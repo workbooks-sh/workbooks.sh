@@ -46,6 +46,15 @@ export const routerOptions: RouterOptions = {
       },
     },
     {
+      name: "entries",
+      path: "/entries",
+      component: () => import("$lib/views/EntriesView.svelte"),
+      beforeEnter: (nav) => {
+        chrome.section = "Entries";
+        return requireSidecar(nav);
+      },
+    },
+    {
       name: "network",
       path: "/network",
       component: () => import("$lib/views/NetworkView.svelte"),

@@ -15,7 +15,7 @@
   import { Plus, User as UserIcon } from "@lucide/svelte";
   import type { IRouter } from "@dvcol/svelte-simple-router/models";
   import type { Component } from "svelte";
-  import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon } from "@lucide/svelte";
+  import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon, List as ListIcon } from "@lucide/svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/iconAccent.svelte";
   import { auth } from "$lib/auth.svelte";
   import { chrome } from "$lib/chrome.svelte";
@@ -60,6 +60,7 @@
   const topTabs: RailTab[] = [
     { name: "create", label: "Create", icon: CreateIcon },
     { name: "kanban", label: "Kanban", icon: Kanban },
+    { name: "entries", label: "Entries", icon: ListIcon },
   ];
   const bottomTabs: RailTab[] = [
     { name: "network", label: "Network", icon: NetworkIcon },

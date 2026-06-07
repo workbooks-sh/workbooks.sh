@@ -156,6 +156,19 @@ export interface WorkbookEntry {
   path: string;
   kind: "workbook" | "org" | "code" | "text";
 }
+/** One slice of a server-paginated list. `total` is the full count so
+ *  the client can render the pager without holding every row. The old
+ *  app never paged (SearchDrawer hard-capped at 200); the rebuild makes
+ *  the slice explicit so the sidecar can stream pages later. */
+export interface EntriesPageReq {
+  offset: number;
+  limit: number;
+  query: string;
+}
+export interface EntriesPage {
+  items: WorkbookEntry[];
+  total: number;
+}
 export interface Plugin {
   id: string;
   name: string;
@@ -263,6 +276,20 @@ const BUILTIN_THEMES: Theme[] = [
     created_at: 0,
   },
 ];
+
+/* A deterministic 137-row corpus so the pager has enough to page. */
+const ENTRY_KINDS: WorkbookEntry["kind"][] = ["workbook", "org", "code", "text"];
+const ENTRY_EXT: Record<WorkbookEntry["kind"], string> = {
+  workbook: "wb",
+  org: "org",
+  code: "ts",
+  text: "md",
+};
+const MOCK_ENTRIES: WorkbookEntry[] = Array.from({ length: 137 }, (_, i) => {
+  const kind = ENTRY_KINDS[i % ENTRY_KINDS.length];
+  const name = `entry-${String(i + 1).padStart(3, "0")}`;
+  return { name: `${name}.${ENTRY_EXT[kind]}`, path: `Sandbox/${name}.${ENTRY_EXT[kind]}`, kind };
+});
 
 /* ───────────────────────── Commands ────────────────────────── */
 
@@ -459,6 +486,19 @@ export const commands = {
     ok({ name: args.name, icon: "📦", viewMode: "grid", folders: [], active: true, subtree: args.subtree }),
   packageWorkbooks: (_args: { name: string }): Promise<WorkbookEntry[]> => ok([]),
   packageRefreshActive: (): Promise<void> => ok(undefined),
+  // Server-paginated entry list. Mock builds a deterministic corpus and
+  // slices it after an optional name/path filter, mirroring the real
+  // sidecar contract (offset/limit in, items+total out).
+  // TODO(sidecar): forward to the engine's paged file index.
+  entriesPage: (req: EntriesPageReq): Promise<EntriesPage> => {
+    const all = MOCK_ENTRIES.filter(
+      (e) =>
+        !req.query ||
+        e.name.toLowerCase().includes(req.query.toLowerCase()) ||
+        e.path.toLowerCase().includes(req.query.toLowerCase()),
+    );
+    return ok({ items: all.slice(req.offset, req.offset + req.limit), total: all.length });
+  },
 
   // Plugins
   pluginsList: (): Promise<Plugin[]> =>
