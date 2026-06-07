@@ -25,6 +25,11 @@ defmodule Workbooks.Bundle do
   carrying every named volume) + a manifest. Returns the `.wbundle` blob.
   """
   def ship(id, html, vfs_bytes, opts \\ []) when is_binary(vfs_bytes) do
+    # Privacy by default: a shared bundle carries the working tree, NOT the
+    # session that made it — agent memory + tmp are stripped unless the owner
+    # explicitly opts in. One boundary (`Workbooks.Private`) for every egress.
+    vfs_bytes = if opts[:include_private], do: vfs_bytes, else: Workbooks.VFS.public_only(vfs_bytes)
+
     {html, signed} =
       case opts[:tenant] do
         nil -> {html, false}
@@ -34,8 +39,9 @@ defmodule Workbooks.Bundle do
     manifest = %{
       "id" => id,
       "format" => "wbundle/1",
-      "volumes" => Workbooks.VFS.volumes(),
+      "volumes" => if(opts[:include_private], do: Workbooks.VFS.volumes(), else: Workbooks.Private.public_volumes()),
       "signed" => signed,
+      "private_included" => !!opts[:include_private],
       "created" => System.system_time(:second)
     }
 

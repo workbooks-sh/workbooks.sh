@@ -62,6 +62,26 @@ defmodule Workbooks.VFS do
   end
 
   @doc """
+  Return VFS bytes with private volumes (agent `memory`, `tmp`) removed — only
+  `Workbooks.Private.public_volumes/0` survive. Used on egress so a shared
+  container ships its working tree, never the session that produced it.
+  """
+  def public_only(bytes) when is_binary(bytes) do
+    tmp = Path.join(System.tmp_dir!(), "vfs-pub-#{:erlang.phash2(bytes)}.sqlite")
+    File.write!(tmp, bytes)
+    {:ok, c} = Sqlite3.open(tmp)
+    keep = Enum.map_join(Workbooks.Private.public_volumes(), ",", &"'#{&1}'")
+    Sqlite3.execute(c, "DELETE FROM vfs WHERE volume NOT IN (#{keep})")
+    Sqlite3.execute(c, "VACUUM")
+    Sqlite3.close(c)
+    out = File.read!(tmp)
+    File.rm(tmp)
+    out
+  rescue
+    _ -> bytes
+  end
+
+  @doc """
   Run a read query against the Instance VFS and return rows as a JSON array of
   arrays — the `vfs-query` Dock import. A bad query returns a JSON error object,
   never a host crash (the Instance must not be able to take down its engine).

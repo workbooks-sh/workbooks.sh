@@ -49,6 +49,36 @@ did + atproto libs; reimplement nothing we can call).
 - Orchestrated by the org-workflow DAG, NOT Bazel. Revisit Bazel only at real
   multi-language / huge-graph / remote-cache scale.
 
+* Public / private boundary — privacy by DEFAULT (locked)
+*Sharing exposes WORK, never the session that produced it.* Telemetry, agent
+memory, scratch thinking, signing keys, issue-tracker exports — none of it
+travels when work is committed, packed, or checked out, unless the owner
+EXPLICITLY opts in. This is the default that prevents the leak class we already
+hit (beads task data pushed to GitHub — potentially revealing/secret content).
+
+- *One boundary, every egress.* =Workbooks.Private= is the single source of truth
+  for what is personal/session data; Git, Bundle, and Library all consult it, so
+  the line can't drift between paths. Two kinds:
+  - FILES/DIRS in a working tree — =scratch/=, =.workbooks/= (keys), =.beads/=,
+    =.claude/=, and the session sidecars =_steps.jsonl= / =_status.json= /
+    =_telemetry.db= / =_ledger.json= / =_*.{jsonl,json,db}=. Emitted as the
+    git-ignore set written into every tenant repo automatically, so neither agent
+    nor human has to remember it (the "automated public/private ignore" — without
+    a real FS this is too error-prone to leave manual).
+  - VFS VOLUMES in a container — only =workspace= ships; =memory= (agent
+    long-term memory) and =tmp= are stripped from a bundle on egress
+    (=VFS.public_only/1=).
+- *Opt-in is explicit.* =include_private: true= (Bundle) / future =--include-private=
+  flags, same shape as the identity toolkit's key export. Default is always the
+  safe one.
+- *Provenance still ships.* The signed manifest is EMBEDDED in the artifact html
+  (=Workbooks.Manifest=), so a shared workbook stays verifiable — but the
+  =_ledger.json= (session telemetry, sealed) stays private. Proof travels; the
+  session log doesn't.
+- *Why it's load-bearing.* The whole Library model is "share the contents, never
+  the Library." That only holds if the contents themselves are clean by default.
+  Privacy-by-default is the precondition for safe sharing, not an add-on.
+
 * The Library (the identity-scoped top layer) — locked
 *A Library is what one identity (user OR org) can reach — an access graph, not a
 folder.* It is the answer to "what work is mine / my org's, and where does it

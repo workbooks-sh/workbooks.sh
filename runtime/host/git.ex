@@ -41,10 +41,14 @@ defmodule Workbooks.Git do
     dir
   end
 
+  # Personal/session data never enters version control by default — the automated
+  # public/private ignore. The full set is owned by `Workbooks.Private` (one
+  # boundary for git + bundle + library), so it can't drift between egress paths.
   defp ensure_gitignore(dir) do
     gi = Path.join(dir, ".gitignore")
     have = if File.exists?(gi), do: File.read!(gi), else: ""
-    unless String.contains?(have, ".workbooks/"), do: File.write!(gi, have <> ".workbooks/\n")
+    missing = Enum.reject(Workbooks.Private.gitignore_lines(), &String.contains?(have, &1))
+    unless missing == [], do: File.write!(gi, have <> Enum.join(missing, "\n") <> "\n")
   end
 
   @doc """
