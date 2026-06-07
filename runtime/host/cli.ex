@@ -67,8 +67,45 @@ defmodule Workbooks.CLI do
     "bundled #{map_size(parts)} parts → #{dest}"
   end
 
+  # Observability through the CLI (not a dashboard) — the telemetry + ledger
+  # feedback loop over the always-on _steps.jsonl any run writes.
+  def call(["telemetry"], _t) do
+    runs = Workbooks.Workflow.Telemetry.index()
+    if runs == [] do
+      "(no runs)"
+    else
+      header = "SLUG\tSTAGE\tCALLS\tERRORS\tMS"
+      rows = Enum.map_join(runs, "\n", fn r ->
+        "#{r.slug}\t#{r.stage}\t#{r.tool_calls}\t#{r.errors}\t#{r.total_ms}"
+      end)
+      "#{header}\n#{rows}"
+    end
+  end
+
+  def call(["telemetry", slug], _t) do
+    case Workbooks.Workflow.Telemetry.summary(wd(slug)) do
+      %{error: e} -> e
+      s ->
+        errs = Enum.map_join(s.errors, "\n", fn e -> "  ! step #{e.step} #{e.tool}: #{e.error}" end)
+        "stage=#{s.stage} calls=#{s.tool_calls} errors=#{length(s.errors)} total_ms=#{s.total_ms}" <>
+          if(s.errors == [], do: "", else: "\n" <> errs)
+    end
+  end
+
+  def call(["ledger", slug], _t) do
+    case Workbooks.Ledger.verify(wd(slug)) do
+      %{error: e} -> e
+      v ->
+        mark = fn b -> if b, do: "ok", else: "FAIL" end
+        "tamper-evident=#{mark.(v.tamper_evident)} attributable=#{mark.(v.attributable)} " <>
+          "count=#{v.count} did=#{v.did}"
+    end
+  end
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
+
+  defp wd(slug), do: "/tmp/bb/#{slug}"
 
   defp json(data), do: Jason.encode!(data, pretty: true)
 
@@ -81,6 +118,8 @@ defmodule Workbooks.CLI do
       wb var list                          list variables
       wb var ref <template>                inject {{var:KEY}} / {{secret:KEY}}
       wb bundle <src.org> <out>            pack a Workbook Bundle
+      wb telemetry [<slug>]                runs index, or one run's summary + errors
+      wb ledger <slug>                     verify a run's signed ledger (tamper/attribution)
       wb version
     """
   end
