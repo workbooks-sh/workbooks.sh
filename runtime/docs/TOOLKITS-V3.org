@@ -59,15 +59,18 @@
 
    #+BEGIN_SRC org
    #+EXEC: command       # CLI_BIN is a registered WASM run-command (jq, grep) — default, most portable
-   #+EXEC: posix         # CLI_BIN is a native PATH binary, run under the `posix` Policy profile inside the microVM (ffmpeg-class)
+   #+EXEC: posix         # CLI_BIN is a native PATH binary, run under the `posix` Policy profile inside the deploy container (ffmpeg-class)
    #+EXEC: task          # no single CLI; the toolkit ships :role task bash recipes run via `wb toolkit run`
    #+EXEC: federation    # no CLI; a data-source plugin + sync daemon (see §Federation)
    #+END_SRC
 
-   The microVM (Fly/Firecracker/libkrun) is already the tenancy isolation
-   boundary, so `posix` native binaries are safe there; `command` (WASM) is the
-   tighter, portable default. `wb toolkit verify` checks the declared EXEC mode
-   is satisfiable (command registered / binary on PATH).
+   DEPLOYMENT NOTE (corrected 2026-06-07): we are NOT using microVMs. The whole
+   runtime is wrapped in ONE portable Linux container (OCI/Docker) for deployment
+   isolation — local now (instead of seatbelt), same image in cloud. It is not
+   per-component and not a Firecracker/libkrun microVM. That single deploy
+   container is the OS-isolation boundary, so `posix` native binaries are safe
+   there; `command` (WASM) is the tighter, portable default. `wb toolkit verify`
+   checks the declared EXEC mode is satisfiable (command registered / binary on PATH).
 
 ** Progressive disclosure is the whole point (carried forward, unchanged)
    Manifest = the INDEX (need-keyed table), skills read on demand via `cat`.
@@ -147,7 +150,7 @@
   | clock/random/env/scoped dir     | WASI-p2 (host configures preopens)                 | cheap           |
   | network                         | wasi:http outbound, gated by `net` cap (stock CLIs)| REAL WORK       |
   | TLS-fingerprint / headless browser | custom Dock import (browse-fetch); CLI never holds a socket | per-cap closure |
-  | ffmpeg-class native             | #+EXEC: posix, native in microVM                   | accept it       |
+  | ffmpeg-class native             | #+EXEC: posix, native in the deploy container      | accept it       |
 
   The one genuinely new decision: support `wasi:http` host-gated so a STOCK
   network CLI runs unmodified (gated at the WASI boundary), rather than forcing
@@ -157,7 +160,7 @@
   telemetry/enforcement chokepoint (per EXTENSIONS-ORB.org).
 
 ** The FS bridge — preopen ↔ VFS (widens auto-wrap to file CLIs)
-   Three FS layers stack: the microVM's Linux FS (outer), WASI's preopen FS (the
+   Three FS layers stack: the deploy container's Linux FS (outer), WASI's preopen FS (the
    wasm-level capability FS — deny-by-default, grant-per-dir), and our SQLite VFS
    (vfs.ex volumes workspace/memory/tmp). The CONNECTOR is the preopen:
    `wasmtime --dir <host>::<guest>` mounts a host dir into the guest. Back that
@@ -173,20 +176,25 @@
    WITH a preopen → those take #+EXEC: posix. Bridge widens the class; it does not
    erase the boundary.
 
-** Network → bind the wasm net capability to Workbooks.Browse (two routes)
-   wasmtime 45 confirmed to support `-S http`, `-S tcp/udp`, `-S inherit-network`,
-   `-S allow-ip-name-lookup`. Browse (browse.ex: native/Exa/Firecrawl + proxy) is
-   the host service both routes terminate at, gated by the net/browse cap:
-   - ROUTE A — wasi:http, gated: a wasip2 component doing HTTP runs with `-S http`
-     and the host outbound handler points at Workbooks.Browse. Stock-ish, but
-     needs wasip2 (wasip1 core modules have weak socket support). `inherit-network`
-     is the un-gated full-access form — NOT the path we want.
-   - ROUTE B — a Dock import (our existing pattern, cleanest/safest): guests today
-     get vfs-query / run-command / llm-complete bound to Elixir closures
-     (instance/imports.ex). Add `browse-fetch` → Workbooks.Browse.fetch. The CLI
-     calls the import; the host does the fetch with the full browser stack; the CLI
-     never holds a socket. Requires the CLI call OUR import (adapted/component),
-     not a stock raw-socket CLI.
+** Network → a `browse-fetch` Dock import bound to Workbooks.Browse  [DECISION: Route B, 2026-06-07]
+   DECIDED: use the Dock-import route only — safest, reuses what we have, no new
+   library. Do NOT enable wasi:sockets/wasi:http or `-S inherit-network` unless a
+   future need proves the existing Browse/HTTP stack can't serve it.
+
+   Add `browse-fetch` (and as needed `net-fetch`) as a Dock import bound to
+   `Workbooks.Browse.fetch`, gated by the `browse`/`net` Policy cap — exactly the
+   shape of the existing vfs-query / run-command / llm-complete imports
+   (instance/imports.ex). The guest calls the import; the host performs the fetch
+   with the full browser stack (native/Exa/Firecrawl + proxy, TLS handling); the
+   guest NEVER holds a socket. The capability gate stays the single
+   enforcement/telemetry chokepoint, and the host owns all credentials/egress
+   policy. Cost: the CLI must call our import (an adapted CLI or a component) —
+   acceptable; we are not chasing transparent stock raw-socket CLIs.
+
+   REJECTED for now — Route A (wasi:http / wasi:sockets / inherit-network):
+   wasmtime 45 supports `-S http/tcp/udp/inherit-network`, but it widens the egress
+   surface and would route around our Browse policies. Park it; revisit only if a
+   library/capability gap appears that HTTP-via-Browse genuinely can't cover.
 
 * SPIKE — empirical proof (2026-06-07, this box)
 

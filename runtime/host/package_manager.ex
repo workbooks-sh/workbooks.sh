@@ -3,11 +3,13 @@ defmodule Workbooks.PackageManager do
   Tangle: take the OQL build plan from a literate Workbook and compile each
   component's source block to a WASM component, content-addressed in build/cache.
 
-  Isolation — the only place we run OS processes. The whole runtime runs inside
-  ONE Linux microVM (a Fly Machine in cloud — Firecracker — or libkrun/Docker
-  locally), so the app is always on Linux. `bwrap` then does cheap per-build
-  namespace isolation INSIDE that VM — one outer VM, many bwrap jobs, no per-build
-  VMs and no per-session VMs (workbooks are WASM-in-BEAM). The isolator is
+  Isolation — the only place we run OS processes. The whole runtime is wrapped in
+  ONE portable Linux container (OCI/Docker — local now for deployment isolation,
+  the same image in cloud), so the app is always on Linux. NOT a microVM, and NOT
+  per-component — one outer container for the whole runtime; workbooks/commands are
+  WASM-in-BEAM inside it. `bwrap` then does cheap per-build namespace isolation
+  INSIDE that container — one outer container, many bwrap jobs, no per-build or
+  per-session sandboxes at the OS level. The build isolator is
   `Workbooks.Sandbox` (bwrap on Linux, sandbox-exec locally); untrusted
   user-submitted source compiles under it (network-denied) once deps are
   pre-fetched (wb-11ck.36). The compile commands below run the trusted toolchain.

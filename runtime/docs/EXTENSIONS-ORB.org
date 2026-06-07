@@ -186,10 +186,18 @@ Three terms are in play: *toolkit*, *extension/plugin*, *capability*.
 | Telemetry point | host/agent at the OS edge          | the capability gate *is* the boundary|
 | Enforcement     | configured (seccomp/AppArmor)      | *by construction* (un-imported = un-callable)|
 
-The substrate already runs the *whole runtime inside ONE Linux microVM* (Fly
-Machine / Firecracker / libkrun — see =PackageManager= moduledoc). That microVM
-is the *deployment* boundary: it isolates the runtime from other tenants on the
-host. Containers are not being reinvented — they are the *outer* layer and stay.
+CORRECTION (2026-06-07): the prose below says "microVM" — that is INACCURATE.
+We are NOT using microVMs (no Firecracker/libkrun). The whole runtime is wrapped
+in ONE portable Linux container (OCI/Docker), local now for deployment isolation
+(instead of seatbelt) and the same image in cloud. Read "microVM" → "portable
+Linux container" throughout this doc. The two-layer ARGUMENT still holds verbatim
+(an outer OS-isolation layer + the inner WASM capability layer); only the
+outer-layer technology name changes — container, not microVM.
+
+The substrate already runs the *whole runtime inside ONE portable Linux container*
+(OCI/Docker — see =PackageManager= moduledoc). That container is the *deployment*
+boundary: it isolates the runtime from the host. Containers are not being
+reinvented — they are the *outer* layer and stay.
 
 WASM components are the *inner* layer for *untrusted extension code*, and there a
 container would be the *wrong* tool: too coarse (process, not function), ambient
