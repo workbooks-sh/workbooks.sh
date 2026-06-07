@@ -1,26 +1,45 @@
 <script lang="ts">
   /**
-   * WorkbookView — the "frontend as workbook" dogfood. The desktop app asks the
-   * RUNTIME to weave a stored Org workbook → HTML (GET /api/w/:id/html, rendered
-   * by the OQL kernel) and displays it. The webview renders the runtime's own
-   * output — the app eating the workbook format it ships.
+   * WorkbookView — the app renders its own format. The LOCAL embedded kernel
+   * (oql.wasm) weaves Org → HTML in-process: no runtime, no Docker, offline. A
+   * stored workbook can also be pulled from the runtime by id WHEN connected
+   * (optional server tier), but the default path needs nothing.
    */
-  import { FileText, RefreshCw } from "@lucide/svelte";
+  import { FileText, RefreshCw, Cloud } from "@lucide/svelte";
+  import { weave, hasLocalKernel } from "$lib/kernel";
   import { rt, getRuntime } from "$lib/runtime";
 
-  let id = $state("");
+  const sample = "* My Workbook\n\nThe app renders *its own format* — locally, via the\nembedded =oql.wasm= kernel. No server required.\n\n** A list\n- weave\n- tangle\n- validate\n";
+
+  let org = $state(sample);
   let html = $state("");
   let err = $state("");
   let busy = $state(false);
 
-  async function render() {
+  async function weaveLocal() {
     err = "";
-    html = "";
+    busy = true;
+    try {
+      if (!hasLocalKernel()) {
+        err = "Local weave needs the desktop shell (oql.wasm).";
+        return;
+      }
+      html = await weave(org);
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e);
+    } finally {
+      busy = false;
+    }
+  }
+
+  // Optional: pull a stored workbook's woven HTML from the runtime (when up).
+  async function loadFromRuntime(id: string) {
+    err = "";
     busy = true;
     try {
       const info = await getRuntime();
-      if (info.state === "spa") {
-        err = "No runtime connected — launch the desktop shell to weave workbooks.";
+      if (info.state !== "up") {
+        err = "Runtime not connected (the optional server tier).";
         return;
       }
       const res = await rt(`/api/w/${encodeURIComponent(id)}/html`);
@@ -35,30 +54,33 @@
       busy = false;
     }
   }
+
+  let id = $state("");
 </script>
 
 <section class="workbook">
-  <form
-    class="bar"
-    onsubmit={(e) => {
-      e.preventDefault();
-      void render();
-    }}
-  >
+  <div class="bar">
     <FileText size={18} strokeWidth={1.6} />
-    <input bind:value={id} placeholder="workbook id" />
-    <button disabled={busy || !id}>
-      <RefreshCw size={15} strokeWidth={1.8} class={busy ? "spin" : ""} />
-      Render
+    <button disabled={busy} onclick={() => void weaveLocal()}>
+      <RefreshCw size={15} strokeWidth={1.8} />
+      Weave locally
     </button>
-  </form>
+    <span class="spacer"></span>
+    <input bind:value={id} placeholder="stored id (runtime)" />
+    <button class="ghost" disabled={busy || !id} onclick={() => void loadFromRuntime(id)}>
+      <Cloud size={15} strokeWidth={1.8} />
+      From runtime
+    </button>
+  </div>
+
+  <textarea bind:value={org} spellcheck="false"></textarea>
 
   {#if err}
     <p class="err">{err}</p>
   {/if}
 
   {#if html}
-    <!-- The runtime wove this HTML from Org; we render its output verbatim. -->
+    <!-- HTML woven by the local kernel (or the runtime) from Org, rendered verbatim. -->
     <article class="woven">{@html html}</article>
   {/if}
 </section>
@@ -92,6 +114,24 @@
     padding: 0.4rem 0.7rem;
     border-radius: 6px;
     cursor: pointer;
+  }
+  .bar button.ghost {
+    opacity: 0.8;
+  }
+  .spacer {
+    flex: 1;
+  }
+  textarea {
+    min-height: 9rem;
+    resize: vertical;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
   }
   .err {
     color: #e06c75;

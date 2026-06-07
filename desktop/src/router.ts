@@ -82,13 +82,14 @@ export const routerOptions: RouterOptions = {
       },
     },
     {
-      // The runtime weaves a stored Org workbook → HTML; the webview renders it.
+      // Workbook-native: the LOCAL embedded kernel weaves Org → HTML, so this view
+      // needs NO runtime (not sidecar-gated). The runtime is optional here.
       name: "workbook",
       path: "/workbook",
       component: () => import("$lib/views/WorkbookView.svelte"),
-      beforeEnter: (nav) => {
+      beforeEnter: () => {
         chrome.section = "Workbook";
-        return requireSidecar(nav);
+        return true;
       },
     },
   ],
