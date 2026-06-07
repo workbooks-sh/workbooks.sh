@@ -1,0 +1,4 @@
+# Exclude everything under projects/ from GitHub's language stats.
+# Files stay in the repo and remain browsable; they just don't count
+# toward the language bar and collapse in diffs by default.
+projects/**    linguist-vendored
