@@ -49,6 +49,31 @@ did + atproto libs; reimplement nothing we can call).
 - Orchestrated by the org-workflow DAG, NOT Bazel. Revisit Bazel only at real
   multi-language / huge-graph / remote-cache scale.
 
+* Tangle build step — three projections of one workbook (locked)
+*A workbook RUNS WebAssembly, not source.* So pack has a compile stage, and the
+same workbook projects three ways depending on where it's going:
+
+- *source* (=wb pack=) — the build INPUTS (=.rs=, =Cargo.toml=, readable assets).
+  What syncs to GitHub + what a human diffs. No build outputs.
+- *runnable* (=wb pack --build=) — compile each component to =.wasm=, ship the
+  OUTPUTS, DROP the source inputs. "Build files don't enter the runnable artifact
+  unless they're WebAssembly." Non-source assets (docs, html) stay.
+- *archive* (=purpose: :archive=) — everything (source + outputs + session).
+
+- *Real, not stubbed* (=Workbooks.Build=): compiles with the toolchains actually
+  present — =cargo component= for crates, =rustc --target wasm32-*= for a lone
+  =.rs=. A component whose toolchain is missing (JS needs =jco=) is reported
+  UNBUILT with the reason, never faked. =Workbooks.Build.build_input?/1= +
+  =build_output?/1= are the classification both pack + the git rail consult.
+- *Compile-time vs run-time / local vs cloud.* COMPILE needs the host toolchain
+  (dev box, or a CI/deploy step) — it is NOT a runtime dependency. RUN needs only
+  a wasm runtime: a core module runs via wasmtime (=CommandRegistry=, like
+  jq/grep), a WIT component runs in a =Wasmex= Instance (the Dock, like the OQL
+  kernel). So a workbook compiles once (anywhere with the toolchain) and its
+  =.wasm= runs in any Instance — local engine or cloud =bn-engine-agents=,
+  identically. The cloud runtime image need not carry rustc; it carries the
+  prebuilt =.wasm=.
+
 * Public / private boundary — privacy by DEFAULT (locked)
 *Sharing exposes WORK, never the session that produced it.* Telemetry, agent
 memory, scratch thinking, signing keys, issue-tracker exports — none of it
