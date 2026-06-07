@@ -252,42 +252,31 @@ defmodule Workbooks.CLI do
   # switches to machine-readable output.
   defp deploy_run(rest) do
     json? = Enum.member?(rest, "--json")
-    {place, args} = pop_place(Enum.reject(rest, &(&1 == "--json")))
+    args = Enum.reject(rest, &(&1 == "--json"))
 
     result =
-      cond do
-        # A cloud --place routes the verb to that provider recipe.
-        place && place != "local" ->
-          action = List.first(args) || "up"
-          Workbooks.Deploy.cloud(place, action)
-
-        true ->
-          case args do
-            [] -> {:ok, deploy_usage(), %{}}
-            ["help" | _] -> {:ok, deploy_usage(), %{}}
-            ["providers"] -> Workbooks.Deploy.providers()
-            ["doctor"] -> Workbooks.Deploy.doctor()
-            ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
-            ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
-            ["local" | _] -> Workbooks.Deploy.local()
-            ["up" | _] -> Workbooks.Deploy.local()
-            ["status"] -> Workbooks.Deploy.status()
-            ["verify"] -> Workbooks.Deploy.verify()
-            ["down"] -> Workbooks.Deploy.down()
-            ["logs"] -> Workbooks.Deploy.logs()
-            other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
-          end
+      case args do
+        [] -> {:ok, deploy_usage(), %{}}
+        ["help" | _] -> {:ok, deploy_usage(), %{}}
+        # The declarative model: a deployment.org describes local|cloud × tenancy × BYOD.
+        ["validate", file] -> Workbooks.Deploy.validate(file)
+        ["apply", file] -> Workbooks.Deploy.apply(file)
+        # Zero-config local convenience (= a default local deployment).
+        ["local" | _] -> Workbooks.Deploy.local()
+        ["doctor"] -> Workbooks.Deploy.doctor()
+        ["status"] -> Workbooks.Deploy.status()
+        ["verify"] -> Workbooks.Deploy.verify()
+        ["down"] -> Workbooks.Deploy.down()
+        ["logs"] -> Workbooks.Deploy.logs()
+        # The one image artifact.
+        ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
+        ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
+        ["validate"] -> {:error, "wb deploy validate <deployment.org>", %{}}
+        ["apply"] -> {:error, "wb deploy apply <deployment.org>", %{}}
+        other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
       end
 
     {Workbooks.Deploy.render(result, json?), Workbooks.Deploy.failed?(result)}
-  end
-
-  # Extract `--place <name>` (the cloud target) from the args, if present.
-  defp pop_place(args) do
-    case Enum.split_while(args, &(&1 != "--place")) do
-      {before, ["--place", p | rest]} -> {p, before ++ rest}
-      _ -> {nil, args}
-    end
   end
 
   # Image.build/publish return {:ok|:error, string}; lift to the tagged contract.
@@ -297,21 +286,20 @@ defmodule Workbooks.CLI do
 
   defp deploy_usage do
     """
-    wb deploy — the deploy-kit: build/publish the runtime image, run it local or cloud.
-    Non-interactive + idempotent; add --json to any verb for machine-readable output.
-      doctor       check + self-heal prerequisites (run this first)
-      build        build the runtime image for this arch + stage it into the krunvm store
-      publish      build multi-arch + push to the registry (ghcr) — `latest` + git sha
-      local | up   bring up the local daemon (krunvm microVM + launchd agent)
-      status       VM + runtime + agent state
-      verify       prove the LIVE runtime answers (exit non-zero if not)
-      down         stop the agent + microVM (keeps data + APFS volume)
-      logs         print the tail command for daemon logs
-      providers    list available places (local + plug-and-play cloud providers)
-    Cloud: wb deploy --place <provider> <up|status|down|logs>
-      e.g. WB_SSH_HOST=user@host wb deploy --place ssh up
-           wb deploy --place fly up
-    Image ref via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
+    wb deploy — the deploy-kit. A deployment is described by a deployment.org:
+      ENGINE_PLACE  local | cloud      TENANCY_MODE  single | multi
+      STORAGE       local-fs | s3      DATABASE      sqlite | postgres   (BYOD)
+      PROFILE <agent profile>          (secrets — S3 keys, DB DSN — come from ENV)
+    Non-interactive + idempotent; add --json to any verb.
+      validate <file>   coherence-check a deployment.org (no deploy)
+      apply <file>      validate, then converge to it (local krunvm OR the cloud provider)
+      local             zero-config local deployment (convenience)
+      doctor            check + self-heal local prerequisites
+      status | verify   local daemon state / prove the LIVE runtime answers
+      down | logs       stop the local daemon / where its logs are
+      build | publish   build the one runtime image / push it multi-arch to ghcr
+    Cloud provider is config (PROVIDER:, default fly) — the extension point, not a menu.
+    See deploy/deployments/ for example configs.
     """
   end
 

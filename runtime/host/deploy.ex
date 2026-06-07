@@ -15,33 +15,59 @@ defmodule Workbooks.Deploy do
   runtime answers. Backends sit behind a seam (`Krunvm` today; podman/docker/WSL2
   later). Reached via `wb deploy <verb> [--json]`.
   """
-  alias Workbooks.Deploy.{Krunvm, Image, Backend}
+  alias Workbooks.Deploy.{Krunvm, Image, Backend, Config}
 
-  @doc "List the available places — `local` plus every plug-and-play cloud provider."
-  def providers do
-    places = Backend.list()
-    ok("places: #{Enum.join(places, ", ")}", %{places: places})
+  @doc "Coherence-check a deployment.org without deploying (the write-then-submit gate)."
+  def validate(file) do
+    with {:ok, p} <- Config.parse(file) do
+      case Config.validate(p) do
+        :ok -> ok("valid — #{Config.summary(p)}", %{valid: true})
+        {:error, issues} -> err("invalid deployment:\n  - " <> Enum.join(issues, "\n  - "), %{valid: false, issues: issues})
+      end
+    else
+      {:error, msg} -> err(msg, %{})
+    end
   end
 
   @doc """
-  Run a cloud provider action (`up` | `status` | `down` | `logs`) for `place`.
-  The provider (deploy/providers/<place>) implements the engine contract; the
-  deploy-kit supplies the image ref + forwards the deployer's env. Idempotent;
-  the provider's exit code propagates to ours.
+  Apply a `deployment.org`: validate, then converge to it. ENGINE_PLACE picks the
+  target (local krunvm vs the cloud provider); TENANCY_MODE + the BYOD STORAGE/
+  DATABASE axes + PROFILE flow to the engine as env. Idempotent.
   """
-  def cloud(place, action) do
-    case Backend.resolve(place) do
-      {:provider, _p, boot} ->
-        case Backend.run_provider(boot, action, %{"WB_IMAGE" => Image.ref()}) do
-          {:ok, out} -> ok("[#{place}] #{action}:\n#{String.trim_trailing(out)}", %{place: place, action: action})
-          {:error, out} -> err("[#{place}] #{action} failed:\n#{String.trim_trailing(out)}", %{place: place, action: action})
+  def apply(file) do
+    with {:ok, p} <- Config.parse(file),
+         :ok <- coherent(p) do
+      env = Config.to_env(p)
+
+      case Config.place(p) do
+        "local" -> local(env: env)
+        "cloud" -> cloud_apply(p, env)
+        other -> err("ENGINE_PLACE must be local|cloud (got #{inspect(other)})", %{})
+      end
+    else
+      {:error, issues} when is_list(issues) -> err("invalid deployment:\n  - " <> Enum.join(issues, "\n  - "), %{issues: issues})
+      {:error, msg} -> err(msg, %{})
+    end
+  end
+
+  defp coherent(p) do
+    case Config.validate(p), do: (:ok -> :ok; {:error, issues} -> {:error, issues})
+  end
+
+  # Cloud is one concept; the provider is config (PROVIDER, default fly) — the
+  # extension point, not a user-facing menu. The config env becomes the engine's.
+  defp cloud_apply(p, env) do
+    provider = Config.provider(p)
+
+    case Backend.resolve(provider) do
+      {:provider, _pl, boot} ->
+        case Backend.run_provider(boot, "up", Map.put(env, "WB_IMAGE", Image.ref())) do
+          {:ok, out} -> ok("cloud deploy (#{provider}) — #{Config.summary(p)}:\n#{String.trim_trailing(out)}", %{provider: provider})
+          {:error, out} -> err("cloud deploy (#{provider}) failed:\n#{String.trim_trailing(out)}", %{provider: provider})
         end
 
-      {:local, _} ->
-        err("'local' has no provider recipe — use `wb deploy #{action}` (krunvm) without --place", %{})
-
-      {:error, msg} ->
-        err(msg, %{available: Backend.list()})
+      _ ->
+        err("cloud PROVIDER=#{provider} has no recipe at deploy/providers/#{provider}", %{provider: provider})
     end
   end
 
@@ -65,11 +91,12 @@ defmodule Workbooks.Deploy do
   @doc "Bring up the local containerized runtime daemon. Idempotent (converges)."
   def local(opts \\ []) do
     image = Keyword.get(opts, :image, Image.ref())
+    env = Keyword.get(opts, :env, %{})
     host_port = Keyword.get(opts, :host_port, free_host_port())
 
     with {:ok, _, _} <- doctor(),
          {:ok, info} <- Krunvm.create(image, host_port: host_port),
-         {:ok, _} <- Krunvm.install_agent(%{}) do
+         {:ok, _} <- Krunvm.install_agent(env) do
       base = %{url: info.url, image: image, data_dir: info.data_dir, agent: Krunvm.label()}
 
       case await_discovery(15_000) do
