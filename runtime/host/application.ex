@@ -21,14 +21,30 @@ defmodule Workbooks.Application do
     Supervisor.start_link(children, strategy: :one_for_one, name: Workbooks.Supervisor)
   end
 
-  # The HTTP/WS surface is opt-in (WB_WEB=1) so the demo boots without binding a port.
+  # The HTTP surfaces are opt-in so the demo boots without binding a port.
+  # Two SEPARATE listeners / planes (PUBLIC-WEB-PLAN.org):
+  #   WB_WEB=1     → control plane (authed): Workbooks.Web on PORT (default 4000)
+  #   WB_PUBLIC=1  → content plane (anonymous, GET-only): Workbooks.PublicWeb on
+  #                  PUBLIC_PORT (default 4001). Distinct listener so public traffic
+  #                  never shares the authed router or its pipeline.
   defp web do
-    if System.get_env("WB_WEB") == "1" do
-      [{Bandit, plug: Workbooks.Web, scheme: :http, port: port()}]
-    else
-      []
-    end
+    control =
+      if System.get_env("WB_WEB") == "1" do
+        [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, port: port()}, id: :control_web)]
+      else
+        []
+      end
+
+    public =
+      if System.get_env("WB_PUBLIC") == "1" do
+        [Supervisor.child_spec({Bandit, plug: Workbooks.PublicWeb, scheme: :http, port: public_port()}, id: :public_web)]
+      else
+        []
+      end
+
+    control ++ public
   end
 
   defp port, do: String.to_integer(System.get_env("PORT", "4000"))
+  defp public_port, do: String.to_integer(System.get_env("PUBLIC_PORT", "4001"))
 end
