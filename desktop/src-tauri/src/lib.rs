@@ -15,6 +15,7 @@ use tauri::{
 };
 
 mod daemon;
+mod kernel;
 use daemon::Discovery;
 
 /// What the frontend needs to talk to the runtime: the localhost URL + the
@@ -42,6 +43,13 @@ fn runtime_url() -> Runtime {
     }
 }
 
+/// Weave an Org workbook → HTML LOCALLY via the embedded OQL kernel — no runtime,
+/// no Docker. The workbook-native path: the app renders its own format offline.
+#[tauri::command]
+fn weave(org: String) -> Result<String, String> {
+    kernel::weave(&org)
+}
+
 #[tauri::command]
 fn daemon_status() -> String {
     daemon::wb(&["deploy", "status", "--json"]).unwrap_or_else(|e| e)
@@ -60,6 +68,7 @@ fn daemon_down() -> String {
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            weave,
             runtime_url,
             daemon_status,
             daemon_up,
