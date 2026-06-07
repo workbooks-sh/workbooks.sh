@@ -17,12 +17,12 @@ defmodule Workbooks.MixProject do
   end
 
   # No lib/. Host code lives in host/. The in-BEAM ML adapter lives in host_ml/ and
-  # is compiled ONLY when WB_BUMBLEBEE=1 (it references Bumblebee directly), so the
+  # is compiled ONLY when WB_CLIP=1 (it references Ortex/Tokenizers directly), so the
   # default build needs neither the dir nor the dep. The registry routes to it at
   # runtime via Code.ensure_loaded?, so host/ compiles without it either way.
   defp elixirc_paths(_) do
     base = ["host"]
-    if System.get_env("WB_BUMBLEBEE") == "1", do: base ++ ["host_ml"], else: base
+    if System.get_env("WB_CLIP") == "1", do: base ++ ["host_ml"], else: base
   end
 
   def application do
@@ -46,13 +46,13 @@ defmodule Workbooks.MixProject do
     ] ++ ml_deps()
   end
 
-  # In-BEAM neural embedder (CLIP image+text via Bumblebee + EXLA, served with
-  # Nx.Serving batching). HEAVY (pulls XLA), so OPT-IN at build time —
-  # `WB_BUMBLEBEE=1 mix release`. Default builds stay lean (text = Model2Vec,
-  # no EXLA); the standalone CLIP sidecar remains the no-NIF alternative.
+  # In-BEAM CLIP image+text embedder — ONNX via Ortex (onnxruntime, ~20 MB) + the
+  # HF tokenizer + q8 CLIP towers (~147 MB). LIGHT vs EXLA/XLA (~900 MB), no JIT.
+  # OPT-IN at build — `WB_CLIP=1 mix release` — so default builds stay lean (text =
+  # Model2Vec, no native ML at all). Runtime route: WB_EMBED=clip.
   defp ml_deps do
-    if System.get_env("WB_BUMBLEBEE") == "1" do
-      [{:bumblebee, "~> 0.6"}, {:exla, "~> 0.9"}, {:nx, "~> 0.9"}, {:stb_image, "~> 0.6"}]
+    if System.get_env("WB_CLIP") == "1" do
+      [{:ortex, "~> 0.1.10"}, {:tokenizers, "~> 0.5"}, {:nx, "~> 0.9"}, {:stb_image, "~> 0.6"}]
     else
       []
     end

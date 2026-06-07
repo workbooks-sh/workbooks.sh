@@ -49,13 +49,13 @@ defmodule Workbooks.Embed do
     end
   end
 
-  # In-BEAM CLIP (Bumblebee+EXLA) — present only in a WB_BUMBLEBEE=1 build, so we
-  # reach it dynamically; the lean build returns an honest, actionable error.
+  # In-BEAM CLIP (ONNX via Ortex) — present only in a WB_CLIP=1 build, so we reach
+  # it dynamically; the lean build returns an honest, actionable error.
   defp clip_embed(inputs, modality) do
-    if Code.ensure_loaded?(Workbooks.Embed.BumblebeeClip) do
-      apply(Workbooks.Embed.BumblebeeClip, :embed, [inputs, modality])
+    if Code.ensure_loaded?(Workbooks.Embed.OrtexClip) do
+      apply(Workbooks.Embed.OrtexClip, :embed, [inputs, modality])
     else
-      {:error, "in-BEAM CLIP not built — rebuild with WB_BUMBLEBEE=1, or run the standalone sidecar + set WB_EMBED_IMAGE=http:<url>"}
+      {:error, "in-BEAM CLIP not built — rebuild with WB_CLIP=1 (or point WB_EMBED_IMAGE=http:<url> at an external embedder)"}
     end
   end
 

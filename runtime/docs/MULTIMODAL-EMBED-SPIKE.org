@@ -9,16 +9,19 @@ in-BEAM? Is there a Gemma multimodal model? How big, and does it need another se
 Text embeds in pure Elixir ONLY because Model2Vec is STATIC (tokenize → matrix
 lookup → mean — no neural net). Image/video models are ViTs/CNNs needing actual
 neural inference. That inference can run THREE ways, all behind =Workbooks.Embed=:
-  1. *IN-BEAM (Bumblebee + EXLA)* — the heavy in-process path. CLIP runs inside the
-     BEAM via Nx.Serving (one shared model, request batching). PROVEN here (see
-     "Tested" below). OPT-IN at build: =WB_BUMBLEBEE=1= pulls {bumblebee, exla, nx,
-     stb_image} AND compiles =host_ml/embed_bumblebee_clip.ex= — default builds pull
-     NONE of it (no XLA, lean image). Runtime route: =WB_EMBED=clip=. Scales (EXLA
-     dirty-NIF, batched), the cost is XLA in the image + the model download.
+  1. *IN-BEAM (ONNX via Ortex)* — the small in-process path, SHIPPED. CLIP runs
+     inside the BEAM through onnxruntime (Ortex), two q8 towers in one 512-d space.
+     OPT-IN at build: =WB_CLIP=1= pulls {ortex, tokenizers, nx, stb_image} AND
+     compiles =host_ml/embed_ortex_clip.ex= — default builds pull NONE of it (lean).
+     Runtime route: =WB_EMBED=clip=. ~170 MB total (onnxruntime ~20 MB + q8 model
+     ~147 MB), no XLA, no JIT. PROVEN here (see "Tested" below).
+     [Rejected: an EXLA/Bumblebee version — it worked but carried a 300 MB XLA
+     runtime + 605 MB model + a ~24 s first-call JIT (~900 MB). ONNX is ~5× smaller
+     and warms in ~250 ms; not worth the weight.]
   2. *WASM / browser* — transformers.js (onnxruntime-web) runs CLIP/SigLIP client-
      side, same place =verify.mjs/embed.mjs= run. Sovereign, no server inference.
-  3. *Sidecar / API* — Node CLIP sidecar (=runtime/sidecar/clip=, no NIF) or a
-     hosted multimodal API. Connect via =WB_EMBED_IMAGE=http:<url>=.
+  3. *External API* — a hosted multimodal embedder. Connect via
+     =WB_EMBED_IMAGE=http:<url>=.
 All slot into =Workbooks.Embed= (the provider behaviour). =Workbooks.Vector= is
 already modality-agnostic (any dim) — only the EMBEDDER changes per modality; index
 + search + storage are unchanged.
@@ -58,13 +61,15 @@ image by meaning, inference 115 ms (native; 605 MB fp32 / q8 ≈ 150 MB). CLIP r
 in WASM in any browser (transformers.js = onnxruntime-web) → a workbook can do
 sovereign image search CLIENT-SIDE, the same place verify.mjs/embed.mjs run.
 
-Then proven IN-BEAM too (=WB_BUMBLEBEE=1=, Bumblebee+EXLA, =openai/clip-vit-base-
-patch32=, 512-d joint space): the same dog photo embedded closer to =a photo of a
-dog= (cosine 0.279) than =a sports car= (0.219) — cross-modal correct, matching the
-Node sidecar (0.273 / 0.222). API: load the two towers separately with architecture
-=:for_embedding= (adds the projection head → joint space, output key =:embedding=);
-the full CLIP model can't serve one modality alone (needs both inputs at once).
-First call ~24 s (EXLA JIT + model download); warm calls are batched serving runs.
+Then proven IN-BEAM via ONNX (=WB_CLIP=1=, Ortex/onnxruntime, =Xenova/clip-vit-base-
+patch32= q8 towers, 512-d joint space), BOTH directions cross-modal correct:
+  dog-image ↔ dog-text 0.273 > car-text 0.214
+  car-image ↔ car-text 0.278 > dog-text 0.210
+First text embed ~250 ms (no JIT). Adapter (=host_ml/embed_ortex_clip.ex=): the
+HF tokenizer pads to ctx 77 → text tower; image resize-shortest-224 + center-crop +
+CLIP-mean/std normalize (HWC→CHW) → vision tower; first ONNX output is the projected
+embedding, L2-normed. Ortex outputs live on =Ortex.Backend= → =Nx.backend_transfer=
+before any Nx math.
 
 * VLM2Vec-V2.0 — the preferred multimodal model (user pick), but GPU-only
 - Base = *Qwen2-VL-7B-Instruct* (7B params, bf16 ≈ ~15 GB on disk). Embeds text +
@@ -117,7 +122,8 @@ it: =WB_EMBED_MULTIMODAL=http:http://localhost:<port>=. Then ALL modalities
 sidecar, just a bigger model on real hardware. NOT runnable here (no GPU) and NOT
 on a multi-tenant CPU Fly box — honest stub: the connection + routing + probe are
 built; the GPU sidecar is the operator's to stand up on a capable machine. The
-shape mirrors =runtime/sidecar/clip/server.mjs= (swap CLIP for the VLM).
+shape mirrors =host_ml/embed_ortex_clip.ex= (swap CLIP q8 for the VLM, or run it as
+an external endpoint via =WB_EMBED_IMAGE=http:<url>=).
 
 * Worth prototyping when the need lands
 A WASM image-embed command (onnxruntime-web + TinyCLIP) registered like the text

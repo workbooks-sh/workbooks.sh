@@ -119,7 +119,10 @@ same "compute at author time, bake the result" conclusion.)
    traversal; another modality slot, no embeddings needed.
    Decide dep weight when we get here; the seam means it drops in without churn.
 
-* Open decision (when we reach step 6)
-ortex (ONNX Runtime via Rustler — lighter) vs Bumblebee/Nx/EXLA (heavier, more
-Elixir-native). Both run all-MiniLM/EmbeddingGemma on CPU. Stub the round-trip for
-now per the current "no e2e" directive; the seam keeps it a drop-in either way.
+* Resolved: ortex (ONNX) over Bumblebee/EXLA
+ortex (ONNX Runtime via Rustler) vs Bumblebee/Nx/EXLA: DECIDED for ortex. The image
+embedder (=Workbooks.Embed.OrtexClip=, CLIP, WB_CLIP=1) ships on it — ~170 MB vs
+EXLA's ~900 MB (300 MB XLA + 605 MB model + ~24 s JIT), and ~250 ms warm vs ~24 s.
+The no-NIF constraint is lifted for OPT-IN builds; the lean default still carries no
+native ML. Same call holds for any heavier text embedder (all-MiniLM/EmbeddingGemma)
+when we want one — ortex behind the same =Workbooks.Embed= seam.
