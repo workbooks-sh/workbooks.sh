@@ -10,9 +10,9 @@ defmodule Workbooks.CLI do
   @version "0.1.0"
 
   def main(argv) do
-    {:ok, _} = Application.ensure_all_started(:workbooks)
-
-    # Deploy verbs carry exit codes (AX: agents read 0=ok, non-zero=fail) + --json.
+    # Deploy verbs are HOST-side (shell out + file config) — they need no runtime,
+    # so they don't boot the app (which would load the OQL/wasmex NIF that can't
+    # load from an escript archive). They carry exit codes + --json for agents.
     case argv do
       ["deploy" | rest] ->
         {out, failed?} = deploy_run(rest)
@@ -20,6 +20,7 @@ defmodule Workbooks.CLI do
         if failed?, do: System.halt(1)
 
       _ ->
+        {:ok, _} = Application.ensure_all_started(:workbooks)
         IO.puts(call(argv))
     end
   end

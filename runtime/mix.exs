@@ -10,7 +10,10 @@ defmodule Workbooks.MixProject do
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: ["test"],
-      escript: [main_module: Workbooks.CLI, name: "wb"],
+      # app: nil → the escript does NOT auto-start :workbooks (which would load the
+      # OQL/wasmex NIF, impossible from an escript archive). CLI.main starts the app
+      # itself only for verbs that need the runtime; `wb deploy` stays NIF-free.
+      escript: [main_module: Workbooks.CLI, name: "wb", app: nil],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
