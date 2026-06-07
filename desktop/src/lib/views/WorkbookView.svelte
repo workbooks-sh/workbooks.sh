@@ -5,37 +5,46 @@
    * stored workbook can also be pulled from the runtime by id WHEN connected
    * (optional server tier), but the default path needs nothing.
    */
-  import { FileText, RefreshCw, Cloud } from "@lucide/svelte";
-  import { weave, hasLocalKernel } from "$lib/kernel";
+  import { FileText, Cloud, CircleCheck, CircleAlert } from "@lucide/svelte";
+  import { weave, validate, hasLocalKernel } from "$lib/kernel";
   import { rt, getRuntime } from "$lib/runtime";
 
-  const sample = "* My Workbook\n\nThe app renders *its own format* — locally, via the\nembedded =oql.wasm= kernel. No server required.\n\n** A list\n- weave\n- tangle\n- validate\n";
+  const sample = "* My Workbook\n\nThe app renders *its own format* — live, locally, via the\nembedded =oql.wasm= kernel. No server required.\n\n** A list\n- weave\n- tangle\n- validate\n";
 
   let org = $state(sample);
   let html = $state("");
   let err = $state("");
-  let busy = $state(false);
+  let issues = $state<number | null>(null);
 
-  async function weaveLocal() {
+  // Live edit→preview: debounced weave + validate as you type, fully in-process.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function onInput() {
+    if (!hasLocalKernel()) {
+      err = "Live weave needs the desktop shell (oql.wasm).";
+      return;
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => void refresh(), 250);
+  }
+
+  async function refresh() {
     err = "";
-    busy = true;
     try {
-      if (!hasLocalKernel()) {
-        err = "Local weave needs the desktop shell (oql.wasm).";
-        return;
-      }
       html = await weave(org);
+      const diag = (await validate(org)) as unknown[];
+      issues = Array.isArray(diag) ? diag.length : null;
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
-    } finally {
-      busy = false;
     }
   }
+
+  $effect(() => {
+    if (hasLocalKernel()) void refresh();
+  });
 
   // Optional: pull a stored workbook's woven HTML from the runtime (when up).
   async function loadFromRuntime(id: string) {
     err = "";
-    busy = true;
     try {
       const info = await getRuntime();
       if (info.state !== "up") {
@@ -48,10 +57,9 @@
         return;
       }
       html = await res.text();
+      issues = null;
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
-    } finally {
-      busy = false;
     }
   }
 
@@ -61,19 +69,21 @@
 <section class="workbook">
   <div class="bar">
     <FileText size={18} strokeWidth={1.6} />
-    <button disabled={busy} onclick={() => void weaveLocal()}>
-      <RefreshCw size={15} strokeWidth={1.8} />
-      Weave locally
-    </button>
+    <span class="title">Workbook — live, local</span>
+    {#if issues !== null}
+      <span class="status" class:ok={issues === 0}>
+        {#if issues === 0}<CircleCheck size={14} />valid{:else}<CircleAlert size={14} />{issues} issue{issues === 1 ? "" : "s"}{/if}
+      </span>
+    {/if}
     <span class="spacer"></span>
     <input bind:value={id} placeholder="stored id (runtime)" />
-    <button class="ghost" disabled={busy || !id} onclick={() => void loadFromRuntime(id)}>
+    <button class="ghost" disabled={!id} onclick={() => void loadFromRuntime(id)}>
       <Cloud size={15} strokeWidth={1.8} />
       From runtime
     </button>
   </div>
 
-  <textarea bind:value={org} spellcheck="false"></textarea>
+  <textarea bind:value={org} oninput={onInput} spellcheck="false"></textarea>
 
   {#if err}
     <p class="err">{err}</p>
@@ -120,6 +130,24 @@
   }
   .spacer {
     flex: 1;
+  }
+  .title {
+    font-size: 0.9rem;
+    opacity: 0.75;
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #e06c7522;
+    color: #e06c75;
+  }
+  .status.ok {
+    background: #98c37922;
+    color: #98c379;
   }
   textarea {
     min-height: 9rem;
