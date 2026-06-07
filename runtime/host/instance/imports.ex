@@ -22,9 +22,9 @@ defmodule Workbooks.Instance.Imports do
   defp add("vfs", acc, vfs),
     do: Map.put(acc, "vfs-query", {:fn, fn sql -> VFS.query_json(vfs, sql) end})
 
-  # commands: invoke a registered in-WASM command by name (stdin/stdout).
+  # commands: invoke a registered in-WASM command by name (argv + stdin → stdout).
   defp add("commands", acc, _vfs),
-    do: Map.put(acc, "run-command", {:fn, fn name, input -> run_command(name, input) end})
+    do: Map.put(acc, "run-command", {:fn, fn name, input, args -> run_command(name, input, args) end})
 
   # llm: call the LLM (the host holds the key — the component never sees it).
   defp add("llm", acc, _vfs),
@@ -32,8 +32,8 @@ defmodule Workbooks.Instance.Imports do
 
   defp add(_other, acc, _), do: acc
 
-  defp run_command(name, input) do
-    case Workbooks.CommandRegistry.run(name, input) do
+  defp run_command(name, input, args) do
+    case Workbooks.CommandRegistry.run(name, input, args) do
       {:ok, out} -> out
       {:error, e} -> Jason.encode!(%{error: inspect(e)})
     end

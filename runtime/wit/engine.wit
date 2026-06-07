@@ -8,9 +8,11 @@ package workbooks:engine;
 world engine {
   import session-info: func() -> string;
   import vfs-query: func(sql: string) -> string;
-  // Invoke a registered in-WASM command by name (stdin/stdout) — a local,
-  // pure-compute sandboxed binary (jq/ripgrep), how an agent runs commands
-  // without an OS shell. NOT the toolkit/integration layer. Gated by `commands`.
-  import run-command: func(command: string, input: string) -> string;
+  // Invoke a registered in-WASM command by name (the universal CLI ABI:
+  // argv + stdin → stdout) — a local, pure-compute sandboxed binary (jq/ripgrep),
+  // how an agent runs commands without an OS shell. `args` is the command's argv;
+  // the host applies each command's arg mode (real wasmtime argv, or fold into the
+  // first stdin line for legacy stdin-protocol commands). Gated by `commands`.
+  import run-command: func(command: string, input: string, args: list<string>) -> string;
   export run: func(input: string) -> string;
 }

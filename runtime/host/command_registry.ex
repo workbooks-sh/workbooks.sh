@@ -43,8 +43,50 @@ defmodule Workbooks.CommandRegistry do
     "grep" => {:wasm, "build/commands/grep.wasm", :stdin1}
   }
 
-  @doc "Registered command names."
-  def list, do: Map.keys(@builtins)
+  # Dynamically registered commands live in :persistent_term (rare writes, fast
+  # reads, no process needed). The registry is the static built-ins OVERLAID with
+  # whatever was registered at runtime — so the command set is NOT a hardcoded
+  # list: any wasm CLI can be registered and run through the same generic path.
+  @dynamic {__MODULE__, :dynamic_commands}
+
+  @doc "All commands: static built-ins overlaid with dynamically registered ones."
+  def registry, do: Map.merge(@builtins, :persistent_term.get(@dynamic, %{}))
+
+  @doc "Registered command names (built-ins + dynamic)."
+  def list, do: Map.keys(registry())
+
+  @doc "Register a prebuilt wasm CLI under `name` with an arg mode (:argv | :stdin1)."
+  def register(name, wasm_path, mode \\ :argv) do
+    :persistent_term.put(@dynamic, Map.put(:persistent_term.get(@dynamic, %{}), name, {:wasm, wasm_path, mode}))
+    :ok
+  end
+
+  @doc """
+  The generic auto-wrap: build an arbitrary upstream Rust CLI crate to
+  wasm32-wasip1 and register it as a command — any WASI-clean crate, zero per-CLI
+  code. Returns {:ok, wasm_path} | {:error, reason}. (Other languages build via
+  PackageManager.build_dir/2 + register/3; this is the cargo-crate convenience.)
+  """
+  def build_and_register_crate(name, crate, mode \\ :argv) do
+    root = Path.join(System.tmp_dir!(), "wbcmd-#{crate}")
+
+    case System.cmd("cargo", ["install", crate, "--target", "wasm32-wasip1", "--root", root, "--no-track"],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        case Path.wildcard(Path.join([root, "bin", "*.wasm"])) do
+          [wasm | _] ->
+            register(name, wasm, mode)
+            {:ok, wasm}
+
+          [] ->
+            {:error, :no_wasm}
+        end
+
+      {err, _} ->
+        {:error, err}
+    end
+  end
 
   @doc "Run a registered command with stdin `input` (no argv) → {:ok, out} | {:error, reason}."
   def run(name, input), do: run(name, input, [])
@@ -56,7 +98,7 @@ defmodule Workbooks.CommandRegistry do
   :argv passes real wasmtime argv; :stdin1 folds argv into the first stdin line.
   """
   def run(name, input, argv, dirs \\ []) when is_list(argv) do
-    case @builtins[name] do
+    case registry()[name] do
       nil -> {:error, {:unknown_command, name}}
       spec -> run_builtin(spec, input, argv, dirs)
     end
