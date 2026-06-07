@@ -71,6 +71,19 @@ fn outline(org: String) -> Result<String, String> {
     kernel::call("parse-headlines", &org)
 }
 
+/// Read a workbook file the user picked (via the dialog plugin, main-thread safe).
+/// The dialog returns a path; the actual read/write is plain Rust — no fs-plugin
+/// scope to configure. Part of the "shell = capabilities" model.
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn daemon_status() -> String {
     daemon::wb(&["deploy", "status", "--json"]).unwrap_or_else(|e| e)
@@ -88,12 +101,15 @@ fn daemon_down() -> String {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             weave,
             tangle,
             validate,
             lint,
             outline,
+            read_file,
+            write_file,
             runtime_url,
             daemon_status,
             daemon_up,
