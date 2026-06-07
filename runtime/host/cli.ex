@@ -154,13 +154,16 @@ defmodule Workbooks.CLI do
   # Compile a workspace's components → WASM; report what built / what couldn't.
   def call(["build", slug], t), do: Workbooks.Library.build(t, slug) |> json()
 
-  # Source rail — mirror the tenant's repo (the unpacked monorepo) to GitHub.
-  def call(["github", "push" | rest], t) do
-    case Workbooks.GitHub.push(t, repo: opt(rest, "--repo"), visibility: if("--public" in rest, do: "public", else: "private")) do
-      {:ok, url} -> "pushed → #{url}"
-      {:skip, r} -> "skipped: #{r}"
-      {:error, e} -> "error: #{String.slice(e, 0, 300)}"
-    end
+  # Source rail — mirror the tenant repo (the unpacked monorepo) to any git host.
+  # A URL pushes anywhere; --forge auto-provisions via gh/glab/tea.
+  def call(["mirror", url], t), do: Workbooks.Git.mirror(t, url) |> mirror_msg()
+
+  def call(["mirror" | rest], t) do
+    Workbooks.Git.forge_push(t,
+      forge: opt(rest, "--forge"),
+      repo: opt(rest, "--repo"),
+      visibility: if("--public" in rest, do: "public", else: "private")
+    ) |> mirror_msg()
   end
 
   def call(["unpack", bundle, dest], _t) do
@@ -190,6 +193,10 @@ defmodule Workbooks.CLI do
     end
   end
 
+  defp mirror_msg({:ok, url}), do: "mirrored → #{url}"
+  defp mirror_msg({:skip, r}), do: "skipped: #{r}"
+  defp mirror_msg({:error, e}), do: "error: #{String.slice(to_string(e), 0, 300)}"
+
   defp wd(slug), do: "/tmp/bb/#{slug}"
 
   defp json(data), do: Jason.encode!(data, pretty: true)
@@ -213,7 +220,8 @@ defmodule Workbooks.CLI do
       wb checkin <member> <workdir>        pack + sign a member back into the library
       wb pack <workspace> <out> [--build]  compose members → one workbook (--build = compile to WASM)
       wb build <workspace>                 compile components → WASM; report built/unbuilt
-      wb github push [--repo n] [--public] mirror the tenant repo (monorepo) to GitHub
+      wb mirror <remote-url>               mirror the tenant repo to any git host (push)
+      wb mirror [--forge github|gitlab|gitea] [--repo n] [--public]   auto-provision + push
       wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
       wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
       wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)

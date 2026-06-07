@@ -199,6 +199,99 @@ defmodule Workbooks.Git do
     end
   end
 
+  # ── source rail: mirror to ANY git host ──────────────────────────────────────
+  # The rail is plain `git push` to a remote URL — host-agnostic (GitHub, GitLab,
+  # Gitea, self-hosted, Radicle). The host stays provider-free; only first-time
+  # repo PROVISIONING varies, and that leans on whichever forge CLI is on PATH
+  # (gh/glab/tea — the toolkit layer), never hardcoded. Sits alongside `publish`
+  # (Radicle) since both are "push this repo to a federation/host."
+  @forge_cli %{"github" => "gh", "gitlab" => "glab", "gitea" => "tea"}
+
+  @doc "Mirror the tenant repo to an explicit remote URL — works with every git host."
+  def mirror(tenant, remote_url, opts \\ []) when is_binary(remote_url) do
+    dir = ensure_repo(tenant)
+    ensure_commit(dir, tenant)
+    remote = opts[:remote] || "origin"
+    git(dir, ["remote", "remove", remote])
+    git(dir, ["remote", "add", remote, remote_url])
+
+    case git(dir, ["push", remote, "HEAD"]) do
+      {_, 0} -> {:ok, remote_url}
+      {out, _} -> {:error, out}
+    end
+  end
+
+  @doc """
+  Push the tenant repo to a forge: push an existing remote, else PROVISION a new
+  repo via the named (or first-present) forge CLI, then push. opts: :forge, :repo,
+  :visibility ("private"), :remote. {:ok, url} | {:skip, reason} | {:error, out}.
+  """
+  def forge_push(tenant, opts \\ []) do
+    dir = ensure_repo(tenant)
+    ensure_commit(dir, tenant)
+    remote = opts[:remote] || "origin"
+
+    if has_remote?(dir, remote) do
+      case git(dir, ["push", remote, "HEAD"]) do
+        {_, 0} -> {:ok, remote_url(dir, remote)}
+        {out, _} -> {:error, out}
+      end
+    else
+      provision(opts[:forge] || detect_forge(), dir, remote, opts)
+    end
+  end
+
+  @doc "Which forge CLI is available (the toolkit), or nil. github > gitlab > gitea."
+  def detect_forge, do: Enum.find(~w(github gitlab gitea), &has?(@forge_cli[&1]))
+
+  @doc "Delete a provisioned repo (test cleanup / retired mirror) via its forge CLI."
+  def forge_delete("github", repo), do: System.cmd("gh", ["repo", "delete", repo, "--yes"], stderr_to_stdout: true)
+  def forge_delete("gitlab", repo), do: System.cmd("glab", ["repo", "delete", repo, "--yes"], stderr_to_stdout: true)
+  def forge_delete("gitea", repo), do: System.cmd("tea", ["repo", "delete", repo, "--confirm"], stderr_to_stdout: true)
+
+  defp provision(nil, _dir, _remote, _opts),
+    do: {:skip, "no forge CLI (gh/glab/tea) on PATH — create the remote yourself + use mirror/3"}
+
+  defp provision("github", dir, remote, opts) do
+    name = opts[:repo] || "wb-#{Path.basename(dir)}"
+    vis = opts[:visibility] || "private"
+
+    case System.cmd("gh", ["repo", "create", name, "--source", ".", "--#{vis}", "--push", "--remote", remote], cd: dir, stderr_to_stdout: true) do
+      {_, 0} -> {:ok, remote_url(dir, remote)}
+      {out, _} -> {:error, out}
+    end
+  end
+
+  defp provision(forge, dir, _remote, opts) when forge in ~w(gitlab gitea) do
+    cli = @forge_cli[forge]
+    name = opts[:repo] || "wb-#{Path.basename(dir)}"
+
+    if has?(cli) do
+      System.cmd(cli, ["repo", "create", name], cd: dir, stderr_to_stdout: true)
+      forge_push(Path.basename(dir), Keyword.put(opts, :forge, forge))
+    else
+      {:skip, "#{cli} not installed for #{forge}"}
+    end
+  end
+
+  # Snapshot the working tree before mirroring, so the rail pushes actual content.
+  # `git add -A` is SAFE because the auto-`.gitignore` (Workbooks.Private) excludes
+  # session/personal data — a bulk add can't sweep in the signing key or telemetry.
+  # Hooks disabled so the global bd hook doesn't touch a non-beads tenant repo.
+  defp ensure_commit(dir, %{} = id) do
+    git(dir, ["add", "-A"])
+    git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "mirror snapshot"], env: commit_env(id))
+  end
+
+  defp ensure_commit(dir, tenant), do: ensure_commit(dir, identity(tenant))
+
+  defp has_remote?(dir, remote), do: match?({_, 0}, git(dir, ["remote", "get-url", remote]))
+  defp remote_url(dir, remote) do
+    case git(dir, ["remote", "get-url", remote]), do: ({out, 0} -> String.trim(out); _ -> nil)
+  end
+
+  defp has?(bin), do: match?({_, 0}, System.cmd("sh", ["-c", "command -v #{bin}"], stderr_to_stdout: true))
+
   @doc """
   Publish (federate) the tenant's repo over Radicle. Ensures the rad profile +
   the repo (with at least one commit), then `rad init`s it public if not already
