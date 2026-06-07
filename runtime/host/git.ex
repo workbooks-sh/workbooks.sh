@@ -33,8 +33,18 @@ defmodule Workbooks.Git do
       git(dir, ["init", "-q"])
     end
 
+    # The signing key NEVER enters version control — the ledger's whole
+    # attribution model rests on the private half staying host-only. Ignore the
+    # entire .workbooks/ keystore (git AND jj-colocate both honor .gitignore).
+    ensure_gitignore(dir)
     ensure_keypair(dir, tenant)
     dir
+  end
+
+  defp ensure_gitignore(dir) do
+    gi = Path.join(dir, ".gitignore")
+    have = if File.exists?(gi), do: File.read!(gi), else: ""
+    unless String.contains?(have, ".workbooks/"), do: File.write!(gi, have <> ".workbooks/\n")
   end
 
   @doc """
