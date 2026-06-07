@@ -14,6 +14,7 @@
  */
 
 import { commands } from "./bindings";
+import { isTauri, listen } from "./tauri";
 
 export { commands };
 export type * from "./bindings";
@@ -35,15 +36,20 @@ type Unsubscribe = () => void;
 type EventHandler<T> = (payload: T) => void;
 
 /**
- * Subscribe to a streaming Tauri event.
- *
- * TODO(tauri-shell): replace with
- *   `import { listen } from "@tauri-apps/api/event";`
- *   `return await listen<T>(name, (e) => fn(e.payload));`
- * Returns a no-op unsubscribe in the mock so callers' teardown is safe.
+ * Subscribe to a streaming Tauri event. In the desktop shell this binds the real
+ * `@tauri-apps/api/event` listener (e.g. `sidecar-state` from the daemon bridge);
+ * in a plain SPA it's a no-op so callers' teardown stays safe.
  */
-export function on<T = unknown>(_name: IpcEvent, _fn: EventHandler<T>): Unsubscribe {
-  return () => {};
+export function on<T = unknown>(name: IpcEvent, fn: EventHandler<T>): Unsubscribe {
+  if (!isTauri()) return () => {};
+
+  let off: (() => void) | null = null;
+  let cancelled = false;
+  listen<T>(name, fn).then((u) => (cancelled ? u() : (off = u)));
+  return () => {
+    cancelled = true;
+    off?.();
+  };
 }
 
 export const events = { on };
