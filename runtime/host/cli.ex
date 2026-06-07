@@ -102,8 +102,31 @@ defmodule Workbooks.CLI do
     end
   end
 
+  # Sign a published artifact with the tenant's did:key (the sharing rail).
+  def call(["sign", file | rest], t) do
+    out = opt(rest, "--out") || file
+    html = File.read!(file)
+    signed = Workbooks.Manifest.sign(html, t, [%{"type" => "c2pa.action.published", "actor" => Workbooks.Git.did(t)}])
+    File.write!(out, signed)
+    "signed #{file} as #{Workbooks.Git.did(t)} → #{out}"
+  end
+
+  def call(["verify", file], _t) do
+    case Workbooks.Manifest.verify(File.read!(file)) do
+      %{error: e} -> e
+      v -> "valid=#{v.valid} signature=#{v.signature} asset_integrity=#{v.asset_integrity} issuer=#{v.issuer_did}"
+    end
+  end
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
+
+  defp opt(args, flag) do
+    case Enum.find_index(args, &(&1 == flag)) do
+      nil -> nil
+      i -> Enum.at(args, i + 1)
+    end
+  end
 
   defp wd(slug), do: "/tmp/bb/#{slug}"
 
@@ -120,6 +143,8 @@ defmodule Workbooks.CLI do
       wb bundle <src.org> <out>            pack a Workbook Bundle
       wb telemetry [<slug>]                runs index, or one run's summary + errors
       wb ledger <slug>                     verify a run's signed ledger (tamper/attribution)
+      wb sign <file.html> [--out <f>]      embed a did:key provenance manifest
+      wb verify <file.html>                check an artifact's signature + integrity
       wb version
     """
   end
