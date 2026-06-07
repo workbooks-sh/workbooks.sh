@@ -50,8 +50,17 @@ defmodule Workbooks.Vector do
   end
 
   # ── SQLite path (brute-force cosine, the live-tested default) ─────────────────
+  # Brute-force is O(n). A work pool would only buy a constant (cores) factor —
+  # the real fix at scale is sub-linear ANN (the pgvector backend, already built).
+  # So instead of hiding the linear cost we make it VISIBLE: a one-time warning
+  # past a threshold tells the operator to set WB_DATABASE_URL for pgvector ANN.
+  @scan_warn 25_000
+
   defp sqlite_search(tenant, query_vec, k, scope) do
-    DB.query(open(), "SELECT id, workbook, path, headline, vec, text FROM vectors WHERE tenant=?1", [tenant])
+    rows = DB.query(open(), "SELECT id, workbook, path, headline, vec, text FROM vectors WHERE tenant=?1", [tenant])
+    warn_if_large(length(rows))
+
+    rows
     |> Enum.map(fn [id, wb, path, hl, vec, text] ->
       %{id: id, workbook: wb, path: path, headline: hl, text: text, score: Embed.cosine(query_vec, Jason.decode!(vec))}
     end)
@@ -81,6 +90,22 @@ defmodule Workbooks.Vector do
 
   defp scope_filter(hits, []), do: hits
   defp scope_filter(hits, scope), do: Enum.filter(hits, &(&1.workbook in scope))
+
+  defp warn_if_large(n) when n > @scan_warn do
+    unless :persistent_term.get({__MODULE__, :warned}, false) do
+      require Logger
+      Logger.warning(
+        "Vector: brute-force search over #{n} vectors on SQLite (O(n) per query). " <>
+          "For sub-linear ANN at scale, set WB_DATABASE_URL → pgvector. See docs/VECTOR-QUERY.org."
+      )
+
+      :persistent_term.put({__MODULE__, :warned}, true)
+    end
+
+    :ok
+  end
+
+  defp warn_if_large(_), do: :ok
 
   # pgvector literal: "[0.1,0.2,…]" (cast `::vector` in the query).
   @doc false

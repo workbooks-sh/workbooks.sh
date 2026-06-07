@@ -36,16 +36,27 @@ defmodule Workbooks.Embed.Model2Vec do
 
   defp ensure_downloaded do
     id = System.get_env("WB_EMBED_MODEL", @model_id)
-    dir = Path.join([System.get_env("WB_DATA", "tmp/data"), "_models", Path.basename(id)])
-    File.mkdir_p!(dir)
+    base = Path.basename(id)
+    # 1. Baked into the image (WB_MODELS_DIR) — present, zero download.
+    baked = Path.join(System.get_env("WB_MODELS_DIR", "/opt/models"), base)
 
-    Enum.each(@files, fn f ->
-      path = Path.join(dir, f)
-      unless File.exists?(path), do: fetch("https://huggingface.co/#{id}/resolve/main/#{f}", path)
-    end)
+    if present?(baked) do
+      baked
+    else
+      # 2. Cache on the storage volume — download once if missing.
+      dir = Path.join([System.get_env("WB_DATA", "tmp/data"), "_models", base])
+      File.mkdir_p!(dir)
 
-    dir
+      Enum.each(@files, fn f ->
+        path = Path.join(dir, f)
+        unless File.exists?(path), do: fetch("https://huggingface.co/#{id}/resolve/main/#{f}", path)
+      end)
+
+      dir
+    end
   end
+
+  defp present?(dir), do: Enum.all?(@files, &File.exists?(Path.join(dir, &1)))
 
   # Atomic: download to <path>.tmp then rename, so a truncated/failed download
   # never leaves a corrupt cached file that load/2 would then mis-parse.
