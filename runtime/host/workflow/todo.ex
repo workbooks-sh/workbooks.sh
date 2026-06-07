@@ -28,6 +28,10 @@ defmodule Workbooks.Workflow.Todo do
     kws = keywords(org)
     tasks = parse(org, kws)
     workdir = Keyword.get(opts, :workdir, ".")
+    # Session scratch — the agent's own org-native working memory, shared across
+    # every task in this run (it persists; a later task reads what an earlier one
+    # wrote). The agent thinks/plans/writes its own :check tests here.
+    File.mkdir_p!(Path.join(workdir, "scratch"))
     runner = Keyword.get(opts, :run, fn t -> default_run(t, workdir) end)
 
     roots = children_of(tasks, nil)
@@ -111,7 +115,15 @@ defmodule Workbooks.Workflow.Todo do
     do: %{id: t.id, idx: t.idx, title: t.title, state: state, output: String.slice(to_string(out), 0, 600)}
 
   defp default_run(task, workdir) do
-    sys = "You are a workflow task runner. Do exactly what the task says, using your tools. Write any output files in your CURRENT working directory. Finish with done."
+    sys =
+      "You are a workflow task runner. Do exactly what the task says, using your tools. " <>
+        "Write output files in your CURRENT working directory. You also have a SCRATCH " <>
+        "directory at ./scratch/ — your own org-native working memory that persists across " <>
+        "every task in this run. Use it to think: write plans, notes, and intermediate " <>
+        "findings as .org files; read what earlier tasks left there; clear what's stale. " <>
+        "If a task needs acceptance criteria, write them as a `#+begin_src sh :check` block " <>
+        "in scratch and run it yourself before finishing. Finish with done."
+
     Workbooks.Agent.run(sys, "#{task.title}\n\n#{task.body}", exec: true, workdir: workdir, max_steps: 60).result
   end
 
