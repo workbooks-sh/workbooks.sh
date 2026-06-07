@@ -125,6 +125,44 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
 
+  # Free-form brandnana agent: take an OPEN request (a brand, several brands, an
+  # industry, an ad/trends question) and let the Brandnana agent drive the
+  # brandnana toolkit freely to deliver a queryable presentation workbook. No
+  # fixed pipeline — the agent decides the path (and may spawn sub-agents).
+  post "/api/brandnana-ask" do
+    {:ok, body, conn} = read_body(conn)
+    %{"request" => request} = Jason.decode!(body)
+    slug = "ask-" <> (request |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.slice(0, 28)) <> "-#{System.unique_integer([:positive])}"
+    workdir = "/tmp/bb/#{slug}"
+    File.rm_rf!(workdir)
+    File.mkdir_p!(workdir)
+    File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "running"}))
+
+    spawn(fn ->
+      def_path = "#{System.get_env("WB_PROFILE_DIR") || "/opt/profile"}/agents/brandnana.org"
+      on_step = fn ev ->
+        File.write(Path.join(workdir, "_trace.jsonl"), Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 140)}) <> "\n", [:append])
+      end
+
+      try do
+        result = Workbooks.AgentDef.run(File.read!(def_path), request, exec: true, workdir: workdir, max_steps: 250, on_step: on_step)
+
+        pub =
+          case File.read(Path.join(workdir, "published-url")) do
+            {:ok, u} -> String.trim(u)
+            _ -> nil
+          end
+
+        File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "done", published: pub, result: String.slice(result.result || "", 0, 400)}))
+      rescue
+        e -> File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "error", error: Exception.message(e)}))
+      end
+    end)
+
+    json = Jason.encode!(%{slug: slug, request: request, workdir: workdir, status: "running"})
+    conn |> put_resp_content_type("application/json") |> send_resp(202, json)
+  end
+
   # Poll a brand-book run — the stage + published deck URL (BrandBook writes
   # _status.json into the workdir as each stage starts/finishes).
   get "/api/brand-book/:slug" do

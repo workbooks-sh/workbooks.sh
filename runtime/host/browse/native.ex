@@ -10,10 +10,13 @@ defmodule Workbooks.Browse.Native do
   one) so a rotating-proxy service can be layered on without touching callers.
   """
   @behaviour Workbooks.Browse.Provider
-  alias Workbooks.Browse.{Crawl, Extract, Fetch}
+  alias Workbooks.Browse.{Crawl, Extract, Fetch, Search}
 
   @impl true
-  def capabilities, do: [:fetch, :crawl]
+  def capabilities, do: [:fetch, :crawl, :search]
+
+  @impl true
+  def search(query, opts \\ []), do: {:ok, Search.query(query, opts)}
 
   @impl true
   def fetch(url, opts \\ []) do

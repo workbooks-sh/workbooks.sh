@@ -115,6 +115,9 @@ defmodule Workbooks.Browse.Extract do
     |> String.trim()
   end
 
+  @doc "Decode common HTML entities (named + numeric). Public for sibling modules."
+  def decode_entities(s), do: decode(s)
+
   # ── helpers ─────────────────────────────────────────────────────────────────
   defp strip_tags(s), do: String.replace(s, ~r/<[^>]+>/, " ")
 
