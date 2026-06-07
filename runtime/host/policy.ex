@@ -31,5 +31,22 @@ defmodule Workbooks.Policy do
   @doc "Wall-clock CPU cap (ms) for one component call — the runaway trap."
   def timeout(profile), do: profile |> fetch() |> Map.fetch!(:timeout)
 
+  @doc """
+  Whether this profile may use host network (wasi:http + inherit_network +
+  DNS). SECURITY (wb-sec, finding #7): derived from caps — ONLY profiles granting
+  `net` or `browse` get network. `minimal` (caps: vfs, commands) gets NONE.
+
+  In stock wasmex, `WasiP2Options.allow_http` is the single switch that gates
+  BOTH `wasmtime_wasi_http::add_only_http_to_linker_sync` AND, in store.rs,
+  `wasi_ctx_builder.inherit_network()` + `allow_ip_name_lookup`. So setting it
+  false here means a non-network component cannot reach the host network stack at
+  all (no http import linked, no socket pool inherited, no DNS) — closing the
+  bypass where every Instance (even minimal) had full egress.
+  """
+  def allow_http?(profile) do
+    caps = caps(profile)
+    "net" in caps or "browse" in caps
+  end
+
   defp fetch(profile), do: Map.get(@profiles, profile, @profiles.minimal)
 end

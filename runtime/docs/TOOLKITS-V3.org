@@ -26,8 +26,11 @@
     executable leaf. jq, grep, and any toolkit's CLI live here.
   - *Toolkit* — the AGENT-FACING front door: a `:toolkit:`-tagged org node
     (manifest) naming a CLI + a SKILL_DIR of progressive-disclosure recipes the
-    agent reads on demand. Trusted; about agent competence; discovered by
-    `(tags :toolkit:)`.
+    agent reads on demand; about agent competence; discovered by `(tags :toolkit:)`.
+    NOT trusted by virtue of being on disk — see "Security model" below. (The
+    earlier "Trusted" label was a trust-model defect: the discovery root is an
+    unauthenticated writable directory, so a toolkit there is untrusted supply
+    chain. Read-only surfaces are open; execution is default-deny + sandboxed.)
 
   Nesting: a Toolkit wraps a CLI; that CLI becomes a Command; Workflows
   orchestrate components that run Commands. A toolkit is NEVER a new core
@@ -366,6 +369,72 @@
     federation 3-face for SaaS; retire publish/.
   - P8 — Extensions (untrusted WASM artifacts) per EXTENSIONS-ORB.org. Later;
     gated on Orb WIT maturity / the Rust-component authoring path.
+
+* Security model (wb-sec — hardening, 2026-06-07)
+
+  The discovery root ($WB_TOOLKITS_ROOT or ./toolkits) is an UNAUTHENTICATED,
+  writable directory. A toolkit there is UNTRUSTED supply-chain input — its
+  location does not make it first-party. The hardening enforces:
+
+  ** Trust boundary (toolkits.ex)
+     - READ-ONLY surfaces (list/show/search) stay open, but: skill slugs are
+       path-contained (reject `..`/separators; canonicalize + assert containment
+       under <toolkit>/skills/), and $WB_TOOLKITS_ROOT is honored only if it is
+       an existing dir (a blank/bogus value can't repoint the surface).
+     - EXECUTION surfaces (`verify` pre blocks, `run` task blocks) are
+       DEFAULT-DENY. A :role bash block is arbitrary host code; it runs ONLY when
+       the operator opts in via WB_TOOLKIT_EXEC=1, and then under
+       Workbooks.Sandbox (network-denied, fs-confined) with a wall-clock cap and
+       a `ulimit` prologue (anti fork-bomb) — never bare host bash.
+     - BUILD refuses a CLI_BIN that collides with a reserved built-in
+       (jq/grep/upper) before any compile.
+
+  ** Build isolation (package_manager.ex / sandbox.ex) — NOW WIRED
+     Every compiler invocation (cargo build, tinygo, zig cc, wasm-ld, javy, bun
+     build, inline rust) runs through `Workbooks.Sandbox.run` (network-DENIED,
+     fs-confined), and offline (`cargo build --offline`). The doc previously
+     claimed sandboxed builds while the code shelled out to the host directly;
+     that gap is closed. RESIDUAL RISK: `cargo install <crate>` (the crate:
+     auto-wrap) MUST fetch from the registry, so it runs FS-confined but
+     network-PERMITTED (`Sandbox.run_net`); a fetched crate's build.rs/proc-macros
+     still execute with network during install — installing an arbitrary published
+     crate is an inherent trust decision (allowlist/review crate names). The
+     offline, fully network-denied path is the local path: source dir.
+
+  ** Command registry (command_registry.ex)
+     - Built-ins (jq/grep/upper) are RESERVED and cannot be shadowed; registry/0
+       merges built-ins last so even a poisoned dynamic term loses at lookup.
+     - register/3 rejects empty/nil/malformed names and any wasm path outside the
+       content-addressed build/commands/ store.
+     - cargo install gets `--` before the crate spec and a charset check on the
+       crate token (kills option-injection like --git=<url>).
+     - Content-addressed artifacts are re-verified (sha256 == filename) at RUN
+       time, closing the register→run TOCTOU.
+     - The run-command path enforces input/argv size caps and runs wasmtime under
+       `-W timeout`/`-W fuel` (the Policy CPU cap previously never wrapped it).
+     RESIDUAL RISK: the dynamic registry is still a single process-wide
+     :persistent_term (finding #9) — registration is now name/path-guarded and
+     size-bounded, but it is not yet per-Instance/per-tenant namespaced, and
+     registration is not gated by a Policy capability. Cross-tenant poisoning of
+     *non-reserved* command names by code that can call register/3 remains
+     possible; full isolation needs a per-session registry struct threaded
+     through run/ (tracked as a follow-up refactor).
+
+  ** WASI capability gating (instance.ex / policy.ex)
+     - allow_http is DERIVED from the profile (`Policy.allow_http?/1`): only
+       `net`/`browse` profiles get it. In stock wasmex that one flag gates BOTH
+       the wasi:http import AND store.rs `inherit_network()`+DNS, so `minimal`
+       now gets NO host network at all (closing the critical egress bypass where
+       every Instance reached wasi:http regardless of caps).
+     RESIDUAL RISK (findings #7 tail, #8): stock wasmex `add_to_linker_sync`
+     still links the full wasi:p2 *type* surface (clocks/random/filesystem-types/
+     cli-environment) into every component unconditionally. wall-clock + CSPRNG
+     are therefore still ambient on `minimal`. Removing them requires a custom
+     per-profile linker / restricted WasiCtx in the wasmex NIF (or an
+     import-allowlist validation pass over the component's imports). That NIF-level
+     change is NOT done here; the network egress (the exploitable hole) is closed
+     via the allow_http gate, which also disables inherit_network. Clocks/random
+     are low-harm ambient caps pending the linker refactor.
 
 * See also
   - ../../toolkits/AUTHORING.org — the operational standard authors follow.

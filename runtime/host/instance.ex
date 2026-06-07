@@ -49,6 +49,15 @@ defmodule Workbooks.Instance do
     # A WASI context links the wasi:* interfaces a component needs to *instantiate*
     # — JS components (StarlingMonkey) hard-link wasi:http/io even when unused.
     # stdio is not inherited (sandboxed); the typed Dock is the real surface.
+    #
+    # SECURITY (wb-sec, finding #7): allow_http is DERIVED from the profile, not
+    # hardcoded true. In stock wasmex this single flag gates wasi:http linking AND
+    # inherit_network()+DNS in store.rs — so a non-network profile (minimal) gets
+    # NO host network at all (no http import, no socket pool, no name lookup). The
+    # network egress bypass (every Instance reaching wasi:http regardless of caps)
+    # is closed: only `net`/`browse` profiles get egress.
+    allow_http = Policy.allow_http?(profile)
+
     {:ok, pid} =
       Wasmex.Components.start_link(%{
         bytes: bytes,
@@ -57,7 +66,7 @@ defmodule Workbooks.Instance do
           inherit_stdin: false,
           inherit_stdout: false,
           inherit_stderr: false,
-          allow_http: true
+          allow_http: allow_http
         },
         imports: imports
       })
