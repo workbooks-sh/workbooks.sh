@@ -18,8 +18,32 @@
   import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon } from "@lucide/svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/iconAccent.svelte";
   import { auth } from "$lib/auth.svelte";
+  import AccountMenu from "./AccountMenu.svelte";
 
   let { router }: { router: IRouter } = $props();
+
+  // Account menu — anchored off the bottom-pinned account button. The
+  // button toggles it; the menu's contents adapt to auth state.
+  let accountMenuOpen = $state(false);
+  let accountBtnEl = $state<HTMLButtonElement>();
+
+  function toggleAccountMenu() {
+    if (auth.status === "checking") return;
+    accountMenuOpen = !accountMenuOpen;
+  }
+  function closeAccountMenu() {
+    accountMenuOpen = false;
+  }
+  function onWindowClick(e: MouseEvent) {
+    if (!accountMenuOpen) return;
+    const t = e.target as Node;
+    if (accountBtnEl?.contains(t)) return;
+    if (document.querySelector("[data-account-menu]")?.contains(t)) return;
+    closeAccountMenu();
+  }
+  function onWindowKey(e: KeyboardEvent) {
+    if (e.key === "Escape") closeAccountMenu();
+  }
 
   type RailTab = { name: string; label: string; icon: Component };
   const topTabs: RailTab[] = [
@@ -124,11 +148,15 @@
   {/each}
 
   <button
+    bind:this={accountBtnEl}
     class="account"
     class:signed={auth.signedIn}
     title={auth.signedIn ? (auth.user?.email ?? "Account") : "Sign in"}
     aria-label="Account"
-    onclick={() => (auth.signedIn ? void auth.signOut() : void auth.signIn())}
+    aria-haspopup="menu"
+    aria-expanded={accountMenuOpen}
+    disabled={auth.status === "checking"}
+    onclick={toggleAccountMenu}
   >
     {#if auth.signedIn}
       <span class="ini">{accountInitial()}</span>
@@ -136,7 +164,13 @@
       <UserIcon size={15} strokeWidth={1.8} />
     {/if}
   </button>
+
+  {#if accountMenuOpen}
+    <AccountMenu onclose={closeAccountMenu} />
+  {/if}
 </nav>
+
+<svelte:window onclick={onWindowClick} onkeydown={onWindowKey} />
 
 <style>
   .rail {
@@ -149,6 +183,8 @@
     padding: 0.85rem 0 1rem;
     background: var(--color-surface);
     border-right: 1px solid var(--color-border);
+    position: relative;
+    overflow: visible;
   }
   .ws {
     width: 34px;

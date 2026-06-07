@@ -7,17 +7,18 @@
   import { CloudOff, RefreshCw } from "@lucide/svelte";
   import { auth } from "$lib/auth.svelte";
   import { useRouter } from "@dvcol/svelte-simple-router/router";
-  import { commands } from "$lib/bindings";
 
   const router = useRouter();
   let busy = $state(false);
 
+  // "Try again" actually restarts the engine process (not just a re-probe)
+  // — a re-probe alone never recovers a crashed engine or a port conflict.
+  // After the restart the store reflects whatever state we land in.
   async function retry() {
     busy = true;
     try {
-      const s = await commands.sidecarStatus();
-      auth.sidecarReachable = s.reachable;
-      if (s.reachable) void router.push({ name: "create" });
+      await auth.restartEngine();
+      if (auth.sidecarReachable) void router.push({ name: "create" });
     } finally {
       busy = false;
     }
