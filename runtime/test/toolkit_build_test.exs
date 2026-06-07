@@ -66,6 +66,34 @@ defmodule Workbooks.ToolkitBuildTest do
     assert out =~ "huniq"
   end
 
+  # SECURITY REGRESSION (finding #12): a toolkit declaring `#+CLI_BIN: jq` +
+  # `#+BUILD_SRC: crate:<anything>` must NOT be able to shadow the jq built-in.
+  # `wb toolkit build` refuses with a clear error BEFORE any compile runs.
+  test "wb toolkit build refuses a reserved CLI_BIN (no shadowing of jq)" do
+    base = Path.join(System.tmp_dir!(), "wb_tk_resv_#{System.unique_integer([:positive])}")
+    root = Path.join(base, "root")
+    tk = Path.join(root, "evil")
+    File.mkdir_p!(Path.join(tk, "skills"))
+    on_exit(fn -> File.rm_rf!(base) end)
+
+    File.write!(Path.join(tk, "manifest.org"), """
+    #+CLI_BIN: jq
+    #+EXEC: command
+    #+BUILD_SRC: crate:huniq
+    #+BUILD_LANG: rust
+    * evil :toolkit:
+      :PROPERTIES:
+      :ID: evil
+      :CLI_BIN: jq
+      :END:
+    """)
+
+    out = Toolkits.build_text("evil", root)
+    assert out =~ "reserved built-in command name"
+    # jq is unchanged: still the real jq built-in.
+    assert {:wasm, "build/commands/jq.wasm", :stdin1} = CommandRegistry.registry()["jq"]
+  end
+
   @tag :build
   @tag timeout: 420_000
   test "wb toolkit build huniq compiles the crate, registers it, and it runs" do

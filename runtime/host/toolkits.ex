@@ -15,6 +15,27 @@ defmodule Workbooks.Toolkits do
 
   In the clean-room a toolkit's CLI is a WASM command (`run-command`,
   wb-11ck.21), not a native PATH binary — but the discovery contract is identical.
+
+  ## TRUST BOUNDARY (wb-sec)
+
+  The discovery root ($WB_TOOLKITS_ROOT or ./toolkits) is an UNAUTHENTICATED,
+  writable directory. A toolkit dropped there is UNTRUSTED supply-chain input —
+  NOT "first-party" by virtue of its location. Accordingly:
+
+    * READ-ONLY surfaces (list / show / search) are open, but slugs/roots are
+      path-contained (no `..`/separator traversal; files must resolve inside the
+      toolkit) and $WB_TOOLKITS_ROOT is honored only if it is an existing dir.
+    * EXECUTION surfaces (`verify` pre blocks, `run` task blocks) are DEFAULT-DENY.
+      A :role bash block is arbitrary host code; it runs ONLY when the operator
+      opts in via `WB_TOOLKIT_EXEC=1`, and even then it runs under
+      `Workbooks.Sandbox` (network-denied, fs-confined) with a wall-clock cap and
+      a `ulimit` prologue (anti fork-bomb), never bare host bash.
+    * BUILD (`build`) refuses to register a command under a reserved built-in
+      name (jq/grep/upper); compilers run under the sandbox (see PackageManager).
+
+  The intended sandboxed surface for a toolkit's CLI is the WASM `run-command`
+  path (Dock-gated). Host bash from skill files bypasses that and is therefore
+  gated/capped/isolated above. See docs/TOOLKITS-V3.org for the full model.
   """
   alias Workbooks.OQL
 
@@ -74,11 +95,23 @@ defmodule Workbooks.Toolkits do
   # files. Thin reads over the on-disk org toolkits + the :role block executor.
   # Discovery rides discover_dir/1; these add the human/agent-facing rendering.
 
-  @doc "Default discovery root: $WB_TOOLKITS_ROOT, else first of toolkits/ | ../toolkits that exists."
+  @doc """
+  Default discovery root: $WB_TOOLKITS_ROOT (validated), else first of
+  toolkits/ | ../toolkits that exists.
+
+  SECURITY (wb-sec, finding #6): $WB_TOOLKITS_ROOT is honored ONLY if it names an
+  existing directory. An unset/blank/non-dir value falls back to the in-tree
+  defaults rather than letting a bogus value repoint the whole surface. Note the
+  trust-boundary caveat in the moduledoc: the discovery root is read-only/search
+  by default; EXECUTION (verify/run/build) is separately gated — see TOOLKITS-V3.
+  """
   def default_root do
-    System.get_env("WB_TOOLKITS_ROOT") ||
-      Enum.find(["toolkits", "../toolkits", Path.expand("../toolkits", File.cwd!())], &File.dir?/1) ||
-      "toolkits"
+    env = System.get_env("WB_TOOLKITS_ROOT")
+
+    cond do
+      is_binary(env) and env != "" and File.dir?(env) -> env
+      true -> Enum.find(["toolkits", "../toolkits", Path.expand("../toolkits", File.cwd!())], &File.dir?/1) || "toolkits"
+    end
   end
 
   @doc "`wb toolkit list` — every toolkit under the root, keyed by id, with status + tagline."
@@ -126,8 +159,13 @@ defmodule Workbooks.Toolkits do
   def search_text(query, root \\ default_root()) do
     q = String.downcase(query)
 
+    base = Path.expand(root)
+
     hits =
       Path.wildcard(Path.join(root, "*/skills/**/*.org"))
+      # SECURITY (wb-sec, finding #6): only emit content for files that truly live
+      # under the resolved root — a symlinked entry that escapes is skipped.
+      |> Enum.filter(&contained?(&1, base))
       |> Enum.flat_map(fn path ->
         rel = Path.relative_to(path, root)
 
@@ -157,15 +195,24 @@ defmodule Workbooks.Toolkits do
             {File.exists?(Path.join([dir, "skills", "overview.org"])), "skills/overview.org present"}
           ] ++ exec_checks(d)
 
+        # SECURITY (wb-sec): :role pre blocks are arbitrary bash from an untrusted
+        # toolkit dir. They run ONLY when execution is opted-in (WB_TOOLKIT_EXEC=1);
+        # otherwise verify reports them as skipped (structural checks still run).
         pre =
-          Path.wildcard(Path.join([dir, "skills", "**", "*.org"]))
-          |> Enum.flat_map(fn path ->
-            extract_role_blocks(File.read!(path), "pre")
-            |> Enum.map(fn body ->
-              {out, code} = run_bash(body, [])
-              {code == 0, "pre #{Path.relative_to(path, dir)}" <> if(code == 0, do: "", else: ": " <> String.trim(out))}
+          if exec_allowed?() do
+            Path.wildcard(Path.join([dir, "skills", "**", "*.org"]))
+            |> Enum.filter(&contained?(&1, Path.expand(dir)))
+            |> Enum.flat_map(fn path ->
+              extract_role_blocks(File.read!(path), "pre")
+              |> Enum.map(fn body ->
+                {out, code} = run_bash(body, [])
+                {code == 0, "pre #{Path.relative_to(path, dir)}" <> if(code == 0, do: "", else: ": " <> String.trim(out))}
+              end)
             end)
-          end)
+          else
+            n = pre_block_count(dir)
+            if n == 0, do: [], else: [{true, "pre checks SKIPPED (#{n} block(s); set WB_TOOLKIT_EXEC=1 to run sandboxed)"}]
+          end
 
         Enum.map_join(struct ++ pre, "\n", fn {ok, label} -> "#{if ok, do: "✓", else: "✗"} #{label}" end)
     end
@@ -264,17 +311,32 @@ defmodule Workbooks.Toolkits do
   defp do_build(id, %{cli_bin: nil}),
     do: "cannot build #{id}: no CLI_BIN declared (nothing to register a command under)"
 
-  defp do_build(id, %{exec: exec}) when exec in ["task", "federation"],
+  # SECURITY (wb-sec, finding #12): a toolkit's CLI_BIN is attacker-controlled
+  # DATA. Refuse to build/register a command under a RESERVED built-in name
+  # (jq/grep/upper) when this descriptor would register a command (crate/path) —
+  # otherwise importing an untrusted toolkit silently hijacks a core command for
+  # every Instance. (CommandRegistry also enforces this; this is the clear, early
+  # surface, before any compile runs.) Non-registering modes fall through.
+  defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path] do
+    if bin in Workbooks.CommandRegistry.reserved_names(),
+      do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
+      else: do_build_clause(id, d)
+  end
+
+  defp do_build(id, d), do: do_build_clause(id, d)
+
+  defp do_build_clause(id, %{exec: exec}) when exec in ["task", "federation"],
     do: "#{id}: #+EXEC: #{exec} — no command to build (task/federation toolkits ship no CLI binary)"
 
-  defp do_build(id, %{exec: "posix", cli_bin: bin}) do
+  defp do_build_clause(id, %{exec: "posix", cli_bin: bin}) do
     case System.find_executable(bin) do
       nil -> "#{id}: #+EXEC: posix — native binary #{inspect(bin)} not found on PATH (install it; nothing to build)"
       path -> "#{id}: #+EXEC: posix — native binary #{bin} present at #{path} (no WASM build needed)"
     end
   end
 
-  defp do_build(id, %{exec: exec, build_src: {:crate, crate}, cli_bin: bin, arg_mode: mode})
+  defp do_build_clause(id, %{exec: exec, build_src: {:crate, crate}, cli_bin: bin, arg_mode: mode})
        when exec in ["command", nil] do
     case Workbooks.CommandRegistry.build_and_register_crate(bin, crate, mode) do
       {:ok, wasm} -> "#{id}: built crate #{crate} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
@@ -282,7 +344,7 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  defp do_build(id, %{exec: exec, build_src: {:path, dir}, build_lang: lang, cli_bin: bin, arg_mode: mode})
+  defp do_build_clause(id, %{exec: exec, build_src: {:path, dir}, build_lang: lang, cli_bin: bin, arg_mode: mode})
        when exec in ["command", nil] do
     lang = lang || "rust"
     abs = if Path.type(dir) == :absolute, do: dir, else: Path.join(tk_dir(id, default_root()) || ".", dir)
@@ -302,13 +364,13 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  defp do_build(id, %{build_src: nil}),
+  defp do_build_clause(id, %{build_src: nil}),
     do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir>)"
 
-  defp do_build(id, %{build_src: {:git, url}}),
+  defp do_build_clause(id, %{build_src: {:git, url}}),
     do: "#{id}: #+BUILD_SRC git+#{url} not yet supported by `wb toolkit build` (use crate: or path:)"
 
-  defp do_build(id, %{build_src: {:unknown, spec}}),
+  defp do_build_clause(id, %{build_src: {:unknown, spec}}),
     do: "#{id}: unrecognized #+BUILD_SRC #{inspect(spec)} (expected crate:<name> | git+<url> | path:<dir>)"
 
   defp error_text(reason) when is_binary(reason), do: String.slice(reason, -2000, 2000)
@@ -319,15 +381,29 @@ defmodule Workbooks.Toolkits do
   from the `<task>` skill and run it with positional `$1 $2 …` from <args>.
   """
   def run_task_text(id, task, args, root \\ default_root()) do
-    with dir when not is_nil(dir) <- tk_dir(id, root),
-         path when not is_nil(path) <- skill_path(dir, task),
-         [body | _] <- extract_role_blocks(File.read!(path), "task") do
-      {out, _code} = run_bash(body, args)
-      out
+    # SECURITY (wb-sec, findings #4/#15/#16): the task slug is path-contained by
+    # skill_path; the body is arbitrary bash, so execution is default-deny and
+    # only runs sandboxed when opted-in (WB_TOOLKIT_EXEC=1).
+    if not exec_allowed?() do
+      "refusing to run #{id}/#{task}: toolkit bash execution is disabled (set WB_TOOLKIT_EXEC=1 to run sandboxed)"
     else
-      [] -> "no :role task block in #{id}/#{task}"
-      _ -> "no such toolkit/skill: #{id}/#{task}"
+      with dir when not is_nil(dir) <- tk_dir(id, root),
+           path when not is_nil(path) <- skill_path(dir, task),
+           [body | _] <- extract_role_blocks(File.read!(path), "task") do
+        {out, _code} = run_bash(body, args)
+        out
+      else
+        [] -> "no :role task block in #{id}/#{task}"
+        _ -> "no such toolkit/skill: #{id}/#{task}"
+      end
     end
+  end
+
+  # Count :role pre blocks across a toolkit's skills (for the verify SKIPPED note).
+  defp pre_block_count(dir) do
+    Path.wildcard(Path.join([dir, "skills", "**", "*.org"]))
+    |> Enum.filter(&contained?(&1, Path.expand(dir)))
+    |> Enum.reduce(0, fn path, acc -> acc + length(extract_role_blocks(File.read!(path), "pre")) end)
   end
 
   # Is the declared #+EXEC mode satisfiable right now?
@@ -369,16 +445,41 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  # SECURITY (wb-sec, findings #4/#5): a skill slug is agent/LLM-supplied. It must
+  # name a file INSIDE the toolkit's own skills/ dir — never traverse out via "..",
+  # a path separator, or an absolute segment. We (1) reject any slug that isn't a
+  # bare, dot-dot-free name, and (2) canonicalize the candidate and assert it is
+  # strictly contained under <dir>/skills/ before any File access. Both layers are
+  # required: charset alone misses symlink/Path quirks; containment alone still
+  # lets a `..` candidate that happens to resolve back inside slip valid names.
+  @slug_re ~r/^[A-Za-z0-9._-]+$/
+
+  defp safe_slug?(slug),
+    do: is_binary(slug) and Regex.match?(@slug_re, slug) and slug not in [".", ".."]
+
   # thin skill: skills/<slug>.org ; thick skill: skills/<slug>/SKILL.org
   defp skill_path(dir, slug) do
-    thin = Path.join([dir, "skills", "#{slug}.org"])
-    thick = Path.join([dir, "skills", slug, "SKILL.org"])
+    if safe_slug?(slug) do
+      skills = Path.join(dir, "skills")
+      thin = Path.join([dir, "skills", "#{slug}.org"])
+      thick = Path.join([dir, "skills", slug, "SKILL.org"])
 
-    cond do
-      File.exists?(thin) -> thin
-      File.exists?(thick) -> thick
-      true -> nil
+      cond do
+        File.exists?(thin) and contained?(thin, skills) -> thin
+        File.exists?(thick) and contained?(thick, skills) -> thick
+        true -> nil
+      end
+    else
+      nil
     end
+  end
+
+  # candidate must canonicalize to a path strictly inside `base` (base itself or
+  # a descendant). Path.expand collapses any "." / ".." in the candidate.
+  defp contained?(candidate, base) do
+    base = Path.expand(base)
+    abs = Path.expand(candidate)
+    abs == base or String.starts_with?(abs, base <> "/")
   end
 
   defp manifest_kw(dir, key) do
@@ -401,9 +502,45 @@ defmodule Workbooks.Toolkits do
     |> Enum.map(fn [_, body] -> body end)
   end
 
-  # Run a bash snippet with positional args ($1, $2, …). Trusted input: toolkit
-  # skill files are first-party, not user-submitted.
-  defp run_bash(body, args), do: System.cmd("bash", ["-c", body, "bash"] ++ args, stderr_to_stdout: true)
+  # ── SECURITY TRUST BOUNDARY (wb-sec, findings #3/#13/#14/#15/#16/#17) ────────
+  #
+  # Executing a :role bash block from a discovered toolkit dir is REMOTE CODE
+  # EXECUTION by design — the block body is arbitrary bash. The discovery root is
+  # an unauthenticated, writable directory ($WB_TOOLKITS_ROOT or ./toolkits), so a
+  # toolkit dropped there is UNTRUSTED supply-chain input, NOT "first-party".
+  #
+  # Defenses applied here:
+  #   1. DEFAULT-DENY: bash execution is OFF unless the operator opts in via
+  #      WB_TOOLKIT_EXEC=1 (an explicit, auditable trust grant). Read-only
+  #      surfaces (list/show/search) never execute and stay open.
+  #   2. SANDBOX: when execution IS granted, the snippet runs under
+  #      Workbooks.Sandbox (network-DENIED, fs-confined) — not bare host bash.
+  #   3. RESOURCE CAPS: a `ulimit` prologue (CPU seconds, max user processes,
+  #      file size) blunts fork bombs / runaway loops, and a BEAM-side wall-clock
+  #      watchdog kills the OS process tree on timeout so nothing wedges the host.
+  #
+  # The intended SANDBOXED surface for toolkit CLIs is the WASM `run-command`
+  # path (Dock-gated). Host bash from skill files bypasses that entirely and is
+  # therefore gated, capped, and isolated here.
+  @exec_timeout_ms 30_000
+  # ulimit prologue: -t CPU seconds, -u max user processes (anti fork-bomb),
+  # -f max file size (512MB blocks * ... actually blocks), executed before the body.
+  @ulimit_prologue "ulimit -t 30 -u 256 -f 1048576 2>/dev/null || true\n"
+
+  @doc "Whether :role bash execution from discovered toolkits is opted-in (WB_TOOLKIT_EXEC=1)."
+  def exec_allowed?, do: System.get_env("WB_TOOLKIT_EXEC") == "1"
+
+  # Run a bash snippet with positional args ($1, $2, …) under the sandbox, capped.
+  # Returns {output, exit_code}. The caller MUST have checked exec_allowed?.
+  defp run_bash(body, args) do
+    script = @ulimit_prologue <> body
+    task = Task.async(fn -> Workbooks.Sandbox.run(["bash", "-c", script, "bash"] ++ args) end)
+
+    case Task.yield(task, @exec_timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {out, code}} -> {out, code}
+      _ -> {"timed out after #{@exec_timeout_ms}ms", 124}
+    end
+  end
 
   defp agent(hs, id), do: Enum.find(hs, &("agent" in &1["tags"] and &1["id"] == id))
 
