@@ -487,14 +487,14 @@ defmodule Workbooks.CommandRegistry do
   file-mode CLIs. How argv reaches the command is per its registered arg mode:
   :argv passes real wasmtime argv; :stdin1 folds argv into the first stdin line.
   """
-  def run(name, input, argv, dirs \\ []) when is_list(argv) do
+  def run(name, input, argv, dirs \\ [], ropts \\ []) when is_list(argv) do
     case registry()[name] do
       nil -> {:error, {:unknown_command, name}}
-      spec -> run_builtin(spec, input, argv, dirs)
+      spec -> run_builtin(spec, input, argv, dirs, ropts)
     end
   end
 
-  defp run_builtin({:wasm, path, mode}, input, argv, dirs) do
+  defp run_builtin({:wasm, path, mode}, input, argv, dirs, ropts) do
     # SECURITY (wb-sec): content-addressed artifacts in build/commands/<sha>.wasm
     # are verified at RUN time, not just at register time — closing the TOCTOU
     # where the bytes at the path are swapped after registration. The filename IS
@@ -503,7 +503,7 @@ defmodule Workbooks.CommandRegistry do
       :ok ->
         {stdin, args} = apply_argmode(mode, input, argv)
 
-        case Workbooks.PackageManager.run(path, stdin, args, dirs) do
+        case Workbooks.PackageManager.run(path, stdin, args, dirs, ropts) do
           {:error, _} = err -> err
           out -> {:ok, String.trim(out)}
         end
@@ -514,17 +514,24 @@ defmodule Workbooks.CommandRegistry do
   end
 
   # A runtime registered with default preopens (e.g. its stdlib): merge them ahead
-  # of the caller's dirs so it always finds its resources.
-  defp run_builtin({:wasm, path, mode, opts}, input, argv, dirs) do
-    run_builtin({:wasm, path, mode}, input, argv, Map.get(opts, :dirs, []) ++ dirs)
+  # of the caller's dirs so it always finds its resources. The spec may also carry
+  # default run opts (:run_opts, e.g. a compiler's higher fuel/timeout).
+  defp run_builtin({:wasm, path, mode, opts}, input, argv, dirs, ropts) do
+    run_builtin(
+      {:wasm, path, mode},
+      input,
+      argv,
+      Map.get(opts, :dirs, []) ++ dirs,
+      Keyword.merge(Map.get(opts, :run_opts, []), ropts)
+    )
   end
 
-  defp run_builtin({:src, lang, src, mode}, input, argv, dirs) do
+  defp run_builtin({:src, lang, src, mode}, input, argv, dirs, ropts) do
     case Workbooks.PackageManager.build(%{"name" => "cmd", "lang" => lang, "src" => src}) do
       {_, _, {:ok, wasm, _}} ->
         {stdin, args} = apply_argmode(mode, input, argv)
 
-        case Workbooks.PackageManager.run(wasm, stdin, args, dirs) do
+        case Workbooks.PackageManager.run(wasm, stdin, args, dirs, ropts) do
           {:error, _} = err -> err
           out -> {:ok, String.trim(out)}
         end

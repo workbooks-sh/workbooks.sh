@@ -7,7 +7,9 @@ defmodule Workbooks.CompilersTest do
   alias Workbooks.Compilers
 
   test "lists languages with a compilers/<lang>/manifest" do
-    assert "c" in Compilers.list()
+    langs = Compilers.list()
+    assert "c" in langs
+    assert "zig" in langs
   end
 
   describe "C compiler in the sandbox (c4)" do
@@ -24,6 +26,31 @@ defmodule Workbooks.CompilersTest do
       assert out =~ "sum 42"
       # the compiler ran IN wasm — only the source dir was preopened (containment is the
       # same preopen boundary proven across the palette + the c4 spike "could not open").
+    end
+  end
+
+  describe "Zig compiler in the sandbox (zig1.wasm)" do
+    @tag :build
+    @tag timeout: 300_000
+    test "builds zig1.wasm and compiles untrusted .zig → C entirely in-sandbox" do
+      # zig1.wasm runs the FULL zig frontend + Sema + C-backend INSIDE wasm (zero native
+      # execution) and emits C. End-to-end run chains the emitted C through the C lane
+      # (tcc.wasm) — see compilers/zig/README.org for the honest status.
+      assert {:ok, "zig1", wasm} = Compilers.build("zig")
+      assert File.regular?(wasm)
+
+      tmp = Path.join(System.tmp_dir!(), "zw-#{System.unique_integer([:positive])}.zig")
+
+      File.write!(
+        tmp,
+        ~s|const std = @import("std");\npub fn main() void { std.debug.print("z={d}\\n", .{6 * 7}); }\n|
+      )
+
+      assert {:ok, c, _log} = Compilers.compile("zig", tmp)
+      # genuine zig C-backend output (not a stub): its runtime header + size asserts.
+      assert String.contains?(c, "zig.h")
+      assert String.contains?(c, "zig_static_assert")
+      assert byte_size(c) > 10_000
     end
   end
 end

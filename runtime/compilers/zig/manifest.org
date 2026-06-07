@@ -1,0 +1,9 @@
+#+COMPILER: zig
+#+CLI_BIN: zig1
+#+KIND: compile-to-c
+#+BUILD: build.sh
+#+ARG_MODE: argv
+#+LIB_ROOT: zig-root
+#+ZIG_LIB: lib
+#+TARGET: wasm32-wasi
+#+SOURCE: zig 0.16.0 stage1/zig1.wasm — the bootstrap compiler. Runs the FULL zig frontend + Sema + C-backend codegen INSIDE wasm and emits C. Compiler-in-sandbox: zero native execution. See README.org for the honest end-to-end-run status.
