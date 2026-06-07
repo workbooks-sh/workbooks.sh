@@ -41,6 +41,12 @@ defmodule Workbooks.Instance.Imports do
   defp add("llm", acc, _vfs, _ctx),
     do: Map.put(acc, "llm-complete", {:fn, fn prompt -> llm_complete(prompt) end})
 
+  # browse: fetch+extract a URL through the host's Browse capability (Route B —
+  # the host owns network egress; the component never opens a socket). The
+  # extracted page is normalized to a JSON string for the typed `-> string` Dock.
+  defp add("browse", acc, _vfs, _ctx),
+    do: Map.put(acc, "browse-fetch", {:fn, fn url -> browse_fetch(url) end})
+
   defp add(_other, acc, _, _ctx), do: acc
 
   defp run_command(name, input, args, ctx) do
@@ -78,6 +84,17 @@ defmodule Workbooks.Instance.Imports do
   end
 
   defp log_step(_ctx, _name, _exit_code, _dur_ms), do: :ok
+
+  # Reach the host Browse capability and hand the component a JSON string. The
+  # component sees only the typed `-> string` result; it never touches the socket.
+  defp browse_fetch(url) do
+    case Workbooks.Browse.fetch(url) do
+      {:ok, page} -> Jason.encode!(page)
+      {:error, e} -> Jason.encode!(%{error: inspect(e)})
+    end
+  rescue
+    e -> Jason.encode!(%{error: inspect(e)})
+  end
 
   defp llm_complete(prompt) do
     case Workbooks.Llm.complete([%{role: "user", content: prompt}]) do

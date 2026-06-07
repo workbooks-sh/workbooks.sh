@@ -14,5 +14,10 @@ world engine {
   // the host applies each command's arg mode (real wasmtime argv, or fold into the
   // first stdin line for legacy stdin-protocol commands). Gated by `commands`.
   import run-command: func(command: string, input: string, args: list<string>) -> string;
+  // Fetch+extract one URL through the host's Browse capability (Workbooks.Browse).
+  // Route B: the host owns the network egress — the component never opens a socket
+  // (wasi:http/sockets are NOT granted). Returns the extracted page as a JSON
+  // string. Gated by `browse`.
+  import browse-fetch: func(url: string) -> string;
   export run: func(input: string) -> string;
 }
