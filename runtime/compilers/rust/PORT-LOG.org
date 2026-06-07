@@ -216,3 +216,27 @@
   + libstd objs + wasi_shim + crt1 → wasm-ld → run → "hello".
   PURITY upgrade (later): replay the per-crate mrustc commands (minicargo -v dumps them) with
   mrustc.wasm so even libstd builds in-sandbox.
+
+* 2026-06-07 (iter 11) — libstd build wired up; current wall = layout asserts under arch=wasm32
+  Progress (all reproducible, committed under compilers/rust/std/):
+  - native mrustc+minicargo build the std graph via `make -f minicargo.mk RUSTC_VERSION=1.54.0
+    MRUSTC_TARGET=<wasm32-wasi.spec> OUTDIR=output-wasi/ LIBS` (MRUSTC_TARGET must be a PATH;
+    MRUSTC_TARGET_VER=1.54 — NOT 1.54.0).
+  - The source scaffolding works (patch/vendor/overrides). Added missing wasi override
+    build_dlmalloc.txt (empty; dlmalloc build.rs emits nothing) — wasi pulls dlmalloc.
+  - Added ARCH_WASM32 to mrustc (mrustc-arch-wasm32.patch) so target_arch=wasm32.
+  - cc step: mrustc invokes `wasm32-wasi-gcc`; wrapper → wasi-sdk clang cross-compiles the
+    trusted libstd C → wasm objects (cc-wrapper.template.sh).
+  - libcore.{c,hir} ARE produced for wasi.
+  CURRENT WALL: with arch=wasm32, the cc step fails on size/align static-asserts in
+  libcore.rlib.c (e.g. OptionSome sizeof==24/alignof==8) — mrustc's computed layout != what
+  wasm32 clang computes for some types. NOTE: arch=arm did NOT have this (the no_std e2e
+  proved arm's layout matches wasm32 clang exactly). So either ARCH_WASM32's params are
+  slightly off (atomics? I set all-true vs arm's u16/u64=false — may shift Option<Atomic>
+  layouts), OR target_arch=wasm32 pulls core code whose layout mrustc miscomputes.
+  NEXT (two options): (A) PRAGMATIC — use arch=arm for the std build too (proven layout) and
+  have the cc-wrapper sed-stub the 3 ARM barrier asms before compiling (reuses the working
+  core path). (B) CLEAN — fix ARCH_WASM32 params to match wasm32 clang exactly (diff
+  mrustc's computed sizes vs clang's; likely the atomics flags). Try (A) first — it's known
+  to work for core. Then: build full std, compile a println hello.rs in-sandbox against it,
+  link, run. Memory headroom fine.
