@@ -1,0 +1,52 @@
+#+TITLE: Multimodal (image / video / audio) embeddings — research spike
+#+STATUS: researched; not built. Fits the existing Embed slot; embedder is the only new part.
+
+* The question
+Can we embed images + video for semantic search, like we do text? Can it run
+in-BEAM? Is there a Gemma multimodal model? How big, and does it need another server?
+
+* Key finding: text was special; image/video need real inference
+Text embeds in pure Elixir ONLY because Model2Vec is STATIC (tokenize → matrix
+lookup → mean — no neural net). Image/video models are ViTs/CNNs needing actual
+neural inference → too slow for pure Elixir. So NOT in-BEAM. Two paths that fit
+what we already have:
+  1. WASM — onnxruntime-web / tract compile the engine to WASM; transformers.js
+     runs CLIP/SigLIP image embeddings in-browser/Node today. Same Wasmex-sandbox
+     `embed`-command path, bigger model. Runs server AND browser, in our infra.
+  2. External API / sidecar.
+Either slots into =Workbooks.Embed= (the provider behaviour). =Workbooks.Vector=
+is already modality-agnostic (any dim) — only the EMBEDDER changes per modality;
+index + search + storage are unchanged.
+
+* The models (2026)
+- *Gemini Embedding 2* (Google, public preview Mar 2026) — first natively
+  MULTIMODAL embedder: text + image + video + audio + PDF in ONE 3072-d space
+  (cross-modal: a text query matches images/video directly). Top MTEB 68.32. But
+  HOSTED API — external, per-query, on Google's servers. The "covers all bases"
+  option, not sovereign.
+- *EmbeddingGemma* (308M, open, on-device) — TEXT-ONLY (the one we already cite).
+- *SigLIP 2* (Google, Feb 2025, Apache-2.0) — open image-text encoder, several
+  sizes; base ~375 MB. The sovereign image workhorse.
+- *TinyCLIP* (MIT, ~24 MB) — small image-text model, runs in WASM/browser.
+- *Video* = sample keyframes → embed each as an image → pool/store (recent
+  methods need ~1.4% of frames). NO separate video model — reuse the image
+  embedder; "search a video" = search its keyframe vectors.
+
+* Recommendation — two options, both fit the slot
+  | option                         | covers                         | runs where           | tradeoff |
+  | Gemini Embedding 2 (API)       | text+image+video+audio, 1 space| Google servers       | zero infra, top quality; external + per-query + not sovereign |
+  | WASM SigLIP/TinyCLIP + frames  | text↔image (video via frames)  | our Wasmex sandbox + browser | sovereign, multi-tenant; bigger model, no audio |
+
+Keep the modality-slot design (it accommodates both). Text ships now (pure
+Elixir, tiny). Add image/video as a SECOND =Embed= adapter when needed — WASM
+SigLIP/TinyCLIP for sovereign, or Gemini Embedding 2 as the all-in-one convenience
+adapter (same shape as the =openrouter= text adapter). The only new work is the
+embedder; everything downstream is reused. Multimodal vectors live in the SAME
+Vector store, so cross-modal search (text query → image/video hits) is automatic
+once both land in one space (native with Gemini Embedding 2; with SigLIP the
+image-text space is shared by construction).
+
+* Worth prototyping when the need lands
+A WASM image-embed command (onnxruntime-web + TinyCLIP) registered like the text
+embedder — proves sovereign image search end-to-end, runs in the browser viewer
+too. Until then: text is done; image/video is a documented drop-in.
