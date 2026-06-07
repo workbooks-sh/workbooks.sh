@@ -40,6 +40,7 @@ scratch/
 .beads-credential-key
 .beads/
 
-# Not tracked in this repo (server-specific / separate projects)
-deploy/
-projects/
+# Not tracked in this repo (server-specific / separate projects). Anchored to the
+# repo ROOT so nested dirs like runtime/host/deploy/ stay tracked.
+/deploy/
+/projects/

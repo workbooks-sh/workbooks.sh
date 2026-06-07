@@ -58,6 +58,9 @@ defmodule Workbooks.Deploy.Krunvm do
         "--name", @vm,
         "--cpus", to_string(Keyword.get(opts, :cpus, 2)),
         "--mem", to_string(Keyword.get(opts, :mem_mib, 2048)),
+        # The runtime image's WORKDIR — krunvm doesn't inherit it, so set it
+        # explicitly or a relative entrypoint runs from `/` and fails.
+        "--workdir", "/app",
         "--port", "#{host_port}:#{@guest_port}",
         "--volume", "#{data}:/data",
         "--volume", "#{disco}:/disco"
@@ -80,8 +83,8 @@ defmodule Workbooks.Deploy.Krunvm do
       |> Map.merge(%{"WB_DESKTOP" => "1", "WB_DESKTOP_DIR" => "/disco", "WB_DATA" => "/data", "WB_EMBED" => "local"})
       |> Enum.flat_map(fn {k, v} -> ["--env", "#{k}=#{v}"] end)
 
-    # `bin/workbooks start` is the release entrypoint inside the image.
-    ["krunvm", "start", @vm] ++ envs ++ ["--", "bin/workbooks", "start"]
+    # Absolute path to the release entrypoint (robust regardless of guest cwd).
+    ["krunvm", "start", @vm] ++ envs ++ ["--", "/app/bin/workbooks", "start"]
   end
 
   @doc "Is the microVM defined in krunvm's store?"
