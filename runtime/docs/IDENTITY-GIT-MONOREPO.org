@@ -120,9 +120,28 @@ broker) — with the signed agent ledger proving every step.
 
 * Phased build
 - *Phase 0 — Telemetry (the floor; in progress)*
-  0a verify live =_telemetry.db= ; 0b step-level events (tool/duration/cost via
-  the agent on_step) ; 0c a read/query surface ; 0d per-session db + a
-  cross-session index ; 0e wire into brandnana agent runs too.
+  *Completeness mandate (the thing we always get wrong):* instrument at the
+  CHOKEPOINTS, not the call sites, so nothing can escape by construction. There
+  are exactly two:
+  - =Workbooks.Agent.exec_one= — EVERY tool call flows through here (run/shell/
+    fetch/vfs/done). Record per call: tool, args summary, output, *exit_code*
+    (run/shell), *stderr/error*, duration, ts, agent_id, run_id. This is how we
+    catch "a bash call broke the system" or "a toolkit failed" — those ARE tool
+    calls, so they cannot be missed.
+  - =Workbooks.Llm.complete= — every model call: model, prompt/completion tokens,
+    cost, duration, error.
+  Plus the crash boundary (the spawn try/rescue → exception + stacktrace events)
+  and validation results (each =:done-when:=/=:check=). Captured in the loop, not
+  dependent on a caller wiring =on_step= — always-on whenever a workdir exists.
+  *Emit OpenTelemetry spans* (=:opentelemetry=) for the standard trace AND write
+  the SQLite ledger. Observability = *CLI feedback loop, NOT a dashboard*: a
+  =wb telemetry= command reads the ledger → timeline of tool calls / exit codes /
+  errors / cost for a run, and aggregates across runs. Complete feedback loop of
+  what actually happened.
+  0a verify live =_telemetry.db= [DONE] ; 0b chokepoint instrumentation
+  (exec_one + Llm.complete → step/tool/error/cost) ; 0c the =wb telemetry= CLI +
+  OTel spans ; 0d per-session db + cross-session index ; 0e wire into brandnana
+  agent runs too.
 - *Phase 1 — Auth profile* : deploy-kit =auth= knob (workos/clerk/native/bluesky),
   Guardian unchanged ; verify BetterAuth API-key + JWKS end-to-end.
 - *Phase 2 — Git/DID + sharing + ledger-hardening*
@@ -140,9 +159,10 @@ broker) — with the signed agent ledger proving every step.
   to the viewer; JJ branches + the ledger cover agent concurrency.
 - native 2FA ; Workbooks-operated PLC/seed services.
 
-* Open decisions (Shane)
-1. Brandnana IdP — Clerk, or WorkOS for consistency?
-2. Radicle/PDS seed — host a shared default on our Cloudflare, or self-host-only
-   to start?
-3. Telemetry scope — confirm per-session + cross-session index, task AND step
-   level.
+* Decisions (locked 2026-06-07)
+1. Brandnana IdP — *Clerk* for now (both integrations tested later; not urgent).
+2. Seed hosting — *self-host only* to start: it's *Bluesky (public)* OR *the
+   developer self-hosts on their own engine*. No shared Cloudflare seed for now.
+   Brandnana runs *our own* seed for its agents.
+3. Telemetry scope — confirmed: per-session + cross-session index, task AND step
+   level. See the completeness mandate below.
