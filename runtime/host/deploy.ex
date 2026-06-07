@@ -17,9 +17,71 @@ defmodule Workbooks.Deploy do
   """
   alias Workbooks.Deploy.{Krunvm, Image, Backend, Config}
 
+  @default_file "deployment.org"
+
+  @template_local """
+  # A Workbooks deployment — single-tenant, all-local (runs in a krunvm microVM,
+  # cloud-identical isolation). Edit, then:  wb deploy validate  →  wb deploy apply
+  * deployment :deployment:
+    :PROPERTIES:
+    :ENGINE_PLACE: local
+    :TENANCY_MODE: single
+    :STORAGE:      local-fs
+    :DATABASE:     sqlite
+    :AUTH:         trusted
+    # :PROFILE:    path/to/your/agent/profile
+    :END:
+  """
+
+  @template_cloud """
+  # A Workbooks deployment — multi-tenant SaaS in the cloud. Fill the <...>.
+  # SECRETS live in your ENV, never here:  WB_S3_KEY  WB_S3_SECRET  WB_DATABASE_URL
+  # Then:  wb deploy validate  →  wb deploy apply
+  * deployment :deployment:
+    :PROPERTIES:
+    :ENGINE_PLACE:     cloud
+    :PROVIDER:         fly
+    :APP:              <your-app-name>
+    :REGION:           sjc
+    :TENANCY_MODE:     multi
+    :STORAGE:          s3
+    :STORAGE_ENDPOINT: https://s3.us-east-1.amazonaws.com
+    :STORAGE_BUCKET:   <your-bucket>
+    :STORAGE_REGION:   us-east-1
+    :DATABASE:         postgres
+    :AUTH:             clerk
+    :ISSUER:           https://<your-clerk-domain>
+    # :PROFILE:        path/to/your/agent/profile
+    :END:
+  """
+
+  @doc "Scaffold a deployment.org from a preset (`local` | `cloud`). The starting point."
+  def init(preset \\ "local", opts \\ []) do
+    file = Keyword.get(opts, :file, @default_file)
+    force? = Keyword.get(opts, :force, false)
+
+    cond do
+      template(preset) == nil ->
+        err("unknown preset '#{preset}' — try: local | cloud", %{presets: ["local", "cloud"]})
+
+      File.exists?(file) and not force? ->
+        err("#{file} already exists — edit it, or `wb deploy init #{preset} --force` to replace it", %{file: file})
+
+      true ->
+        File.write!(file, template(preset))
+        ok("wrote #{file} (#{preset}) — edit it, then `wb deploy validate` → `wb deploy apply`", %{file: file, preset: preset})
+    end
+  end
+
+  defp template("local"), do: @template_local
+  defp template("cloud"), do: @template_cloud
+  defp template("cloud-saas"), do: @template_cloud
+  defp template(_), do: nil
+
   @doc "Coherence-check a deployment.org without deploying (the write-then-submit gate)."
   def validate(file) do
-    with {:ok, p} <- Config.parse(file) do
+    with :ok <- exists(file),
+         {:ok, p} <- Config.parse(file) do
       case Config.validate(p) do
         :ok -> ok("valid — #{Config.summary(p)}", %{valid: true})
         {:error, issues} -> err("invalid deployment:\n  - " <> Enum.join(issues, "\n  - "), %{valid: false, issues: issues})
@@ -29,13 +91,18 @@ defmodule Workbooks.Deploy do
     end
   end
 
+  defp exists(file) do
+    if File.exists?(file), do: :ok, else: {:error, "no #{file} — run `wb deploy init` to scaffold one"}
+  end
+
   @doc """
   Apply a `deployment.org`: validate, then converge to it. ENGINE_PLACE picks the
   target (local krunvm vs the cloud provider); TENANCY_MODE + the BYOD STORAGE/
   DATABASE axes + PROFILE flow to the engine as env. Idempotent.
   """
   def apply(file) do
-    with {:ok, p} <- Config.parse(file),
+    with :ok <- exists(file),
+         {:ok, p} <- Config.parse(file),
          :ok <- coherent(p) do
       env = Config.to_env(p)
 

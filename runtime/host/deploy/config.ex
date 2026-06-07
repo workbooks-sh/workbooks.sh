@@ -95,6 +95,7 @@ defmodule Workbooks.Deploy.Config do
     }
 
     base
+    |> put_present("WB_APP_NAME", p["APP"])
     |> put_present("WB_S3_ENDPOINT", p["STORAGE_ENDPOINT"])
     |> put_present("WB_S3_BUCKET", p["STORAGE_BUCKET"])
     |> put_present("WB_S3_REGION", p["STORAGE_REGION"])

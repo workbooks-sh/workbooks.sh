@@ -258,22 +258,22 @@ defmodule Workbooks.CLI do
       case args do
         [] -> {:ok, deploy_usage(), %{}}
         ["help" | _] -> {:ok, deploy_usage(), %{}}
-        # The declarative model: a deployment.org describes local|cloud × tenancy × BYOD.
-        ["validate", file] -> Workbooks.Deploy.validate(file)
-        ["apply", file] -> Workbooks.Deploy.apply(file)
-        # Zero-config local convenience (= a default local deployment).
+        # The declarative model: scaffold → edit → validate → apply. The file
+        # defaults to ./deployment.org, so most commands take no argument.
+        ["init" | rest] -> Workbooks.Deploy.init(preset_arg(rest), force: "--force" in rest)
+        ["validate" | rest] -> Workbooks.Deploy.validate(file_arg(rest))
+        ["apply" | rest] -> Workbooks.Deploy.apply(file_arg(rest))
+        # Quick zero-config local run (no file — like `docker run`).
         ["local" | _] -> Workbooks.Deploy.local()
         ["doctor"] -> Workbooks.Deploy.doctor()
-        # No file → the local daemon; a deployment.org → that deployment (local OR cloud).
-        ["status" | rest] -> Workbooks.Deploy.status(List.first(rest))
-        ["verify" | rest] -> Workbooks.Deploy.verify(List.first(rest))
-        ["down" | rest] -> Workbooks.Deploy.down(List.first(rest))
-        ["logs" | rest] -> Workbooks.Deploy.logs(List.first(rest))
+        # ./deployment.org if present (local OR cloud), else the local daemon.
+        ["status" | rest] -> Workbooks.Deploy.status(file_opt(rest))
+        ["verify" | rest] -> Workbooks.Deploy.verify(file_opt(rest))
+        ["down" | rest] -> Workbooks.Deploy.down(file_opt(rest))
+        ["logs" | rest] -> Workbooks.Deploy.logs(file_opt(rest))
         # The one image artifact.
         ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
         ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
-        ["validate"] -> {:error, "wb deploy validate <deployment.org>", %{}}
-        ["apply"] -> {:error, "wb deploy apply <deployment.org>", %{}}
         other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
       end
 
@@ -285,22 +285,40 @@ defmodule Workbooks.CLI do
   defp deploy_norm({:error, msg}), do: {:error, msg, %{}}
   defp deploy_norm(:error), do: {:error, "command not found (is docker/buildx installed?)", %{}}
 
+  # File arg helpers — the deployment.org defaults to ./deployment.org.
+  defp preset_arg(rest), do: Enum.find(rest, "local", &(not String.starts_with?(&1, "-")))
+  defp file_arg(rest), do: Enum.find(rest, "deployment.org", &(not String.starts_with?(&1, "-")))
+
+  defp file_opt(rest) do
+    case Enum.find(rest, &(not String.starts_with?(&1, "-"))) do
+      nil -> if File.exists?("deployment.org"), do: "deployment.org", else: nil
+      f -> f
+    end
+  end
+
   defp deploy_usage do
     """
-    wb deploy — the deploy-kit. A deployment is described by a deployment.org:
-      ENGINE_PLACE  local | cloud      TENANCY_MODE  single | multi
-      STORAGE       local-fs | s3      DATABASE      sqlite | postgres   (BYOD)
-      PROFILE <agent profile>          (secrets — S3 keys, DB DSN — come from ENV)
-    Non-interactive + idempotent; add --json to any verb.
-      validate <file>   coherence-check a deployment.org (no deploy)
-      apply <file>      validate, then converge to it (local krunvm OR the cloud provider)
-      local             zero-config local deployment (convenience)
-      doctor            check + self-heal local prerequisites
-      status | verify   local daemon state / prove the LIVE runtime answers
-      down | logs       stop the local daemon / where its logs are
-      build | publish   build the one runtime image / push it multi-arch to ghcr
-    Cloud provider is config (PROVIDER:, default fly) — the extension point, not a menu.
-    See deploy/deployments/ for example configs.
+    wb deploy — stand up the Workbooks runtime, local or cloud. Non-interactive,
+    idempotent; add --json to any verb for machine output (exit 0 ok / non-zero fail).
+
+    THE FLOW (declarative — reproducible):
+      wb deploy init [local|cloud]   scaffold ./deployment.org
+      wb deploy validate             coherence-check it (no deploy)
+      wb deploy apply                deploy it — local microVM OR the cloud provider
+      wb deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.org)
+      wb deploy down                 tear it down
+    (commands default to ./deployment.org; pass a path to use another)
+
+    QUICK (no config, like `docker run`):
+      wb deploy local                run the runtime locally right now
+      wb deploy doctor               check + self-heal local prerequisites
+
+    A deployment.org describes:
+      ENGINE_PLACE local|cloud · TENANCY_MODE single|multi · STORAGE local-fs|s3
+      DATABASE sqlite|postgres · AUTH trusted|clerk|… · PROFILE · (cloud: PROVIDER, APP)
+    Secrets (S3 keys, DB DSN) come from your ENV, never the file.
+
+    IMAGE:  wb deploy build | publish   (build / push the one runtime image to ghcr)
     """
   end
 
