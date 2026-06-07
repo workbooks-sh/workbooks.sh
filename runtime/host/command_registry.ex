@@ -30,9 +30,11 @@ defmodule Workbooks.CommandRegistry do
   #             where the binary reads its filter/pattern from line 1 of stdin).
   @builtins %{
     # A proof command: uppercases stdin. Source-built (Javy) on first use.
+    # Chunked read (64 KiB) accumulated until EOF — handles stdin of any size
+    # (the old fixed 8 KiB buffer silently truncated larger inputs).
     "upper" =>
       {:src, "js",
-       ~S|const b=new Uint8Array(8192);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;const s=new TextDecoder().decode(b.subarray(0,t)).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.toUpperCase()));|,
+       ~S|const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const s=new TextDecoder().decode(all).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.toUpperCase()));|,
        :argv},
     # Real jq: a wasi-clean jaq-interpret wrapper compiled to wasm (commands/jq/).
     # Stdin protocol: first line = filter, rest = JSON.

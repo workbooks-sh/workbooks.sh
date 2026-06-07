@@ -492,7 +492,7 @@ defmodule Workbooks.Toolkits do
   end
 
   defp captions(body),
-    do: Regex.scan(~r/^#\+CAPTION:\s*(.+)$/m, body) |> Enum.map(fn [_, c] -> String.trim(c) end)
+    do: Regex.scan(~r/^[ \t]*#\+CAPTION:\s*(.+)$/m, body) |> Enum.map(fn [_, c] -> String.trim(c) end)
 
   @doc false
   # Extract the body of every `#+begin_src bash :role <role> …` block.

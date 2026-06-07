@@ -199,17 +199,16 @@ defmodule Workbooks.ToolkitsTest do
       assert out =~ ~r/^\s+•\s/m
     end
 
-    test "every git skill has captions, yet NONE render a TOC (same bug, broad)" do
-      # Reinforces the bug's blast radius: all 9 git skills carry #+CAPTION
-      # lines, but every one of them indents the caption, so NOT ONE produces a
-      # TOC header. This whole feature is currently dead for the real tree.
+    test "every git skill has captions AND renders a TOC (indented captions detected)" do
+      # All 9 git skills carry indented #+CAPTION lines; captions/1 now tolerates
+      # leading whitespace, so each produces a TOC header (regression guard for the
+      # column-0-anchor bug).
       for slug <- ~w(overview bisect cherry-pick partial-staging
                      rebase-without-losing-work recover-from-detached-head
                      undo-a-commit-safely worktree-management submodule-flows) do
         out = Toolkits.show_skill_text("git", slug, @root)
         assert out =~ "#+CAPTION:", "#{slug} should contain caption lines"
-        # BUG: indented captions → no TOC. SHOULD become `assert` after the fix.
-        refute out =~ "TOC (CAPTIONs):", "#{slug} unexpectedly rendered a TOC"
+        assert out =~ "TOC (CAPTIONs):", "#{slug} should render a TOC"
       end
     end
 
