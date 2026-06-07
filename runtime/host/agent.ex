@@ -32,8 +32,13 @@ defmodule Workbooks.Agent do
       }, required: ["pipeline"]}
     }},
     %{type: "function", function: %{
+      name: "search",
+      description: "RECALL by meaning — semantic search over the org/code files in your working context (no separate memory store; the files ARE the memory). Returns the most relevant snippets with their path. Use this to recall what's known instead of re-deriving it. To 'remember' something, write it as an org file with vfs_write — it becomes searchable automatically. e.g. query=\"how do we handle auth headers\".",
+      parameters: %{type: "object", properties: %{query: %{type: "string"}}, required: ["query"]}
+    }},
+    %{type: "function", function: %{
       name: "wb",
-      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only), `memory remember <key> <text>` / `memory recall <key>` / `memory search <q>` (your long-term memory — persists findings across runs). e.g. args=\"memory remember acme_color teal\".",
+      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only). e.g. args=\"var set acme_color teal\".",
       parameters: %{type: "object", properties: %{args: %{type: "string"}}, required: ["args"]}
     }},
     %{type: "function", function: %{
@@ -160,6 +165,20 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "run"}, st), do: {"run not permitted (no exec capability)", st, nil}
+
+  # Semantic recall over the agent's working org/code context — the files ARE the
+  # memory (no separate store to drift). Stateless: always the current files.
+  defp exec_one(%{name: "search", args: a}, st) do
+    hits = Workbooks.Library.search_dir(st.workdir, a["query"] || "", k: 5)
+
+    out =
+      case hits do
+        [] -> "(no relevant context found)"
+        _ -> Enum.map_join(hits, "\n", fn h -> "[#{h.path}] #{h.headline}\n  #{String.slice(h.text, 0, 240) |> String.replace("\n", " ")}" end)
+      end
+
+    {out, st, nil}
+  end
 
   defp exec_one(%{name: "fetch", args: a}, st), do: {fetch_url(a["url"]), st, nil}
 

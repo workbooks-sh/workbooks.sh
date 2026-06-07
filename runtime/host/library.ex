@@ -337,6 +337,37 @@ defmodule Workbooks.Library do
     |> Enum.sort_by(& &1.rrf, :desc)
   end
 
+  @doc """
+  Semantic recall over a directory's org/code files — STATELESS (chunk + embed +
+  rank on the fly, no stored index). This is "memory" reframed: there is no
+  separate note store to drift; you search the actual org/code context the agent
+  is working in, so results always reflect the CURRENT files. Returns ranked
+  %{path, headline, text, score}. opts: :k.
+  """
+  def search_dir(dir, query, opts \\ []) do
+    chunks =
+      dir
+      |> Path.join("**/*")
+      |> Path.wildcard()
+      |> Enum.filter(&File.regular?/1)
+      |> Enum.filter(&text_file?(&1))
+      |> Enum.flat_map(fn f ->
+        chunk(Path.basename(f), File.read!(f))
+        |> Enum.map(fn {hl, text} -> %{path: Path.relative_to(f, dir), headline: hl, text: text} end)
+      end)
+
+    with [_ | _] <- chunks,
+         {:ok, [qvec]} <- Workbooks.Embed.embed([query]),
+         {:ok, vecs} <- Workbooks.Embed.embed(Enum.map(chunks, & &1.text)) do
+      Enum.zip(chunks, vecs)
+      |> Enum.map(fn {c, v} -> Map.put(c, :score, Workbooks.Embed.cosine(qvec, v)) end)
+      |> Enum.sort_by(& &1.score, :desc)
+      |> Enum.take(opts[:k] || 5)
+    else
+      _ -> []
+    end
+  end
+
   @text_exts ~w(.org .md .txt .rs .js .ts .jsx .tsx .svelte .ex .exs .py .go .html .css .sql .json .toml .yaml .yml)
   defp text_file?(name), do: Path.extname(name) in @text_exts
 
