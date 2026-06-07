@@ -142,8 +142,16 @@ defmodule Workbooks.Agent do
   # Exec agents share an OS workdir (the substrate the toolkit CLIs + the next
   # agent read) — so their "filesystem" tools target that workdir, not the
   # per-agent in-memory VFS. Non-exec agents use the sandboxed VFS.
+  # Resolve an agent-supplied path under the workdir. Absolute paths are used
+  # as-is (the agent already knows the workdir) — else Path.join would DOUBLE it
+  # (workdir/workdir/analysis/x.org), hiding files from `analysis check` + the
+  # next agent. Relative paths join under the workdir.
+  defp in_workdir(workdir, path) do
+    if Path.type(path) == :absolute, do: path, else: Path.join(workdir, path || "")
+  end
+
   defp exec_one(%{name: "vfs_write", args: a}, %{exec: true} = st) do
-    path = Path.join(st.workdir, a["path"])
+    path = in_workdir(st.workdir, a["path"])
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, a["content"] || "")
     {"wrote #{byte_size(a["content"] || "")} bytes to #{a["path"]}", st, nil}
@@ -157,7 +165,7 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "vfs_read", args: a}, %{exec: true} = st) do
-    out = case File.read(Path.join(st.workdir, a["path"])) do
+    out = case File.read(in_workdir(st.workdir, a["path"])) do
       {:ok, c} -> c
       {:error, r} -> "not found: #{a["path"]} (#{r})"
     end
