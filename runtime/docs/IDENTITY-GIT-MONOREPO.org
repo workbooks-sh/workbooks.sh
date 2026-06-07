@@ -17,7 +17,16 @@ did + atproto libs; reimplement nothing we can call).
   - PACKED = workbook(s)/containers, DID-referenced, compact, runnable.
   - UNPACKED = a flat source tree (org + readable SQL + the manifest) — the
     *monorepo* projection that syncs to GitHub.
-- *Monorepo* — NOT a separate thing: the unpacked projection of a workspace.
+- *Library* — the TOP layer, scoped to ONE identity (a user OR an org), never
+  shared. NOT a folder — an ACCESS GRAPH: the set of every workspace + workbook
+  that identity can reach, resolved ACROSS orgs, workspaces, and servers. The
+  Library IS the permission / scope / policy layer (it disassembles into "what
+  this identity can touch"); the workspace/workbook are what it grants access to.
+  See "The Library" below.
+- *Monorepo* — NOT a separate thing and NOT the Library: the unpacked,
+  git-backed PROJECTION (backup + sync + portability) of a workspace's content
+  to a repo (local FS / GitHub / Radicle). It's how Library content leaves the
+  runtime to be backed up + shared; the live access model stays in the Library.
 - *Manifest* (=.workbooks/workspace.org=) — declares members (by DID or path) +
   the logical structure. The structure lives in CONFIG, decoupled from the file
   tree, so reorganizing the monorepo = editing the manifest, not moving files.
@@ -39,6 +48,40 @@ did + atproto libs; reimplement nothing we can call).
   and diffable.
 - Orchestrated by the org-workflow DAG, NOT Bazel. Revisit Bazel only at real
   multi-language / huge-graph / remote-cache scale.
+
+* The Library (the identity-scoped top layer) — locked
+*A Library is what one identity (user OR org) can reach — an access graph, not a
+folder.* It is the answer to "what work is mine / my org's, and where does it
+live." Never shared between identities; sharing happens to its CONTENTS, by
+manifest + C2PA, on egress.
+
+- *It disassembles into access, not files.* A Library resolves an identity's
+  workbooks + workspaces ACROSS every org it belongs to, every workspace, and
+  every server (this engine or another) — into one extensible map of permission
+  scopes + policies. Membership in N orgs ⇒ the Library is the union of what
+  those memberships grant, with each item carrying its own scope. So the Library
+  IS the access-control layer over workbook files; the existing per-request
+  tenant scoping (Guardian) + the WASM capability Policy are its enforcement
+  points, not a separate system.
+- *Monorepo = the Library's backup/sync, not the Library.* "Back up all my work
+  to a repo" = project the Library's workspaces to their unpacked git form
+  (=Workbooks.Git= per-tenant repo → GitHub / Radicle / local FS). The repo is
+  durable + portable + diffable; the Library stays the live access graph. One is
+  the photo, the other is the room.
+- *Checkout (load/unload).* Pull a workbook/workspace OUT of the Library into a
+  working context (the unpacked workdir + scratch we already run) and check it
+  back IN when done — borrow/return, exactly =unpack=/=pack=. On the way out it
+  can be shared through the manifest/sharing rails; on the way back its ledger +
+  signature update.
+- *C2PA is the connective tissue.* Every item in a Library is did:key/C2PA-linked
+  (=Workbooks.Manifest=, the signed ledger), so access, provenance, and sharing
+  are ONE fabric: a checkout is attributable, a shared artifact verifies
+  standalone, and "who may touch this" rides the same identity that signs it.
+- *Build order.* Access model first (Library = a manifest/index over the tenant's
+  workspaces + an access-resolution fn over Guardian scopes + Policy), THEN
+  cross-workbook OQL query-through across a Library's members. Pack/unpack
+  (=Bundle=) + signing (=Manifest=) + git backup (=Git=) already exist — the
+  Library is the index + access layer that composes them, not new machinery.
 
 * Identity (auth)
 - Already wired: *BetterAuth* issues JWTs (login, OAuth, API keys); *Guardian*
@@ -172,9 +215,12 @@ broker) — with the signed agent ledger proving every step.
   2c C2PA signing on did:key ; 2d ATproto publish (Bluesky OAuth, blob+record) ;
   2e self-host did:web ; 2f Radicle =rad= P2P ; 2g harden the ledger
   (hash-chain + agent-DID sign + anchor).
-- *Phase 3 — Composition* : manifest format (=workspace.org=) ; =pack=/=unpack=
-  (generalize seal/unbundle) ; cross-workbook mount + OQL query-through ;
-  runtime broker edges.
+- *Phase 3 — Composition* : the *Library* (identity-scoped access graph over the
+  tenant's workspaces, resolved over Guardian scopes + Policy) ; manifest format
+  (=workspace.org=) ; =pack=/=unpack= (generalize seal/unbundle) ; checkout
+  (load/unload = unpack/pack) ; cross-workbook mount + OQL query-through ;
+  runtime broker edges. Backup/sync to git is the monorepo PROJECTION, not the
+  Library itself.
 
 * Deferred / not now
 - *Bazel* — own workflow-DAG build instead; revisit only at scale.
