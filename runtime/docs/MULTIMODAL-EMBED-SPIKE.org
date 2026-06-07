@@ -67,6 +67,25 @@ sovereign image search CLIENT-SIDE, the same place verify.mjs/embed.mjs run.
   Endpoint (dedicated GPU). Can't run 7B locally to demo on our data; wire the
   adapter, point it at the GPU endpoint, validate there.
 
+* Defaults by deployment: cloud = CLIP, local-capable = bigger multimodal
+The right default depends on WHERE the runtime runs — and the open provider
+registry (=Workbooks.Embed=) makes it a config choice, not a fork:
+- *Cloud / Fly (CPU, multi-tenant)* → CLIP-class is the recommended default: one
+  model for image+TEXT in ONE space (cross-modal), small enough (~150 MB q8) to
+  ride in the runtime. A 7B VLM can't run multi-tenant on a CPU Fly machine.
+  Text can stay Model2Vec (pure Elixir) where pure-text quality matters; image (+
+  cross-modal) via CLIP.
+- *Local / single machine with an accelerator* (a dev's Mac MPS, a workstation
+  GPU) → since it's ONE computer, not multi-tenant, the runtime can serve a
+  HEAVIER multimodal model locally as the default (VLM2Vec, etc.), geared to that
+  machine's accelerator. The runtime can ASSESS capability (cores/RAM/OS/GPU) and,
+  if the box can run it, default to the bigger local model; else fall back to CLIP
+  / Model2Vec. "Fit the system it's on."
+- Both are just `WB_EMBED*` config today (local adapter / `http:<sidecar>` /
+  `WB_EMBED_MULTIMODAL`). The remaining BUILD is the actual local model RUNNER
+  (CLIP via a WASM `embed` command or an onnxruntime/torch sidecar) + a small
+  capability probe to pick the default — the registry already routes to it.
+
 * The modality spectrum (all one Vector store, pick per need)
   | modality                         | model                         | where it runs |
   | text                             | Model2Vec/potion (DONE)       | pure Elixir, in-BEAM, tiny |
