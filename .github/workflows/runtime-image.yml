@@ -46,6 +46,10 @@ jobs:
 
       # The deploy-kit lives in the Elixir runtime — run its publish verb.
       - uses: erlef/setup-beam@v1
+        # The arm runner reports ImageOS=ubuntu24-arm64, which setup-beam can't map;
+        # pin the OS family (it has arm64 OTP for ubuntu24).
+        env:
+          ImageOS: ubuntu24
         with:
           otp-version: "27"
           elixir-version: "1.18"
