@@ -141,6 +141,50 @@ defmodule Workbooks.Library do
     e -> %{"error" => Exception.message(e)}
   end
 
+  @doc """
+  PACK a workspace into one parent workbook (the fractal "compile to another
+  workbook" — containers hold containers). Bundles the `workspace.org` manifest +
+  every path member's bytes into a single `.wbundle`, so a project of feature
+  workbooks becomes one shippable parent. Privacy by default: personal/session
+  files are stripped (`Workbooks.Private`); `include_private: true` to keep them.
+  Returns {:ok, blob} or {:error, reason}. (DID members are referenced, not
+  vendored — resolved on unpack; extension point.)
+  """
+  def pack(tenant, workspace_slug, opts \\ []) do
+    case Enum.find(workspaces(tenant), &(&1.slug == workspace_slug)) do
+      nil -> {:error, "no such workspace: #{workspace_slug}"}
+      ws ->
+        repo = Git.repo_path(tenant)
+
+        parts =
+          for %{ref: {:path, p}} <- ws.members, into: %{} do
+            {p, File.read!(Path.join(repo, p))}
+          end
+          |> Map.put("workspace.org", File.read!(ws.path))
+
+        parts = if opts[:include_private], do: parts, else: Workbooks.Private.strip_parts(parts)
+        {:ok, Workbooks.Bundle.pack(parts)}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  @doc """
+  UNPACK a parent workbook back to a flat tree under `dest` — the working form
+  (the monorepo projection). Mirror of `pack/3`; reuses `Bundle.unpack`.
+  Returns the list of files written.
+  """
+  def unpack(blob, dest) when is_binary(blob) do
+    File.mkdir_p!(dest)
+
+    for {name, content} <- Workbooks.Bundle.unpack(blob) do
+      path = Path.join(dest, name)
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, content)
+      name
+    end
+  end
+
   defp find(tenant, member_id), do: Enum.find(members(tenant), &(&1.id == member_id))
 
   # Unpack a member into the working dir: a .wbundle → its html + vfs; else copy.

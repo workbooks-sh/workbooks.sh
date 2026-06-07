@@ -142,6 +142,19 @@ defmodule Workbooks.CLI do
   def call(["checkin", member, workdir], t),
     do: Workbooks.Library.checkin(t, member, workdir) |> Map.drop([:member]) |> json()
 
+  # Compose a workspace's members into ONE parent workbook, and back.
+  def call(["pack", slug, out], t) do
+    case Workbooks.Library.pack(t, slug) do
+      {:ok, blob} -> File.write!(out, blob); "packed #{slug} → #{out} (#{byte_size(blob)} bytes)"
+      {:error, e} -> e
+    end
+  end
+
+  def call(["unpack", bundle, dest], _t) do
+    files = Workbooks.Library.unpack(File.read!(bundle), dest)
+    "unpacked #{length(files)} files → #{dest}"
+  end
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
 
@@ -173,6 +186,8 @@ defmodule Workbooks.CLI do
       wb library query <sql>               cross-workbook query across members' VFS
       wb checkout <member> <workdir>       borrow a member into a working dir
       wb checkin <member> <workdir>        pack + sign a member back into the library
+      wb pack <workspace> <out.wbundle>    compile a workspace's members → one parent workbook
+      wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
       wb version
     """
   end
