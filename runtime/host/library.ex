@@ -54,6 +54,59 @@ defmodule Workbooks.Library do
   @doc "The Library owner's did:key — the identity every member is signed/scoped under."
   def did(tenant), do: Git.did(tenant)
 
+  # ── checkout / check-in (borrow ⇄ return = unpack ⇄ pack) ────────────────────
+
+  @doc """
+  Check a member OUT of the Library into `workdir` — the unpacked working form
+  (the same workdir/scratch the workflow runs). A `.wbundle` member is unpacked
+  via `Bundle.restore`; a plain file is copied. DID members resolve on demand
+  (not wired — extension point). Returns %{member, workdir, scope} or %{error}.
+  """
+  def checkout(tenant, member_id, workdir) do
+    case find(tenant, member_id) do
+      nil -> %{error: "no such member: #{member_id}"}
+      %{ref: {:path, p}} = m ->
+        File.mkdir_p!(workdir)
+        place(Path.join(Git.repo_path(tenant), p), workdir)
+        %{member: m, workdir: workdir, scope: access(tenant, tenant, m.scope)}
+
+      %{ref: {:did, _}} = m -> %{error: "DID resolution not wired", member: m}
+      m -> %{error: "unresolved member", member: m}
+    end
+  end
+
+  @doc """
+  Check a member back IN — pack the workdir's `workbook.html`, SIGN it with the
+  tenant did:key (`Workbooks.Manifest`, the pack-and-sign step), and write it
+  back to the member's repo path. Returns %{member, bytes} or %{error}.
+  """
+  def checkin(tenant, member_id, workdir) do
+    with %{ref: {:path, p}} = m <- find(tenant, member_id),
+         {:ok, html} <- File.read(Path.join(workdir, "workbook.html")) do
+      signed = Workbooks.Manifest.sign(html, tenant, [%{"type" => "c2pa.action.updated", "actor" => Git.did(tenant)}])
+      dest = Path.join(Git.repo_path(tenant), p)
+      File.write!(dest, signed)
+      %{member: m, bytes: byte_size(signed)}
+    else
+      nil -> %{error: "no such member: #{member_id}"}
+      {:error, _} -> %{error: "no workbook.html in #{workdir}"}
+      m -> %{error: "member not a path ref", member: m}
+    end
+  end
+
+  defp find(tenant, member_id), do: Enum.find(members(tenant), &(&1.id == member_id))
+
+  # Unpack a member into the working dir: a .wbundle → its html + vfs; else copy.
+  defp place(src, workdir) do
+    if String.ends_with?(src, ".wbundle") and File.exists?(src) do
+      {_m, html, vfs} = Workbooks.Bundle.restore(File.read!(src))
+      File.write!(Path.join(workdir, "workbook.html"), html)
+      File.write!(Path.join(workdir, "vfs.sqlite"), vfs)
+    else
+      File.cp(src, Path.join(workdir, "workbook.html"))
+    end
+  end
+
   defp normalize(s) when s in ["read", "write"], do: s
   defp normalize(_), do: "read"
 end
