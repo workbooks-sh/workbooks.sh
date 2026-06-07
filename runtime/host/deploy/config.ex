@@ -16,6 +16,7 @@ defmodule Workbooks.Deploy.Config do
   @tenancy ~w(single multi)
   @storage ~w(local-fs s3)
   @database ~w(sqlite postgres)
+  @auth ~w(trusted betterauth clerk oidc)
 
   @doc "Parse a deployment.org → the property map (string keys)."
   def parse(path) do
@@ -57,6 +58,7 @@ defmodule Workbooks.Deploy.Config do
     tenancy = p["TENANCY_MODE"] || "single"
     storage = p["STORAGE"] || "local-fs"
     database = p["DATABASE"] || "sqlite"
+    auth = p["AUTH"] || "trusted"
 
     issues =
       []
@@ -64,8 +66,13 @@ defmodule Workbooks.Deploy.Config do
       |> enum_check(tenancy, @tenancy, "TENANCY_MODE")
       |> enum_check(storage, @storage, "STORAGE")
       |> enum_check(database, @database, "DATABASE")
+      |> enum_check(auth, @auth, "AUTH")
       |> add_if(tenancy == "multi" and database == "sqlite",
         "TENANCY_MODE: multi on DATABASE: sqlite serializes every tenant through one writer — set DATABASE: postgres")
+      |> add_if(tenancy == "multi" and auth == "trusted",
+        "TENANCY_MODE: multi needs real AUTH (betterauth|clerk|oidc) — `trusted` has no identity to isolate tenants by")
+      |> add_if(auth != "trusted" and blank?(p["ISSUER"]),
+        "AUTH: #{auth} needs an ISSUER (the token issuer / JWKS origin)")
       |> add_if(storage == "s3" and (blank?(p["STORAGE_BUCKET"]) or blank?(p["STORAGE_ENDPOINT"])),
         "STORAGE: s3 needs STORAGE_BUCKET + STORAGE_ENDPOINT in the file")
       |> add_if(storage == "s3" and (env_blank?("WB_S3_KEY") or env_blank?("WB_S3_SECRET")),
@@ -93,11 +100,34 @@ defmodule Workbooks.Deploy.Config do
     |> put_present("WB_S3_REGION", p["STORAGE_REGION"])
     |> put_present("WB_PROFILE_DIR", p["PROFILE"])
     |> put_present("WB_REGION", p["REGION"])
+    |> auth_env(p)
     |> forward_secret("WB_S3_KEY")
     |> forward_secret("WB_S3_SECRET")
     |> forward_secret("WB_DATABASE_URL")
     |> forward_secret("OPENROUTER_API_KEY")
   end
+
+  # AUTH/ISSUER → the runtime's Guardian env: WB_AUTH_ISSUER + the JWKS endpoint
+  # (RS256 verification). `trusted` is the no-real-auth path (single-tenant). The
+  # JWKS path is derived per provider (BetterAuth is non-standard); an explicit
+  # JWKS_URL property overrides.
+  defp auth_env(map, p) do
+    auth = p["AUTH"] || "trusted"
+    issuer = p["ISSUER"]
+
+    if auth == "trusted" or blank?(issuer) do
+      map
+    else
+      jwks = p["JWKS_URL"] || derive_jwks(auth, issuer)
+
+      map
+      |> Map.put("WB_AUTH_ISSUER", issuer)
+      |> put_present("WB_JWKS_URL", jwks)
+    end
+  end
+
+  defp derive_jwks("betterauth", issuer), do: String.trim_trailing(issuer, "/") <> "/api/auth/jwks"
+  defp derive_jwks(_oidc, issuer), do: String.trim_trailing(issuer, "/") <> "/.well-known/jwks.json"
 
   @doc "Which place a config targets (`local` | `cloud`)."
   def place(p), do: p["ENGINE_PLACE"]
