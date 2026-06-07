@@ -94,6 +94,53 @@ defmodule Workbooks.Library do
     end
   end
 
+  @doc """
+  Cross-workbook OQL query-through — run one SQL across EVERY member that carries
+  a queryable SQLite VFS (a `.wbundle`), returning rows tagged by member. The
+  Library reads as one queryable surface without merging the workbooks. Members
+  with no VFS (html-only, unresolved DID) are reported in `skipped`, never
+  silently dropped. Reuses `VFS.open`/`VFS.query_json` — no new query engine.
+  """
+  def query(tenant, sql) do
+    {hits, skipped} =
+      members(tenant)
+      |> Enum.reduce({[], []}, fn m, {hits, skipped} ->
+        case member_vfs_bytes(tenant, m) do
+          {:ok, bytes} ->
+            rows = query_bytes(bytes, sql)
+            {[%{member: m.id, workspace: m.workspace, rows: rows} | hits], skipped}
+
+          :none -> {hits, [m.id | skipped]}
+        end
+      end)
+
+    %{rows: Enum.reverse(hits), skipped: Enum.reverse(skipped)}
+  end
+
+  defp member_vfs_bytes(tenant, %{ref: {:path, p}}) do
+    src = Path.join(Git.repo_path(tenant), p)
+    if String.ends_with?(src, ".wbundle") and File.exists?(src) do
+      {_m, _html, vfs} = Workbooks.Bundle.restore(File.read!(src))
+      {:ok, vfs}
+    else
+      :none
+    end
+  end
+
+  defp member_vfs_bytes(_tenant, _m), do: :none
+
+  defp query_bytes(bytes, sql) do
+    tmp = Path.join(System.tmp_dir!(), "lib-q-#{:erlang.phash2({bytes, sql})}.sqlite")
+    File.write!(tmp, bytes)
+    {:ok, conn} = Workbooks.VFS.open(tmp)
+    json = Workbooks.VFS.query_json(conn, sql)
+    Exqlite.Sqlite3.close(conn)
+    File.rm(tmp)
+    Jason.decode!(json)
+  rescue
+    e -> %{"error" => Exception.message(e)}
+  end
+
   defp find(tenant, member_id), do: Enum.find(members(tenant), &(&1.id == member_id))
 
   # Unpack a member into the working dir: a .wbundle → its html + vfs; else copy.
