@@ -5,13 +5,14 @@ env-name = ""
 
 [backend.c]
 variant = "gnu"
+emulate-i128 = true
 target = "wasm32-wasi"
 compiler-opts = ["-ffunction-sections",]
 linker-opts-pre = []
 linker-opts-post = ["-Wl,--gc-sections",]
 
 [arch]
-name = "arm"
+name = "wasm32"
 pointer-bits = 32
 is-big-endian = false
 has-atomic-u8 = true

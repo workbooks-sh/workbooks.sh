@@ -258,3 +258,25 @@
      - or bump to MRUSTC_TARGET_VER=1.74 (newer std/mrustc may lay out cleanly).
   STATUS unchanged on the headline: no_std Rust + C + Zig fully work in-sandbox (merged).
   Full-std is a real deep grind here, not a quick win.
+
+* 2026-06-07 (iter 13) — ★ ENTIRE std DEP GRAPH builds for wasi; blocked only on `wasi` crate
+  Two fixes cracked the layout/asm walls together:
+  - spec arch="wasm32" (ARCH_WASM32) → NO ARM barrier asm (target_arch=wasm32).
+  - spec [backend.c] emulate-i128 = true → mrustc emits emulated i128 (struct{lo,hi}, align 8),
+    fixing the OptionSome size/align asserts (native __int128 was align 16 ≠ mrustc's layout).
+  - CC_wasm32_wasi=<wrapper> forces mrustc to cross-compile its C via wasi-sdk clang.
+  RESULT: minicargo built the FULL std dependency graph for wasi (all .hir): core, alloc,
+  compiler_builtins, cfg_if, dlmalloc, hashbrown, libc, panic_abort, panic_unwind,
+  rustc_demangle, std_detect, unwind. std ITSELF then compiles its sys/wasi + os/wasi
+  backend (os=wasi selection works!) and fails at ONE point:
+    library/std/src/os/wasi/fs.rs:454 — `wasi::FILETYPE_BLOCK_DEVICE` → "Couldn't find path
+    component 'wasi'": the external `wasi` bindings crate wasn't built as a std dependency.
+  WHY: std's Cargo.toml lists `wasi` under [target.'cfg(target_os="wasi")'.dependencies];
+  minicargo's target-dep cfg resolution didn't include it (the makefile's RUSTC_ARCH derivation
+  defaulted to x86_64 since MRUSTC_TARGET is a file path → STD_ENV_ARCH=x86_64). std's MODULE
+  cfg (mrustc, via spec os=wasi) correctly picked the wasi modules, but the CRATE-dep cfg
+  (minicargo) didn't add the wasi crate.
+  NEXT: get minicargo to build the vendored `wasi` crate as a std dep — fix its target cfg
+  eval (pass the right arch/target so cfg(target_os="wasi") deps resolve), or build the wasi
+  crate explicitly and -L it. Then std links; then hello.rs (println) in-sandbox → run.
+  We are ~1 dep + final link from full std. Memory fine throughout.
