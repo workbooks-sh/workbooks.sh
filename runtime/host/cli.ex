@@ -229,8 +229,12 @@ defmodule Workbooks.CLI do
     end
   end
 
-  # Deploy-kit: stand up the ONE runtime image, locally (containerized) or cloud.
+  # Deploy-kit: ONE source of deploy logic — build/publish the runtime image, run
+  # it locally (containerized) or cloud. Dogfooded: CI + the desktop app call these
+  # same verbs.
   def call(["deploy"], _t), do: deploy_usage()
+  def call(["deploy", "build" | _], _t), do: deploy_out(Workbooks.Deploy.Image.build(into_krunvm: true))
+  def call(["deploy", "publish" | _], _t), do: deploy_out(Workbooks.Deploy.Image.publish())
   def call(["deploy", "local" | _], _t), do: deploy_out(Workbooks.Deploy.local())
   def call(["deploy", "up" | _], _t), do: deploy_out(Workbooks.Deploy.local())
   def call(["deploy", "status"], _t), do: deploy_out(Workbooks.Deploy.status())
@@ -245,12 +249,14 @@ defmodule Workbooks.CLI do
 
   defp deploy_usage do
     """
-    wb deploy — run the runtime image locally (containerized) or in the cloud.
+    wb deploy — the deploy-kit: build/publish the runtime image, run it local or cloud.
+      build        build the runtime image for this arch + stage it into the krunvm store
+      publish      build multi-arch + push to the registry (ghcr) — `latest` + git sha
       local | up   bring up the local daemon (krunvm microVM + launchd agent)
       status       VM + runtime + agent state
       down         stop the agent + microVM (keeps data + APFS volume)
       logs         print the tail command for daemon logs
-    Image via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
+    Image ref via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
     """
   end
 

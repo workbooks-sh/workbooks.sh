@@ -14,13 +14,11 @@ defmodule Workbooks.Deploy do
   later) so the model is cross-platform even though mac ships first. Reached via
   `wb deploy <local|status|down|logs>`.
   """
-  alias Workbooks.Deploy.Krunvm
-
-  @default_image "ghcr.io/workbooks-sh/runtime:latest"
+  alias Workbooks.Deploy.{Krunvm, Image}
 
   @doc "Bring up the local containerized runtime daemon. Idempotent (converges)."
   def local(opts \\ []) do
-    image = Keyword.get(opts, :image, System.get_env("WB_IMAGE", @default_image))
+    image = Keyword.get(opts, :image, Image.ref())
     host_port = Keyword.get(opts, :host_port, free_host_port())
 
     with :ok <- ensure_prereqs(),
