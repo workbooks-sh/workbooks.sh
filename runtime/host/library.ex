@@ -151,6 +151,13 @@ defmodule Workbooks.Library do
   vendored — resolved on unpack; extension point.)
   """
   def pack(tenant, workspace_slug, opts \\ []) do
+    # Two egress purposes (the storage-vs-share distinction):
+    #   :share   (default) — strip personal/session data; what a recipient gets.
+    #   :archive           — keep everything; YOUR complete snapshot, so a
+    #                        re-download of your own backup still has your session.
+    # `include_private: true` is the low-level equivalent (:archive sets it).
+    include_private = opts[:include_private] || opts[:purpose] == :archive
+
     case Enum.find(workspaces(tenant), &(&1.slug == workspace_slug)) do
       nil -> {:error, "no such workspace: #{workspace_slug}"}
       ws ->
@@ -167,7 +174,7 @@ defmodule Workbooks.Library do
           |> Map.new()
           |> Map.put("workspace.org", File.read!(ws.path))
 
-        parts = if opts[:include_private], do: parts, else: Workbooks.Private.strip_parts(parts)
+        parts = if include_private, do: parts, else: Workbooks.Private.strip_parts(parts)
         {:ok, Workbooks.Bundle.pack(parts)}
     end
   rescue
