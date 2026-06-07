@@ -229,8 +229,30 @@ defmodule Workbooks.CLI do
     end
   end
 
+  # Deploy-kit: stand up the ONE runtime image, locally (containerized) or cloud.
+  def call(["deploy"], _t), do: deploy_usage()
+  def call(["deploy", "local" | _], _t), do: deploy_out(Workbooks.Deploy.local())
+  def call(["deploy", "up" | _], _t), do: deploy_out(Workbooks.Deploy.local())
+  def call(["deploy", "status"], _t), do: deploy_out(Workbooks.Deploy.status())
+  def call(["deploy", "down"], _t), do: deploy_out(Workbooks.Deploy.down())
+  def call(["deploy", "logs"], _t), do: deploy_out(Workbooks.Deploy.logs())
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
+
+  defp deploy_out({:ok, msg}), do: msg
+  defp deploy_out({:error, msg}), do: "deploy error: #{msg}"
+
+  defp deploy_usage do
+    """
+    wb deploy — run the runtime image locally (containerized) or in the cloud.
+      local | up   bring up the local daemon (krunvm microVM + launchd agent)
+      status       VM + runtime + agent state
+      down         stop the agent + microVM (keeps data + APFS volume)
+      logs         print the tail command for daemon logs
+    Image via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
+    """
+  end
 
   defp opt(args, flag) do
     case Enum.find_index(args, &(&1 == flag)) do
