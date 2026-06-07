@@ -98,6 +98,21 @@ defmodule Workbooks.ToolchainPalletTest do
       {:ok, go} = CommandRegistry.run("go", "", ["run", "/w/a.go"], ["#{tmp}::/w"])
       assert go =~ "go 42"
     end
+
+    @tag :build
+    @tag timeout: 300_000
+    test "wb toolkit build palette lua (wasi-sdk sjlj build) runs .lua incl. pcall/longjmp" do
+      {:ok, _} = ensure_oql()
+      out = Toolkits.build_text("palette", "lua", @root)
+      assert out =~ "registered command \"lua\""
+
+      tmp = Path.join(System.tmp_dir!(), "wbl-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      File.write!(Path.join(tmp, "a.lua"), "print('lua', 6*7); local ok=pcall(function() error('x') end); print('pcall', ok)")
+      {:ok, lua} = CommandRegistry.run("lua", "", ["/w/a.lua"], ["#{tmp}::/w"])
+      assert lua =~ "lua 42"
+      assert lua =~ "pcall false"
+    end
   end
 
   defp ensure_oql do

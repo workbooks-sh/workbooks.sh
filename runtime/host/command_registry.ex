@@ -293,6 +293,33 @@ defmodule Workbooks.CommandRegistry do
   end
 
   @doc """
+  Run a committed build SCRIPT that compiles a language from source (e.g. Lua via
+  wasi-sdk) and prints the output wasm path as its LAST stdout line; content-address
+  + register it. For build-from-source runtimes with no upstream prebuilt. The
+  script is first-party (lives in the toolkit dir), runs network-permitted (it may
+  fetch a pinned source tarball + toolchain).
+  """
+  def build_and_register_script(name, script, mode \\ :argv) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not File.regular?(script) -> {:error, :no_script}
+      true ->
+        case Workbooks.Sandbox.run_net(["bash", script]) do
+          {out, 0} ->
+            wasm = out |> String.split("\n", trim: true) |> List.last() |> to_string() |> String.trim()
+
+            if wasm != "" and File.regular?(wasm),
+              do: register_artifact(name, wasm, mode),
+              else: {:error, {:no_wasm_from_script, String.slice(to_string(out), max(0, String.length(to_string(out)) - 400)..-1//1)}}
+
+          {err, _} ->
+            {:error, {:script_failed, err}}
+        end
+    end
+  end
+
+  @doc """
   Fetch a PREBUILT wasm command from a pinned https URL, verify its sha256,
   content-address it, and register it. This is the "pallet" path for prebuilt
   language runtimes/compilers (qjs, python, …): we do NOT build, so no build.rs /

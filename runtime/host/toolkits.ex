@@ -269,6 +269,7 @@ defmodule Workbooks.Toolkits do
       String.starts_with?(spec, "wasm:") -> {:wasm, String.trim_leading(spec, "wasm:")}
       String.starts_with?(spec, "archive:") -> {:archive, String.trim_leading(spec, "archive:")}
       String.starts_with?(spec, "gobuild:") -> {:gobuild, String.trim_leading(spec, "gobuild:")}
+      String.starts_with?(spec, "script:") -> {:script, String.trim_leading(spec, "script:")}
       true -> {:unknown, spec}
     end
   end
@@ -320,31 +321,46 @@ defmodule Workbooks.Toolkits do
         "no such toolkit: #{id}"
 
       dir ->
-        runtimes = Path.wildcard(Path.join([dir, "runtimes", "*.org"]))
+        entries = runtime_entries(dir)
 
         cond do
-          runtimes == [] ->
+          entries == [] ->
             do_build(id, parse_descriptor(File.read!(Path.join(dir, "manifest.org"))))
 
           which not in [nil, ""] ->
-            f = Path.join([dir, "runtimes", "#{which}.org"])
+            case Enum.find(entries, fn {n, _} -> n == which end) do
+              nil ->
+                have = entries |> Enum.map(&elem(&1, 0)) |> Enum.sort() |> Enum.join(", ")
+                "no such runtime: #{id}/#{which} (have: #{have})"
 
-            if File.exists?(f) do
-              do_build("#{id}/#{which}", parse_descriptor(File.read!(f)))
-            else
-              have = runtimes |> Enum.map(&Path.basename(&1, ".org")) |> Enum.sort() |> Enum.join(", ")
-              "no such runtime: #{id}/#{which} (have: #{have})"
+              {n, f} ->
+                do_build("#{id}/#{n}", desc_with_dir(f))
             end
 
           true ->
-            runtimes
+            entries
             |> Enum.sort()
-            |> Enum.map_join("\n", fn f ->
-              do_build("#{id}/#{Path.basename(f, ".org")}", parse_descriptor(File.read!(f)))
-            end)
+            |> Enum.map_join("\n", fn {n, f} -> do_build("#{id}/#{n}", desc_with_dir(f)) end)
         end
     end
   end
+
+  # A runtime entry is either runtimes/<name>.org (a flat pinned spec) or
+  # runtimes/<name>/manifest.org (a dir carrying a build script + assets).
+  defp runtime_entries(dir) do
+    flat =
+      Path.wildcard(Path.join([dir, "runtimes", "*.org"]))
+      |> Enum.map(fn f -> {Path.basename(f, ".org"), f} end)
+
+    sub =
+      Path.wildcard(Path.join([dir, "runtimes", "*", "manifest.org"]))
+      |> Enum.map(fn f -> {Path.basename(Path.dirname(f)), f} end)
+
+    flat ++ sub
+  end
+
+  defp desc_with_dir(file),
+    do: parse_descriptor(File.read!(file)) |> Map.put(:src_dir, Path.dirname(file))
 
   defp do_build(id, %{cli_bin: nil}),
     do: "cannot build #{id}: no CLI_BIN declared (nothing to register a command under)"
@@ -356,7 +372,7 @@ defmodule Workbooks.Toolkits do
   # every Instance. (CommandRegistry also enforces this; this is the clear, early
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
-       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild] do
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild, :script] do
     if bin in Workbooks.CommandRegistry.reserved_names(),
       do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
       else: do_build_clause(id, d)
@@ -440,6 +456,24 @@ defmodule Workbooks.Toolkits do
     case Workbooks.CommandRegistry.build_and_register_go(bin, pkg, mode) do
       {:ok, wasm} -> "#{id}: built go #{pkg} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
       {:error, reason} -> "#{id}: build FAILED for go #{pkg}:\n" <> error_text(reason)
+    end
+  end
+
+  # script:<file> — run a build script (in the runtime's own dir) that compiles a
+  # language from source (e.g. Lua via wasi-sdk) and prints the output wasm path as
+  # its LAST stdout line; we content-address + register it. For build-from-source
+  # runtimes with no prebuilt (Lua, Zig).
+  defp do_build_clause(id, %{exec: exec, build_src: {:script, rel}, cli_bin: bin, arg_mode: mode, src_dir: sdir})
+       when exec in ["command", nil] do
+    script = Path.join(sdir, rel)
+
+    if not File.regular?(script) do
+      "#{id}: build script not found: #{script}"
+    else
+      case Workbooks.CommandRegistry.build_and_register_script(bin, script, mode) do
+        {:ok, wasm} -> "#{id}: ran build script #{rel} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
+        {:error, reason} -> "#{id}: build script FAILED for #{rel}:\n" <> error_text(reason)
+      end
     end
   end
 
