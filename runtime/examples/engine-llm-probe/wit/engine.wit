@@ -1,0 +1,10 @@
+package workbooks:engine-llm;
+
+// A richer Dock subset: session-info + llm-complete. The host provides these
+// under the network profile (vfs/commands/net/llm). The component calls the LLM
+// without ever holding the API key.
+world engine {
+  import session-info: func() -> string;
+  import llm-complete: func(prompt: string) -> string;
+  export run: func(input: string) -> string;
+}

@@ -1,0 +1,57 @@
+#+TITLE: ffmpeg — overview
+#+TOOLKIT: ffmpeg
+#+SKILL: overview
+#+TAGS: video audio media intro
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  Reach for these skills when the agent needs to process video
+  or audio: extract a thumbnail, transcode to a different
+  codec/format, pull the audio track out, trim a clip, resize.
+
+  For checking metadata only (=duration, codec, dims=), use
+  =ffprobe= directly — it's simpler than =ffmpeg=:
+
+  #+begin_src bash
+  ffprobe -hide_banner -i input.mp4 2>&1 | head
+  #+end_src
+
+* The argument-order gotcha
+
+  ffmpeg's CLI is order-sensitive:
+
+  #+begin_example
+  ffmpeg [global opts] -i <input1> [in1 opts] -i <input2> [in2 opts] [filter opts] <output>
+  #+end_example
+
+  Flags BEFORE =-i= apply to inputs. Flags AFTER =-i= apply to
+  outputs. =-ss 30= before =-i= seeks the INPUT (fast); after
+  =-i= it seeks the OUTPUT (slow). Skills always show the right
+  position.
+
+* Verify
+
+  #+CAPTION: confirm ffmpeg is installed
+  #+begin_src bash :role pre
+  command -v ffmpeg >/dev/null || { echo "ffmpeg missing — brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"; exit 1; }
+  ffmpeg -version | head -1
+  #+end_src
+
+* See also
+
+  - [[file:extract-thumbnail.org][extract-thumbnail]] — single still from a video at time T
+  - [[file:transcode-to-h264.org][transcode-to-h264]] — re-encode for browser/streaming compat
+  - [[file:extract-audio.org][extract-audio]] — pull audio out as mp3/wav
+  - [[file:trim.org][trim]] — cut a video to a time range
+  - [[file:concat.org][concat]] — stitch multiple clips into one
+  - [[file:subtitle-burn.org][subtitle-burn]] — bake captions in as pixels
+  - [[file:hardware-acceleration.org][hardware-acceleration]] — VideoToolbox / NVENC / VAAPI
+  - [[file:lossy-tradeoffs.org][lossy-tradeoffs]] — CRF, bitrate, preset, codec mental model
+
+  When uncertain about a flag: =ffmpeg -h <topic>= (e.g.
+  =ffmpeg -h encoder=libx264=).

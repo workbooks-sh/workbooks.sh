@@ -1,0 +1,45 @@
+#+TITLE: linear toolkit
+#+TOOLKIT: linear
+#+VERSION: 0.1.0
+#+KIND: federation
+#+STATUS: experimental
+#+TAGLINE: Linear task federation — mirror a Linear project into org :task: nodes, query + (gated) write-back.
+#+ENV_KEYS: LINEAR_API_KEY
+
+* linear — task federation connector                             :toolkit:
+  :PROPERTIES:
+  :ID:        linear
+  :KIND:      federation
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  A *federation* toolkit (BACKEND-PATTERN.org §KIND ladder): the
+  superset of a base toolkit. It carries THREE faces, one authoring
+  unit:
+
+  1. *base* — this =manifest.org= + =skills/= (how an agent uses it).
+  2. *data-source* — =plugin/manifest.org= (=#+SLOT: data-source=): the
+     OQL read face, so =SELECT ... FROM linear-issue= routes here.
+  3. *sync daemon* — =sync.org= (a =:daemon:= node, =:RUNTIME: beam=,
+     =:OWNERSHIP: tenant=): the engine runs the connector's pull on an
+     interval as a supervised GenServer (no VMM), mirroring Linear
+     issues into =:task:= org nodes.
+
+  The sync is the AIRGAP: the Board reads the synced =:task:= headlines
+  on disk and never touches Linear's API or the tenant's
+  =LINEAR_API_KEY=. The connector does the external I/O with the
+  tenant's creds; their only contact surface is org headlines.
+
+  Credentials: =LINEAR_API_KEY= (declared in =#+ENV_KEYS:=). The
+  connector fetches it through =WorkbooksRuntime.Plugin.Auth= — never
+  =System.get_env= directly, never baked into the toolkit (toolkits hold
+  no creds; the same toolkit serves an agent and a deploy recipe in
+  different trust contexts).
+
+  Skill index (read on demand):
+
+  | Skill            | Use when                                        |
+  |------------------+-------------------------------------------------|
+  | =overview=       | First contact, what this connector covers       |
+  | =sync-a-project= | Mirror a Linear project/team into a Board       |

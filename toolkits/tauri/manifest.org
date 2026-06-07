@@ -1,0 +1,36 @@
+#+TITLE: tauri toolkit
+#+TOOLKIT: tauri
+#+VERSION: 0.1.0
+#+CLI_BIN: cargo-tauri
+#+CLI_VERSION_RANGE: >=2.0
+#+STATUS: experimental
+#+TAGLINE: Tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app.
+#+REQUIRES: cargo, tauri-cli>=2.0
+#+SKILL_DIR: skills/
+
+* tauri — desktop app shell                                       :toolkit:
+  :PROPERTIES:
+  :ID:        tauri
+  :CLI_BIN:   cargo-tauri
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  Wrapper around the Tauri v2 CLI (=cargo tauri= or =npx @tauri-apps/cli=).
+  The Workbooks use case is a *thin shell*: a Tauri webview pointing at a
+  prebuilt single-file workbook (=dist/<slug>.html=) — no engine, no Node at
+  runtime, no IPC commands. ~wb forge desktop~ drives this CLI through the
+  recipes in =deploy-kit/desktop/=, generating a throwaway Tauri project,
+  building it, and discarding the scaffold (nothing is vendored into the
+  workbook).
+
+  Skills here cover the part agents get wrong: *code signing + notarization*,
+  the gate between "builds on my machine" and "I can share it." =cargo tauri
+  build --help= remains authoritative for flags.
+
+  Skill index (read on demand):
+
+  | Skill                    | Use when                                          |
+  |--------------------------+---------------------------------------------------|
+  | =code-signing=           | Make a Tauri build shareable — sign + notarize (macOS) / sign (Windows), the gate between "builds here" and "ships" |
+  | =cross-platform-release= | Produce installers for macOS / Windows / Linux from one workbook .html |

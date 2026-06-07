@@ -1,0 +1,9 @@
+# Cloudflare Pages response headers.
+
+# /sw.js — service-worker kill switch.
+# No-cache so existing browsers with a stale SW registration pick
+# up the new (self-unregistering) version on the very next visit
+# rather than waiting up to 24h for the spec-default SW refresh.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /

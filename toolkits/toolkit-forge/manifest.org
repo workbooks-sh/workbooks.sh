@@ -1,0 +1,51 @@
+#+TITLE: toolkit-forge toolkit
+#+TOOLKIT: toolkit-forge
+#+VERSION: 0.1.0
+#+CLI_BIN: git
+#+CLI_VERSION_RANGE: >=2.30
+#+STATUS: experimental
+#+TAGLINE: Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.org standard.
+#+REQUIRES: git>=2.30 node>=20
+
+* toolkit-forge — build toolkits for the toolkit substrate         :toolkit:
+  :PROPERTIES:
+  :ID:        toolkit-forge
+  :CLI_BIN:   git
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  The self-hosting toolkit: it teaches an agent how to BUILD another
+  toolkit. Given a TARGET — an npm package name, a GitHub URL, or a
+  semantic need ("I need PDF manipulation") — these skills walk the
+  agent through resolving + fetching the target, studying its REAL
+  CLI/API surface (never training priors), designing the
+  progressive-disclosure skill map, authoring DEEP empirically-verified
+  skills, and verifying the result. The output is a complete toolkit at
+  =toolkits/<name>/=, consistent in depth/breadth with =ffmpeg/=.
+
+  This toolkit has no bespoke CLI of its own — the "tool" is =git=
+  (clone targets) + =node/npm= (resolve packages) + the agent's own
+  bash, driven by the standard in
+  =[[file:../AUTHORING.org][toolkits/AUTHORING.org]]=. A Claude Code session can also
+  run the whole pipeline automatically via the =forge-toolkit= Workflow
+  (=.claude/workflows/forge-toolkit.js=, surfaced as the
+  =/forge-toolkit <target>= skill); these skills are what a runtime
+  agent (which has only bash) reads to do it by hand, e.g. to forge a
+  toolkit for a deployment target on demand.
+
+  DO this for: wrapping a CLI/package/capability an agent will reuse.
+  Do NOT for: a one-off shell incantation (just run it); editing an
+  existing toolkit's prose (edit the =.org= files directly).
+
+  Skill index (read on demand):
+
+  | Skill              | Use when                                             |
+  |--------------------+------------------------------------------------------|
+  | =overview=         | First contact — the forge loop + the standard        |
+  | =research-target=  | Resolve + fetch the target (npm / GitHub / semantic) |
+  | =study-surface=    | Map the REAL commands + gotchas + needs from source  |
+  | =design-skills=    | Decide name/CLI_BIN + the need→skill disclosure map  |
+  | =author-deep-skill=| Write one DEEP, verified skill to the spec           |
+  | =write-manifest=   | Build the manifest index that routes by need         |
+  | =verify-toolkit=   | Org balance, links resolve, recipes run, index whole |

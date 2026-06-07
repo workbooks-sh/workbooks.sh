@@ -1,0 +1,34 @@
+#+TITLE: wrangler toolkit
+#+TOOLKIT: wrangler
+#+VERSION: 0.1.0
+#+CLI_BIN: wrangler
+#+CLI_VERSION_RANGE: >=3.0
+#+STATUS: experimental
+#+TAGLINE: Cloudflare's CLI — deploy a forged workbook to Pages on the user's own account.
+#+REQUIRES: wrangler>=3.0
+#+SKILL_DIR: skills/
+
+* wrangler — Cloudflare Workers + Pages CLI                       :toolkit:
+  :PROPERTIES:
+  :ID:        wrangler
+  :CLI_BIN:   wrangler
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  Wrapper around the standard =wrangler= binary. The Workbooks use case is
+  one-shot: ship a built workbook (=dist/<slug>.html=) to Cloudflare Pages
+  on the *user's own* Cloudflare account. ~wb forge web --to cloudflare~
+  drives this CLI through the =toolkits/wrangler/deploy/cloudflare.sh= recipe.
+
+  Auth is wrangler's own browser login (=wrangler login=) — the OAuth token
+  lives in =~/.wrangler=, never in anything Workbooks stores or proxies.
+
+  =wrangler --help= and =wrangler pages deploy --help= remain authoritative
+  for per-flag detail. The skills cover the end-to-end deploy task.
+
+  Skill index (read on demand):
+
+  | Skill                         | Use when                                    |
+  |-------------------------------+---------------------------------------------|
+  | =deploy-a-workbook-to-pages=  | Ship a built =dist/<slug>.html= to Cloudflare Pages on the user's own account |

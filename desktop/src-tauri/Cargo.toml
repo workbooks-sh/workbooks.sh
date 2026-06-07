@@ -1,0 +1,74 @@
+[package]
+name = "workbooks-desktop"
+version = "0.0.1"
+description = "Workbooks Desktop — Tauri local-first IDE for OQL agents + workbooks."
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "workbooks_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+# AES-256-GCM for at-rest encryption of secret values. Key lives in
+# the OS keychain (macOS Keychain / Windows Credential Manager /
+# Linux Secret Service) via the `keyring` crate so it never touches
+# disk in plaintext.
+aes-gcm = "0.10"
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+rand = "0.8"
+# Cross-platform `which` for resolving a local-CLI binary on PATH.
+# Used by the integration-detect flow (Claude Code / Codex / Google
+# Workspace `gws` cards) to find the user's installed binary.
+which = "7"
+# Cross-platform pseudo-terminal — same crate WezTerm uses. Backs the
+# embedded terminal drawer + the one-click installer that streams
+# brew/npm output to the same surface.
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "process", "sync", "io-util"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+regex = "1"
+log = "0.4"
+env_logger = "0.11"
+once_cell = "1"
+notify = "8"
+flate2 = "1"
+base64 = "0.22"
+# SHA-256 for PKCE code_challenge generation in the Google OAuth flow.
+sha2 = "0.10"
+# URL-encode OAuth query params.
+urlencoding = "2"
+# Canonical org-mode parser + edit-preserving serializer. Path dep
+# because oql-core lives in this monorepo (substrates/oql) and isn't
+# published. Backs every desktop-config file (bookmarks, env-vars,
+# keys, …) so agents can read/edit the same on-disk format as the
+# rest of the OQL-managed substrate.
+oql-core = { path = "../../substrates/oql/crates/oql-core" }
+# orgize provides the AST node types used by oql-core's iterator
+# returns (Headline, Properties). Pinned to whatever oql-core uses
+# so the types match.
+orgize = "0.10.0-alpha.10"
+tauri-plugin-mcp-bridge = { version = "0.2", optional = true }
+
+# macOS-only: WKWebView media-access enablement so navigator.mediaDevices
+# is exposed and getUserMedia works in the Tauri webview (wb-dj5r voice).
+# Already in the dep tree via tauri/wry; pinning here makes the direct
+# use explicit.
+[target."cfg(target_os = \"macos\")".dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+block2 = "0.6"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+ui-automation = ["dep:tauri-plugin-mcp-bridge"]

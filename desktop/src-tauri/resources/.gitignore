@@ -1,0 +1,16 @@
+# Staged at build time from build.rs (wb-i38o.16). The canonical
+# sources live in:
+#   packages/workbooks/spikes/oql-container/src/build.mjs
+#   packages/workbooks/spikes/oql-container/package.json
+#   packages/oql/crates/oql-wasm/pkg/      (wasm-pack --target nodejs)
+#   packages/oql/crates/oql-wasm/pkg-web/  (wasm-pack --target web)
+#
+# We ignore the staged copies so the working tree never drifts from
+# the monorepo originals — `cargo build` (via build.rs) keeps them
+# in sync.
+workbook-bundler/
+oql-wasm/
+oql-wasm-web/
+node_modules/
+!.gitignore
+!.gitkeep

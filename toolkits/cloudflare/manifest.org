@@ -1,0 +1,45 @@
+#+TITLE: cloudflare toolkit
+#+TOOLKIT: cloudflare
+#+VERSION: 0.1.0
+#+CLI_BIN: wrangler
+#+CLI_VERSION_RANGE: >=3.0
+#+STATUS: experimental
+#+TAGLINE: All-Cloudflare backend for a forged workbook — D1 + Workers AI + Pages, on the user's own account.
+#+REQUIRES: wrangler>=3.0
+#+SKILL_DIR: skills/
+
+* cloudflare — D1 + Workers AI + Pages, one account                :toolkit:
+  :PROPERTIES:
+  :ID:        cloudflare
+  :CLI_BIN:   wrangler
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  The all-Cloudflare path for a forged workbook: a live, multi-tenant app
+  standing entirely on the user's OWN Cloudflare account, with just a
+  =wrangler= login — no second provider, no DB to provision elsewhere.
+
+  - DATA + AI: the unified gateway Worker, d1 driver (=deploy-kit/app/gateway=) — D1 (SQLite)
+    for tenant-scoped data, Workers AI for the AI features. Driven by
+    ~wb forge app deploy --backend cf-d1~ (recipe =toolkits/wrangler/deploy/cf-d1.sh=).
+  - AUTH: BetterAuth-on-D1 mounted in the Worker at =/api/auth/*= when
+    =BETTER_AUTH_SECRET= is set (sessions, organizations, JWKS, bearer); an
+    HS256 dev-token path is the fallback when it isn't.
+  - HOSTING: the workbook =.html= frontend ships to Cloudflare Pages via
+    ~wb forge web deploy --to cloudflare~ (=toolkits/wrangler/deploy/cloudflare.sh=).
+
+  Account selection is automatic: with one account on the login it's derived
+  from =wrangler whoami=; with several, set =CLOUDFLARE_ACCOUNT_ID=. The token
+  is wrangler's own (=~/.wrangler=) — Workbooks never reads, stores, or proxies
+  it. This is the sibling of the =byod= (Postgres + Railway) toolkit; pick
+  =cloudflare= when the user wants a single account + bill.
+
+  =wrangler --help=, =wrangler d1 --help=, =wrangler deploy --help= remain
+  authoritative for per-flag detail. The skills cover the end-to-end tasks.
+
+  Skill index (read on demand):
+
+  | Skill                   | Use when                                           |
+  |-------------------------+----------------------------------------------------|
+  | =all-cloudflare-backend= | Stand a forged workbook entirely on the user's Cloudflare account — D1 data + Workers AI + BetterAuth + Pages hosting, one login |

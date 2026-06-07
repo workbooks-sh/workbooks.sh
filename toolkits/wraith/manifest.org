@@ -1,0 +1,47 @@
+#+TITLE: wraith toolkit
+#+TOOLKIT: wraith
+#+VERSION: 0.1.0
+#+CLI_BIN: wraith
+#+CLI_VERSION_RANGE: >=0.0.0
+#+STATUS: stable
+#+TAGLINE: Rust + TS/JS codebase analyzer — dead code, unused deps, cycles, dupes, complexity.
+
+* wraith — codebase analyzer                                     :toolkit:
+  :PROPERTIES:
+  :ID:        wraith
+  :CLI_BIN:   wraith
+  :STATUS:    stable
+  :SKILL_DIR: skills/
+  :END:
+
+  Static analyzer for Rust and TS/JS workspaces. Finds dead pub
+  items, unused dependencies, circular imports, AI-slop
+  signatures, near-duplicate functions, over-complex functions,
+  and module-boundary violations.
+
+  Used by agents during /clean-up/ passes to surface findings
+  before reviewers do.
+
+  Verbs you reach for most:
+
+  | Verb            | What it finds                                      |
+  |-----------------+----------------------------------------------------|
+  | =dead-code=     | pub items with no references in the workspace      |
+  | =unused-deps=   | Cargo.toml deps that aren't imported               |
+  | =health=        | fns above cyclomatic / cognitive thresholds        |
+  | =slop=          | AI-slop signatures (lint-escapes, glob imports, …) |
+  | =dupes=         | token-shingled clone detection at fn-body level    |
+  | =audit=         | dead-code + unused-deps on git-changed files only  |
+  | =fix=           | auto-remove dead pub items + unused deps           |
+
+  Skill index:
+
+  | Skill                            | Use when                                                       |
+  |----------------------------------+----------------------------------------------------------------|
+  | =overview=                   | First contact, when to reach for wraith                        |
+  | =clean-up-a-rust-package=    | New PR or before review — find what's dead                      |
+  | =reduce-complexity=          | A function flagged as too complex; refactor it                 |
+  | =boundary-enforcement=       | Codify which crates/modules may import which others             |
+  | =fix-write-workflow=         | Apply =wraith fix --apply= safely after dry-run                |
+  | =refactor-extract-fn=        | Mechanically extract a sub-tree from a complexity hotspot      |
+  | =slop-suppression-policy=    | Triage =wraith slop= findings + team policy on suppressions    |

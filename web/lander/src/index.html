@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workbooks Studio — AI builds the tools your team needs</title>
+<meta name="description" content="Build pricing models, dashboards, internal tools, and decks as one HTML file each. Claude writes the first draft. Studio is where your team finds them and controls who can open them." />
+<meta property="og:title" content="Workbooks Studio" />
+<meta property="og:description" content="A customer dashboard, a pricing calculator, a quick lookup tool. AI writes the code. Each ends up as one file that runs in any browser. Studio is how your team finds and uses them." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://workbooks.sh" />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="logo-black.svg" />
+<link rel="stylesheet" href="styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand" aria-label="Workbooks home">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">Workbooks<em>Studio</em></span>
+  </a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">
+      Open Studio<span class="arrow" aria-hidden="true">→</span>
+    </a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Hero ----------------------------------------------------------- -->
+  <section class="hero section">
+    <div class="halo" aria-hidden="true"></div>
+    <div class="container stagger">
+
+      <a href="/docs/changelog/" class="hero-chip">
+        <span class="badge">beta</span>
+        <span>Studio is in open beta — bring your team</span>
+        <span class="arrow" aria-hidden="true">→</span>
+      </a>
+
+      <h1>
+        The AI
+        <span class="accent-mark">work surface</span>
+        for your team.
+      </h1>
+
+      <p class="lede">
+        A customer dashboard. A pricing calculator. A quick way to
+        look someone up. Your team and your agents build them as
+        small apps — single files that run in any browser. Studio
+        is where they all end up.
+      </p>
+
+      <div class="hero-cta">
+        <a href="https://studio.workbooks.sh" class="btn btn-primary btn-lg">
+          Open Studio<span class="arrow" aria-hidden="true">→</span>
+        </a>
+        <a href="#showcase" class="btn btn-secondary btn-lg">See what teams build</a>
+      </div>
+
+      <div class="hero-install" aria-label="install command — workbook CLI">
+        <code id="cmd-cli">npm install -g @work.books/cli</code>
+        <button class="copy" data-target="cmd-cli" aria-label="copy install command">copy</button>
+      </div>
+
+      <!-- Harness capsule — eight chips for the AI coding tools we
+           ship a self-install prompt for. Each chip copies a prompt
+           to clipboard on click; the tooltip above tells the user
+           what's happening. The trailing "+ N more" link points to
+           the full directory of additional tools in docs. -->
+      <div class="harness-capsule" aria-label="Works with these AI coding tools">
+        <span class="harness-label">Works with</span>
+
+        <button type="button" class="harness-chip" style="--brand:#D97757;"
+          data-name="Claude Code"
+          data-prompt="Install Workbooks for Claude Code. Run `curl -fsSL https://workbooks.sh/skill | sh` to install the official skill, then verify with `workbook --version`. Restart Claude Code and run `/workbooks` to confirm the skill loaded. Also add the MCP server to .mcp.json: {&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;]}}}">
+          <img src="/logos/claudecode-color.svg" alt="" width="14" height="14" />
+          <span>Claude Code</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#7A9DFF;"
+          data-name="Codex"
+          data-prompt="Install Workbooks for OpenAI Codex. Run `npm install -g @work.books/cli`. Edit ~/.codex/config.toml and add:&#10;[mcp_servers.workbooks]&#10;command = &quot;workbook&quot;&#10;args = [&quot;mcp&quot;, &quot;serve&quot;]&#10;Restart codex. Verify by asking you to list my workbook groups.">
+          <img src="/logos/codex-color.svg" alt="" width="14" height="14" />
+          <span>Codex</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#FF4D4D;"
+          data-name="OpenClaw"
+          data-prompt="Install Workbooks for OpenClaw. Run `npm install -g @work.books/cli`. Add the Workbooks MCP server to your OpenClaw config (~/.openclaw/config.json):&#10;{&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;]}}}&#10;Restart OpenClaw. Verify by asking it to list my workbook groups.">
+          <img src="/logos/openclaw-color.svg" alt="" width="14" height="14" />
+          <span>OpenClaw</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#a8a8a8;"
+          data-name="Cursor"
+          data-prompt="Install Workbooks for Cursor. Run `npm install -g @work.books/cli` and create .cursor/mcp.json in this project:&#10;{&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;]}}}&#10;Then run `Restart MCP servers` from the Cursor command palette. Verify by asking to list my workbook groups.">
+          <i class="harness-chip-mask" style="--logo:url('/logos/cursor.svg');" aria-hidden="true"></i>
+          <span>Cursor</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#6E7681;"
+          data-name="GitHub Copilot"
+          data-prompt="Install Workbooks for GitHub Copilot. Run `npm install -g @work.books/cli`. In VS Code, open Copilot's Agent-mode settings and register an MCP server: command `workbook`, args `[mcp, serve]`. Reload VS Code. Verify by asking Copilot Agent to list my workbook groups.">
+          <i class="harness-chip-mask" style="--logo:url('/logos/githubcopilot.svg');" aria-hidden="true"></i>
+          <span>Copilot</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#F0B428;"
+          data-name="Hermes Agent"
+          data-prompt="Install Workbooks for Hermes Agent. Run `npm install -g @work.books/cli`. Edit ~/.hermes/config.toml and add:&#10;[tools.mcp.workbooks]&#10;command = &quot;workbook&quot;&#10;args = [&quot;mcp&quot;, &quot;serve&quot;]&#10;Run `hermes reload`. Verify by asking to list my workbook groups.">
+          <i class="harness-chip-mask" style="--logo:url('/logos/hermesagent.svg');" aria-hidden="true"></i>
+          <span>Hermes</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#9CA3AF;"
+          data-name="Goose"
+          data-prompt="Install Workbooks for Goose. Run `npm install -g @work.books/cli`. Edit ~/.config/goose/config.yaml and add an extensions entry:&#10;extensions:&#10;  workbooks:&#10;    type: stdio&#10;    command: workbook&#10;    args: [mcp, serve]&#10;Restart Goose. Verify by asking to list my workbook groups.">
+          <i class="harness-chip-mask" style="--logo:url('/logos/goose.svg');" aria-hidden="true"></i>
+          <span>Goose</span>
+        </button>
+
+        <button type="button" class="harness-chip" style="--brand:#F26207;"
+          data-name="Replit Agent"
+          data-prompt="Install Workbooks for Replit Agent. In your Replit workspace, open the Shell and run `npm install -g @work.books/cli`. Then add the Workbooks MCP server to your Replit Agent config (search Replit's docs for the latest MCP setup path). Verify by asking the agent to list my workbook groups.">
+          <img src="/logos/replit-color.svg" alt="" width="14" height="14" />
+          <span>Replit</span>
+        </button>
+
+        <a class="harness-chip more" href="/docs/harness/" title="All supported tools — see docs">
+          <span>+ 9 more</span>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Live Studio peek — iframe to /demo route on studio.workbooks.sh.
+       Loaded lazily via IntersectionObserver to keep first paint
+       cheap. Skeleton shimmers underneath while the SvelteKit app
+       hydrates. ---------------------------------------------------- -->
+  <section class="peek" aria-label="Studio live preview">
+    <div class="peek-frame">
+      <div class="peek-titlebar">
+        <div class="peek-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="peek-url">
+          <span class="lock" aria-hidden="true">🔒</span>
+          <b>studio.workbooks.sh</b><span class="muted">/demo/groups/showcase</span>
+        </div>
+      </div>
+      <div class="peek-stage">
+        <div class="peek-skeleton" aria-hidden="true">
+          <div class="sk-rail"></div>
+          <div class="sk-body">
+            <div class="sk-bar"></div>
+            <div class="sk-bar narrow"></div>
+            <div class="sk-grid">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+        <iframe
+          id="studio-demo"
+          class="peek-iframe"
+          title="Workbooks Studio — live demo"
+          loading="lazy"
+          referrerpolicy="origin"
+          src="about:blank"
+          data-src="https://studio.workbooks.sh/demo/groups/showcase"
+        ></iframe>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem — names the SaaS-stack pain. Option B repurposed as a
+       section header so the lander still gets the punchier copy. -->
+  <section class="section problem" aria-label="The problem">
+    <div class="container">
+      <div class="section-header left">
+        <p class="eyebrow"><span class="dot" style="background:var(--accent-coral); box-shadow:0 0 8px var(--accent-coral);"></span> The problem</p>
+        <h2>Stop renting ten SaaS tools. Build them.</h2>
+        <p class="lede">
+          You pay Mixpanel to track three events. You pay Retool to
+          render one form. You pay Streamlit Cloud to host a 200-line
+          app nobody updates. Three vendors, three invoices, three
+          things your team has to learn — for one job each.
+        </p>
+      </div>
+
+      <div class="problem-grid">
+        <article class="pain">
+          <p class="pain-who">Your CFO wants a pricing model.</p>
+          <p class="pain-now">Six weeks later, a Streamlit deploy that breaks every time someone refactors. Or a Google sheet nobody trusts.</p>
+        </article>
+        <article class="pain">
+          <p class="pain-who">Your CS team needs a customer-lookup tool.</p>
+          <p class="pain-now">So you pay for Retool seats, queue an eng ticket, and they end up paging you the next time a column changes.</p>
+        </article>
+        <article class="pain">
+          <p class="pain-who">Your PM wants a funnel.</p>
+          <p class="pain-now">So you add a tracking pixel, pay Mixpanel per event, and wait two sprints for someone to wire it up.</p>
+        </article>
+      </div>
+
+      <p class="bridge">
+        What if AI built each of those for you, in a few minutes, as a single file you could open in any browser?
+      </p>
+    </div>
+  </section>
+
+  <!-- Showcase — five concrete workbook examples. The thumbs are
+       static mini-mockups for now; once the real workbooks ship, the
+       Open links replace these with iframe previews like Hex. ------ -->
+  <section class="section showcase" aria-label="Example workbooks" id="showcase">
+    <div class="container">
+      <div class="section-header left">
+        <p class="eyebrow"><span class="dot"></span> What teams build</p>
+        <h2>Five apps your team could ship this week.</h2>
+        <p class="lede">
+          Each one is a single file with the code, the data, and the
+          screens inside. We call them <strong>workbooks</strong>. AI
+          writes the first version. You finish it. Your team is using
+          it the same day.
+        </p>
+      </div>
+
+      <div class="showcase-grid">
+
+        <article class="show-card">
+          <div class="show-thumb" style="--g1:#a78bfa; --g2:#5cf0c1;">
+            <span class="show-type-pill">tool</span>
+            <!-- Mini-mock: pricing simulator with two sliders + result -->
+            <div class="mock mock-pricing">
+              <div class="mock-row">
+                <span class="mock-label">Seats</span>
+                <span class="mock-track"><span class="mock-knob" style="left:32%"></span></span>
+                <span class="mock-value">120</span>
+              </div>
+              <div class="mock-row">
+                <span class="mock-label">Usage</span>
+                <span class="mock-track"><span class="mock-knob" style="left:64%"></span></span>
+                <span class="mock-value">2.4M</span>
+              </div>
+              <div class="mock-output">
+                <span class="mock-output-label">monthly revenue</span>
+                <span class="mock-output-value">$28,400</span>
+              </div>
+            </div>
+          </div>
+          <div class="show-body">
+            <h3>Pricing simulator</h3>
+            <p>Move two sliders, see what you'd make in a month. The kind of thing your team usually rebuilds in a spreadsheet every quarter.</p>
+            <p class="show-coming">Workbook coming soon</p>
+          </div>
+        </article>
+
+        <article class="show-card">
+          <div class="show-thumb" style="--g1:#5cf0c1; --g2:#7ad7f0;">
+            <span class="show-type-pill">app</span>
+            <!-- Mini-mock: PDF dropzone + summary lines -->
+            <div class="mock mock-summary">
+              <div class="mock-drop">
+                <span class="mock-drop-icon">⇪</span>
+                <span class="mock-drop-text">contract.pdf · 14 pages</span>
+              </div>
+              <div class="mock-out-row"></div>
+              <div class="mock-out-row" style="width:84%"></div>
+              <div class="mock-out-row" style="width:62%"></div>
+            </div>
+          </div>
+          <div class="show-body">
+            <h3>Summarize a PDF</h3>
+            <p>Drop a contract or a report into the app. AI reads it and gives you the headlines. Your API key stays with us, not in the file you share.</p>
+            <p class="show-coming">Workbook coming soon</p>
+          </div>
+        </article>
+
+        <article class="show-card">
+          <div class="show-thumb" style="--g1:#ff8a4c; --g2:#a78bfa; --g3:#5cf0c1;">
+            <span class="show-type-pill">notebook</span>
+            <!-- Mini-mock: code cell + chart bars -->
+            <div class="mock mock-notebook">
+              <div class="mock-code">
+                <span class="mock-line"><span class="mock-tok-kw">SELECT</span> cohort, <span class="mock-tok-fn">retained</span>()</span>
+                <span class="mock-line">&nbsp;&nbsp;<span class="mock-tok-kw">FROM</span> events</span>
+                <span class="mock-line">&nbsp;&nbsp;<span class="mock-tok-kw">GROUP BY</span> 1</span>
+              </div>
+              <div class="mock-chart">
+                <span style="height:62%"></span><span style="height:48%"></span>
+                <span style="height:74%"></span><span style="height:42%"></span>
+                <span style="height:55%"></span><span style="height:38%"></span>
+              </div>
+            </div>
+          </div>
+          <div class="show-body">
+            <h3>Customer retention notebook</h3>
+            <p>An analysis page that shows how many customers stick around month over month. Code, charts, and notes side by side.</p>
+            <p class="show-coming">Workbook coming soon</p>
+          </div>
+        </article>
+
+        <article class="show-card">
+          <div class="show-thumb" style="--g1:#7ad7f0; --g2:#a78bfa;">
+            <span class="show-type-pill">app</span>
+            <!-- Mini-mock: search field + result row -->
+            <div class="mock mock-lookup">
+              <div class="mock-search">
+                <span class="mock-search-icon">⌕</span>
+                <span class="mock-search-input">cust_3f9a…</span>
+              </div>
+              <div class="mock-result">
+                <div class="mock-result-row"><span>Mira Patel</span><span class="mock-pill">active</span></div>
+                <div class="mock-result-sub">4 orders · $2,840 LTV</div>
+              </div>
+            </div>
+          </div>
+          <div class="show-body">
+            <h3>Customer lookup</h3>
+            <p>Type a name. See their orders, tickets, and recent activity. The internal tool your support team has been asking for.</p>
+            <p class="show-coming">Workbook coming soon</p>
+          </div>
+        </article>
+
+        <article class="show-card">
+          <div class="show-thumb" style="--g1:#ff8a4c; --g2:#ffd66b;">
+            <span class="show-type-pill">deck</span>
+            <!-- Mini-mock: slide with title + chart -->
+            <div class="mock mock-deck">
+              <div class="mock-slide-title">Q3 — Revenue</div>
+              <div class="mock-slide-chart">
+                <span style="height:30%"></span><span style="height:48%"></span>
+                <span style="height:64%"></span><span style="height:82%"></span>
+              </div>
+              <div class="mock-slide-dots">
+                <i></i><i class="on"></i><i></i><i></i><i></i>
+              </div>
+            </div>
+          </div>
+          <div class="show-body">
+            <h3>Quarterly update</h3>
+            <p>Slides with live charts. Click a number to see what's behind it. The kind of update you'd send your board, but useful.</p>
+            <p class="show-coming">Workbook coming soon</p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Studio features ------------------------------------------------ -->
+  <section class="features section" id="studio">
+    <div class="container">
+      <div class="section-header">
+        <p class="eyebrow"><span class="dot"></span> Studio</p>
+        <h2>We hold the apps. Your team uses them.</h2>
+        <p class="lede" style="margin-top:1rem;">
+          Studio is where each workbook ends up after it's built. It
+          sets who can open which ones. It adds your API keys when an
+          app loads, so they're never inside the file. It tells you
+          who opened what. The files still work without us.
+        </p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature">
+          <div class="feature-glyph">◫</div>
+          <h3>Group libraries</h3>
+          <p>Put the apps your sales team uses in one place. Put the apps your engineers use in another. Tag them, search them, move them in a click.</p>
+        </article>
+
+        <article class="feature">
+          <div class="feature-glyph">◉</div>
+          <h3>Sign-in &amp; take offline</h3>
+          <p>Private apps need a sign-in to open. Take any of them offline in one click — the link stops working right away.</p>
+        </article>
+
+        <article class="feature">
+          <div class="feature-glyph">⌘</div>
+          <h3>Keys out of the file</h3>
+          <p>Your API keys and database URLs are added when an app loads, not when you save it. Rotate them later without rebuilding.</p>
+        </article>
+
+        <article class="feature">
+          <div class="feature-glyph">⌖</div>
+          <h3>Run it from Claude</h3>
+          <p>Claude (or Cursor, or Codex) can publish, retire, and list your apps for you. You just say what you want done.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Programmable agents — chat carousel that iframes Studio's
+       real chat panel (left, narrower) and a real workbook artifact
+       (right). Each thread points at the same agent slug, so the
+       chat conversation and the canvas artifact are matched. Demo
+       chat lives at studio.workbooks.sh/demo/chat?agent=<slug>;
+       canvas workbooks are static HTML at /wb/<slug>.html. -->
+  <section class="section agent-section" id="agents">
+    <div class="container">
+
+      <header class="agent-header">
+        <p class="eyebrow"><span class="dot" style="background:var(--accent-teal);box-shadow:0 0 8px var(--accent-teal);"></span> Programmable agents</p>
+        <h2>A hackable agent harness across your team.</h2>
+        <p class="lede">
+          Pick a problem. See the chat. See the workbook it built.
+        </p>
+      </header>
+
+      <div class="agent-demo">
+
+        <nav class="agent-prompts" role="tablist" aria-label="What to ask your team's agents">
+          <button type="button" class="prompt-chip is-active" role="tab"
+            data-thread="pricing-analyst" style="--brand:#5cf0c1;">
+            <span class="prompt-chip-icon" aria-hidden="true">💸</span>
+            Compare us to Vercel and Hex this quarter
+          </button>
+          <button type="button" class="prompt-chip" role="tab"
+            data-thread="call-synthesizer" style="--brand:#a78bfa;">
+            <span class="prompt-chip-icon" aria-hidden="true">🎙</span>
+            What did 32 customer calls actually say?
+          </button>
+          <button type="button" class="prompt-chip" role="tab"
+            data-thread="eng-buddy" style="--brand:#ffd66b;">
+            <span class="prompt-chip-icon" aria-hidden="true">🛠</span>
+            I just joined eng — walk me through setup
+          </button>
+          <button type="button" class="prompt-chip" role="tab"
+            data-thread="standup" style="--brand:#7ad7f0;">
+            <span class="prompt-chip-icon" aria-hidden="true">☀</span>
+            Draft today's stand-up before 9 AM
+          </button>
+          <button type="button" class="prompt-chip" role="tab"
+            data-thread="default" style="--brand:#ff8a4c;">
+            <span class="prompt-chip-icon" aria-hidden="true">✨</span>
+            Turn meeting notes into the launch post
+          </button>
+          <button type="button" class="prompt-chip" role="tab"
+            data-thread="customer-lookup" style="--brand:#FF6B9D;">
+            <span class="prompt-chip-icon" aria-hidden="true">🪪</span>
+            A customer emailed about a disputed bill
+          </button>
+        </nav>
+
+        <div class="agent-stage">
+
+          <div class="agent-thread is-active" data-thread="pricing-analyst" style="--brand:#5cf0c1;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Pricing Analyst"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=pricing-analyst&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — 2026 competitor pricing"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/pricing.html"></iframe>
+          </div>
+
+          <div class="agent-thread" data-thread="call-synthesizer" style="--brand:#a78bfa;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Call Synthesizer"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=call-synthesizer&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — Week 19 call themes"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/themes.html"></iframe>
+          </div>
+
+          <div class="agent-thread" data-thread="eng-buddy" style="--brand:#ffd66b;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Eng Buddy"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=eng-buddy&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — Day-one setup, Mira"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/setup.html"></iframe>
+          </div>
+
+          <div class="agent-thread" data-thread="standup" style="--brand:#7ad7f0;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Stand-up Drafter"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=standup&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — Stand-up notebook"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/standup.html"></iframe>
+          </div>
+
+          <div class="agent-thread" data-thread="default" style="--brand:#ff8a4c;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Workhorse"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=default&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — Launch announcement draft"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/launch-doc.html"></iframe>
+          </div>
+
+          <div class="agent-thread" data-thread="customer-lookup" style="--brand:#FF6B9D;">
+            <iframe class="agent-frame agent-chat-frame"
+                title="Studio chat — Customer Lookup"
+                loading="lazy"
+                referrerpolicy="origin"
+                src="about:blank"
+                data-src="https://studio.workbooks.sh/demo/chat?agent=customer-lookup&amp;embed=1"></iframe>
+            <iframe class="agent-frame agent-canvas-frame"
+                title="Workbook — Customer timeline"
+                loading="lazy"
+                src="about:blank"
+                data-src="/wb/customer.html"></iframe>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="agent-footnote">
+        <p>
+          Every chat above is rendered by Studio's real chat panel.
+          Every artifact is a real <code>.html</code> file. Click around
+          — sort the table, page through the slides, tick off setup
+          steps. The interactions are real because the workbook is.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Thesis — why a new standard, and why HTML -------------------- -->
+  <section class="section" id="standard">
+    <div class="container">
+      <div class="split">
+        <div class="split-prose">
+          <p class="eyebrow"><span class="dot" style="background:var(--accent-coral);box-shadow:0 0 8px var(--accent-coral);"></span> Why this works</p>
+          <h2>A calculator and a dashboard are built from the same parts.</h2>
+          <p>
+            Some code that does the math. Some data to feed it. A few
+            screens for the person using it. A customer lookup is the
+            same three parts. So is a slide deck.
+          </p>
+          <p>
+            Today, each of those is a different product. Streamlit for
+            the calculator. Retool for the lookup. Looker for the
+            dashboard. PowerPoint for the deck. Four products. Four
+            bills. Four things your team has to learn.
+          </p>
+          <p>
+            A workbook is one file that holds all three parts inside.
+            Open it in any browser and it runs. There's no app to
+            install, no server to keep up, no separate place where the
+            data lives.
+          </p>
+          <div class="inline-links">
+            <a href="/docs/standard/" class="btn btn-secondary">Read the spec</a>
+            <a href="https://github.com/shinyobjectz-sh/workbooks" class="btn btn-ghost">Source on GitHub<span class="arrow" aria-hidden="true" style="margin-left:.2em">↗</span></a>
+          </div>
+        </div>
+
+        <div class="split-visual">
+          <div class="code-card">
+            <div class="code-card-head">
+              <span class="file">my-workbook.html</span>
+              <button class="copy" data-target="cmd-html" aria-label="copy code">copy</button>
+            </div>
+<pre id="cmd-html"><span class="c-com">&lt;!-- everything in one file --&gt;</span>
+<span class="c-key">&lt;!doctype</span> html<span class="c-key">&gt;</span>
+<span class="c-key">&lt;html&gt;</span>
+  <span class="c-key">&lt;head&gt;</span>
+    <span class="c-key">&lt;meta</span> name=<span class="c-str">"wb-permissions"</span> content=<span class="c-str">"net"</span><span class="c-key">&gt;</span>
+    <span class="c-key">&lt;style&gt;</span> <span class="c-com">…</span> <span class="c-key">&lt;/style&gt;</span>
+  <span class="c-key">&lt;/head&gt;</span>
+  <span class="c-key">&lt;body&gt;</span>
+    <span class="c-com">&lt;!-- your app code, inlined --&gt;</span>
+    <span class="c-key">&lt;script</span> type=<span class="c-str">"module"</span><span class="c-key">&gt;</span>
+      <span class="c-fn">render</span>()
+    <span class="c-key">&lt;/script&gt;</span>
+
+    <span class="c-com">&lt;!-- bundled source travels along --&gt;</span>
+    <span class="c-key">&lt;script</span> id=<span class="c-str">"wb-source-bundle"</span>
+            type=<span class="c-str">"application/x-workbook-source"</span><span class="c-key">&gt;</span>
+      eJzNVk1v2zAMvfdXEN6h…
+    <span class="c-key">&lt;/script&gt;</span>
+  <span class="c-key">&lt;/body&gt;</span>
+<span class="c-key">&lt;/html&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- External agents — Workbooks as an open standard that every
+       AI coding tool can drive via MCP. Brief by design: the harness
+       capsule in the hero is the visual evidence; this section gives
+       the reader words for what they saw. -->
+  <section class="section external-agents" id="harness">
+    <div class="container">
+      <div class="split">
+        <div class="split-prose">
+          <p class="eyebrow"><span class="dot" style="background:var(--accent-violet);box-shadow:0 0 8px var(--accent-violet);"></span> Outside Studio</p>
+          <h2>Use Workbooks from the AI tool you already work in.</h2>
+          <p>
+            Studio's agents live inside Studio. But your team probably
+            also has agents <em>outside</em> Studio — Claude Code,
+            Cursor, Codex, OpenClaw, Goose, the rest of the row from
+            the top of the page. We give those a way in too.
+          </p>
+          <p>
+            Workbooks ships an open standard and an MCP server. Any
+            coding tool that speaks MCP can read your team's library,
+            build new workbooks, and publish them back. Same Studio,
+            two ways in.
+          </p>
+          <div class="inline-links">
+            <a href="/docs/harness/" class="btn btn-secondary">See every harness</a>
+            <a href="/docs/standard/" class="btn btn-ghost">Read the standard</a>
+          </div>
+        </div>
+
+        <div class="split-visual">
+          <div class="external-card">
+            <div class="external-card-head">
+              <span class="external-card-label">From any coding tool</span>
+              <span class="external-card-arrow">→</span>
+              <span class="external-card-label">your team's library</span>
+            </div>
+            <ul class="external-card-list">
+              <li><strong>list_groups</strong> — find what your team has built</li>
+              <li><strong>open_workbook</strong> — read code, data, or output from any artifact</li>
+              <li><strong>build</strong> — generate a new workbook from a prompt</li>
+              <li><strong>publish</strong> — push it to a group your team can see</li>
+              <li><strong>revoke</strong> — take any of it offline in one call</li>
+            </ul>
+            <p class="external-card-foot">
+              No config to copy. Each tool has a one-line install
+              prompt in <a href="/docs/harness/">the docs</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Open standard mini-section — trust anchor ------------------- -->
+  <section class="section" style="padding-top:2rem;">
+    <div class="container">
+      <div class="section-header left" style="max-width:780px;">
+        <p class="eyebrow"><span class="dot" style="background:var(--accent-mint);box-shadow:0 0 8px var(--accent-mint);"></span> Open source</p>
+        <h2>Yours, even if we disappear.</h2>
+        <p class="lede">
+          Every line of code is on GitHub. You can run the whole thing
+          on your own server. You can change anything you want. We do
+          the hosting because most teams don't want to — but if we
+          shut down tomorrow, your apps keep working in your browser,
+          and you can take the code with you.
+        </p>
+        <div class="inline-links">
+          <a href="https://github.com/shinyobjectz-sh/workbooks" class="btn btn-secondary">GitHub<span class="arrow" aria-hidden="true" style="margin-left:.2em">↗</span></a>
+          <a href="https://www.npmjs.com/package/@work.books/cli" class="btn btn-ghost">@work.books/cli on npm<span class="arrow" aria-hidden="true" style="margin-left:.2em">↗</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA strip ------------------------------------------------------ -->
+  <section class="section" style="padding-top:1rem;">
+    <div class="container">
+      <div class="cta-strip">
+        <div>
+          <h2>Start with one app this week.</h2>
+          <p>Free during open beta. Bring your team. Ask Claude what to build first.</p>
+        </div>
+        <div class="cta-strip-actions">
+          <a href="https://studio.workbooks.sh" class="btn btn-primary btn-lg">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+          <span class="cta-strip-note">no card · cancel any time · run it on your own server if you'd rather</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <a href="/" class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Workbooks<em>Studio</em></span>
+      </a>
+      <p>One HTML file per tool. Studio holds them. Your team opens them.</p>
+    </div>
+    <div>
+      <h5>Studio</h5>
+      <a href="https://studio.workbooks.sh">Open Studio</a>
+      <a href="https://run.workbooks.sh">Run a workbook</a>
+      <a href="/pricing/">Pricing</a>
+      <a href="/inspect/">Inspect a file</a>
+      <a href="/docs/changelog/">Changelog</a>
+    </div>
+    <div>
+      <h5>Docs</h5>
+      <a href="/docs/quickstart/">Quickstart</a>
+      <a href="/docs/cli/">CLI reference</a>
+      <a href="/docs/standard/">The standard</a>
+      <a href="/docs/agents/">Agent setup</a>
+    </div>
+    <div>
+      <h5>Open source</h5>
+      <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub</a>
+      <a href="https://www.npmjs.com/package/@work.books/cli">CLI on npm</a>
+      <a href="/skill">Claude Code skill</a>
+      <a href="/docs/source-bundle/">Source bundle</a>
+    </div>
+  </div>
+  <div class="foot-meta">
+    <span>© Workbooks — shinyobjectz</span>
+    <span>standard &amp; studio · apache-2.0 · open source on github</span>
+  </div>
+</footer>
+
+<script>
+  // Subtle nav border on scroll so the nav doesn't float as a flat
+  // bar over the halo when content is below the fold.
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Canvas interactions inside each agent thread.
+  // 1) Pricing table — click a header to sort by that column.
+  document.querySelectorAll('[data-canvas="pricing"]').forEach((table) => {
+    table.querySelectorAll('th[data-sort]').forEach((th) => {
+      th.addEventListener('click', () => {
+        const tbody = table.querySelector('tbody');
+        const key = th.dataset.sort;
+        const type = th.dataset.type;
+        const isAsc = !th.classList.contains('sort-asc');
+        table.querySelectorAll('th').forEach((o) => o.classList.remove('sort-asc', 'sort-desc'));
+        th.classList.toggle('sort-asc', isAsc);
+        th.classList.toggle('sort-desc', !isAsc);
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort((a, b) => {
+          let va = a.dataset[key];
+          let vb = b.dataset[key];
+          if (type === 'num') { va = parseFloat(va); vb = parseFloat(vb); }
+          return isAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+        });
+        rows.forEach((r) => tbody.appendChild(r));
+      });
+    });
+  });
+  // 2) Theme deck — prev / next buttons and dot click.
+  document.querySelectorAll('[data-canvas="deck"]').forEach((deck) => {
+    const slides = deck.querySelectorAll('.canvas-deck-slide');
+    const dots = deck.querySelectorAll('[data-deck-dots] i');
+    const prev = deck.querySelector('[data-deck-prev]');
+    const next = deck.querySelector('[data-deck-next]');
+    let i = 0;
+    function show(idx) {
+      i = (idx + slides.length) % slides.length;
+      slides.forEach((s, j) => s.classList.toggle('is-active', j === i));
+      dots.forEach((d, j) => d.classList.toggle('is-active', j === i));
+    }
+    prev && prev.addEventListener('click', () => show(i - 1));
+    next && next.addEventListener('click', () => show(i + 1));
+    dots.forEach((d, j) => d.addEventListener('click', () => show(j)));
+  });
+  // 3) Checklist — click a row to toggle done; progress bar follows.
+  document.querySelectorAll('[data-canvas="checklist"]').forEach((list) => {
+    const items = list.querySelectorAll('li');
+    const card = list.closest('.canvas-card');
+    const count = card && card.querySelector('[data-check-count]');
+    const fill = card && card.querySelector('[data-check-fill]');
+    items.forEach((li) => {
+      li.addEventListener('click', () => {
+        li.classList.toggle('is-done');
+        const done = list.querySelectorAll('.is-done').length;
+        if (count) count.textContent = `${done} / ${items.length} done`;
+        if (fill) fill.style.width = `${(done / items.length) * 100}%`;
+      });
+    });
+  });
+
+  // Agent carousel — six tabs, each switches the active thread.
+  // Each thread holds two iframes (Studio chat + a real workbook),
+  // both lazy-loaded the first time the thread becomes active.
+  // Auto-advances every 9s once the section scrolls into view; the
+  // first user click freezes it.
+  (() => {
+    const tabs = Array.from(document.querySelectorAll('.prompt-chip'));
+    const threads = Array.from(document.querySelectorAll('.agent-thread'));
+    if (!tabs.length) return;
+
+    let userInteracted = false;
+    let timer = null;
+
+    function armFrames(thread) {
+      thread.querySelectorAll('iframe[data-src]').forEach((f) => {
+        if (f.src === 'about:blank' || !f.src.includes(f.dataset.src.split('?')[0])) {
+          f.addEventListener('load', () => f.classList.add('is-loaded'), { once: true });
+          f.src = f.dataset.src;
+        }
+      });
+    }
+
+    function show(id) {
+      tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.thread === id));
+      const active = threads.find((t) => t.dataset.thread === id);
+      threads.forEach((t) => t.classList.toggle('is-active', t === active));
+      if (active) armFrames(active);
+    }
+    function next() {
+      const active = tabs.findIndex((t) => t.classList.contains('is-active'));
+      const id = tabs[(active + 1) % tabs.length].dataset.thread;
+      show(id);
+    }
+    function startAuto() {
+      stopAuto();
+      timer = setInterval(() => {
+        if (!userInteracted) next();
+      }, 9000);
+    }
+    function stopAuto() {
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        userInteracted = true;
+        stopAuto();
+        show(tab.dataset.thread);
+      });
+    });
+
+    // Start auto-advance + arm the active thread's iframes once
+    // the section scrolls into view.
+    const section = document.querySelector('.agent-section');
+    if (section && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const activeThread = threads.find((t) => t.classList.contains('is-active'));
+            if (activeThread) armFrames(activeThread);
+            if (!userInteracted) startAuto();
+          } else {
+            stopAuto();
+          }
+        });
+      }, { threshold: 0.25 });
+      io.observe(section);
+    } else {
+      const activeThread = threads.find((t) => t.classList.contains('is-active'));
+      if (activeThread) armFrames(activeThread);
+      startAuto();
+    }
+  })();
+
+  // Harness chips — click copies the per-tool install prompt to
+  // clipboard. The tooltip text swaps to "Copied!" for 1.4s.
+  document.querySelectorAll('.harness-chip[data-prompt]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const prompt = btn.dataset.prompt;
+      const name = btn.dataset.name || 'this tool';
+      try {
+        await navigator.clipboard.writeText(prompt);
+        btn.classList.add('copied');
+        btn.setAttribute('data-tooltip', `Prompt copied — paste it into ${name}`);
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.removeAttribute('data-tooltip');
+        }, 1600);
+      } catch {
+        btn.setAttribute('data-tooltip', 'Press ⌘C to copy');
+        setTimeout(() => btn.removeAttribute('data-tooltip'), 1600);
+      }
+    });
+  });
+
+  // Lazy-load the Studio demo iframe when it scrolls near the
+  // viewport, then fade the skeleton out once it actually loads.
+  const demo = document.getElementById('studio-demo');
+  if (demo) {
+    const stage = demo.closest('.peek-stage');
+    let armed = false;
+    const arm = () => {
+      if (armed) return;
+      armed = true;
+      demo.src = demo.dataset.src;
+      demo.addEventListener('load', () => {
+        if (stage) stage.classList.add('ready');
+      }, { once: true });
+    };
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) { arm(); io.disconnect(); break; }
+        }
+      }, { rootMargin: '300px 0px' });
+      io.observe(demo);
+    } else {
+      arm();
+    }
+  }
+
+
+
+  // Copy-to-clipboard for every .copy[data-target] button. Replaces
+  // the button text briefly so users get feedback.
+  document.querySelectorAll('.copy[data-target]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const node = document.getElementById(btn.dataset.target);
+      if (!node) return;
+      const text = node.innerText.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        const prev = btn.textContent;
+        btn.textContent = 'copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
+      } catch {
+        btn.textContent = 'press ⌘C';
+      }
+    });
+  });
+</script>
+</body>
+</html>

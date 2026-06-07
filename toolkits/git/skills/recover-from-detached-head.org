@@ -1,0 +1,70 @@
+#+TITLE: git — recover from a detached HEAD
+#+TOOLKIT: git
+#+SKILL: recover-from-detached-head
+#+TAGS: vcs recovery detached-head
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  =git status= reports:
+
+    HEAD detached at <SHA>
+
+  You're not on any branch. New commits won't belong to any
+  branch; they'd be lost when HEAD moves away unless rescued.
+
+* The recovery decision
+
+  Three sub-cases:
+
+  1. *Detached but no new commits yet* → just check out a real
+     branch. Nothing to lose.
+  2. *Detached and you've made commits you want to keep* →
+     create a new branch from the current HEAD, then check out
+     wherever you were going.
+  3. *Detached and the new commits should NOT be kept* → check
+     out a branch; the commits become unreachable and will be
+     garbage-collected after ~30 days (=git reflog= recovers
+     them in the meantime if you change your mind).
+
+* Workflow
+
+  #+CAPTION: 1. confirm detached + see if commits exist
+  #+begin_src bash :role pre
+  git status
+  git log --oneline HEAD --not --all | head -10
+  #+end_src
+
+  If the second command output is empty, you have no
+  unreachable commits → case 1, safe to switch.
+
+  #+CAPTION: 2a. case 1 — just switch back to a branch
+  #+begin_src bash
+  git checkout main          # or whatever branch you meant to be on
+  #+end_src
+
+  #+CAPTION: 2b. case 2 — save the detached commits to a new branch first
+  #+begin_src bash
+  git branch rescue-$(date +%Y%m%d-%H%M)   # mark the current HEAD with a branch
+  git checkout main                         # now safe to switch
+  # rescue-... contains your work; merge or cherry-pick from it later
+  #+end_src
+
+* Gotchas
+
+  - Do NOT =git reset --hard= when in detached state — it just
+    moves HEAD to where you already are; doesn't help.
+  - Do NOT delete the rescue branch until you've actually used
+    or rejected its commits (=git branch -d rescue-...= refuses
+    if unmerged; use =-D= to force-delete only when sure).
+  - =git reflog= shows the last ~30 days of HEAD movements —
+    can resurrect a "lost" commit even after the rescue branch
+    is gone.
+
+* See also
+
+  - [[file:undo-a-commit-safely.org][undo-a-commit-safely]] — if the detached state was caused by amend/reset

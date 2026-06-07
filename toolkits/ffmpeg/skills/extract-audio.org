@@ -1,0 +1,67 @@
+#+TITLE: ffmpeg — extract audio from a video
+#+TOOLKIT: ffmpeg
+#+SKILL: extract-audio
+#+TAGS: audio extract mp3 wav aac
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  Source is a video file; you want just the audio as a
+  standalone =.mp3= / =.wav= / =.m4a=. Common cases: transcripts,
+  podcast clips, music extraction.
+
+* Workflow
+
+  #+CAPTION: 1. confirm input has an audio stream
+  #+begin_src bash :role pre
+  test -f "$1" || { echo "input $1 not found"; exit 1; }
+  ffprobe -v error -show_streams -select_streams a:0 "$1" \
+    | grep -E "codec_name|sample_rate|channels" || { echo "no audio stream"; exit 1; }
+  #+end_src
+
+  #+CAPTION: 2a. copy audio without re-encoding (preserves quality, fast)
+  #+begin_src bash
+  # extension depends on source codec — use ffprobe to check
+  ffmpeg -i input.mp4 -vn -c:a copy output.m4a
+  # -vn      = no video
+  # -c:a copy = stream copy, no re-encode
+  #+end_src
+
+  #+CAPTION: 2b. transcode to mp3 (universal compatibility)
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vn -c:a libmp3lame -q:a 2 output.mp3
+  # -q:a 2  = high quality VBR (0=highest, 9=lowest)
+  #+end_src
+
+  #+CAPTION: 2c. transcode to wav (uncompressed, for further processing)
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vn -c:a pcm_s16le -ar 16000 -ac 1 output.wav
+  # -ar 16000 = 16kHz sample rate (good for speech-to-text)
+  # -ac 1     = mono
+  #+end_src
+
+  #+CAPTION: confirm output is valid audio + non-zero duration
+  #+begin_src bash :role post :path output.mp3
+  test -f "$1" || { echo "output missing"; exit 1; }
+  ffprobe -v error -show_entries format=duration -of csv=p=0 "$1" \
+    | awk '$1 + 0 > 0 { print "✓", $1, "seconds"; exit } END { print "✗ zero-duration"; exit 1 }'
+  #+end_src
+
+* Gotchas
+
+  - =-c:a copy= only works if the container (e.g. .m4a, .mka)
+    supports the source codec. If you get "Could not write
+    header", transcode instead.
+  - For speech-to-text inputs (Whisper, etc.), use 16kHz mono
+    WAV (2c above) — most STT models expect this format.
+  - =-vn= is critical; without it the output container may
+    still try to include the video stream.
+
+* See also
+
+  - [[file:extract-thumbnail.org][extract-thumbnail]] — visual still
+  - [[file:transcode-to-h264.org][transcode-to-h264]] — keep video, re-encode

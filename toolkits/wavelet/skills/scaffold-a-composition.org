@@ -1,0 +1,48 @@
+#+TITLE: wavelet — scaffold a composition
+#+TOOLKIT: wavelet
+#+SKILL: scaffold-a-composition
+#+TAGS: video init scaffold
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: yes
+  :DESTRUCTIVE: no
+  :REQUIRES: node>=20
+  :END:
+
+  Empty directory; need a starting-point wavelet composition the
+  user can iterate on. Templates are domain-specific (text-card,
+  product-reel, etc.); =wavelet init --help= lists the current
+  set.
+
+* Workflow
+
+  #+CAPTION: 1. scaffold a new composition
+  #+begin_src bash
+  wavelet init my-comp --template=text-card
+  cd my-comp
+  #+end_src
+
+  #+CAPTION: 2. inspect the source structure
+  #+begin_src bash
+  cat main.xml          # the composition declaration
+  ls assets/            # fonts, images the composition references
+  #+end_src
+
+  #+CAPTION: confirm scaffold produced what we expect
+  #+begin_src bash :role post :path my-comp
+  test -f "$1/main.xml" || { echo "$1/main.xml missing"; exit 1; }
+  test -d "$1/assets"   || { echo "$1/assets missing"; exit 1; }
+  echo "✓ scaffold ok"
+  #+end_src
+
+* Gotchas
+
+  - Fonts are not bundled; the composition references Google Fonts
+    / Bunny / Fontshare URLs. First render fetches + caches.
+  - Asset paths in main.xml are relative to the project root.
+
+* See also
+
+  - [[file:preview-and-render.org][preview-and-render]] — iterate + ship

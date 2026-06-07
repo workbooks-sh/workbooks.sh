@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quickstart — Workbooks docs</title>
+<meta name="description" content="From npm install to a published workbook in five minutes." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/" class="is-active">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+    <a href="https://www.npmjs.com/package/@work.books/cli">npm ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Quickstart · 5 min</p>
+    <h1>From zero to a published workbook.</h1>
+    <p>
+      You'll install the CLI, scaffold a project, build it to one HTML
+      file, and (optionally) publish it to Studio.
+    </p>
+
+    <h2>1. Install the CLI</h2>
+    <p>Requires Node 18+. Bun, pnpm, and yarn all work.</p>
+<pre><code>npm install -g @work.books/cli
+workbook --version</code></pre>
+
+    <h2>2. Scaffold a project</h2>
+    <p>
+      Pick a slug — the file you publish later will be named after it.
+      The default template is a Svelte app; pass <code>--template</code>
+      for others (<code>vanilla</code>, <code>react</code>,
+      <code>mdx</code>).
+    </p>
+<pre><code>workbook init pricing-analysis
+cd pricing-analysis
+bun install</code></pre>
+
+    <h2>3. Dev loop</h2>
+    <p>
+      <code>workbook dev</code> watches your source and serves a live
+      preview on a local port. The runtime sandboxing mirrors the
+      production iframe, so behaviour matches what your recipient sees
+      when they open the built file.
+    </p>
+<pre><code>workbook dev</code></pre>
+
+    <h2>4. Build</h2>
+    <p>
+      <code>workbook build</code> compiles your project to one HTML
+      file under <code>dist/</code>. By default, the build embeds a
+      gzipped snapshot of your source so anyone with the file can run
+      <code>workbook unbundle</code> to recover the project. See
+      <a href="/docs/source-bundle/">Source bundle</a> for the wire
+      format and how to opt out.
+    </p>
+<pre><code>workbook build
+ls dist/</code></pre>
+
+    <div class="note">
+      <strong>That's the file.</strong> <code>dist/index.html</code> is
+      a self-contained workbook. You can email it, attach it to an
+      issue, drop it in S3, or open it locally with
+      <code>open dist/index.html</code>. No daemon, no host required.
+    </div>
+
+    <h2>5. Publish to Studio (optional)</h2>
+    <p>
+      If you want a shareable link with identity and revocation,
+      <code>workbook publish</code> uploads the artifact to Studio. The
+      first run opens a browser to sign in; subsequent runs reuse the
+      stored token.
+    </p>
+<pre><code>workbook publish --group pricing-research</code></pre>
+    <p>
+      You'll get back a <code>workbooks.sh/w/&lt;id&gt;</code> URL.
+      Studio handles auth, the recipient hits sign-in if the workbook is
+      private, and the artifact streams to their browser inside a
+      sandboxed iframe. See <a href="/docs/studio/">Hosting on Studio</a>
+      for access policies and revocation.
+    </p>
+
+    <h2>Next steps</h2>
+    <ul>
+      <li>Read <a href="/docs/standard/">the standard</a> if you want to write a workbook by hand or build your own tooling.</li>
+      <li>Wire up <a href="/docs/agents/">an agent</a> so Claude or Cursor can scaffold, publish, and manage workbooks for you.</li>
+      <li>Check the <a href="/docs/cli/">CLI reference</a> for every command and flag.</li>
+    </ul>
+
+    <div class="docs-pager">
+      <a href="/docs/"><span>← Previous</span><b>Overview</b></a>
+      <a class="next" href="/docs/studio/"><span>Next →</span><b>Hosting on Studio</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

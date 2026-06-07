@@ -1,0 +1,61 @@
+#+TITLE: Deploy a workbook to Railway
+#+CAPTION: Ship a built workbook .html as a static site on the user's own Railway account.
+
+* When to use
+
+The user wants their workbook live on the web hosted on *their own* Railway
+account (vs Cloudflare Pages, or our broker / Live URL). Railway is a good
+pick when they already use Railway for other services, or want the workbook
+to live alongside a backend they run there.
+
+* Workflow
+
+One command — you (the agent) run it via bash. If the user isn't signed into
+Railway it opens the browser sign-in automatically, then stages + deploys.
+
+#+begin_src bash
+# build the workbook if needed (emits dist/<slug>.html)
+wb build
+
+# deploy — auto-opens 'railway login' if needed, then ships it
+wb forge web deploy dist/<slug>.html --to railway
+#+end_src
+
+The artifact is staged behind a generated Caddy image (which listens on
+Railway's =$PORT=) and deployed with =railway up=. The public URL is printed
+(or =railway domain= generates one).
+
+To check / force auth separately:
+
+#+begin_src bash
+wb forge web doctor --to railway --login
+#+end_src
+
+* Auth — we set up THEIR CLI, we never hold the token
+
+=railway login= opens a browser and signs into the *user's* Railway account.
+The token is stored by railway in =~/.railway= — Workbooks never reads, stores,
+or proxies it. Check with =railway whoami=.
+
+* Common pitfalls
+
+- *$PORT*: Railway injects =$PORT= and routes to it. The generated Caddyfile
+  binds =:{$PORT:80}= — a static server that hardcodes :80 will fail health
+  checks. The recipe handles this; only relevant if you hand-roll.
+- *Project linking*: the recipe runs =railway init --name <project>= when the
+  cwd isn't already linked to a project. To deploy into an existing project,
+  =railway link= it first.
+- *Build vs static*: we deploy a Dockerfile (Caddy) rather than relying on
+  Railway's buildpack auto-detection, so a bare HTML file deploys predictably.
+
+* Verification checklist
+
+- =railway whoami= shows the expected account.
+- =railway status= shows the project + a successful deployment.
+- The printed URL returns 200 and renders the workbook.
+
+* See also
+
+- =deploy-kit/web/railway.sh= — the recipe this drives.
+- =plans/forge-targets.org= — the broader forge-targets design.
+- https://docs.railway.com/guides/cli — authoritative CLI reference.

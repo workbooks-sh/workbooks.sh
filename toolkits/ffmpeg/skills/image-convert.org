@@ -1,0 +1,215 @@
+#+TITLE: ffmpeg — convert image formats (png/jpg/webp/avif, alpha, quality)
+#+TOOLKIT: ffmpeg
+#+SKILL: image-convert
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use to convert a still image between png/jpg/webp/avif. Covers alpha handling (jpg has none), the per-encoder quality knob (-q:v vs -quality vs -crf), lossless webp, chroma subsampling, and the "looks washed out / wrong colors" pixel-format pitfalls.
+#+TAGS: image convert png jpg jpeg webp avif alpha quality chroma pix_fmt
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  You have a still image and need it in a DIFFERENT file format — a
+  PNG render delivered as a small JPG, a transparent asset kept as
+  PNG/WEBP, a modern AVIF for size. ffmpeg picks the encoder from the
+  OUTPUT extension; you tune quality per-encoder. *Do not hand-roll
+  python/PIL.*
+
+  NOT for: changing pixel dimensions ([[file:image-resize.org][image-resize]]); cropping/
+  padding ([[file:image-crop-pad.org][image-crop-pad]]). To inspect the current
+  pixel format / format: =ffprobe -v error -show_entries stream=pix_fmt,codec_name -of csv=p=0 in.png=.
+
+* The format cheat-sheet
+
+  | Format | Alpha | Lossy? | Quality knob          | Use when                          |
+  |--------+-------+--------+-----------------------+-----------------------------------|
+  | PNG    | yes   | no     | =-compression_level=  | lossless / alpha / intermediate   |
+  | JPG    | NO    | yes    | =-q:v= (2–31, low=best)| photos, smallest universal lossy  |
+  | WEBP   | yes   | both   | =-quality= / =-lossless=| smaller-than-jpg, web, has alpha |
+  | AVIF   | yes   | both   | =-crf= (libsvtav1)    | smallest modern; newer support    |
+
+  The output extension chooses the muxer; you usually only add the
+  quality flag.
+
+* Workflow
+
+  #+CAPTION: verify input + show its current pixel format
+  #+begin_src bash :role pre
+  test -f "$1" || { echo "input file $1 not found"; exit 1; }
+  ffprobe -v error -show_entries stream=pix_fmt,codec_name -of csv=p=0 "$1"
+  #+end_src
+
+** PNG → JPG (small, universal, lossy)
+
+  =-q:v= for the mjpeg encoder runs 2 (best) to 31 (worst). 2–5 is
+  visually clean; 7–10 is fine for thumbnails.
+
+  #+CAPTION: high-quality jpg
+  #+begin_src bash
+  ffmpeg -i in.png -q:v 2 out.jpg
+  #+end_src
+
+  CRITICAL chroma note: ffmpeg's mjpeg encoder defaults to
+  =yuvj444p= (NO chroma subsampling — larger files, but no color
+  bleed). Most JPEG tooling expects =yuvj420p= (4:2:0, smaller,
+  standard). For maximum compatibility and smaller files, force it:
+
+  #+CAPTION: standard 4:2:0 jpg (smaller, broadest compatibility)
+  #+begin_src bash
+  ffmpeg -i in.png -q:v 3 -pix_fmt yuvj420p out.jpg
+  #+end_src
+
+  Keep =yuvj444p= only when fine colored text/edges show subsampling
+  artifacts (red text on dark, thin UI lines).
+
+** → WEBP
+
+  IMPORTANT: many ffmpeg builds ship WITHOUT the WebP *encoder*
+  (=libwebp= not compiled in). =ffmpeg -i in.png out.webp= then fails
+  with "Default encoder for format webp ... is probably disabled."
+  Check first:
+
+  #+CAPTION: confirm a webp encoder exists before relying on it
+  #+begin_src bash :role pre
+  ffmpeg -hide_banner -encoders 2>/dev/null | grep -i webp \
+    || { echo "no webp encoder in this ffmpeg build — use png/jpg/avif, or install ffmpeg with libwebp"; exit 1; }
+  #+end_src
+
+  When present, =libwebp= uses =-quality 0–100= (higher = better) for
+  lossy and =-lossless 1= for lossless:
+
+  #+CAPTION: lossy webp (quality 80) — keeps alpha
+  #+begin_src bash
+  ffmpeg -i in.png -c:v libwebp -quality 80 out.webp
+  #+end_src
+
+  #+CAPTION: LOSSLESS webp (exact pixels, still smaller than png often)
+  #+begin_src bash
+  ffmpeg -i in.png -c:v libwebp -lossless 1 out.webp
+  #+end_src
+
+** → AVIF (smallest, modern)
+
+  AVIF is an AV1 still. With this toolchain it encodes via
+  =libsvtav1=; quality is the AV1 =-crf= (0 = lossless-ish/huge,
+  ~30 = good, higher = smaller/worse). AVIF keeps alpha and supports
+  10-bit.
+
+  #+CAPTION: avif at crf 30 (good quality/size balance)
+  #+begin_src bash
+  ffmpeg -i in.png -c:v libsvtav1 -crf 30 out.avif
+  #+end_src
+
+  #+CAPTION: smaller avif (crf 45)
+  #+begin_src bash
+  ffmpeg -i in.png -c:v libsvtav1 -crf 45 out.avif
+  #+end_src
+
+  (Builds compiled with =libaom-av1= use =-c:v libaom-av1 -crf N=
+  instead — same idea, slower, often slightly smaller.)
+
+** JPG/WEBP → PNG (lossless, gain alpha-capable container)
+
+  #+CAPTION: any → png
+  #+begin_src bash
+  ffmpeg -i in.jpg out.png
+  #+end_src
+
+  Note: converting a lossy JPG to PNG does NOT recover lost detail —
+  it just stops further degradation and gives you a lossless
+  container.
+
+  #+CAPTION: confirm the conversion + report format/alpha
+  #+begin_src bash :role post :path out.png
+  test -f "$1" || { echo "output missing"; exit 1; }
+  file "$1" | grep -qE "PNG|JPEG|WebP|AVIF" || { echo "not an image"; exit 1; }
+  ffprobe -v error -show_entries stream=pix_fmt -of csv=p=0 "$1"
+  #+end_src
+
+* Alpha handling — the big one
+
+  *JPG has NO alpha channel.* Convert a transparent PNG → JPG and the
+  transparency is flattened — by default to BLACK, which looks like a
+  black box where you expected the page background.
+
+  If you must produce a JPG from a transparent source, composite it
+  onto a known background color first (so the flatten is intentional).
+  The robust pattern: =split= the image, fill one copy solid with
+  =drawbox=...:t=fill= as the background, then =overlay= the original
+  on top. This inherits the source size automatically (a bare =color=
+  filter would NOT — it emits the lavfi default size, mismatching the
+  image).
+
+  #+CAPTION: flatten transparent png onto WHITE, then write jpg
+  #+begin_src bash
+  ffmpeg -i logo.png -vf "split[a][b];[a]drawbox=color=white:t=fill[bg];[bg][b]overlay" -frames:v 1 flat.jpg
+  #+end_src
+
+  #+CAPTION: same, onto a brand color, forcing standard jpg chroma
+  #+begin_src bash
+  ffmpeg -i logo.png -vf "split[a][b];[a]drawbox=color=0x111418:t=fill[bg];[bg][b]overlay,format=yuvj420p" -frames:v 1 flat.jpg
+  #+end_src
+
+  To KEEP alpha, target PNG / WEBP / AVIF — not JPG.
+
+* "Looks washed out / colors are wrong" — pixel-format pitfalls
+
+  Color shifts on conversion almost always trace to a pixel-format /
+  color-range mismatch, not the encoder quality:
+
+  1. *RGB ↔ YUV range.* JPG uses the =yuvj*= (full-range) family. If a
+     filter forces a video-range =yuv420p= without flagging full
+     range, brights/darks compress and the image looks flat/washed.
+     For JPG, prefer the =yuvj420p= / =yuvj444p= variants (note the
+     =j=) so range is correct.
+  2. *Stripped color metadata.* Re-encoding can drop the source ICC /
+     color-primaries tag, so a viewer assumes sRGB and a wide-gamut
+     source looks dull. ffmpeg is not a color-management tool — for
+     ICC-critical work, keep PNG and manage color elsewhere.
+  3. *16-bit → 8-bit banding.* A 16-bit PNG flattened to 8-bit can
+     band in gradients. Add =-pix_fmt rgb24= explicitly so you know
+     the bit depth you're writing.
+  4. *Premultiplied vs straight alpha.* Compositing a premultiplied
+     PNG with a filter expecting straight alpha darkens edges. Match
+     with =format=rgba= and =overlay=...:alpha=straight= when halos
+     appear (see [[file:image-overlay-composite.org][image-overlay-composite]]).
+
+* Common pitfalls
+
+  1. *No webp encoder.* Lots of ffmpeg builds lack =libwebp=. Probe
+     with =ffmpeg -encoders | grep webp= before scripting webp output.
+  2. *Wrong quality flag per encoder.* JPG=≈=-q:v= (low is good);
+     WEBP=≈=-quality= (high is good); AVIF=≈=-crf= (low is good).
+     Using =-q:v= on libwebp or =-crf= on mjpeg silently does nothing
+     useful.
+  3. *JPG ate my transparency.* Expected — JPG has no alpha. Flatten
+     onto a chosen color, or pick PNG/WEBP/AVIF.
+  4. *JPG default is 4:4:4 here.* Bigger than you'd expect; force
+     =-pix_fmt yuvj420p= for standard, smaller 4:2:0 JPGs.
+  5. *Multi-frame source warning.* If the input "image" is actually a
+     1-frame video / animated source, add =-frames:v 1= (or
+     =-update 1=) or ffmpeg complains it "Cannot write more than one
+     file with the same name."
+  6. *Lossless ≠ smaller automatically.* =-lossless 1= webp / low-crf
+     avif can be LARGER than a good lossy JPG. Lossless is for
+     exactness (alpha, text), not minimum bytes.
+
+* Verification checklist
+
+  - [ ] Output exists + =file= reports the intended format
+  - [ ] Alpha preserved (PNG/WEBP/AVIF) OR intentionally flattened (JPG)
+  - [ ] Colors match the source (no wash-out → check =pix_fmt= is the
+        =yuvj*= variant for JPG)
+  - [ ] File size is in the expected ballpark for the quality chosen
+  - [ ] For webp: an encoder actually existed in this build
+
+* See also
+
+  - [[file:image-resize.org][image-resize]] — change pixel dimensions (often paired with convert)
+  - [[file:image-crop-pad.org][image-crop-pad]] — reframe; the JPG-alpha-drop rule applies to pad too
+  - [[file:image-overlay-composite.org][image-overlay-composite]] — flatten/compose with correct alpha
+  - [[file:lossy-tradeoffs.org][lossy-tradeoffs]] — CRF/quality mental model (video, same intuition)
+  - =ffmpeg -h encoder=mjpeg= / =-h encoder=libwebp= / =-h encoder=libsvtav1=

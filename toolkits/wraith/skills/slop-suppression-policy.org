@@ -1,0 +1,231 @@
+#+TITLE: wraith — slop findings + per-team policy on suppressions
+#+TOOLKIT: wraith
+#+SKILL: slop-suppression-policy
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when `wraith slop` surfaces AI-slop signatures — lint-escape `#[allow(...)]`, debug residue, placeholder prose, defensive-reasoning comments, glob imports, cross-language wrong-syntax. Decide which to delete, which to suppress (and where), and how to write the team rule.
+#+TAGS: rust ai-slop lint cleanup policy hygiene
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: yes
+  :REQUIRES: wraith>=0.0.0
+  :END:
+
+  =wraith slop= has produced a finding list and you need to
+  decide, per finding: delete it, fix it, or accept it as a
+  known exception. The output is opinionated — the right
+  posture is "treat every finding as a real signal until you've
+  written down why this one is OK."
+
+  Not for: ordinary lint findings (clippy / rustfmt); behavior
+  bugs (tests); architectural issues (=wraith boundaries= or
+  =wraith circular-deps=).
+
+* What slop flags
+
+  Verified from =wraith slop --help= and the broader doc
+  surface:
+
+  | Signature                  | Looks like                                               |
+  |----------------------------+----------------------------------------------------------|
+  | Lint-escape suppressions   | =#[allow(dead_code)]=, =#[allow(clippy::too_many_lines)]= |
+  | Debug residue              | =dbg!=, =println!= outside =main.rs= / =bin/=, leftover =eprintln!= |
+  | Placeholder prose          | "TODO", "FIXME", "XXX", "placeholder", "tbd" in comments |
+  | Defensive-reasoning prose  | Comments that explain why the code definitely works ("we know this is safe because…") |
+  | Glob imports               | =use foo::*;= bringing the whole namespace in            |
+  | Cross-language wrong-syntax| TS-ish syntax in Rust files (=:=, =foo: type=, =const X = …;=); Rust-ish in TS |
+
+  Output is per-file with a slop score — high score = high
+  density of signals.
+
+* Workflow
+
+  #+CAPTION: 1. confirm wraith reachable
+  #+begin_src bash :role pre
+  command -v wraith >/dev/null || { echo "wraith missing"; exit 1; }
+  wraith slop --help | head -2
+  #+end_src
+
+** Step 1 — run a full sweep + see the score distribution
+
+   #+CAPTION: full slop report
+   #+begin_src bash
+   wraith slop
+   #+end_src
+
+   #+CAPTION: top 10 sloppiest files (machine-readable triage list)
+   #+begin_src bash
+   wraith --format json slop | jq -r '
+     [.[] | { file: .file, score: .score, kinds: [.findings[].kind] | unique }]
+     | sort_by(-.score)[0:10][]
+     | "\(.score)\t\(.file)\t\(.kinds | join(","))"
+   '
+   #+end_src
+
+** Step 2 — classify each finding into one of four buckets
+
+   For every finding, pick ONE:
+
+   | Bucket               | Action                                                                                 |
+   |----------------------+----------------------------------------------------------------------------------------|
+   | DELETE               | Just remove the residue / comment / suppression. Most slop is this.                    |
+   | FIX                  | Replace placeholder prose with real comment; replace glob with explicit imports.        |
+   | SUPPRESS (file-local)| Real exception. Keep the suppression but add a one-line "// SLOP-OK: <reason>" comment. |
+   | SUPPRESS (config)    | Same class is OK across the whole repo. Move to =.wraithrc.json= so it stops surfacing. |
+
+   Default to DELETE. The right amount of FIX is the second
+   biggest bucket. SUPPRESS is rare and always needs a written
+   reason.
+
+** Step 3 — DELETE the easy ones first
+
+   Most lint-escape and debug-residue findings have no
+   justification. Removing them is one PR, no discussion:
+
+   #+CAPTION: find debug residue in non-binary files
+   #+begin_src bash
+   git grep -nE 'dbg!|println!' -- 'crates/*-core/src' 'crates/*-lib/src'
+   # delete each unless it's clearly part of CLI/binary stdout
+   #+end_src
+
+   #+CAPTION: find unjustified #[allow(...)] attrs
+   #+begin_src bash
+   git grep -nE '#\[allow\([^)]+\)\]' -- '**/*.rs'
+   # for each, ask: is there a comment justifying it? If no — remove it,
+   # then re-run cargo check / clippy to see what surfaces.
+   #+end_src
+
+** Step 4 — FIX placeholder prose + glob imports
+
+   #+CAPTION: surface TODOs / FIXMEs
+   #+begin_src bash
+   git grep -nE '(TODO|FIXME|XXX|placeholder|tbd)' -- '**/*.rs' '**/*.ts'
+   # for each: either resolve it (write the real code) or file a bd issue
+   # and turn the comment into "(see bd wb-xxxx)".
+   #+end_src
+
+   #+CAPTION: glob imports — expand them explicitly
+   #+begin_src bash
+   git grep -nE '^use [^;]+::\*;' -- '**/*.rs'
+   # rust-analyzer / IDE: "Expand glob import" — or do it by hand:
+   # the explicit list is the documentation.
+   #+end_src
+
+** Step 5 — SUPPRESS (file-local) with a reason
+
+   When a suppression is genuinely needed (FFI, macro-generated
+   code, derive-generated dead helpers), keep it AND add an
+   adjacent "SLOP-OK" comment that makes the reason searchable:
+
+   #+CAPTION: pattern: justified suppression
+   #+begin_src rust
+   // SLOP-OK: generated by bindgen; clippy can't see through the macro
+   #[allow(clippy::missing_safety_doc)]
+   pub unsafe fn raw_handle() -> *mut c_void { … }
+   #+end_src
+
+   #+CAPTION: audit — every #[allow(...)] should have a sibling SLOP-OK line
+   #+begin_src bash
+   git grep -B1 -nE '#\[allow\(' -- '**/*.rs' \
+     | grep -B1 -E '#\[allow\(' \
+     | grep -v 'SLOP-OK' \
+     | head -30
+   # any output here = unjustified allow that should either be removed
+   # or get a SLOP-OK reason added
+   #+end_src
+
+** Step 6 — SUPPRESS (config) for whole-repo exceptions
+
+   If a class of finding is universally OK in this repo (e.g.
+   you've decided that =println!= is fine in =examples/=
+   crates), move the rule out of source noise and into
+   =.wraithrc.json= where it's reviewable in one place. (Today
+   slop doesn't have per-pattern toggles in the default config
+   schema — file a bd issue if you need one; in the meantime,
+   document the exception in your team =CONTRIBUTING.org=.)
+
+** Step 7 — verify the score moved
+
+   #+CAPTION: confirm post-cleanup state
+   #+begin_src bash :role post
+   wraith slop | tail -20
+   # The total count + per-file scores should be down. If a hotspot
+   # file is unchanged, you didn't actually delete the residue.
+   #+end_src
+
+   #+CAPTION: rebuild + test — deleting suppressions surfaces real lints
+   #+begin_src bash :role post
+   cargo check --workspace --all-targets
+   cargo clippy --workspace --all-targets -- -D warnings
+   cargo test  --workspace
+   #+end_src
+
+* Team policy template
+
+  Write this down once in your team's =CONTRIBUTING.org= and
+  reference it from PR reviews:
+
+  #+begin_example
+  ## Wraith slop findings — team policy
+
+  1. New code must not introduce =wraith slop= findings without an
+     adjacent =// SLOP-OK: <reason>= line.
+  2. =dbg!= / =println!= forbidden outside =bin/= / =examples/= /
+     =main.rs=.
+  3. =TODO= comments are forbidden — file a bd issue and reference
+     it (=// see bd wb-xxxx=).
+  4. Glob imports forbidden — explicit only.
+  5. Bare =#[allow(...)]= forbidden — every one needs SLOP-OK.
+  6. PRs are gated by =wraith slop= delta — net new findings = block.
+  #+end_example
+
+* Common pitfalls
+
+  1. *Treated suppression as the default.* Slop findings are
+     usually real residue, not exceptions. DELETE is the most
+     common right answer; SUPPRESS is rare.
+
+  2. *Suppressed without a reason.* A bare =#[allow(...)]= with
+     no SLOP-OK comment is indistinguishable from drift. Always
+     leave a sentence explaining WHY.
+
+  3. *Deleted a justified suppression and broke a downstream
+     consumer.* Removing =#[allow(dead_code)]= on a public-API
+     surface item surfaces a real dead-code finding the public
+     API needed kept. Cross-reference the public surface with
+     =wraith dead-code= before deleting.
+
+  4. *Removed =println!= from a binary's main loop.* If the
+     residue IS the user-facing output of the binary, it's not
+     residue. Use the file location (=src/main.rs=, =src/bin/*=)
+     as the signal — slop's heuristic isn't perfect.
+
+  5. *Treated the slop score as gospel.* It's a density metric,
+     not a quality metric. A file can be high-scoring purely
+     because it has a lot of justified suppressions in one place
+     (e.g. FFI bindings). Verify each finding before bulk-acting.
+
+  6. *Didn't re-run cargo clippy after removing suppressions.*
+     Suppressions hide real lints. After removing them you'll
+     get clippy noise; that's the point — fix or re-suppress
+     with reason.
+
+* Verification checklist
+
+  - [ ] =wraith slop= total count dropped after cleanup
+  - [ ] Every remaining =#[allow(...)]= has a SLOP-OK reason
+  - [ ] No bare =TODO= / =FIXME= without a bd reference
+  - [ ] No =dbg!= / =println!= outside binary entrypoints
+  - [ ] No glob imports in library crates
+  - [ ] =cargo clippy --workspace --all-targets -- -D warnings= passes
+  - [ ] Team policy committed to =CONTRIBUTING.org= if not already
+
+* See also
+
+  - [[file:overview.org][overview]] — first contact with wraith
+  - [[file:clean-up-a-rust-package.org][clean-up-a-rust-package]] — sweep before slop
+  - [[file:fix-write-workflow.org][fix-write-workflow]] — automated dead-code / unused-deps
+  - [[file:boundary-enforcement.org][boundary-enforcement]] — architectural rules slop doesn't cover
+  - [[file:reduce-complexity.org][reduce-complexity]] — for high cyclomatic / cognitive findings

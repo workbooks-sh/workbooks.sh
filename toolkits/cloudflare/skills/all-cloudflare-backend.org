@@ -1,0 +1,150 @@
+#+TITLE: Stand up an all-Cloudflare backend (D1 + Workers AI + Pages)
+#+CAPTION: Turn a workbook into a live, multi-tenant app on the user's own Cloudflare account.
+
+* When to use
+
+The user wants their workbook to read/write LIVE data with real sign-in and
+per-user (or per-org) isolation — a real app — and wants it ALL on Cloudflare:
+one account, one bill, just a =wrangler= login. No Postgres to provision, no
+second provider. This is the sibling of the =byod= path (Postgres + Railway);
+pick =cloudflare= when "everything on Cloudflare" is the goal.
+
+The shape: a Cloudflare Worker (the unified gateway, d1 driver) holds the data (D1) + AI
+(Workers AI) + auth (BetterAuth-on-D1). The workbook =.html= is the FRONTEND and
+ships to Cloudflare Pages. The browser never speaks D1 — it calls the Worker,
+which authenticates the caller, runs ONLY allowlisted tenant-scoped named
+queries, and the Workers AI endpoint.
+
+BetterAuth-on-D1 is VERIFIED LIVE and fully automated. One command —
+=wb forge app deploy --backend cf-d1 --auth better-auth= — stands up a Worker
+with D1 + Workers AI + BetterAuth mounted at =/api/auth/*=, needing only a
+=wrangler login=. No other account, no manual migration step.
+
+* Account selection (shared, automatic)
+
+Both the backend deploy and the Pages deploy resolve the account the same way:
+
+- =CLOUDFLARE_ACCOUNT_ID= set → use it.
+- Unset + exactly one account on the login → derived from =wrangler whoami=.
+- Unset + multiple accounts → the recipe lists them and stops; set
+  =CLOUDFLARE_ACCOUNT_ID= to pick one and re-run.
+
+The resolver lives in =toolkits/wrangler/deploy/cloudflare.sh= (=wb_cf_resolve_account=)
+and is sourced by =toolkits/wrangler/deploy/cf-d1.sh= so both paths behave identically.
+Check the active login any time with =wrangler whoami=.
+
+* Workflow
+
+#+begin_src bash
+# 0. build the workbook (emits dist/<slug>.html), and confirm the login.
+wb build
+wrangler whoami          # opens browser sign-in via the recipe if not signed in
+
+# 1. stand up the backend. --auth better-auth (verified) is the all-Cloudflare
+#    real-sign-in path; --auth hmac-dev is the dev-token fallback.
+#    The recipe: creates the D1 db, applies schema.sql --remote, (for
+#    better-auth) generates + applies the better-auth tables and sets
+#    BETTER_AUTH_SECRET, deploys the Worker, and injects the PUBLIC descriptor
+#    { provider:"cf-d1", url, auth } into a COPY of the workbook.
+wb forge app deploy dist/<slug>.html --backend cf-d1 --auth better-auth
+# dev-token fallback instead:
+# wb forge app deploy dist/<slug>.html --backend cf-d1 --auth hmac-dev
+
+# 2. ship the connected workbook copy (dist/app/<slug>.html) to Pages.
+wb forge web deploy dist/app/<slug>.html --to cloudflare
+#+end_src
+
+* D1 (data)
+
+- The recipe runs =wrangler d1 create <slug>= idempotently — if the database
+  already exists it reuses the id (looked up via =wrangler d1 list=).
+- Schema lives in =deploy-kit/app/gateway/schema.sql= and is applied with
+  =wrangler d1 execute <db> --remote --file schema.sql=. It uses
+  =IF NOT EXISTS=, so re-applying is safe.
+- Queries are an allowlist in the Worker (=d1-driver.js= → =queries=), each
+  tenant-scoped (=where tenant_id = ?=). The browser POSTs =/q/<name>= with
+  params; raw SQL is never accepted from the client.
+- By hand: =wrangler d1 execute <db> --remote --command "select count(*) from notes"=.
+
+* Workers AI
+
+- Bound as =AI= in =wrangler.toml= (=[ai]= binding) — no API key, billed to the
+  account. The Worker calls =env.AI.run("@cf/meta/llama-3.1-8b-instruct", ...)=
+  for =POST /ai/summarize=.
+- Swap the model by editing the model id in =d1-driver.js=; see the Workers AI
+  model catalog for options. Keep prompts server-side — the browser only hits
+  the named endpoint.
+
+* Auth (BetterAuth-on-D1 — verified; HS256 dev fallback)
+
+- =--auth better-auth= (VERIFIED LIVE): BetterAuth mounts in the Worker at
+  =/api/auth/*= (sign-up, sign-in, sessions, organizations, JWKS, bearer
+  tokens) backed by the SAME D1. The tenant for every query is resolved from
+  the session — active organization, else the user id — NEVER from the request
+  body. The recipe (=cf-d1.sh=) does the WHOLE flow automatically: npm install
+  =--legacy-peer-deps=, generate the better-auth tables via
+  =@better-auth/cli ... --config ./auth-gen.config.mjs=, apply them to the
+  remote D1, =wrangler secret put BETTER_AUTH_SECRET=, then deploy twice (the
+  second pass injects =BETTER_AUTH_URL= once the =*.workers.dev= host is known).
+  No manual migration step.
+
+  Sign-in from the workbook (cross-origin, bearer — no third-party cookies):
+  =POST <worker-url>/api/auth/sign-up/email= then =/sign-in/email=; read the
+  token from the =set-auth-token= header and send it as =Authorization: Bearer=.
+
+  Two upstream-bug workarounds are baked in (you don't run them, just know why
+  the extra files exist): kysely 0.29 dropped =DEFAULT_MIGRATION_TABLE= which
+  =@better-auth/kysely-adapter='s D1 dialect still imports, so
+  =kysely-shim.mjs= re-exports kysely plus those constants and
+  =wrangler.toml= aliases =kysely= to it; and =d1-driver.js= carries a minimal
+  in-tree kysely-0.29 D1 dialect (replacing the incompatible =kysely-d1=).
+
+- =--auth hmac-dev= (FALLBACK): the Worker accepts an HS256 bearer carrying a
+  tenant claim. The recipe sets =GATEWAY_JWT_SECRET=; mint dev tokens with
+  =wb forge app token --secret <secret> --tenant <id>=. No auth tables —
+  the simplest path for a quick demo without real sign-in.
+
+* Auth — we set up THEIR account, we never hold the token
+
+=wrangler login= signs into the USER'S Cloudflare account; the OAuth token lives
+in =~/.wrangler=. The =BETTER_AUTH_SECRET= / =GATEWAY_JWT_SECRET= are set as
+Worker secrets via =wrangler secret put= — piped, never written to a committed
+file. Workbooks never sees the users, the data, or the secrets.
+
+* Common pitfalls
+
+- *Multiple accounts*: a >1-account login can't be resolved non-interactively —
+  set =CLOUDFLARE_ACCOUNT_ID=. The recipe lists the candidates and exits.
+- *nodejs_compat*: the Worker imports npm deps (better-auth, kysely) — the
+  staged =wrangler.toml= sets =compatibility_flags = ["nodejs_compat"]=. Without
+  it the bundle fails at deploy.
+- *better-auth tables*: the recipe generates + applies them automatically on
+  the =--auth better-auth= path; you don't run the migration by hand. The
+  =--auth hmac-dev= fallback path needs no tables.
+- *--legacy-peer-deps*: the gateway install uses it (better-auth's optional
+  prisma peer conflicts with better-sqlite3, used only for schema generation) —
+  the recipe already passes it.
+- *Rotating BETTER_AUTH_SECRET*: it encrypts the JWKS private key stored in D1 —
+  rotating it invalidates existing sessions/keys. Keep it stable across deploys.
+- *Pages project name rules*: =[a-z0-9-]= only; =wb forge web deploy= slugifies.
+
+* Verification checklist
+
+- =wrangler whoami= shows the expected account/email.
+- =GET <worker-url>/health= returns =ok:true= with =auth: "better-auth"= (or
+  ="hmac"= on the fallback path).
+- A named query (=POST /q/list_notes=) returns only the caller's tenant rows;
+  a second tenant cannot see the first's data.
+- =POST /ai/summarize= returns a summary for the tenant's notes.
+- The =*.pages.dev= URL serves the connected workbook and it talks to the Worker.
+
+* See also
+
+- =toolkits/wrangler/deploy/cf-d1.sh= — the backend recipe (D1 + Workers AI + secret + deploy + inject).
+- =deploy-kit/app/gateway/= — the unified gateway: =core.mjs= + =auth.mjs=
+  (shared with the Postgres driver), =d1-driver.js= (Worker entry: D1 dialect,
+  queries, Workers AI), =kysely-shim.mjs= (aliased in wrangler.toml),
+  schema.sql, README.org.
+- =toolkits/wrangler/deploy/cloudflare.sh= — the Pages recipe + shared account resolver.
+- =toolkits/wrangler= — the static Pages-only path; =toolkits/byod= — the Postgres sibling.
+- =wrangler d1 --help=, =wrangler deploy --help= — authoritative flag reference.

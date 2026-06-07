@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Changelog — Workbooks</title>
+<meta name="description" content="What changed in Workbooks Studio and the open standard." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/" class="is-active">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+    <a href="https://www.npmjs.com/package/@work.books/cli">npm ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Changelog</p>
+    <h1>What's new.</h1>
+    <p>
+      Studio (the SaaS) and the open standard release independently.
+      Studio versions follow the workspace UI; the CLI and runtime
+      follow npm semver on <code>@work.books/cli</code> and
+      <code>@work.books/runtime</code>.
+    </p>
+
+    <h2>Studio v0.5 — May 2026</h2>
+    <ul>
+      <li><strong>Group libraries</strong> — workbooks live inside groups with their own contributors and access policy.</li>
+      <li><strong>Broker upload via <code>workbook publish</code></strong> — loopback OAuth from the CLI, no manual token paste.</li>
+      <li><strong>Per-workbook self-revoke</strong> — change visibility or clear grants without leaving the workbook page.</li>
+      <li><strong>Public sharing</strong> — <code>workbooks.sh/w/&lt;id&gt;</code> resolves through the broker; recipient sees a trust prompt before the artifact runs.</li>
+    </ul>
+
+    <h2>Standard — May 2026</h2>
+    <ul>
+      <li><strong>Source bundle becomes default</strong> in <code>@work.books/cli</code> <code>0.5.0</code>: builds embed a gzipped snapshot of the source tree (<code>--no-bundle</code> opts out, <code>--bundle-git</code> includes <code>.git/</code>).</li>
+      <li><strong>Compound extension retired.</strong> Workbooks are <code>.html</code> — not <code>.workbook.html</code>. Content-sniff is the source of truth.</li>
+      <li><strong>Workbooks pivot.</strong> Product framing moves from "self-editing daemon-mounted file" to "portable HTML mini-app with source travelling inside." See <a href="/docs/standard/">the standard</a> for the current model. The legacy daemon still ships for installed users; new features go to the CLI and hosted Studio.</li>
+    </ul>
+
+    <h2>Earlier</h2>
+    <p>
+      Pre-0.5 changelog lives on GitHub. See
+      <a href="https://github.com/shinyobjectz-sh/workbooks/releases">workbooks/releases</a>
+      for the full release history across the runtime, CLI, broker, and
+      Studio.
+    </p>
+
+    <div class="docs-pager">
+      <a href="/docs/agents/"><span>← Previous</span><b>Agent setup</b></a>
+      <a class="next" href="/docs/"><span>Next →</span><b>Back to overview</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

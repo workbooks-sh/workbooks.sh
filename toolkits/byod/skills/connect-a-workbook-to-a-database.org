@@ -1,0 +1,150 @@
+#+TITLE: Connect a workbook to a live database (BYOD + auth)
+#+CAPTION: Turn a static workbook into a real, multi-tenant app with no engine.
+
+* When to use
+
+The user wants their workbook to read/write LIVE data with real sign-in and
+per-user (or per-org) isolation — a real app, not a static page — but does NOT
+need the agent engine. Auth is their OWN (BetterAuth), on their OWN infra.
+Workbooks never sees their users, credentials, or DB.
+
+* Pick a backend (--backend)
+
+Two backends, both with the SAME auth choices (=--auth better-auth= default, or
+=hmac-dev=). Choose by where the data + the account live:
+
+- =cf-d1= — ALL-CLOUDFLARE, the simplest path. A single Worker
+  (~deploy-kit/app/gateway~, d1 driver) holds the data in D1 (SQLite) and runs the AI
+  features on Workers AI. Needs ONLY a ~wrangler~ login — no second provider, no
+  separate Postgres. BetterAuth runs on D1 inside the Worker. Reach for this when
+  the user has no existing DB and wants one command.
+- =postgres-gateway= — a tiny Node gateway (Railway) in front of the user's OWN
+  Postgres (Crunchy / Railway / RDS). BetterAuth runs in the gateway on that
+  same Postgres. Reach for this when they already have a Postgres they must use.
+
+* The shape (so you don't get it wrong)
+
+- The workbook ~.html~ is the FRONTEND. It is deployed to Pages/desktop/mobile.
+- A BACKEND (the SAME gateway core: d1 driver as a Worker, or pg driver as a
+  Node service) + AUTH
+  (BetterAuth) deploy SEPARATELY, holding/fronting the data.
+- The workbook only ever learns a PUBLIC connection descriptor
+  (~<script id="workbook-backend">~: ~{provider, url, auth}~ — backend URL + auth
+  mode). No DB credentials or server code are ever in the served ~.html~.
+- The browser CANNOT speak the DB. It calls the backend, which: authenticates
+  the caller (BetterAuth session / bearer / api-key), runs ONLY allowlisted
+  NAMED queries (no raw SQL), and scopes every query to the caller's tenant.
+
+* Workflow
+
+#+begin_src bash
+# 0. check readiness (node, wrangler / railway, what secrets you still need)
+wb forge app doctor
+
+# 1. (postgres-gateway only) write your named-query allowlist — the ONLY queries
+#    the browser can run. Start from the shipped example; each query is
+#    tenant-scoped. (see deploy-kit/app/gateway/queries.example.mjs)
+
+# 2a. ALL-CLOUDFLARE: D1 + Workers AI, only a wrangler login needed. The recipe
+#     creates the D1 db, applies schema.sql (+ the generated better-auth tables),
+#     sets the secret, deploys the Worker, and injects the descriptor.
+wb forge app deploy dist/<slug>.html \
+  --backend cf-d1 \
+  --auth better-auth
+
+# 2b. POSTGRES: stands up the gateway+auth next to your DB, runs BetterAuth
+#     migrations, and injects the descriptor into a copy of the workbook.
+wb forge app deploy dist/<slug>.html \
+  --backend postgres-gateway \
+  --auth better-auth \
+  --db-url 'postgres://…your DB…' \
+  --queries queries.mjs
+
+# 3. ship the connected workbook (the copy in dist/app/) as a website/app:
+wb forge web deploy dist/app/<slug>.html --to cloudflare
+#+end_src
+
+In the workbook frontend, wire sign-in + queries with plain ~fetch~ against the
+injected descriptor — there is no client library to import. Both backends expose
+the same surface (~/api/auth/*~ BetterAuth, ~POST /q/<name>~); it is exercised
+end-to-end by ~deploy-kit/app/gateway/test.sh~.
+
+#+begin_src js
+// The deploy injected a PUBLIC descriptor into the page:
+const wb = JSON.parse(document.getElementById("workbook-backend").textContent);
+
+// Sign in (bearer flow: the token arrives in the set-auth-token header).
+// Use /sign-up/email with {name, email, password} to register instead.
+const res = await fetch(`${wb.auth.baseURL}/sign-in/email`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ email, password }),
+});
+const token = res.headers.get("set-auth-token");
+
+// Run a NAMED query (the only kind the backend accepts):
+const { rows } = await (await fetch(`${wb.url}/q/list_notes`, {
+  method: "POST",
+  headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+  body: JSON.stringify({ params: { limit: 50 } }),
+})).json();
+#+end_src
+
+* Auth options (--auth)
+
+Cross-provider: the SAME flags work on both =cf-d1= and =postgres-gateway=. Each
+backend supplies its own BetterAuth DB adapter (D1 vs Postgres).
+
+- =better-auth= (default) — self-hosted in the backend: email+password, sessions,
+  organizations (multi-tenant), JWT+JWKS, bearer tokens, and API keys. Tenancy =
+  active organization, else the user id. On cf-d1 it runs on D1 inside the Worker
+  (kysely + an in-tree D1 dialect); on postgres-gateway it runs on your Postgres.
+- =hmac-dev= — HS256 dev tokens (no sign-in UI); mint with
+  ~wb forge app token --secret <s> --tenant <id>~. For local/testing only.
+- =none= — single-tenant / public (postgres-gateway only).
+
+API keys (programmatic callers) are issued via BetterAuth's api-key plugin and
+sent as the =x-api-key= header; the backend scopes them to the key's owner.
+
+* Security model (what keeps tenants apart)
+
+- The tenant is taken from the SERVER-VERIFIED session / api-key, NEVER from the
+  request body — a client cannot read another tenant's rows by lying.
+- Only NAMED queries run; there is no raw-SQL path from the browser.
+- Secrets (DATABASE_URL / BETTER_AUTH_SECRET on postgres-gateway;
+  BETTER_AUTH_SECRET / GATEWAY_JWT_SECRET on cf-d1) are provider secrets — set via
+  ~wrangler secret~ / Railway variables, never in the served ~.html~.
+- 500s return a generic message (no DB internals leak); /q is rate-limited.
+
+* Common pitfalls
+
+- *cf-d1 multiple accounts*: the recipe auto-picks a single Cloudflare account
+  from ~wrangler whoami~; with >1 it stops — set =CLOUDFLARE_ACCOUNT_ID=.
+- *No --queries* (postgres-gateway): you ship the EXAMPLE allowlist. Write your
+  own + redeploy.
+- *CORS in production*: set =CORS_ORIGIN= (=--cors=) to your workbook's exact
+  Pages origin (default ~*~ is fine for dev, loose for prod).
+- *Migrations*: ~deploy~ runs BetterAuth migrations from your machine — for
+  postgres-gateway your machine needs network to the DB; for cf-d1 the generated
+  tables are applied to remote D1 via wrangler.
+- *Raw DB in the browser*: impossible — always via the backend (or another
+  browser-native backend like Convex/Supabase).
+
+* Verification checklist
+
+- =cf-d1=: BetterAuth on D1 is VERIFIED — sign-up/sign-in mount at
+  ~/api/auth/*~, bearer returned in the ~set-auth-token~ header, tenant-scoped
+  D1 reads, cross-tenant isolation.
+- =postgres-gateway=: ~bash deploy-kit/app/gateway/test.sh~ passes
+  (signup→bearer, tenant-scoped query, cross-tenant isolation, 401, JWKS,
+  api-key, HS256 fallback); =/health= returns ~{"ok":true,...}~.
+- Either way: a signed-in user sees only their own rows; a second user sees none.
+
+* See also
+
+- =plans/forge-byod.org= / =plans/forge-auth.org= — the design.
+- =deploy-kit/app/gateway/= — the unified gateway: one core + auth module,
+  d1 + pg drivers, schema, queries example, test (see its README.org).
+- =toolkits/wrangler/deploy/cf-d1.sh= + =deploy-kit/app/postgres-gateway.sh= —
+  the provision recipes.
+- =wb forge app --help= — the CLI surface.

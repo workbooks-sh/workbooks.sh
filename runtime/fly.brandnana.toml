@@ -1,0 +1,32 @@
+# Fly deploy for the clean-room brandnana engine — the WASM runtime hosting the
+# real brand-book pipeline. A SEPARATE app (bn-engine-agents); the live bn-engine
+# is never touched. Build context = monorepo root (see scripts/build-brandnana-engine.sh).
+# Secrets: OPENROUTER_API_KEY FIRECRAWL_API_KEY BRANDNANA_API_KEY GEMINI_API_KEY
+#          THE_COMPANIES_API_KEY GROQ_API_KEY WB_PUBLIC_BEARER (copy from bn-engine).
+
+app = "bn-engine-agents"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile.brandnana"
+
+[env]
+  WB_WEB = "1"
+  PORT = "4000"
+  WB_REGISTRY = "/tmp/registry.db"
+  WB_PROFILE_DIR = "/opt/profile"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # NEVER autostop: brand-book runs are background spawns with no HTTP traffic;
+  # fly's idle-autostop would kill the run mid-flight and wipe /tmp.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+# The brand-book run (harvest + 2 long-horizon agents + imagemagick) is heavy.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 4096

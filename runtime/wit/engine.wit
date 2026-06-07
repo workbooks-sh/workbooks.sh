@@ -1,0 +1,16 @@
+package workbooks:engine;
+
+// The Dock interface — the typed capability surface a Workbook Instance runs
+// against. session-info is always granted (read-only ids); vfs/llm/net are
+// gated by the Instance's Policy caps. A component that imports a cap its
+// profile doesn't grant fails to instantiate — capability enforcement by
+// construction. The Workbook's entrypoint is `run`.
+world engine {
+  import session-info: func() -> string;
+  import vfs-query: func(sql: string) -> string;
+  // Invoke a registered in-WASM command by name (stdin/stdout) — a local,
+  // pure-compute sandboxed binary (jq/ripgrep), how an agent runs commands
+  // without an OS shell. NOT the toolkit/integration layer. Gated by `commands`.
+  import run-command: func(command: string, input: string) -> string;
+  export run: func(input: string) -> string;
+}

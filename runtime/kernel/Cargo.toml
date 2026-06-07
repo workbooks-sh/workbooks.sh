@@ -1,0 +1,31 @@
+[package]
+name = "oql"
+version = "0.1.0"
+edition = "2021"
+description = "OQL — the opinionated Org kernel. Narrow Org lens + tangle-plan emitter, compiled to WASM. Clean-room rewrite (OQL-KERNEL.org)."
+
+# Standalone — not part of any parent workspace.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json = "1"
+orgize = "0.10.0-alpha.10"
+wit-bindgen-rt = { version = "0.41", features = ["bitflags"] }
+
+# cargo-component: build a WIT-typed Component from the workbooks:oql world.
+# One ABI for the whole system — the kernel no longer opts out of the Component
+# Model it imposes on user code.
+[package.metadata.component]
+package = "workbooks:oql"
+
+[package.metadata.component.target]
+path = "wit"
+world = "oql"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

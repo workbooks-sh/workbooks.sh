@@ -1,0 +1,38 @@
+#+TITLE: brandnana — brief
+#+TOOLKIT: brandnana
+#+SKILL: brief
+#+TAGS: brief creative strategy generate
+#+STATUS: experimental
+
+* When to use this
+
+Turn gathered signal into a creative brief, or kick off the full brief-generation
+pipeline for a domain.
+
+* Common verbs
+
+#+begin_src bash
+brandnana brief <domain>                      # get the brief for a domain
+brandnana brief <domain> --handle <handle>    # override the social handle
+brandnana brief generate <domain>             # run the generation pipeline
+brandnana brief generate <domain> --competitors a.com,b.com
+brandnana brief generate <domain> --with-video --link-only --force
+brandnana brief generate <domain> --out ./dir # write to a dir instead of installing
+#+end_src
+
+=brief <domain>= defaults the social handle to the second-level domain; override
+with =--handle= when they differ. =brief generate= shares flags with =book=
+(=--competitors=, =--with-video=, =--link-only=, =--force=).
+
+* What "good" looks like
+
+- Feed the brief real evidence (ads + social + catalog), not priors.
+- =--out= for an inspectable artifact; omit it to install as a skill.
+
+* Common pitfalls
+
+- Generating a brief before gathering signal — it'll be generic.
+
+* See also
+
+- =overview=, =ads=, =social=, =book=.

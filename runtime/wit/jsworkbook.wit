@@ -1,0 +1,7 @@
+package workbooks:jsworkbook;
+
+// A JS Workbook component: exports the same `run` entrypoint as the engine world.
+// Authored in JS, componentized via jco (StarlingMonkey), run in an Instance.
+world workbook {
+  export run: func(input: string) -> string;
+}

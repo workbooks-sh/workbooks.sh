@@ -1,0 +1,37 @@
+#+TITLE: wavelet toolkit
+#+TOOLKIT: wavelet
+#+VERSION: 0.1.0
+#+CLI_BIN: wavelet
+#+CLI_VERSION_RANGE: >=0.0.0
+#+STATUS: experimental
+#+TAGLINE: Imperative editing CLI for motion-graphics video compositions (init, inspect, preview, render).
+#+REQUIRES: node>=20
+
+* wavelet — motion-graphics video CLI                            :toolkit:
+  :PROPERTIES:
+  :ID:        wavelet
+  :CLI_BIN:   wavelet
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  Wavelet is Workbooks' motion-graphics renderer — Blitz + Vello +
+  Animato + rsmpeg. The =wavelet= CLI is the imperative editing
+  surface: scaffold a composition, preview it in a dev server,
+  render to mp4.
+
+  Verbs: =wavelet init | inspect | lint | preview | render | trim
+  | split | cut | concat | move | verify=. Not all verbs are
+  stable; rely on =wavelet --help= for the current surface.
+
+  Skill index (read on demand):
+
+  | Skill                            | Use when                                                |
+  |----------------------------------+---------------------------------------------------------|
+  | =overview=                   | First contact, when to use wavelet                      |
+  | =scaffold-a-composition=     | Empty dir → composition source                          |
+  | =preview-and-render=         | Dev loop → final mp4                                    |
+  | =text-cards=                 | Titles, lower-thirds, end cards as overlay scenes       |
+  | =transitions=                | Cut / cross-fade / fade-to-black between scenes         |
+  | =audio-sync=                 | Align visual events to audio cues (beats, VO, sfx)      |
+  | =template-catalog=           | Pick a =wavelet init --template= value                   |

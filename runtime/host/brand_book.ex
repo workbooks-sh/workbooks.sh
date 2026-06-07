@@ -1,0 +1,109 @@
+defmodule Workbooks.BrandBook do
+  @moduledoc """
+  The brandnana brand book, ported onto the clean-room runtime. The mainline runs
+  this as a Scout→Strategist→Designer board; here it's a three-stage pipeline over
+  one shared OS workdir, driven by the clean-room agent loop:
+
+    1. HARVEST  — `brandnana harvest-all <domain>` (deterministic sweep → an
+       OQL-queryable org substrate in the workdir). Needs the cloud keys, so it
+       only fully runs on a deployed engine.
+    2. STRATEGIST — the real brandnana-strategist agent (exec + workdir) reads the
+       substrate, writes gated `analysis/*.org`.
+    3. DESIGNER — the real designer agent composes + publishes the deck-v2 HTML.
+
+  The agents are the canonical profile `:agent:` defs baked at WB_PROFILE_DIR
+  (/opt/profile/agents) — the exact files the production engine uses — parsed by
+  `Workbooks.AgentDef`; their bash/brandnana toolkits are the clean-room `run`
+  exec tool. The engine env (the brandnana keys) is inherited by every `run`.
+  Stage status is written to `<workdir>/_status.json` for observability.
+  """
+  alias Workbooks.AgentDef
+
+  @doc "Run the full brand-book pipeline for `domain`. Returns %{domain, workdir, stages, deck}."
+  def run(domain, opts \\ []) do
+    workdir = opts[:workdir] || Path.join(System.tmp_dir!(), "brandbook-#{slug(domain)}-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(workdir)
+
+    status(workdir, %{domain: domain, stage: "harvest", started: true})
+    harvest = harvest(domain, workdir)
+
+    status(workdir, %{domain: domain, stage: "strategist", harvest: harvest})
+    strategist = stage(strategist_path(), strategist_task(domain), workdir, opts[:strategist_steps] || 60)
+
+    status(workdir, %{domain: domain, stage: "designer", harvest: harvest})
+    designer = stage(designer_path(), designer_task(domain), workdir, opts[:designer_steps] || 90)
+
+    result = %{
+      domain: domain,
+      workdir: workdir,
+      harvest: harvest,
+      strategist: String.slice(strategist.result, 0, 400),
+      designer: String.slice(designer.result, 0, 400),
+      deck: find_deck(workdir),
+      published: published_url(workdir)
+    }
+
+    status(workdir, Map.put(result, :stage, "done"))
+    result
+  end
+
+  # Stage 1 — the deterministic harvest (inherits the engine env / keys).
+  defp harvest(domain, workdir) do
+    {out, code} = System.cmd("brandnana", ["harvest-all", domain], cd: workdir, stderr_to_stdout: true)
+    %{exit: code, tail: String.slice(out, max(byte_size(out) - 400, 0), 400)}
+  rescue
+    e -> %{exit: :error, error: Exception.message(e)}
+  end
+
+  # Stages 2 & 3 — a real brandnana agent, exec-enabled, rooted in the workdir.
+  # on_step appends each tool step to a trace file so a long-horizon run is
+  # observable from outside (the in-VFS events.org is only written at finish).
+  defp stage(agent_org_path, task, workdir, steps) do
+    role = Path.basename(agent_org_path, ".org")
+    trace = Path.join(workdir, "_trace-#{role}.jsonl")
+    on_step = fn ev ->
+      line = Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 160)})
+      File.write(trace, line <> "\n", [:append])
+    end
+    AgentDef.run(File.read!(agent_org_path), task, exec: true, workdir: workdir, max_steps: steps, on_step: on_step)
+  end
+
+  defp strategist_task(domain) do
+    "You are Stage-2 for the brand at #{domain}. The Stage-1 harvest left the " <>
+      "OQL-queryable substrate in your working directory (brand.org, catalog/, " <>
+      "social/, ads.org, harvest-provenance.org). Read it with your run tool " <>
+      "(cat/grep/wb/brandnana), then write the gated analysis/*.org and make " <>
+      "`brandnana analysis check .` print RESULT: PASS. Then finish with done."
+  end
+
+  defp designer_task(domain) do
+    "You are Stage-3 for the brand at #{domain}. Stages 1-2 are done: the substrate " <>
+      "and gated analysis/*.org are in your working directory. Get the slide spine " <>
+      "with `brandnana book insight-slides .`, compose the deck-v2 brand book, " <>
+      "publish it with `brandnana book publish`, and review the slides. When the " <>
+      "deck is published, write the URL to ./published-url, then finish with done."
+  end
+
+  # Agent defs: the canonical profile agents (baked at WB_PROFILE_DIR), with a
+  # local examples/ fallback for dev.
+  defp strategist_path, do: first_existing(["#{profile_dir()}/agents/brandnana-strategist.org", local("bn-strategist.org")])
+  defp designer_path, do: first_existing(["#{profile_dir()}/agents/designer.org", local("bn-designer.org")])
+  defp profile_dir, do: System.get_env("WB_PROFILE_DIR") || "/opt/profile"
+  defp local(name), do: Path.expand(Path.join([__DIR__, "..", "examples", "agents", name]))
+  defp first_existing(paths), do: Enum.find(paths, &File.exists?/1) || hd(paths)
+
+  defp find_deck(workdir) do
+    Path.wildcard(Path.join(workdir, "**/deck*.html")) |> List.first() ||
+      Path.wildcard(Path.join(workdir, "**/*.html")) |> List.first()
+  end
+
+  defp published_url(workdir) do
+    case File.read(Path.join(workdir, "published-url")) do
+      {:ok, url} -> String.trim(url)
+      _ -> nil
+    end
+  end
+
+  defp status(workdir, map), do: File.write(Path.join(workdir, "_status.json"), Jason.encode!(map))
+  defp slug(d), do: String.replace(d, ~r/[^a-z0-9]/i, "-")
+end

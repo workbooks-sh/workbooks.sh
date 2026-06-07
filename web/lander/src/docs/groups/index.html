@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Group display & views — Workbooks docs</title>
+<meta name="description" content="Pick how a group's library renders. Configure layouts, sort, grouping, and visible fields. Push a views.toml from the CLI or upload from settings." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <a href="/docs/groups/" class="is-active">Group display</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+    <a href="https://www.npmjs.com/package/@work.books/cli">npm ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Studio</p>
+    <h1>Group display &amp; views.</h1>
+    <p>
+      A group's library page renders through a saved <em>view</em>.
+      Each view picks a layout, a sort order, a grouping field, and
+      which fields are visible. Admins can ship one or more views as
+      shared options for the group; members can also save their own
+      private views.
+    </p>
+
+    <h2 id="layouts">Layouts</h2>
+    <p>Seven layouts are built in. Each is the same data, just a different shape.</p>
+    <ul>
+      <li><strong>List.</strong> Dense rows with title, type, tags, and timestamps. The default for most libraries.</li>
+      <li><strong>Grid.</strong> Card grid with author and description. Best for portfolios and showcases.</li>
+      <li><strong>Table.</strong> Tabular view. Choose which columns appear via <code>fields</code>.</li>
+      <li><strong>Kanban.</strong> Columns grouped by type, tag, or author. Good for triage and pipelines.</li>
+      <li><strong>Finder.</strong> Sidebar tree of groupings with a details pane. Best for deep libraries.</li>
+      <li><strong>Gallery.</strong> One featured workbook above a grid. Good for highlighting a hero artifact.</li>
+      <li><strong>Timeline.</strong> Chronological feed sorted by created or updated time.</li>
+    </ul>
+
+    <h2 id="settings">From the Studio settings page</h2>
+    <p>
+      Open <em>Group → Settings → Display</em>. The section lists every
+      saved view. Click a view to edit its layout, sort, grouping, and
+      visible fields. Use the star to pick the default view — that's
+      what new visitors see on first load.
+    </p>
+    <p>
+      Members see the same shared views as admins, plus any private
+      views they've saved for themselves. Private views never leak to
+      anyone else.
+    </p>
+
+    <h2 id="views-toml">Defining views in a file</h2>
+    <p>
+      Display config can live in a <code>views.toml</code> file you
+      check into source. Same shape as the settings UI; one
+      <code>[[view]]</code> table per view.
+    </p>
+<pre><code>default = "triage"
+
+[[view]]
+id        = "triage"
+name      = "Triage"
+layout    = "kanban"
+group_by  = "type"
+sort      = { by = "newest", dir = "desc" }
+fields    = ["title", "type", "tags", "author", "updated"]
+
+[[view]]
+id        = "feed"
+name      = "Recent activity"
+layout    = "timeline"
+sort      = { by = "updated", dir = "desc" }
+</code></pre>
+
+    <p>Valid values:</p>
+    <ul>
+      <li><code>layout</code> — <code>list</code>, <code>grid</code>, <code>table</code>, <code>kanban</code>, <code>finder</code>, <code>gallery</code>, <code>timeline</code>.</li>
+      <li><code>sort.by</code> — <code>newest</code>, <code>alpha</code>, <code>updated</code>, <code>views</code>.</li>
+      <li><code>sort.dir</code> — <code>asc</code> or <code>desc</code>.</li>
+      <li><code>group_by</code> — <code>none</code>, <code>type</code>, <code>tag</code>, <code>author</code>.</li>
+      <li><code>fields</code> — any of <code>title</code>, <code>type</code>, <code>tags</code>, <code>author</code>, <code>updated</code>. Omit to take the default set.</li>
+    </ul>
+
+    <h2 id="push">Pushing from the CLI</h2>
+    <p>
+      Once the CLI's <code>group push</code> subcommand lands, you'll
+      sync the file with one command:
+    </p>
+<pre><code>workbook group push views.toml --group pricing-research</code></pre>
+    <p>
+      Until then, upload the file from the Display section in Studio
+      — same parser, same result.
+    </p>
+
+    <div class="note">
+      <strong>Status.</strong> The views.toml format described here is
+      the target shape and is what the upload + CLI flows will accept
+      once those land. The settings UI works today and writes to the
+      same broker storage.
+    </div>
+
+    <div class="docs-pager">
+      <a href="/docs/studio/"><span>← Previous</span><b>Hosting on Studio</b></a>
+      <a class="next" href="/docs/standard/"><span>Next →</span><b>The standard</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

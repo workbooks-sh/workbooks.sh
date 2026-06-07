@@ -1,0 +1,46 @@
+# Fly app config — the Engine (orchestrator). Rendered by
+# toolkits/fly/deploy/bootstrap.sh (__APP_NAME__ / __REGION__ substituted). The engine is a long-running HTTP
+# service; in the headless model it runs the agent loop as a local subprocess on
+# this machine (WB_VMM_BACKEND=process) — the machine IS the workspace boundary.
+app = "__APP_NAME__"
+primary_region = "__REGION__"
+
+# The image is built by the bootstrap (`flyctl deploy <repo-root> --dockerfile
+# deploy-kit/Dockerfile.engine`), so no [build] section here — the Dockerfile +
+# context are passed on the command line (the context is the monorepo root, not
+# this dir).
+
+[env]
+  OQL_HEADLESS = "1"
+  WB_VMM_BACKEND = "process"
+  # PORT must match [http_service].internal_port below. The cloud
+  # Dockerfile defaults to 8080 if unset; pin here so the template owns
+  # the source of truth.
+  PORT = "4000"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Agent sessions run ASYNC: POST /api/run returns immediately, then the agent
+  # loop (60-300s) runs in the background with no in-flight HTTP request. Auto-
+  # stop would kill the machine mid-session (taking its in-memory VmHosts +
+  # sessions with it). Keep the engine up so sessions complete. Sessions are
+  # machine-local in-memory, so also run a SINGLE machine (or add sticky
+  # sessions / shared session state before scaling out).
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Liveness check on the unauthenticated GET /api/health (api/router.ex
+  # :api_public pipeline — no bearer). Required for the bluegreen update
+  # strategy and gives Fly a real health signal instead of bare TCP.
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

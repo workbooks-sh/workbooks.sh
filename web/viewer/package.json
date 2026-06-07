@@ -1,0 +1,23 @@
+{
+  "name": "@workbooks/viewer",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Workbooks Viewer — workbooks.sh/w/<rid> read-only web view for recipients. SvelteKit on Cloudflare Pages. wb-u2o0.6.4.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@lucide/svelte": "^1.11.0",
+    "@sveltejs/adapter-cloudflare": "^7.0.0",
+    "@sveltejs/kit": "^2.57.0",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
+    "svelte": "^5.46.0",
+    "svelte-check": "^4.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  }
+}

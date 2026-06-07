@@ -1,0 +1,10 @@
+# Fly app config — the agent-runtime VM pool. Agent machines are NOT a
+# long-running service: the engine's fly.rs backend creates one per workspace on
+# demand (boot) and destroys it on done (shutdown). This app exists only to hold
+# the agent-runtime image the engine creates machines from. Rendered by
+# toolkits/fly/deploy/bootstrap.sh (__APP_NAME__ / __REGION__ substituted).
+app = "__APP_NAME__-agents"
+primary_region = "__REGION__"
+
+[build]
+  dockerfile = "../../../deploy-kit/Dockerfile.agent-runtime"

@@ -1,0 +1,89 @@
+#+TITLE: Cross-platform multi-target builds + release CI for a forged desktop app
+#+CAPTION: One workbook, many native installers — locally per-OS or via a generated GitHub Actions release matrix.
+
+* When to use
+
+A workbook has been forged into a desktop app and the user wants MORE than a
+single host build: multiple architectures (Apple Silicon + Intel), multiple
+operating systems, or an automated release pipeline that produces signed
+installers on a tag. Use this alongside =tauri code-signing= (signing is the
+gate; this is the distribution shape).
+
+* Multi-target builds (=WB_FORGE_TARGET=)
+
+=wb forge desktop build= reads =WB_FORGE_TARGET=, which now accepts three forms:
+
+- *empty* → the host build (bundles land directly in =WB_FORGE_OUT=). Unchanged.
+- *comma-separated triples* → e.g. =aarch64-apple-darwin,x86_64-apple-darwin=.
+  Each triple builds into its own subfolder =WB_FORGE_OUT/<triple>/=.
+- *the literal "all"* → the sensible set for the HOST OS:
+  - macOS   → =aarch64-apple-darwin= + =x86_64-apple-darwin=
+  - Linux   → =x86_64-unknown-linux-gnu= + =aarch64-unknown-linux-gnu=
+  - Windows → =x86_64-pc-windows-msvc=
+
+For each triple the recipe runs =rustup target add <triple>= when rustup is
+present (warns otherwise), builds, and collects the installers per triple.
+
+#+begin_src bash :role example
+# both macOS archs in one go (on a Mac):
+WB_FORGE_TARGET="aarch64-apple-darwin,x86_64-apple-darwin" \
+  wb forge desktop build dist/app.html --app-name "My App" --app-id com.you.app
+# → dist/desktop/aarch64-apple-darwin/...  and  dist/desktop/x86_64-apple-darwin/...
+#+end_src
+
+*Cross-OS is a CI concern.* Building Windows from macOS (or vice-versa) needs
+extra toolchains/linkers and is brittle locally. =all= is most useful PER-OS in
+CI, where each runner natively builds its own platform. That is exactly what
+release-init generates.
+
+* Release CI (=wb forge desktop release-init=)
+
+Generates =.github/workflows/wb-desktop-release.yml= into the user's repo. The
+workflow:
+
+- triggers on =desktop-v*= tags + manual dispatch;
+- builds a matrix of macos-14 (arm64), macos-13 (x86_64), ubuntu-22.04,
+  windows-2022 — each runner natively builds its own triple;
+- installs the Tauri CLI and drives the SAME deploy-kit recipe
+  (=wb forge desktop build=, falling back to =deploy-kit/desktop/build.sh= when
+  the =wb= CLI isn't on the runner);
+- wires macOS signing/notarization + Windows signing the same way the canonical
+  workflow does — *degrades to unsigned with a loud warning* when secrets are
+  absent;
+- uploads bundle artifacts, then a publish job creates a draft GitHub Release.
+
+It refuses to overwrite an existing workflow unless =WB_FORGE_FORCE=1=, and
+prints the exact list of GitHub secrets to set.
+
+#+begin_src bash :role example
+wb forge desktop release-init        # writes the workflow into ./ (cwd)
+git add .github/workflows/wb-desktop-release.yml && git commit -m "ci: desktop release"
+git tag desktop-v0.1.0 && git push --tags   # kicks off the matrix build
+#+end_src
+
+** Secrets the generated workflow consumes
+
+- macOS: =APPLE_CERTIFICATE=, =APPLE_CERTIFICATE_PASSWORD=,
+  =APPLE_SIGNING_IDENTITY=, =APPLE_ID=, =APPLE_PASSWORD=, =APPLE_TEAM_ID=.
+- Windows: =TAURI_SIGNING_PRIVATE_KEY=, =TAURI_SIGNING_PRIVATE_KEY_PASSWORD=.
+- Linux: none (AppImage/deb/rpm distribute unsigned by convention).
+
+Absent any of these, the corresponding leg still builds — unsigned, with a
+=::warning::= in the log.
+
+* Verification checklist
+
+- Local: =WB_FORGE_TARGET=all wb forge desktop build ...= produces a per-triple
+  subfolder per expanded target for the host OS.
+- CI: a pushed =desktop-v*= tag runs all four legs; the publish job attaches every
+  installer to a draft Release. (LIVE-VERIFY — needs a real repo + secrets.)
+- Signed legs: =spctl -a -vv <app>= says "Notarized" (macOS); the .msi installs
+  without a SmartScreen block (Windows, with an EV cert).
+
+* See also
+
+- =deploy-kit/desktop/build.sh= / =lib.sh= — the multi-target recipe + helpers
+  (=wb_expand_targets=, =wb_desktop_build_one=).
+- =deploy-kit/desktop/release-init.sh= — the workflow generator.
+- =deploy-kit/desktop/template/github/wb-desktop-release.yml= — the template.
+- =tauri code-signing= — the cert + notarization setup this depends on.

@@ -1,0 +1,20 @@
+package workbooks:oql;
+
+// The OQL kernel as a typed Component — the same contract the Package Manager
+// forces on user JS components (jco/componentize-js), now applied to our own
+// kernel. Pure in / pure out: every export is string→string, no host imports,
+// so it instantiates with no WASI context and a fault traps inside Wasmtime.
+world oql {
+  // query: Org structure → headline rows (JSON)
+  export parse-headlines: func(org: string) -> string;
+  // lint: Org → diagnostics (JSON)
+  export lint: func(org: string) -> string;
+  // tangle: literate Workbook → WIT-world-shaped build plan (JSON)
+  export tangle-plan: func(org: string) -> string;
+  // validate: build plan → diagnostics (dangling inputs, missing language)
+  export validate: func(org: string) -> string;
+  // upgrade gate: diff deployed vs new world, refuse breaking changes (JSON)
+  export check-upgrade: func(old: string, new: string) -> string;
+  // render: Org → rich HTML (orgize to_html)
+  export render: func(org: string) -> string;
+}

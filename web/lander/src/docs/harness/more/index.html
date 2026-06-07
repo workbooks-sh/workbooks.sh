@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>More harnesses — Workbooks docs</title>
+<meta name="description" content="Install prompts for Lovable, v0, Replit, OpenHands, Roo Code, Goose, Trae, and GitHub Copilot. Paste into your tool and it auto-installs Workbooks." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<script src="/js/copy-install.js" defer></script>
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <a href="/docs/harness/claude-code/">Claude Code</a>
+    <a href="/docs/harness/cursor/">Cursor</a>
+    <a href="/docs/harness/codex/">OpenAI Codex</a>
+    <a href="/docs/harness/openclaw/">OpenClaw</a>
+    <a href="/docs/harness/cline/">Cline</a>
+    <a href="/docs/harness/continue/">Continue</a>
+    <a href="/docs/harness/windsurf/">Windsurf</a>
+    <a href="/docs/harness/hermes-agent/">Hermes Agent</a>
+    <a href="/docs/harness/pi/">Pi</a>
+    <a href="/docs/harness/more/" class="is-active">More tools</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Harnesses · More tools</p>
+    <h1>Everything else.</h1>
+    <p>
+      Eight more AI coding tools we ship install prompts for. Each card
+      copies a one-shot prompt you paste straight into the tool — it
+      figures out the MCP config path itself. If your agent gets stuck,
+      the fallback under each card has the manual steps.
+    </p>
+
+    <div class="more-grid">
+
+      <div class="install-card" id="roo-code" style="--brand:#EF4444;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/roocode.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">Roo Code</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          A VS Code coding agent forked from Cline. Same MCP server
+          shape, same auto-approve list.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="Roo Code"
+          data-prompt="Install Workbooks for Roo Code. Run `npm install -g @work.books/cli`. In VS Code, open Roo Code → MCP Servers → Edit MCP Settings, then add:&#10;{&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;]}}}&#10;Save. Verify by asking to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install <code>@work.books/cli</code> globally; in
+          VS Code, open the Roo Code MCP settings file and add a
+          server named <code>workbooks</code> with command
+          <code>workbook</code> and args <code>["mcp","serve"]</code>.
+        </p>
+      </div>
+
+      <div class="install-card" id="goose" style="--brand:#9CA3AF;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/goose.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">Goose</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          Block's open-source local agent. Workbooks plugs in as a
+          Goose extension under <code>~/.config/goose/config.yaml</code>.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="Goose"
+          data-prompt="Install Workbooks for Goose. Run `npm install -g @work.books/cli`. Edit ~/.config/goose/config.yaml and add:&#10;extensions:&#10;  workbooks:&#10;    type: stdio&#10;    command: workbook&#10;    args: [mcp, serve]&#10;Restart Goose. Verify by asking to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install the CLI; under <code>extensions:</code> in
+          <code>~/.config/goose/config.yaml</code> add a <code>stdio</code>
+          extension that calls <code>workbook mcp serve</code>.
+        </p>
+      </div>
+
+      <div class="install-card" id="openhands" style="--brand:#16A34A;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/openhands.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">OpenHands</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          The open-source SWE agent (formerly OpenDevin). Add Workbooks
+          to the runtime's MCP config and restart the worker.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="OpenHands"
+          data-prompt="Install Workbooks for OpenHands. Run `npm install -g @work.books/cli`. Edit ~/.openhands/config.toml and add an MCP server entry: command `workbook`, args `[mcp, serve]`. Restart the OpenHands runtime. Verify by asking to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install the CLI; register an MCP entry in
+          <code>~/.openhands/config.toml</code>; restart the OpenHands
+          runtime so the new tools surface.
+        </p>
+      </div>
+
+      <div class="install-card" id="trae" style="--brand:#3B82F6;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/trae.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">Trae</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          ByteDance's AI-native IDE. MCP servers register through the
+          tools panel in Trae's settings.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="Trae"
+          data-prompt="Install Workbooks for Trae. Run `npm install -g @work.books/cli`. Open Trae's MCP settings and add a server named `workbooks` with command `workbook` and args `[mcp, serve]`. Reload Trae. Verify by asking to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install the CLI; in Trae's <em>Settings → MCP</em>
+          panel add a server named <code>workbooks</code> with command
+          <code>workbook</code> and args <code>[mcp, serve]</code>.
+        </p>
+      </div>
+
+      <div class="install-card" id="github-copilot" style="--brand:#6E7681;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/githubcopilot.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">GitHub Copilot</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          Copilot's <em>Agent</em> mode supports MCP servers. Register
+          Workbooks once and any repo Copilot drives can publish to
+          Studio.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="GitHub Copilot"
+          data-prompt="Install Workbooks for GitHub Copilot. Run `npm install -g @work.books/cli`. In VS Code, open Copilot's Agent settings and register a new MCP server with command `workbook` and args `[mcp, serve]`. Reload VS Code. Verify by asking Copilot Agent to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install the CLI; in VS Code, open <em>Settings →
+          Copilot → Agent → MCP servers</em> and register Workbooks
+          with the stdio command above.
+        </p>
+      </div>
+
+      <div class="install-card" id="replit" style="--brand:#F26207;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/replit.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">Replit Agent</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          Replit's in-workspace agent. Install the CLI in your Repl's
+          shell; the agent can then call out to it.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="Replit Agent"
+          data-prompt="Install Workbooks for Replit Agent. In your Replit workspace, open the Shell and run `npm install -g @work.books/cli`. Then register the Workbooks MCP server in the agent's settings (Replit's MCP config path varies by version — check the docs panel inside the Repl). Verify by asking the agent to list my workbook groups.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: install the CLI inside your Repl's shell; consult
+          the in-Repl Replit Agent docs for the current MCP server
+          registration path (it has been moving around release-by-release).
+        </p>
+      </div>
+
+      <div class="install-card" id="lovable" style="--brand:#FF66B2;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/lovable.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">Lovable</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          Lovable runs entirely in the browser. The Workbooks CLI runs
+          on your machine, so the loop is: Lovable generates the file,
+          you download it, you run <code>workbook publish</code>.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="Lovable"
+          data-prompt="Use Workbooks with Lovable. In Lovable's chat, ask it to generate a Workbooks-shaped single HTML file (with a wb-permissions meta tag and a wb-source-bundle script tag). Download the file. Then locally run `npm install -g @work.books/cli` and `workbook publish path/to/file.html --group <group-slug>` to push it to Studio.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: ask Lovable to generate a single-file HTML app with
+          a <code>wb-permissions</code> meta and a source-bundle script
+          tag; download the file; <code>workbook publish</code> it
+          locally to push it into your Studio group.
+        </p>
+      </div>
+
+      <div class="install-card" id="v0" style="--brand:#FAFAFA;">
+        <div class="install-card-head">
+          <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/v0.svg');"></i></span>
+          <div>
+            <p class="install-card-eyebrow">Auto-install</p>
+            <h2 class="install-card-title">v0</h2>
+          </div>
+        </div>
+        <p class="install-card-desc">
+          Vercel's web-based code generator. Same shape as Lovable —
+          generate locally, publish locally.
+        </p>
+        <button class="install-card-cta" type="button"
+          data-name="v0"
+          data-prompt="Use Workbooks with v0. Ask v0 to generate a single HTML file shaped like a workbook (with wb-permissions meta and a wb-source-bundle script tag containing the project source). Download the file. Locally, run `npm install -g @work.books/cli` and `workbook publish path/to/file.html --group <group-slug>` to push it to Studio.">
+          <span>Copy install prompt</span>
+          <span class="install-card-cta-icon">⎘</span>
+        </button>
+        <p class="install-card-fallback">
+          Manual: prompt v0 for a single-file HTML app with the
+          workbook source-bundle script tag; download; publish locally
+          with <code>workbook publish</code>.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="docs-pager">
+      <a href="/docs/harness/pi/"><span>← Previous</span><b>Pi</b></a>
+      <a class="next" href="/docs/harness/"><span>Next →</span><b>All harnesses</b></a>
+    </div>
+  </article>
+</div>
+
+<style>
+  /* Side-by-side cards on wider viewports so eight isn't a long scroll. */
+  .more-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.1rem;
+    margin: 0 0 2.5rem;
+  }
+  .more-grid .install-card { margin: 0; }
+  .more-grid .install-card-title { font-size: 1rem; }
+  .more-grid .install-card-desc { font-size: 0.86rem; }
+  .more-grid .install-card-fallback { font-size: 0.78rem; }
+</style>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

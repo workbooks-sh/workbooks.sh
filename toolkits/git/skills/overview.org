@@ -1,0 +1,53 @@
+#+TITLE: git — overview
+#+TOOLKIT: git
+#+SKILL: overview
+#+TAGS: vcs version-control intro
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  Reach for these skills when the agent encounters a git task
+  beyond =git add= / =git commit= / =git push= — the common-but-
+  dangerous workflows where model priors often suggest the wrong
+  recipe (force-push, =git reset --hard=, =git checkout .=).
+
+  For simple stage-commit-push, plain bash + =git --help= is
+  fine. These skills cover the recovery + rewrite operations
+  where getting it wrong loses work.
+
+* What this toolkit deliberately doesn't cover
+
+  - git internals (plumbing commands, refs, object model)
+  - GitHub-specific verbs — use the =gh= toolkit
+  - Workbooks federation via Radicle — see =wb=
+
+* Verify
+
+  #+CAPTION: confirm git is installed at a workable version
+  #+begin_src bash :role pre
+  command -v git >/dev/null || { echo "git missing"; exit 1; }
+  git --version
+  #+end_src
+
+  #+CAPTION: confirm we're in a git repo (most skills assume this)
+  #+begin_src bash :role pre
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || { echo "not inside a git work tree"; exit 1; }
+  #+end_src
+
+* See also
+
+  - [[file:recover-from-detached-head.org][recover-from-detached-head]] — get back to a branch safely
+  - [[file:rebase-without-losing-work.org][rebase-without-losing-work]] — move a branch onto updated main
+  - [[file:undo-a-commit-safely.org][undo-a-commit-safely]] — revert vs reset vs amend
+  - [[file:bisect.org][bisect]] — binary-search the commit that introduced a regression
+  - [[file:cherry-pick.org][cherry-pick]] — apply one commit (or range) from another branch
+  - [[file:partial-staging.org][partial-staging]] — split a dirty file into multiple commits
+  - [[file:worktree-management.org][worktree-management]] — have two branches checked out simultaneously
+  - [[file:submodule-flows.org][submodule-flows]] — init / bump / remove submodules
+
+  When uncertain about a verb: =git <verb> --help=.

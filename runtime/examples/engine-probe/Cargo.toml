@@ -1,0 +1,25 @@
+[package]
+name = "engine-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Test fixture: a Workbook component that exercises the workbooks:engine Dock (session-info + vfs-query)."
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen-rt = { version = "0.41", features = ["bitflags"] }
+
+[package.metadata.component]
+package = "workbooks:engine-probe"
+
+[package.metadata.component.target]
+path = "../../wit/engine.wit"
+world = "engine"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

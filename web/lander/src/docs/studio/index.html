@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hosting on Studio — Workbooks docs</title>
+<meta name="description" content="Group libraries, identity, access, and revocation on Workbooks Studio." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/" class="is-active">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+    <a href="https://www.npmjs.com/package/@work.books/cli">npm ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Studio</p>
+    <h1>Hosting on Studio.</h1>
+    <p>
+      Studio is the hosted workspace for workbooks. It adds a library,
+      group-level access control, identity, and a managed viewer at
+      <code>workbooks.sh/w/&lt;id&gt;</code>. Everything described here
+      is optional — the file format works without Studio.
+    </p>
+
+    <h2>Concepts</h2>
+    <p>
+      <strong>Workspace.</strong> Your account's top-level container.
+      One workspace per organisation. Holds groups, members, billing.
+    </p>
+    <p>
+      <strong>Group.</strong> A library of workbooks with its own
+      contributor list and access policy. Workbooks live inside groups,
+      not at the workspace root.
+    </p>
+    <p>
+      <strong>Workbook.</strong> A published artifact. Has an ID, an
+      owner, a visibility setting (<code>public</code> /
+      <code>workspace</code> / <code>private</code>), and a version
+      history.
+    </p>
+
+    <h2>Publishing</h2>
+    <p>
+      Use <code>workbook publish</code> from the CLI. The first time you
+      publish, the CLI opens a browser to authorize with your Studio
+      account; the resulting token is stored in your OS keychain.
+    </p>
+<pre><code>workbook publish --group pricing-research --visibility workspace</code></pre>
+    <p>
+      Subsequent runs re-publish to the same workbook ID. Pass
+      <code>--new</code> to mint a fresh ID if you want a separate
+      artifact rather than a new version.
+    </p>
+
+    <h2>Visibility</h2>
+    <ul>
+      <li><strong>Public</strong> — anyone with the URL can run it. The artifact is served from the broker without auth.</li>
+      <li><strong>Workspace</strong> — anyone signed into the workspace can run it. Default for new publishes.</li>
+      <li><strong>Private</strong> — explicit grant list. Recipients sign in via the hosted viewer; the broker checks the grant before streaming the artifact.</li>
+    </ul>
+
+    <h2>Access &amp; revocation</h2>
+    <p>
+      The broker checks access on every fetch — there is no
+      caching-by-token. To kill access immediately, change visibility to
+      <code>private</code> and clear the grant list, or revoke from the
+      workbook page in Studio. The artifact bytes also rotate so any
+      cached copies on the recipient side stop working.
+    </p>
+    <div class="note">
+      <strong>Workbooks are still untrusted code.</strong> Studio is a
+      hosting layer; it does not vouch for the contents of a workbook.
+      The runtime sandbox (cross-origin iframe + CSP) applies regardless
+      of where the file came from. See
+      <a href="/docs/standard/#security">the security model</a>.
+    </div>
+
+    <h2>Runtime configuration</h2>
+    <p>
+      Some workbooks need environment values (API keys, dataset URLs,
+      feature flags). Studio stores these per-workbook and injects them
+      into the runtime as <code>WB_ENV</code> at fetch time, so they
+      never live in the artifact bytes you ship. Manage them from the
+      workbook's <em>Settings → Runtime</em> tab.
+    </p>
+
+    <h2>Pricing</h2>
+    <p>
+      Free during private beta. Pay-as-you-go pricing after GA: per-seat
+      for Studio, per-GB-served for the viewer/broker. No markup on
+      pass-through infra. Full pricing will land here when GA ships.
+    </p>
+
+    <div class="docs-pager">
+      <a href="/docs/quickstart/"><span>← Previous</span><b>Quickstart</b></a>
+      <a class="next" href="/docs/standard/"><span>Next →</span><b>The standard</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

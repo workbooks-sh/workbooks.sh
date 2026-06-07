@@ -1,0 +1,56 @@
+#+TITLE: 3w — overview (the verb map, the cost model, what's live)
+#+TOOLKIT: 3w
+#+SKILL: overview
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use on first contact with 3w. The verb surface, the $0 cost model, the Google exclusion, and which verbs are live vs landing with later phases.
+#+TAGS: overview help intro 3w web research browser map
+#+STATUS: experimental
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     no
+  :DESTRUCTIVE: no
+  :COST:        free
+  :END:
+
+  Read this first when you haven't used =3w= in this session. It orients you to
+  the verbs and the rules that keep it cheap and unblocked.
+  NOT for: the actual recipes — those are the per-verb skills linked below.
+
+* What 3w is
+
+  A local-first deep-research browser baked into the sandbox. No API keys, no
+  per-call cost: search is native multi-engine, reads impersonate Chrome, JS
+  rendering is a local headless browser (Lightpanda). Egress is from *this*
+  sandbox's IP. The endgame is compiling a research run into a portable
+  *workbook context repository* (raw searchable index + media + agent-authored
+  org analysis) — those verbs come online across bd epic wb-ebwt.
+
+* The verb surface
+
+  | Verb            | Status | What                                                    |
+  |-----------------+--------+---------------------------------------------------------|
+  | =3w search=     | live   | keyless multi-engine search ([[file:search.org][search]]) |
+  | =3w read=       | live   | URL → clean markdown, JS-aware ([[file:read-extract.org][read-extract]]) |
+  | =3w browse=     | soon   | interactive snapshot/act (agent-browser + Lightpanda)   |
+  | =3w crawl=      | soon   | frontier crawl + page-template extraction               |
+  | =3w harvest=    | soon   | media/SVG/font + component catalog                      |
+  | =3w har=        | soon   | capture network session → mine hidden JSON endpoints    |
+  | =3w repo=       | soon   | assemble the workbook context repository (=wb build=)   |
+  | =3w doctor=     | soon   | run the troubleshooting checks                          |
+
+* The rules that keep it free + unblocked
+
+  1. *No Google.* The native pool is ddg+bing+brave+mojeek. Google's wall is
+     JS/behavioral and unscrapeable cheaply — never try to force it; widen
+     engines or use a paid SERP backend if a deploy truly needs it.
+  2. *Search before read.* Don't guess URLs; =search= is the on-ramp.
+  3. *Let read pick its tier.* Cheap Http fetch by default; render only when a
+     page needs JS. Don't blanket =--render=.
+  4. *Cross-engine consensus = trust.* Prefer results several engines agree on.
+
+* See also
+
+  - [[file:search.org][search]] — find pages by query
+  - [[file:read-extract.org][read-extract]] — read a URL as markdown
+  - [[file:troubleshoot.org][troubleshoot]] — when search/read comes back empty or walled

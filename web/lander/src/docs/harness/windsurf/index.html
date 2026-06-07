@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Windsurf — Workbooks harness setup</title>
+<meta name="description" content="Wire Workbooks into Windsurf, Codeium's AI-native IDE, via ~/.codeium/windsurf/mcp_config.json." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<script src="/js/copy-install.js" defer></script>
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <a href="/docs/harness/claude-code/">Claude Code</a>
+    <a href="/docs/harness/cursor/">Cursor</a>
+    <a href="/docs/harness/codex/">OpenAI Codex</a>
+    <a href="/docs/harness/openclaw/">OpenClaw</a>
+    <a href="/docs/harness/cline/">Cline</a>
+    <a href="/docs/harness/continue/">Continue</a>
+    <a href="/docs/harness/windsurf/" class="is-active">Windsurf</a>
+    <a href="/docs/harness/hermes-agent/">Hermes Agent</a>
+    <a href="/docs/harness/pi/">Pi</a>
+    <a href="/docs/harness/more/">More tools</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Harness · Windsurf</p>
+    <h1>Windsurf.</h1>
+    <p>
+      Codeium's AI-native IDE. Cascade (Windsurf's agent) reads MCP
+      server config from a JSON file under Codeium's settings dir.
+    </p>
+
+    <div class="install-card" style="--brand:#52C49A;">
+      <div class="install-card-head">
+        <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/windsurf.svg');"></i></span>
+        <div>
+          <p class="install-card-eyebrow">Auto-install</p>
+          <h2 class="install-card-title">Paste this into Windsurf</h2>
+        </div>
+      </div>
+      <p class="install-card-desc">
+        Click below to copy a self-install prompt. Paste it into a
+        Cascade session and Windsurf will create the MCP config and
+        refresh its tools for you.
+      </p>
+      <button class="install-card-cta" type="button"
+        data-name="Windsurf"
+        data-prompt="Install Workbooks for Windsurf. Run `npm install -g @work.books/cli`. Edit ~/.codeium/windsurf/mcp_config.json:&#10;{&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;]}}}&#10;Refresh MCP servers in Cascade. Verify by asking to list my workbook groups.">
+        <span>Copy install prompt</span>
+        <span class="install-card-cta-icon">⎘</span>
+      </button>
+      <p class="install-card-fallback">Or follow the manual steps below.</p>
+    </div>
+
+    <h2>1. Install the CLI</h2>
+<pre><code>npm install -g @work.books/cli</code></pre>
+
+    <h2>2. Edit the MCP config</h2>
+    <p><strong>macOS / Linux:</strong></p>
+<pre><code>$EDITOR ~/.codeium/windsurf/mcp_config.json</code></pre>
+    <p>If the file doesn't exist yet, create the directory and the file.</p>
+
+    <h2>3. Add the Workbooks server</h2>
+<pre><code>{
+  "mcpServers": {
+    "workbooks": {
+      "command": "workbook",
+      "args": ["mcp", "serve"]
+    }
+  }
+}</code></pre>
+
+    <h2>4. Refresh in Windsurf</h2>
+    <p>
+      Open Cascade. Click the hammer icon (tools) at the top of the
+      panel → <em>Refresh MCP servers</em>. The workbooks tool group
+      should appear in the list.
+    </p>
+
+    <h2>Quirks &amp; tips</h2>
+    <ul>
+      <li><strong>Cascade vs Chat.</strong> MCP tools only run in Cascade (the agent), not in plain Chat. Switch modes if the agent isn't using your tools.</li>
+      <li><strong>Settings UI.</strong> Newer Windsurf builds expose MCP config in Settings → Cascade → Plugins (instead of editing the JSON by hand). Either path edits the same file.</li>
+      <li><strong>Network-restricted Windsurf instances.</strong> If your team uses an air-gapped Windsurf, the OAuth browser flow for <code>workbook publish</code> still needs network access from the host running the CLI subprocess.</li>
+    </ul>
+
+    <h2>Verify</h2>
+    <p>Cascade: <em>"Use workbooks to list my groups."</em></p>
+
+    <div class="docs-pager">
+      <a href="/docs/harness/continue/"><span>← Previous</span><b>Continue</b></a>
+      <a class="next" href="/docs/harness/hermes-agent/"><span>Next →</span><b>Hermes Agent</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

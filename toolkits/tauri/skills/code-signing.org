@@ -1,0 +1,130 @@
+#+TITLE: Code-signing + notarization for a forged desktop app
+#+CAPTION: The gate between "builds on my machine" and "I can share it."
+
+* When to use
+
+A workbook has been forged into a desktop app (~wb forge desktop build~) and
+the user wants to *share or distribute* it — send the .dmg to someone, put it
+on a website, ship it. An UNSIGNED build runs fine on the machine that built
+it, but every OTHER machine blocks it: macOS Gatekeeper refuses to open it,
+Windows SmartScreen warns sharply. Signing (and on macOS, notarization) is what
+removes those blocks. Use this when ~wb forge desktop doctor~ reports no signing
+identity, or a recipient says "it won't open / it's damaged."
+
+* The mental model
+
+- *Signing* proves the app came from a known developer and wasn't tampered
+  with. macOS and Windows both want it.
+- *Notarization* (macOS only) is an extra step: you upload the signed app to
+  Apple, they scan it and issue a ticket you "staple" to the app. Without it,
+  even a signed app gets a Gatekeeper warning on first open.
+- Both require a paid developer identity. There is no free path to a build that
+  opens cleanly on someone else's machine.
+
+* macOS — what to get
+
+1. *Apple Developer Program* — $99/yr at https://developer.apple.com/programs/.
+   Required; there is no way around it for distributable signing.
+2. *A "Developer ID Application" certificate* — create it in the Apple Developer
+   portal (Certificates → +) or let Xcode manage it. This is the cert for apps
+   distributed OUTSIDE the Mac App Store (which is what ~wb forge desktop~
+   produces). Install it into your login keychain. Verify:
+   #+begin_src bash :role example
+   security find-identity -v -p codesigning | grep "Developer ID Application"
+   #+end_src
+3. *Notarization credentials* — the preferred, verified path reuses your iOS
+   App Store Connect API key (.p8): set =APP_STORE_CONNECT_API_KEY_ID= +
+   =APP_STORE_CONNECT_API_ISSUER_ID= (see the dedicated section below). Fallback
+   is an app-specific password (appleid.apple.com → Sign-In and Security →
+   App-Specific Passwords) plus your Team ID — Tauri uses these env vars:
+   #+begin_src bash :role example
+   export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+   export APPLE_ID="you@example.com"
+   export APPLE_PASSWORD="abcd-efgh-ijkl-mnop"   # app-specific, NOT your Apple ID password
+   export APPLE_TEAM_ID="TEAMID"
+   #+end_src
+   With either set, ~wb forge desktop build~ signs and Tauri notarizes +
+   staples automatically; without them it builds unsigned and warns.
+
+* Windows — what to get
+
+- A *code-signing certificate* (OV or, for instant SmartScreen reputation, EV)
+  from a CA like DigiCert / Sectigo. Cheaper than Apple but still paid.
+- Tauri reads =TAURI_SIGNING_PRIVATE_KEY= / =TAURI_SIGNING_PRIVATE_KEY_PASSWORD=
+  (for the updater) and the OS signing toolchain uses the cert thumbprint
+  (=WINDOWS_CERT_THUMBPRINT=). Unsigned MSIs trigger SmartScreen; EV certs clear
+  it immediately, OV certs build reputation over time.
+
+* Linux
+
+No signing required by convention — AppImage / .deb / .rpm distribute unsigned.
+(Flatpak/Snap stores have their own signing; out of scope for the thin shell.)
+
+* Workflow
+
+#+begin_src bash
+# 1. see exactly what's present vs missing
+wb forge desktop doctor
+
+# 2. (macOS) once you have the cert + creds, export the env vars above, then:
+wb forge desktop build dist/<slug>.html --app-name "My App" --app-id com.you.myapp --icon ./icon.png
+
+# 3. ship the signed (+ notarized on macOS) artifact from ./dist/desktop/
+#+end_src
+
+* Common pitfalls
+
+- *App-specific password vs Apple ID password*: notarization needs the
+  app-specific one. Using the account password fails with an auth error.
+- *"Developer ID Application" vs "Apple Development"*: the former distributes
+  outside the App Store (what you want); the latter only runs on registered
+  devices. ~doctor~ specifically looks for "Developer ID Application".
+- *Team ID*: find it at the top-right of the Apple Developer portal, or
+  =security find-identity= shows it in parentheses in the identity name.
+- *Notarization takes minutes*: Apple's service is async; the build waits on it.
+  A slow build near the end is usually notarization, not a hang.
+- *Unsigned is fine for yourself*: if the user only wants the app on their OWN
+  machine, skip all of this — ~wb forge desktop build~ already works unsigned.
+
+* Verification checklist
+
+- =security find-identity -v -p codesigning= lists "Developer ID Application".
+- After build: =codesign --verify --deep --strict <app>= exits 0.
+- After notarization: =spctl -a -vv <app>= says "accepted / Notarized".
+- A colleague on another Mac can open the .dmg without a Gatekeeper block.
+
+* See also
+
+- =deploy-kit/desktop/build.sh= / =doctor.sh= — the recipes this informs.
+- =plans/forge-targets.org= — the forge-targets design + the cert gate.
+- Tauri signing docs: https://v2.tauri.app/distribute/sign/
+
+* Notarize with your App Store Connect API key (the path that's VERIFIED)
+
+The same App Store Connect API key (.p8) you use for iOS signing+upload also
+notarizes the desktop build — ONE key for both. This is the verified path.
+
+Set two env vars; keep the .p8 where iOS already expects it:
+#+begin_src bash :role example
+export APP_STORE_CONNECT_API_KEY_ID="ABCD123456"
+export APP_STORE_CONNECT_API_ISSUER_ID="aaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+# the .p8 must be named AuthKey_<KEY_ID>.p8, mode 600:
+#   ~/.appstoreconnect/private_keys/AuthKey_ABCD123456.p8
+#+end_src
+
+With those present, =wb forge desktop build= maps them onto Tauri's
+=APPLE_API_KEY= / =APPLE_API_ISSUER= / =APPLE_API_KEY_PATH= and Tauri notarizes
++ staples automatically — no app-specific password, no Apple ID. If the explicit
+Tauri vars (=APPLE_API_KEY= …) or the Apple-ID set are already exported, the
+build leaves them untouched; the ASC mapping only kicks in when neither is set.
+
+Fallback (if you have no ASC key): set =APPLE_ID= + =APPLE_TEAM_ID= +
+=APPLE_PASSWORD= (app-specific) and Tauri notarizes + staples the same way.
+
+VERIFIED: with the ASC key set, =wb forge desktop build= produces an artifact
+that is signed + notarized + stapled + Gatekeeper-accepted —
+=spctl -a -vv= reports "accepted / Notarized".
+
+=wb forge desktop doctor= confirms which path is active: it looks for
+=AuthKey_<KEY_ID>.p8= under ~/.appstoreconnect/private_keys/ and reports
+"notarization ready via App Store Connect API key (same .p8 as iOS)".

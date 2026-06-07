@@ -1,0 +1,53 @@
+#+TITLE: wavelet — overview
+#+TOOLKIT: wavelet
+#+SKILL: overview
+#+TAGS: video motion-graphics render
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: yes
+  :DESTRUCTIVE: no
+  :END:
+
+  Request involves producing or editing a motion-graphics video:
+  short-form ad, explainer reel, animated title card, etc.
+  Wavelet is Workbooks' renderer — output is an mp4 (or a
+  workbook .html bundling the source for re-rendering elsewhere).
+
+  Don't reach for wavelet for:
+  - Encoding an existing video file → use [[file:../ffmpeg/skills/overview.org][ffmpeg toolkit]]
+  - Extracting frames / audio from video → ffmpeg
+  - Authoring static documents → [[file:../wb/skills/overview.org][wb toolkit]]
+
+* Composition source shape
+
+  A wavelet composition is an HTML-like declarative source:
+
+  #+begin_example
+  <wavelet duration="6">
+    <scene>
+      <text>Hello world</text>
+    </scene>
+  </wavelet>
+  #+end_example
+
+  =wavelet init= scaffolds a starter; =wavelet render= produces
+  =out.mp4=.
+
+* Verify
+
+  #+CAPTION: confirm wavelet CLI is on PATH + node 20+ available
+  #+begin_src bash :role pre
+  command -v wavelet >/dev/null || { echo "wavelet CLI missing — install with 'npm i -g @work.books/wavelet-cli'"; exit 1; }
+  node --version | grep -qE '^v(2[0-9]|[3-9][0-9])\.' || { echo "node >=20 required"; exit 1; }
+  #+end_src
+
+* See also
+
+  - [[file:scaffold-a-composition.org][scaffold-a-composition]] — start from empty dir
+  - [[file:preview-and-render.org][preview-and-render]] — dev loop → final mp4
+  - [[file:text-cards.org][text-cards]] — title / lower-third / end-card overlays
+  - [[file:transitions.org][transitions]] — hand-offs between scenes
+  - [[file:audio-sync.org][audio-sync]] — anchor visuals to audio cues
+  - [[file:template-catalog.org][template-catalog]] — what =wavelet init= templates exist

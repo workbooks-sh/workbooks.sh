@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cline — Workbooks harness setup</title>
+<meta name="description" content="Wire Workbooks into Cline, the VS Code coding agent, via its MCP server settings panel." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<script src="/js/copy-install.js" defer></script>
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <a href="/docs/harness/claude-code/">Claude Code</a>
+    <a href="/docs/harness/cursor/">Cursor</a>
+    <a href="/docs/harness/codex/">OpenAI Codex</a>
+    <a href="/docs/harness/openclaw/">OpenClaw</a>
+    <a href="/docs/harness/cline/" class="is-active">Cline</a>
+    <a href="/docs/harness/continue/">Continue</a>
+    <a href="/docs/harness/windsurf/">Windsurf</a>
+    <a href="/docs/harness/hermes-agent/">Hermes Agent</a>
+    <a href="/docs/harness/pi/">Pi</a>
+    <a href="/docs/harness/more/">More tools</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Harness · Cline</p>
+    <h1>Cline.</h1>
+    <p>
+      Cline is a VS Code extension. It manages MCP servers through its
+      own settings panel rather than a config file you edit by hand.
+    </p>
+
+    <div class="install-card" style="--brand:#4FC3F7;">
+      <div class="install-card-head">
+        <span class="install-card-logo"><i class="install-card-mask" style="--logo:url('/logos/cline.svg');"></i></span>
+        <div>
+          <p class="install-card-eyebrow">Auto-install</p>
+          <h2 class="install-card-title">Paste this into Cline</h2>
+        </div>
+      </div>
+      <p class="install-card-desc">
+        Click below to copy a self-install prompt. Paste it into a Cline
+        task and the agent will open the MCP settings, add the entry,
+        and reload for you.
+      </p>
+      <button class="install-card-cta" type="button"
+        data-name="Cline"
+        data-prompt="Install Workbooks for Cline. Run `npm install -g @work.books/cli`. In VS Code, open the Cline panel, click MCP servers → Edit MCP Settings, and add:&#10;{&quot;mcpServers&quot;:{&quot;workbooks&quot;:{&quot;command&quot;:&quot;workbook&quot;,&quot;args&quot;:[&quot;mcp&quot;,&quot;serve&quot;],&quot;disabled&quot;:false,&quot;autoApprove&quot;:[]}}}&#10;Save the file. Verify by asking to list my workbook groups.">
+        <span>Copy install prompt</span>
+        <span class="install-card-cta-icon">⎘</span>
+      </button>
+      <p class="install-card-fallback">Or follow the manual steps below.</p>
+    </div>
+
+    <h2>1. Install the CLI</h2>
+<pre><code>npm install -g @work.books/cli</code></pre>
+
+    <h2>2. Open the MCP settings</h2>
+    <p>
+      In VS Code, click the Cline icon in the activity bar. At the top
+      of the Cline panel, click the <strong>MCP servers</strong> icon
+      (a small stack), then <em>Edit MCP Settings</em>. Cline opens its
+      settings JSON file.
+    </p>
+
+    <h2>3. Add the Workbooks entry</h2>
+<pre><code>{
+  "mcpServers": {
+    "workbooks": {
+      "command": "workbook",
+      "args": ["mcp", "serve"],
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}</code></pre>
+    <p>Save the file. Cline reloads it automatically.</p>
+
+    <h2>Quirks &amp; tips</h2>
+    <ul>
+      <li><strong>autoApprove.</strong> Add tool names like <code>"workbooks__list_groups"</code> to <code>autoApprove</code> so Cline doesn't pause for confirmation on every read. Leave write tools (<code>publish</code>, <code>revoke</code>) off the auto list.</li>
+      <li><strong>VS Code reload.</strong> If a tool call returns nothing or the server icon stays grey, <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>P</kbd> → <em>Developer: Reload Window</em>.</li>
+      <li><strong>Cline Pro.</strong> If you're on a managed Cline plan, MCP servers run inside the VS Code process, not in Cline's cloud. The CLI must be installed locally.</li>
+    </ul>
+
+    <h2>Verify</h2>
+    <p>In the Cline panel, the workbooks server should show a green dot. Ask: <em>"What workbook groups do I have?"</em></p>
+
+    <div class="docs-pager">
+      <a href="/docs/harness/openclaw/"><span>← Previous</span><b>OpenClaw</b></a>
+      <a class="next" href="/docs/harness/continue/"><span>Next →</span><b>Continue</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+# wb-publish — the publish/identity toolkit binary (toolkits/publish/).
+#
+# Standalone home of the AT Protocol + Workbooks Network identity stack
+# moved out of `wb` (M5-publish-to-toolkit, plans/minimal-platform.org:
+# provider/integration logic lives in toolkits). `wb identity …` /
+# `wb atproto …` pass through to this binary when it's on PATH.
+#
+# Install: cargo install --path toolkits/publish/bin
+
+[package]
+name = "wb-publish"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Workbooks publish toolkit — AT Protocol publishing (publish/delete/feed/firehose/endpoint) + Workbooks Network identity (did:key export/import, Bluesky app-password + OAuth binding, C2PA certs)."
+
+[[bin]]
+name = "wb-publish"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "process", "sync", "time"] }
+# `blocking` — the loopback OAuth callback server self-pings on
+# shutdown with a blocking client (bluesky_oauth/server.rs).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking"] }
+dirs = "5"
+time = { version = "0.3", features = ["formatting", "macros"] }
+base64 = "0.22"
+rand = "0.8"
+which = "6"
+rpassword = "7"
+percent-encoding = "2"
+
+# AT Protocol OAuth (wb-8fhk.22) — OAuth 2.0 / DPoP / PAR / PKCE:
+#   webbrowser — cross-platform "open this URL".
+#   tiny_http  — loopback HTTP server for the OAuth callback.
+#   p256       — ES256 ECDSA signing for DPoP proofs.
+#   sha2       — SHA-256 for PKCE S256 + DPoP `ath` claim.
+#   uuid       — random `jti` claim per DPoP proof.
+webbrowser = "1"
+tiny_http = { version = "0.12", default-features = false }
+p256 = { version = "0.13", features = ["ecdsa", "pem"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+# Firehose subscriber (wb-8fhk.23) — com.atproto.sync.subscribeRepos is
+# a WebSocket stream of length-prefixed CBOR frames.
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-webpki-roots", "connect"] }
+futures-util = { version = "0.3", default-features = false }
+ciborium = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = "thin"
+opt-level = "z"
+
+# Standalone workspace anchor — toolkit binaries ship independently of
+# the root monorepo workspace (same pattern as cli/wb).
+[workspace]

@@ -1,0 +1,87 @@
+#+TITLE: wraith — clean up a Rust package
+#+TOOLKIT: wraith
+#+SKILL: clean-up-a-rust-package
+#+TAGS: rust cleanup dead-code unused-deps slop
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: maybe
+  :END:
+
+  About to finalize a PR or hand off a Rust package. Want a
+  quick checklist of what's stale, unused, over-complex, or
+  AI-slop-flavored.
+
+* Workflow
+
+  Run from the package root (or workspace root).
+
+  #+CAPTION: 1. dead code — pub items nothing references
+  #+begin_src bash
+  wraith dead-code
+  #+end_src
+
+  #+CAPTION: 2. unused dependencies in Cargo.toml
+  #+begin_src bash
+  wraith unused-deps
+  #+end_src
+
+  #+CAPTION: 3. over-complex functions (cyclo>15 or cog>25)
+  #+begin_src bash
+  wraith health
+  #+end_src
+
+  #+CAPTION: 4. AI-slop signatures (glob imports, lint-escapes, placeholder prose)
+  #+begin_src bash
+  wraith slop
+  #+end_src
+
+  #+CAPTION: 5. near-duplicate fn bodies
+  #+begin_src bash
+  wraith dupes
+  #+end_src
+
+* The shortcut: =wraith audit=
+
+  Runs dead-code + unused-deps but ONLY on files changed in
+  your current git branch. Good for a fast "what did this PR
+  introduce" check.
+
+  #+begin_src bash
+  wraith audit
+  #+end_src
+
+* Auto-fix (with care)
+
+  =wraith fix= can remove dead pub items + unused deps. Dry-run
+  by default — preview the diff first.
+
+  #+CAPTION: preview what fix would change
+  #+begin_src bash
+  wraith fix --dry-run
+  #+end_src
+
+  #+CAPTION: actually apply (after reviewing diff)
+  #+begin_src bash
+  wraith fix --write
+  # then: cargo build && cargo test
+  #+end_src
+
+* Gotchas
+
+  - =dead-code= flags PUB items with no in-workspace refs — does
+    NOT flag pub items consumed by /downstream/ crates. If your
+    package is a library, dead-code in the public surface may be
+    legitimate API.
+  - =health= thresholds (cyclo/cog) are conservative defaults;
+    override in =.wraithrc.json= if your codebase has a higher
+    natural floor.
+  - =slop= flags =use super::*= which is idiomatic in =#[cfg(test)]=
+    modules — ignore those hits.
+
+* See also
+
+  - [[file:reduce-complexity.org][reduce-complexity]] — for the cases =health= flagged
+  - =wraith hooks install= — auto-run on git pre-commit

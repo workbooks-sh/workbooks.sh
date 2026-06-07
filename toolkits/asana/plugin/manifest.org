@@ -1,0 +1,25 @@
+#+TITLE: asana
+#+VERSION: 1
+#+SLOT: data-source
+#+ENTITIES: asana-task
+#+IMPL: WorkbooksRuntime.Plugin.Asana
+#+AUTH: pat
+#+ENV_KEYS: ASANA_PAT
+#+CAPABILITIES: read
+#+SCOPE: tenant
+#+DESCRIPTION: Asana tasks as an OQL data source. Pull-on-demand read face of the asana federation toolkit.
+
+* About
+  The OQL read face (face 2 of 3) of the =asana= federation toolkit.
+  Registering this plugin routes =SELECT ... FROM asana-task= queries
+  to =WorkbooksRuntime.Plugin.Asana.query/3=, which translates the OQL
+  AST to Asana's REST API (=GET /tasks=) and returns headline-shaped
+  maps.
+
+  This face is READ-ONLY and pull-on-demand — no resident process. The
+  persistent mirror (interval pull into =:task:= nodes) is the SEPARATE
+  sync-daemon face (=../sync.org=), driven by
+  =WorkbooksRuntime.Plugin.TaskSync=.
+
+  Credentials (=ASANA_PAT=) are fetched through
+  =WorkbooksRuntime.Plugin.Auth=, never =System.get_env= directly.

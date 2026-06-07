@@ -1,0 +1,33 @@
+#+TITLE: byod toolkit
+#+TOOLKIT: byod
+#+VERSION: 0.1.0
+#+CLI_BIN: wb
+#+CLI_VERSION_RANGE: >=0.1
+#+STATUS: experimental
+#+TAGLINE: Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine.
+#+REQUIRES: wb, node>=20, railway>=3 (to deploy the gateway)
+#+SKILL_DIR: skills/
+
+* byod — workbook → app with a live backend + auth                :toolkit:
+  :PROPERTIES:
+  :ID:        byod
+  :CLI_BIN:   wb
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :END:
+
+  Wraps ~wb forge app~ — connect a forged workbook to a live Postgres
+  (Crunchy/Railway/RDS) through a secure data gateway, with the developer's
+  OWN auth (BetterAuth) for sign-in, sessions, organizations (multi-tenant),
+  and API keys. No agent engine required.
+
+  The workbook .html is the frontend; the gateway + auth deploy SEPARATELY and
+  are pointed at via a PUBLIC connection descriptor injected into the .html —
+  never DB credentials or server code. See plans/forge-byod.org +
+  plans/forge-auth.org.
+
+  Skill index (read on demand):
+
+  | Skill                              | Use when                            |
+  |------------------------------------+-------------------------------------|
+  | =connect-a-workbook-to-a-database= | Give a forged workbook a live Postgres + the developer's own auth (sessions, orgs, API keys), no engine |

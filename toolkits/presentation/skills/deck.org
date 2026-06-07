@@ -1,0 +1,26 @@
+#+TITLE: deck — assemble a slide deck as reveal.js
+#+SKILL: deck
+#+TOOLKIT: presentation
+
+* deck — author + assemble a presentation                          :skill:
+  The brandnana deck path, which now emits reveal.js. Author slides as a spec
+  (one JSON per slide is the low-risk path — many small files, not one giant
+  turn), then assemble + publish.
+
+  1. Author the spec dir: =deck.json= ({title, palette:{…11 tokens}}) +
+     =NN-<name>.json= one Slide each (splash / act-divider / prose / grid /
+     persona / quote-hero / end-card … see =DeckSpec= in
+     =projects/brandnana/apps/cli/src/commands/book-assemble.ts=).
+  2. Assemble → reveal.js:
+     #+begin_src bash
+     brandnana book assemble <spec-dir> --out deck.html
+     #+end_src
+     The 1280×720 slide design is wrapped in =.reveal>.slides>section.slide=
+     and scaled to the viewport — arrow keys, =f= fullscreen, =o= overview,
+     hash-routed slide URLs. =transition:none= (hard cuts, no fade/wipe).
+  3. Gate + publish: =brandnana book publish <deck.html>= → a single-file
+     workbook with the =wb-source-bundle= embedded. See the =publish-workbook=
+     skill.
+
+  The output is a *presentation*, not a scroll page. Don't add your own
+  slide-nav JS — reveal owns it.

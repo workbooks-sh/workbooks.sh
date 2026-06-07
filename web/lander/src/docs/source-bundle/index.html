@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Source bundle — Workbooks docs</title>
+<meta name="description" content="The gzipped source-bundle wire format embedded inside every workbook." />
+<meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="/logo-black.svg" />
+<link rel="stylesheet" href="/styles.css" />
+<meta name="darkreader-lock">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="/" class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Workbooks<em>Studio</em></span></a>
+  <div class="nav-links">
+    <a href="/pricing/">Pricing</a>
+    <a href="/docs/" class="is-active">Docs</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks" class="ext">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a href="https://run.workbooks.sh" class="btn btn-ghost">Run</a>
+    <a href="https://studio.workbooks.sh" class="btn btn-primary">Open Studio<span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<div class="docs-shell">
+  <aside class="docs-sidebar" aria-label="Docs navigation">
+    <h4>Get started</h4>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Quickstart</a>
+    <a href="/docs/studio/">Hosting on Studio</a>
+    <h4>Standard</h4>
+    <a href="/docs/standard/">The standard</a>
+    <a href="/docs/source-bundle/" class="is-active">Source bundle</a>
+    <a href="/inspect/">Inspect a file</a>
+    <h4>CLI &amp; agents</h4>
+    <a href="/docs/cli/">CLI reference</a>
+    <a href="/docs/agents/">Agent setup</a>
+    <a href="/skill">Claude Code skill</a>
+    <h4>Harnesses</h4>
+    <a href="/docs/harness/">All harnesses</a>
+    <h4>Project</h4>
+    <a href="/docs/changelog/">Changelog</a>
+    <a href="https://github.com/shinyobjectz-sh/workbooks">GitHub ↗</a>
+    <a href="https://www.npmjs.com/package/@work.books/cli">npm ↗</a>
+  </aside>
+
+  <article class="docs-content">
+    <p class="docs-eyebrow">Standard · Source bundle</p>
+    <h1>The source travels inside the file.</h1>
+    <p>
+      Every workbook built with <code>@work.books/cli</code> embeds a
+      gzipped snapshot of its source tree inside the artifact itself.
+      Recipients run <code>workbook unbundle &lt;file&gt;</code> to
+      recover the project and iterate. This is what makes a workbook
+      forkable without infrastructure.
+    </p>
+
+    <h2>Why</h2>
+    <p>
+      A built HTML artifact is opaque — minified, bundled, hard to read.
+      Without something extra, "send me the workbook" means "send me the
+      compiled output, and separately, the source, and remember to keep
+      them in sync." The source-bundle removes the separately.
+    </p>
+
+    <h2>Wire format</h2>
+    <p>
+      The bundle is a single <code>&lt;script&gt;</code> tag near the
+      end of <code>&lt;body&gt;</code>:
+    </p>
+<pre><code>&lt;script id="wb-source-bundle"
+        type="application/x-workbook-source"
+        data-format="json+gzip+base64"
+        data-version="1"
+        data-root-name="my-thing"
+        data-file-count="42"
+        data-bundle-size="14823"
+        data-uncompressed-size="68421"&gt;BASE64_GZIP_JSON&lt;/script&gt;</code></pre>
+    <p>
+      The <code>type</code> is intentionally not
+      <code>application/javascript</code> — browsers ignore unknown
+      script types entirely, so the embedded data has zero parse cost
+      and zero DOM impact. It's data sitting next to the runtime, not
+      part of it.
+    </p>
+
+    <h2>Manifest</h2>
+    <p>
+      After base64-decode + gunzip, the payload is JSON:
+    </p>
+<pre><code>{
+  "version": 1,
+  "createdAt": "2026-05-04T...",
+  "rootName": "my-thing",
+  "files": [
+    { "path": "src/index.html", "content": "&lt;base64&gt;", "mode": 420 },
+    { "path": "src/main.js",    "content": "&lt;base64&gt;", "mode": 420 }
+  ]
+}</code></pre>
+
+    <h2>Truncation</h2>
+    <p>
+      Files larger than <code>maxFileBytes</code> (5 MiB by default)
+      get a <code>{ truncated: true, originalSize: N }</code> marker
+      instead of content. This keeps the artifact from ballooning when a
+      project vendors binary blobs or large datasets. Override with
+      <code>workbook build --max-file-bytes 20M</code>.
+    </p>
+
+    <h2>Unbundling</h2>
+<pre><code>workbook unbundle my-workbook.html out/
+ls out/</code></pre>
+    <p>
+      Path-traversal defence: entries with <code>..</code>, absolute
+      paths, or null bytes are silently dropped. <code>unbundle</code>
+      will never write outside the target directory.
+    </p>
+
+    <h2>Opting out</h2>
+    <p>
+      Pass <code>--no-bundle</code> to disable the source bundle for a
+      build. The resulting file is still a valid workbook — just one
+      that can't be unbundled. Useful when shipping a workbook that
+      embeds proprietary logic you don't want recipients to read.
+    </p>
+    <p>
+      Pass <code>--bundle-git</code> to include the
+      <code>.git/</code> directory. Off by default because most authors
+      don't want their commit history travelling with the artifact;
+      handy for handoffs where you do.
+    </p>
+
+    <div class="note">
+      <strong>Encryption.</strong> Encrypted-at-rest workbooks (the
+      Signal product, sealed broker uploads) skip the source bundle by
+      default — the artifact is opaque ciphertext, so there's no
+      readable source to embed.
+    </div>
+
+    <div class="docs-pager">
+      <a href="/docs/standard/"><span>← Previous</span><b>The standard</b></a>
+      <a class="next" href="/docs/cli/"><span>Next →</span><b>CLI reference</b></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

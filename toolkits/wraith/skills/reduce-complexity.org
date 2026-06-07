@@ -1,0 +1,89 @@
+#+TITLE: wraith — reduce a function's complexity
+#+TOOLKIT: wraith
+#+SKILL: reduce-complexity
+#+TAGS: rust refactor extract-fn complexity
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: maybe
+  :END:
+
+  =wraith health= flagged a function as over-threshold (cyclo>15
+  or cog>25). You want to refactor it into something readable
+  without losing behavior.
+
+* Workflow
+
+  #+CAPTION: 1. see why this fn is flagged (structured branch tree)
+  #+begin_src bash
+  wraith health --fn 'crate::mod::fn_name' --show-branches
+  #+end_src
+
+  #+CAPTION: 2. ask for extraction suggestions
+  #+begin_src bash
+  wraith health --fn 'crate::mod::fn_name' --suggest-extractions
+  #+end_src
+
+  Output ranks sub-trees in the fn that are good extraction
+  candidates — typically by lifted-parameter count + branch
+  cohesion.
+
+  #+CAPTION: 3. apply an extraction (single-file rewrite)
+  #+begin_src bash
+  wraith refactor extract-fn --help
+  # follow the suggested invocation; --dry-run first
+  #+end_src
+
+* The manual refactor pattern
+
+  When the tool's suggestions aren't right, the patterns that
+  reliably reduce wraith complexity scores:
+
+  1. *Extract per-branch helpers.* A 5-arm =match= with non-trivial
+     bodies inside the arms scores high. Pull each arm into its
+     own =fn=.
+
+  2. *Split per-step pipelines.* A long imperative fn doing
+     {pre-flight → main work → output} can split into 3 helpers.
+     Loses one level of context-chasing for the reader; saves on
+     cog score.
+
+  3. *Replace nested =if let= chains with =?=.* If your fn is full
+     of =if let Some(x) = ... else { return Err(...) }=, define an
+     intermediate fn that returns =Result= and uses =?=.
+
+  4. *Pull data validation into its own struct.* If the fn opens
+     with 6 if-statements that just check arg shape, the arg
+     should be a typed struct whose constructor encodes the
+     constraints.
+
+* Verify the refactor didn't break behavior
+
+  #+CAPTION: tests still pass
+  #+begin_src bash :role post
+  cargo test
+  #+end_src
+
+  #+CAPTION: complexity actually went down
+  #+begin_src bash :role post
+  wraith health | head -5
+  #+end_src
+
+* Gotchas
+
+  - Pure code motion (extracting a sub-fn) preserves behavior.
+    Re-ordering branches doesn't always — review carefully.
+  - =--suggest-extractions= is heuristic; not every suggestion is
+    right. Prefer your own judgment when the suggestion looks
+    weird.
+  - cog vs cyclo measure different things — cog (cognitive
+    complexity) tracks NESTING. Sometimes a fn passes cyclo (low
+    branch count) but fails cog (deeply nested branches).
+    Flattening with early =return= drops cog without changing
+    cyclo.
+
+* See also
+
+  - [[file:clean-up-a-rust-package.org][clean-up-a-rust-package]] — full sweep before PR

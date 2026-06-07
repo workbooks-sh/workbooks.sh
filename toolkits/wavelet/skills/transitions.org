@@ -1,0 +1,260 @@
+#+TITLE: wavelet — transitions between scenes (cut, cross-fade, fade-to-black)
+#+TOOLKIT: wavelet
+#+SKILL: transitions
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when stitching multiple scenes together and deciding how they hand off — hard cut, crossfade, fade-to-black, push-on. Wavelet has no first-class transition primitive; transitions are expressed as overlapping `<gm-scene>` time windows + opacity tweens in the registered GSAP timelines.
+#+TAGS: video transitions cut crossfade fade scene timing
+#+STATUS: experimental
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :REQUIRES: node>=20 wavelet
+  :END:
+
+  Two scenes need to hand off to each other and the question is
+  *how*. Wavelet doesn't have a =<gm-transition>= primitive —
+  transitions are emergent from how the scenes' time windows
+  overlap and how their enter / exit tweens line up.
+
+  Not for: video-file-level transitions (use ffmpeg's xfade
+  for that on encoded mp4s); video crossfades between two
+  =<gm-clip>= elements on the base track (today, base-track
+  clips don't crossfade — you either hard-cut or put the
+  crossfade in an overlay scene that masks the seam).
+
+* The five hand-offs
+
+  | Hand-off              | What overlaps                                | Look                                 |
+  |-----------------------+----------------------------------------------+--------------------------------------|
+  | Hard cut              | Nothing — back-to-back scenes                | Snap. Default. Use 80% of the time.  |
+  | Cross-fade            | ~0.3–0.6s overlap; both fade opposite        | Gentle. For mood shifts.             |
+  | Fade-to-black         | No overlap; black card scene in between      | Decisive. End-of-section beat.       |
+  | Push / slide          | Overlap; outgoing exits one way, incoming opposite | Energetic. Use sparingly.        |
+  | Match-cut             | No overlap, same shape position kept         | Invisible. For continuity.           |
+
+** Reminder
+
+   The user explicitly does not want fades or wipes for ad
+   creative — hard cuts only between ad shots. (See user
+   memory =ad-creative-no-fade-or-wipe-transitions.md=.)
+   Cross-fades + fade-to-black are appropriate for explainers,
+   narrative reels, mood-shift moments — NOT short-form ads.
+
+* Workflow
+
+  #+CAPTION: 1. before authoring — list current scenes + time spans
+  #+begin_src bash :role pre
+  test -f gamut.html || { echo "no gamut.html"; exit 1; }
+  wavelet inspect 2>&1 | grep -E "scene|track|timeline" || true
+  #+end_src
+
+** Hard cut — the default
+
+   Two back-to-back scenes with no overlap and no fade-out on
+   the outgoing scene. The runtime unmounts scene A's
+   template at A.start + A.duration and mounts B's at B.start.
+
+   #+CAPTION: scene A and B back-to-back
+   #+begin_src html
+   <gm-track id="content" z="10">
+     <gm-scene id="shot-a" start="0s"   duration="2.5s"> … </gm-scene>
+     <gm-scene id="shot-b" start="2.5s" duration="2.5s"> … </gm-scene>
+   </gm-track>
+   #+end_src
+
+   Neither scene needs an opacity exit tween. The snap IS the
+   cut. This is the right default for ads (per the project's
+   creative direction).
+
+** Cross-fade — overlapping opacity tweens
+
+   Scene A and B share a window. A fades out across the
+   overlap; B fades in. Length 0.3–0.6s is the readable range.
+
+   #+CAPTION: A.exit and B.enter overlap from 2.2s to 2.7s
+   #+begin_src html
+   <gm-track id="content" z="10">
+     <gm-scene id="shot-a" start="0s"   duration="2.7s">
+       <template>
+         <div class="a">…</div>
+         <script>
+           const tl = gsap.timeline({ paused: true });
+           tl.from(".a", { opacity: 0, duration: 0.4 }, 0);
+           // Exit overlaps the start of B by 0.5s
+           tl.to(".a",   { opacity: 0, duration: 0.5, ease: "power2.in" }, 2.2);
+           wavelet.registerTimeline("shot-a", tl);
+         </script>
+       </template>
+     </gm-scene>
+
+     <gm-scene id="shot-b" start="2.2s" duration="3.0s">
+       <template>
+         <div class="b">…</div>
+         <script>
+           const tl = gsap.timeline({ paused: true });
+           // Enter inside the overlap window
+           tl.from(".b", { opacity: 0, duration: 0.5, ease: "power2.out" }, 0);
+           wavelet.registerTimeline("shot-b", tl);
+         </script>
+       </template>
+     </gm-scene>
+   </gm-track>
+   #+end_src
+
+** Fade-to-black — no overlap, black scene between
+
+   The cleanest "section break" hand-off. Insert a third
+   scene that's just a black overlay, ~0.4s long, between A
+   and B.
+
+   #+CAPTION: A → black → B, no time overlaps
+   #+begin_src html
+   <gm-scene id="shot-a"  start="0s"   duration="3.0s"> … </gm-scene>
+
+   <gm-scene id="ftb"     start="3.0s" duration="0.6s">
+     <template>
+       <div class="ftb-fill"></div>
+       <script>
+         const tl = gsap.timeline({ paused: true });
+         tl.from(".ftb-fill", { opacity: 0, duration: 0.25, ease: "power2.in" },  0);
+         tl.to  (".ftb-fill", { opacity: 0, duration: 0.25, ease: "power2.out" }, 0.35);
+         wavelet.registerTimeline("ftb", tl);
+       </script>
+     </template>
+   </gm-scene>
+
+   <gm-scene id="shot-b"  start="3.6s" duration="3.0s"> … </gm-scene>
+   #+end_src
+
+   #+CAPTION: black-fill style — append to ./styles.css
+   #+begin_src css
+   .ftb-fill { position: absolute; inset: 0; background: #000; }
+   #+end_src
+
+   Note: this works because the content track sits at =z=10=
+   ABOVE the base video. The black fill covers everything
+   under it for its window.
+
+** Push / slide — overlapping translateX
+
+   Outgoing scene's exit translates left; incoming's enter
+   starts from the right. Lengths must match within the overlap
+   window or the seam tears.
+
+   #+CAPTION: A pushes off left as B pushes in from right
+   #+begin_src html
+   <gm-scene id="push-a" start="0s"   duration="2.6s">
+     <template>
+       <div class="pa">A</div>
+       <script>
+         const tl = gsap.timeline({ paused: true });
+         tl.from(".pa", { x: 100, opacity: 0, duration: 0.4 }, 0);
+         tl.to  (".pa", { x: -800, duration: 0.5, ease: "power2.in" }, 2.1);
+         wavelet.registerTimeline("push-a", tl);
+       </script>
+     </template>
+   </gm-scene>
+
+   <gm-scene id="push-b" start="2.1s" duration="3.0s">
+     <template>
+       <div class="pb">B</div>
+       <script>
+         const tl = gsap.timeline({ paused: true });
+         tl.from(".pb", { x: 800, duration: 0.5, ease: "power2.out" }, 0);
+         wavelet.registerTimeline("push-b", tl);
+       </script>
+     </template>
+   </gm-scene>
+   #+end_src
+
+** Match-cut — back-to-back with shape carried over
+
+   No overlap, no opacity change — but B's first frame mirrors
+   A's last frame's positioning (same element class anchored
+   to the same coordinates). The eye reads it as the same shape
+   morphing.
+
+   #+CAPTION: square in A's last frame → same square in B's first
+   #+begin_src html
+   <gm-scene id="mc-a" start="0s"   duration="2.0s">
+     <template>
+       <div class="square" style="left: 40%; top: 40%;"></div>
+       <script>
+         const tl = gsap.timeline({ paused: true });
+         tl.from(".square", { scale: 0.5, opacity: 0, duration: 0.4 }, 0);
+         // Hold — no exit tween; the shape is the bridge
+         wavelet.registerTimeline("mc-a", tl);
+       </script>
+     </template>
+   </gm-scene>
+
+   <gm-scene id="mc-b" start="2.0s" duration="2.5s">
+     <template>
+       <!-- Same .square class, same coords — eye reads continuity -->
+       <div class="square" style="left: 40%; top: 40%;"></div>
+       <div class="caption">…</div>
+       <script>
+         const tl = gsap.timeline({ paused: true });
+         tl.from(".caption", { opacity: 0, duration: 0.4 }, 0.2);
+         wavelet.registerTimeline("mc-b", tl);
+       </script>
+     </template>
+   </gm-scene>
+   #+end_src
+
+** Verify the seam
+
+   #+CAPTION: scrub specifically across the transition boundary
+   #+begin_src bash
+   wavelet preview --start <transition-start-time>
+   # Visually verify the hand-off in the browser
+   #+end_src
+
+   #+CAPTION: render a short isolated segment around the seam
+   #+begin_src bash :role post
+   wavelet render --start <start> --end <end> --out /tmp/seam.mp4
+   open /tmp/seam.mp4    # macOS — play it
+   #+end_src
+
+* Common pitfalls
+
+  1. *Double-rendered frame at the cut.* Scene A ends at 2.5s
+     and B starts at 2.5s — at frame =2.5 * fps= both scenes
+     are "active" for one frame. Usually invisible, but if A
+     has any fade-out at all and B fades in opposite, you get
+     a momentary flash. Fix: nudge B.start to 2.501s or accept
+     the 1-frame overlap.
+
+  2. *Cross-fade reads as a hard cut.* Probably too short
+     (<0.2s) or the easings don't match. Use linear or
+     matched =power2.in= / =power2.out= for symmetry.
+
+  3. *Push-direction tear.* Outgoing scene goes off the same
+     side the incoming comes from. Always opposites: A → left,
+     B from right; OR A → up, B from down.
+
+  4. *Black-card scene placed BELOW base track.* The ftb scene
+     must sit on a higher =z= than the base video. Default
+     content track is =z=10= — keep ftb there.
+
+  5. *Forgot the user's no-fade rule for ad work.* For ad
+     creative the answer is almost always hard cut. Reach for
+     cross-fade / fade-to-black only on explainer + narrative
+     content.
+
+* Verification checklist
+
+  - [ ] Each scene's time window verified with =wavelet inspect=
+  - [ ] No accidental opacity tweens left over from prior iteration
+  - [ ] Overlap windows match enter/exit easings symmetrically
+  - [ ] Played the seam in =wavelet preview= and watched the boundary
+  - [ ] If shipping for an ad: hard cuts only
+
+* See also
+
+  - [[file:text-cards.org][text-cards]] — author the scenes you're transitioning between
+  - [[file:audio-sync.org][audio-sync]] — synchronize transitions to musical beats
+  - [[file:preview-and-render.org][preview-and-render]] — see the seam at full quality
+  - [[file:template-catalog.org][template-catalog]] — starter scaffolds

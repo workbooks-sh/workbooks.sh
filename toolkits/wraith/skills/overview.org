@@ -1,0 +1,42 @@
+#+TITLE: wraith — overview
+#+TOOLKIT: wraith
+#+SKILL: overview
+#+TAGS: rust analysis lint cleanup
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  About to push a branch or open a PR and want a quick sweep
+  for dead code, over-complex functions, and unused deps.
+  Wraith catches the slow-creep cruft before reviewers do.
+
+  Also useful mid-refactor: "this function feels gnarly" → run
+  =wraith health --fn <path>= for a structured branch tree +
+  extraction suggestions.
+
+* What wraith won't do
+
+  - Behavior testing — wraith is static analysis only.
+  - Type checking — that's rustc / tsc.
+  - Formatting — that's rustfmt / prettier.
+
+* Verify
+
+  #+CAPTION: confirm wraith is installed
+  #+begin_src bash :role pre
+  command -v wraith >/dev/null || { echo "wraith missing — cargo install --path projects/wraith"; exit 1; }
+  wraith --help 2>&1 | head -1
+  #+end_src
+
+* See also
+
+  - [[file:clean-up-a-rust-package.org][clean-up-a-rust-package]] — full sweep on a single package
+  - [[file:reduce-complexity.org][reduce-complexity]] — refactor a flagged function
+  - [[file:boundary-enforcement.org][boundary-enforcement]] — codify import-layering rules
+  - [[file:fix-write-workflow.org][fix-write-workflow]] — apply automated removals safely
+  - [[file:refactor-extract-fn.org][refactor-extract-fn]] — extract a sub-tree from a complex fn
+  - [[file:slop-suppression-policy.org][slop-suppression-policy]] — triage =wraith slop= findings

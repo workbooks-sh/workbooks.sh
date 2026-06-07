@@ -1,0 +1,271 @@
+#+TITLE: ffmpeg — overlay (watermark · PiP · burned text via drawtext)
+#+TOOLKIT: ffmpeg
+#+SKILL: video-overlay
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when you need to composite something ON TOP of a video — a logo/watermark, a picture-in-picture inset, or burned-in text via drawtext (positioning, box, fonts, escaping, timed enable). Covers the overlay filter, scaling the overlay, and the drawtext escaping minefield.
+#+TAGS: video overlay watermark logo pip picture-in-picture drawtext text burn
+#+STATUS: stable
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK: no
+  :DESTRUCTIVE: no
+  :END:
+
+  You need to put a SECOND visual element on top of the base video:
+
+  - *watermark / logo* — a PNG (usually with alpha) in a corner
+  - *picture-in-picture (PiP)* — a second video inset (webcam,
+    reaction, B-roll thumbnail)
+  - *burned text* — a label, lower-third, timestamp, or CTA drawn
+    directly into the pixels with =drawtext=
+  - *timed overlays* — element appears only during a time window
+    (=enable='between(t,5,10)'=)
+
+  NOT for: full-frame subtitles from an SRT/ASS file
+  ([[file:subtitle-burn.org][subtitle-burn]] — that's a dedicated caption renderer);
+  resizing the base video itself ([[file:video-scale-crop.org][video-scale-crop]]).
+
+  =overlay= and =drawtext= require a re-encode of the base video —
+  you cannot stream-copy and composite at the same time.
+
+* Mental model
+
+  - =overlay= composites input #2 onto input #1 at pixel (x,y).
+    Needs TWO inputs → use =-filter_complex= (not =-vf=) and
+    label the streams.
+  - =drawtext= renders text into ONE stream → works with =-vf= (no
+    second input). It is the most escaping-sensitive filter in
+    ffmpeg; read the pitfalls before composing a complex string.
+  - Position vars available in =overlay=: =W,H= = base (main) size;
+    =w,h= = overlay size. In =drawtext=: =w,h= = frame size;
+    =text_w,text_h= (alias =tw,th=) = rendered text box size.
+
+* Workflow
+
+** Watermark — logo PNG in a corner
+
+  =overlay=x:y= with =main_w/overlay_w= expressions keeps a fixed
+  margin regardless of resolution.
+
+  #+CAPTION: verify both inputs
+  #+begin_src bash :role pre
+  test -f input.mp4 || { echo "video missing"; exit 1; }
+  test -f logo.png  || { echo "logo missing"; exit 1; }
+  ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 logo.png
+  #+end_src
+
+  #+CAPTION: logo bottom-right with a 20px margin
+  #+begin_src bash
+  ffmpeg -i input.mp4 -i logo.png -filter_complex \
+    "[0:v][1:v]overlay=W-w-20:H-h-20" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy -movflags +faststart out.mp4
+  # W,H = base video; w,h = logo. Corner cheatsheet:
+  #   top-left      10:10
+  #   top-right     W-w-10:10
+  #   bottom-left   10:H-h-10
+  #   bottom-right  W-w-10:H-h-10
+  #   centered      (W-w)/2:(H-h)/2
+  #+end_src
+
+  #+CAPTION: scale the logo to 12% of frame width first, then overlay
+  #+begin_src bash
+  ffmpeg -i input.mp4 -i logo.png -filter_complex \
+    "[1:v]scale=iw*0.5:-1[wm];[0:v][wm]overlay=W-w-20:H-h-20" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy -movflags +faststart out.mp4
+  # scale the OVERLAY (label [1:v]) before compositing. -1 keeps aspect
+  # (logos are stills, so the odd-dimension rule is relaxed; -2 is safe too).
+  #+end_src
+
+  #+CAPTION: semi-transparent watermark (50% via colorchannelmixer alpha)
+  #+begin_src bash
+  ffmpeg -i input.mp4 -i logo.png -filter_complex \
+    "[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=W-w-20:H-h-20" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy out.mp4
+  # format=rgba ensures an alpha plane exists before aa= multiplies it.
+  #+end_src
+
+** Picture-in-picture (PiP) — second video inset
+
+  #+CAPTION: inset the second video at 1/4 size, top-right
+  #+begin_src bash
+  ffmpeg -i main.mp4 -i webcam.mp4 -filter_complex \
+    "[1:v]scale=iw/4:-2[pip];[0:v][pip]overlay=W-w-20:20" \
+    -map 0:a? \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy -movflags +faststart out.mp4
+  # audio comes from the MAIN input (0:a?). Overlay only composites video;
+  # to MIX both audio tracks see video-audio-mux. -2 keeps PiP dims even.
+  #+end_src
+
+  #+CAPTION: rounded / circular PiP via an alpha mask (geq)
+  #+begin_src bash
+  ffmpeg -i main.mp4 -i face.mp4 -filter_complex \
+    "[1:v]scale=300:300,format=rgba, \
+       geq=lum='p(X,Y)':a='if(lte(hypot(X-150,Y-150),150),255,0)'[circ]; \
+     [0:v][circ]overlay=W-w-30:H-h-30" \
+    -map 0:a? -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy out.mp4
+  # geq builds a circular alpha (radius 150 around center 150,150).
+  #+end_src
+
+** Burned text with drawtext
+
+  FIRST check the build has =drawtext= — it requires ffmpeg compiled
+  =--enable-libfreetype=, which some minimal builds (incl. certain
+  Homebrew bottles) omit. =ffmpeg -filters | grep drawtext= → empty
+  means "No such filter: 'drawtext'" at runtime. Fix: install a
+  full build (=brew install ffmpeg= pulls freetype; on Linux the
+  distro package usually has it). If you can't get drawtext, render
+  the text with [[file:subtitle-burn.org][subtitle-burn]] (libass) or composite a pre-rendered
+  text PNG with =overlay= (works in any build).
+
+  Two ways to supply the font:
+  - =fontfile=/abs/path/to/Font.ttf= — explicit, most portable.
+  - =font='Arial'= — relies on fontconfig finding it (may differ
+    by machine). Prefer =fontfile= in scripts.
+
+  #+CAPTION: find an installed font path (macOS / Linux)
+  #+begin_src bash :role pre
+  fc-list 2>/dev/null | grep -iE "arial|helvetica|dejavu" | head -3
+  # macOS without fontconfig: ls /System/Library/Fonts/Supplemental/Arial.ttf
+  # Linux fallback that's almost always present:
+  #   /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+  #+end_src
+
+  #+CAPTION: bottom-center label with a semi-opaque box
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vf \
+    "drawtext=fontfile=/System/Library/Fonts/Supplemental/Arial.ttf: \
+      text='Made with Workbooks': \
+      fontcolor=white: fontsize=36: \
+      box=1: boxcolor=black@0.5: boxborderw=12: \
+      x=(w-text_w)/2: y=h-text_h-40" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p \
+    -c:a copy out.mp4
+  # x=(w-text_w)/2 → horizontally centered. y=h-text_h-40 → 40px above bottom.
+  # box=1 + boxcolor=black@0.5 → translucent backing for legibility.
+  #+end_src
+
+  #+CAPTION: outline instead of a box (borderw + bordercolor)
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vf \
+    "drawtext=fontfile=/path/Font.ttf:text='LIVE': \
+      fontcolor=white:fontsize=48: \
+      borderw=4:bordercolor=black: \
+      x=40:y=40" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p -c:a copy out.mp4
+  #+end_src
+
+  #+CAPTION: long / dynamic text from a file (avoids shell-escaping hell)
+  #+begin_src bash
+  printf 'Quarterly results: revenue up 24%%' > caption.txt
+  ffmpeg -i input.mp4 -vf \
+    "drawtext=fontfile=/path/Font.ttf:textfile=caption.txt: \
+      fontcolor=white:fontsize=32:x=40:y=h-th-40:box=1:boxcolor=black@0.5:boxborderw=10" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p -c:a copy out.mp4
+  # textfile= reads the string from disk — no need to escape : ' % in the CLI.
+  #+end_src
+
+  #+CAPTION: live timecode burn-in (drawtext timecode/pts)
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vf \
+    "drawtext=fontfile=/path/Font.ttf: \
+      text='%{pts\:hms}': fontcolor=white:fontsize=28: \
+      box=1:boxcolor=black@0.6:boxborderw=8:x=20:y=20" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p -c:a copy out.mp4
+  # %{pts\:hms} prints H:MM:SS.mmm. The colon inside the % expansion MUST be
+  # backslash-escaped, else drawtext reads it as an option separator.
+  #+end_src
+
+** Timed overlays — show only during a window
+
+  =enable= takes an expression; the element renders only when it's
+  true. =t= is the timestamp in seconds.
+
+  #+CAPTION: logo only from t=5s to t=10s
+  #+begin_src bash
+  ffmpeg -i input.mp4 -i logo.png -filter_complex \
+    "[0:v][1:v]overlay=W-w-20:H-h-20:enable='between(t,5,10)'" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p -c:a copy out.mp4
+  #+end_src
+
+  #+CAPTION: lower-third text for the first 8 seconds only
+  #+begin_src bash
+  ffmpeg -i input.mp4 -vf \
+    "drawtext=fontfile=/path/Font.ttf:text='Jane Doe — Founder': \
+      fontcolor=white:fontsize=34:box=1:boxcolor=black@0.5:boxborderw=12: \
+      x=60:y=h-th-80:enable='lt(t,8)'" \
+    -c:v libx264 -crf 23 -preset medium -pix_fmt yuv420p -c:a copy out.mp4
+  # enable expressions: between(t,A,B) | lt(t,N) | gt(t,N) | gte(t,A)*lte(t,B)
+  #+end_src
+
+  #+CAPTION: confirm the overlay landed (extract a frame inside the window)
+  #+begin_src bash :role post :path out.mp4
+  test -f "$1" || { echo "output missing"; exit 1; }
+  ffmpeg -y -ss 6 -i "$1" -frames:v 1 overlay-check.png 2>/dev/null
+  echo "✓ overlay-check.png — visually confirm the element is present at t=6s"
+  #+end_src
+
+* Common pitfalls
+
+  1. *=-vf= can't take two inputs.* overlay/PiP need two streams →
+     use =-filter_complex= with labels (=[0:v][1:v]=). =drawtext= is
+     single-input so =-vf= is fine for it.
+
+  2. *drawtext escaping is brutal.* Inside the filter string, =:=
+     separates options, ='= delimits values, =%= introduces an
+     expansion, and =\= escapes. A literal colon in text → ='\:'=;
+     a literal percent → =\%= (or =%%= in a shell printf). When in
+     doubt, use =textfile=file.txt= and avoid the CLI escaping
+     entirely.
+
+  3. *Font not found = silent fallback or hard fail.* =font='Arial'=
+     depends on fontconfig; on a fresh Linux box Arial may be
+     absent. Prefer =fontfile=/abs/path.ttf= and verify it exists
+     (the =fc-list= pre step). DejaVuSans is the safest Linux
+     default.
+
+  3b. *"No such filter: 'drawtext'".* The build lacks
+     =--enable-libfreetype=. Check up front with
+     =ffmpeg -filters | grep drawtext=. Install a full ffmpeg, or
+     fall back to libass ([[file:subtitle-burn.org][subtitle-burn]]) / an overlaid text PNG.
+
+  4. *Logo has no alpha → opaque box.* A JPG logo or a flattened PNG
+     paints a solid rectangle. Use a PNG WITH transparency; if it
+     lost alpha, =format=rgba= won't recreate it — re-export the
+     asset with a real alpha channel.
+
+  5. *Overlay coordinate vars are case-sensitive.* In =overlay=,
+     uppercase =W,H= = main video, lowercase =w,h= = overlay. Swap
+     them and the logo flies off-canvas. (In =drawtext=, =w,h= = the
+     frame and =tw,th= = the text box — different namespace.)
+
+  6. *PiP/overlay forces a re-encode of the whole base video.* You
+     can't =-c copy= while compositing. Budget the encode time and
+     pick a preset (see [[file:lossy-tradeoffs.org][lossy-tradeoffs]]).
+
+  7. *Default overlay only runs to the SHORTER input.* If the PiP
+     clip is shorter than the base, it vanishes when it ends. Add
+     =overlay=...:eof_action=pass= to keep the base playing, or loop
+     the inset.
+
+* Verification checklist
+
+  - [ ] Output exists + plays end-to-end
+  - [ ] Overlay/text is in the intended CORNER (extract a frame)
+  - [ ] Watermark alpha respected (no opaque rectangle)
+  - [ ] Timed overlay present inside the window, absent outside it
+  - [ ] Text legible over busy footage (box or outline used)
+  - [ ] Audio preserved (=ffprobe= still shows the audio stream)
+
+* See also
+
+  - [[file:subtitle-burn.org][subtitle-burn]] — full-frame captions from SRT/ASS
+  - [[file:video-scale-crop.org][video-scale-crop]] — reframe the base before overlaying
+  - [[file:video-audio-mux.org][video-audio-mux]] — mix the PiP's audio with the base track
+  - [[file:overview.org][overview]] — the -i / filter argument-order gotcha
+  - =ffmpeg -h filter=overlay= / =-h filter=drawtext=
