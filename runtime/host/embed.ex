@@ -42,9 +42,20 @@ defmodule Workbooks.Embed do
   def embed(inputs, modality) when is_list(inputs) do
     case provider(modality) do
       {:http, url} -> Workbooks.Embed.Http.embed(url, inputs, modality)
-      nil -> {:error, "no embedder configured for #{modality} — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL)"}
+      {:clip} -> clip_embed(inputs, modality)
+      nil -> {:error, "no embedder configured for #{modality} — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED=clip / WB_EMBED_MULTIMODAL)"}
       mod when modality == :text -> apply(mod, :embed, [inputs])
-      _ -> {:error, "#{modality} needs an external embedder — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL for one cross-modal model)"}
+      _ -> {:error, "#{modality} needs an external embedder — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED=clip for in-BEAM image+text)"}
+    end
+  end
+
+  # In-BEAM CLIP (Bumblebee+EXLA) — present only in a WB_BUMBLEBEE=1 build, so we
+  # reach it dynamically; the lean build returns an honest, actionable error.
+  defp clip_embed(inputs, modality) do
+    if Code.ensure_loaded?(Workbooks.Embed.BumblebeeClip) do
+      apply(Workbooks.Embed.BumblebeeClip, :embed, [inputs, modality])
+    else
+      {:error, "in-BEAM CLIP not built — rebuild with WB_BUMBLEBEE=1, or run the standalone sidecar + set WB_EMBED_IMAGE=http:<url>"}
     end
   end
 
@@ -54,8 +65,9 @@ defmodule Workbooks.Embed do
     cond do
       url = endpoint("WB_EMBED_MULTIMODAL") -> {:http, url}
       modality == :text -> spec(System.get_env("WB_EMBED", "hash"))
-      url = endpoint("WB_EMBED_#{up(modality)}") -> {:http, url}
-      true -> spec(System.get_env("WB_EMBED_#{up(modality)}"))
+      m = System.get_env("WB_EMBED_#{up(modality)}") -> spec(m)
+      System.get_env("WB_EMBED") == "clip" -> {:clip}
+      true -> nil
     end
   end
 
@@ -65,6 +77,7 @@ defmodule Workbooks.Embed do
   defp spec(nil), do: nil
   defp spec("local"), do: Workbooks.Embed.Local
   defp spec("openrouter"), do: Workbooks.Embed.OpenRouter
+  defp spec("clip"), do: {:clip}
   defp spec("http:" <> url), do: {:http, url}
   defp spec(_), do: Workbooks.Embed.Hash
 
