@@ -8,12 +8,16 @@ defmodule Workbooks.MixProject do
       app: :workbooks,
       version: "0.1.0",
       elixir: "~> 1.17",
-      elixirc_paths: ["host"],
+      elixirc_paths: elixirc_paths(Mix.env()),
+      test_paths: ["test"],
       escript: [main_module: Workbooks.CLI, name: "wb"],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
   end
+
+  # No lib/. Host code lives in host/. Tests compile from test/ too (only in :test).
+  defp elixirc_paths(_), do: ["host"]
 
   def application do
     [
