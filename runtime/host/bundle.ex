@@ -24,11 +24,18 @@ defmodule Workbooks.Bundle do
   Ship a Workbook for egress: bundle its HTML + VFS (the single SQLite file
   carrying every named volume) + a manifest. Returns the `.wbundle` blob.
   """
-  def ship(id, html, vfs_bytes) when is_binary(vfs_bytes) do
+  def ship(id, html, vfs_bytes, opts \\ []) when is_binary(vfs_bytes) do
+    {html, signed} =
+      case opts[:tenant] do
+        nil -> {html, false}
+        t -> {Workbooks.Manifest.sign(html, t, [%{"type" => "c2pa.action.published", "actor" => Workbooks.Git.did(t)}]), true}
+      end
+
     manifest = %{
       "id" => id,
       "format" => "wbundle/1",
       "volumes" => Workbooks.VFS.volumes(),
+      "signed" => signed,
       "created" => System.system_time(:second)
     }
 
@@ -43,5 +50,10 @@ defmodule Workbooks.Bundle do
   def restore(blob) when is_binary(blob) do
     parts = unpack(blob)
     {Jason.decode!(parts["manifest.json"]), parts["workbook.html"], parts["vfs.sqlite"]}
+  end
+
+  @doc "Verify a shipped bundle's embedded provenance (signature + asset integrity)."
+  def verify(blob) when is_binary(blob) do
+    Workbooks.Manifest.verify(unpack(blob)["workbook.html"] || "")
   end
 end

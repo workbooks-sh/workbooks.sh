@@ -156,6 +156,38 @@
   (wasi:sockets) behind a stricter cap. The capability gate stays the single
   telemetry/enforcement chokepoint (per EXTENSIONS-ORB.org).
 
+** The FS bridge — preopen ↔ VFS (widens auto-wrap to file CLIs)
+   Three FS layers stack: the microVM's Linux FS (outer), WASI's preopen FS (the
+   wasm-level capability FS — deny-by-default, grant-per-dir), and our SQLite VFS
+   (vfs.ex volumes workspace/memory/tmp). The CONNECTOR is the preopen:
+   `wasmtime --dir <host>::<guest>` mounts a host dir into the guest. Back that
+   host dir with a VFS volume and a STOCK file-CLI operates on our VFS
+   transparently. v1 = materialize volume → temp dir → preopen → run → copy
+   changes back; v2 = a virtual FS over SQLite. PackageManager.run/3 already
+   takes `dirs` (the preopen list); wiring it to a VFS volume is the next step.
+   PROVEN 2026-06-07 (see §SPIKE): a normal read+write CLI round-tripped through
+   a host::guest mapping; without the mapping the guest saw nothing (NotFound) —
+   container-style isolation, function-granular.
+   WALL: the bridge fixes file ACCESS, not `mmap`. WASI's fd_read/fd_write cannot
+   express mmap, so mmap-based CLIs (e.g. sd's file mode) stay "unsupported" even
+   WITH a preopen → those take #+EXEC: posix. Bridge widens the class; it does not
+   erase the boundary.
+
+** Network → bind the wasm net capability to Workbooks.Browse (two routes)
+   wasmtime 45 confirmed to support `-S http`, `-S tcp/udp`, `-S inherit-network`,
+   `-S allow-ip-name-lookup`. Browse (browse.ex: native/Exa/Firecrawl + proxy) is
+   the host service both routes terminate at, gated by the net/browse cap:
+   - ROUTE A — wasi:http, gated: a wasip2 component doing HTTP runs with `-S http`
+     and the host outbound handler points at Workbooks.Browse. Stock-ish, but
+     needs wasip2 (wasip1 core modules have weak socket support). `inherit-network`
+     is the un-gated full-access form — NOT the path we want.
+   - ROUTE B — a Dock import (our existing pattern, cleanest/safest): guests today
+     get vfs-query / run-command / llm-complete bound to Elixir closures
+     (instance/imports.ex). Add `browse-fetch` → Workbooks.Browse.fetch. The CLI
+     calls the import; the host does the fetch with the full browser stack; the CLI
+     never holds a socket. Requires the CLI call OUR import (adapted/component),
+     not a stock raw-socket CLI.
+
 * SPIKE — empirical proof (2026-06-07, this box)
 
   Tested the auto-wrap claim end-to-end on a REAL upstream CLI we did not write:
