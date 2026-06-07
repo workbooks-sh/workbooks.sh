@@ -27,8 +27,8 @@ defmodule Workbooks.Workflow.Todo do
   def run(org, opts \\ []) when is_binary(org) do
     kws = keywords(org)
     tasks = parse(org, kws)
-    runner = Keyword.get(opts, :run, &default_run/1)
     workdir = Keyword.get(opts, :workdir, ".")
+    runner = Keyword.get(opts, :run, fn t -> default_run(t, workdir) end)
 
     roots = children_of(tasks, nil)
     {results, _} = run_set(roots, tasks, false, %{}, runner, workdir)
@@ -110,9 +110,9 @@ defmodule Workbooks.Workflow.Todo do
   defp record(t, out, state),
     do: %{id: t.id, idx: t.idx, title: t.title, state: state, output: String.slice(to_string(out), 0, 600)}
 
-  defp default_run(task) do
-    sys = "You are a workflow task runner. Do exactly what the task says, using your tools. Finish with done."
-    Workbooks.Agent.run(sys, "#{task.title}\n\n#{task.body}", exec: true, max_steps: 60).result
+  defp default_run(task, workdir) do
+    sys = "You are a workflow task runner. Do exactly what the task says, using your tools. Write any output files in your CURRENT working directory. Finish with done."
+    Workbooks.Agent.run(sys, "#{task.title}\n\n#{task.body}", exec: true, workdir: workdir, max_steps: 60).result
   end
 
   # ── parse (self-contained, no WASM) ──────────────────────────────────────────
