@@ -5,7 +5,7 @@
    * stored workbook can also be pulled from the runtime by id WHEN connected
    * (optional server tier), but the default path needs nothing.
    */
-  import { FileText, Cloud, CircleCheck, CircleAlert, FolderOpen, Save } from "@lucide/svelte";
+  import { FileText, Cloud, CircleCheck, CircleAlert, FolderOpen, FilePlus, Save } from "@lucide/svelte";
   import { weave, validate, outline, hasLocalKernel } from "$lib/kernel";
   import { openWorkbook, saveWorkbook } from "$lib/files";
   import { rt, getRuntime } from "$lib/runtime";
@@ -32,6 +32,30 @@
   async function save() {
     const p = await saveWorkbook(org, path ?? undefined);
     if (p) path = p;
+  }
+
+  function newWorkbook() {
+    org = "* ";
+    path = null;
+    html = "";
+    issues = null;
+    headlines = [];
+  }
+
+  // Editor shortcuts: ⌘N new · ⌘O open · ⌘S save.
+  function onKey(e: KeyboardEvent) {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === "n") {
+      e.preventDefault();
+      newWorkbook();
+    } else if (k === "o") {
+      e.preventDefault();
+      void open();
+    } else if (k === "s") {
+      e.preventDefault();
+      void save();
+    }
   }
 
   const sample = "* My Workbook\n\nThe app renders *its own format* — live, locally, via the\nembedded =oql.wasm= kernel. No server required.\n\n** A list\n- weave\n- tangle\n- validate\n";
@@ -92,14 +116,20 @@
   let id = $state("");
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 <section class="workbook">
   <div class="bar">
     <FileText size={18} strokeWidth={1.6} />
-    <button class="ghost" onclick={() => void open()}>
+    <button class="ghost" onclick={newWorkbook} title="New (⌘N)">
+      <FilePlus size={15} strokeWidth={1.8} />
+      New
+    </button>
+    <button class="ghost" onclick={() => void open()} title="Open (⌘O)">
       <FolderOpen size={15} strokeWidth={1.8} />
       Open
     </button>
-    <button class="ghost" onclick={() => void save()}>
+    <button class="ghost" onclick={() => void save()} title="Save (⌘S)">
       <Save size={15} strokeWidth={1.8} />
       Save
     </button>
