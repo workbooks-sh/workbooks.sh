@@ -246,6 +246,19 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Did.web_document(host)))
   end
 
+  # Source rail (2a/2b) — mirror the tenant's repo (the monorepo) to GitHub via gh.
+  post "/api/github/:tenant/push" do
+    {:ok, body, conn} = read_body(conn)
+    opts = if body == "", do: %{}, else: Jason.decode!(body)
+    result =
+      case Workbooks.GitHub.push(conn.params["tenant"], repo: opts["repo"], visibility: opts["visibility"] || "private") do
+        {:ok, url} -> %{ok: true, url: url}
+        {:skip, r} -> %{ok: false, skip: r}
+        {:error, e} -> %{ok: false, error: String.slice(e, 0, 300)}
+      end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # Ledger verify (Phase 2g) — recompute the hash-chain over the run's current
   # _steps.jsonl and check the did:key signature: tamper-evident + attributable.
   get "/api/ledger/:slug" do

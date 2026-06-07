@@ -154,6 +154,15 @@ defmodule Workbooks.CLI do
   # Compile a workspace's components → WASM; report what built / what couldn't.
   def call(["build", slug], t), do: Workbooks.Library.build(t, slug) |> json()
 
+  # Source rail — mirror the tenant's repo (the unpacked monorepo) to GitHub.
+  def call(["github", "push" | rest], t) do
+    case Workbooks.GitHub.push(t, repo: opt(rest, "--repo"), visibility: if("--public" in rest, do: "public", else: "private")) do
+      {:ok, url} -> "pushed → #{url}"
+      {:skip, r} -> "skipped: #{r}"
+      {:error, e} -> "error: #{String.slice(e, 0, 300)}"
+    end
+  end
+
   def call(["unpack", bundle, dest], _t) do
     files = Workbooks.Library.unpack(File.read!(bundle), dest)
     "unpacked #{length(files)} files → #{dest}"
@@ -204,6 +213,7 @@ defmodule Workbooks.CLI do
       wb checkin <member> <workdir>        pack + sign a member back into the library
       wb pack <workspace> <out> [--build]  compose members → one workbook (--build = compile to WASM)
       wb build <workspace>                 compile components → WASM; report built/unbuilt
+      wb github push [--repo n] [--public] mirror the tenant repo (monorepo) to GitHub
       wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
       wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
       wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
