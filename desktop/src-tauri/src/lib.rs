@@ -118,11 +118,13 @@ pub fn run() {
         .setup(|app| {
             build_tray(app.handle())?;
 
-            // Bring the runtime up in the background; tell the WebView when it's
-            // ready so the frontend can connect to the discovered URL.
+            // Workbook-native: do NOT auto-start the heavy runtime on launch. The
+            // app opens + weaves/edits workbooks via the embedded kernel with no
+            // server. Just CONNECT to a runtime if one is already up (discovery
+            // file present) and report state; starting it is explicit (the tray, or
+            // when the user opens an agent feature).
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let _ = daemon::wb(&["deploy", "local", "--json"]);
                 let state = if Discovery::read().is_some() { "up" } else { "down" };
                 let _ = handle.emit("sidecar-state", state);
             });
@@ -143,7 +145,7 @@ pub fn run() {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let status = MenuItem::with_id(app, "status", "Engine: starting…", false, None::<&str>)?;
     let open = MenuItem::with_id(app, "open", "Open Workbooks", true, None::<&str>)?;
-    let restart = MenuItem::with_id(app, "restart", "Restart engine", true, None::<&str>)?;
+    let restart = MenuItem::with_id(app, "restart", "Start / restart engine", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Workbooks", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&status, &open, &restart, &sep, &quit])?;
