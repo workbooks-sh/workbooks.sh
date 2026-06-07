@@ -205,6 +205,31 @@ defmodule Workbooks.Library do
   end
 
   @doc """
+  PACK a workspace and STORE the resulting workbook on the configured backend
+  (`Workbooks.Storage` — local volume / S3 / R2, per deploy). Durable across
+  redeploys; tenant-scoped. Returns {:ok, key} (the storage key) or {:error, _}.
+  opts pass through to `pack/3` (build:, purpose:, only:).
+  """
+  def store(tenant, workspace_slug, opts \\ []) do
+    case pack(tenant, workspace_slug, opts) do
+      {:ok, blob} ->
+        key = "workbooks/#{workspace_slug}.wbundle"
+        case Workbooks.Storage.put(tenant, key, blob) do
+          :ok -> {:ok, key}
+          err -> err
+        end
+
+      err -> err
+    end
+  end
+
+  @doc "Fetch a stored workbook's bytes by key (from the configured backend)."
+  def fetch(tenant, key), do: Workbooks.Storage.get(tenant, key)
+
+  @doc "List the tenant's stored workbooks (keys on the configured backend)."
+  def stored(tenant), do: Workbooks.Storage.list(tenant, "workbooks")
+
+  @doc """
   UNPACK a parent workbook back to a flat tree under `dest` — the working form
   (the monorepo projection). Mirror of `pack/3`; reuses `Bundle.unpack`.
   Returns the list of files written.

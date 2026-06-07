@@ -174,6 +174,28 @@ defmodule Workbooks.CLI do
     "unpacked #{length(files)} files → #{dest}"
   end
 
+  # Durable storage on the configured backend (local volume / S3 / R2).
+  def call(["store", slug | rest], t) do
+    case Workbooks.Library.store(t, slug, build: "--build" in rest) do
+      {:ok, key} -> "stored #{slug} → #{key} (backend: #{Workbooks.Storage.adapter() |> Module.split() |> List.last()})"
+      {:error, e} -> "error: #{e}"
+    end
+  end
+
+  def call(["stored"], t) do
+    case Workbooks.Library.stored(t) do
+      [] -> "(nothing stored)"
+      keys -> Enum.join(keys, "\n")
+    end
+  end
+
+  def call(["fetch", key, out], t) do
+    case Workbooks.Library.fetch(t, key) do
+      {:ok, bytes} -> File.write!(out, bytes); "fetched #{key} → #{out} (#{byte_size(bytes)} bytes)"
+      :error -> "not found: #{key}"
+    end
+  end
+
   # Toolkits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
   # read their progressive-disclosure skill recipes on demand (the CLI help-wrapper).
   def call(["toolkit"], _t), do: Toolkits.list_text()
