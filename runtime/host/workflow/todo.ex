@@ -36,7 +36,11 @@ defmodule Workbooks.Workflow.Todo do
 
     roots = children_of(tasks, nil)
     {results, _} = run_set(roots, tasks, false, %{}, runner, workdir)
-    %{tasks: Map.values(results) |> Enum.sort_by(& &1.idx)}
+    out = %{tasks: Map.values(results) |> Enum.sort_by(& &1.idx)}
+
+    # Always-on telemetry → <workdir>/_telemetry.db (best-effort).
+    Workbooks.Workflow.Telemetry.persist(workdir, Path.basename(workdir), out.tasks)
+    out
   end
 
   # ── execution ────────────────────────────────────────────────────────────────
@@ -112,7 +116,7 @@ defmodule Workbooks.Workflow.Todo do
   end
 
   defp record(t, out, state),
-    do: %{id: t.id, idx: t.idx, title: t.title, state: state, output: String.slice(to_string(out), 0, 600)}
+    do: %{id: t.id, idx: t.idx, title: t.title, state: state, output: String.slice(to_string(out), 0, 600), ts: System.system_time(:second)}
 
   defp default_run(task, workdir) do
     sys =
