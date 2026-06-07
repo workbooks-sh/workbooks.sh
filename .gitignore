@@ -26,10 +26,11 @@ runtime/build/tools/
 
 # OS
 **/.DS_Store
-.claude/worktrees/
+.claude/
 scratch/
 
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
 .beads-credential-key
+.beads/
