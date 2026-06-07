@@ -215,7 +215,12 @@ defmodule Workbooks.Library do
       {:ok, blob} ->
         key = "workbooks/#{workspace_slug}.wbundle"
         case Workbooks.Storage.put(tenant, key, blob) do
-          :ok -> {:ok, key}
+          :ok ->
+            # Index for semantic search at store time (best-effort — storage is
+            # the durable record; the index is rebuildable via index/2).
+            unless opts[:no_index], do: index(tenant, workspace_slug)
+            {:ok, key}
+
           err -> err
         end
 
@@ -225,6 +230,72 @@ defmodule Workbooks.Library do
 
   @doc "Fetch a stored workbook's bytes by key (from the configured backend)."
   def fetch(tenant, key), do: Workbooks.Storage.get(tenant, key)
+
+  @doc """
+  Index a workspace for semantic search — chunk each member (org by section, code
+  by line-window), embed the chunks (`Workbooks.Embed`, batched), and upsert the
+  vectors (`Workbooks.Vector`) tagged {workbook, path, headline}. Re-indexable
+  (forgets the workspace's prior vectors first). Returns {:ok, chunk_count}.
+  Called automatically by `store/3`; embed happens at STORE time, not query time.
+  """
+  def index(tenant, workspace_slug, _opts \\ []) do
+    case Enum.find(workspaces(tenant), &(&1.slug == workspace_slug)) do
+      nil -> {:error, "no such workspace: #{workspace_slug}"}
+      ws ->
+        repo = Git.repo_path(tenant)
+        Workbooks.Vector.forget(tenant, workspace_slug)
+
+        chunks =
+          ws.members
+          |> Enum.flat_map(fn
+            %{ref: {:path, p}} -> vendor(repo, p)
+            _ -> []
+          end)
+          |> Enum.filter(fn {name, _} -> text_file?(name) end)
+          |> Enum.flat_map(fn {name, content} ->
+            chunk(name, content)
+            |> Enum.with_index()
+            |> Enum.map(fn {{headline, text}, i} ->
+              %{id: "#{workspace_slug}:#{name}:#{i}", text: text,
+                meta: %{workbook: workspace_slug, path: name, headline: headline, text: text}}
+            end)
+          end)
+
+        case chunks do
+          [] -> {:ok, 0}
+          _ ->
+            {:ok, vectors} = Workbooks.Embed.embed(Enum.map(chunks, & &1.text))
+            Enum.zip(chunks, vectors) |> Enum.each(fn {c, v} -> Workbooks.Vector.upsert(tenant, c.id, v, c.meta) end)
+            {:ok, length(chunks)}
+        end
+    end
+  end
+
+  @text_exts ~w(.org .md .txt .rs .js .ts .jsx .tsx .svelte .ex .exs .py .go .html .css .sql .json .toml .yaml .yml)
+  defp text_file?(name), do: Path.extname(name) in @text_exts
+
+  # Org → one chunk per heading section (heading + body); other text → line windows.
+  defp chunk(name, content) do
+    if String.ends_with?(name, ".org"), do: org_sections(content), else: line_windows(content, 20)
+  end
+
+  defp org_sections(content) do
+    Regex.split(~r/^(?=\*+ )/m, content, trim: true)
+    |> Enum.map(fn sec ->
+      headline = sec |> String.split("\n", parts: 2) |> hd() |> String.replace(~r/^\*+\s*/, "") |> String.replace(~r/\s+:[\w:]+:\s*$/, "") |> String.trim()
+      {headline, String.trim(sec)}
+    end)
+    |> Enum.reject(fn {_, t} -> t == "" end)
+  end
+
+  defp line_windows(content, n) do
+    content
+    |> String.split("\n")
+    |> Enum.chunk_every(n)
+    |> Enum.with_index()
+    |> Enum.map(fn {lines, i} -> {"lines #{i * n + 1}–#{i * n + length(lines)}", Enum.join(lines, "\n")} end)
+    |> Enum.reject(fn {_, t} -> String.trim(t) == "" end)
+  end
 
   @doc "List the tenant's stored workbooks (keys on the configured backend)."
   def stored(tenant), do: Workbooks.Storage.list(tenant, "workbooks")
