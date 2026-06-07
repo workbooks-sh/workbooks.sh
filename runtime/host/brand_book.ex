@@ -28,10 +28,10 @@ defmodule Workbooks.BrandBook do
     harvest = harvest(domain, workdir)
 
     status(workdir, %{domain: domain, stage: "strategist", harvest: harvest})
-    strategist = stage(strategist_path(), strategist_task(domain), workdir, opts[:strategist_steps] || 60)
+    strategist = stage(strategist_path(), strategist_task(domain), workdir, opts[:strategist_steps] || 75)
 
     status(workdir, %{domain: domain, stage: "designer", harvest: harvest})
-    designer = stage(designer_path(), designer_task(domain), workdir, opts[:designer_steps] || 90)
+    designer = stage(designer_path(), designer_task(domain), workdir, opts[:designer_steps] || 120)
 
     result = %{
       domain: domain,
@@ -69,19 +69,28 @@ defmodule Workbooks.BrandBook do
   end
 
   defp strategist_task(domain) do
-    "You are Stage-2 for the brand at #{domain}. The Stage-1 harvest left the " <>
-      "OQL-queryable substrate in your working directory (brand.org, catalog/, " <>
-      "social/, ads.org, harvest-provenance.org). Read it with your run tool " <>
-      "(cat/grep/wb/brandnana), then write the gated analysis/*.org and make " <>
-      "`brandnana analysis check .` print RESULT: PASS. Then finish with done."
+    "You are Stage-2 (strategist) for #{domain}. The harvest substrate is in your " <>
+      "working directory: brand.org, catalog/, social/, ads.org, plus pre-read " <>
+      "summaries in analysis/reports/. Work EFFICIENTLY — skim the pre-reads, " <>
+      "don't exhaustively cat every file. Within your first few turns, START " <>
+      "WRITING the gated analysis as RELATIVE paths: analysis/positioning.org, " <>
+      "analysis/audience.org, analysis/messaging.org, analysis/voice.org — each " <>
+      "an :insight: grounded in the substrate's :point: facts via :GROUNDS:. " <>
+      "Then run `brandnana analysis check .` and fix any FAIL until it prints " <>
+      "RESULT: PASS. Then finish with done."
   end
 
   defp designer_task(domain) do
-    "You are Stage-3 for the brand at #{domain}. Stages 1-2 are done: the substrate " <>
-      "and gated analysis/*.org are in your working directory. Get the slide spine " <>
-      "with `brandnana book insight-slides .`, compose the deck-v2 brand book, " <>
-      "publish it with `brandnana book publish`, and review the slides. When the " <>
-      "deck is published, write the URL to ./published-url, then finish with done."
+    "You are Stage-3 (designer) for #{domain}. The substrate + the gated " <>
+      "analysis/*.org are in your working directory. Build a LONG, COHERENT " <>
+      "reveal.js presentation — aim for 25+ slides with a clear arc: splash, act " <>
+      "dividers, positioning, audience personas, the catalog ladder, ad concepts, " <>
+      "voice, palette, an end-card. Get the spine with `brandnana book " <>
+      "insight-slides .`, author one slide spec per file under spec/ (relative " <>
+      "paths), assemble with `brandnana book assemble spec --out deck.html`, then " <>
+      "PUBLISH with `brandnana book publish` so the workbook embeds the queryable " <>
+      "wb-source-bundle. Write the published URL to ./published-url. Review the " <>
+      "rendered slides for overflow/empties and fix them. Then finish with done."
   end
 
   # Agent defs: the canonical profile agents (baked at WB_PROFILE_DIR), with a
