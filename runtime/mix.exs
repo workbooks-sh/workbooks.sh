@@ -16,8 +16,14 @@ defmodule Workbooks.MixProject do
     ]
   end
 
-  # No lib/. Host code lives in host/. Tests compile from test/ too (only in :test).
-  defp elixirc_paths(_), do: ["host"]
+  # No lib/. Host code lives in host/. The in-BEAM ML adapter lives in host_ml/ and
+  # is compiled ONLY when WB_BUMBLEBEE=1 (it references Bumblebee directly), so the
+  # default build needs neither the dir nor the dep. The registry routes to it at
+  # runtime via Code.ensure_loaded?, so host/ compiles without it either way.
+  defp elixirc_paths(_) do
+    base = ["host"]
+    if System.get_env("WB_BUMBLEBEE") == "1", do: base ++ ["host_ml"], else: base
+  end
 
   def application do
     [
@@ -37,6 +43,18 @@ defmodule Workbooks.MixProject do
       {:guardian, "~> 2.3"},
       {:jose, "~> 1.11"},
       {:postgrex, "~> 0.19"}
-    ]
+    ] ++ ml_deps()
+  end
+
+  # In-BEAM neural embedder (CLIP image+text via Bumblebee + EXLA, served with
+  # Nx.Serving batching). HEAVY (pulls XLA), so OPT-IN at build time —
+  # `WB_BUMBLEBEE=1 mix release`. Default builds stay lean (text = Model2Vec,
+  # no EXLA); the standalone CLIP sidecar remains the no-NIF alternative.
+  defp ml_deps do
+    if System.get_env("WB_BUMBLEBEE") == "1" do
+      [{:bumblebee, "~> 0.6"}, {:exla, "~> 0.9"}, {:nx, "~> 0.9"}]
+    else
+      []
+    end
   end
 end
