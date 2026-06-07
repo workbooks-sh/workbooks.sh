@@ -24,8 +24,11 @@ defmodule Workbooks.Deploy.Image do
     platform = Keyword.get(opts, :platform, host_platform())
     tag = ref(Keyword.get(opts, :tag, "latest"))
 
+    # Plain `docker build` (not buildx) for the LOCAL single-arch image — it loads
+    # into the docker daemon by default and needs no buildx plugin (colima ships
+    # without it). buildx stays for multi-arch publish/0.
     with {:ok, root} <- repo_root(),
-         args = ["buildx", "build", "-f", @dockerfile, "--platform", platform, "-t", tag, "--load", "."],
+         args = ["build", "-f", @dockerfile, "--platform", platform, "-t", tag, "."],
          {:ok, _} <- sh("docker", args, root) do
       if Keyword.get(opts, :into_krunvm, false), do: into_krunvm(tag), else: {:ok, "built #{tag} (#{platform})"}
     end
