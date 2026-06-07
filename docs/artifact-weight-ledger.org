@@ -1,0 +1,136 @@
+#+TITLE: AdBuy Artifact Weight Ledger
+#+DATE: 2026-06-06
+#+DESCRIPTION: Size ceiling + WKWebView parse/memory at current and projected card scale.
+
+* Measurement snapshot — v0.1 (2026-06-06)
+
+Clean =npx vite build= from fresh dist/.
+
+| Asset category          | Raw bytes | Transfer (gzip/compressed) |
+|-------------------------+-----------+----------------------------|
+| WASM (sim)              |    262 KB |                     114 KB |
+| JS total (all pages)    |    136 KB |                      37 KB |
+| CSS total (all pages)   |    211 KB |                      36 KB |
+| Fonts — WOFF2 (17 files)|    767 KB |                     767 KB |
+| Headshots (6 PNGs)      |    676 KB |                     676 KB |
+| HTML (4 pages)          |     15 KB |                       4 KB |
+| *Dist total*            |  *8.7 MB* |                  *~3.5 MB* |
+
+Notes:
+- 8.7 MB dist includes Phosphor icon SVG/TTF/WOFF fallback fonts (5.7 MB). These are
+  NOT transferred when the browser supports WOFF2 (all relevant devices do).
+- Effective first-load transfer ≈ 3.5 MB — dominated by WOFF2 fonts (767 KB).
+- WASM gzip-compresses well: 262 KB → 114 KB.
+
+** Font weight analysis
+
+Baloo 2 Variable ships 4 language subsets (latin, latin-ext, devanagari, vietnamese).
+On-device only latin (143 KB woff2) is fetched. Devanagari (115 KB) is bundled unnecessarily.
+Nunito ships 5 subsets; only latin (39 KB) matters.
+
+| Font family    | Subsets bundled | Needed | Waste |
+|----------------+-----------------+--------+-------|
+| Baloo 2        |               4 |      1 | 3 (290 KB) |
+| Nunito         |               5 |      1 | 4 (129 KB) |
+| Fraunces       |               2 |      1 | 1 ( 68 KB) |
+| Archivo        |               3 |      1 | 2 (102 KB) |
+| Phosphor icons |               2 |      2 |    0       |
+
+Total recoverable font waste: ~589 KB WOFF2. Action: switch to subset-only imports in shared.js.
+Not a blocker — WKWebView loads subsets on demand based on unicode ranges in the CSS; unused
+subsets are not fetched even if bundled. Impact is app bundle size on TestFlight, not runtime.
+
+* Delivery model: Capacitor app vs single-file workbook
+
+The issue asks about "inlining into one .html WKWebView parses at boot." This applies to the
+*workbook export* format (=.html= with all assets base64-inlined). The Capacitor app uses a
+different path: assets are copied to the app bundle and served from =capacitor://localhost= as
+real files — NO base64 inflation.
+
+| Delivery                | Boot parse target | Base64 inflation |
+|-------------------------+-------------------+------------------|
+| Capacitor app (current) | Not applicable    | None             |
+| Single-file workbook    | ≤ 2 MB parse      | ×1.37            |
+
+*Ruling:* Do NOT declare single-file workbook format for AdBuy v1. The Capacitor delivery
+model has no inlining constraint. Revisit if/when a workbook export is wanted for distribution.
+
+* Card scale projection (130–160 cards with art)
+
+Current card count: 18 (text labels only — zero art bytes).
+
+** Strategist headshot art
+- 6 headshots today: avg 113 KB PNG each.
+- Toon-render pipeline targets ~40 KB WebP per headshot (design/03-art-direction.md).
+- Characters are fixed (not per card); 10–15 unique characters is the v1 ceiling.
+- 15 characters × 40 KB WebP = 600 KB — within budget.
+
+** Card thumbnail art (combinatorial logo kit cards)
+No card thumbnail art in v1. Cards are text + category chips (see cards.js). If visual
+card art ships post-v1:
+
+| Cards | 40 KB WebP ea | 60 KB PNG ea | Base64 (×1.37) |
+|-------+---------------+--------------+----------------|
+|   130 |       5.2 MB  |      7.8 MB  |        7.1 MB  |
+|   160 |       6.4 MB  |      9.6 MB  |        8.8 MB  |
+
+For Capacitor delivery these are static files, loaded lazily as collected — the player
+never holds all 160 at once in memory. No ceiling issue for the app format.
+Single-file workbook at 160 cards + 40 KB WebP = 6.4 MB art alone → exceeds the 2 MB
+parse ceiling. Confirmed: workbook export is incompatible with full card art.
+
+* WKWebView JS heap limits (floor device: iPhone SE 2020, iOS 16)
+
+| Device          | Reported JS heap limit | Notes                         |
+|-----------------+------------------------+-------------------------------|
+| iPhone SE 2020  | ~60 MB                 | Floor device (2 GB RAM)       |
+| iPhone 12 mini  | ~150 MB                | Mid-tier (4 GB RAM)           |
+| iPhone 15       | ~300 MB+               | Current flagship              |
+
+AdBuy at v0.1 peak runtime heap (estimated):
+- WASM module: 262 KB compiled → ~1–2 MB linear memory
+- JS engine (Vite bundle): ~120 KB code + runtime structures ≈ 5–10 MB
+- DOM (4 screens, cards): low, <5 MB
+- Font render buffers: handled by OS glyph cache, not JS heap
+
+Estimated peak heap: ~15–25 MB. Well within iPhone SE floor (60 MB).
+At 160-card scale with DOM card nodes live: add ~5 MB → still well within floor.
+
+* Sim test coverage + CI placement (wb-epjh.22)
+
+** Current state
+=cargo test= in =sim-rs/= runs 100 tests (99 unit + 1 integration).
+The integration test =tests/wasm_size.rs= guards the WASM binary under a 512 KB ceiling.
+Determinism is enforced by =wasm::tests::dashboard_is_deterministic=.
+
+** Run locally
+#+BEGIN_SRC bash
+bash sim-rs/check.sh       # build WASM + run all tests (100 passing)
+# or individually:
+cd sim-rs && cargo test     # 100 tests; wasm artifact must exist for wasm_size guard
+#+END_SRC
+
+** CI placement options (decision required — platform-side)
+
+| Option | Where | Cost | Notes |
+|--------+-------+------+-------|
+| New workflow | =.github/workflows/adbuy-sim.yml= | Low | Dedicated; runs on sim-rs/** push |
+| Extend runtime-wasm-size.yml | existing workflow | Medium | Adds adbuy job alongside runtime WASM checks |
+| Pre-commit hook | =.git/hooks/= | None | Local only — not enforced for all contributors |
+
+Recommendation: new workflow (option 1). Trigger: =paths: ['projects/adbuy/sim-rs/**']=.
+Steps: install wasm-pack, run =bash sim-rs/check.sh=. CI placeholder ready when platform can wire it.
+
+* Ceiling recommendations
+
+| Constraint           | Current    | Ceiling       | Status   |
+|----------------------+------------+---------------+----------|
+| Capacitor bundle     |   8.7 MB   | 25 MB         | ✓ OK     |
+| First-load transfer  |   ~3.5 MB  | 10 MB         | ✓ OK     |
+| JS heap (floor dev)  |   ~20 MB   | 50 MB (80%)   | ✓ OK     |
+| Single-file workbook |  N/A       | NOT SUPPORTED | See note |
+| Font subset waste    |  ~589 KB   | 0 KB          | Low prio |
+
+No blockers for Phase 1. Font subset trimming is a Polish task, not a gate.
+Single-file workbook export for AdBuy requires a different asset strategy (art-free
+card version or separate distribution pipeline) — not a v1 problem.

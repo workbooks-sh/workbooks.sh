@@ -1,0 +1,20 @@
+# wb-source-bundle exclusion list for AdBuy
+# Format: one glob per line, relative to project root
+# Wired into wb CLI via platform-hold issue (wb-epjh.9)
+
+# Artlix-derived renders: in active use but redistribution rights unconfirmed.
+# Replace with original art before public source distribution.
+design/art-explorations/characters/
+
+# Defold-era dead assets (safe to bundle but no longer needed)
+assets/fonts/
+assets/img/
+assets/ui.atlas
+
+# Build outputs / Capacitor scaffold / dev state
+dist/
+ios/
+node_modules/
+.wb-forge/
+app/pkg/
+sim-rs/target/

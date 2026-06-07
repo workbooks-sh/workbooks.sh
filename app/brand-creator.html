@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b5998">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AdBuy">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ADBUY — Brand Creator</title>
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<script type="module" src="./shared.js"></script>
+<script type="module" src="./brand-fonts.js"></script>
+<link rel="stylesheet" href="./styles/brand-creator.css">
+</head>
+<body>
+<div class="device"><div class="frame">
+
+  <!-- persistent live logo preview -->
+  <div class="preview">
+    <div class="eyebrow">YOUR BRAND</div>
+    <button class="roundshuf" onclick="surprise()" title="Shuffle the whole brand"><i class="ph-bold ph-shuffle"></i></button>
+    <div class="logostage"><div class="logo" id="logo"></div></div>
+    <div class="idrow">
+      <div class="vbadge"><span class="vchip"><i id="vicon" class="ph-fill ph-cooking-pot"></i></span><span id="pvvert">cookware</span></div>
+      <div class="palrow" id="palrow"></div>
+    </div>
+    <div class="pspacer"></div>
+    <div class="pnav">
+      <button class="btn sec" id="backbtn" onclick="go(-1)">Back</button>
+      <button class="btn sec" id="nextbtn" onclick="go(1)">Next</button>
+    </div>
+  </div>
+
+  <!-- step content -->
+  <div class="steps">
+    <div class="steptop">
+      <div class="dots" id="dots"></div>
+      <div class="stepnum" id="stepnum">STEP 1 OF 6</div>
+      <div class="steptitle" id="steptitle"></div>
+      <div class="stephint" id="stephint"></div>
+    </div>
+    <div class="stepbody" id="stepbody"></div>
+  </div>
+
+</div></div>
+<script type="module" src="./scripts/brand-creator.js"></script>
+</body>
+</html>

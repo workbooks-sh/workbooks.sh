@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b5998">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AdBuy">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ADBUY — Dashboard</title>
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<script type="module" src="./shared.js"></script>
+<link rel="stylesheet" href="./styles/dashboard.css">
+</head>
+<body>
+<div class="device"><div class="frame" id="frame">
+
+  <div class="screen on" id="title">
+    <h1 class="disp">AD<span>BUY</span></h1>
+    <p>run ad campaigns · card game</p>
+    <button class="btn" style="font-size:19px;padding:15px 34px" id="playbtn" disabled>Loading…</button>
+  </div>
+
+  <div class="screen" id="sign">
+    <div class="clientcard">
+      <div class="logo"><i id="brandlogo" class="ph-fill ph-cooking-pot"></i></div>
+      <h2 id="brandname">Copper &amp; Char</h2>
+      <div class="vert" id="brandvert">cookware brand</div>
+      <div class="traits" id="brandtraits"></div>
+      <div class="ladder" id="brandladder"></div>
+      <button class="reroll" id="rerollbtn" onclick="reroll()"><i class="ph-bold ph-arrows-clockwise"></i> re-roll</button>
+    </div>
+    <div class="signside">
+      <span class="agency-byline" id="agencyname"></span>
+      <h3 class="disp" id="signheader">They need a strategist.</h3>
+      <p id="signbody">One week. Hit the number. Your attention is the budget — three moves a day, then the market answers overnight.</p>
+      <div id="signhire"></div>
+      <button class="btn" id="signbtn" style="font-size:18px;padding:14px 30px" onclick="enterDesk()">Take the job</button>
+    </div>
+  </div>
+
+  <div class="screen" id="desk">
+    <div class="hdr">
+      <div class="daywin" id="daywin"></div>
+      <div class="wavebadge" id="wavebadge"></div>
+      <div class="goalcluster" id="goalcluster" onclick="openGoal()">
+        <b id="brev">$0</b> <span class="of" id="goalof">/ $0</span>
+        <span class="goalbar"><i id="revfill"></i></span>
+        <span class="goaldays" id="goaldays">—</span>
+        <i class="ph-fill ph-caret-down" style="font-size:9px;color:var(--dim)"></i>
+      </div>
+      <div class="hdr-right">
+        <div class="ap"><span class="aplbl">MOVES</span><span id="ap"></span></div>
+        <button class="endday" id="endbtn" onclick="nextDay()">NEXT DAY <i class="ph-bold ph-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <div class="adrow" id="adrow"></div>
+
+    <div class="ftr">
+      <div class="hpill">return <b class="roasv" id="roas">—</b></div>
+      <div class="hpill"><i class="ph-fill ph-coins" style="color:var(--green)"></i><b class="money" id="bank">$0</b></div>
+      <div class="hpill" id="spendpill" style="display:none"><i class="ph-fill ph-receipt"></i><b id="spentval">—</b></div>
+      <div class="racebar" id="raceplate" style="display:none">
+        <i class="ph-fill ph-push-pin" style="color:var(--blue)"></i>A
+        <span class="track"><span class="bell-l"></span><span class="bell-r"></span><span class="needle" id="needle"></span></span>
+        <span id="racen">n=0</span>
+      </div>
+      <div class="hpill">TRUST <span class="pips" id="trust"></span></div>
+      <div class="styleswap" onclick="cycleStyle()"><i class="ph-fill ph-palette"></i><b id="stylename">characters</b></div>
+    </div>
+
+    <div id="goalmodal" onclick="closeGoal(event)">
+      <div class="gpanel">
+        <div class="ghead"><i class="ph-fill ph-target" style="color:var(--blue)"></i><h3 id="ghtitle">This Week's Goal</h3></div>
+        <div class="gline"><span>Client</span><b id="gclient">—</b></div>
+        <div class="gline"><span>Hit by close</span><b id="gtarget">—</b></div>
+        <div class="gline"><span>Spend at least</span><b id="gfloor">—</b></div>
+        <div class="gline"><span>Fee if you pass</span><b style="color:var(--green)" id="gfee">—</b></div>
+        <div class="gline"><span>Miss it</span><b style="color:var(--red)" id="gmiss">−1 trust pip</b></div>
+        <div class="gladder" id="gladder"></div>
+        <div class="gpace" id="gpace"></div>
+        <div class="grow"><button class="btn sec" onclick="closeGoal()">Got it</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="recap">
+    <div class="rtitle"><i class="ph-fill ph-moon-stars"></i><span id="rtitle">Night</span></div>
+    <div class="rsub" id="rsub">the market is looking at your work…</div>
+    <div id="focus"></div>
+    <div id="doneRow"></div>
+    <div id="rtotals"></div>
+    <div class="skip-tap">tap to skip →</div>
+  </div>
+
+  <div class="screen" id="close">
+    <div class="panel">
+      <div class="verdict disp" id="verdict">WEEK PASSED</div>
+      <div class="feeline" id="feeline"></div>
+      <div class="detail" id="closedetail"></div>
+      <div class="close-learn" id="closelearn"></div>
+      <div class="pinresult"><i class="ph-fill ph-push-pin" style="color:var(--blue)"></i>
+        <span id="pinlabel">A wins on Hook</span> <span class="stamp2" id="pingrade">CONFIRMED</span></div>
+      <div class="callresult" id="callresult"></div>
+      <div class="codexrow" id="codexcount"></div>
+      <div class="packrow" id="packrow"></div>
+      <div class="nextup" id="nextup"></div>
+      <div class="progressrow" id="progressrow"></div>
+      <div class="row" id="closerow"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="newsstand">
+    <div class="ns-wave" id="ns-wave">PACK OPENED</div>
+    <div class="ns-cards" id="ns-cards"></div>
+    <button class="btn" id="ns-next">Next wave →</button>
+  </div>
+
+  <div id="stamp"><div class="inner">
+    <i class="ph-fill ph-bell-ringing"></i>
+    <h3>WINNER CLEAR</h3>
+    <p id="stamptext">A WINS ON HOOK — PIN CONFIRMED</p>
+  </div></div>
+
+  <div id="pmodal" onclick="closeProposal(event)">
+    <div class="mpanel">
+      <div class="mhead">
+        <div class="mface" id="mface">👩‍🎤</div>
+        <div><h3 id="mname">Maya</h3><div class="role" id="mrole">Creative Strategist · ★★</div></div>
+        <span class="mconf" id="mconf">says 80% sure</span>
+      </div>
+      <div class="mbody" id="mbody"></div>
+      <div class="mtrack">accuracy · <b id="mskill">—</b> · your call</div>
+      <div class="mrow"><button class="btn sec" onclick="closeProposal()">Got it</button></div>
+    </div>
+  </div>
+
+  <div id="boot"><div class="b">The simulator failed to load. Serve this over <b>http://localhost</b> (not file://) so the browser can fetch the WASM module.<code id="booterr"></code></div></div>
+  <div class="flash" id="flash"></div>
+
+</div></div>
+<script type="module" src="./scripts/dashboard.js"></script>
+</body>
+</html>

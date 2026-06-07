@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — The Table</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+:root{
+  --desk:#100d22;
+  --desk2:#171331;
+  --card-edge:#ec40a8;
+  --cyan:#5af5ee;
+  --amber:#ffb938;
+  --green:#4ef08a;
+  --text:#e3e3f4;
+  --dim:#73719f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:#07060f;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Silkscreen',monospace;color:var(--text);
+  min-height:100vh;
+}
+
+/* the table */
+.table{
+  position:relative;width:min(900px,100vw);height:min(420px,100vh);
+  background:
+    radial-gradient(120% 140% at 50% -20%, var(--desk2) 0%, var(--desk) 60%, #0b0919 100%);
+  border-radius:18px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.7);
+  display:flex;
+}
+.table::after{ /* one quiet vignette — that's all the atmosphere */
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(100% 90% at 50% 40%, transparent 60%, rgba(5,3,14,.5) 100%);
+}
+@media (max-width:920px), (max-height:430px){
+  .table{width:100vw;height:100vh;height:100dvh;border-radius:0}
+}
+
+/* ---- left rail: the only numbers not on a card ---- */
+.rail{
+  flex:0 0 168px;display:flex;flex-direction:column;justify-content:center;
+  gap:14px;padding:0 0 0 26px;z-index:2;
+}
+.client{font-size:9px;color:var(--dim);letter-spacing:1px;line-height:1.8}
+.roas-label{font-size:9px;color:var(--dim)}
+.roas{font-size:44px;line-height:1;color:var(--cyan);text-shadow:0 0 18px rgba(90,245,238,.35)}
+.goal{font-size:9px;color:var(--dim);margin-top:6px}
+.goalbar{
+  margin-top:6px;width:120px;height:8px;background:#1d1940;border-radius:4px;overflow:hidden;
+}
+.goalbar i{display:block;height:100%;width:58%;background:var(--cyan);border-radius:4px;transition:width .6s ease}
+.days{display:flex;gap:6px;margin-top:10px}
+.day{width:8px;height:8px;border-radius:50%;background:#241f4a}
+.day.done{background:var(--amber)}
+.day.live{background:var(--amber);animation:soft 2.4s ease-in-out infinite}
+@keyframes soft{50%{opacity:.35}}
+
+/* ---- the played row: cards ARE the interface ---- */
+.row{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:26px;
+  padding-bottom:46px;z-index:2;
+}
+.play{position:relative;text-align:center}
+.card{
+  width:118px;height:158px;border-radius:10px;position:relative;cursor:pointer;
+  border:3px solid var(--card-edge);
+  background:
+    linear-gradient(180deg,#34306b 0%, #2a2557 22%, #1d1942 70%, #15392c 86%, #15392c 100%);
+  box-shadow:0 14px 26px rgba(0,0,0,.55), 0 0 0 1px #0b0919;
+  transform-origin:50% 90%;
+  animation:idle 5.2s ease-in-out infinite;
+}
+.play:nth-child(2) .card{animation-delay:-1.7s}
+.play:nth-child(3) .card{animation-delay:-3.4s}
+@keyframes idle{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1.1deg)}}
+
+/* card face: name strip, simple mark, cta chip — nothing else */
+.card .name{
+  position:absolute;top:9px;left:9px;right:9px;
+  font-size:7px;line-height:1.6;color:var(--text);text-align:left;
+}
+.card .mark{
+  position:absolute;top:46px;left:50%;transform:translateX(-50%);
+  font-size:34px;filter:saturate(.9);
+}
+.card .cta{
+  position:absolute;bottom:9px;left:9px;right:9px;height:16px;border-radius:3px;
+  background:#1f5c43;border:1px solid #2f8a64;
+  font-size:6px;color:#a9f0c9;display:flex;align-items:center;justify-content:center;
+}
+.card.foil::after{
+  content:"";position:absolute;inset:-1px;border-radius:8px;pointer-events:none;
+  background:linear-gradient(115deg, transparent 35%, rgba(90,245,238,.28) 47%, rgba(236,64,168,.22) 53%, transparent 65%);
+  background-size:300% 100%;animation:foil 6s ease-in-out infinite;
+}
+@keyframes foil{0%,100%{background-position:115% 0}50%{background-position:-15% 0}}
+.card.worn{filter:saturate(.55) brightness(.85)}
+.card.worn .wear{
+  position:absolute;top:-7px;right:-7px;width:16px;height:16px;border-radius:50%;
+  background:var(--amber);color:#231603;font-size:9px;line-height:16px;
+}
+
+/* the settle pass: one card at a time */
+.play.settle .card{
+  animation:none;
+  transform:rotate(0) scale(1.07) translateY(-8px);
+  box-shadow:0 22px 40px rgba(0,0,0,.6), 0 0 28px rgba(90,245,238,.25);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.earn{
+  margin-top:13px;font-size:15px;color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.earn small{display:block;font-size:7px;color:var(--dim);margin-top:4px}
+.play.settle .earn{color:var(--cyan)}
+.float{
+  position:absolute;left:50%;top:-14px;transform:translateX(-50%);
+  font-size:12px;color:var(--green);opacity:0;pointer-events:none;
+}
+.play.settle .float{animation:rise 1.1s ease-out}
+@keyframes rise{
+  0%{opacity:0;transform:translate(-50%,8px)}
+  25%{opacity:1;transform:translate(-50%,-4px) scale(1.2)}
+  45%{transform:translate(-50%,-8px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-26px)}
+}
+
+/* ---- the hand: just a quiet presence ---- */
+.hand{
+  position:absolute;bottom:-58px;left:50%;transform:translateX(-50%);
+  display:flex;z-index:1;
+}
+.hcard{
+  width:74px;height:100px;border-radius:7px;margin:0 -14px;
+  border:2px solid #8a2a64;
+  background:linear-gradient(180deg,#2a2557,#1a1638);
+  box-shadow:0 -6px 18px rgba(0,0,0,.5);
+  opacity:.85;
+}
+.hcard:nth-child(1){transform:rotate(-9deg) translateY(14px)}
+.hcard:nth-child(2){transform:rotate(-3deg) translateY(4px)}
+.hcard:nth-child(3){transform:rotate(3deg) translateY(4px)}
+.hcard:nth-child(4){transform:rotate(9deg) translateY(14px)}
+</style>
+</head>
+<body>
+
+<div class="table">
+
+  <div class="rail">
+    <div class="client">COPPER &amp; CHAR<br>WAVE 2 OF 3</div>
+    <div>
+      <div class="roas-label">ROAS</div>
+      <div class="roas" id="roas">1.27</div>
+      <div class="goal">TARGET 1.45</div>
+      <div class="goalbar"><i id="goalfill"></i></div>
+    </div>
+    <div class="days">
+      <span class="day done"></span><span class="day done"></span>
+      <span class="day live"></span><span class="day"></span><span class="day"></span>
+    </div>
+  </div>
+
+  <div class="row" id="row">
+    <div class="play">
+      <div class="float">+$45</div>
+      <div class="card foil">
+        <div class="name">PAIN POINT<br>× UGC SELFIE</div>
+        <div class="mark">🔥</div>
+        <div class="cta">SHOP NOW</div>
+      </div>
+      <div class="earn"><span class="val">$318</span><small>HOOK 31%</small></div>
+    </div>
+    <div class="play">
+      <div class="float">+$45</div>
+      <div class="card">
+        <div class="name">FOUNDER STORY<br>× DEMO CLOSEUP</div>
+        <div class="mark">🛠</div>
+        <div class="cta">SHOP NOW</div>
+      </div>
+      <div class="earn"><span class="val">$204</span><small>HOOK 27%</small></div>
+    </div>
+    <div class="play">
+      <div class="float">+$45</div>
+      <div class="card worn">
+        <div class="wear">!</div>
+        <div class="name">FOMO DROP<br>× CINEMATIC</div>
+        <div class="mark">⏳</div>
+        <div class="cta">SHOP NOW</div>
+      </div>
+      <div class="earn"><span class="val">$90</span><small>TIRED · 25%</small></div>
+    </div>
+  </div>
+
+  <div class="hand">
+    <div class="hcard"></div><div class="hcard"></div><div class="hcard"></div><div class="hcard"></div>
+  </div>
+
+</div>
+
+<script>
+// THE SETTLE PASS — one card at a time, left to right, calm.
+// No streams. Each pass: spotlight a card, float its earnings, tick its
+// counter, move on. The whole screen is otherwise still.
+const plays = [...document.querySelectorAll('.play')];
+const weights = [0.5, 0.33, 0.17]; // the tired card earns less
+let rev = 612, spend = 483;
+
+function settle(i){
+  const p = plays[i];
+  const gain = [45, 45, 45][i] * (Math.random() < weights[i] * 1.6 ? 1 : 0);
+  p.classList.add('settle');
+  if (gain) {
+    rev += gain;
+    const v = p.querySelector('.val');
+    v.textContent = '$' + (parseInt(v.textContent.slice(1)) + gain);
+  } else {
+    p.querySelector('.float').style.visibility = 'hidden';
+  }
+  setTimeout(() => {
+    p.classList.remove('settle');
+    p.querySelector('.float').style.visibility = '';
+    if (i + 1 < plays.length) setTimeout(() => settle(i + 1), 350);
+    else {
+      spend += 14;
+      document.getElementById('roas').textContent = (rev / spend).toFixed(2);
+      document.getElementById('goalfill').style.width = Math.min(96, rev / 1160 * 100) + '%';
+    }
+  }, 1000);
+}
+setInterval(() => settle(0), 4600);
+setTimeout(() => settle(0), 800);
+</script>
+</body>
+</html>

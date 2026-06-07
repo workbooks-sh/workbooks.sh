@@ -1,0 +1,161 @@
+#+TITLE: AdBuy — Device Spike Ledger
+#+DATE: 2026-06-06
+
+* Floor device + deployment baseline
+
+** Decision: floor device
+
+iPhone SE 3rd gen (2022) — A15 Bionic, 60 Hz LCD, 4.7″.
+
+Rationale: youngest cheap iPhone still on active sale, A15 handles Vite SPA +
+245 KB WASM easily, 60 Hz is the honest cage because 40–50% of our install base
+will never see ProMotion. Everything must feel good here first.
+
+** iOS deployment target
+
+Current xcodeproj: =IPHONEOS_DEPLOYMENT_TARGET = 15.0=. Capacitor 8 minimum is
+*iOS 16.0* (breaking change from Cap 7). The xcodeproj value is stale from the
+initial scaffold and must be bumped.
+
+*Required change:* set =IPHONEOS_DEPLOYMENT_TARGET = 16.0= in
+=ios/App/App.xcodeproj/project.pbxproj= (three occurrences) and in the Podfile
+platform line.
+
+** TARGETED_DEVICE_FAMILY
+
+Current: ="1,2"= (iPhone + iPad). AdBuy is a portrait phone game; iPad is out
+of scope.
+
+*Required change:* set ="1"= (iPhone only) — removes iPad from submission
+targets, simplifies layout assumptions, shrinks App Store review surface.
+
+* ProMotion / 120 Hz
+
+** Mechanism
+
+iOS 15.4+ enables high-refresh-rate rendering inside WKWebView automatically —
+no Capacitor plugin, no private API. =requestAnimationFrame= fires at 120 Hz on
+ProMotion devices running ≥ 15.4. CSS animations and Web Animations API also
+benefit automatically.
+
+** capacitor-high-refresh-rate audit
+
+No package by that name exists on npm (confirmed 2026-06-06). The referenced
+mechanism is the iOS 15.4+ WKWebView change, which is public API, zero App
+Review risk. No plugin needed; no plugin to ship.
+
+** 60 Hz fallback
+
+iPhone SE 3 (floor) is 60 Hz. All animation specs must be authored at 16.67 ms
+frame time and tested there first. ProMotion smoothness is a progressive
+enhancement, not a baseline promise.
+
+*Feel spec at 60 Hz:* card lift = 120 ms transform (2 frames feel-margin),
+queue-settle = 200 ms, stamp drop = 80 ms. No jank at 16.67 ms cadence is
+the shipped bar.
+
+* Drag-follow latency
+
+** What to measure
+
+Target: pointer-down → visual transform ≤ 1 frame (≤ 16.67 ms at 60 Hz,
+≤ 8.33 ms at 120 Hz). This is NOT CSS fps — it is input-event→paint latency.
+
+Measurement: ChromeDevTools "Frame Timing" trace in Capacitor live-reload on
+device. Look for "InputLatency::TouchStart" to first paint commit.
+
+** Known floor
+
+iOS touch events delivered at up to 240 Hz on ProMotion hardware, but DOM
+=touchmove= coalesced to display refresh. At 60 Hz, expect 8–16 ms
+touch→commit. Pointer capture via =setPointerCapture= reduces handler overhead;
+do NOT poll =touchmove= in a rAF loop (double-count latency).
+
+* WebAudio touch-to-sound latency
+
+** The ~12 ms bar
+
+=AudioContext.outputLatency= on modern iOS: 6–12 ms (hardware-dependent). The
+12 ms budget is the *practical* click→speaker ceiling we design to.
+
+Achievable via: =AudioBuffer= + =AudioBufferSourceNode.start()= called
+synchronously inside a =touchstart= handler that has already unlocked the
+context. No dynamic decoding in the hot path.
+
+** WKWebView unlock
+
+=AudioContext= requires a user gesture to transition from =suspended= to
+=running=. Call =AudioContext.resume()= in the first =touchstart= handler (or
+on the game's tap-to-start screen). After unlock, subsequent =start()= calls
+have no gate.
+
+iOS 14.4+: short tones (≤ 250 ms) auto-play without gesture in some contexts,
+but explicit resume is the safe path for all iOS 16+.
+
+** Latency spike on cold start
+
+First decode has JIT overhead. Pre-decode all SFX into =AudioBuffer= on the
+"tap to start" screen, not on first use. Budget: decode at init, play at zero
+latency.
+
+* WebGL context + readPixels mint
+
+** Context availability
+
+WebGL 1 + WebGL 2 available in WKWebView on iOS 15+. Context creation via
+=canvas.getContext('webgl2')= — fall back to ='webgl'= if null (SE 3 handles
+both fine).
+
+** readPixels trap
+
+=readPixels= forces a GPU→CPU sync stall (typically 1–4 ms but can spike to
+a full frame). Do NOT call it in the game loop or card animation path.
+
+If card "minting" requires a canvas snapshot, call =readPixels= in a
+=requestIdleCallback= or after a settle delay, then cache the result.
+
+Preferred mint animation: WebGL canvas overlay running a particle/shimmer
+shader driven by =requestAnimationFrame=, output composited via CSS
+=mix-blend-mode=. No readPixels needed.
+
+* Landscape cold-start / safe-area
+
+** Orientation lock
+
+Lock to portrait only via =Info.plist= key
+=UISupportedInterfaceOrientations = [UIInterfaceOrientationPortrait]=.
+Remove landscape entries. This is a phone card game; landscape is not in scope
+and complicates notch/safe-area math.
+
+** Notch safe area
+
+With portrait-only lock, the only variable is bottom home indicator bar (34 pt
+safe area on notched devices) and the Dynamic Island / notch top inset.
+
+CSS: use =env(safe-area-inset-*)= on the outer =.device= container. Already
+present in =app/_device.css=; confirm it applies to all four edges in portrait.
+
+** Cold-start splash
+
+LaunchScreen.storyboard must specify portrait orientation only. Center the
+AdBuy mark on a solid =--paper= background. Do not embed the logo as a
+multi-scale PNG — use a vector or a single @3x asset.
+
+* Action items
+
+- [ ] Bump =IPHONEOS_DEPLOYMENT_TARGET= from 15.0 → 16.0 in xcodeproj + Podfile
+- [ ] Set =TARGETED_DEVICE_FAMILY = "1"= (drop iPad target)
+- [ ] Lock orientation to portrait in Info.plist
+- [ ] Audit =app/_device.css= safe-area insets cover all four edges
+- [ ] Pre-decode all SFX AudioBuffers at game start (prerequisite for wb-epjh.18)
+- [ ] Profile drag-follow latency on SE 3 simulator before shipping ceremony kernel
+- [ ] No capacitor-high-refresh-rate plugin to install — document it as a non-issue
+
+* Decision log
+
+| Date       | Decision                                    | Rationale                                |
+|------------|---------------------------------------------|------------------------------------------|
+| 2026-06-06 | Floor = iPhone SE 3 (A15, 60 Hz, iOS 16)   | Cheapest current-gen, honest 60 Hz floor |
+| 2026-06-06 | TARGETED_DEVICE_FAMILY = "1"                | Phone-only game; iPad scope not open     |
+| 2026-06-06 | No high-refresh-rate plugin needed          | iOS 15.4+ WKWebView handles it natively  |
+| 2026-06-06 | Deployment target = iOS 16                  | Capacitor 8 minimum; SE 3 ships on 16   |

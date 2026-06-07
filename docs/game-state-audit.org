@@ -1,0 +1,85 @@
+#+TITLE: AdBuy — Game State Audit
+#+DATE: 2026-06-06
+
+* Purpose
+
+Snapshot of what is implemented vs. what the Phase 1 gate requires.
+Gate: strangers play one wave on a phone, unprompted "one more" is observable,
+wave completes in ≤6 min median excluding the Newsstand exit ramp.
+
+* Status by system
+
+** ✅ DONE — simulation core
+
+- =sim-rs/= Rust WASM sim — all five bespoke systems present:
+  - Live sim: 10Hz integer-state seeded substreams via =wave.rs=
+  - Ceremony queue: bell + autopsy events from =end_day=; blocking JS reveals
+  - Significance engine: sequential test in =significance.rs= + ledger field notes
+  - Diagnosis engine: 6-case rule table in =diagnosis.rs=; guess-first via DIAGNOSE chip
+  - Market director: seeded drama-curve event table in =director.rs=
+- Fatigue: =fatigue.rs= wear tracking → FRESH / CREATIVE LIMITED / CREATIVE FATIGUE
+- Codex: cross-run pattern tracker in =ledger.rs=; observed/confirmed counts live
+- Economy: pack opening (auto at wave end when bank > $700), collection, IP accrual
+- 12-card demo_pack, 2 lanes (cold/warm), 2 clients (Copper & Char, Tundra Boots)
+- 3-wave per client × 2 clients run structure; FIRED / RUN_WON terminal states
+
+** ✅ DONE — UI / game loop
+
+- Build → Flight → Autopsy → Newsstand wave cycle (fully playable)
+- AP budget (3/day), spend floor ($600/week), fee on pass, trust pip burn on miss
+- Ad card render: live metrics, fatigue chip, killed state, Called/Leader chips
+- Night ceremony: per-ad focus beat, revenue tick-up, bell stamp
+- Close screen: verdict, ROAS (color-coded), call verdict, codex stats, pack cards, collection size
+- PIN IT A/B picker (HOOK metric, predicts A or B wins)
+- CALL IT A/B picker (flight day ≥2, records winner prediction)
+- DIAGNOSE: tap to reveal 6-case diagnosis on ad with ≥2k impressions
+- Strategist proposals (Maya) with confidence and track record
+- Pack-reveal on close screen: last 3 opened card names (human-readable labels)
+- Keyboard shortcuts: n/b/p/Escape
+- Save/load via =@capacitor/filesystem=
+- Style cycling (7 art directions)
+
+** ✅ DONE — Newsstand ceremony (wb-epjh.200, 2026-06-06)
+
+Newsstand now shows a staggered card-by-card reveal with deal sounds. Header
+changed to two-line "Wave N complete / N cards unlocked". "Begin wave N+1 →"
+button is hidden until all cards have revealed + 500ms beat, then fades in.
+
+** ✅ DONE — Wave-2 brief preview (wb-epjh.201, 2026-06-06)
+
+Close screen nextup row now shows for ALL passed waves (not just NEWSSTAND state).
+Fatigue chip names the concept ("FOMO × Cinematic fatigued" vs "A fatigued").
+
+** ⚠️ PARTIAL — Newsstand / shop (Phase 2 deferred)
+
+Auto-buy flow is in place. Shop layout (2 singles + 2 packs + permanent-upgrade
+slots) is deferred to Phase 2.
+
+** ❌ / ⚠️ PARTIAL — Phase 1 hard requirements
+
+| Gap | Blocking Phase 1 gate? | Notes |
+|-----|------------------------|-------|
+| Newsstand pack-rip ceremony | ✅ DONE (wb-epjh.200) | Stagger reveal + CTA holds until done |
+| Wave-2 brief preview before commit | ✅ DONE (wb-epjh.201) | nextup for all passed waves; named fatigue chip |
+| Newsstand shop layout | No (deferred Phase 2) | Auto-buy acceptable |
+| Cold open / onboarding script | No (Phase 3) | First 10-min script deferred |
+| Content beyond demo_pack | No | ✅ 12 cards present |
+| Dot funnel spectacle | No | JS funnel stats satisfy v1 floor |
+
+** ✅ DONE — code health (wb-epjh.202, 2026-06-06)
+
+- =dashboard.js= 438 LOC ✓ (was 496; runNight+nightChyron extracted to night.js)
+- =night.js= 123 LOC ✓
+- =week.js= 178 LOC ✓
+- =cards.js= 20 LOC ✓
+- =game.rs= 460 LOC ✓
+- =wasm.rs= 460 LOC ✓
+- =economy.rs= 498 LOC ⚠️ (approaching 500 cap; split before next sim feature)
+- Remaining sim-rs files all under 500 ✓
+
+* Phase 1 remaining work
+
+All three original priority items done. Remaining:
+- =economy.rs= split (before next sim feature touches it)
+- Copy sweep: any remaining ad-industry jargon in player-visible text
+- Playtest gap discovery (wb-epjh.24 — needs TestFlight)

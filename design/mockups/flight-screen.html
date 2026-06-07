@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — Flight Screen · Late-Night Cable</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+:root{
+  --ink:#0b0918;
+  --deep:#14112b;
+  --panel:#1d1940;
+  --panel2:#241f4e;
+  --line:#3a3470;
+  --magenta:#ec40a8;
+  --cyan:#5af5ee;
+  --amber:#ffb938;
+  --green:#4ef08a;
+  --red:#ff4655;
+  --text:#d6d6f2;
+  --dim:#8584b4;
+  --glow-c:rgba(90,245,238,.55);
+  --glow-m:rgba(236,64,168,.5);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:none}
+html,body{height:100%}
+body{
+  background:#060510;
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% -10%, #161232 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 34px, rgba(255,255,255,.012) 34px 35px);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;color:var(--text);
+  min-height:100vh;padding:24px 0;
+}
+
+/* ---------- the monitor ---------- */
+.set{position:relative}
+.bezel{
+  background:linear-gradient(160deg,#23203a,#0e0c1c 60%);
+  border-radius:34px;padding:14px;
+  box-shadow:0 40px 90px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.screen{
+  position:relative;width:390px;height:780px;overflow:hidden;
+  background:
+    radial-gradient(140% 100% at 50% 0%, #1c1840 0%, var(--ink) 70%);
+  border-radius:22px;
+  display:flex;flex-direction:column;
+  box-shadow:inset 0 0 60px rgba(0,0,0,.55);
+}
+/* CRT: scanlines + vignette + breathing phosphor */
+.screen::before{
+  content:"";position:absolute;inset:0;z-index:50;pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(8,6,20,.22) 0 1px, transparent 1px 3px);
+  mix-blend-mode:multiply;
+}
+.screen::after{
+  content:"";position:absolute;inset:0;z-index:51;pointer-events:none;
+  background:radial-gradient(120% 95% at 50% 45%, transparent 55%, rgba(4,2,14,.55) 100%);
+  animation:breathe 7s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:.9}50%{opacity:1}}
+
+/* ---------- top status strip ---------- */
+.strip{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 14px 8px;
+  font-family:'Silkscreen',monospace;font-size:9px;letter-spacing:.4px;
+}
+.onair{
+  display:flex;align-items:center;gap:6px;
+  background:#2a0f1e;border:1px solid var(--red);
+  color:#ff97a3;border-radius:3px;padding:4px 8px;
+}
+.onair .lamp{
+  width:7px;height:7px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 8px var(--red), 0 0 16px rgba(255,70,85,.6);
+  animation:lamp 1.6s ease-in-out infinite;
+}
+@keyframes lamp{0%,100%{opacity:1}50%{opacity:.35}}
+.client{color:var(--dim)}
+.client b{color:var(--text);font-weight:400}
+.pips{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--dim)}
+.pip{width:9px;height:13px;border:1px solid var(--line);border-radius:2px;background:linear-gradient(180deg,var(--cyan),#1e8f8a)}
+.pip.spent{background:#161330}
+
+.dayrow{
+  display:flex;align-items:center;gap:10px;
+  padding:2px 14px 10px;font-size:10px;color:var(--dim);
+}
+.daylabel{font-family:'Silkscreen',monospace;font-size:9px;color:var(--amber)}
+.dayticks{display:flex;gap:3px;flex:1}
+.tick{height:5px;flex:1;background:#262152;border-radius:1px;overflow:hidden;position:relative}
+.tick.done{background:linear-gradient(90deg,var(--amber),#c97f12)}
+.tick.live::after{
+  content:"";position:absolute;inset:0;background:var(--amber);
+  transform-origin:left;animation:fillday 36s linear infinite;
+}
+@keyframes fillday{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.tc{font-size:10px;color:#56548a;font-variant-numeric:tabular-nums}
+
+/* ---------- hero monitor ---------- */
+.hero{
+  margin:2px 12px 10px;position:relative;
+  background:linear-gradient(180deg,var(--panel) 0%,#171336 100%);
+  border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px 12px;overflow:hidden;
+}
+.hero::before{ /* phosphor sheen sweep */
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(115deg, transparent 30%, rgba(90,245,238,.05) 45%, transparent 60%);
+  animation:sweep 9s linear infinite;
+}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.hero .tag{font-family:'Silkscreen',monospace;font-size:8px;color:var(--dim);letter-spacing:1px}
+.roas{
+  font-family:'VT323',monospace;font-size:86px;line-height:.9;
+  color:var(--cyan);
+  text-shadow:0 0 14px var(--glow-c), 2px 0 0 rgba(236,64,168,.28), -2px 0 0 rgba(90,245,238,.28);
+  font-variant-numeric:tabular-nums;
+  display:flex;align-items:baseline;gap:10px;
+}
+.roas small{font-size:26px;color:var(--dim);text-shadow:none;font-family:'Silkscreen',monospace}
+.target{
+  margin-top:6px;height:14px;background:#13102c;border:1px solid var(--line);
+  border-radius:3px;position:relative;overflow:hidden;
+}
+.target .fill{
+  position:absolute;inset:1px auto 1px 1px;width:52%;
+  background:repeating-linear-gradient(90deg,var(--cyan) 0 6px, #2bb5af 6px 8px);
+  box-shadow:0 0 10px var(--glow-c);border-radius:2px;
+  transition:width .4s steps(8);
+}
+.target .mark{
+  position:absolute;top:-3px;bottom:-3px;left:78%;width:2px;background:var(--amber);
+  box-shadow:0 0 6px rgba(255,185,56,.8);
+}
+.heromicro{
+  display:flex;justify-content:space-between;margin-top:7px;
+  font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums;
+}
+.heromicro b{color:var(--text);font-weight:600}
+.toast{
+  position:absolute;right:14px;top:12px;
+  font-family:'Silkscreen',monospace;font-size:10px;color:var(--green);
+  text-shadow:0 0 10px rgba(78,240,138,.7);
+  opacity:0;transform:translateY(6px);
+}
+.toast.pop{animation:toast 1.4s ease-out}
+@keyframes toast{
+  0%{opacity:0;transform:translateY(8px) scale(.8)}
+  18%{opacity:1;transform:translateY(0) scale(1.15)}
+  30%{transform:scale(1)}
+  75%{opacity:1}
+  100%{opacity:0;transform:translateY(-10px)}
+}
+
+/* ---------- funnel monitor ---------- */
+.mon{
+  margin:0 12px 10px;background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;
+}
+.monhead{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-family:'Silkscreen',monospace;font-size:8px;letter-spacing:1px;
+  color:var(--dim);margin-bottom:9px;
+}
+.monhead .lane{color:var(--magenta)}
+.gate{display:grid;grid-template-columns:44px 1fr 64px;gap:8px;align-items:center;margin:7px 0}
+.gate .glabel{font-family:'Silkscreen',monospace;font-size:9px;color:var(--text)}
+.gauge{height:13px;background:#13102c;border:1px solid #2c2758;border-radius:2px;position:relative;overflow:hidden}
+.gauge .bar{
+  position:absolute;inset:1px auto 1px 1px;border-radius:1px;
+  background:repeating-linear-gradient(90deg, var(--cyan) 0 5px, rgba(90,245,238,.45) 5px 7px);
+  box-shadow:0 0 8px var(--glow-c);
+  transition:width .5s steps(10);
+}
+.gate .gval{font-size:11px;text-align:right;color:var(--cyan);font-variant-numeric:tabular-nums}
+.gate .gval span{color:var(--dim);font-size:9px;display:block}
+.gate.warn .bar{background:repeating-linear-gradient(90deg,var(--amber) 0 5px, rgba(255,185,56,.45) 5px 7px);box-shadow:0 0 8px rgba(255,185,56,.5)}
+.gate.warn .gval{color:var(--amber)}
+.calib{position:relative}
+.calib .veil{
+  position:absolute;inset:0;border-radius:2px;
+  background:repeating-linear-gradient(90deg, rgba(133,132,180,.35) 0 7px, transparent 7px 11px);
+  animation:static .35s steps(2) infinite;
+}
+@keyframes static{0%{transform:translateX(0)}100%{transform:translateX(-7px)}}
+.calnote{font-size:8px;color:var(--dim);font-family:'Silkscreen',monospace}
+
+/* ---------- ad slots + race ---------- */
+.slots{margin:0 12px 10px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slot{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:9px;display:flex;gap:9px;align-items:center;
+}
+.minicard{
+  width:46px;height:62px;border-radius:5px;flex:none;position:relative;
+  background:linear-gradient(180deg,#322d62 12%, #262152 30%, #1c1840 75%, #173a2e 88%);
+  border:2px solid var(--magenta);
+  box-shadow:0 4px 10px rgba(0,0,0,.5), 0 0 10px rgba(236,64,168,.25);
+}
+.minicard.foil::after{
+  content:"";position:absolute;inset:0;border-radius:3px;
+  background:linear-gradient(115deg, transparent 30%, rgba(90,245,238,.35) 46%, rgba(236,64,168,.3) 54%, transparent 70%);
+  background-size:300% 100%;
+  animation:foil 3.5s ease-in-out infinite;
+}
+@keyframes foil{0%,100%{background-position:110% 0}50%{background-position:-10% 0}}
+.minicard.tired{filter:saturate(.45) brightness(.8)}
+.minicard.tired::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 2px, transparent 2px 5px);
+  animation:tracking 1.2s steps(4) infinite;
+}
+@keyframes tracking{0%{transform:translateY(0)}100%{transform:translateY(5px)}}
+.slotinfo{min-width:0;flex:1}
+.adname{font-family:'Silkscreen',monospace;font-size:8px;line-height:1.5;color:var(--text)}
+.adstat{font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:2px}
+.adstat b{color:var(--cyan);font-weight:600}
+.badge{
+  display:inline-block;margin-top:5px;font-family:'Silkscreen',monospace;font-size:7px;
+  padding:2px 5px;border-radius:2px;letter-spacing:.5px;
+}
+.badge.lead{background:rgba(90,245,238,.12);color:var(--cyan);border:1px solid rgba(90,245,238,.4)}
+.badge.limited{
+  background:rgba(255,185,56,.1);color:var(--amber);border:1px solid rgba(255,185,56,.45);
+  animation:blink 2.4s steps(2) infinite;
+}
+@keyframes blink{50%{opacity:.55}}
+
+.race{
+  margin:0 12px 10px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px 11px;
+}
+.racehead{display:flex;justify-content:space-between;font-family:'Silkscreen',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:7px}
+.racehead .call{color:var(--magenta)}
+.tug{height:15px;border:1px solid #2c2758;border-radius:3px;background:#13102c;position:relative;overflow:visible}
+.tug .lane-a{position:absolute;inset:1px 50% 1px 1px;background:linear-gradient(90deg,rgba(90,245,238,.12),rgba(90,245,238,.4));border-radius:2px}
+.tug .lane-b{position:absolute;inset:1px 1px 1px 50%;background:linear-gradient(90deg,rgba(236,64,168,.4),rgba(236,64,168,.12));border-radius:2px}
+.tug .needle{
+  position:absolute;top:-5px;bottom:-5px;width:3px;left:38%;
+  background:#fff;box-shadow:0 0 9px rgba(255,255,255,.8);
+  transition:left .6s cubic-bezier(.34,1.56,.64,1);
+}
+.tug .bellzone{
+  position:absolute;top:-2px;bottom:-2px;left:12%;width:3px;
+  border-left:2px dashed rgba(255,185,56,.6);
+}
+.racefoot{display:flex;justify-content:space-between;margin-top:7px;font-size:9.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.racefoot .bell{color:var(--amber);font-family:'Silkscreen',monospace;font-size:8px}
+
+/* ---------- chyron ---------- */
+.chyron{
+  margin:auto 0 0;position:relative;
+  background:linear-gradient(180deg,#241f4e,#191542);
+  border-top:2px solid var(--magenta);
+  box-shadow:0 -6px 18px rgba(236,64,168,.12);
+  overflow:hidden;height:34px;display:flex;align-items:center;
+}
+.chyron .feedlabel{
+  flex:none;z-index:2;height:100%;display:flex;align-items:center;
+  background:var(--magenta);color:#1c0717;font-family:'Silkscreen',monospace;
+  font-size:8px;padding:0 9px;letter-spacing:1px;
+}
+.marquee{white-space:nowrap;display:inline-block;animation:marquee 26s linear infinite;font-size:11px;color:var(--text)}
+.marquee b{color:var(--amber)}.marquee i{color:var(--cyan);font-style:normal}
+@keyframes marquee{from{transform:translateX(20%)}to{transform:translateX(-100%)}}
+
+/* ---------- verb dock ---------- */
+.dock{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:7px;
+  padding:11px 12px 7px;background:#100d26;
+}
+.verb{
+  font-family:'Silkscreen',monospace;font-size:8px;letter-spacing:.3px;
+  color:var(--text);background:linear-gradient(180deg,#2c2660,#1d1944);
+  border:1px solid var(--line);border-bottom:3px solid #0a081c;
+  border-radius:6px;padding:9px 2px 7px;text-align:center;cursor:pointer;
+  user-select:none;-webkit-user-select:none;transition:transform .06s;
+}
+.verb:active{transform:translateY(2px);border-bottom-width:1px}
+.verb small{display:block;margin-top:3px;font-size:7px;color:var(--dim)}
+.verb.free small{color:var(--green)}
+.verb.kill{border-color:#5c3a4c}.verb.kill:active{background:#3a1f33}
+.tokens{
+  display:flex;justify-content:center;gap:6px;padding:4px 0 12px;
+  background:#100d26;font-size:13px;color:var(--cyan);
+}
+.tokens .spent{color:#2c2758}
+.hint{
+  background:#100d26;text-align:center;padding:0 0 12px;
+  font-family:'Silkscreen',monospace;font-size:7px;color:#56548a;letter-spacing:1px;
+}
+
+@media (max-width:520px){
+  body{padding:0}
+  .bezel{padding:0;border-radius:0;box-shadow:none}
+  .screen{width:100vw;height:100vh;height:100dvh;border-radius:0}
+}
+</style>
+</head>
+<body>
+<div class="set">
+<div class="bezel">
+<div class="screen">
+
+  <div class="strip">
+    <div class="onair"><span class="lamp"></span>ON AIR</div>
+    <div class="client"><b>COPPER &amp; CHAR</b> · WAVE 2/3</div>
+    <div class="pips">PIPS <span class="pip"></span><span class="pip"></span><span class="pip spent"></span></div>
+  </div>
+
+  <div class="dayrow">
+    <span class="daylabel">DAY 3/5</span>
+    <div class="dayticks">
+      <div class="tick done"></div><div class="tick done"></div>
+      <div class="tick live"></div><div class="tick"></div><div class="tick"></div>
+    </div>
+    <span class="tc" id="tc">TC 02:14:09:00</span>
+  </div>
+
+  <div class="hero">
+    <div class="tag">ACCOUNT MONITOR — RETURN ON AD SPEND</div>
+    <div class="roas"><span id="roas">1.27</span><small>ROAS</small></div>
+    <div class="target"><div class="fill" id="revfill"></div><div class="mark"></div></div>
+    <div class="heromicro">
+      <span>REV <b id="rev">$612</b> / $1,160</span>
+      <span>SPEND <b id="spend">$483</b></span>
+      <span>CPM <b>$12.40</b></span>
+    </div>
+    <div class="toast" id="toast">+$45 CONVERT</div>
+  </div>
+
+  <div class="mon">
+    <div class="monhead"><span>FUNNEL GATES</span><span class="lane">LANE: COLD · PROBLEM-AWARE</span></div>
+    <div class="gate">
+      <span class="glabel">HOOK</span>
+      <div class="gauge"><div class="bar" style="width:71%"></div></div>
+      <span class="gval" id="hook">28.4%<span>9,212 stops</span></span>
+    </div>
+    <div class="gate">
+      <span class="glabel">HOLD</span>
+      <div class="gauge"><div class="bar" style="width:56%"></div></div>
+      <span class="gval">44.7%<span>4,118 held</span></span>
+    </div>
+    <div class="gate warn">
+      <span class="glabel">CTR</span>
+      <div class="gauge"><div class="bar" style="width:33%"></div></div>
+      <span class="gval">1.94%<span>714 clicks</span></span>
+    </div>
+    <div class="gate">
+      <span class="glabel">CVR</span>
+      <div class="gauge calib"><div class="bar" style="width:38%"></div><div class="veil"></div></div>
+      <span class="gval"><span class="calnote">CALIBRATING 7/10</span></span>
+    </div>
+  </div>
+
+  <div class="slots">
+    <div class="slot">
+      <div class="minicard foil"></div>
+      <div class="slotinfo">
+        <div class="adname">PAIN POINT<br>× UGC SELFIE</div>
+        <div class="adstat">HOOK <b>31.2%</b></div>
+        <span class="badge lead">A · LEADER</span>
+      </div>
+    </div>
+    <div class="slot">
+      <div class="minicard tired"></div>
+      <div class="slotinfo">
+        <div class="adname">FOMO DROP<br>× CINEMATIC</div>
+        <div class="adstat">HOOK <b>24.8%</b></div>
+        <span class="badge limited">CREATIVE LIMITED</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="race">
+    <div class="racehead"><span>A/B RACE — HOOK</span><span class="call">YOUR CALL: A</span></div>
+    <div class="tug">
+      <div class="lane-a"></div><div class="lane-b"></div>
+      <div class="bellzone"></div>
+      <div class="needle" id="needle"></div>
+    </div>
+    <div class="racefoot">
+      <span class="bell">🔔 BELL AT z 2.81</span>
+      <span id="racen">n=1,847 · z=1.92</span>
+    </div>
+  </div>
+
+  <div class="chyron">
+    <div class="feedlabel">FEED</div>
+    <div class="marquee">
+      &nbsp;◆ DAY 2 CLOSE — REV $401 ▲ &nbsp;&nbsp;◆ <b>CPM SPIKE INBOUND — 0:12</b> &nbsp;&nbsp;◆ <i>MAYA:</i> "urgency reads tired on COLD — swap the hook" &nbsp;&nbsp;◆ AD B FREQUENCY 2.7 — WEAR SHOWING &nbsp;&nbsp;◆ BENCH: race resumes with carried n &nbsp;&nbsp;◆ DAY 2 CLOSE — REV $401 ▲ &nbsp;&nbsp;◆ <b>CPM SPIKE INBOUND — 0:12</b>
+    </div>
+  </div>
+
+  <div class="dock">
+    <div class="verb kill">KILL<small class="free">FREE</small></div>
+    <div class="verb">BOOST<small>⬡ 1</small></div>
+    <div class="verb">SWAP<small>⬡ 1</small></div>
+    <div class="verb">CALL IT<small class="free">FREE</small></div>
+    <div class="verb">DIAGNOSE<small class="free">1ST FREE</small></div>
+  </div>
+  <div class="tokens">⬡ ⬡ ⬡ <span class="spent">⬡</span></div>
+  <div class="hint">TAP A CARD TO INSPECT — DRAG TO COMMIT — PAUSE IS FREE</div>
+
+</div>
+</div>
+</div>
+
+<script>
+// light theater so the feel reads — numbers drift honestly upward
+let rev = 612, spend = 483, frames = 0, n = 1847, z = 1.92;
+const $ = id => document.getElementById(id);
+
+setInterval(() => { // timecode, 12fps feel
+  frames = (frames + 3) % 30;
+  const s = 9 + Math.floor(frames / 30);
+  $('tc').textContent = `TC 02:14:${String(s).padStart(2,'0')}:${String(frames).padStart(2,'0')}`;
+}, 250);
+
+setInterval(() => { // spend ticks steadily; revenue arrives lumpy
+  spend += 0.9 + Math.random() * 0.6;
+  if (Math.random() < 0.22) {
+    rev += 45;
+    const t = $('toast');
+    t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop');
+  }
+  $('spend').textContent = '$' + Math.floor(spend);
+  $('rev').textContent = '$' + Math.floor(rev);
+  $('roas').textContent = (rev / spend).toFixed(2);
+  $('revfill').style.width = Math.min(96, rev / 1160 * 100) + '%';
+}, 900);
+
+setInterval(() => { // the race wobbles its way toward the bell
+  n += 40 + Math.floor(Math.random() * 30);
+  z += (Math.random() - 0.42) * 0.18;
+  z = Math.max(0.4, Math.min(2.7, z));
+  $('racen').textContent = `n=${n.toLocaleString()} · z=${z.toFixed(2)}`;
+  $('needle').style.left = (50 - z / 2.81 * 38) + '%';
+}, 1200);
+</script>
+</body>
+</html>

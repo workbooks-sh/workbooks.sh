@@ -1,0 +1,12 @@
+:root{
+  --paper:#eef1f6; --card:#fff; --line:#d8deea; --line2:#c4ccdc;
+  --ink:#1c2b4a; --dim:#7c8aa5; --blue:#3b5998; --blue2:#5872b8; --bluepale:#e9eef9;
+  --green:#3fa15f; --greenpale:#e4f4e9; --amber:#d98e04; --amberpale:#fdf3dd;
+  --red:#d0455a; --redpale:#fbe9ec;
+  --shadow:0 2px 0 var(--line2), 0 6px 16px rgba(28,43,74,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+html,body{height:100%}
+body{background:#cfd6e2;display:flex;align-items:center;justify-content:center;
+  font-family:'Nunito Variable',sans-serif;color:var(--ink);min-height:100vh}
+.disp{font-family:'Baloo 2 Variable',cursive}

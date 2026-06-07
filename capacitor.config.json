@@ -1,0 +1,21 @@
+{
+  "appId": "com.workbooks.adbuy",
+  "appName": "AdBuy",
+  "webDir": "app",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#eef1f6",
+    "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#eef1f6",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DEFAULT"
+    },
+    "Haptics": {}
+  }
+}

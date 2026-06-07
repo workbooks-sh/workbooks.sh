@@ -1,0 +1,16 @@
+node_modules/
+**/node_modules/
+_build/
+deps/
+target/
+dist/
+.next/
+.svelte-kit/
+.cache/
+.wrangler/
+*.beam
+erl_crash.dump
+.env
+.env.local
+**/workbook.local.json
+.DS_Store

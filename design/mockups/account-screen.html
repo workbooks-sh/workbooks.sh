@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — Account · round 3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap');
+
+:root{
+  --bg:#0b0b0e;
+  --surface:#17171c;
+  --surface2:#1f1f26;
+  --line:#2a2a33;
+  --text:#f5f5f7;
+  --dim:#9898a4;
+  --aqua:#2ee6d6;
+  --coral:#fe4d63;
+  --green:#3ddc84;
+  --amber:#ffb938;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:#000;display:flex;align-items:center;justify-content:center;
+  font-family:'Instrument Sans',sans-serif;color:var(--text);min-height:100vh;
+}
+.phone{
+  width:390px;height:820px;background:var(--bg);border-radius:40px;
+  overflow:hidden;position:relative;display:flex;flex-direction:column;
+  box-shadow:0 30px 90px rgba(0,0,0,.8), 0 0 0 10px #141418, 0 0 0 11px #26262e;
+}
+@media (max-width:520px){
+  body{background:var(--bg)}
+  .phone{width:100vw;height:100vh;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* ---------- header: the ACCOUNT (client) ---------- */
+.top{padding:50px 20px 0}
+.brandrow{display:flex;align-items:center;gap:12px}
+.avatar{
+  width:44px;height:44px;border-radius:14px;flex:none;
+  background:linear-gradient(135deg,#ff8a5c,#fe4d63);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:16px;color:#fff;
+}
+.brand h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.brand p{font-size:12.5px;color:var(--dim);margin-top:1px}
+.live{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:var(--coral);
+  background:rgba(254,77,99,.1);border:1px solid rgba(254,77,99,.25);
+  padding:6px 11px;border-radius:99px;
+}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--coral);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+/* hero: one number that matters */
+.hero{display:flex;align-items:flex-end;gap:18px;padding:22px 0 6px}
+.hero .big{font-size:54px;font-weight:700;letter-spacing:-2.5px;line-height:1;font-variant-numeric:tabular-nums}
+.hero .big span{color:var(--aqua)}
+.hero .meta{padding-bottom:7px}
+.hero .meta b{display:block;font-size:13px;font-weight:600;color:var(--dim)}
+.hero .meta em{font-style:normal;font-size:13px;font-weight:600;color:var(--green)}
+.progress{height:6px;background:var(--surface2);border-radius:3px;margin:10px 0 0;overflow:hidden}
+.progress i{display:block;height:100%;width:53%;border-radius:3px;background:linear-gradient(90deg,var(--aqua),#1db8aa);transition:width .5s ease}
+.subrow{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);padding:8px 0 4px;font-variant-numeric:tabular-nums}
+
+/* ---------- lanes = campaigns; ads live inside ---------- */
+.lanes{flex:1;overflow-y:auto;padding:6px 0 110px;scrollbar-width:none}
+.lanes::-webkit-scrollbar{display:none}
+.lane{margin-top:18px}
+.lanehead{display:flex;align-items:baseline;gap:8px;padding:0 20px 10px}
+.lanehead h2{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.lanehead .aud{font-size:11.5px;color:var(--dim)}
+.lanehead .count{margin-left:auto;font-size:11.5px;color:var(--dim)}
+.shelf{
+  display:flex;gap:12px;overflow-x:auto;padding:2px 20px 14px;
+  scroll-snap-type:x mandatory;scrollbar-width:none;
+}
+.shelf::-webkit-scrollbar{display:none}
+
+/* ---------- the ad card ---------- */
+.ad{
+  flex:0 0 150px;scroll-snap-align:start;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:18px;
+  overflow:hidden;transition:transform .18s ease, box-shadow .18s ease;
+  position:relative;
+}
+.ad:active{transform:scale(.97)}
+.ad.settling{
+  transform:translateY(-4px);
+  box-shadow:0 12px 30px rgba(46,230,214,.13), 0 0 0 1.5px var(--aqua);
+}
+.thumb{height:96px;position:relative;display:flex;align-items:center;justify-content:center;font-size:30px}
+.t1{background:linear-gradient(135deg,#173f3a,#0f2a27)}
+.t2{background:linear-gradient(135deg,#3a2d16,#241b0e)}
+.t3{background:linear-gradient(135deg,#3a1620,#220e14)}
+.t4{background:linear-gradient(135deg,#16303a,#0e1c22)}
+.chip{
+  position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:99px;letter-spacing:.2px;
+}
+.chip.leader{background:rgba(46,230,214,.15);color:var(--aqua)}
+.chip.learning{background:rgba(152,152,164,.15);color:var(--dim)}
+.chip.tired{background:rgba(255,185,56,.15);color:var(--amber)}
+.adbody{padding:10px 12px 12px}
+.adname{font-size:12.5px;font-weight:600;line-height:1.35;letter-spacing:-.1px}
+.adrev{display:flex;align-items:baseline;gap:6px;margin-top:8px;font-variant-numeric:tabular-nums}
+.adrev b{font-size:17px;font-weight:700}
+.adrev span{font-size:11px;color:var(--dim)}
+.gain{
+  position:absolute;top:74px;right:10px;font-size:12px;font-weight:700;color:var(--green);
+  opacity:0;pointer-events:none;
+}
+.settling .gain{animation:rise 1.1s ease-out}
+@keyframes rise{
+  0%{opacity:0;transform:translateY(6px)}
+  25%{opacity:1;transform:translateY(-2px) scale(1.15)}
+  100%{opacity:0;transform:translateY(-18px)}
+}
+.newad{
+  flex:0 0 150px;border:1.5px dashed var(--line);border-radius:18px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--dim);font-size:12.5px;font-weight:600;min-height:170px;cursor:pointer;
+}
+.newad i{
+  width:34px;height:34px;border-radius:50%;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-style:normal;
+  font-size:18px;color:var(--text);
+}
+
+/* ---------- tab bar: the app's constructs ---------- */
+.tabs{
+  position:absolute;bottom:0;left:0;right:0;z-index:5;
+  display:flex;justify-content:space-around;align-items:center;
+  padding:12px 8px calc(20px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg, rgba(11,11,14,0) 0%, var(--bg) 26%);
+}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--dim);cursor:pointer}
+.tab svg{width:23px;height:23px;stroke:var(--dim);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--text)}
+.tab.on svg{stroke:var(--aqua)}
+
+/* ---------- the click-through: ad detail sheet ---------- */
+.scrim{
+  position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:9;
+  opacity:0;pointer-events:none;transition:opacity .22s ease;
+}
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:10;
+  background:var(--surface);border-radius:26px 26px 0 0;
+  padding:10px 20px calc(26px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.25,1);
+  box-shadow:0 -16px 50px rgba(0,0,0,.55);
+}
+.open .scrim{opacity:1;pointer-events:auto}
+.open .sheet{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 16px}
+.sheethead{display:flex;align-items:center;gap:13px}
+.sheetthumb{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#173f3a,#0f2a27);display:flex;align-items:center;justify-content:center;font-size:24px}
+.sheethead h3{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.sheethead p{font-size:12.5px;color:var(--dim);margin-top:2px}
+.funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 4px}
+.stat{background:var(--surface2);border-radius:14px;padding:11px 6px;text-align:center}
+.stat b{display:block;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.3px}
+.stat.warn b{color:var(--amber)}
+.sheetnote{font-size:12.5px;color:var(--dim);line-height:1.5;padding:8px 2px 14px}
+.sheetnote b{color:var(--text);font-weight:600}
+.verbs{display:flex;gap:9px}
+.verb{
+  flex:1;text-align:center;padding:13px 0;border-radius:99px;
+  font-size:13.5px;font-weight:700;cursor:pointer;user-select:none;
+  background:var(--surface2);color:var(--text);transition:transform .1s;
+}
+.verb:active{transform:scale(.96)}
+.verb.primary{background:var(--aqua);color:#04211e}
+.verb.danger{background:rgba(254,77,99,.14);color:var(--coral)}
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <div class="top">
+    <div class="brandrow">
+      <div class="avatar">C</div>
+      <div class="brand">
+        <h1>Copper &amp; Char</h1>
+        <p>Wave 2 of 3 · Day 3 of 5</p>
+      </div>
+      <div class="live"><i></i>LIVE</div>
+    </div>
+    <div class="hero">
+      <div class="big"><span id="roas">1.27</span></div>
+      <div class="meta"><b>ROAS · target 1.45</b><em id="trend">▲ on pace</em></div>
+    </div>
+    <div class="progress"><i id="prog"></i></div>
+    <div class="subrow">
+      <span>Revenue <b style="color:var(--text)" id="rev">$612</b> of $1,160</span>
+      <span>Spend $483</span>
+    </div>
+  </div>
+
+  <div class="lanes">
+
+    <div class="lane">
+      <div class="lanehead">
+        <h2>Cold Intros</h2><span class="aud">problem-aware · 50k</span>
+        <span class="count">3 ads</span>
+      </div>
+      <div class="shelf">
+        <div class="ad" data-ad="0" onclick="openSheet()">
+          <div class="thumb t1">🍳<span class="chip leader">Leader</span><span class="gain">+$45</span></div>
+          <div class="adbody">
+            <div class="adname">Pain Point × UGC Selfie</div>
+            <div class="adrev"><b class="val">$318</b><span>revenue</span></div>
+          </div>
+        </div>
+        <div class="ad" data-ad="1" onclick="openSheet()">
+          <div class="thumb t2">🛠<span class="chip learning">Learning</span><span class="gain">+$45</span></div>
+          <div class="adbody">
+            <div class="adname">Founder Story × Demo</div>
+            <div class="adrev"><b class="val">$204</b><span>revenue</span></div>
+          </div>
+        </div>
+        <div class="ad" data-ad="2" onclick="openSheet()">
+          <div class="thumb t3">⏳<span class="chip tired">Tired</span><span class="gain">+$45</span></div>
+          <div class="adbody">
+            <div class="adname">FOMO Drop × Cinematic</div>
+            <div class="adrev"><b class="val">$90</b><span>revenue</span></div>
+          </div>
+        </div>
+        <div class="newad"><i>+</i>New ad</div>
+      </div>
+    </div>
+
+    <div class="lane">
+      <div class="lanehead">
+        <h2>Warm Retargeting</h2><span class="aud">product-aware · 40k</span>
+        <span class="count">2 ads</span>
+      </div>
+      <div class="shelf">
+        <div class="ad" data-ad="3" onclick="openSheet()">
+          <div class="thumb t4">⭐<span class="chip leader">Leader</span><span class="gain">+$45</span></div>
+          <div class="adbody">
+            <div class="adname">Social Proof × Bundle</div>
+            <div class="adrev"><b class="val">$262</b><span>revenue</span></div>
+          </div>
+        </div>
+        <div class="ad" data-ad="4" onclick="openSheet()">
+          <div class="thumb t2">🧪<span class="chip learning">Learning</span><span class="gain">+$45</span></div>
+          <div class="adbody">
+            <div class="adname">Comparison × Free Trial</div>
+            <div class="adrev"><b class="val">$138</b><span>revenue</span></div>
+          </div>
+        </div>
+        <div class="newad"><i>+</i>New ad</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tabs">
+    <div class="tab on">
+      <svg viewBox="0 0 24 24"><path d="M3 13h5v8H3zM10 7h5v14h-5zM17 3h5v18h-5z"/></svg>
+      Account
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="13" height="16" rx="2"/><path d="M19 3l2 2-9 9-3 1 1-3z"/></svg>
+      Build
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 9c1.7 0 3 1.3 3 3M16 4.5c2.5.5 4.5 2.5 5 5"/></svg>
+      Team
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2zm0 0a2 2 0 012-2h13"/></svg>
+      Codex
+    </div>
+  </div>
+
+  <div class="scrim" onclick="closeSheet()"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="sheethead">
+      <div class="sheetthumb">🍳</div>
+      <div>
+        <h3>Pain Point × UGC Selfie</h3>
+        <p>Cold Intros · flying 3 days · $186 spent</p>
+      </div>
+    </div>
+    <div class="funnel">
+      <div class="stat"><b>31%</b><span>HOOK</span></div>
+      <div class="stat"><b>46%</b><span>HOLD</span></div>
+      <div class="stat warn"><b>1.9%</b><span>CTR</span></div>
+      <div class="stat"><b>2.6%</b><span>CVR</span></div>
+    </div>
+    <p class="sheetnote">They watch but don't act — <b>CTR is the leak.</b> Maya suggests sharpening the offer before scaling.</p>
+    <div class="verbs">
+      <div class="verb danger">Kill</div>
+      <div class="verb">Iterate</div>
+      <div class="verb primary">Boost</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// the settle pass survives the redesign: one card at a time, calm
+const ads = [...document.querySelectorAll('.ad')];
+let rev = 612, spend = 483, idx = 0;
+function settle(){
+  const ad = ads[idx % ads.length];
+  ad.classList.add('settling');
+  if (Math.random() < 0.55){
+    rev += 45;
+    const v = ad.querySelector('.val');
+    v.textContent = '$' + (parseInt(v.textContent.slice(1)) + 45);
+    document.getElementById('rev').textContent = '$' + rev;
+  } else {
+    ad.querySelector('.gain').style.visibility = 'hidden';
+  }
+  setTimeout(() => {
+    ad.classList.remove('settling');
+    ad.querySelector('.gain').style.visibility = '';
+    spend += 9;
+    document.getElementById('roas').textContent = (rev/spend).toFixed(2);
+    document.getElementById('prog').style.width = Math.min(96, rev/1160*100) + '%';
+  }, 1000);
+  idx++;
+}
+setInterval(settle, 2600);
+setTimeout(settle, 700);
+
+const phone = document.getElementById('phone');
+function openSheet(){ phone.classList.add('open') }
+function closeSheet(){ phone.classList.remove('open') }
+</script>
+</body>
+</html>

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — Loop Skeleton v4</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
+:root{
+  --paper:#eef1f6; --card:#fff; --line:#d8deea; --line2:#c4ccdc;
+  --ink:#1c2b4a; --dim:#7c8aa5; --blue:#3b5998; --blue2:#5872b8; --bluepale:#e9eef9;
+  --green:#3fa15f; --greenpale:#e4f4e9; --amber:#d98e04; --amberpale:#fdf3dd;
+  --red:#d0455a; --r:14px;
+  --shadow:0 2px 0 var(--line2), 0 6px 16px rgba(28,43,74,.07);
+}
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+html,body{height:100%}
+body{background:#cfd6e2;display:flex;align-items:center;justify-content:center;
+  font-family:'Nunito',sans-serif;color:var(--ink);min-height:100vh}
+.disp{font-family:'Baloo 2',cursive}
+
+.frame{background:var(--paper);}
+
+.btn{font-family:'Baloo 2';font-weight:700;font-size:16px;border:none;cursor:pointer;
+  padding:12px 26px;border-radius:14px;color:#fff;background:var(--blue);min-height:48px;
+  box-shadow:0 3px 0 #2c4170;transition:transform .06s, box-shadow .06s}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #2c4170}
+.btn.sec{background:var(--card);color:var(--blue);box-shadow:0 3px 0 var(--line2);border:2.5px solid var(--line2)}
+.btn.sec:active{box-shadow:0 1px 0 var(--line2)}
+.screen{position:absolute;inset:0;display:none;z-index:5}
+.screen.on{display:flex}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px}
+.ch-learning{background:var(--bluepale);color:var(--blue);position:relative;overflow:hidden}
+.ch-learning::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);animation:shim 1.6s linear infinite}
+@keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.ch-leader{background:var(--greenpale);color:var(--green)}
+.ch-tired{background:var(--amberpale);color:var(--amber)}
+
+/* TITLE + SIGNING */
+#title{flex-direction:column;align-items:center;justify-content:center;gap:18px}
+#title h1{font-size:54px;font-weight:800;letter-spacing:-1px}
+#title h1 span{color:var(--blue)}
+#title p{color:var(--dim);font-weight:700;margin-top:-12px}
+#sign{align-items:center;justify-content:center;gap:34px}
+.clientcard{width:250px;background:var(--card);border-radius:18px;box-shadow:var(--shadow);
+  padding:22px;text-align:center;border:2.5px solid var(--line2)}
+.clientcard .logo{width:64px;height:64px;border-radius:18px;margin:0 auto;
+  background:linear-gradient(135deg,#ff8a5c,#d0455a);display:flex;align-items:center;
+  justify-content:center;font-size:30px;color:#fff}
+.clientcard h2{font-family:'Baloo 2';font-size:21px;font-weight:800;margin-top:12px;min-height:28px}
+.clientcard .vert{color:var(--dim);font-weight:700;font-size:12px}
+.traits{display:flex;justify-content:center;gap:5px;margin-top:9px;flex-wrap:wrap}
+.trait{font-size:9.5px;font-weight:800;padding:2.5px 8px;border-radius:99px;background:var(--bluepale);color:var(--blue)}
+.ladder{margin-top:12px;text-align:left;font-size:13px;font-weight:700}
+.ladder div{display:flex;justify-content:space-between;padding:7px 10px;border-radius:9px;margin-top:5px;background:var(--paper)}
+.ladder b{color:var(--blue)}
+.signside{max-width:280px}
+.signside h3{font-family:'Baloo 2';font-size:24px;font-weight:800;line-height:1.2}
+.signside p{color:var(--dim);font-weight:600;font-size:13.5px;margin:10px 0 18px}
+.reroll{background:none;border:none;color:var(--blue);font-weight:800;font-size:12px;cursor:pointer;margin-top:10px}
+
+/* ===================== THE DESK v4: cards own the screen ===================== */
+#desk{flex-direction:column}
+.hdr{position:relative;display:flex;align-items:center;gap:8px;padding:10px 14px 6px;flex:none}
+/* day window: Day N chips + a yellow goal day */
+.daywin{display:flex;gap:5px;align-items:center}
+.wd{text-align:center;font-size:8px;font-weight:800;color:var(--dim);
+  padding:5px 9px 4px;border-radius:9px;background:#e3e8f1;position:relative;line-height:1.2}
+.wd small{display:block;font-size:11px;font-family:'Baloo 2';font-weight:800;color:var(--ink)}
+.wd.today{background:var(--blue);color:#cdd8ef;box-shadow:0 2px 0 #2c4170}
+.wd.today small{color:#fff}
+.wd.tele small::after{content:" ⛈"}
+.wd.goalday{background:var(--amber);color:#5c3d02;cursor:pointer;box-shadow:0 2px 0 #a86e02}
+.wd.goalday small{color:#fff}
+.dwsep{font-size:9px;font-weight:800;color:var(--dim);padding:0 2px}
+/* top-center goal: ONE clean row */
+.goalcluster{position:absolute;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  padding:5px 14px;border-radius:11px;background:var(--card);box-shadow:var(--shadow)}
+.goalcluster b{font-family:'Baloo 2';font-weight:800;font-size:15px;color:var(--blue);font-variant-numeric:tabular-nums}
+.goalcluster .of{font-size:12px;font-weight:800;color:var(--dim)}
+.goalbar{width:84px;height:6px;background:var(--paper);border-radius:3px;position:relative;overflow:hidden}
+.goalbar i{display:block;height:100%;border-radius:3px;background:var(--green);width:0%;transition:width .5s}
+.goaldays{font-size:10px;font-weight:800;color:var(--dim);letter-spacing:.2px}
+/* goal modal */
+#goalmodal{position:absolute;inset:0;z-index:90;background:rgba(17,23,46,.4);display:none;align-items:center;justify-content:center}
+#goalmodal.on{display:flex}
+.gpanel{width:340px;background:var(--card);border-radius:18px;padding:18px 22px;box-shadow:0 24px 60px rgba(10,16,38,.4);
+  animation:mpop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes mpop{from{transform:scale(.86) translateY(10px);opacity:0}}
+.ghead{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.ghead h3{font-family:'Baloo 2';font-size:18px;font-weight:800}
+.gline{display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.gline span{color:var(--dim)} .gline b{font-weight:800}
+.gladder{font-size:11px;font-weight:700;color:var(--dim);margin:12px 0 16px;text-align:center}
+.grow{display:flex;justify-content:flex-end}
+.hpill{display:flex;align-items:center;gap:6px;background:var(--card);border-radius:10px;
+  box-shadow:var(--shadow);padding:5px 11px;font-size:11px;font-weight:800;color:var(--dim)}
+.hpill b{font-family:'Baloo 2';font-weight:800;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+.hpill b.money{color:var(--green)}
+.hpill b.roasv{color:var(--blue)}
+.hpill .mini{height:5px;width:54px;background:var(--paper);border-radius:3px;position:relative;overflow:visible}
+.hpill .mini i{display:block;height:100%;border-radius:3px;background:var(--green);width:0%;transition:width .5s}
+.hpill .mini em{position:absolute;top:-2px;left:80%;width:2px;height:9px;background:var(--amber);border-radius:1px}
+.pips{display:flex;gap:4px;align-items:center}
+.pip{width:11px;height:16px;border-radius:4px;background:var(--green);box-shadow:0 2px 0 #2e7847}
+.pip.spent{background:#d4dae6;box-shadow:0 2px 0 var(--line2)}
+
+/* the full-span card row — bigger 4:5 portrait cards */
+.adrow{flex:1;display:flex;gap:20px;justify-content:center;align-items:center;padding:2px 16px 18px}
+.adcard{width:248px;background:var(--card);border-radius:20px;box-shadow:0 2px 0 var(--line2), 0 5px 14px rgba(28,43,74,.10);
+  border:2.5px solid var(--line2);padding:10px;position:relative;transition:filter .4s, transform .2s}
+.adcard:hover{transform:translateY(-3px)}
+.adcard.tired{filter:saturate(.5)}
+.adcard .art{aspect-ratio:4/5;border-radius:14px;background-size:cover;background-position:center top;position:relative;
+  border:1px solid var(--line);background-color:#dfe6f1}
+.adcard .statusrow{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:5px}
+.adcard .statusrow .chip{box-shadow:0 2px 8px rgba(20,30,60,.25)}
+.adcard .abtag{display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:7px;background:var(--blue);color:#fff;font-family:'Baloo 2';font-weight:800;
+  font-size:12px;box-shadow:0 2px 0 #2c4170, 0 2px 8px rgba(20,30,60,.25)}
+.adcard .killx{position:absolute;top:-10px;right:-10px;width:26px;height:26px;border-radius:50%;
+  background:var(--red);color:#fff;font-size:13px;line-height:26px;text-align:center;
+  box-shadow:0 2px 0 #99313f;display:none;cursor:pointer;z-index:2}
+.adcard:hover .killx{display:block}
+.adcard .slots{display:flex;position:absolute;left:16px;bottom:46px}
+.adcard .ms{width:26px;height:34px;border-radius:6px;border:2px solid var(--card);background:#f4f6fb;
+  display:flex;align-items:center;justify-content:center;font-size:12px;margin-left:-7px;
+  box-shadow:0 2px 6px rgba(28,43,74,.18)}
+.adcard .ms:first-child{margin-left:0}
+.adcard .meta{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 4px 2px}
+.adcard h4{font-family:'Baloo 2';font-size:14.5px;font-weight:800;line-height:1.15}
+.adcard .rev{font-family:'Baloo 2';font-weight:800;font-size:21px;color:var(--green);font-variant-numeric:tabular-nums}
+.emptyslot{width:218px;height:248px;border:2.5px dashed var(--line2);border-radius:18px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  color:var(--dim);font-weight:800;font-size:13px;cursor:pointer;background:rgba(255,255,255,.45)}
+.emptyslot .plus{width:38px;height:38px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:17px}
+.emptyslot small{font-size:10px;color:var(--blue);font-weight:800}
+.emptyslot.passive{cursor:default;opacity:.55;background:rgba(255,255,255,.25)}
+.emptyslot.passive .plus{display:none}
+.emptyslot.passive small{color:var(--dim)}
+.emptyslot.passive i.slotmark{font-size:22px;color:var(--line2)}
+
+/* footer: the small stuff lives down here */
+.ftr{flex:none;display:flex;align-items:center;gap:9px;padding:6px 14px 12px;border-top:1px solid var(--line)}
+.ftr .styleswap{margin-left:auto}
+.ap{display:flex;gap:6px;align-items:center}
+
+/* strategist proposal badge — lives ON the thing she has a take about */
+.pbadge{position:absolute;top:-11px;right:26px;width:27px;height:27px;border-radius:50%;
+  background:var(--blue);color:#fff;border:2.5px solid var(--card);z-index:4;cursor:pointer;
+  font-family:'Baloo 2';font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 0 #2c4170, 0 4px 12px rgba(28,43,74,.25)}
+.pbadge::after{content:"";position:absolute;inset:-7px;border-radius:50%;
+  border:2.5px solid var(--blue);opacity:0;animation:ping 2.4s ease-out infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.7}70%{transform:scale(1.15);opacity:0}100%{opacity:0}}
+.pbadge.read::after{display:none}
+.pbadge.read{opacity:.75}
+
+/* the strategist modal */
+#pmodal{position:absolute;inset:0;z-index:90;background:rgba(17,23,46,.45);
+  display:none;align-items:center;justify-content:center}
+#pmodal.on{display:flex}
+.mpanel{width:360px;background:var(--card);border-radius:18px;padding:18px 20px;
+  box-shadow:0 24px 60px rgba(10,16,38,.4);animation:mpop .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes mpop{from{transform:scale(.85) translateY(12px);opacity:0}}
+.mhead{display:flex;align-items:center;gap:11px}
+.mface{width:44px;height:44px;border-radius:14px;background:var(--bluepale);
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+.mhead h3{font-family:'Baloo 2';font-size:17px;font-weight:800}
+.mhead .role{font-size:11px;font-weight:700;color:var(--dim)}
+.mconf{margin-left:auto;font-size:10px;font-weight:800;color:var(--amber);
+  background:var(--amberpale);padding:3px 9px;border-radius:99px;white-space:nowrap}
+.mbody{font-size:13.5px;font-weight:600;line-height:1.55;margin:13px 2px 16px}
+.mtrack{font-size:10.5px;font-weight:800;color:var(--dim);margin-bottom:14px}
+.mtrack b{color:var(--blue)}
+.mrow{display:flex;gap:9px;justify-content:flex-end}
+.apdot{width:14px;height:14px;border-radius:7px;background:var(--blue);box-shadow:0 2px 0 #2c4170;transform:rotate(45deg)}
+.apdot.spent{background:#d4dae6;box-shadow:0 2px 0 var(--line2)}
+.apdot.refill{animation:refill .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes refill{0%{transform:rotate(45deg) scale(.3)}60%{transform:rotate(45deg) scale(1.3)}100%{transform:rotate(45deg) scale(1)}}
+.aplbl{font-size:9px;font-weight:800;color:var(--dim);letter-spacing:.6px;margin-left:4px}
+.maya{flex:1;background:var(--card);border-radius:12px 12px 12px 4px;box-shadow:var(--shadow);
+  padding:7px 13px;font-size:11.5px;font-weight:700;max-width:430px}
+.maya b{color:var(--blue);font-size:9.5px;letter-spacing:.5px}
+.styleswap{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;color:var(--dim);cursor:pointer;
+  background:var(--card);border-radius:10px;box-shadow:var(--shadow);padding:6px 11px}
+.styleswap b{color:var(--blue)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.endday{font-family:'Baloo 2';font-weight:800;font-size:13.5px;color:#fff;background:var(--blue);
+  border:none;border-radius:11px;padding:9px 16px;cursor:pointer;box-shadow:0 3px 0 #2c4170;
+  display:inline-flex;align-items:center;gap:7px}
+.endday:active{transform:translateY(2px);box-shadow:0 1px 0 #2c4170}
+.endday:disabled{background:#aab4c9;box-shadow:0 3px 0 #8d97ad;cursor:not-allowed}
+
+/* race strip (compact, header-adjacent) */
+.racebar{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:10px;
+  box-shadow:var(--shadow);padding:5px 11px;font-size:10px;font-weight:800;color:var(--dim)}
+.racebar .track{width:90px;height:9px;border-radius:5px;background:var(--paper);position:relative}
+.racebar .needle{position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;left:50%;
+  background:var(--ink);transition:left 1s cubic-bezier(.34,1.56,.64,1)}
+.racebar .bell-l,.racebar .bell-r{position:absolute;top:-2px;bottom:-2px;border-left:2px dotted var(--amber)}
+.racebar .bell-l{left:8%}.racebar .bell-r{left:92%}
+
+/* ============ NIGHT RECAP (v3 ceremony, now with art) ============ */
+#recap{position:absolute;inset:0;z-index:40;background:rgba(17,23,46,.97);
+  display:none;flex-direction:column;align-items:center;padding-top:22px;
+  opacity:0;transition:opacity .35s ease}
+#recap.on{display:flex}
+#recap.vis{opacity:1}
+#recap .rtitle{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#fff;display:flex;align-items:center;gap:9px}
+#recap .rtitle i{color:#8da4dd}
+#recap .rsub{font-size:11.5px;font-weight:700;color:#8da4dd;margin-top:2px;min-height:17px}
+#focus{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+.bigcard{width:226px;background:var(--card);border-radius:20px;padding:11px;position:relative;
+  box-shadow:0 26px 60px rgba(0,0,0,.5);
+  animation:dealin .42s cubic-bezier(.34,1.56,.64,1)}
+@keyframes dealin{0%{transform:translateY(46px) scale(.6) rotate(-5deg);opacity:0}100%{transform:none;opacity:1}}
+.bigcard.exit{animation:dealout .3s ease forwards}
+@keyframes dealout{to{transform:translateY(60px) scale(.45);opacity:0}}
+.bigcard .bart{height:150px;border-radius:13px;background-size:cover;background-position:center;border:1px solid var(--line)}
+.bigcard .slots{display:flex;justify-content:center;margin-top:-19px;position:relative}
+.bigcard .ms{width:34px;height:46px;border-radius:8px;border:2.5px solid var(--card);background:#f4f6fb;
+  display:flex;align-items:center;justify-content:center;font-size:16px;margin-left:-9px;
+  box-shadow:0 3px 8px rgba(28,43,74,.25)}
+.bigcard .ms:first-child{margin-left:0}
+.bigcard .ms.pulse{animation:slotpop .34s cubic-bezier(.34,1.56,.64,1)}
+@keyframes slotpop{45%{transform:scale(1.4) translateY(-7px);border-color:var(--blue);background:var(--bluepale)}}
+.bigcard h4{font-family:'Baloo 2';font-size:15.5px;font-weight:800;text-align:center;margin-top:7px}
+.bigcard .nightrev{font-family:'Baloo 2';font-weight:800;font-size:29px;text-align:center;
+  color:var(--green);margin-top:2px;font-variant-numeric:tabular-nums}
+.bigcard .float{position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+  font-family:'Baloo 2';font-weight:800;font-size:21px;color:#7ef2a8;opacity:0;
+  text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.bigcard .float.go{animation:rise 1s ease-out}
+@keyframes rise{0%{opacity:0;transform:translate(-50%,10px)}25%{opacity:1;transform:translate(-50%,-4px) scale(1.25)}100%{opacity:0;transform:translate(-50%,-32px)}}
+.bigcard .dud{position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:800;color:#9aa8cf;opacity:0}
+.bigcard .dud.go{animation:rise 1s ease-out}
+#doneRow{display:flex;gap:10px;align-items:center;justify-content:center;min-height:64px;padding-bottom:6px}
+.minidone{width:44px;height:58px;border-radius:8px;background-size:cover;background-position:center;
+  position:relative;animation:dropin .3s ease;overflow:hidden}
+@keyframes dropin{from{transform:translateY(-12px);opacity:0}}
+.minidone b{position:absolute;left:0;right:0;bottom:0;font-family:'Baloo 2';font-size:9.5px;color:#fff;
+  background:rgba(17,23,46,.75);text-align:center;padding:1px 0}
+#rtotals{font-family:'Baloo 2';font-weight:800;font-size:14px;color:#fff;padding-bottom:14px;
+  opacity:0;transition:opacity .3s}
+#rtotals.show{opacity:1}
+#rtotals em{font-style:normal;color:#7ef2a8}
+
+#stamp{position:absolute;inset:0;z-index:80;display:none;align-items:center;justify-content:center;pointer-events:none}
+#stamp .inner{background:var(--card);border-radius:20px;padding:22px 34px;text-align:center;
+  box-shadow:0 20px 60px rgba(10,16,38,.5);transform:rotate(-3deg)}
+#stamp .inner i{font-size:34px;color:var(--amber)}
+#stamp .inner h3{font-family:'Baloo 2';font-weight:800;font-size:22px;margin-top:4px}
+#stamp .inner p{font-weight:800;font-size:12px;color:var(--green);margin-top:2px}
+#stamp.show{display:flex}
+#stamp.show .inner{animation:stampin 1.7s cubic-bezier(.34,1.56,.64,1)}
+@keyframes stampin{0%{transform:rotate(-3deg) scale(.4);opacity:0}18%{transform:rotate(-3deg) scale(1.12);opacity:1}30%{transform:rotate(-3deg) scale(1)}85%{opacity:1}100%{opacity:0}}
+
+#close{align-items:center;justify-content:center;flex-direction:column;z-index:7}
+#close .panel{background:var(--card);border-radius:20px;box-shadow:0 18px 50px rgba(28,43,74,.25);
+  padding:26px 38px;text-align:center}
+#close .verdict{font-family:'Baloo 2';font-size:38px;font-weight:800}
+#close .verdict.pass{color:var(--green)}
+#close .verdict.miss{color:var(--red)}
+#close .detail{font-weight:700;color:var(--dim);margin-top:4px}
+.pinresult{display:inline-flex;align-items:center;gap:9px;background:var(--paper);border-radius:12px;
+  padding:9px 16px;font-weight:800;font-size:13px;margin-top:14px}
+.pinresult .stamp2{font-family:'Baloo 2';padding:3px 11px;border-radius:99px;background:var(--greenpale);color:var(--green)}
+#close .row{display:flex;gap:12px;margin-top:18px;justify-content:center}
+</style>
+</head>
+<body>
+<div class="device"><div class="frame" id="frame">
+
+  <div class="screen on" id="title">
+    <h1 class="disp">ADD<span>ENDUM</span></h1>
+    <p>the ad account, the card game</p>
+    <button class="btn" style="font-size:19px;padding:15px 34px" onclick="go('sign')">Play</button>
+  </div>
+
+  <div class="screen" id="sign">
+    <div class="clientcard">
+      <div class="logo"><i class="ph-fill ph-cooking-pot"></i></div>
+      <h2 id="brandname">Hearth &amp; Hew</h2>
+      <div class="vert">direct-to-consumer cookware</div>
+      <div class="traits" id="brandtraits"></div>
+      <div class="ladder">
+        <div><span>Week 1</span><b>$520 revenue</b></div>
+        <div><span>Week 2</span><b>ROAS 1.45</b></div>
+      </div>
+      <button class="reroll" onclick="reroll()"><i class="ph-bold ph-arrows-clockwise"></i> different client</button>
+    </div>
+    <div class="signside">
+      <h3 class="disp">They need a strategist.</h3>
+      <p>One week. Hit the number. Your attention is the budget — three moves a day, then the market answers overnight.</p>
+      <button class="btn" style="font-size:18px;padding:14px 30px" onclick="startRun()">Sign the engagement</button>
+    </div>
+  </div>
+
+  <div class="screen" id="desk">
+    <div class="hdr">
+      <div class="daywin" id="daywin"></div>
+      <div class="goalcluster" id="goalcluster" onclick="openGoal()">
+        <b id="brev">$0</b> <span class="of">/ $520</span>
+        <span class="goalbar"><i id="revfill"></i></span>
+        <span class="goaldays" id="goaldays">7d to goal</span>
+        <i class="ph-fill ph-caret-down" style="font-size:9px;color:var(--dim)"></i>
+      </div>
+      <div class="hdr-right">
+        <div class="ap" id="ap"></div>
+        <button class="endday" id="endbtn" onclick="endDay()">NEXT DAY <i class="ph-bold ph-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <div class="adrow" id="adrow"></div>
+
+    <div class="ftr">
+      <div class="hpill">ROAS <b class="roasv" id="roas">—</b></div>
+      <div class="hpill"><i class="ph-fill ph-coins" style="color:var(--green)"></i><b class="money" id="bank">$600</b></div>
+      <div class="racebar" id="raceplate" style="display:none">
+        <i class="ph-fill ph-push-pin" style="color:var(--blue)"></i>A
+        <span class="track"><span class="bell-l"></span><span class="bell-r"></span><span class="needle" id="needle"></span></span>
+        <span id="racen">n=0</span>
+      </div>
+      <div class="hpill">TRUST <span class="pips"><span class="pip"></span><span class="pip"></span><span class="pip"></span></span></div>
+      <div class="styleswap" onclick="cycleStyle()"><i class="ph-fill ph-palette"></i><b id="stylename">sticker-pop</b></div>
+    </div>
+
+    <div id="goalmodal" onclick="closeGoal(event)">
+      <div class="gpanel">
+        <div class="ghead"><i class="ph-fill ph-target" style="color:var(--blue)"></i><h3>The Brief — Week 1</h3></div>
+        <div class="gline"><span>Client</span><b>Copper &amp; Char</b></div>
+        <div class="gline"><span>Hit by Sunday</span><b id="gtarget">$520 revenue</b></div>
+        <div class="gline"><span>Spend floor</span><b>$240 / week</b></div>
+        <div class="gline"><span>Fee if you pass</span><b style="color:var(--green)">+$300</b></div>
+        <div class="gline"><span>Miss it</span><b style="color:var(--red)">−1 trust pip</b></div>
+        <div class="gladder">Week 2 → ROAS 1.45 · Week 3 → Launch Week (boss)</div>
+        <div class="grow"><button class="btn sec" onclick="closeGoal()">Got it</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="recap">
+    <div class="rtitle"><i class="ph-fill ph-moon-stars"></i><span id="rtitle">Monday night</span></div>
+    <div class="rsub" id="rsub">the market is looking at your work…</div>
+    <div id="focus"></div>
+    <div id="doneRow"></div>
+    <div id="rtotals"></div>
+  </div>
+
+  <div class="screen" id="close">
+    <div class="panel">
+      <div class="verdict disp" id="verdict">WEEK PASSED</div>
+      <div class="detail" id="closedetail"></div>
+      <div class="pinresult"><i class="ph-fill ph-push-pin" style="color:var(--blue)"></i>
+        “A wins on Hook” <span class="stamp2" id="pingrade">CONFIRMED</span></div>
+      <div class="row">
+        <button class="btn sec" onclick="alert('Newsstand — next build')">Newsstand</button>
+        <button class="btn" onclick="location.reload()">Run it back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stamp"><div class="inner">
+    <i class="ph-fill ph-bell-ringing"></i>
+    <h3>SIGNIFICANT</h3>
+    <p>A WINS ON HOOK — PIN CONFIRMED</p>
+  </div></div>
+
+  <div id="pmodal" onclick="closeProposal(event)">
+    <div class="mpanel">
+      <div class="mhead">
+        <div class="mface">👩‍🎤</div>
+        <div><h3>Maya</h3><div class="role">Creative Strategist · ★★</div></div>
+        <span class="mconf" id="mconf">says 80% sure</span>
+      </div>
+      <div class="mbody" id="mbody"></div>
+      <div class="mtrack">TRACK RECORD · <b>runs 61%</b> over 18 graded calls — weigh accordingly.</div>
+      <div class="mrow"><button class="btn sec" onclick="closeProposal()">Got it</button></div>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+/* the generated art, in context — cycle the complete style sets */
+const STYLES = ["characters","sticker-pop","upa-flat","paper-cutout","cereal-mascot","midcentury-ad","storybook"];
+let styleIdx = 0;
+const SUBJECTS = ["combo","creator","product"]; // ad i -> subject image
+function artUrl(i){
+  return `../art-explorations/${STYLES[styleIdx]}/${SUBJECTS[i % SUBJECTS.length]}.png`;
+}
+function cycleStyle(){
+  styleIdx = (styleIdx + 1) % STYLES.length;
+  document.getElementById('stylename').textContent = STYLES[styleIdx];
+  if (S) render();
+}
+function openGoal(){ document.getElementById('goalmodal').classList.add('on'); }
+function closeGoal(ev){ if (ev && ev.target.closest('.gpanel')) return; document.getElementById('goalmodal').classList.remove('on'); }
+
+/* mini namegen (cookware banks, JS port of sim/namegen.lua) */
+const NOUN = ["Hearth","Ember","Copper","Whisk","Simmer","Cast","Char","Salt","Ladle","Rind","Grain","Crock"];
+const ABS = ["Theory","Studio","Works","House","Method","Club"];
+const FORM = ["Co.","Goods","Supply","Society"];
+const ADJ = ["Plain","Stout","Honest","Rustic","True","Iron"];
+const TRAITS = ["thrifty","loud","heritage","clinical","playful","earnest","premium","scrappy","cozy","bold"];
+function rnd(a){ return a[Math.floor(Math.random()*a.length)] }
+function reroll(){
+  const p = Math.random();
+  let name;
+  if (p < .25){ let a = rnd(NOUN), b = rnd(NOUN); while(b===a) b = rnd(NOUN); name = a+" & "+b; }
+  else if (p < .5) name = rnd(NOUN)+" "+rnd(ABS);
+  else if (p < .7) name = rnd(ADJ)+" "+rnd(NOUN);
+  else if (p < .85) name = rnd(NOUN)+" "+rnd(FORM);
+  else name = "The "+rnd(NOUN)+" "+rnd(FORM);
+  const tr = [];
+  while (tr.length < 3){ const t = rnd(TRAITS); if (!tr.includes(t)) tr.push(t); }
+  document.getElementById('brandname').textContent = name;
+  document.getElementById('brandtraits').innerHTML = tr.map(t=>`<span class="trait">${t}</span>`).join('');
+}
+
+/* state */
+const DAYS = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+const DAYNAMES = {MON:"Monday",TUE:"Tuesday",WED:"Wednesday",THU:"Thursday",FRI:"Friday",SAT:"Saturday",SUN:"Sunday"};
+const DAYMOD = {MON:.9, TUE:1, WED:1, THU:1.05, FRI:1, SAT:1.25, SUN:1.25};
+const TELEGRAPH_DAY = 3;
+const ADS_AVAILABLE = [
+  {name:"Pain Point × UGC", slots:["🔥","🤳","🎬"], base:34},
+  {name:"Founder × Demo",   slots:["🛠️","🔍","🎬"], base:26},
+  {name:"FOMO × Cinematic", slots:["⏳","🎥","🎬"], base:20},
+];
+let S = null;
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+function startRun(){
+  S = {day:0, ap:3, bank:600, rev:0, spend:0, ads:[], next:0, z:0, n:0, belled:false, busy:false};
+  buildAd();
+  render(); go('desk');
+}
+function buildAd(){
+  if (S.busy || S.ads.length>=3 || S.next>=ADS_AVAILABLE.length) return;
+  if (S.ads.length>0){ if(S.ap<1) return; S.ap--; }
+  const t = ADS_AVAILABLE[S.next];
+  S.ads.push({...t, art:S.next, rev:0, days:0, tired:false});
+  S.next++;
+  S.bank -= 80; S.spend += 80;
+  render();
+}
+function killAd(i,ev){ ev.stopPropagation(); if(S.busy) return; S.ads.splice(i,1); render(); }
+
+function render(){
+  // day window: today + tomorrow as "Day N", then days-to-goal, then the goal day (amber)
+  const left = 7 - S.day;
+  const chip = (i, today) => {
+    const tele = (i===TELEGRAPH_DAY && !today) ? ' tele' : '';
+    return `<div class="wd ${today?'today':''}${tele}">Day<small>${i+1}</small></div>`;
+  };
+  let html = chip(S.day, true);
+  if (S.day+1 < 6) html += chip(S.day+1, false);
+  html += `<span class="dwsep">${left}d →</span>`;
+  html += `<div class="wd goalday" onclick="openGoal()">GOAL<small>Day 7</small></div>`;
+  document.getElementById('daywin').innerHTML = html;
+  document.getElementById('goaldays').textContent = `${left}d to goal`;
+  document.getElementById('ap').innerHTML = [0,1,2].map(i=>
+    `<div class="apdot ${i>=S.ap?'spent':''}"></div>`).join('');
+  document.getElementById('bank').textContent = '$'+S.bank;
+  document.getElementById('brev').textContent = '$'+S.rev;
+  document.getElementById('roas').textContent = S.spend? (S.rev/S.spend).toFixed(2) : '—';
+  document.getElementById('revfill').style.width = Math.min(100, S.rev/520*100)+'%';
+  if (S.ads.length >= 2 || S.belled){
+    document.getElementById('raceplate').style.display = '';
+    document.getElementById('racen').textContent = 'n='+S.n.toLocaleString();
+    document.getElementById('needle').style.left = (50 - (S.z/2.81)*42) + '%';
+  }
+  const row = document.getElementById('adrow');
+  row.innerHTML = S.ads.map((a,i)=>`
+    <div class="adcard ${a.tired?'tired':''}" id="ad${i}">
+      <div class="killx" onclick="killAd(${i},event)">✕</div>
+      <div class="art" style="background-image:url('${artUrl(a.art)}')">
+        <div class="statusrow">
+          ${i<2?`<span class="abtag">${'AB'[i]}</span>`:''}
+          <span class="chip ${a.days<2?'ch-learning':a.tired?'ch-tired':'ch-leader'}">
+            ${a.days<2?'<i class="ph-fill ph-hourglass-medium"></i>Learning'
+              :a.tired?'<i class="ph-fill ph-battery-medium"></i>Creative Limited'
+              :'<i class="ph-fill ph-crown"></i>Leader'}</span>
+        </div>
+      </div>
+      <div class="slots">${a.slots.map(s=>`<div class="ms">${s}</div>`).join('')}</div>
+      <div class="meta">
+        <h4>${a.name}</h4>
+        <div class="rev">$${a.rev}</div>
+      </div>
+    </div>`).join('') + emptySlots();
+  placeProposal();
+}
+
+/* ——— the strategist speaks in badges, not banners ——— */
+const PROPOSALS = {
+  0:{ target:'firstslot', conf:80, text:"Cold traffic wants its problem named before it wants your product. Open with the <b>Pain Point</b> hook — UGC face, plain promise. We can race something against it tomorrow." },
+  1:{ target:'race', conf:70, text:"Two ads make a race. I pinned <b>A to win on Hook</b> — now we let the nights collect evidence. Don't call it early; the needle wobbles before it means anything." },
+  2:{ target:'ad0', conf:75, text:"A is pulling ahead. If the bell rings, iterate the <b>winner</b> — same body, new hook — instead of spending on a fresh concept. Winners teach cheaper." },
+  3:{ target:'wd4', conf:85, text:"Storm tomorrow: a competitor sale spikes CPM all <b>Thursday</b>. Every impression costs more — don't launch anything new into that; let the proven ads ride it." },
+  4:{ target:'ad2', conf:90, text:"FOMO is <b>wearing out</b> — frequency is up, the hook stopped stopping people. Kill it proudly or rest it; feeding a tired ad is paying for ghosts." },
+  5:{ target:'ad0', conf:65, text:"Weekend scroll inbound — more eyes, cheaper reach. Make sure your best two are live and <b>don't touch them</b>; edits reset learning right when volume peaks." },
+  6:{ target:'race', conf:60, text:"Last night of the week. The math is the math now — whatever the close says, the <b>autopsy</b> is where we bank what we learned." },
+};
+let proposalRead = -1;
+
+function placeProposal(){
+  document.querySelectorAll('.pbadge').forEach(b=>b.remove());
+  if (!S || S.busy) return;
+  const p = PROPOSALS[S.day];
+  if (!p) return;
+  let el = null;
+  if (p.target === 'firstslot') el = document.querySelector('.emptyslot:not(.passive)');
+  else if (p.target === 'race') el = document.getElementById('raceplate');
+  else if (p.target === 'wd4') el = document.querySelectorAll('.wd')[3];
+  else el = document.getElementById(p.target);
+  if (!el || (p.target === 'race' && el.style.display === 'none')) el = document.getElementById('ad0');
+  if (!el) return;
+  el.style.position = 'relative';
+  const b = document.createElement('div');
+  b.className = 'pbadge' + (proposalRead === S.day ? ' read' : '');
+  b.textContent = 'M';
+  b.onclick = (ev)=>{ ev.stopPropagation(); openProposal(p); };
+  el.appendChild(b);
+}
+function openProposal(p){
+  document.getElementById('mbody').innerHTML = p.text;
+  document.getElementById('mconf').textContent = 'says ' + p.conf + '% sure';
+  document.getElementById('pmodal').classList.add('on');
+  proposalRead = S.day;
+}
+function closeProposal(ev){
+  if (ev && ev.target.closest('.mpanel')) return;
+  document.getElementById('pmodal').classList.remove('on');
+  placeProposal();
+}
+
+// the slot rack: total capacity is ALWAYS visible; only the first empty
+// slot is actionable, and only when a build is actually affordable
+function emptySlots(){
+  const TOTAL = 3;
+  let html = '';
+  const canBuild = !S.busy && S.next < ADS_AVAILABLE.length && (S.ads.length === 0 || S.ap >= 1);
+  for (let k = S.ads.length; k < TOTAL; k++){
+    if (k === S.ads.length && canBuild){
+      html += `<div class="emptyslot" onclick="buildAd()">
+        <div class="plus"><i class="ph-bold ph-plus"></i></div>Build an ad
+        <small>${S.ads.length ? '1 AP' : 'FREE · first one'}</small></div>`;
+    } else {
+      const why = S.next >= ADS_AVAILABLE.length ? 'no concepts left'
+                : S.ap < 1 ? 'needs 1 AP' : 'ad slot';
+      html += `<div class="emptyslot passive">
+        <i class="ph-fill ph-cards slotmark"></i>AD SLOT<small>${why}</small></div>`;
+    }
+  }
+  return html;
+}
+
+/* night recap (v3 ceremony, art-forward) */
+function endDay(){
+  if (S.busy || S.ads.length===0) return;
+  S.busy = true;
+  document.getElementById('endbtn').disabled = true;
+  const day = DAYS[S.day];
+  document.getElementById('rtitle').textContent = DAYNAMES[day] + ' night';
+  document.getElementById('rsub').textContent =
+    DAYMOD[day]>1 ? 'weekend scroll — more eyes, cheaper reach'
+    : DAYMOD[day]<1 ? 'slow Monday — the feed wakes up late'
+    : 'the market is looking at your work…';
+  document.getElementById('doneRow').innerHTML = '';
+  document.getElementById('rtotals').classList.remove('show');
+  document.getElementById('focus').innerHTML = '';
+  const recap = document.getElementById('recap');
+  recap.classList.add('on');
+  requestAnimationFrame(()=> recap.classList.add('vis'));
+  setTimeout(()=> focusBeat(0, day, S.rev, S.spend), 500);
+}
+
+function focusBeat(i, day, rev0, spend0){
+  if (i >= S.ads.length) return nightEnd(day, rev0, spend0);
+  const a = S.ads[i];
+  const gain = Math.round(a.base * DAYMOD[day] * (a.tired?0.5:1) * (0.7+Math.random()*0.6));
+  const hit = gain > 8;
+
+  const focus = document.getElementById('focus');
+  focus.innerHTML = `
+    <div class="bigcard" id="big">
+      <div class="float" id="bigfloat">+$${gain}</div>
+      <div class="dud" id="bigdud">quiet day</div>
+      <div class="bart" style="background-image:url('${artUrl(a.art)}')"></div>
+      <div class="slots">${a.slots.map(s=>`<div class="ms">${s}</div>`).join('')}</div>
+      <h4>${a.name}</h4>
+      <div class="nightrev" id="bigrev">$${a.rev}</div>
+    </div>`;
+
+  const slots = focus.querySelectorAll('.ms');
+  slots.forEach((s, k)=> setTimeout(()=> s.classList.add('pulse'), 420 + k*170));
+
+  setTimeout(()=>{
+    if (hit){
+      document.getElementById('bigfloat').classList.add('go');
+      const el = document.getElementById('bigrev');
+      const from = a.rev, to = a.rev + gain, t0 = performance.now();
+      (function tickup(now){
+        const p = Math.min(1, (now - t0) / 450);
+        el.textContent = '$' + Math.round(from + (to - from) * p);
+        if (p < 1) requestAnimationFrame(tickup);
+      })(performance.now());
+    } else {
+      document.getElementById('bigdud').classList.add('go');
+    }
+    a.rev += gain; S.rev += gain; S.spend += 12; a.days++;
+    if (a.days >= 4) a.tired = true;
+  }, 420 + slots.length*170 + 120);
+
+  setTimeout(()=>{
+    document.getElementById('big').classList.add('exit');
+    setTimeout(()=>{
+      document.getElementById('doneRow').innerHTML +=
+        `<div class="minidone" style="background-image:url('${artUrl(a.art)}')"><b>+$${gain}</b></div>`;
+      focusBeat(i+1, day, rev0, spend0);
+    }, 280);
+  }, 420 + slots.length*170 + 950);
+}
+
+function nightEnd(day, rev0, spend0){
+  let belled = false;
+  if (S.ads.length >= 2 && !S.belled){
+    S.n += 1600 + Math.floor(Math.random()*500);
+    S.z = Math.min(3.0, S.z + 0.7 + Math.random()*0.5);
+    if (S.z >= 2.81){ S.belled = true; belled = true; }
+  }
+  const totals = document.getElementById('rtotals');
+  totals.innerHTML = `${DAYNAMES[day]} close — spent $${Math.round(S.spend - spend0)} · earned <em>$${S.rev - rev0}</em>`;
+  totals.classList.add('show');
+
+  const finish = ()=> setTimeout(()=>{
+    const recap = document.getElementById('recap');
+    recap.classList.remove('vis');
+    setTimeout(()=>{
+      recap.classList.remove('on');
+      S.day++;
+      if (S.day >= 7) return weekClose();
+      S.ap = 3; S.busy = false;
+      document.getElementById('endbtn').disabled = false;
+      render();
+      document.querySelectorAll('.apdot').forEach((d,k)=> setTimeout(()=> d.classList.add('refill'), k*120));
+    }, 380);
+  }, 900);
+
+  if (belled){
+    setTimeout(()=>{
+      const st = document.getElementById('stamp');
+      st.classList.add('show');
+      setTimeout(()=>{ st.classList.remove('show'); finish(); }, 1800);
+    }, 500);
+  } else finish();
+}
+
+function weekClose(){
+  const pass = S.rev >= 520;
+  document.getElementById('verdict').textContent = pass?'WEEK PASSED':'WEEK MISSED';
+  document.getElementById('verdict').className = 'verdict disp '+(pass?'pass':'miss');
+  document.getElementById('closedetail').textContent =
+    `$${S.rev} revenue of $520 · ROAS ${(S.rev/S.spend).toFixed(2)} · ${pass?'full fee paid':'a trust pip burns'}`;
+  document.getElementById('pingrade').textContent = S.belled ? 'CONFIRMED' : 'INCONCLUSIVE';
+  go('close');
+}
+
+reroll();
+</script>
+</body>
+</html>

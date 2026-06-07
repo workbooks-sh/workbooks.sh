@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b5998">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AdBuy">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ADBUY — Team</title>
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<script type="module" src="./shared.js"></script>
+<link rel="stylesheet" href="./styles/team-designer.css">
+</head>
+<body>
+<div class="device"><div class="frame">
+
+  <div class="left">
+    <div class="lock">
+      <div class="lcrest" id="lcrest"><i class="ph-fill ph-chart-line-up"></i></div>
+      <div><div class="lname" id="lname">Your Studio</div><div class="lsub">FIRST HIRES</div></div>
+    </div>
+    <div class="budget">
+      <div class="row"><span class="lbl">HIRING BUDGET</span></div>
+      <div class="row"><span class="amt" id="budamt">$0</span><span class="lbl" id="budtot"></span></div>
+      <div class="bar"><i id="budbar"></i></div>
+    </div>
+    <div class="teamhdr">YOUR TWO HIRES</div>
+    <div class="seats" id="seats"></div>
+    <button class="btn qs-btn qh-left" onclick="quickHire()"><i class="ph-bold ph-lightning"></i> Quick hire — skip browsing</button>
+    <div class="pnav">
+      <button class="btn sec" onclick="location.href='brand-creator.html'">Back</button>
+      <button class="btn" id="next" onclick="next()">Start →</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="rhead">
+      <h1>Build your first team</h1>
+      <p>One Creative Strategist, one Paid Media Manager. Shuffle for someone you like; hire within budget.</p>
+    </div>
+    <div class="carousel" id="carousel"></div>
+    <div class="rfoot" id="poolhint"></div>
+  </div>
+
+</div></div>
+
+<div id="rolemodal" onclick="closeRole(event)">
+  <div class="rpanel">
+    <div class="rh"><div class="ric" id="rmic"><i class="ph-fill ph-brain"></i></div><h3 id="rmname">Role</h3></div>
+    <p id="rminfo"></p>
+    <div class="mrow"><button class="btn sec" onclick="closeRole()">Got it</button></div>
+  </div>
+</div>
+
+<script type="module" src="./scripts/team-designer.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>wasm sim test</title>
+<style>body{font-family:monospace;background:#111;color:#9f9;padding:24px}</style></head>
+<body><div id="out">loading wasm…</div>
+<script type="module">
+import init, { random_brand, colors_json, glyphs_for } from './pkg/adbuy_sim.js';
+await init();
+const b = JSON.parse(random_brand(7, "skincare"));
+const colors = JSON.parse(colors_json());
+const line = b.name + "|" + b.c1 + "," + b.c2 + "," + b.c3 + "," + b.glyph + "|colors=" + colors.length;
+document.getElementById('out').textContent = "WASM: " + line;
+document.title = "OK";
+</script></body></html>

@@ -1,0 +1,70 @@
+/* Device frame + fixed-canvas scaling for Addendum screens.
+   Every screen is authored at ONE logical canvas — 852 × 393 pt (iPhone 15
+   landscape) — and uniformly transform-scaled to fit, so fonts/padding/all
+   scale together like points→pixels. _device.js sets --scale (fit BOTH axes).
+
+   - DESKTOP browser: shows a framed phone mockup (bezel + island), centered.
+   - REAL device (phone/tablet/Capacitor/simulator): fills the screen, NO fake
+     chrome — the real device already has the bezel. Game is LANDSCAPE.
+
+   Usage: <div class="device"><div class="frame"> …screen… </div></div> */
+
+.device{
+  position:relative;
+  width:min(90vw, calc(90vh * 19.5 / 9));
+  aspect-ratio:19.5 / 9;
+  border-radius:46px;
+  overflow:hidden;
+  background:#000;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 30px 90px rgba(28,43,74,.40),
+             0 0 0 12px #14151a,
+             0 0 0 14px #2d3038;
+}
+.device.portrait{ width:min(46vw, calc(90vh * 9 / 19.5)); aspect-ratio:9 / 19.5; }
+
+/* fixed logical canvas — scaled by _device.js via --scale (fit) */
+.frame{
+  width:852px; height:393px; flex:none;
+  transform-origin:center center;
+  transform:scale(var(--scale, 1));
+  position:relative; overflow:hidden;
+}
+.device.portrait .frame{ width:393px; height:852px; }
+
+/* fake chrome — desktop mockup only */
+.device::before{ content:"";position:absolute;z-index:9999;pointer-events:none;
+  left:9px;top:50%;transform:translateY(-50%);width:11px;height:84px;border-radius:8px;background:#000; }
+.device::after{ content:"";position:absolute;z-index:9999;pointer-events:none;
+  right:7px;top:50%;transform:translateY(-50%);width:5px;height:120px;border-radius:3px;background:rgba(255,255,255,.55); }
+.device.portrait::before{ left:50%;top:9px;transform:translateX(-50%);width:84px;height:11px; }
+.device.portrait::after{ right:auto;bottom:7px;top:auto;left:50%;transform:translateX(-50%);width:120px;height:5px; }
+
+/* ── REAL touch device: fill the screen, drop the fake frame ── */
+@media (hover: none) and (pointer: coarse){
+  html,body{ background:#eef1f6; overflow:hidden; }
+  .device{
+    width:100vw; height:100vh; height:100dvh; max-height:none;
+    border-radius:0; box-shadow:none; aspect-ratio:auto;
+  }
+  .device::before, .device::after{ display:none; }
+}
+
+/* Portrait-mode rotate hint — only shown on real touch devices in portrait */
+#rotate-hint{
+  display:none; position:fixed; inset:0; z-index:99999;
+  background:#0a0f1e; flex-direction:column; align-items:center;
+  justify-content:center; gap:20px;
+}
+#rotate-hint .rh-icon{
+  font-size:56px; color:#fff; line-height:1;
+  animation:rh-spin 2s ease-in-out infinite;
+}
+#rotate-hint p{
+  font-size:17px; font-weight:700; color:rgba(255,255,255,.8);
+  letter-spacing:.02em; text-align:center; margin:0;
+}
+@keyframes rh-spin{0%,100%{transform:rotate(0deg)}50%{transform:rotate(90deg)}}
+@media (hover:none) and (pointer:coarse) and (orientation:portrait){
+  #rotate-hint{ display:flex; }
+}

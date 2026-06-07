@@ -1,0 +1,77 @@
+#+TITLE: AdBuy — Audio Content Plan
+#+DATE: 2026-06-06
+
+* Status
+
+WebAudio synthesis layer is live (=app/scripts/audio.js=) — all SFX are
+synthesized at runtime, no audio files required for MVP. This doc covers what
+to source for a polished release.
+
+* SFX inventory (synthesis first, replace if needed)
+
+Current synthesized SFX and their upgrade paths:
+
+| Key          | Synthesized via        | Replace with          |
+|--------------|------------------------|-----------------------|
+| sfxTap       | sine 880 Hz, 55ms      | short UI tap WAV/OGG  |
+| sfxDeal      | triangle sweep 420→200 | card-place thud       |
+| sfxKill      | sawtooth 160→120       | paper-shred short     |
+| sfxError     | sawtooth 130Hz buzz    | low buzz/error beep   |
+| sfxBell      | sine triad C5-E5-G5    | bell/chime hit        |
+| sfxWin       | bell + C6 cap          | victory sting 0.5s    |
+| sfxMiss      | sawtooth 220→165 sag   | low defeat sting 0.5s |
+| sfxTick      | square 1.1kHz 28ms     | clock/counter tick    |
+| sfxSlotPop   | sine 660Hz 40ms        | card-slot snap        |
+
+* BGM stems (deferred — infrastructure ready)
+
+The =playStem= / =crossfade= API in audio.js accepts AudioBuffer.
+Wire when content exists.
+
+Proposed stem structure for a 5-day flight:
+- =stem-build.ogg=: ambient low-energy loop (BUILD state, no flight yet)
+- =stem-flight.ogg=: medium-energy loop (FLIGHT days 1–3)
+- =stem-close.ogg=: tense loop (FLIGHT day 4–5, autopsy approaching)
+- =stem-newsstand.ogg=: triumphant or reflective (NEWSSTAND result)
+
+Crossfade trigger: =state= field changes (BUILD→FLIGHT, etc.).
+
+* License options
+
+** Synthesized (current)
+
+All current SFX are Web Audio API synthesis — no license required, no budget.
+
+** Free tier for production upgrade
+
+- =freesound.org= (CC0/CC-BY): individual SFX, attribution required for CC-BY
+- =kenney.nl/assets= (CC0): game UI SFX packs, full commercial use, no attribution
+  Recommended: Kenney "Interface Sounds" + "Sci-Fi Sounds" packs (WAV/OGG, CC0)
+
+** Paid stem music
+
+- =soundsnap.com=: royalty-free loops, ~$25/mo subscription
+- =epidemic sound=: subscription, broad license covers mobile app
+- Budget estimate for polished release: ~$50–100 (Kenney SFX free + one
+  Epidemic/Soundsnap month for stems)
+
+* Implementation notes
+
+** Silent switch (iOS)
+
+Web Audio in WKWebView plays through the iOS silent switch (unlike HTML5
+=<audio>=). No native AVAudioSession routing needed. Confirmed behavior on
+iOS 15.4+; no special handling required.
+
+** AudioContext unlock
+
+=unlockAudio()= in audio.js must be called in the first user gesture handler.
+Currently wired to the dashboard's first interaction. Verify it fires before any
+SFX attempt — early calls to SFX functions check =live()= and no-op silently if
+context not running.
+
+** OGG vs WAV
+
+Vite bundles audio files via =?url= import. For mobile: OGG Vorbis is ~30%
+smaller than WAV; Capacitor/WKWebView supports OGG on iOS 11+. Use OGG for
+stems, WAV for short SFX (WAV decodes faster).

@@ -1,0 +1,86 @@
+#+TITLE: AdBuy — Asset License Audit
+#+DATE: 2026-06-06
+
+* Summary
+
+Full inventory of tracked binary assets. Purpose: confirm no EULA-restricted source assets
+reach the source bundle or public repo. Artlix Unity Asset Store GLBs triggered this audit.
+
+* Verdict by asset group
+
+** CLEAR — project-owned / OFL
+
+| Path                            | Type   | Origin                    | License |
+|---------------------------------|--------|---------------------------|---------|
+| app/icon-*.png                  | PNG    | Created for this project  | Owned   |
+| app/art/headshots/p1-p6.png     | PNG    | See note below            | See §§  |
+| assets/img/circle.png           | PNG    | Defold UI atlas shape     | Owned   |
+| assets/img/roundrect.png        | PNG    | Defold UI atlas shape     | Owned   |
+| assets/fonts/Archivo.ttf        | Font   | Google Fonts              | OFL-1.1 |
+| assets/fonts/Baloo2.ttf         | Font   | Google Fonts              | OFL-1.1 |
+| assets/fonts/Fraunces.ttf       | Font   | Google Fonts              | OFL-1.1 |
+| assets/fonts/Nunito.ttf         | Font   | Google Fonts              | OFL-1.1 |
+
+Note on assets/fonts/: these TTFs are from the Defold era, superseded by @fontsource-variable
+npm packages. Dead code — safe to delete in a separate cleanup pass.
+
+Note on headshots: p1-p6.png origin is undocumented. Provisionally treated as project-owned
+(authored for the game). Must be confirmed or replaced before any public release.
+
+** CLEAR — art-exploration renders (non-characters styles)
+
+All renders under design/art-explorations/ except characters/ appear to be original
+AI-generated or manually illustrated game concept art. No Unity Asset Store source.
+
+| Style            | Files                                   | Assessment     |
+|------------------|-----------------------------------------|----------------|
+| cereal-mascot/   | combo, creator, mascot, product         | Original       |
+| midcentury-ad/   | combo, creator, mascot, product         | Original       |
+| paper-cutout/    | combo, creator, mascot, product         | Original       |
+| sticker-pop/     | combo, creator, mascot, product         | Original       |
+| storybook/       | combo, creator, mascot, product         | Original       |
+| upa-flat/        | combo, creator, mascot, product         | Original       |
+| _test/probe.png  | single probe render                     | Original       |
+
+** DELETED — Artlix Unity Asset Store source texture
+
+design/art-explorations/characters/textures/M_C3CV1_BaseColor_BaseColor.png
+
+Confirmed Unity Asset Store material texture (Artlix character pack). Asset Store Standard
+EULA §2.3 prohibits redistribution of source assets. Removed from git in this commit.
+
+** FLAGGED — characters/ renders (derived works, in active use)
+
+| Path                                          | Status    |
+|-----------------------------------------------|-----------|
+| design/art-explorations/characters/combo.png   | In use    |
+| design/art-explorations/characters/creator.png | In use    |
+| design/art-explorations/characters/product.png | In use    |
+
+These are renders of the Artlix 3D model. Rendered output status under the Asset Store EULA
+is ambiguous (§2.1 allows "incorporation into interactive media"). Listed in .wb-bundle-exclude
+pending explicit EULA confirmation or replacement with original art.
+
+BLOCKER for public source distribution: replace with original character renders or obtain
+explicit redistribution rights before any wb-source-bundle / wb unbundle of this project.
+
+** NOT IN SCOPE (gitignored)
+
+ios/App/App/public/spike/*.glb — Artlix GLBs (artlix_f1.glb + anim clips). Gitignored via
+/ios/ in .gitignore; not tracked, not in any source bundle. No action required for git.
+On-disk copies can be removed when ios/ scaffold is next regenerated.
+
+* Exclusion mechanism
+
+.wb-bundle-exclude (co-located with this doc) lists paths that wb-source-bundle should skip.
+Wiring this file into the wb CLI is platform-hold wb-epjh.9 / wb-epjh.3.
+
+Until then: do NOT run wb-source-bundle on this project without manually excluding
+design/art-explorations/characters/.
+
+* Action items
+
+- [ ] Replace characters/ renders with original art (unblocks public source distribution)
+- [ ] Confirm or replace headshots provenance
+- [ ] Delete dead Defold assets: assets/fonts/*.ttf, assets/fonts/*.font, assets/ui.atlas (cleanup)
+- [ ] Wire .wb-bundle-exclude into wb CLI (platform-hold)

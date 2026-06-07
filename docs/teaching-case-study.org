@@ -1,0 +1,254 @@
+#+TITLE: AdBuy — Case Study: idea → Rust sim → workbook → TestFlight
+#+DATE: 2026-06-06
+#+DESCRIPTION: Stranger-followable walkthrough of how a Workbooks game is built and shipped.
+
+* Overview
+
+AdBuy is a turn-based ad-account simulator game built as a Workbooks mobile app.
+It exists to answer one question: *can a single developer ship a real game to the
+App Store entirely through the Workbooks toolchain?*
+
+The tech spine: a deterministic Rust sim compiled to WASM, a vanilla JS/CSS Vite app,
+packaged into a native iOS shell by Capacitor, delivered via Workbooks' =wb forge mobile=
+pipeline. No game engine. No server. Local-first throughout.
+
+This document is the stranger-followable walk-through — every command shown, every
+decision traceable to a doc. The target reader has never touched this repo.
+
+* The stack (what's in the box)
+
+| Layer | Technology | Location |
+|-------+-----------+----------|
+| Game sim | Rust (wasm-bindgen cdylib) | =sim-rs/= |
+| UI | Vanilla JS/CSS, Vite 6 MPA | =app/= |
+| Asset pipeline | Vite build → =dist/= | =vite.config.js= |
+| Native shell | Capacitor 8 + iOS | =ios/= (generated) |
+| Dev loop | =dev.sh= (Vite server + cap run) | =dev.sh= |
+| Tests | cargo test (100 unit + WASM size guard) | =sim-rs/src/= + =sim-rs/tests/= |
+| Decisions | =DECISIONS.md= | root |
+| Weight audit | =docs/artifact-weight-ledger.org= | this dir |
+
+* Prerequisites
+
+#+BEGIN_SRC bash
+# Rust toolchain + WASM target
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-pack
+
+# Node (for Vite, Capacitor)
+brew install node   # or nvm, fnm
+
+# Xcode + Xcode Command Line Tools (macOS only; for iOS packaging)
+xcode-select --install
+# Install Xcode from App Store, open it once to accept the license.
+#+END_SRC
+
+* Step 1 — Build the Rust sim
+
+The sim is a deterministic, seeded game engine. It speaks JSON on both sides of
+the WASM boundary. No floats in state; integer-valued everywhere.
+
+#+BEGIN_SRC bash
+cd projects/adbuy
+
+# Release build (opt-level=z, LTO, stripped) → app/pkg/
+bash sim-rs/build.sh
+
+# Dev build (fast, large, unoptimized)
+bash sim-rs/build.sh --dev
+
+# Run the 100-test suite (unit tests + WASM size guard)
+cd sim-rs && cargo test
+# Expected: test result: ok. 100 passed; 0 failed
+
+# Verify size
+ls -lh app/pkg/adbuy_sim_bg.wasm   # ~260 KB release
+#+END_SRC
+
+The sim outputs two files:
+- =app/pkg/adbuy_sim.js= — the JS wrapper (wasm-bindgen generated + hand-patched)
+- =app/pkg/adbuy_sim_bg.wasm= — the binary, 256–264 KB release
+
+Size ceiling: 512 KB (enforced by =sim-rs/tests/wasm_size.rs=).
+
+** What the sim exposes
+
+The JS bridge is one handle: =Dashboard=. All game state round-trips as JSON strings.
+A minimal session looks like:
+
+#+BEGIN_SRC javascript
+import init, { Dashboard } from './pkg/adbuy_sim.js';
+await init();
+
+const d = new Dashboard(/* seed= */ 42);
+d.start_run(42);                                       // → state JSON (BUILD)
+d.build_ad("hook_pain,vis_ugc,fmt_video", false);     // → state JSON
+d.build_ad("hook_stat,vis_demo,fmt_carousel", false); // → state JSON
+const out = d.end_day();                              // → events + state JSON
+// Repeat end_day() until events include {"type":"autopsy"} (week end)
+const state = d.get_state();                          // → full state snapshot
+#+END_SRC
+
+Full call inventory: =wasm_call.rs=. Protocol doc: =app/pkg/adbuy_sim.js= header.
+
+* Step 2 — Build the web app
+
+The UI is a 4-page Vite MPA (index, dashboard, brand-creator, team-designer).
+All pages share =app/shared.js= (fonts, icon set, reduce-motion class).
+
+#+BEGIN_SRC bash
+cd projects/adbuy
+
+# Install JS deps (first time only)
+npm install
+
+# Production build → dist/
+npx vite build
+# Expected: ✓ built in ~300ms, dist/ ~8.7 MB (3.5 MB transfer)
+
+# Dev server (browser only, no Capacitor)
+npx vite app --host 0.0.0.0 --port 5173
+# Open http://localhost:5173
+#+END_SRC
+
+The build emits =dist/= — this is what Capacitor syncs into the native shell.
+
+** Key size facts (from docs/artifact-weight-ledger.org)
+
+| Asset | Raw | Transfer |
+|-------+-----+----------|
+| WASM | 263 KB | 114 KB |
+| JS (all pages) | 136 KB | 37 KB |
+| Fonts (WOFF2) | 767 KB | 767 KB |
+| CSS | 211 KB | 36 KB |
+| *Total* | *8.7 MB* | *~3.5 MB* |
+
+8.7 MB includes Phosphor SVG/TTF font fallbacks (5.7 MB total) which are NOT
+downloaded on WOFF2-capable devices (all target devices).
+
+* Step 3 — Run on iOS (dev loop)
+
+#+BEGIN_SRC bash
+cd projects/adbuy
+
+# Full dev loop on a physical device (WiFi live-reload)
+./dev.sh
+
+# Simulator (no signing, no device required)
+./dev.sh --sim
+
+# Rebuild sim first, then launch
+./dev.sh --build-sim
+
+# Just start the Vite server (app already installed on device)
+./dev.sh --host-only
+#+END_SRC
+
+=dev.sh= orchestrates:
+1. Rebuild WASM if =app/pkg/= is missing
+2. =npm install= if =node_modules/= is missing
+3. =npx cap add ios= on first run (generates the Xcode project, ~1 min)
+4. =npx cap sync ios= (copies =dist/= into the native shell)
+5. =npx vite app --host 0.0.0.0 --port 5173= (background dev server)
+6. =npx cap run ios --live-reload --external= (deploys to device over WiFi)
+
+On first run, Xcode may prompt to sign the app — use a free personal Apple ID
+for device testing (=Personal Team= in Xcode → Signing & Capabilities).
+
+** Game loop (sanity check on device)
+
+1. Open AdBuy → land on the home screen (=index.html=)
+2. Tap "New Game" → Brand Creator (=brand-creator.html=) → pick a name/mark
+3. Tap "Next" → Team Designer (=team-designer.html=) → hire a strategist
+4. Tap "Launch" → Dashboard (=dashboard.html=) → play one week (3 AP/day, 5 days)
+5. Tap "NEXT DAY" until the Week Close screen appears
+6. Tap "Next brief" → the sign screen for Wave 2 appears
+
+Phase 1 gate: a stranger picks up the phone, plays one wave unprompted,
+and says "one more." Median wave: ≤6 min.
+
+* Step 4 — Ship to TestFlight
+
+#+BEGIN_SRC bash
+# From the monorepo root:
+wb forge mobile --target ios-release   # builds signed IPA via Xcode CLI
+
+# Or manually through Xcode:
+#   1. npx cap sync ios
+#   2. Open ios/App/App.xcworkspace in Xcode
+#   3. Product → Archive → Distribute App → TestFlight
+#+END_SRC
+
+The =wb forge mobile= command is the Workbooks-managed path (see deploy-kit/mobile/).
+It reads =forge.toml= for app metadata and handles build number generation.
+
+TestFlight delivers the IPA to beta testers without App Store review.
+Beta feedback arrives via the TestFlight app (tester notes) and Apple's crash
+symbolication (automatic, from dSYMs archived with the build).
+
+* The no-telemetry pillar and TestFlight feedback
+
+From =docs/00-vision.md= pillar 6:
+#+BEGIN_QUOTE
+Local-first, player-owned. Everything ships in the bundle. No server, no live data,
+no telemetry by default. The opt-in bug report is a seed + input journal.
+#+END_QUOTE
+
+This does NOT conflict with TestFlight because:
+1. Crash reports flow through Apple's infrastructure, not AdBuy's. Apple collects
+   them as part of the TestFlight contract that testers accept on enrollment.
+2. The TestFlight feedback form is Apple's UI, not ours. We receive it in App Store
+   Connect — no game state is transmitted.
+3. The "seed + input journal" crash path is separate: a player can export their seed
+   and input log so a developer can reproduce a crash locally. This is user-initiated
+   and ships no data to any server.
+4. Beta is explicitly not production. TestFlight's data collection is constrained to
+   the beta context; it does not follow the app to the App Store.
+
+Ruling: TestFlight crash symbolication and opt-in tester notes are compatible with
+the no-telemetry pillar. No code change needed. The pillar governs the shipped game,
+not the beta tooling.
+
+* Platform-side canon updates (out of scope for projects/adbuy/)
+
+These items are noted here for traceability but require edits outside this dir:
+
+** OPEN-STANDARD-PLAN.org (runtime/docs/)
+- Add the 'game' shape to the workbook taxonomy: a game workbook has a Rust sim
+  entry point, a multi-page MPA shell, and no server dependency.
+- Add asset-weight guidance: game workbooks are exempt from the single-file
+  inlining requirement (art at scale breaks the 2 MB parse ceiling).
+- Add WebGL-island guidance: the game shell can embed a canvas/WebGL surface as
+  a layout island; the workbook host does not constrain it.
+
+** Authoring skill (under toolkits/ or agent/)
+- The authoring skill should learn the game shape: when =[[sim-rs/]]= is present,
+  suggest sim tests before UI changes; when WASM size grows past 400 KB, note the
+  ceiling; when card count crosses 50, prompt the art pipeline discussion.
+
+** forge-targets.org (plans/)
+- The current prose implies single-file export is the canonical game delivery.
+  Add a carve-out: games with art assets use the Capacitor path, not workbook export.
+  The dir seam in lib.sh (for non-game staging) is intentional and stays.
+- Token-vocabulary carve-out: bespoke game art (headshots, card thumbnails, brand
+  logos) does not live in the workbook token vocabulary — it lives in =app/art/=
+  with explicit licensing (see docs/asset-license-audit.org).
+
+* Summary — what this case study proves
+
+AdBuy demonstrates that the Workbooks toolchain can ship a fully local game to
+TestFlight with no external services. The full pipeline is:
+
+#+BEGIN_EXAMPLE
+idea → sim-rs/ (Rust, deterministic) → wasm-pack → app/pkg/ → Vite MPA → dist/
+→ Capacitor sync → Xcode archive → TestFlight → player's phone
+#+END_EXAMPLE
+
+Everything in this chain lives in the monorepo. No npm registry publishes.
+No CDN. No LLM APIs. The only runtime dependency is the WASM binary shipped in
+the app bundle.
+
+Phase 1 success criterion (the gate for expanding production):
+strangers play one wave on a physical phone, say "one more" without prompting,
+and the wave completes in ≤6 minutes median.

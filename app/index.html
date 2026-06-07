@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b5998">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AdBuy">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ADBUY</title>
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<script type="module" src="./shared.js"></script>
+<link rel="stylesheet" href="./styles/index.css">
+</head>
+<body>
+<div class="device">
+  <div class="frame">
+    <div class="brand">
+      <div class="mark">
+        <div class="crest"><i class="ph-fill ph-chart-line-up"></i></div>
+        <div class="title disp">AD<span>BUY</span></div>
+      </div>
+      <div class="tag">THE AD CAMPAIGN CARD GAME</div>
+    </div>
+
+    <nav class="menu">
+      <a class="mbtn" href="brand-creator.html">
+        <i class="ph-fill ph-plus-circle"></i>
+        <div class="txt"><span class="lbl">New Game</span><span class="sub" id="newgamesub">Build a brand · take your first client</span></div>
+      </a>
+      <a class="mbtn sec" id="continue" href="dashboard.html?resume=1">
+        <i class="ph-fill ph-play-circle"></i>
+        <div class="txt"><span class="lbl">Continue</span><span class="sub" id="continuesub">No save yet</span></div>
+      </a>
+      <button class="mbtn sec" onclick="openSettings()">
+        <i class="ph-fill ph-gear-six"></i>
+        <div class="txt"><span class="lbl">Settings</span><span class="sub">Sound, haptics, data</span></div>
+      </button>
+    </nav>
+    <div class="ver">v0.1</div>
+  </div>
+</div>
+<div id="settingsmodal" onclick="closeSettings(event)">
+  <div class="spanel">
+    <h3 class="disp">Settings</h3>
+    <div class="srow"><span>Sound</span><button class="toggle" id="sndtoggle" onclick="toggleSound()"></button></div>
+    <div class="srow"><span>Haptics</span><button class="toggle" id="haptoggle" onclick="toggleHaptics()"></button></div>
+    <div class="srow"><span>Reduce motion</span><button class="toggle" id="motoggle" onclick="toggleMotion()"></button></div>
+    <div class="srow sdanger"><span>Save data</span><button class="btn sec smbtn" id="clearbtn" onclick="clearData()">Clear</button></div>
+    <div class="srow"><button class="btn sec sfull" onclick="closeSettings()">Done</button></div>
+  </div>
+</div>
+<script type="module" src="./scripts/index.js"></script>
+</body>
+</html>

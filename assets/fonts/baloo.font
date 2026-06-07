@@ -1,0 +1,4 @@
+font: "/assets/fonts/Baloo2.ttf"
+material: "/builtins/fonts/font-df.material"
+size: 48
+output_format: TYPE_DISTANCE_FIELD

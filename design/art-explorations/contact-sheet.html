@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Addendum — Card-Art Style Contact Sheet</title>
+<style>
+  :root {
+    --bg: #faf8f4;
+    --card: #ffffff;
+    --ink: #2b2b33;
+    --muted: #6b6b76;
+    --line: #e6e2da;
+    --accent: #e8643c;
+    --pass: #2e7d4f;
+    --warn: #b07a00;
+    --fail: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    padding: 32px 40px 80px;
+  }
+  header { max-width: 1180px; margin: 0 auto 28px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 14px; }
+  .brief {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 20px;
+    max-width: 1180px;
+  }
+  .brief h2 { font-size: 15px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+  .brief ul { margin: 6px 0 0; padding-left: 20px; }
+  .brief li { margin: 3px 0; }
+  main { max-width: 1180px; margin: 28px auto 0; }
+  .colhead {
+    display: grid;
+    grid-template-columns: 240px repeat(4, 256px);
+    gap: 0 16px;
+    padding: 0 16px 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .style-row {
+    display: grid;
+    grid-template-columns: 240px repeat(4, 256px);
+    gap: 0 16px;
+    align-items: start;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .style-meta h3 { margin: 0 0 6px; font-size: 18px; }
+  .style-meta p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .cell img {
+    width: 240px;
+    height: 240px;
+    object-fit: contain;
+    display: block;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+  }
+  .cell a:hover img { outline: 3px solid var(--accent); outline-offset: -1px; }
+  .cell .cap { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .missing {
+    width: 240px;
+    height: 240px;
+    border: 2px dashed #d8b9b2;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fail);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    background: #fdf6f4;
+  }
+  .row-failed { opacity: 0.92; }
+  .row-failed .style-meta h3::after {
+    content: " — GENERATION FAILED";
+    color: var(--fail);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  /* Verdict section */
+  .verdict {
+    max-width: 1180px;
+    margin: 48px auto 0;
+  }
+  .verdict h2 { font-size: 22px; letter-spacing: -0.01em; border-top: 3px solid var(--ink); padding-top: 18px; }
+  .verdict-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
+  .verdict-card h3 { margin: 0 0 8px; font-size: 16px; }
+  .verdict-card dl { margin: 0; }
+  .verdict-card dt { font-weight: 600; font-size: 13px; margin-top: 8px; }
+  .verdict-card dd { margin: 2px 0 0; color: var(--ink); font-size: 14px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; vertical-align: 2px; margin-left: 6px; }
+  .tag.pass { background: #e3f2e9; color: var(--pass); }
+  .tag.warn { background: #faf0d7; color: var(--warn); }
+  .tag.fail { background: #fae3de; color: var(--fail); }
+  .shortlist {
+    border-left: 4px solid var(--accent);
+    background: #fff;
+    border-radius: 0 12px 12px 0;
+    padding: 14px 20px;
+    margin-top: 22px;
+  }
+  .shortlist h3 { margin: 0 0 6px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Addendum — Card-Art Style Exploration</h1>
+  <p class="sub">Contact sheet for picking <strong>the game's single card-art style</strong>. One style wins; everything gets regenerated through its prompt "style bible". Click any image for full size (1024&times;1024).</p>
+  <div class="brief">
+    <h2>What Shane is choosing &amp; the criteria</h2>
+    <p>The art style for all card art, fed by the <strong>layered art system</strong> (docs/design/brands-and-products.md &sect;4): card visuals are composed from alpha-cut layers — setting + person cutout + product cutout — so a finite asset set yields combinatorial ad visuals. The winning style must therefore:</p>
+    <ul>
+      <li><strong>Stylized retro cartoon, never realistic</strong> — a specific period flavor, drawn-by-one-artist feel.</li>
+      <li><strong>Cutout-friendly silhouettes</strong> — subjects on plain backgrounds with clean, uncropped edges that survive alpha cutout + background swap.</li>
+      <li><strong>Carries both people and products</strong> — creators, founders, mascots AND jars/gadgets must read in the same vocabulary.</li>
+      <li><strong>Matches the chunky-cute light UI</strong> — bright, friendly, rounded; sits well on a light interface.</li>
+    </ul>
+  </div>
+</header>
+
+<main>
+  <div class="colhead">
+    <div>Style</div><div>Creator</div><div>Product</div><div>Mascot</div><div>Combo scene</div>
+  </div>
+
+  <!-- sticker-pop -->
+  <section class="style-row">
+    <div class="style-meta">
+      <h3>sticker-pop</h3>
+      <p>Chunky vinyl-sticker pop — thick uniform dark-navy outlines, soft cel shading, rounded toy-like proportions, bright candy palette.</p>
+    </div>
+    <div class="cell"><a href="sticker-pop/creator.png" target="_blank"><img src="sticker-pop/creator.png" alt="sticker-pop creator"></a><div class="cap">creator.png</div></div>
+    <div class="cell"><a href="sticker-pop/product.png" target="_blank"><img src="sticker-pop/product.png" alt="sticker-pop product"></a><div class="cap">product.png</div></div>
+    <div class="cell"><a href="sticker-pop/mascot.png" target="_blank"><img src="sticker-pop/mascot.png" alt="sticker-pop mascot"></a><div class="cap">mascot.png</div></div>
+    <div class="cell"><a href="sticker-pop/combo.png" target="_blank"><img src="sticker-pop/combo.png" alt="sticker-pop combo"></a><div class="cap">combo.png</div></div>
+  </section>
+
+  <!-- upa-flat -->
+  <section class="style-row">
+    <div class="style-meta">
+      <h3>upa-flat</h3>
+      <p>1950s UPA flat cartoon modernism — boldly simplified geometric shapes, flat limited gouache palette, screenprint grain, angular-but-friendly.</p>
+    </div>
+    <div class="cell"><a href="upa-flat/creator.png" target="_blank"><img src="upa-flat/creator.png" alt="upa-flat creator"></a><div class="cap">creator.png</div></div>
+    <div class="cell"><a href="upa-flat/product.png" target="_blank"><img src="upa-flat/product.png" alt="upa-flat product"></a><div class="cap">product.png</div></div>
+    <div class="cell"><a href="upa-flat/mascot.png" target="_blank"><img src="upa-flat/mascot.png" alt="upa-flat mascot"></a><div class="cap">mascot.png</div></div>
+    <div class="cell"><a href="upa-flat/combo.png" target="_blank"><img src="upa-flat/combo.png" alt="upa-flat combo"></a><div class="cap">combo.png</div></div>
+  </section>
+
+  <!-- midcentury-ad: FAILED -->
+  <section class="style-row row-failed">
+    <div class="style-meta">
+      <h3>midcentury-ad</h3>
+      <p>1960s Madison Avenue print-ad illustration — flat gouache, halftone dot texture, off-register inks, optimistic retro-commercial poses. Prompts written (prompts.md); no images were generated.</p>
+    </div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">creator.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">product.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">mascot.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">combo.png — missing</div></div>
+  </section>
+
+  <!-- cereal-mascot: FAILED -->
+  <section class="style-row row-failed">
+    <div class="style-meta">
+      <h3>cereal-mascot</h3>
+      <p>Retro 1960s cereal-box mascot cartoon — rubber-hose limbs, exaggerated grins, saturated primaries, vintage print misregistration. Prompts written (prompts.md); no images were generated.</p>
+    </div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">creator.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">product.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">mascot.png — missing</div></div>
+    <div class="cell"><div class="missing">not generated</div><div class="cap">combo.png — missing</div></div>
+  </section>
+
+  <!-- storybook: FAILED -->
+  <section class="style-row row-failed">
+    <div class="style-meta">
+      <h3>storybook</h3>
+      <p>Mid-century children's storybook illustration (planned flavor). The run never started — no directory, no prompts, no images on disk.</p>
+    </div>
+    <div class="cell"><div class="missing">never started</div><div class="cap">creator.png — missing</div></div>
+    <div class="cell"><div class="missing">never started</div><div class="cap">product.png — missing</div></div>
+    <div class="cell"><div class="missing">never started</div><div class="cap">mascot.png — missing</div></div>
+    <div class="cell"><div class="missing">never started</div><div class="cap">combo.png — missing</div></div>
+  </section>
+
+  <!-- paper-cutout -->
+  <section class="style-row">
+    <div class="style-meta">
+      <h3>paper-cutout</h3>
+      <p>Layered paper-cutout collage — crisp die-cut craft-paper shapes stacked with soft inter-layer drop shadows, paper-grain texture, handmade diorama feel.</p>
+    </div>
+    <div class="cell"><a href="paper-cutout/creator.png" target="_blank"><img src="paper-cutout/creator.png" alt="paper-cutout creator"></a><div class="cap">creator.png</div></div>
+    <div class="cell"><a href="paper-cutout/product.png" target="_blank"><img src="paper-cutout/product.png" alt="paper-cutout product"></a><div class="cap">product.png</div></div>
+    <div class="cell"><a href="paper-cutout/mascot.png" target="_blank"><img src="paper-cutout/mascot.png" alt="paper-cutout mascot"></a><div class="cap">mascot.png</div></div>
+    <div class="cell"><a href="paper-cutout/combo.png" target="_blank"><img src="paper-cutout/combo.png" alt="paper-cutout combo"></a><div class="cap">combo.png</div></div>
+  </section>
+</main>
+
+<!-- ============================================================ -->
+<section class="verdict">
+  <h2>Composability Verdict</h2>
+  <p class="sub">Judged from the actual pixels on disk against the layered art system (&sect;4): (a) alpha-cutout / background-swap readiness, (b) style consistency between isolated subjects and the combo scene, (c) brief failures.</p>
+
+  <div class="verdict-card">
+    <h3>sticker-pop <span class="tag pass">cutout: excellent</span> <span class="tag pass">consistency: excellent</span></h3>
+    <dl>
+      <dt>(a) Cutout / background swap</dt>
+      <dd>The best of the batch. Every subject ships with a thick uniform navy contour <em>plus</em> a white die-cut sticker border on flat cream — the cut path is literally pre-drawn. The heavy self-contained outline means cutouts will read on any swapped setting without losing edge definition. Hair on the creator is detailed but stays inside one closed silhouette.</dd>
+      <dt>(b) Isolated vs combo consistency</dt>
+      <dd>Strongest of the three. Same line weight, same candy palette, same character (brunette creator) and the same jar reappear in the combo forest scene. Honest nits: the combo collapsed the whole scene into a single die-cut sticker with a scalloped border (the model treats "sticker" as bordered object), and the creator's outfit drifted (pink cardigan &rarr; yellow cardigan). Neither matters under the layered system — you cut subjects once and composite, you don't regenerate scenes.</dd>
+      <dt>(c) Brief failures</dt>
+      <dd>None. Closest match to the chunky-cute light UI; mildly generic "kawaii sticker pack" energy is the only risk to distinctiveness.</dd>
+    </dl>
+  </div>
+
+  <div class="verdict-card">
+    <h3>upa-flat <span class="tag pass">cutout: good</span> <span class="tag warn">one cropped silhouette</span> <span class="tag pass">consistency: excellent</span></h3>
+    <dl>
+      <dt>(a) Cutout / background swap</dt>
+      <dd>Flat color fields and crisp vector-like edges alpha-cut cleanly; product and mascot are textbook cutouts. Two cautions: the creator's bell skirt runs to the bottom frame edge despite the "uncropped" instruction — her cutout would have a flat clipped base — and the style has <em>no outlines</em>, so cream/pale shapes (skin, dress panels) risk melting into light swapped backgrounds; settings would need enough tonal contrast.</dd>
+      <dt>(b) Isolated vs combo consistency</dt>
+      <dd>Excellent — the combo is arguably the best single image in the batch: same geometric vocabulary, grain, and palette as the isolated subjects. Character costume drifted (orange top/yellow skirt &rarr; red top/teal skirt, headband &rarr; bow), the usual generation drift the layered system exists to bypass.</dd>
+      <dt>(c) Brief failures</dt>
+      <dd>None. Most distinctive period identity of the batch; slightly more "elegant" than "chunky-cute", so it sits a half-step from the UI's toy-like roundness.</dd>
+    </dl>
+  </div>
+
+  <div class="verdict-card">
+    <h3>paper-cutout <span class="tag warn">cutout: caveat — baked shadows</span> <span class="tag pass">consistency: excellent</span></h3>
+    <dl>
+      <dt>(a) Cutout / background swap</dt>
+      <dd>Edges themselves are crisp die-cuts, but every subject has soft drop shadows <em>baked onto the background</em> around the silhouette. An alpha cut either carries a cream-tinted shadow halo onto the new setting or amputates the style's signature depth cue, and the baked shadow direction would fight composited scenes. Mitigation exists: cut hard to the paper edge and re-add drop shadows programmatically at composite time — which would actually reproduce the diorama look natively and makes this style conceptually the best <em>fit</em> for a layered system, at the cost of extra cleanup per asset.</dd>
+      <dt>(b) Isolated vs combo consistency</dt>
+      <dd>Very consistent — paper grain, layer shadows, and palette all carry into the (busy, flower-dense) combo scene; the creator and jar are recognizably the same. Minor drift in the creator's pose/outfit.</dd>
+      <dt>(c) Brief failures</dt>
+      <dd>No brief failure — charming and on-palette — but it is the highest-effort pipeline of the three because of the shadow problem.</dd>
+    </dl>
+  </div>
+
+  <div class="verdict-card">
+    <h3>midcentury-ad <span class="tag fail">FAILED — no images</span></h3>
+    <dl><dt>Status</dt><dd>Prompts were finalized (midcentury-ad/prompts.md) but zero images exist on disk. Cannot be judged; needs a regeneration run before it can compete. Note its prompt vocabulary overlaps heavily with upa-flat (gouache, halftone, same palette family), so upa-flat partially previews it.</dd></dl>
+  </div>
+
+  <div class="verdict-card">
+    <h3>cereal-mascot <span class="tag fail">FAILED — no images</span></h3>
+    <dl><dt>Status</dt><dd>Prompts finalized (cereal-mascot/prompts.md), zero images generated. Cannot be judged. Worth one retry mainly for the mascot subject class — rubber-hose energy may beat all three survivors there.</dd></dl>
+  </div>
+
+  <div class="verdict-card">
+    <h3>storybook <span class="tag fail">FAILED — never started</span></h3>
+    <dl><dt>Status</dt><dd>No directory, no prompts, no images. The exploration for this style never ran at all.</dd></dl>
+  </div>
+
+  <div class="shortlist">
+    <h3>Shortlist</h3>
+    <p><strong>1. sticker-pop</strong> — cleanest cutout affordance in the batch (outline + pre-drawn die-cut border), best match to the chunky-cute light UI, and the tightest isolated&harr;combo consistency. The lowest-risk choice for the layered art system as designed.<br>
+    <strong>2. upa-flat</strong> — the most distinctive and ownable look; flat shapes alpha-cut trivially. Pick it if distinctiveness outweighs the two caveats (outline-less edges on light settings, enforce "full silhouette inside frame" in the style bible).<br>
+    <em>paper-cutout</em> is the conceptual soulmate of the layered system but needs a shadow-handling pipeline; park it as the stretch option. Regenerate midcentury-ad and cereal-mascot before a final ruling if completeness matters.</p>
+  </div>
+</section>
+
+</body>
+</html>

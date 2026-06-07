@@ -1,0 +1,122 @@
+.frame{background:var(--paper);display:flex}
+
+/* ===== left: persistent live logo preview ===== */
+.preview{flex:0 0 320px;background:linear-gradient(180deg,#fff,#eaeef6);position:relative;
+  border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;
+  padding:26px 24px 18px}
+.roundshuf{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;
+  border:2px solid var(--line2);background:var(--card);color:var(--blue);font-size:17px;cursor:pointer;
+  box-shadow:0 2px 0 var(--line2);display:flex;align-items:center;justify-content:center}
+.roundshuf:active{transform:translateY(2px);box-shadow:none}
+.preview .eyebrow{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--dim)}
+.logostage{display:flex;align-items:center;justify-content:center;width:100%;margin:16px 0 4px}
+/* the resolved logo — one clean stacked arrangement, crest balanced w/ name */
+.logo{display:flex;flex-direction:column;align-items:center;gap:14px}
+.crest{width:88px;height:88px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 16px rgba(28,43,74,.16);transition:background .25s}
+.crest i{font-size:44px;transition:color .25s}
+.wordmark{font-weight:800;line-height:1.05;transition:color .25s;max-width:248px;text-align:center;word-break:break-word;font-size:27px}
+.f-fraunces{font-family:'Fraunces Variable',serif}
+.f-archivo{font-family:'Archivo Variable',sans-serif;letter-spacing:-1px}
+.f-baloo{font-family:'Baloo 2 Variable',cursive}
+/* industry + colors row — quiet, neutral chip so brand colors are the only saturation */
+.idrow{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin-top:12px}
+.vbadge{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:var(--dim);
+  text-transform:capitalize;background:var(--card);border:1.5px solid var(--line);border-radius:99px;padding:4px 11px 4px 5px}
+.vchip{width:22px;height:22px;border-radius:7px;background:var(--paper);color:var(--dim);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:13px}
+.idrow .palrow{padding-left:14px;border-left:1.5px solid var(--line)}
+.pspacer{flex:1}
+.palrow{display:flex;gap:6px;justify-content:center}
+.palrow span{width:22px;height:22px;border-radius:7px;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.06)}
+
+/* ===== right: paginated steps ===== */
+.steps{flex:1;display:flex;flex-direction:column}
+.steptop{padding:22px 28px 0}
+.dots{display:flex;gap:7px;margin-bottom:14px}
+.dot{height:7px;flex:1;border-radius:4px;background:#dbe1ec;cursor:pointer;transition:background .2s}
+.dot.done{background:var(--blue2)}
+.dot.active{background:var(--blue)}
+.stepnum{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--dim)}
+.steptitle{font-family:'Baloo 2 Variable';font-size:25px;font-weight:800;margin:2px 0 2px}
+.stephint{font-size:12.5px;font-weight:600;color:var(--dim)}
+.stepbody{flex:1;overflow-y:auto;padding:16px 28px;scrollbar-width:thin}
+/* choice grids */
+.grid{display:grid;gap:11px}
+.g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+.opt{background:var(--card);border:2.5px solid var(--line2);border-radius:14px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:14px 8px;box-shadow:0 2px 0 var(--line2);transition:transform .08s,border-color .12s,box-shadow .12s}
+.opt:active{transform:translateY(2px);box-shadow:none}
+.opt.sel{border-color:var(--blue);box-shadow:0 2px 0 var(--blue),0 0 0 3px var(--bluepale)}
+.opt i{font-size:26px;color:var(--ink)} .opt.sel i{color:var(--blue)}
+.opt .lab{font-size:11px;font-weight:800}
+.opt .sub{font-size:9.5px;font-weight:700;color:var(--dim)}
+.optsm{padding:12px 4px} .optsm i{font-size:22px}
+/* palette swatch option */
+.palopt{height:62px;border-radius:14px;cursor:pointer;border:3px solid transparent;position:relative;
+  display:flex;overflow:hidden;box-shadow:0 2px 0 var(--line2)}
+.palopt.sel{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+.palopt div{flex:1}
+.palopt .pcheck{position:absolute;top:5px;right:6px;color:#fff;font-size:13px;display:none}
+.palopt.sel .pcheck{display:block}
+/* icon search */
+.suglabel{font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--dim);margin-bottom:8px}
+.searchbar{display:flex;align-items:center;gap:8px;background:var(--card);border:2.5px solid var(--line2);
+  border-radius:12px;padding:9px 13px;margin:16px 0 12px;box-shadow:0 2px 0 var(--line2)}
+.searchbar i{color:var(--dim);font-size:16px}
+.searchbar input{flex:1;border:none;outline:none;font-family:'Nunito Variable';font-weight:700;font-size:14px;color:var(--ink);background:none}
+#iconresults .opt{padding:9px 4px} #iconresults .opt i{font-size:21px}
+.noresults{grid-column:1/-1;text-align:center;color:var(--dim);font-weight:700;font-size:12px;padding:16px}
+/* color spinners (slot machine) */
+.spinrow{display:flex;gap:18px;justify-content:center;padding-top:6px}
+.spincol{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spincol .slabel{font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--dim)}
+.spincol .srole{font-size:9px;font-weight:700;color:var(--blue)}
+.spinner{position:relative;width:88px;height:198px;border-radius:18px;background:var(--paper);
+  box-shadow:inset 0 2px 6px rgba(28,43,74,.14);overflow:hidden}
+.reel{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;
+  padding:77px 0;-webkit-overflow-scrolling:touch}
+.reel::-webkit-scrollbar{display:none}
+.sw{height:44px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center}
+.sw div{width:60px;height:34px;border-radius:9px;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.07);transition:transform .12s}
+.selband{position:absolute;left:6px;right:6px;top:77px;height:44px;border-radius:11px;pointer-events:none;
+  box-shadow:0 0 0 3px var(--blue), 0 0 0 6px var(--bluepale)}
+.spinarrows{display:flex;gap:24px}
+.spinarrows button{border:none;background:var(--card);box-shadow:0 2px 0 var(--line2);border-radius:8px;
+  width:30px;height:24px;cursor:pointer;color:var(--blue);font-size:13px}
+.spinarrows button:active{transform:translateY(2px);box-shadow:none}
+/* name step */
+.namebox{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:6px}
+.namebig{font-family:'Baloo 2 Variable';font-weight:800;font-size:34px;text-align:center;color:var(--ink);
+  background:var(--card);border:2.5px solid var(--line2);border-radius:14px;padding:14px 22px;
+  min-width:300px;text-align:center;box-shadow:var(--shadow)}
+.namebig:focus{outline:none;border-color:var(--blue)}
+.reroll{font-family:'Baloo 2 Variable';font-weight:700;font-size:13px;color:var(--blue);background:var(--bluepale);
+  border:none;border-radius:11px;padding:9px 16px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.namehint{font-size:11.5px;font-weight:700;color:var(--dim)}
+/* sign step */
+.signwrap{text-align:center;padding-top:18px}
+.signwrap h2{font-family:'Baloo 2 Variable';font-size:24px;font-weight:800}
+.signwrap p{font-size:13px;font-weight:600;color:var(--dim);margin:8px auto 0;max-width:340px;line-height:1.5}
+.signrow{display:flex;justify-content:center;gap:18px;margin-top:18px;font-size:12px;font-weight:800}
+.signrow span{color:var(--dim)} .signrow b{display:block;font-size:14px;color:var(--ink);margin-top:2px}
+.swrow{display:flex;gap:5px;align-items:center;margin-top:4px}
+.swrow s{display:inline-block;width:18px;height:18px;border-radius:5px;text-decoration:none;border:1.5px solid rgba(0,0,0,.12)}
+/* footer nav */
+.pnav{display:flex;align-items:center;gap:8px;width:100%;margin-top:16px}
+.pnav .btn{flex:1;padding:10px 8px;font-size:14px;min-height:42px}
+.pnav .iconbtn{flex:0 0 46px;width:46px;min-width:46px;padding:0;
+  display:flex;align-items:center;justify-content:center;font-size:18px}
+.btn{font-family:'Baloo 2 Variable';font-weight:700;font-size:15px;border:none;cursor:pointer;
+  padding:12px 26px;border-radius:13px;color:#fff;background:var(--blue);box-shadow:0 3px 0 #2c4170}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #2c4170}
+.btn.sec{background:var(--card);color:var(--blue);box-shadow:0 3px 0 var(--line2);border:2.5px solid var(--line2)}
+.btn.sec:active{box-shadow:0 1px 0 var(--line2)}
+.btn.go{background:var(--green);box-shadow:0 3px 0 #2e7847;font-size:17px;padding:13px 30px}
+.btn.go:active{box-shadow:0 1px 0 #2e7847}
+.nav .spacer{flex:1}
+.qs-row{margin-bottom:10px;display:flex;justify-content:center}
+.qs-btn{font-size:14px;padding:11px 28px;width:100%}
+.qs-or{text-align:center;font-size:11px;font-weight:600;color:var(--dim,#7a8aa0);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}

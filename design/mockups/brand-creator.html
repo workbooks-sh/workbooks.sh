@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — Brand Creator</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="_device.css">
+<script src="_device.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Archivo:wght@700;900&display=swap');
+:root{
+  --paper:#eef1f6; --card:#fff; --line:#d8deea; --line2:#c4ccdc;
+  --ink:#1c2b4a; --dim:#7c8aa5; --blue:#3b5998; --blue2:#5872b8; --bluepale:#e9eef9;
+  --green:#3fa15f; --greenpale:#e4f4e9; --amber:#d98e04; --amberpale:#fdf3dd; --red:#d0455a;
+  --shadow:0 2px 0 var(--line2), 0 6px 16px rgba(28,43,74,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+html,body{height:100%}
+body{background:#cfd6e2;display:flex;align-items:center;justify-content:center;
+  font-family:'Nunito',sans-serif;color:var(--ink);min-height:100vh}
+.disp{font-family:'Baloo 2',cursive}
+.frame{background:var(--paper);display:flex}
+
+/* ===== left: persistent live logo preview ===== */
+.preview{flex:0 0 320px;background:linear-gradient(180deg,#fff,#eaeef6);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;
+  padding:26px 24px 18px}
+.preview .eyebrow{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--dim)}
+.logostage{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+/* the resolved logo */
+.logo{display:flex;align-items:center;justify-content:center;gap:14px}
+.logo.stacked{flex-direction:column;gap:12px}
+.logo.emblem{flex-direction:column;gap:10px}
+.crest{width:120px;height:120px;display:flex;align-items:center;justify-content:center;position:relative;
+  box-shadow:0 8px 22px rgba(28,43,74,.18);transition:clip-path .2s, border-radius .2s, background .25s}
+.crest i{font-size:58px;transition:color .25s}
+.logo.horizontal .crest{width:96px;height:96px}.logo.horizontal .crest i{font-size:46px}
+.wordmark{font-weight:800;line-height:1;transition:color .25s;max-width:230px;text-align:center;word-break:break-word}
+.logo.stacked .wordmark,.logo.emblem .wordmark{font-size:30px}
+.logo.horizontal .wordmark{font-size:26px;text-align:left}
+.f-fraunces{font-family:'Fraunces',serif}
+.f-archivo{font-family:'Archivo',sans-serif;letter-spacing:-1px}
+.f-baloo{font-family:'Baloo 2',cursive}
+.previewmeta{width:100%;text-align:center;margin-top:8px}
+.previewmeta .vname{font-family:'Baloo 2';font-weight:800;font-size:18px}
+.previewmeta .vvert{font-size:11px;font-weight:700;color:var(--dim);margin-top:1px}
+.palrow{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.palrow span{width:22px;height:22px;border-radius:7px;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.06)}
+.surprise{margin-top:14px;font-family:'Baloo 2';font-weight:700;font-size:13px;color:var(--blue);
+  background:var(--card);border:2px solid var(--line2);box-shadow:0 3px 0 var(--line2);
+  border-radius:12px;padding:9px 16px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.surprise:active{transform:translateY(2px);box-shadow:none}
+
+/* ===== right: paginated steps ===== */
+.steps{flex:1;display:flex;flex-direction:column}
+.steptop{padding:22px 28px 0}
+.dots{display:flex;gap:7px;margin-bottom:14px}
+.dot{height:7px;flex:1;border-radius:4px;background:#dbe1ec;cursor:pointer;transition:background .2s}
+.dot.done{background:var(--blue2)}
+.dot.active{background:var(--blue)}
+.stepnum{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--dim)}
+.steptitle{font-family:'Baloo 2';font-size:25px;font-weight:800;margin:2px 0 2px}
+.stephint{font-size:12.5px;font-weight:600;color:var(--dim)}
+.stepbody{flex:1;overflow-y:auto;padding:16px 28px;scrollbar-width:thin}
+/* choice grids */
+.grid{display:grid;gap:11px}
+.g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+.opt{background:var(--card);border:2.5px solid var(--line2);border-radius:14px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:14px 8px;box-shadow:0 2px 0 var(--line2);transition:transform .08s,border-color .12s,box-shadow .12s}
+.opt:active{transform:translateY(2px);box-shadow:none}
+.opt.sel{border-color:var(--blue);box-shadow:0 2px 0 var(--blue),0 0 0 3px var(--bluepale)}
+.opt i{font-size:26px;color:var(--ink)} .opt.sel i{color:var(--blue)}
+.opt .lab{font-size:11px;font-weight:800}
+.opt .sub{font-size:9.5px;font-weight:700;color:var(--dim)}
+.optsm{padding:12px 4px} .optsm i{font-size:22px}
+/* palette swatch option */
+.palopt{height:62px;border-radius:14px;cursor:pointer;border:3px solid transparent;position:relative;
+  display:flex;overflow:hidden;box-shadow:0 2px 0 var(--line2)}
+.palopt.sel{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+.palopt div{flex:1}
+.palopt .pcheck{position:absolute;top:5px;right:6px;color:#fff;font-size:13px;display:none}
+.palopt.sel .pcheck{display:block}
+/* icon search */
+.suglabel{font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--dim);margin-bottom:8px}
+.searchbar{display:flex;align-items:center;gap:8px;background:var(--card);border:2.5px solid var(--line2);
+  border-radius:12px;padding:9px 13px;margin:16px 0 12px;box-shadow:0 2px 0 var(--line2)}
+.searchbar i{color:var(--dim);font-size:16px}
+.searchbar input{flex:1;border:none;outline:none;font-family:'Nunito';font-weight:700;font-size:14px;color:var(--ink);background:none}
+#iconresults .opt{padding:9px 4px} #iconresults .opt i{font-size:21px}
+.noresults{grid-column:1/-1;text-align:center;color:var(--dim);font-weight:700;font-size:12px;padding:16px}
+/* color spinners (slot machine) */
+.spinrow{display:flex;gap:18px;justify-content:center;padding-top:6px}
+.spincol{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spincol .slabel{font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--dim)}
+.spincol .srole{font-size:9px;font-weight:700;color:var(--blue)}
+.spinner{position:relative;width:88px;height:198px;border-radius:18px;background:var(--paper);
+  box-shadow:inset 0 2px 6px rgba(28,43,74,.14);overflow:hidden}
+.reel{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;
+  padding:77px 0;-webkit-overflow-scrolling:touch}
+.reel::-webkit-scrollbar{display:none}
+.sw{height:44px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center}
+.sw div{width:60px;height:34px;border-radius:9px;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.07);transition:transform .12s}
+.selband{position:absolute;left:6px;right:6px;top:77px;height:44px;border-radius:11px;pointer-events:none;
+  box-shadow:0 0 0 3px var(--blue), 0 0 0 6px var(--bluepale)}
+.spinarrows{display:flex;gap:24px}
+.spinarrows button{border:none;background:var(--card);box-shadow:0 2px 0 var(--line2);border-radius:8px;
+  width:30px;height:24px;cursor:pointer;color:var(--blue);font-size:13px}
+.spinarrows button:active{transform:translateY(2px);box-shadow:none}
+/* name step */
+.namebox{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:6px}
+.namebig{font-family:'Baloo 2';font-weight:800;font-size:34px;text-align:center;color:var(--ink);
+  background:var(--card);border:2.5px solid var(--line2);border-radius:14px;padding:14px 22px;
+  min-width:300px;text-align:center;box-shadow:var(--shadow)}
+.namebig:focus{outline:none;border-color:var(--blue)}
+.reroll{font-family:'Baloo 2';font-weight:700;font-size:13px;color:var(--blue);background:var(--bluepale);
+  border:none;border-radius:11px;padding:9px 16px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.namehint{font-size:11.5px;font-weight:700;color:var(--dim)}
+/* sign step */
+.signwrap{text-align:center;padding-top:18px}
+.signwrap h2{font-family:'Baloo 2';font-size:24px;font-weight:800}
+.signwrap p{font-size:13px;font-weight:600;color:var(--dim);margin:8px auto 0;max-width:340px;line-height:1.5}
+.signrow{display:flex;justify-content:center;gap:18px;margin-top:18px;font-size:12px;font-weight:800}
+.signrow span{color:var(--dim)} .signrow b{display:block;font-size:14px;color:var(--ink);margin-top:2px}
+/* footer nav */
+.nav{flex:none;display:flex;align-items:center;gap:12px;padding:14px 28px;border-top:1px solid var(--line)}
+.btn{font-family:'Baloo 2';font-weight:700;font-size:15px;border:none;cursor:pointer;
+  padding:12px 26px;border-radius:13px;color:#fff;background:var(--blue);box-shadow:0 3px 0 #2c4170}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #2c4170}
+.btn.sec{background:var(--card);color:var(--blue);box-shadow:0 3px 0 var(--line2);border:2.5px solid var(--line2)}
+.btn.sec:active{box-shadow:0 1px 0 var(--line2)}
+.btn.go{background:var(--green);box-shadow:0 3px 0 #2e7847;font-size:17px;padding:13px 30px}
+.btn.go:active{box-shadow:0 1px 0 #2e7847}
+.nav .spacer{flex:1}
+.recipeline{font-size:10px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="device"><div class="frame">
+
+  <!-- persistent live logo preview -->
+  <div class="preview">
+    <div class="eyebrow">YOUR BRAND</div>
+    <div class="logostage"><div class="logo" id="logo"></div></div>
+    <div class="previewmeta">
+      <div class="vname" id="pvname">—</div>
+      <div class="vvert" id="pvvert">—</div>
+    </div>
+    <div class="palrow" id="palrow"></div>
+    <div class="surprise" onclick="surprise()"><i class="ph-bold ph-shuffle"></i> Surprise me</div>
+  </div>
+
+  <!-- paginated steps -->
+  <div class="steps">
+    <div class="steptop">
+      <div class="dots" id="dots"></div>
+      <div class="stepnum" id="stepnum">STEP 1 OF 7</div>
+      <div class="steptitle" id="steptitle"></div>
+      <div class="stephint" id="stephint"></div>
+    </div>
+    <div class="stepbody" id="stepbody"></div>
+    <div class="nav">
+      <button class="btn sec" id="backbtn" onclick="go(-1)">Back</button>
+      <span class="recipeline" id="recipeline"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="nextbtn" onclick="go(1)">Next</button>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+/* ===== baked atoms (mirror of sim/logo.lua) ===== */
+const CONTAINERS = ["shield","circle","lozenge","crest","banner","hex","rounded_sq","diamond","oval","badge","ribbon","seal"];
+const FONTS = [{id:"fraunces",label:"Fraunces",cls:"f-fraunces"},{id:"archivo",label:"Archivo",cls:"f-archivo"},{id:"baloo",label:"Baloo",cls:"f-baloo"}];
+const LAYOUTS = ["stacked","horizontal","emblem"];
+const GLYPHS = [
+  {id:"leaf",v:"skincare"},
+  {id:"drop",v:"skincare"},
+  {id:"flower",v:"skincare"},
+  {id:"plant",v:"skincare"},
+  {id:"sparkle",v:"skincare"},
+  {id:"sun",v:"skincare"},
+  {id:"cooking-pot",v:"cookware"},
+  {id:"fork-knife",v:"cookware"},
+  {id:"flame",v:"cookware"},
+  {id:"bowl-steam",v:"cookware"},
+  {id:"knife",v:"cookware"},
+  {id:"cake",v:"cookware"},
+  {id:"cursor",v:"software"},
+  {id:"stack",v:"software"},
+  {id:"lightning",v:"software"},
+  {id:"broadcast",v:"software"},
+  {id:"code",v:"software"},
+  {id:"terminal-window",v:"software"},
+  {id:"coat-hanger",v:"apparel"},
+  {id:"scissors",v:"apparel"},
+  {id:"t-shirt",v:"apparel"},
+  {id:"baseball-cap",v:"apparel"},
+  {id:"handbag",v:"apparel"},
+  {id:"sneaker",v:"apparel"},
+  {id:"wine",v:"beverages"},
+  {id:"coffee",v:"beverages"},
+  {id:"beer-stein",v:"beverages"},
+  {id:"martini",v:"beverages"},
+  {id:"brandy",v:"beverages"},
+  {id:"tea-bag",v:"beverages"},
+  {id:"paint-brush",v:"beauty"},
+  {id:"eyedropper",v:"beauty"},
+  {id:"butterfly",v:"beauty"},
+  {id:"flower-lotus",v:"beauty"},
+  {id:"hand-heart",v:"beauty"},
+  {id:"mask-happy",v:"beauty"},
+  {id:"pill",v:"wellness"},
+  {id:"barbell",v:"wellness"},
+  {id:"heartbeat",v:"wellness"},
+  {id:"first-aid-kit",v:"wellness"},
+  {id:"flask",v:"wellness"},
+  {id:"drop",v:"wellness"},
+  {id:"house",v:"home"},
+  {id:"armchair",v:"home"},
+  {id:"lamp",v:"home"},
+  {id:"bed",v:"home"},
+  {id:"lightbulb",v:"home"},
+  {id:"plant",v:"home"},
+  {id:"paw-print",v:"pet"},
+  {id:"dog",v:"pet"},
+  {id:"cat",v:"pet"},
+  {id:"bone",v:"pet"},
+  {id:"fish",v:"pet"},
+  {id:"bird",v:"pet"},
+  {id:"cookie",v:"snacks"},
+  {id:"popcorn",v:"snacks"},
+  {id:"ice-cream",v:"snacks"},
+  {id:"hamburger",v:"snacks"},
+  {id:"pizza",v:"snacks"},
+  {id:"carrot",v:"snacks"},
+  {id:"star",v:"universal"},
+  {id:"crown",v:"universal"},
+  {id:"diamond",v:"universal"},
+  {id:"wave-sine",v:"universal"},
+  {id:"moon",v:"universal"},
+  {id:"heart",v:"universal"},
+  {id:"rocket",v:"universal"},
+  {id:"globe",v:"universal"},
+  {id:"gift",v:"universal"},
+  {id:"mountains",v:"universal"},
+  {id:"hexagon",v:"universal"},
+  {id:"sun",v:"universal"}
+];
+const ICONS = ["acorn","activity","address-book","address-book-tabs","air-traffic-control","airplane","airplane-in-flight","airplane-landing","airplane-takeoff","airplane-taxiing","airplane-tilt","airplay","alarm","alien","align-bottom","align-bottom-simple","align-center-horizontal","align-center-horizontal-simple","align-center-vertical","align-center-vertical-simple","align-left","align-left-simple","align-right","align-right-simple","align-top","align-top-simple","amazon-logo","ambulance","anchor","anchor-simple","android-logo","angle","angular-logo","aperture","app-store-logo","app-window","apple-logo","apple-podcasts-logo","approximate-equals","archive","archive-box","archive-tray","armchair","arrow-arc-left","arrow-arc-right","arrow-bend-double-up-left","arrow-bend-double-up-right","arrow-bend-down-left","arrow-bend-down-right","arrow-bend-left-down","arrow-bend-left-up","arrow-bend-right-down","arrow-bend-right-up","arrow-bend-up-left","arrow-bend-up-right","arrow-circle-down","arrow-circle-down-left","arrow-circle-down-right","arrow-circle-left","arrow-circle-right","arrow-circle-up","arrow-circle-up-left","arrow-circle-up-right","arrow-clockwise","arrow-counter-clockwise","arrow-down","arrow-down-left","arrow-down-right","arrow-elbow-down-left","arrow-elbow-down-right","arrow-elbow-left","arrow-elbow-left-down","arrow-elbow-left-up","arrow-elbow-right","arrow-elbow-right-down","arrow-elbow-right-up","arrow-elbow-up-left","arrow-elbow-up-right","arrow-fat-down","arrow-fat-left","arrow-fat-line-down","arrow-fat-line-left","arrow-fat-line-right","arrow-fat-line-up","arrow-fat-lines-down","arrow-fat-lines-left","arrow-fat-lines-right","arrow-fat-lines-up","arrow-fat-right","arrow-fat-up","arrow-left","arrow-line-down","arrow-line-down-left","arrow-line-down-right","arrow-line-left","arrow-line-right","arrow-line-up","arrow-line-up-left","arrow-line-up-right","arrow-right","arrow-square-down","arrow-square-down-left","arrow-square-down-right","arrow-square-in","arrow-square-left","arrow-square-out","arrow-square-right","arrow-square-up","arrow-square-up-left","arrow-square-up-right","arrow-u-down-left","arrow-u-down-right","arrow-u-left-down","arrow-u-left-up","arrow-u-right-down","arrow-u-right-up","arrow-u-up-left","arrow-u-up-right","arrow-up","arrow-up-left","arrow-up-right","arrows-clockwise","arrows-counter-clockwise","arrows-down-up","arrows-horizontal","arrows-in","arrows-in-cardinal","arrows-in-line-horizontal","arrows-in-line-vertical","arrows-in-simple","arrows-left-right","arrows-merge","arrows-out","arrows-out-cardinal","arrows-out-line-horizontal","arrows-out-line-vertical","arrows-out-simple","arrows-split","arrows-vertical","article","article-medium","article-ny-times","asclepius","asterisk","asterisk-simple","at","atom","avocado","axe","baby","baby-carriage","backpack","backspace","bag","bag-simple","balloon","bandaids","bank","barbell","barcode","barn","barricade","baseball","baseball-cap","baseball-helmet","basket","basketball","bathtub","battery-charging","battery-charging-vertical","battery-empty","battery-full","battery-high","battery-low","battery-medium","battery-plus","battery-plus-vertical","battery-vertical-empty","battery-vertical-full","battery-vertical-high","battery-vertical-low","battery-vertical-medium","battery-warning","battery-warning-vertical","beach-ball","beanie","bed","beer-bottle","beer-stein","behance-logo","bell","bell-ringing","bell-simple","bell-simple-ringing","bell-simple-slash","bell-simple-z","bell-slash","bell-z","belt","bezier-curve","bicycle","binary","binoculars","biohazard","bird","blueprint","bluetooth","bluetooth-connected","bluetooth-slash","bluetooth-x","boat","bomb","bone","book","book-bookmark","book-open","book-open-text","book-open-user","bookmark","bookmark-simple","bookmarks","bookmarks-simple","books","boot","boules","bounding-box","bowl-food","bowl-steam","bowling-ball","box-arrow-down","box-arrow-up","boxing-glove","brackets-angle","brackets-curly","brackets-round","brackets-square","brain","brandy","bread","bridge","briefcase","briefcase-metal","broadcast","broom","browser","browsers","bug","bug-beetle","bug-droid","building","building-apartment","building-office","buildings","bulldozer","bus","butterfly","cable-car","cactus","caduceus","cake","calculator","calendar","calendar-blank","calendar-check","calendar-dot","calendar-dots","calendar-heart","calendar-minus","calendar-plus","calendar-slash","calendar-star","calendar-x","call-bell","camera","camera-plus","camera-rotate","camera-slash","campfire","car","car-battery","car-profile","car-simple","cardholder","cards","cards-three","caret-circle-double-down","caret-circle-double-left","caret-circle-double-right","caret-circle-double-up","caret-circle-down","caret-circle-left","caret-circle-right","caret-circle-up","caret-circle-up-down","caret-double-down","caret-double-left","caret-double-right","caret-double-up","caret-down","caret-left","caret-line-down","caret-line-left","caret-line-right","caret-line-up","caret-right","caret-up","caret-up-down","carrot","cash-register","cassette-tape","castle-turret","cat","cell-signal-full","cell-signal-high","cell-signal-low","cell-signal-medium","cell-signal-none","cell-signal-slash","cell-signal-x","cell-tower","certificate","chair","chalkboard","chalkboard-simple","chalkboard-teacher","champagne","charging-station","chart-bar","chart-bar-horizontal","chart-donut","chart-line","chart-line-down","chart-line-up","chart-pie","chart-pie-slice","chart-polar","chart-scatter","chat","chat-centered","chat-centered-dots","chat-centered-slash","chat-centered-text","chat-circle","chat-circle-dots","chat-circle-slash","chat-circle-text","chat-dots","chat-slash","chat-teardrop","chat-teardrop-dots","chat-teardrop-slash","chat-teardrop-text","chat-text","chats","chats-circle","chats-teardrop","check","check-circle","check-fat","check-square","check-square-offset","checkerboard","checks","cheers","cheese","chef-hat","cherries","church","cigarette","cigarette-slash","circle","circle-dashed","circle-half","circle-half-tilt","circle-notch","circle-wavy","circle-wavy-check","circle-wavy-question","circle-wavy-warning","circles-four","circles-three","circles-three-plus","circuitry","city","clipboard","clipboard-text","clock","clock-afternoon","clock-clockwise","clock-countdown","clock-counter-clockwise","clock-user","closed-captioning","cloud","cloud-arrow-down","cloud-arrow-up","cloud-check","cloud-fog","cloud-lightning","cloud-moon","cloud-rain","cloud-slash","cloud-snow","cloud-sun","cloud-warning","cloud-x","clover","club","coat-hanger","coda-logo","code","code-block","code-simple","codepen-logo","codesandbox-logo","coffee","coffee-bean","coin","coin-vertical","coins","columns","columns-plus-left","columns-plus-right","command","compass","compass-rose","compass-tool","computer-tower","confetti","contactless-payment","control","cookie","cooking-pot","copy","copy-simple","copyleft","copyright","corners-in","corners-out","couch","court-basketball","cow","cowboy-hat","cpu","crane","crane-tower","credit-card","cricket","crop","cross","crosshair","crosshair-simple","crown","crown-cross","crown-simple","cube","cube-focus","cube-transparent","currency-btc","currency-circle-dollar","currency-cny","currency-dollar","currency-dollar-simple","currency-eth","currency-eur","currency-gbp","currency-inr","currency-jpy","currency-krw","currency-kzt","currency-ngn","currency-rub","cursor","cursor-click","cursor-text","cylinder","database","desk","desktop","desktop-tower","detective","dev-to-logo","device-mobile","device-mobile-camera","device-mobile-slash","device-mobile-speaker","device-rotate","device-tablet","device-tablet-camera","device-tablet-speaker","devices","diamond","diamonds-four","dice-five","dice-four","dice-one","dice-six","dice-three","dice-two","disc","disco-ball","discord-logo","divide","dna","dog","door","door-open","dot","dot-outline","dots-nine","dots-six","dots-six-vertical","dots-three","dots-three-circle","dots-three-circle-vertical","dots-three-outline","dots-three-outline-vertical","dots-three-vertical","download","download-simple","dress","dresser","dribbble-logo","drone","drop","drop-half","drop-half-bottom","drop-simple","drop-slash","dropbox-logo","ear","ear-slash","egg","egg-crack","eject","eject-simple","elevator","empty","engine","envelope","envelope-open","envelope-simple","envelope-simple-open","equalizer","equals","eraser","escalator-down","escalator-up","exam","exclamation-mark","exclude","exclude-square","export","eye","eye-closed","eye-slash","eyedropper","eyedropper-sample","eyeglasses","eyes","face-mask","facebook-logo","factory","faders","faders-horizontal","fallout-shelter","fan","farm","fast-forward","fast-forward-circle","feather","fediverse-logo","figma-logo","file","file-archive","file-arrow-down","file-arrow-up","file-audio","file-c","file-c-sharp","file-cloud","file-code","file-cpp","file-css","file-csv","file-dashed","file-doc","file-dotted","file-html","file-image","file-ini","file-jpg","file-js","file-jsx","file-lock","file-magnifying-glass","file-md","file-minus","file-pdf","file-plus","file-png","file-ppt","file-py","file-rs","file-search","file-sql","file-svg","file-text","file-ts","file-tsx","file-txt","file-video","file-vue","file-x","file-xls","file-zip","files","film-reel","film-script","film-slate","film-strip","fingerprint","fingerprint-simple","finn-the-human","fire","fire-extinguisher","fire-simple","fire-truck","first-aid","first-aid-kit","fish","fish-simple","flag","flag-banner","flag-banner-fold","flag-checkered","flag-pennant","flame","flashlight","flask","flip-horizontal","flip-vertical","floppy-disk","floppy-disk-back","flow-arrow","flower","flower-lotus","flower-tulip","flying-saucer","folder","folder-dashed","folder-dotted","folder-lock","folder-minus","folder-notch","folder-notch-minus","folder-notch-open","folder-notch-plus","folder-open","folder-plus","folder-simple","folder-simple-dashed","folder-simple-dotted","folder-simple-lock","folder-simple-minus","folder-simple-plus","folder-simple-star","folder-simple-user","folder-star","folder-user","folders","football","football-helmet","footprints","fork-knife","four-k","frame-corners","framer-logo","function","funnel","funnel-simple","funnel-simple-x","funnel-x","game-controller","garage","gas-can","gas-pump","gauge","gavel","gear","gear-fine","gear-six","gender-female","gender-intersex","gender-male","gender-neuter","gender-nonbinary","gender-transgender","ghost","gif","gift","git-branch","git-commit","git-diff","git-fork","git-merge","git-pull-request","github-logo","gitlab-logo","gitlab-logo-simple","globe","globe-hemisphere-east","globe-hemisphere-west","globe-simple","globe-simple-x","globe-stand","globe-x","goggles","golf","goodreads-logo","google-cardboard-logo","google-chrome-logo","google-drive-logo","google-logo","google-photos-logo","google-play-logo","google-podcasts-logo","gps","gps-fix","gps-slash","gradient","graduation-cap","grains","grains-slash","graph","graphics-card","greater-than","greater-than-or-equal","grid-four","grid-nine","guitar","hair-dryer","hamburger","hammer","hand","hand-arrow-down","hand-arrow-up","hand-coins","hand-deposit","hand-eye","hand-fist","hand-grabbing","hand-heart","hand-palm","hand-peace","hand-pointing","hand-soap","hand-swipe-left","hand-swipe-right","hand-tap","hand-waving","hand-withdraw","handbag","handbag-simple","hands-clapping","hands-praying","handshake","hard-drive","hard-drives","hard-hat","hash","hash-straight","head-circuit","headlights","headphones","headset","heart","heart-break","heart-half","heart-straight","heart-straight-break","heartbeat","hexagon","high-definition","high-heel","highlighter","highlighter-circle","hockey","hoodie","horse","hospital","hourglass","hourglass-high","hourglass-low","hourglass-medium","hourglass-simple","hourglass-simple-high","hourglass-simple-low","hourglass-simple-medium","house","house-line","house-simple","hurricane","ice-cream","identification-badge","identification-card","image","image-broken","image-square","images","images-square","infinity","info","instagram-logo","intersect","intersect-square","intersect-three","intersection","invoice","island","jar","jar-label","jeep","joystick","kanban","key","key-return","keyboard","keyhole","knife","ladder","ladder-simple","lamp","lamp-pendant","laptop","lasso","lastfm-logo","layout","leaf","lectern","lego","lego-smiley","lemniscate","less-than","less-than-or-equal","letter-circle-h","letter-circle-p","letter-circle-v","lifebuoy","lightbulb","lightbulb-filament","lighthouse","lightning","lightning-a","lightning-slash","line-segment","line-segments","line-vertical","link","link-break","link-simple","link-simple-break","link-simple-horizontal","link-simple-horizontal-break","linkedin-logo","linktree-logo","linux-logo","list","list-bullets","list-checks","list-dashes","list-heart","list-magnifying-glass","list-numbers","list-plus","list-star","lock","lock-key","lock-key-open","lock-laminated","lock-laminated-open","lock-open","lock-simple","lock-simple-open","lockers","log","magic-wand","magnet","magnet-straight","magnifying-glass","magnifying-glass-minus","magnifying-glass-plus","mailbox","map-pin","map-pin-area","map-pin-line","map-pin-plus","map-pin-simple","map-pin-simple-area","map-pin-simple-line","map-trifold","markdown-logo","marker-circle","martini","mask-happy","mask-sad","mastodon-logo","math-operations","matrix-logo","medal","medal-military","medium-logo","megaphone","megaphone-simple","member-of","memory","messenger-logo","meta-logo","meteor","metronome","microphone","microphone-slash","microphone-stage","microscope","microsoft-excel-logo","microsoft-outlook-logo","microsoft-powerpoint-logo","microsoft-teams-logo","microsoft-word-logo","minus","minus-circle","minus-square","money","money-wavy","monitor","monitor-arrow-up","monitor-play","moon","moon-stars","moped","moped-front","mosque","motorcycle","mountains","mouse","mouse-left-click","mouse-middle-click","mouse-right-click","mouse-scroll","mouse-simple","music-note","music-note-simple","music-notes","music-notes-minus","music-notes-plus","music-notes-simple","navigation-arrow","needle","network","network-slash","network-x","newspaper","newspaper-clipping","not-equals","not-member-of","not-subset-of","not-superset-of","notches","note","note-blank","note-pencil","notebook","notepad","notification","notion-logo","nuclear-plant","number-circle-eight","number-circle-five","number-circle-four","number-circle-nine","number-circle-one","number-circle-seven","number-circle-six","number-circle-three","number-circle-two","number-circle-zero","number-eight","number-five","number-four","number-nine","number-one","number-seven","number-six","number-square-eight","number-square-five","number-square-four","number-square-nine","number-square-one","number-square-seven","number-square-six","number-square-three","number-square-two","number-square-zero","number-three","number-two","number-zero","numpad","nut","ny-times-logo","octagon","office-chair","onigiri","open-ai-logo","option","orange","orange-slice","oven","package","paint-brush","paint-brush-broad","paint-brush-household","paint-bucket","paint-roller","palette","panorama","pants","paper-plane","paper-plane-right","paper-plane-tilt","paperclip","paperclip-horizontal","parachute","paragraph","parallelogram","park","password","path","patreon-logo","pause","pause-circle","paw-print","paypal-logo","peace","pen","pen-nib","pen-nib-straight","pencil","pencil-circle","pencil-line","pencil-ruler","pencil-simple","pencil-simple-line","pencil-simple-slash","pencil-slash","pentagon","pentagram","pepper","percent","person","person-arms-spread","person-simple","person-simple-bike","person-simple-circle","person-simple-hike","person-simple-run","person-simple-ski","person-simple-snowboard","person-simple-swim","person-simple-tai-chi","person-simple-throw","person-simple-walk","perspective","phone","phone-call","phone-disconnect","phone-incoming","phone-list","phone-outgoing","phone-pause","phone-plus","phone-slash","phone-transfer","phone-x","phosphor-logo","pi","piano-keys","picnic-table","picture-in-picture","piggy-bank","pill","ping-pong","pint-glass","pinterest-logo","pinwheel","pipe","pipe-wrench","pix-logo","pizza","placeholder","planet","plant","play","play-circle","play-pause","playlist","plug","plug-charging","plugs","plugs-connected","plus","plus-circle","plus-minus","plus-square","poker-chip","police-car","polygon","popcorn","popsicle","potted-plant","power","prescription","presentation","presentation-chart","printer","prohibit","prohibit-inset","projector-screen","projector-screen-chart","pulse","push-pin","push-pin-simple","push-pin-simple-slash","push-pin-slash","puzzle-piece","qr-code","question","question-mark","queue","quotes","rabbit","racquet","radical","radio","radio-button","radioactive","rainbow","rainbow-cloud","ranking","read-cv-logo","receipt","receipt-x","record","rectangle","rectangle-dashed","recycle","reddit-logo","repeat","repeat-once","replit-logo","resize","rewind","rewind-circle","road-horizon","robot","rocket","rocket-launch","rows","rows-plus-bottom","rows-plus-top","rss","rss-simple","rug","ruler","sailboat","scales","scan","scan-smiley","scissors","scooter","screencast","screwdriver","scribble","scribble-loop","scroll","seal","seal-check","seal-percent","seal-question","seal-warning","seat","seatbelt","security-camera","selection","selection-all","selection-background","selection-foreground","selection-inverse","selection-plus","selection-slash","shapes","share","share-fat","share-network","shield","shield-check","shield-checkered","shield-chevron","shield-plus","shield-slash","shield-star","shield-warning","shipping-container","shirt-folded","shooting-star","shopping-bag","shopping-bag-open","shopping-cart","shopping-cart-simple","shovel","shower","shrimp","shuffle","shuffle-angular","shuffle-simple","sidebar","sidebar-simple","sigma","sign-in","sign-out","signature","signpost","sim-card","siren","sketch-logo","skip-back","skip-back-circle","skip-forward","skip-forward-circle","skull","skype-logo","slack-logo","sliders","sliders-horizontal","slideshow","smiley","smiley-angry","smiley-blank","smiley-meh","smiley-melting","smiley-nervous","smiley-sad","smiley-sticker","smiley-wink","smiley-x-eyes","snapchat-logo","sneaker","sneaker-move","snowflake","soccer-ball","sock","solar-panel","solar-roof","sort-ascending","sort-descending","soundcloud-logo","spade","sparkle","speaker-hifi","speaker-high","speaker-low","speaker-none","speaker-simple-high","speaker-simple-low","speaker-simple-none","speaker-simple-slash","speaker-simple-x","speaker-slash","speaker-x","speedometer","sphere","spinner","spinner-ball","spinner-gap","spiral","split-horizontal","split-vertical","spotify-logo","spray-bottle","square","square-half","square-half-bottom","square-logo","square-split-horizontal","square-split-vertical","squares-four","stack","stack-minus","stack-overflow-logo","stack-plus","stack-simple","stairs","stamp","standard-definition","star","star-and-crescent","star-four","star-half","star-of-david","steam-logo","steering-wheel","steps","stethoscope","sticker","stool","stop","stop-circle","storefront","strategy","stripe-logo","student","subset-of","subset-proper-of","subtitles","subtitles-slash","subtract","subtract-square","subway","suitcase","suitcase-rolling","suitcase-simple","sun","sun-dim","sun-horizon","sunglasses","superset-of","superset-proper-of","swap","swatches","swimming-pool","sword","synagogue","syringe","t-shirt","table","tabs","tag","tag-chevron","tag-simple","target","taxi","tea-bag","telegram-logo","television","television-simple","tennis-ball","tent","terminal","terminal-window","test-tube","text-a-underline","text-aa","text-align-center","text-align-justify","text-align-left","text-align-right","text-b","text-bolder","text-columns","text-h","text-h-five","text-h-four","text-h-one","text-h-six","text-h-three","text-h-two","text-indent","text-italic","text-outdent","text-strikethrough","text-subscript","text-superscript","text-t","text-t-slash","text-underline","textbox","thermometer","thermometer-cold","thermometer-hot","thermometer-simple","threads-logo","three-d","thumbs-down","thumbs-up","ticket","tidal-logo","tiktok-logo","tilde","timer","tip-jar","tipi","tire","toggle-left","toggle-right","toilet","toilet-paper","toolbox","tooth","tornado","tote","tote-simple","towel","tractor","trademark","trademark-registered","traffic-cone","traffic-sign","traffic-signal","train","train-regional","train-simple","tram","translate","trash","trash-simple","tray","tray-arrow-down","tray-arrow-up","treasure-chest","tree","tree-evergreen","tree-palm","tree-structure","tree-view","trend-down","trend-up","triangle","triangle-dashed","trolley","trolley-suitcase","trophy","truck","truck-trailer","tumblr-logo","twitch-logo","twitter-logo","umbrella","umbrella-simple","union","unite","unite-square","upload","upload-simple","usb","user","user-check","user-circle","user-circle-check","user-circle-dashed","user-circle-gear","user-circle-minus","user-circle-plus","user-focus","user-gear","user-list","user-minus","user-plus","user-rectangle","user-sound","user-square","user-switch","users","users-four","users-three","van","vault","vector-three","vector-two","vibrate","video","video-camera","video-camera-slash","video-conference","vignette","vinyl-record","virtual-reality","virus","visor","voicemail","volleyball","wall","wallet","warehouse","warning","warning-circle","warning-diamond","warning-octagon","washing-machine","watch","wave-sawtooth","wave-sine","wave-square","wave-triangle","waveform","waveform-slash","waves","webcam","webcam-slash","webhooks-logo","wechat-logo","whatsapp-logo","wheelchair","wheelchair-motion","wifi-high","wifi-low","wifi-medium","wifi-none","wifi-slash","wifi-x","wind","windmill","windows-logo","wine","wrench","x","x-circle","x-logo","x-square","yarn","yin-yang","youtube-logo"];
+const COLORS = [
+  [255,255,255],
+  [255,245,245],
+  [192,86,60],
+  [64,26,16],
+  [255,138,101],
+  [255,138,92],
+  [74,28,8],
+  [237,106,44],
+  [224,122,63],
+  [176,98,52],
+  [45,42,40],
+  [255,244,236],
+  [58,40,24],
+  [20,18,16],
+  [235,230,224],
+  [255,250,244],
+  [250,242,232],
+  [40,28,12],
+  [216,142,36],
+  [255,193,94],
+  [60,40,8],
+  [28,22,12],
+  [255,185,56],
+  [66,48,12],
+  [244,236,220],
+  [222,170,58],
+  [255,201,77],
+  [255,209,102],
+  [255,205,80],
+  [250,204,21],
+  [107,114,52],
+  [38,42,16],
+  [244,247,228],
+  [132,204,22],
+  [32,48,12],
+  [26,42,10],
+  [47,74,46],
+  [20,34,20],
+  [228,244,228],
+  [84,122,92],
+  [228,244,236],
+  [245,255,250],
+  [32,178,128],
+  [16,64,48],
+  [22,140,104],
+  [120,255,214],
+  [18,52,42],
+  [18,46,42],
+  [38,120,108],
+  [60,232,210],
+  [34,224,210],
+  [92,225,230],
+  [86,204,242],
+  [47,72,88],
+  [37,150,224],
+  [18,52,86],
+  [64,96,128],
+  [240,244,248],
+  [13,27,42],
+  [8,16,26],
+  [248,251,255],
+  [71,85,105],
+  [236,240,246],
+  [24,32,46],
+  [12,14,18],
+  [28,43,74],
+  [59,89,152],
+  [30,34,44],
+  [244,247,255],
+  [236,237,242],
+  [48,63,159],
+  [20,26,72],
+  [238,240,255],
+  [240,236,255],
+  [236,228,255],
+  [30,22,48],
+  [74,58,110],
+  [34,18,68],
+  [94,53,177],
+  [24,12,34],
+  [20,10,28],
+  [56,12,46],
+  [171,42,141],
+  [252,244,250],
+  [255,64,160],
+  [82,18,48],
+  [214,40,118],
+  [74,28,48],
+  [255,248,251],
+  [255,77,148],
+  [233,84,140],
+  [199,58,107],
+  [250,234,238],
+  [64,18,26],
+  [208,69,90],
+  [72,12,18],
+  [214,40,57]
+];
+
+const PALETTE_TRIPLETS = [
+  [67,1,66],
+  [49,69,48],
+  [95,12,94],
+  [77,75,76],
+  [37,39,38],
+  [68,70,65],
+  [19,22,21],
+  [63,67,66],
+  [55,61,56],
+  [71,73,72],
+  [62,58,64],
+  [43,42,44],
+  [34,36,35],
+  [31,33,32],
+  [8,16,7],
+  [97,2,96],
+  [26,18,24],
+  [79,74,78],
+  [83,84,82],
+  [91,89,86],
+  [93,92,88],
+  [11,15,14],
+  [25,10,13],
+  [41,45,47],
+  [59,51,60],
+  [80,85,81],
+  [3,17,4]
+];
+// container -> CSS shape (clip-path or border-radius)
+const SHAPE = {
+  shield:"clip:polygon(50% 0,100% 14%,100% 60%,50% 100%,0 60%,0 14%)",
+  circle:"r:50%", lozenge:"r:46%/34%", oval:"r:50%",
+  crest:"clip:polygon(8% 0,92% 0,100% 70%,50% 100%,0 70%)",
+  banner:"clip:polygon(0 0,100% 0,100% 78%,50% 100%,0 78%)",
+  hex:"clip:polygon(25% 3%,75% 3%,100% 50%,75% 97%,25% 97%,0 50%)",
+  rounded_sq:"r:26%", diamond:"clip:polygon(50% 0,100% 50%,50% 100%,0 50%)",
+  badge:"clip:polygon(50% 0,61% 10%,76% 7%,80% 22%,95% 30%,89% 45%,98% 58%,86% 68%,88% 84%,72% 86%,63% 99%,50% 91%,37% 99%,28% 86%,12% 84%,14% 68%,2% 58%,11% 45%,5% 30%,20% 22%,24% 7%,39% 10%)",
+  ribbon:"clip:polygon(0 18%,100% 18%,100% 82%,50% 100%,0 82%)",
+  seal:"r:50%",
+};
+const VERTICALS = [
+  {id:"skincare",label:"Skincare",ic:"ph-drop",sub:"creams · serums"},
+  {id:"cookware",label:"Cookware",ic:"ph-cooking-pot",sub:"pans · tools"},
+  {id:"software",label:"Software",ic:"ph-cursor",sub:"apps · tools"},
+  {id:"apparel",label:"Apparel",ic:"ph-coat-hanger",sub:"basics · wear"},
+  {id:"beverages",label:"Beverages",ic:"ph-wine",sub:"drinks · brews"},
+  {id:"beauty",label:"Beauty",ic:"ph-paint-brush-household",sub:"makeup · color"},
+  {id:"wellness",label:"Wellness",ic:"ph-pill",sub:"supplements"},
+  {id:"home",label:"Home",ic:"ph-house",sub:"decor · goods"},
+  {id:"pet",label:"Pet",ic:"ph-paw-print",sub:"treats · gear"},
+  {id:"snacks",label:"Snacks",ic:"ph-cookie",sub:"food · treats"},
+];
+
+/* ===== mini namegen (per vertical) ===== */
+const BANKS = {
+  skincare:{noun:["Glow","Dew","Petal","Bare","Mist","Balm","Fern","Tonic","Rinse","Velvet","Clover","Moss","Pearl","Sage","Bloom","Halo"],adj:["Tidy","Plain","Gentle","Quiet","Honest","Soft"]},
+  cookware:{noun:["Hearth","Ember","Copper","Whisk","Rind","Simmer","Cast","Grain","Skillet","Flame","Crock","Ladle","Hew","Char","Salt","Smoke"],adj:["Plain","Stout","Honest","Rustic","True","Iron"]},
+  software:{noun:["Ledger","Beacon","Stack","Pilot","Relay","Plot","Kit","Draft","Signal","Anchor","Cursor","Branch","Module","Patch","Query","Scope"],adj:["Plain","Swift","Tidy","Open","Bright","Clear"]},
+  apparel:{noun:["Loom","Hem","Weft","Marlow","Selvage","Oak","Harbor","Twill","Drift","Field","Cedar","Wool","Cuff","Stitch","Cove","North"],adj:["Plain","True","Worn","Honest","Quiet","Sturdy"]},
+  beverages:{noun:["Fizz","Brew","Spritz","Pour","Steep","Zest","Bramble","Quench","Cask","Vine","Hops","Bubble","Splash","Grove","Orchard","Cellar"],adj:["Crisp","Cold","Bright","Wild","Bold","Pure"]},
+  beauty:{noun:["Blush","Tint","Gloss","Matte","Kohl","Lash","Pout","Flush","Rouge","Sheen","Glaze","Shade","Bronze","Veil","Satin","Dab"],adj:["Dewy","Bold","Lush","Vivid","Soft","Bare"]},
+  wellness:{noun:["Vital","Verve","Vigor","Restore","Balance","Flow","Pulse","Nourish","Revive","Renew","Source","Root","Prime","Spring","Zenith","Sustain"],adj:["Daily","Pure","Whole","Clean","Calm","Clear"]},
+  home:{noun:["Nest","Hollow","Abode","Vessel","Nook","Haven","Roost","Clay","Slate","Terra","Hue","Birch","Ash","Willow","Alcove","Bough"],adj:["Cozy","Warm","Snug","Plain","Quiet","Homespun"]},
+  pet:{noun:["Paw","Trot","Romp","Pounce","Snout","Whisker","Tail","Kibble","Den","Pack","Howl","Purr","Nuzzle","Scout","Burrow","Biscuit"],adj:["Good","Happy","Loyal","Scruffy","Furry","Frisky"]},
+  snacks:{noun:["Crunch","Munch","Snap","Nibble","Crumb","Bite","Pop","Cluster","Batch","Morsel","Crackle","Chomp","Brittle","Nugget","Toasty","Drizzle"],adj:["Crispy","Salty","Sweet","Tangy","Toasted","Bold"]}
+};
+const ABS=["Theory","Studio","Works","House","Method","Club"], FORM=["Co.","Goods","Supply","Society"];
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function genName(v){const b=BANKS[v];const p=Math.random();
+  if(p<.25){let a=rnd(b.noun),c=rnd(b.noun);while(c===a)c=rnd(b.noun);return a+" & "+c;}
+  if(p<.5)return rnd(b.noun)+" "+rnd(ABS); if(p<.7)return rnd(b.adj)+" "+rnd(b.noun);
+  if(p<.85)return rnd(b.noun)+" "+rnd(FORM); return "The "+rnd(b.noun)+" "+rnd(FORM);}
+
+/* ===== state (the recipe + identity) ===== */
+let R = { vertical:"cookware", name:"Hearth & Hew", glyph:"whisk", container:"squircle", c1:49, c2:69, c3:48, font:"fraunces", layout:"stacked" };
+let step = 0;
+const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
+const glyphsFor = v => GLYPHS.filter(g=>g.v===v||g.v==="universal");
+const glyphIc = id => "ph-fill ph-"+id;
+
+/* ===== live logo render (mirrors Logo.resolve) ===== */
+const col = i => rgb(COLORS[i-1]);  // 1-based recipe color id
+function renderLogo(){
+  const logo = document.getElementById('logo');
+  logo.className = "logo "+R.layout;
+  const fontcls = FONTS.find(f=>f.id===R.font).cls;
+  logo.innerHTML =
+    `<div class="crest" style="border-radius:28%;background:${col(R.c1)}"><i class="ph-fill ${glyphIc(R.glyph)}" style="color:${col(R.c2)}"></i></div>`+
+    `<div class="wordmark ${fontcls}" style="color:${col(R.c3)}">${R.name}</div>`;
+  document.getElementById('pvname').textContent = R.name;
+  document.getElementById('pvvert').textContent = VERTICALS.find(v=>v.id===R.vertical).label.toLowerCase();
+  document.getElementById('palrow').innerHTML = [R.c1,R.c2,R.c3].map(i=>`<span style="background:${col(i)}"></span>`).join('');
+  document.getElementById('recipeline').textContent =
+    `${R.glyph} · c${R.c1}/${R.c2}/${R.c3} · ${R.font} · ${R.layout}`;
+}
+
+/* ===== steps ===== */
+const STEPS = [
+  {key:"vertical",title:"Pick your industry",hint:"Tap one — we'll spin up a fresh themed brand you can tweak. Tap again to re-roll it.",render:()=>
+    `<div class="grid g4">`+VERTICALS.map(v=>
+      `<div class="opt ${R.vertical===v.id?'sel':''}" onclick="pickIndustry('${v.id}')">
+        <i class="ph-fill ${v.ic}"></i><span class="lab">${v.label}</span><span class="sub">${v.sub}</span></div>`).join('')+`</div>`},
+  {key:"name",title:"Name the brand",hint:"Roll one from the grammar, or type your own.",render:()=>
+    `<div class="namebox">
+      <input class="namebig" id="nameinput" value="${R.name.replace(/"/g,'&quot;')}" oninput="R.name=this.value;renderLogo()" maxlength="22">
+      <button class="reroll" onclick="R.name=genName(R.vertical);document.getElementById('nameinput').value=R.name;renderLogo()"><i class="ph-bold ph-arrows-clockwise"></i> Roll a name</button>
+      <div class="namehint">Tip: short names read best on a card.</div>
+    </div>`},
+  {key:"glyph",title:"Choose your mark",hint:"Suggested for your industry, or search the whole icon library.",render:()=>
+    `<div class="suglabel">SUGGESTED</div>
+     <div class="grid g6">`+glyphsFor(R.vertical).map(id=>
+      `<div class="opt optsm ${R.glyph===id?'sel':''}" onclick="pick('glyph','${id}')"><i class="ph-fill ph-${id}"></i></div>`).join('')+`</div>
+     <div class="searchbar"><i class="ph-fill ph-magnifying-glass"></i>
+       <input id="iconsearch" placeholder="search ${ICONS.length} icons…" oninput="searchIcons(this.value)" value="${iconQuery}">
+     </div>
+     <div class="grid g6" id="iconresults"></div>`,
+   after:()=>searchIcons(iconQuery)},
+  {key:"palette",title:"Spin your colors",hint:"Scroll each reel — primary, secondary, tertiary. Or hit Surprise for a curated set.",render:()=>
+    `<div class="spinrow">
+       ${spinnerHTML('c1','PRIMARY','background')}
+       ${spinnerHTML('c2','SECONDARY','mark')}
+       ${spinnerHTML('c3','TERTIARY','wordmark')}
+     </div>`,
+   after:()=>{ ['c1','c2','c3'].forEach(initSpinner); }},
+  {key:"font",title:"Set the type",hint:"The wordmark font + how mark and name sit together.",render:()=>
+    `<div class="grid g3" style="margin-bottom:16px">`+FONTS.map(f=>
+      `<div class="opt ${R.font===f.id?'sel':''}" onclick="pick('font','${f.id}')">
+        <span class="${f.cls}" style="font-size:24px;font-weight:800">Ag</span><span class="lab">${f.label}</span></div>`).join('')+`</div>
+     <div class="stephint" style="margin:0 0 10px">Arrangement</div>
+     <div class="grid g3">`+LAYOUTS.map(l=>
+      `<div class="opt ${R.layout===l?'sel':''}" onclick="pick('layout','${l}')">
+        <i class="ph-fill ${l==='stacked'?'ph-rows':l==='horizontal'?'ph-columns':'ph-square'}"></i>
+        <span class="lab">${l}</span></div>`).join('')+`</div>`},
+  {key:"sign",title:"Sign your brand",hint:"This is your studio. The save is named for it.",render:()=>
+    `<div class="signwrap">
+      <h2>${R.name}</h2>
+      <p>A new ${VERTICALS.find(v=>v.id===R.vertical).label.toLowerCase()} brand. Your logo, your colors — from here you'll pick a first product and take your first client.</p>
+      <div class="signrow">
+        <div><span>INDUSTRY</span><b>${VERTICALS.find(v=>v.id===R.vertical).label}</b></div>
+        <div><span>MARK</span><b>${R.glyph}</b></div>
+        <div><span>COLORS</span><b>c${R.c1}/${R.c2}/${R.c3}</b></div>
+      </div>
+    </div>`},
+];
+
+/* ===== color spinners ===== */
+const SW_H = 44;
+function spinnerHTML(field, label, role){
+  const sws = COLORS.map((c,i)=>`<div class="sw"><div style="background:rgb(${c[0]},${c[1]},${c[2]})"></div></div>`).join('');
+  return `<div class="spincol">
+    <div class="slabel">${label}</div><div class="srole">${role}</div>
+    <div class="spinner"><div class="reel" id="reel_${field}" data-field="${field}">${sws}</div><div class="selband"></div></div>
+    <div class="spinarrows">
+      <button onclick="nudge('${field}',-1)"><i class="ph-bold ph-caret-up"></i></button>
+      <button onclick="nudge('${field}',1)"><i class="ph-bold ph-caret-down"></i></button></div>
+  </div>`;
+}
+function initSpinner(field){
+  const reel = document.getElementById('reel_'+field);
+  reel.scrollTop = (R[field]-1)*SW_H;           // center current color
+  let t;
+  reel.onscroll = ()=>{ clearTimeout(t); t=setTimeout(()=>{
+    const idx = Math.round(reel.scrollTop/SW_H)+1;
+    if(idx!==R[field]){ R[field]=Math.max(1,Math.min(COLORS.length,idx)); renderLogo(); }
+  }, 60); };
+}
+function nudge(field, d){
+  R[field]=Math.max(1,Math.min(COLORS.length,R[field]+d));
+  const reel=document.getElementById('reel_'+field);
+  reel.scrollTo({top:(R[field]-1)*SW_H, behavior:'smooth'});
+  renderLogo();
+}
+
+function renderStep(){
+  const s = STEPS[step];
+  document.getElementById('stepnum').textContent = `STEP ${step+1} OF ${STEPS.length}`;
+  document.getElementById('steptitle').textContent = s.title;
+  document.getElementById('stephint').textContent = s.hint;
+  document.getElementById('stepbody').innerHTML = s.render();
+  if(s.after) s.after();
+  document.getElementById('dots').innerHTML = STEPS.map((_,i)=>
+    `<div class="dot ${i<step?'done':i===step?'active':''}" onclick="jump(${i})"></div>`).join('');
+  document.getElementById('backbtn').style.visibility = step===0?'hidden':'visible';
+  const nb = document.getElementById('nextbtn');
+  if(step===STEPS.length-1){ nb.textContent="Launch Brand 🚀"; nb.className="btn go"; }
+  else { nb.textContent="Next"; nb.className="btn"; }
+  renderLogo();
+}
+function pick(field,val){ R[field]=val; renderStep(); }
+
+// picking an industry spins up a fresh themed brand (name + mark + colors)
+function pickIndustry(id){
+  R.vertical = id;
+  R.name = genName(id);
+  R.glyph = rnd(glyphsFor(id));
+  const trip = rnd(PALETTE_TRIPLETS); R.c1=trip[0]; R.c2=trip[1]; R.c3=trip[2];
+  renderStep();
+}
+
+// full-library icon search (Suggested stays above; results cap for DOM)
+let iconQuery = "";
+function searchIcons(q){
+  iconQuery = q;
+  const el = document.getElementById('iconresults'); if(!el) return;
+  const ql = q.trim().toLowerCase();
+  const list = (ql ? ICONS.filter(n=>n.includes(ql)) : ICONS);
+  const shown = list.slice(0,90);
+  el.innerHTML = shown.length
+    ? shown.map(n=>`<div class="opt optsm ${R.glyph===n?'sel':''}" onclick="pick('glyph','${n}')" title="${n}"><i class="ph-fill ph-${n}"></i></div>`).join('')
+      + (list.length>90?`<div class="noresults">+${list.length-90} more — keep typing to narrow</div>`:'')
+    : `<div class="noresults">no icons match “${q}”</div>`;
+}
+function go(d){
+  if(step===STEPS.length-1 && d>0){ launch(); return; }
+  step=Math.max(0,Math.min(STEPS.length-1,step+d)); renderStep();
+}
+function jump(i){ step=i; renderStep(); }
+function surprise(){
+  R.vertical = rnd(VERTICALS).id;
+  R.name = genName(R.vertical);
+  R.glyph = rnd(glyphsFor(R.vertical)).id;
+  R.container = "squircle";
+  const trip = rnd(PALETTE_TRIPLETS);   // curated, contrast-safe color set
+  R.c1 = trip[0]; R.c2 = trip[1]; R.c3 = trip[2];
+  R.font = rnd(FONTS).id;
+  R.layout = rnd(LAYOUTS);
+  renderStep();
+}
+function launch(){
+  alert("Brand launched: "+R.name+"\n\nrecipe = "+JSON.stringify(R,null,1)+"\n\n→ next: Product Creator");
+}
+renderStep();
+</script>
+</body>
+</html>

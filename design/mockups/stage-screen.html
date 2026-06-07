@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ADDENDUM — The Stage · round 4</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0c0d10;
+  --plate:#16181d;
+  --line:#23262c;
+  --text:#f2f3f5;
+  --dim:#8d929c;
+  --score:#3ce8d2;
+  --money:#45e07f;
+  --tired:#ffb938;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:#000;display:flex;align-items:center;justify-content:center;
+  font-family:'Instrument Sans',sans-serif;color:var(--text);min-height:100vh;
+}
+.stage{
+  width:390px;height:820px;border-radius:40px;overflow:hidden;position:relative;
+  background:
+    radial-gradient(90% 50% at 50% -8%, #1a1d23 0%, transparent 70%),
+    var(--bg);
+  display:flex;flex-direction:column;align-items:center;
+  box-shadow:0 30px 90px rgba(0,0,0,.8), 0 0 0 10px #131418, 0 0 0 11px #24262c;
+}
+@media (max-width:520px){
+  body{background:var(--bg)}
+  .stage{width:100vw;height:100vh;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* ---------- the score ---------- */
+.score{margin-top:64px;text-align:center}
+.score .num{
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:84px;line-height:.95;
+  letter-spacing:-3px;font-variant-numeric:tabular-nums;
+  color:var(--score);
+  text-shadow:0 0 50px rgba(60,232,210,.25);
+}
+.score .lbl{
+  margin-top:8px;font-size:12px;font-weight:600;letter-spacing:2.5px;color:var(--dim);
+}
+.score .lbl b{color:var(--text);font-weight:600}
+.ring{
+  margin:14px auto 0;width:150px;height:4px;border-radius:2px;background:#1c1f24;
+  position:relative;overflow:visible;
+}
+.ring i{
+  display:block;height:100%;width:53%;border-radius:2px;
+  background:var(--score);transition:width .6s ease;
+}
+.ring em{
+  position:absolute;top:-4px;left:76%;width:2px;height:12px;border-radius:1px;
+  background:var(--dim);
+}
+
+/* ---------- lane caption ---------- */
+.lane{
+  margin-top:40px;font-size:11px;font-weight:600;letter-spacing:3px;color:var(--dim);
+}
+
+/* ---------- the played cards ---------- */
+.row{
+  margin-top:18px;display:flex;align-items:center;gap:-1px;
+  perspective:900px;
+}
+.cardw{position:relative;text-align:center}
+.cardw:nth-child(1){transform:rotate(-4deg) translateY(10px);z-index:1}
+.cardw:nth-child(2){transform:translateY(-4px);z-index:3}
+.cardw:nth-child(3){transform:rotate(4deg) translateY(10px);z-index:2}
+.cardw + .cardw{margin-left:-14px}
+
+.card{
+  width:148px;height:206px;border-radius:16px;position:relative;overflow:hidden;
+  background:var(--plate);
+  box-shadow:0 24px 50px rgba(0,0,0,.65), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+}
+.card .art{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;font-size:64px;
+}
+.a1{background:
+  radial-gradient(120% 90% at 30% 20%, #0f4a40 0%, #092e28 55%, #071e1a 100%)}
+.a2{background:
+  radial-gradient(120% 90% at 70% 15%, #4a3a12 0%, #2e240b 55%, #1d1707 100%)}
+.a3{background:
+  radial-gradient(120% 90% at 50% 25%, #4a1a24 0%, #2c0f15 55%, #1d0a0e 100%)}
+.card .art span{filter:drop-shadow(0 10px 24px rgba(0,0,0,.6))}
+
+.card .plate{
+  position:absolute;left:0;right:0;bottom:0;padding:26px 12px 12px;
+  background:linear-gradient(180deg, transparent 0%, rgba(8,9,11,.92) 45%);
+  text-align:left;
+}
+.card .plate h3{
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:13.5px;
+  letter-spacing:-.2px;line-height:1.25;
+}
+.card .plate p{font-size:10.5px;color:var(--dim);margin-top:2px;font-weight:500}
+
+/* the power number — revenue lives ON the card, like Snap power */
+.power{
+  position:absolute;top:10px;right:10px;
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:21px;
+  letter-spacing:-.5px;font-variant-numeric:tabular-nums;
+  color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.9);
+}
+.power small{font-size:11px;font-weight:700;opacity:.65}
+
+/* state as treatment, not chrome */
+.card.leader{box-shadow:0 24px 50px rgba(0,0,0,.65), 0 0 0 1.5px rgba(60,232,210,.55), 0 0 34px rgba(60,232,210,.12)}
+.card.tired{filter:saturate(.5) brightness(.82)}
+.tiredbadge{
+  position:absolute;top:10px;left:10px;
+  font-size:10px;font-weight:700;color:var(--tired);
+  background:rgba(20,15,4,.7);border:1px solid rgba(255,185,56,.4);
+  padding:3px 7px;border-radius:6px;letter-spacing:.4px;
+}
+
+/* settle: one card breathes, its money pops */
+.cardw.settle .card{transform:translateY(-12px) scale(1.04)}
+.gain{
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:17px;color:var(--money);
+  text-shadow:0 0 18px rgba(69,224,127,.5);
+  opacity:0;pointer-events:none;white-space:nowrap;
+}
+.cardw.settle .gain{animation:pop 1.2s ease-out}
+@keyframes pop{
+  0%{opacity:0;transform:translate(-50%,10px) scale(.7)}
+  22%{opacity:1;transform:translate(-50%,-2px) scale(1.18)}
+  40%{transform:translate(-50%,-5px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-30px)}
+}
+
+/* ---------- footer: day + the hand asleep at the edge ---------- */
+.daytrack{
+  margin-top:auto;display:flex;align-items:center;gap:9px;
+  font-size:11px;font-weight:600;letter-spacing:2px;color:var(--dim);
+  padding-bottom:6px;
+}
+.daytrack .d{width:6px;height:6px;border-radius:50%;background:#22252b}
+.daytrack .d.done{background:var(--dim)}
+.daytrack .d.live{background:var(--score);box-shadow:0 0 8px rgba(60,232,210,.6)}
+.hand{
+  position:relative;height:74px;width:100%;overflow:hidden;flex:none;
+}
+.hand .hc{
+  position:absolute;top:26px;width:92px;height:128px;border-radius:12px;
+  background:linear-gradient(180deg,#1b1e24,#101216);
+  box-shadow:0 -8px 24px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.hand .hc:nth-child(1){left:calc(50% - 150px);transform:rotate(-10deg)}
+.hand .hc:nth-child(2){left:calc(50% - 92px);transform:rotate(-4deg);top:18px}
+.hand .hc:nth-child(3){left:calc(50% - 30px);transform:rotate(2deg);top:16px}
+.hand .hc:nth-child(4){left:calc(50% + 32px);transform:rotate(8deg);top:22px}
+.hand .hc:nth-child(5){left:calc(50% + 90px);transform:rotate(14deg);top:34px}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="score">
+    <div class="num" id="roas">1.27</div>
+    <div class="lbl">ROAS — TARGET <b>1.45</b></div>
+    <div class="ring"><i id="prog"></i><em></em></div>
+  </div>
+
+  <div class="lane">COLD INTROS · DAY 3</div>
+
+  <div class="row">
+    <div class="cardw">
+      <div class="gain">+$45</div>
+      <div class="card leader">
+        <div class="art a1"><span>🍳</span></div>
+        <div class="power"><small>$</small><span class="val">318</span></div>
+        <div class="plate">
+          <h3>Pain Point</h3>
+          <p>× UGC Selfie</p>
+        </div>
+      </div>
+    </div>
+    <div class="cardw">
+      <div class="gain">+$45</div>
+      <div class="card">
+        <div class="art a2"><span>🛠️</span></div>
+        <div class="power"><small>$</small><span class="val">204</span></div>
+        <div class="plate">
+          <h3>Founder Story</h3>
+          <p>× Demo Closeup</p>
+        </div>
+      </div>
+    </div>
+    <div class="cardw">
+      <div class="gain">+$45</div>
+      <div class="card tired">
+        <div class="art a3"><span>⏳</span></div>
+        <div class="tiredbadge">TIRED</div>
+        <div class="power"><small>$</small><span class="val">90</span></div>
+        <div class="plate">
+          <h3>FOMO Drop</h3>
+          <p>× Cinematic Pour</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="daytrack">
+    <span class="d done"></span><span class="d done"></span>
+    <span class="d live"></span><span class="d"></span><span class="d"></span>
+  </div>
+  <div class="hand">
+    <div class="hc"></div><div class="hc"></div><div class="hc"></div><div class="hc"></div><div class="hc"></div>
+  </div>
+
+</div>
+
+<script>
+// the settle pass: one card at a time; everything else is still
+const cards = [...document.querySelectorAll('.cardw')];
+const odds = [0.6, 0.45, 0.2];
+let rev = 612, spend = 483, i = 0;
+function settle(){
+  const c = cards[i % cards.length];
+  const hit = Math.random() < odds[i % cards.length];
+  c.classList.add('settle');
+  if (hit){
+    rev += 45;
+    const v = c.querySelector('.val');
+    v.textContent = parseInt(v.textContent) + 45;
+  } else {
+    c.querySelector('.gain').style.visibility = 'hidden';
+  }
+  setTimeout(() => {
+    c.classList.remove('settle');
+    c.querySelector('.gain').style.visibility = '';
+    spend += 9;
+    document.getElementById('roas').textContent = (rev/spend).toFixed(2);
+    document.getElementById('prog').style.width = Math.min(96, rev/1160*100) + '%';
+  }, 1100);
+  i++;
+}
+setInterval(settle, 3400);
+setTimeout(settle, 900);
+</script>
+</body>
+</html>

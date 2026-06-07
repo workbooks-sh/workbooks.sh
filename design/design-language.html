@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADDENDUM — Design Language v0.2</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&display=swap');
+
+/* ============ FOUNDATIONS — cuter retro Facebook, light, chunky ============ */
+:root{
+  --paper:#eef1f6;        /* the FB gray-blue room */
+  --card:#ffffff;
+  --line:#d8deea;
+  --line2:#c4ccdc;
+  --ink:#1c2b4a;          /* deep navy text */
+  --dim:#7c8aa5;
+  --blue:#3b5998;         /* THE retro blue */
+  --blue2:#5872b8;
+  --bluepale:#e9eef9;
+  --green:#3fa15f;
+  --greenpale:#e4f4e9;
+  --amber:#d98e04;
+  --amberpale:#fdf3dd;
+  --red:#d0455a;
+  --redpale:#fbe9ec;
+  --gold:#b58a2c;
+  --inert:#ececf1;        /* shared "out of play" fill — c-spent, cx-unseen, dead dchips */
+  --inertink:#9a9aa8;
+  --r:14px;               /* chunky rounding everywhere */
+  --shadow:0 2px 0 var(--line2), 0 6px 16px rgba(28,43,74,.07);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:'Nunito',sans-serif;font-size:14px;line-height:1.5;
+  padding:34px 28px 80px;
+}
+h1,h2,h3,.disp{font-family:'Baloo 2',cursive}
+.page{max-width:1080px;margin:0 auto}
+.page>header{margin-bottom:8px}
+.page>header h1{font-size:34px;font-weight:800;letter-spacing:-.5px}
+.page>header h1 span{color:var(--blue)}
+.page>header p{color:var(--dim);font-weight:600;max-width:70ch}
+.rule{font-size:12px;font-weight:800;color:var(--blue);background:var(--bluepale);
+  display:inline-block;padding:4px 12px;border-radius:99px;margin:10px 8px 0 0}
+
+section{margin-top:44px}
+section>h2{
+  font-size:21px;font-weight:800;padding-bottom:8px;margin-bottom:18px;
+  border-bottom:3px solid var(--line);
+}
+section>h2 small{font-size:12px;color:var(--dim);font-family:'Nunito';font-weight:700;margin-left:10px}
+.grid{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start}
+.cell{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+.cap{font-size:11.5px;font-weight:700;color:var(--dim);max-width:360px}
+.cap b{color:var(--blue);font-weight:800}
+
+/* ============ swatches & type ============ */
+.sw{width:108px;height:64px;border-radius:var(--r);box-shadow:var(--shadow);
+  display:flex;align-items:flex-end;padding:8px;font-size:11px;font-weight:800;color:#fff}
+.sw.light{color:var(--ink)}
+.tspec{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 22px;max-width:430px}
+.tspec .t1{font-family:'Baloo 2';font-size:34px;font-weight:800;line-height:1.1}
+.tspec .t2{font-family:'Baloo 2';font-size:21px;font-weight:700;margin-top:6px}
+.tspec .t3{font-size:14px;font-weight:600;margin-top:6px}
+.tspec .t4{font-size:12px;font-weight:700;color:var(--dim);margin-top:6px;letter-spacing:.4px}
+.num{font-family:'Baloo 2';font-variant-numeric:tabular-nums;font-weight:800}
+
+/* ============ THE COMPONENT CARD ============ */
+.ccard{
+  width:132px;height:182px;border-radius:16px;background:var(--card);
+  box-shadow:var(--shadow);position:relative;padding:9px;
+  border:2.5px solid var(--line2);
+  display:flex;flex-direction:column;
+}
+.ccard .kicker{font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--dim)}
+.ccard .art{
+  margin-top:6px;height:72px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:36px;
+}
+/* kind tints — FIVE kinds; shared with .minislot (recipes read by color) */
+.k-hook .art{background:#fdebe2}
+.k-visual .art{background:#e3f1fd}
+.k-format .art{background:#eee9fb}
+.k-offer .art{background:#e4f4e9}
+.k-mod .art{background:#fdf3dd}   /* MODIFIER — attaches to proven ads; rhymes with the IP pill */
+.ccard h4{font-family:'Baloo 2';font-size:14.5px;font-weight:700;line-height:1.15;margin-top:8px}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto}
+.tag{font-size:9.5px;font-weight:800;padding:2.5px 7px;border-radius:99px}
+.tag.urgency{background:var(--redpale);color:var(--red)}
+.tag.problem{background:var(--amberpale);color:var(--amber)}
+.tag.trust{background:var(--bluepale);color:var(--blue)}
+.tag.social{background:var(--greenpale);color:var(--green)}
+/* rarity = the border speaks (identity axis A) */
+.rar-uncommon{border-color:var(--blue2)}
+.rar-rare{border-color:var(--gold);box-shadow:0 2px 0 #9a7424, 0 6px 16px rgba(181,138,44,.18)}
+.rar-legend{border-color:transparent;background:
+  linear-gradient(var(--card),var(--card)) padding-box,
+  linear-gradient(120deg,#e8b33c,#d0455a,#3b5998,#3fa15f) border-box}
+/* foil = V2 marker (identity axis B) — stacks on ANY rarity; economy.lua mints V2 from
+   any fatigued winner + IP. Ambient foil caps at 2/screen; excess renders .frozen. */
+.foil .art{position:relative;overflow:hidden}
+.foil .art::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.7) 47%,transparent 64%);
+  background-size:300% 100%;animation:foil 3.2s ease-in-out infinite}
+.foil.frozen .art::after{animation:none;background-position:47% 0}
+@keyframes foil{0%,100%{background-position:115% 0}50%{background-position:-15% 0}}
+.v2flag{position:absolute;top:7px;right:7px;background:var(--gold);color:#fff;
+  font-size:9px;font-weight:800;padding:3px 7px;border-radius:8px;transform:rotate(6deg);
+  box-shadow:0 2px 0 #8a6a1e;z-index:2}
+/* fatigue lifecycle (axis C) — state is treatment, full-card filter only */
+.ccard.limited{filter:saturate(.55)}          /* CREATIVE LIMITED (was .worn) */
+.ccard.limited .art{opacity:.65}
+.ccard.fatigued{filter:saturate(.35)}         /* CREATIVE FATIGUE — stage 2 */
+.ccard.fatigued .art{opacity:.5}
+.ccard.spent{filter:saturate(.2);opacity:.75}
+/* scars 0–3 — countable dog-eared corners (per completed wear cycle, permanent, global) */
+.scar{position:absolute;width:14px;height:14px;background:var(--line2);z-index:2}
+.scar.s1{top:0;left:0;border-top-left-radius:13px;clip-path:polygon(0 0,100% 0,0 100%)}
+.scar.s2{top:0;right:0;border-top-right-radius:13px;clip-path:polygon(0 0,100% 0,100% 100%)}
+.scar.s3{bottom:0;left:0;border-bottom-left-radius:13px;clip-path:polygon(0 0,0 100%,100% 100%)}
+/* card back — pack flips + face-down hand; no rarity tells (the flip IS the reveal) */
+.ccard.back{background:linear-gradient(160deg,var(--blue) 0%,#2c4170 100%);
+  border-color:#22345c;align-items:center;justify-content:center}
+.ccard.back .zig{position:absolute;left:10px;right:10px;height:6px;
+  background:repeating-linear-gradient(90deg,#fff3 0 8px,transparent 8px 16px)}
+.ccard.back .bdia{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.18);transform:rotate(45deg)}
+
+/* ============ THE COMPOSED AD ============ */
+.adtile{
+  width:340px;background:var(--card);border:2.5px solid transparent;
+  border-radius:var(--r);box-shadow:var(--shadow);
+  padding:13px 15px;display:flex;align-items:center;gap:13px;
+}
+.adtile.leader{border-color:var(--greenpale)}  /* the border speaks — recolor, not outline */
+.adtile .slotstack{display:flex}
+.minislot{width:34px;height:46px;border-radius:7px;border:2px solid var(--line2);
+  background:#f4f6fb;display:flex;align-items:center;justify-content:center;font-size:16px;
+  margin-left:-9px;box-shadow:0 1px 0 var(--line2)}
+.minislot:first-child{margin-left:0}
+.minislot.empty{border-style:dashed;color:var(--dim)}
+.minislot.empty i{font-size:13px}
+/* minislot kind tints — inherited from the ccard k-* atom */
+.mk-hook{background:#fdebe2}
+.mk-visual{background:#e3f1fd}
+.mk-format{background:#eee9fb}
+.mk-offer{background:#e4f4e9}
+.mk-mod{background:#fdf3dd}
+/* charm pip — an ATTACHED modifier's micro-form on the ad (max 3) */
+.charms{display:flex;flex-direction:column;gap:4px;margin-left:-4px}
+.charm{width:13px;height:13px;border-radius:50%;background:#fdf3dd;
+  border:2px solid var(--amber);box-shadow:0 1px 0 var(--line2)}
+.adtile .meta{flex:1;min-width:0}
+.adtile h4{font-family:'Baloo 2';font-size:15px;font-weight:700;line-height:1.2}
+.adtile .lane{font-size:11px;font-weight:700;color:var(--dim)}
+.adtile .pow{text-align:right}
+.adtile .pow .num{font-size:21px;color:var(--green)}
+.adtile .pow span{display:block;font-size:10px;font-weight:800;color:var(--dim);letter-spacing:.6px}
+
+/* the Desk board card — the played ad, ported from the dead dark mock into the light
+   language. NO idle wobble: nothing pulses at rest (turn-based days). */
+.deskcard{width:128px;background:var(--card);border:2.5px solid var(--line2);border-radius:16px;
+  box-shadow:var(--shadow);padding:9px;display:flex;flex-direction:column;gap:6px;position:relative}
+.deskcard h4{font-family:'Baloo 2';font-size:13px;font-weight:700;line-height:1.15}
+.deskcard .dart{height:44px;border-radius:8px;background:#f4f6fb;display:flex;
+  align-items:center;justify-content:center;font-size:21px;position:relative}
+.deskcard .dart .cta{position:absolute;left:6px;right:6px;bottom:4px;height:7px;border-radius:4px;background:var(--greenpale)}
+.deskcard .drow{display:flex;justify-content:space-between;align-items:flex-end;min-height:30px}
+.deskcard .dnum{font-family:'Baloo 2';font-weight:800;font-variant-numeric:tabular-nums;
+  font-size:19px;color:var(--green);line-height:1.05}
+.deskcard .dnum span{display:block;font-family:'Nunito';font-size:8.5px;font-weight:800;color:var(--dim);letter-spacing:.6px}
+.deskcard .dnum.dim{color:var(--inertink)}    /* learning: $— until the first night ceremony */
+.deskcard .recipe{display:flex}
+.deskcard .recipe .minislot{width:24px;height:32px;font-size:12px;border-radius:6px;margin-left:-7px}
+.deskcard .recipe .minislot:first-child{margin-left:0}
+.deskcard.limited .dart,.deskcard.limited .recipe{filter:saturate(.55)}
+.deskcard.limited .dart{opacity:.65}
+.deskcard.fatigued .dart,.deskcard.fatigued .recipe{filter:saturate(.35)}
+.deskcard.fatigued .dart{opacity:.5}
+.deskcard.spent{filter:saturate(.2);opacity:.75}
+.deskcard.over .recipe .minislot{border-color:var(--amber)}   /* over-capacity: amber on the stack, no new chrome */
+.deskcard .wline{font-size:9px;font-weight:800;letter-spacing:.6px;color:var(--amber)}
+
+/* ============ CHIPS ============ */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;
+  padding:5px 12px;border-radius:99px;font-variant-numeric:tabular-nums}
+.chip i{font-size:12px;line-height:1}
+/* ATOM: small-chip token (chip--sm) — one definition; consumers: adtile Leader,
+   note flask, race-meter pin-grade stamps */
+.chip.sm{font-size:10px;padding:2px 8px;gap:4px}
+.chip.sm i{font-size:10.5px}
+.c-leader{background:var(--greenpale);color:var(--green)}
+.c-learning{background:var(--bluepale);color:var(--blue);position:relative;overflow:hidden}
+.c-learning::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);
+  animation:shim 1.6s linear infinite}
+@keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.c-limited{background:var(--amberpale);color:var(--amber)}
+.c-fatigue{background:var(--redpale);color:var(--red)}
+.c-spent{background:var(--inert);color:var(--inertink)}
+.c-boss{background:var(--ink);color:#fff}
+.c-clean{background:var(--bluepale);color:var(--blue);border:2px dashed var(--blue2)}
+.c-event{background:var(--amberpale);color:var(--amber)}  /* weather chip — director event, all day */
+/* pin grade stamps (chip--sm skins) */
+.gr-ok{background:var(--blue);color:#fff}
+.gr-bust{background:var(--redpale);color:var(--red)}
+.gr-inc{background:var(--inert);color:var(--inertink)}
+
+/* ============ BUTTONS, VERBS & ACTION POINTS ============ */
+.btn{
+  font-family:'Baloo 2';font-weight:700;font-size:15px;border:none;cursor:pointer;
+  padding:13px 22px;min-height:48px;border-radius:14px;color:#fff;background:var(--blue);
+  box-shadow:0 3px 0 #2c4170;transition:transform .06s, box-shadow .06s;
+}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #2c4170}
+.btn.danger{background:var(--red);box-shadow:0 3px 0 #99313f}
+.btn.danger:active{box-shadow:0 1px 0 #99313f}   /* per-variant pressed shelf — never blue */
+.btn.disabled{background:#c9cfdd;box-shadow:0 3px 0 #aeb6c8;cursor:not-allowed}
+.btn.disabled:active{transform:none;box-shadow:0 3px 0 #aeb6c8}  /* disabled never travels */
+/* ATOM: pressable plate — white fill, 2.5px line2 border, line2 shelf, Baloo label,
+   pressy 60ms travel; derives .btn.sec, .verb, .dchip (one template, three parameter sets) */
+.btn.sec,.verb,.dchip{background:var(--card);border:2.5px solid var(--line2);
+  box-shadow:0 3px 0 var(--line2);cursor:pointer}
+.btn.sec:active,.verb:active,.dchip:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line2)}
+.btn.sec{color:var(--blue)}
+.verb{width:86px;border-radius:14px;padding:10px 4px 8px;text-align:center}
+.verb .vname{font-family:'Baloo 2';font-weight:700;font-size:14px}
+.verb .vcost{font-size:10.5px;font-weight:800;color:var(--dim);margin-top:2px}
+.verb .vcost.free{color:var(--green)}
+.verb.kill{margin-right:8px}                    /* + dock gap 8 = ≥16dp destructive clearance */
+.verb.kill .vname{color:var(--red)}             /* red owns kill — celebrated, not scary */
+.verb.armed{border-color:var(--blue)}           /* awaiting target — the border speaks */
+.verb.off{border-color:var(--line);box-shadow:0 3px 0 var(--line);color:var(--inertink);cursor:not-allowed}
+.verb.off .vname,.verb.off .vcost{color:var(--inertink)}  /* cost stays LEGIBLE — the economy is the curriculum */
+.verb.off:active{transform:none;box-shadow:0 3px 0 var(--line)}
+.verb.off .pipcost{background:#b9c1d2;box-shadow:none}
+/* ATOM: spend-token (resources owns it) — full color on shelf, gray on gray shelf when spent.
+   Parameter sets: AP pip = blue diamond (rail 22px / cost glyph 10px) · trust pip = green rect */
+.appip{width:22px;height:22px;border-radius:8px;background:var(--blue);transform:rotate(45deg);
+  box-shadow:0 2px 0 #2c4170;display:inline-block;margin:5px 9px}
+.appip.mark{background:rgba(59,89,152,.5)}      /* earmarked — armed verb previews the spend; sits still */
+.appip.spent{background:#d4dae6;box-shadow:0 2px 0 var(--line2)}
+.pipcost{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--blue);
+  transform:rotate(45deg);box-shadow:0 1px 0 #2c4170;margin-right:5px}
+/* END DAY — the game's central verb. BLUE (the apex of agency); heavier by MASS, not hue:
+   16px radius, 4px shelf, 3px travel, day sub-label. Never disabled. */
+.endday{font-family:'Baloo 2';font-weight:800;font-size:17px;color:#fff;background:var(--blue);
+  border:none;border-radius:16px;padding:18px;cursor:pointer;box-shadow:0 4px 0 #2c4170;
+  width:124px;text-align:center}
+.endday:active{transform:translateY(3px);box-shadow:0 1px 0 #2c4170}
+.endday small{display:block;font-family:'Nunito';font-size:9.5px;font-weight:800;
+  letter-spacing:.6px;opacity:.85;margin-top:2px}
+.endday.forfeit small{color:var(--amber);opacity:1}  /* static amber warning — no pulse */
+
+/* ============ SCORE & METRICS ============ */
+/* ATOM: meter-bar — paper trough + fill + marker tick; consumers: score plate bar,
+   funnel gate (vertical), hire track record */
+.bar,.tbar{background:var(--paper);position:relative}
+.bar i,.tbar i{display:block;height:100%;border-radius:inherit}
+.bar em,.tbar em{position:absolute;width:3px;border-radius:2px;background:var(--amber)}
+.scoreplate{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
+  padding:18px 26px;text-align:center;width:230px}
+.scoreplate .num{font-size:52px;line-height:1;color:var(--blue)}
+.scoreplate .lbl{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--dim);margin-top:4px}
+.scoreplate .bar{height:9px;border-radius:5px;margin-top:12px;overflow:visible}
+.scoreplate .bar i{width:70%;background:var(--green)}     /* 1.27 / (1.25 × 1.45) = 70% */
+.scoreplate .bar em{top:-3px;left:80%;height:15px}        /* tick fixed at 80% = target */
+.stat{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 16px;
+  text-align:center;min-width:86px}
+.stat .num{font-size:20px}
+.stat .lbl{font-size:10px;font-weight:800;color:var(--dim);letter-spacing:.8px}
+.stat .lbl i{font-size:11px;vertical-align:-1px}
+.stat.warn .num{color:var(--amber)}
+.stat.warn .lbl i{color:var(--amber)}
+.stat .int{font-size:10.5px;font-weight:700;color:var(--dim);letter-spacing:0;margin-top:4px}
+.gates{display:flex;gap:10px;background:var(--card);padding:14px 16px;border-radius:var(--r);box-shadow:var(--shadow)}
+.gate{width:74px;text-align:center}
+.gate .gbar{height:46px;background:var(--paper);border-radius:9px;position:relative;overflow:hidden}
+.gate .gbar i{position:absolute;left:0;right:0;bottom:0;background:var(--blue2);border-radius:9px 9px 0 0}
+.gate .gbar em{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--line2)}  /* forecast hairline at 50% */
+.gate.warn .gbar i{background:var(--amber)}
+.gate .lbl{font-size:10px;font-weight:800;color:var(--dim);margin-top:6px;letter-spacing:.6px}
+.gate .lbl i{font-size:10px;color:var(--amber);vertical-align:-1px}
+.gate .num{font-size:13px}
+/* race meter — two-sided test: TWO bell lines, plain paper trough, A/B endcaps.
+   No red side: nothing is being lost in a race. */
+.race{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 18px;width:340px}
+.race .rh{display:flex;justify-content:space-between;font-size:11px;font-weight:800;color:var(--dim);letter-spacing:.5px}
+.race .rh i{color:var(--amber);font-size:13px}
+.race .trackrow{display:flex;align-items:center;gap:8px;margin-top:9px}
+.race .endcap{font-size:11px;font-weight:800;color:var(--ink)}
+.race .endcap.lost{color:#b9c1d2}
+.race .track{flex:1;height:14px;border-radius:8px;position:relative;background:var(--paper)}
+.race .needle{position:absolute;top:-4px;bottom:-4px;width:4px;border-radius:2px;
+  background:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.race .bell-l{position:absolute;top:-2px;bottom:-2px;left:8%;border-left:3px dotted var(--amber)}
+.race .bell-r{position:absolute;top:-2px;bottom:-2px;left:92%;border-left:3px dotted var(--amber)}
+.race .rf{display:flex;justify-content:space-between;align-items:center;margin-top:8px;
+  font-size:11px;font-weight:700;color:var(--dim)}
+.race .rf .pincall{color:var(--blue);font-weight:800}
+.race .rf .pincall i{font-size:12px;vertical-align:-1px}
+.race .rf .ghost{opacity:.45}
+.race .stamp{font-weight:800;color:var(--ink);letter-spacing:.4px}
+.race .verdict{font-family:'Baloo 2';font-weight:800;font-size:13.5px;color:var(--ink)}
+.race.early .track{opacity:.55}
+.race.early .needle{opacity:.4}
+.race.carry{filter:saturate(.25);opacity:.85}
+/* the Pin — pre-registration, graded at autopsy */
+.pin{display:inline-flex;align-items:center;gap:7px;background:var(--bluepale);border:2px solid var(--blue2);
+  border-radius:12px;padding:7px 13px;font-weight:800;font-size:12.5px;color:var(--blue)}
+.pin i{font-size:14px}
+.pin.ok{background:var(--blue);border-color:var(--blue);color:#fff}
+.pin.bust{background:var(--redpale);border-color:var(--red);color:var(--red)}
+.pin.inc{background:var(--inert);border-color:#d4dae6;color:var(--inertink)}
+
+/* ============ RESOURCES ============ */
+/* bankroll = the stat-plate atom + a sub-line slot + leading icon (bespoke .bank retired) */
+.pips{display:flex;gap:7px}
+.pip{width:18px;height:24px;border-radius:7px;background:var(--green);box-shadow:0 2px 0 #2e7847}
+.pip.spent{background:#d4dae6;box-shadow:0 2px 0 var(--line2)}
+/* THE WEEK STRIP — MON–SUN turn indicator (replaces the dot track). done = blue2,
+   live = blue + press shelf (no ring), telegraphed = tomorrow's weather (amber). */
+.week{display:flex;gap:5px}
+.wd{width:44px;text-align:center;font-size:10px;font-weight:800;letter-spacing:.6px;
+  color:var(--dim);padding:6px 0;border-radius:9px;background:#e3e8f1}
+.wd.done{background:var(--blue2);color:#fff}
+.wd.live{background:var(--blue);color:#fff;box-shadow:0 2px 0 #2c4170}
+.wd.tele{background:var(--amberpale);color:var(--amber)}
+.float{font-family:'Baloo 2';font-weight:800;color:var(--green);font-size:19px}
+.float.neg{color:var(--red)}                    /* sinks instead of rises; $0 never spawns */
+.ip{display:inline-flex;gap:6px;align-items:center;background:var(--amberpale);color:var(--amber);
+  font-weight:800;border-radius:99px;padding:6px 13px;font-size:12.5px}
+.ip i{font-size:13px}
+.ip.zero{background:var(--inert);color:var(--inertink)}  /* shown, never hidden */
+
+/* ============ PEOPLE ============ */
+.hire{width:230px;background:var(--card);border:2.5px solid var(--line2);
+  border-radius:var(--r);box-shadow:var(--shadow);padding:15px}
+/* hires are pool collectibles — the border speaks, same ladder as the ccard */
+.hire.rar-uncommon{border-color:var(--blue2)}
+.hire.rar-rare{border-color:var(--gold)}
+.hire .hd{display:flex;gap:11px;align-items:center}
+.face{width:44px;height:44px;border-radius:14px;background:var(--bluepale);
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+.facechip{width:52px;height:52px;border-radius:14px;background:var(--bluepale);
+  display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:var(--shadow)}
+.hire h4{font-family:'Baloo 2';font-size:16px;font-weight:700}
+.hire .role{font-size:11px;font-weight:700;color:var(--dim)}
+.hire .role i{color:var(--gold);font-size:11px}
+/* trait pills — own classes, NOT the card aspect tags (.tag.*) */
+.traits{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap}
+.trait{font-size:9.5px;font-weight:800;padding:2.5px 7px;border-radius:99px}
+.trait.style{background:var(--bluepale);color:var(--blue)}
+.trait.calib{background:var(--amberpale);color:var(--amber)}
+.trait.hidden{background:var(--inert);color:var(--inertink)}
+.trait.hidden i{font-size:10px;vertical-align:-1px}
+.hire .salary{display:flex;justify-content:space-between;align-items:center;margin-top:11px;
+  font-size:12px;font-weight:800}
+.hire .salary b{color:var(--red)}
+.track{margin-top:9px}
+.track .lbl{font-size:9.5px;font-weight:800;color:var(--dim);display:flex;justify-content:space-between;gap:6px}
+.track .lbl .says{color:var(--amber)}
+.track .lbl .runs{color:var(--blue)}
+.track .tbar{height:8px;border-radius:4px;margin-top:4px}
+.track .tbar i{width:61%;background:var(--blue2)}
+.track .tbar em{top:-3px;left:84%;height:14px}           /* amber tick = her CLAIMED 84% */
+.track .tbar.empty i{width:0}
+.shimbar{overflow:hidden}
+.shimbar::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);
+  animation:shim 1.6s linear infinite}
+.deskslot{width:230px;min-height:148px;border:2.5px dashed var(--line2);border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;gap:8px;color:var(--dim);
+  font-weight:800;font-size:13px}
+.deskslot i{font-size:14px}
+.bubble{max-width:280px;background:var(--card);border-radius:16px 16px 16px 5px;box-shadow:var(--shadow);
+  padding:12px 16px;font-size:13px;font-weight:600}
+.bubble .who{font-size:11px;font-weight:800;color:var(--blue)}
+.bubble .conf{display:inline-block;margin-top:7px;font-size:10.5px;font-weight:800;color:var(--amber);
+  background:var(--amberpale);padding:3px 9px;border-radius:99px}
+
+/* ============ KNOWLEDGE ============ */
+/* ATOM: know-row — icon well · claim (bold metric) · meta; consumers: Field Note, Codex row */
+.note,.cxrow{width:340px;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+  padding:11px 15px;display:flex;align-items:center;gap:11px;font-size:12.5px;font-weight:700}
+.note .dir,.cxrow .dir{font-size:17px;line-height:1}
+.dir.up,.dir.down{color:var(--blue)}            /* knowledge is blue — never green */
+.dir.null{color:var(--dim)}
+.note .nb,.cxrow .nb{flex:1}
+.note .ev,.cxrow .ev{font-size:10.5px;color:var(--dim);font-weight:800}
+.redact{display:inline-block;width:150px;height:11px;border-radius:6px;background:#dfe3ec;vertical-align:middle}
+.codex{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:12px;
+  padding:7px 14px;border-radius:99px}           /* pill law: 99px — it names a state */
+.codex i{font-size:13px}
+.cx-unseen{background:var(--inert);color:var(--inertink)}
+.cx-observed{background:var(--bluepale);color:var(--blue)}
+.cx-canon{background:var(--ink);color:#ffd76b}
+.diagchips{display:flex;gap:8px;flex-wrap:wrap;max-width:440px}
+.dchip{font-family:'Baloo 2';font-weight:700;font-size:13px;border-radius:14px;
+  padding:12px 16px;min-height:48px}              /* ≥48dp answer plates */
+.dchip i{font-size:14px;vertical-align:-2px}
+.dchip.sel{transform:translateY(2px);box-shadow:0 1px 0 var(--line2)}  /* committed — seated while grading */
+.dchip.hit{background:var(--amberpale);border-color:var(--amber);color:var(--amber)}
+.dchip.dead{background:var(--inert);color:var(--inertink);border-color:#dfe0e8;
+  box-shadow:0 3px 0 #d4dae6;cursor:not-allowed}
+.dchip.dead:active{transform:none;box-shadow:0 3px 0 #d4dae6}
+
+/* ============ EVENTS & SHOP ============ */
+.toastx{background:var(--card);border-left:6px solid var(--amber);border-radius:12px;
+  box-shadow:var(--shadow);padding:11px 16px;font-weight:700;font-size:13px;width:340px;
+  font-variant-numeric:tabular-nums}
+.toastx b{color:var(--amber)}
+.toastx>i{color:var(--amber);font-size:15px;vertical-align:-2px;margin-right:2px}
+.toastx.close{border-left-color:var(--blue)}
+.toastx.close b{color:var(--blue)}
+.toastx.close>i{color:var(--blue)}
+.toastx .net{font-family:'Baloo 2';font-weight:800;font-size:15px;color:var(--green)}
+.toastx .net.neg{color:var(--red)}
+.kinds{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
+  padding:12px 16px;width:380px;display:flex;flex-direction:column;gap:8px;
+  font-size:12px;font-weight:700}
+.kinds .krow{display:flex;align-items:center;gap:8px}
+.kinds .krow i{color:var(--amber);font-size:15px}
+.kinds .krow span{flex:1}
+.kinds .krow b{color:var(--amber)}
+.kinds .krow em{font-style:normal;font-size:10px;font-weight:800;color:var(--dim)}
+.pack{width:124px;height:168px;border-radius:16px;position:relative;cursor:pointer;
+  background:linear-gradient(160deg,var(--blue) 0%,#2c4170 100%);
+  box-shadow:0 4px 0 #22345c, 0 10px 22px rgba(43,65,112,.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.pack .zig{position:absolute;top:26px;left:0;right:0;height:7px;
+  background:repeating-linear-gradient(90deg,#fff3 0 9px, transparent 9px 18px)}
+.pack .em{font-size:32px}
+.pack h4{font-family:'Baloo 2';font-weight:700;font-size:14px;margin-top:4px}
+.pack .odds{font-size:8.5px;font-weight:800;letter-spacing:.5px;opacity:.85;margin-top:3px}
+/* ATOM: price — ONE blue price pill (pack face, shop single, upgrade tile).
+   Green never prices: green is money you HAVE; buying is agency = blue. */
+.price{display:inline-block;background:#fff;color:var(--blue);font-family:'Baloo 2';
+  font-weight:700;font-size:13px;padding:4px 13px;border-radius:99px;
+  box-shadow:0 2px 0 var(--line2);text-align:center}
+.price.off{background:#c9cfdd;color:#fff;box-shadow:0 2px 0 #aeb6c8}
+.price .dup{display:block;font-family:'Nunito';font-size:9.5px;font-weight:800;color:var(--amber)}
+.price .dup i{font-size:9.5px}
+.pack .price{margin-top:6px;box-shadow:none}
+.shopcard{display:flex;flex-direction:column;align-items:center}
+.shopcard .price{margin-top:-14px;position:relative;z-index:3}
+.uptile{width:230px;background:var(--card);border:2.5px solid var(--line2);border-radius:var(--r);
+  box-shadow:0 3px 0 var(--line2);padding:13px 15px;cursor:pointer;
+  display:flex;align-items:center;gap:11px}
+.uptile:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line2)}
+.uptile>i{font-size:22px;color:var(--blue)}
+.uptile .ub{flex:1}
+.uptile h4{font-family:'Baloo 2';font-size:14px;font-weight:700;line-height:1.2}
+.uptile .fx{font-size:10.5px;color:var(--dim);font-weight:700}
+
+/* ============ ICON ATLAS ============ */
+.icons{display:flex;flex-wrap:wrap;gap:8px}
+.icon{width:99px;background:var(--card);border-radius:10px;box-shadow:var(--shadow);
+  padding:9px 4px 7px;text-align:center}
+.icon i{font-size:19px}
+.icon .n{font-size:8.5px;font-weight:800;color:var(--dim);margin-top:3px;letter-spacing:.2px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>ADDENDUM <span>design language</span> <small style="font-size:14px;color:var(--dim)">v0.2 · post loop-pivot</small></h1>
+  <p>Every component below renders a real game primitive — captions cite the sim module it comes from. Nothing here is decoration. The loop is turn-based days (MON–SUN) under an Action Point budget; End Day resolves the market as one sequenced ceremony.</p>
+  <span class="rule">LIGHT MODE</span><span class="rule">CHUNKY + ROUNDED</span><span class="rule">RETRO-FB BLUE</span><span class="rule">GAME SCREENS = LANDSCAPE</span><span class="rule">TURN-BASED DAYS + AP</span><span class="rule">PHOSPHOR FILL CHROME</span>
+</header>
+
+<section>
+  <h2>Foundations <small>palette · type — emoji live ONLY in card-art wells; all chrome glyphs are Phosphor Fill, token-tinted</small></h2>
+  <div class="grid">
+    <div class="cell"><div class="sw" style="background:var(--blue)">blue / primary</div><div class="cap">the retro FB blue — action + knowledge (the player's agency)</div></div>
+    <div class="cell"><div class="sw light" style="background:var(--paper);border:2px solid var(--line)">paper</div><div class="cap">room background</div></div>
+    <div class="cell"><div class="sw light" style="background:var(--card);border:2px solid var(--line)">card white</div><div class="cap">every surface</div></div>
+    <div class="cell"><div class="sw" style="background:var(--green)">money green</div><div class="cap">revenue · pips · FREE</div></div>
+    <div class="cell"><div class="sw" style="background:var(--amber)">amber</div><div class="cap">wear · warnings · target · telegraphs</div></div>
+    <div class="cell"><div class="sw" style="background:var(--red)">red</div><div class="cap">fatigue · kill · salary</div></div>
+    <div class="cell">
+      <div class="tspec">
+        <div class="t1">Baloo 2 — score 1.27</div>
+        <div class="t2">Baloo 2 — card names</div>
+        <div class="t3">Nunito 600 — body &amp; meta</div>
+        <div class="t4">NUNITO 800 CAPS — LABELS</div>
+      </div>
+      <div class="cap">chunky display + friendly body, tabular numerals</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The Component Card <small>sim/content.lua · sim/resonance.lua (aspect tags) · sim/economy.lua (rarity, foil V2) · sim/fatigue.lua (wear, scars)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="ccard k-hook"><div class="kicker">HOOK</div><div class="art">🔥</div>
+        <h4>Pain Point</h4><div class="tags"><span class="tag problem">problem 3</span><span class="tag urgency">urgency 1</span></div></div>
+      <div class="cap"><b>common</b> · kind-tinted art · aspect tags = resonance inputs</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-visual rar-uncommon"><div class="kicker">VISUAL</div><div class="art">🤳</div>
+        <h4>UGC Selfie</h4><div class="tags"><span class="tag social">social 2</span><span class="tag trust">trust 1</span></div></div>
+      <div class="cap"><b>uncommon</b> · blue border</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-format rar-rare"><div class="kicker">FORMAT</div><div class="art">🎬</div>
+        <h4>Split Screen</h4><div class="tags"><span class="tag trust">compare 3</span></div></div>
+      <div class="cap"><b>rare</b> · gold border</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-offer rar-legend"><div class="kicker">OFFER</div><div class="art">💎</div>
+        <h4>Whale Bundle</h4><div class="tags"><span class="tag social">offer 4</span></div></div>
+      <div class="cap"><b>legendary</b> · rainbow edge — the shop-excluded white whale. rarity has no motion: the border speaks silently</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-mod"><div class="kicker">MODIFIER</div><div class="art">🏷️</div>
+        <h4>Discount Sticker</h4><div class="tags"><span class="tag problem">value 2</span></div></div>
+      <div class="cap"><b>MODIFIER</b> — the 5th kind (~24 of ~150 v1 cards) · attaches to a proven ad · renders as a charm pip on the ad tile</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-hook foil"><div class="v2flag">V2</div><div class="kicker">HOOK</div><div class="art">🔥</div>
+        <h4>Pain Point V2</h4><div class="tags"><span class="tag problem">problem 4</span></div></div>
+      <div class="cap"><b>foil V2 on a COMMON</b> — foil = V2 identity, stackable on ANY rarity (economy.lua: any fatigued winner + 5 IP). shine = art well only; ambient foil caps at 2/screen, excess freezes at 47%</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="ccard k-hook limited"><span class="scar s1"></span><div class="kicker">HOOK</div><div class="art">⏳</div>
+        <h4>FOMO Drop</h4><div class="tags"><span class="tag urgency">urgency 2</span></div></div>
+      <div class="cap"><b>CREATIVE LIMITED</b> · saturate(.55), art 65% · 1 scar (dog-ear) — Meta's literal words</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-visual fatigued"><span class="scar s1"></span><span class="scar s2"></span><div class="kicker">VISUAL</div><div class="art">📢</div>
+        <h4>Banner Blast</h4><div class="tags"><span class="tag social">social 1</span></div></div>
+      <div class="cap"><b>CREATIVE FATIGUE</b> — stage 2 · saturate(.35), art 50% · 2 scars · CPA ≥2×</div>
+    </div>
+    <div class="cell">
+      <div class="ccard k-hook spent"><span class="scar s1"></span><span class="scar s2"></span><span class="scar s3"></span><div class="kicker">HOOK</div><div class="art">🪦</div>
+        <h4>Old Meme</h4><div class="tags"><span class="tag urgency">retired</span></div></div>
+      <div class="cap"><b>spent</b> · 3 scars → retires into Learnings · scars are countable corners, permanent and global</div>
+    </div>
+    <div class="cell">
+      <div class="ccard back"><div class="zig" style="top:14px"></div><div class="bdia"></div><div class="zig" style="bottom:14px"></div></div>
+      <div class="cap"><b>card back</b> — pack flips + face-down hand · echoes the pack's blue + zig · no rarity tells (the flip IS the reveal)</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The Composed Ad <small>sim/composer.lua (slots, capacity) · sim/wave.lua (launch/kill) — revenue is the ad's power number</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="adtile">
+        <div class="slotstack"><div class="minislot mk-hook">🔥</div><div class="minislot mk-visual">🤳</div><div class="minislot mk-format">🎬</div><div class="minislot empty mk-offer"><i class="ph-bold ph-plus"></i></div></div>
+        <div class="meta"><h4>Pain Point × UGC</h4><div class="lane">Cold Intros · live MON</div></div>
+        <div class="pow"><div class="num">$318</div><span>REVENUE</span></div>
+      </div>
+      <div class="cap">kind-tinted minislots — the recipe reads by color · empty slot = dashed, expected kind's tint, Phosphor <b>Bold</b> + (the one sanctioned outline)</div>
+    </div>
+    <div class="cell">
+      <div class="adtile leader">
+        <div class="slotstack"><div class="minislot mk-hook">⭐</div><div class="minislot mk-visual">📦</div><div class="minislot mk-format">🎬</div><div class="minislot mk-offer">💎</div></div>
+        <div class="charms"><span class="charm"></span></div>
+        <div class="meta"><h4>Social Proof × Bundle</h4><div class="lane">Warm Retargeting · live MON</div>
+          <span class="chip sm c-leader"><i class="ph-fill ph-crown"></i>Leader</span></div>
+        <div class="pow"><div class="num">$262</div><span>REVENUE</span></div>
+      </div>
+      <div class="cap"><b>leader</b> — border recolor (the border speaks, never an outline hack) · chip--sm in the designated chip slot · charm pip = one attached MODIFIER (max 3)</div>
+    </div>
+    <div class="cell">
+      <div style="display:flex;gap:6px">
+        <div class="minislot mk-hook">🔥</div><div class="minislot mk-visual">🤳</div><div class="minislot mk-format">🎬</div><div class="minislot mk-offer">💎</div><div class="minislot mk-mod">🏷️</div>
+      </div>
+      <div class="cap">the minislot is the ccard's micro form — five kind tints, one source of truth</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="deskcard">
+        <h4>Pain Point × UGC</h4>
+        <div class="dart">🔥<span class="cta"></span></div>
+        <div class="drow"><div class="dnum">$318<span>REVENUE</span></div></div>
+        <div class="recipe"><div class="minislot mk-hook">🔥</div><div class="minislot mk-visual">🤳</div><div class="minislot mk-format">🎬</div></div>
+      </div>
+      <div class="cap"><b>the Desk board card</b> — the played ad, light language. no idle wobble; killed exits via <b>return</b> + budget-refund float</div>
+    </div>
+    <div class="cell">
+      <div class="deskcard">
+        <h4>Scarcity × Demo</h4>
+        <div class="dart">⏰<span class="cta"></span></div>
+        <div class="drow"><div class="dnum dim">$—<span>REVENUE</span></div><span class="chip sm c-learning"><i class="ph-fill ph-hourglass-medium"></i>3/10</span></div>
+        <div class="recipe"><div class="minislot mk-hook">⏰</div><div class="minislot mk-visual">🎥</div><div class="minislot mk-format">📱</div></div>
+      </div>
+      <div class="cap"><b>learning</b> — power number prints <b>$—</b> until the first night ceremony; the tile never prints a forecast where actuals go</div>
+    </div>
+    <div class="cell">
+      <div class="deskcard limited">
+        <h4>FOMO × Stock</h4>
+        <div class="dart">⏳<span class="cta"></span></div>
+        <div class="drow"><div class="dnum">$141<span>REVENUE</span></div><span class="chip sm c-limited"><i class="ph-fill ph-battery-medium"></i></span></div>
+        <div class="recipe"><div class="minislot mk-hook">⏳</div><div class="minislot mk-visual">📦</div><div class="minislot mk-format">🎬</div></div>
+      </div>
+      <div class="cap"><b>limited</b> — recipe + art wear like their cards (saturate .55)</div>
+    </div>
+    <div class="cell">
+      <div class="deskcard fatigued">
+        <h4>Meme × Loud</h4>
+        <div class="dart">📢<span class="cta"></span></div>
+        <div class="drow"><div class="dnum">$74<span>REVENUE</span></div><span class="chip sm c-fatigue"><i class="ph-fill ph-battery-low"></i></span></div>
+        <div class="recipe"><div class="minislot mk-hook">😂</div><div class="minislot mk-visual">📢</div><div class="minislot mk-format">🎬</div></div>
+      </div>
+      <div class="cap"><b>fatigued</b> — stage 2 desaturation</div>
+    </div>
+    <div class="cell">
+      <div class="deskcard spent">
+        <h4>Old Meme × UGC</h4>
+        <div class="dart">🪦<span class="cta"></span></div>
+        <div class="drow"><div class="dnum">$12<span>REVENUE</span></div><span class="chip sm c-spent"><i class="ph-fill ph-moon-stars"></i></span></div>
+        <div class="recipe"><div class="minislot mk-hook">🪦</div><div class="minislot mk-visual">🤳</div><div class="minislot mk-format">🎬</div></div>
+      </div>
+      <div class="cap"><b>spent</b> — whole tile saturate(.2), 75%</div>
+    </div>
+    <div class="cell">
+      <div class="deskcard over">
+        <h4>Everything Ad</h4>
+        <div class="dart">🧨<span class="cta"></span></div>
+        <div class="drow"><div class="dnum dim">—<span>DRAFT</span></div><span class="wline">WEIGHT 5 / CAP 4</span></div>
+        <div class="recipe"><div class="minislot mk-hook">🔥</div><div class="minislot mk-visual">🤳</div><div class="minislot mk-format">🎬</div><div class="minislot mk-offer">💎</div><div class="minislot empty"><i class="ph-bold ph-plus"></i></div></div>
+      </div>
+      <div class="cap"><b>over-capacity</b> (Builder draft) — composer.lua over_by: amber stack + weight readout; the Builder's projection chain shows the floored hook/hold penalty arithmetic <b>before</b> launch</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Status Chips <small>sim/shimmer.lua (learning) · sim/fatigue.lua (Meta's literal words) · sim/wave.lua (boss) · sim/significance.lua (clean test)</small></h2>
+  <div class="grid">
+    <div class="cell"><span class="chip c-learning"><i class="ph-fill ph-hourglass-medium"></i>Learning 7/10</span><div class="cap">calibrating — shimmer sweep · all learning chips share <b>one synchronized phase</b> (one ambient system, ruled)</div></div>
+    <div class="cell"><span class="chip c-leader"><i class="ph-fill ph-crown"></i>Leader</span><div class="cap">winning its race</div></div>
+    <div class="cell"><span class="chip c-limited"><i class="ph-fill ph-battery-medium"></i>Creative Limited</span><div class="cap">wear stage 1</div></div>
+    <div class="cell"><span class="chip c-fatigue"><i class="ph-fill ph-battery-low"></i>Creative Fatigue</span><div class="cap">wear stage 2 (CPA ≥2×)</div></div>
+    <div class="cell"><span class="chip c-spent"><i class="ph-fill ph-moon-stars"></i>Spent</span><div class="cap">retired</div></div>
+    <div class="cell"><span class="chip c-boss"><i class="ph-fill ph-star"></i>Launch Week</span><div class="cap">boss brief — hard gate</div></div>
+    <div class="cell"><span class="chip c-clean"><i class="ph-fill ph-flask"></i>Clean Test</span><div class="cap">one-card difference — mints Field Notes · the only bordered chip (provisional/lab cue)</div></div>
+    <div class="cell">
+      <div style="display:flex;gap:8px;align-items:center"><span class="chip sm c-leader"><i class="ph-fill ph-crown"></i>Leader</span><span class="chip sm c-clean"><i class="ph-fill ph-flask"></i></span><span class="chip sm gr-ok">CONFIRMED</span></div>
+      <div class="cap"><b>chip--sm</b> — the one small-chip token · consumers: adtile Leader, note flask, pin-grade stamps</div>
+    </div>
+    <div class="cell"><div class="cap" style="max-width:280px">an ad tile has <b>exactly one chip slot</b>. priority:<br><b>Learning &gt; Creative Fatigue &gt; Creative Limited &gt; Leader &gt; none</b><br>boss + clean chips live on other hosts and never compete for it</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Buttons, Verbs &amp; Action Points <small>sim/wave.lua (verbs act on live ads) · the day-loop AP budget (flows.md) · sim/diagnosis.lua — KILL free always</small></h2>
+  <div class="grid">
+    <div class="cell"><button class="btn">Launch Ad</button><div class="cap">primary · ≥48dp · presses onto its own shelf</div></div>
+    <div class="cell"><button class="btn sec">View Codex</button><div class="cap">secondary — the pressable-plate atom</div></div>
+    <div class="cell"><button class="btn danger">Fire Maya</button><div class="cap">danger (severance!) · pressed shelf stays red · asks twice: label swaps to "Sure? −$60 severance" for 3s · ≥16dp clearance from neighbors</div></div>
+    <div class="cell"><button class="btn disabled">Boost</button><div class="cap">no AP left — visible, chunky, and it <b>never travels</b></div></div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div style="display:flex;gap:8px">
+        <div class="verb kill"><div class="vname">Kill</div><div class="vcost free">FREE</div></div>
+        <div class="verb"><div class="vname">Boost</div><div class="vcost"><span class="pipcost"></span>1</div></div>
+        <div class="verb"><div class="vname">Swap</div><div class="vcost"><span class="pipcost"></span>1</div></div>
+        <div class="verb"><div class="vname">Call It</div><div class="vcost free">FREE</div></div>
+        <div class="verb"><div class="vname">Diagnose</div><div class="vcost free">1ST FREE</div></div>
+      </div>
+      <div class="cap">the verb dock — a MORNING surface, contextual to the selected ad, spending the day's AP · Kill label red + extra clearance · Diagnose: 1st free per <b>DAY</b>, then <span class="pipcost" style="margin:0 2px"></span>1 · cost glyph = the AP pip itself</div>
+    </div>
+    <div class="cell">
+      <div style="display:flex;gap:8px">
+        <div class="verb armed"><div class="vname">Swap</div><div class="vcost"><span class="pipcost"></span>1</div></div>
+        <div class="verb off"><div class="vname">Boost</div><div class="vcost"><span class="pipcost"></span>1</div></div>
+        <div class="verb off"><div class="vname">Call It</div><div class="vcost">NO RACE</div></div>
+      </div>
+      <div class="cap"><b>armed</b> (blue border — awaiting target; tap away cancels) · <b>unaffordable</b> (gray, cost stays legible) · <b>not-applicable</b> — the dock always shows all five: spatial stability over hiding</div>
+    </div>
+    <div class="cell">
+      <div><span class="appip"></span><span class="appip"></span><span class="appip mark"></span><span class="appip spent"></span></div>
+      <div class="cap"><b>Action Points</b> · 2 left + 1 <b>earmarked</b> (armed verb previews the spend at 50% fill — sits still, no pulse) + 1 spent · base 3/day + team capacity · refills each morning, no carryover</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell"><button class="endday">END DAY<small>MON → MARKET</small></button><div class="cap"><b>End Day</b> — the game's central verb. BLUE (apex of agency; amber would moonlight the warning color). heavier by mass: 16px radius, 4px shelf, 3px travel, day sub-label. never disabled</div></div>
+    <div class="cell"><button class="endday forfeit">END DAY<small>2 AP UNSPENT</small></button><div class="cap"><b>forfeit warning</b> — static amber sub-label, no pulse: the honest telegraph that unspent AP is forfeited (no carryover)</div></div>
+    <div class="cell"><button class="endday">END DAY<small>SUN → WEEK CLOSE</small></button><div class="cap">Sunday — hands off to the week-close brief check</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Score &amp; Metrics <small>sim/funnel.lua (gates) · sim/significance.lua (two-sided race + bell, N_MIN 200) · sim/wave.lua (pins → CONFIRMED/BUSTED/INCONCLUSIVE)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="scoreplate"><div class="num">1.27</div><div class="lbl">ROAS — TARGET 1.45</div>
+        <div class="bar"><i></i><em></em></div></div>
+      <div class="cap">the score plate · published scale: domain <b>0 → 1.25×target</b>, tick fixed at 80% = target · fill = 1.27/1.8125 = 70% — the arithmetic computes · tick turns green the frame fill passes it</div>
+    </div>
+    <div class="cell">
+      <div style="display:flex;gap:10px">
+        <div class="stat"><div class="num">31%</div><div class="lbl">HOOK</div></div>
+        <div class="stat"><div class="num">46%</div><div class="lbl">HOLD</div></div>
+        <div class="stat warn"><div class="num">1.9%</div><div class="lbl"><i class="ph-fill ph-drop"></i> CTR</div></div>
+        <div class="stat"><div class="num">2.6%</div><div class="lbl">CVR</div></div>
+      </div>
+      <div class="cap">stat blocks · the leak = amber num + <b>drop glyph</b> (shape redundancy, CVD) — and it appears only <b>after</b> the player's diagnosis guess is graded</div>
+    </div>
+    <div class="cell">
+      <div class="gates">
+        <div class="gate"><div class="gbar"><em></em><i style="height:62%"></i></div><div class="num">28%</div><div class="lbl">HOOK</div></div>
+        <div class="gate"><div class="gbar"><em></em><i style="height:53%"></i></div><div class="num">45%</div><div class="lbl">HOLD</div></div>
+        <div class="gate warn"><div class="gbar"><em></em><i style="height:33%"></i></div><div class="num">1.9%</div><div class="lbl"><i class="ph-fill ph-drop"></i> CTR</div></div>
+        <div class="gate"><div class="gbar"><em></em><i style="height:48%"></i></div><div class="num">2.4%</div><div class="lbl">CVR</div></div>
+      </div>
+      <div class="cap">funnel gates · published scale: domain <b>0 → 2× lane forecast</b>, hairline = forecast at 50% — below the line IS the leak (structure, not color-alone) · in guess mode gates gain the press shelf (≥48dp targets)</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="race early">
+        <div class="rh"><span>A/B RACE — HOOK</span><span>n=84 — needs 200</span></div>
+        <div class="trackrow"><span class="endcap">A</span><div class="track"><div class="bell-l"></div><div class="bell-r"></div><div class="needle" style="left:calc(50% - 2px)"></div></div><span class="endcap">B</span></div>
+        <div class="rf"><span>too early to read</span><span class="ghost"><i class="ph-fill ph-push-pin"></i> no call placed</span></div>
+      </div>
+      <div class="cap"><b>too early</b> — n &lt; 200 either arm: needle parked center at 40%, track dimmed</div>
+    </div>
+    <div class="cell">
+      <div class="race">
+        <div class="rh"><span>A/B RACE — HOOK</span><span>n=1,847</span></div>
+        <div class="trackrow"><span class="endcap">A</span><div class="track"><div class="bell-l"></div><div class="bell-r"></div><div class="needle" style="left:36%"></div></div><span class="endcap">B</span></div>
+        <div class="rf"><span><i class="ph-fill ph-bell" style="color:var(--amber)"></i> bell at ±significance</span><span class="pincall"><i class="ph-fill ph-push-pin"></i> PINNED — A · HOOK</span></div>
+      </div>
+      <div class="cap"><b>racing, pinned</b> · published mapping: needle x = 50% + 42%×clamp(z/z_bell), bell lines at 8%/92% — it touches a line exactly at significance · needle moves only at night (discrete honest day-moves)</div>
+    </div>
+    <div class="cell">
+      <div class="race">
+        <div class="rh"><span>A/B RACE — HOOK</span><span>n=1,400</span></div>
+        <div class="trackrow"><span class="endcap">A</span><div class="track"><div class="bell-l"></div><div class="bell-r"></div><div class="needle" style="left:30%"></div></div><span class="endcap">B</span></div>
+        <div class="rf"><span class="stamp">CALLED — A · n=1,400</span><span>graded at autopsy</span></div>
+      </div>
+      <div class="cap"><b>called early</b> (CALL IT) — needle freezes, ink stamp, <b>no bell</b>: player-resolved, not evidence-resolved</div>
+    </div>
+    <div class="cell">
+      <div class="race">
+        <div class="rh"><span>A/B RACE — HOOK <i class="ph-fill ph-bell"></i></span><span>n=2,410</span></div>
+        <div class="trackrow"><span class="endcap lost">A</span><div class="track"><div class="bell-l"></div><div class="bell-r"></div><div class="needle" style="left:calc(92% - 2px)"></div></div><span class="endcap">B</span></div>
+        <div class="rf"><span class="verdict">B beats A +9.2pts</span><span class="chip sm gr-bust">BUSTED</span></div>
+      </div>
+      <div class="cap"><b>resolved by bell</b> — needle rests past the line, loser endcap desaturates · pin grade stamps in (the A pin: BUSTED) · the full Shout setpiece is for clean races only</div>
+    </div>
+    <div class="cell">
+      <div class="race carry">
+        <div class="rh"><span>A/B RACE — HOOK</span><span>n=1,847</span></div>
+        <div class="trackrow"><span class="endcap">A</span><div class="track"><div class="bell-l"></div><div class="bell-r"></div><div class="needle" style="left:42%"></div></div><span class="endcap">B</span></div>
+        <div class="rf"><span>carries over — n banked</span><span class="chip sm gr-inc">INCONCLUSIVE</span></div>
+      </div>
+      <div class="cap"><b>inconclusive at week close</b> — meter desaturates toward spent; the benched pair keeps its n</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell"><span class="pin"><i class="ph-fill ph-push-pin"></i> PINNED — A wins HOOK</span><div class="cap">the Pin — pre-registration, graded at autopsy ("Call it" copy retired: the names never mix with the CALL IT verb)</div></div>
+    <div class="cell"><span class="pin ok"><i class="ph-fill ph-check"></i> CONFIRMED — A wins HOOK</span><div class="cap">blue = knowledge gained; often chains a Field Note mint</div></div>
+    <div class="cell"><span class="pin bust"><i class="ph-fill ph-x"></i> BUSTED — A wins HOOK</span><div class="cap">a wrong call — the one honest red on a pin</div></div>
+    <div class="cell"><span class="pin inc"><i class="ph-fill ph-push-pin"></i> INCONCLUSIVE — n too small</span><div class="cap">spent treatment; benched pairs add "carries over"</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Resources <small>sim/economy.lua (bankroll, interest $1 per $5 cap $100, IP) · sim/wave.lua (pips) · flows.md (the week strip, turn-based days)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="stat" style="text-align:left;padding:12px 20px">
+        <div class="num" style="font-size:24px;color:var(--green)"><i class="ph-fill ph-coins" style="font-size:19px"></i> $1,240</div>
+        <div class="lbl">BANKROLL</div>
+        <div class="int">+$100 interest at week close — at cap</div>
+      </div>
+      <div class="cap">bankroll = the stat-plate atom + sub-line slot · interest is <b>computed</b>, never authored: $1 per $5 banked, cap $100 (reached at $500) — $1,240 banked = the capped $100 · pays as the FIRST beat of the week-close ceremony</div>
+    </div>
+    <div class="cell"><div class="pips"><div class="pip"></div><div class="pip"></div><div class="pip spent"></div></div><div class="cap">trust pips · 2 left · burn beat plays at week close (pop → desaturate → shelf sag) · the spend-token atom: green rect parameter set</div></div>
+    <div class="cell">
+      <div class="week"><span class="wd done">MON</span><span class="wd done">TUE</span><span class="wd live">WED</span><span class="wd tele">THU</span><span class="wd">FRI</span><span class="wd">SAT</span><span class="wd">SUN</span></div>
+      <div class="cap"><b>the week strip</b> — MON–SUN turn indicator (the dot track is deleted) · done = blue2 (no strike-through) · live = blue + press shelf (no ring) · <b>telegraphed</b> = tomorrow's weather, amber · weekday identity is mechanical (weekends shift volume/CPM)</div>
+    </div>
+    <div class="cell"><span class="float">+$45</span> <span class="float neg">−$40</span><div class="cap">settle floats — positive rises, <b>negative sinks</b> (direction = the non-color encoding) · $0 never spawns · the float stamps whole; the bank rolls</div></div>
+    <div class="cell"><span class="ip"><i class="ph-fill ph-sparkle"></i> 7 Iteration Points</span><div class="cap">duplicates → IP → V2 mint (5 IP + a worn winner)</div></div>
+    <div class="cell"><span class="ip zero"><i class="ph-fill ph-sparkle"></i> 0 Iteration Points</span><div class="cap">zero state — shown, never hidden (persistent resources don't vanish)</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>People <small>sim/team.lua (hires, salaries, severance) · sim/strategist.lua (proposals, claimed vs actual calibration)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="hire">
+        <div class="hd"><div class="face">👩‍🎤</div><div><h4>Maya</h4><div class="role">Creative Strategist · <i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i></div></div></div>
+        <div class="traits"><span class="trait style">creative</span><span class="trait calib">overconfident</span></div>
+        <div class="salary"><span>salary / week</span><b>−$40</b></div>
+        <div class="track"><div class="lbl"><span>TRACK RECORD</span><span><b class="says">SAYS 84%</b> · <b class="runs">RUNS 61%</b> <span style="color:var(--dim)">(18)</span></span></div>
+          <div class="tbar"><i></i><em></em></div></div>
+      </div>
+      <div class="cap">hired + calibrated · both numbers printed: <b>SAYS</b> (her claim, amber) vs <b>RUNS</b> (the bar she runs, blue) over 18 graded calls — the gap IS the character · amber tick = claimed (never red) · "overconfident" was EARNED, then revealed</div>
+    </div>
+    <div class="cell">
+      <div class="hire rar-uncommon">
+        <div class="hd"><div class="face">🧔</div><div><h4>Dev</h4><div class="role">Performance Analyst · <i class="ph-fill ph-star"></i></div></div></div>
+        <div class="traits"><span class="trait style">analytical</span><span class="trait hidden"><i class="ph-fill ph-question"></i></span></div>
+        <div class="salary"><span>salary / week</span><b>−$60</b></div>
+        <div class="track"><div class="lbl"><span>TRACK RECORD</span><span>NO HISTORY</span></div>
+          <div class="tbar empty"><i></i></div></div>
+        <button class="btn" style="width:100%;margin-top:11px;padding:9px;min-height:44px;font-size:14px">Hire</button>
+      </div>
+      <div class="cap"><b>candidate</b> (Team Board) · calibration trait hidden as the <b>?</b> pill until earned — nobody's resume says "overconfident"; style trait IS visible (it's how he pitches) · rarity vocabulary: the border speaks (uncommon)</div>
+    </div>
+    <div class="cell">
+      <div class="hire">
+        <div class="hd"><div class="face">👨‍🎨</div><div><h4>Sasha</h4><div class="role">Creative Strategist · <i class="ph-fill ph-star"></i></div></div></div>
+        <div class="traits"><span class="trait style">creative</span><span class="trait hidden"><i class="ph-fill ph-question"></i></span></div>
+        <div class="salary"><span>salary / week</span><b>−$35</b></div>
+        <div class="track"><div class="lbl"><span>TRACK RECORD</span><span>CALIBRATING 3/5</span></div>
+          <div class="tbar shimbar"><i style="width:48%"></i></div></div>
+      </div>
+      <div class="cap"><b>uncalibrated</b> — the track bar runs the shimmer (the same learning atom): she's in learning phase too · SAYS/RUNS + tick appear at 5 graded calls</div>
+    </div>
+    <div class="cell">
+      <div class="deskslot"><i class="ph-bold ph-plus"></i> HIRE</div>
+      <div class="cap"><b>empty desk slot</b> — capacity is visible (2 slots → 4–5 via upgrades) · tap → Team Board</div>
+    </div>
+    <div class="cell">
+      <div class="facechip">👩‍🎤</div>
+      <div class="cap"><b>face chip</b> — desk presence, 48–56dp: the bubble's anchor and the persistent tap target (tap Maya → Team Board)</div>
+    </div>
+    <div class="cell">
+      <div class="bubble"><div class="who">MAYA SUGGESTS</div>
+        “Urgency reads tired on cold traffic — pin a race: swap the hook.”
+        <div><span class="conf">says 90% sure</span></div></div>
+      <div class="cap">proposal bubble — propose, never decide · same amber, same "says n%" voice as her card · people speak in bubbles; the market speaks in toasts</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Knowledge <small>sim/ledger.lua (Field Notes, Codex) · sim/diagnosis.lua (6-case table, guess grading)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="note"><span class="dir up"><i class="ph-fill ph-trend-up"></i></span><div class="nb">Urgency lifts <b>Hook</b> on Cold<div class="ev">seen 2× this run</div></div><span class="chip sm c-clean"><i class="ph-fill ph-flask"></i></span></div>
+      <div class="cap">Field Note (+1) — minted by clean tests, evidence stacks · the know-row atom: icon well · claim · meta</div>
+    </div>
+    <div class="cell">
+      <div class="note"><span class="dir down"><i class="ph-fill ph-trend-down"></i></span><div class="nb">Hard Sell hurts <b>CTR</b> on Warm<div class="ev">seen 1× this run</div></div><span class="chip sm c-clean"><i class="ph-fill ph-flask"></i></span></div>
+      <div class="cap"><b>hurts (−1)</b> — direction follows the winner; the ledger banks harm and the UI must say it · shape distinguishes, not color (both knowledge-blue)</div>
+    </div>
+    <div class="cell">
+      <div class="note"><span class="dir null"><i class="ph-fill ph-circle"></i></span><div class="nb">No lift: Scarcity on Hook, Cold<div class="ev">null — banked anyway</div></div></div>
+      <div class="cap">null note — negative knowledge is knowledge; equal visual weight, on purpose</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span class="codex cx-unseen"><i class="ph-fill ph-question"></i> Unseen</span>
+        <span class="codex cx-observed"><i class="ph-fill ph-eye"></i> Observed — 1 run</span>
+        <span class="codex cx-canon"><i class="ph-fill ph-star"></i> CANON — replicated 2 runs</span>
+      </div>
+      <div class="cap">Codex states — "14 of 32 patterns confirmed" · pill radius 99 (it names a state) · CANON: the only ink-filled pill besides boss</div>
+    </div>
+    <div class="cell">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="cxrow"><span class="dir" style="color:var(--inertink)"><i class="ph-fill ph-question"></i></span><div class="nb"><span class="redact"></span></div><span class="codex cx-unseen" style="padding:5px 11px;font-size:11px">UNSEEN</span></div>
+        <div class="cxrow"><span class="dir" style="color:#ffd76b"><i class="ph-fill ph-star"></i></span><div class="nb">Urgency lifts <b>Hook</b> on Cold</div><span class="codex cx-canon" style="padding:5px 11px;font-size:11px">CANON</span></div>
+      </div>
+      <div class="cap"><b>the Codex row</b> (screen 9 stacks these) — UNSEEN claims are <b>redacted</b>: knowledge you haven't earned isn't legible</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="diagchips">
+        <span class="dchip">Hook</span><span class="dchip">Hold</span><span class="dchip">CTR</span>
+        <span class="dchip">CVR</span><span class="dchip"><i class="ph-fill ph-moon" style="color:var(--red)"></i> Fatigue</span><span class="dchip"><i class="ph-fill ph-arrows-out" style="color:var(--dim)"></i> No single leak</span>
+      </div>
+      <div class="cap">diagnose guess chips — tap where it leaks (6-case table) · ≥48dp plates, radius 14 (they ARE the verb plate) · metric chips stay text-only: the name is the icon</div>
+    </div>
+    <div class="cell">
+      <div class="diagchips">
+        <span class="dchip sel">CVR</span><span class="dchip hit">CTR</span><span class="dchip dead">Hook</span>
+      </div>
+      <div class="cap"><b>committed</b> (seated while grading) · <b>CORRECT = amber</b> — the answer IS the leak, never green · <b>WRONG</b> wobbles ±3° then settles spent (dead for repeats; after a wrong guess the true chip fills amber)</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Events &amp; Shop <small>sim/director.lua (day-scoped events, telegraphed the night before) · sim/economy.lua (Newsstand: 2 singles + 2 packs + 1 upgrade; odds printed)</small></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="toastx"><i class="ph-fill ph-trend-up"></i> Tomorrow: <b>CPM spike</b> — pricier eyeballs all day</div>
+      <div class="cap">director telegraph — tomorrow's weather, announced in the night ceremony. <b>no countdowns</b>: events are day-scoped, never live pressure</div>
+    </div>
+    <div class="cell">
+      <span class="chip c-event"><i class="ph-fill ph-trend-up"></i>CPM spike — today</span>
+      <div class="cap">the active-day <b>weather chip</b> (status-chip atom instance) — rides the Desk day header all day, dismounts quietly at night</div>
+    </div>
+    <div class="cell">
+      <div class="kinds">
+        <div class="krow"><i class="ph-fill ph-trend-up"></i><span>Tomorrow: <b>CPM spike</b> — pricier eyeballs all day</span><em>cpm ×1.35</em></div>
+        <div class="krow"><i class="ph-fill ph-trend-down"></i><span>Tomorrow: <b>cheap reach</b> — CPM dips all day</span><em>cpm ×0.80</em></div>
+        <div class="krow"><i class="ph-fill ph-sword"></i><span>Tomorrow: <b>competitor enters</b> — hooks land softer</span><em>hook ×0.78</em></div>
+        <div class="krow"><i class="ph-fill ph-fire"></i><span>Tomorrow: <b>novelty trending</b> — novelty aspects amplified</span><em>novelty ×1.5</em></div>
+        <div class="krow"><i class="ph-fill ph-eye-slash"></i><span>Tomorrow: <b>reporting outage</b> — CVR hidden all day</span><em>hides CVR</em></div>
+      </div>
+      <div class="cap">the 5-kind director table — one amber for all five (valence lives in icon + copy); events amplify/mute/hide/tax, never flip a Layer-1 sign</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="toastx close"><i class="ph-fill ph-envelope-simple"></i> <b>Wednesday close</b> — spend $483 · revenue $612 · <span class="net">+$129</span></div>
+      <div class="cap">day-close stinger — the night's receipt; net is the hero</div>
+    </div>
+    <div class="cell">
+      <div class="toastx close"><i class="ph-fill ph-envelope-simple"></i> <b>Thursday close</b> — spend $510 · revenue $402 · <span class="net neg">−$108</span></div>
+      <div class="cap">loss close — red net + the minus sign (shape redundancy) · a quiet ledger, not a siren</div>
+    </div>
+  </div>
+  <div class="grid" style="margin-top:22px">
+    <div class="cell">
+      <div class="pack"><div class="zig"></div><div class="em">🎴</div><h4>Card Pack</h4><div class="odds">3 CARDS · 70 / 25 / 5</div><div class="price">$75</div></div>
+      <div class="cap">the pack — earned currency only; the contract is <b>printed on the face</b> (Apple 3.1.1 + rule 8½) · first tap = inspect, odds full-size; money never leaves on the first tap</div>
+    </div>
+    <div class="cell">
+      <div class="shopcard">
+        <div class="ccard k-hook"><div class="kicker">HOOK</div><div class="art">🔥</div>
+          <h4>Pain Point</h4><div class="tags"><span class="tag problem">problem 3</span><span class="tag urgency">urgency 1</span></div></div>
+        <div class="price">$50</div>
+      </div>
+      <div class="cap">shop single = the REAL ccard + the price atom (the pricetag row is dissolved — the card is the information a purchase is made on) · unaffordable: price goes disabled-gray, the card stays full color</div>
+    </div>
+    <div class="cell">
+      <div class="shopcard">
+        <div class="ccard k-visual rar-uncommon"><div class="kicker">VISUAL</div><div class="art">🤳</div>
+          <h4>UGC Selfie</h4><div class="tags"><span class="tag social">social 2</span></div></div>
+        <div class="price">$80<span class="dup">→ <i class="ph-fill ph-sparkle"></i> 2 IP — owned</span></div>
+      </div>
+      <div class="cap"><b>owned-duplicate preview</b> — if buying converts to IP, the player knows <b>before</b> paying (rule 8½)</div>
+    </div>
+    <div class="cell">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="uptile"><i class="ph-fill ph-lightning"></i><div class="ub"><h4>Fourth Cup of Coffee</h4><div class="fx">+1 AP every day</div></div><span class="price">$100</span></div>
+        <div class="uptile"><i class="ph-fill ph-flask"></i><div class="ub"><h4>Third Bench Slot</h4><div class="fx">bench fits one more racer</div></div><span class="price off">$100</span></div>
+      </div>
+      <div class="cap"><b>upgrade tile</b> — icon + name + effect line + the one blue price atom (green never prices) · the set: Fourth Cup of Coffee, Third Bench Slot, Inside Contact (dossiers un-redact faster), Bigger Desk (hold one more card) · on purchase the effect visibly lands where its rule lives</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Icon Atlas <small>the curated Phosphor Fill set (~29) — rasterized white @1x/@2x → icons.atlas, runtime-tinted; pipeline lands with the first Defold build</small></h2>
+  <div class="icons">
+    <div class="icon"><i class="ph-fill ph-hourglass-medium" style="color:var(--blue)"></i><div class="n">hourglass-medium<br>learning</div></div>
+    <div class="icon"><i class="ph-fill ph-crown" style="color:var(--green)"></i><div class="n">crown<br>leader</div></div>
+    <div class="icon"><i class="ph-fill ph-battery-medium" style="color:var(--amber)"></i><div class="n">battery-medium<br>limited</div></div>
+    <div class="icon"><i class="ph-fill ph-battery-low" style="color:var(--red)"></i><div class="n">battery-low<br>fatigue</div></div>
+    <div class="icon"><i class="ph-fill ph-moon-stars" style="color:var(--inertink)"></i><div class="n">moon-stars<br>spent</div></div>
+    <div class="icon"><i class="ph-fill ph-star" style="color:var(--gold)"></i><div class="n">star<br>boss · canon · rank</div></div>
+    <div class="icon"><i class="ph-fill ph-flask" style="color:var(--blue)"></i><div class="n">flask<br>clean test · bench</div></div>
+    <div class="icon"><i class="ph-fill ph-question" style="color:var(--inertink)"></i><div class="n">question<br>unseen · hidden trait</div></div>
+    <div class="icon"><i class="ph-fill ph-eye" style="color:var(--blue)"></i><div class="n">eye<br>observed</div></div>
+    <div class="icon"><i class="ph-fill ph-trend-up" style="color:var(--blue)"></i><div class="n">trend-up<br>lift · cpm spike</div></div>
+    <div class="icon"><i class="ph-fill ph-trend-down" style="color:var(--blue)"></i><div class="n">trend-down<br>hurts · cpm dip</div></div>
+    <div class="icon"><i class="ph-fill ph-circle" style="color:var(--dim)"></i><div class="n">circle<br>null note</div></div>
+    <div class="icon"><i class="ph-fill ph-drop" style="color:var(--amber)"></i><div class="n">drop<br>the leak</div></div>
+    <div class="icon"><i class="ph-fill ph-bell" style="color:var(--amber)"></i><div class="n">bell<br>significance</div></div>
+    <div class="icon"><i class="ph-fill ph-push-pin" style="color:var(--blue)"></i><div class="n">push-pin<br>the pin</div></div>
+    <div class="icon"><i class="ph-fill ph-check" style="color:var(--blue)"></i><div class="n">check<br>confirmed</div></div>
+    <div class="icon"><i class="ph-fill ph-x" style="color:var(--red)"></i><div class="n">x<br>busted</div></div>
+    <div class="icon"><i class="ph-fill ph-coins" style="color:var(--green)"></i><div class="n">coins<br>bankroll</div></div>
+    <div class="icon"><i class="ph-fill ph-sparkle" style="color:var(--amber)"></i><div class="n">sparkle<br>iteration points</div></div>
+    <div class="icon"><i class="ph-fill ph-moon" style="color:var(--red)"></i><div class="n">moon<br>diag: fatigue</div></div>
+    <div class="icon"><i class="ph-fill ph-arrows-out" style="color:var(--dim)"></i><div class="n">arrows-out<br>no single leak</div></div>
+    <div class="icon"><i class="ph-fill ph-sword" style="color:var(--amber)"></i><div class="n">sword<br>competitor</div></div>
+    <div class="icon"><i class="ph-fill ph-fire" style="color:var(--amber)"></i><div class="n">fire<br>viral moment</div></div>
+    <div class="icon"><i class="ph-fill ph-eye-slash" style="color:var(--amber)"></i><div class="n">eye-slash<br>blackout</div></div>
+    <div class="icon"><i class="ph-fill ph-envelope-simple" style="color:var(--blue)"></i><div class="n">envelope-simple<br>day close</div></div>
+    <div class="icon"><i class="ph-fill ph-lightning" style="color:var(--blue)"></i><div class="n">lightning<br>+1 AP</div></div>
+    <div class="icon"><i class="ph-fill ph-detective" style="color:var(--blue)"></i><div class="n">detective<br>inside contact</div></div>
+    <div class="icon"><i class="ph-fill ph-hand" style="color:var(--blue)"></i><div class="n">hand<br>bigger desk</div></div>
+    <div class="icon"><i class="ph-bold ph-plus" style="color:var(--dim)"></i><div class="n">plus (BOLD)<br>empty slot</div></div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
