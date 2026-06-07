@@ -20,33 +20,91 @@ defmodule Workbooks.PublicWeb do
   """
   use Plug.Router
 
+  # Every public-plane response self-identifies (the honest "served by workbooks"
+  # marker — visible in response headers; HTML bodies also carry a view-source comment).
+  plug(:mark)
   plug(:match)
   plug(:dispatch)
+
+  @marker "<!-- Served by the Workbooks runtime — public content plane (github.com/workbooks-sh) -->"
 
   get "/health" do
     send_resp(conn, 200, "ok")
   end
 
-  get "/" do
+  # GET any path → serve the host's app. Non-GET never matches a `get` clause and
+  # falls through to the 404 below — no writes, no Dock on this plane.
+  get "/*_glob" do
     serve(conn)
   end
 
-  # Any other path / method: this plane only serves the app at "/". No writes,
-  # no Dock — anything else is a 404 (a non-GET never matches a `get` clause).
   match _ do
     send_resp(conn, 404, "not found")
   end
+
+  defp mark(conn, _),
+    do: Plug.Conn.register_before_send(conn, &Plug.Conn.put_resp_header(&1, "x-served-by", "workbooks-runtime"))
 
   defp serve(conn) do
     case app_id(conn) do
       nil ->
         send_resp(conn, 404, "no app for host")
 
-      id ->
-        case Workbooks.ControlPlane.get_workbook(id) do
-          nil -> send_resp(conn, 404, "no app for host")
-          org -> conn |> put_resp_content_type("text/html") |> send_resp(200, static_page(id, org))
+      app ->
+        dir = site_dir(app)
+
+        cond do
+          File.dir?(dir) -> serve_static(conn, dir)
+          (org = Workbooks.ControlPlane.get_workbook(app)) -> serve_html(conn, static_page(app, org))
+          true -> send_resp(conn, 404, "no app for host")
         end
+    end
+  end
+
+  # Serve a file from the host's published static site dir (build/public/<app>/),
+  # with index.html as the directory default. Path-traversal safe: ".." segments
+  # are rejected AND the resolved path is contained within the site dir.
+  defp serve_static(conn, dir) do
+    with {:ok, rel} <- safe_rel(conn.request_path),
+         path <- index_default(Path.join(dir, rel)),
+         true <- contained?(dir, path) and File.regular?(path) do
+      ctype = MIME.from_path(path)
+
+      if String.starts_with?(ctype, "text/html") do
+        serve_html(conn, inject_marker(File.read!(path)))
+      else
+        conn |> put_resp_content_type(ctype) |> send_file(200, path)
+      end
+    else
+      _ -> send_resp(conn, 404, "not found")
+    end
+  end
+
+  defp serve_html(conn, body),
+    do: conn |> put_resp_content_type("text/html") |> send_resp(200, inject_marker(body))
+
+  defp site_dir(app), do: Path.join([File.cwd!(), "build", "public", app])
+
+  defp index_default(path), do: if(File.dir?(path), do: Path.join(path, "index.html"), else: path)
+
+  # Reject any ".." segment; return the cleaned relative path.
+  defp safe_rel(request_path) do
+    segs = request_path |> String.split("/", trim: true)
+    if Enum.any?(segs, &(&1 == "..")), do: :error, else: {:ok, Enum.join(segs, "/")}
+  end
+
+  # The resolved path must live inside the site dir (defense vs traversal/symlinks).
+  defp contained?(dir, path) do
+    base = Path.expand(dir)
+    full = Path.expand(path)
+    full == base or String.starts_with?(full, base <> "/")
+  end
+
+  defp inject_marker(html) do
+    cond do
+      String.contains?(html, @marker) -> html
+      String.contains?(html, "</head>") -> String.replace(html, "</head>", "#{@marker}</head>", global: false)
+      true -> @marker <> "\n" <> html
     end
   end
 

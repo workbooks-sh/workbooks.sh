@@ -4,6 +4,28 @@
 #+STATUS: PLAN
 #+RELATED: ARCHITECTURE.org, TOOLKITS-V3.org, EXTENSIONS-ORB.org, SECRETS.org
 
+* Provider neutrality (do NOT overbuild for any one vendor)
+
+  The runtime hosts + terminates TLS itself (=sni_fun=), so it has NO hard
+  dependency on any DNS host or edge/CDN. The domain may live at Cloudflare,
+  GoDaddy, Namecheap, Route 53, or self-hosted DNS — design for all of them:
+  - *DNS automation* is a pluggable ADAPTER layer = our toolkits (cloudflare,
+    + future godaddy/namecheap/route53, and RFC 2136 for standards DNS). When a
+    provider adapter + creds exist, the agent writes records automatically; when
+    not, we emit exact manual instructions and verify them. One user flow, many
+    adapters (the capability matrix). Never hardcode one provider's API.
+  - *Edge / DDoS* is OPTIONAL defense-in-depth, not a requirement. Cloudflare's
+    proxy (orange-cloud) is the RECOMMENDED option because its free tier genuinely
+    absorbs volumetric DDoS, hides the origin IP, and adds WAF/CDN — but it is one
+    choice among many (Fastly, Bunny, AWS Shield, …). The honest constraint: a
+    single BEAM VM cannot self-defend against volumetric floods (no edge
+    bandwidth), so SOME edge is advisable for a hot public site — but the runtime
+    works with NONE (direct, with origin rate-limiting) and with ANY (origin behind
+    the edge). Recommend Cloudflare; depend on nothing.
+  - *Origin-side* defense (always available, vendor-free): PlugAttack/Hammer rate
+    limiting + Bandit/ThousandIsland connection caps on the content listener.
+    Stops app-layer abuse; not a substitute for an edge against true floods.
+
 * Goal
 
   Host a public app on a real domain (apex or custom), served by the SAME Elixir
