@@ -1,6 +1,31 @@
 #+TITLE: Rust compiler-in-WASM (compilers/rust/)
 #+EPIC: wb-zyl (P3)
-#+STATUS: HONEST BLOCKER — rustc-in-wasm is an open upstream frontier (no working path today)
+#+STATUS: ACTIVE PURSUIT — not impossible; two patchable paths being ground (see "Pursuit")
+
+* Pursuit (wb-zyl.7) — it is NOT physically impossible
+
+  rustc-in-wasm is engineering, not a wall: wasm is Turing-complete and the hardest shared
+  dependency — LLVM compiled to wasm32-wasi — is ALREADY solved (it's what gave us
+  clang.wasm via YoWASP). Two paths, validate-then-escalate:
+
+  - *Path 1 (near-term, mirrors our Zig win): mrustc.wasm → clang.wasm.* mrustc is a C++
+    compiler that translates Rust → C; build it to wasm32-wasi so it runs in-sandbox, then
+    clang.wasm compiles its C output → wasm → run. mrustc now bootstraps Rust *1.90.0*
+    (modern), so this is real Rust, just no proc-macros and a pinned edition.
+    First-wall probe (zig cc -target wasm32-wasi, via kassane/mrustc-zig): builds into the
+    code, hits ordinary WASI-port issues — `pipe()`/jobserver (stub to serial; no fork on
+    WASI), and zig's WASI libc++ gating `<fstream>`/localization (use wasi-sdk's fuller
+    libc++, or replace ifstream with fopen). Deeper risks to map: fstream-on-WASI, 32-bit
+    pointer assumptions, the wasm32 4 GB compile ceiling (→ memory64). All patchable.
+    mrustc's own subprocess call to the C compiler is intercepted exactly as we split
+    clang's compile/link (it can't fork under WASI).
+
+  - *Path 2 (the 100% target): fork rustc → wasm32-wasi.* Link YoWASP's wasi-LLVM (done),
+    force in-process rust-lld (no subprocess), run proc-macro-free, patch realpath/threads.
+    Bigger, but every piece is known; #62202 was closed as "do it via PRs", not "can't".
+
+----------------------------------------------------------------------
+Original blocker analysis (still accurate for the off-the-shelf state):
 
 * The goal
 
