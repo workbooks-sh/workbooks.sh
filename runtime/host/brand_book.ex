@@ -85,13 +85,19 @@ defmodule Workbooks.BrandBook do
   defp strategist_task(domain) do
     "You are Stage-2 (strategist) for #{domain}. The harvest substrate is in your " <>
       "working directory: brand.org, catalog/, social/, ads.org, plus pre-read " <>
-      "summaries in analysis/reports/. Work EFFICIENTLY — skim the pre-reads, " <>
-      "don't exhaustively cat every file. Within your first few turns, START " <>
-      "WRITING the gated analysis as RELATIVE paths: analysis/positioning.org, " <>
-      "analysis/audience.org, analysis/messaging.org, analysis/voice.org — each " <>
-      "an :insight: grounded in the substrate's :point: facts via :GROUNDS:. " <>
-      "Then run `brandnana analysis check .` and fix any FAIL until it prints " <>
-      "RESULT: PASS. Then finish with done."
+      "summaries in analysis/reports/. \n\n" <>
+      "READ BUDGET — this is a HARD rule, not advice: read ONLY the five " <>
+      "analysis/reports/*.org pre-reads (brand, catalog, social, reviews, ads) " <>
+      "plus brand.org. They already summarize everything. DO NOT cat catalog/ " <>
+      "product files and DO NOT run jq on social/*.json — those JSON files are " <>
+      "large and often malformed (jq will error on nulls); the social pre-read " <>
+      "already has what you need. Every step spent reading raw catalog/social is " <>
+      "wasted and risks running out of budget before you write.\n\n" <>
+      "By step 8 at the latest, WRITE all four gated analyses as RELATIVE paths: " <>
+      "analysis/positioning.org, analysis/audience.org, analysis/messaging.org, " <>
+      "analysis/voice.org — each an :insight: grounded in the pre-reads' :point: " <>
+      "facts via :GROUNDS:. Then run `brandnana analysis check .` and fix any FAIL " <>
+      "until it prints RESULT: PASS. Then finish with done."
   end
 
   defp designer_task(domain) do
