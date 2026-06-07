@@ -62,6 +62,24 @@ defmodule Workbooks.CommandRegistry do
   end
 
   @doc """
+  Register a freshly BUILT artifact: content-address it (sha256 → build/commands/
+  <sha>.wasm) and register the addressed path under `name`. Idempotent — the same
+  source builds to the same bytes → same hash → same path. Returns {:ok, path} so
+  callers can report/seed from the stable artifact. Use this for build outputs;
+  `register/3` stays for already-content-addressed / prebuilt paths.
+  """
+  def register_artifact(name, wasm_path, mode \\ :argv) do
+    case Workbooks.PackageManager.content_address(wasm_path) do
+      {:ok, addressed, _sha} ->
+        register(name, addressed, mode)
+        {:ok, addressed}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   The generic auto-wrap: build an arbitrary upstream Rust CLI crate to
   wasm32-wasip1 and register it as a command — any WASI-clean crate, zero per-CLI
   code. Returns {:ok, wasm_path} | {:error, reason}. (Other languages build via
@@ -76,8 +94,9 @@ defmodule Workbooks.CommandRegistry do
       {_, 0} ->
         case Path.wildcard(Path.join([root, "bin", "*.wasm"])) do
           [wasm | _] ->
-            register(name, wasm, mode)
-            {:ok, wasm}
+            # Content-address the build output so the registry points at a stable
+            # build/commands/<sha>.wasm, not cargo's transient --root temp dir.
+            register_artifact(name, wasm, mode)
 
           [] ->
             {:error, :no_wasm}

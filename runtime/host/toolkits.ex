@@ -289,8 +289,13 @@ defmodule Workbooks.Toolkits do
 
     case Workbooks.PackageManager.build_dir(abs, lang) do
       {:ok, wasm, _} ->
-        Workbooks.CommandRegistry.register(bin, wasm, mode)
-        "#{id}: built #{lang} dir #{abs} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
+        case Workbooks.CommandRegistry.register_artifact(bin, wasm, mode) do
+          {:ok, addressed} ->
+            "#{id}: built #{lang} dir #{abs} → #{addressed}; registered command #{inspect(bin)} (mode #{mode})"
+
+          {:error, reason} ->
+            "#{id}: built #{lang} dir #{abs} but FAILED to content-address:\n" <> error_text(reason)
+        end
 
       {:error, reason} ->
         "#{id}: build FAILED for path #{abs} (#{lang}):\n" <> error_text(reason)

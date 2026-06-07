@@ -27,6 +27,10 @@ defmodule Workbooks.PackageManager do
   # export-less component that can be neither run nor composed (see COMPOSE-NOTES.org).
   @adapter Path.join(@tools, "wasi_snapshot_preview1.command.wasm")
   @cache Path.expand(Path.join([__DIR__, "..", "build", "cache"]))
+  # Content-addressed store for registered command artifacts: a built .wasm is
+  # hashed (sha256 of its bytes) and copied here as <sha>.wasm. Same source ⇒ same
+  # hash ⇒ same path ⇒ idempotent rebuilds (no duplicate artifacts, stable id).
+  @commands Path.expand(Path.join([__DIR__, "..", "build", "commands"]))
 
   @doc "Tangle a literate Workbook: build every component → [{name, lang, result}]."
   def tangle(org) when is_binary(org) do
@@ -100,7 +104,39 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Mode 2 — Go. Compile a real Go project dir (its own `go.mod`, multi-file `main`
+  # package) to a runnable WASI command via TinyGo (`-target=wasip1`): argv + stdin
+  # → stdout, the universal CLI ABI. If the dir has no `go.mod` we synthesize a
+  # minimal one (TinyGo refuses a bare main.go), so a single-file fixture also builds.
+  def build_dir(dir, lang) when lang in ["go", "tinygo"] do
+    abs = Path.expand(dir)
+    out = Path.join(@cache, "#{cache_key(["godir", abs])}.wasm")
+    File.mkdir_p!(@cache)
+    ensure_go_mod(abs)
+    env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
+
+    case System.cmd("tinygo", ["build", "-o", out, "-target=wasip1", "."],
+           cd: abs,
+           stderr_to_stdout: true,
+           env: env
+         ) do
+      {_, 0} -> {:ok, out, :built_dir}
+      {err, _} -> {:error, err}
+    end
+  end
+
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
+
+  # TinyGo needs a module: if the dir has no go.mod, write a minimal one named
+  # after the dir so a single-file `main` package still compiles.
+  defp ensure_go_mod(abs) do
+    mod = Path.join(abs, "go.mod")
+
+    unless File.exists?(mod) do
+      name = abs |> Path.basename() |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
+      File.write!(mod, "module #{name}\n\ngo 1.21\n")
+    end
+  end
 
   defp component_crate?(manifest),
     do: File.exists?(manifest) and File.read!(manifest) =~ "[package.metadata.component]"
@@ -249,6 +285,36 @@ defmodule Workbooks.PackageManager do
     opt-level = "z"
     """
   end
+
+  @doc """
+  Content-address a built command artifact: hash its BYTES (sha256), copy it to
+  `build/commands/<sha>.wasm`, and return that stable path. Identical source ⇒
+  identical wasm ⇒ identical hash ⇒ same path — so rebuilds are idempotent (the
+  copy is skipped when the addressed file already exists). This is the path a
+  command is REGISTERED under, decoupling the registry from transient cache/temp
+  build outputs. Returns {:ok, addressed_path, sha} | {:error, reason}.
+  """
+  def content_address(wasm_path) do
+    case File.read(wasm_path) do
+      {:ok, bytes} ->
+        sha = :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+        File.mkdir_p!(@commands)
+        addressed = Path.join(@commands, "#{sha}.wasm")
+        unless File.exists?(addressed), do: File.write!(addressed, bytes)
+        {:ok, addressed, sha}
+
+      {:error, reason} ->
+        {:error, {:read_artifact, wasm_path, reason}}
+    end
+  end
+
+  @doc """
+  Capture a built CLI's `--help` text by running the wasm command with argv
+  `["--help"]` and no stdin. The agent reads this the way a human reads `--help`;
+  per TOOLKITS-V3 it MAY seed an overview/leaf skill draft (never a substitute for
+  the hand-authored semantic surface). Returns the captured text (stdout+stderr).
+  """
+  def capture_help(wasm_path, flag \\ "--help"), do: run(wasm_path, "", [flag])
 
   @doc "Run a built WASM component with input, returning its output (WASI stdin/stdout)."
   def run(wasm_path, input), do: run(wasm_path, input, [])

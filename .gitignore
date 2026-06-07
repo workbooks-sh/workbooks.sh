@@ -17,6 +17,11 @@
 # Wasm build cache + toolchain (regenerated; keep build/oql.wasm + build/commands)
 runtime/build/cache/
 runtime/build/tools/
+# Content-addressed command artifacts are regenerated build outputs (sha256 names);
+# curated commands (jq/grep) keep their plain names and stay tracked.
+runtime/build/commands/*.wasm
+!runtime/build/commands/jq.wasm
+!runtime/build/commands/grep.wasm
 
 # Secrets / local
 .env
