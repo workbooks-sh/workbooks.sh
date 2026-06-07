@@ -400,3 +400,29 @@
   sandbox is gated ONLY on doing the trusted libstd prebuild with a pure-mrustc.wasm pipeline
   (ABI-consistent .hir). Not a fundamental wall — orchestration. Paths A(-O0/debug)/B(Linux
   __2)/C(ABI-stable .hir patch) remain if the pure replay still trips the libstd trap.
+
+* 2026-06-07 (iter 20) — robust intercept found; clean-room run is the remaining work
+  ROBUST INTERCEPT (the fix for "minicargo ignores MRUSTC"): replace bin/mrustc itself with a
+  wrapper that runs mrustc.wasm (+ clang.wasm cc + llvm-ar). Then minicargo CANNOT bypass it —
+  every crate's .hir is mrustc.wasm-__2. Verified the wrapper handles the config probe
+  (bin/mrustc --version → mrustc.wasm). This is the right plumbing for a pure-wasm libstd.
+  Remaining wrinkles (all setup, not compiler walls):
+   - keep the make `bin/mrustc:` target from relinking over the wrapper (touch it newest, or
+     stub the rule).
+   - mrustc.wasm writes only inside its single preopen → run from the mrustc dir with
+     --dir <mrustcdir>::. and keep ALL outputs (output-wasi/, --out-dir) UNDER that dir.
+     (An isolate test failed only because --out-dir was outside the preopen — not a -O0 bug.)
+   - after deps build: grep libcore.rlib.hir for `__2` (must be, not `__1`) before libstd.
+  CLEAN-ROOM SEQUENCE for the loop (fresh context, no accumulated state):
+   1. fresh worktree; build mrustc.wasm (build.sh) + native minicargo; cp wasm32-wasi.spec.
+   2. bin/mrustc := wrapper(mrustc.wasm + clang.wasm + ar); touch it.
+   3. rm output-wasi; minicargo LIBS → deps via wrapper; assert libcore.hir has __2.
+   4. build wasi crate + libstd via the wrapper (minicargo skips the wasi target-dep).
+   5. clang.wasm each libstd .c → .o (the wrapper already does this).
+   6. mrustc.wasm hello.rs (println) IN-SANDBOX vs the __2 libstd → hello.c → clang.wasm →
+      wasm-ld (crt1 + libstd .o + -lsetjmp + _Unwind_Resume stub) → run "hello".
+   7. if libstd traps in mrustc.wasm even with __2 deps → THEN it's the real mrustc.wasm bug
+      (Path A: -g/-O0 mrustc.wasm to locate) — but that hasn't been cleanly tested yet (every
+      attempt so far tripped on ABI-mix or preopen, not the trap itself).
+  HEADLINE UNCHANGED: full std COMPILES+RUNS in wasm (iter 14). Untrusted-fully-in-sandbox =
+  this clean-room orchestration; bounded; no fundamental wall identified.
