@@ -2,6 +2,15 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
+## Four Golden Rules of Development
+
+Consider these at **every turn**, before writing or accepting any code:
+
+1. **DRY** — Is this code DRY enough? No copy-paste of logic that should have one home.
+2. **Least code** — Is this written in the fewest lines of code possible? Prefer deleting and leaning on deps over adding.
+3. **Componentize** — Can this be shared across multiple consumers instead of rewritten? Reduce duplication by increasing the dependency on one well-factored component, not by re-implementing.
+4. **Drift** — Do we have drift, and is that drift causing the issue right now? Fix it by aligning around the right idea, not by patching around the wrong one.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
 
