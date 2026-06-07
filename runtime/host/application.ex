@@ -24,7 +24,7 @@ defmodule Workbooks.Application do
     Workbooks.Embed.Model2Vec.warm()
     # Surface the search config so the embedder + vector backend aren't opaque.
     require Logger
-    Logger.info("search config — embed: #{Workbooks.Embed.adapter() |> Module.split() |> List.last()}, vectors: #{Workbooks.DB.backend()}")
+    Logger.info("search config — embed: #{Workbooks.Embed.adapter() |> Module.split() |> List.last()}, vectors: #{Workbooks.DB.backend()}, machine recommends: #{Workbooks.Embed.Capability.recommend()}")
     result
   end
 
