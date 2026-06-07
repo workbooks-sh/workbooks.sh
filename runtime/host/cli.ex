@@ -11,7 +11,17 @@ defmodule Workbooks.CLI do
 
   def main(argv) do
     {:ok, _} = Application.ensure_all_started(:workbooks)
-    IO.puts(call(argv))
+
+    # Deploy verbs carry exit codes (AX: agents read 0=ok, non-zero=fail) + --json.
+    case argv do
+      ["deploy" | rest] ->
+        {out, failed?} = deploy_run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
+      _ ->
+        IO.puts(call(argv))
+    end
   end
 
   @doc "Run a wb subcommand, returning its output. `tenant` scopes the variable store."
@@ -231,29 +241,53 @@ defmodule Workbooks.CLI do
 
   # Deploy-kit: ONE source of deploy logic — build/publish the runtime image, run
   # it locally (containerized) or cloud. Dogfooded: CI + the desktop app call these
-  # same verbs.
-  def call(["deploy"], _t), do: deploy_usage()
-  def call(["deploy", "build" | _], _t), do: deploy_out(Workbooks.Deploy.Image.build(into_krunvm: true))
-  def call(["deploy", "publish" | _], _t), do: deploy_out(Workbooks.Deploy.Image.publish())
-  def call(["deploy", "local" | _], _t), do: deploy_out(Workbooks.Deploy.local())
-  def call(["deploy", "up" | _], _t), do: deploy_out(Workbooks.Deploy.local())
-  def call(["deploy", "status"], _t), do: deploy_out(Workbooks.Deploy.status())
-  def call(["deploy", "down"], _t), do: deploy_out(Workbooks.Deploy.down())
-  def call(["deploy", "logs"], _t), do: deploy_out(Workbooks.Deploy.logs())
+  # same verbs. Routed through `deploy_run/1` (string interface; exit codes live in
+  # main/1). Every verb is non-interactive, idempotent, and supports `--json`.
+  def call(["deploy" | rest], _t), do: elem(deploy_run(rest), 0)
 
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
 
-  defp deploy_out({:ok, msg}), do: msg
-  defp deploy_out({:error, msg}), do: "deploy error: #{msg}"
+  # Dispatch a deploy verb → {rendered_output, failed?}. `--json` anywhere in args
+  # switches to machine-readable output.
+  defp deploy_run(rest) do
+    json? = Enum.member?(rest, "--json")
+    args = Enum.reject(rest, &(&1 == "--json"))
+
+    result =
+      case args do
+        [] -> {:ok, deploy_usage(), %{}}
+        ["help" | _] -> {:ok, deploy_usage(), %{}}
+        ["doctor"] -> Workbooks.Deploy.doctor()
+        ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
+        ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
+        ["local" | _] -> Workbooks.Deploy.local()
+        ["up" | _] -> Workbooks.Deploy.local()
+        ["status"] -> Workbooks.Deploy.status()
+        ["verify"] -> Workbooks.Deploy.verify()
+        ["down"] -> Workbooks.Deploy.down()
+        ["logs"] -> Workbooks.Deploy.logs()
+        other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
+      end
+
+    {Workbooks.Deploy.render(result, json?), Workbooks.Deploy.failed?(result)}
+  end
+
+  # Image.build/publish return {:ok|:error, string}; lift to the tagged contract.
+  defp deploy_norm({:ok, msg}), do: {:ok, msg, %{}}
+  defp deploy_norm({:error, msg}), do: {:error, msg, %{}}
+  defp deploy_norm(:error), do: {:error, "command not found (is docker/buildx installed?)", %{}}
 
   defp deploy_usage do
     """
     wb deploy — the deploy-kit: build/publish the runtime image, run it local or cloud.
+    Non-interactive + idempotent; add --json to any verb for machine-readable output.
+      doctor       check + self-heal prerequisites (run this first)
       build        build the runtime image for this arch + stage it into the krunvm store
       publish      build multi-arch + push to the registry (ghcr) — `latest` + git sha
       local | up   bring up the local daemon (krunvm microVM + launchd agent)
       status       VM + runtime + agent state
+      verify       prove the LIVE runtime answers (exit non-zero if not)
       down         stop the agent + microVM (keeps data + APFS volume)
       logs         print the tail command for daemon logs
     Image ref via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
