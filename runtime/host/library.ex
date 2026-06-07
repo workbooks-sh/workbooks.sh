@@ -249,6 +249,11 @@ defmodule Workbooks.Library do
           ws.members
           |> Enum.flat_map(fn
             %{ref: {:path, p}} -> vendor(repo, p)
+            # Cross-workbook by DID (4b): resolve the referenced workbook + index
+            # its content too — federated query against the identity. Best-effort.
+            %{ref: {:did, did}, id: id} ->
+              case Workbooks.Did.resolve(did), do: ({:ok, b} -> [{"#{id}.html", b}]; _ -> [])
+
             _ -> []
           end)
           |> Enum.filter(fn {name, _} -> text_file?(name) end)
