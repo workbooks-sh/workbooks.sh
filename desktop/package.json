@@ -1,8 +1,8 @@
 {
-  "name": "@workbooks/desktop-min",
+  "name": "@workbooks/desktop",
   "private": true,
   "version": "0.0.1",
-  "description": "Workbooks Desktop — fresh minimal Svelte 5 SPA (no SvelteKit). Frontend-only; Tauri shell + Rust IPC deferred.",
+  "description": "Workbooks Desktop — clean-room Svelte 5 SPA (no SvelteKit). Frontend-only; Tauri shell + Rust IPC deferred.",
   "type": "module",
   "scripts": {
     "dev": "vite",

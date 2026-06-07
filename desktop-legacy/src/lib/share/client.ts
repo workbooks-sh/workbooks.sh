@@ -13,10 +13,10 @@
 
 import {
   DemoModeError,
-  NetworkClientError,
   getBrokerUrl,
   getNetworkMode,
 } from "$lib/network/client";
+import { asError } from "$lib/_http";
 
 // ── Wire types — mirror services/broker/worker/src/routes/rooms.ts ──
 
@@ -38,17 +38,6 @@ export interface RegisterWorkbookResult {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
-
-async function asError(r: Response): Promise<NetworkClientError> {
-  let body: unknown = null;
-  try { body = await r.json(); }
-  catch { body = await r.text().catch(() => null); }
-  const errMsg =
-    body && typeof body === "object" && body !== null && "error" in body
-      ? String((body as { error: unknown }).error)
-      : `HTTP ${r.status}`;
-  return new NetworkClientError(errMsg, r.status, body);
-}
 
 function requireLive(): void {
   if (getNetworkMode() === "demo") throw new DemoModeError();

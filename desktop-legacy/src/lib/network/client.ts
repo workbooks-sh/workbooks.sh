@@ -12,6 +12,8 @@
  * the desktop bootstrap once cookies are available.
  */
 
+import { asError } from "$lib/_http";
+
 export type NetworkMode = "demo" | "live";
 let mode: NetworkMode = "demo";
 
@@ -394,20 +396,6 @@ export async function removeGroupMember(id: string, handle: string): Promise<voi
     { method: "DELETE", credentials: "include" },
   );
   if (!r.ok) throw await asError(r);
-}
-
-async function asError(r: Response): Promise<NetworkClientError> {
-  let body: unknown = null;
-  try {
-    body = await r.json();
-  } catch {
-    body = await r.text().catch(() => null);
-  }
-  const errMsg =
-    body && typeof body === "object" && "error" in body
-      ? String((body as { error: unknown }).error)
-      : `HTTP ${r.status}`;
-  return new NetworkClientError(errMsg, r.status, body);
 }
 
 // ── Subscriptions (wb-u2o0.4.1) ────────────────────────────────────

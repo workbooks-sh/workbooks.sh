@@ -26,26 +26,6 @@ import type {
   RawEventRow,
 } from "./types";
 
-// Channel events we render directly. Anything else falls through into
-// a "raw event" row when KEEP_RAW is true.
-const KNOWN_NAMES = new Set([
-  "session_started",
-  "llm_turn_start",
-  "llm_turn_stop",
-  "tool_call_start",
-  "tool_call_stop",
-  "session_persisted",
-  "lease_lost",
-  "session_completed",
-  "session_failed",
-  "session_cancelled",
-]);
-
-// Set false to drop "raw event" rows for unknown events. Keeping on
-// for v1 makes it obvious when the agent emits a new event the UI
-// doesn't model yet.
-const KEEP_RAW = true;
-
 interface RawEntry {
   event: BridgeEvent;
 }
@@ -318,12 +298,12 @@ class ChatSessionStore {
         }
         case "session_persisted":
         case "lease_lost":
-          if (KEEP_RAW) blocks.push(raw(event));
+          blocks.push(raw(event));
           break;
         default:
-          if (KEEP_RAW && !KNOWN_NAMES.has(event.name)) {
-            blocks.push(raw(event));
-          }
+          // Unmodeled event — surface it as a raw row so it's obvious
+          // when the agent emits something the UI doesn't render yet.
+          blocks.push(raw(event));
           break;
       }
     }
