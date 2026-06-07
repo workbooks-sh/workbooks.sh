@@ -426,3 +426,24 @@
       attempt so far tripped on ABI-mix or preopen, not the trap itself).
   HEADLINE UNCHANGED: full std COMPILES+RUNS in wasm (iter 14). Untrusted-fully-in-sandbox =
   this clean-room orchestration; bounded; no fundamental wall identified.
+
+* 2026-06-07 (iter 21) — ★ APPROACH VALIDATED: mrustc.wasm builds + READS its own libcore.hir
+  Replaced bin/mrustc with a wrapper(mrustc.wasm + clang.wasm + ar). Ran it DIRECTLY on
+  libcore → Trans Codegen DONE → libcore.rlib.{hir,c} (20MB C, 540KB hir). Then mrustc.wasm
+  compiled a no_std crate against THAT libcore.rlib → Trans Codegen DONE, NO "Expecting __2
+  got __1". So a mrustc.wasm-built .hir is ABI-consistent + readable by mrustc.wasm. The whole
+  untrusted-std-in-sandbox approach is SOUND — the only blocker was ever mixing native(__1)
+  and wasm(__2) .hir.
+  Remaining = purely mechanical: build all 16 crates with mrustc.wasm (the wrapper works
+  directly, per-crate), in dep order, with correct --extern/--cfg. minicargo+wrapper still
+  glitches (0 deps — likely an exit-code/stdout-parsing mismatch with the script wrapper; NOT
+  a relink — bin/mrustc stays the wrapper). So bypass minicargo for the wasm build:
+   - capture the 16 per-crate arg-lists ONCE (run native minicargo with a logging shim that
+     records argv), then replay each with the wrapper (pure mrustc.wasm). OR
+   - fix the wrapper's exit/stdout contract so minicargo accepts it.
+  Then: wasi crate + libstd via the wrapper; clang.wasm the .c; user hello.rs in-sandbox vs the
+  __2 libstd; link (-lsetjmp + _Unwind_Resume stub) → run. The libstd-trap question is FINALLY
+  testable cleanly now (consistent __2 deps); if -O1 mrustc.wasm still traps on libstd → Path A
+  debug build; the -O0 mrustc.wasm is broken (produced nothing on core) so it's not an option.
+  HEADLINE: full std COMPILES+RUNS in wasm (iter 14). Untrusted-in-sandbox: approach validated
+  (iter 21), completion = mechanical 16-crate replay. No fundamental wall.
