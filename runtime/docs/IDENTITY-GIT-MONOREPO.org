@@ -121,23 +121,46 @@ broker) — with the signed agent ledger proving every step.
 * Phased build
 - *Phase 0 — Telemetry (the floor; in progress)*
   *Completeness mandate (the thing we always get wrong):* instrument at the
-  CHOKEPOINTS, not the call sites, so nothing can escape by construction. There
-  are exactly two:
-  - =Workbooks.Agent.exec_one= — EVERY tool call flows through here (run/shell/
-    fetch/vfs/done). Record per call: tool, args summary, output, *exit_code*
-    (run/shell), *stderr/error*, duration, ts, agent_id, run_id. This is how we
-    catch "a bash call broke the system" or "a toolkit failed" — those ARE tool
-    calls, so they cannot be missed.
+  CHOKEPOINTS, not the call sites, so nothing can escape by construction. The
+  PRIMARY chokepoint is the component model itself:
+  - *The Dock WIT interface (=wit/engine.wit=) — the core.* Every WASM component
+    runs against a typed capability surface (=vfs-query=, =run-command=, =llm=,
+    =net=, =session-info=) and the Policy already gates each import "by
+    construction." So the *capability gate IS the telemetry point*: wrap the
+    host's implementation of each Dock import → record cap, args, result,
+    duration, error at the protocol boundary. A component can do NOTHING except
+    through an interface we implement, so nothing escapes. Declarative — the
+    component's WIT imports ARE the instrumentation manifest. This is the
+    "WASM-based telemetry tool": observe at the same boundary we enforce. As more
+    moves to components, telemetry is already there.
+  - =Workbooks.Agent.exec_one= — the NATIVE exec path (System.cmd for exec:true
+    agents, e.g. brandnana). Record tool, args, output, *exit_code*, *stderr/
+    error*, duration. Catches "a bash call broke the system." [partly DONE:
+    exit-code/error/duration + always-on =_steps.jsonl=]
   - =Workbooks.Llm.complete= — every model call: model, prompt/completion tokens,
     cost, duration, error.
   Plus the crash boundary (the spawn try/rescue → exception + stacktrace events)
   and validation results (each =:done-when:=/=:check=). Captured in the loop, not
   dependent on a caller wiring =on_step= — always-on whenever a workdir exists.
-  *Emit OpenTelemetry spans* (=:opentelemetry=) for the standard trace AND write
-  the SQLite ledger. Observability = *CLI feedback loop, NOT a dashboard*: a
-  =wb telemetry= command reads the ledger → timeline of tool calls / exit codes /
-  errors / cost for a run, and aggregates across runs. Complete feedback loop of
-  what actually happened.
+  *ADOPT, don't author* (less self-authored = better): use existing WASM
+  observability — don't hand-roll capture/format/export.
+  - =wasi-otel= (WebAssembly/wasi-otel) — the WASI STANDARD OTel interface for
+    components. The component imports the wasi-otel WIT; the HOST provides it via
+    a small host plugin (function-call into native, no network hop) that forwards
+    to the OTel SDK (batching/export/protocol = the SDK's job). Parent-child
+    spans across host↔guest + trace-context propagation. THIS is the WASM
+    chokepoint — standardized, not self-authored. We author only the Elixir
+    (Wasmex) host bridge.
+  - =Dylibso Observe SDK= (dylibso/observe-sdk) — optional: recompile any wasm
+    module to add per-function + memory-alloc tracing → OTel, zero guest changes.
+  - Native exec path (System.cmd, not WASM) → the Elixir =:opentelemetry= SDK,
+    fed by the =exec_tools= instrumentation (exit code/error/duration). Emits OTel
+    directly since wasi-otel can't cover non-WASM.
+  Everything → OTel → a *CLI feedback loop, NOT a dashboard*: a =wb telemetry=
+  command reads the spans (local collector / sqlite exporter) → timeline of tool
+  calls / exit codes / errors / cost per run + aggregates. Self-authored surface
+  = the wasi-otel host bridge + the exec→OTel emit + the CLI. SPIKE FIRST:
+  verify wasi-otel ↔ Wasmex/Wasmtime wiring before committing.
   0a verify live =_telemetry.db= [DONE] ; 0b chokepoint instrumentation
   (exec_one + Llm.complete → step/tool/error/cost) ; 0c the =wb telemetry= CLI +
   OTel spans ; 0d per-session db + cross-session index ; 0e wire into brandnana

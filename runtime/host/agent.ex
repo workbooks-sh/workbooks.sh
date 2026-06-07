@@ -109,30 +109,54 @@ defmodule Workbooks.Agent do
 
   defp exec_tools(calls, st) do
     Enum.reduce(calls, {[], st, nil}, fn call, {msgs, s, done} ->
-      {out, s2, d} = exec_one(call, s)
-      ev = %{step: s.step, tool: call.name, args: call.args, output: String.slice(out, 0, 4000)}
+      t0 = System.monotonic_time(:millisecond)
+      {out, s2, d} = exec_one(call, Map.put(s, :last, %{}))
+      meta = Map.get(s2, :last, %{})
+
+      ev = %{
+        step: s.step,
+        tool: call.name,
+        args: call.args,
+        output: String.slice(out, 0, 4000),
+        exit_code: meta[:exit_code],
+        error: meta[:error],
+        dur_ms: System.monotonic_time(:millisecond) - t0,
+        ts: System.system_time(:second)
+      }
+
       s.on_step.(ev)
+      log_step(s2, ev)
       {msgs ++ [%{role: "tool", tool_call_id: call.id, content: out}], %{s2 | events: s2.events ++ [ev]}, done || d}
     end)
   end
 
-  defp exec_one(%{name: "shell", args: a}, st) do
-    out =
-      case Shell.run(a["pipeline"], a["input"] || "") do
-        {:ok, o} -> o
-        {:error, e} -> "error: #{inspect(e)}"
-      end
+  # Always-on per-tool telemetry — appended lock-free to <workdir>/_steps.jsonl
+  # regardless of any caller-supplied on_step, so nothing escapes by construction.
+  defp log_step(%{workdir: wd}, ev) when is_binary(wd) do
+    line = Jason.encode!(%{ev | output: String.slice(ev.output || "", 0, 200)})
+    File.write(Path.join(wd, "_steps.jsonl"), line <> "\n", [:append])
+  rescue
+    _ -> :ok
+  end
 
-    {out, st, nil}
+  defp log_step(_, _), do: :ok
+
+  defp exec_one(%{name: "shell", args: a}, st) do
+    case Shell.run(a["pipeline"], a["input"] || "") do
+      {:ok, o} -> {o, st, nil}
+      {:error, e} -> {"error: #{inspect(e)}", Map.put(st, :last, %{error: inspect(e)}), nil}
+    end
   end
 
   defp exec_one(%{name: "run", args: a}, %{exec: true} = st) do
-    {out, _code} =
+    {out, code} =
       System.cmd("sh", ["-c", a["cmd"] || ""], cd: st.workdir, stderr_to_stdout: true, env: st.env)
 
-    {String.slice(out, 0, 8000), st, nil}
+    # Capture the exit code — a non-zero is a bash call that broke; record it.
+    meta = %{exit_code: code, error: if(code != 0, do: "nonzero exit #{code}", else: nil)}
+    {String.slice(out, 0, 8000), Map.put(st, :last, meta), nil}
   catch
-    kind, e -> {"run error: #{inspect({kind, e})}", st, nil}
+    kind, e -> {"run error: #{inspect({kind, e})}", Map.put(st, :last, %{error: inspect({kind, e})}), nil}
   end
 
   defp exec_one(%{name: "run"}, st), do: {"run not permitted (no exec capability)", st, nil}
