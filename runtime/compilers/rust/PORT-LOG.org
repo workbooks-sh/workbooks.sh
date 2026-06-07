@@ -361,3 +361,23 @@
   sandbox is blocked here by a libc++-ABI .hir coupling — solvable via (A) -O0/debug mrustc.wasm
   to fix the libstd trap, (B) a Linux native-mrustc build with __2 libc++, or (C) an ABI-stable
   .hir-serialization patch to mrustc. All three are real engineering, none a fundamental wall.
+
+* 2026-06-07 (iter 18) — -O0 mrustc.wasm built; clean Path-A test still pending (mixed-ABI state)
+  Built a -O0 mrustc.wasm (47MB, 256MB stack) to test whether the libstd trap is an -O1
+  miscompile of mrustc's own code. INCONCLUSIVE: output-wasi currently holds NATIVE (__1) dep
+  .hir (a later native build overwrote the iter-16 mrustc.wasm __2 deps), so -O0 mrustc.wasm
+  hit the __2-vs-__1 ABI error reading the DEPS, before reaching libstd codegen.
+  CLEAN Path-A test (for the loop): one consistent toolchain end-to-end —
+    1. rm -rf output-wasi
+    2. build ALL deps + wasi + libstd with the SAME mrustc.wasm (use mrustc_O0.wasm via the
+       mrustc-via-wasm.sh wrapper, or rebuild deps with -O0 then libstd) so every .hir is __2.
+    3. if -O0 mrustc.wasm compiles libstd → libstd.{hir,c} → clang.wasm → link → run untrusted
+       hello.rs in-sandbox. If -O0 ALSO traps → it's not an -O1 miscompile; need a -g symbol'd
+       mrustc.wasm to locate the faulting fn, OR pursue Path C (ABI-stable .hir serialization)
+       or Path B on Linux.
+  Artifacts now: /tmp/mr has mrustc_std.wasm (-O1), mrustc_bigstk.wasm (-O1/256MB),
+  mrustc_O0.wasm (-O0/256MB); native bin/mrustc is ABI=__1 (Apple libc++).
+  STATUS unchanged: full std COMPILES+RUNS in wasm (iter 14). Untrusted-fully-in-sandbox is
+  deep but mapped — 3 paths (A: -O0/debug mrustc.wasm; B: Linux __2 native build; C: ABI-stable
+  .hir patch). The key discipline: keep ONE mrustc toolchain's .hir throughout (don't mix
+  native __1 and wasm __2 in output-wasi).
