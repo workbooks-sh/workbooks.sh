@@ -1,0 +1,8 @@
+#+COMPILER: rust
+#+CLI_BIN: mrustc
+#+KIND: compile-to-c-then-wasm
+#+BUILD: build.sh
+#+ARG_MODE: argv
+#+LIB_ROOT: mrustc-root
+#+TARGET: wasm32-wasip1
+#+SOURCE: mrustc (thepowersgang/mrustc @ be69c747) — a C++ Rust→C compiler (bootstraps Rust 1.90). Built to wasm32-wasi with wasi-sdk so it runs in-sandbox; its C output is compiled to wasm by the clang lane. STATUS: in-progress port (see PORT-LOG.org) — not yet a working end-to-end Rust lane.

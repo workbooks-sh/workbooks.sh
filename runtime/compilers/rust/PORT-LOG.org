@@ -29,3 +29,19 @@
   - compilers/rust/ should hold: pinned mrustc source spec + build recipe (build.sh →
     mrustc.wasm) + the jobserver/io stubs + manifest.org (KIND=compile-to-c-then-wasm).
   - Wire Workbooks.Compilers.rust_compile_and_run/4 (mrustc.wasm .rs→C, then compile_c).
+
+* 2026-06-07 (iter 2) — Path 1 toolchain VALIDATED + recipe encoded
+  Switched the cross-compiler from zig's libc++ to *wasi-sdk-33* (its libc++ ships full
+  <fstream> + an exceptions-enabled sysroot variant) — this clears the fstream/localization
+  wall outright. Patched jobserver.cpp → serial under __wasi__ (no pipe/fork).
+  RESULT: tools/common/*.cpp all compile clean to wasm32-wasip1 (the lib that failed under
+  zig). Committed the recipe: compilers/rust/{manifest.org, build.sh}:
+    - fetch wasi-sdk-33 (sha-pinned, arm64-macos + x86_64-linux) + mrustc @ be69c747
+    - patch jobserver (serial) + codegen_c.cpp (under __wasi__: emit C, skip the system()
+      C-compile — the clang lane links it separately, exactly like the Zig chain)
+    - compile all ~129 src/ + tools/common cpp → link mrustc.wasm
+  NEXT (grind): run build.sh end-to-end — expect walls in src/ core: possible 32-bit
+  pointer assumptions, missing syscalls/_WASI_EMULATED_*, memory (escalate -W memory64=y +
+  --target wasm64 if the compile exceeds 4GB), -fno-rtti viability (mrustc may need rtti →
+  drop the flag). Once mrustc.wasm links: register it, run mrustc.wasm on a hello.rs to emit
+  C in-sandbox, then Compilers.compile_c that C → wasm → run; wire rust_compile_and_run/4.
