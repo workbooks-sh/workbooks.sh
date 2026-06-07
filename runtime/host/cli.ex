@@ -5,7 +5,7 @@ defmodule Workbooks.CLI do
   modules the Runtime uses. `call/2` returns output as a string (so an agent can
   run `wb` in-process as a tool); `main/1` prints it.
   """
-  alias Workbooks.{OQL, Bundle, Vars, Memory}
+  alias Workbooks.{OQL, Bundle, Vars, Memory, Toolkits}
 
   @version "0.1.0"
 
@@ -155,6 +155,18 @@ defmodule Workbooks.CLI do
     "unpacked #{length(files)} files → #{dest}"
   end
 
+  # Toolkits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
+  # read their progressive-disclosure skill recipes on demand (the CLI help-wrapper).
+  def call(["toolkit"], _t), do: Toolkits.list_text()
+  def call(["toolkit", "list"], _t), do: Toolkits.list_text()
+  def call(["toolkit", "show", id], _t), do: Toolkits.show_text(id)
+  def call(["toolkit", "show", id, skill], _t), do: Toolkits.show_skill_text(id, skill)
+  def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
+  def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
+
+  def call(["toolkit", "run", id, task | rest], _t),
+    do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
 
@@ -188,6 +200,11 @@ defmodule Workbooks.CLI do
       wb checkin <member> <workdir>        pack + sign a member back into the library
       wb pack <workspace> <out.wbundle>    compile a workspace's members → one parent workbook
       wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
+      wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
+      wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
+      wb toolkit search <query>            substring search across all skills
+      wb toolkit verify <id>               structural checks + run the toolkit's :role pre blocks
+      wb toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
       wb version
     """
   end

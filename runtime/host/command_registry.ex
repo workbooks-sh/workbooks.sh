@@ -20,40 +20,67 @@ defmodule Workbooks.CommandRegistry do
   directly, not as a stdio command.
   """
 
-  # Two kinds of built-in: {:src, lang, code} compiled on first use, and
-  # {:wasm, path} a prebuilt artifact (e.g. jq — a real CLI compiled to wasm).
+  # Built-in shapes (each carries an ARG MODE — the last element):
+  #   {:src, lang, code, mode}  compiled on first use
+  #   {:wasm, path, mode}       a prebuilt artifact (a real CLI compiled to wasm)
+  # Arg mode reconciles two conventions:
+  #   :argv   — args passed as real wasmtime argv (the universal CLI ABI). The
+  #             default for auto-wrapped upstream CLIs (e.g. sd, ripgrep).
+  #   :stdin1 — args become the FIRST stdin line (our legacy jq/grep protocol,
+  #             where the binary reads its filter/pattern from line 1 of stdin).
   @builtins %{
     # A proof command: uppercases stdin. Source-built (Javy) on first use.
     "upper" =>
       {:src, "js",
-       ~S|const b=new Uint8Array(8192);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;const s=new TextDecoder().decode(b.subarray(0,t)).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.toUpperCase()));|},
+       ~S|const b=new Uint8Array(8192);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;const s=new TextDecoder().decode(b.subarray(0,t)).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.toUpperCase()));|,
+       :argv},
     # Real jq: a wasi-clean jaq-interpret wrapper compiled to wasm (commands/jq/).
     # Stdin protocol: first line = filter, rest = JSON.
-    "jq" => {:wasm, "build/commands/jq.wasm"},
+    "jq" => {:wasm, "build/commands/jq.wasm", :stdin1},
     # Real grep: a regex-crate wrapper (commands/grep/). Stdin protocol: first
     # line = pattern, rest = text; matching lines printed. (ripgrep's recursive
     # file walk doesn't fit a stdin command; line-grep is the command form.)
-    "grep" => {:wasm, "build/commands/grep.wasm"}
+    "grep" => {:wasm, "build/commands/grep.wasm", :stdin1}
   }
 
   @doc "Registered command names."
   def list, do: Map.keys(@builtins)
 
-  @doc "Run a registered command by name with input → {:ok, output} | {:error, reason}."
-  def run(name, input) do
+  @doc "Run a registered command with stdin `input` (no argv) → {:ok, out} | {:error, reason}."
+  def run(name, input), do: run(name, input, [])
+
+  @doc """
+  Run a registered command with stdin `input` AND `argv` (a list) → {:ok, out} |
+  {:error, reason}. `dirs` are host paths preopened into the guest (WASI --dir) for
+  file-mode CLIs. How argv reaches the command is per its registered arg mode:
+  :argv passes real wasmtime argv; :stdin1 folds argv into the first stdin line.
+  """
+  def run(name, input, argv, dirs \\ []) when is_list(argv) do
     case @builtins[name] do
       nil -> {:error, {:unknown_command, name}}
-      spec -> run_builtin(spec, input)
+      spec -> run_builtin(spec, input, argv, dirs)
     end
   end
 
-  defp run_builtin({:wasm, path}, input),
-    do: {:ok, Workbooks.PackageManager.run(path, input) |> String.trim()}
+  defp run_builtin({:wasm, path, mode}, input, argv, dirs) do
+    {stdin, args} = apply_argmode(mode, input, argv)
+    {:ok, Workbooks.PackageManager.run(path, stdin, args, dirs) |> String.trim()}
+  end
 
-  defp run_builtin({:src, lang, src}, input) do
+  defp run_builtin({:src, lang, src, mode}, input, argv, dirs) do
     case Workbooks.PackageManager.build(%{"name" => "cmd", "lang" => lang, "src" => src}) do
-      {_, _, {:ok, wasm, _}} -> {:ok, Workbooks.PackageManager.run(wasm, input) |> String.trim()}
-      {_, _, err} -> {:error, err}
+      {_, _, {:ok, wasm, _}} ->
+        {stdin, args} = apply_argmode(mode, input, argv)
+        {:ok, Workbooks.PackageManager.run(wasm, stdin, args, dirs) |> String.trim()}
+
+      {_, _, err} ->
+        {:error, err}
     end
   end
+
+  # :argv → args go to wasmtime as argv. :stdin1 → args become the first stdin
+  # line (legacy), so the wasm sees no argv. Empty argv is a no-op either way.
+  defp apply_argmode(_mode, input, []), do: {input, []}
+  defp apply_argmode(:argv, input, argv), do: {input, argv}
+  defp apply_argmode(:stdin1, input, argv), do: {Enum.join(argv, " ") <> "\n" <> input, []}
 end

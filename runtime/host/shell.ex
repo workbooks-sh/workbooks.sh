@@ -45,22 +45,37 @@ defmodule Workbooks.Shell do
   end
 
   defp exec(stage, input) do
-    {cmd, args} =
-      case String.split(stage, " ", parts: 2) do
-        [c] -> {c, ""}
-        [c, a] -> {c, a |> String.trim() |> unquote_arg()}
-      end
-
-    stdin = if args == "", do: input, else: args <> "\n" <> input
-    CommandRegistry.run(cmd, stdin)
+    case tokenize(stage) do
+      [] -> {:ok, input}
+      [cmd | argv] -> CommandRegistry.run(cmd, input, argv)
+    end
   end
 
-  # Strip one layer of matching surrounding quotes (LLMs habitually quote args).
-  defp unquote_arg(<<q, rest::binary>> = s) when q in [?', ?"] do
-    if byte_size(rest) >= 1 and binary_part(rest, byte_size(rest) - 1, 1) == <<q>>,
-      do: binary_part(rest, 0, byte_size(rest) - 1),
-      else: s
-  end
+  # Split a stage into [cmd | argv], honoring single/double quotes and stripping
+  # one quote layer per token: `jq '.a | b'` → ["jq", ".a | b"]; `sd a b` →
+  # ["sd", "a", "b"]. The registry then applies each command's arg mode (real
+  # argv for auto-wrapped CLIs; first-stdin-line for legacy jq/grep).
+  defp tokenize(stage) do
+    {toks, cur, started, _q} =
+      stage
+      |> String.to_charlist()
+      |> Enum.reduce({[], [], false, nil}, fn ch, {toks, cur, started, q} ->
+        cond do
+          is_nil(q) and ch in [?', ?"] ->
+            {toks, cur, true, ch}
 
-  defp unquote_arg(s), do: s
+          q == ch ->
+            {toks, cur, started, nil}
+
+          is_nil(q) and ch in [?\s, ?\t] ->
+            if started, do: {[Enum.reverse(cur) | toks], [], false, nil}, else: {toks, cur, false, nil}
+
+          true ->
+            {toks, [ch | cur], true, q}
+        end
+      end)
+
+    toks = if started, do: [Enum.reverse(cur) | toks], else: toks
+    toks |> Enum.reverse() |> Enum.map(&List.to_string/1)
+  end
 end
