@@ -1,0 +1,31 @@
+#+TITLE: Rust-in-WASM port log (wb-zyl.7)
+#+NOTE: append-only running log so the grind loop never loses the thread.
+
+* Goal
+  Untrusted Rust compiled AND run ENTIRELY in the wasm sandbox (zero native exec).
+  Path 1: mrustc.wasm (Rust→C) → clang.wasm (C→wasm) → run. Path 2: fork rustc→wasm32-wasi.
+
+* Assets already in-repo (reuse, don't rebuild)
+  - compilers/clang/ — YoWASP clang/lld in wasm (C→wasm), WORKING end-to-end.
+  - Workbooks.Compilers.compile_c/3 + compile_and_run_c/3 (the C→wasm→run lane).
+  - The Zig chain (zig_compile_and_run) is the template: producer→C, then clang lane,
+    plus bridges (wasi_shim.c, builtin no-op prelude, crt:false).
+
+* 2026-06-07 — Path 1 first-wall probe (zig cc -target wasm32-wasi via kassane/mrustc-zig)
+  mrustc now bootstraps Rust 1.90 (modern). `zig build -Dtarget=wasm32-wasi` on mrustc-zig
+  compiles INTO the code, then fails in tools/common with ~25 errors:
+  - jobserver.cpp: `pipe()` undeclared → WASI has no pipe/fork. FIX: stub jobserver to
+    serial (no parallelism) under __wasi__.
+  - toml.h/.cpp: `std::ifstream` incomplete + `operator<<(ostream, const char*)` not found
+    → zig's WASI libc++ gates <fstream>/<ostream>/localization. FIX options: (a) build with
+    wasi-sdk's fuller libc++ instead of zig's; (b) replace std::ifstream with fopen/fread.
+  NEXT (in priority): (1) get a wasi-sdk (or YoWASP clang sysroot, which HAS full libc++)
+  cross-compile of mrustc instead of zig's libcxx; (2) stub jobserver→serial; (3) build
+  past common/ into the compiler core; (4) map deeper walls: 32-bit ptr assumptions,
+  4GB memory ceiling (→ memory64), mrustc's subprocess call to the C compiler (intercept
+  like clang compile/link split).
+
+* TODO scaffolding
+  - compilers/rust/ should hold: pinned mrustc source spec + build recipe (build.sh →
+    mrustc.wasm) + the jobserver/io stubs + manifest.org (KIND=compile-to-c-then-wasm).
+  - Wire Workbooks.Compilers.rust_compile_and_run/4 (mrustc.wasm .rs→C, then compile_c).
