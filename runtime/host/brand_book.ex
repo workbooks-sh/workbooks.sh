@@ -55,6 +55,12 @@ defmodule Workbooks.BrandBook do
     e -> %{exit: :error, error: Exception.message(e)}
   end
 
+  # A stage gets a hard wall-clock budget: an agent can wedge (a stalled LLM call
+  # past its own timeout, a slow tool) and `max_steps` only bounds step COUNT, not
+  # time. If the stage exceeds this, kill it and return a partial — the pipeline
+  # proceeds (the next stage / find_deck still sees whatever landed on disk).
+  @stage_timeout_ms 15 * 60 * 1000
+
   # Stages 2 & 3 — a real brandnana agent, exec-enabled, rooted in the workdir.
   # on_step appends each tool step to a trace file so a long-horizon run is
   # observable from outside (the in-VFS events.org is only written at finish).
@@ -65,7 +71,15 @@ defmodule Workbooks.BrandBook do
       line = Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 160)})
       File.write(trace, line <> "\n", [:append])
     end
-    AgentDef.run(File.read!(agent_org_path), task, exec: true, workdir: workdir, max_steps: steps, on_step: on_step)
+
+    t = Task.async(fn ->
+      AgentDef.run(File.read!(agent_org_path), task, exec: true, workdir: workdir, max_steps: steps, on_step: on_step)
+    end)
+
+    case Task.yield(t, @stage_timeout_ms) || Task.shutdown(t, :brutal_kill) do
+      {:ok, result} -> result
+      _ -> %{result: "#{role}: stage timed out (#{div(@stage_timeout_ms, 60_000)}m wall-clock)", steps: 0, events: []}
+    end
   end
 
   defp strategist_task(domain) do
