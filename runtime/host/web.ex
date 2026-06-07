@@ -225,6 +225,20 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
   end
 
+  # Library (Phase 3) — the tenant's access graph: workspaces + their members.
+  get "/api/library/:tenant" do
+    wss = Workbooks.Library.workspaces(conn.params["tenant"])
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{workspaces: wss}))
+  end
+
+  # Cross-workbook OQL query-through across a Library's members. {"sql": "..."}
+  post "/api/library/:tenant/query" do
+    {:ok, body, conn} = read_body(conn)
+    sql = Jason.decode!(body)["sql"] || ""
+    result = Workbooks.Library.query(conn.params["tenant"], sql)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # did:web (Phase 2e) — the engine's self-hosted identity document. A standard
   # DID resolver fetches this; the key matches the tenant's did:key + ledger.
   get "/.well-known/did.json" do

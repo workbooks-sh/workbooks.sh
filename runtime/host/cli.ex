@@ -118,6 +118,30 @@ defmodule Workbooks.CLI do
     end
   end
 
+  # Library (Phase 3) — the identity's access graph + cross-workbook query.
+  def call(["library"], t) do
+    wss = Workbooks.Library.workspaces(t)
+    if wss == [] do
+      "(empty library)"
+    else
+      Enum.map_join(wss, "\n", fn ws ->
+        members = Enum.map_join(ws.members, "\n", fn m ->
+          {kind, ref} = m.ref
+          "    #{m.id}\t#{kind}:#{ref}\t#{m.scope}"
+        end)
+        "#{ws.slug}  (#{length(ws.members)} members)\n#{members}"
+      end)
+    end
+  end
+
+  def call(["library", "query" | sql], t), do: Workbooks.Library.query(t, Enum.join(sql, " ")) |> json()
+
+  def call(["checkout", member, workdir], t),
+    do: Workbooks.Library.checkout(t, member, workdir) |> Map.drop([:member]) |> json()
+
+  def call(["checkin", member, workdir], t),
+    do: Workbooks.Library.checkin(t, member, workdir) |> Map.drop([:member]) |> json()
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
 
@@ -145,6 +169,10 @@ defmodule Workbooks.CLI do
       wb ledger <slug>                     verify a run's signed ledger (tamper/attribution)
       wb sign <file.html> [--out <f>]      embed a did:key provenance manifest
       wb verify <file.html>                check an artifact's signature + integrity
+      wb library                           list the tenant's workspaces + members
+      wb library query <sql>               cross-workbook query across members' VFS
+      wb checkout <member> <workdir>       borrow a member into a working dir
+      wb checkin <member> <workdir>        pack + sign a member back into the library
       wb version
     """
   end
