@@ -1,21 +1,4 @@
-# Tauri / Rust
-/src-tauri/target
-/src-tauri/Cargo.lock
-/src-tauri/gen
-/src-tauri/WixTools
-
-# Frontend
-node_modules
-# generated from runtime/engine/priv/api-verbs.json (scripts/gen-engine-api.mjs)
-/src/lib/engine-api/gen.ts
-.svelte-kit
-dist
-build
-
-# Editor / OS
+node_modules/
+dist/
 .DS_Store
 *.log
-
-# Local user state
-.env
-.env.local

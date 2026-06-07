@@ -1,13 +1,11 @@
-/**
- * Shared types for Dropdown.svelte — extracted because Svelte 5
- * components with `generics` can't `export type` from their <script>
- * block.
- */
+import type { Component } from "svelte";
 
-export type DropdownItem<V> = {
-  value: V;
+/** One option in a Dropdown. `icon` is a lucide component; `description`
+ *  renders as a muted second line under the label. */
+export interface DropdownItem<T extends string | number = string> {
+  value: T;
   label: string;
   description?: string;
-  icon?: typeof import("@lucide/svelte").Check;
+  icon?: Component;
   disabled?: boolean;
-};
+}

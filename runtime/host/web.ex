@@ -218,6 +218,13 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, body)
   end
 
+  # Telemetry feedback loop (CLI reads this): task states + tool-call count +
+  # total time + errors (bash exit codes / tool failures) for a run.
+  get "/api/telemetry/:slug" do
+    summary = Workbooks.Workflow.Telemetry.summary("/tmp/bb/#{conn.params["slug"]}")
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
+  end
+
   # Browse — the runtime's web capability, reachable over HTTP so any consumer
   # (brandnana harvest, an agent, an external caller) can fetch/crawl/search
   # through the configured provider (free native browser by default).

@@ -1,24 +1,6 @@
-import adapter from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
-/**
- * Static adapter — Tauri loads the frontend off the filesystem as
- * pre-rendered assets, no Node/CF runtime in the loop. SPA fallback
- * via `index.html` keeps client-side routing working without a server.
- *
- * @type {import('@sveltejs/kit').Config}
- */
-const config = {
+/** Plain Svelte 5 (runes) — no SvelteKit, no adapters. */
+export default {
   preprocess: vitePreprocess(),
-  kit: {
-    adapter: adapter({
-      pages: "build",
-      assets: "build",
-      fallback: "index.html",
-      precompress: false,
-      strict: true,
-    }),
-  },
 };
-
-export default config;
