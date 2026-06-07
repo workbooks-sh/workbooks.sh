@@ -225,6 +225,13 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
   end
 
+  # did:web (Phase 2e) — the engine's self-hosted identity document. A standard
+  # DID resolver fetches this; the key matches the tenant's did:key + ledger.
+  get "/.well-known/did.json" do
+    host = host_authority(conn)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Did.web_document(host)))
+  end
+
   # Ledger verify (Phase 2g) — recompute the hash-chain over the run's current
   # _steps.jsonl and check the did:key signature: tamper-evident + attributable.
   get "/api/ledger/:slug" do
@@ -313,6 +320,15 @@ defmodule Workbooks.Web do
 
   defp render_pages(pages, _),
     do: %{count: length(pages), pages: Enum.map(pages, &Map.take(&1, [:url, :title, :description, :headings]))}
+
+  # The public authority for did:web — prefer the proxy's forwarded host (fly
+  # terminates TLS upstream) so the DID id matches the URL clients actually used.
+  defp host_authority(conn) do
+    case Plug.Conn.get_req_header(conn, "x-forwarded-host") do
+      [h | _] when is_binary(h) and h != "" -> h
+      _ -> conn.host
+    end
+  end
 
   defp viewer_page do
     ~S"""
