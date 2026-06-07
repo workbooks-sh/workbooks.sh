@@ -20,6 +20,26 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
+  # Run a workflow declared in Org — the runtime parses the :workflow: DAG and
+  # executes it (topological waves; agent + WASM components; recursive).
+  #   {"org": "...", "input": "..."}  → run records
+  #   ?plan=1                         → the schedule/plan only (no execution)
+  post "/api/workflow" do
+    {:ok, body, conn} = read_body(conn)
+    %{"org" => org} = params = Jason.decode!(body)
+
+    try do
+      out =
+        if conn.params["plan"] == "1",
+          do: Workbooks.Workflow.list(org),
+          else: Workbooks.Workflow.run(org, Map.get(params, "input", ""))
+
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(out))
+    rescue
+      e -> conn |> put_resp_content_type("application/json") |> send_resp(500, Jason.encode!(%{error: Exception.message(e)}))
+    end
+  end
+
   # List registered Instances for the tenant.
   get "/instances" do
     json = Jason.encode!(Workbooks.ControlPlane.list())
