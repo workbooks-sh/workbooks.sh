@@ -29,7 +29,9 @@ defmodule Workbooks.Private do
   # `_*.jsonl|json|db` catches future session sidecars without editing this list.
   @private_prefixes ~w(_)
 
-  # VFS volumes that DO ship. Everything else (memory, tmp) is private.
+  # VFS volumes (mirror of Workbooks.VFS). Only @public_volumes ship; the rest
+  # (memory, tmp) are private — one list keeps file-form + VFS-form in lockstep.
+  @volumes ~w(workspace memory tmp)
   @public_volumes ~w(workspace)
 
   @doc "Volumes that ship when a container is shared. The rest stay private."
@@ -50,9 +52,15 @@ defmodule Workbooks.Private do
   default — written into every tenant repo's `.gitignore` (`Workbooks.Git`). This
   is the automated public/private ignore: the agent (and human) never has to
   remember it.
+
+  Includes the VFS private volumes as directory globs (`memory/`, `tmp/`) so the
+  TWO forms of a workbook filesystem stay consistent: if the SQLite VFS is ever
+  unpacked to a real tree, the same volumes git already treats as private in the
+  file form are ignored there too. One boundary, both forms.
   """
   def gitignore_lines do
-    @private_dirs ++ ["_*.jsonl", "_*.json", "_*.db"]
+    volume_dirs = Enum.map(@volumes -- @public_volumes, &"#{&1}/")
+    @private_dirs ++ volume_dirs ++ ["_*.jsonl", "_*.json", "_*.db"]
   end
 
   @doc "Drop private entries from a parts map (e.g. a Bundle's file set)."
