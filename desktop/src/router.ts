@@ -16,8 +16,10 @@ import type { RouterOptions, NavigationGuard } from "@dvcol/svelte-simple-router
 import { auth } from "$lib/auth.svelte";
 import { chrome } from "$lib/chrome.svelte";
 
-/** Hard gate: the sidecar must be reachable for the app to function.
- *  Signed-out is allowed (publish/network degrade gracefully). */
+/** Gate for RUNTIME-DEPENDENT views only (agents/network/sync). Workbook-native:
+ *  the app opens + weaves/edits workbooks via the embedded kernel with NO runtime,
+ *  so the core views (create/kanban/entries/settings/workbook) are NOT gated; only
+ *  features that genuinely need the server tier redirect when it's unreachable. */
 const requireSidecar: NavigationGuard = () => {
   if (!auth.sidecarReachable) return { name: "offline" };
   return true;
@@ -31,27 +33,27 @@ export const routerOptions: RouterOptions = {
       name: "create",
       path: "/create",
       component: () => import("$lib/views/HomeView.svelte"),
-      beforeEnter: (nav) => {
+      beforeEnter: () => {
         chrome.section = "Create";
-        return requireSidecar(nav);
+        return true;
       },
     },
     {
       name: "kanban",
       path: "/kanban",
       component: () => import("$lib/views/KanbanView.svelte"),
-      beforeEnter: (nav) => {
+      beforeEnter: () => {
         chrome.section = "Kanban";
-        return requireSidecar(nav);
+        return true;
       },
     },
     {
       name: "entries",
       path: "/entries",
       component: () => import("$lib/views/EntriesView.svelte"),
-      beforeEnter: (nav) => {
+      beforeEnter: () => {
         chrome.section = "Entries";
-        return requireSidecar(nav);
+        return true;
       },
     },
     {
@@ -67,9 +69,9 @@ export const routerOptions: RouterOptions = {
       name: "settings",
       path: "/settings",
       component: () => import("$lib/views/SettingsView.svelte"),
-      beforeEnter: (nav) => {
+      beforeEnter: () => {
         chrome.section = "Settings";
-        return requireSidecar(nav);
+        return true;
       },
     },
     {
