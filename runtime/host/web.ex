@@ -225,6 +225,15 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
   end
 
+  # Cross-session index (0d) — every run, newest first, each rolled up. The
+  # "see across runs" view for the CLI: catch an error trend, not one run.
+  get "/api/telemetry" do
+    runs = Workbooks.Workflow.Telemetry.index()
+    rollup = %{runs: length(runs), with_errors: Enum.count(runs, &(&1.errors > 0)),
+               tool_calls: Enum.reduce(runs, 0, fn r, a -> a + r.tool_calls end)}
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{rollup: rollup, runs: runs}))
+  end
+
   # Browse — the runtime's web capability, reachable over HTTP so any consumer
   # (brandnana harvest, an agent, an external caller) can fetch/crawl/search
   # through the configured provider (free native browser by default).

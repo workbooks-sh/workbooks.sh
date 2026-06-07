@@ -103,11 +103,40 @@ defmodule Workbooks.Workflow.Telemetry do
     _ -> %{error: "no telemetry"}
   end
 
-  defp q(c, sql) do
-    {:ok, stmt} = Sqlite3.prepare(c, sql)
-    {:ok, rows} = Sqlite3.fetch_all(c, stmt)
-    Sqlite3.release(c, stmt)
-    rows
+  @runs_base "/tmp/bb"
+
+  @doc """
+  Cross-session index (0d) — every run under the base, newest first, each rolled
+  up to stage + tool-call count + error count + duration. The "see across runs"
+  view: spot a regression (errors climbing run-over-run), not just one run in
+  isolation. Pure scan over the same always-on `_steps.jsonl`/`_status.json` —
+  no extra writes, so it's free and can't drift from the per-run truth.
+  """
+  def index(base \\ @runs_base, limit \\ 50) do
+    case File.ls(base) do
+      {:ok, slugs} ->
+        slugs
+        |> Enum.map(fn slug ->
+          wd = Path.join(base, slug)
+          s = summary(wd)
+          %{slug: slug, stage: s[:stage], tool_calls: s[:tool_calls] || 0,
+            errors: length(s[:errors] || []), total_ms: s[:total_ms] || 0, mtime: mtime(wd)}
+        end)
+        |> Enum.reject(&(&1.tool_calls == 0 and is_nil(&1.stage)))
+        |> Enum.sort_by(& &1.mtime, :desc)
+        |> Enum.take(limit)
+
+      _ -> []
+    end
+  end
+
+  # Run recency = the last time its always-on step log was touched (falls back to
+  # the dir itself for runs that never logged a step).
+  defp mtime(wd) do
+    case File.stat(Path.join(wd, "_steps.jsonl"), time: :posix) do
+      {:ok, %{mtime: m}} -> m
+      _ -> case File.stat(wd, time: :posix), do: ({:ok, %{mtime: m}} -> m; _ -> 0)
+    end
   end
 
   @doc "Query the telemetry db → task event rows (maps). For observability."
