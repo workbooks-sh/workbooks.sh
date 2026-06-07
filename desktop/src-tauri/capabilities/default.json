@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the Workbooks desktop shell — window show/hide, tray, and the daemon-bridge commands.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:tray:default",
+    "core:menu:default",
+    "core:event:default"
+  ]
+}
