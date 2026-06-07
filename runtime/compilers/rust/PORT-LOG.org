@@ -168,3 +168,12 @@
   5. Wire Workbooks.Compilers.rust_compile_and_run/4 once hello works.
   EXPECT: more mrustc bugs in std (std ≫ core), more bare-wasi symbols (extend wasi_shim.c),
   edition/cfg per-crate (minicargo + the rustc-1.54 overrides toml handle this).
+
+* 2026-06-07 (iter 8) — wasm32-wasi target spec WRITTEN + validated
+  Dumped arm-linux-gnu via mrustc --dump-target-spec, edited → wasm32-wasi.spec:
+  family="", os-name="wasi", env-name="", arch=arm (wasm32 ABI), no -pthread.
+  VALIDATED: mrustc.wasm --target /path/wasm32-wasi.spec compiles libcore (os=wasi loads +
+  Codegen DONE). This is the enabler — with os=wasi, std will select sys/wasi (not unix).
+  Committed compilers/rust/wasm32-wasi.spec.
+  NEXT: build minicargo.wasm (same recipe as mrustc), then minicargo builds core→alloc→std
+  with this spec, then a println hello.rs → C → clang.wasm → run.
