@@ -7,6 +7,32 @@ match. OQL already makes a workbook queryable via SQL; this adds the semantic
 half so "find the bit about retry backoff" works without the exact words — over
 org content AND code. Rides the BYO-storage layer (storage is the precondition).
 
+* The construct: a QUERYABLE WORKBOOK — agent-agnostic, not "AI memory"
+This is general data infrastructure, NOT an AI feature. "Vector search" is one
+QUERY MODALITY, not the point; "agent memory" is one CONSUMER, not the definition.
+A workbook is a queryable data object — any script, service, or agent run out of a
+workbook can query it (and other workbooks), the same way it would query a
+database. Frame + name accordingly: it's `Query`, not `Memory`.
+
+- *Modalities are slots* (like the storage/embed providers): LITERAL (SQL via
+  OQL — done), SEMANTIC (vector, pluggable embeddings — building), GRAPH
+  (relationships / a GraphQL-style traversal over members + links — future). A
+  caller picks the modality; new ones drop in without touching callers.
+- *Consumers are anything*: exposed over the CLI (`wb search`/`wb query`), the
+  HTTP API (`/api/search`), and in-workbook scripts — an agent is just one
+  caller among scripts + services. No modality or surface assumes an LLM.
+- *Cross-workbook by DID*: a workbook can query ANOTHER workbook's data by its
+  DID (resolve via `Workbooks.Did`, then query the resolved members) — federated
+  query against the identity, not just the local library. This is the same DID
+  rail the composition layer uses; querying is one more thing you do "against the
+  DID."
+- *Embeddings are pluggable + not required*: literal + graph queries need no model
+  at all; semantic uses the `Workbooks.Embed` slot (hash baseline → external →
+  in-BEAM). The construct degrades cleanly to pure data querying with zero ML.
+- Agent memory, RAG, etc. are then trivial CONSUMERS of this — they call the same
+  query surface every other script does. We build the construct; the AI use is
+  downstream, not the foundation.
+
 * Three seams (each a provider slot, like Storage/Browse/auth)
 
 ** 1. Embedding — =Workbooks.Embed= (`embed(texts) -> vectors`)
@@ -57,9 +83,16 @@ same "compute at author time, bake the result" conclusion.)
 2. =Workbooks.Vector= — brute-force cosine on SQLite (default) first; interface
    stable for pgvector/sqlite-vec.
 3. Index at store-time: =Library.store= chunks + embeds + upserts vectors.
-4. =Library.search(tenant, query, scope)= — semantic, then hybrid with OQL.
+4. =Library.search(tenant, query, scope)= — semantic, then hybrid with OQL
+   literal. Exposed as a CONSUMER-AGNOSTIC surface: =wb search= / =wb query= +
+   =/api/search= (any script/service/agent calls it). No LLM assumed.
+4b. Cross-workbook by DID: a member referenced by DID is resolved
+   (=Workbooks.Did=) and included in the search scope — federated query against
+   the identity.
 5. pgvector adapter for the Postgres backend; sqlite-vec upgrade.
 6. =local= embedder (Bumblebee or ortex, small model) — the multi-tenant default.
+7. GRAPH modality (future) — relationships/links across members as a GraphQL-style
+   traversal; another modality slot, no embeddings needed.
    Decide dep weight when we get here; the seam means it drops in without churn.
 
 * Open decision (when we reach step 6)

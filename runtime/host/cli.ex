@@ -196,6 +196,18 @@ defmodule Workbooks.CLI do
     end
   end
 
+  # Query a workbook/library — semantic ∪ literal (hybrid). Consumer-agnostic;
+  # any script/service uses the same surface an agent would. --semantic/--literal
+  # force a single modality; --workbook <slug> scopes it.
+  def call(["search" | rest], t) do
+    {flags, words} = Enum.split_with(rest, &String.starts_with?(&1, "--"))
+    mode = cond do "--semantic" in flags -> :semantic; "--literal" in flags -> :literal; true -> :hybrid end
+    hits = Workbooks.Library.search(t, Enum.join(words, " "), mode: mode, workbook: opt(rest, "--workbook"), k: 8)
+
+    if hits == [], do: "(no matches)",
+      else: Enum.map_join(hits, "\n", fn h -> "#{h.workbook}/#{h.path} :: #{h.headline}\n  #{String.slice(h.text, 0, 80) |> String.replace("\n", " ")}" end)
+  end
+
   # Toolkits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
   # read their progressive-disclosure skill recipes on demand (the CLI help-wrapper).
   def call(["toolkit"], _t), do: Toolkits.list_text()

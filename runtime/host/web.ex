@@ -290,6 +290,16 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
+  # Query surface (semantic ∪ literal) — consumer-agnostic; any script/service
+  # calls it, not just agents. {"query": "...", "mode": "hybrid"|"semantic"|"literal", "workbook": "..."}
+  post "/api/search/:tenant" do
+    {:ok, body, conn} = read_body(conn)
+    p = Jason.decode!(body)
+    mode = String.to_atom(p["mode"] || "hybrid")
+    hits = Workbooks.Library.search(conn.params["tenant"], p["query"] || "", mode: mode, workbook: p["workbook"], k: p["k"] || 8)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{hits: hits}))
+  end
+
   # Cross-session index (0d) — every run, newest first, each rolled up. The
   # "see across runs" view for the CLI: catch an error trend, not one run.
   get "/api/telemetry" do

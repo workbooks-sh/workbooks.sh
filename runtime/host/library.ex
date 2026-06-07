@@ -271,6 +271,53 @@ defmodule Workbooks.Library do
     end
   end
 
+  @doc """
+  Search the tenant's indexed workbooks — a CONSUMER-AGNOSTIC query surface (any
+  script/service/agent calls it; no LLM assumed). HYBRID by default: a semantic
+  pass (vector cosine) fused with a literal pass (query-term overlap) via
+  reciprocal-rank-fusion — semantic finds meaning, literal pins exact terms,
+  fusion gets both. opts: :k, :workbook / :workbooks (scope), :mode
+  (:hybrid | :semantic | :literal). Returns ranked %{path, headline, text, ...}.
+  """
+  def search(tenant, query, opts \\ []) do
+    k = opts[:k] || 5
+    mode = opts[:mode] || :hybrid
+    {:ok, qvec} = Workbooks.Embed.embed(query)
+
+    pool = Workbooks.Vector.search(tenant, qvec, Keyword.merge(opts, k: 50))
+    terms = query |> String.downcase() |> String.split(~r/\W+/, trim: true) |> Enum.reject(&(&1 == ""))
+
+    ranked =
+      case mode do
+        :semantic -> pool
+        :literal -> Enum.sort_by(pool, &lex_score(&1.text, terms), :desc)
+        _ -> rrf(pool, Enum.sort_by(pool, &lex_score(&1.text, terms), :desc))
+      end
+
+    Enum.take(ranked, k)
+  end
+
+  defp lex_score(text, terms) do
+    t = String.downcase(text || "")
+    Enum.count(terms, &String.contains?(t, &1))
+  end
+
+  # Reciprocal-rank fusion of two rankings (by chunk id). RRF score = Σ 1/(60+rank).
+  defp rrf(rank_a, rank_b) do
+    idx = fn list -> list |> Enum.with_index() |> Map.new(fn {h, i} -> {h.id, i} end) end
+    a = idx.(rank_a)
+    b = idx.(rank_b)
+
+    (Map.keys(a) ++ Map.keys(b))
+    |> Enum.uniq()
+    |> Enum.map(fn id ->
+      hit = Enum.find(rank_a, &(&1.id == id)) || Enum.find(rank_b, &(&1.id == id))
+      score = 1 / (60 + Map.get(a, id, 1000)) + 1 / (60 + Map.get(b, id, 1000))
+      Map.put(hit, :rrf, score)
+    end)
+    |> Enum.sort_by(& &1.rrf, :desc)
+  end
+
   @text_exts ~w(.org .md .txt .rs .js .ts .jsx .tsx .svelte .ex .exs .py .go .html .css .sql .json .toml .yaml .yml)
   defp text_file?(name), do: Path.extname(name) in @text_exts
 
