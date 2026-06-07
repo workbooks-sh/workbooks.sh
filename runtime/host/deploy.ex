@@ -114,8 +114,10 @@ defmodule Workbooks.Deploy do
     end
   end
 
-  @doc "Report local daemon state: VM presence, launchd, the discovery file."
-  def status do
+  @doc "Daemon state — local by default, or a cloud deployment's state given its config file."
+  def status(file \\ nil), do: lifecycle(file, &local_status/0, "status")
+
+  defp local_status do
     vm? = Krunvm.exists?()
 
     {runtime, fields} =
@@ -128,8 +130,15 @@ defmodule Workbooks.Deploy do
        Map.merge(fields, %{microvm: vm?, agent: Krunvm.label()}))
   end
 
-  @doc "Prove the LIVE runtime answers (not just that config is valid). Non-zero if not."
-  def verify do
+  @doc "Prove the LIVE runtime answers — local daemon, or a cloud deployment's URL."
+  def verify(file \\ nil) do
+    case place_of(file) do
+      {:cloud, p} -> cloud_verify(p)
+      _ -> local_verify()
+    end
+  end
+
+  defp local_verify do
     with {:ok, d} <- Krunvm.discovery(),
          port when is_integer(port) <- d["port"],
          {:ok, status, body} <- http_get("http://127.0.0.1:#{port}/health", d["token"]) do
@@ -143,18 +152,73 @@ defmodule Workbooks.Deploy do
     end
   end
 
-  @doc "Tear down the local daemon (launchd agent + microVM; keeps data + APFS volume). Idempotent."
-  def down do
+  @doc "Tear down — local daemon by default, or a cloud deployment given its config file."
+  def down(file \\ nil), do: lifecycle(file, &local_down/0, "down")
+
+  defp local_down do
     Krunvm.down()
     ok("local runtime down (data + APFS volume preserved)", %{state: "down"})
   end
 
-  @doc "Where to look for daemon logs."
-  def logs do
+  @doc "Where logs are — local daemon, or a cloud deployment's logs given its config file."
+  def logs(file \\ nil), do: lifecycle(file, &local_logs/0, "logs")
+
+  defp local_logs do
     dir = Path.join([System.user_home!(), "Library", "Application Support", "sh.workbooks", "logs"])
     out = Path.join(dir, "runtime.out.log")
     err_log = Path.join(dir, "runtime.err.log")
     ok("tail -f #{err_log} #{out}", %{stdout: out, stderr: err_log})
+  end
+
+  # ---- local|cloud dispatch for the lifecycle verbs --------------------------
+  # No file → local. A file → its ENGINE_PLACE decides (cloud runs the provider).
+  defp lifecycle(file, local_fun, action) do
+    case place_of(file) do
+      {:cloud, p} -> cloud_action(p, action)
+      {:error, msg} -> err(msg, %{})
+      _ -> local_fun.()
+    end
+  end
+
+  defp place_of(nil), do: :local
+
+  defp place_of(file) do
+    case Config.parse(file) do
+      {:ok, p} -> if Config.place(p) == "cloud", do: {:cloud, p}, else: {:local, p}
+      {:error, msg} -> {:error, msg}
+    end
+  end
+
+  defp cloud_action(p, action) do
+    provider = Config.provider(p)
+
+    case Backend.resolve(provider) do
+      {:provider, _pl, boot} ->
+        case Backend.run_provider(boot, action, Map.put(Config.to_env(p), "WB_IMAGE", Image.ref())) do
+          {:ok, out} -> ok("cloud #{action} (#{provider}):\n#{String.trim_trailing(out)}", %{provider: provider, action: action})
+          {:error, out} -> err("cloud #{action} (#{provider}) failed:\n#{String.trim_trailing(out)}", %{provider: provider, action: action})
+        end
+
+      _ ->
+        err("cloud PROVIDER=#{provider} has no recipe at deploy/providers/#{provider}", %{provider: provider})
+    end
+  end
+
+  # Cloud liveness: ask the provider for the public URL, then GET /health.
+  defp cloud_verify(p) do
+    provider = Config.provider(p)
+
+    with {:provider, _pl, boot} <- Backend.resolve(provider),
+         {:ok, out} <- Backend.run_provider(boot, "url", Map.put(Config.to_env(p), "WB_IMAGE", Image.ref())),
+         url when is_binary(url) <- (out |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.find(&String.starts_with?(&1, "http"))),
+         {:ok, 200, body} <- http_get(url <> "/health", nil) do
+      if String.contains?(body, "ok"),
+        do: ok("cloud runtime healthy — #{url}/health → 200", %{state: "healthy", url: url, provider: provider}),
+        else: err("cloud runtime reachable but unhealthy at #{url}", %{state: "unhealthy", url: url})
+    else
+      {:ok, status, _} -> err("cloud runtime returned HTTP #{status}", %{state: "unhealthy", http: status})
+      _ -> err("could not verify cloud runtime (provider #{provider}) — is it deployed? `wb deploy apply`", %{state: "unreachable"})
+    end
   end
 
   @doc "Render a tagged result for the CLI — `--json` → machine map, else the message."

@@ -264,10 +264,11 @@ defmodule Workbooks.CLI do
         # Zero-config local convenience (= a default local deployment).
         ["local" | _] -> Workbooks.Deploy.local()
         ["doctor"] -> Workbooks.Deploy.doctor()
-        ["status"] -> Workbooks.Deploy.status()
-        ["verify"] -> Workbooks.Deploy.verify()
-        ["down"] -> Workbooks.Deploy.down()
-        ["logs"] -> Workbooks.Deploy.logs()
+        # No file → the local daemon; a deployment.org → that deployment (local OR cloud).
+        ["status" | rest] -> Workbooks.Deploy.status(List.first(rest))
+        ["verify" | rest] -> Workbooks.Deploy.verify(List.first(rest))
+        ["down" | rest] -> Workbooks.Deploy.down(List.first(rest))
+        ["logs" | rest] -> Workbooks.Deploy.logs(List.first(rest))
         # The one image artifact.
         ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
         ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
