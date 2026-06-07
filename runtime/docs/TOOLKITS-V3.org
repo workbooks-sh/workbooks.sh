@@ -171,10 +171,24 @@
    PROVEN 2026-06-07 (see §SPIKE): a normal read+write CLI round-tripped through
    a host::guest mapping; without the mapping the guest saw nothing (NotFound) —
    container-style isolation, function-granular.
-   WALL: the bridge fixes file ACCESS, not `mmap`. WASI's fd_read/fd_write cannot
-   express mmap, so mmap-based CLIs (e.g. sd's file mode) stay "unsupported" even
-   WITH a preopen → those take #+EXEC: posix. Bridge widens the class; it does not
-   erase the boundary.
+   mmap is NOT a wall — it is EMULATABLE at the build layer (PROVEN 2026-06-07).
+   You cannot forward the raw memory accesses to the host (they are loads/stores,
+   not calls), but you do not need to: give the guest its OWN mmap implemented over
+   pread/pwrite (the WASI file ops that DO route). A ~30-line shim
+   (malloc+pread for MAP_PRIVATE read; flush-on-msync/munmap for MAP_SHARED) was
+   compiled with `zig cc prog.c mmap_shim.c` and ran end-to-end: read-through-
+   pointer AND write-back-through-pointer to the host file, both correct.
+   - Delivery = a BUILD-PROFILE concern (the crate/sysroot pallet). C/wasi-sdk
+     CLIs link the shim → mmap() resolves to the emulation, CLI unmodified.
+     Rust crates that hard-gate on cfg(target_arch) (memmap2 returns Unsupported
+     before calling mmap) need a [patch.crates-io] override/fork, OR normal IO.
+   - Residual TRUE limits (rare for CLIs, → #+EXEC: posix only here): no lazy
+     demand-paging (whole region eager-loaded → files near/over wasm32 ~4GB don't
+     fit; memory64 raises the ceiling), and cross-process shared-memory IPC
+     (separate sandboxes share no address space — cannot be faithfully emulated).
+   So the posix-fallback set shrinks from "anything using mmap" to "huge-file mmap
+   + shared-memory IPC" — which toolkit CLIs do not do. sd specifically still needs
+   a memmap2 patch (hard-gated) or posix; most file-CLIs work with the shim.
 
 ** Network → a `browse-fetch` Dock import bound to Workbooks.Browse  [DECISION: Route B, 2026-06-07]
    DECIDED: use the Dock-import route only — safest, reuses what we have, no new
