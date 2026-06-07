@@ -90,15 +90,49 @@ defmodule Workbooks.Workflow.Todo do
 
   defp run_leaf(task, results, runner, workdir) do
     out =
-      case runner.(task) do
-        {:ok, o} -> o
-        {:error, e} -> "ERROR: #{inspect(e)}"
-        o when is_binary(o) -> o
-        o -> inspect(o)
+      case retrieve_block(task.body) do
+        # A `#+begin_src retrieve` task is a NATIVE (non-LLM) semantic-recall step:
+        # search the working org/code context and hand the result downstream.
+        {query, k} -> run_retrieve(task, query, k, workdir)
+        nil -> run_agent(runner, task)
       end
 
     state = if validate(task, workdir), do: "DONE", else: "FAILED"
     {Map.put(results, task.id, record(task, out, state)), state}
+  end
+
+  defp run_agent(runner, task) do
+    case runner.(task) do
+      {:ok, o} -> o
+      {:error, e} -> "ERROR: #{inspect(e)}"
+      o when is_binary(o) -> o
+      o -> inspect(o)
+    end
+  end
+
+  # `#+begin_src retrieve :k 5\n<query>\n#+end_src` → {query, k} | nil.
+  defp retrieve_block(body) do
+    case Regex.run(~r/#\+begin_src\s+retrieve([^\n]*)\n(.*?)\n\s*#\+end_src/si, body) do
+      [_, header, query] -> {String.trim(query), parse_k(header)}
+      _ -> nil
+    end
+  end
+
+  defp parse_k(header), do: (case Regex.run(~r/:k\s+(\d+)/, header), do: ([_, n] -> String.to_integer(n); _ -> 5))
+
+  # Run the retrieval, return the ranked chunks AND drop them in scratch/ so the
+  # next task/agent reads them (the shared working memory is the org context).
+  defp run_retrieve(task, query, k, workdir) do
+    hits = Workbooks.Library.search_dir(workdir, query, k: k)
+
+    out =
+      if hits == [],
+        do: "(no relevant context)",
+        else: Enum.map_join(hits, "\n", fn h -> "[#{h.path}] #{h.headline}: #{String.slice(h.text, 0, 200) |> String.replace("\n", " ")}" end)
+
+    File.mkdir_p!(Path.join(workdir, "scratch"))
+    File.write!(Path.join([workdir, "scratch", "retrieval-#{task.id}.org"]), "* Retrieval: #{query}\n#{out}\n")
+    out
   end
 
   # DONE only if acceptance passes. :done-when: command, or a `#+begin_src sh
