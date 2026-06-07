@@ -39,7 +39,13 @@ defmodule Workbooks.Instance do
     {:ok, vfs} = Workbooks.VFS.open(Keyword.get(opts, :vfs, ":memory:"))
     # session/info — the read-only ids the component sees via `session-info`.
     sess = %{id: id, tenant: Keyword.get(opts, :tenant), profile: profile}
-    imports = Workbooks.Instance.Imports.for_caps(Policy.caps(profile), vfs, sess)
+    # workdir (when given) scopes the always-on Dock telemetry log. It is host
+    # context only — NOT folded into `sess`, so `session-info` never leaks the
+    # host path to the component.
+    imports =
+      Workbooks.Instance.Imports.for_caps(Policy.caps(profile), vfs, sess,
+        workdir: Keyword.get(opts, :workdir)
+      )
     # A WASI context links the wasi:* interfaces a component needs to *instantiate*
     # — JS components (StarlingMonkey) hard-link wasi:http/io even when unused.
     # stdio is not inherited (sandboxed); the typed Dock is the real surface.
