@@ -242,6 +242,9 @@ export interface SaveResult {
 
 /* ──────────────────────── Mock helpers ─────────────────────── */
 
+import { isTauri } from "./tauri";
+import { rt, daemon } from "./runtime";
+
 const now = () => Date.now();
 const ok = <T>(v: T): Promise<T> => Promise.resolve(v);
 
@@ -516,9 +519,22 @@ export const commands = {
   setupStatus: (): Promise<SetupStatus> => ok({ keychainInitialized: true }),
   setupInitializeKeychain: (): Promise<void> => ok(undefined),
 
-  // Sidecar
-  sidecarStatus: (): Promise<SidecarStatus> => ok({ reachable: true, state: "ok" }),
-  sidecarRestart: (): Promise<void> => ok(undefined),
+  // Sidecar — REAL in the desktop shell: probe the runtime's /health through the
+  // discovered URL+token; restart drives the deploy-kit daemon. Mocked in a plain
+  // SPA (always reachable, so a browser build isn't gated offline).
+  sidecarStatus: async (): Promise<SidecarStatus> => {
+    if (!isTauri()) return { reachable: true, state: "ok" };
+    try {
+      const res = await rt("/health");
+      return { reachable: res.ok, state: res.ok ? "ok" : "unhealthy" };
+    } catch {
+      return { reachable: false, state: "stopped" };
+    }
+  },
+  sidecarRestart: async (): Promise<void> => {
+    if (!isTauri()) return;
+    await daemon.up();
+  },
 
   // Skills
   skillsList: (): Promise<Skill[]> =>
