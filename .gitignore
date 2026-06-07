@@ -39,3 +39,7 @@ scratch/
 *.db
 .beads-credential-key
 .beads/
+
+# Not tracked in this repo (server-specific / separate projects)
+deploy/
+projects/
