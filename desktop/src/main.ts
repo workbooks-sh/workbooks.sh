@@ -11,3 +11,10 @@ void themes.init();
 const app = mount(App, { target: document.getElementById("app")! });
 
 export default app;
+
+// Self-update: a few seconds after launch, install a newer signed build if any,
+// then relaunch. No-op outside the desktop shell.
+void (async () => {
+  const { installUpdate } = await import("$lib/updater");
+  setTimeout(() => void installUpdate().catch(() => {}), 4000);
+})();
