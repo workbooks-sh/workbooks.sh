@@ -1,0 +1,5 @@
+#+RUNTIME: zig
+#+CLI_BIN: zigdemo
+#+EXEC: command
+#+BUILD_SRC: zigbuild:hello.zig
+#+ARG_MODE: argv

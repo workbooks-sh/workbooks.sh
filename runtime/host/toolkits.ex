@@ -270,6 +270,7 @@ defmodule Workbooks.Toolkits do
       String.starts_with?(spec, "archive:") -> {:archive, String.trim_leading(spec, "archive:")}
       String.starts_with?(spec, "gobuild:") -> {:gobuild, String.trim_leading(spec, "gobuild:")}
       String.starts_with?(spec, "script:") -> {:script, String.trim_leading(spec, "script:")}
+      String.starts_with?(spec, "zigbuild:") -> {:zigbuild, String.trim_leading(spec, "zigbuild:")}
       true -> {:unknown, spec}
     end
   end
@@ -372,7 +373,7 @@ defmodule Workbooks.Toolkits do
   # every Instance. (CommandRegistry also enforces this; this is the clear, early
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
-       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild, :script] do
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild, :script, :zigbuild] do
     if bin in Workbooks.CommandRegistry.reserved_names(),
       do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
       else: do_build_clause(id, d)
@@ -456,6 +457,22 @@ defmodule Workbooks.Toolkits do
     case Workbooks.CommandRegistry.build_and_register_go(bin, pkg, mode) do
       {:ok, wasm} -> "#{id}: built go #{pkg} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
       {:error, reason} -> "#{id}: build FAILED for go #{pkg}:\n" <> error_text(reason)
+    end
+  end
+
+  # zigbuild:<file.zig> — compile a Zig source file (in the runtime's dir) to a
+  # wasm32-wasi command with native zig. Zig = compile-to-wasm authoring (no interpreter).
+  defp do_build_clause(id, %{exec: exec, build_src: {:zigbuild, rel}, cli_bin: bin, arg_mode: mode, src_dir: sdir})
+       when exec in ["command", nil] do
+    zfile = Path.join(sdir, rel)
+
+    if not File.regular?(zfile) do
+      "#{id}: zig source not found: #{zfile}"
+    else
+      case Workbooks.CommandRegistry.build_and_register_zig(bin, zfile, mode) do
+        {:ok, wasm} -> "#{id}: compiled zig #{rel} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
+        {:error, reason} -> "#{id}: zig build FAILED for #{rel}:\n" <> error_text(reason)
+      end
     end
   end
 

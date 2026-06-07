@@ -30,6 +30,7 @@
   | =ruby=   | =ruby=   | CRuby 3.3 + stdlib    | ruby.wasm wasip1-full tarball  |
   | =go=     | =go=     | Go interpreter        | yaegi → gobuild wasip1 (go run <f>) |
   | =lua=    | =lua=    | Lua 5.4 (single)      | wasi-sdk build (sjlj; -W exceptions=y) |
+  | =zig=    | =zigdemo=| Zig → wasm (authoring)| native zig (zigbuild; compile-to-wasm, no interp) |
 
   The =.wasm= artifacts are NOT committed (derived; DeployKit fetches them from the
   pinned specs). Only the pinned manifest set lives in git.

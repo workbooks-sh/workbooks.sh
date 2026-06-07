@@ -113,6 +113,16 @@ defmodule Workbooks.ToolchainPalletTest do
       assert lua =~ "lua 42"
       assert lua =~ "pcall false"
     end
+
+    @tag :build
+    @tag timeout: 180_000
+    test "wb toolkit build palette zig (native zig → wasm command) runs a Zig-authored command" do
+      {:ok, _} = ensure_oql()
+      out = Toolkits.build_text("palette", "zig", @root)
+      assert out =~ "registered command \"zigdemo\""
+      {:ok, z} = CommandRegistry.run("zigdemo", "", [], [])
+      assert z =~ "55"
+    end
   end
 
   defp ensure_oql do

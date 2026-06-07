@@ -293,6 +293,37 @@ defmodule Workbooks.CommandRegistry do
   end
 
   @doc """
+  Compile a Zig SOURCE file to a wasm32-wasi command (native zig) and register it.
+  Zig has no sandboxed interpreter (compiler-in-wasm is the LLVM mountain) — it is a
+  compile-to-wasm AUTHORING language: write a tool in Zig, get a sandboxed command.
+  Offline build (no deps fetched); zig cache pinned to a temp dir.
+  """
+  def build_and_register_zig(name, zig_file, mode \\ :argv) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not File.regular?(zig_file) -> {:error, :no_source}
+      true ->
+        out = Path.join(System.tmp_dir!(), "wbzig-#{:erlang.unique_integer([:positive])}.wasm")
+        cache = Path.join(System.tmp_dir!(), "wbzigc-#{:erlang.unique_integer([:positive])}")
+
+        env = [
+          {"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"},
+          {"ZIG_GLOBAL_CACHE_DIR", cache},
+          {"ZIG_LOCAL_CACHE_DIR", cache}
+        ]
+
+        case Workbooks.Sandbox.run(
+               ["zig", "build-exe", zig_file, "-target", "wasm32-wasi", "-O", "ReleaseSmall", "-femit-bin=#{out}"],
+               env: env
+             ) do
+          {_, 0} -> if File.regular?(out), do: register_artifact(name, out, mode), else: {:error, :no_wasm}
+          {err, _} -> {:error, err}
+        end
+    end
+  end
+
+  @doc """
   Run a committed build SCRIPT that compiles a language from source (e.g. Lua via
   wasi-sdk) and prints the output wasm path as its LAST stdout line; content-address
   + register it. For build-from-source runtimes with no upstream prebuilt. The
