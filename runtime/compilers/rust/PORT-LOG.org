@@ -142,3 +142,29 @@
   (drop the asm stub), and wiring Workbooks.Compilers.rust_compile_and_run/4 + a libcore
   prebuild into the runtime so it's a first-class lane like C/Zig. The PHYSICAL question is
   answered: Rust-in-sandbox is POSSIBLE and DONE.
+
+* 2026-06-07 (iter 7) — FULL STD plan (confirmed achievable from source)
+  GOAL: a real `fn main(){ println!("hello") }` compiled + run in-sandbox (not just no_std).
+  WHY core worked but std needs more: std needs an OS backend; mrustc only had unix targets,
+  so std would pick its UNIX backend → POSIX deps (pthread/socket/fork) wasi lacks.
+  THE FIX (verified in source):
+  - std/src/sys/mod.rs selects the backend on `cfg(target_os = "wasi")` (checked first). So
+    we just need mrustc's target to say os=wasi.
+  - mrustc loads CUSTOM target-spec FILES (src/trans/target.cpp load_spec_from_file): keys
+    target.family / os-name / env-name / arch. arch must be a built-in (arm/x86/...).
+  - ARCH_ARM32 = {ptr 32, align i16=2,i32=4,i64=8,i128=16,f32=4,f64=8} = EXACTLY wasm32's
+    ABI (why arm worked for core). So spec = { family="", os-name="wasi", arch="arm" } makes
+    std compile its WASI backend with wasm32-correct layout.
+  - Optional clean finish: add ARCH_WASM32 (~6 lines in target.cpp) so target_arch="wasm32"
+    → drops core's ARM-barrier asm stub entirely. Not required to get std working.
+  PLAN:
+  1. Build minicargo.wasm (mrustc's tools/minicargo, same C++/wasi recipe as mrustc) — std is
+     a CRATE GRAPH (core→alloc→std + libc/cfg-if/hashbrown/std_detect/unwind/panic_*), needs
+     orchestration; hand-rolling per-crate -L is error-prone.
+  2. Write compilers/rust/wasm32-wasi.spec (the target file above). Commit it.
+  3. minicargo.wasm builds libstd from rustc-1.54 library/ with that target, in-sandbox.
+  4. Compile a hello.rs (uses std/println) → C → clang.wasm (+ wasi shim, sjlj, stack) →
+     link → run → "hello". Watch memory (core was ~600MB; std bigger but likely <4GB).
+  5. Wire Workbooks.Compilers.rust_compile_and_run/4 once hello works.
+  EXPECT: more mrustc bugs in std (std ≫ core), more bare-wasi symbols (extend wasi_shim.c),
+  edition/cfg per-crate (minicargo + the rustc-1.54 overrides toml handle this).
