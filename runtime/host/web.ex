@@ -107,6 +107,10 @@ defmodule Workbooks.Web do
     %{"domain" => domain} = Jason.decode!(body)
     slug = String.replace(domain, ~r/[^a-z0-9]/i, "-")
     workdir = "/tmp/bb/#{slug}"
+    # FRESH per run: a reused workdir keeps the prior run's catalog SQLite, which
+    # makes the re-crawl 409 ("already exists") → 0 products → a thin substrate
+    # the strategist can't ground on. Each brand-book run starts from a clean dir.
+    File.rm_rf!(workdir)
     File.mkdir_p!(workdir)
     # Capture any crash so a dead spawn is diagnosable (else status freezes silently).
     spawn(fn ->
