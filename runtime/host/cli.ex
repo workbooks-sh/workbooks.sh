@@ -252,25 +252,42 @@ defmodule Workbooks.CLI do
   # switches to machine-readable output.
   defp deploy_run(rest) do
     json? = Enum.member?(rest, "--json")
-    args = Enum.reject(rest, &(&1 == "--json"))
+    {place, args} = pop_place(Enum.reject(rest, &(&1 == "--json")))
 
     result =
-      case args do
-        [] -> {:ok, deploy_usage(), %{}}
-        ["help" | _] -> {:ok, deploy_usage(), %{}}
-        ["doctor"] -> Workbooks.Deploy.doctor()
-        ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
-        ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
-        ["local" | _] -> Workbooks.Deploy.local()
-        ["up" | _] -> Workbooks.Deploy.local()
-        ["status"] -> Workbooks.Deploy.status()
-        ["verify"] -> Workbooks.Deploy.verify()
-        ["down"] -> Workbooks.Deploy.down()
-        ["logs"] -> Workbooks.Deploy.logs()
-        other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
+      cond do
+        # A cloud --place routes the verb to that provider recipe.
+        place && place != "local" ->
+          action = List.first(args) || "up"
+          Workbooks.Deploy.cloud(place, action)
+
+        true ->
+          case args do
+            [] -> {:ok, deploy_usage(), %{}}
+            ["help" | _] -> {:ok, deploy_usage(), %{}}
+            ["providers"] -> Workbooks.Deploy.providers()
+            ["doctor"] -> Workbooks.Deploy.doctor()
+            ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
+            ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
+            ["local" | _] -> Workbooks.Deploy.local()
+            ["up" | _] -> Workbooks.Deploy.local()
+            ["status"] -> Workbooks.Deploy.status()
+            ["verify"] -> Workbooks.Deploy.verify()
+            ["down"] -> Workbooks.Deploy.down()
+            ["logs"] -> Workbooks.Deploy.logs()
+            other -> {:error, "unknown verb: wb deploy #{Enum.join(other, " ")}", %{}}
+          end
       end
 
     {Workbooks.Deploy.render(result, json?), Workbooks.Deploy.failed?(result)}
+  end
+
+  # Extract `--place <name>` (the cloud target) from the args, if present.
+  defp pop_place(args) do
+    case Enum.split_while(args, &(&1 != "--place")) do
+      {before, ["--place", p | rest]} -> {p, before ++ rest}
+      _ -> {nil, args}
+    end
   end
 
   # Image.build/publish return {:ok|:error, string}; lift to the tagged contract.
@@ -290,6 +307,10 @@ defmodule Workbooks.CLI do
       verify       prove the LIVE runtime answers (exit non-zero if not)
       down         stop the agent + microVM (keeps data + APFS volume)
       logs         print the tail command for daemon logs
+      providers    list available places (local + plug-and-play cloud providers)
+    Cloud: wb deploy --place <provider> <up|status|down|logs>
+      e.g. WB_SSH_HOST=user@host wb deploy --place ssh up
+           wb deploy --place fly up
     Image ref via WB_IMAGE (default ghcr.io/workbooks-sh/runtime:latest).
     """
   end

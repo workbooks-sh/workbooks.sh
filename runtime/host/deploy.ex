@@ -15,7 +15,35 @@ defmodule Workbooks.Deploy do
   runtime answers. Backends sit behind a seam (`Krunvm` today; podman/docker/WSL2
   later). Reached via `wb deploy <verb> [--json]`.
   """
-  alias Workbooks.Deploy.{Krunvm, Image}
+  alias Workbooks.Deploy.{Krunvm, Image, Backend}
+
+  @doc "List the available places — `local` plus every plug-and-play cloud provider."
+  def providers do
+    places = Backend.list()
+    ok("places: #{Enum.join(places, ", ")}", %{places: places})
+  end
+
+  @doc """
+  Run a cloud provider action (`up` | `status` | `down` | `logs`) for `place`.
+  The provider (deploy/providers/<place>) implements the engine contract; the
+  deploy-kit supplies the image ref + forwards the deployer's env. Idempotent;
+  the provider's exit code propagates to ours.
+  """
+  def cloud(place, action) do
+    case Backend.resolve(place) do
+      {:provider, _p, boot} ->
+        case Backend.run_provider(boot, action, %{"WB_IMAGE" => Image.ref()}) do
+          {:ok, out} -> ok("[#{place}] #{action}:\n#{String.trim_trailing(out)}", %{place: place, action: action})
+          {:error, out} -> err("[#{place}] #{action} failed:\n#{String.trim_trailing(out)}", %{place: place, action: action})
+        end
+
+      {:local, _} ->
+        err("'local' has no provider recipe — use `wb deploy #{action}` (krunvm) without --place", %{})
+
+      {:error, msg} ->
+        err(msg, %{available: Backend.list()})
+    end
+  end
 
   @doc "Check + self-heal prerequisites (idempotent). The first thing an agent runs."
   def doctor do
