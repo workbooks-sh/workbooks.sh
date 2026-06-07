@@ -240,3 +240,21 @@
   mrustc's computed sizes vs clang's; likely the atomics flags). Try (A) first — it's known
   to work for core. Then: build full std, compile a println hello.rs in-sandbox against it,
   link, run. Memory headroom fine.
+
+* 2026-06-07 (iter 12) — std wall = mrustc layout discrepancy under os=wasi (deep, not a flag)
+  Tried both arch=wasm32 AND arch=arm for the std build: BOTH fail the SAME way — libcore.rlib.c
+  size/align static-asserts fail at the cc step (e.g. OptionSome: mrustc says sizeof==24, clang
+  computes otherwise). This is NOT arch and NOT the asm-stub (applied): it's that minicargo
+  builds core with os-name="wasi" cfg + `--cfg debug_assertions`, and under THAT cfg combo
+  mrustc's own layout computation disagrees with clang for some Option/struct instantiations.
+  The no_std e2e did NOT hit this because it built core with the builtin arm-linux-gnu target
+  (os=linux) + no debug_assertions — different cfg path, different (correct) layouts.
+  => Genuine mrustc bug territory (layout under the wasi cfg), needs real debugging:
+     - inspect the emitted struct s_...OptionSome in libcore.rlib.c vs what clang lays out;
+     - check mrustc's ALIGNOF/size macro + its niche/Option layout under target_os=wasi;
+     - or build core WITHOUT --cfg debug_assertions (minicargo adds it; try a release std);
+     - or try os-name="linux" in the spec (std still picks unix backend then → POSIX deps,
+       back to the thread/socket shims — a different tradeoff to weigh);
+     - or bump to MRUSTC_TARGET_VER=1.74 (newer std/mrustc may lay out cleanly).
+  STATUS unchanged on the headline: no_std Rust + C + Zig fully work in-sandbox (merged).
+  Full-std is a real deep grind here, not a quick win.
