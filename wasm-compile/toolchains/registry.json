@@ -1,0 +1,63 @@
+{
+  "$schema": "./registry.schema.json",
+  "spec": "wasm-compile/SPEC.md",
+  "description": "Pinned, sha-verified compiler toolchains that run INSIDE a wasm sandbox (wasmtime) and compile untrusted source with zero native execution. Recipes are canonical in runtime/compilers/<lang>/; this registry is the index + pins. `vendor.sh` assembles a standalone copy.",
+  "engine": { "name": "wasmtime", "min_version": "45.0.0", "flags": ["-W exceptions=y", "-W memory64=y", "-W fuel=<n>", "-W timeout=<ms>"] },
+  "toolchains": [
+    {
+      "lang": "c",
+      "name": "c4",
+      "kind": "compile-and-run",
+      "status": "working",
+      "version": "rswier/c4 (patched: O_RDONLY, no int-redefine)",
+      "source": { "type": "vendored", "path": "runtime/compilers/c/c4.c", "license": "MIT/GPL (see RELICENSING upstream)" },
+      "recipe": "runtime/compilers/c/build.sh",
+      "produces": "c4.wasm",
+      "notes": "No-LLVM C-SUBSET compiler+interpreter. Compiles AND runs untrusted C in one wasm process. Built with `zig cc -target wasm32-wasi`. Subset only (no full C99); for full C use the clang toolchain."
+    },
+    {
+      "lang": "c",
+      "name": "clang",
+      "kind": "compile-to-wasm",
+      "status": "working",
+      "version": "22.0.0-git20542-10",
+      "source": {
+        "type": "https",
+        "url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
+        "sha256": "6230ea1afa9691fa065935cf68c01642ff9b31c183fe8ac64cdfda025df06009",
+        "upstream": "https://github.com/YoWASP/clang (LLVM built for wasm32-wasi)",
+        "license": "Apache-2.0 WITH LLVM-exception"
+      },
+      "recipe": "runtime/compilers/clang/build.sh",
+      "artifacts": { "core": "clang-root/llvm.core.wasm", "sysroot": "clang-root/sysroot" },
+      "produces": "<name>.wasm",
+      "notes": "Full C/C++ clang+lld as a wasm32-wasi module (imports ONLY wasi_snapshot_preview1). Two in-sandbox stages: `clang -c` then `wasm-ld` (the driver can't fork under WASI). Also the backend that finishes the Zig lane."
+    },
+    {
+      "lang": "zig",
+      "name": "zig1+clang",
+      "kind": "compile-to-c-then-wasm",
+      "status": "working",
+      "version": "zig 0.16.0 (stage1/zig1.wasm) + clang toolchain",
+      "source": {
+        "type": "https",
+        "url": "https://ziglang.org/download/0.16.0/zig-0.16.0.tar.xz",
+        "sha256": "43186959edc87d5c7a1be7b7d2a25efffd22ce5807c7af99067f86f99641bfdf",
+        "license": "MIT"
+      },
+      "recipe": "runtime/compilers/zig/build.sh",
+      "bridges": ["runtime/compilers/zig/wasi_shim.c", "__builtin_return_address/frame_address no-op prelude", "wasm-ld crt:false (zig brings its own _start)"],
+      "produces": "<name>.wasm",
+      "notes": "zig1.wasm (bootstrap, C-backend-only) compiles .zig -> C in-sandbox; the clang toolchain compiles+links that C -> wasm. End-to-end zero native execution. Direct .zig->wasm in-sandbox blocked upstream (ziglang/zig#20665)."
+    },
+    {
+      "lang": "rust",
+      "name": "rustc",
+      "kind": "compile-to-wasm",
+      "status": "blocked",
+      "blocker": "runtime/compilers/rust/README.org",
+      "summary": "rustc->wasm32-wasi is an open upstream frontier (rust-lang/rust#62202, internals#16198): rustc embeds LLVM as a library, forks a proc-macro server + linker (impossible under WASI), needs realpath/threads. No prebuilt rustc.wasm exists. cg_clif emits native (no wasm output). mrustc (Rust->C) has no wasm build + only Rust ~1.54.",
+      "unblock_when": "an upstream/community wasm32-wasi rustc ships (a la YoWASP clang), OR LLVM-for-wasi (RFC #79073) matures + in-process proc-macro/linker + WASI realpath/threads."
+    }
+  ]
+}
