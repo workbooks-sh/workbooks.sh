@@ -1,5 +1,9 @@
 #+TITLE: Deploy-kit — BYOD storage + auth (extensible runtime deployment)
-#+STATUS: design locked; building in the loop
+#+STATUS: BUILT. Storage seam + Local + S3/R2 (SigV4 verified) + BYO-Postgres seam
+#+STATUS: + WB_SIGNING_KEY persistence, all live/tested. Tenant-scoping verified
+#+STATUS: (cross-tenant read denied). One-screen config: deploy/storage.env.example.
+#+STATUS: Remaining = migrate each structured store onto Workbooks.DB incrementally
+#+STATUS: + a live S3/R2 + live Postgres round-trip once operator creds exist.
 
 * The goal
 Deploy-kit is the EXTENSIBLE way to stand up a runtime. An operator should lock
