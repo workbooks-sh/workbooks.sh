@@ -27,3 +27,4 @@ runtime/build/tools/
 # OS
 **/.DS_Store
 .claude/worktrees/
+scratch/
