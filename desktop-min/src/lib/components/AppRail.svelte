@@ -18,9 +18,20 @@
   import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon } from "@lucide/svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/iconAccent.svelte";
   import { auth } from "$lib/auth.svelte";
+  import { chrome } from "$lib/chrome.svelte";
   import AccountMenu from "./AccountMenu.svelte";
 
   let { router }: { router: IRouter } = $props();
+
+  // Cross-component nav requests (e.g. a settings deep-link) land here:
+  // the rail owns the router prop, so it consumes + clears the request.
+  $effect(() => {
+    const req = chrome.requestedSection;
+    if (!req) return;
+    chrome.requestedSection = null;
+    chrome.mode = "app";
+    void router.push({ name: req });
+  });
 
   // Account menu — anchored off the bottom-pinned account button. The
   // button toggles it; the menu's contents adapt to auth state.
@@ -59,10 +70,22 @@
   const workspace = { name: "Personal", icon: "🗂️" };
   const packages = [{ id: "sandbox", name: "Sandbox", icon: "📦", active: true }];
 
-  const activeName = $derived((router.route?.name as string | undefined) ?? "create");
+  // The rail highlight tracks the URL, but only while the main area is
+  // in app mode — a focused document tab dims the section buttons.
+  const routeName = $derived((router.route?.name as string | undefined) ?? "create");
+  const activeName = $derived(chrome.mode === "app" ? routeName : null);
 
   function go(name: string) {
+    chrome.mode = "app";
     void router.push({ name });
+  }
+
+  // Clicking a package avatar: an inactive package activates + opens its
+  // file drawer; the already-active package toggles the drawer.
+  function onPackage(p: { id: string; active: boolean }) {
+    if (p.active) chrome.toggleFiles();
+    else chrome.openFiles();
+    // TODO(stores): commands.packageSetActive({ name: p.id }) when wired.
   }
 
   function initials(name: string): string {
@@ -117,7 +140,14 @@
 
   {#each packages as p (p.id)}
     {@const acc = iconAccent(p.icon)}
-    <button class="pkg" style={tileStyle(p.icon, acc)} title={p.name} aria-label={p.name}>
+    <button
+      class="pkg"
+      class:active={p.active && chrome.leftPanel === "files"}
+      style={tileStyle(p.icon, acc)}
+      title={p.name}
+      aria-label={p.name}
+      onclick={() => onPackage(p)}
+    >
       {#if isImageIcon(p.icon)}
         <img src={p.icon} alt="" />
       {:else if p.icon}
@@ -244,6 +274,10 @@
     overflow: hidden;
     padding: 0;
     font-size: 0.95rem;
+  }
+  .pkg.active {
+    background: var(--color-surface-soft);
+    box-shadow: 0 0 0 1px var(--color-border-strong);
   }
   .pkg img {
     width: 100%;
