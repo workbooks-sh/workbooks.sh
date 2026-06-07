@@ -90,7 +90,19 @@ same "compute at author time, bake the result" conclusion.)
    (=Workbooks.Did=) and included in the search scope — federated query against
    the identity.
 5. pgvector adapter for the Postgres backend; sqlite-vec upgrade.
-6. =local= embedder — run IN WebAssembly, NOT a native NIF (user constraint;
+6. =local= embedder — DONE, via *Model2Vec/potion (static embeddings), PURE
+   ELIXIR*. Chosen over ORT-Web because static embeddings skip the model runtime
+   entirely (tokenize → matrix lookup → mean-pool), so it's the smallest to ship
+   (~30 MB matrix, no runtime), multi-tenant (one resident matrix), and satisfies
+   "WASM or Elixir, no native NIF" via the Elixir path. =Workbooks.Embed.Model2Vec=
+   (WordPiece tokenizer + safetensors binary matrix) + =Workbooks.Embed.Local=;
+   =WB_EMBED=local= downloads potion-base-8M once to the storage volume. Verified
+   REAL semantic similarity (dog↔puppy 0.70, synonym/paraphrase matching the
+   lexical hash baseline can't). =WB_EMBED_MODEL= overrides the potion variant.
+   (The ORT-Web/WASM path below is retained as an option for higher raw quality
+   or a browser-native story, but is NOT what we shipped.)
+
+   OLD PLAN (superseded): run IN WebAssembly, NOT a native NIF (user constraint;
    Bumblebee's fast path is the EXLA/Torchx NIF, ortex is a NIF — both excluded).
    Plan: a small ONNX model (all-MiniLM-L6-v2, 384-d, Apache-2.0) via tract OR
    ONNX-Runtime-Web compiled to wasm32-wasip1, registered as the =embed= command
