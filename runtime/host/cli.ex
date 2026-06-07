@@ -5,7 +5,7 @@ defmodule Workbooks.CLI do
   modules the Runtime uses. `call/2` returns output as a string (so an agent can
   run `wb` in-process as a tool); `main/1` prints it.
   """
-  alias Workbooks.{OQL, Bundle, Vars, Memory, Toolkits}
+  alias Workbooks.{OQL, Bundle, Vars, Toolkits}
 
   @version "0.1.0"
 
@@ -45,20 +45,9 @@ defmodule Workbooks.CLI do
 
   def call(["var", "ref" | rest], t), do: Vars.ref(t, Enum.join(rest, " "))
 
-  # Agent long-term memory (persists findings across runs).
-  def call(["memory", "remember", key | rest], t) do
-    Memory.remember(t, key, Enum.join(rest, " "))
-    "remembered #{key}"
-  end
-
-  def call(["memory", "recall", key], t), do: Memory.recall(t, key) || "no memory: #{key}"
-
-  def call(["memory", "search" | q], t) do
-    case Memory.search(t, Enum.join(q, " ")) do
-      [] -> "(no matches)"
-      hits -> Enum.map_join(hits, "\n", fn %{key: k, content: c} -> "#{k}: #{String.slice(c, 0, 120)}" end)
-    end
-  end
+  # "Memory" is removed by design: the org/code files ARE the context. Recall =
+  # `wb search` (semantic) / `wb library query` (literal); "remember" = write an
+  # org file. No separate store to drift. See docs/VECTOR-QUERY.org.
 
   def call(["bundle", src, dest], _t) do
     org = File.read!(src)
