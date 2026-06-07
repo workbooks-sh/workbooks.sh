@@ -1,0 +1,16 @@
+#+TITLE: compilers/rust — Rust compiler in WASM
+#+STATUS: PLAN (P3, the peak)
+
+Goal: compile .rs → .wasm with rustc running IN the sandbox.
+Backend: rustc + rustc_codegen_cranelift (Cranelift is pure Rust → compiles to wasm;
+~10x faster than LLVM; NO LLVM-in-wasm). + watt-style wasm proc-macros for crates.
+
+Plan:
+- Build rustc + the Cranelift codegen backend → wasm32-wasi (the hard port). memory64
+  for large compiles. wasm proc-macros (watt / rust-lang/compiler-team#876) for the
+  crate ecosystem; single-file / no-proc-macro subset first.
+- Register via the `compiler:` framework; preopen source + rust sysroot/std.
+- Prove: a real .rs compiles in-sandbox and the output runs.
+Frontier risk: HIGH — rustc building to wasm32-wasi (bootstrap + std deps), Cranelift
+feature parity, proc-macros, memory ceilings. This is where "our limits" = "the
+frontier"; learn by building, contribute upstream where needed, document honestly.

@@ -1,0 +1,16 @@
+#+TITLE: compilers/zig — Zig compiler in WASM
+#+STATUS: PLAN (P2)
+
+Goal: compile .zig → .wasm with the compiler running IN the sandbox.
+Backend: Zig's SELF-HOSTED wasm backend (no LLVM) — the light path.
+Note: zig1.wasm (the official bootstrap) only has the C backend (emits C), so it is
+NOT this; we need a zig built with the self-hosted wasm backend targeting wasm32-wasi.
+A community project has compiled the Zig compiler+std to wasm for in-browser use — prior art.
+
+Plan:
+- Build zig (self-hosted wasm backend) → zig.wasm; pin source + sha; build.sh.
+- Register via the `compiler:` framework; preopen source + zig std.
+- Prove: a real .zig compiles in-sandbox and the output runs.
+Frontier risk: MEDIUM — self-hosted wasm backend completeness for arbitrary Zig
+(falls back to LLVM where incomplete). Map the gaps; document honestly if it can't
+yet self-host a given program.

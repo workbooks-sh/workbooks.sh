@@ -1,0 +1,99 @@
+#+TITLE: Compiler-in-WASM — compile C/Zig/Rust source INSIDE the sandbox (no native execution)
+#+DATE: 2026-06-07
+#+EPIC: wb-cwasm
+#+STATUS: PLAN
+#+RELATED: TOOLKITS-V3.org, EXTENSIONS-ORB.org, ../host/command_registry.ex
+#+MEMORY: runtime-engine-wasmtime-only
+
+* Why (the security truth this fixes)
+
+  The palette's INTERPRETED runtimes (qjs/python/ruby/lua, go-via-yaegi) run untrusted
+  SOURCE entirely in the wasm sandbox — zero native execution — so they are safe for
+  untrusted input. The COMPILED languages (C/Zig/Rust) currently compile NATIVELY
+  (native clang/zig/rustc + a crate's build.rs/proc-macros), contained only by
+  bwrap/seatbelt. That is NOT a sufficient boundary for adversarial untrusted source on
+  a shared host (OS sandboxes are defense-in-depth, not isolation — why microVMs exist).
+
+  So today the honest rule is: *compiled-language entries (crate:/zigbuild:/rustbuild:/
+  the wasi-sdk script: builds) are TRUSTED-AUTHORING only — you write the tool.* They are
+  NOT safe for compiling arbitrary untrusted source.
+
+  This epic removes that asterisk: run the COMPILER ITSELF in the wasm sandbox, so
+  compiling untrusted C/Zig/Rust becomes as safe as running Python today — the capability
+  gate is the only boundary, no native code runs. Proven in miniature by the c4 spike (a
+  real C compiler ran + compiled + executed C entirely in the sandbox).
+
+* The one stone that's ours: the `compiler:` framework
+
+  All three languages share ONE integration; the codegen backend differs. So the reusable
+  piece WE build once is the framework, not the backend:
+
+  #+begin_src
+  compile(compiler.wasm, source_files, sysroot_dir) -> artifact.wasm   # all in-sandbox
+          ↓ capability-gated wasmtime · memory64 · preopen FS ↓
+  run(artifact.wasm, argv, stdin, dirs)                                 # already have this
+  #+end_src
+
+  - One interface, three tenants: clang/zig/rustc each = "a compiler.wasm + a sysroot".
+  - Generalizes c4 + the existing run path (run/3,4, content-addressing, preopen, the
+    script:/wasm:/archive: recipes). Adds: memory64 in the wasmtime config, sysroot
+    materialization, capture of the emitted artifact, then run it (both stages sandboxed).
+  - Engine-agnostic + standalone-publishable (any wasmtime). This is the novel artifact.
+
+* Layout — runtime/compilers/<lang>/
+
+  All compiler-in-wasm code lives under =runtime/compilers/=, one dir per SOURCE
+  language: =compilers/c/=, =compilers/zig/=, =compilers/rust/=. Each holds a pinned
+  source spec + build recipe (produces =<lang>c.wasm=) + libc/syscall stubs + a README
+  with the per-language plan & frontier risks. The SHARED integration (run a
+  compiler.wasm in-sandbox, preopen source+sysroot, capture+run the artifact) is the
+  `compiler:` framework in =host/= — not duplicated per language. Built artifacts are
+  not committed (derived; DeployKit builds from the recipes).
+
+* The strategy: NO LLVM (the fast three-birds path)
+
+  LLVM-in-wasm (one shared backend for all three) is the elegant single-stone but the
+  heaviest single task (size/perf/memory64; upstream `[RFC] Building LLVM for WebAssembly`
+  is mid-flight). We instead use each language's LIGHTEST no-LLVM backend — three lighter
+  efforts, unified by the framework:
+  - *C*    → tcc / chibicc (self-contained, no LLVM; c4 already proves the model).
+  - *Zig*  → the self-hosted wasm backend (no LLVM).
+  - *Rust* → rustc + `rustc_codegen_cranelift` (Cranelift is pure Rust → compiles to wasm;
+             ~10× faster than LLVM; no LLVM-in-wasm) + wasm proc-macros (watt /
+             rust-lang/compiler-team#876) for the crate ecosystem.
+
+  (LLVM-in-wasm stays the documented long-term alternative for production-grade codegen +
+  the landmark publish — not on this epic's critical path.)
+
+* Phased plan — validate-then-escalate (epic wb-cwasm)
+
+  - P0 — `compiler:` FRAMEWORK. The `compiler:` pallet tier (compiler.wasm + sysroot →
+    compile source in-sandbox → emit artifact.wasm → run it). memory64 in the wasmtime
+    config. Our code; small; the reusable core. Prove with c4 as the first tenant.
+  - P1 — C (tcc.wasm). Build TinyCC (or chibicc) to wasm32-wasi (no LLVM), plug into the
+    framework. Prove: untrusted .c compiled IN the sandbox → wasm → runs. (Near-done:
+    c4 already validates; tcc is the production C compiler version.)
+  - P2 — Zig (zig.wasm). Build zig with the self-hosted wasm backend → wasm. Prove: .zig
+    compiled in-sandbox → wasm → runs. Frontier risk: self-hosted-backend completeness.
+  - P3 — Rust (rustc.wasm via Cranelift). Build rustc + rustc_codegen_cranelift to wasm;
+    + watt-style wasm proc-macros for crates; memory64. The peak. Frontier risk:
+    rustc→wasi bootstrap, std deps, proc-macros, memory ceilings.
+  - P4 — Package to publish. Standalone Apache/MIT repo: `wasm-compile/` (framework lib +
+    spec) + `toolchains/` (pinned, sha'd compiler.wasm + reproducible recipes) — a
+    "wasm-native toolchain registry". Each compiler.wasm is independently useful → even
+    partial wins publish.
+
+* Where WE write code vs the frontier (the unknowns we learn by trying)
+
+  - Ours: the framework; per-compiler build recipes + libc/syscall stubs (the
+    tmpnam/clock class of fix we already hit with Lua); memory64 wiring; artifact capture;
+    the publish packaging.
+  - Frontier (discover by building; may require upstream contribution): Zig self-hosted
+    wasm-backend completeness; rustc building to wasm32-wasi (bootstrap + std deps);
+    Cranelift feature parity; wasm proc-macros (watt / compiler-team#876); memory64
+    ceilings on large compiles. Mapping these limits IS a goal.
+
+* Done = an honest answer per language
+
+  Each phase ends merged to main with EITHER a working in-sandbox compiler (untrusted-safe)
+  OR a committed honest-blocker note naming the exact frontier wall hit. No stubs.
