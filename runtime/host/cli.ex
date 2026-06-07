@@ -211,6 +211,24 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "run", id, task | rest], _t),
     do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
 
+  # Compiler-in-WASM (wb-zyl) — compilers run IN the sandbox (zero native execution).
+  def call(["compiler"], _t), do: "compilers: " <> Enum.join(Workbooks.Compilers.list(), ", ")
+  def call(["compiler", "list"], _t), do: "compilers: " <> Enum.join(Workbooks.Compilers.list(), ", ")
+
+  def call(["compiler", "build", lang], _t) do
+    case Workbooks.Compilers.build(lang) do
+      {:ok, cli, wasm} -> "built #{lang} compiler → #{wasm}; registered command #{inspect(cli)}"
+      {:error, reason} -> "compiler build FAILED for #{lang}: #{inspect(reason)}"
+    end
+  end
+
+  def call(["compiler", "run", lang, file | argv], _t) do
+    case Workbooks.Compilers.compile_run(lang, file, argv) do
+      {:ok, out} -> out
+      {:error, reason} -> "compile/run FAILED (#{lang} #{file}): #{inspect(reason)}"
+    end
+  end
+
   def call(["version"], _t), do: "wb #{@version}"
   def call(_, _t), do: usage()
 

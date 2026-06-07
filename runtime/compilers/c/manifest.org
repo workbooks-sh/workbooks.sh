@@ -1,0 +1,6 @@
+#+COMPILER: c
+#+CLI_BIN: c4
+#+KIND: compile-and-run
+#+BUILD: build.sh
+#+ARG_MODE: argv
+#+SOURCE: c4 (rswier/c4) — real self-hosting C-subset compiler+VM, no LLVM; patched for wasi (O_RDONLY, no int-redefine)

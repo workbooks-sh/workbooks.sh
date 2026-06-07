@@ -461,11 +461,11 @@ defmodule Workbooks.PackageManager do
     try do
       File.write!(inp, input)
 
-      # exceptions=y enables the WASM exception-handling proposal, which setjmp/
-      # longjmp lowers onto (wasi-sdk -wasm-enable-sjlj). Required to run longjmp-
-      # using runtimes (Lua, and any C using setjmp). Harmless for modules that
-      # don't use it. (Wasm 3.0 / W3C standard; wasmtime implements it.)
-      wopts = ["-W", "exceptions=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+      # exceptions=y → setjmp/longjmp (Lua etc., via wasi-sdk -wasm-enable-sjlj).
+      # memory64=y → compilers-in-wasm (wb-cwasm) that exceed the wasm32 4GB ceiling on
+      # large inputs (LLVM-class). Both harmless for modules that don't use them.
+      # (Wasm 3.0 / W3C standard; wasmtime implements them.)
+      wopts = ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
       parts = wopts ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
       cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
 
