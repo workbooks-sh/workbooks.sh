@@ -1,6 +1,19 @@
 #+TITLE: Rust compiler-in-WASM (compilers/rust/)
 #+EPIC: wb-zyl (P3)
-#+STATUS: ACTIVE PURSUIT — not impossible; two patchable paths being ground (see "Pursuit")
+#+STATUS: WORKING (no_std) — untrusted Rust compiles AND runs entirely in the sandbox, zero native exec
+
+* ★ DONE (2026-06-07): Rust-in-sandbox PROVEN end-to-end
+
+  =e2e.sh= → "RUST IN WASM SANDBOX: 55" (fib(10)), zero native execution: mrustc.wasm
+  (Rust→C, for libcore + the untrusted crate) → clang.wasm (C→wasm) → wasm-ld → run, every
+  stage under wasmtime. Real Rust (the actual rustc-1.54 core crate + a user crate), no_std,
+  edition-pinned, no proc-macros. Build recipe: build.sh (mrustc.wasm). Full wall history +
+  the exact working settings: PORT-LOG.org. Memory peaked ~600MB — the wasm32 4GB ceiling
+  never bit. Enhancements (not blockers): full std, a clean wasm32 mrustc target spec (drops
+  the asm-stub), and a Workbooks.Compilers.rust_compile_and_run/4 lane.
+
+----------------------------------------------------------------------
+Pursuit history (kept for context):
 
 * Pursuit (wb-zyl.7) — it is NOT physically impossible
 

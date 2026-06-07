@@ -5,4 +5,4 @@
 #+ARG_MODE: argv
 #+LIB_ROOT: mrustc-root
 #+TARGET: wasm32-wasip1
-#+SOURCE: mrustc (thepowersgang/mrustc @ be69c747) — a C++ Rust→C compiler (bootstraps Rust 1.90). Built to wasm32-wasi with wasi-sdk so it runs in-sandbox; its C output is compiled to wasm by the clang lane. STATUS: mrustc.wasm BUILDS + RUNS in-sandbox (parses Rust, loads target). Remaining: provide the Rust stdlib for end-to-end .rs→run (see PORT-LOG.org).
+#+SOURCE: mrustc (thepowersgang/mrustc @ be69c747) — a C++ Rust→C compiler. Built to wasm32-wasi (build.sh) so it runs in-sandbox; its C output is compiled to wasm by the clang lane. STATUS: WORKING — untrusted no_std Rust compiles AND runs entirely in-sandbox (e2e.sh proves 'RUST IN WASM SANDBOX: 55', zero native exec). Enhancements pending: full std, a clean wasm32 target spec, runtime API wiring (PORT-LOG.org).

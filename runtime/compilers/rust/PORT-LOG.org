@@ -115,3 +115,30 @@
   Then widen to full std (alloc+std; bigger C, watch memory but core was only ~600MB) and
   wire Workbooks.Compilers.rust_compile_and_run/4. Edition must be passed (--edition 2018);
   proper multi-crate orchestration ideally via minicargo.wasm later.
+
+* 2026-06-07 (iter 6) — ★ END-TO-END: untrusted Rust compiled AND run in the sandbox ★
+  PROVEN: `RUST IN WASM SANDBOX: 55` (fib(10)) — zero native execution. Full chain:
+    1. mrustc.wasm: rustc-1.54 library/core → libcore.rlib.{hir,c}  (in sandbox)
+    2. mrustc.wasm: prog.rs (no_std, exports rust_compute) → libprog.rlib.c  (in sandbox)
+    3. clang.wasm: core.c + prog.c + harness.c → .o  (in sandbox)
+    4. wasm-ld: link + crt1-command.o → prog.wasm  (in sandbox)
+    5. wasmtime: prog.wasm → "RUST IN WASM SANDBOX: 55"
+  The exact working invocation is in e2e.sh (committed). Key settings discovered:
+  - mrustc target = arm-linux-gnu (32-bit + i64-align-8 MATCHES wasm32; i586 mismatched →
+    SIMD alignment static-asserts failed).
+  - --edition 2018 (core 1.54 macro syntax); MRUSTC_TARGET_VER=1.54.
+  - mrustc emits ARM inline asm (mcr p15 memory barriers) for the arm target → stubbed to
+    no-ops in the emitted C (safe: single-threaded wasm). [The clean fix is a proper wasm32
+    mrustc target spec with no asm — a follow-up; the stub is honest + correct for now.]
+  - clang flags for mrustc's C: -fno-strict-aliasing -fwasm-exceptions -mllvm
+    -wasm-enable-sjlj (mrustc uses setjmp/longjmp) -mllvm -wasm-use-legacy-eh=false.
+  - link: crt1-command.o + objects + -lc + libclang_rt.builtins.a (no -lunwind needed).
+  - mrustc.wasm MUST be linked with -Wl,-z,stack-size=67108864 (recursive parser).
+  Peak memory across the whole thing stayed ~600MB — the wasm32 4GB ceiling never bit.
+
+  SCOPE/honesty: this is real Rust (the actual core crate + an untrusted user crate), no_std,
+  edition-pinned (mrustc ~1.54 mode), no proc-macros. REMAINING (enhancements, not blockers):
+  full std (alloc+std → bigger C, likely still <4GB), a proper wasm32 mrustc target spec
+  (drop the asm stub), and wiring Workbooks.Compilers.rust_compile_and_run/4 + a libcore
+  prebuild into the runtime so it's a first-class lane like C/Zig. The PHYSICAL question is
+  answered: Rust-in-sandbox is POSSIBLE and DONE.
