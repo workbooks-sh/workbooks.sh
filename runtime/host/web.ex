@@ -246,6 +246,21 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Did.web_document(host)))
   end
 
+  # Radicle (2f) — federate the tenant repo over the P2P network; returns rad: id.
+  post "/api/radicle/:tenant/publish" do
+    result =
+      try do
+        case Workbooks.Git.publish(conn.params["tenant"]) do
+          nil -> %{ok: false, error: "radicle not available"}
+          rid -> %{ok: true, rid: rid}
+        end
+      rescue
+        e -> %{ok: false, error: Exception.message(e)}
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # Source rail (2a/2b) — mirror the tenant repo to any git host. {"url": "..."}
   # pushes anywhere; {"forge": "github"|"gitlab"|"gitea"} auto-provisions via its CLI.
   post "/api/mirror/:tenant" do

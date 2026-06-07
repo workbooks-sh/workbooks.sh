@@ -166,6 +166,9 @@ defmodule Workbooks.CLI do
     ) |> mirror_msg()
   end
 
+  # Radicle — federate the tenant repo over the P2P network (returns its rad: id).
+  def call(["radicle"], t), do: (case Workbooks.Git.publish(t), do: (nil -> "radicle: not available"; rid -> "published → #{rid}"))
+
   def call(["unpack", bundle, dest], _t) do
     files = Workbooks.Library.unpack(File.read!(bundle), dest)
     "unpacked #{length(files)} files → #{dest}"
@@ -222,6 +225,7 @@ defmodule Workbooks.CLI do
       wb build <workspace>                 compile components → WASM; report built/unbuilt
       wb mirror <remote-url>               mirror the tenant repo to any git host (push)
       wb mirror [--forge github|gitlab|gitea] [--repo n] [--public]   auto-provision + push
+      wb radicle                           federate the tenant repo over Radicle (P2P)
       wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
       wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
       wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
