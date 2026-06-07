@@ -76,3 +76,24 @@
   - Start with the smallest stdlib slice that compiles (core-only / no_std) to prove the
     .rs→C→wasm→run chain, then widen to full std.
   - Wire Workbooks.Compilers.rust_compile_and_run/4 once a .rs runs.
+
+* 2026-06-07 (iter 4) — TESTED the stdlib compile + the "memory thing"
+  Fed rustc-1.54.0-src/library/core to mrustc.wasm in-sandbox. Findings:
+  - Parse needs `--edition 2018` (core 1.54 uses 2018 macro syntax; default edition errored
+    on TOK_FATARROW in core/src/macros/mod.rs).
+  - With edition set, it crashes in early compile: "memory fault at wasm address
+    0x10000042c in linear memory of size 0x570000". KEY: that address is ~4.0GB but the
+    wasm memory is only ~5.7MB and peak RSS is ~253MB. So this is NOT the 4GB ceiling /
+    OOM — it's a 32-BIT POINTER BUG: mrustc (only tested on 64-bit hosts) computes/stores
+    a pointer as 64-bit somewhere; on wasm32 it lands at a bogus >4GB address.
+  - CONCLUSION: the feared wasm32 4GB memory ceiling is NOT the Path-1 wall (mrustc is
+    lean). The real wall is mrustc's 64-bit-pointer assumptions. These are findable+fixable
+    (grep for uintptr/uint64 pointer packing, tagged pointers, hash-of-pointer, size_t vs
+    u64) but tedious — likely several sites.
+  NEXT: build a DEBUG mrustc.wasm (with assertions + -g, WASMTIME_BACKTRACE_DETAILS=1) to
+  get the exact function at the fault; fix the pointer assumption(s); re-test core. Then
+  proper stdlib orchestration (edition/cfg/--extern) ideally via minicargo (build
+  minicargo.wasm too) rather than hand-rolled invocations. Memory headroom is fine; if a
+  LATER full-std compile ever approaches 4GB, escalate to memory64 — but not needed yet.
+  STATUS: Zig fully works end-to-end (re-demoed live: "ZIG IN WASM SANDBOX: 42"). Rust =
+  compiler runs+parses in-sandbox; stdlib compile blocked on mrustc 64-bit-ptr bugs.
