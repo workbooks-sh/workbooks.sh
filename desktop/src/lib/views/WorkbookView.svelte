@@ -6,9 +6,17 @@
    * (optional server tier), but the default path needs nothing.
    */
   import { FileText, Cloud, CircleCheck, CircleAlert, FolderOpen, Save } from "@lucide/svelte";
-  import { weave, validate, hasLocalKernel } from "$lib/kernel";
+  import { weave, validate, outline, hasLocalKernel } from "$lib/kernel";
   import { openWorkbook, saveWorkbook } from "$lib/files";
   import { rt, getRuntime } from "$lib/runtime";
+
+  interface Headline {
+    level: number;
+    title: string;
+    state?: string | null;
+    tags?: string[];
+  }
+  let headlines = $state<Headline[]>([]);
 
   let path = $state<string | null>(null);
 
@@ -50,6 +58,7 @@
       html = await weave(org);
       const diag = (await validate(org)) as unknown[];
       issues = Array.isArray(diag) ? diag.length : null;
+      headlines = (await outline(org)) as Headline[];
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
     }
@@ -108,16 +117,29 @@
     </button>
   </div>
 
-  <textarea bind:value={org} oninput={onInput} spellcheck="false"></textarea>
+  <div class="body">
+    <nav class="outline" aria-label="workbook outline">
+      {#each headlines as h}
+        <div class="hl" style="padding-left:{(h.level - 1) * 0.7 + 0.1}rem" title={h.title}>
+          {#if h.state}<em class="hl-state">{h.state}</em>{/if}{h.title}
+        </div>
+      {/each}
+      {#if headlines.length === 0}<div class="hl muted">no headlines</div>{/if}
+    </nav>
 
-  {#if err}
-    <p class="err">{err}</p>
-  {/if}
+    <div class="main">
+      <textarea bind:value={org} oninput={onInput} spellcheck="false"></textarea>
 
-  {#if html}
-    <!-- HTML woven by the local kernel (or the runtime) from Org, rendered verbatim. -->
-    <article class="woven">{@html html}</article>
-  {/if}
+      {#if err}
+        <p class="err">{err}</p>
+      {/if}
+
+      {#if html}
+        <!-- HTML woven by the local kernel (or runtime) from Org, rendered verbatim. -->
+        <article class="woven">{@html html}</article>
+      {/if}
+    </div>
+  </div>
 </section>
 
 <style>
@@ -173,6 +195,47 @@
   .status.ok {
     background: #98c37922;
     color: #98c379;
+  }
+  .body {
+    display: flex;
+    gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
+  }
+  .outline {
+    width: 180px;
+    flex: none;
+    overflow: auto;
+    border-right: 1px solid var(--border, #2a2a2a);
+    padding-right: 0.5rem;
+    font-size: 0.82rem;
+  }
+  .hl {
+    padding: 0.15rem 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 4px;
+    cursor: default;
+  }
+  .hl:hover {
+    background: #ffffff10;
+  }
+  .hl-state {
+    color: #d19a66;
+    font-style: normal;
+    font-size: 0.72rem;
+    margin-right: 0.35rem;
+  }
+  .muted {
+    opacity: 0.4;
+  }
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
   }
   textarea {
     min-height: 9rem;
