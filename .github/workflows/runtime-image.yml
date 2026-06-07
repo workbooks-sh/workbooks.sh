@@ -16,7 +16,11 @@ on:
 
 concurrency:
   group: runtime-image-${{ github.ref }}
-  cancel-in-progress: true
+  # QUEUE, don't cancel: two autoloops push runtime/ every few minutes, and the
+  # multi-arch emulated build is ~12 min — cancel-in-progress meant a build NEVER
+  # finished (the image never published). Queuing guarantees one completes, then
+  # the next runs; :latest always advances.
+  cancel-in-progress: false
 
 jobs:
   publish:
