@@ -143,11 +143,16 @@ defmodule Workbooks.Web do
   #   {"query": "...", "mode": "search"}
   post "/api/browse" do
     {:ok, body, conn} = read_body(conn)
-    params = Jason.decode!(body)
-    result = browse(params)
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
-  rescue
-    e -> conn |> put_resp_content_type("application/json") |> send_resp(500, Jason.encode!(%{error: Exception.message(e)}))
+
+    try do
+      result = browse(Jason.decode!(body))
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    rescue
+      e ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(500, Jason.encode!(%{error: Exception.message(e)}))
+    end
   end
 
   # The document viewer — a clean, Google-Docs-style reader for Workbooks.

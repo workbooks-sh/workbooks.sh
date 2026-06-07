@@ -13,7 +13,7 @@ defmodule Workbooks.Browse.Firecrawl do
   Native's concurrent fan-out over Firecrawl-fetched pages.
   """
   @behaviour Workbooks.Browse.Provider
-  alias Workbooks.Browse.{Crawl, Extract}
+  alias Workbooks.Browse.Extract
 
   @base "https://api.firecrawl.dev/v1"
   @timeout 60_000
