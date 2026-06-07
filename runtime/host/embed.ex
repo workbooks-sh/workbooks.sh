@@ -43,7 +43,7 @@ defmodule Workbooks.Embed do
     case provider(modality) do
       {:http, url} -> Workbooks.Embed.Http.embed(url, inputs, modality)
       nil -> {:error, "no embedder configured for #{modality} — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL)"}
-      mod when modality == :text -> mod.embed(inputs)
+      mod when modality == :text -> apply(mod, :embed, [inputs])
       _ -> {:error, "#{modality} needs an external embedder — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL for one cross-modal model)"}
     end
   end
