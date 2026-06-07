@@ -46,6 +46,34 @@ Vector store, so cross-modal search (text query → image/video hits) is automat
 once both land in one space (native with Gemini Embedding 2; with SigLIP the
 image-text space is shared by construction).
 
+* Tested: CLIP cross-modal works (image embeddings are real)
+Ran =Xenova/clip-vit-base-patch32= (transformers.js): a dog photo scored
+=a photo of a dog= 0.977 vs =a sports car= 0.021, =cat= 0.001 — cross-modal text↔
+image by meaning, inference 115 ms (native; 605 MB fp32 / q8 ≈ 150 MB). CLIP runs
+in WASM in any browser (transformers.js = onnxruntime-web) → a workbook can do
+sovereign image search CLIENT-SIDE, the same place verify.mjs/embed.mjs run.
+
+* VLM2Vec-V2.0 — the preferred multimodal model (user pick), but GPU-only
+- Base = *Qwen2-VL-7B-Instruct* (7B params, bf16 ≈ ~15 GB on disk). Embeds text +
+  image + VIDEO + visual documents into ONE space — SOTA on MMEB-V2. No ONNX /
+  quantized export published.
+- *Cannot run in WASM or the BEAM* — a 7B VLM needs a GPU (~18–24 GB VRAM bf16,
+  ~8–12 GB quantized). It is a GPU INFERENCE SERVICE, not in-process — the "run
+  on another server" reality.
+- *Fits the Embed slot anyway*: an EXTERNAL/sidecar adapter (=Workbooks.Embed.VLM2Vec=)
+  POSTs text/image/video to a GPU endpoint, returns vectors into the SAME Vector
+  store → cross-modal search automatic. Same shape as the =openrouter= text adapter.
+- *Deploy options to actually run it*: Modal / Replicate / Fly GPU / HF Inference
+  Endpoint (dedicated GPU). Can't run 7B locally to demo on our data; wire the
+  adapter, point it at the GPU endpoint, validate there.
+
+* The modality spectrum (all one Vector store, pick per need)
+  | modality                         | model                         | where it runs |
+  | text                             | Model2Vec/potion (DONE)       | pure Elixir, in-BEAM, tiny |
+  | image (sovereign/client, light)  | CLIP/SigLIP/TinyCLIP          | WASM (browser/sandbox) — CLIP proven |
+  | text+image+video+docs (SOTA)     | VLM2Vec-V2 (Qwen2-VL-7B)      | GPU service (Modal/Replicate/Fly GPU) |
+  | text+image+video+audio (all-in)  | Gemini Embedding 2            | hosted API (Google) |
+
 * Worth prototyping when the need lands
 A WASM image-embed command (onnxruntime-web + TinyCLIP) registered like the text
 embedder — proves sovereign image search end-to-end, runs in the browser viewer
