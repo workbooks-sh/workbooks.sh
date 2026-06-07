@@ -5,7 +5,7 @@
   "identifier": "sh.workbooks.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:5178",
     "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
