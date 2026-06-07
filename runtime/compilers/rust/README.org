@@ -1,16 +1,51 @@
-#+TITLE: compilers/rust — Rust compiler in WASM
-#+STATUS: PLAN (P3, the peak)
+#+TITLE: Rust compiler-in-WASM (compilers/rust/)
+#+EPIC: wb-zyl (P3)
+#+STATUS: HONEST BLOCKER — rustc-in-wasm is an open upstream frontier (no working path today)
 
-Goal: compile .rs → .wasm with rustc running IN the sandbox.
-Backend: rustc + rustc_codegen_cranelift (Cranelift is pure Rust → compiles to wasm;
-~10x faster than LLVM; NO LLVM-in-wasm). + watt-style wasm proc-macros for crates.
+* The goal
 
-Plan:
-- Build rustc + the Cranelift codegen backend → wasm32-wasi (the hard port). memory64
-  for large compiles. wasm proc-macros (watt / rust-lang/compiler-team#876) for the
-  crate ecosystem; single-file / no-proc-macro subset first.
-- Register via the `compiler:` framework; preopen source + rust sysroot/std.
-- Prove: a real .rs compiles in-sandbox and the output runs.
-Frontier risk: HIGH — rustc building to wasm32-wasi (bootstrap + std deps), Cranelift
-feature parity, proc-macros, memory ceilings. This is where "our limits" = "the
-frontier"; learn by building, contribute upstream where needed, document honestly.
+  Run the Rust compiler INSIDE the wasm sandbox so untrusted .rs compiles + runs with zero
+  native execution — as we achieved for C (clang.wasm) and Zig (zig1.wasm → clang.wasm).
+
+* Why it is blocked today (researched 2026-06-07)
+
+  Every route that worked for C/Zig has no Rust analog yet:
+
+  1. *rustc built to wasm32-wasi* (so rustc runs in wasmtime) — OPEN upstream:
+     rust-lang/rust#62202 and internals "Running rustc on WASM" (#16198, closed without
+     consensus). It is strictly *heavier* than clang-to-wasi (which we got via YoWASP),
+     because rustc:
+     - embeds LLVM as a *library* (not the clang driver) — needs the whole LLVM-for-wasi
+       port (RFC #79073) AND rustc's own bootstrap to wasm;
+     - shells out to a *proc-macro server* and the linker as SUBPROCESSES — impossible
+       under WASI (the exact fork wall we hit with clang's driver, but unavoidable here);
+     - needs threads, and `std::fs::canonicalize`/realpath — the same WASI filesystem gap
+       that blocks the zig self-hosted-wasm route (ziglang/zig#20665).
+
+  2. *No prebuilt rustc.wasm* exists. YoWASP ships clang/lld and zig ships zig1.wasm, but
+     there is no equivalent wasmtime-runnable rustc — so unlike C/Zig we cannot fetch+pin.
+
+  3. *rustc_codegen_cranelift (cg_clif)* does NOT help: it emits *native* machine code
+     (faster debug builds), Cranelift has no wasm32 *output* target, and cg_clif itself is
+     not compiled to wasm. So "rustc + Cranelift → wasm, in wasm" does not exist.
+
+  4. *The compiler→C→clang.wasm chain* (what finished Zig) has no Rust analog: mrustc
+     (Rust→C via C++) could in principle emit C for clang.wasm, but it has no wasm build,
+     targets only Rust ~1.54, and is a massive bootstrap-only tool — not a real path.
+
+* What WOULD unblock it (the precise asks)
+
+  - An upstream/community wasm32-wasi build of rustc (à la YoWASP clang), OR
+  - LLVM-for-wasi (RFC #79073) maturing enough that rustc's LLVM backend builds to wasm,
+    PLUS a WASI story for the proc-macro/linker subprocess model (in-process, like we do
+    for clang's compile+link split), PLUS realpath/threads on WASI.
+
+  When any of these lands we revisit — the `compiler:` framework + clang.wasm lane already
+  here would host it (rustc.wasm → emit object/wasm → wasm-ld, exactly as the C/Zig lanes).
+  Until then this is an honest wall, not a stub.
+
+* Note
+
+  Native `cargo`/`rustc` builds (trusted-authoring) still work via the normal toolchain —
+  but that is NOT an untrusted-source boundary (see COMPILER-IN-WASM.org "Why"). This file
+  is specifically about running the compiler IN the sandbox.
