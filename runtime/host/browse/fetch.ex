@@ -28,10 +28,20 @@ defmodule Workbooks.Browse.Fetch do
   @spec get(String.t(), keyword()) :: result()
   def get(url, opts \\ []) do
     ensure_started()
+    apply_proxy(Keyword.get(opts, :proxy))
     profile = Keyword.get(opts, :profile, :chrome)
     redirects = Keyword.get(opts, :max_redirects, @default_max_redirects)
     headers = Keyword.get(opts, :headers, default_headers(profile))
     request(url, profile, headers, redirects)
+  end
+
+  # Proxy slot: route through {host, port} when configured. Process-global in
+  # :httpc, so sequential by design; rotating-proxy concurrency is a follow-up
+  # (a per-proxy inets profile pool). nil = direct, the default.
+  defp apply_proxy(nil), do: :ok
+
+  defp apply_proxy({host, port}) do
+    :httpc.set_options([{:proxy, {{to_charlist(host), port}, []}}])
   end
 
   defp request(_url, _profile, _headers, redirects) when redirects < 0,
