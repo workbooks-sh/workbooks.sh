@@ -96,6 +96,22 @@ did + atproto libs; reimplement nothing we can call).
   provenance, built into the substrate. JJ's op-log reinforces it.
 - Same table, two stages — like "Guardian stays, the issuer swaps."
 
+* Validation-gated merges (org validations × JJ × sub-agents)
+The org-mode validations (the workflow's =:done-when:= commands + =#+begin_src
+:check= blocks — "unit tests for org mode") become the SEMANTIC layer of JJ's
+conflict resolution. JJ auto-resolves TEXT; the org specs resolve MEANING.
+- Concurrent sub-agents work on JJ branches; JJ auto-rebases/merges the bytes.
+- After a merge, the *predetermined* org specs run as the MERGE GATE: a change
+  that violates a declared spec FAILS even if it merged cleanly as text →
+  rejected / re-resolved / flagged.
+- So sub-agent concurrency (JJ branches) + validation (workflow specs) + the
+  signed ledger (who changed what, attributable) are ONE mechanism: agents fan
+  out, the org specs arbitrate correctness, the ledger records it, JJ's op-log +
+  the hash-chain make it all replayable + tamper-evident.
+- This is where sub-agents get *tested + evaluated* against the org substrate
+  itself. Build it at the Phase 2 (JJ) ∩ Phase 3 (sub-agents) ∩ ledger
+  intersection — predetermined specs as the conflict arbiter.
+
 * The throughline
 identity (tenant + agent DIDs) → sovereignty (per-tenant git + signing) →
 sharing (source→GitHub/JJ/Radicle, artifact→ATproto/self-host, C2PA) →
