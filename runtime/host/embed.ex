@@ -129,10 +129,35 @@ defmodule Workbooks.Embed.OpenRouter do
 end
 
 defmodule Workbooks.Embed.Local do
-  @moduledoc "In-BEAM small model (ortex/Bumblebee) — the multi-tenant semantic default. Wired in a later step."
+  @moduledoc """
+  In-WASM small model — the multi-tenant semantic default, run as a `embed` WASM
+  command in the EXISTING Wasmex sandbox (like jq/grep/oql), NOT a new native NIF
+  (no EXLA/Torchx/ortex). A small ONNX model (all-MiniLM-L6-v2, 384-dim) via
+  tract / ONNX-Runtime-Web compiled to wasm32-wasip1; embed at store-time so wasm
+  speed is a non-issue, and the same artifact runs in the browser viewer.
+  Pending the build of the `embed.wasm` artifact (VECTOR-QUERY.org step 6).
+  """
   @behaviour Workbooks.Embed
   @impl true
-  def dim, do: 384
+  def dim, do: String.to_integer(System.get_env("WB_EMBED_DIM", "384"))
+
   @impl true
-  def embed(_texts), do: {:error, "local embedder not wired yet (ortex/Bumblebee + all-MiniLM — VECTOR-QUERY.org step 6)"}
+  def embed(texts) do
+    if "embed" in Workbooks.CommandRegistry.list() do
+      try do
+        {:ok, Enum.map(texts, fn t ->
+          case Workbooks.CommandRegistry.run("embed", t) do
+            {:ok, out} -> Jason.decode!(out)
+            {:error, e} -> throw({:err, e})
+          end
+        end)}
+      catch
+        {:err, e} -> {:error, e}
+      end
+    else
+      {:error, "WASM 'embed' command not registered — build a small ONNX model " <>
+        "(tract/onnxruntime-web → wasm32-wasip1) + CommandRegistry.register(\"embed\", path). " <>
+        "Runs in the existing sandbox, no native NIF. VECTOR-QUERY.org step 6."}
+    end
+  end
 end

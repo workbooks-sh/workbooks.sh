@@ -90,7 +90,19 @@ same "compute at author time, bake the result" conclusion.)
    (=Workbooks.Did=) and included in the search scope — federated query against
    the identity.
 5. pgvector adapter for the Postgres backend; sqlite-vec upgrade.
-6. =local= embedder (Bumblebee or ortex, small model) — the multi-tenant default.
+6. =local= embedder — run IN WebAssembly, NOT a native NIF (user constraint;
+   Bumblebee's fast path is the EXLA/Torchx NIF, ortex is a NIF — both excluded).
+   Plan: a small ONNX model (all-MiniLM-L6-v2, 384-d, Apache-2.0) via tract OR
+   ONNX-Runtime-Web compiled to wasm32-wasip1, registered as the =embed= command
+   in =CommandRegistry= and run in the EXISTING Wasmex sandbox (like jq/grep/oql)
+   — invoked by =Workbooks.Embed.Local=. Embed at store-time so wasm speed is moot
+   (all-MiniLM is ~8–12 ms via ONNX-Runtime-Web; tens of ms via tract); the SAME
+   artifact runs in the browser viewer. Note: Wasmex is itself a Rust NIF (the
+   wasm runtime) — the rule means no SEPARATE ML NIF, model-in-sandbox instead.
+   Fallback if we ever need near-native speed: WASI-NN (host ort backend) — but
+   that reintroduces a host-native lib. WasmEdge/LlamaEdge is the alternative
+   whole-runtime (OpenAI =/embeddings= over WASI-NN+ggml) if we want its server
+   wholesale — a 2nd runtime alongside Wasmex.
 7. GRAPH modality (future) — relationships/links across members as a GraphQL-style
    traversal; another modality slot, no embeddings needed.
    Decide dep weight when we get here; the seam means it drops in without churn.
