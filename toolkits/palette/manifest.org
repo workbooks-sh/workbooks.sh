@@ -28,6 +28,7 @@
   | =qjs=    | =qjs=    | JS engine (single)    | quickjs-ng qjs-wasi.wasm       |
   | =python= | =python= | CPython 3.12 + stdlib | VMware WLR (wasi-sdk) tarball  |
   | =ruby=   | =ruby=   | CRuby 3.3 + stdlib    | ruby.wasm wasip1-full tarball  |
+  | =go=     | =go=     | Go interpreter        | yaegi → gobuild wasip1 (go run <f>) |
 
   The =.wasm= artifacts are NOT committed (derived; DeployKit fetches them from the
   pinned specs). Only the pinned manifest set lives in git.

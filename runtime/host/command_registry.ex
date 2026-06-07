@@ -241,6 +241,57 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  # A Go package path (optionally @version). Discrete System.cmd args (no shell), so
+  # this guards data shape, not injection.
+  @go_pkg_re ~r/^[a-zA-Z0-9._\/\-]+(@[a-zA-Z0-9._+\-]+)?$/
+
+  @doc """
+  Build a Go package to wasm (GOOS=wasip1) and register it as a command — e.g. a Go
+  INTERPRETER like yaegi, so untrusted .go source runs in the sandbox (Go is
+  compiled, so the "runtime" is an interpreter compiled to wasm). Returns
+  {:ok, wasm} | {:error, reason}. Caches GO* under a temp root (no host-home writes).
+  """
+  def build_and_register_go(name, pkg, mode \\ :argv)
+
+  def build_and_register_go(name, _pkg, _mode) when not is_binary(name) or name == "",
+    do: {:error, :invalid_name}
+
+  def build_and_register_go(name, pkg, mode) do
+    cond do
+      name in @reserved -> {:error, :reserved_name}
+      not Regex.match?(@name_re, name) -> {:error, :invalid_name}
+      not (is_binary(pkg) and Regex.match?(@go_pkg_re, pkg)) -> {:error, :invalid_pkg}
+      true -> do_build_and_register_go(name, pkg, mode)
+    end
+  end
+
+  defp do_build_and_register_go(name, pkg, mode) do
+    root = Path.join(System.tmp_dir!(), "wbgo-#{:erlang.unique_integer([:positive])}")
+    File.mkdir_p!(root)
+    out = Path.join(root, "out.wasm")
+    base = pkg |> String.split("@") |> hd()
+    env = go_env(root)
+
+    with {_, 0} <- Workbooks.Sandbox.run_net(["go", "mod", "init", "wbgo"], cd: root, env: env),
+         {_, 0} <- Workbooks.Sandbox.run_net(["go", "get", pkg], cd: root, env: env),
+         {_, 0} <- Workbooks.Sandbox.run_net(["go", "build", "-o", out, base], cd: root, env: env) do
+      if File.regular?(out), do: register_artifact(name, out, mode), else: {:error, :no_wasm}
+    else
+      {err, _} -> {:error, err}
+    end
+  end
+
+  defp go_env(root) do
+    [
+      {"GOOS", "wasip1"},
+      {"GOARCH", "wasm"},
+      {"GOPATH", Path.join(root, "gp")},
+      {"GOCACHE", Path.join(root, "gc")},
+      {"GOMODCACHE", Path.join(root, "gm")},
+      {"PATH", "/opt/homebrew/bin:/usr/local/go/bin:#{System.get_env("PATH")}"}
+    ]
+  end
+
   @doc """
   Fetch a PREBUILT wasm command from a pinned https URL, verify its sha256,
   content-address it, and register it. This is the "pallet" path for prebuilt

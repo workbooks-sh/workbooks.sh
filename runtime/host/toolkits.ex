@@ -268,6 +268,7 @@ defmodule Workbooks.Toolkits do
       String.starts_with?(spec, "path:") -> {:path, String.trim_leading(spec, "path:")}
       String.starts_with?(spec, "wasm:") -> {:wasm, String.trim_leading(spec, "wasm:")}
       String.starts_with?(spec, "archive:") -> {:archive, String.trim_leading(spec, "archive:")}
+      String.starts_with?(spec, "gobuild:") -> {:gobuild, String.trim_leading(spec, "gobuild:")}
       true -> {:unknown, spec}
     end
   end
@@ -355,7 +356,7 @@ defmodule Workbooks.Toolkits do
   # every Instance. (CommandRegistry also enforces this; this is the clear, early
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
-       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive] do
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild] do
     if bin in Workbooks.CommandRegistry.reserved_names(),
       do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
       else: do_build_clause(id, d)
@@ -429,6 +430,16 @@ defmodule Workbooks.Toolkits do
 
       {:error, reason} ->
         "#{id}: fetch/unpack FAILED for #{url}:\n" <> error_text(reason)
+    end
+  end
+
+  # gobuild:<pkg> — build a Go package to wasip1 (e.g. a Go interpreter like yaegi)
+  # and register it so untrusted .go source runs in the sandbox.
+  defp do_build_clause(id, %{exec: exec, build_src: {:gobuild, pkg}, cli_bin: bin, arg_mode: mode})
+       when exec in ["command", nil] do
+    case Workbooks.CommandRegistry.build_and_register_go(bin, pkg, mode) do
+      {:ok, wasm} -> "#{id}: built go #{pkg} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
+      {:error, reason} -> "#{id}: build FAILED for go #{pkg}:\n" <> error_text(reason)
     end
   end
 

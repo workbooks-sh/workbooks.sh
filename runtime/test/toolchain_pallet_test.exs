@@ -85,6 +85,19 @@ defmodule Workbooks.ToolchainPalletTest do
       {:ok, py} = CommandRegistry.run("python", "", ["/w/a.py"], ["#{tmp}::/w"])
       assert py =~ "fact 120"
     end
+
+    @tag :build
+    test "wb toolkit build palette go (gobuild yaegi → wasip1) runs .go source" do
+      {:ok, _} = ensure_oql()
+      out = Toolkits.build_text("palette", "go", @root)
+      assert out =~ "registered command \"go\""
+
+      tmp = Path.join(System.tmp_dir!(), "wbgo-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      File.write!(Path.join(tmp, "a.go"), "package main\nimport \"fmt\"\nfunc main(){ fmt.Println(\"go\", 6*7) }\n")
+      {:ok, go} = CommandRegistry.run("go", "", ["run", "/w/a.go"], ["#{tmp}::/w"])
+      assert go =~ "go 42"
+    end
   end
 
   defp ensure_oql do
