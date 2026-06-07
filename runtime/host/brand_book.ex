@@ -87,10 +87,12 @@ defmodule Workbooks.BrandBook do
       "dividers, positioning, audience personas, the catalog ladder, ad concepts, " <>
       "voice, palette, an end-card. Get the spine with `brandnana book " <>
       "insight-slides .`, author one slide spec per file under spec/ (relative " <>
-      "paths), assemble with `brandnana book assemble spec --out deck.html`, then " <>
-      "PUBLISH with `brandnana book publish` so the workbook embeds the queryable " <>
-      "wb-source-bundle. Write the published URL to ./published-url. Review the " <>
-      "rendered slides for overflow/empties and fix them. Then finish with done."
+      "paths), assemble with `brandnana book assemble spec --out deck.html`. Then " <>
+      "make it a QUERYABLE context repository: `brandnana book seal deck.html .` " <>
+      "(embeds the org substrate + catalog SQLite as the wb-source-bundle), verify " <>
+      "`grep -c 'id=\"wb-source-bundle\"' deck.html` prints 1, then `brandnana book " <>
+      "publish <slug> deck.html`. Write the published URL to ./published-url. " <>
+      "Review the rendered slides for overflow/empties and fix them. Finish with done."
   end
 
   # Agent defs: the canonical profile agents (baked at WB_PROFILE_DIR), with a
