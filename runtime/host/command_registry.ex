@@ -218,6 +218,63 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Fetch a PREBUILT wasm command from a pinned https URL, verify its sha256,
+  content-address it, and register it. This is the "pallet" path for prebuilt
+  language runtimes/compilers (qjs, python, …): we do NOT build, so no build.rs /
+  no compile-time code runs — a prebuilt is inert bytes until run in the sandbox.
+  The ONLY trust gate is the sha PIN: a compromised mirror cannot swap the binary.
+  Returns {:ok, addressed_path, sha} | {:error, reason}. A nil `sha256` registers
+  whatever is fetched and returns its hash (so an author can pin it); a non-nil
+  mismatch is refused. (The artifact still runs capability-gated in the sandbox —
+  defense in depth on top of the pin.)
+  """
+  def fetch_and_register_wasm(name, url, sha256 \\ nil, mode \\ :argv)
+
+  def fetch_and_register_wasm(name, _url, _sha, _mode)
+      when not is_binary(name) or name == "",
+      do: {:error, :invalid_name}
+
+  def fetch_and_register_wasm(name, url, sha256, mode) do
+    cond do
+      name in @reserved -> {:error, :reserved_name}
+      not Regex.match?(@name_re, name) -> {:error, :invalid_name}
+      not (is_binary(url) and String.starts_with?(url, "https://")) -> {:error, :invalid_url}
+      true -> do_fetch_and_register_wasm(name, url, sha256, mode)
+    end
+  end
+
+  defp do_fetch_and_register_wasm(name, url, sha256, mode) do
+    tmp = Path.join(System.tmp_dir!(), "wbwasm-#{:erlang.unique_integer([:positive])}.wasm")
+
+    # -f fail on HTTP error, --proto =https forbids downgrade/file:, `--` ends opts
+    # so the URL can never be read as a flag. Fetch needs network; the prebuilt is
+    # then sha-verified before anything trusts it.
+    case Workbooks.Sandbox.run_net(["curl", "-fsSL", "--proto", "=https", "-o", tmp, "--", url]) do
+      {_, 0} ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        cond do
+          is_binary(sha256) and sha256 != "" and got != String.downcase(String.trim(sha256)) ->
+            File.rm(tmp)
+            {:error, {:sha_mismatch, [expected: String.downcase(String.trim(sha256)), got: got]}}
+
+          true ->
+            result = register_artifact(name, tmp, mode)
+            File.rm(tmp)
+
+            case result do
+              {:ok, addressed} -> {:ok, addressed, got}
+              err -> err
+            end
+        end
+
+      {err, _} ->
+        File.rm(tmp)
+        {:error, {:fetch_failed, err}}
+    end
+  end
+
   @doc "Run a registered command with stdin `input` (no argv) → {:ok, out} | {:error, reason}."
   def run(name, input), do: run(name, input, [])
 

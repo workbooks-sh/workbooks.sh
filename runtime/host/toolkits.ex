@@ -249,11 +249,12 @@ defmodule Workbooks.Toolkits do
       build_lang: kw(body, "BUILD_LANG"),
       caps: (kw(body, "CAPS") || "") |> String.split() ,
       cli_bin: kw(body, "CLI_BIN") || drawer(body, "CLI_BIN"),
-      arg_mode: arg_mode(kw(body, "ARG_MODE"))
+      arg_mode: arg_mode(kw(body, "ARG_MODE")),
+      sha256: kw(body, "SHA256")
     }
   end
 
-  # crate:<name> | git+<url> | path:<dir>  → tagged tuple (nil if absent/unknown).
+  # crate:<name> | git+<url> | path:<dir> | wasm:<url>  → tagged tuple (nil if absent).
   defp parse_build_src(nil), do: nil
 
   defp parse_build_src(spec) do
@@ -263,6 +264,7 @@ defmodule Workbooks.Toolkits do
       String.starts_with?(spec, "crate:") -> {:crate, String.trim_leading(spec, "crate:")}
       String.starts_with?(spec, "git+") -> {:git, String.trim_leading(spec, "git+")}
       String.starts_with?(spec, "path:") -> {:path, String.trim_leading(spec, "path:")}
+      String.starts_with?(spec, "wasm:") -> {:wasm, String.trim_leading(spec, "wasm:")}
       true -> {:unknown, spec}
     end
   end
@@ -318,7 +320,7 @@ defmodule Workbooks.Toolkits do
   # every Instance. (CommandRegistry also enforces this; this is the clear, early
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
-       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path] do
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm] do
     if bin in Workbooks.CommandRegistry.reserved_names(),
       do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
       else: do_build_clause(id, d)
@@ -364,8 +366,23 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  # wasm:<url> — a PREBUILT runtime/compiler (qjs, python, …): fetch the pinned
+  # URL, sha-verify, content-address, register. No build step runs (a prebuilt is
+  # inert until run in the sandbox); the sha pin is the supply-chain gate.
+  defp do_build_clause(id, %{exec: exec, build_src: {:wasm, url}, cli_bin: bin, arg_mode: mode, sha256: sha})
+       when exec in ["command", nil] do
+    case Workbooks.CommandRegistry.fetch_and_register_wasm(bin, url, sha, mode) do
+      {:ok, addressed, hash} ->
+        pin = if sha in [nil, ""], do: "  (UNPINNED — add `#+SHA256: #{hash}` to the manifest)", else: ""
+        "#{id}: fetched prebuilt #{url} → #{addressed}; registered command #{inspect(bin)} (mode #{mode})#{pin}"
+
+      {:error, reason} ->
+        "#{id}: fetch FAILED for #{url}:\n" <> error_text(reason)
+    end
+  end
+
   defp do_build_clause(id, %{build_src: nil}),
-    do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir>)"
+    do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir> | wasm:<url>)"
 
   defp do_build_clause(id, %{build_src: {:git, url}}),
     do: "#{id}: #+BUILD_SRC git+#{url} not yet supported by `wb toolkit build` (use crate: or path:)"
