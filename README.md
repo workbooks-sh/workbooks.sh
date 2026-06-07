@@ -12,7 +12,7 @@ agents, and ships a single-file `.html` deliverable.
 | `runtime/`  | **the product** — the `:workbooks` engine. Elixir host in `host/` (the agent loop, OQL, VFS, BrandBook pipeline, web surface), the OQL kernel (Rust → `build/oql.wasm`) in `kernel/`, WIT worlds in `wit/`, baked wasm commands in `build/commands/`. |
 | `toolkits/` | capability toolkits the engine discovers — incl. `presentation` (reveal.js) and `video` (hyperframes); CLIs wrapped as agent skills. |
 | `web/`      | the lander + the workbook viewer.                                     |
-| `desktop/`  | the Tauri desktop app (being refactored).                            |
+| `desktop/`  | the **workbook-native** Tauri app — embeds the OQL kernel (`oql.wasm`) and edits/renders workbooks **offline, no server**; optionally connects to a runtime for agents/sync. Cross-platform build/release in `.github/workflows/desktop-release.yml`. See `desktop/README.md`. |
 
 ## The runtime
 
@@ -27,7 +27,10 @@ mix deps.get && mix compile
 iex -S mix          # or: MIX_ENV=prod mix release
 ```
 
-Deploy: `runtime/Dockerfile` + `runtime/fly.toml`.
+Deploy via the **deploy-kit** (`wb deploy`, in `runtime/host/deploy/`): one OCI image
+(`ghcr.io/workbooks-sh/runtime`, published by CI), run locally in a Linux container
+(`wb deploy local`) or on a cloud machine (`wb deploy apply <deployment.org>`).
+`wb deploy init` scaffolds the config; `validate` → `apply`.
 
 ## What this isn't
 
