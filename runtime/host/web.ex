@@ -40,6 +40,30 @@ defmodule Workbooks.Web do
     end
   end
 
+  # Run a NATIVE org TODO outline as a workflow (the implicit interpreter — no
+  # custom tags; the outline IS the state machine). Async: spawns the run, poll
+  # at /api/brand-book/<slug> for the per-task states. {"org": "..."}.
+  post "/api/workflow/todo" do
+    {:ok, body, conn} = read_body(conn)
+    %{"org" => org} = Jason.decode!(body)
+    slug = "wf-#{System.unique_integer([:positive])}"
+    workdir = "/tmp/bb/#{slug}"
+    File.rm_rf!(workdir)
+    File.mkdir_p!(workdir)
+    File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, stage: "running"}))
+
+    spawn(fn ->
+      try do
+        res = Workbooks.Workflow.Todo.run(org, workdir: workdir)
+        File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, stage: "done", tasks: res.tasks}))
+      rescue
+        e -> File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, stage: "error", error: Exception.message(e)}))
+      end
+    end)
+
+    conn |> put_resp_content_type("application/json") |> send_resp(202, Jason.encode!(%{slug: slug, status: "running"}))
+  end
+
   # List registered Instances for the tenant.
   get "/instances" do
     json = Jason.encode!(Workbooks.ControlPlane.list())
