@@ -45,3 +45,34 @@
   --target wasm64 if the compile exceeds 4GB), -fno-rtti viability (mrustc may need rtti →
   drop the flag). Once mrustc.wasm links: register it, run mrustc.wasm on a hello.rs to emit
   C in-sandbox, then Compilers.compile_c that C → wasm → run; wire rust_compile_and_run/4.
+
+* 2026-06-07 (iter 3) — MILESTONE: mrustc.wasm BUILDS + RUNS in the sandbox
+  The Rust compiler now executes inside wasm. Full wall sequence solved (all in build.sh):
+  1. includes: -Isrc/include (target_version.hpp lives there).
+  2. jobserver.cpp pipe()/fork → serial stub under __wasi__.
+  3. codegen_c.cpp system() (invokes the C compiler) → skip under __wasi__ (emit C; the
+     clang lane links it separately — same split as clang's compile/link).
+  4. proc_macro.cpp <spawn.h>/<sys/wait.h> → guarded out under __wasi__ (proc-macros need a
+     subprocess; unsupported in-sandbox by design). wasi/wasi_compat.h provides ENOSYS
+     stubs for pipe/posix_spawn/waitpid/kill so it COMPILES (errors only if a proc-macro is
+     actually used). wasi/sys_stub.cpp defines system()→-1.
+  5. zlib (HIR compression, mandatory, no disable) → vendored, compiled to wasm.
+  6. version.cpp VERSION_GIT_* → supplied via a generated header.
+  7. link: -lwasi-emulated-process-clocks (clock) + -lunwind (_Unwind_CallPersonality,
+     __wasm_lpad_context) + EH multilib (auto-selected by -fwasm-exceptions).
+  8. THE EH ABI: wasi-sdk-33 emits LEGACY try/catch which wasmtime 45 rejects
+     ("legacy_exceptions feature required"). Fix: -mllvm -wasm-use-legacy-eh=false → new
+     exnref EH, which wasmtime accepts with -W exceptions=y. (No legacy flag in wasmtime 45.)
+  RESULT: `wasmtime run -W exceptions=y mrustc.wasm --version` →
+    "rustc 1.29.100 (mrustc v0.12.0 wasm:be69c747)". It also parses a real .rs and loads the
+    target (--target i586-linux-gnu; 32-bit, matches wasm32). 16.5 MB module.
+
+  NEXT (the remaining grind to end-to-end):
+  - mrustc needs the Rust STDLIB: `Unable to locate crate 'std'`. mrustc's flow compiles the
+    stdlib from rustc's source library/ (for MRUSTC_TARGET_VER, e.g. 1.54/1.74) into .hir,
+    then user crates link against it. So: fetch rustc-<ver>-src, run mrustc.wasm to build
+    libcore/liballoc/libstd IN the sandbox (heavy — watch the wasm32 4GB ceiling → may need
+    -W memory64=y + a memory64 build), then compile t.rs → C, then clang lane → wasm → run.
+  - Start with the smallest stdlib slice that compiles (core-only / no_std) to prove the
+    .rs→C→wasm→run chain, then widen to full std.
+  - Wire Workbooks.Compilers.rust_compile_and_run/4 once a .rs runs.
