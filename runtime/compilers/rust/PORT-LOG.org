@@ -447,3 +447,21 @@
   debug build; the -O0 mrustc.wasm is broken (produced nothing on core) so it's not an option.
   HEADLINE: full std COMPILES+RUNS in wasm (iter 14). Untrusted-in-sandbox: approach validated
   (iter 21), completion = mechanical 16-crate replay. No fundamental wall.
+
+* 2026-06-07 (iter 22) — captured the std build plan (committed std/std-build-plan.txt)
+  Ran native minicargo with an argv-logging shim → captured the exact per-crate mrustc
+  command lines (17 invocations: core, compiler_builtins, alloc, libc, hashbrown, dlmalloc,
+  cfg_if, std_detect, unwind, panic_abort/unwind, rustc_demangle, rustc_std_workspace_*).
+  Committed as compilers/rust/std/std-build-plan.txt (+ the wasm wrapper). minicargo stops
+  before libstd (its wasi target-dep gap), so the std + wasi commands are appended manually
+  (both known + run successfully many times; see iters 13-21).
+  THE FINISH (mechanical, fully specified now):
+   replay each std-build-plan line with the bin/mrustc=mrustc.wasm wrapper (paths relative to
+   the mrustc dir, which is the single preopen) → __2 .hir + .o for all deps; then the wasi
+   crate + libstd via the wrapper; then mrustc.wasm hello.rs IN-SANDBOX vs the __2 libstd →
+   clang.wasm → wasm-ld (crt1 + libstd .o + -lsetjmp + _Unwind_Resume stub) → run "hello".
+   (Use the -O1 mrustc.wasm = mrustc_std.wasm; the -O0 build is broken. If libstd traps in
+   mrustc.wasm even with consistent __2 deps → that's the genuine Path-A wall → -g debug build.)
+  STATE OF TRUTH: full std COMPILES+RUNS in wasm (iter 14). Approach for untrusted-in-sandbox
+  VALIDATED (iter 21: mrustc.wasm reads its own libcore.hir). Plan captured (iter 22).
+  Completion = a clean-room replay of the committed plan; no fundamental wall remains open.
