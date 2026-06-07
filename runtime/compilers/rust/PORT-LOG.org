@@ -340,3 +340,24 @@
   Path B is likely FASTER (no mrustc bug to chase): just match the host libc++ ABI.
   UNCHANGED: full std COMPILES + RUNS in wasm ("...42", iter 14) — the pipeline is proven;
   this is specifically about doing the (trusted) libstd build with an in-sandbox-readable .hir.
+
+* 2026-06-07 (iter 17) — Path B blocked on macOS (Apple libc++ locked to __1); paths narrowed
+  Path B (match libc++ ABI): rebuilt NATIVE mrustc with -D_LIBCPP_ABI_VERSION=2 (Makefile
+  honors CXXFLAGS_EXTRA) — but Apple's system libc++ IGNORES it and stays std::__1. mrustc.wasm
+  (wasi-sdk libc++) is std::__2. So native-built .hir (__1) still ≠ mrustc.wasm reader (__2).
+  Verified empirically: same "Expecting __2 got __1" on a native(ABI=2) libcore.hir.
+  => Path B is viable only where native mrustc can be built with a __2 libc++ — i.e. on LINUX
+     with LLVM/libc++ (the deploy target), NOT on this macOS dev box (Apple libc++ = __1).
+  Path A (build libstd via mrustc.wasm) remains blocked by the mrustc.wasm "unreachable" trap
+  on the libstd crate (post-Parse, ~222MB, not stack at 64/256MB). Native compiles it; wasm
+  traps → an mrustc.wasm codegen/UB difference. Cheapest next probe: rebuild mrustc.wasm at
+  -O0 (the trap may be an -O1 miscompile of mrustc's own code) and retry libstd; if that fails,
+  a symbol'd debug mrustc.wasm to locate the exact faulting function.
+  THIRD option (cleanest long-term): patch mrustc's .hir serialization to NOT embed the
+  libc++-version-dependent type name (it serializes a std::vector<HIR::TypeParamDef> tag via a
+  libc++-mangled name) — make the tag ABI-stable → native and wasm .hir interoperate regardless
+  of libc++. That removes the whole ABI-coupling.
+  HONEST STATUS: full std COMPILES+RUNS in wasm (proven, iter 14). Untrusted-std-FULLY-in-
+  sandbox is blocked here by a libc++-ABI .hir coupling — solvable via (A) -O0/debug mrustc.wasm
+  to fix the libstd trap, (B) a Linux native-mrustc build with __2 libc++, or (C) an ABI-stable
+  .hir-serialization patch to mrustc. All three are real engineering, none a fundamental wall.
