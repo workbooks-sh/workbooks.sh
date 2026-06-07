@@ -14,6 +14,39 @@ defmodule Workbooks.Embed.Model2Vec do
   Loaded once into :persistent_term. `model` is %{vocab, unk, matrix, dim, normalize}.
   """
 
+  # ── load ──────────────────────────────────────────────────────────────────────
+  @doc """
+  Load a model from a dir holding `config.json`, `vocab.txt` (one token per line,
+  line index = id), `model.safetensors` (a single F32 `embeddings` tensor). The
+  matrix stays a BINARY (refc-shared, ~30 MB) with by-offset lookup — never a map
+  of float-lists (which would balloon in the BEAM). Returns the model map.
+  """
+  def load(dir) do
+    cfg = Path.join(dir, "config.json") |> File.read!() |> Jason.decode!()
+    dim = cfg["hidden_dim"] || 256
+    {vocab, unk} = load_vocab(Path.join(dir, "vocab.txt"))
+    %{vocab: vocab, unk: unk, matrix: load_matrix(Path.join(dir, "model.safetensors")),
+      dim: dim, normalize: cfg["normalize"] != false}
+  end
+
+  defp load_vocab(path) do
+    vocab =
+      File.read!(path)
+      |> String.split("\n")
+      |> Enum.with_index()
+      |> Map.new(fn {tok, i} -> {tok, i} end)
+
+    {vocab, Map.get(vocab, "[UNK]", 1)}
+  end
+
+  # safetensors: 8-byte LE header length, JSON header, then the tensor data. The
+  # single `embeddings` tensor sits at data offset 0, so the data section IS the matrix.
+  defp load_matrix(path) do
+    <<hlen::little-unsigned-64, rest::binary>> = File.read!(path)
+    <<_header::binary-size(hlen), data::binary>> = rest
+    data
+  end
+
   # ── inference ─────────────────────────────────────────────────────────────────
   @doc "Embed texts with a loaded model → [vector]."
   def embed(texts, model), do: Enum.map(texts, &embed_one(&1, model))
@@ -22,11 +55,22 @@ defmodule Workbooks.Embed.Model2Vec do
     vecs =
       text
       |> tokenize(vocab, unk)
-      |> Enum.map(&Map.get(matrix, &1, List.duplicate(0.0, dim)))
+      |> Enum.map(&vec(matrix, &1, dim))
 
     pooled = mean_pool(vecs, dim)
     if Map.get(model, :normalize, true), do: l2(pooled), else: pooled
   end
+
+  # Decode token `id`'s vector — a binary slice of `dim` little-endian f32 (the
+  # real model) or a map entry (synthetic tests).
+  defp vec(matrix, id, dim) when is_binary(matrix) do
+    off = id * dim * 4
+    if off >= 0 and off + dim * 4 <= byte_size(matrix),
+      do: (for <<f::little-float-32 <- binary_part(matrix, off, dim * 4)>>, do: f),
+      else: List.duplicate(0.0, dim)
+  end
+
+  defp vec(matrix, id, dim) when is_map(matrix), do: Map.get(matrix, id, List.duplicate(0.0, dim))
 
   # ── WordPiece tokenizer (pure Elixir — matches BERT-style models) ────────────
   defp tokenize(text, vocab, unk) do
