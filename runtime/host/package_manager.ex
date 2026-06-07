@@ -323,6 +323,7 @@ defmodule Workbooks.PackageManager do
   end
 
   defp build_js(src, out) do
+    Workbooks.Tools.ensure!()
     File.mkdir_p!(@cache)
     tmp = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.js")
     File.write!(tmp, src)
@@ -558,6 +559,7 @@ defmodule Workbooks.PackageManager do
   emits a CORE module but `wac` only links COMPONENTS. Cached by core path + adapter.
   """
   def componentize(core_wasm) do
+    Workbooks.Tools.ensure!()
     out = Path.join(@cache, "#{cache_key([core_wasm, @adapter])}.component.wasm")
 
     cond do
@@ -584,6 +586,7 @@ defmodule Workbooks.PackageManager do
   / jco), not stock Javy. See docs/COMPOSE-NOTES.org.
   """
   def compose(components) when is_list(components) and components != [] do
+    Workbooks.Tools.ensure!()
     key = cache_key(["compose" | components])
     out = Path.join(@cache, "#{key}.composed.wasm")
     script = Path.join(@cache, "#{key}.wac")
@@ -694,6 +697,8 @@ defmodule Workbooks.PackageManager do
 
   @doc "Validate a component artifact with `wasm-tools validate`."
   def validate_component(path) do
+    Workbooks.Tools.ensure!()
+
     case System.cmd(@wasm_tools, ["validate", path], stderr_to_stdout: true) do
       {_, 0} -> :valid
       {err, _} -> {:invalid, err}
