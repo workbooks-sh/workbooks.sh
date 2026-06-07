@@ -52,7 +52,7 @@ defmodule Workbooks.MixProject do
   # no EXLA); the standalone CLIP sidecar remains the no-NIF alternative.
   defp ml_deps do
     if System.get_env("WB_BUMBLEBEE") == "1" do
-      [{:bumblebee, "~> 0.6"}, {:exla, "~> 0.9"}, {:nx, "~> 0.9"}]
+      [{:bumblebee, "~> 0.6"}, {:exla, "~> 0.9"}, {:nx, "~> 0.9"}, {:stb_image, "~> 0.6"}]
     else
       []
     end

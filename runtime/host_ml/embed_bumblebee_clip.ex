@@ -38,13 +38,22 @@ defmodule Workbooks.Embed.BumblebeeClip do
   defp servings do
     case :persistent_term.get(@pt, nil) do
       nil ->
-        {:ok, model} = Bumblebee.load_model({:hf, @repo})
+        # CLIP is two towers projecting into ONE joint space. The full model needs
+        # BOTH inputs at once; for embeddings we load each tower separately with the
+        # :for_embedding architecture (adds the projection head → joint 512-d space,
+        # output key :embedding).
+        {:ok, text_model} =
+          Bumblebee.load_model({:hf, @repo}, module: Bumblebee.Text.ClipText, architecture: :for_embedding)
+
+        {:ok, image_model} =
+          Bumblebee.load_model({:hf, @repo}, module: Bumblebee.Vision.ClipVision, architecture: :for_embedding)
+
         {:ok, tok} = Bumblebee.load_tokenizer({:hf, @repo})
         {:ok, feat} = Bumblebee.load_featurizer({:hf, @repo})
 
         s = %{
-          text: Bumblebee.Text.text_embedding(model, tok, embedding_processor: :l2_norm, defn_options: [compiler: EXLA]),
-          image: Bumblebee.Vision.image_embedding(model, feat, embedding_processor: :l2_norm, defn_options: [compiler: EXLA])
+          text: Bumblebee.Text.text_embedding(text_model, tok, output_attribute: :embedding, embedding_processor: :l2_norm, defn_options: [compiler: EXLA]),
+          image: Bumblebee.Vision.image_embedding(image_model, feat, output_attribute: :embedding, embedding_processor: :l2_norm, defn_options: [compiler: EXLA])
         }
 
         :persistent_term.put(@pt, s)

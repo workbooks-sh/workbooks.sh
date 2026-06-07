@@ -5,18 +5,23 @@
 Can we embed images + video for semantic search, like we do text? Can it run
 in-BEAM? Is there a Gemma multimodal model? How big, and does it need another server?
 
-* Key finding: text was special; image/video need real inference
+* Key finding: text is static (pure Elixir); image/video need neural inference — 3 ways to run it
 Text embeds in pure Elixir ONLY because Model2Vec is STATIC (tokenize → matrix
 lookup → mean — no neural net). Image/video models are ViTs/CNNs needing actual
-neural inference → too slow for pure Elixir. So NOT in-BEAM. Two paths that fit
-what we already have:
-  1. WASM — onnxruntime-web / tract compile the engine to WASM; transformers.js
-     runs CLIP/SigLIP image embeddings in-browser/Node today. Same Wasmex-sandbox
-     `embed`-command path, bigger model. Runs server AND browser, in our infra.
-  2. External API / sidecar.
-Either slots into =Workbooks.Embed= (the provider behaviour). =Workbooks.Vector=
-is already modality-agnostic (any dim) — only the EMBEDDER changes per modality;
-index + search + storage are unchanged.
+neural inference. That inference can run THREE ways, all behind =Workbooks.Embed=:
+  1. *IN-BEAM (Bumblebee + EXLA)* — the heavy in-process path. CLIP runs inside the
+     BEAM via Nx.Serving (one shared model, request batching). PROVEN here (see
+     "Tested" below). OPT-IN at build: =WB_BUMBLEBEE=1= pulls {bumblebee, exla, nx,
+     stb_image} AND compiles =host_ml/embed_bumblebee_clip.ex= — default builds pull
+     NONE of it (no XLA, lean image). Runtime route: =WB_EMBED=clip=. Scales (EXLA
+     dirty-NIF, batched), the cost is XLA in the image + the model download.
+  2. *WASM / browser* — transformers.js (onnxruntime-web) runs CLIP/SigLIP client-
+     side, same place =verify.mjs/embed.mjs= run. Sovereign, no server inference.
+  3. *Sidecar / API* — Node CLIP sidecar (=runtime/sidecar/clip=, no NIF) or a
+     hosted multimodal API. Connect via =WB_EMBED_IMAGE=http:<url>=.
+All slot into =Workbooks.Embed= (the provider behaviour). =Workbooks.Vector= is
+already modality-agnostic (any dim) — only the EMBEDDER changes per modality; index
++ search + storage are unchanged.
 
 * The models (2026)
 - *Gemini Embedding 2* (Google, public preview Mar 2026) — first natively
@@ -52,6 +57,14 @@ Ran =Xenova/clip-vit-base-patch32= (transformers.js): a dog photo scored
 image by meaning, inference 115 ms (native; 605 MB fp32 / q8 ≈ 150 MB). CLIP runs
 in WASM in any browser (transformers.js = onnxruntime-web) → a workbook can do
 sovereign image search CLIENT-SIDE, the same place verify.mjs/embed.mjs run.
+
+Then proven IN-BEAM too (=WB_BUMBLEBEE=1=, Bumblebee+EXLA, =openai/clip-vit-base-
+patch32=, 512-d joint space): the same dog photo embedded closer to =a photo of a
+dog= (cosine 0.279) than =a sports car= (0.219) — cross-modal correct, matching the
+Node sidecar (0.273 / 0.222). API: load the two towers separately with architecture
+=:for_embedding= (adds the projection head → joint space, output key =:embedding=);
+the full CLIP model can't serve one modality alone (needs both inputs at once).
+First call ~24 s (EXLA JIT + model download); warm calls are batched serving runs.
 
 * VLM2Vec-V2.0 — the preferred multimodal model (user pick), but GPU-only
 - Base = *Qwen2-VL-7B-Instruct* (7B params, bf16 ≈ ~15 GB on disk). Embeds text +
