@@ -22,6 +22,9 @@ defmodule Workbooks.Application do
     # Pre-warm the semantic embedder in the background (no-op unless WB_EMBED=local)
     # so the first search/index isn't blocked on the model download.
     Workbooks.Embed.Model2Vec.warm()
+    # Surface the search config so the embedder + vector backend aren't opaque.
+    require Logger
+    Logger.info("search config — embed: #{Workbooks.Embed.adapter() |> Module.split() |> List.last()}, vectors: #{Workbooks.DB.backend()}")
     result
   end
 
