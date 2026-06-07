@@ -1,24 +1,30 @@
 defmodule Workbooks.Embed do
   @moduledoc """
-  Text → vector — the embedding provider slot (same pattern as Storage/Browse).
-  Selected by `WB_EMBED`:
+  The embedding provider registry — OPEN + modality-aware. You connect ANY
+  embedder and the system routes by modality (text / image / video / …). Built-in
+  text adapters, plus a generic `Http` connector so you can plug an external model
+  on Modal / Replicate / Fly GPU / a HF Inference Endpoint / OpenRouter — wherever.
 
-    - `hash` (default) — zero-dep, offline, DETERMINISTIC feature-hashing of
-      character n-grams. A real LEXICAL-vector baseline (typo/substring tolerant),
-      so the whole vector pipeline works out of the box with no key + no model.
-      Not deeply semantic — that's the upgrade.
-    - `openrouter` — true semantic vectors via an OpenAI-compatible /embeddings
-      endpoint, reusing the existing LLM key. Per-query cost.
-    - `local` — a small model resident in the BEAM (all-MiniLM / EmbeddingGemma
-      via ortex/Bumblebee), serving every tenant from one load: the multi-tenant
-      semantic default. Heavy dep → wired in a later step (honest stub for now).
+  Two shapes, operator's choice:
+    * ONE unified model for everything — `WB_EMBED_MULTIMODAL=http:<url>` (e.g.
+      CLIP for text+image, or VLM2Vec for text+image+video). Text and image land
+      in the SAME space, so cross-modal search (text query → image hits) works.
+    * SEPARATE models per modality — `WB_EMBED` for text (default), plus
+      `WB_EMBED_IMAGE` / `WB_EMBED_VIDEO` = `http:<url>`. (Different providers =
+      different spaces: text-finds-text, image-finds-image, but NOT cross — for
+      cross-modal use one unified provider.)
 
-  Embed at STORE time, not query time (see docs/VECTOR-QUERY.org).
+  Adapter specs: `local` (Model2Vec, text) · `hash` (lexical text) · `openrouter`
+  (OpenAI-compatible text) · `http:<url>` (any endpoint, any modality). Embed at
+  STORE time, not query time (docs/VECTOR-QUERY.org, MULTIMODAL-EMBED-SPIKE.org).
   """
-  @callback embed(texts :: [String.t()]) :: {:ok, [[float]]} | {:error, term}
+  @callback embed(inputs :: [term]) :: {:ok, [[float]]} | {:error, term}
   @callback dim() :: pos_integer()
 
-  def adapter do
+  @doc "The text adapter module (for dim + the boot log + the Vector store)."
+  def adapter, do: text_adapter()
+
+  defp text_adapter do
     case System.get_env("WB_EMBED", "hash") do
       "openrouter" -> Workbooks.Embed.OpenRouter
       "local" -> Workbooks.Embed.Local
@@ -26,15 +32,44 @@ defmodule Workbooks.Embed do
     end
   end
 
-  @doc "Embed one or many texts → {:ok, [vector]} | {:error, _}."
-  def embed(text) when is_binary(text) do
-    case embed([text]), do: ({:ok, [v]} -> {:ok, v}; e -> e)
+  @doc "Embed one or many inputs for a modality (default :text) → {:ok, [vector]} | {:error, _}."
+  def embed(input, modality \\ :text)
+
+  def embed(input, modality) when is_binary(input) do
+    case embed([input], modality), do: ({:ok, [v]} -> {:ok, v}; e -> e)
   end
 
-  def embed(texts) when is_list(texts), do: adapter().embed(texts)
+  def embed(inputs, modality) when is_list(inputs) do
+    case provider(modality) do
+      {:http, url} -> Workbooks.Embed.Http.embed(url, inputs, modality)
+      nil -> {:error, "no embedder configured for #{modality} — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL)"}
+      mod when modality == :text -> mod.embed(inputs)
+      _ -> {:error, "#{modality} needs an external embedder — set WB_EMBED_#{up(modality)}=http:<url> (or WB_EMBED_MULTIMODAL for one cross-modal model)"}
+    end
+  end
 
-  @doc "The active adapter's vector dimension."
-  def dim, do: adapter().dim()
+  # The provider for a modality: a single multimodal endpoint covers all
+  # modalities (one space); else per-modality config; text falls back to built-in.
+  defp provider(modality) do
+    cond do
+      url = endpoint("WB_EMBED_MULTIMODAL") -> {:http, url}
+      modality == :text -> spec(System.get_env("WB_EMBED", "hash"))
+      url = endpoint("WB_EMBED_#{up(modality)}") -> {:http, url}
+      true -> spec(System.get_env("WB_EMBED_#{up(modality)}"))
+    end
+  end
+
+  defp endpoint(var), do: (case System.get_env(var), do: ("http:" <> u -> u; _ -> nil))
+  defp up(m), do: m |> to_string() |> String.upcase()
+
+  defp spec(nil), do: nil
+  defp spec("local"), do: Workbooks.Embed.Local
+  defp spec("openrouter"), do: Workbooks.Embed.OpenRouter
+  defp spec("http:" <> url), do: {:http, url}
+  defp spec(_), do: Workbooks.Embed.Hash
+
+  @doc "The active text adapter's vector dimension."
+  def dim, do: text_adapter().dim()
 
   @doc "Cosine similarity of two equal-length vectors."
   def cosine(a, b) do
@@ -124,6 +159,40 @@ defmodule Workbooks.Embed.OpenRouter do
 
       {:ok, {{_, c, _}, _, resp}} -> {:error, "HTTP #{c}: #{String.slice(resp, 0, 200)}"}
       {:error, e} -> {:error, inspect(e)}
+    end
+  end
+end
+
+defmodule Workbooks.Embed.Http do
+  @moduledoc """
+  The OPEN connection — any external embedder, any modality. POSTs
+  `{"inputs": [...], "modality": "text"|"image"|...}` to a configured endpoint and
+  reads vectors back (accepts `vectors` / `embeddings` / OpenAI `data[].embedding`).
+  Point a `WB_EMBED_*` var at it (`http:<url>`) and that's the model — Modal,
+  Replicate, Fly GPU, a HF Inference Endpoint, an OpenAI-compatible service, your
+  own sidecar. Auth via `WB_EMBED_KEY` (Bearer). The provider sets its modalities
+  by WHICH var points here (e.g. WB_EMBED_IMAGE, or WB_EMBED_MULTIMODAL for all).
+  """
+  def embed(url, inputs, modality) do
+    body = Jason.encode!(%{inputs: inputs, modality: to_string(modality)})
+    headers = [{~c"content-type", ~c"application/json"} | auth()]
+    :inets.start()
+    :ssl.start()
+
+    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
+      {:ok, {{_, 200, _}, _, resp}} ->
+        d = Jason.decode!(resp)
+        {:ok, d["vectors"] || d["embeddings"] || (d["data"] && Enum.map(d["data"], & &1["embedding"]))}
+
+      {:ok, {{_, c, _}, _, r}} -> {:error, "HTTP #{c}: #{String.slice(r, 0, 200)}"}
+      {:error, e} -> {:error, inspect(e)}
+    end
+  end
+
+  defp auth do
+    case System.get_env("WB_EMBED_KEY") do
+      nil -> []
+      k -> [{~c"authorization", String.to_charlist("Bearer " <> k)}]
     end
   end
 end
