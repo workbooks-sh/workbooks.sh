@@ -155,11 +155,16 @@ defmodule Workbooks.Library do
       nil -> {:error, "no such workspace: #{workspace_slug}"}
       ws ->
         repo = Git.repo_path(tenant)
+        # Partial vs full: opts[:only] packs just those member ids; default = all.
+        members = case opts[:only] do
+          nil -> ws.members
+          ids -> Enum.filter(ws.members, &(&1.id in List.wrap(ids)))
+        end
 
         parts =
-          for %{ref: {:path, p}} <- ws.members, into: %{} do
-            {p, File.read!(Path.join(repo, p))}
-          end
+          members
+          |> Enum.flat_map(fn %{ref: {:path, p}} -> vendor(repo, p) end)
+          |> Map.new()
           |> Map.put("workspace.org", File.read!(ws.path))
 
         parts = if opts[:include_private], do: parts, else: Workbooks.Private.strip_parts(parts)
@@ -182,6 +187,26 @@ defmodule Workbooks.Library do
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, content)
       name
+    end
+  end
+
+  # Vendor a member's bytes into the parent. A FILE member → that one file; a
+  # DIRECTORY member (a feature folder of mixed-language source — Svelte, Rust,
+  # SQL…) → its whole subtree, each file keyed by its repo-relative path so the
+  # tree round-trips exactly on unpack. Language-agnostic: it's just bytes+paths.
+  defp vendor(repo, p) do
+    full = Path.join(repo, p)
+
+    cond do
+      File.dir?(full) ->
+        full
+        |> Path.join("**/*")
+        |> Path.wildcard()
+        |> Enum.filter(&File.regular?/1)
+        |> Enum.map(fn f -> {Path.relative_to(f, repo), File.read!(f)} end)
+
+      File.regular?(full) -> [{p, File.read!(full)}]
+      true -> []
     end
   end
 
