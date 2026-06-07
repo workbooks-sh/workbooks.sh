@@ -18,8 +18,20 @@ defmodule Workbooks.Auth do
   @impl true
   def call(conn, _opts) do
     case bearer(conn) do
-      nil -> dev_fallback(conn)
+      nil -> no_bearer(conn)
       token -> verify(conn, token)
+    end
+  end
+
+  # No credential. Single-tenant allows the dev fallback; multi-tenant does NOT —
+  # isolation can't rest on a spoofable header, so a request must be authenticated.
+  # `/health` is infra liveness (no tenant data) — always allowed so load-balancer
+  # and `wb deploy verify` checks work in either mode.
+  defp no_bearer(conn) do
+    cond do
+      conn.request_path == "/health" -> dev_fallback(conn)
+      Workbooks.Tenancy.multi?() -> conn |> send_resp(401, "authentication required (multi-tenant)") |> halt()
+      true -> dev_fallback(conn)
     end
   end
 
