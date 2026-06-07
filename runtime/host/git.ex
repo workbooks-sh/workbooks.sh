@@ -53,20 +53,50 @@ defmodule Workbooks.Git do
 
   @doc """
   Generate+store a per-tenant Ed25519 keypair (`:crypto`) under `.workbooks/` —
-  the signing-key basis for the tenant's future Radicle DID. Untracked (the
-  private half never gets committed). Idempotent. Returns the public key (raw).
+  the signing-key basis for the tenant's DID. Untracked (the private half never
+  gets committed). Idempotent. Returns the public key (raw).
+
+  DURABILITY (the fix for ephemeral deploys): the keystore lives on the
+  container fs, which is wiped on every redeploy — so without a persisted seed a
+  redeploy MINTS A NEW DID and breaks every prior signature/ledger. For the
+  primary tenant we restore the keypair DETERMINISTICALLY from a persisted 32-byte
+  seed (`WB_SIGNING_KEY`, a Fly secret) so the DID is stable across deploys. Other
+  tenants' keys will come from the BYOD storage backend (next focus); until then
+  they regenerate, which is fine in single-tenant mode.
   """
   def ensure_keypair(dir, tenant) do
     path = key_path(dir, tenant)
 
     unless File.exists?(path) do
-      {pub, priv} = :crypto.generate_key(:eddsa, :ed25519)
+      {pub, priv} = restore_or_generate(tenant)
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, Base.encode16(priv, case: :lower))
       File.write!(path <> ".pub", Base.encode16(pub, case: :lower))
     end
 
     (path <> ".pub") |> File.read!() |> Base.decode16!(case: :lower)
+  end
+
+  # Restore the keypair from a persisted seed (stable DID across deploys) or mint
+  # a fresh one. `WB_SIGNING_KEY` = base64 of the 32-byte Ed25519 seed, held as a
+  # Fly secret; applies to the primary tenant (`WB_PRIMARY_TENANT`, default "dev").
+  defp restore_or_generate(tenant) do
+    case persisted_seed(tenant) do
+      {:ok, seed} -> {pub, _} = :crypto.generate_key(:eddsa, :ed25519, seed); {pub, seed}
+      :none -> :crypto.generate_key(:eddsa, :ed25519)
+    end
+  end
+
+  defp persisted_seed(tenant) do
+    primary = System.get_env("WB_PRIMARY_TENANT", "dev")
+
+    with true <- to_string(tenant) == primary,
+         k when is_binary(k) and k != "" <- System.get_env("WB_SIGNING_KEY"),
+         {:ok, seed} when byte_size(seed) == 32 <- Base.decode64(k) do
+      {:ok, seed}
+    else
+      _ -> :none
+    end
   end
 
   @doc """
