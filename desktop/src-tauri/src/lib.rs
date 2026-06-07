@@ -43,11 +43,32 @@ fn runtime_url() -> Runtime {
     }
 }
 
-/// Weave an Org workbook → HTML LOCALLY via the embedded OQL kernel — no runtime,
-/// no Docker. The workbook-native path: the app renders its own format offline.
+/// The embedded OQL kernel, exposed LOCALLY (no runtime, no Docker). The
+/// workbook-native surface: render/tangle/validate/lint/outline a workbook
+/// fully in-process.
 #[tauri::command]
 fn weave(org: String) -> Result<String, String> {
-    kernel::weave(&org)
+    kernel::call("render", &org)
+}
+
+#[tauri::command]
+fn tangle(org: String) -> Result<String, String> {
+    kernel::call("tangle-plan", &org)
+}
+
+#[tauri::command]
+fn validate(org: String) -> Result<String, String> {
+    kernel::call("validate", &org)
+}
+
+#[tauri::command]
+fn lint(org: String) -> Result<String, String> {
+    kernel::call("lint", &org)
+}
+
+#[tauri::command]
+fn outline(org: String) -> Result<String, String> {
+    kernel::call("parse-headlines", &org)
 }
 
 #[tauri::command]
@@ -69,6 +90,10 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             weave,
+            tangle,
+            validate,
+            lint,
+            outline,
             runtime_url,
             daemon_status,
             daemon_up,

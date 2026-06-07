@@ -80,5 +80,14 @@ mod tests {
         assert!(html.contains("Hello"), "expected heading text, got: {html}");
         assert!(html.contains('<'), "expected HTML markup, got: {html}");
     }
+
+    // The full kernel surface works in-process: outline + validate return JSON.
+    #[test]
+    fn outline_and_validate_return_json() {
+        let rows = super::call("parse-headlines", "* One\n** Two\n").expect("parse");
+        assert!(rows.trim_start().starts_with('[') || rows.contains("One"), "outline json: {rows}");
+        let diag = super::call("validate", "* x\n").expect("validate");
+        assert!(diag.trim_start().starts_with('[') || diag.trim_start().starts_with('{'), "validate json: {diag}");
+    }
 }
 
