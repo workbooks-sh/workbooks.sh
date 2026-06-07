@@ -136,6 +136,20 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, body)
   end
 
+  # Browse — the runtime's web capability, reachable over HTTP so any consumer
+  # (brandnana harvest, an agent, an external caller) can fetch/crawl/search
+  # through the configured provider (free native browser by default).
+  #   {"url": "...", "mode": "fetch"|"crawl", "as": "org"|"json"}
+  #   {"query": "...", "mode": "search"}
+  post "/api/browse" do
+    {:ok, body, conn} = read_body(conn)
+    params = Jason.decode!(body)
+    result = browse(params)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  rescue
+    e -> conn |> put_resp_content_type("application/json") |> send_resp(500, Jason.encode!(%{error: Exception.message(e)}))
+  end
+
   # The document viewer — a clean, Google-Docs-style reader for Workbooks.
   get "/docs" do
     conn |> put_resp_content_type("text/html") |> send_resp(200, viewer_page())
@@ -164,6 +178,32 @@ defmodule Workbooks.Web do
   # The viewer SPA: the runtime renders Org→HTML server-side (orgize, in the
   # kernel); the page only fetches that HTML + colors code (highlight.js, BSD).
   # No client Org library, no chrome — a clean page.
+  # Dispatch a /api/browse request to the Browse capability.
+  defp browse(%{"mode" => "search", "query" => q} = p) do
+    case Workbooks.Browse.search(q, limit: Map.get(p, "limit", 8)) do
+      {:ok, results} -> %{mode: "search", query: q, results: results}
+      {:error, reason} -> %{mode: "search", error: inspect(reason)}
+    end
+  end
+
+  defp browse(%{"mode" => "crawl", "url" => url} = p) do
+    {:ok, pages} = Workbooks.Browse.crawl(url, max_pages: Map.get(p, "max_pages", 10))
+    render_pages(pages, Map.get(p, "as", "json"))
+  end
+
+  defp browse(%{"url" => url} = p) do
+    case Workbooks.Browse.fetch(url) do
+      {:ok, page} -> render_pages([page], Map.get(p, "as", "json"))
+      {:error, reason} -> %{error: inspect(reason)}
+    end
+  end
+
+  defp render_pages(pages, "org"),
+    do: %{count: length(pages), org: Workbooks.Browse.Crawl.to_org(pages)}
+
+  defp render_pages(pages, _),
+    do: %{count: length(pages), pages: Enum.map(pages, &Map.take(&1, [:url, :title, :description, :headings]))}
+
   defp viewer_page do
     ~S"""
     <!doctype html><html lang="en"><head>
