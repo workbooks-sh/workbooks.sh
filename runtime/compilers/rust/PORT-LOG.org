@@ -381,3 +381,22 @@
   deep but mapped — 3 paths (A: -O0/debug mrustc.wasm; B: Linux __2 native build; C: ABI-stable
   .hir patch). The key discipline: keep ONE mrustc toolchain's .hir throughout (don't mix
   native __1 and wasm __2 in output-wasi).
+
+* 2026-06-07 (iter 19) — the crux blocker named: .hir ABI-consistency vs the build system
+  Tried the clean -O0 Path-A test (rebuild all deps via -O0 mrustc.wasm). The deps came out
+  __1 again → minicargo used NATIVE bin/mrustc for them, not the MRUSTC= wrapper (the override
+  isn't honored for every crate; minicargo invokes bin/mrustc directly in places). So output-
+  wasi keeps ending up mixed/native-__1, and any mrustc.wasm (__2) read of it fails.
+  => THE crux for untrusted-std-in-sandbox is build-system plumbing, not a compiler wall:
+     EVERY libstd crate's .hir must be produced by mrustc.wasm (__2), with NO native bin/mrustc
+     in the loop. minicargo fights this. CLEANEST fix = DON'T use minicargo for the wasm libstd;
+     instead capture the static per-crate command list ONCE (from a verbose native minicargo
+     run) and host-orchestrate the replay purely with mrustc.wasm + clang.wasm (no bin/mrustc
+     anywhere) — exactly the wb-zyl.7 no_std approach, scaled to the std graph. Then verify
+     `llvm-nm`/grep the libcore.hir contains __2 (not __1) BEFORE building libstd.
+  This is bounded shell-orchestration (≈16 ordered mrustc.wasm calls + clang.wasm), no new
+  compiler walls expected (every crate already compiles via mrustc.wasm individually).
+  HONEST BOTTOM LINE: full std COMPILES+RUNS in wasm (iter 14, proven). Untrusted-fully-in-
+  sandbox is gated ONLY on doing the trusted libstd prebuild with a pure-mrustc.wasm pipeline
+  (ABI-consistent .hir). Not a fundamental wall — orchestration. Paths A(-O0/debug)/B(Linux
+  __2)/C(ABI-stable .hir patch) remain if the pure replay still trips the libstd trap.
