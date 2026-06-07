@@ -1,0 +1,16 @@
+#+TITLE: huniq — overview
+#+CAPTION: What huniq does and when to reach for it
+
+* What it is
+  =huniq= removes duplicate lines from stdin, keeping the FIRST occurrence and
+  preserving input order. It is faster and order-preserving compared to the
+  =sort | uniq= idiom.
+
+* The command
+  Reads stdin, writes deduped lines to stdout. No flags needed for the common
+  case.
+
+  #+begin_src bash :role pre
+  # Build is satisfiable: the crate is fetchable and WASI-clean.
+  command -v cargo >/dev/null
+  #+end_src

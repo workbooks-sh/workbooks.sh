@@ -216,6 +216,7 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "show", id, skill], _t), do: Toolkits.show_skill_text(id, skill)
   def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
+  def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
 
   def call(["toolkit", "run", id, task | rest], _t),
     do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
@@ -264,7 +265,8 @@ defmodule Workbooks.CLI do
       wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
       wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
       wb toolkit search <query>            substring search across all skills
-      wb toolkit verify <id>               structural checks + run the toolkit's :role pre blocks
+      wb toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
+      wb toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
       wb toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
       wb version
     """
