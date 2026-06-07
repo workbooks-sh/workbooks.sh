@@ -14,6 +14,50 @@ defmodule Workbooks.Embed.Model2Vec do
   Loaded once into :persistent_term. `model` is %{vocab, unk, matrix, dim, normalize}.
   """
 
+  @model_id "minishlab/potion-base-8M"
+  @files ~w(config.json vocab.txt model.safetensors)
+  @pt {__MODULE__, :model}
+
+  @doc """
+  The resident model — downloaded once to `<WB_DATA>/_models/<id>/` (cached on the
+  storage volume across redeploys), loaded once into :persistent_term, then shared
+  by every tenant. `WB_EMBED_MODEL` overrides the model id (any Model2Vec/potion).
+  """
+  def get do
+    case :persistent_term.get(@pt, nil) do
+      nil ->
+        model = load(ensure_downloaded())
+        :persistent_term.put(@pt, model)
+        model
+
+      model -> model
+    end
+  end
+
+  defp ensure_downloaded do
+    id = System.get_env("WB_EMBED_MODEL", @model_id)
+    dir = Path.join([System.get_env("WB_DATA", "tmp/data"), "_models", Path.basename(id)])
+    File.mkdir_p!(dir)
+
+    Enum.each(@files, fn f ->
+      path = Path.join(dir, f)
+      unless File.exists?(path), do: fetch("https://huggingface.co/#{id}/resolve/main/#{f}", path)
+    end)
+
+    dir
+  end
+
+  defp fetch(url, path) do
+    :inets.start()
+    :ssl.start()
+    req = {String.to_charlist(url), [{~c"user-agent", ~c"workbooks-runtime"}]}
+
+    case :httpc.request(:get, req, [autoredirect: true, timeout: 180_000], body_format: :binary) do
+      {:ok, {{_, 200, _}, _, body}} -> File.write!(path, body)
+      other -> raise "model download failed (#{url}): #{inspect(elem(other, 0))}"
+    end
+  end
+
   # ── load ──────────────────────────────────────────────────────────────────────
   @doc """
   Load a model from a dir holding `config.json`, `vocab.txt` (one token per line,
