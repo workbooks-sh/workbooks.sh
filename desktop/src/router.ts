@@ -81,5 +81,15 @@ export const routerOptions: RouterOptions = {
         return true;
       },
     },
+    {
+      // The runtime weaves a stored Org workbook → HTML; the webview renders it.
+      name: "workbook",
+      path: "/workbook",
+      component: () => import("$lib/views/WorkbookView.svelte"),
+      beforeEnter: (nav) => {
+        chrome.section = "Workbook";
+        return requireSidecar(nav);
+      },
+    },
   ],
 };
