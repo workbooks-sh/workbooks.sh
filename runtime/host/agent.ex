@@ -142,14 +142,6 @@ defmodule Workbooks.Agent do
   # Exec agents share an OS workdir (the substrate the toolkit CLIs + the next
   # agent read) — so their "filesystem" tools target that workdir, not the
   # per-agent in-memory VFS. Non-exec agents use the sandboxed VFS.
-  # Resolve an agent-supplied path under the workdir. Absolute paths are used
-  # as-is (the agent already knows the workdir) — else Path.join would DOUBLE it
-  # (workdir/workdir/analysis/x.org), hiding files from `analysis check` + the
-  # next agent. Relative paths join under the workdir.
-  defp in_workdir(workdir, path) do
-    if Path.type(path) == :absolute, do: path, else: Path.join(workdir, path || "")
-  end
-
   defp exec_one(%{name: "vfs_write", args: a}, %{exec: true} = st) do
     path = in_workdir(st.workdir, a["path"])
     File.mkdir_p!(Path.dirname(path))
@@ -189,6 +181,14 @@ defmodule Workbooks.Agent do
 
   defp exec_one(%{name: "done", args: a}, st), do: {"ok", st, a["result"] || ""}
   defp exec_one(%{name: n}, st), do: {"unknown tool: #{n}", st, nil}
+
+  # Resolve an agent-supplied path under the workdir. Absolute paths are used
+  # as-is (the agent already knows the workdir) — else Path.join would DOUBLE it
+  # (workdir/workdir/analysis/x.org), hiding files from `analysis check` + the
+  # next agent. Relative paths join under the workdir.
+  defp in_workdir(workdir, path) do
+    if Path.type(path) == :absolute, do: path, else: Path.join(workdir, path || "")
+  end
 
   # Research fetch: GET a URL, strip HTML to readable text, truncate for the model.
   defp fetch_url(url) do
