@@ -174,7 +174,12 @@ defmodule Workbooks.Library do
           |> Map.new()
           |> Map.put("workspace.org", File.read!(ws.path))
 
-        parts = if include_private, do: parts, else: Workbooks.Private.strip_parts(parts)
+        # Privacy = built-in safe defaults (Workbooks.Private) PLUS the repo's own
+        # `.gitignore`, honored via git's OWN matcher (`git check-ignore`). So the
+        # agent's NATIVE git instinct — the .gitignore it already writes — IS the
+        # share boundary; there's no bespoke API to learn, and the defaults hold
+        # even if it writes nothing. Safe by default, native by design.
+        parts = if include_private, do: parts, else: parts |> Workbooks.Private.strip_parts() |> drop_gitignored(repo)
         parts = if opts[:build], do: build_projection(parts, include_private), else: parts
         {:ok, Workbooks.Bundle.pack(parts)}
     end
@@ -256,6 +261,23 @@ defmodule Workbooks.Library do
       File.regular?(full) -> [{p, File.read!(full)}]
       true -> []
     end
+  end
+
+  # Drop any part the tenant repo's .gitignore covers — using git's own matcher,
+  # not a reimplementation (DRY + exact git semantics). The agent marks "don't
+  # share" the same way it marks "don't track": a .gitignore line it already knows.
+  defp drop_gitignored(parts, repo) do
+    names = Map.keys(parts)
+
+    ignored =
+      case System.cmd("git", ["check-ignore" | names], cd: repo, stderr_to_stdout: true) do
+        {out, _} -> out |> String.split("\n", trim: true) |> MapSet.new()
+        _ -> MapSet.new()
+      end
+
+    Map.reject(parts, fn {name, _} -> MapSet.member?(ignored, name) end)
+  rescue
+    _ -> parts
   end
 
   defp find(tenant, member_id), do: Enum.find(members(tenant), &(&1.id == member_id))
