@@ -320,3 +320,23 @@
   Then mrustc.wasm compiles the untrusted .rs against THAT libstd.hir → run. Mechanical;
   no new walls expected (every crate already compiled cleanly via native mrustc w/ identical
   flags). Memory fine (libstd.c 26MB; 4GB never approached).
+
+* 2026-06-07 (iter 16) — untrusted-std-in-sandbox: 15/16 crates via mrustc.wasm; libstd traps
+  Built the ABI-consistent libstd deps THROUGH mrustc.wasm (std/mrustc-via-wasm.sh: native
+  minicargo orchestrates, but MRUSTC routes to mrustc.wasm for .hir + clang.wasm for .c→.o +
+  ar). RESULT: all 14 dep crates + the `wasi` bindings crate built via mrustc.wasm (.hir in
+  the __1 libc++ ABI that mrustc.wasm reads). ONLY libstd itself fails:
+    mrustc.wasm on rustc-1.54 library/std → "wasm trap: unreachable" right after Parse
+    (~0.3s, peak RSS ~222MB). NOT memory, NOT stack (tried 64MB AND 256MB stacks — same).
+    Native mrustc compiles the SAME libstd fine → it's an mrustc.wasm-specific bug that only
+    the largest crate triggers (a latent UB / edge case benign natively but trapping in wasm).
+  So untrusted-std-FULLY-in-sandbox is blocked on ONE of two specific walls:
+   (A) the mrustc.wasm libstd-crate trap — needs a SYMBOL'D debug mrustc.wasm (-g, no -O) to
+       locate the faulting function, then fix the mrustc bug; OR
+   (B) the .hir libc++-ABI mismatch (native mrustc serializes its C++ HIR types with the host
+       libc++ inline namespace __2; mrustc.wasm expects __1) — rebuild NATIVE mrustc against a
+       __1 libc++ so its (working) libstd.hir is readable by mrustc.wasm. Then native-built
+       libstd + in-sandbox user compile works (no need to compile libstd in wasm at all).
+  Path B is likely FASTER (no mrustc bug to chase): just match the host libc++ ABI.
+  UNCHANGED: full std COMPILES + RUNS in wasm ("...42", iter 14) — the pipeline is proven;
+  this is specifically about doing the (trusted) libstd build with an in-sandbox-readable .hir.
