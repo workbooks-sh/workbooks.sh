@@ -1,27 +1,31 @@
 defmodule Workbooks.Vector do
   @moduledoc """
   Tenant-scoped vector store — the semantic index, on the BYO structured backend
-  (`Workbooks.DB`: SQLite default, Postgres when configured). Brute-force cosine
-  for now (fine for one library); the interface is stable so a pgvector / sqlite-vec
-  ANN adapter drops in later without changing callers (VECTOR-QUERY.org).
+  (`Workbooks.DB`). Backend-aware:
 
-  Tenant-scoped exactly like blobs/rows: `tenant` is the first arg of every call,
-  so one tenant's vectors are never visible to another. Vectors are stored as JSON
-  with their source metadata ({workbook, path, headline, text}) so a hit points
-  back to where it came from.
+    - SQLite (default): vectors as JSON, brute-force cosine in Elixir — fine for
+      one library, zero extension. (sqlite-vec is the ANN upgrade when the
+      extension is loadable.)
+    - Postgres: a `pgvector` column + ANN in the database (`<=>` cosine distance,
+      indexable) — scales to many tenants. The same interface either way, so
+      callers never branch.
+
+  Tenant-scoped: `tenant` is the first arg of every call; one tenant's vectors are
+  never visible to another. Each row carries source metadata {workbook, path,
+  headline, text} so a hit points back. See VECTOR-QUERY.org.
   """
   alias Workbooks.{DB, Embed}
 
   @doc "Upsert a chunk's vector + source metadata under the tenant scope."
   def upsert(tenant, id, vector, meta \\ %{}) do
     h = open()
-    # delete-then-insert = portable upsert (works on SQLite AND Postgres).
     DB.query(h, "DELETE FROM vectors WHERE tenant=?1 AND id=?2", [tenant, id])
+    vec = if pg?(), do: vec_literal(vector), else: Jason.encode!(vector)
 
     DB.query(
       h,
       "INSERT INTO vectors (tenant, id, workbook, path, headline, vec, text) VALUES (?1,?2,?3,?4,?5,?6,?7)",
-      [tenant, id, meta[:workbook] || "", meta[:path] || "", meta[:headline] || "", Jason.encode!(vector), meta[:text] || ""]
+      [tenant, id, meta[:workbook] || "", meta[:path] || "", meta[:headline] || "", vec, meta[:text] || ""]
     )
 
     :ok
@@ -29,23 +33,14 @@ defmodule Workbooks.Vector do
 
   @doc """
   Semantic search: top-`k` chunks by cosine to `query_vec`, within the tenant.
-  opts: :workbook (one) or :workbooks (a list — a workspace/library scope), :k.
-  Returns [%{id, workbook, path, headline, text, score}] (highest score first).
+  Postgres does the ranking in-DB (ANN); SQLite ranks brute-force. opts:
+  :workbook / :workbooks (scope), :k. Returns [%{id, workbook, path, headline,
+  text, score}] highest-first.
   """
   def search(tenant, query_vec, opts \\ []) do
-    h = open()
     k = opts[:k] || 5
     scope = List.wrap(opts[:workbooks] || opts[:workbook])
-
-    rows = DB.query(h, "SELECT id, workbook, path, headline, vec, text FROM vectors WHERE tenant=?1", [tenant])
-
-    rows
-    |> Enum.map(fn [id, wb, path, hl, vec, text] ->
-      %{id: id, workbook: wb, path: path, headline: hl, text: text, score: Embed.cosine(query_vec, Jason.decode!(vec))}
-    end)
-    |> then(fn hits -> if scope == [], do: hits, else: Enum.filter(hits, &(&1.workbook in scope)) end)
-    |> Enum.sort_by(& &1.score, :desc)
-    |> Enum.take(k)
+    if pg?(), do: pg_search(tenant, query_vec, k, scope), else: sqlite_search(tenant, query_vec, k, scope)
   end
 
   @doc "Drop a workbook's vectors (re-index / delete)."
@@ -54,14 +49,57 @@ defmodule Workbooks.Vector do
     :ok
   end
 
+  # ── SQLite path (brute-force cosine, the live-tested default) ─────────────────
+  defp sqlite_search(tenant, query_vec, k, scope) do
+    DB.query(open(), "SELECT id, workbook, path, headline, vec, text FROM vectors WHERE tenant=?1", [tenant])
+    |> Enum.map(fn [id, wb, path, hl, vec, text] ->
+      %{id: id, workbook: wb, path: path, headline: hl, text: text, score: Embed.cosine(query_vec, Jason.decode!(vec))}
+    end)
+    |> scope_filter(scope)
+    |> Enum.sort_by(& &1.score, :desc)
+    |> Enum.take(k)
+  end
+
+  # ── Postgres path (pgvector — ANN in-DB; shape-tested, live step documented) ──
+  defp pg_search(tenant, query_vec, k, scope) do
+    {clause, params} =
+      if scope == [],
+        do: {"", []},
+        else: {" AND workbook = ANY(?2)", [scope]}
+
+    qparam = if scope == [], do: 2, else: 3
+
+    sql =
+      "SELECT id, workbook, path, headline, 1 - (vec <=> ?#{qparam}::vector) AS score, text " <>
+        "FROM vectors WHERE tenant=?1#{clause} ORDER BY vec <=> ?#{qparam}::vector LIMIT #{k}"
+
+    DB.query(open(), sql, [tenant] ++ params ++ [vec_literal(query_vec)])
+    |> Enum.map(fn [id, wb, path, hl, score, text] ->
+      %{id: id, workbook: wb, path: path, headline: hl, text: text, score: score}
+    end)
+  end
+
+  defp scope_filter(hits, []), do: hits
+  defp scope_filter(hits, scope), do: Enum.filter(hits, &(&1.workbook in scope))
+
+  # pgvector literal: "[0.1,0.2,…]" (cast `::vector` in the query).
+  @doc false
+  def vec_literal(vector), do: "[" <> Enum.map_join(vector, ",", &to_string/1) <> "]"
+
+  defp pg?, do: DB.backend() == :postgres
+
   defp open do
     h = DB.open("vectors")
-    DB.execute(h, """
-    CREATE TABLE IF NOT EXISTS vectors (
-      tenant TEXT, id TEXT, workbook TEXT, path TEXT, headline TEXT, vec TEXT, text TEXT
-    )
-    """)
 
+    ddl =
+      if pg?() do
+        DB.execute(h, "CREATE EXTENSION IF NOT EXISTS vector")
+        "CREATE TABLE IF NOT EXISTS vectors (tenant TEXT, id TEXT, workbook TEXT, path TEXT, headline TEXT, vec vector(#{Embed.dim()}), text TEXT)"
+      else
+        "CREATE TABLE IF NOT EXISTS vectors (tenant TEXT, id TEXT, workbook TEXT, path TEXT, headline TEXT, vec TEXT, text TEXT)"
+      end
+
+    DB.execute(h, ddl)
     h
   end
 end
