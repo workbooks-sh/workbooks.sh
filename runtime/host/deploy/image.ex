@@ -37,7 +37,9 @@ defmodule Workbooks.Deploy.Image do
   registry (CI uses GITHUB_TOKEN; a maintainer uses a PAT).
   """
   def publish(opts \\ []) do
-    platforms = Keyword.get(opts, :platforms, "linux/amd64,linux/arm64")
+    # WB_PLATFORMS lets CI build a single arch NATIVELY (no QEMU) — e.g. arm64 on
+    # an arm runner — which is ~10× faster than emulated multi-arch.
+    platforms = Keyword.get(opts, :platforms, System.get_env("WB_PLATFORMS", "linux/amd64,linux/arm64"))
 
     with {:ok, root} <- repo_root() do
       sha = git_sha(root)

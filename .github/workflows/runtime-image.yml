@@ -24,15 +24,17 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    # Native arm64 runner → no QEMU, ~10× faster than emulated multi-arch. mac-first
+    # local deploys need arm64; WB_PLATFORMS pins it (amd64 cloud = a later matrix arm).
+    runs-on: ubuntu-24.04-arm
+    env:
+      WB_PLATFORMS: linux/arm64
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
 
-      # Buildx + emulation so the deploy-kit can build linux/amd64 + linux/arm64.
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       # Registry auth (the deploy-kit shells `docker buildx --push`).
