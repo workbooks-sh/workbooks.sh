@@ -301,3 +301,22 @@
   REMAINING for UNTRUSTED-in-sandbox std: the user hello.rs→C step here used NATIVE mrustc;
   rebuild mrustc.wasm WITH this patch (ARCH_WASM32 + builtin target + wasm_import) so untrusted
   .rs compiles in-sandbox against the (trusted, prebuilt) libstd — mechanical, same as no_std.
+
+* 2026-06-07 (iter 15) — std RUNS in wasm ✓; untrusted-in-sandbox needs ABI-consistent libstd
+  Rebuilt mrustc.wasm WITH the patch (ARCH_WASM32 + builtin wasm32-wasi + wasm_import) and
+  tried the untrusted path: mrustc.wasm compiling hello.rs in-sandbox against the (native-built)
+  libstd.hir. WALL: mrustc.wasm errors reading the .hir —
+    "Expecting OpenNamed(NSt3__26vector...) got OpenNamed(NSt3__16vector...)"
+  = a libc++ ABI mismatch in the SERIALIZED .hir: native mrustc was built with host libc++
+  (std::__2) but mrustc.wasm with wasi-sdk libc++ (std::__1); the .hir embeds C++ mangled type
+  names that differ. So the .hir is reader-specific.
+  => For UNTRUSTED std-in-sandbox, libstd must be built BY mrustc.wasm (so its .hir matches the
+     in-sandbox reader) — exactly how no_std/libcore worked in-sandbox (wb-zyl.7). The native
+     libstd build proved the PIPELINE (std compiles+runs in wasm: "...42"); it's just not the
+     ABI-matching artifact for the in-sandbox compiler.
+  FINAL STEP: build libstd via mrustc.wasm (host-orchestrated per-crate: mrustc.wasm emits
+  .c+.hir for core→…→std with the wasm32-wasi target; clang.wasm compiles each .c → .o — the
+  same split we use everywhere, since mrustc.wasm's own cc step is stubbed under __wasi__).
+  Then mrustc.wasm compiles the untrusted .rs against THAT libstd.hir → run. Mechanical;
+  no new walls expected (every crate already compiled cleanly via native mrustc w/ identical
+  flags). Memory fine (libstd.c 26MB; 4GB never approached).
