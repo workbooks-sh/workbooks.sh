@@ -1,7 +1,15 @@
 #+TITLE: Toolkit authoring — the depth/breadth standard every toolkit follows
 #+DATE: 2026-06-05
 #+EPIC: wb-skv2
-#+RELATED: ../runtime/docs/TOOLKITS-PLAN.org, ../runtime/docs/TOOLKIT-SKILLS-V2.org, ../runtime/docs/TOOLKIT-DISCOVERY.org
+#+RELATED: ../runtime/docs/TOOLKITS-V3.org (authoritative, clean-room), ../runtime/docs/TOOLKITS-PLAN.org, ../runtime/docs/TOOLKIT-SKILLS-V2.org, ../runtime/docs/TOOLKIT-DISCOVERY.org
+
+#+BEGIN_COMMENT
+NOTE (2026-06-07): the three RELATED design docs were restored from the archive
+this day (each carries a clean-room reconciliation banner). For the AUTHORITATIVE
+clean-room shape — per-toolkit #+EXEC mode, the `wb toolkit` surface, telemetry/
+VFS integration — read ../runtime/docs/TOOLKITS-V3.org first. This file remains
+the operational "exactly what to write" standard; V3 owns the runtime contract.
+#+END_COMMENT
 
 * Why this doc
 

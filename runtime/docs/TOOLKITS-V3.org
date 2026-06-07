@@ -1,0 +1,251 @@
+#+TITLE: Toolkits V3 — the clean-room toolkit system (authoritative)
+#+DATE: 2026-06-07
+#+EPIC: wb-tk3
+#+STATUS: PLAN
+#+SUPERSEDES: TOOLKITS-PLAN.org, TOOLKIT-SKILLS-V2.org, TOOLKIT-DISCOVERY.org (for the clean-room)
+#+RELATED: ARCHITECTURE.org, EXTENSIONS-ORB.org, PLUGINS-PLAN.org, ../../toolkits/AUTHORING.org
+
+* What this doc is
+
+  The single source of truth for the toolkit system *in the clean-room runtime*
+  (this repo, workbooks.sh). It reconciles the restored mainline design docs
+  (TOOLKITS-PLAN / TOOLKIT-SKILLS-V2 / TOOLKIT-DISCOVERY — kept for provenance,
+  each banner-flagged) with what the clean-room actually is: a ~2.4k-LOC L0 core
+  where a CLI is a WASM `run-command`, not a native PATH binary, and where
+  telemetry + SQLite/VFS are first-class.
+
+  Read ARCHITECTURE.org for the onion (L0–L4); a toolkit is L4. Read
+  EXTENSIONS-ORB.org for toolkit-vs-extension-vs-capability vocabulary.
+
+* The three nouns (settled — do not conflate)
+
+  - *Capability* — a Dock import (a host power: vfs, llm, net, browse), gated by
+    Policy. The thing WASM cannot do that the host provides.
+  - *Command* — a CLI converted to a runnable WASM module (stdin→stdout),
+    invoked by name via the `run-command` Dock import. CommandRegistry. The
+    executable leaf. jq, grep, and any toolkit's CLI live here.
+  - *Toolkit* — the AGENT-FACING front door: a `:toolkit:`-tagged org node
+    (manifest) naming a CLI + a SKILL_DIR of progressive-disclosure recipes the
+    agent reads on demand. Trusted; about agent competence; discovered by
+    `(tags :toolkit:)`.
+
+  Nesting: a Toolkit wraps a CLI; that CLI becomes a Command; Workflows
+  orchestrate components that run Commands. A toolkit is NEVER a new core
+  registry entry — bash/the Dock stays the agent's one tool.
+
+* What exists today (2026-06-07 audit)
+
+  | Piece                       | State    | Where                              |
+  |-----------------------------+----------+------------------------------------|
+  | Skill FORMAT + depth bar    | DONE     | toolkits/AUTHORING.org + 40 toolkits |
+  | 40+ authored toolkits       | DONE*    | toolkits/<name>/{manifest,skills}  |
+  | Discovery (tags :toolkit:)  | DONE     | runtime/host/toolkits.ex (88 LOC)  |
+  | CLI = WASM command          | PARTIAL  | command_registry.ex (3: upper/jq/grep) |
+  | `wb toolkit` learn-surface  | MISSING  | (was Rust toolkit.rs in archive)   |
+  | Manifest auto-injection     | MISSING  | (no SessionRunner index inject)    |
+  | run-command telemetry hook  | MISSING  | instance/imports.ex (no workdir ctx) |
+  | command caps (vfs/net/secret)| STUB    | policy.ex net/llm declared, stubbed |
+  | Design docs                 | RESTORED | this commit                        |
+
+  (*) The 40 toolkits were authored against the OLD mainline: they assume native
+  PATH binaries and the old `wb toolkit` Rust runner. Their *skill docs* are
+  good; their *execution contract* needs re-pointing at the clean-room.
+
+* The core decisions
+
+** Execution mode is per-toolkit, declared in the manifest (NOT a global rule)
+   A toolkit's manifest declares how its CLI runs. No single "everything is
+   WASM" or "everything is PATH" law — resolve case-by-case as we re-author.
+
+   #+BEGIN_SRC org
+   #+EXEC: command       # CLI_BIN is a registered WASM run-command (jq, grep) — default, most portable
+   #+EXEC: posix         # CLI_BIN is a native PATH binary, run under the `posix` Policy profile inside the microVM (ffmpeg-class)
+   #+EXEC: task          # no single CLI; the toolkit ships :role task bash recipes run via `wb toolkit run`
+   #+EXEC: federation    # no CLI; a data-source plugin + sync daemon (see §Federation)
+   #+END_SRC
+
+   The microVM (Fly/Firecracker/libkrun) is already the tenancy isolation
+   boundary, so `posix` native binaries are safe there; `command` (WASM) is the
+   tighter, portable default. `wb toolkit verify` checks the declared EXEC mode
+   is satisfiable (command registered / binary on PATH).
+
+** Progressive disclosure is the whole point (carried forward, unchanged)
+   Manifest = the INDEX (need-keyed table), skills read on demand via `cat`.
+   Three tiers an agent reaches for the HIGHEST that fits:
+   1. MANIFEST — auto-injected catalog row (+ #+FLOW for deep CLIs).
+   2. TASK — one runnable recipe per common multi-verb NEED (the noun, not a
+      verb chain). Default entry for deep CLIs.
+   3. LEAF — full per-verb reference, read only off the happy path.
+   Thin skill = one .org; thick skill = skills/<slug>/SKILL.org + references/.
+   This is all already specified in AUTHORING.org + TOOLKIT-SKILLS-V2.org.
+
+* Minimal authoring: the CLI→WASM auto-wrap (the build model)
+
+  The authoring goal is ZERO glue code per toolkit. The author writes a build
+  descriptor (a few manifest lines) + the org skills. Nothing else — no bindings,
+  no host shim, no per-CLI API definition.
+
+** The load-bearing insight: stdio IS the universal API
+   A CLI's interface is `argv + stdin → stdout + exit code`. Every CLI shares
+   that ABI; WASI preserves it exactly. So `run-command(argv, stdin) → stdout` is
+   ALREADY the API for every toolkit. There is nothing to generate. You do NOT
+   compile a CLI to get a "schema" — you get the universal stdio ABI for free.
+
+   Corollary (state plainly, it prevents a wrong turn): compiling a CLI to WASM
+   does NOT and CANNOT yield a *semantic* schema (what the flags/subcommands
+   mean, the gotchas, the right recipe). That knowledge is un-extractable from a
+   binary — it is exactly what the org skill is. The .wasm and the org are
+   orthogonal:
+   - .wasm  = AUTO-BUILT from source. stdio ABI universal ⇒ zero glue.
+   - skills = HAND-AUTHORED. the semantic surface; un-generatable from a binary.
+   (`<cli> --help` captured in the build sandbox MAY seed overview/leaf drafts —
+   a starting point, never a substitute for the depth bar.)
+
+** The manifest build descriptor (the few lines an author adds)
+   #+BEGIN_SRC org
+   #+EXEC:       command            # see EXEC modes above
+   #+BUILD_SRC:  cargo:jaq-interpret # crate | git+<url> | path:<dir> | bin:<name>
+   #+BUILD_LANG: rust               # rust | go | js | py — picks the build recipe
+   #+CAPS:       net                # WASI worlds / Dock imports the wasm may use; deployer grants
+   #+END_SRC
+   `wb toolkit build <name>` → PackageManager picks the lang recipe → compiles
+   under Sandbox (network-denied) → content-addresses → registers the artifact in
+   CommandRegistry under CLI_BIN. One single .wasm per toolkit CLI. (Bundling the
+   .wasm + org into a distributable .html Workbook is OPTIONAL — a distribution
+   concern, not an authoring one.)
+
+** Per-language build recipes (extends PackageManager.build_dir/2)
+   | Lang   | Path                                            | Reality                       |
+   |--------+-------------------------------------------------+-------------------------------|
+   | rust   | cargo build --target wasm32-wasip2 + component  | cleanest; jq/grep already this |
+   | go     | GOOS=wasip1 go build / TinyGo                    | works for many                |
+   | js/ts  | Javy / jco componentize                         | works                         |
+   | py/rb  | componentize-py                                 | heavy; pure-source only       |
+   | c/c++  | wasi-sdk clang                                   | hard/often infeasible → posix |
+
+   HONEST SCOPE: auto-wrap works for CLIs that compile CLEAN to WASI — pure
+   compute + stdio + files (~80%: text tools, jq-likes, image libs). Native C
+   deps / threads / browser / GPU (ffmpeg-class) do NOT transparently wasm — they
+   take #+EXEC: posix. Do not promise "any CLI"; promise "any WASI-clean CLI,
+   posix-fallback the rest."
+
+* Capabilities: what WASM can't do — two layers, do not conflate
+
+  "Outsource to the build profile that does the dock pallet assembly" is really
+  TWO things:
+  1. BUILD-TIME (the build recipe) — compile the crate to wasm + link as a
+     component, under Sandbox. PackageManager + Sandbox. Produces the .wasm.
+  2. RUN-TIME (the Dock) — when the running wasm tries what WASM can't, it calls
+     OUT to a host import, gated by Policy. "Dock pallet assembly" =
+     Instance.Imports.for_caps/3 building the host closures for the granted caps.
+     THIS ALREADY EXISTS.
+
+  The capability ladder (free → escape hatch):
+  | CLI needs                       | Mechanism                                          | Cost            |
+  |---------------------------------+----------------------------------------------------+-----------------|
+  | compute, stdin/stdout           | the run-command ABI                                | free, today     |
+  | clock/random/env/scoped dir     | WASI-p2 (host configures preopens)                 | cheap           |
+  | network                         | wasi:http outbound, gated by `net` cap (stock CLIs)| REAL WORK       |
+  | TLS-fingerprint / headless browser | custom Dock import (browse-fetch); CLI never holds a socket | per-cap closure |
+  | ffmpeg-class native             | #+EXEC: posix, native in microVM                   | accept it       |
+
+  The one genuinely new decision: support `wasi:http` host-gated so a STOCK
+  network CLI runs unmodified (gated at the WASI boundary), rather than forcing
+  CLIs to call our typed net-fetch (only works for CLIs written for us — not
+  stock). Recommendation: wire wasi:http behind the `net` cap; raw TCP
+  (wasi:sockets) behind a stricter cap. The capability gate stays the single
+  telemetry/enforcement chokepoint (per EXTENSIONS-ORB.org).
+
+* The headline build: the `wb toolkit` surface
+
+  Reimplement the archive's Rust toolkit.rs (2278 LOC) as Elixir subcommands in
+  runtime/host/cli.ex. THIS is the "CLI help-wrapper that teaches the agent the
+  underlying CLI from our skill files." It is mostly thin `cat`/`ls` over org +
+  the role-block executor.
+
+  | Subcommand                          | Does                                                   |
+  |-------------------------------------+--------------------------------------------------------|
+  | =wb toolkit list=                   | scan discovery root, print manifest summaries          |
+  | =wb toolkit show <tk>=              | manifest body + skill index table                      |
+  | =wb toolkit show <tk> <skill>=      | skill body + a #+CAPTION-derived TOC header            |
+  | =wb toolkit search <q>=             | substring (or `(...)` ⇒ OQL) over skills               |
+  | =wb toolkit verify <tk>=            | run :role pre blocks; check EXEC mode satisfiable      |
+  | =wb toolkit run <tk> <task> -- …=   | extract the :role task block, run via run_bash_snippet |
+
+  Port these helpers from toolkit.rs: `extract_role_blocks(content, role)`,
+  `run_bash_snippet(body)`, CAPTION-TOC extraction, the thin/thick skill
+  resolver. The agent uses these the way a human reads `--help` — except the
+  help is OUR verified recipes, not the upstream man page.
+
+* Integration with the new systems (the real gaps)
+
+** Telemetry — every toolkit-CLI call should be a step
+   Today `run-command` (instance/imports.ex) has no telemetry hook and no
+   workdir context, so a toolkit call emits nothing to `_steps.jsonl`. Plan:
+   - Thread workdir/tenant into the `run-command` closure.
+   - On each call, append a step `{tool: "toolkit:<id>", exit_code, dur_ms, ts}`
+     to `_steps.jsonl` (same shape agent.ex/log_step already writes; surfaced by
+     workflow/telemetry.ex summary/1).
+   - The capability gate is the chokepoint (per EXTENSIONS-ORB.org) — wiring the
+     hook here makes toolkit usage observable by construction.
+
+** SQLite / VFS / secrets — give commands a Dock
+   Commands currently run via bare `wasmtime` with NO Dock (package_manager.run/2)
+   → they can't read VFS, secrets, or net. Plan: route capability-needing
+   commands through the Instance Dock (vfs-query, net-fetch, the secret model)
+   gated by the toolkit's declared caps, instead of the context-free wasmtime
+   path. Honor the skill's `:NETWORK:` / `:DESTRUCTIVE:` drawer flags at call
+   time (skip offline / confirm before running).
+
+* Federation (SaaS connectors) — the three-face toolkit
+
+  For Notion/GitHub/Stripe/Linear-style integrations (see PLUGINS-PLAN.org;
+  linear/ + asana/ already shaped this way). A federation toolkit has three faces
+  in one directory:
+  1. *Base* — manifest.org + skills/ — how the agent uses it.
+  2. *Data-source* — plugin/manifest.org (#+SLOT: data-source, #+ENTITIES,
+     #+IMPL) — the OQL read face (`SELECT … FROM linear-issue`).
+  3. *Sync daemon* — sync.org (:daemon: node, interval pull) — mirrors the API
+     into `:task:`/entity nodes; supervised, airgapped from the agent.
+  Auth is centralized (Plugin.Auth.fetch context-aware: env → keychain → broker),
+  declared via #+ENV_KEYS, never in toolkit source.
+
+* Deprecation / re-authoring
+
+  - *publish/* (5.4k Rust, atproto/bluesky) — old-system native CLI. DEPRECATE.
+    Reframe as either a federation toolkit (data-source + sync) or a WASM
+    `command`. Do not port the Rust as-is.
+  - *Workbooks-native toolkits* (3w, byod, tauri, capacitor, presentation,
+    brandnana, wraith, wavelet, …) — re-author for the clean-room: declare EXEC
+    mode, wire telemetry, point CLI_BIN at a command/posix binary that exists.
+  - *Generic-CLI toolkits* (git, ffmpeg) — skill docs are fine. git → `command`
+    or `posix`; ffmpeg → `posix`. Just declare EXEC and verify.
+
+* Phased plan (the epic wb-tk3)
+
+  - P0 — Restore + reconcile docs. (this commit)
+  - P1 — `wb toolkit` surface in cli.ex (list/show/show-skill/search/verify/run
+    + role-block executor + CAPTION-TOC). The headline deliverable.
+  - P2 — Command context + telemetry: workdir/tenant into run-command, emit a
+    step per call, honor :NETWORK:/:DESTRUCTIVE:.
+  - P3 — Manifest auto-injection: SessionRunner builds the compact TOOLKITS index
+    (need table only, ~200 tok/toolkit) from the agent's :TOOLKITS: list.
+  - P4 — EXEC-mode + build descriptor parsing: parse #+EXEC / #+BUILD_SRC /
+    #+BUILD_LANG / #+CAPS; `wb toolkit build <name>` drives PackageManager per
+    lang; posix mode resolves a native binary. Zero-glue auto-wrap.
+  - P5 — CLI→WASM build recipes: extend PackageManager.build_dir for the lang
+    matrix (rust/go/js/py); content-address + register under CLI_BIN; optional
+    `<cli> --help` capture to seed overview/leaf. Scope = WASI-clean CLIs.
+  - P6 — Capability layer for commands: wire `wasi:http` host-gated behind the
+    `net` cap (stock network CLIs run, gated); land net-fetch/llm in the .wit;
+    deployer grant prompt from #+CAPS. The dock-pallet assembly for commands.
+  - P7 — Re-author + deprecate: rebuild workbooks toolkits with build descriptors;
+    federation 3-face for SaaS; retire publish/.
+  - P8 — Extensions (untrusted WASM artifacts) per EXTENSIONS-ORB.org. Later;
+    gated on Orb WIT maturity / the Rust-component authoring path.
+
+* See also
+  - ../../toolkits/AUTHORING.org — the operational standard authors follow.
+  - ARCHITECTURE.org §"Command vs Toolkit vs Workflow".
+  - EXTENSIONS-ORB.org — toolkit (front-door) vs extension (artifact).
+  - runtime/host/toolkits.ex — the implemented discovery half.
