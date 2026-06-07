@@ -280,3 +280,24 @@
   eval (pass the right arch/target so cfg(target_os="wasi") deps resolve), or build the wasi
   crate explicitly and -L it. Then std links; then hello.rs (println) in-sandbox → run.
   We are ~1 dep + final link from full std. Memory fine throughout.
+
+* 2026-06-07 (iter 14) — ★★★ FULL STD: `println!` Rust runs in the wasm sandbox ★★★
+  OUTPUT: "HELLO FROM RUST STD IN WASM: 42" — `fn main(){ println!(...) }` compiled through
+  mrustc→libstd→C→clang.wasm→wasm, run under wasmtime. Real Rust + the real std library.
+  The walls solved this run (all in std/mrustc-wasm-std.patch + std/build-libstd.sh):
+  1. emulate-i128=true (spec) — emulated i128 struct (align 8) fixes the size/align asserts.
+  2. ARCH_WASM32 (mrustc patch) — target_arch=wasm32, NO ARM barrier asm.
+  3. built-in "wasm32-wasi" target (mrustc patch) — so --target wasm32-wasi works for mrustc
+     AND matches std's [target.wasm32-wasi.dependencies] in minicargo.
+  4. #[link(wasm_import_module)] handling (mrustc patch) — the `wasi` bindings crate uses it;
+     mrustc errored before, now ignores it (imports resolve at link via wasi-libc/shim).
+  5. STD_ENV_ARCH=wasm32 — std's env!() needs it.
+  6. The `wasi` crate + libstd: minicargo's target-dep resolution didn't auto-add `wasi`, so
+     build the wasi crate + libstd explicitly with --extern wasi (build-libstd.sh).
+  7. Link: clang+wasm-ld with -lsetjmp (provides __wasm_setjmp/longjmp/__c_longjmp sjlj
+     runtime) + a 1-line _Unwind_Resume stub (ustub.c; dead for non-panicking code; sjlj EH
+     model ≠ Rust's _Unwind_*).
+  Memory: libstd.c is 26MB; whole build stayed well under the wasm32 4GB ceiling.
+  REMAINING for UNTRUSTED-in-sandbox std: the user hello.rs→C step here used NATIVE mrustc;
+  rebuild mrustc.wasm WITH this patch (ARCH_WASM32 + builtin target + wasm_import) so untrusted
+  .rs compiles in-sandbox against the (trusted, prebuilt) libstd — mechanical, same as no_std.
