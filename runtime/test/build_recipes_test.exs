@@ -16,6 +16,7 @@ defmodule Workbooks.BuildRecipesTest do
 
   @gocli Path.expand("fixtures/gocli", __DIR__)
   @jscli Path.expand("fixtures/jscli", __DIR__)
+  @ccli Path.expand("fixtures/ccli", __DIR__)
 
   test "build_dir Go fixture -> runnable wasip1 command (argv + stdin)" do
     assert {:ok, wasm, :built_dir} = PackageManager.build_dir(@gocli, "go")
@@ -49,6 +50,34 @@ defmodule Workbooks.BuildRecipesTest do
     assert "p5-gocli" in CommandRegistry.list()
     assert {:ok, out} = CommandRegistry.run("p5-gocli", "one\ntwo\n", ["#"])
     assert out =~ "# one"
+  end
+
+  # P10 — mmap emulation shim wired into the C/wasi build path. A C CLI that
+  # mmap()s a file MAP_SHARED, reads through the pointer, mutates it, and relies on
+  # msync/munmap to flush back. wasi-libc has no working mmap (returns ENOSYS);
+  # build/shims/mmap_shim.c emulates it over pread/pwrite, linked via wasm-ld
+  # --wrap. Proven end-to-end: read-through AND write-back round-trip.
+  test "build_dir C fixture: mmap shim round-trips a file (read + MAP_SHARED write-back)" do
+    assert {:ok, wasm, :built} = PackageManager.build_dir(@ccli, "c")
+    assert File.exists?(wasm)
+
+    work = Path.join(System.tmp_dir!(), "mmap-rt-#{:erlang.unique_integer([:positive])}")
+    File.mkdir_p!(work)
+    File.write!(Path.join(work, "data.txt"), "hello world\n")
+
+    out = PackageManager.run(wasm, "", ["/data.txt"], ["#{work}::/"])
+    # read-through-mmap: the guest saw the first byte via pread into the mapping.
+    assert out =~ "read-through: h"
+    assert out =~ "ok"
+    # write-back-through-mmap: mutations flushed to the host file on msync/munmap.
+    assert File.read!(Path.join(work, "data.txt")) == "HELLO WORLD\n"
+  end
+
+  test "build_dir C: without a preopen the guest cannot reach the host file (isolation)" do
+    {:ok, wasm, :built} = PackageManager.build_dir(@ccli, "c")
+    # no `dirs` -> no host path mapped into the guest -> open() fails, not a crash.
+    out = PackageManager.run(wasm, "", ["/nope.txt"], [])
+    refute out =~ "read-through:"
   end
 
   @tag :build

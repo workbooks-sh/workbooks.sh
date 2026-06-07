@@ -180,8 +180,38 @@
    pointer AND write-back-through-pointer to the host file, both correct.
    - Delivery = a BUILD-PROFILE concern (the crate/sysroot pallet). C/wasi-sdk
      CLIs link the shim → mmap() resolves to the emulation, CLI unmodified.
+     WIRED (P10, 2026-06-07): build/shims/mmap_shim.c (file-backed mmap over
+     pread/pwrite — MAP_PRIVATE via malloc+pread, MAP_SHARED flush on
+     msync/munmap via pwrite) is linked into EVERY C/wasi build by
+     PackageManager (build_c inline blocks + build_dir(_, "c")). wasi-libc now
+     ships its own mmap that just returns ENOSYS, so a plain duplicate collides;
+     we redirect mmap/munmap/msync to the shim's __wrap_* with `wasm-ld --wrap`.
+     zig 0.16's cc front end rejects --wrap, so PackageManager two-phases it:
+     compile sources+shim to objects, capture the exact `wasm-ld` link line from
+     `zig cc -v` (its sysroot/libc paths live in zig's cache — never hardcoded,
+     stays correct across zig versions), then replay that line through wasm-ld
+     with --wrap injected. Proof = build_recipes_test.exs "build_dir C fixture:
+     mmap shim round-trips a file": a C CLI mmaps MAP_SHARED, reads through the
+     pointer ("read-through: h") and write-backs ("hello world\n" → "HELLO
+     WORLD\n") through the host file via a wasmtime preopen. CLI source untouched.
      Rust crates that hard-gate on cfg(target_arch) (memmap2 returns Unsupported
      before calling mmap) need a [patch.crates-io] override/fork, OR normal IO.
+     The Rust path (memmap2): unlike C, the shim cannot be link-injected because
+     memmap2's wasm cfg returns Err(Unsupported) in Rust BEFORE any mmap() FFI
+     call is emitted — there is no symbol to --wrap. Override the crate at the
+     workspace root:
+       #+begin_src toml
+       # Cargo.toml
+       [patch.crates-io]
+       memmap2 = { git = "https://github.com/<org>/memmap2-wasi", branch = "wasi-pread" }
+       #+end_src
+     The fork's only delta is the wasm32-wasi Mmap::map/map_mut impl: instead of
+     returning Unsupported, declare `extern "C" { fn mmap(...); }` and call it,
+     so it links the SAME C shim (build it into the crate via a build.rs
+     `cc::Build::new().file(".../mmap_shim.c")` + the --wrap flags). Net: one C
+     shim, two front doors — C/zig links it directly; Rust reaches it through a
+     patched memmap2 whose wasm impl FFIs into mmap() rather than bailing. Crates
+     that just use std::fs / normal IO (the majority of file-CLIs) need neither.
    - Residual TRUE limits (rare for CLIs, → #+EXEC: posix only here): no lazy
      demand-paging (whole region eager-loaded → files near/over wasm32 ~4GB don't
      fit; memory64 raises the ceiling), and cross-process shared-memory IPC
