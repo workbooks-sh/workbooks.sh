@@ -40,6 +40,9 @@ defmodule Workbooks.Workflow.Todo do
 
     # Always-on telemetry → <workdir>/_telemetry.db (best-effort).
     Workbooks.Workflow.Telemetry.persist(workdir, Path.basename(workdir), out.tasks)
+    # Seal the run: hash-chain + sign _steps.jsonl into a tamper-evident,
+    # attributable ledger (Phase 2g). Best-effort, never blocks the result.
+    Workbooks.Ledger.seal(workdir, Keyword.get(opts, :tenant, "dev"))
     out
   end
 

@@ -225,6 +225,13 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
   end
 
+  # Ledger verify (Phase 2g) — recompute the hash-chain over the run's current
+  # _steps.jsonl and check the did:key signature: tamper-evident + attributable.
+  get "/api/ledger/:slug" do
+    result = Workbooks.Ledger.verify("/tmp/bb/#{conn.params["slug"]}")
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # Cross-session index (0d) — every run, newest first, each rolled up. The
   # "see across runs" view for the CLI: catch an error trend, not one run.
   get "/api/telemetry" do

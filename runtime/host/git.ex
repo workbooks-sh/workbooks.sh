@@ -66,6 +66,30 @@ defmodule Workbooks.Git do
     "did:key:z" <> base58btc(<<0xED, 0x01>> <> pub)
   end
 
+  @doc """
+  Sign bytes with the tenant's Ed25519 private key (the did:key half) — the
+  ATTRIBUTABLE half of the signed ledger. Returns the raw signature.
+  """
+  def sign(tenant, msg) do
+    dir = repo_path(tenant)
+    ensure_keypair(dir, tenant)
+    priv = key_path(dir, tenant) |> File.read!() |> Base.decode16!(case: :lower)
+    :crypto.sign(:eddsa, :none, msg, [priv, :ed25519])
+  end
+
+  @doc "Verify a signature over `msg` against a `did:key` (decodes the pubkey from the DID)."
+  def verify_sig(did, msg, sig) do
+    :crypto.verify(:eddsa, :none, msg, sig, [pub_of_did(did), :ed25519])
+  rescue
+    _ -> false
+  end
+
+  # did:key:z<base58(0xed01 || pub)> → the raw 32-byte Ed25519 public key.
+  defp pub_of_did("did:key:z" <> b58) do
+    <<0xED, 0x01, pub::binary-size(32)>> = decode58(b58)
+    pub
+  end
+
   # Base58btc (Bitcoin alphabet) — the multibase `z` encoding for did:key.
   @b58 ~c"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   defp base58btc(bin) do
@@ -74,6 +98,12 @@ defmodule Workbooks.Git do
 
   defp encode58(0, acc), do: List.to_string(acc)
   defp encode58(n, acc), do: encode58(div(n, 58), [Enum.at(@b58, rem(n, 58)) | acc])
+
+  defp decode58(str) do
+    n = str |> String.to_charlist() |> Enum.reduce(0, fn ch, acc -> acc * 58 + Enum.find_index(@b58, &(&1 == ch)) end)
+    zeros = str |> String.to_charlist() |> Enum.take_while(&(&1 == ?1)) |> length()
+    :binary.copy(<<0>>, zeros) <> :binary.encode_unsigned(n)
+  end
 
   defp leading_zeros(<<0, rest::binary>>, n), do: leading_zeros(rest, n + 1)
   defp leading_zeros(_, n), do: n
