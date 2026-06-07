@@ -70,7 +70,16 @@ defmodule Workbooks.Library do
         place(Path.join(Git.repo_path(tenant), p), workdir)
         %{member: m, workdir: workdir, scope: access(tenant, tenant, m.scope)}
 
-      %{ref: {:did, _}} = m -> %{error: "DID resolution not wired", member: m}
+      %{ref: {:did, did}} = m ->
+        case Workbooks.Did.resolve(did) do
+          {:ok, bytes} ->
+            File.mkdir_p!(workdir)
+            File.write!(Path.join(workdir, "workbook.html"), bytes)
+            %{member: m, workdir: workdir, scope: access(tenant, tenant, m.scope), resolved: did}
+
+          {:error, e} -> %{error: "resolve #{did}: #{e}", member: m}
+        end
+
       m -> %{error: "unresolved member", member: m}
     end
   end
@@ -170,7 +179,15 @@ defmodule Workbooks.Library do
 
         parts =
           members
-          |> Enum.flat_map(fn %{ref: {:path, p}} -> vendor(repo, p) end)
+          |> Enum.flat_map(fn
+            %{ref: {:path, p}} -> vendor(repo, p)
+            # A DID member is RESOLVED (fetched) + vendored under its id, so the
+            # parent workbook carries the referenced workbook's bytes.
+            %{ref: {:did, did}, id: id} ->
+              case Workbooks.Did.resolve(did), do: ({:ok, b} -> [{"#{id}.html", b}]; _ -> [])
+
+            _ -> []
+          end)
           |> Map.new()
           |> Map.put("workspace.org", File.read!(ws.path))
 
