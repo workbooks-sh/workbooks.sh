@@ -120,11 +120,18 @@ defmodule Workbooks.Browse.Extract do
 
   defp decode(s) do
     s
+    |> String.replace(~r/&#x([0-9a-fA-F]+);/, fn m ->
+      [_, hex] = Regex.run(~r/&#x([0-9a-fA-F]+);/, m)
+      <<String.to_integer(hex, 16)::utf8>>
+    end)
+    |> String.replace(~r/&#(\d+);/, fn m ->
+      [_, dec] = Regex.run(~r/&#(\d+);/, m)
+      <<String.to_integer(dec)::utf8>>
+    end)
     |> String.replace("&amp;", "&")
     |> String.replace("&lt;", "<")
     |> String.replace("&gt;", ">")
     |> String.replace("&quot;", "\"")
-    |> String.replace("&#39;", "'")
     |> String.replace("&nbsp;", " ")
   end
 
