@@ -68,6 +68,22 @@ defmodule Workbooks.Embed do
   defp spec("http:" <> url), do: {:http, url}
   defp spec(_), do: Workbooks.Embed.Hash
 
+  @doc """
+  Embed a TEXT query in the SPACE of `modality`'s embedder — for cross-modal
+  search (e.g. a text query against CLIP image vectors: CLIP is one space, so the
+  query goes through the IMAGE provider in text mode). Falls back to the text
+  embedder if that modality has no distinct provider.
+  """
+  def embed_query_for(modality, text) do
+    result =
+      case provider(modality) do
+        {:http, url} -> Workbooks.Embed.Http.embed(url, [text], :text)
+        _ -> embed([text], :text)
+      end
+
+    case result, do: ({:ok, [v]} -> {:ok, v}; e -> e)
+  end
+
   @doc "The active text adapter's vector dimension."
   def dim, do: text_adapter().dim()
 

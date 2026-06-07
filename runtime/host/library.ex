@@ -398,6 +398,33 @@ defmodule Workbooks.Library do
   def stored(tenant), do: Workbooks.Storage.list(tenant, "workbooks")
 
   @doc """
+  Index an IMAGE (url/path/base64) for cross-modal search — embed it with the
+  image embedder (CLIP, one text+image space) and upsert into the `images` scope.
+  Returns :ok | {:error, _}.
+  """
+  def index_image(tenant, id, image, meta \\ %{}) do
+    case Workbooks.Embed.embed(image, :image) do
+      {:ok, vec} ->
+        Workbooks.Vector.upsert(tenant, "image:#{id}", vec, Map.merge(%{workbook: "images", path: id, headline: meta[:caption] || id}, meta))
+        :ok
+
+      err -> err
+    end
+  end
+
+  @doc """
+  Cross-modal image search — a TEXT query finds the most similar IMAGES. The query
+  is embedded in the image embedder's space (CLIP-text), so it matches the stored
+  image vectors. Returns ranked %{path, score, ...} or {:error, _}.
+  """
+  def search_images(tenant, query, opts \\ []) do
+    case Workbooks.Embed.embed_query_for(:image, query) do
+      {:ok, qvec} -> Workbooks.Vector.search(tenant, qvec, Keyword.merge(opts, workbook: "images"))
+      err -> err
+    end
+  end
+
+  @doc """
   UNPACK a parent workbook back to a flat tree under `dest` — the working form
   (the monorepo projection). Mirror of `pack/3`; reuses `Bundle.unpack`.
   Returns the list of files written.
