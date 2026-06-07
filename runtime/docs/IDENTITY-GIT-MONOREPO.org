@@ -1,0 +1,132 @@
+#+TITLE: Identity → Sharing → Composition — the substrate plan
+#+DATE: 2026-06-07
+#+STATUS: PLAN (source of truth; supersedes scattered notes)
+
+The whole substrate reduces to a few primitives. This doc inks the model + the
+phased build. Guiding rule throughout: *least code, lean on existing libraries
+and CLIs* (shell to =jj=/=rad=/=git= like we shell to =cargo=/=bun=; reuse crypto +
+did + atproto libs; reimplement nothing we can call).
+
+* The primitives (everything is one of these)
+- *Container* — a single =.html= file bundling data + the runtime to query it.
+  Containers nest (a container's file tree can hold containers). Fractal.
+- *Workbook* — a packed container. The artifact. Facets, not types: document /
+  context-repository / file-store / agent-container / backend — set by content +
+  which runtime pieces are embedded + whether something inside is active.
+- *Workspace* — the unit a user/org loads + unloads. A collection. Two forms:
+  - PACKED = workbook(s)/containers, DID-referenced, compact, runnable.
+  - UNPACKED = a flat source tree (org + readable SQL + the manifest) — the
+    *monorepo* projection that syncs to GitHub.
+- *Monorepo* — NOT a separate thing: the unpacked projection of a workspace.
+- *Manifest* (=.workbooks/workspace.org=) — declares members (by DID or path) +
+  the logical structure. The structure lives in CONFIG, decoupled from the file
+  tree, so reorganizing the monorepo = editing the manifest, not moving files.
+  The same workbooks project into different layouts via different manifests.
+- *DID* — the reference scheme. A member is embedded (vendored) OR referenced by
+  DID (resolved on demand). Embed = portable but bloats; reference = lean but
+  needs resolution. Workbook scale → embed; monorepo scale → reference.
+
+* Pack / unpack (the codec, not a build tool)
+- =pack=   : source tree + manifest → workspace (re-weave each member, resolve
+  DID refs). Generalizes =book seal= over a manifest.
+- =unpack= : workspace → flat source tree + manifest (for git/GitHub). Extends
+  unbundle to write files to disk.
+- The agent's WORKING form IS the unpacked tree — literally the workflow workdir
+  + scratch we built. It edits source, then =pack= (= =book seal=) to store/share.
+  Load/unload a workspace = unpack/pack.
+- *Unpacked SQLite is readable source* (SQL dumps / org tables), not binary
+  blobs — the point of the unpacked form is that GitHub shows something legible
+  and diffable.
+- Orchestrated by the org-workflow DAG, NOT Bazel. Revisit Bazel only at real
+  multi-language / huge-graph / remote-cache scale.
+
+* Identity (auth)
+- Already wired: *BetterAuth* issues JWTs (login, OAuth, API keys); *Guardian*
+  verifies via JWKS + scopes every request to a tenant (=organizationId=). That
+  scoping IS data sovereignty.
+- Deploy-kit knob: =auth: workos | clerk | native | bluesky=. Guardian never
+  changes — only the issuer/JWKS swaps.
+  - desktop → WorkOS ; brandnana (cloud) → DECIDE (Clerk vs WorkOS) ;
+    public-federated → bluesky (see Sharing) ; native + own 2FA → later.
+- *Agent DIDs*: extend minting from tenants to AGENTS (and sessions). Every agent
+  edit is signed by its agent DID. Basis for the ledger below.
+
+* Sharing — two rails (map to pack/unpack)
+- *Source rail → GitHub (working layer = JJ).* The UNPACKED monorepo syncs here.
+  JJ is the working VCS (cheap branches, auto-rebase, an op-log that is itself
+  provenance); it writes git objects, so GitHub + Radicle work unchanged. GitHub
+  integration = a multi-tenant *GitHub App* (one install per deployer; their
+  users connect through it). Radicle (=rad= CLI) layers on the same git objects
+  for P2P share by DID — stacks with JJ, doesn't conflict.
+- *Artifact rail → ATproto (public) / self-host (private).* The PACKED workbook
+  publishes here, C2PA-signed.
+  - PUBLIC = Bluesky/ATproto. Sign in with Bluesky (ATproto OAuth, DPoP-bound
+    tokens) → you are =did:plc:…= → publish a workbook RECORD to your PDS
+    (=uploadBlob= + ref; records cap ~256KB so real workbooks always go as
+    blobs). Bluesky is auth + DID + publish target in one.
+  - PRIVATE = self-host: =did:web= on your domain + your deploy-kit engine.
+  - Deploy-kit MODE knob: public-federated vs private-sovereign.
+- *DID bridging (load-bearing): the DIDs do NOT unify.* Signing uses =did:key=
+  (Ed25519, engine-minted — already done). ATproto uses =did:plc= (secp256k1,
+  PDS-held). A PDS will not accept a did:key. Answer: don't merge them —
+  *C2PA-sign the bytes with the did:key BEFORE the carrier*, publish under the
+  did:plc, attach issuer DID + record CID as a =PublishedAtproto= assertion. The
+  C2PA manifest BINDS the two (provenance, not authn). No central signer, no PKI,
+  no revocation registry day one.
+
+* Composition (cross-workbook)
+- Two coupling modes; the runtime is the BROKER, the manifest declares the graph:
+  - CO-PACKED (tight) — workbooks that must stay paired → same container → talk
+    in-process.
+  - REFERENCED (loose) — e.g. one context-repository referenced by N agent
+    containers → each holds a DID ref → the runtime mediates over its WIT /
+    protobuf component layer (typed cross-workbook calls are native to the
+    component model). N agents → 1 shared context repo → N artifacts, edges in
+    the manifest.
+
+* The signed agent ledger (the spine — where it all converges)
+*telemetry + agent DID + C2PA signing = one capability.*
+- Plain now (Phase 0): per-session =_telemetry.db= with task + step events.
+- Hardened later (Phase 2): each entry hash-chains the prior (tamper-EVIDENT),
+  signed by the agent DID (ATTRIBUTABLE), optionally runtime-witnessed + anchored
+  to the carrier (a git/JJ commit or an ATproto record → externally VERIFIABLE).
+- Payoff: pinpoint a session log → the agent DID → trace every file + edit it
+  made, in order. Detect a prompt injection and its full blast radius after the
+  fact — and neither agent nor user can rewrite the record. Infallible
+  provenance, built into the substrate. JJ's op-log reinforces it.
+- Same table, two stages — like "Guardian stays, the issuer swaps."
+
+* The throughline
+identity (tenant + agent DIDs) → sovereignty (per-tenant git + signing) →
+sharing (source→GitHub/JJ/Radicle, artifact→ATproto/self-host, C2PA) →
+composition (manifest-driven workspace↔monorepo, cross-workbook via the runtime
+broker) — with the signed agent ledger proving every step.
+
+* Phased build
+- *Phase 0 — Telemetry (the floor; in progress)*
+  0a verify live =_telemetry.db= ; 0b step-level events (tool/duration/cost via
+  the agent on_step) ; 0c a read/query surface ; 0d per-session db + a
+  cross-session index ; 0e wire into brandnana agent runs too.
+- *Phase 1 — Auth profile* : deploy-kit =auth= knob (workos/clerk/native/bluesky),
+  Guardian unchanged ; verify BetterAuth API-key + JWKS end-to-end.
+- *Phase 2 — Git/DID + sharing + ledger-hardening*
+  2a JJ working layer (shell to =jj=) ; 2b GitHub App (multi-tenant) ;
+  2c C2PA signing on did:key ; 2d ATproto publish (Bluesky OAuth, blob+record) ;
+  2e self-host did:web ; 2f Radicle =rad= P2P ; 2g harden the ledger
+  (hash-chain + agent-DID sign + anchor).
+- *Phase 3 — Composition* : manifest format (=workspace.org=) ; =pack=/=unpack=
+  (generalize seal/unbundle) ; cross-workbook mount + OQL query-through ;
+  runtime broker edges.
+
+* Deferred / not now
+- *Bazel* — own workflow-DAG build instead; revisit only at scale.
+- *CRDT (Automerge/Yjs)* — only if live char-level multi-writer editing returns
+  to the viewer; JJ branches + the ledger cover agent concurrency.
+- native 2FA ; Workbooks-operated PLC/seed services.
+
+* Open decisions (Shane)
+1. Brandnana IdP — Clerk, or WorkOS for consistency?
+2. Radicle/PDS seed — host a shared default on our Cloudflare, or self-host-only
+   to start?
+3. Telemetry scope — confirm per-session + cross-session index, task AND step
+   level.
