@@ -50,15 +50,9 @@ defmodule Workbooks.PublicWeb do
     end
   end
 
-  # HOST → app id: the leftmost DNS label. conn.host is already port-stripped by
-  # Plug. A bare/single-label host (localhost, an apex) yields that label, which
-  # simply won't resolve to a workbook → 404. P1 generalizes via Domains.resolve/1.
-  defp app_id(conn) do
-    case conn.host |> to_string() |> String.split(".") do
-      [label | _] when label != "" -> label
-      _ -> nil
-    end
-  end
+  # HOST → app id via the Domains registry (a registered host wins; otherwise it
+  # falls back to the leftmost DNS label). conn.host is already port-stripped by Plug.
+  defp app_id(conn), do: Workbooks.Domains.resolve(conn.host)
 
   @doc """
   A STATIC, self-contained page for the public plane: the rendered workbook with no

@@ -15,6 +15,7 @@ defmodule Workbooks.Application do
         Workbooks.Vars,
         Workbooks.Memory,
         Workbooks.Instance.Supervisor,
+        Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
       ] ++ web()
 
@@ -42,9 +43,28 @@ defmodule Workbooks.Application do
         []
       end
 
-    control ++ public
+    # WB_PUBLIC_TLS=1 → the content plane over HTTPS with per-host certs chosen at
+    # handshake by Workbooks.Domains.sni/1 (one node, many domains, no Caddy).
+    public_tls =
+      if System.get_env("WB_PUBLIC_TLS") == "1" do
+        [
+          Supervisor.child_spec(
+            {Bandit,
+             plug: Workbooks.PublicWeb,
+             scheme: :https,
+             port: public_tls_port(),
+             thousand_island_options: [transport_options: [sni_fun: &Workbooks.Domains.sni/1]]},
+            id: :public_web_tls
+          )
+        ]
+      else
+        []
+      end
+
+    control ++ public ++ public_tls
   end
 
   defp port, do: String.to_integer(System.get_env("PORT", "4000"))
   defp public_port, do: String.to_integer(System.get_env("PUBLIC_PORT", "4001"))
+  defp public_tls_port, do: String.to_integer(System.get_env("PUBLIC_TLS_PORT", "4443"))
 end
