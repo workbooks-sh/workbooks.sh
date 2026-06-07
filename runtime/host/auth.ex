@@ -23,7 +23,19 @@ defmodule Workbooks.Auth do
     end
   end
 
+  # Desktop daemon: the per-boot token from the discovery file authenticates the
+  # local WebView. Only honored when WB_DESKTOP=1 (the token doesn't exist
+  # otherwise) and it scopes to the single local tenant; anything else → JWT.
   defp verify(conn, token) do
+    if Workbooks.Desktop.enabled?() and Plug.Crypto.secure_compare(token, Workbooks.Desktop.token()) do
+      tenant = Workbooks.Desktop.tenant()
+      conn |> assign(:identity, %{user_id: tenant, tenant_id: tenant, session_id: nil}) |> assign(:tenant, tenant)
+    else
+      verify_jwt(conn, token)
+    end
+  end
+
+  defp verify_jwt(conn, token) do
     case Guardian.resource_from_token(token) do
       {:ok, identity, _claims} ->
         conn |> assign(:identity, identity) |> assign(:tenant, identity.tenant_id)

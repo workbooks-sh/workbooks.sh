@@ -19,6 +19,15 @@ defmodule Workbooks.Application do
       ] ++ web()
 
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Workbooks.Supervisor)
+
+    # Desktop daemon: publish the discovery file (port + per-boot token) so the
+    # Tauri shell can find + authenticate to the runtime inside the container.
+    if Workbooks.Desktop.enabled?() do
+      path = Workbooks.Desktop.write_discovery!()
+      require Logger
+      Logger.info("desktop daemon — discovery written: #{path} (port #{Workbooks.Desktop.port()})")
+    end
+
     # Pre-warm the semantic embedder in the background (no-op unless WB_EMBED=local)
     # so the first search/index isn't blocked on the model download.
     Workbooks.Embed.Model2Vec.warm()
@@ -35,11 +44,18 @@ defmodule Workbooks.Application do
   #                  PUBLIC_PORT (default 4001). Distinct listener so public traffic
   #                  never shares the authed router or its pipeline.
   defp web do
+    # Desktop daemon (WB_DESKTOP=1) implies the control plane, bound on all
+    # interfaces (the container forwards host→guest) at the fixed desktop port.
     control =
-      if System.get_env("WB_WEB") == "1" do
-        [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, port: port()}, id: :control_web)]
-      else
-        []
+      cond do
+        Workbooks.Desktop.enabled?() ->
+          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, ip: Workbooks.Desktop.bind_ip(), port: Workbooks.Desktop.port()}, id: :control_web)]
+
+        System.get_env("WB_WEB") == "1" ->
+          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, port: port()}, id: :control_web)]
+
+        true ->
+          []
       end
 
     public =
