@@ -156,6 +156,45 @@
   (wasi:sockets) behind a stricter cap. The capability gate stays the single
   telemetry/enforcement chokepoint (per EXTENSIONS-ORB.org).
 
+* SPIKE — empirical proof (2026-06-07, this box)
+
+  Tested the auto-wrap claim end-to-end on a REAL upstream CLI we did not write:
+  `sd` (a sed-alternative). Verdict: the common case SPIKES; the capability edge
+  SMOKES exactly where the model predicts. Toolchain present: wasmtime 45.0.1,
+  rustc 1.94 + wasm32-wasip1, wasm-tools, tinygo/go, mix (OTP 28).
+
+  Build (ZERO edits, plain cargo — the whole "auto-wrap build step"):
+  #+begin_src bash
+  cargo install sd --target wasm32-wasip1 --root /tmp/spike-sd --no-track
+  # → /tmp/spike-sd/bin/sd.wasm  (1.5 MB, built in 10.7s, first try)
+  #+end_src
+  It compiled clean even pulling in rayon (threads) + memmap2 — they degrade
+  rather than break the build.
+
+  Ran through the PRODUCTION runtime modules (mix run --no-start):
+  | What                                   | Path                          | Result        |
+  |----------------------------------------+-------------------------------+---------------|
+  | sd 'wasm' 'WASM' over stdin            | PackageManager.run/3 (argv)   | ✅ correct     |
+  | sd '[0-9]+' '#' (regex engine in wasm) | PackageManager.run/3          | ✅ correct     |
+  | sd --help (clap argv parsing)          | wasmtime                      | ✅ correct     |
+  | jq filter (existing command)           | CommandRegistry.run/2         | ✅ still works |
+  | sd file-edit mode (memmap2 mmap)       | wasmtime --dir … (preopen)    | ✅ SMOKES: "unsupported" |
+
+  Findings carried into the plan:
+  1. *Auto-wrap is real* for WASI-clean compute+stdio CLIs — zero glue, the stdio
+     ABI IS the API, confirmed against an untouched third-party binary.
+  2. *The boundary is exactly where predicted*: sd's mmap file-mode fails even
+     WITH a preopen ("unsupported") — that path needs #+EXEC: posix. Stdin-filter
+     mode is the sweet spot.
+  3. *GAP the spike exposed*: the implemented run path was stdin-ONLY (run/2,
+     `wasmtime <wasm> < file`) — no argv. Real CLIs need argv. Added
+     PackageManager.run/3 (argv + optional preopen dirs, shell-escaped, no
+     injection) this commit. The run-command Dock import + CommandRegistry still
+     need the argv parameter threaded through — that is now explicit P4 work.
+  4. *Derived-artifact rule honored*: sd.wasm is NOT committed (it is rebuildable
+     from the one cargo line above), per ARCHITECTURE.org "WASM owns the artifact,
+     Org owns the spec."
+
 * The headline build: the `wb toolkit` surface
 
   Reimplement the archive's Rust toolkit.rs (2278 LOC) as Elixir subcommands in

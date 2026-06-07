@@ -249,12 +249,27 @@ defmodule Workbooks.PackageManager do
   end
 
   @doc "Run a built WASM component with input, returning its output (WASI stdin/stdout)."
-  def run(wasm_path, input) do
+  def run(wasm_path, input), do: run(wasm_path, input, [])
+
+  @doc """
+  Run a built WASM command with stdin `input` AND `argv` — the universal CLI ABI
+  (argv + stdin → stdout). This is what lets an unmodified upstream CLI compiled
+  to wasm32-wasip1 (e.g. `sd`, `jq`) be driven exactly as on a native shell.
+  `dirs` are host paths preopened into the guest (WASI `--dir`) for file-mode CLIs.
+  argv/dirs are passed as discrete System.cmd args (no shell), so no injection.
+  """
+  def run(wasm_path, input, argv, dirs \\ []) when is_list(argv) do
     inp = Path.join(System.tmp_dir!(), "wb-in-#{:erlang.unique_integer([:positive])}")
     File.write!(inp, input)
-    {out, _} = System.cmd("sh", ["-c", "wasmtime #{wasm_path} < #{inp}"], stderr_to_stdout: true)
+    parts = Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
+    cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
+    {out, _} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
+    File.rm(inp)
     out
   end
+
+  # POSIX single-quote escaping: wrap in '...' and replace ' with '\'' — no injection.
+  defp sh_escape(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
   @doc """
   Execute a Workbook's DAG: build each component, run them in topological order,
