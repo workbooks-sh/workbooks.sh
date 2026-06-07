@@ -175,6 +175,7 @@ defmodule Workbooks.Library do
           |> Map.put("workspace.org", File.read!(ws.path))
 
         parts = if include_private, do: parts, else: Workbooks.Private.strip_parts(parts)
+        parts = if opts[:build], do: build_projection(parts, include_private), else: parts
         {:ok, Workbooks.Bundle.pack(parts)}
     end
   rescue
@@ -195,6 +196,46 @@ defmodule Workbooks.Library do
       File.write!(path, content)
       name
     end
+  end
+
+  @doc """
+  Compile a workspace's components and return the build report (what became WASM,
+  what couldn't). The report behind `wb build` / `pack --build`. Builds a throwaway
+  copy of the parts so the tenant repo stays clean.
+  """
+  def build(tenant, workspace_slug) do
+    case pack(tenant, workspace_slug, purpose: :archive) do
+      {:ok, blob} ->
+        tmp = Path.join(System.tmp_dir!(), "wb-build-#{:erlang.phash2({tenant, workspace_slug})}")
+        File.rm_rf!(tmp)
+        unpack(blob, tmp)
+        report = Workbooks.Build.build(tmp)
+        File.rm_rf(tmp)
+        %{built: Enum.map(report.built, &Map.drop(&1, [:bytes])), unbuilt: report.unbuilt}
+
+      {:error, e} -> %{error: e}
+    end
+  end
+
+  # The RUNNABLE projection: compile components, then ship the .wasm OUTPUTS while
+  # dropping the source build INPUTS (a workbook runs WebAssembly, not source).
+  # Built in a temp tree so nothing leaks into the tenant repo. Archive keeps both.
+  defp build_projection(parts, include_private) do
+    tmp = Path.join(System.tmp_dir!(), "wb-pack-build-#{:erlang.phash2(parts)}")
+    File.rm_rf!(tmp)
+
+    Enum.each(parts, fn {name, content} ->
+      p = Path.join(tmp, name)
+      File.mkdir_p!(Path.dirname(p))
+      File.write!(p, content)
+    end)
+
+    report = Workbooks.Build.build(tmp)
+    wasm = Map.new(report.built, fn b -> {b.name <> ".wasm", b.bytes} end)
+    File.rm_rf(tmp)
+
+    parts = if include_private, do: parts, else: Map.reject(parts, fn {n, _} -> Workbooks.Build.build_input?(n) end)
+    Map.merge(parts, wasm)
   end
 
   # Vendor a member's bytes into the parent. A FILE member → that one file; a

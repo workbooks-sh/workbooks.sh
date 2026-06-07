@@ -143,12 +143,16 @@ defmodule Workbooks.CLI do
     do: Workbooks.Library.checkin(t, member, workdir) |> Map.drop([:member]) |> json()
 
   # Compose a workspace's members into ONE parent workbook, and back.
-  def call(["pack", slug, out], t) do
-    case Workbooks.Library.pack(t, slug) do
+  # `--build` → the RUNNABLE projection: compile components to WASM, drop source.
+  def call(["pack", slug, out | rest], t) do
+    case Workbooks.Library.pack(t, slug, build: "--build" in rest) do
       {:ok, blob} -> File.write!(out, blob); "packed #{slug} → #{out} (#{byte_size(blob)} bytes)"
       {:error, e} -> e
     end
   end
+
+  # Compile a workspace's components → WASM; report what built / what couldn't.
+  def call(["build", slug], t), do: Workbooks.Library.build(t, slug) |> json()
 
   def call(["unpack", bundle, dest], _t) do
     files = Workbooks.Library.unpack(File.read!(bundle), dest)
@@ -198,7 +202,8 @@ defmodule Workbooks.CLI do
       wb library query <sql>               cross-workbook query across members' VFS
       wb checkout <member> <workdir>       borrow a member into a working dir
       wb checkin <member> <workdir>        pack + sign a member back into the library
-      wb pack <workspace> <out.wbundle>    compile a workspace's members → one parent workbook
+      wb pack <workspace> <out> [--build]  compose members → one workbook (--build = compile to WASM)
+      wb build <workspace>                 compile components → WASM; report built/unbuilt
       wb unpack <bundle> <dest>            disassemble a parent workbook → flat tree
       wb toolkit [list]                    list discoverable toolkits (id · status · tagline)
       wb toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
