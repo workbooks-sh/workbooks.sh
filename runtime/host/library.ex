@@ -269,9 +269,15 @@ defmodule Workbooks.Library do
         case chunks do
           [] -> {:ok, 0}
           _ ->
-            {:ok, vectors} = Workbooks.Embed.embed(Enum.map(chunks, & &1.text))
-            Enum.zip(chunks, vectors) |> Enum.each(fn {c, v} -> Workbooks.Vector.upsert(tenant, c.id, v, c.meta) end)
-            {:ok, length(chunks)}
+            # Embed failures (e.g. WB_EMBED=local but the model can't download) are
+            # returned cleanly — never a MatchError that crashes the caller process.
+            case Workbooks.Embed.embed(Enum.map(chunks, & &1.text)) do
+              {:ok, vectors} ->
+                Enum.zip(chunks, vectors) |> Enum.each(fn {c, v} -> Workbooks.Vector.upsert(tenant, c.id, v, c.meta) end)
+                {:ok, length(chunks)}
+
+              {:error, e} -> {:error, "embed failed: #{e}"}
+            end
         end
     end
   end
@@ -287,8 +293,16 @@ defmodule Workbooks.Library do
   def search(tenant, query, opts \\ []) do
     k = opts[:k] || 5
     mode = opts[:mode] || :hybrid
-    {:ok, qvec} = Workbooks.Embed.embed(query)
 
+    with {:ok, qvec} <- Workbooks.Embed.embed(query) do
+      search_with(tenant, qvec, query, k, mode, opts)
+    else
+      # Embedder unavailable → no semantic results (clean empty, never a crash).
+      {:error, _} -> []
+    end
+  end
+
+  defp search_with(tenant, qvec, query, k, mode, opts) do
     pool = Workbooks.Vector.search(tenant, qvec, Keyword.merge(opts, k: 50))
     terms = query |> String.downcase() |> String.split(~r/\W+/, trim: true) |> Enum.reject(&(&1 == ""))
 

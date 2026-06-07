@@ -47,15 +47,38 @@ defmodule Workbooks.Embed.Model2Vec do
     dir
   end
 
+  # Atomic: download to <path>.tmp then rename, so a truncated/failed download
+  # never leaves a corrupt cached file that load/2 would then mis-parse.
   defp fetch(url, path) do
     :inets.start()
     :ssl.start()
     req = {String.to_charlist(url), [{~c"user-agent", ~c"workbooks-runtime"}]}
+    tmp = path <> ".tmp"
 
     case :httpc.request(:get, req, [autoredirect: true, timeout: 180_000], body_format: :binary) do
-      {:ok, {{_, 200, _}, _, body}} -> File.write!(path, body)
-      other -> raise "model download failed (#{url}): #{inspect(elem(other, 0))}"
+      {:ok, {{_, 200, _}, _, body}} -> File.write!(tmp, body); File.rename!(tmp, path)
+      {:ok, {{_, code, _}, _, _}} -> raise "download #{url} → HTTP #{code}"
+      {:error, e} -> raise "download #{url} → #{inspect(e)}"
     end
+  end
+
+  @doc """
+  Pre-warm the model in the background (call at boot) so the FIRST embed request
+  isn't blocked on the ~30 MB download + load. No-op unless WB_EMBED=local. Safe
+  to call repeatedly — get/0 loads once into :persistent_term.
+  """
+  def warm do
+    if System.get_env("WB_EMBED") == "local" do
+      Task.start(fn ->
+        try do
+          get()
+        rescue
+          _ -> :ok
+        end
+      end)
+    end
+
+    :ok
   end
 
   # ── load ──────────────────────────────────────────────────────────────────────

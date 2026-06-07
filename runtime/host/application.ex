@@ -19,7 +19,11 @@ defmodule Workbooks.Application do
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
       ] ++ web()
 
-    Supervisor.start_link(children, strategy: :one_for_one, name: Workbooks.Supervisor)
+    result = Supervisor.start_link(children, strategy: :one_for_one, name: Workbooks.Supervisor)
+    # Pre-warm the semantic embedder in the background (no-op unless WB_EMBED=local)
+    # so the first search/index isn't blocked on the model download.
+    Workbooks.Embed.Model2Vec.warm()
+    result
   end
 
   # The HTTP surfaces are opt-in so the demo boots without binding a port.
