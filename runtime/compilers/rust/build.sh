@@ -87,7 +87,7 @@ done < <(find "$SRC/src" "$SRC/tools/common" -name '*.cpp' | sort)
 "$CXX" "${FLAGS[@]}" -c "$SD/wasi/sys_stub.cpp" -o "$OBJ/zz_sys_stub.o"; OBJS+=("$OBJ/zz_sys_stub.o")
 
 echo "[rust] linking mrustc.wasm"
-"$CXX" --target=wasm32-wasip1 -fwasm-exceptions $NEWEH "${OBJS[@]}" "$ZOBJ"/*.o \
+"$CXX" --target=wasm32-wasip1 -fwasm-exceptions $NEWEH -Wl,-z,stack-size=67108864 "${OBJS[@]}" "$ZOBJ"/*.o \
   -lwasi-emulated-process-clocks -lunwind -o "$WASM"
 
 [ -f "$WASM" ] || { echo "[rust] no mrustc.wasm after link"; exit 1; }

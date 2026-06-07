@@ -97,3 +97,21 @@
   LATER full-std compile ever approaches 4GB, escalate to memory64 — but not needed yet.
   STATUS: Zig fully works end-to-end (re-demoed live: "ZIG IN WASM SANDBOX: 42"). Rust =
   compiler runs+parses in-sandbox; stdlib compile blocked on mrustc 64-bit-ptr bugs.
+
+* 2026-06-07 (iter 5) — BREAKTHROUGH: mrustc.wasm COMPILES libcore fully in-sandbox
+  The iter-4 "memory fault at ~4GB" was a STACK OVERFLOW, not a pointer bug and not the 4GB
+  heap ceiling: the fault was deep in the recursive-descent parser (Parse_PathNodes ← a long
+  Parse_Expr1_2…13 chain), and wasi-sdk's default wasm stack is tiny (64KB). FIX: link with
+  -Wl,-z,stack-size=67108864 (64MB). Added to build.sh.
+  RESULT: `mrustc.wasm library/core/src/lib.rs --crate-type lib --edition 2018
+  --target i586-linux-gnu` runs the FULL pipeline in-sandbox: Parse → Resolve → Monomorph →
+  MIR Optimise → HIR Serialise → Trans Codegen DONE. Outputs: libcore.hir.c (21MB of C) +
+  libcore.hir.hir (1.36MB metadata). PEAK RSS ~592MB / footprint ~502MB — the wasm32 4GB
+  ceiling is comfortably clear. Real Rust (the actual stdlib core crate) compiles in wasm.
+  (mrustc's final "Running gcc" to compile its C is our system() no-op stub — by design; the
+  clang lane compiles the emitted C.)
+  NEXT (the last mile to end-to-end): clang.wasm compiles libcore.hir.c → core objects, then
+  compile a small #![no_std] program against libcore.hir → C → clang.wasm → link → run.
+  Then widen to full std (alloc+std; bigger C, watch memory but core was only ~600MB) and
+  wire Workbooks.Compilers.rust_compile_and_run/4. Edition must be passed (--edition 2018);
+  proper multi-crate orchestration ideally via minicargo.wasm later.
