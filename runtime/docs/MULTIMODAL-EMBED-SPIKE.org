@@ -93,6 +93,19 @@ registry (=Workbooks.Embed=) makes it a config choice, not a fork:
   | text+image+video+docs (SOTA)     | VLM2Vec-V2 (Qwen2-VL-7B)      | GPU service (Modal/Replicate/Fly GPU) |
   | text+image+video+audio (all-in)  | Gemini Embedding 2            | hosted API (Google) |
 
+* Wiring the heavy local multimodal (VLM2Vec) — operator step, accelerator-gated
+The capability probe (=Workbooks.Embed.Capability=) recommends =:big_multimodal=
+ONLY when the machine has an accelerator (CUDA / Apple-Silicon MPS) + enough RAM.
+On such a machine the operator runs a LOCAL GPU/MPS sidecar (a Python service with
+VLM2Vec/Qwen2-VL-7B, or any multimodal embedder) exposing the same
+=POST /embed {inputs,modality} -> {vectors}= contract, and points the runtime at
+it: =WB_EMBED_MULTIMODAL=http:http://localhost:<port>=. Then ALL modalities
+(text+image+video) go through it in one space — same registry path as the CLIP
+sidecar, just a bigger model on real hardware. NOT runnable here (no GPU) and NOT
+on a multi-tenant CPU Fly box — honest stub: the connection + routing + probe are
+built; the GPU sidecar is the operator's to stand up on a capable machine. The
+shape mirrors =runtime/sidecar/clip/server.mjs= (swap CLIP for the VLM).
+
 * Worth prototyping when the need lands
 A WASM image-embed command (onnxruntime-web + TinyCLIP) registered like the text
 embedder — proves sovereign image search end-to-end, runs in the browser viewer
