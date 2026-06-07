@@ -1,0 +1,53 @@
+#+TITLE: brandnana portal
+#+DESCRIPTION: brandnana.net management portal — API key management, OAuth connections, account/usage.
+
+* Overview
+
+  SvelteKit + adapter-cloudflare app deployed to Cloudflare Pages. Serves
+  as the web UI for brandnana API users.
+
+  Design: CLI-aesthetic, monochrome, monospace throughout. No UI library.
+  See [[../../../CLAUDE.md]] §11 for color conventions.
+
+* Routes
+
+  | Route          | Purpose                          |
+  |----------------+----------------------------------|
+  | /              | Landing — paste API key          |
+  | /login         | Device-flow auth + paste token   |
+  | /keys          | List / create / rotate / revoke  |
+  | /connections   | Meta / TikTok / Google OAuth     |
+  | /account       | Email, plan, usage caps          |
+
+* Dev
+
+  #+begin_src sh
+  cd projects/brandnana/apps/portal
+  bun install
+  bun run dev
+  #+end_src
+
+* Build
+
+  #+begin_src sh
+  bun run build
+  # output → .svelte-kit/cloudflare/
+  #+end_src
+
+* Deploy (Cloudflare Pages)
+
+  #+begin_src sh
+  wrangler pages deploy .svelte-kit/cloudflare --project-name brandnana-portal
+  #+end_src
+
+* API surface wired
+
+  - =GET /auth/keys= — list keys
+  - =POST /auth/keys= — create key
+  - =POST /auth/keys/:id/rotate= — rotate key
+  - =DELETE /auth/keys/:id= — revoke key
+  - =GET /oauth/:provider/status= — connection status
+  - =GET /account= — account + usage
+
+  NOTE: =/auth/keys= endpoints are not yet implemented on the server side.
+  The UI shows a =[coming soon]= empty state. Follow-up: wb-c4hs.1 API side.

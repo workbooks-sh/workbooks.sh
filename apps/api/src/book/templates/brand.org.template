@@ -1,0 +1,64 @@
+#+TITLE: {{brand_name}} brand book
+#+GENERATED_AT: {{utc_iso}}
+#+GENERATED_BY: brandnana v{{version}}
+#+DOMAIN: {{domain}}
+#+SLUG: {{slug}}
+
+* {{brand_name}}                                                       :brand:
+  :PROPERTIES:
+  :ID:           {{slug}}
+  :DOMAIN:       {{domain}}
+  :LEGAL_NAME:   {{legal_name}}
+  :FOUNDED:      {{founded_year}}
+  :HQ:           {{hq_city}}
+  :CATEGORY:     {{category}}
+  :TAGLINE:      {{tagline}}
+  :END:
+
+** Descriptors
+{{#descriptors}}
+   - {{.}}
+{{/descriptors}}
+
+** Voice
+{{voice_notes}}
+
+** Visual identity                                                     :visual:
+
+*** Primary palette                                                    :palette:primary:
+    :PROPERTIES:
+    :PRIMARY_HEX:    {{primary_hex}}
+    :PRIMARY_NAME:   {{primary_name}}
+    :SECONDARY_HEX:  {{secondary_hex}}
+    :SECONDARY_NAME: {{secondary_name}}
+    :END:
+
+*** Extended palette                                                   :palette:extended:
+    {{#extended_colors}}
+    - {{name}}: {{hex}}
+    {{/extended_colors}}
+
+*** Typography                                                         :fonts:
+    :PROPERTIES:
+    :PRIMARY_FONT:   {{primary_font}}
+    :SECONDARY_FONT: {{secondary_font}}
+    :MONO_FONT:      {{mono_font}}
+    :END:
+
+*** Logo                                                               :logo:
+    :PROPERTIES:
+    :PRIMARY_URL:  {{logo_primary_url}}
+    :ON_LIGHT_URL: {{logo_on_light_url}}
+    :ON_DARK_URL:  {{logo_on_dark_url}}
+    :SVG_PATH:     {{logo_svg_path}}
+    :END:
+
+** Social handles                                                      :social:
+{{#social}}
+   - {{network}}: {{handle}} ({{url}})
+{{/social}}
+
+** Captured by
+{{#capture_verbs}}
+   - {{verb}}@{{ts}}: {{summary}}
+{{/capture_verbs}}

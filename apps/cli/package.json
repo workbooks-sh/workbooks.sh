@@ -1,0 +1,28 @@
+{
+  "name": "@brandnana/cli",
+  "private": false,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "brandnana": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target=node --outdir=dist --external better-sqlite3 --external bindings --external keytar",
+    "build:binary": "bash scripts/build-binary.sh",
+    "build:binary:current": "bash scripts/build-binary.sh $(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/darwin/')-$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/')",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brandnana/schema": "workspace:*",
+    "@brandnana/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.3.0",
+    "commander": "^12.1.0",
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "typescript": "^5.6.0"
+  }
+}

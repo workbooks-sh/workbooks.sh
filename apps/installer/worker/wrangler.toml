@@ -1,0 +1,16 @@
+name = "brandnana-installer"
+main = "src/index.ts"
+compatibility_date = "2024-09-25"
+
+# Pin to Shane@shinyobjectz.com's CF account.
+account_id = "6d4b74aeb10f455fbf88141901e7595d"
+
+# Routes
+[[routes]]
+pattern = "install.brandnana.net"
+custom_domain = true
+
+# R2 binding for binaries
+[[r2_buckets]]
+binding = "BINARIES"
+bucket_name = "brandnana-binaries"

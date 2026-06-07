@@ -1,0 +1,21 @@
+{
+  "name": "@brandnana/admin",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "secrets:push": "bash scripts/secrets-push.sh"
+  },
+  "dependencies": {
+    "@brandnana/schema": "workspace:*",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^3.80.0"
+  }
+}

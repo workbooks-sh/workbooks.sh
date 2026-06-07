@@ -1,0 +1,21 @@
+#+TITLE: {{brand_name}} brand-book capture timeline
+#+GENERATED_AT: {{utc_iso}}
+
+* Capture log
+{{#events}}
+** {{ts}} — {{verb_id}}                                        :event:{{status}}:
+   :PROPERTIES:
+   :VERB:           {{verb_id}}
+   :STATUS:         {{status}}
+   :DURATION_MS:    {{duration_ms}}
+   :VENDOR_COST:    ${{vendor_cost_usd}}
+   :CUSTOMER_CHARGE: ${{customer_charge_usd}}
+   :MARGIN:         ${{margin_usd}}
+   :END:
+
+   {{summary}}
+
+{{#error}}
+   ERROR: {{error}}
+{{/error}}
+{{/events}}

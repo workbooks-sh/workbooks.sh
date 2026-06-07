@@ -1,0 +1,38 @@
+#+TITLE: Strategist Parallel Research — design exploration
+# Explores the runtime's agent->sub-agent->sub-board recursion applied to the
+# Strategist (author-analysis). Baseline: E2E #5 strategist = ~9min / 50 turns, solo.
+
+* Two spawn primitives (both already in the runtime)
+- =wb agent spawn <slug> --prompt= — fire-and-forget; child inherits parent workdir
+  (shared FS); NO return channel, results = files on disk; barrier via =wb agent wait=.
+  Caps: MAX_CHILDREN 10, SPAWN_DEPTH 2, CAN_GRANT. agent_controller.ex:374 / sub_agent.ex:109.
+- Board composite/sub_board — runtime-driven recursion; each child a VERIFIED node
+  (:ACCEPT: gate), observable in wb trace. dispatcher.ex:282 dispatch_composite.
+
+* The tension (resolved): wb-pyfx vs parallel research operate on DIFFERENT halves
+- MECHANICAL data-prep (read slices -> reports/*.org): NOT LLM-worthy. Spawning 5
+  grep children = straggler-bound barrier (run #10: one child 51 turns gated 7.5m).
+  -> deterministic =brandnana substrate slice= verb (wb-pyfx). <1s, no LLM.
+- DEEP RESEARCH (reason over a dimension): LLM-worthy. Parallel children ADD QUALITY
+  (clean context window per dimension). -> the user's idea. Dimensions: positioning /
+  whitespace / audience / creative-patterns.
+
+* Three designs (all assume substrate slice ran first)
+- D1 in-band fan-out: spawn brand-researcher per dimension -> analysis/<dim>.org ->
+  strategist stitches+gates. ~9min -> ~1.5min. Risk: straggler barrier, no per-child gate.
+- D2 sub-board: composite task -> research Board, each dimension a VERIFIED leaf.
+  Highest quality+observability. Needs wb-3zg1 (worktree-accept bug) OR :ISOLATION: none.
+- D3 hybrid: D1 + bounded wave + deterministic straggler FALLBACK (strategist authors
+  a missing dimension itself). No engine changes. Straggler-resilient.
+
+* RECOMMENDATION
+1. wb-pyfx (substrate slice verb, strip fan-out+barrier+3 failmodes) — ~0.5d, biggest win.
+2. D3 (brand-researcher def + per-dimension fan-out + fallback) — ~1d, NO engine changes.
+3. D2 sub-board (verified dimension nodes) — ~2-3d, v2 after wb-3zg1.
+CAUTION: dimension split is a QUALITY bet — validate vs single-context strategist via the
+analysis-quality eval BEFORE the heavy sub-board. If it's only speed, D3 is permanent.
+
+* Key files
+dispatcher.ex (dispatch_composite/leaf/script), sub_agent.ex (spawn caps/depth),
+agent_controller.ex (POST /api/agents/spawn), brandnana-strategist.org, pre-read.org
+(FALLBACK lines 242-310 = the slice verb), runtime/docs/BOARD-V2-RECURSIVE-MODEL.org.

@@ -1,0 +1,50 @@
+# Brandnana API — local development secrets template.
+# Copy to `.dev.vars` (gitignored) and fill in real values for `wrangler dev`.
+# For production, push the same file via `bun run secrets:push`.
+
+# Cloudflare AI Gateway bearer token (cf-aig-authorization). Optional —
+# unset in prod, so LLM calls go direct to the provider. Mint at
+# dash.cloudflare.com → AI → AI Gateway → <gateway> → API tokens.
+CF_AI_GATEWAY_TOKEN=""
+
+# CLI sign-in (GitHub OAuth device flow — needs an OAuth App with Device
+# Flow enabled at https://github.com/settings/developers; only the client
+# id is needed, no client_secret).
+GITHUB_CLIENT_ID=""
+
+# LLM providers
+CEREBRAS_API_KEY=""        # primary agent-curation LLM
+OPENROUTER_API_KEY=""      # primary book-composition + vision LLM
+GROQ_API_KEY=""            # fast-inference upstream
+
+# Auth
+CLERK_SECRET_KEY=""        # portal session-JWT verification
+WORKOS_API_KEY=""          # AuthKit/SSO
+WORKOS_CLIENT_ID=""
+
+# Web research (replaces EXA)
+VALYU_API_KEY=""
+
+# Ad intelligence — ALL ad-library fan-out goes through ScrapeCreators
+SCRAPECREATORS_API_KEY=""
+
+# Vendor APIs
+FIRECRAWL_API_KEY=""
+# context.dev (rebrand of logo.dev). Covers brand retrieve, styleguide,
+# fonts, web scraping, product extraction, NAICS/SIC lookup. Replaces
+# both logo.dev and Brandfetch in our stack.
+CONTEXT_DEV_API_KEY=""
+# The Companies API (thecompaniesapi.com) — company enrichment behind
+# GET /brand/:domain/company.
+THE_COMPANIES_API_KEY=""
+
+# DEPRECATED — replaced by Valyu, remove after migration.
+EXA_API_KEY=""
+
+# OAuth (Ad Library APIs) — deferred / out for now.
+META_CLIENT_ID=""
+META_CLIENT_SECRET=""
+TIKTOK_CLIENT_ID=""
+TIKTOK_CLIENT_SECRET=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""

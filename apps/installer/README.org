@@ -1,0 +1,68 @@
+#+TITLE: brandnana installer
+#+DESCRIPTION: One-line install: curl -fsSL https://install.brandnana.net | sh
+
+* What this is
+
+A Cloudflare Worker that:
+1. Serves an install shell script at =https://install.brandnana.net/=
+2. Serves the compiled =brandnana= binaries from R2 at =/binaries/:version/:name=
+
+The worker is in =worker/=; the script it serves is =install.sh=.
+
+* Layout
+
+#+begin_example
+apps/installer/
+├── install.sh                ← the shell script users run
+├── scripts/
+│   └── publish-binaries.sh  ← upload built binaries to R2
+└── worker/
+    ├── wrangler.toml
+    ├── package.json
+    ├── tsconfig.json
+    └── src/
+        └── index.ts          ← Hono worker; install.sh inlined as INSTALL_SCRIPT
+#+end_example
+
+* Deploy
+
+** First time only
+
+1. Create R2 bucket:
+   #+begin_src sh
+   wrangler r2 bucket create brandnana-binaries
+   #+end_src
+
+2. Configure custom domain in the Cloudflare dashboard:
+   =install.brandnana.net= → =brandnana-installer= worker
+   (the =wrangler.toml= declares =custom_domain = true= on the route; CF still
+   needs the DNS record and zone association done once in the dashboard).
+
+** Each release
+
+1. Build binaries:
+   #+begin_src sh
+   cd ../cli && bun run build:binary
+   #+end_src
+
+2. Upload binaries (replaces both versioned and =latest= slots):
+   #+begin_src sh
+   cd ../installer && ./scripts/publish-binaries.sh v0.1.0
+   #+end_src
+
+3. Deploy worker:
+   #+begin_src sh
+   cd worker && wrangler deploy
+   #+end_src
+
+* Local test
+
+#+begin_src sh
+cd worker && bunx wrangler dev --port 8788
+# in another terminal:
+curl -fsSL http://localhost:8788/
+#+end_src
+
+The =/binaries/…= routes return 404 locally unless you populate the local R2
+dev binding (=wrangler r2 object put= into the local emulator). That's expected
+— the local test only validates the install script is served as =text/plain=.

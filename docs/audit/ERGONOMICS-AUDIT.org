@@ -1,0 +1,62 @@
+#+TITLE: DeployKit + agent/query/observability ergonomics audit
+#+UPDATED: 2026-06-05
+
+Grounded against the code (workflow wf_1eeaf15a-40d, 5 agents) from a real
+overnight autonomous session (~10 redeploys, board agent authoring, wb
+query/trace/unbundle, the wb-defh durability work). Severity·effort·layer noted.
+
+* HEADLINE — the single biggest loop drag
+  Profile/boards/toolkits are baked into the read-only image, so a ONE-LINE .org
+  prompt/skill/board edit forces a full ~8-15min Rust+bun+Elixir rebuild + restart
+  — even though the engine reads them LIVE per-request (agent_def.ex:153 File.read,
+  no boot cache). Fix (deploykit·M): (1) seed COPY → /opt/profile.default, boot
+  rsync-if-empty into /data/profile, set WB_PROFILE_DIR=/data/profile; (2) add
+  `wb profile sync` → new POST /api/profile/files (clone WorkspaceController.write_
+  files base64+root-confine primitive). Prompt-tweak loop: ~10min → seconds.
+
+* Deploy cycle
+  - [deploykit·M·high] Cargo builds (workbooks-embed ~75 crates + wb-cli) have NO
+    --mount=type=cache (mix/bun stages do) → full recompile every deploy. Fix: add
+    registry/git + target cache mounts; CAUTION cp the binary OUT of the cache-
+    mounted target (the wb-lb3o.17 / 1f4d4c2e0 lesson — cache mounts aren't in the
+    layer FS for the final COPY --from).
+  - [deploykit·S·high] fly.bn-engine.toml has NO [checks] block → --strategy
+    immediate mandatory → mid-run kill. /api/health EXISTS (router.ex:38). Fix: add
+    [[http_service.checks]] → /api/health, drop hardcoded immediate (propagate.sh:52).
+  - [engine·L·med] Mid-run deploy kills the in-flight board (in-memory GenServer;
+    Board.Supervisor is an EMPTY DynamicSupervisor, no boot recovery) → stale
+    :in_progress + un-released claim. = wb-defh part-2 (boot recovery scan + drain).
+
+* Agent/board authoring
+  - [workbook-cli·M·high] No offline `wb agent validate` / `wb board validate` —
+    authors hand-roll throwaway mix tests to check .org parses.
+  - [engine·S·med] `:MAX_TURNS:` is declared in agent .org + #+EXTENSIONS but
+    parsed by NOTHING (advisory/dead). Delete it (wall-clock-only design) or wire it.
+  - [engine·S·high] wb-defh silent-discard root FIXED (042a0f18b, has_id? padded
+    :ID:). Keep the regression test.
+  - [engine·S·med] SAME hazard still live: sync.ex JSON-board cascade write_promotions
+    discards File.write (advance_task_json:38-41 does it right — mirror it). Adjacent:
+    network/identity.ex clear_bluesky discards write_state. NO lint/policy against
+    discarding fallible results — the systemic hazard that hid wb-defh.
+
+* Query engine + book-as-backend
+  - [workbook-cli·S·med] `wb query "<expr>" FILE` rejects a positional path with a
+    bare clap error. Fix: optional positional path + "did you mean --path?" hint.
+  - [workbook-cli·M·high] `wb workbooks query` → /api/workbook/query 404 + --count
+    usage error: production-lag (redeploy) + needs --engine/--token + no local fallback.
+  - [brandnana·M·high] The deck publish path trusts agent HTML VERBATIM and never
+    (re)builds the wb-source-bundle (the wb-ann4 root). `wb embed-source` mitigates
+    agent-side; ROBUST fix: publish.ts validate-or-rebuild the bundle SERVER-SIDE so
+    a hand-rolled/missing bundle can't ship.
+  - [deploykit·S·low] forge toolchain now ships next to wb in BOTH spots (fixed).
+
+* Observability & telemetry
+  - BRIGHT SPOT: wb sessions + wb trace (verdict/ctx/tool-histogram/spawn-tree) +
+    durable JSONL = the model. The verdict line caught wb-looe. Build on it.
+  - [workbook-cli·M·med] No `wb login`/saved engine context — every remote command
+    needs an SSH-minted tenant token + --engine/--token. Fix: `wb login --engine
+    <url>` → ~/.config/wb/context.json (0600).
+  - [engine·S·med] OTel→Langfuse export wired but DORMANT in prod, nothing reports
+    it (wb-zl74). Fix: log Otlp.configure result at boot + /api/about field.
+    Adjacent: Prometheus reporter STARTS but is never mounted on /metrics — a SECOND
+    dormant observability surface.

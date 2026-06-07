@@ -1,0 +1,95 @@
+#+TITLE: Wall-clock baseline — brand-book runs (wb-syjo)
+
+First per-stage profile read on FULLY-accurate, unmasked telemetry. Tracks the
+trend as the observability-driven loop tightens turn-economy.
+
+* Deployed fixes (as of run #9)
+  - Engine classify_verb: cd-prefix, var-assignment (=VAR=val= / ="…"= / =$(…)=),
+    separators (=;= =&&= newline), brace-groups (={= =}= =&=). Bounded shell-noise
+    set COMPLETE. (brace-group classify committed post-#9-deploy → lands run #10.)
+  - harvest-sweep STOP trap #4: =RESULT: PASS= → durable push, no post-check re-verify.
+  - strategist: cite =:point:= ids verbatim (avoid dangling-citation gate grind).
+  - API creative-vision: prose replies kept as =summary= (not dropped to all-empty).
+
+* Run #9 — allbirds.com
+
+** Scout (brand-scout) — 56 turns · 10.1m · 0 FM
+   - tool 3.2m / llm 6.9m → LLM dominates; turn-count is the lever.
+   - Biggest tool cost: =brandnana:catalog.crawl= 1.6m (server-side DO; client streams).
+   - Harvest is PARALLEL: =brand fetch || logo || design tokens || social= via
+     ={ …; } &= batches — good wall-clock (not sequential).
+   - STOP trap #4 VALIDATED: PASS (t54) → =substrate publish= (t55) → done (t56). No tail.
+   - TREND: turns 93 (#7) → 78 (#8) → 56 (#9); wall-clock 11.4m → 11.9m → 10.1m.
+
+** Strategist (brandnana-strategist) — 37 turns · 0 FM
+   - cite-verbatim VALIDATED: =RESULT: PASS= on the FIRST gate run, 0 dangling
+     (24 insights, 82 citations). Proactively verified anchor formats at t25-27
+     (~3 turns — incl the ad-id that dangled in run #8) → zero gate grind.
+   - TREND: strategist turns 52 (#7) → 62 (#8, dangling grind) → 37 (#9). #8 was the
+     outlier; cite-verbatim + simpler brand put #9 well below baseline.
+
+** Designer — 111 turns · 0 FM · render:1 (no re-render loop)
+   - vision prose-fallback VALIDATED: 0 empty verdicts (run #8: 14/45). 45-slide deck
+     published + deck-gate PASS (t86).
+   - POST-GATE TAIL: ~25 turns past PASS (t86->t111) — derived a FALSE "19 composite
+     slides" from the prose verdicts (deck had 45 distinct sections; gate had counted
+     them) + resorted to pixel-reading (t109, the dead-end). Steered by wb-9vnn
+     ("trust the gate for structure"). Expect ~85 next run.
+   - TREND: Designer turns 88 (#7) -> 111 (#9, post-gate tail = the overage).
+
+* Run #9 SUMMARY — first fully-validated clean run
+  scout 56 · strategist 37 · Designer 111 (~88 + ~25 post-gate tail). All 4 deployed
+  fixes confirmed (unmasking, STOP trap #4, cite-verbatim, vision prose-fallback).
+  2 fixes staged for run #10: brace-group classify, designer trust-the-gate.
+
+* Run #10 (brooklinen.com) — validated brace-group + trust-the-gate
+  - scout 55 (STOP trap #4 holds); brace-group unmasked (brandnana:brand.fetch not bash:{).
+  - Designer ~85 turns (vs #9's 111) — trust-the-gate VALIDATED: composite:0/pixel:0,
+    no post-gate tail (~25 turns saved). 42-slide deck published.
+  - NEW BIG FINDING via wb-oypg: strategist 14.8m wall-clock is ~HALF sub-agent wait
+    (bash:wb 5m + bash:sleep 2m = blocking on a 7.5m fan-out barrier). The barrier is
+    IMBALANCED — one pre-read sub 51 turns vs others ~6 (wb-3av4, P1). Fixed via
+    pre-read.org turn-budget; validate run #11.
+  - Staged for run #11: comment-; classify, pre-read turn-budget, wb-oypg baked wb,
+    dormant-arm cleanup.
+
+* Run #11 (ruggable.com) — comment-; validated; vision hang surfaced; engine restart
+  - comment-; classify VALIDATED: scout verbs clean (no =bash:let's= leak).
+  - @known_verbs gap: =brandnana logo= + =design tokens= masked as =bash:brandnana= —
+    added (wb-j5nw); systematic hand-curated drift filed (wb-oeya).
+  - scout grindy: cost-retry-spin (8-19x =brand.fetch=, OFF-LIMITS) + a slow ~15min
+    =creative.analyze= HANG (the vision call had NO fetch timeout). Scout recovered (78t).
+  - The hang likely cascaded to an ENGINE RESTART (04:53Z) that killed the run mid-flight
+    (wb-f7qp). Pre-read subs (partial, before the kill): 7/17/17/38/48 (median 17 vs #10's
+    31 — budget helping; barrier confounded by ruggable's big catalog).
+  - FIXED: vision.ts =AbortSignal.timeout= 90s/30s on the OpenRouter + media fetches
+    (816c0bf1e, deployed). Backstop wb-5o8d (engine bash-timeout gaps), CLI mirror wb-wbld.
+
+* Run #12 (brooklinen.com) — pre-read budget VALIDATED (apples-to-apples vs #10)
+  - scout 65 turns, NO hang (vs #11's 78) — vision timeout holds in turn-count too.
+  - pre-read budget VALIDATED: subs 6/11/11/18 (max 18) vs #10's 6/19/31/35/51 (max 51).
+    Barrier 51->18 (~65%); the 31/35/51 over-runners gone. wb-3av4 CLOSED.
+  - The pipeline's big per-stage wall-clock levers are now ALL fixed + validated:
+    scout STOP-trap (93->55), strategist cite-verbatim (62->37) + fan-out budget (51->18),
+    Designer trust-the-gate (111->85), + vision timeout (no hangs). Remaining waste is
+    OFF-LIMITS (cost-retry) or inherent (LLM turn-economy + server-side crawl).
+
+* E2E #5 (2026-06-06) — STRUCTURAL WIN VALIDATED IN PROD
+gather-org-data ran as :TYPE: script (brandnana harvest-all) — DONE, ZERO escalation,
+ZERO scout session, ZERO LLM, no OOM. ~2.5min deterministic harvest vs ~9.5min old LLM scout (~4x).
+All 12 stages clean (init->resolve->brand/logo/tokens->company->catalog->social->ads->creative->build->check->publish).
+Engine primitives shipped: :TYPE: script (wb-2ane), :ON_FAILURE: escalate, :COMMAND var-injection, WB_ENGINE_BEARER
+for scripts. harvest-all CLI (wb-qy3g). Latent: media-degeneracy non-determinism (wb-gby2) still forces a scout
+recovery on ~some runs; db_path fix (bf5aeed73) makes that recovery target the right SQLite.
+
+* E2E #7 (2026-06-06) — ALL 3 AGENTS VALIDATED, full book DONE
+Board: done {gather-org-data, author-analysis, compose-deck all DONE}. Complete brand book generated.
+- gather-org-data: zero-LLM harvest-all script, ~2.5min, NO escalation (3rd reproducible clean run).
+- author-analysis: deterministic `substrate slice` + SOLO author, ~9min/61t, NO straggler fan-out
+  (wb-pyfx validated; trace t2 ran the slice verb, zero children spawned; #6 was a 25min straggler).
+- compose-deck: deterministic `defect_count` gate (no defects) + ONE optional TIER-2 vision batch by the
+  designer's choice, ~25min total = ~18min AUTHORING + ~7min QA. NO ~15min vision grind (wb-8jpb validated;
+  #5 ground 15min on per-slide vision).
+NEXT LONG POLE: designer AUTHORING ~18min (writes 40 slide files, ~2 turns each). The QA grind is fixed;
+authoring is now the dominant designer cost. Candidate: parallel slide-group authoring (spawn-as-tool) or a
+tighter compose template. Strategist solo ~9min reasoning is the other pole -> wb-aazw (spawn-as-toolkit).

@@ -1,0 +1,11 @@
+{
+  "name": "@brandnana/skill",
+  "private": false,
+  "version": "0.0.1",
+  "description": "Portable Brandnana skill for Claude Code / Codex / Cursor / any AI harness",
+  "files": ["SKILL.md", "scripts/", "examples/"],
+  "main": "SKILL.md",
+  "scripts": {
+    "install:cli": "bash scripts/install.sh"
+  }
+}

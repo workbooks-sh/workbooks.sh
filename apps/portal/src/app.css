@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/* Tailwind v4 content scanner — include Svelte files so utility classes used
+   in templates are actually emitted into the output CSS. Without this the
+   theme tokens loaded but every util like `max-w-5xl`, `bg-banana`, `rounded-sm`
+   was missing from the build. */
+@source "../src/**/*.{html,js,ts,svelte}";
+
+@theme {
+  /* surfaces */
+  --color-bg: #ffffff;
+  --color-bg-cream: #fbf4e4;
+  --color-bg-cream-soft: #f5ecd5;
+  --color-paper: #ffffff;
+
+  /* type — pure neutral greys, not warm */
+  --color-fg: #18181b;          /* near-black */
+  --color-fg-soft: #3f3f46;     /* body text */
+  --color-fg-muted: #71717a;
+  --color-fg-subtle: #a1a1aa;
+
+  /* brandnana palette — TWO brand colors. Everything else is grey. */
+  --color-banana: #f0c040;       /* primary CTA */
+  --color-banana-deep: #d4a830;
+  --color-banana-soft: #fef6dd;  /* pale yellow tint for hover/highlight */
+  --color-blue: #2c5fb5;         /* royal blue — secondary accent */
+  --color-blue-deep: #1e4690;
+  --color-blue-soft: #e8efff;    /* pale blue tint for hover/highlight */
+
+  /* Greys for surfaces / type. Pure neutral, no warmth. */
+  --color-bg-soft: #fafafa;      /* section dividers */
+  --color-bg-tint: #f4f4f5;      /* card bg */
+  --color-line: #e5e5e5;         /* hairline border */
+  --color-line-strong: #d4d4d8;
+
+  /* Back-compat for dashboard pages */
+  --color-cherry: #d65a3a;
+  --color-cherry-deep: #b8451f;
+  --color-olive: #8b9e64;
+  --color-rust: #9b5a3a;
+  --color-plum: #7a4a6b;
+  --color-teal: #4a7a8c;
+  --color-burnt: #c75d2c;
+
+  /* borders */
+  --color-border-warm: #d9c89e;
+  --color-border-strong: #b89e6a;
+  --color-border-ink: #1f1a14;   /* the chunky-button border */
+
+  /* type stack — modern minimal */
+  --font-serif: "Times New Roman", Georgia, Cambria, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", monospace;
+
+  /* semantic state colors */
+  --color-ok: #4caf7d;
+  --color-warn: #d4900a;
+  --color-error: #c94040;
+}
+
+/*
+  ROOT CAUSE OF EARLIER STYLE BREAKAGE
+  ─────────────────────────────────────
+  Tailwind v4 emits all utilities AND its preflight reset INSIDE @layer.
+  Per CSS Cascade Level 5, ANY unlayered rule beats ALL layered rules
+  (regardless of specificity). When we had `*{margin:0;padding:0}` at the
+  ROOT of this file (outside any @layer), it outranked Tailwind's preflight
+  — but critically, our reset did NOT set `border-style: solid`. Tailwind's
+  preflight does (via `*{border:0 solid}`). So `border-2` was emitting
+  `border-width: 2px` but `border-style` fell back to its CSS default of
+  `none` → NO BORDER VISIBLE. Same effect cascaded across other utilities.
+
+  Fix: wrap every base/component rule below in @layer base or @layer components
+  so they cooperate with Tailwind v4's cascade rather than override it.
+*/
+
+@layer base {
+  html {
+    background: white;
+    color: var(--color-fg);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background: white;
+    color: var(--color-fg);
+  }
+  h1, h2, h3, h4 { font-family: var(--font-serif); }
+  code, pre { font-family: var(--font-mono); }
+  a {
+    color: var(--color-fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  a:hover { color: var(--color-fg-muted); }
+  input, button, textarea, select {
+    font-family: var(--font-sans);
+    font-size: 13px;
+  }
+  button { cursor: pointer; }
+}
+
+@layer components {
+  /* legacy dashboard utilities (kept for /app/* pages that still rely on them) */
+  .muted   { color: var(--color-fg-muted); }
+  .subtle  { color: var(--color-fg-subtle); }
+  .ok      { color: var(--color-ok); }
+  .warn    { color: var(--color-warn); }
+  .error   { color: var(--color-error); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border: 1px solid var(--color-border-warm);
+    background: transparent;
+    color: var(--color-fg);
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-radius: 2px;
+  }
+  .btn:hover { background: var(--color-bg-cream); border-color: var(--color-border-strong); }
+  .btn:active { background: var(--color-bg-cream-soft); }
+  .btn.danger { color: var(--color-error); border-color: var(--color-error); }
+  .btn.danger:hover { background: color-mix(in srgb, var(--color-error) 8%, transparent); }
+  .btn.primary {
+    background: var(--color-banana);
+    color: var(--color-fg);
+    border-color: var(--color-banana-deep);
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: var(--color-banana-deep); border-color: var(--color-banana-deep); }
+
+  .input {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-warm);
+    background: white;
+    color: var(--color-fg);
+    outline: none;
+    transition: border-color 0.1s;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    border-radius: 2px;
+  }
+  .input:focus { border-color: var(--color-border-strong); }
+  .input::placeholder { color: var(--color-fg-subtle); }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border-warm);
+    color: var(--color-fg-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    border-radius: 2px;
+  }
+  .chip.ok    { border-color: var(--color-ok); color: var(--color-ok); }
+  .chip.warn  { border-color: var(--color-warn); color: var(--color-warn); }
+  .chip.error { border-color: var(--color-error); color: var(--color-error); }
+
+  /* dashboard "section" card — kept name for backwards-compat with app/* pages */
+  .section {
+    border: 1px solid var(--color-border-warm);
+    padding: 16px;
+    margin-bottom: 16px;
+    background: var(--color-bg-cream);
+    border-radius: 2px;
+  }
+  .section-title {
+    color: var(--color-fg-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    font-family: var(--font-sans);
+  }
+}

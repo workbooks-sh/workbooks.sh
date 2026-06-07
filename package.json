@@ -1,0 +1,20 @@
+{
+  "name": "brandnana",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ad/brand intelligence substrate for agents. Skill + CLI + managed API.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "api:dev": "bun run --cwd apps/api dev",
+    "cli:build": "bun run --cwd apps/cli build",
+    "typecheck": "bun --filter='./apps/*' --filter='./packages/*' run typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "@biomejs/biome": "^1.9.0"
+  },
+  "packageManager": "bun@1.1.0"
+}

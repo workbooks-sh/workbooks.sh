@@ -1,0 +1,43 @@
+#+TITLE: {{competitor_name}} — competitor of {{brand_name}}
+#+GENERATED_AT: {{utc_iso}}
+
+* {{competitor_name}}                                          :competitor:
+  :PROPERTIES:
+  :ID:        {{slug}}
+  :DOMAIN:    {{domain}}
+  :CATEGORY:  {{category}}
+  :END:
+
+** Snapshot
+   {{snapshot_notes}}
+
+** Visual deltas vs {{brand_name}}                             :delta:
+   :PROPERTIES:
+   :PALETTE_DISTANCE: {{palette_distance}}
+   :TONE_DELTA:       {{tone_delta}}
+   :END:
+
+   {{delta_notes}}
+
+** Ads                                                         :ads:
+{{#ads}}
+*** {{ad_headline}}                                            :ad:
+    :PROPERTIES:
+    :AD_ID:        {{ad_id}}
+    :PROVIDER:     {{provider}}
+    :FIRST_SEEN:   {{first_seen}}
+    :LAST_SEEN:    {{last_seen}}
+    :PLATFORM:     {{platform}}
+    :CTA:          {{cta}}
+    :LANDING_URL:  {{landing_url}}
+    :MEDIA_URL:    {{media_url}}
+    :MEDIA_TYPE:   {{media_type}}
+    :END:
+
+    {{ad_body}}
+
+    Analysis:
+    - Theme:   {{theme}}
+    - Emotion: {{emotion}}
+    - Hook:    {{hook}}
+{{/ads}}

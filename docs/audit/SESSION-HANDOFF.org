@@ -1,0 +1,55 @@
+#+TITLE: Brandnana hardening — session handoff (2026-06-06)
+# Single pointer for the next session. Full timings: wall-clock-baseline.org.
+# Strategist design: strategist-parallel-research.org. Epic: bd show wb-syjo.
+
+* WHERE WE LEFT OFF
+The deterministic-first arc is COMPLETE + validated end-to-end. All three Brandnana
+agents now do their MECHANICAL work deterministically (no LLM grind); the LLM is
+reserved for genuine reasoning/authoring. Proven by E2E #7: a full brand book
+generated with all three fixes live. Loop cron killed. All on main @ 66399551a, clean tree.
+
+* WHAT SHIPPED (committed, on main, validated)
+- Scout  → =brandnana harvest-all= : deterministic 12-stage harvest as a board
+  =:TYPE: script= (zero LLM). ~9.5min LLM scout → ~2.5min script. (wb-qy3g, closed)
+- Engine primitives (wb-2ane, closed): =:TYPE: script= (run a command, no LLM/worktree),
+  =:ON_FAILURE: escalate= (script-fail spawns the task's agent to recover),
+  =:COMMAND:= run-var injection (=$domain=), and =WB_ENGINE_BEARER=/=WB_ENGINE_URL=
+  injected into script env so a script's CLI verbs auth like an agent (gitwork push).
+- Strategist → =brandnana substrate slice= : deterministic pre-read verb replacing the
+  straggler-bound 5-child grep fan-out. ~25min straggler → ~9min consistent SOLO. (wb-pyfx, closed)
+- Designer → deterministic render-time DEFECTS (overflow/empty/broken-image/clipped) in
+  renderDeckSlides + a TIER-1 =defect_count= gate; LLM vision demoted to optional TIER-2.
+  ~15min vision grind → fixed deterministic gate. (wb-8jpb, closed)
+
+* LAST RESULTS (E2E #7, full book DONE)
+- gather-org-data : ~2.5min, ZERO LLM, no escalation (3rd reproducible clean run)
+- author-analysis : ~9min/61t, deterministic slice + SOLO author, NO straggler (trace t2 = slice verb, 0 children)
+- compose-deck    : ~25min = ~18min AUTHORING + ~7min QA; deterministic defect gate (no defects)
+                    + ONE optional vision batch by choice; NO per-slide grind
+- Board: done. Complete brand book.
+
+* THE TWO REMAINING WALL-CLOCK POLES — both solved by ONE capability
+Both are irreducible-SOLO reasoning; the only cut is parallelism via the SAME primitive:
+the user's =spawn-as-toolkit= idea — the agent reaches for =wb agent spawn= BY JUDGMENT
+(not a forced fan-out) to parallelize genuinely-deep units.
+- Strategist ~9min reasoning  → spawn research children (per dimension) by judgment
+- Designer  ~18min authoring  → spawn slide-group authoring children by judgment
+=> wb-aazw is the one build that serves both. Design + the spawn-as-toolkit reframe:
+   strategist-parallel-research.org. Capability already exists in runtime
+   (wb agent spawn; board composite/sub_board; strategist :ALLOW_SPAWN: t :SPAWN_DEPTH: 2).
+
+* OPEN bd (children of wb-syjo by description; links didn't register — find via: bd list --status open | grep -i strateg/designer/3w/media)
+- wb-aazw P1 — spawn-as-toolkit (the shared next build; serves strategist + designer). START HERE.
+- wb-tbq3 P2 — designer authoring is the new long pole (~18min, 40 slides) → spawn-as-tool or tighter template.
+- wb-gby2 P2 — substrate-check media non-determinism (one R2 hash dominating; crawl-quality, not mirror). Connects to wb-7id9.
+- wb-7id9 P2 — add 3w crawl tier (shopify → 3w $0 → firecrawl) to stop firecrawl spend. ~4.5d, 3w needs a product extractor.
+- PRIOR designer-vision tasks wb-6vn7 / wb-5dti — the "designer not converging on vision" root; ADDRESSED by wb-8jpb's
+  deterministic gate (vision now optional). Verify against a fresh run, then close.
+
+* OFF-LIMITS (per loop charter): cost side-quest wb-rg0q / wb-mxp1 / wb-31te.
+
+* HOW TO RESUME A RUN (engine bn-engine, machine 2862657f723d18)
+mint: fly ssh console -a bn-engine -C "/bin/sh -lc '/app/bin/workbooks_runtime_container rpc \"WorkbooksRuntime.Api.TenantToken.mint(\\\"bn-engine\\\") |> elem(1) |> IO.puts()\"'"
+launch: RUN=/tmp/board-run-$(date +%s); cp /opt/profile/boards/brand-book/board.org $RUN/; POST /api/run-plan {board_dir:$RUN, workdir:$RUN, vars:{domain:X}}
+observe: wb trace task-<id> / wb sessions --engine https://bn-engine.fly.dev --token $TOK
+deploy after CLI/profile/engine edits: scripts/propagate.sh --deploy (~15min; rebuilds from source).

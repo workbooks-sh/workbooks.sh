@@ -1,0 +1,67 @@
+#+TITLE: {{brand_name}} product catalog
+#+GENERATED_AT: {{utc_iso}}
+#+PRODUCT_COUNT: {{product_count}}
+#+CATEGORY_COUNT: {{category_count}}
+
+* Catalog
+
+** by-category                                                 :index:category:
+{{#categories}}
+*** {{name}}
+{{#subcategories}}
+**** {{name}}
+{{#products}}
+***** {{name}}                                                 :product:
+      :PROPERTIES:
+      :ID:         {{slug}}
+      :SKU:        {{sku}}
+      :PRICE:      {{price}}
+      :CURRENCY:   {{currency}}
+      :SIZES:      {{sizes_csv}}
+      :COLORS:     {{colors_csv}}
+      :IMAGES:     {{images_csv}}
+      :URL:        {{url}}
+      :STOCK:      {{stock_status}}
+      :MATERIALS:  {{materials_csv}}
+      :TAGS:       {{tags_csv}}
+      :CATEGORY:   {{category_path}}
+      :COLLECTION: {{collection}}
+      :PRICE_BAND: {{price_band}}
+      :END:
+
+      {{description}}
+{{/products}}
+{{/subcategories}}
+{{/categories}}
+
+** by-collection                                               :index:collection:
+{{#collections}}
+*** {{name}}
+{{#products}}
+**** {{name}} ([[id:{{slug}}][see canonical]])               :product:ref:
+{{/products}}
+{{/collections}}
+
+** by-color                                                    :index:color:
+{{#colors}}
+*** {{name}}                                                   :color:{{slug}}:
+{{#products}}
+**** {{name}} ([[id:{{slug}}][see canonical]])               :product:ref:
+{{/products}}
+{{/colors}}
+
+** by-price-band                                               :index:price-band:
+{{#price_bands}}
+*** {{name}}
+{{#products}}
+**** {{name}} — ${{price}} ([[id:{{slug}}][see canonical]]) :product:ref:
+{{/products}}
+{{/price_bands}}
+
+** by-stock-status                                             :index:stock-status:
+{{#stock_groups}}
+*** {{status}}
+{{#products}}
+**** {{name}} ([[id:{{slug}}][see canonical]])               :product:ref:
+{{/products}}
+{{/stock_groups}}

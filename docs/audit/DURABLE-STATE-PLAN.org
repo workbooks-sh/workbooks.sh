@@ -1,0 +1,39 @@
+#+TITLE: Durable engine state — observability history + substrate survival (wb-l6yq)
+#+UPDATED: 2026-06-05
+
+Every machine restart/redeploy wipes engine state: =/tmp= is ephemeral and
+SessionTrack is an in-memory ETS table recreated empty on boot. Consequences:
+- =/api/sessions= returns =(no sessions)= after a restart → =wb sessions=/=wb trace=
+  can't query history (defeats "shotgun across a large dataset").
+- The board run's workdir + substrate are wiped → every re-run re-harvests (~10 min)
+  even when a valid substrate was just produced (the slow-cycle pain).
+- A board run does not survive a machine cycle.
+
+* What exists now
+  - SessionTrack (session_track.ex): =GenServer= + named ETS =:wb_session_track=
+    (=:ets.new= in init → empty on boot). =record/lookup/all= are ETS ops. No disk.
+  - Traces: =<workdir>/.workbooks/sessions/<id>/trace.jsonl= — workdir is /tmp/* (ephemeral).
+  - =WB_DATA_ROOT= = =/tmp/wb= (no volume) — engine state is ephemeral.
+  - Volume *wb_data* (3GB, iad, encrypted) CREATED + unattached (this session).
+
+* Plan (implement + deploy POST board-run; needs a redeploy)
+  1. *Mount the volume.* fly.bn-engine.toml → =[mounts] source="wb_data"
+     destination="/data"=. (Volume already created in iad.)
+  2. *Durable engine root.* Set =WB_DATA_ROOT=/data= (Dockerfile.engine-profile ENV)
+     so engine state + workbook dirs live on the volume.
+  3. *SessionTrack survives restart.* Keep the ETS table (read_concurrency) but
+     MIRROR every =record/3= to an append =/data/session-track.jsonl=, and on
+     =init= load that file back into ETS. (JSONL chosen over DETS: append-only,
+     human-readable, no 2GB/closdown footguns.) Net: =/api/sessions= lists finished
+     runs after a restart.
+  4. *Traces survive.* Board/agent runs root their workdir under =/data= (e.g.
+     =/data/runs/board-run-<ts>=) so =trace.jsonl= persists → =wb trace <id>= works
+     on past sessions, and the substrate is reusable across deploys (kills the
+     re-harvest cycle: re-run the board pointed at an existing =/data= substrate).
+  5. *Verify:* run a session → redeploy → =wb sessions= still lists it + =wb trace=
+     reads it; the substrate dir still exists.
+
+* Risks / notes
+  - Single machine in iad → one volume attaches fine. Multi-machine later needs LiteFS/R2.
+  - 3GB is a starter; traces + substrates accumulate — add a prune (keep last N runs).
+  - Keep session_track.ex < 800 LOC; the JSONL mirror is ~20 lines.

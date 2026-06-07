@@ -1,0 +1,21 @@
+name = "brandnana-admin"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "6d4b74aeb10f455fbf88141901e7595d"
+
+[[routes]]
+pattern = "admin.brandnana.net"
+custom_domain = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "brandnana"
+database_id = "624defd0-4919-4191-86c4-4c52bef0e31c"
+
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "brandnana-assets"
+
+# Secrets (set via apps/admin/scripts/secrets-push.sh):
+#   BRANDNANA_ADMIN_KEY
