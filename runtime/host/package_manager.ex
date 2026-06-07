@@ -32,6 +32,20 @@ defmodule Workbooks.PackageManager do
   # hash ⇒ same path ⇒ idempotent rebuilds (no duplicate artifacts, stable id).
   @commands Path.expand(Path.join([__DIR__, "..", "build", "commands"]))
 
+  # SECURITY (wb-sec): hard caps for the command run path. A guest that builds a
+  # huge string and passes it as `run-command` input would otherwise pin it in
+  # BEAM heap AND write it whole to /tmp (memory + disk DoS). argv likewise is
+  # bounded so a single oversized arg cannot blow ARG_MAX (which silently failed).
+  @max_input_bytes 64 * 1024 * 1024
+  @max_argv_bytes 256 * 1024
+  # Wall-clock + fuel caps on the wasmtime CLI so an infinite-loop guest cannot
+  # hang the host forever (the Instance Policy timeout never wrapped this path).
+  @default_run_timeout_ms 30_000
+  @default_fuel 5_000_000_000
+
+  @doc "The content-addressed commands store dir (build/commands/)."
+  def commands_dir, do: @commands
+
   @doc "Tangle a literate Workbook: build every component → [{name, lang, result}]."
   def tangle(org) when is_binary(org) do
     Workbooks.OQL.tangle_plan(org)
@@ -76,9 +90,14 @@ defmodule Workbooks.PackageManager do
     abs = Path.expand(dir)
     manifest = Path.join(abs, "Cargo.toml")
     {tool, lead} = if component_crate?(manifest), do: {"cargo-component", ["component"]}, else: {"cargo", []}
-    cmd = lead ++ ["build", "--manifest-path", manifest, "--target", "wasm32-wasip1", "--release"]
+    # SECURITY (wb-sec): a local crate's build.rs / proc-macros are HOSTILE. Build
+    # under Workbooks.Sandbox (network-DENIED, fs-confined) so they cannot
+    # exfiltrate or reach the network. The dir's deps must be vendored/cached
+    # first (the wb-11ck.36 resolve-then-offline-compile pattern). `--offline`
+    # makes cargo fail loudly instead of attempting a (sandbox-blocked) fetch.
+    cmd = lead ++ ["build", "--offline", "--manifest-path", manifest, "--target", "wasm32-wasip1", "--release"]
 
-    case System.cmd(tool_bin(tool), cmd, stderr_to_stdout: true, env: cargo_env()) do
+    case Workbooks.Sandbox.run([tool_bin(tool) | cmd], env: cargo_env()) do
       {_, 0} ->
         case Path.wildcard(Path.join([abs, "target", "wasm32-wasip1", "release", "*.wasm"])) do
           [wasm | _] -> {:ok, wasm, if(lead == [], do: :built_dir, else: :built_component)}
@@ -95,10 +114,12 @@ defmodule Workbooks.PackageManager do
     out = Path.join(@cache, "#{cache_key([abs])}.wasm")
     js = Path.join(System.tmp_dir!(), "wb-dir-#{cache_key([abs])}.js")
     File.mkdir_p!(@cache)
-    # bun install resolves the dir's npm dependencies; bun build inlines them.
-    System.cmd("bun", ["install"], cd: abs, stderr_to_stdout: true)
+    # SECURITY (wb-sec): npm postinstall/build scripts are HOSTILE. `bun install`
+    # needs the registry (network-permitted, fs-confined); `bun build` (which can
+    # trigger build-time scripts) runs network-DENIED.
+    Workbooks.Sandbox.run_net(["bun", "install"], cd: abs)
 
-    case System.cmd("bun", ["build", Path.join(abs, "index.js"), "--outfile", js], stderr_to_stdout: true) do
+    case Workbooks.Sandbox.run(["bun", "build", Path.join(abs, "index.js"), "--outfile", js]) do
       {_, 0} -> build_js(File.read!(js), out)
       {err, _} -> {:error, err}
     end
@@ -115,11 +136,9 @@ defmodule Workbooks.PackageManager do
     ensure_go_mod(abs)
     env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
 
-    case System.cmd("tinygo", ["build", "-o", out, "-target=wasip1", "."],
-           cd: abs,
-           stderr_to_stdout: true,
-           env: env
-         ) do
+    # SECURITY (wb-sec): Go generate / cgo / linker plugins can run host code.
+    # Compile network-DENIED, fs-confined (deps must be cached: `go mod download`).
+    case Workbooks.Sandbox.run(["tinygo", "build", "-o", out, "-target=wasip1", "."], cd: abs, env: env) do
       {_, 0} -> {:ok, out, :built_dir}
       {err, _} -> {:error, err}
     end
@@ -209,8 +228,8 @@ defmodule Workbooks.PackageManager do
   defp compile_objects(srcs, objs, env) do
     Enum.zip(srcs, objs)
     |> Enum.reduce_while(:ok, fn {src, obj}, _ ->
-      case System.cmd("zig", ["cc", "-target", "wasm32-wasi", "-Oz", "-c", "-o", obj, src],
-             stderr_to_stdout: true, env: env) do
+      # SECURITY (wb-sec): zig cc compiling untrusted C — network-DENIED.
+      case Workbooks.Sandbox.run(["zig", "cc", "-target", "wasm32-wasi", "-Oz", "-c", "-o", obj, src], env: env) do
         {_, 0} -> {:cont, :ok}
         {err, _} -> {:halt, {:error, err}}
       end
@@ -222,8 +241,7 @@ defmodule Workbooks.PackageManager do
   # that single `wasm-ld …` line. Returns the line minus the leading "wasm-ld ".
   defp probe_link_line(objs, out, env) do
     {output, _} =
-      System.cmd("zig", ["cc", "-target", "wasm32-wasi", "-Oz", "-o", out] ++ objs ++ ["-v"],
-        stderr_to_stdout: true, env: env)
+      Workbooks.Sandbox.run(["zig", "cc", "-target", "wasm32-wasi", "-Oz", "-o", out] ++ objs ++ ["-v"], env: env)
 
     case output |> String.split("\n") |> Enum.find(&String.starts_with?(&1, "wasm-ld ")) do
       nil -> {:error, "could not capture wasm-ld link line:\n#{output}"}
@@ -237,7 +255,7 @@ defmodule Workbooks.PackageManager do
   defp wrap_link(ld_line, env) do
     args = @mmap_wraps ++ String.split(ld_line, ~r/\s+/, trim: true)
 
-    case System.cmd("wasm-ld", args, stderr_to_stdout: true, env: env) do
+    case Workbooks.Sandbox.run(["wasm-ld" | args], env: env) do
       {_, 0} -> :ok
       {err, _} -> {:error, err}
     end
@@ -251,10 +269,8 @@ defmodule Workbooks.PackageManager do
     File.write!(Path.join(dir, "main.go"), src)
     env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
 
-    case System.cmd("tinygo", ["build", "-o", out, "-target=wasip1", Path.join(dir, "main.go")],
-           stderr_to_stdout: true,
-           env: env
-         ) do
+    # SECURITY (wb-sec): compile network-DENIED, fs-confined.
+    case Workbooks.Sandbox.run(["tinygo", "build", "-o", out, "-target=wasip1", Path.join(dir, "main.go")], env: env) do
       {_, 0} -> {:ok, out, :built}
       {err, _} -> {:error, err}
     end
@@ -311,7 +327,8 @@ defmodule Workbooks.PackageManager do
     tmp = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.js")
     File.write!(tmp, src)
 
-    case System.cmd(@javy, ["build", tmp, "-o", out], stderr_to_stdout: true) do
+    # SECURITY (wb-sec): Javy compiles untrusted JS — network-DENIED, fs-confined.
+    case Workbooks.Sandbox.run([@javy, "build", tmp, "-o", out]) do
       {_, 0} -> {:ok, out, :built}
       {err, _} -> {:error, err}
     end
@@ -323,7 +340,8 @@ defmodule Workbooks.PackageManager do
     js = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.built.js")
     File.write!(ts, src)
 
-    case System.cmd("bun", ["build", ts, "--outfile", js], stderr_to_stdout: true) do
+    # SECURITY (wb-sec): bun build of untrusted TS — network-DENIED, fs-confined.
+    case Workbooks.Sandbox.run(["bun", "build", ts, "--outfile", js]) do
       {_, 0} -> build_js(File.read!(js), out)
       {err, _} -> {:error, err}
     end
@@ -336,9 +354,11 @@ defmodule Workbooks.PackageManager do
     File.write!(Path.join(dir, "Cargo.toml"), rust_cargo())
     File.write!(Path.join([dir, "src", "main.rs"]), src)
 
-    cmd = ["build", "--manifest-path", Path.join(dir, "Cargo.toml"), "--target", "wasm32-wasip1", "--release"]
+    # SECURITY (wb-sec): even an inline Rust block can carry hostile proc-macros.
+    # The scaffolded crate has no deps, so build offline + network-DENIED.
+    cmd = ["build", "--offline", "--manifest-path", Path.join(dir, "Cargo.toml"), "--target", "wasm32-wasip1", "--release"]
 
-    case System.cmd("cargo", cmd, stderr_to_stdout: true) do
+    case Workbooks.Sandbox.run(["cargo" | cmd], env: cargo_env()) do
       {_, 0} ->
         File.cp!(Path.join([dir, "target", "wasm32-wasip1", "release", "comp.wasm"]), out)
         {:ok, out, :built}
@@ -402,15 +422,60 @@ defmodule Workbooks.PackageManager do
   to wasm32-wasip1 (e.g. `sd`, `jq`) be driven exactly as on a native shell.
   `dirs` are host paths preopened into the guest (WASI `--dir`) for file-mode CLIs.
   argv/dirs are passed as discrete System.cmd args (no shell), so no injection.
+
+  SECURITY (wb-sec): caps + bounds enforced here (the run-command Dock surface):
+    * input size is capped (@max_input_bytes) before it is written to /tmp — a
+      guest cannot fill host memory/disk via an oversized stdin.
+    * total argv size is capped (@max_argv_bytes) — an oversized arg used to blow
+      ARG_MAX and fail SILENTLY (empty output); now it returns a clear error.
+    * wasmtime runs under `-W timeout=` AND `-W fuel=` so an infinite-loop guest
+      traps instead of hanging the host forever (the Policy CPU cap never wrapped
+      this path). `opts[:timeout_ms]` overrides the default.
+    * the stdin temp file is removed in an `after` block so a crash/kill cannot
+      leak it.
+    * a non-zero wasmtime exit (including the timeout trap) returns
+      `{:error, {:command_failed, status, out}}` instead of a silent "".
+
+  Returns the trimmed-on-success stdout as a binary, or `{:error, reason}`.
   """
-  def run(wasm_path, input, argv, dirs \\ []) when is_list(argv) do
+  def run(wasm_path, input, argv, dirs \\ [], opts \\ []) when is_list(argv) do
+    cond do
+      not is_binary(input) or byte_size(input) > @max_input_bytes ->
+        {:error, {:input_too_large, max: @max_input_bytes}}
+
+      argv_bytes(argv) > @max_argv_bytes ->
+        {:error, {:argv_too_large, max: @max_argv_bytes}}
+
+      true ->
+        run_wasmtime(wasm_path, input, argv, dirs, opts)
+    end
+  end
+
+  defp argv_bytes(argv), do: Enum.reduce(argv, 0, fn a, acc -> acc + byte_size(to_string(a)) + 1 end)
+
+  defp run_wasmtime(wasm_path, input, argv, dirs, opts) do
+    timeout_ms = Keyword.get(opts, :timeout_ms, @default_run_timeout_ms)
+    fuel = Keyword.get(opts, :fuel, @default_fuel)
     inp = Path.join(System.tmp_dir!(), "wb-in-#{:erlang.unique_integer([:positive])}")
-    File.write!(inp, input)
-    parts = Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
-    cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
-    {out, _} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
-    File.rm(inp)
-    out
+
+    try do
+      File.write!(inp, input)
+
+      wopts = ["-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+      parts = wopts ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
+      cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
+
+      # NOTE: a non-zero exit here is usually the GUEST exiting non-zero (a normal
+      # CLI failure, e.g. a file not preopened) — that output is returned to the
+      # caller verbatim, preserving the universal-CLI contract. The DoS protection
+      # is the `-W timeout`/`-W fuel` trap above (an infinite loop is killed by
+      # wasmtime) plus the input/argv size caps (no silent E2BIG) — not a status
+      # check here.
+      {out, _status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
+      out
+    after
+      File.rm(inp)
+    end
   end
 
   # POSIX single-quote escaping: wrap in '...' and replace ' with '\'' — no injection.
@@ -456,8 +521,14 @@ defmodule Workbooks.PackageManager do
   @doc "Default step: build the component and run it as a WASM stdin/stdout filter."
   def run_component_step(comp, input) do
     case build(comp) do
-      {_, _, {:ok, wasm, _}} -> run(wasm, input) |> String.trim()
-      {_, _, other} -> {:error, other}
+      {_, _, {:ok, wasm, _}} ->
+        case run(wasm, input) do
+          {:error, _} = err -> err
+          out -> String.trim(out)
+        end
+
+      {_, _, other} ->
+        {:error, other}
     end
   end
 

@@ -49,17 +49,83 @@ defmodule Workbooks.CommandRegistry do
   # list: any wasm CLI can be registered and run through the same generic path.
   @dynamic {__MODULE__, :dynamic_commands}
 
-  @doc "All commands: static built-ins overlaid with dynamically registered ones."
-  def registry, do: Map.merge(@builtins, :persistent_term.get(@dynamic, %{}))
+  # SECURITY (wb-sec): built-in names are RESERVED. A dynamic registration must
+  # never shadow jq/grep/upper — otherwise any caller that can reach register/3
+  # (or a data-driven `wb toolkit build`) silently hijacks a trusted command for
+  # every Instance (semantic supply-chain attack). registry/0 also merges with
+  # @builtins LAST so even a stale/poisoned dynamic key cannot win at lookup.
+  @reserved Map.keys(@builtins)
+
+  # SECURITY (wb-sec): a registered command name must be a non-empty binary made
+  # of a conservative charset. Empty/nil names pollute the namespace and can mask
+  # lookup; exotic names are never legitimate command ids.
+  @name_re ~r/^[A-Za-z0-9_.-]+$/
+
+  # SECURITY (wb-sec): bound the number of dynamic entries so a registration
+  # storm cannot grow the :persistent_term map unboundedly (each put triggers a
+  # global GC) — a DoS. 4096 is far above any real command set.
+  @max_dynamic 4096
+
+  @doc "Reserved (built-in) command names that may not be dynamically registered."
+  def reserved_names, do: @reserved
+
+  @doc """
+  All commands: dynamically registered ones OVERLAID with the static built-ins
+  (built-ins LAST → built-ins always win). Even if a poisoned dynamic key for a
+  built-in name slips in, lookup resolves to the trusted built-in.
+  """
+  def registry, do: Map.merge(:persistent_term.get(@dynamic, %{}), @builtins)
 
   @doc "Registered command names (built-ins + dynamic)."
   def list, do: Map.keys(registry())
 
-  @doc "Register a prebuilt wasm CLI under `name` with an arg mode (:argv | :stdin1)."
-  def register(name, wasm_path, mode \\ :argv) do
-    :persistent_term.put(@dynamic, Map.put(:persistent_term.get(@dynamic, %{}), name, {:wasm, wasm_path, mode}))
-    :ok
+  @doc """
+  Register a prebuilt wasm CLI under `name` with an arg mode (:argv | :stdin1).
+
+  SECURITY: rejects empty/nil/malformed names, reserved (built-in) names, and any
+  `wasm_path` that does not resolve INSIDE the content-addressed commands store
+  (build/commands/). This stops the namespace from being poisoned and stops a
+  registration from pointing at arbitrary wasm planted elsewhere on the host.
+  Use `register_artifact/3` to register a freshly built artifact (it content-
+  addresses into the store first).
+  """
+  def register(name, wasm_path, mode \\ :argv)
+
+  def register(name, _wasm_path, _mode) when not is_binary(name) or name == "",
+    do: {:error, :invalid_name}
+
+  def register(name, wasm_path, mode) do
+    cond do
+      name in @reserved ->
+        {:error, :reserved_name}
+
+      not Regex.match?(@name_re, name) ->
+        {:error, :invalid_name}
+
+      not confined_command_path?(wasm_path) ->
+        {:error, :path_not_confined}
+
+      true ->
+        cur = :persistent_term.get(@dynamic, %{})
+
+        if not Map.has_key?(cur, name) and map_size(cur) >= @max_dynamic do
+          {:error, :registry_full}
+        else
+          :persistent_term.put(@dynamic, Map.put(cur, name, {:wasm, wasm_path, mode}))
+          :ok
+        end
+    end
   end
+
+  # A registered path must canonicalize to a file strictly inside the content-
+  # addressed commands store. Confines registration to managed build outputs.
+  defp confined_command_path?(path) when is_binary(path) do
+    base = Workbooks.PackageManager.commands_dir() |> Path.expand()
+    abs = Path.expand(path)
+    String.starts_with?(abs, base <> "/")
+  end
+
+  defp confined_command_path?(_), do: false
 
   @doc """
   Register a freshly BUILT artifact: content-address it (sha256 → build/commands/
@@ -71,8 +137,10 @@ defmodule Workbooks.CommandRegistry do
   def register_artifact(name, wasm_path, mode \\ :argv) do
     case Workbooks.PackageManager.content_address(wasm_path) do
       {:ok, addressed, _sha} ->
-        register(name, addressed, mode)
-        {:ok, addressed}
+        case register(name, addressed, mode) do
+          :ok -> {:ok, addressed}
+          {:error, reason} -> {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -85,11 +153,52 @@ defmodule Workbooks.CommandRegistry do
   code. Returns {:ok, wasm_path} | {:error, reason}. (Other languages build via
   PackageManager.build_dir/2 + register/3; this is the cargo-crate convenience.)
   """
-  def build_and_register_crate(name, crate, mode \\ :argv) do
-    root = Path.join(System.tmp_dir!(), "wbcmd-#{crate}")
+  # SECURITY (wb-sec): a crate spec is `<name>` or `<name>@<version>`, both from a
+  # conservative charset. This blocks argv OPTION-INJECTION (a leading-dash token
+  # like `--git=<attacker-url>` / `--index` / `--path` would otherwise redirect
+  # what `cargo install` fetches and builds — chaining into build.rs RCE).
+  @crate_re ~r/^[a-zA-Z0-9_][a-zA-Z0-9_.\-]*(@[a-zA-Z0-9_.+\-]+)?$/
 
-    case System.cmd("cargo", ["install", crate, "--target", "wasm32-wasip1", "--root", root, "--no-track"],
-           stderr_to_stdout: true
+  def build_and_register_crate(name, crate, mode \\ :argv)
+
+  def build_and_register_crate(name, _crate, _mode)
+      when not is_binary(name) or name == "",
+      do: {:error, :invalid_name}
+
+  def build_and_register_crate(name, crate, mode) do
+    cond do
+      name in @reserved ->
+        {:error, :reserved_name}
+
+      not Regex.match?(@name_re, name) ->
+        {:error, :invalid_name}
+
+      not is_binary(crate) or not Regex.match?(@crate_re, crate) ->
+        {:error, :invalid_crate}
+
+      true ->
+        do_build_and_register_crate(name, crate, mode)
+    end
+  end
+
+  defp do_build_and_register_crate(name, crate, mode) do
+    # The temp root is derived from a now-validated crate token, but still expand
+    # to be safe and to avoid surprises from a future relaxed charset.
+    root = Path.expand(Path.join(System.tmp_dir!(), "wbcmd-#{crate}"))
+
+    # SECURITY (wb-sec): `--` terminates option parsing so `crate` can never be
+    # read as a flag (kills cargo option-injection). The compile runs FS-confined
+    # via Workbooks.Sandbox.run_net. RESIDUAL RISK: `cargo install` MUST reach the
+    # registry to fetch the crate, so the network cannot be denied around the
+    # fetch — a fetched crate's build.rs still runs with network during install.
+    # This is the documented inherent trust boundary of installing an arbitrary
+    # published crate (callers must allowlist/review crate names). The offline,
+    # network-DENIED path is build_dir/2 for a local, already-vendored source tree.
+    # Options FIRST, then `--`, then the crate spec — so `crate` can never be read
+    # as an option (cargo parses everything after `--` as positional crate specs).
+    case Workbooks.Sandbox.run_net(
+           ["cargo", "install", "--target", "wasm32-wasip1", "--root", root, "--no-track", "--", crate],
+           env: cargo_env()
          ) do
       {_, 0} ->
         case Path.wildcard(Path.join([root, "bin", "*.wasm"])) do
@@ -124,20 +233,61 @@ defmodule Workbooks.CommandRegistry do
   end
 
   defp run_builtin({:wasm, path, mode}, input, argv, dirs) do
-    {stdin, args} = apply_argmode(mode, input, argv)
-    {:ok, Workbooks.PackageManager.run(path, stdin, args, dirs) |> String.trim()}
+    # SECURITY (wb-sec): content-addressed artifacts in build/commands/<sha>.wasm
+    # are verified at RUN time, not just at register time — closing the TOCTOU
+    # where the bytes at the path are swapped after registration. The filename IS
+    # the sha256 of the trusted bytes; we re-hash on load and refuse a mismatch.
+    case verify_artifact(path) do
+      :ok ->
+        {stdin, args} = apply_argmode(mode, input, argv)
+
+        case Workbooks.PackageManager.run(path, stdin, args, dirs) do
+          {:error, _} = err -> err
+          out -> {:ok, String.trim(out)}
+        end
+
+      {:error, _} = err ->
+        err
+    end
   end
 
   defp run_builtin({:src, lang, src, mode}, input, argv, dirs) do
     case Workbooks.PackageManager.build(%{"name" => "cmd", "lang" => lang, "src" => src}) do
       {_, _, {:ok, wasm, _}} ->
         {stdin, args} = apply_argmode(mode, input, argv)
-        {:ok, Workbooks.PackageManager.run(wasm, stdin, args, dirs) |> String.trim()}
+
+        case Workbooks.PackageManager.run(wasm, stdin, args, dirs) do
+          {:error, _} = err -> err
+          out -> {:ok, String.trim(out)}
+        end
 
       {_, _, err} ->
         {:error, err}
     end
   end
+
+  # Re-verify a content-addressed artifact's bytes against the sha256 in its
+  # filename. Built-in prebuilt artifacts (jq.wasm/grep.wasm) and source-built
+  # outputs are not content-addressed by filename → no hash to check (skip). Only
+  # build/commands/<64-hex>.wasm carries a verifiable hash.
+  defp verify_artifact(path) when is_binary(path) do
+    base = Path.basename(path, ".wasm")
+
+    if Regex.match?(~r/^[0-9a-f]{64}$/, base) do
+      case File.read(path) do
+        {:ok, bytes} ->
+          actual = :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+          if actual == base, do: :ok, else: {:error, {:artifact_integrity, path}}
+
+        {:error, reason} ->
+          {:error, {:read_artifact, path, reason}}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp cargo_env, do: [{"PATH", "#{Path.expand("~/.cargo/bin")}:#{System.get_env("PATH")}"}]
 
   # :argv → args go to wasmtime as argv. :stdin1 → args become the first stdin
   # line (legacy), so the wasm sees no argv. Empty argv is a no-op either way.
