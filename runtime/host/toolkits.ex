@@ -250,11 +250,13 @@ defmodule Workbooks.Toolkits do
       caps: (kw(body, "CAPS") || "") |> String.split() ,
       cli_bin: kw(body, "CLI_BIN") || drawer(body, "CLI_BIN"),
       arg_mode: arg_mode(kw(body, "ARG_MODE")),
-      sha256: kw(body, "SHA256")
+      sha256: kw(body, "SHA256"),
+      wasm_path: kw(body, "WASM_PATH"),
+      preopen: kw(body, "PREOPEN")
     }
   end
 
-  # crate:<name> | git+<url> | path:<dir> | wasm:<url>  → tagged tuple (nil if absent).
+  # crate:<name> | git+<url> | path:<dir> | wasm:<url> | archive:<url> → tagged tuple.
   defp parse_build_src(nil), do: nil
 
   defp parse_build_src(spec) do
@@ -265,6 +267,7 @@ defmodule Workbooks.Toolkits do
       String.starts_with?(spec, "git+") -> {:git, String.trim_leading(spec, "git+")}
       String.starts_with?(spec, "path:") -> {:path, String.trim_leading(spec, "path:")}
       String.starts_with?(spec, "wasm:") -> {:wasm, String.trim_leading(spec, "wasm:")}
+      String.starts_with?(spec, "archive:") -> {:archive, String.trim_leading(spec, "archive:")}
       true -> {:unknown, spec}
     end
   end
@@ -302,11 +305,43 @@ defmodule Workbooks.Toolkits do
   Other EXEC modes (posix/task/federation) need no WASM build. Returns a human/agent
   string describing what happened (real build output on failure).
   """
-  def build_text(id, root \\ default_root()) do
-    with {:ok, d} <- descriptor(id, root) do
-      do_build(id, d)
-    else
-      {:error, {:no_toolkit, _}} -> "no such toolkit: #{id}"
+  def build_text(id, root \\ default_root()), do: build_text(id, nil, root)
+
+  @doc """
+  Build a toolkit. A toolkit may hold a SET of build entries in `runtimes/*.org`
+  (e.g. the `palette` toolkit = many language runtimes, one cohesive set) — then
+  `wb toolkit build <id>` builds them all and `wb toolkit build <id> <name>` builds
+  one. A plain single-CLI toolkit (no runtimes/) builds from its own manifest.
+  """
+  def build_text(id, which, root) do
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        runtimes = Path.wildcard(Path.join([dir, "runtimes", "*.org"]))
+
+        cond do
+          runtimes == [] ->
+            do_build(id, parse_descriptor(File.read!(Path.join(dir, "manifest.org"))))
+
+          which not in [nil, ""] ->
+            f = Path.join([dir, "runtimes", "#{which}.org"])
+
+            if File.exists?(f) do
+              do_build("#{id}/#{which}", parse_descriptor(File.read!(f)))
+            else
+              have = runtimes |> Enum.map(&Path.basename(&1, ".org")) |> Enum.sort() |> Enum.join(", ")
+              "no such runtime: #{id}/#{which} (have: #{have})"
+            end
+
+          true ->
+            runtimes
+            |> Enum.sort()
+            |> Enum.map_join("\n", fn f ->
+              do_build("#{id}/#{Path.basename(f, ".org")}", parse_descriptor(File.read!(f)))
+            end)
+        end
     end
   end
 
@@ -320,7 +355,7 @@ defmodule Workbooks.Toolkits do
   # every Instance. (CommandRegistry also enforces this; this is the clear, early
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
-       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm] do
+       when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive] do
     if bin in Workbooks.CommandRegistry.reserved_names(),
       do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
       else: do_build_clause(id, d)
@@ -381,8 +416,24 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  # archive:<url> — a PREBUILT runtime that ships as a tar.gz (wasm + stdlib):
+  # fetch + sha-verify + unpack + register the inner #+WASM_PATH with a default
+  # #+PREOPEN so it finds its resources. The user's script is reached via an extra
+  # preopen at run time (merged ahead by the registry).
+  defp do_build_clause(id, %{exec: exec, build_src: {:archive, url}, cli_bin: bin, arg_mode: mode, sha256: sha, wasm_path: wp, preopen: pre})
+       when exec in ["command", nil] do
+    case Workbooks.CommandRegistry.fetch_and_register_archive(bin, url, sha, wp, pre, mode) do
+      {:ok, addressed, hash} ->
+        pin = if sha in [nil, ""], do: "  (UNPINNED — add `#+SHA256: #{hash}` to the manifest)", else: ""
+        "#{id}: fetched + unpacked #{url} → #{addressed}; registered command #{inspect(bin)} (mode #{mode}, preopen #{pre || ".::/"})#{pin}"
+
+      {:error, reason} ->
+        "#{id}: fetch/unpack FAILED for #{url}:\n" <> error_text(reason)
+    end
+  end
+
   defp do_build_clause(id, %{build_src: nil}),
-    do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir> | wasm:<url>)"
+    do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir> | wasm:<url> | archive:<url>)"
 
   defp do_build_clause(id, %{build_src: {:git, url}}),
     do: "#{id}: #+BUILD_SRC git+#{url} not yet supported by `wb toolkit build` (use crate: or path:)"

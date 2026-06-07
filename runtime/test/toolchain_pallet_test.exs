@@ -59,9 +59,9 @@ defmodule Workbooks.ToolchainPalletTest do
     end
 
     @tag :build
-    test "wb toolkit build qjs (from the committed manifest) fetches, verifies, registers, runs JS" do
+    test "wb toolkit build palette qjs (one runtime from the set) fetches, verifies, registers, runs JS" do
       {:ok, _} = ensure_oql()
-      out = Toolkits.build_text("qjs", @root)
+      out = Toolkits.build_text("palette", "qjs", @root)
       assert out =~ "registered command \"qjs\""
       assert "qjs" in CommandRegistry.list()
 
@@ -71,6 +71,19 @@ defmodule Workbooks.ToolchainPalletTest do
       File.write!(Path.join(tmp, "a.js"), "console.log('sum', 19 + 23)")
       {:ok, js} = CommandRegistry.run("qjs", "", ["/w/a.js"], ["#{tmp}::/w"])
       assert js =~ "sum 42"
+    end
+
+    @tag :build
+    test "wb toolkit build palette python (archive runtime: wasm + stdlib) runs a .py" do
+      {:ok, _} = ensure_oql()
+      out = Toolkits.build_text("palette", "python", @root)
+      assert out =~ "registered command \"python\""
+
+      tmp = Path.join(System.tmp_dir!(), "wbpy-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      File.write!(Path.join(tmp, "a.py"), "import math; print('fact', math.factorial(5))")
+      {:ok, py} = CommandRegistry.run("python", "", ["/w/a.py"], ["#{tmp}::/w"])
+      assert py =~ "fact 120"
     end
   end
 

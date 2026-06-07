@@ -206,6 +206,7 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
   def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
+  def call(["toolkit", "build", id, which], _t), do: Toolkits.build_text(id, which, Toolkits.default_root())
 
   def call(["toolkit", "run", id, task | rest], _t),
     do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))

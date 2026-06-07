@@ -119,6 +119,29 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Register a prebuilt wasm command WITH default run options — currently `:dirs`,
+  host preopens the command always needs (e.g. a language runtime's stdlib dir).
+  These merge ahead of caller-supplied dirs at run time. Same guards as register/3.
+  """
+  def register(name, wasm_path, mode, opts) when is_map(opts) do
+    cond do
+      not is_binary(name) or name == "" -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not Regex.match?(@name_re, name) -> {:error, :invalid_name}
+      not confined_command_path?(wasm_path) -> {:error, :path_not_confined}
+      true ->
+        cur = :persistent_term.get(@dynamic, %{})
+
+        if not Map.has_key?(cur, name) and map_size(cur) >= @max_dynamic do
+          {:error, :registry_full}
+        else
+          :persistent_term.put(@dynamic, Map.put(cur, name, {:wasm, wasm_path, mode, opts}))
+          :ok
+        end
+    end
+  end
+
   # A registered path must canonicalize to a file strictly inside the content-
   # addressed commands store. Confines registration to managed build outputs.
   defp confined_command_path?(path) when is_binary(path) do
@@ -275,6 +298,77 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Fetch a PREBUILT runtime shipped as a tar.gz (a wasm + its companion files, e.g.
+  a language's standard library), verify sha256, unpack into the content-addressed
+  store, and register the inner wasm with a default preopen so the runtime finds
+  its resources. `wasm_rel` is the wasm path inside the archive; `preopen` is
+  "<subdir>::<guest>" (subdir relative to the unpacked root; "." = root).
+  Returns {:ok, wasm_path, sha} | {:error, reason}.
+  """
+  def fetch_and_register_archive(name, url, sha256, wasm_rel, preopen, mode \\ :argv) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not (is_binary(url) and String.starts_with?(url, "https://")) -> {:error, :invalid_url}
+      not is_binary(wasm_rel) -> {:error, :no_wasm_path}
+      true -> do_fetch_and_register_archive(name, url, sha256, wasm_rel, preopen, mode)
+    end
+  end
+
+  defp do_fetch_and_register_archive(name, url, sha256, wasm_rel, preopen, mode) do
+    tmp = Path.join(System.tmp_dir!(), "wbarc-#{:erlang.unique_integer([:positive])}.tgz")
+
+    case Workbooks.Sandbox.run_net(["curl", "-fsSL", "--proto", "=https", "-o", tmp, "--", url]) do
+      {_, 0} ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        cond do
+          is_binary(sha256) and sha256 != "" and got != String.downcase(String.trim(sha256)) ->
+            File.rm(tmp)
+            {:error, {:sha_mismatch, [expected: String.downcase(String.trim(sha256)), got: got]}}
+
+          true ->
+            # Unpack into the content-addressed store (build/commands/<sha>.d/) so the
+            # inner wasm path is confined there. bsdtar/GNU tar strip leading '/' and
+            # refuse '..' traversal by default; the sha pin is the trust gate.
+            dir = Path.join(Workbooks.PackageManager.commands_dir(), "#{got}.d")
+            File.rm_rf!(dir)
+            File.mkdir_p!(dir)
+            {tout, tcode} = System.cmd("tar", ["xzf", tmp, "-C", dir], stderr_to_stdout: true)
+            File.rm(tmp)
+
+            wasm = Path.join(dir, wasm_rel)
+
+            cond do
+              tcode != 0 -> {:error, {:untar_failed, tout}}
+              not File.regular?(wasm) -> {:error, {:wasm_not_in_archive, wasm_rel}}
+              true ->
+                {sub, guest} = parse_preopen(preopen)
+                host = Path.expand(Path.join(dir, sub))
+
+                case register(name, wasm, mode, %{dirs: ["#{host}::#{guest}"]}) do
+                  :ok -> {:ok, wasm, got}
+                  err -> err
+                end
+            end
+        end
+
+      {err, _} ->
+        File.rm(tmp)
+        {:error, {:fetch_failed, err}}
+    end
+  end
+
+  defp parse_preopen(nil), do: {".", "/"}
+
+  defp parse_preopen(spec) do
+    case String.split(String.trim(spec), "::", parts: 2) do
+      [sub, guest] -> {sub, guest}
+      [sub] -> {sub, "/"}
+    end
+  end
+
   @doc "Run a registered command with stdin `input` (no argv) → {:ok, out} | {:error, reason}."
   def run(name, input), do: run(name, input, [])
 
@@ -308,6 +402,12 @@ defmodule Workbooks.CommandRegistry do
       {:error, _} = err ->
         err
     end
+  end
+
+  # A runtime registered with default preopens (e.g. its stdlib): merge them ahead
+  # of the caller's dirs so it always finds its resources.
+  defp run_builtin({:wasm, path, mode, opts}, input, argv, dirs) do
+    run_builtin({:wasm, path, mode}, input, argv, Map.get(opts, :dirs, []) ++ dirs)
   end
 
   defp run_builtin({:src, lang, src, mode}, input, argv, dirs) do
