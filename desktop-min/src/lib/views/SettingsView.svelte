@@ -6,8 +6,12 @@
    * to drop a real panel in later.
    */
   import GeneralSettings from "$lib/settings/GeneralSettings.svelte";
+  import AgentsSettings from "$lib/settings/AgentsSettings.svelte";
   import ThemesSettings from "$lib/settings/ThemesSettings.svelte";
-  import SettingsPanel from "$lib/settings/SettingsPanel.svelte";
+  import IntegrationsSettings from "$lib/settings/IntegrationsSettings.svelte";
+  import SkillsSettings from "$lib/settings/SkillsSettings.svelte";
+  import McpServersSettings from "$lib/settings/McpServersSettings.svelte";
+  import PluginsSettings from "$lib/settings/PluginsSettings.svelte";
 
   type TabId = "general" | "agents" | "themes" | "integrations" | "skills" | "mcp" | "plugins";
   const tabs: { id: TabId; label: string }[] = [
@@ -21,14 +25,6 @@
   ];
 
   let active = $state<TabId>("general");
-
-  const placeholders: Record<string, { title: string; lede: string }> = {
-    agents: { title: "Agents", lede: "Catalog editor — name, model, and skills per agent." },
-    integrations: { title: "Integrations", lede: "Toggle connected services." },
-    skills: { title: "Skills", lede: "Installed skills and the marketplace." },
-    mcp: { title: "MCPs", lede: "Add, remove, and test MCP servers." },
-    plugins: { title: "Plugins", lede: "Install and configure OQL plugins." },
-  };
 </script>
 
 <div class="settings">
@@ -52,13 +48,18 @@
   <div class="body">
     {#if active === "general"}
       <GeneralSettings />
+    {:else if active === "agents"}
+      <AgentsSettings />
     {:else if active === "themes"}
       <ThemesSettings />
-    {:else}
-      {@const p = placeholders[active]}
-      <SettingsPanel title={p.title} lede={p.lede}>
-        <p class="soon">Coming soon — wired once the backend lands.</p>
-      </SettingsPanel>
+    {:else if active === "integrations"}
+      <IntegrationsSettings />
+    {:else if active === "skills"}
+      <SkillsSettings />
+    {:else if active === "mcp"}
+      <McpServersSettings />
+    {:else if active === "plugins"}
+      <PluginsSettings />
     {/if}
   </div>
 </div>
@@ -102,10 +103,5 @@
     color: var(--color-fg);
     background: var(--color-surface-soft);
     border-color: var(--color-border);
-  }
-  .soon {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--color-fg-muted);
   }
 </style>

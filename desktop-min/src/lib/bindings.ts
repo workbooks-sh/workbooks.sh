@@ -27,6 +27,14 @@ export interface AgentSettingsUpdate {
 export interface AgentSource {
   source: string;
 }
+export interface AgentCatalogEntry {
+  slug: string;
+  title: string;
+  tagline: string | null;
+  model: string | null;
+  icon: string | null;
+  parseError: boolean;
+}
 export interface Bookmark {
   id: string;
   title: string;
@@ -269,6 +277,27 @@ export const commands = {
     }),
 
   // Agents
+  // TODO(tauri): real catalog is served by the sidecar over HTTP
+  // (GET /api/agents); this mock stands in until the shell lands.
+  agentsList: (): Promise<AgentCatalogEntry[]> =>
+    ok([
+      {
+        slug: "workhorse",
+        title: "Workhorse",
+        tagline: "The default do-anything agent.",
+        model: null,
+        icon: null,
+        parseError: false,
+      },
+      {
+        slug: "strategist",
+        title: "Strategist",
+        tagline: "Plans multi-step work before touching code.",
+        model: "anthropic/claude-opus-4",
+        icon: null,
+        parseError: false,
+      },
+    ]),
   agentsRead: (slug: string): Promise<AgentSource> =>
     ok({ source: `# agent: ${slug}\n` }),
   agentsCreate: (_req: { slug: string; source: string }): Promise<void> =>
@@ -292,7 +321,11 @@ export const commands = {
     ok(undefined),
 
   // Connections
-  connectionsList: (): Promise<ConnectionRedacted[]> => ok([]),
+  connectionsList: (): Promise<ConnectionRedacted[]> =>
+    ok([
+      { id: "cx-github", service: "GitHub", kind: "managed_oauth", version: null },
+      { id: "cx-claude", service: "Claude Code", kind: "local_cli", version: "1.2.0" },
+    ]),
   connectionsCreate: (req: ConnectionCreate): Promise<ConnectionRedacted> =>
     ok({ id: "conn-1", service: req.service, kind: "api_key" }),
   connectionsDelete: (_id: string): Promise<void> => ok(undefined),
@@ -343,7 +376,11 @@ export const commands = {
     ok(["openai", "anthropic", "openrouter", "google"]),
 
   // MCP servers
-  mcpList: (): Promise<McpServer[]> => ok([]),
+  mcpList: (): Promise<McpServer[]> =>
+    ok([
+      { id: "mcp-gh", name: "GitHub", command: "npx @mcp/server-github", enabled: true },
+      { id: "mcp-fs", name: "Filesystem", command: "npx @mcp/server-fs ~/Workbooks", enabled: false },
+    ]),
   mcpCreate: (req: McpCreate): Promise<McpServer> =>
     ok({ id: "mcp-1", name: req.name, command: req.command, enabled: true }),
   mcpUpdate: (req: McpUpdate): Promise<McpServer> =>
@@ -424,7 +461,11 @@ export const commands = {
   packageRefreshActive: (): Promise<void> => ok(undefined),
 
   // Plugins
-  pluginsList: (): Promise<Plugin[]> => ok([]),
+  pluginsList: (): Promise<Plugin[]> =>
+    ok([
+      { id: "plg-stripe", name: "Stripe (OQL)", enabled: true },
+      { id: "plg-linear", name: "Linear (OQL)", enabled: false },
+    ]),
   pluginsInstall: (req: PluginCreate): Promise<Plugin> =>
     ok({ id: "plg-1", name: req.source, enabled: true }),
   pluginsSetEnabled: (_req: { id: string; enabled: boolean }): Promise<void> =>
@@ -440,7 +481,12 @@ export const commands = {
   sidecarRestart: (): Promise<void> => ok(undefined),
 
   // Skills
-  skillsList: (): Promise<Skill[]> => ok([]),
+  skillsList: (): Promise<Skill[]> =>
+    ok([
+      { id: "sk-web", name: "Web search", slug: "web-search", scope: "global" },
+      { id: "sk-git", name: "Git toolkit", slug: "git", scope: "workspace" },
+      { id: "sk-brand", name: "Brand book", slug: "brandnana", scope: "package" },
+    ]),
   skillsSetScope: (_req: SkillScopeUpdate): Promise<void> => ok(undefined),
   skillsDelete: (_id: string): Promise<void> => ok(undefined),
 
