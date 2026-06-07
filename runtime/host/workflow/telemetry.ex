@@ -71,27 +71,34 @@ defmodule Workbooks.Workflow.Telemetry do
   end
 
   @doc """
-  Observability summary for a run — the CLI feedback loop. Returns task states,
-  tool-call counts, errors (bash exits / tool failures), and total step time.
+  Observability summary for a run — the CLI feedback loop. UNIVERSAL + LIVE:
+  reads the always-on `_steps.jsonl` (written at the agent chokepoint by EVERY
+  exec agent — workflow, brandnana, free-form ask), so any run is observable even
+  mid-flight and even without a persisted db. Tasks/stage come from `_status.json`.
+  Returns tool-call count, errors (bash exits / tool failures), total step time,
+  the recent tool timeline, and the run stage.
   """
   def summary(workdir) do
-    path = Path.join(workdir, "_telemetry.db")
-    {:ok, c} = Sqlite3.open(path)
-
-    steps = q(c, "SELECT step, tool, exit_code, error, dur_ms FROM step_events ORDER BY step")
-    tasks = q(c, "SELECT task_id, state FROM task_events ORDER BY idx")
-    Sqlite3.close(c)
+    steps = read_steps(workdir)
+    status = read_status(workdir)
 
     errors =
-      Enum.filter(steps, fn [_s, _t, code, err, _d] -> (code && code != 0) || err end)
-      |> Enum.map(fn [s, t, code, err, _d] -> %{step: s, tool: t, exit_code: code, error: err} end)
+      steps
+      |> Enum.filter(fn s -> (s["exit_code"] && s["exit_code"] != 0) || s["error"] end)
+      |> Enum.map(fn s -> %{step: s["step"], tool: s["tool"], exit_code: s["exit_code"], error: s["error"]} end)
 
-    %{
-      tasks: Enum.map(tasks, fn [id, st] -> %{id: id, state: st} end),
-      tool_calls: length(steps),
-      total_ms: Enum.reduce(steps, 0, fn [_, _, _, _, d], a -> a + (d || 0) end),
-      errors: errors
-    }
+    if steps == [] and status == %{} do
+      %{error: "no telemetry for this run"}
+    else
+      %{
+        stage: status["stage"],
+        tasks: status["tasks"] || [],
+        tool_calls: length(steps),
+        total_ms: Enum.reduce(steps, 0, fn s, a -> a + (s["dur_ms"] || 0) end),
+        errors: errors,
+        recent: steps |> Enum.take(-15) |> Enum.map(&Map.take(&1, ["step", "tool", "exit_code", "dur_ms"]))
+      }
+    end
   rescue
     _ -> %{error: "no telemetry"}
   end
@@ -117,6 +124,25 @@ defmodule Workbooks.Workflow.Telemetry do
     end)
   rescue
     _ -> []
+  end
+
+  # The always-on per-tool log — the universal source (every exec agent writes it).
+  defp read_steps(workdir) do
+    case File.read(Path.join(workdir, "_steps.jsonl")) do
+      {:ok, body} ->
+        body
+        |> String.split("\n", trim: true)
+        |> Enum.flat_map(fn line -> case Jason.decode(line), do: ({:ok, m} -> [m]; _ -> []) end)
+
+      _ -> []
+    end
+  end
+
+  defp read_status(workdir) do
+    case File.read(Path.join(workdir, "_status.json")) do
+      {:ok, body} -> case Jason.decode(body), do: ({:ok, m} -> m; _ -> %{})
+      _ -> %{}
+    end
   end
 
   defp now, do: System.system_time(:second)
