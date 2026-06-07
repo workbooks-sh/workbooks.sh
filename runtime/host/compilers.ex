@@ -121,6 +121,178 @@ defmodule Workbooks.Compilers do
     end
   end
 
+  # clang/lld (YoWASP LLVM-for-wasi) link paths inside the mounted sysroot (/usr).
+  @clang_lib_rt "/usr/lib/wasm32-unknown-wasip1"
+  @clang_lib_c "/usr/lib/wasm32-wasip1"
+
+  @doc """
+  Compile + LINK C source to a RUNNABLE wasm with clang+lld, entirely in the sandbox
+  (zero native execution). Two in-sandbox stages: `clang -c` then `wasm-ld` — the clang
+  driver can't spawn the linker under WASI, so we run them as separate llvm.core.wasm
+  invocations (the same multitool, dispatched by argv). Returns {:ok, wasm_path, logs}.
+
+  This is the production full-C compiler-in-wasm (clang 22, libc) — unlike c4's interpreted
+  C subset. opts: `:argv` (extra clang flags), `:includes` ([{host_dir, guest_dir}] extra
+  header roots, e.g. zig.h for the Zig chain), `:run_opts`.
+  """
+  def compile_c(source_path, opts \\ [], root \\ default_root()) do
+    m = Path.join([root, "clang", "manifest.org"])
+    cli = kw(m, "CLI_BIN") || "clang"
+    sysroot = Path.expand(Path.join([root, "clang", kw(m, "SYSROOT") || "clang-root/sysroot"]))
+    target = Keyword.get(opts, :target, kw(m, "TARGET") || "wasm32-wasip1")
+    extra = Keyword.get(opts, :argv, [])
+    includes = Keyword.get(opts, :includes, [])
+
+    cond do
+      not File.dir?(Path.join(sysroot, "lib")) ->
+        {:error, {:not_built, sysroot}}
+
+      true ->
+        # ensure the clang multitool command is registered (idempotent)
+        if CommandRegistry.run(cli, "", ["--version"]) == {:error, {:unknown_command, cli}},
+          do: build("clang", root)
+
+        id = Integer.to_string(:erlang.unique_integer([:positive]))
+        job = Path.join(System.tmp_dir!(), "clangjob-#{id}")
+        File.mkdir_p!(Path.join(job, "tmp"))
+        ext = Path.extname(source_path)
+        srcname = "src" <> if(ext == "", do: ".c", else: ext)
+        File.cp!(Path.expand(source_path), Path.join(job, srcname))
+
+        # extra C sources compiled + linked alongside the main one (e.g. the zig wasi shim)
+        extra_csrc = Keyword.get(opts, :extra_csrc, [])
+
+        extra_names =
+          extra_csrc
+          |> Enum.with_index()
+          |> Enum.map(fn {host, i} ->
+            nm = "extra#{i}.c"
+            File.cp!(Path.expand(host), Path.join(job, nm))
+            nm
+          end)
+
+        inc = includes |> Enum.with_index() |> Enum.map(fn {{h, _}, i} -> {h, "/inc#{i}"} end)
+        inc_flags = Enum.flat_map(inc, fn {_, g} -> ["-I", g] end)
+
+        preopens =
+          ["#{sysroot}::/usr", "#{job}::/work", "#{Path.join(job, "tmp")}::/tmp"] ++
+            Enum.map(inc, fn {h, g} -> "#{h}::#{g}" end)
+
+        ropts =
+          Keyword.merge(
+            [fuel: 800_000_000_000, timeout_ms: 180_000, env: ["TMPDIR=/tmp"]],
+            Keyword.get(opts, :run_opts, [])
+          )
+
+        # compile main + each extra source to its own object (one clang invocation each —
+        # the driver can't batch+link under WASI). Collect the produced object guest-paths.
+        srcs = [{srcname, "out.o"}] ++ Enum.map(extra_names, &{&1, Path.rootname(&1) <> ".o"})
+
+        logs1 =
+          for {sn, on} <- srcs do
+            CommandRegistry.run(
+              cli,
+              "",
+              ["clang", "--target=#{target}", "--sysroot=/usr", "-O2"] ++
+                inc_flags ++ extra ++ ["-c", "/work/#{sn}", "-o", "/work/#{on}"],
+              preopens,
+              ropts
+            )
+          end
+
+        log1 = List.first(logs1)
+        objs = Enum.map(srcs, fn {_, on} -> on end)
+        all_objs? = Enum.all?(objs, &File.regular?(Path.join(job, &1)))
+
+        result =
+          if all_objs? do
+            # crt1 provides _start for plain C; a zig C-backend object brings its own _start
+            # (and libc init), so the zig chain links with crt: false to avoid a dup _start.
+            crt = if Keyword.get(opts, :crt, true), do: ["#{@clang_lib_c}/crt1-command.o"], else: []
+            obj_paths = Enum.map(objs, &"/work/#{&1}")
+
+            c2 =
+              ["wasm-ld", "-m", "wasm32", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
+                crt ++ obj_paths ++
+                ["-lc", "#{@clang_lib_rt}/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
+
+            log2 = CommandRegistry.run(cli, "", c2, preopens, ropts)
+            outw = Path.join(job, "out.wasm")
+
+            if File.regular?(outw) do
+              dest = Path.join(System.tmp_dir!(), "wbc-#{id}.wasm")
+              File.cp!(outw, dest)
+              {:ok, dest, {log1, log2}}
+            else
+              {:error, {:link_failed, log2}}
+            end
+          else
+            {:error, {:compile_failed, log1}}
+          end
+
+        File.rm_rf(job)
+        result
+    end
+  end
+
+  @doc """
+  Compile C → wasm with clang in-sandbox, then RUN the emitted wasm in-sandbox. The whole
+  pipeline (compile, link, execute) is zero native execution. Returns {:ok, output}.
+  """
+  def compile_and_run_c(source_path, run_argv \\ [], opts \\ [], root \\ default_root()) do
+    case compile_c(source_path, opts, root) do
+      {:ok, wasm, _logs} ->
+        out = Workbooks.PackageManager.run(wasm, "", run_argv, [])
+        File.rm(wasm)
+
+        case out do
+          {:error, _} = e -> e
+          s -> {:ok, String.trim(to_string(s))}
+        end
+
+      err ->
+        err
+    end
+  end
+
+  @doc """
+  Zig END-TO-END in the sandbox: zig1.wasm compiles .zig → C (zero native exec), then clang
+  compiles+links that C → wasm, then we run it — every stage in wasm. zig.h (zig's C-backend
+  runtime header) is supplied from the zig lib via `:includes`. Returns {:ok, output}.
+  """
+  def zig_compile_and_run(source_path, run_argv \\ [], opts \\ [], root \\ default_root()) do
+    case compile("zig", source_path, opts, root) do
+      {:ok, c_source, _log} ->
+        cfile = Path.join(System.tmp_dir!(), "zigc-#{:erlang.unique_integer([:positive])}.c")
+        # zig's C-backend emits __builtin_return_address/frame_address for stack-trace
+        # capture; clang-on-wasm doesn't implement those (non-emscripten). They affect only
+        # debug traces, not program logic, so no-op them for the wasm target.
+        prelude = """
+        #define __builtin_return_address(x) ((void *)0)
+        #define __builtin_frame_address(x) ((void *)0)
+        #define __builtin_extract_return_addr(x) (x)
+        """
+        File.write!(cfile, prelude <> c_source)
+        zm = Path.join([root, "zig", "manifest.org"])
+        zigdir = Path.join(root, "zig")
+        ziglib = Path.expand(Path.join([zigdir, kw(zm, "LIB_ROOT") || "zig-root", kw(zm, "ZIG_LIB") || "lib"]))
+        shim = Path.expand(Path.join(zigdir, "wasi_shim.c"))
+
+        r =
+          compile_and_run_c(cfile, run_argv,
+            [includes: [{ziglib, "/ziglib"}], crt: false, extra_csrc: [shim],
+             argv: ["-I/ziglib", "-Wno-everything", "-std=c11"]],
+            root
+          )
+
+        File.rm(cfile)
+        r
+
+      err ->
+        err
+    end
+  end
+
   defp kw(file, key) do
     with {:ok, body} <- File.read(file),
          [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do

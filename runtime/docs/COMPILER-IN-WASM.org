@@ -5,6 +5,19 @@
 #+RELATED: TOOLKITS-V3.org, EXTENSIONS-ORB.org, ../host/command_registry.ex
 #+MEMORY: runtime-engine-wasmtime-only
 
+* STATUS (2026-06-07)
+
+  - *C* — DONE two ways: c4 (no-LLVM, interpreted C *subset*, compile+run in wasm) AND
+    clang.wasm (full C/C++ via YoWASP LLVM-for-wasi: clang -c + wasm-ld, both in wasm,
+    emitted wasm runs). compilers/c/ + compilers/clang/.
+  - *Zig* — DONE end-to-end: zig1.wasm (.zig→C) → clang.wasm (C+wasi-shim→wasm) → run,
+    all in the sandbox. compilers/zig/ (wasi_shim.c bridges zig's bare wasi names).
+  - *Finding that reshaped the plan*: no no-LLVM compiler emits wasm (tcc/chibicc emit
+    native; c4 interprets). A *full* C→wasm-in-wasm compiler is necessarily clang/LLVM —
+    so the "NO LLVM" strategy gets COMPILE (c4, zig1) but the full RUN needs clang.wasm.
+    We fetch+pin YoWASP's prebuilt clang (already targets wasmtime) rather than build LLVM.
+  - *Rust* — next (wb-zyl.4). *Package-to-publish* — wb-zyl.5.
+
 * Why (the security truth this fixes)
 
   The palette's INTERPRETED runtimes (qjs/python/ruby/lua, go-via-yaegi) run untrusted

@@ -457,6 +457,7 @@ defmodule Workbooks.PackageManager do
   defp run_wasmtime(wasm_path, input, argv, dirs, opts) do
     timeout_ms = Keyword.get(opts, :timeout_ms, @default_run_timeout_ms)
     fuel = Keyword.get(opts, :fuel, @default_fuel)
+    env = Keyword.get(opts, :env, [])
     inp = Path.join(System.tmp_dir!(), "wb-in-#{:erlang.unique_integer([:positive])}")
 
     try do
@@ -467,7 +468,8 @@ defmodule Workbooks.PackageManager do
       # large inputs (LLVM-class). Both harmless for modules that don't use them.
       # (Wasm 3.0 / W3C standard; wasmtime implements them.)
       wopts = ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
-      parts = wopts ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
+      envs = Enum.flat_map(env, &["--env", &1])
+      parts = wopts ++ envs ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
       cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
 
       # NOTE: a non-zero exit here is usually the GUEST exiting non-zero (a normal

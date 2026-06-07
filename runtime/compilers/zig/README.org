@@ -1,6 +1,28 @@
 #+TITLE: Zig compiler-in-WASM (compilers/zig/)
 #+EPIC: wb-zyl (P2)
-#+STATUS: COMPILER-IN-SANDBOX PROVEN (.zig → C); end-to-end run chains the C lane
+#+STATUS: DONE — untrusted .zig compiled AND run entirely in the sandbox (via the clang lane)
+
+* END-TO-END (the run step is now closed)
+
+  =Workbooks.Compilers.zig_compile_and_run/4= runs the full pipeline in wasm, zero native
+  execution: zig1.wasm (.zig→C) → clang.wasm (C + the wasi shim → object) → wasm-ld
+  (link→wasm) → run. Proven: a =std.debug.print= program → "zig-e2e=42"
+  (test/compilers_test.exs, =:build=).
+
+  Two bridges were needed to feed zig's C-backend output to clang/lld (both committed):
+  - =wasi_shim.c= — zig declares wasi syscalls as bare externs (=fd_write=, =proc_exit=,
+    …) with no import attributes; the shim forwards each to wasi-libc's =__wasi_*= import
+    (auto-generated from <wasi/wasip1.h>, full preview1 set). Linked with the zig object.
+  - a prelude no-ops =__builtin_return_address/frame_address= (zig emits these for
+    stack-trace capture; clang-on-wasm doesn't implement them — debug-only, safe to stub).
+  - link with =crt: false=: zig's object brings its own =_start= + libc init, so we omit
+    clang's crt1-command.o to avoid a duplicate =_start=.
+
+  (Direct .zig→wasm in-sandbox — zig's self-hosted wasm backend running in wasm — remains
+  blocked upstream, ziglang/zig#20665; the C-backend route above is the working path.)
+
+----------------------------------------------------------------------
+Original notes (compile-to-C half):
 
 * What works (proven through our runtime)
 

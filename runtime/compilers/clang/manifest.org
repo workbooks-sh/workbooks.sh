@@ -1,0 +1,9 @@
+#+COMPILER: clang
+#+CLI_BIN: clang
+#+KIND: compile-to-wasm
+#+BUILD: build.sh
+#+ARG_MODE: argv
+#+CORE: clang-root/llvm.core.wasm
+#+SYSROOT: clang-root/sysroot
+#+TARGET: wasm32-wasip1
+#+SOURCE: YoWASP clang/lld 22.1.0 (LLVM built FOR wasm32-wasi, runs on wasmtime) — a full C/C++ compiler-in-wasm. Prebuilt + sha-pinned (npm @yowasp/clang), not built by us. This is the production C lane and the backend that finishes Zig (.zig→C→wasm). See README.org.
