@@ -177,3 +177,20 @@
   Committed compilers/rust/wasm32-wasi.spec.
   NEXT: build minicargo.wasm (same recipe as mrustc), then minicargo builds core→alloc→std
   with this spec, then a println hello.rs → C → clang.wasm → run.
+
+* 2026-06-07 (iter 9) — ARCHITECTURE PIVOT: minicargo.wasm is a DEAD END; host orchestrates
+  minicargo's entire job is posix_spawn(mrustc) per crate (tools/minicargo/jobs.cpp:255,
+  os.cpp). No subprocess in WASI → minicargo CANNOT run in-sandbox. Corrected design:
+  - The ORCHESTRATOR is the HOST (our runtime), which runs mrustc.wasm once per crate in dep
+    order — exactly as we already split clang's compile/link into host-driven steps.
+  - The std crate-build PLAN (crate order + per-crate flags: --crate-name/-type, -L, --extern,
+    --cfg, edition) is STATIC. Capture it ONCE from NATIVE minicargo (build native mrustc +
+    minicargo, run it on rustc-1.54 library with --target wasm32-wasi.spec, verbose/dry-run to
+    dump each mrustc command), then commit that command sequence as a replay script. The host
+    replays each as an mrustc.wasm invocation in-sandbox → libstd.hir/.c.
+  - SECURITY note: libstd is TRUSTED (the standard library), so prebuilding it is fine; the
+    UNTRUSTED user .rs always compiles in-sandbox (mrustc.wasm) against the prebuilt libstd.
+    Host-replay keeps even the std build in-sandbox for purity, but it's not a security req.
+  NEXT: native mrustc+minicargo build (in progress) → capture the std plan → replay core→
+  alloc→std with mrustc.wasm + wasm32-wasi.spec → compile hello.rs (println) in-sandbox →
+  clang.wasm + libstd.c → run "hello".
