@@ -194,3 +194,25 @@
   NEXT: native mrustc+minicargo build (in progress) → capture the std plan → replay core→
   alloc→std with mrustc.wasm + wasm32-wasi.spec → compile hello.rs (println) in-sandbox →
   clang.wasm + libstd.c → run "hello".
+
+* 2026-06-07 (iter 10) — native mrustc+minicargo built; the exact libstd build path
+  Built native mrustc (27MB) + minicargo (1.2MB) from the pinned source. libstd is NOT a
+  point-minicargo-at-library/std job — minicargo.mk:256 shows it needs mrustc's
+  version-specific scaffolding: source PATCH (rustc-1.54.0-src.patch), --script-overrides
+  (build-script overrides dir), --manifest-overrides rustc-1.54.0-overrides.toml, --vendor-dir.
+  The whole thing is orchestrated by `make -f minicargo.mk`.
+  CONCRETE NEXT (the build): from the mrustc source tree —
+    make -f minicargo.mk RUSTC_VERSION=1.54.0 MRUSTC_TARGET=<abs path to wasm32-wasi.spec> \
+      output-1.54.0-<suffix>/libstd.rlib
+  This downloads+patches rustc-1.54 src, sets up overrides, and builds core→alloc→std (+deps)
+  with NATIVE mrustc for our wasi target → libstd.{hir,c}. std is TRUSTED, so this native
+  prebuild is acceptable (like building mrustc.wasm itself natively); the UNTRUSTED user .rs
+  then compiles IN-SANDBOX (mrustc.wasm) against these libstd.hir.
+  Expect walls: MRUSTC_TARGET as a spec-file path may tangle with the makefile's RUSTC_ARCH
+  derivation (it splits RUSTC_TARGET on '-'); may need to set RUSTC_ARCH=arm explicitly, or
+  add wasm32-wasi as a recognized name. The std-1.54 wasi backend may surface mrustc bugs.
+  AFTER libstd exists: (a) clang.wasm compiles each libstd .c → objects; (b) mrustc.wasm
+  compiles hello.rs (println) in-sandbox against libstd.hir → hello.c; (c) clang.wasm hello.c
+  + libstd objs + wasi_shim + crt1 → wasm-ld → run → "hello".
+  PURITY upgrade (later): replay the per-crate mrustc commands (minicargo -v dumps them) with
+  mrustc.wasm so even libstd builds in-sandbox.
