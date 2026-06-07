@@ -1,0 +1,68 @@
+#+TITLE: Querying + vector search across the library (semantic ∪ literal)
+#+STATUS: design locked; building in the loop (after storage)
+
+* Goal
+Find across a workbook / workspace / library by MEANING as well as by literal
+match. OQL already makes a workbook queryable via SQL; this adds the semantic
+half so "find the bit about retry backoff" works without the exact words — over
+org content AND code. Rides the BYO-storage layer (storage is the precondition).
+
+* Three seams (each a provider slot, like Storage/Browse/auth)
+
+** 1. Embedding — =Workbooks.Embed= (`embed(texts) -> vectors`)
+The "is it multi-tenant?" question decided here:
+- =local= (the multi answer): ONE small text model resident in the BEAM
+  (EmbeddingGemma-300M or all-MiniLM-L6-v2 — both commercially licensed), serving
+  every tenant from one load. No per-query external call → free, private, multi.
+  Heavy dep (Bumblebee/Nx, or the lighter ortex/ONNX), so PLUGGABLE not mandatory.
+- =openrouter= (lean default to start): reuse the existing LLM key, real semantic
+  search with ZERO new dependency; per-query cost. Swap to =local= when we want to
+  shed the external dependency.
+- Selected by =WB_EMBED=local|openrouter=; the model id is config.
+
+** 2. Vector store — =Workbooks.Vector= (tenant-scoped, on the storage layer)
+- Postgres backend (=Workbooks.DB= = postgres) → *pgvector* (Crunchy/Neon/
+  Supabase ship it) — a real vector column + ANN index.
+- SQLite default → brute-force cosine (fine for one library); *sqlite-vec* as the
+  ANN upgrade. Same interface either way: =upsert(tenant, id, vector, meta)= /
+  =search(tenant, query_vector, k, scope)=.
+
+** 3. Query — hybrid, over the access graph
+- LITERAL: OQL / =Library.query= (SQL over members' VFS) — already built.
+- SEMANTIC: embed the query → ANN over the scope's vectors → ranked chunks.
+- HYBRID: combine (e.g. reciprocal-rank-fusion) — the strongest. Scope =
+  workbook | workspace | library, resolved through =Workbooks.Library=.
+
+* The load-bearing principle: embed at STORE time, not query time
+When a workbook is packed/stored (=Library.store=), chunk + embed it ONCE and
+upsert the vectors. Queries are then pure lookups — cheap, and the embedder is hit
+on writes (rare) not reads (hot). This is what makes BOTH the local model and an
+external API affordable. (The archive's mobile-embeddings research reached the
+same "compute at author time, bake the result" conclusion.)
+
+* Chunking
+- Org: by headline / section / src block (reuse =OQL.parse_headlines=).
+- Code: by function / top-level item (language-aware later; lines now).
+- Each chunk carries {workbook, path, headline, span} so a hit points back.
+
+* Multi-tenant + security
+- Vectors are tenant-scoped exactly like blobs/rows (tenant is the first arg).
+- The =local= model is shared compute, not shared DATA — every tenant's vectors
+  stay in their scope; the model just turns text into numbers.
+- Embedding provider creds (if external) live in secrets; never in the image.
+
+* Build order (the loop)
+1. =Workbooks.Embed= seam + =openrouter= adapter (reuse the LLM key) + =local=
+   stub (honest "not wired"); =WB_EMBED= select.
+2. =Workbooks.Vector= — brute-force cosine on SQLite (default) first; interface
+   stable for pgvector/sqlite-vec.
+3. Index at store-time: =Library.store= chunks + embeds + upserts vectors.
+4. =Library.search(tenant, query, scope)= — semantic, then hybrid with OQL.
+5. pgvector adapter for the Postgres backend; sqlite-vec upgrade.
+6. =local= embedder (Bumblebee or ortex, small model) — the multi-tenant default.
+   Decide dep weight when we get here; the seam means it drops in without churn.
+
+* Open decision (when we reach step 6)
+ortex (ONNX Runtime via Rustler — lighter) vs Bumblebee/Nx/EXLA (heavier, more
+Elixir-native). Both run all-MiniLM/EmbeddingGemma on CPU. Stub the round-trip for
+now per the current "no e2e" directive; the seam keeps it a drop-in either way.
