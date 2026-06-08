@@ -123,22 +123,11 @@ step at a time with a small set of tools — and records every step so you can s
 what it did.
 
 ```mermaid
-sequenceDiagram
-    participant You as 👤 You
-    participant Agent as 🤖 Agent
-    participant Tools as 🧰 Tools
-    participant Log as 📒 events.org
-
-    Note over Tools: shell · fetch · files · search
-    You->>Agent: describe the app
-    rect rgba(232, 97, 42, 0.13)
-    loop until done
-        Agent->>Tools: take a step
-        Tools-->>Agent: result
-        Agent->>Log: record it
-    end
-    end
-    Agent-->>You: finished Workbook
+flowchart LR
+    You["👤 You<br/>describe the app"] --> Agent["🤖 Agent"]
+    Agent <-->|"step ⇄ result · repeats until done"| Tools["🧰 Tools<br/>shell · fetch · files · search"]
+    Agent -->|logs each step| Log["📒 events.org"]
+    Agent ==>|done| Done["📦 Finished Workbook"]
 ```
 
 **Private routes stay sealed.** A route is just a path inside the Workbook. Public paths are
@@ -146,24 +135,17 @@ plain; the ones you mark private are encrypted, and the Runtime hands over the k
 after an access check. A private page isn't hidden — it's unreadable without permission.
 
 ```mermaid
-sequenceDiagram
-    participant Visitor as 👤 Visitor
-    participant Workbook as 📄 Workbook
-    participant Runtime as ⚙️ Runtime
+flowchart TD
+    Open["👤 Open a private route"] --> Sealed["🔒 Sealed — needs a key"]
+    Sealed --> Ask["⚙️ Runtime checks access"]
+    Ask --> Q{"Allowed?"}
+    Q -->|yes| Key["🔑 Key released<br/>unseal & view"]
+    Q -->|no| Deny["✕ No key<br/>stays unreadable"]
 
-    Visitor->>Workbook: open a private route
-    Workbook-->>Visitor: 🔒 sealed — needs a key
-    Visitor->>Runtime: ask for the key
-    alt access allowed
-        rect rgba(40, 200, 90, 0.14)
-        Runtime-->>Visitor: 🔑 key
-        Visitor->>Workbook: unseal & view
-        end
-    else denied
-        rect rgba(220, 70, 70, 0.14)
-        Runtime-->>Visitor: ✕ no key
-        end
-    end
+    classDef ok fill:#28c84022,stroke:#28c840,stroke-width:1.5px;
+    classDef no fill:#dc464622,stroke:#dc4646,stroke-width:1.5px;
+    class Key ok
+    class Deny no
 ```
 
 ## The primitives
