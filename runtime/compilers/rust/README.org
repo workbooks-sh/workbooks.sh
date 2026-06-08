@@ -1,6 +1,6 @@
 #+TITLE: Rust compiler-in-WASM (compilers/rust/)
 #+EPIC: wb-zyl (P3)
-#+STATUS: WORKING — Rust incl. full std (println!) compiles + runs in the sandbox
+#+STATUS: DONE — untrusted Rust incl. full std (Vec/iterators/println!) compiles AND runs in the sandbox, zero native exec
 #+NOTE: no_std = fully in-sandbox (untrusted). std = libstd trusted-prebuilt; runs in wasm ("HELLO FROM RUST STD IN WASM: 42"); untrusted-std-in-sandbox = rebuild mrustc.wasm w/ std/mrustc-wasm-std.patch (mechanical).
 
 * ★ DONE (2026-06-07): Rust-in-sandbox PROVEN end-to-end
