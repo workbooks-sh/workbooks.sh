@@ -15,7 +15,17 @@ defmodule Workbooks.MixProject do
       # itself only for verbs that need the runtime; `wb deploy` stays NIF-free.
       escript: [main_module: Workbooks.CLI, name: "wb", app: nil],
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
+    ]
+  end
+
+  # wb-v3d: `mix deps.get` re-extracts the upstream wasmex (precompiled NIF, no exception support),
+  # silently reverting the patch the proc-macro exec-bridge needs. Re-apply it idempotently so the
+  # bridge survives a deps refresh. The script is a no-op when already patched + source-built.
+  defp aliases do
+    [
+      "deps.get": ["deps.get", "cmd bash scripts/provision-wasmex-pm.sh"]
     ]
   end
 

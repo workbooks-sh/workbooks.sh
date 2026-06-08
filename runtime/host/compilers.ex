@@ -427,22 +427,48 @@ defmodule Workbooks.Compilers do
         for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
         depserr
 
-      {:ok, extern_args, _dep_objs0} ->
-        # wb-mrz: link EVERY compiled dep object actually present in deps/ (sorted →
-        # deterministic), not the threaded list — which under-counts when a dep's obj is
-        # cached mid-tree (its sub-dep objs come back as []). deps/ was cleaned at build
-        # start, so it holds exactly this program's full transitive tree.
+      {:ok, extern_args0, _dep_objs0} ->
+        all_dep_objs = Path.wildcard(Path.join(o, "deps/*.rlib.o"))
+
+        # wb-v3d: proc-macro routing. ensure_deps dropped `.pmonly`/`.pmentry` markers. `.pmonly`
+        # objects are proc-macro build-time-only (kept OUT of the runtime link, linked INTO a server
+        # wasm instead); each `.pmentry` is a proc-macro crate the user externs → build its server +
+        # rewrite its --extern. When any exist, the user compile runs under Wasmex (mrustc_pm.wasm)
+        # so derives EXECUTE; with none, the plain CLI path below is byte-for-byte unchanged.
+        pmonly =
+          Path.wildcard(Path.join(o, "deps/*.rlib.o.pmonly"))
+          |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(String.replace_suffix(&1, ".pmonly", ""))}")
+          |> MapSet.new()
+
+        {extern_args, pm_servers} = build_pm_servers(o, cl, extern_args0)
+
+        # wb-mrz: link EVERY compiled dep object present in deps/ (sorted → deterministic) EXCEPT the
+        # proc-macro subtree. deps/ was cleaned at build start, so it holds exactly this tree.
         dep_objs =
-          Path.wildcard(Path.join(o, "deps/*.rlib.o"))
+          all_dep_objs
           |> Enum.sort()
           |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(&1)}")
+          |> Enum.reject(&MapSet.member?(pmonly, &1))
 
-        ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi-174/deps"]
+        ldirs = if all_dep_objs == [], do: [], else: ["-L", "output-wasi-174/deps"]
+
+        user_args =
+          ["output-wasi-174/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
+           "-L", "output-wasi-174"] ++ ldirs ++ extern_args ++
+            ["--out-dir", "output-wasi-174", "--target", "wasm32-wasi", "--edition", "2021"]
 
         log1 =
-          mr.(["output-wasi-174/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
-               "-L", "output-wasi-174"] ++ ldirs ++ extern_args ++
-              ["--out-dir", "output-wasi-174", "--target", "wasm32-wasi", "--edition", "2021"])
+          if pm_servers == [] do
+            mr.(user_args)
+          else
+            pm_wasm = Path.join(Path.dirname(mrdir), "mrustc_pm.wasm")
+            env = %{"MRUSTC_TARGET_VER" => "1.74", "STD_ENV_ARCH" => "wasm32", "TMPDIR" => "/tmp"}
+
+            case Workbooks.ProcMacroHost.run_mrustc(pm_wasm, user_args, mrdir, env) do
+              {:ok, out} -> out
+              {:error, e} -> inspect(e)
+            end
+          end
 
         result =
           if File.regular?(Path.join(o, "#{name}.c")) do
@@ -510,6 +536,42 @@ defmodule Workbooks.Compilers do
           {:halt, e}
       end
     end)
+  end
+
+  # wb-v3d: for each `.pmentry` marker, link a proc-macro SERVER wasm from the proc-macro subtree
+  # (every `.pmonly` object + libstd, which carries the proc_macro server runtime), write its `.hir`
+  # metadata sidecar (mrustc loads HIR from `<--extern path>.hir`), and rewrite that crate's
+  # `--extern` to the server. Returns {rewritten_extern_args, [server_rel_paths]}.
+  defp build_pm_servers(o, cl, extern_args) do
+    case Path.wildcard(Path.join(o, "deps/*.rlib.o.pmentry")) do
+      [] ->
+        {extern_args, []}
+
+      entries ->
+        mrdir = Path.dirname(o)
+
+        pmonly_objs =
+          Path.wildcard(Path.join(o, "deps/*.rlib.o.pmonly"))
+          |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(String.replace_suffix(&1, ".pmonly", ""))}")
+
+        libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi-174/#{Path.basename(&1)}")
+
+        Enum.reduce(entries, {extern_args, []}, fn marker, {ex, servers} ->
+          [crate, rlib_rel] = String.split(File.read!(marker), "\t", parts: 2)
+          server_rel = "output-wasi-174/deps/#{crate}_server.wasm"
+
+          cl.(["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+               "/usr/lib/wasm32-wasip1/crt1-command.o"] ++ pmonly_objs ++ libstd ++
+              ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o",
+               "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
+               "-o", "/work/#{server_rel}"])
+
+          File.cp!(Path.join(mrdir, rlib_rel <> ".hir"), Path.join(o, "deps/#{crate}_server.wasm.hir"))
+
+          rewritten = Enum.map(ex, fn a -> if String.starts_with?(a, "#{crate}="), do: "#{crate}=#{server_rel}", else: a end)
+          {rewritten, [server_rel | servers]}
+        end)
+    end
   end
 
   # The Rust crate identifier used in source/--crate-name/--extern: hyphens become underscores
@@ -663,9 +725,18 @@ defmodule Workbooks.Compilers do
 
       if compiled? do
         cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/deps/lib#{name}.rlib.c", "-o", obj_guest])
-        if File.regular?(obj_host),
-          do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
-          else: {:error, {:dep_cc_failed, name, version}}
+        if File.regular?(obj_host) do
+          # wb-v3d: drop marker files so the post-ensure_deps pass can route proc-macros without
+          # threading pm-state through the whole dep recursion. `.pmonly` = this object is in a
+          # proc-macro subtree (spoof? compile) → keep it OUT of the final runtime link and IN the
+          # server wasm. `.pmentry` = this object IS a proc-macro crate the user externs → build a
+          # server wasm + a `<server>.hir` from its rlib metadata.
+          if spoof?, do: File.touch!(obj_host <> ".pmonly")
+          if pm?, do: File.write!(obj_host <> ".pmentry", "#{crate_id(name)}\t#{rlib_rel}")
+          {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)}
+        else
+          {:error, {:dep_cc_failed, name, version}}
+        end
       else
         {:error, {:dep_compile_failed, name, version}}
       end

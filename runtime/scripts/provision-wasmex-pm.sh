@@ -27,6 +27,11 @@ open(f, "w").write(s.replace(anchor, anchor + add, 1))
 PY
 fi
 
+DYLIB="$SD/deps/wasmex/native/wasmex/target/release/libwasmex.dylib"
+if [ -f "$DYLIB" ] && grep -q "wasm_exceptions(true)" "$ENG"; then
+  echo "[wasmex-pm] source-built NIF already present — skip rebuild"
+  exit 0
+fi
 echo "[wasmex-pm] rebuilding the wasmex NIF from source (WASMEX_BUILD=1; compiles wasmtime)…"
 cd "$SD"
 WASMEX_BUILD=1 mix deps.compile wasmex --force

@@ -514,4 +514,20 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
   test "regex \\d via feature-hint (auto unicode-perl, no caller dep_features)" do
     run_with("regex@1.5.4", ~S|fn main(){ let re = regex::Regex::new(r"\d+").unwrap(); println!("{}", re.find("ab123cd").unwrap().as_str()); }|, "123")
   end
+
+  # wb-v3d (wb-zq4 gap #2): a REAL proc-macro derive runs in-sandbox end-to-end. PackageManager
+  # detects derive-new is a proc-macro crate, builds it (+ syn/quote/proc-macro2) to a SERVER wasm,
+  # and routes the user compile through Workbooks.ProcMacroHost (mrustc_pm.wasm under Wasmex) so
+  # #[derive(new)] EXECUTES — the output runs the derive-generated Point::new(3,4) constructor.
+  # Needs the proc-macro toolchain: build.sh's mrustc_pm.wasm + provision-wasmex-pm.sh.
+  @tag :build
+  @tag :netdeps
+  @tag :procmacro
+  @tag timeout: 900_000
+  test "derive-new — proc-macro #[derive(new)] executes in-sandbox (exec-bridge)" do
+    run_with("derive-new@=0.5.9", ~S|use derive_new::new;
+#[derive(new)]
+struct Point { x: i32, y: i32 }
+fn main(){ let p = Point::new(3, 4); println!("{}", p.x + p.y); }|, "7")
+  end
 end

@@ -54,6 +54,9 @@ PM="$SRC/src/expand/proc_macro.cpp"
 # wb-v3d: the committed patch supersedes the old spawn-include perl-patch — it BOTH wasi-guards the
 # spawn headers AND adds the host-import exec-bridge (gated behind -DWB_PROCMACRO_HOST). Idempotent.
 grep -q WB_PROCMACRO_HOST "$PM" || git -C "$SRC" apply "$SD/patches/proc_macro_host.patch"
+# wb-v3d: accept the in-source `#![crate_type = "proc-macro"]` that older derive crates use.
+CT="$SRC/src/expand/crate_tags.cpp"
+grep -q '"proc-macro"' "$CT" || git -C "$SRC" apply "$SD/patches/crate_type_procmacro.patch"
 
 # --- version defines header ---
 cat > "$ROOT/ver.h" <<EOF
