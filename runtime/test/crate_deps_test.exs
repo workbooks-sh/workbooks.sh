@@ -181,4 +181,43 @@ fn main(){ println!("{}", "hello".width()); }|, "5")
   test "smallvec — inline small vector" do
     run_with("smallvec@1.6.1", ~S|fn main(){ let mut v: smallvec::SmallVec<[i32;4]> = smallvec::SmallVec::new(); v.push(7); v.push(8); println!("{}", v.iter().sum::<i32>()); }|, "15")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "cfg-if — conditional-compile macro" do
+    run_with("cfg-if@1.0.0", ~S|cfg_if::cfg_if!{ if #[cfg(target_arch="wasm32")] { fn g()->i32{42} } else { fn g()->i32{0} } }
+fn main(){ println!("{}", g()); }|, "42")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "scopeguard — RAII guard with closure" do
+    run_with("scopeguard@1.1.0", ~S|fn main(){ let g = scopeguard::guard(7, |_v| {}); println!("{}", *g); }|, "7")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "pin-project-lite — declarative pin_project! macro" do
+    run_with("pin-project-lite@0.2.9", ~S|pin_project_lite::pin_project!{ struct S { #[pin] x: i32 } }
+fn main(){ let s = S { x: 9 }; println!("{}", s.x); }|, "9")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "static_assertions — compile-time const_assert!" do
+    run_with("static_assertions@1.1.0", ~S|static_assertions::const_assert!(1 + 1 == 2);
+fn main(){ println!("ok"); }|, "ok")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "maplit — hashmap! literal macro" do
+    run_with("maplit@1.0.2", ~S|#[macro_use] extern crate maplit;
+fn main(){ let m = hashmap!{"a" => 1, "b" => 2}; println!("{}", m["a"] + m["b"]); }|, "3")
+  end
 end
