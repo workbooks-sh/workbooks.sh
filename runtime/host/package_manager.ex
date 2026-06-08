@@ -16,7 +16,6 @@ defmodule Workbooks.PackageManager do
   """
 
   @tools Path.expand(Path.join([__DIR__, "..", "build", "tools"]))
-  @javy Path.join(@tools, "javy")
   @wasm_tools Path.join(@tools, "wasm-tools")
   @wac Path.join(@tools, "wac")
   # jco/componentize-js (node_modules/.bin) — the ONLY path that emits a real
@@ -111,19 +110,22 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Mode 2 — JS/TS. Compile a project dir's entry (index.js / index.ts) to a runnable wasm
+  # command ENTIRELY in the sandbox via QuickJS-ng (wb-fm0.4) — zero native execution, no bun.
+  # TS is type-stripped in-sandbox first (build_ts). NOTE: npm-dependency bundling is NOT done
+  # in-sandbox yet — a dir with a node_modules import graph returns
+  # {:error, {:js_bundling_unsupported_in_sandbox, _}} rather than shelling native bun.
   def build_dir(dir, lang) when lang in ["js", "ts"] do
     abs = Path.expand(dir)
     out = Path.join(@cache, "#{cache_key([abs])}.wasm")
-    js = Path.join(System.tmp_dir!(), "wb-dir-#{cache_key([abs])}.js")
-    File.mkdir_p!(@cache)
-    # SECURITY (wb-sec): npm postinstall/build scripts are HOSTILE. `bun install`
-    # needs the registry (network-permitted, fs-confined); `bun build` (which can
-    # trigger build-time scripts) runs network-DENIED.
-    Workbooks.Sandbox.run_net(["bun", "install"], cd: abs)
+    ext = if lang == "ts", do: "ts", else: "js"
+    entry = Path.join(abs, "index.#{ext}")
 
-    case Workbooks.Sandbox.run(["bun", "build", Path.join(abs, "index.js"), "--outfile", js]) do
-      {_, 0} -> build_js(File.read!(js), out)
-      {err, _} -> {:error, err}
+    cond do
+      js_dir_has_deps?(abs) -> {:error, {:js_bundling_unsupported_in_sandbox, abs}}
+      not File.regular?(entry) -> {:error, "no index.#{ext} in #{abs}"}
+      lang == "ts" -> build_ts(File.read!(entry), out)
+      true -> js_to_wasm(entry, out)
     end
   end
 
@@ -184,6 +186,13 @@ defmodule Workbooks.PackageManager do
   defp has_external_rust_deps?(manifest) do
     File.exists?(manifest) and
       Regex.match?(~r/^\[dependencies\]\s*\n\s*\w/m, File.read!(manifest))
+  end
+
+  # A package.json with a non-empty "dependencies" needs a bundler + registry the in-sandbox
+  # single-file JS lane doesn't do yet. A dep-free single-file project is fine.
+  defp js_dir_has_deps?(abs) do
+    pj = Path.join(abs, "package.json")
+    File.exists?(pj) and Regex.match?(~r/"dependencies"\s*:\s*\{\s*"/, File.read!(pj))
   end
 
   # TinyGo needs a module: if the dir has no go.mod, write a minimal one named
@@ -343,16 +352,27 @@ defmodule Workbooks.PackageManager do
     build_engine_js(@node_preamble <> "\n" <> src, world_wit)
   end
 
+  # JS = compile to a runnable wasm command ENTIRELY in the sandbox via QuickJS-ng built to
+  # wasm by clang.wasm (wb-fm0.4) — zero native execution, no native javy. The harness keeps
+  # the Javy.IO + console contract so existing JS workbooks run unchanged.
   defp build_js(src, out) do
-    Workbooks.Tools.ensure!()
     File.mkdir_p!(@cache)
-    tmp = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.js")
-    File.write!(tmp, src)
+    js = Path.join(@cache, "js-#{cache_key([src])}.js")
+    File.write!(js, src)
+    js_to_wasm(js, out)
+  end
 
-    # SECURITY (wb-sec): Javy compiles untrusted JS — network-DENIED, fs-confined.
-    case Workbooks.Sandbox.run([@javy, "build", tmp, "-o", out]) do
-      {_, 0} -> {:ok, out, :built}
-      {err, _} -> {:error, err}
+  defp js_to_wasm(src, out) do
+    File.mkdir_p!(@cache)
+
+    case Workbooks.Compilers.js_compile_to_wasm(src) do
+      {:ok, wasm, _logs} ->
+        File.cp!(wasm, out)
+        File.rm(wasm)
+        {:ok, out, :built}
+
+      {:error, _} = err ->
+        err
     end
   end
 

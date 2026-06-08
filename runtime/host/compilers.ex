@@ -447,6 +447,99 @@ defmodule Workbooks.Compilers do
     out
   end
 
+  # ── JS full lane (wb-fm0.4) ────────────────────────────────────────────────
+  # Untrusted JS compiles AND runs entirely in the sandbox via QuickJS-ng built to wasm by
+  # clang.wasm (no JIT, no native javy). The wb harness (compilers/js/harness.c) supplies the
+  # same contract the native-javy lane did — Javy.IO.readSync/writeSync + console — plus a
+  # TextEncoder/Decoder polyfill. Recipe: compilers/js/build.sh.
+  @js_qobjs ~w(quickjs cutils libregexp libunicode xsum)
+
+  @doc """
+  Compile JS source → a runnable wasm command entirely in the sandbox: embed the JS into a C
+  byte array (js_src.c), clang.wasm-compile it, and wasm-ld it with the prebuilt harness +
+  libquickjs objects. Self-heals the toolchain (compilers/js/build.sh) if the objects are
+  absent. Returns {:ok, wasm_path, log} | {:error, reason}.
+  """
+  def js_compile_to_wasm(source_path, _opts \\ [], root \\ default_root()) do
+    jd = Path.join(root, "js")
+    clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
+    csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
+    qsrc = Path.expand(Path.join(jd, "qjs-root/quickjs-ng"))
+    harness = Path.expand(Path.join(jd, "harness.o"))
+    libobjs = Enum.map(@js_qobjs, &Path.join(qsrc, "#{&1}.o"))
+
+    have_toolchain? = File.regular?(harness) and Enum.all?(libobjs, &File.regular?/1)
+
+    cond do
+      not File.regular?(clang) ->
+        {:error, {:clang_not_built, clang}}
+
+      not have_toolchain? ->
+        # one-time self-heal: build the QuickJS objects + harness in-sandbox
+        wasmtime_build_js(jd)
+
+        if File.regular?(harness) and Enum.all?(libobjs, &File.regular?/1),
+          do: do_js_compile(source_path, clang, csys, harness, libobjs),
+          else: {:error, {:js_toolchain_missing, jd}}
+
+      true ->
+        do_js_compile(source_path, clang, csys, harness, libobjs)
+    end
+  end
+
+  defp wasmtime_build_js(jd) do
+    System.cmd("bash", [Path.expand(Path.join(jd, "build.sh"))], stderr_to_stdout: true)
+  end
+
+  defp do_js_compile(source_path, clang, csys, harness, libobjs) do
+    id = Integer.to_string(:erlang.unique_integer([:positive]))
+    job = Path.join(System.tmp_dir!(), "wbjs-#{id}")
+    File.mkdir_p!(Path.join(job, "tmp"))
+    File.write!(Path.join(job, "js_src.c"), js_src_c(File.read!(Path.expand(source_path))))
+    File.cp!(harness, Path.join(job, "harness.o"))
+    for o <- libobjs, do: File.cp!(o, Path.join(job, Path.basename(o)))
+
+    cl = fn args ->
+      wasmtime(["-W", "exceptions=y", "--dir", "#{csys}::/usr", "--dir", "#{job}::/work",
+                "--dir", "#{job}/tmp::/tmp", "--env", "TMPDIR=/tmp", clang | args])
+    end
+
+    log1 = cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O2", "-w", "-c", "/work/js_src.c", "-o", "/work/js_src.o"])
+
+    result =
+      if File.regular?(Path.join(job, "js_src.o")) do
+        objs = (["harness.o", "js_src.o"] ++ Enum.map(@js_qobjs, &"#{&1}.o")) |> Enum.map(&"/work/#{&1}")
+
+        ld =
+          ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+           "/usr/lib/wasm32-wasip1/crt1-command.o"] ++
+            objs ++
+            ["-lc", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
+
+        log2 = cl.(ld)
+        outw = Path.join(job, "out.wasm")
+
+        if File.regular?(outw) do
+          dest = Path.join(System.tmp_dir!(), "wbjs-#{id}.wasm")
+          File.cp!(outw, dest)
+          {:ok, dest, {log1, log2}}
+        else
+          {:error, {:link_failed, log2}}
+        end
+      else
+        {:error, {:cc_failed, log1}}
+      end
+
+    File.rm_rf(job)
+    result
+  end
+
+  # Embed JS bytes as a C byte array the harness evals (wb_js_src/wb_js_len).
+  defp js_src_c(src) do
+    bytes = src |> :binary.bin_to_list() |> Enum.join(",")
+    "const char wb_js_src[]={#{bytes}#{if(byte_size(src) > 0, do: ",", else: "")}0};\nconst unsigned wb_js_len=#{byte_size(src)};\n"
+  end
+
   defp kw(file, key) do
     with {:ok, body} <- File.read(file),
          [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do

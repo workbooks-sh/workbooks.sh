@@ -1,0 +1,4 @@
+qjs-root
+*.o
+.cc
+.test

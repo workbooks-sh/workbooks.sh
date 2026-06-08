@@ -1,0 +1,9 @@
+#+COMPILER: js
+#+CLI_BIN: qjs
+#+KIND: compile-to-wasm
+#+BUILD: build.sh
+#+TARGET: wasm32-wasip1
+#+SOURCE: QuickJS-ng (v0.10.0) compiled to wasm objects via clang.wasm + the wb harness
+  (harness.c: Javy.IO + console + TextEncoder/Decoder). Untrusted JS embeds into js_src.c and
+  links against these objects → a standalone wasm. Zero native execution; no native javy.
+  STATUS: WORKING — Javy.IO contract preserved (reverse/uppercase filters pass). wb-fm0.4.

@@ -95,6 +95,27 @@ defmodule Workbooks.BuildRecipesTest do
     assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
   end
 
+  # wb-fm0.4 — INLINE JS compiles to a runnable wasm ENTIRELY in the sandbox via QuickJS-ng
+  # built by clang.wasm (no native javy). The Javy.IO + TextEncoder/Decoder contract is
+  # preserved, so existing JS workbooks run unchanged. Self-heals the toolchain if absent.
+  @tag :build
+  @tag timeout: 300_000
+  test "inline JS compiles in-sandbox via QuickJS (no native javy) and runs the Javy.IO contract" do
+    src = ~S"""
+    const buf = new Uint8Array(65536);
+    let total = 0, n;
+    while ((n = Javy.IO.readSync(0, buf.subarray(total))) > 0) total += n;
+    const text = new TextDecoder().decode(buf.subarray(0, total)).replace(/\n$/, "");
+    const out = text.split("\n").map((l) => l.split("").reverse().join("")).join("\n") + "\n";
+    Javy.IO.writeSync(1, new TextEncoder().encode(out));
+    """
+
+    {_n, "js", {:ok, wasm, status}} = PackageManager.build(%{"name" => "jsr", "lang" => "js", "src" => src})
+    assert status in [:built, :cached]
+    assert File.exists?(wasm)
+    assert PackageManager.run(wasm, "abc\nXY\n", []) |> String.trim() == "cba\nYX"
+  end
+
   # wb-fm0.3 — INLINE Rust with FULL STD (Vec/iterators/println!) compiles to a runnable wasm
   # entirely in the sandbox via mrustc.wasm (.rs→C) → clang.wasm (C→wasm), linked against the
   # libstd that mrustc.wasm prebuilt — zero native execution (no cargo). Requires the one-time
