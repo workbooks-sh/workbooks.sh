@@ -394,7 +394,8 @@ defmodule Workbooks.Compilers do
         for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
         depserr
 
-      {:ok, extern_args, dep_objs} ->
+      {:ok, extern_args, dep_objs0} ->
+        dep_objs = Enum.uniq(dep_objs0)
         ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi/deps"]
 
         log1 =
@@ -455,8 +456,8 @@ defmodule Workbooks.Compilers do
       {name, version} = parse_dep(dep)
 
       case compile_dep(name, version, mrdir, o, mr, cl) do
-        {:ok, rlib_rel, obj_guest} ->
-          {:cont, {:ok, externs ++ ["--extern", "#{name}=#{rlib_rel}"], objs ++ [obj_guest]}}
+        {:ok, rlib_rel, obj_guest, dep_objs} ->
+          {:cont, {:ok, externs ++ ["--extern", "#{name}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
         {:error, _} = e ->
           {:halt, e}
@@ -471,32 +472,197 @@ defmodule Workbooks.Compilers do
     [n] -> {n, "*"}
   end)
 
-  defp compile_dep(name, version, mrdir, o, mr, cl) do
+  # Compile one dependency crate (TRANSITIVELY): resolve its version via the sparse index, fetch
+  # it, compile its OWN normal deps first (recursing), then compile it with --extern for each.
+  # Returns {:ok, rlib_rel, obj_guest, dep_objs} where dep_objs are the transitive objects to link.
+  # Cached by the .o existing. Pure-Rust only (no proc-macros/build.rs); cycles can't occur (cargo
+  # forbids them) and diamonds collapse via the cache.
+  defp compile_dep(name, req, mrdir, o, mr, cl) do
     rlib_rel = "output-wasi/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
     obj_guest = "/work/output-wasi/deps/lib#{name}.rlib.o"
 
     if File.regular?(obj_host) do
-      {:ok, rlib_rel, obj_guest}
+      {:ok, rlib_rel, obj_guest, []}
     else
-      with {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")) do
-        rel_src = "output-wasi/deps/#{name}.rs"
-        File.cp!(lib_rs, Path.join(mrdir, rel_src))
-        cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+      with {:ok, version, subdeps} <- resolve_via_index(name, req),
+           {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")) do
+        # compile transitive deps first; collect their externs + objects
+        case Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
+               case compile_dep(sn, sreq, mrdir, o, mr, cl) do
+                 {:ok, srlib, sobj, sub_objs} ->
+                   {:cont, {:ok, ex ++ ["--extern", "#{sn}=#{srlib}"], objs ++ [sobj | sub_objs]}}
 
-        mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
-             "-L", "output-wasi", "-L", "output-wasi/deps", "--out-dir", "output-wasi/deps",
-             "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+                 {:error, _} = e ->
+                   {:halt, e}
+               end
+             end) do
+          {:error, _} = e ->
+            e
 
-        c = Path.join(o, "deps/lib#{name}.rlib.c")
+          {:ok, sub_externs, sub_objs} ->
+            rel_src = "output-wasi/deps/#{name}.rs"
+            File.cp!(lib_rs, Path.join(mrdir, rel_src))
+            cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
-        if File.regular?(c) do
-          cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
-          if File.regular?(obj_host), do: {:ok, rlib_rel, obj_guest}, else: {:error, {:dep_cc_failed, name}}
-        else
-          {:error, {:dep_compile_failed, name}}
+            mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
+                 "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
+                ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+
+            c = Path.join(o, "deps/lib#{name}.rlib.c")
+
+            if File.regular?(c) do
+              cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
+              if File.regular?(obj_host),
+                do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
+                else: {:error, {:dep_cc_failed, name}}
+            else
+              {:error, {:dep_compile_failed, name}}
+            end
         end
       end
+    end
+  end
+
+  # Resolve a version requirement against the crates.io sparse index → {:ok, version, normal_deps}.
+  # normal_deps = [{name, req}] for kind=="normal", non-optional deps of the chosen version.
+  defp resolve_via_index(name, req) do
+    url = "https://index.crates.io/#{index_path(name)}"
+
+    case System.cmd("curl", ["-fsSL", "--max-time", "20", url], stderr_to_stdout: true) do
+      {body, 0} ->
+        cands =
+          body
+          |> String.split("\n", trim: true)
+          |> Enum.flat_map(fn line ->
+            case Jason.decode(line) do
+              {:ok, %{"vers" => v, "yanked" => false} = m} ->
+                case parse_semver(v) do
+                  {:ok, sv} -> if semver_req_match?(sv, req), do: [{sv, v, m["deps"] || []}], else: []
+                  _ -> []
+                end
+
+              _ ->
+                []
+            end
+          end)
+
+        case Enum.sort_by(cands, fn {sv, _, _} -> sv end) |> List.last() do
+          {_, vstr, deps} ->
+            norm =
+              deps
+              |> Enum.filter(fn d -> d["kind"] == "normal" and d["optional"] != true end)
+              |> Enum.map(fn d -> {d["name"], d["req"]} end)
+              |> Enum.uniq()
+
+            {:ok, vstr, norm}
+
+          nil ->
+            {:error, {:no_matching_version, name, req}}
+        end
+
+      {out, _} ->
+        {:error, {:index_fetch_failed, name, String.slice(to_string(out), 0, 150)}}
+    end
+  end
+
+  # crates.io sparse-index path: 1/2/3-char names have special prefixes; else first2/next2/name.
+  defp index_path(name) do
+    n = String.downcase(name)
+
+    case String.length(n) do
+      1 -> "1/#{n}"
+      2 -> "2/#{n}"
+      3 -> "3/#{String.at(n, 0)}/#{n}"
+      _ -> "#{String.slice(n, 0, 2)}/#{String.slice(n, 2, 2)}/#{n}"
+    end
+  end
+
+  defp parse_semver(v) do
+    if String.contains?(v, "-") do
+      :pre
+    else
+      base = v |> String.split("+") |> List.first()
+
+      case String.split(base, ".") do
+        [a, b, c] ->
+          with {x, ""} <- Integer.parse(a), {y, ""} <- Integer.parse(b), {z, ""} <- Integer.parse(c),
+               do: {:ok, {x, y, z}},
+               else: (_ -> :bad)
+
+        _ ->
+          :bad
+      end
+    end
+  end
+
+  # Match a {maj,min,pat} version against a Cargo req. Handles the dominant forms: caret (bare /
+  # ^), exact (=), tilde (~), wildcard (*). For comma-ranges / comparators it caret-matches the
+  # first version token (best-effort) — covers the vast majority of crates.io reqs.
+  defp semver_req_match?(ver, req) do
+    r = req |> String.trim() |> String.split(",") |> List.first() |> String.trim()
+
+    cond do
+      r in ["*", ""] -> true
+      String.starts_with?(r, "=") -> semver_eq(ver, String.trim_leading(r, "="))
+      String.starts_with?(r, "~") -> semver_tilde(ver, String.trim_leading(r, "~"))
+      String.starts_with?(r, "^") -> semver_caret(ver, String.trim_leading(r, "^"))
+      String.starts_with?(r, ">") or String.starts_with?(r, "<") -> semver_caret(ver, strip_cmp(r))
+      true -> semver_caret(ver, r)
+    end
+  end
+
+  defp strip_cmp(r), do: r |> String.replace(~r/^[<>=]+/, "") |> String.trim()
+
+  # parse a possibly-partial "x", "x.y", "x.y.z" requirement into {maj,min,pat,specified_count}
+  defp req_parts(s) do
+    nums =
+      s |> String.trim() |> String.split(".")
+      |> Enum.map(fn p -> case Integer.parse(p) do {n, _} -> n; _ -> nil end end)
+
+    case nums do
+      [a | _] when is_integer(a) ->
+        {a, Enum.at(nums, 1) || 0, Enum.at(nums, 2) || 0, Enum.count(nums, &is_integer/1)}
+
+      _ ->
+        :bad
+    end
+  end
+
+  defp semver_eq({x, y, z}, r) do
+    case req_parts(r) do
+      {a, b, c, n} ->
+        (n < 1 or x == a) and (n < 2 or y == b) and (n < 3 or z == c)
+
+      _ ->
+        false
+    end
+  end
+
+  defp semver_caret({x, y, z}, r) do
+    case req_parts(r) do
+      {a, b, c, _} ->
+        ge = {x, y, z} >= {a, b, c}
+        # upper bound = bump the leftmost non-zero component of the requirement
+        lt =
+          cond do
+            a > 0 -> x == a and {y, z} >= {b, c}
+            b > 0 -> x == 0 and y == b and z >= c
+            true -> x == 0 and y == 0 and z >= c
+          end
+
+        ge and lt
+
+      _ ->
+        false
+    end
+  end
+
+  defp semver_tilde({x, y, z}, r) do
+    case req_parts(r) do
+      {a, b, c, n} when n >= 2 -> x == a and y == b and z >= c
+      {a, _, _, 1} -> x == a
+      _ -> false
     end
   end
 
