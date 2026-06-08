@@ -540,6 +540,70 @@ defmodule Workbooks.Compilers do
     "const char wb_js_src[]={#{bytes}#{if(byte_size(src) > 0, do: ",", else: "")}0};\nconst unsigned wb_js_len=#{byte_size(src)};\n"
   end
 
+  # ── TypeScript lane (wb-fm0.6) ─────────────────────────────────────────────
+  # TS = transpile TS→JS in-sandbox (the real `tsc` running inside QuickJS via qjs-run.wasm),
+  # then the JS lane. Zero native execution — no bun/esbuild/swc. Type-strip only
+  # (ts.transpileModule), which is what a workbook component needs.
+  @doc """
+  Compile TypeScript → a runnable wasm command entirely in the sandbox: run the TypeScript
+  compiler (typescript.js) inside qjs-run.wasm to transpile TS→JS, then compile that JS via
+  the QuickJS JS lane. Self-heals the toolchain (build.sh) if absent. Returns
+  {:ok, wasm_path, log} | {:error, reason}.
+  """
+  def ts_compile_to_wasm(source_path, opts \\ [], root \\ default_root()) do
+    jd = Path.join(root, "js")
+    qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
+    tsjob = Path.expand(Path.join(jd, "ts/tsjob.js"))
+
+    unless File.regular?(qrun) and File.regular?(tsjob), do: wasmtime_build_js(jd)
+
+    cond do
+      not (File.regular?(qrun) and File.regular?(tsjob)) ->
+        {:error, {:ts_toolchain_missing, jd}}
+
+      true ->
+        case ts_transpile(File.read!(Path.expand(source_path)), qrun, tsjob) do
+          {:ok, js} ->
+            tmp = Path.join(System.tmp_dir!(), "wbts-#{:erlang.unique_integer([:positive])}.js")
+            File.write!(tmp, js)
+            r = js_compile_to_wasm(tmp, opts, root)
+            File.rm(tmp)
+            r
+
+          err ->
+            err
+        end
+    end
+  end
+
+  # Run tsc (typescript.js) inside qjs-run.wasm: TS on stdin → JS on stdout. The compiler runs
+  # ENTIRELY in the sandbox (QuickJS under wasmtime). Returns {:ok, js} | {:error, reason}.
+  defp ts_transpile(ts_src, qrun, tsjob) do
+    jobdir = Path.dirname(tsjob)
+    id = Integer.to_string(:erlang.unique_integer([:positive]))
+    tin = Path.join(System.tmp_dir!(), "wbts-in-#{id}.ts")
+    terr = Path.join(System.tmp_dir!(), "wbts-err-#{id}.txt")
+    File.write!(tin, ts_src)
+
+    cmd =
+      "wasmtime run -W exceptions=y -W max-wasm-stack=134217728 " <>
+        "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/tsjob.js < #{esc(tin)} 2> #{esc(terr)}"
+
+    try do
+      {out, _status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: false)
+
+      cond do
+        String.trim(out) != "" -> {:ok, out}
+        true -> {:error, {:ts_transpile_failed, String.slice(File.read!(terr), 0, 600)}}
+      end
+    after
+      File.rm(tin)
+      File.rm(terr)
+    end
+  end
+
+  defp esc(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
+
   defp kw(file, key) do
     with {:ok, body} <- File.read(file),
          [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do

@@ -28,15 +28,44 @@ for f in quickjs cutils libregexp libunicode xsum; do
   if [ ! -f "$QSRC/$f.o" ]; then echo "[js] clang.wasm $f.c"; CL "$QSRC" -c "/work/$f.c" -o "/work/$f.o"; fi
 done
 
-# the wb harness (needs quickjs.h from QSRC). Compiled once; per-program only js_src.c varies.
-mkdir -p "$SD/.cc"; cp "$SD/harness.c" "$SD/.cc/harness.c"
-if [ ! -f "$SD/harness.o" ] || [ "$SD/harness.c" -nt "$SD/harness.o" ]; then
-  echo "[js] clang.wasm harness.c"
-  wasmtime run -W exceptions=y --dir "$CSYS::/usr" --dir "$SD/.cc::/work" --dir "$QSRC::/qjs" \
-    --dir "$SD/.cc::/tmp" --env TMPDIR=/tmp "$CLANG" clang --target=wasm32-wasip1 --sysroot=/usr \
-    -O2 -w -I/qjs -c /work/harness.c -o /work/harness.o
-  cp "$SD/.cc/harness.o" "$SD/harness.o"
+# a wasm C unit (harness.c / harness_run.c) → .o, needing quickjs.h from QSRC.
+cc_qjs(){ # $1 = basename (no .c)
+  mkdir -p "$SD/.cc"; cp "$SD/$1.c" "$SD/.cc/$1.c"
+  if [ ! -f "$SD/$1.o" ] || [ "$SD/$1.c" -nt "$SD/$1.o" ]; then
+    echo "[js] clang.wasm $1.c"
+    wasmtime run -W exceptions=y --dir "$CSYS::/usr" --dir "$SD/.cc::/work" --dir "$QSRC::/qjs" \
+      --dir "$SD/.cc::/tmp" --env TMPDIR=/tmp "$CLANG" clang --target=wasm32-wasip1 --sysroot=/usr \
+      -O2 -w -I/qjs -c "/work/$1.c" -o "/work/$1.o"
+    cp "$SD/.cc/$1.o" "$SD/$1.o"
+  fi
+}
+
+# (1) the per-program harness (harness.o) — only js_src.c varies per JS program.
+cc_qjs harness
+
+# (2) qjs-run.wasm — generic QuickJS that evals a JS file given at runtime; used to run the
+#     TypeScript compiler in-sandbox for the TS lane (wb-fm0.6). Link it (it embeds no source).
+cc_qjs harness_run
+if [ ! -f "$SD/qjs-run.wasm" ] || [ "$SD/harness_run.o" -nt "$SD/qjs-run.wasm" ]; then
+  echo "[js] wasm-ld qjs-run.wasm"
+  wasmtime run -W exceptions=y --dir "$CSYS::/usr" --dir "$SD/.cc::/work" --dir "$QSRC::/qjs" --env TMPDIR=/tmp \
+    "$CLANG" wasm-ld -m wasm32 -L/usr/lib/wasm32-unknown-wasip1 -L/usr/lib/wasm32-wasip1 \
+    /usr/lib/wasm32-wasip1/crt1-command.o /work/harness_run.o \
+    /qjs/quickjs.o /qjs/cutils.o /qjs/libregexp.o /qjs/libunicode.o /qjs/xsum.o \
+    -lc /usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a -o /work/qjs-run.wasm
+  cp "$SD/.cc/qjs-run.wasm" "$SD/qjs-run.wasm"
 fi
 
-echo "[js] DONE — libquickjs objects + harness.o in $QSRC + $SD"
+# (3) the TypeScript transpiler job (wb-fm0.6): fetch typescript.js (single-file compiler),
+#     assemble tsjob.js = node-shim preamble + typescript.js + transpile driver. Run in-sandbox
+#     by qjs-run.wasm: TS on stdin → JS on stdout (ts.transpileModule, types stripped).
+TS_VER="${TS_VER:-5.6.3}"
+[ -f "$SD/ts/typescript.js" ] || { echo "[js] fetch typescript@$TS_VER";
+  curl -fsSL "https://unpkg.com/typescript@$TS_VER/lib/typescript.js" -o "$SD/ts/typescript.js"; }
+if [ ! -f "$SD/ts/tsjob.js" ] || [ "$SD/ts/preamble.js" -nt "$SD/ts/tsjob.js" ] || [ "$SD/ts/transpile.js" -nt "$SD/ts/tsjob.js" ]; then
+  echo "[js] assemble ts/tsjob.js"
+  cat "$SD/ts/preamble.js" "$SD/ts/typescript.js" "$SD/ts/transpile.js" > "$SD/ts/tsjob.js"
+fi
+
+echo "[js] DONE — libquickjs objects + harness.o + qjs-run.wasm + ts/tsjob.js"
 echo "$QSRC" 1>&3

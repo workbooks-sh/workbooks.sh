@@ -95,6 +95,24 @@ defmodule Workbooks.BuildRecipesTest do
     assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
   end
 
+  # wb-fm0.6 — INLINE TypeScript compiles to a runnable wasm ENTIRELY in the sandbox: the real
+  # tsc (typescript.js) runs inside QuickJS (qjs-run.wasm) to strip types → JS, then the JS lane
+  # → wasm. Zero native execution (no bun/esbuild). Self-heals the toolchain if absent.
+  @tag :build
+  @tag timeout: 300_000
+  test "inline TypeScript compiles in-sandbox (real tsc in QuickJS, no native bun) and runs" do
+    src = ~S"""
+    interface Pt { x: number; y: number }
+    const dist = (a: Pt, b: Pt): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    const out: string = `ts-sandbox dist=${dist({x:0,y:0}, {x:3,y:4})}\n`;
+    Javy.IO.writeSync(1, new TextEncoder().encode(out));
+    """
+
+    {_n, "ts", {:ok, wasm, status}} = PackageManager.build(%{"name" => "tsr", "lang" => "ts", "src" => src})
+    assert status in [:built, :cached]
+    assert PackageManager.run(wasm, "", []) |> String.trim() == "ts-sandbox dist=7"
+  end
+
   # wb-fm0.4 — INLINE JS compiles to a runnable wasm ENTIRELY in the sandbox via QuickJS-ng
   # built by clang.wasm (no native javy). The Javy.IO + TextEncoder/Decoder contract is
   # preserved, so existing JS workbooks run unchanged. Self-heals the toolchain if absent.

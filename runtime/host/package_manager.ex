@@ -376,16 +376,21 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  # TS = strip types + bundle with bun, then the JS path.
+  # TS = transpile TS→JS in-sandbox (the real tsc inside QuickJS) then the JS lane — zero
+  # native execution, no bun (wb-fm0.6). Type-strip only (ts.transpileModule).
   defp build_ts(src, out) do
-    ts = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.ts")
-    js = Path.join(System.tmp_dir!(), "wb-#{cache_key([src])}.built.js")
+    File.mkdir_p!(@cache)
+    ts = Path.join(@cache, "ts-#{cache_key([src])}.ts")
     File.write!(ts, src)
 
-    # SECURITY (wb-sec): bun build of untrusted TS — network-DENIED, fs-confined.
-    case Workbooks.Sandbox.run(["bun", "build", ts, "--outfile", js]) do
-      {_, 0} -> build_js(File.read!(js), out)
-      {err, _} -> {:error, err}
+    case Workbooks.Compilers.ts_compile_to_wasm(ts) do
+      {:ok, wasm, _logs} ->
+        File.cp!(wasm, out)
+        File.rm(wasm)
+        {:ok, out, :built}
+
+      {:error, _} = err ->
+        err
     end
   end
 
