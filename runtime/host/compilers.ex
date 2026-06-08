@@ -86,6 +86,12 @@ defmodule Workbooks.Compilers do
       cli in [nil, ""] -> {:error, {:no_cli_bin, lang}}
       not File.dir?(Path.join(base, zlib)) -> {:error, {:not_built, base}}
       true ->
+        # self-heal: ensure the compiler command (e.g. zig1) is registered. Without this
+        # the first compile after a fresh boot fails {:unknown_command, cli} (the lib is on
+        # disk but the wasm command was never registered this run). Idempotent — build/2
+        # content-addresses, so a re-register is a no-op. Mirrors compile_c's clang heal.
+        unless cli in CommandRegistry.list(), do: build(lang, root)
+
         id = Integer.to_string(:erlang.unique_integer([:positive]))
         rel = "jobs/#{id}"
         job = Path.join(base, rel)
@@ -262,11 +268,13 @@ defmodule Workbooks.Compilers do
   end
 
   @doc """
-  Zig END-TO-END in the sandbox: zig1.wasm compiles .zig → C (zero native exec), then clang
-  compiles+links that C → wasm, then we run it — every stage in wasm. zig.h (zig's C-backend
-  runtime header) is supplied from the zig lib via `:includes`. Returns {:ok, output}.
+  Zig → a runnable wasm ARTIFACT, entirely in the sandbox: zig1.wasm compiles .zig → C
+  (zero native exec), then clang.wasm compiles+links that C → wasm. Unlike
+  `zig_compile_and_run/4` this returns the wasm PATH (does not run it) — the form the
+  PackageManager registers/runs as a command. zig.h (zig's C-backend runtime header) is
+  supplied from the zig lib via `:includes`. Returns {:ok, wasm_path, logs} | {:error, _}.
   """
-  def zig_compile_and_run(source_path, run_argv \\ [], opts \\ [], root \\ default_root()) do
+  def zig_compile_to_wasm(source_path, opts \\ [], root \\ default_root()) do
     case compile("zig", source_path, opts, root) do
       {:ok, c_source, _log} ->
         cfile = Path.join(System.tmp_dir!(), "zigc-#{:erlang.unique_integer([:positive])}.c")
@@ -285,7 +293,7 @@ defmodule Workbooks.Compilers do
         shim = Path.expand(Path.join(zigdir, "wasi_shim.c"))
 
         r =
-          compile_and_run_c(cfile, run_argv,
+          compile_c(cfile,
             [includes: [{ziglib, "/ziglib"}], crt: false, extra_csrc: [shim],
              argv: ["-I/ziglib", "-Wno-everything", "-std=c11"]],
             root
@@ -293,6 +301,26 @@ defmodule Workbooks.Compilers do
 
         File.rm(cfile)
         r
+
+      err ->
+        err
+    end
+  end
+
+  @doc """
+  Zig END-TO-END in the sandbox: compile .zig → wasm (`zig_compile_to_wasm/3`), then run it —
+  every stage in wasm, zero native execution. Returns {:ok, output}.
+  """
+  def zig_compile_and_run(source_path, run_argv \\ [], opts \\ [], root \\ default_root()) do
+    case zig_compile_to_wasm(source_path, opts, root) do
+      {:ok, wasm, _logs} ->
+        out = Workbooks.PackageManager.run(wasm, "", run_argv, [])
+        File.rm(wasm)
+
+        case out do
+          {:error, _} = e -> e
+          s -> {:ok, String.trim(to_string(s))}
+        end
 
       err ->
         err

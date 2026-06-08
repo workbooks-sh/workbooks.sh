@@ -158,6 +158,23 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Mode 2 — Zig. Compile a real Zig project dir to a runnable wasm command ENTIRELY in
+  # the sandbox: zig1.wasm (.zig → C) → clang.wasm (C → wasm), zero native execution
+  # (wb-fm0.2). The dir's root .zig is the entry (build.zig is not used — single-module).
+  def build_dir(dir, "zig") do
+    abs = Path.expand(dir)
+
+    entry =
+      Path.join(abs, "main.zig")
+      |> File.regular?()
+      |> if(do: Path.join(abs, "main.zig"), else: List.first(Path.wildcard(Path.join(abs, "*.zig"))))
+
+    cond do
+      is_nil(entry) -> {:error, "no .zig source in #{abs}"}
+      true -> zig_to_wasm(entry, Path.join(@cache, "#{cache_key(["zigdir", abs])}.wasm"))
+    end
+  end
+
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
 
   # TinyGo needs a module: if the dir has no go.mod, write a minimal one named
@@ -190,6 +207,13 @@ defmodule Workbooks.PackageManager do
     compile_c_in_sandbox(c, [], out)
   end
 
+  defp compile("zig", src, out) do
+    File.mkdir_p!(@cache)
+    z = Path.join(@cache, "zig-#{cache_key([src])}.zig")
+    File.write!(z, src)
+    zig_to_wasm(z, out)
+  end
+
   defp compile(other, _src, _out), do: {:error, {:unsupported_lang, other}}
 
   # The mmap emulation shim (file-backed mmap over pread/pwrite), linked into every
@@ -212,6 +236,23 @@ defmodule Workbooks.PackageManager do
     File.mkdir_p!(@cache)
 
     case Workbooks.Compilers.compile_c(main, extra_csrc: rest ++ [@mmap_shim], ld_args: @mmap_wraps) do
+      {:ok, wasm, _logs} ->
+        File.cp!(wasm, out)
+        File.rm(wasm)
+        {:ok, out, :built}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  # Zig = compile a .zig source to a runnable wasm command ENTIRELY in the sandbox via
+  # zig1.wasm (.zig → C) → clang.wasm (C → wasm) — zero native execution (wb-fm0.2). The
+  # emitted wasm is copied to `out` (the content-addressed cache path).
+  defp zig_to_wasm(src, out) do
+    File.mkdir_p!(@cache)
+
+    case Workbooks.Compilers.zig_compile_to_wasm(src) do
       {:ok, wasm, _logs} ->
         File.cp!(wasm, out)
         File.rm(wasm)

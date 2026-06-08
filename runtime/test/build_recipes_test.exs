@@ -95,6 +95,20 @@ defmodule Workbooks.BuildRecipesTest do
     assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
   end
 
+  # wb-fm0.2 — INLINE Zig compiles to a runnable wasm ARTIFACT entirely in the sandbox
+  # (zig1.wasm: .zig → C, then clang.wasm: C → wasm), zero native execution. Proves the
+  # PackageManager zig lane routes through Workbooks.Compilers, not a native zig.
+  @tag :build
+  @tag timeout: 600_000
+  test "inline Zig source compiles in-sandbox (no native toolchain) and runs" do
+    src = ~s|const std = @import("std");\npub fn main() void { std.debug.print("zig-pm={d}\\n", .{6 * 7}); }\n|
+    {_name, "zig", result} = PackageManager.build(%{"name" => "zpm", "lang" => "zig", "src" => src})
+    assert {:ok, wasm, status} = result
+    assert status in [:built, :cached]
+    assert File.exists?(wasm)
+    assert PackageManager.run(wasm, "", []) |> String.trim() =~ "zig-pm=42"
+  end
+
   @tag :build
   @tag timeout: 420_000
   test "capture_help on huniq: build -> content-address -> --help" do
