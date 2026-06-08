@@ -95,6 +95,26 @@ defmodule Workbooks.BuildRecipesTest do
     assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
   end
 
+  # wb-fm0.5 — INLINE Go runs ENTIRELY in the sandbox via the yaegi interpreter (yaegi-run.wasm,
+  # built once by native Go cross-compile); the source is embedded as a wbgosrc custom section
+  # and extracted at run. Zero native execution of user code, no TinyGo. Self-heals yaegi if absent.
+  @tag :build
+  @tag timeout: 300_000
+  test "inline Go runs in-sandbox via yaegi (no native tinygo)" do
+    src = """
+    package main
+    import ("bufio";"fmt";"os";"strings")
+    func main(){
+      sc := bufio.NewScanner(os.Stdin)
+      for sc.Scan() { fmt.Println(strings.ToUpper(sc.Text())) }
+    }
+    """
+
+    {_n, "go", {:ok, wasm, status}} = PackageManager.build(%{"name" => "gor", "lang" => "go", "src" => src})
+    assert status in [:built, :cached]
+    assert PackageManager.run(wasm, "hello\nworld\n", []) |> String.trim() == "HELLO\nWORLD"
+  end
+
   # wb-fm0.6 — INLINE TypeScript compiles to a runnable wasm ENTIRELY in the sandbox: the real
   # tsc (typescript.js) runs inside QuickJS (qjs-run.wasm) to strip types → JS, then the JS lane
   # → wasm. Zero native execution (no bun/esbuild). Self-heals the toolchain if absent.

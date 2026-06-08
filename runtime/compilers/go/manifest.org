@@ -1,0 +1,11 @@
+#+COMPILER: go
+#+CLI_BIN: yaegi-run
+#+KIND: interpret-in-sandbox
+#+BUILD: build.sh
+#+TARGET: wasm32-wasip1
+#+SOURCE: yaegi (github.com/traefik/yaegi) — a pure-Go interpreter — cross-compiled to wasip1 by
+  the NATIVE Go toolchain (trusted one-time provisioning, like clang.wasm/mrustc.wasm). At
+  runtime yaegi-run.wasm INTERPRETS untrusted Go entirely in the sandbox; the native compiler
+  never touches user code. PM embeds the user source as a `wbgosrc` custom section → a unique,
+  content-addressable, self-contained wasm. STATUS: WORKING (stdlib filters pass). wb-fm0.5.
+  LIMITS: stdlib only (no external module deps); single main package.

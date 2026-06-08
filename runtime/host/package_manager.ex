@@ -129,22 +129,30 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  # Mode 2 — Go. Compile a real Go project dir (its own `go.mod`, multi-file `main`
-  # package) to a runnable WASI command via TinyGo (`-target=wasip1`): argv + stdin
-  # → stdout, the universal CLI ABI. If the dir has no `go.mod` we synthesize a
-  # minimal one (TinyGo refuses a bare main.go), so a single-file fixture also builds.
+  # Mode 2 — Go. Run a real Go project dir's `main` package ENTIRELY in the sandbox via the
+  # yaegi interpreter (yaegi-run.wasm) — zero native execution of user code, no TinyGo
+  # (wb-fm0.5). Multiple .go files in the dir's root package are concatenated (their `package`
+  # + `import` lines merged) into one source yaegi evaluates. NOTE: external module deps aren't
+  # supported in-sandbox yet — a dir with non-stdlib requires returns
+  # {:error, {:go_deps_unsupported_in_sandbox, _}}.
   def build_dir(dir, lang) when lang in ["go", "tinygo"] do
     abs = Path.expand(dir)
-    out = Path.join(@cache, "#{cache_key(["godir", abs])}.wasm")
-    File.mkdir_p!(@cache)
-    ensure_go_mod(abs)
-    env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
 
-    # SECURITY (wb-sec): Go generate / cgo / linker plugins can run host code.
-    # Compile network-DENIED, fs-confined (deps must be cached: `go mod download`).
-    case Workbooks.Sandbox.run(["tinygo", "build", "-o", out, "-target=wasip1", "."], cd: abs, env: env) do
-      {_, 0} -> {:ok, out, :built_dir}
-      {err, _} -> {:error, err}
+    cond do
+      go_dir_has_deps?(abs) ->
+        {:error, {:go_deps_unsupported_in_sandbox, abs}}
+
+      true ->
+        case Path.wildcard(Path.join(abs, "*.go")) do
+          [] ->
+            {:error, "no .go sources in #{abs}"}
+
+          files ->
+            case go_to_wasm(merge_go_sources(files), Path.join(@cache, "#{cache_key(["godir", abs])}.wasm")) do
+              {:ok, wasm, _} -> {:ok, wasm, :built_dir}
+              err -> err
+            end
+        end
     end
   end
 
@@ -195,17 +203,35 @@ defmodule Workbooks.PackageManager do
     File.exists?(pj) and Regex.match?(~r/"dependencies"\s*:\s*\{\s*"/, File.read!(pj))
   end
 
-  # TinyGo needs a module: if the dir has no go.mod, write a minimal one named
-  # after the dir so a single-file `main` package still compiles.
-  defp ensure_go_mod(abs) do
+  # A go.mod that `require`s a non-stdlib module needs dep fetching the in-sandbox yaegi lane
+  # doesn't do. A stdlib-only program (no require block, or only the module/go lines) is fine.
+  defp go_dir_has_deps?(abs) do
     mod = Path.join(abs, "go.mod")
-
-    unless File.exists?(mod) do
-      name = abs |> Path.basename() |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
-      File.write!(mod, "module #{name}\n\ngo 1.21\n")
-    end
+    File.exists?(mod) and Regex.match?(~r/^\s*require\s/m, File.read!(mod))
   end
 
+  # Merge a Go package's files into one source yaegi can eval: keep the first file's `package`
+  # clause, collect every import, and concatenate the bodies (minus their package/import lines).
+  defp merge_go_sources([single]), do: File.read!(single)
+
+  defp merge_go_sources(files) do
+    bodies = Enum.map(files, &File.read!/1)
+    pkg = Enum.find_value(bodies, "package main", fn b -> Regex.run(~r/^\s*package\s+\w+/m, b) |> List.first() end)
+
+    imports =
+      bodies
+      |> Enum.flat_map(fn b -> Regex.scan(~r/^\s*import\s+(?:"[^"]+"|\([^)]*\))/m, b) |> Enum.map(&List.first/1) end)
+      |> Enum.uniq()
+
+    stripped =
+      Enum.map_join(bodies, "\n", fn b ->
+        b
+        |> String.replace(~r/^\s*package\s+\w+.*$/m, "")
+        |> String.replace(~r/^\s*import\s+(?:"[^"]+"|\([^)]*\))/m, "")
+      end)
+
+    "#{pkg}\n#{Enum.join(imports, "\n")}\n#{stripped}\n"
+  end
 
   defp compile("js", src, out), do: build_js(src, out)
   defp compile("ts", src, out), do: build_ts(src, out)
@@ -290,19 +316,57 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  # Go = compile a single-file main package to wasm via TinyGo (WASI stdio).
-  defp build_go(src, out) do
-    File.mkdir_p!(@cache)
-    dir = Path.join(@cache, "go-#{cache_key([src])}")
-    File.mkdir_p!(dir)
-    File.write!(Path.join(dir, "main.go"), src)
-    env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
+  # Go = run a single-file main package via the yaegi interpreter IN the sandbox (wb-fm0.5).
+  defp build_go(src, out), do: go_to_wasm(src, out)
 
-    # SECURITY (wb-sec): compile network-DENIED, fs-confined.
-    case Workbooks.Sandbox.run(["tinygo", "build", "-o", out, "-target=wasip1", Path.join(dir, "main.go")], env: env) do
-      {_, 0} -> {:ok, out, :built}
-      {err, _} -> {:error, err}
+  # yaegi-run.wasm (built once by compilers/go/build.sh — native Go cross-compile, trusted
+  # provisioning) + the untrusted Go source EMBEDDED in a `wbgosrc` custom section. The result
+  # is a unique, content-addressable, self-contained wasm: run_wasmtime detects the section,
+  # extracts the source to a preopen, and yaegi interprets it in-sandbox (zero native execution
+  # of user code). The native Go compiler only ever built the trusted runner — never user code.
+  @yaegi Path.expand(Path.join([__DIR__, "..", "compilers", "go", "yaegi-root", "yaegi-run.wasm"]))
+  @go_build Path.expand(Path.join([__DIR__, "..", "compilers", "go", "build.sh"]))
+  @go_magic "WBGOSRC1"
+
+  defp go_to_wasm(src, out) do
+    File.mkdir_p!(@cache)
+
+    with :ok <- ensure_yaegi(),
+         {:ok, yaegi} <- File.read(@yaegi) do
+      File.write!(out, yaegi <> go_src_section(src))
+      {:ok, out, :built}
+    else
+      {:error, _} = err -> err
     end
+  end
+
+  # Build yaegi-run.wasm if it isn't present yet (idempotent one-time provisioning).
+  defp ensure_yaegi do
+    if File.regular?(@yaegi) do
+      :ok
+    else
+      case System.cmd("bash", [@go_build], stderr_to_stdout: true) do
+        {_, 0} -> if File.regular?(@yaegi), do: :ok, else: {:error, :yaegi_build_failed}
+        {out, _} -> {:error, {:yaegi_build_failed, String.slice(out, -400, 400)}}
+      end
+    end
+  end
+
+  # A wasm custom section "wbgosrc" carrying the Go source, ending in a 16-byte trailer
+  # (<source length::big-64> ++ "WBGOSRC1") so run_wasmtime can extract it with one pread.
+  # Custom sections are ignored at execution, so the module stays a valid runnable yaegi.
+  defp go_src_section(src) do
+    name = "wbgosrc"
+    payload = src <> <<byte_size(src)::big-64>> <> @go_magic
+    body = leb128(byte_size(name)) <> name <> payload
+    <<0>> <> leb128(byte_size(body)) <> body
+  end
+
+  defp leb128(n) when n < 128, do: <<n>>
+
+  defp leb128(n) do
+    import Bitwise
+    <<(0x80 ||| (n &&& 0x7F))>> <> leb128(n >>> 7)
   end
 
   @jsworkbook_wit Path.expand(Path.join([__DIR__, "..", "wit", "jsworkbook.wit"]))
@@ -483,6 +547,22 @@ defmodule Workbooks.PackageManager do
     env = Keyword.get(opts, :env, [])
     inp = Path.join(System.tmp_dir!(), "wb-in-#{:erlang.unique_integer([:positive])}")
 
+    # Go-interpreter artifacts (wb-fm0.5) carry the untrusted Go source in a `wbgosrc` custom
+    # section: the wasm IS yaegi-run.wasm, so we stage the source as /gosrc/main.go and prepend
+    # it as argv[1] for the runner. yaegi then interprets it in-sandbox; the program's clean
+    # argv (argv[2:]) and stdin/stdout flow as normal. Non-Go wasms are untouched.
+    {argv, dirs, gosrc_dir} =
+      case go_artifact_source(wasm_path) do
+        {:ok, src} ->
+          d = Path.join(System.tmp_dir!(), "wb-gosrc-#{:erlang.unique_integer([:positive])}")
+          File.mkdir_p!(d)
+          File.write!(Path.join(d, "main.go"), src)
+          {["/gosrc/main.go" | argv], ["#{d}::/gosrc" | dirs], d}
+
+        :no ->
+          {argv, dirs, nil}
+      end
+
     try do
       File.write!(inp, input)
 
@@ -505,6 +585,38 @@ defmodule Workbooks.PackageManager do
       out
     after
       File.rm(inp)
+      if gosrc_dir, do: File.rm_rf(gosrc_dir)
+    end
+  end
+
+  # The Go artifact's 16-byte trailer is <source length::big-64> ++ @go_magic ("WBGOSRC1",
+  # defined with the build_go helpers above).
+  #
+  # O(1) probe: read only the last 16 bytes. If the magic is present, read back the embedded Go
+  # source. Any other wasm lacks the trailer → :no (a one-pread cost on the run path).
+  defp go_artifact_source(wasm_path) do
+    case File.stat(wasm_path) do
+      {:ok, %{size: size}} when size > 16 ->
+        case :file.open(wasm_path, [:read, :binary]) do
+          {:ok, fd} ->
+            try do
+              with {:ok, <<slen::big-64, @go_magic>>} <- :file.pread(fd, size - 16, 16),
+                   true <- slen > 0 and slen <= size - 16,
+                   {:ok, src} <- :file.pread(fd, size - 16 - slen, slen) do
+                {:ok, src}
+              else
+                _ -> :no
+              end
+            after
+              :file.close(fd)
+            end
+
+          _ ->
+            :no
+        end
+
+      _ ->
+        :no
     end
   end
 
