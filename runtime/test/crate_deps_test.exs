@@ -281,4 +281,27 @@ fn main(){ println!("{}", "abc".graphemes(true).count()); }|, "3")
     run_with("ordered-float@2.10.0", ~S|use ordered_float::OrderedFloat;
 fn main(){ let mut v = vec![OrderedFloat(3.0f64), OrderedFloat(1.0)]; v.sort(); println!("{}", v[0].0); }|, "1")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "aho-corasick — multi-pattern automaton (regex's matcher)" do
+    run_with("aho-corasick@0.7.18", ~S|use aho_corasick::AhoCorasick;
+fn main(){ let ac = AhoCorasick::new(&["he","she"]); println!("{}", ac.is_match("she")); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "log — logging facade macros" do
+    run_with("log@0.4.17", ~S|fn main(){ log::info!("hi"); println!("ok"); }|, "ok")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "bytes — BytesMut buffer (transitive, tokio ecosystem)" do
+    run_with("bytes@1.1.0", ~S|use bytes::BufMut;
+fn main(){ let mut b = bytes::BytesMut::new(); b.put_u8(65); b.put_u8(66); println!("{}", b.len()); }|, "2")
+  end
 end
