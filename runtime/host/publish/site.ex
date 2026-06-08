@@ -77,7 +77,7 @@ defmodule Workbooks.Publish.Site do
   defp parse_nav(body) do
     lines = String.split(body, "\n")
 
-    {sections, current_idx} =
+    {sections, _current_idx} =
       Enum.reduce(lines, {[], nil}, fn line, {sects, idx} ->
         t = String.trim(line)
 
