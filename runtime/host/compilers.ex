@@ -440,7 +440,8 @@ defmodule Workbooks.Compilers do
           |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(String.replace_suffix(&1, ".pmonly", ""))}")
           |> MapSet.new()
 
-        {extern_args, pm_servers} = build_pm_servers(o, cl, extern_args0)
+        {pm_servers, pm_externs} = build_pm_servers(o, cl, extern_args0)
+        extern_args = extern_args0 ++ pm_externs
 
         # wb-mrz: link EVERY compiled dep object present in deps/ (sorted → deterministic) EXCEPT the
         # proc-macro subtree. deps/ was cleaned at build start, so it holds exactly this tree.
@@ -539,38 +540,44 @@ defmodule Workbooks.Compilers do
   end
 
   # wb-v3d: for each `.pmentry` marker, link a proc-macro SERVER wasm from the proc-macro subtree
-  # (every `.pmonly` object + libstd, which carries the proc_macro server runtime), write its `.hir`
-  # metadata sidecar (mrustc loads HIR from `<--extern path>.hir`), and rewrite that crate's
-  # `--extern` to the server. Returns {rewritten_extern_args, [server_rel_paths]}.
+  # (every `.pmonly` object + libstd, which carries the proc_macro server runtime). Returns the list
+  # of linked server paths. NO --extern rewrite or `.hir` copy: mrustc loads each proc-macro crate's
+  # HIR from its own `lib<crate>.rlib.hir` (it does for transitive proc-macros like serde_derive too),
+  # and Workbooks.ProcMacroHost maps the loaded `lib<crate>.rlib` path → `<crate>_server.wasm` at run
+  # time — so this handles BOTH top-level and transitive proc-macro crates uniformly.
   defp build_pm_servers(o, cl, extern_args) do
     case Path.wildcard(Path.join(o, "deps/*.rlib.o.pmentry")) do
       [] ->
-        {extern_args, []}
+        {[], []}
 
       entries ->
-        mrdir = Path.dirname(o)
-
         pmonly_objs =
           Path.wildcard(Path.join(o, "deps/*.rlib.o.pmonly"))
           |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(String.replace_suffix(&1, ".pmonly", ""))}")
 
         libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi-174/#{Path.basename(&1)}")
+        already = extern_args |> Enum.filter(&String.contains?(&1, "=")) |> Enum.map(&(String.split(&1, "=") |> hd())) |> MapSet.new()
 
-        Enum.reduce(entries, {extern_args, []}, fn marker, {ex, servers} ->
-          [crate, rlib_rel] = String.split(File.read!(marker), "\t", parts: 2)
-          server_rel = "output-wasi-174/deps/#{crate}_server.wasm"
+        {servers, externs} =
+          Enum.reduce(entries, {[], []}, fn marker, {servers, externs} ->
+            [crate, rlib_rel] = String.split(File.read!(marker), "\t", parts: 2)
+            server_rel = "output-wasi-174/deps/#{crate}_server.wasm"
 
-          cl.(["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
-               "/usr/lib/wasm32-wasip1/crt1-command.o"] ++ pmonly_objs ++ libstd ++
-              ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o",
-               "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
-               "-o", "/work/#{server_rel}"])
+            cl.(["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+                 "/usr/lib/wasm32-wasip1/crt1-command.o"] ++ pmonly_objs ++ libstd ++
+                ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o",
+                 "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
+                 "-o", "/work/#{server_rel}"])
 
-          File.cp!(Path.join(mrdir, rlib_rel <> ".hir"), Path.join(o, "deps/#{crate}_server.wasm.hir"))
+            # A TRANSITIVE proc-macro (e.g. serde_derive pulled by serde's `derive` feature) isn't in
+            # the user's --extern list, so a re-exported derive (`use serde::Serialize`) can't resolve
+            # to its handler. --extern every proc-macro crate (build-time only; excluded from the
+            # runtime link) so its derives are always visible. Skip ones already externed (top-level).
+            ext = if MapSet.member?(already, crate), do: [], else: ["--extern", "#{crate}=#{rlib_rel}"]
+            {[server_rel | servers], externs ++ ext}
+          end)
 
-          rewritten = Enum.map(ex, fn a -> if String.starts_with?(a, "#{crate}="), do: "#{crate}=#{server_rel}", else: a end)
-          {rewritten, [server_rel | servers]}
-        end)
+        {servers, externs}
     end
   end
 
@@ -606,7 +613,7 @@ defmodule Workbooks.Compilers do
       # newest; if it fails to compile (the mrustc ~1.54 ceiling on newer crate internals), walk
       # to the next-older in-range version until one compiles. Makes transitive deps practical
       # without a newer compiler — bounded to a handful of attempts.
-      with {:ok, candidates} <- resolve_via_index(name, req) do
+      with {:ok, candidates} <- resolve_via_index(name, req, Map.get(feats, name)) do
         # Feature MODES to try, in order (wb-3s8). A caller override is authoritative (one mode).
         #   :full   — the crate's FULL default features (the correct, common case)
         #   :reduce — no_std fallbacks, but ONLY for a TOP-LEVEL dep (top?). A sub-dep must keep
@@ -732,7 +739,13 @@ defmodule Workbooks.Compilers do
           # server wasm. `.pmentry` = this object IS a proc-macro crate the user externs → build a
           # server wasm + a `<server>.hir` from its rlib metadata.
           if spoof?, do: File.touch!(obj_host <> ".pmonly")
-          if pm?, do: File.write!(obj_host <> ".pmentry", "#{crate_id(name)}\t#{rlib_rel}")
+
+          if pm? do
+            File.write!(obj_host <> ".pmentry", "#{crate_id(name)}\t#{rlib_rel}")
+            # A proc-macro crate-type build throws (gcc spawn) before writing the .rlib stub, but
+            # --extern still needs the file present (mrustc reads the HIR from <rlib>.hir). Touch it.
+            File.touch!(String.replace_suffix(obj_host, ".o", ""))
+          end
           {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)}
         else
           {:error, {:dep_cc_failed, name, version}}
@@ -795,9 +808,12 @@ defmodule Workbooks.Compilers do
     for f <- Path.wildcard(Path.join(o, "deps/lib#{name}.rlib*")), do: File.rm(f)
   end
 
-  # Resolve a version requirement against the crates.io sparse index → {:ok, version, normal_deps}.
-  # normal_deps = [{name, req}] for kind=="normal", non-optional deps of the chosen version.
-  defp resolve_via_index(name, req) do
+  # Resolve a version requirement against the crates.io sparse index → {:ok, [{version, deps}]}.
+  # deps = [{name, req}] for kind=="normal" deps that are either non-optional OR an optional dep
+  # ACTIVATED by the caller's enabled features (cargo feature resolution, e.g. serde "derive" →
+  # serde_derive). `enabled` is the caller's feature list for this crate, or nil (→ the crate's
+  # own `default` feature set from the index).
+  defp resolve_via_index(name, req, enabled \\ nil) do
     url = "https://index.crates.io/#{index_path(name)}"
 
     case System.cmd("curl", ["-fsSL", "--max-time", "20", url], stderr_to_stdout: true) do
@@ -809,7 +825,7 @@ defmodule Workbooks.Compilers do
             case Jason.decode(line) do
               {:ok, %{"vers" => v, "yanked" => false} = m} ->
                 case parse_semver(v) do
-                  {:ok, sv} -> if semver_req_match?(sv, req), do: [{sv, v, m["deps"] || []}], else: []
+                  {:ok, sv} -> if semver_req_match?(sv, req), do: [{sv, v, m["deps"] || [], m["features"] || %{}}], else: []
                   _ -> []
                 end
 
@@ -823,26 +839,52 @@ defmodule Workbooks.Compilers do
         # the WRONG order under the ceiling — newer releases pull restructured deps (e.g. serde
         # 1.0.2xx → proc-macro2) or use post-1.54 syntax, and the cap never reaches the older one.
         exact = req |> String.trim() |> String.trim_leading("=")
-        sorted = Enum.sort_by(cands, fn {sv, _, _} -> sv end, :desc)
-        {req_first, rest} = Enum.split_with(sorted, fn {_, v, _} -> v == exact end)
+        sorted = Enum.sort_by(cands, fn {sv, _, _, _} -> sv end, :desc)
+        {req_first, rest} = Enum.split_with(sorted, fn {_, v, _, _} -> v == exact end)
 
         ranked =
           (req_first ++ rest)
           |> Enum.take(6)
-          |> Enum.map(fn {_, vstr, deps} ->
-            norm =
+          |> Enum.map(fn {_, vstr, deps, features} ->
+            # cargo feature resolution: an optional dep is pulled iff its name is in the closure of
+            # the caller's ENABLED features. Only when the caller passed explicit features (e.g.
+            # serde→[std,derive]); a default-feature build pulls no optional deps, exactly as before
+            # (conservative — never silently add a dep that might not compile on the ceiling).
+            active = if enabled, do: feature_closure(enabled, features), else: MapSet.new()
+
+            want =
               deps
-              |> Enum.filter(fn d -> d["kind"] == "normal" and d["optional"] != true end)
+              |> Enum.filter(fn d ->
+                d["kind"] == "normal" and (d["optional"] != true or MapSet.member?(active, d["name"]))
+              end)
               |> Enum.map(fn d -> {d["name"], d["req"]} end)
               |> Enum.uniq()
 
-            {vstr, norm}
+            {vstr, want}
           end)
 
         if ranked == [], do: {:error, {:no_matching_version, name, req}}, else: {:ok, ranked}
 
       {out, _} ->
         {:error, {:index_fetch_failed, name, String.slice(to_string(out), 0, 150)}}
+    end
+  end
+
+  # Transitive closure of enabled cargo features → the set of activated feature/dep names. Each
+  # enabled name may be a feature (expands via the `features` map) and/or an optional-dep name; we
+  # add both the raw token and its dep base (stripping `dep:`, a `/feature` suffix, and weak `?`).
+  # An optional dep is activated when its name lands in this set (handles serde "derive" → serde_derive).
+  defp feature_closure(enabled, features), do: fc(enabled, features, MapSet.new())
+
+  defp fc([], _features, acc), do: acc
+
+  defp fc([f | rest], features, acc) do
+    if MapSet.member?(acc, f) do
+      fc(rest, features, acc)
+    else
+      base = f |> String.replace_prefix("dep:", "") |> String.split("/") |> hd() |> String.trim_trailing("?")
+      acc = acc |> MapSet.put(f) |> MapSet.put(base)
+      fc(Map.get(features, f, []) ++ rest, features, acc)
     end
   end
 

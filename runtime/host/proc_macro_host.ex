@@ -108,7 +108,7 @@ defmodule Workbooks.ProcMacroHost do
   """
   def run_server(exe, name, input, opts \\ []) do
     runner = Keyword.get(opts, :wasmtime, "wasmtime")
-    exe = Path.expand(exe, Keyword.get(opts, :mrdir, File.cwd!()))
+    exe = Path.expand(server_wasm_for(exe), Keyword.get(opts, :mrdir, File.cwd!()))
     tmp = Path.join(System.tmp_dir!(), "wbpm-#{System.unique_integer([:positive])}.bin")
     File.write!(tmp, input)
 
@@ -126,4 +126,19 @@ defmodule Workbooks.ProcMacroHost do
   end
 
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
+
+  # mrustc passes whatever it loaded the proc-macro crate from — for a top-level dep that's the
+  # rewritten server path; for a TRANSITIVE proc-macro (e.g. serde_derive pulled by serde) it's the
+  # `lib<crate>.rlib` it found on the search path. Map any `…/lib<crate>.rlib` to the sibling
+  # `<crate>_server.wasm` the pipeline linked; pass anything else (already a .wasm) through.
+  defp server_wasm_for(exe) do
+    base = Path.basename(exe)
+
+    if String.ends_with?(base, ".rlib") and String.starts_with?(base, "lib") do
+      crate = base |> String.replace_prefix("lib", "") |> String.replace_suffix(".rlib", "") |> String.replace("-", "_")
+      Path.join(Path.dirname(exe), "#{crate}_server.wasm")
+    else
+      exe
+    end
+  end
 end

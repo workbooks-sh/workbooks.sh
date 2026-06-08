@@ -32,8 +32,13 @@ if [ ! -e "$MR/rustc-1.54.0-src/library/std/src/lib.rs" ]; then
   say "fetching rustc-1.54.0-src"; ( cd "$MR" && make -f minicargo.mk RUSTCSRC RUSTC_VERSION=1.54.0 >&2 )
 else say "rustc-1.54.0-src present — skip"; fi
 
-# 4. the libstd prebuild (built entirely BY mrustc.wasm — hash/ABI consistent)
-if [ ! -f "$MR/output-wasi/libstd.rlib.o" ]; then
+# 4. the 1.54 libstd prebuild (built entirely BY mrustc.wasm — hash/ABI consistent).
+#    NOTE: the RUNTIME uses only the 1.74 lane (output-wasi-174); this 1.54 libstd (output-wasi/)
+#    backs the legacy proof scripts (e2e.sh / multicrate-e2e.sh) ONLY. WB_SKIP_154_LIBSTD=1 skips
+#    it — the path provision-runtime.sh takes (saves the long build for runtime/CI provisioning).
+if [ "${WB_SKIP_154_LIBSTD:-0}" = "1" ]; then
+  say "skipping 1.54 libstd (runtime uses the 1.74 lane only)"
+elif [ ! -f "$MR/output-wasi/libstd.rlib.o" ]; then
   say "prebuilding libstd via mrustc.wasm (long)"; bash "$SD/std/prebuild-libstd.sh" >&2
 else say "libstd prebuilt — skip"; fi
 

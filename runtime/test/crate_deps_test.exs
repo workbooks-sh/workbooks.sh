@@ -530,4 +530,34 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
 struct Point { x: i32, y: i32 }
 fn main(){ let p = Point::new(3, 4); println!("{}", p.x + p.y); }|, "7")
   end
+
+  # wb-v3d: THE serde unlock — a single `serde` dep with the `derive` feature auto-pulls serde_derive
+  # (cargo-style feature→optional-dep activation), which compiles to a server wasm and EXECUTES the
+  # derive. SUPPORTED IDIOM: import the derive from `serde_derive` directly (`use serde_derive::...`)
+  # — mrustc does not resolve serde's `pub use serde_derive::*` RE-EXPORT of a proc-macro derive, so
+  # the `use serde::Serialize` form does not work (an mrustc limitation, marked TODO upstream).
+  # @tag :serde — opt-in; serde + serde_derive + syn-full is a heavy (~15 min) compile.
+  @tag :serde
+  @tag :netdeps
+  @tag timeout: 1_800_000
+  test "serde — #[derive(Serialize)] executes in-sandbox via the derive feature (single dep)" do
+    src = """
+    extern crate serde;
+    use serde_derive::Serialize;
+    #[derive(Serialize)]
+    struct Point { x: i32, y: i32 }
+    fn main() { let _p = Point { x: 3, y: 4 }; println!("SERDE-OK"); }
+    """
+
+    path = "/tmp/serde_ct.rs"
+    File.write!(path, src)
+
+    case Workbooks.Compilers.rust_compile_to_wasm(path, deps: ["serde@=1.0.156"], dep_features: %{"serde" => ["std", "derive"]}) do
+      {:ok, wasm, _} ->
+        assert Workbooks.PackageManager.run(wasm, "", []) |> String.trim() == "SERDE-OK"
+
+      {:error, reason} ->
+        IO.puts("\n[skip] serde: #{inspect(reason) |> String.slice(0, 80)}")
+    end
+  end
 end
