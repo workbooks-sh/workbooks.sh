@@ -109,15 +109,23 @@ defmodule Workbooks.ProcMacroHost do
   def run_server(exe, name, input, opts \\ []) do
     runner = Keyword.get(opts, :wasmtime, "wasmtime")
     exe = Path.expand(server_wasm_for(exe), Keyword.get(opts, :mrdir, File.cwd!()))
+    # SECURITY: the server is UNTRUSTED code (an arbitrary proc-macro / build script). It runs in the
+    # wasm sandbox (no ambient FS/net/spawn — it can't escape or exfiltrate), but a malicious/buggy
+    # one can spin forever (DoS). Bound wall-clock with a shell watchdog that hard-kills wasmtime on
+    # overrun, and cap stack. (Memory/fuel caps land with the Wasmex-hosted path; see wb-* hardening.)
+    secs = max(1, div(Keyword.get(opts, :exec_timeout_ms, 60_000), 1000))
     tmp = Path.join(System.tmp_dir!(), "wbpm-#{System.unique_integer([:positive])}.bin")
     File.write!(tmp, input)
 
     try do
       # stdin redirection via sh -c matches the validated `server.wasm <name> < blob` round-trip.
-      cmd = "#{runner} run -W exceptions=y #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
+      run = "#{runner} run -W exceptions=y -W max-wasm-stack=536870912 #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
+      # watchdog: run in bg, kill -9 after `secs`, propagate the real exit code.
+      cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
 
       case System.cmd("sh", ["-c", cmd], stderr_to_stdout: false) do
         {output, 0} -> {:ok, output}
+        {_output, 137} -> {:error, {:server_timeout, secs}}
         {output, code} -> {:error, {:server_exit, code, String.slice(output, 0, 300)}}
       end
     after
