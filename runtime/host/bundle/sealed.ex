@@ -44,11 +44,16 @@ defmodule Workbooks.Bundle.Sealed do
   aad ALL fail the GCM tag (indistinguishable, by design).
   """
   def open(@magic <> rest, key, aad \\ "") when byte_size(key) == @key_bytes do
-    <<iv::binary-size(@iv_bytes), tag::binary-size(@tag_bytes), ct::binary>> = rest
+    # Fail CLOSED on a truncated/malformed envelope — never crash, never leak.
+    case rest do
+      <<iv::binary-size(@iv_bytes), tag::binary-size(@tag_bytes), ct::binary>> ->
+        case :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, ct, aad, tag, false) do
+          :error -> {:error, :auth_failed}
+          plaintext when is_binary(plaintext) -> {:ok, plaintext}
+        end
 
-    case :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, ct, aad, tag, false) do
-      :error -> {:error, :auth_failed}
-      plaintext when is_binary(plaintext) -> {:ok, plaintext}
+      _ ->
+        {:error, :malformed}
     end
   end
 

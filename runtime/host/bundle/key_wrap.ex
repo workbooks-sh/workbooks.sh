@@ -47,15 +47,28 @@ defmodule Workbooks.Bundle.KeyWrap do
   tamper, or mismatched info — all fail the tag, indistinguishably).
   """
   def unwrap(@magic <> rest, {recipient_pub, recipient_priv}, info \\ "") do
-    <<eph_pub::binary-size(32), iv::binary-size(@iv_bytes), tag::binary-size(@tag_bytes), ct::binary>> = rest
-    shared = :crypto.compute_key(:ecdh, eph_pub, recipient_priv, :x25519)
-    kek = derive(shared, eph_pub, recipient_pub, info)
+    # Fail CLOSED on truncated/garbage input — a bad ephemeral point can make
+    # :crypto raise, so the whole derivation is guarded.
+    case rest do
+      <<eph_pub::binary-size(32), iv::binary-size(@iv_bytes), tag::binary-size(@tag_bytes), ct::binary>> ->
+        try do
+          shared = :crypto.compute_key(:ecdh, eph_pub, recipient_priv, :x25519)
+          kek = derive(shared, eph_pub, recipient_pub, info)
 
-    case :crypto.crypto_one_time_aead(:aes_256_gcm, kek, iv, ct, info, tag, false) do
-      :error -> {:error, :unwrap_failed}
-      key when is_binary(key) -> {:ok, key}
+          case :crypto.crypto_one_time_aead(:aes_256_gcm, kek, iv, ct, info, tag, false) do
+            :error -> {:error, :unwrap_failed}
+            key when is_binary(key) -> {:ok, key}
+          end
+        rescue
+          _ -> {:error, :unwrap_failed}
+        end
+
+      _ ->
+        {:error, :malformed}
     end
   end
+
+  def unwrap(_not_wrapped, _keypair, _info), do: {:error, :not_wrapped}
 
   @doc """
   A Workbooks.Bundle.Sealed KeyProvider that unwraps from a store of wrapped keys
