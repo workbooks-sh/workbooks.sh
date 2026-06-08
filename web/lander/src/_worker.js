@@ -29,6 +29,21 @@ export default {
     // /api/* — viewer-side same-origin proxies (artifact streaming,
     //   etc). Without this they hit the lander's static assets and
     //   return its index.html instead of the workbook bytes.
+    // /docs/* — documentation site proxied from workbooks-docs.pages.dev
+    // so workbooks.sh/docs/* serves docs under the canonical hostname.
+    if (url.pathname === "/docs" || url.pathname.startsWith("/docs/")) {
+      const docPath = url.pathname === "/docs" ? "/index.html" : url.pathname.slice("/docs".length);
+      const target = new URL(docPath + url.search, "https://workbooks-docs.pages.dev");
+      const upstreamHeaders = new Headers(request.headers);
+      upstreamHeaders.delete("host");
+      return fetch(new Request(target.toString(), {
+        method: request.method,
+        headers: upstreamHeaders,
+        body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+        redirect: "manual",
+      }));
+    }
+
     if (
       url.pathname === "/w" ||
       url.pathname.startsWith("/w/") ||
