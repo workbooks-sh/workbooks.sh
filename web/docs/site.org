@@ -2,6 +2,7 @@
 #+PUBLISH_TARGET: cloudflare-pages
 #+PUBLISH_PROJECT: workbooks-docs
 #+PUBLISH_DOMAIN: docs.workbooks.sh
+#+PUBLISH_BASE_PATH: /docs
 
 * [[index.org][Introduction]]
 

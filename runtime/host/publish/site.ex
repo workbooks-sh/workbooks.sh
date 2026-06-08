@@ -120,7 +120,8 @@ defmodule Workbooks.Publish.Site do
 
   defp render_all(%{sections: sections, dir: dir, config: config}) do
     pages = Enum.flat_map(sections, & &1.pages)
-    nav_html = build_nav_html(sections, config)
+    base = config["PUBLISH_BASE_PATH"] || ""
+    nav_html = build_nav_html(sections, config, base)
 
     errors =
       Enum.flat_map(pages, fn page ->
@@ -154,8 +155,9 @@ defmodule Workbooks.Publish.Site do
   end
 
   # Build sidebar nav HTML. Current page gets `aria-current="page"`.
-  defp build_nav_html(sections, config) do
+  defp build_nav_html(sections, config, base \\ "") do
     site_title = config["PUBLISH_TITLE"] || "Workbooks"
+    home = if base == "", do: "/index.html", else: "#{base}/index.html"
 
     items =
       Enum.map_join(sections, "\n", fn section ->
@@ -163,7 +165,8 @@ defmodule Workbooks.Publish.Site do
 
         links =
           Enum.map_join(section.pages, "\n", fn page ->
-            ~s(<li><a href="/#{page.url}" data-url="#{page.url}">#{esc(page.title)}</a></li>)
+            href = if base == "", do: "/#{page.url}", else: "#{base}/#{page.url}"
+            ~s(<li><a href="#{href}" data-url="#{page.url}">#{esc(page.title)}</a></li>)
           end)
 
         "#{label}<ul>#{links}</ul>"
@@ -172,7 +175,7 @@ defmodule Workbooks.Publish.Site do
     """
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-head">
-        <a href="/index.html" class="sidebar-title">#{esc(site_title)}</a>
+        <a href="#{home}" class="sidebar-title">#{esc(site_title)}</a>
         <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">✕</button>
       </div>
       <div class="nav-body">
