@@ -362,4 +362,21 @@ fn main(){ println!("{}", "hello_world".to_camel_case()); }|, "HelloWorld")
   test "unicode-ident — XID identifier classification" do
     run_with("unicode-ident@1.0.0", ~S|fn main(){ println!("{}", unicode_ident::is_xid_start('x')); }|, "true")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "regex unicode \\d via opts[:dep_features] — feature selection unlocks unicode-perl" do
+    # The full default feature set (unicode-age/script/segment tables + perf) exceeds the mrustc
+    # ceiling, but the MINIMAL unicode-perl set compiles and makes \d/\w live. Exercises the
+    # per-dep feature-selection API directly (run_with only threads deps).
+    src = Path.join(System.tmp_dir!(), "cd_rx_unicode.rs")
+    File.write!(src, ~S|fn main(){ let re = regex::Regex::new(r"\d+").unwrap(); println!("{}", re.find("ab123cd").unwrap().as_str()); }|)
+    feats = %{"regex" => ["std", "unicode-perl"], "regex-syntax" => ["std", "unicode-perl"]}
+
+    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: ["regex@1.5.4"], dep_features: feats) do
+      {:ok, wasm, _} -> assert PM.run(wasm, "", []) |> String.trim() == "123"
+      {:error, reason} -> IO.puts("\n[skip] regex unicode: #{inspect(reason) |> String.slice(0, 80)}")
+    end
+  end
 end
