@@ -108,10 +108,34 @@ defmodule Workbooks.ToolchainPalletTest do
 
       tmp = Path.join(System.tmp_dir!(), "wbl-#{System.unique_integer([:positive])}")
       File.mkdir_p!(tmp)
-      File.write!(Path.join(tmp, "a.lua"), "print('lua', 6*7); local ok=pcall(function() error('x') end); print('pcall', ok)")
+
+      # This program exercises Lua's pcall (protected call), which catches a raised
+      # error via setjmp/longjmp. In wasm there is no native setjmp/longjmp — it only
+      # works because the Lua wasm is built with wasi-sdk's `-wasm-enable-sjlj`
+      # (lowering longjmp to the standardized Wasm exception-handling proposal) AND is
+      # run on wasmtime with `-W exceptions=y`. If sjlj were broken the guest would
+      # TRAP/abort on `error(...)` instead of unwinding; here it must unwind cleanly:
+      #   * pcall returns false (the error was caught, not fatal),
+      #   * the error message is propagated back, and
+      #   * execution CONTINUES past the protected call (longjmp resumed at setjmp).
+      # We print with explicit string concatenation (one space) so the output format
+      # is unambiguous and self-consistent with the assertions below.
+      prog = """
+      print('lua ' .. tostring(6*7))
+      local ok, err = pcall(function() error('boom') end)
+      print('pcall caught=' .. tostring(not ok) .. ' err=' .. tostring(err))
+      print('after pcall still running')
+      """
+
+      File.write!(Path.join(tmp, "a.lua"), prog)
       {:ok, lua} = CommandRegistry.run("lua", "", ["/w/a.lua"], ["#{tmp}::/w"])
       assert lua =~ "lua 42"
-      assert lua =~ "pcall false"
+      # pcall returned false → the raised error was CAUGHT by setjmp/longjmp (not fatal).
+      assert lua =~ "pcall caught=true"
+      # the error value was propagated through the longjmp, carrying Lua's position info.
+      assert lua =~ "boom"
+      # and the stack unwound back to the setjmp point, so the program kept running.
+      assert lua =~ "after pcall still running"
     end
 
     @tag :build
