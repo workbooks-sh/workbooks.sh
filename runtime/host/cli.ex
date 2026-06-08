@@ -10,12 +10,17 @@ defmodule Workbooks.CLI do
   @version "0.1.0"
 
   def main(argv) do
-    # Deploy verbs are HOST-side (shell out + file config) — they need no runtime,
-    # so they don't boot the app (which would load the OQL/wasmex NIF that can't
-    # load from an escript archive). They carry exit codes + --json for agents.
+    # Deploy + publish verbs are HOST-side (shell out + file config) — they need no
+    # runtime, so they don't boot the app (which would load the OQL/wasmex NIF that
+    # can't load from an escript archive). They carry exit codes + --json for agents.
     case argv do
       ["deploy" | rest] ->
         {out, failed?} = deploy_run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
+      ["publish" | rest] ->
+        {out, failed?} = publish_run(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
@@ -286,6 +291,63 @@ defmodule Workbooks.CLI do
   defp deploy_norm({:error, msg}), do: {:error, msg, %{}}
   defp deploy_norm(:error), do: {:error, "command not found (is docker/buildx installed?)", %{}}
 
+  # Dispatch a publish verb → {rendered_output, failed?}.
+  defp publish_run(rest) do
+    json? = Enum.member?(rest, "--json")
+    args = Enum.reject(rest, &(&1 == "--json"))
+    pub = Workbooks.Publish
+
+    result =
+      case args do
+        [] -> {:ok, publish_usage(), %{}}
+        ["help" | _] -> {:ok, publish_usage(), %{}}
+        ["init" | rest] ->
+          pub.init(force: "--force" in rest, file: pub_config_arg(rest))
+        ["validate" | rest] ->
+          pub.validate(pub_config_arg(rest))
+        ["apply" | rest] ->
+          org = pub_org_arg(rest)
+          cfg = pub_config_arg(rest)
+          pub.apply(org, cfg)
+        other ->
+          {:error, "unknown verb: wb publish #{Enum.join(other, " ")}", %{}}
+      end
+
+    {pub.render_result(result, json?), pub.failed?(result)}
+  end
+
+  defp publish_usage do
+    """
+    wb publish — render a Workbook (.org) → self-contained HTML → live URL.
+    Non-interactive; add --json for machine output (exit 0 ok / non-zero fail).
+
+    THE FLOW:
+      wb publish init                scaffold ./publish.org
+      wb publish validate            coherence-check it (no render, no deploy)
+      wb publish apply <file.org>    render + ship → prints the live URL
+    (config defaults to ./publish.org; workbook defaults to ./workbook.org)
+
+    A publish.org describes:
+      PUBLISH_TARGET  cloudflare-pages | gh-pages | self-hosted
+      PUBLISH_PROJECT the CF Pages project name, GitHub repo (org/name), or runtime URL
+      PUBLISH_DOMAIN  optional custom domain (for the printed URL)
+      PUBLISH_TITLE   page <title> (falls back to PUBLISH_PROJECT)
+      PUBLISH_OUTPUT  where to write the rendered HTML (default: .publish_out/index.html)
+    """
+  end
+
+  defp pub_org_arg(rest) do
+    Enum.find(rest, Workbooks.Publish.default_workbook(), fn a ->
+      not String.starts_with?(a, "-") and String.ends_with?(a, ".org")
+    end)
+  end
+
+  defp pub_config_arg(rest) do
+    Enum.find(rest, Workbooks.Publish.default_config(), fn a ->
+      not String.starts_with?(a, "-") and not String.ends_with?(a, ".org")
+    end)
+  end
+
   # File arg helpers — the deployment.org defaults to ./deployment.org.
   defp preset_arg(rest), do: Enum.find(rest, "local", &(not String.starts_with?(&1, "-")))
   defp file_arg(rest), do: Enum.find(rest, "deployment.org", &(not String.starts_with?(&1, "-")))
@@ -367,6 +429,9 @@ defmodule Workbooks.CLI do
       wb toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
       wb toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
       wb toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
+      wb publish init                          scaffold ./publish.org
+      wb publish validate                      coherence-check it
+      wb publish apply <file.org>              render + deploy → live URL
       wb version
     """
   end
