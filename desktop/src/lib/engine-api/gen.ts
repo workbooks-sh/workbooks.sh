@@ -45,6 +45,10 @@ export async function engineRequest<T = unknown>(
   if (!base) {
     throw new EngineApiError("daemon_down", "Agent server isn't running.", 0);
   }
+  // RCP trusted rung: attach the per-boot discovery token so REST calls carry the
+  // Bearer (previously omitted — fine for single-tenant anon, but rejected by a
+  // multi-tenant runtime). See runtime/docs/RUNTIME-CONNECT-PROTOCOL.org §2.
+  const token = sidecar.status.token;
   const ctrl = opts.timeoutMs ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), opts.timeoutMs) : null;
   try {
@@ -54,6 +58,7 @@ export async function engineRequest<T = unknown>(
       headers: {
         accept: "application/json",
         ...(hasBody ? { "content-type": opts.contentType ?? "application/json" } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       body: opts.bodyText ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
       signal: ctrl?.signal,
