@@ -88,4 +88,16 @@ fn main(){ println!("{}", F::all().bits()); }|, "3")
 lazy_static!{ static ref A: i32 = 6*7; }
 fn main(){ println!("{}", *A); }|, "42")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "serde_json — DEEP transitive tree (serde+itoa+ryu), JSON parse+serialize, no derive" do
+    run_with("serde_json@1.0.68", ~S'fn main(){
+  let v: serde_json::Value = serde_json::from_str("{\"a\":1,\"b\":[2,3,4]}").unwrap();
+  let mut s: i64 = 0;
+  for x in v["b"].as_array().unwrap() { s += x.as_i64().unwrap(); }
+  println!("{} {}", v["a"], s);
+}', "1 9")
+  end
 end
