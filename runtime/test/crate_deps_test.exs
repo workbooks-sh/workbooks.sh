@@ -408,6 +408,44 @@ fn main(){ let r: nom::IResult<&str,&str> = digit1("123abc"); println!("{}", r.u
   @tag :build
   @tag :netdeps
   @tag timeout: 900_000
+  test "seahash — deterministic hash" do
+    run_with("seahash@4.1.0", ~S|fn main(){ let a=seahash::hash(b"hello"); let b=seahash::hash(b"hello"); println!("{}", a==b && a!=0); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "fxhash — fast hasher" do
+    run_with("fxhash@0.2.1", ~S|use std::hash::Hasher;
+fn main(){ let mut h=fxhash::FxHasher::default(); h.write(b"abc"); println!("{}", h.finish()!=0); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "twox-hash — XxHash64" do
+    run_with("twox-hash@1.6.3", ~S|use std::hash::Hasher;
+fn main(){ let mut h=twox_hash::XxHash64::with_seed(0); h.write(b"abc"); let a=h.finish(); let mut g=twox_hash::XxHash64::with_seed(0); g.write(b"abc"); println!("{}", a==g.finish() && a!=0); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "leb128 — varint roundtrip" do
+    run_with("leb128@0.2.5", ~S|fn main(){ let mut buf=Vec::new(); leb128::write::unsigned(&mut buf, 300).unwrap(); let mut rdr=&buf[..]; println!("{}", leb128::read::unsigned(&mut rdr).unwrap()); }|, "300")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "integer-encoding — VarInt roundtrip" do
+    run_with("integer-encoding@3.0.4", ~S|use integer_encoding::VarInt;
+fn main(){ let v=300u64.encode_var_vec(); println!("{}", u64::decode_var(&v).unwrap().0); }|, "300")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
   test "itertools (0.10) via opts[:dep_features] (use_alloc, no std)" do
     # itertools@0.10 fails to compile with its std default but compiles with use_alloc only.
     src = Path.join(System.tmp_dir!(), "cd_itertools010.rs")
