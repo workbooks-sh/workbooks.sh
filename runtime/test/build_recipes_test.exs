@@ -80,6 +80,21 @@ defmodule Workbooks.BuildRecipesTest do
     refute out =~ "read-through:"
   end
 
+  # wb-fm0.1 — INLINE C (a literate `c` source block, the build_inline path) compiles
+  # ENTIRELY in the sandbox via clang.wasm (Compilers.compile_c), zero native execution.
+  # This is the inline counterpart to the build_dir C tests above; together they prove
+  # both PackageManager C entry points route through the in-sandbox compiler.
+  @tag :build
+  @tag timeout: 300_000
+  test "inline C source compiles in-sandbox (no native toolchain) and runs" do
+    src = "#include <stdio.h>\nint main(){ long f=1; for(int i=1;i<=6;i++) f*=i; printf(\"6!=%ld\\n\", f); return 0; }"
+    {_name, "c", result} = PackageManager.build(%{"name" => "fac", "lang" => "c", "src" => src})
+    assert {:ok, wasm, status} = result
+    assert status in [:built, :cached]
+    assert File.exists?(wasm)
+    assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
+  end
+
   @tag :build
   @tag timeout: 420_000
   test "capture_help on huniq: build -> content-address -> --help" do

@@ -145,15 +145,16 @@ defmodule Workbooks.PackageManager do
   end
 
   # Mode 2 — C. Compile a real C project dir (multi-file, its own headers) to a
-  # runnable wasm32-wasi command via `zig cc`, linking the mmap shim so a CLI that
-  # calls mmap()/munmap()/msync() works unmodified (wasi-libc's mmap just returns
-  # ENOSYS). All *.c under the dir are compiled together.
+  # runnable wasm32-wasi command. The compile+link runs ENTIRELY in the sandbox via
+  # clang.wasm + wasm-ld (Workbooks.Compilers.compile_c) — zero native execution, so
+  # untrusted C source never touches a native toolchain (wb-fm0.1). All *.c under the
+  # dir are compiled together (first is the main TU, the rest passed as extra sources).
   def build_dir(dir, "c") do
     abs = Path.expand(dir)
 
     case Path.wildcard(Path.join(abs, "**/*.c")) do
       [] -> {:error, "no .c sources in #{abs}"}
-      srcs -> build_c_sources(srcs, Path.join(@cache, "#{cache_key(["cdir", abs])}.wasm"))
+      [main | rest] -> compile_c_in_sandbox(main, rest, Path.join(@cache, "#{cache_key(["cdir", abs])}.wasm"))
     end
   end
 
@@ -182,82 +183,42 @@ defmodule Workbooks.PackageManager do
   defp compile("ts", src, out), do: build_ts(src, out)
   defp compile("rust", src, out), do: build_rust(src, out)
   defp compile("go", src, out), do: build_go(src, out)
-  defp compile("c", src, out), do: build_c(src, out)
-  defp compile(other, _src, _out), do: {:error, {:unsupported_lang, other}}
-
-  # The mmap emulation shim, linked into every C/wasi build (see build_c_sources).
-  @mmap_shim Path.expand(Path.join([__DIR__, "..", "build", "shims", "mmap_shim.c"]))
-  # Calls to these get rerouted to the shim's __wrap_* via wasm-ld --wrap.
-  @mmap_wraps ["--wrap=mmap", "--wrap=munmap", "--wrap=msync"]
-
-  # C = compile to wasm32-wasi via `zig cc` (bundles clang + wasi-libc; no SDK).
-  defp build_c(src, out) do
+  defp compile("c", src, out) do
     File.mkdir_p!(@cache)
     c = Path.join(@cache, "c-#{cache_key([src])}.c")
     File.write!(c, src)
-    build_c_sources([c], out)
+    compile_c_in_sandbox(c, [], out)
   end
 
-  # Shared C/wasi compile+link used by inline `c` blocks AND build_dir(_, "c").
+  defp compile(other, _src, _out), do: {:error, {:unsupported_lang, other}}
+
+  # The mmap emulation shim (file-backed mmap over pread/pwrite), linked into every
+  # C/wasi build. wasi-libc's own mmap returns ENOSYS; @mmap_wraps redirect
+  # mmap/munmap/msync to the shim's __wrap_* at link time.
+  @mmap_shim Path.expand(Path.join([__DIR__, "..", "build", "shims", "mmap_shim.c"]))
+  @mmap_wraps ["--wrap=mmap", "--wrap=munmap", "--wrap=msync"]
+
+  # C = compile + link to a runnable wasm32-wasip1 command ENTIRELY in the sandbox
+  # via clang.wasm + wasm-ld (Workbooks.Compilers.compile_c) — zero native execution
+  # (wb-fm0.1). The old native `zig cc`/`wasm-ld` path is gone: untrusted C source is
+  # never handed to a native toolchain. `main` is the primary translation unit; `rest`
+  # are additional .c sources compiled+linked alongside it. The emitted wasm is copied
+  # to `out` (the content-addressed cache path) so the rest of the build path is unchanged.
   #
-  # mmap emulation: wasi-libc ships an mmap that just returns ENOSYS, so we link
-  # build/shims/mmap_shim.c (a file-backed mmap over pread/pwrite) and redirect
-  # mmap/munmap/msync to its __wrap_* with `wasm-ld --wrap`. zig 0.16's cc front
-  # end rejects --wrap, so we two-phase it: (1) compile every source + the shim to
-  # objects; (2) ask `zig cc -v` for the exact wasm-ld link line (its sysroot/libc
-  # paths live in zig's cache, so we never hardcode them — this stays correct
-  # across zig versions/cache clears), then replay that line through `wasm-ld`
-  # with the --wrap flags injected. The probe link is expected to fail on the
-  # mmap dup-symbol; we only need the line it prints. CLI source is untouched.
-  defp build_c_sources(srcs, out) do
+  # mmap parity: the shim is linked (extra_csrc) and mmap/munmap/msync are --wrap'd to it
+  # (ld_args), so a CLI that mmap()s a file works the same as on the old zig-cc lane —
+  # now with zero native execution.
+  defp compile_c_in_sandbox(main, rest, out) do
     File.mkdir_p!(@cache)
-    env = [{"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"}]
-    work = Path.join(@cache, "cobj-#{cache_key(srcs ++ [@mmap_shim])}")
-    File.mkdir_p!(work)
 
-    all = srcs ++ [@mmap_shim]
-    objs = Enum.map(all, fn s -> Path.join(work, "#{cache_key([s])}.o") end)
+    case Workbooks.Compilers.compile_c(main, extra_csrc: rest ++ [@mmap_shim], ld_args: @mmap_wraps) do
+      {:ok, wasm, _logs} ->
+        File.cp!(wasm, out)
+        File.rm(wasm)
+        {:ok, out, :built}
 
-    with :ok <- compile_objects(all, objs, env),
-         {:ok, ld_line} <- probe_link_line(objs, out, env),
-         :ok <- wrap_link(ld_line, env) do
-      {:ok, out, :built}
-    end
-  end
-
-  defp compile_objects(srcs, objs, env) do
-    Enum.zip(srcs, objs)
-    |> Enum.reduce_while(:ok, fn {src, obj}, _ ->
-      # SECURITY (wb-sec): zig cc compiling untrusted C — network-DENIED.
-      case Workbooks.Sandbox.run(["zig", "cc", "-target", "wasm32-wasi", "-Oz", "-c", "-o", obj, src], env: env) do
-        {_, 0} -> {:cont, :ok}
-        {err, _} -> {:halt, {:error, err}}
-      end
-    end)
-  end
-
-  # Ask zig for the real wasm-ld invocation. The link itself fails (mmap defined
-  # in both libc and the shim), but `-v` prints the full command first; we parse
-  # that single `wasm-ld …` line. Returns the line minus the leading "wasm-ld ".
-  defp probe_link_line(objs, out, env) do
-    {output, _} =
-      Workbooks.Sandbox.run(["zig", "cc", "-target", "wasm32-wasi", "-Oz", "-o", out] ++ objs ++ ["-v"], env: env)
-
-    case output |> String.split("\n") |> Enum.find(&String.starts_with?(&1, "wasm-ld ")) do
-      nil -> {:error, "could not capture wasm-ld link line:\n#{output}"}
-      line -> {:ok, String.replace_prefix(line, "wasm-ld ", "")}
-    end
-  end
-
-  # Replay the captured link, injecting --wrap so mmap/munmap/msync resolve to the
-  # shim. zig's link line is plain whitespace-separated absolute paths/flags
-  # (no quoting), so a simple split is safe.
-  defp wrap_link(ld_line, env) do
-    args = @mmap_wraps ++ String.split(ld_line, ~r/\s+/, trim: true)
-
-    case Workbooks.Sandbox.run(["wasm-ld" | args], env: env) do
-      {_, 0} -> :ok
-      {err, _} -> {:error, err}
+      {:error, _} = err ->
+        err
     end
   end
 

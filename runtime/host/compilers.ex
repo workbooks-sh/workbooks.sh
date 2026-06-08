@@ -133,7 +133,9 @@ defmodule Workbooks.Compilers do
 
   This is the production full-C compiler-in-wasm (clang 22, libc) — unlike c4's interpreted
   C subset. opts: `:argv` (extra clang flags), `:includes` ([{host_dir, guest_dir}] extra
-  header roots, e.g. zig.h for the Zig chain), `:run_opts`.
+  header roots, e.g. zig.h for the Zig chain), `:extra_csrc` (more .c sources compiled +
+  linked alongside the main one), `:ld_args` (extra wasm-ld link flags, e.g. `--wrap=mmap`
+  for the mmap shim), `:crt` (link crt1, default true), `:run_opts`.
   """
   def compile_c(source_path, opts \\ [], root \\ default_root()) do
     m = Path.join([root, "clang", "manifest.org"])
@@ -211,9 +213,13 @@ defmodule Workbooks.Compilers do
             crt = if Keyword.get(opts, :crt, true), do: ["#{@clang_lib_c}/crt1-command.o"], else: []
             obj_paths = Enum.map(objs, &"/work/#{&1}")
 
+            # opts[:ld_args] are extra wasm-ld flags (e.g. --wrap=mmap for the mmap
+            # shim). They must precede the objects/libs so symbol wrapping applies.
+            ld_extra = Keyword.get(opts, :ld_args, [])
+
             c2 =
               ["wasm-ld", "-m", "wasm32", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
-                crt ++ obj_paths ++
+                ld_extra ++ crt ++ obj_paths ++
                 ["-lc", "#{@clang_lib_rt}/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
 
             log2 = CommandRegistry.run(cli, "", c2, preopens, ropts)
