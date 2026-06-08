@@ -117,4 +117,25 @@ fn main(){ println!("{}", *N); }', "42")
   println!("{} {}", v["a"], s);
 }', "1 9")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "percent-encoding — Display encode" do
+    run_with("percent-encoding@2.1.0", ~S|fn main(){ println!("{}", percent_encoding::utf8_percent_encode("a b/c", percent_encoding::NON_ALPHANUMERIC)); }|, "a%20b%2Fc")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "glob — pattern match" do
+    run_with("glob@0.3.0", ~S|fn main(){ let p = glob::Pattern::new("*.rs").unwrap(); println!("{}", p.matches("foo.rs")); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "tinyvec — stack-allocated ArrayVec" do
+    run_with("tinyvec@1.5.1", ~S|fn main(){ let mut v: tinyvec::ArrayVec<[i32;4]> = Default::default(); v.push(5); v.push(7); v.push(9); println!("{}", v.iter().sum::<i32>()); }|, "21")
+  end
 end
