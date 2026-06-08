@@ -1,0 +1,54 @@
+#+TITLE: The BEAM-backed Rust runtime — wasm computes, the BEAM orchestrates (wb-ova)
+#+NOTE: The contract for writing in-sandbox Rust that needs I/O, storage, time, or concurrency.
+#+NOTE: Crate: compilers/rust/wb/lib.rs. Proof: test/wb_runtime_test.exs. Host: host/rust_dock.ex.
+
+* The model (one idea)
+  wasm is great at COMPUTE and bad at the world (no threads, no sockets, no clock). The BEAM is the
+  opposite — built for concurrency, I/O, supervision, fault-tolerance. So we split the work:
+
+    wasm  =  pure compute        — memory-safe, bounded, deterministic     (the "math")
+    BEAM  =  I/O, storage, time, concurrency — process-safe, supervised    (the "world")
+    wb::  =  the seam            — thin Rust calls the BEAM implements
+
+  A Rust program does its computation normally; the moment it needs to touch the world, it calls a
+  `wb::*` function, and the BEAM performs that operation safely and Policy-gated. The program never
+  opens a socket, file, or clock — it can't, and it doesn't need to.
+
+* Why not just use tokio / std::net?
+  They need an OS the sandbox doesn't have (threads, epoll), and tokio doesn't compile under the
+  in-sandbox compiler's ~1.74 ceiling anyway. `wb::*` gives the same CAPABILITIES (network, storage,
+  time, and — system-level — concurrency) via a small API, with the BEAM as the async/IO runtime.
+  This is NOT a drop-in for existing tokio/reqwest code; it's the supported way to do I/O here.
+
+* The API (compilers/rust/wb/lib.rs)
+  - wb::time::now_millis()                  — wall clock (always available)
+  - wb::vfs::{write,read,read_string}       — sandboxed key/value store      (cap: "vfs")
+  - wb::http::{get,get_string}              — network egress, host performs it (cap: "http")
+  Each cap is granted by the run PROFILE's Policy. Request one the profile didn't grant and the
+  module fails to instantiate — capability-by-construction.
+
+* Concurrency — already there, at the right layer
+  You rarely need in-program async. The SYSTEM is concurrent: the BEAM runs many wasm instances at
+  once, each its own supervised process, each making blocking `wb::*` calls the BEAM services
+  concurrently. So "fan out N requests" = N programs (or one program the host fans out), not an
+  in-wasm executor. (In-program async/await would need a minimal executor compiled in — possible
+  later, not needed for the common case.)
+
+* How to build + run
+  Compile the program with the host externs left importable, then run it under the Dock:
+    {:ok, wasm} = Compilers.rust_compile_to_wasm(src, no_exceptions: true, allow_undefined: true)
+    {:ok, out}  = RustDock.run(wasm, profile: :network)   # or :minimal (no egress)
+  (`mod wb { <lib.rs> }` inline, or — once wired — `--extern wb` as an auto-provided crate.)
+
+* The contract for an agent writing Rust live
+  - Do the computation in plain Rust (memory-safe, the ceiling permitting — pin/floor handle deps).
+  - For ANYTHING that touches the world — time, storage, network — call `wb::*`. Do not reach for
+    std::net / std::fs / std::thread / tokio; they won't work and you don't need them.
+  - Safety is structural: you cannot escape (wasm), cannot exhaust the host (bounded + supervised),
+    and only get the caps the Policy granted. You don't have to reason about memory-unsafety or
+    runaway processes — the architecture forbids them.
+
+* Honest limits
+  - 1.74 ceiling still applies to YOUR source (the wb crate is thin and fine).
+  - Not transparent tokio/std::net replacement — same capabilities, different (small) API.
+  - In-program async/await needs a future slice (an executor); system concurrency covers most needs.
