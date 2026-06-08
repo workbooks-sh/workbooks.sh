@@ -68,7 +68,7 @@ mindmap
   root((A Workbook))
     Document
     Filesystem of docs
-    SQLite database
+    Database
     Single-page app
     Desktop app
     Web page
@@ -79,21 +79,23 @@ mindmap
 
 One Runtime runs any Workbook the same way everywhere. It's built on Elixir, so it stays
 fast and parallel under load with nothing to babysit, and it runs real code — in several
-languages — inside a sandbox, so even untrusted code stays in its box. One Runtime means
-one thing to manage, not a fleet.
+languages — inside a sandbox, so even untrusted code stays in its box.
 
-Run it yourself for free, on your own machine with your own keys — or let us run it in the
-cloud when you'd rather not manage infrastructure. The managed option is a convenience,
-never a gate.
+It's **multi-tenant from the ground up**, so the same engine that runs your own apps can
+serve your whole team and your clients too — each tenant isolated, with its own data and
+identity. Build something for yourself, then open it up to everyone else without standing
+up new infrastructure. Run it yourself for free with your own keys, or let us run it in the
+cloud when you'd rather not — the managed option is a convenience, never a gate.
 
 ```mermaid
 flowchart LR
-    WB["📄 Any Workbook"] --> RT["⚙️ One Runtime<br/>sandbox · real code · agents"]
-    RT --> A["💻 Run it yourself<br/>free · your machine · your keys"]
-    RT --> B["☁️ Or let us run it<br/>managed cloud · optional"]
+    WB["📄 Your Workbooks"] --> RT["⚙️ One Runtime<br/>multi-tenant · sandbox · agents"]
+    RT --> You["👤 You"]
+    RT --> Team["👥 Your team"]
+    RT --> Clients["🧑‍💼 Your clients"]
 
-    classDef free fill:#28c84018,stroke:#28c840,stroke-width:1.5px;
-    class A free
+    classDef start fill:#28c84018,stroke:#28c840,stroke-width:1.5px;
+    class You start
 ```
 
 ## Why it's built this way
