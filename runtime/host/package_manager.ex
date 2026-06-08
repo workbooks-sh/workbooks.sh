@@ -86,6 +86,25 @@ defmodule Workbooks.PackageManager do
     {name, lang, result}
   end
 
+  # Rust inline blocks can declare crates.io deps (comp["deps"], e.g. ["fnv@1.0.7"]). They are
+  # fetched + compiled in-sandbox and linked (wb-3s8). Other langs ignore deps for now.
+  defp build_inline("rust", src, deps) do
+    out = Path.join(@cache, "#{cache_key(["rust", src, Enum.join(deps, ",")])}.wasm")
+
+    if File.exists?(out) do
+      {:ok, out, :cached}
+    else
+      File.mkdir_p!(@cache)
+      rs = Path.join(@cache, "rust-#{cache_key([src, Enum.join(deps, ",")])}.rs")
+      File.write!(rs, src)
+
+      case Workbooks.Compilers.rust_compile_to_wasm(rs, deps: deps) do
+        {:ok, wasm, _logs} -> File.cp!(wasm, out); File.rm(wasm); {:ok, out, :built}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
   defp build_inline(lang, src, deps) do
     out = Path.join(@cache, "#{cache_key([lang, src, Enum.join(deps, ",")])}.wasm")
     if File.exists?(out), do: {:ok, out, :cached}, else: compile(lang, src, out)

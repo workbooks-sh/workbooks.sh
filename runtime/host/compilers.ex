@@ -343,7 +343,7 @@ defmodule Workbooks.Compilers do
   than silently shelling a native rustc — the canon is no native compile for untrusted source.
   Returns {:ok, wasm_path, log} | {:error, reason}.
   """
-  def rust_compile_to_wasm(source_path, _opts \\ [], root \\ default_root()) do
+  def rust_compile_to_wasm(source_path, opts \\ [], root \\ default_root()) do
     rd = Path.join(root, "rust")
     mrdir = Path.expand(Path.join(rd, "mrustc-root/mrustc"))
     mrwasm = Path.expand(Path.join(rd, "mrustc-root/mrustc_std.wasm"))
@@ -357,11 +357,11 @@ defmodule Workbooks.Compilers do
       not File.regular?(mrwasm) -> {:error, {:mrustc_not_built, mrwasm}}
       not File.regular?(clang) -> {:error, {:clang_not_built, clang}}
       not File.regular?(Path.join(o, "libstd.rlib.o")) -> {:error, {:libstd_not_prebuilt, o}}
-      true -> do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src)
+      true -> do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, opts)
     end
   end
 
-  defp do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src) do
+  defp do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, opts) do
     id = Integer.to_string(:erlang.unique_integer([:positive]))
     name = "wbr#{id}"
     File.mkdir_p!(Path.join(mrdir, ".mrtmp"))
@@ -387,46 +387,157 @@ defmodule Workbooks.Compilers do
     ensure_rust_obj(o, "wasi_shim", shim_src, cl)
     ensure_rust_obj(o, "ustub", ustub_src, cl)
 
-    log1 =
-      mr.(["output-wasi/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
-           "-L", "output-wasi", "--out-dir", "output-wasi", "--target", "wasm32-wasi", "--edition", "2018"])
+    # wb-3s8/wb-6lh: fetch + compile each declared crates.io dependency (pure-Rust, in-sandbox)
+    # into output-wasi/deps/, returning {extern_args, dep_object_paths}. Errors short-circuit.
+    case ensure_deps(Keyword.get(opts, :deps, []), mrdir, o, mr, cl) do
+      {:error, _} = depserr ->
+        for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+        depserr
 
-    result =
-      if File.regular?(Path.join(o, "#{name}.c")) do
-        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
+      {:ok, extern_args, dep_objs} ->
+        ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi/deps"]
 
-        if File.regular?(Path.join(o, "#{name}.o")) do
-          libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi/#{Path.basename(&1)}")
+        log1 =
+          mr.(["output-wasi/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
+               "-L", "output-wasi"] ++ ldirs ++ extern_args ++
+              ["--out-dir", "output-wasi", "--target", "wasm32-wasi", "--edition", "2018"])
 
-          ld =
-            ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
-             "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
-              libstd ++
-              ["/work/output-wasi/wasi_shim.o", "/work/output-wasi/ustub.o",
-               "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
-               "-o", "/work/output-wasi/#{name}.wasm"]
+        result =
+          if File.regular?(Path.join(o, "#{name}.c")) do
+            cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
 
-          log2 = cl.(ld)
-          outw = Path.join(o, "#{name}.wasm")
+            if File.regular?(Path.join(o, "#{name}.o")) do
+              libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi/#{Path.basename(&1)}")
 
-          if File.regular?(outw) do
-            dest = Path.join(System.tmp_dir!(), "wbrust-#{id}.wasm")
-            File.cp!(outw, dest)
-            {:ok, dest, {log1, log2}}
+              ld =
+                ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+                 "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
+                  dep_objs ++ libstd ++
+                  ["/work/output-wasi/wasi_shim.o", "/work/output-wasi/ustub.o",
+                   "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
+                   "-o", "/work/output-wasi/#{name}.wasm"]
+
+              log2 = cl.(ld)
+              outw = Path.join(o, "#{name}.wasm")
+
+              if File.regular?(outw) do
+                dest = Path.join(System.tmp_dir!(), "wbrust-#{id}.wasm")
+                File.cp!(outw, dest)
+                {:ok, dest, {log1, log2}}
+              else
+                {:error, {:link_failed, log2}}
+              end
+            else
+              {:error, {:cc_failed, log1}}
+            end
           else
-            {:error, {:link_failed, log2}}
+            {:error, {:rustc_failed, log1}}
           end
-        else
-          {:error, {:cc_failed, log1}}
-        end
-      else
-        {:error, {:rustc_failed, log1}}
-      end
 
-    # clean this job's transient files (keep the shared libstd/shim/ustub objects)
-    for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
-    File.rm(Path.join(o, "lib#{name}.rlib"))
-    result
+        # clean this job's transient files (keep shared libstd/shim/ustub + cached deps)
+        for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+        File.rm(Path.join(o, "lib#{name}.rlib"))
+        result
+    end
+  end
+
+  # ── crates.io dependency support (wb-3s8 / wb-6lh) ──────────────────────────
+  # Each dep: %{name, version} | {name, version} | "name@version". Fetched from the static
+  # CDN, compiled (with its default features) via mrustc.wasm→clang.wasm into output-wasi/deps/,
+  # cached by name+version. Returns {:ok, extern_args, dep_object_guest_paths} | {:error, _}.
+  # Pure-Rust only (no proc-macros / build.rs / transitive deps yet — the next slices).
+  defp ensure_deps([], _mrdir, _o, _mr, _cl), do: {:ok, [], []}
+
+  defp ensure_deps(deps, mrdir, o, mr, cl) do
+    File.mkdir_p!(Path.join(o, "deps"))
+
+    Enum.reduce_while(deps, {:ok, [], []}, fn dep, {:ok, externs, objs} ->
+      {name, version} = parse_dep(dep)
+
+      case compile_dep(name, version, mrdir, o, mr, cl) do
+        {:ok, rlib_rel, obj_guest} ->
+          {:cont, {:ok, externs ++ ["--extern", "#{name}=#{rlib_rel}"], objs ++ [obj_guest]}}
+
+        {:error, _} = e ->
+          {:halt, e}
+      end
+    end)
+  end
+
+  defp parse_dep(%{name: n, version: v}), do: {n, v}
+  defp parse_dep({n, v}), do: {to_string(n), to_string(v)}
+  defp parse_dep(s) when is_binary(s), do: (case String.split(s, "@", parts: 2) do
+    [n, v] -> {n, v}
+    [n] -> {n, "*"}
+  end)
+
+  defp compile_dep(name, version, mrdir, o, mr, cl) do
+    rlib_rel = "output-wasi/deps/lib#{name}.rlib"
+    obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
+    obj_guest = "/work/output-wasi/deps/lib#{name}.rlib.o"
+
+    if File.regular?(obj_host) do
+      {:ok, rlib_rel, obj_guest}
+    else
+      with {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")) do
+        rel_src = "output-wasi/deps/#{name}.rs"
+        File.cp!(lib_rs, Path.join(mrdir, rel_src))
+        cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+
+        mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
+             "-L", "output-wasi", "-L", "output-wasi/deps", "--out-dir", "output-wasi/deps",
+             "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+
+        c = Path.join(o, "deps/lib#{name}.rlib.c")
+
+        if File.regular?(c) do
+          cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
+          if File.regular?(obj_host), do: {:ok, rlib_rel, obj_guest}, else: {:error, {:dep_cc_failed, name}}
+        else
+          {:error, {:dep_compile_failed, name}}
+        end
+      end
+    end
+  end
+
+  # Fetch + extract a crate from the static CDN; return {:ok, lib_rs_path, default_features, edition}.
+  defp fetch_crate(name, version, into_dir) do
+    File.mkdir_p!(into_dir)
+    url = "https://static.crates.io/crates/#{name}/#{name}-#{version}.crate"
+    tarball = Path.join(into_dir, "#{name}-#{version}.crate")
+
+    with {_, 0} <- System.cmd("curl", ["-fsSL", url, "-o", tarball], stderr_to_stdout: true),
+         {_, 0} <- System.cmd("tar", ["-xzf", tarball, "-C", into_dir], stderr_to_stdout: true) do
+      cdir = Path.join(into_dir, "#{name}-#{version}")
+      lib_rs = Enum.find([Path.join(cdir, "src/lib.rs"), Path.join(cdir, "lib.rs")], &File.regular?/1)
+      cargo = Path.join(cdir, "Cargo.toml")
+
+      cond do
+        is_nil(lib_rs) -> {:error, {:no_lib_rs, name}}
+        true -> {:ok, lib_rs, default_features(cargo), crate_edition(cargo)}
+      end
+    else
+      {out, _} -> {:error, {:fetch_failed, name, version, String.slice(to_string(out), 0, 200)}}
+    end
+  end
+
+  # Parse the [features] default = [...] list from Cargo.toml (the enabled-by-default features).
+  defp default_features(cargo) do
+    with {:ok, body} <- File.read(cargo),
+         [_, list] <- Regex.run(~r/^\s*default\s*=\s*\[([^\]]*)\]/m, body) do
+      Regex.scan(~r/"([^"]+)"/, list) |> Enum.map(fn [_, f] -> f end)
+    else
+      _ -> []
+    end
+  end
+
+  defp crate_edition(cargo) do
+    with {:ok, body} <- File.read(cargo),
+         [_, e] <- Regex.run(~r/^\s*edition\s*=\s*"(\d+)"/m, body) do
+      e
+    else
+      _ -> "2015"
+    end
   end
 
   # Compile a shared support object (wasi_shim/ustub) into output-wasi once; reused by every

@@ -180,6 +180,32 @@ defmodule Workbooks.BuildRecipesTest do
     end
   end
 
+  # wb-3s8 — Rust with a real crates.io DEPENDENCY, compiled + run ENTIRELY in the sandbox.
+  # A component declares deps=["fnv@1.0.7"]; the crate is fetched from static.crates.io, compiled
+  # (with its default features) via mrustc.wasm→clang.wasm, and linked. Needs network for fetch.
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "Rust with a crates.io dependency (fnv) builds + runs in-sandbox" do
+    src = """
+    use fnv::FnvHashMap;
+    fn main() {
+        let mut m: FnvHashMap<&str, i32> = FnvHashMap::default();
+        for w in "a b a c a b".split_whitespace() { *m.entry(w).or_insert(0) += 1; }
+        println!("dep-fnv a={} b={} c={}", m["a"], m["b"], m["c"]);
+    }
+    """
+
+    case PackageManager.build(%{"name" => "rdep", "lang" => "rust", "src" => src, "deps" => ["fnv@1.0.7"]}) do
+      {_n, "rust", {:ok, wasm, st}} ->
+        assert st in [:built, :cached]
+        assert PackageManager.run(wasm, "", []) |> String.trim() == "dep-fnv a=3 b=2 c=1"
+
+      {_n, "rust", {:error, {:fetch_failed, _, _, _}}} ->
+        IO.puts("\n[skip] crates.io fetch failed (offline?) — Rust dep test needs network")
+    end
+  end
+
   # wb-fm0.2 — INLINE Zig compiles to a runnable wasm ARTIFACT entirely in the sandbox
   # (zig1.wasm: .zig → C, then clang.wasm: C → wasm), zero native execution. Proves the
   # PackageManager zig lane routes through Workbooks.Compilers, not a native zig.
