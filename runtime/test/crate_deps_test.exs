@@ -446,6 +446,48 @@ fn main(){ let v=300u64.encode_var_vec(); println!("{}", u64::decode_var(&v).unw
   @tag :build
   @tag :netdeps
   @tag timeout: 900_000
+  test "pico-args — CLI argument parsing" do
+    run_with("pico-args@0.5.0", ~S|fn main(){ let mut p=pico_args::Arguments::from_vec(vec!["-n".into(),"5".into()]); let n: i32 = p.value_from_str("-n").unwrap(); println!("{}", n); }|, "5")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "dtoa — float formatting" do
+    run_with("dtoa@1.0.0", ~S|fn main(){ let mut buf=dtoa::Buffer::new(); println!("{}", buf.format(3.5f64)); }|, "3.5")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "atoi — bytes to integer (transitive num-traits)" do
+    run_with("atoi@1.0.0", ~S|fn main(){ println!("{}", atoi::atoi::<u32>(b"12345").unwrap()); }|, "12345")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "approx — float approximate equality (transitive num-traits)" do
+    run_with("approx@0.5.1", ~S|fn main(){ println!("{}", approx::abs_diff_eq!(1.0f64, 1.0+1e-12, epsilon=1e-6)); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "rgb — pixel struct" do
+    run_with("rgb@0.8.34", ~S|fn main(){ let c=rgb::RGB8::new(255,0,0); println!("{}", c.r); }|, "255")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "arrayvec (0.7) — const-generic ArrayVec<T,N> (proves mrustc handles const generics)" do
+    run_with("arrayvec@0.7.2", ~S|fn main(){ let mut v=arrayvec::ArrayVec::<i32,4>::new(); v.push(3); v.push(4); println!("{}", v.len()); }|, "2")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
   test "itertools (0.10) via opts[:dep_features] (use_alloc, no std)" do
     # itertools@0.10 fails to compile with its std default but compiles with use_alloc only.
     src = Path.join(System.tmp_dir!(), "cd_itertools010.rs")
