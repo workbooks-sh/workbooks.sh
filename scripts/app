@@ -35,7 +35,7 @@ src_paths() {
   case "$1" in
     kernel)  echo "runtime/kernel/src runtime/kernel/wit runtime/kernel/Cargo.toml runtime/kernel/Cargo.lock" ;;
     escript) echo "runtime/host runtime/mix.exs runtime/mix.lock" ;;
-    image)   echo "runtime/host runtime/Dockerfile runtime/deploy runtime/mix.exs runtime/mix.lock" ;;
+    image)   echo "runtime/host deploy/Dockerfile.runtime .dockerignore runtime/scripts/stage-tools.sh runtime/mix.exs runtime/mix.lock" ;;
     app)     echo "desktop/src desktop/src-tauri/src desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock desktop/src-tauri/tauri.conf.json desktop/package.json desktop/src-tauri/oql.wasm" ;;
   esac
 }
@@ -111,6 +111,10 @@ build_escript() {
 build_image() {
   hdr "image: wb deploy build (OCI runtime -> krunvm store)"
   [ -x "$WB_BIN" ] || die "image needs the escript first (build escript)"
+  # Stage the LEAN in-sandbox toolchain (~640M) the image bundles, so cloud/local-container
+  # deployments compile identically to dev. Without this the image ships zero compile tools.
+  hdr "image: stage-tools (lean compilers-dist slice)"
+  ( cd "$ROOT/runtime" && bash scripts/stage-tools.sh >&2 ) || die "stage-tools failed"
   "$WB_BIN" deploy build --into-krunvm 2>&1 | sed 's/^/    /' >&2 \
     || die "image build failed (need docker running + skopeo for krunvm staging)"
 }

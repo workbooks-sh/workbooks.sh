@@ -38,6 +38,12 @@ RUN ARCH=$(dpkg --print-architecture) \
 COPY --from=build /app/_build/prod/rel/workbooks ./
 # Runtime-read wasm commands live under build/commands at the app CWD.
 COPY --from=build /app/build ./build
+# In-sandbox compile toolchain — the LEAN ~600M slice from scripts/stage-tools.sh (NOT the ~6.6G
+# provisioned scratch tree, which .dockerignore excludes). default_root() resolves "compilers" at
+# the app CWD, so the deployed runtime compiles Rust/C/Zig/Go/JS identically to dev. Run
+# `bash scripts/stage-tools.sh` before `docker build`. (deploy/Dockerfile.runtime, the deploy-kit's
+# repo-root-context variant that `wb deploy build` uses, carries the same COPY.)
+COPY compilers-dist ./compilers
 
 EXPOSE 4000
 CMD ["bin/workbooks", "start"]

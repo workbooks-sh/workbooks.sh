@@ -6,3 +6,6 @@ erl_crash.dump
 commands/*/target
 kernel/target
 tmp
+
+# the ~6.6G provisioned scratch tree — the lean compilers-dist/ ships instead (stage-tools.sh)
+compilers

@@ -1,0 +1,26 @@
+# Build CONTEXT for deploy/Dockerfile.runtime is the repo root, but only runtime/ is COPYd into
+# the image. Exclude everything else + the heavy in-runtime SCRATCH so the context stays small and
+# the daemon doesn't ship gigabytes it never uses. The lean runtime/compilers-dist/ (~640M, from
+# scripts/stage-tools.sh) is NOT matched here and ships as the in-sandbox toolchain.
+
+# --- repo dirs not needed by the runtime image ---
+.git
+.beads
+desktop
+web
+**/node_modules
+**/erl_crash.dump
+
+# --- runtime/: rebuilt fresh in the image, so local copies are dead weight ---
+runtime/_build
+runtime/deps
+runtime/.elixir_ls
+runtime/tmp
+runtime/wb
+runtime/.publish_out
+runtime/commands/*/target
+runtime/kernel/target
+
+# --- the ~6.6G provisioned compile-tool SCRATCH (rustc src, mrustc C++ build, wasi-sdk, .bak) ---
+# Never run, only used to PRODUCE the wasm tools. The lean compilers-dist/ ships instead.
+runtime/compilers
