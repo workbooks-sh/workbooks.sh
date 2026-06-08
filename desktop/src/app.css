@@ -1,61 +1,63 @@
-/* Desktop design tokens — the monochrome surface/fg/border vocabulary.
- * Tailwind v4 @theme exposes each token as a utility class AND a CSS
- * variable. Themes override these at runtime by writing inline custom
- * properties on :root (see theme.svelte.ts), which beat these defaults
- * without a Tailwind rebuild. */
+/* Desktop design tokens.
+ *
+ * Lifted verbatim from apps/studio/frontend/src/app.css so reused
+ * Studio components (AppRail, RailTooltip, …) inherit the same
+ * surface / fg / border vocabulary. Tailwind v4 @theme block exposes
+ * each token as both a utility class and a CSS variable.
+ *
+ * What's stripped vs Studio: the @source pull from
+ * vendor/workbooks/packages/runtime (that's the Studio-only block
+ * dispatcher) and the Plot/ECharts tip overrides (no chart engines
+ * in the desktop shell yet).
+ */
 @import "tailwindcss";
 
 @theme {
-  /* The FOUR base tokens. A theme only sets these (+ state/aurora); every
-   * secondary token below DERIVES from them via color-mix, so the whole app
-   * retints from one place and nothing is a static off-theme color. */
   --color-page: #fafafa;
   --color-surface: #ffffff;
+  --color-surface-soft: #f4f4f5;
+  --color-border: rgba(15, 15, 15, 0.08);
+  --color-border-strong: rgba(15, 15, 15, 0.16);
   --color-fg: #0f0f0f;
+  --color-fg-muted: rgba(15, 15, 15, 0.56);
+  --color-fg-subtle: rgba(15, 15, 15, 0.36);
   --color-accent: #0f0f0f;
+  --color-ring: rgba(15, 15, 15, 0.32);
+  --color-grid-line: rgba(15, 15, 15, 0.045);
 
-  /* Derived surface — opaque, nudged toward fg so it tracks any theme. */
-  --color-surface-soft: color-mix(in srgb, var(--color-surface), var(--color-fg) 5%);
-
-  /* Derived lines + muted text — fg at low alpha, so they sit correctly on
-   * whatever surface a theme produces. */
-  --color-border: color-mix(in srgb, var(--color-fg) 9%, transparent);
-  --color-border-strong: color-mix(in srgb, var(--color-fg) 17%, transparent);
-  --color-fg-muted: color-mix(in srgb, var(--color-fg) 56%, transparent);
-  --color-fg-subtle: color-mix(in srgb, var(--color-fg) 36%, transparent);
-  --color-ring: color-mix(in srgb, var(--color-fg) 32%, transparent);
-  --color-grid-line: color-mix(in srgb, var(--color-fg) 5%, transparent);
-
-  /* Semantic state colors — the only non-monochrome chrome. */
-  --color-ok: #10b981;
-  --color-warn: #f59e0b;
-  --color-err: #f43f5e;
-
-  /* Aurora palette — four blobs for the ambient theme gradient.
-   * Themes override --gradient-aurora-{a,b,c,d} in their tokens. */
-  --gradient-aurora-a: #6366f1;
-  --gradient-aurora-b: #a855f7;
-  --gradient-aurora-c: #ec4899;
-  --gradient-aurora-d: #f59e0b;
+  /* Aurora palette — four blob colors for the reusable theme gradient.
+   * Used by the Gemini Live edge glow and any other "Apple Intelligence"
+   * surface that needs a vibrant multi-color wash. Themes override these
+   * by setting --gradient-aurora-{a,b,c,d} in their tokens. Defaults
+   * pick a balanced four-color spectrum that reads as ambient light
+   * rather than as a flat brand color. */
+  --gradient-aurora-a: #6366f1; /* indigo */
+  --gradient-aurora-b: #a855f7; /* purple */
+  --gradient-aurora-c: #ec4899; /* pink   */
+  --gradient-aurora-d: #f59e0b; /* amber  */
 
   --radius-lg: 10px;
   --shadow-pop:
     0 1px 2px rgba(15, 15, 15, 0.04),
-    0 8px 28px rgba(15, 15, 15, 0.1);
+    0 8px 28px rgba(15, 15, 15, 0.10);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    /* Override ONLY the base tokens — every derived token recomputes from
-     * these via the color-mix definitions above (var() resolves per-context). */
-    --color-page: #191919;
-    --color-surface: #242424;
-    --color-fg: #f4f4f4;
-    --color-accent: #f4f4f4;
-    --color-ok: #34d399;
-    --color-warn: #fbbf24;
-    --color-err: #fb7185;
+    --color-page: #1a1a1f;
+    --color-surface: #25252b;
+    --color-surface-soft: #2e2e35;
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-border-strong: rgba(255, 255, 255, 0.24);
+    --color-fg: #f4f4f5;
+    --color-fg-muted: rgba(244, 244, 245, 0.62);
+    --color-fg-subtle: rgba(244, 244, 245, 0.38);
+    --color-accent: #f4f4f5;
+    --color-ring: rgba(255, 255, 255, 0.22);
+    --color-grid-line: rgba(255, 255, 255, 0.05);
+    /* Slightly cooler aurora in dark mode so it reads against the
+     * darker page background. */
     --gradient-aurora-a: #818cf8;
     --gradient-aurora-b: #c084fc;
     --gradient-aurora-c: #f472b6;
@@ -67,14 +69,14 @@ html,
 body {
   margin: 0;
   padding: 0;
-  height: 100%;
-  font-family: "Inter", ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   background: var(--color-page);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-
-#app {
-  height: 100vh;
 }

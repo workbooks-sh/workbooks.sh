@@ -1,0 +1,11 @@
+<svg
+  width="512"
+  height="512"
+  viewBox="0 0 512 512"
+  xmlns="http://www.w3.org/2000/svg"
+  fill="currentColor"
+>
+  <path
+    d="M256 32 C 256 152, 312 200, 480 256 C 312 312, 256 360, 256 480 C 256 360, 200 312, 32 256 C 200 200, 256 152, 256 32 Z"
+  />
+</svg>
