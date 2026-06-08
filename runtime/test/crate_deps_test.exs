@@ -319,4 +319,47 @@ fn main(){ let mut b = bytes::BytesMut::new(); b.put_u8(65); b.put_u8(66); print
   println!("{} {} {}", m.as_str(), &c[1], &c[2]);
 }|, "123 bar baz")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "heck — case conversion" do
+    run_with("heck@0.3.3", ~S|use heck::CamelCase;
+fn main(){ println!("{}", "hello_world".to_camel_case()); }|, "HelloWorld")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "strsim — Levenshtein distance" do
+    run_with("strsim@0.10.0", ~S|fn main(){ println!("{}", strsim::levenshtein("kitten","sitting")); }|, "3")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "bytecount — fast byte counting" do
+    run_with("bytecount@0.6.3", ~S|fn main(){ println!("{}", bytecount::count(b"hello world", b'o')); }|, "2")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "fastrand — seeded PRNG determinism" do
+    run_with("fastrand@1.8.0", ~S|fn main(){ fastrand::seed(1); let a=fastrand::u32(..); fastrand::seed(1); let b=fastrand::u32(..); println!("{}", a==b); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "humantime — duration formatting" do
+    run_with("humantime@2.1.0", ~S|fn main(){ println!("{}", humantime::format_duration(std::time::Duration::from_secs(90))); }|, "1m 30s")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "unicode-ident — XID identifier classification" do
+    run_with("unicode-ident@1.0.0", ~S|fn main(){ println!("{}", unicode_ident::is_xid_start('x')); }|, "true")
+  end
 end
