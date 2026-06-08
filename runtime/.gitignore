@@ -1,3 +1,4 @@
 
 # the built wb escript (build artifact)
 wb
+build/tools/wasm-tools.wasm

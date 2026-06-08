@@ -1,22 +1,38 @@
 defmodule Workbooks.PackageManager do
   @moduledoc """
   Tangle: take the OQL build plan from a literate Workbook and compile each
-  component's source block to a WASM component, content-addressed in build/cache.
+  component's source block to a WASM command/component, content-addressed in build/cache.
 
-  Isolation — the only place we run OS processes. The whole runtime is wrapped in
-  ONE portable Linux container (OCI/Docker — local now for deployment isolation,
-  the same image in cloud), so the app is always on Linux. NOT a microVM, and NOT
-  per-component — one outer container for the whole runtime; workbooks/commands are
-  WASM-in-BEAM inside it. `bwrap` then does cheap per-build namespace isolation
-  INSIDE that container — one outer container, many bwrap jobs, no per-build or
-  per-session sandboxes at the OS level. The build isolator is
-  `Workbooks.Sandbox` (bwrap on Linux, sandbox-exec locally); untrusted
-  user-submitted source compiles under it (network-denied) once deps are
-  pre-fetched (wb-11ck.36). The compile commands below run the trusted toolchain.
+  ── The canon (wb-fm0): untrusted source NEVER compiles or runs natively ──────
+  Every language lane compiles + runs untrusted user source ENTIRELY in the wasm
+  sandbox (wasmtime), zero native compilation:
+    * C      → clang.wasm + wasm-ld            (Compilers.compile_c)       fm0.1
+    * Zig    → zig1.wasm → clang.wasm          (Compilers.zig_compile…)    fm0.2
+    * Rust   → mrustc.wasm → clang.wasm + std  (Compilers.rust_compile…)   fm0.3
+    * JS     → QuickJS-ng built by clang.wasm  (Compilers.js_compile…)     fm0.4
+    * Go     → yaegi interpreter (yaegi-run.wasm)                          fm0.5
+    * TS     → tsc inside QuickJS → JS lane    (Compilers.ts_compile…)     fm0.6
+  The compiler/interpreter wasms themselves are built ONCE by native toolchains
+  (trusted provisioning: build.sh / provision-rust.sh) — those build only the
+  trusted tools, never user code. A lane with external deps (cargo/npm/go-modules)
+  returns `{:error, {*_unsupported_in_sandbox, _}}` rather than falling back to native.
+
+  ── Remaining native tools — NOT in the untrusted-source path ─────────────────
+  The Component-Model composition path (used only by host/demos/build.ex, not the
+  core stdin/stdout dataflow) keeps two native tools, neither of which compiles
+  untrusted source:
+    * `wac` (compose/plug) — composes already-built, validated TRUSTED components;
+      stays native because its tokio dep won't target wasi. Byte manipulation only.
+    * `jco`/componentize-js (typed JS components) — the one HONEST BLOCKER (fm0.7):
+      it runs StarlingMonkey (a JS engine) + wizer under Node to pre-init the JS,
+      which can't be a wasmtime guest. See `build_engine_js`.
+  `wasm-tools` (component new / validate) now runs IN the sandbox via wasm-tools.wasm
+  (fm0.8). `Workbooks.Sandbox` (bwrap/sandbox-exec) remains as defense-in-depth around
+  the whole runtime container, but is no longer the untrusted-COMPILE boundary — the
+  wasm sandbox is.
   """
 
   @tools Path.expand(Path.join([__DIR__, "..", "build", "tools"]))
-  @wasm_tools Path.join(@tools, "wasm-tools")
   @wac Path.join(@tools, "wac")
   # jco/componentize-js (node_modules/.bin) — the ONLY path that emits a real
   # WIT-typed component from JS. `bun install` in runtime/ provisions it.
@@ -376,6 +392,24 @@ defmodule Workbooks.PackageManager do
   WIT-typed Component via jco/StarlingMonkey — so a Workbook can be authored in
   JS, not just Rust, and run in an Instance against the Dock. Unused WASI features
   are disabled to slim it. Returns {:ok, wasm, :built_js_component}.
+
+  ── wb-fm0.7 — HONEST NATIVE BLOCKER ─────────────────────────────────────────
+  This is the ONE build path that stays native, and deliberately so. jco /
+  componentize-js generates a WIT-typed Component by running StarlingMonkey (a JS
+  engine) under Node + `wizer` snapshotting — it EXECUTES the JS at build time to
+  pre-initialize it. That can't move in-sandbox: it needs Node (V8, a JIT — see
+  the JIT note) plus StarlingMonkey + wizer, none of which run as a wasmtime guest.
+  There is no QuickJS→WIT-typed-component path (StarlingMonkey-equivalent + wizer
+  in wasm don't exist).
+
+  Why this is acceptable: typed WIT components are an OPTIONAL advanced feature used
+  only by host/demos/build.ex — the core runtime dataflow (run_world/run_dag) pipes
+  stdin/stdout between WASI command modules, which the 6 in-sandbox lanes
+  (C/Zig/Rust/JS/Go/TS) produce with ZERO native compilation. So the untrusted-source
+  canon ("user code never compiles/runs natively") is fully met; typed-component
+  GENERATION via jco is out of scope and may use the native tool. If a fully
+  in-sandbox typed-component path is ever needed, it requires a new WIT-aware JS
+  engine in wasm — tracked, not blocking.
   """
   def build_engine_js(src, world_wit \\ @jsworkbook_wit) do
     Workbooks.Tools.ensure_jco!()
@@ -690,13 +724,34 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # wasm-tools built to wasm32-wasip1 (compilers/wasm-tools/build.sh) — runs IN the sandbox
+  # via wasmtime (wb-fm0.8). It manipulates already-built, validated wasm BYTES (component
+  # new/validate); it never compiles untrusted source, but routing it through wasmtime keeps
+  # the whole tool surface native-free. wac stays native (its tokio dep won't target wasi) —
+  # it composes trusted components only and is demo-only; jco stays native (wb-fm0.7 blocker).
+  @wasm_tools_wasm Path.join(@tools, "wasm-tools.wasm")
+
+  # Run wasm-tools.wasm under wasmtime, preopening each dir it must read/write at the SAME guest
+  # path so the tool's absolute-path args resolve unchanged. Self-heals the .wasm via build.sh.
+  defp wasm_tools(args, dirs) do
+    unless File.regular?(@wasm_tools_wasm) do
+      System.cmd("bash", [Path.expand(Path.join([__DIR__, "..", "compilers", "wasm-tools", "build.sh"]))],
+        stderr_to_stdout: true)
+    end
+
+    preopens = Enum.flat_map(Enum.uniq(dirs), fn d -> ["--dir", "#{d}::#{d}"] end)
+    System.cmd("wasmtime", ["run", "-W", "exceptions=y"] ++ preopens ++ [@wasm_tools_wasm | args],
+      stderr_to_stdout: true)
+  end
+
   @doc """
   Componentize: wrap a Javy CORE module into a Component-Model component using the
   WASI preview1 adapter (`wasm-tools component new --adapt`). Required because Javy
   emits a CORE module but `wac` only links COMPONENTS. Cached by core path + adapter.
+  Runs wasm-tools IN the sandbox (wasm-tools.wasm under wasmtime) — wb-fm0.8.
   """
   def componentize(core_wasm) do
-    Workbooks.Tools.ensure!()
+    ensure_adapter()
     out = Path.join(@cache, "#{cache_key([core_wasm, @adapter])}.component.wasm")
 
     cond do
@@ -706,10 +761,20 @@ defmodule Workbooks.PackageManager do
       true ->
         args = ["component", "new", core_wasm, "--adapt", "wasi_snapshot_preview1=#{@adapter}", "-o", out]
 
-        case System.cmd(@wasm_tools, args, stderr_to_stdout: true) do
+        case wasm_tools(args, [@cache, Path.dirname(core_wasm), Path.dirname(@adapter)]) do
           {_, 0} -> {:ok, out, :built}
           {err, _} -> {:error, err}
         end
+    end
+  end
+
+  # The WASI preview1 command adapter is a STATIC wasm shipped in jco's node_modules. Copy it
+  # into build/tools on first use; fall back to full Tools provisioning if node_modules is absent.
+  defp ensure_adapter do
+    unless File.regular?(@adapter) do
+      src = Path.expand(Path.join([__DIR__, "..", "node_modules", "@bytecodealliance", "jco", "lib", "wasi_snapshot_preview1.command.wasm"]))
+      File.mkdir_p!(@tools)
+      if File.regular?(src), do: File.cp!(src, @adapter), else: Workbooks.Tools.ensure!()
     end
   end
 
@@ -721,6 +786,12 @@ defmodule Workbooks.PackageManager do
   over WASI stdin/stdout, not over component-model edges — so `wac plug` finds no
   matching imports. Typed JS→JS composition needs WIT-declared worlds (componentize-js
   / jco), not stock Javy. See docs/COMPOSE-NOTES.org.
+
+  wb-fm0.8 carve-out: `wac` stays native (its tokio dep doesn't compile to wasi). It
+  composes already-built, validated TRUSTED components — byte manipulation, never the
+  compilation of untrusted source — and is used only by host/demos/build.ex, so it sits
+  outside the untrusted-source canon. `wasm-tools` (component new/validate) DID move
+  in-sandbox; `wac` is the one wasm-byte tool that couldn't follow.
   """
   def compose(components) when is_list(components) and components != [] do
     Workbooks.Tools.ensure!()
@@ -833,11 +904,9 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  @doc "Validate a component artifact with `wasm-tools validate`."
+  @doc "Validate a component artifact with `wasm-tools validate`, run IN the sandbox (wb-fm0.8)."
   def validate_component(path) do
-    Workbooks.Tools.ensure!()
-
-    case System.cmd(@wasm_tools, ["validate", path], stderr_to_stdout: true) do
+    case wasm_tools(["validate", path], [Path.dirname(path)]) do
       {_, 0} -> :valid
       {err, _} -> {:invalid, err}
     end
