@@ -38,6 +38,8 @@ else say "stable-$VER-macos overrides present — skip"; fi
 # 3. native 1.74 libstd build via minicargo (cross to wasm32-wasi) → output-wasi-174/.
 #    This both VALIDATES native 1.74 support and (via captured per-crate mrustc invocations)
 #    yields the plan replayed through mrustc.wasm for the ABI-consistent sandbox libstd.
-#    [TODO next increment: wire the build + plan capture, mirroring std/build-libstd.sh for 1.74.]
+if [ ! -f "$MR/output-wasi-174/libstd.rlib.o" ]; then
+  say "prebuilding 1.74 libstd via mrustc.wasm (long)"; bash "$SD/std/prebuild-libstd-174.sh" >&2
+else say "1.74 libstd prebuilt — skip"; fi
 
 say "1.74 inputs staged (src + macos overrides). Next: native libstd build + wasm replay."

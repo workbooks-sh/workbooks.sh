@@ -351,7 +351,7 @@ defmodule Workbooks.Compilers do
     csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
     shim_src = Path.expand(Path.join([root, "zig", "wasi_shim.c"]))
     ustub_src = Path.expand(Path.join([rd, "std", "ustub.c"]))
-    o = Path.join(mrdir, "output-wasi")
+    o = Path.join(mrdir, "output-wasi-174")
 
     cond do
       not File.regular?(mrwasm) -> {:error, {:mrustc_not_built, mrwasm}}
@@ -371,7 +371,7 @@ defmodule Workbooks.Compilers do
     mr = fn args ->
       wasmtime(
         ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728",
-         "--env", "MRUSTC_TARGET_VER=1.54", "--env", "STD_ENV_ARCH=wasm32", "--env", "TMPDIR=/tmp",
+         "--env", "MRUSTC_TARGET_VER=1.74", "--env", "STD_ENV_ARCH=wasm32", "--env", "TMPDIR=/tmp",
          "--dir", "#{mrdir}::.", "--dir", "#{mrdir}/.mrtmp::/tmp", mrwasm | args]
       )
     end
@@ -396,7 +396,7 @@ defmodule Workbooks.Compilers do
     File.rm_rf(Path.join(o, "deps"))
 
     # wb-3s8/wb-6lh: fetch + compile each declared crates.io dependency (pure-Rust, in-sandbox)
-    # into output-wasi/deps/, returning {extern_args, dep_object_paths}. Errors short-circuit.
+    # into output-wasi-174/deps/, returning {extern_args, dep_object_paths}. Errors short-circuit.
     case ensure_deps(Keyword.get(opts, :deps, []), mrdir, o, mr, cl, Keyword.get(opts, :dep_features, %{})) do
       {:error, _} = depserr ->
         for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
@@ -410,21 +410,21 @@ defmodule Workbooks.Compilers do
         dep_objs =
           Path.wildcard(Path.join(o, "deps/*.rlib.o"))
           |> Enum.sort()
-          |> Enum.map(&"/work/output-wasi/deps/#{Path.basename(&1)}")
+          |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(&1)}")
 
-        ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi/deps"]
+        ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi-174/deps"]
 
         log1 =
-          mr.(["output-wasi/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
-               "-L", "output-wasi"] ++ ldirs ++ extern_args ++
-              ["--out-dir", "output-wasi", "--target", "wasm32-wasi", "--edition", "2018"])
+          mr.(["output-wasi-174/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
+               "-L", "output-wasi-174"] ++ ldirs ++ extern_args ++
+              ["--out-dir", "output-wasi-174", "--target", "wasm32-wasi", "--edition", "2021"])
 
         result =
           if File.regular?(Path.join(o, "#{name}.c")) do
-            cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
+            cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/#{name}.c", "-o", "/work/output-wasi-174/#{name}.o"])
 
             if File.regular?(Path.join(o, "#{name}.o")) do
-              libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi/#{Path.basename(&1)}")
+              libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi-174/#{Path.basename(&1)}")
 
               # --allow-undefined: leave unresolved externs as wasm IMPORTS instead of erroring
               # — the path for BEAM-mediated host functions (the Dock) called from compiled Rust
@@ -434,11 +434,11 @@ defmodule Workbooks.Compilers do
               ld =
                 ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1"] ++
                   au ++
-                  ["/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
+                  ["/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi-174/#{name}.o"] ++
                   dep_objs ++ libstd ++
-                  ["/work/output-wasi/wasi_shim.o", "/work/output-wasi/ustub.o",
+                  ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o",
                    "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
-                   "-o", "/work/output-wasi/#{name}.wasm"]
+                   "-o", "/work/output-wasi-174/#{name}.wasm"]
 
               log2 = cl.(ld)
               outw = Path.join(o, "#{name}.wasm")
@@ -466,7 +466,7 @@ defmodule Workbooks.Compilers do
 
   # ── crates.io dependency support (wb-3s8 / wb-6lh) ──────────────────────────
   # Each dep: %{name, version} | {name, version} | "name@version". Fetched from the static
-  # CDN, compiled (with its default features) via mrustc.wasm→clang.wasm into output-wasi/deps/,
+  # CDN, compiled (with its default features) via mrustc.wasm→clang.wasm into output-wasi-174/deps/,
   # cached by name+version. Returns {:ok, extern_args, dep_object_guest_paths} | {:error, _}.
   # Pure-Rust only (no proc-macros / build.rs / transitive deps yet — the next slices).
   defp ensure_deps([], _mrdir, _o, _mr, _cl, _feats), do: {:ok, [], []}
@@ -504,9 +504,9 @@ defmodule Workbooks.Compilers do
   # Cached by the .o existing. Pure-Rust only (no proc-macros/build.rs); cycles can't occur (cargo
   # forbids them) and diamonds collapse via the cache.
   defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?) do
-    rlib_rel = "output-wasi/deps/lib#{name}.rlib"
+    rlib_rel = "output-wasi-174/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
-    obj_guest = "/work/output-wasi/deps/lib#{name}.rlib.o"
+    obj_guest = "/work/output-wasi-174/deps/lib#{name}.rlib.o"
 
     if File.regular?(obj_host) do
       {:ok, rlib_rel, obj_guest, []}
@@ -591,14 +591,14 @@ defmodule Workbooks.Compilers do
           cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
           mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
-               "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
-              ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+               "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
+              ["--out-dir", "output-wasi-174/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
 
           if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
         end)
 
       if compiled? do
-        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
+        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/deps/lib#{name}.rlib.c", "-o", obj_guest])
         if File.regular?(obj_host),
           do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
           else: {:error, {:dep_cc_failed, name, version}}
@@ -819,7 +819,7 @@ defmodule Workbooks.Compilers do
     end
   end
 
-  # Compile a shared support object (wasi_shim/ustub) into output-wasi once; reused by every
+  # Compile a shared support object (wasi_shim/ustub) into output-wasi-174 once; reused by every
   # Rust compile. Plain C, no -disable-verifier needed (these aren't mrustc-emitted).
   defp ensure_rust_obj(o, name, src, cl) do
     obj = Path.join(o, "#{name}.o")
@@ -827,7 +827,7 @@ defmodule Workbooks.Compilers do
     unless File.regular?(obj) do
       File.cp!(src, Path.join(o, "#{name}.c"))
       cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w",
-           "-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
+           "-c", "/work/output-wasi-174/#{name}.c", "-o", "/work/output-wasi-174/#{name}.o"])
     end
   end
 
