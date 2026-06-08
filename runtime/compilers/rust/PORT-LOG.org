@@ -465,3 +465,26 @@
   STATE OF TRUTH: full std COMPILES+RUNS in wasm (iter 14). Approach for untrusted-in-sandbox
   VALIDATED (iter 21: mrustc.wasm reads its own libcore.hir). Plan captured (iter 22).
   Completion = a clean-room replay of the committed plan; no fundamental wall remains open.
+
+* 2026-06-07 (iter 23) — ★ THEORY A CONFIRMED + the final wall pinned to one function
+  THE BIG RESULT: libstd COMPILES via mrustc.wasm with consistent __2 deps (Theory A was
+  right — the earlier trap was ABI-mix, NOT a compiler bug). And untrusted hello.rs (Vec,
+  iterators, println!) compiles IN-SANDBOX via mrustc.wasm against the __2 libstd → hello.c
+  (484KB). Both halves of "untrusted std Rust in the sandbox" work.
+  THE LAST WALL (precise, narrow): to LINK, hello.o must use mrustc.wasm-EMITTED libstd.o —
+  because mrustc's monomorphization hashes DIFFER between native and wasm builds (saw an
+  undefined `alloc::raw_vec::finish_grow $5eb022df` when mixing native libstd.o with wasm
+  hello.o). But compiling mrustc.wasm's libstd.c with clang.wasm fails the LLVM verifier:
+    "Attribute 'signext' applied to incompatible type! in function abort_bitcast"
+  - abort_bitcast is a clang-SYNTHESIZED function (not in mrustc src nor the .c text) — clang
+    lowers some construct to it and puts `signext` on a param whose type can't take it (almost
+    certainly the emulated-i128 struct, or a by-value aggregate marked signed). Persists at -O0.
+  - native-emitted libstd.c does NOT hit this (compiled fine, iter 14) → it's a divergence in
+    mrustc.WASM's C emission vs native for that one construct.
+  CONSEQUENCE: the completion is gated on ONE function's codegen — fixable, but needs IR-level
+  work: `clang -S -emit-llvm` the offending TU to find abort_bitcast's origin, then either fix
+  mrustc's emulated-i128 param signedness in codegen_c, or post-process the .c. NOT a
+  fundamental wall; the narrowest possible remaining bug.
+  DEFINITIVE STATUS: full std COMPILES+RUNS in wasm (iter 14). Untrusted compile works
+  in-sandbox (iter 23). Untrusted std end-to-end is blocked on this single signext/abort_bitcast
+  codegen interaction in mrustc.wasm's libstd emission. Everything else is proven.
