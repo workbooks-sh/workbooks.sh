@@ -39,7 +39,7 @@ index 922ba13..298efc7 100644
 +        else if(target_name == "wasm32-wasi" || target_name == "wasm32-wasip1")
 +        {
 +            return TargetSpec {
-+                "", "wasi", "", {CodegenMode::Gnu11, true /*emulated i128*/, "wasm32-wasi", {"-ffunction-sections"}, {}, {"-Wl,--gc-sections"}},
++                "wasm", "wasi", "", {CodegenMode::Gnu11, true /*emulated i128*/, "wasm32-wasi", {"-ffunction-sections"}, {}, {"-Wl,--gc-sections"}},
 +                ARCH_WASM32
 +                };
 +        }
