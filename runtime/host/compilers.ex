@@ -485,44 +485,57 @@ defmodule Workbooks.Compilers do
     if File.regular?(obj_host) do
       {:ok, rlib_rel, obj_guest, []}
     else
-      with {:ok, version, subdeps} <- resolve_via_index(name, req),
-           {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")) do
-        # compile transitive deps first; collect their externs + objects
-        case Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
-               case compile_dep(sn, sreq, mrdir, o, mr, cl) do
-                 {:ok, srlib, sobj, sub_objs} ->
-                   {:cont, {:ok, ex ++ ["--extern", "#{sn}=#{srlib}"], objs ++ [sobj | sub_objs]}}
-
-                 {:error, _} = e ->
-                   {:halt, e}
-               end
-             end) do
-          {:error, _} = e ->
-            e
-
-          {:ok, sub_externs, sub_objs} ->
-            # compile the crate's lib.rs IN PLACE (inside the preopen) so its `mod` submodules
-            # under src/ resolve — NOT a flat copy (that loses multi-file crates' module tree).
-            rel_src = Path.relative_to(lib_rs, mrdir)
-            cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
-
-            mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
-                 "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
-                ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
-
-            c = Path.join(o, "deps/lib#{name}.rlib.c")
-
-            if File.regular?(c) do
-              cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
-              if File.regular?(obj_host),
-                do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
-                else: {:error, {:dep_cc_failed, name}}
-            else
-              {:error, {:dep_compile_failed, name}}
-            end
-        end
+      # VERSION-FALLBACK (wb-6lh): the index gives all matching versions newest-first. Try the
+      # newest; if it fails to compile (the mrustc ~1.54 ceiling on newer crate internals), walk
+      # to the next-older in-range version until one compiles. Makes transitive deps practical
+      # without a newer compiler — bounded to a handful of attempts.
+      with {:ok, candidates} <- resolve_via_index(name, req) do
+        Enum.reduce_while(candidates, {:error, {:no_buildable_version, name, req}}, fn {version, subdeps}, _acc ->
+          case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
+            {:ok, _, _, _} = ok -> {:halt, ok}
+            {:error, _} = e -> (clean_dep_artifacts(o, name); {:cont, e})
+          end
+        end)
       end
     end
+  end
+
+  # Build a SPECIFIC version of a dep: compile its sub-deps first, then it. {:ok,...} | {:error,_}.
+  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
+    with {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
+         {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl) do
+      rel_src = Path.relative_to(lib_rs, mrdir)
+      cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+
+      mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
+           "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
+          ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+
+      c = Path.join(o, "deps/lib#{name}.rlib.c")
+
+      if File.regular?(c) do
+        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
+        if File.regular?(obj_host),
+          do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
+          else: {:error, {:dep_cc_failed, name, version}}
+      else
+        {:error, {:dep_compile_failed, name, version}}
+      end
+    end
+  end
+
+  defp build_subdeps(subdeps, mrdir, o, mr, cl) do
+    Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
+      case compile_dep(sn, sreq, mrdir, o, mr, cl) do
+        {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{sn}=#{srlib}"], objs ++ [sobj | sub_objs]}}
+        {:error, _} = e -> {:halt, e}
+      end
+    end)
+  end
+
+  # Remove a half-built dep's transient outputs so the next fallback version starts clean.
+  defp clean_dep_artifacts(o, name) do
+    for f <- Path.wildcard(Path.join(o, "deps/lib#{name}.rlib*")), do: File.rm(f)
   end
 
   # Resolve a version requirement against the crates.io sparse index → {:ok, version, normal_deps}.
@@ -548,19 +561,21 @@ defmodule Workbooks.Compilers do
             end
           end)
 
-        case Enum.sort_by(cands, fn {sv, _, _} -> sv end) |> List.last() do
-          {_, vstr, deps} ->
+        ranked =
+          cands
+          |> Enum.sort_by(fn {sv, _, _} -> sv end, :desc)
+          |> Enum.take(6)
+          |> Enum.map(fn {_, vstr, deps} ->
             norm =
               deps
               |> Enum.filter(fn d -> d["kind"] == "normal" and d["optional"] != true end)
               |> Enum.map(fn d -> {d["name"], d["req"]} end)
               |> Enum.uniq()
 
-            {:ok, vstr, norm}
+            {vstr, norm}
+          end)
 
-          nil ->
-            {:error, {:no_matching_version, name, req}}
-        end
+        if ranked == [], do: {:error, {:no_matching_version, name, req}}, else: {:ok, ranked}
 
       {out, _} ->
         {:error, {:index_fetch_failed, name, String.slice(to_string(out), 0, 150)}}
