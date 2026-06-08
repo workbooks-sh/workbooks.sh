@@ -457,13 +457,17 @@ defmodule Workbooks.Compilers do
 
       case compile_dep(name, version, mrdir, o, mr, cl) do
         {:ok, rlib_rel, obj_guest, dep_objs} ->
-          {:cont, {:ok, externs ++ ["--extern", "#{name}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
+          {:cont, {:ok, externs ++ ["--extern", "#{crate_id(name)}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
         {:error, _} = e ->
           {:halt, e}
       end
     end)
   end
+
+  # The Rust crate identifier used in source/--crate-name/--extern: hyphens become underscores
+  # (the package name keeps hyphens for fetch/index/paths). e.g. "num-traits" → "num_traits".
+  defp crate_id(name), do: String.replace(name, "-", "_")
 
   defp parse_dep(%{name: n, version: v}), do: {n, v}
   defp parse_dep({n, v}), do: {to_string(n), to_string(v)}
@@ -507,7 +511,7 @@ defmodule Workbooks.Compilers do
       rel_src = Path.relative_to(lib_rs, mrdir)
       cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
-      mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
+      mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
            "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
           ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
 
@@ -527,7 +531,7 @@ defmodule Workbooks.Compilers do
   defp build_subdeps(subdeps, mrdir, o, mr, cl) do
     Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
       case compile_dep(sn, sreq, mrdir, o, mr, cl) do
-        {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{sn}=#{srlib}"], objs ++ [sobj | sub_objs]}}
+        {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{crate_id(sn)}=#{srlib}"], objs ++ [sobj | sub_objs]}}
         {:error, _} = e -> {:halt, e}
       end
     end)
