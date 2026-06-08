@@ -101,6 +101,30 @@ defmodule Workbooks.CommandRegistryTest do
     end
 
     @tag :build
+    test "HOT-SWAP: re-register a name with new source → next run gets new behavior, no restart" do
+      # wb-rhs.8: the "real-time updates" use case. Build a command, run it, then
+      # re-author it under the SAME name with different source — a new content hash
+      # replaces the binding live; the next run reflects the new behavior.
+      name = uniq("hot")
+      rev = ~S|const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const s=new TextDecoder().decode(all).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.split("").reverse().join("")));|
+      upper = ~S|const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const s=new TextDecoder().decode(all).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.toUpperCase()));|
+
+      assert {:ok, _} = CommandRegistry.build_and_register_inline(name, "js", rev)
+      assert {:ok, "cba"} = CommandRegistry.run(name, "abc")
+      {:wasm, path_v1, _} = CommandRegistry.current(name)
+
+      # Re-author the same name with new source → hot-swap.
+      assert {:ok, _} = CommandRegistry.build_and_register_inline(name, "js", upper)
+      assert {:ok, "ABC"} = CommandRegistry.run(name, "abc")
+      {:wasm, path_v2, _} = CommandRegistry.current(name)
+
+      # New content hash → new artifact path; one live binding; builtins intact.
+      assert path_v1 != path_v2
+      assert Enum.count(CommandRegistry.list(), &(&1 == name)) == 1
+      assert "jq" in CommandRegistry.list()
+    end
+
+    @tag :build
     test "FULL self-authoring loop: inline source → build-in-sandbox → register → run" do
       # The wb-rhs.4 headline: an agent writes source, builds it ENTIRELY in the
       # wasm sandbox (Javy here — the fast lane), registers it, and runs it — no

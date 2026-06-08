@@ -82,6 +82,23 @@ defmodule Workbooks.CommandRegistry do
   def list, do: Map.keys(registry())
 
   @doc """
+  The live spec currently bound to `name` (built-in or dynamic), or nil.
+
+  HOT-SWAP (wb-rhs.8): re-registering an existing name (a fresh
+  `build_and_register_inline` / `register` with a new content hash) REPLACES the
+  binding in place — the next `run` resolves the new artifact, with NO restart.
+  Live-update semantics, correct by construction:
+    * In-flight calls finish on the OLD bytes — `run` resolves the path at call
+      time and the old content-addressed file is never deleted on re-register
+      (a new sha is a new file; the old one remains), so a call already in flight
+      keeps its artifact. New calls resolve the new entry.
+    * Built-in names (jq/grep/upper) are RESERVED and unshadowable — a swap can
+      never replace a trusted built-in (registry/0 merges built-ins last).
+  Use `current/1` to observe which artifact is live (telemetry / verify a swap).
+  """
+  def current(name) when is_binary(name), do: Map.get(registry(), name)
+
+  @doc """
   Register a prebuilt wasm CLI under `name` with an arg mode (:argv | :stdin1).
 
   SECURITY: rejects empty/nil/malformed names, reserved (built-in) names, and any
