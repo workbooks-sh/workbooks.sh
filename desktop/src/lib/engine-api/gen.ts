@@ -43,7 +43,7 @@ export async function engineRequest<T = unknown>(
 ): Promise<T> {
   const base = sidecar.status.url;
   if (!base) {
-    throw new EngineApiError("sidecar_down", "Agent server isn't running.", 0);
+    throw new EngineApiError("daemon_down", "Agent server isn't running.", 0);
   }
   const ctrl = opts.timeoutMs ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), opts.timeoutMs) : null;

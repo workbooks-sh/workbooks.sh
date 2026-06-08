@@ -8,7 +8,6 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export interface Bookmark {
   id: string;
@@ -25,27 +24,20 @@ class BookmarksStore {
   lastError = $state<string | null>(null);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("bookmarks.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async refresh() {
     this.loading = true;
     this.lastError = null;
     try {
-      this.bookmarks = await invoke<Bookmark[]>("bookmarks_list");
+      this.bookmarks = await invoke<Bookmark[]>("bookmark_list");
     } catch (e) {
       this.lastError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -58,7 +50,7 @@ class BookmarksStore {
     path: string,
     command_slot: number | null = null,
   ): Promise<Bookmark> {
-    const b = await invoke<Bookmark>("bookmarks_create", {
+    const b = await invoke<Bookmark>("bookmark_create", {
       req: { title, path, command_slot },
     });
     await this.refresh();
@@ -66,17 +58,17 @@ class BookmarksStore {
   }
 
   async update(id: string, title: string): Promise<void> {
-    await invoke("bookmarks_update", { req: { id, title } });
+    await invoke("bookmark_rename", { req: { id, title } });
     await this.refresh();
   }
 
   async delete(id: string): Promise<void> {
-    await invoke("bookmarks_delete", { id });
+    await invoke("bookmark_delete", { id });
     await this.refresh();
   }
 
   async setSlot(id: string, slot: number | null): Promise<void> {
-    await invoke("bookmarks_set_slot", { req: { id, slot } });
+    await invoke("bookmark_set_slot", { req: { id, slot } });
     await this.refresh();
   }
 

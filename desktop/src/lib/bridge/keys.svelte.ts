@@ -1,17 +1,18 @@
-// wb-i38o.6 §1 — API key store (front-end mirror of `~/.oql/desktop/keys.json`).
+// Phase B — API key store (native, OS-keychain backed).
 //
-// The keys themselves never live in JS state — `list()` returns
+// Secrets in OS keychain; redacted index in `~/.oql/desktop/keys.json`.
+// The keys themselves never live in JS state — `refresh()` returns
 // redacted views (masked dots + length), and the raw secret is only
 // fetched on user-driven reveal via `reveal(id)`. This keeps a single
 // devtools `console.log(store)` from leaking secrets.
 //
-// Sidecar coupling: the Elixir oql-agent reads provider env vars at
+// Daemon coupling: the Elixir oql-agent reads provider env vars at
 // boot (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.). Changing
-// keys requires a sidecar restart — the UI surfaces a warning chip
-// after a mutation and exposes `restartSidecar()` to actually do it.
+// keys may require a daemon restart — the UI surfaces a warning chip
+// after a mutation and exposes `restartSidecar()` (now wired to the
+// `daemon_restart` command) to actually do it.
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export interface ApiKeyRedacted {
   id: string;
@@ -40,19 +41,11 @@ class KeysStore {
    *  UI shows a warning chip while this is true. */
   dirty = $state(false);
 
-  #liveUnsub: (() => void) | null = null;
-
   async init() {
     await Promise.all([this.refresh(), this.loadProviders()]);
-    this.#liveUnsub = ws.onMonorepoChange("keys.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async loadProviders() {
     try {
@@ -74,9 +67,9 @@ class KeysStore {
     }
   }
 
-  // Mutations: Rust persists, then pushes the updated env-var map to
-  // the live sidecar via /internal/secrets/refresh — the agent sees
-  // the new value on its next call. No restart required.
+  // Mutations: Rust persists to the keychain + index, then (best-effort)
+  // pushes the updated env-var map to the live daemon — the agent sees
+  // the new value on its next call. No restart required in the happy path.
 
   async create(req: KeyCreate): Promise<ApiKeyRedacted> {
     const k = await invoke<ApiKeyRedacted>("keys_create", { req });
@@ -102,10 +95,18 @@ class KeysStore {
     await invoke<void>("keys_copy_to_clipboard", { id });
   }
 
-  /** Spawn-cycle the Elixir sidecar so freshly-saved keys land in its
-   *  environment. Clears `dirty` on success. */
+  /** Reveal the raw secret for a single key (user-driven). The plaintext
+   *  is read from the keychain in Rust and returned only for this call —
+   *  it is never cached in store state. */
+  async reveal(id: string): Promise<string> {
+    return await invoke<string>("keys_reveal", { id });
+  }
+
+  /** Spawn-cycle the Elixir daemon so freshly-saved keys land in its
+   *  environment. Clears `dirty` on success. (Name kept stable for the
+   *  UI; now wired to the `daemon_restart` command.) */
   async restartSidecar(): Promise<void> {
-    await invoke("sidecar_restart");
+    await invoke("daemon_restart");
     this.dirty = false;
   }
 }

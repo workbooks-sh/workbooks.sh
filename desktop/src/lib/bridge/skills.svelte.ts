@@ -1,13 +1,12 @@
-// Skills bridge — mirrors Rust `skills.rs`.
+// Phase B — Skills bridge (local-store config file).
 //
 // Skills are agent-callable capability bundles (Composio actions,
 // Claude Code invoke, etc.). The registry tracks which are installed
-// and what scope they apply at (User / Workspace / Package). The
-// sidecar reads `~/.oql/desktop/skills.org` at agent-invocation time
-// to compose the active tool set.
+// and what scope they apply at (User / Workspace / Package), persisted
+// to the local config file. The daemon reads it at agent-invocation
+// time to compose the active tool set.
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export type SkillScope = "user" | "workspace" | "package";
 
@@ -39,21 +38,14 @@ class SkillsStore {
   lastError = $state<string | null>(null);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("skills.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async refresh() {
     this.loading = true;

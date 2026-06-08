@@ -1,37 +1,36 @@
 /**
- * Gemini Live transport — wb-xxbm.5.
+ * Gemini Live transport — chat-voice domain (Phase B locked schema).
  *
- * Renderer-side bidirectional audio session with Google's Gemini Live
+ * Renderer-direct bidirectional audio session with Google's Gemini Live
  * (model: gemini-3.1-flash-live-preview). The renderer holds the WS
- * because Web Audio APIs live there; Workhorse stays the source of
- * truth for the agent definition, system prompt, skills, and bash
- * execution. The adapter is therefore narrow:
+ * because Web Audio APIs live there. The session mixes three placement
+ * tiers per the canonical schema map:
  *
- *   - Fetch the rendered system prompt + agent metadata from Workhorse
- *     (GET /api/agents/:slug/system_prompt)
- *   - Open the Gemini Live WS, send `setup` with that prompt + a single
- *     `bash` function declaration (matches the wb-shtl.7 canon)
- *   - Capture mic at 16 kHz mono → stream as base64 PCM via
- *     `realtime_input` messages
- *   - On `tool_call`: POST to /api/agents/:slug/exec, send the
- *     `tool_response` back to Gemini
- *   - Play back audio chunks (24 kHz PCM) via AudioContext
- *   - Surface input/output transcripts to a callback so the chat UI
- *     can render them
+ *   - NATIVE (offline): `connections_reveal_api_key` — the provider key
+ *     is read host-side from the OS keychain via invoke(); the secret
+ *     never crosses IPC except to seed the Gemini WS handshake here.
+ *   - RUNTIME (control-plane, graceful-offline): the rendered system
+ *     prompt (GET /api/agents/:slug/system_prompt) and live bash exec
+ *     (POST /api/agents/:slug/exec) go through `engineRequest()` so an
+ *     offline daemon surfaces as EngineApiError code "daemon_down"
+ *     rather than a raw fetch failure. When the daemon is down we
+ *     degrade — empty/default — and never throw to the chat UI.
+ *   - RENDERER-DIRECT (local-store): the Gemini Live WS, mic capture,
+ *     audio playback, level metering, and the connect chime are all
+ *     client-side. No runtime hop.
+ *
+ * Mic access depends on the native `webview_enable_media` boot config
+ * (re-added to the Rust shell); without it getUserMedia is undefined in
+ * the WKWebview and #openMic throws a clear error.
  *
  * Out of scope (follow-ups):
  *   - Resumability after WS drop
- *   - Multi-agent concurrent live sessions (workspace scope is a
- *     process-global GenServer on the BEAM side; one at a time for v1)
- *   - Screen-share input (wb-xxbm.7)
- *   - Workgate routing for mic permission (wb-80q0.11 once the modal
- *     pattern lands; today we rely on the user-initiated click + the
- *     browser's native getUserMedia prompt)
+ *   - Multi-agent concurrent live sessions (one at a time for v1)
+ *   - Screen-share input
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { enginePath } from "$lib/engine-api/gen";
-import { sidecar } from "$lib/bridge/sidecar.svelte";
+import { engineRequest, EngineApiError } from "$lib/engine-api/gen";
 
 // ── Wire types (Gemini Live BidiGenerateContent) ──────────────────────
 //
@@ -242,15 +241,6 @@ class GeminiLiveSession {
   #rafHandle = 0;
   #analyserBuf: Uint8Array | null = null;
 
-  /** Workhorse origin — discovered by the Rust shell at sidecar spawn
-   *  and exposed via `sidecar.status.url`. The port is per-boot, so
-   *  hardcoding doesn't work. */
-  get #workhorseBase(): string {
-    const url = sidecar.status.url;
-    if (!url) throw new Error("Sidecar not ready");
-    return url;
-  }
-
   async start(
     agentSlug: string,
     workdir: string | null,
@@ -440,23 +430,34 @@ class GeminiLiveSession {
     }
   }
 
+  /** RUNTIME cap: GET /api/agents/:slug/system_prompt via the
+   *  control-plane transport. Graceful-offline — if the daemon is down
+   *  we return an empty prompt so the live session still opens (the
+   *  agent just lacks its rendered persona) rather than throwing to the
+   *  chat UI. */
   async #fetchSystemPrompt(
     slug: string,
     workdir: string | null,
     skills?: string[],
   ): Promise<string> {
-    const url = new URL(`${this.#workhorseBase}${enginePath.agents_system_prompt(slug)}`);
-    if (workdir) url.searchParams.set("workdir", workdir);
-    if (skills && skills.length > 0) {
-      url.searchParams.set("skills", skills.join(","));
-    }
+    const params = new URLSearchParams();
+    if (workdir) params.set("workdir", workdir);
+    if (skills && skills.length > 0) params.set("skills", skills.join(","));
+    const qs = params.toString() ? `?${params.toString()}` : "";
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch agent prompt: ${res.status}`);
+    try {
+      const body = await engineRequest<{ system_prompt: string }>(
+        `/api/agents/${encodeURIComponent(slug)}/system_prompt`,
+        { method: "GET", query: qs },
+      );
+      return body.system_prompt ?? "";
+    } catch (err) {
+      if (isDaemonDown(err)) {
+        console.warn("[gemini-live] daemon down — empty system prompt");
+        return "";
+      }
+      throw err;
     }
-    const body = (await res.json()) as { system_prompt: string };
-    return body.system_prompt;
   }
 
   async #onMessage(raw: string | ArrayBuffer | Blob): Promise<void> {
@@ -547,22 +548,31 @@ class GeminiLiveSession {
     const command = typeof args.command === "string" ? args.command : "";
     this.#callbacks.onToolCallStart?.(id, command);
 
+    // RUNTIME cap: POST /api/agents/:slug/exec via the control-plane
+    // transport. Graceful-offline — a daemon-down exec returns a polite
+    // tool_response so the model can keep talking instead of stalling on
+    // a thrown error.
     try {
       const slug = this.agentSlug ?? "";
-      const res = await fetch(
-        `${this.#workhorseBase}${enginePath.agents_exec(slug)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ command }),
-        },
-      );
-      const body = (await res.json()) as { output?: string; error?: string; detail?: string };
-      const output = body.output ?? `error: ${body.error ?? "unknown"} ${body.detail ?? ""}`;
+      const body = await engineRequest<{
+        output?: string;
+        error?: string;
+        detail?: string;
+      }>(`/api/agents/${encodeURIComponent(slug)}/exec`, {
+        method: "POST",
+        body: { command },
+      });
+      const output =
+        body.output ?? `error: ${body.error ?? "unknown"} ${body.detail ?? ""}`;
       this.#callbacks.onToolCallEnd?.(id, output);
       this.#sendToolResponse(id, name, { output });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "exec failed";
+      const offline = isDaemonDown(err);
+      const msg = offline
+        ? "agent server offline — command not run"
+        : err instanceof Error
+          ? err.message
+          : "exec failed";
       this.#callbacks.onToolCallEnd?.(id, `error: ${msg}`);
       this.#sendToolResponse(id, name, { error: msg });
     }
@@ -741,6 +751,16 @@ class GeminiLiveSession {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
+
+/** True when an error is the "daemon offline" signal from the engine
+ *  transport. Locked schema renames this code `sidecar_down`→`daemon_down`;
+ *  match both so this bridge is correct before and after gen.ts flips. */
+function isDaemonDown(err: unknown): boolean {
+  return (
+    err instanceof EngineApiError &&
+    (err.code === "daemon_down" || err.code === "sidecar_down")
+  );
+}
 
 function int16ToBase64(pcm: Int16Array): string {
   const bytes = new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength);

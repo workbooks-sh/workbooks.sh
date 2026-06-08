@@ -1,7 +1,8 @@
-// wb-i38o.13 — bundle / unbundle bridge.
+// files domain — workbook bundle / unbundle / spec bridge (Phase B).
 //
-// Thin reactive wrapper over the Rust `workbook_bundle` and
-// `workbook_unbundle` Tauri commands. Owns:
+// Thin reactive wrapper over the native Rust `workbook_bundle`,
+// `workbook_unbundle`, and `workbook_spec_read` Tauri commands. All
+// native/offline — no runtime/control-plane calls. Owns:
 //   * an in-flight set so the UI can disable the menu item while
 //     a bundle is running
 //   * the path-derivation rules:
@@ -23,6 +24,12 @@ export interface BundleResult {
 export interface UnbundleResult {
   output_dir: string;
   files: string[];
+}
+
+/** Result of `workbook_spec_read` — the parsed `<script id="workbook-spec">`
+ *  payload, or null when the HTML has no spec marker. */
+export interface WorkbookSpecResult {
+  spec: unknown | null;
 }
 
 /** Strip a trailing slash. The Rust side normalises but the derived
@@ -111,6 +118,12 @@ class WorkbookIoStore {
     } finally {
       this.inFlight.delete(htmlPath);
     }
+  }
+
+  /** Read the `<script id="workbook-spec">` payload from an HTML file.
+   *  Native + offline; returns `{ spec: null }` when no marker present. */
+  async readSpec(htmlPath: string): Promise<WorkbookSpecResult> {
+    return await invoke<WorkbookSpecResult>("workbook_spec_read", { htmlPath });
   }
 }
 

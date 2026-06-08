@@ -1,18 +1,20 @@
-// wb-i38o.3 — workspace store + scope push to the Elixir sidecar.
+// files domain — package store (Phase B). Native package_* commands
+// (fully offline) + best-effort scope push to the optional runtime.
 //
-// Reactive front-end for the Tauri package_* commands. Owns:
+// Reactive front-end for the native Tauri package_* commands. Owns:
 //
-//   * `workspaces` — the list of all defined workspaces by name
-//   * `active` — the active workspace (folder list + name) or null
-//   * scope-push wiring: when the active workspace changes, push the
-//     folder list down the WS bridge to the `workspace:control`
-//     Phoenix channel. The push happens (a) whenever Rust emits
-//     `workspace-scope-change` and (b) once on bridge re-connect (so
-//     a sidecar restart can't leave the agent fail-closed indefinitely).
+//   * `workspaces` — the list of all defined packages by name
+//   * `active` — the active package (folder list + name) or null
+//   * scope-push wiring: when the active package changes, push the
+//     folder list down the WS bridge to the agent's `workspace:control`
+//     channel. RUNTIME-only and graceful: skipped when the bridge is
+//     offline (see pushScopeToAgent). The push happens (a) whenever Rust
+//     emits `workspace-scope-change` and (b) once on bridge re-connect.
 //
-// The bridge already exists (ws.svelte.ts) — we extend it with a
-// `joinAndPushScope()` so we don't have to touch the WS connection
-// state machine.
+// Mutations refresh directly (no ws.onMonorepoChange watchers — the
+// package store is native/local-store; we re-read after every mutation).
+// The native `fs-tree-changed` watcher event still drives a re-scan so
+// folders created out-of-band (agent `mkdir`, external tools) appear.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -80,8 +82,6 @@ class PackageStore {
   lastPushAt = $state<number | null>(null);
 
   #unlisten: UnlistenFn | null = null;
-  #unsubState: (() => void) | null = null;
-  #unsubDescriptors: (() => void) | null = null;
   #unsubFsTree: UnlistenFn | null = null;
   #initStarted = false;
 
@@ -99,32 +99,7 @@ class PackageStore {
       });
     });
 
-    // Live: any external write to state.json or to a package descriptor
-    // means the Rust active_cell is stale. Re-read both and re-push the
-    // scope. Fixes the "edit state.json on disk, app doesn't refresh"
-    // race that hit the UGC Pro switch.
-    this.#unsubState = ws.onMonorepoChange("state.json", async () => {
-      await this.refresh();
-      // Active may have flipped; re-emit the scope so the engine
-      // matches what's on disk.
-      try {
-        await invoke("package_refresh_active");
-      } catch (e) {
-        console.warn("[workspace] refresh_active failed:", e);
-      }
-      await this.pushScopeToAgent();
-    });
-    this.#unsubDescriptors = ws.onMonorepoChange(
-      "**/workspaces/*.org",
-      async () => {
-        await this.refresh();
-        // If the active package's :folders: changed externally, the
-        // scope the engine has is now wrong — push the new one.
-        await this.pushScopeToAgent();
-      },
-    );
-
-    // React to Rust-side workspace mutations.
+    // React to Rust-side package mutations.
     this.#unlisten = await listen<ScopeChangePayload>(
       "workspace-scope-change",
       async (e) => {
@@ -176,12 +151,8 @@ class PackageStore {
 
   destroy() {
     this.#unlisten?.();
-    this.#unsubState?.();
-    this.#unsubDescriptors?.();
     this.#unsubFsTree?.();
     this.#unlisten = null;
-    this.#unsubState = null;
-    this.#unsubDescriptors = null;
     this.#unsubFsTree = null;
     this.#initStarted = false;
   }

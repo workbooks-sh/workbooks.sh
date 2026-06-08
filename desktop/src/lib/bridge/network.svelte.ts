@@ -1,15 +1,28 @@
 /**
- * Bridge: Workbooks Network — desktop ↔ oql-agent IPC (wb-u2o0.9.1).
+ * Bridge: Workbooks Network — desktop social/identity surface.
  *
- * Thin typed wrappers around the Tauri commands in
- * `src-tauri/src/network.rs`. The desktop UI consumes this module in
- * place of the Phase 1 stubs (ConnectFlow, ShareDialog, etc.) so
- * each user action actually runs through Workhorse + Broker.
+ * Phase B canonical schema. Naming dropped the redundant `network_`
+ * prefix: identity/workos/workspace_package/workbook_fork are bare
+ * domain commands now.
+ *
+ * Placement:
+ *   - NATIVE (offline): identity_*, workos_*, workspace_package,
+ *     workgate_install, workbook_fork — invoke() the Rust shell.
+ *   - RUNTIME (graceful-offline): publish → POST /v1/network/shares
+ *     through the control-plane. When the daemon is down the
+ *     engineRequest throws EngineApiError("daemon_down"); publish
+ *     re-throws a typed PublishError so the share dialog can render an
+ *     actionable "start the agent server" message rather than a raw
+ *     transport error.
+ *
+ * Exported names are stable — the UI imports them by name; only the
+ * bodies + internal command names changed.
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { engineRequest, EngineApiError } from "$lib/engine-api/gen";
 
-// ── Types — mirror src-tauri/src/network.rs structs ───────────────
+// ── Types — mirror src-tauri network structs ──────────────────────
 
 export interface IdentityView {
   did: string;
@@ -56,11 +69,24 @@ export interface StoredSession {
   picture_url: string | null;
 }
 
-// ── Identity ──────────────────────────────────────────────────────
+/** Thrown by publish() so the share dialog can switch on `.code` —
+ *  `daemon_down` means "start the agent server", anything else is an
+ *  upstream/broker failure. */
+export class PublishError extends Error {
+  constructor(
+    public code: "daemon_down" | "upstream",
+    message: string,
+  ) {
+    super(message);
+    this.name = "PublishError";
+  }
+}
+
+// ── Identity (native, offline) ────────────────────────────────────
 
 /** Load the current identity, or null if not yet minted. */
 export async function loadIdentity(): Promise<IdentityView | null> {
-  return invoke<IdentityView | null>("network_identity_load");
+  return invoke<IdentityView | null>("identity_load");
 }
 
 /** Mint a fresh keypair (or return existing one — idempotent).
@@ -69,29 +95,51 @@ export async function generateIdentity(opts?: {
   handle?: string;
   workosUserId?: string;
 }): Promise<IdentityView> {
-  return invoke<IdentityView>("network_identity_generate", {
+  return invoke<IdentityView>("identity_generate", {
     handle: opts?.handle ?? null,
     workosUserId: opts?.workosUserId ?? null,
   });
 }
 
 export async function setHandle(handle: string): Promise<IdentityView> {
-  return invoke<IdentityView>("network_identity_set_handle", { handle });
+  return invoke<IdentityView>("identity_set_handle", { handle });
 }
 
 export async function setWorkosUserId(
   workosUserId: string | null,
 ): Promise<IdentityView> {
-  return invoke<IdentityView>("network_identity_set_workos", { workosUserId });
+  return invoke<IdentityView>("identity_set_workos", { workosUserId });
 }
 
-// ── Publisher ─────────────────────────────────────────────────────
+// ── Publisher (runtime, graceful-offline) ─────────────────────────
 
+/** Publish a signed workbook to the broker via the control-plane.
+ *  Local tangle+sign happens host-side first; this call ships the
+ *  resulting share to the broker. The runtime route is
+ *  `POST /v1/network/shares`. When the daemon is offline this throws a
+ *  typed PublishError("daemon_down") instead of letting the raw
+ *  transport error bubble. */
 export async function publish(args: PublishArgs): Promise<PublishResult> {
-  return invoke<PublishResult>("network_publisher_publish", { args });
+  try {
+    return await engineRequest<PublishResult>("/v1/network/shares", {
+      method: "POST",
+      body: args,
+    });
+  } catch (e) {
+    if (e instanceof EngineApiError && e.code === "daemon_down") {
+      throw new PublishError(
+        "daemon_down",
+        "The agent server isn't running — start it to publish.",
+      );
+    }
+    throw new PublishError(
+      "upstream",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
 }
 
-// ── WorkOS sign-in (RFC 8252 loopback + PKCE) ─────────────────────
+// ── WorkOS sign-in (RFC 8252 loopback + PKCE, native) ─────────────
 
 /** Runs the loopback+PKCE sign-in flow: Rust spawns a localhost
  *  callback server, opens the user's system browser to WorkOS, and
@@ -100,7 +148,7 @@ export async function publish(args: PublishArgs): Promise<PublishResult> {
  *  WorkOS user record once the user finishes signing in (and the
  *  browser tab self-closes via the "you're signed in" page). */
 export async function workosSignIn(brokerUrl: string): Promise<StoredSession> {
-  return invoke<StoredSession>("network_workos_sign_in", { brokerUrl });
+  return invoke<StoredSession>("workos_sign_in", { brokerUrl });
 }
 
 /** Read a previously-stashed session from the OS keychain. Returns
@@ -108,24 +156,24 @@ export async function workosSignIn(brokerUrl: string): Promise<StoredSession> {
  *  signed-out. Used on app boot to skip the sign-in prompt for users
  *  who've already authenticated on this machine. */
 export async function loadStoredSession(): Promise<StoredSession | null> {
-  return invoke<StoredSession | null>("network_workos_load_session");
+  return invoke<StoredSession | null>("workos_load_session");
 }
 
 /** Wipe the stored session. Resolves once the keychain entry is
  *  gone (or was never there). */
 export async function clearStoredSession(): Promise<void> {
-  return invoke<void>("network_workos_clear_session");
+  return invoke<void>("workos_clear_session");
 }
 
-// ── Workspace packager (wb-u2o0.9.3) ──────────────────────────────
+// ── Workspace packager (native, local tangle+sign) ────────────────
 
 /** Bundles a workspace's folders into a single signed-publishable
  *  workbook `.html`. Returns the path Publisher can hand to publish(). */
 export async function packageWorkspace(workspaceName: string): Promise<string> {
-  return invoke<string>("network_workspace_package", { workspaceName });
+  return invoke<string>("workspace_package", { workspaceName });
 }
 
-// ── Workgate install (wb-u2o0.4.5) ─────────────────────────────────
+// ── Workgate install (native) ─────────────────────────────────────
 
 export interface WorkgateScopes {
   fs?: string[];
@@ -146,14 +194,15 @@ export interface WorkgateInstallResult {
 
 /** Approve + install an executable share (agent/plugin/skill) into a
  *  workspace. The Tauri shell prompts for OS-level capability approval
- *  via Workgate, then Workhorse clones + verifies + registers. Phase 3
- *  v1 stubs the approval (auto-yes) — full Workgate UI lands as a
- *  separate sub-task. */
-export async function workgateInstall(args: WorkgateInstallArgs): Promise<WorkgateInstallResult> {
-  return invoke<WorkgateInstallResult>("network_workgate_install", { args });
+ *  via Workgate, then the host clones + verifies + registers. Fetching
+ *  a non-local source by RID still needs the broker (pending). */
+export async function workgateInstall(
+  args: WorkgateInstallArgs,
+): Promise<WorkgateInstallResult> {
+  return invoke<WorkgateInstallResult>("workgate_install", { args });
 }
 
-// ── Workbook fork (wb-u2o0.6.2) ────────────────────────────────────
+// ── Workbook fork (native) ────────────────────────────────────────
 
 export interface WorkbookForkArgs {
   source_rid: string;
@@ -168,10 +217,12 @@ export interface WorkbookForkResult {
 }
 
 /** Fork a workbook into a fresh RID owned by the current identity.
- *  Workhorse clones the source, mints a new RID, and re-signs the
+ *  The host clones the source, mints a new RID, and re-signs the
  *  workbook with a `c2pa.action.forked` assertion + extended claim
- *  chain referencing the upstream's current claim as parent. v1
- *  stubs the chain extension; full impl in a follow-up. */
-export async function workbookFork(args: WorkbookForkArgs): Promise<WorkbookForkResult> {
-  return invoke<WorkbookForkResult>("network_workbook_fork", { args });
+ *  chain referencing the upstream's current claim as parent. Forking a
+ *  non-local source still needs the broker (pending). */
+export async function workbookFork(
+  args: WorkbookForkArgs,
+): Promise<WorkbookForkResult> {
+  return invoke<WorkbookForkResult>("workbook_fork", { args });
 }

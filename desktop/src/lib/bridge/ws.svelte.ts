@@ -1,7 +1,10 @@
-// wb-i38o.2 — WebSocket bridge to the local Elixir `oql-agent`.
+// Runtime WS bridge to the local Elixir runtime (graceful-offline).
 //
-// Connects to the Phoenix endpoint that the sidecar (src-tauri/src/sidecar.rs)
-// boots on localhost. The agent's WS shape today (per packages/oql/elixir/
+// Connects to the Phoenix endpoint the daemon (src-tauri/src/daemon.rs)
+// boots on localhost. Lifecycle is driven off `daemon.status`: connect
+// once it lands `ready` (native `running`), disconnect when it stops.
+// The per-boot bearer token from discovery is attached to the socket and
+// to the run POST. The agent's WS shape today (per packages/oql/elixir/
 // oql-agent/lib/oql_agent/web/{user_socket,session_channel,runtime_channel}.ex):
 //
 //   socket "/socket" → topic `session:<session_id>` (per-session telemetry)
@@ -21,7 +24,6 @@
 // global topic.
 
 import { Socket, Channel } from "phoenix";
-import { enginePath } from "$lib/engine-api/gen";
 import { workgate, type WorkgateRequest, type WorkgatePermitDecision } from "$lib/workgate/store.svelte";
 import {
   envRequests,
@@ -29,7 +31,7 @@ import {
   type EnvFulfillPayload,
   type EnvCancelPayload,
 } from "$lib/env_request/store.svelte";
-import { sidecar } from "./sidecar.svelte";
+import { daemon } from "./sidecar.svelte";
 // `package` and `agents` are NOT imported here on purpose. ws is a
 // peer store that emits + accepts events; importing them statically
 // creates a four-way cycle (ws ↔ agents ↔ package ↔ agent_settings)
@@ -220,18 +222,14 @@ class WsBridgeStore {
   init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
-    // React to sidecar state — connect once `ready` lands, disconnect
-    // on crash/restart, reconnect on next ready.
+    // React to daemon state — connect once `ready` lands, disconnect
+    // when it stops/goes unhealthy, reconnect on next ready.
     $effect.root(() => {
       $effect(() => {
-        const { state, url } = sidecar.status;
+        const { state, url, token } = daemon.status;
         if (state === "ready" && url && url !== this.#lastUrl) {
-          this.#connect(url);
-        } else if (
-          state === "crashed" ||
-          state === "restarting" ||
-          state === "stopped"
-        ) {
+          this.#connect(url, token);
+        } else if (state === "stopped" || state === "unhealthy") {
           this.#disconnect();
         }
       });
@@ -277,8 +275,8 @@ class WsBridgeStore {
     text: string,
     opts: { agentSlug?: string | null; skills?: string[] } = {},
   ): Promise<string> {
-    const { url } = sidecar.status;
-    if (!url) throw new Error("sidecar not ready — no URL yet");
+    const { url, token } = daemon.status;
+    if (!url) throw new Error("daemon not ready — no URL yet");
 
     const workdir = active.workdir;
     const agent_slug = opts.agentSlug ?? active.agentSlug ?? FALLBACK_AGENT_SLUG;
@@ -289,14 +287,19 @@ class WsBridgeStore {
     if (workdir) reqBody.workdir = workdir;
     if (opts.skills && opts.skills.length > 0) reqBody.skills = opts.skills;
 
-    const r = await fetch(`${url}${enginePath.run}`, {
+    // New slug-resolving endpoint (returns {session_id}); avoids the
+    // legacy POST /api/run shape ({system,task,max_steps,model}).
+    const r = await fetch(`${url}/api/agent/run`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(reqBody),
     });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const msg = `POST /api/run ${r.status}: ${JSON.stringify(body)}`;
+      const msg = `POST /api/agent/run ${r.status}: ${JSON.stringify(body)}`;
       this.#emit({ name: "bridge:error", payload: { msg }, topic: "bridge" });
       throw new Error(msg);
     }
@@ -428,11 +431,14 @@ class WsBridgeStore {
 
   // ── internals ──
 
-  #connect(httpUrl: string) {
+  #connect(httpUrl: string, token: string | null) {
     this.#disconnect();
     this.#lastUrl = httpUrl;
     const wsUrl = httpUrl.replace(/^http/, "ws") + "/socket";
     const sock = new Socket(wsUrl, {
+      // Per-boot bearer token from discovery — UserSocket.connect/3
+      // authenticates the socket from these params.
+      params: token ? { token } : {},
       // Be quieter than Phoenix's default logger in dev.
       logger: () => {},
     });

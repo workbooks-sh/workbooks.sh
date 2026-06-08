@@ -12,7 +12,6 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export type EnvScope = "user" | "workspace" | "package";
 
@@ -59,21 +58,14 @@ class EnvVarsStore {
   dirty = $state(false);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("env-vars.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async refresh() {
     this.loading = true;

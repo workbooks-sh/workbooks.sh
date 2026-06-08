@@ -1,10 +1,9 @@
-// wb-i38o.6 §3 — Plugin registry store.
+// Phase B — Plugin registry store (native).
 //
-// UI-only persistence today; agent-side plugin loading is OUT OF SCOPE
-// for v1 of this ticket.
+// Index persists in ~/.oql/desktop/plugins.json. Registry-only today;
+// agent-side plugin loading is OUT OF SCOPE for this phase.
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export interface Plugin {
   id: string;
@@ -28,21 +27,14 @@ class PluginsStore {
   lastError = $state<string | null>(null);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("plugins.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async refresh() {
     this.loading = true;

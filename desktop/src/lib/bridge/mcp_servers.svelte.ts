@@ -1,11 +1,10 @@
-// wb-i38o.6 §2 — MCP server registry store.
+// Phase B — MCP server registry store (native).
 //
-// UI-only persistence today; the oql-agent doesn't read
-// ~/.oql/desktop/mcp-servers.json yet — file a follow-up bd if
+// Index persists in ~/.oql/desktop/mcp-servers.json. UI-only consumption
+// today; the oql-agent doesn't read it yet — file a follow-up bd if
 // agent-side consumption requires runtime changes.
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export type McpTransport = "stdio" | "http";
 
@@ -39,21 +38,14 @@ class McpStore {
   lastError = $state<string | null>(null);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("mcp-servers.org", () => {
-      void this.refresh();
-    });
   }
 
-  dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
-  }
+  dispose() {}
 
   async refresh() {
     this.loading = true;

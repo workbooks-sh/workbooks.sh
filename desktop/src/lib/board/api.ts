@@ -1,10 +1,17 @@
-// wb-i38o.33.6 — HTTP client for the Kanban board's data layer.
+// Board data layer — RUNTIME control-plane client (graceful-offline).
 //
-// Fetches matches from `POST /api/oql/query` and groups them into
-// columns. All errors normalize to a `BoardApiError` so the panel can
-// render a single consistent failure UI.
+// "Boards are now workflows": the board reads matches from the org-ql
+// surface on the optional Elixir tier (POST /api/oql/query) and groups
+// them into columns. All engine failures normalize to a `BoardApiError`
+// (alias of EngineApiError) so the panel renders one consistent UI.
+//
+// Offline behavior: the read paths (runQuery, listBoardViews) degrade to
+// empty results when the daemon is down (EngineApiError code
+// "daemon_down") so the board shows an empty state rather than throwing
+// to the UI. The write paths (patchHeadline, setBoardState) intentionally
+// surface their error — a failed mutation must be visible to the user.
 
-import { EngineApiError, enginePath, engineRequest } from "$lib/engine-api/gen";
+import { EngineApiError, engineRequest } from "$lib/engine-api/gen";
 import { listSessions, type SessionRow } from "$lib/sessions/api";
 import type {
   BoardCardItem,
@@ -19,9 +26,20 @@ import { CANONICAL_COLUMNS } from "./types";
 // stable while there is exactly one class at runtime.
 export { EngineApiError as BoardApiError };
 
+/** True when the failure is the daemon being unreachable (offline or
+ *  not yet booted). Both the legacy "sidecar_down" and the canonical
+ *  "daemon_down" codes are treated as offline so this keeps working
+ *  across the engine-api rename. */
+function isDaemonDown(e: unknown): boolean {
+  return (
+    e instanceof EngineApiError &&
+    (e.code === "daemon_down" || e.code === "sidecar_down")
+  );
+}
+
 /** Live sessions for the assigned column — the session type and client
  *  live in $lib/sessions/api; re-exported so board consumers keep one
- *  import surface. */
+ *  import surface. listSessions already degrades to [] when offline. */
 export type LiveSession = SessionRow;
 export async function listActiveSessions(): Promise<LiveSession[]> {
   return listSessions({ activeOnly: true });
@@ -35,11 +53,20 @@ export async function runQuery(
   path: string,
   sexpr: string,
 ): Promise<QueryResponse> {
-  const parsed = await engineRequest<QueryResponse>(enginePath.oql_query, {
-    query: `?path=${encodeURIComponent(path)}`,
-    bodyText: sexpr,
-    contentType: "text/x-oql-sexpr",
-  });
+  let parsed: QueryResponse;
+  try {
+    parsed = await engineRequest<QueryResponse>("/api/oql/query", {
+      query: `?path=${encodeURIComponent(path)}`,
+      bodyText: sexpr,
+      contentType: "text/x-oql-sexpr",
+    });
+  } catch (e) {
+    // Offline → empty board, never throw to the UI. Real query/parse
+    // errors (parse_error etc.) still propagate so the panel can show
+    // the Q-code.
+    if (isDaemonDown(e)) return { headlines: [], parse_warnings: [] };
+    throw e;
+  }
   // Defensive — the server should always return an array, but a
   // misbehaving proxy could mangle it.
   if (!Array.isArray(parsed?.headlines)) {
@@ -163,9 +190,17 @@ export async function setBoardState(
  *  falls back to its hardcoded default). Throws BoardApiError on any
  *  non-2xx response. */
 export async function listBoardViews(path: string): Promise<BoardView[]> {
-  const body = await engineRequest<BoardView[]>("/api/oql/board-views", {
-    query: `?path=${encodeURIComponent(path)}`,
-  });
+  let body: BoardView[];
+  try {
+    body = await engineRequest<BoardView[]>("/api/oql/board-views", {
+      query: `?path=${encodeURIComponent(path)}`,
+    });
+  } catch (e) {
+    // Offline → no views; the panel falls back to its hardcoded
+    // default board. Never throw to the UI for daemon-down.
+    if (isDaemonDown(e)) return [];
+    throw e;
+  }
   if (!Array.isArray(body)) {
     throw new EngineApiError(
       "bad_response",

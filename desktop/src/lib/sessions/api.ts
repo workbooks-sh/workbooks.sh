@@ -1,22 +1,27 @@
-// Engine sessions client — reusable surface for any UI that needs to
-// list, filter, or refresh the engine's session ledger. The engine's
-// /api/sessions endpoint is the source of truth: every session the
-// engine ever started lives there (capped to a retention window by
-// SessionTrack), regardless of who started it — chat tab, board
-// coordinator, CLI, wizard, etc.
+// Sessions ledger client — runtime control-plane surface for any UI
+// that needs to list, filter, or refresh the agent session ledger.
+//
+// RUNTIME cap (graceful-offline): GET /api/sessions on the optional
+// Elixir tier is the source of truth — every agent session the runtime
+// ever started lives there (capped to a retention window), regardless
+// of who started it: chat tab, board coordinator, CLI, wizard, etc.
 //
 // This module deliberately lives outside $lib/chat/ and $lib/board/
 // because the modal that consumes it is meant to be reusable across
 // surfaces (chat header today; potentially board panel, settings
 // view, status tray later). Keeping the client neutral here avoids
 // pulling chat or board imports into surfaces that don't need them.
+//
+// Schema note: runtime Workbooks.Sessions is workbook-INSTANCE VFS
+// resume, NOT the agent ledger — the ledger route (GET /api/sessions)
+// is still pending on the runtime. Until it lands, every call here
+// degrades to an empty ledger, which is the correct empty-state UX.
 
-import { engineRequest, enginePath } from "$lib/engine-api/gen";
+import { engineRequest } from "$lib/engine-api/gen";
 
 export type SessionStatus = "running" | "completed" | "failed" | "cancelled";
 
-/** One session row as returned by /api/sessions. Matches
- *  Workbooks.Engine.SessionTrack.snapshot/0's serialized shape. */
+/** One session row as returned by GET /api/sessions. */
 export interface SessionRow {
   session_id: string;
   agent_slug: string | null;
@@ -32,9 +37,10 @@ export interface ListSessionsOptions {
   activeOnly?: boolean;
 }
 
-/** Fetch the session list from the engine. Returns [] when the sidecar
- *  isn't reachable or the response is malformed — the calling UI
- *  renders an empty state in both cases, which is the right user
+/** Fetch the session ledger from the runtime. Returns [] when the
+ *  daemon isn't reachable (offline), the route is absent (pending),
+ *  the request times out, or the response is malformed — the calling
+ *  UI renders an empty state in every case, which is the right user
  *  experience either way. Hard 3s timeout so a hung daemon never
  *  leaves the UI stuck on "Loading…". */
 export async function listSessions(
@@ -42,13 +48,13 @@ export async function listSessions(
 ): Promise<SessionRow[]> {
   try {
     const body = await engineRequest<{ sessions?: SessionRow[] }>(
-      enginePath.sessions_list,
+      "/api/sessions",
       { query: opts.activeOnly ? "?active=true" : "", timeoutMs: 3_000 },
     );
     return Array.isArray(body?.sessions) ? body.sessions : [];
   } catch {
-    // Engine down, timeout, or malformed body — the UI's empty state
-    // is the right signal in every case.
+    // Daemon down, route pending, timeout, or malformed body — the
+    // UI's empty state is the right signal in every case.
     return [];
   }
 }

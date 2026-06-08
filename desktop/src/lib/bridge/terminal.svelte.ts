@@ -1,12 +1,13 @@
-// Terminal bridge — multi-session.
+// Terminal bridge — multi-session. ALL native (offline). Phase B.
 //
 // Three flavors of session live in the drawer:
 //
-//   1. `sidecar` — pinned, read-only "logs" view. Streams stdout/stderr
-//      from the oql-agent sidecar via the `sidecar-log` Tauri event.
-//      Not a pty; just lines piped into xterm. Always present.
+//   1. `daemon`  — pinned, read-only "logs" view. Streams stdout/stderr
+//      from the oql daemon via the `daemon-log` Tauri event (emitted by
+//      the long-lived daemon.rs capture). Not a pty; just lines piped
+//      into xterm. Always present.
 //   2. `shell`   — interactive shell (zsh/bash/cmd) backed by a real
-//      pty on the Rust side. Spawned via `terminalDrawer.newShell()`.
+//      pty (portable_pty) on the Rust side. Spawned via terminal_spawn.
 //   3. `install` — one-shot child command (brew, npm, curl) spawned
 //      via `terminalDrawer.runInstall(...)`. Same pty machinery as
 //      shells; the drawer marks them as one-shots so the UI can tag
@@ -14,12 +15,18 @@
 //
 // The drawer component (`TerminalDrawer.svelte`) owns the actual
 // xterm.js instances; this bridge owns metadata + IPC to the Rust
-// pty + the sidecar log subscription.
+// pty (terminal_*) + the daemon log subscription.
+//
+// Commands (snake_case, native): terminal_spawn / terminal_write /
+// terminal_resize / terminal_kill.
+// Events (native): terminal-output / terminal-exit / daemon-log.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export type SessionKind = "sidecar" | "shell" | "install";
+// "daemon" replaces the legacy "sidecar" kind. Exported type name kept
+// stable for the UI.
+export type SessionKind = "daemon" | "shell" | "install";
 
 export interface SessionMeta {
   id: string;
@@ -29,7 +36,7 @@ export interface SessionMeta {
   state: "running" | "exited" | "failed";
   /** Last exit code, if any. */
   exit_code: number | null;
-  /** Whether the user can close this session — false for the pinned sidecar. */
+  /** Whether the user can close this session — false for the pinned daemon log session. */
   closable: boolean;
 }
 
@@ -51,7 +58,7 @@ interface ExitEvent {
   exit_code: number | null;
 }
 
-interface SidecarLogEvent {
+interface DaemonLogEvent {
   stream: "stdout" | "stderr";
   line: string;
 }
@@ -72,14 +79,15 @@ function encodeB64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-/** The canonical id for the pinned sidecar logs session. Not a real
- *  Rust pty id — the drawer special-cases it. */
-export const SIDECAR_SESSION_ID = "sidecar-logs";
+/** The canonical id for the pinned daemon logs session. Not a real
+ *  Rust pty id — the drawer special-cases it. Export name kept stable
+ *  for the UI; the underlying id value is now "daemon-logs". */
+export const SIDECAR_SESSION_ID = "daemon-logs";
 
 class TerminalBridge {
   #onOutput = new Map<string, OutputHandler>();
   #onExit = new Map<string, ExitHandler>();
-  #onSidecarLog: ((e: SidecarLogEvent) => void) | null = null;
+  #onDaemonLog: ((e: DaemonLogEvent) => void) | null = null;
   #unlisteners: UnlistenFn[] = [];
   #started = false;
 
@@ -101,12 +109,12 @@ class TerminalBridge {
       }),
     );
 
-    // Sidecar-log is a separate event so we don't have to encode log
-    // bytes as base64. The drawer's sidecar session subscribes via
-    // `subscribeSidecarLogs`.
+    // daemon-log is a separate event so we don't have to encode log
+    // bytes as base64. The drawer's daemon session subscribes via
+    // `subscribeSidecarLogs` (export name kept stable).
     this.#unlisteners.push(
-      await listen<SidecarLogEvent>("sidecar-log", (e) => {
-        if (this.#onSidecarLog) this.#onSidecarLog(e.payload);
+      await listen<DaemonLogEvent>("daemon-log", (e) => {
+        if (this.#onDaemonLog) this.#onDaemonLog(e.payload);
       }),
     );
   }
@@ -116,7 +124,7 @@ class TerminalBridge {
     this.#unlisteners = [];
     this.#onOutput.clear();
     this.#onExit.clear();
-    this.#onSidecarLog = null;
+    this.#onDaemonLog = null;
     this.#started = false;
   }
 
@@ -138,14 +146,15 @@ class TerminalBridge {
     this.#onExit.delete(sessionId);
   }
 
-  /** Subscribe to the sidecar's stdout/stderr lines. Only one
-   *  subscriber at a time — there's only one drawer. */
-  subscribeSidecarLogs(handler: (e: SidecarLogEvent) => void): void {
-    this.#onSidecarLog = handler;
+  /** Subscribe to the daemon's stdout/stderr lines (daemon-log event).
+   *  Only one subscriber at a time — there's only one drawer.
+   *  Export name kept stable for the UI. */
+  subscribeSidecarLogs(handler: (e: DaemonLogEvent) => void): void {
+    this.#onDaemonLog = handler;
   }
 
   unsubscribeSidecarLogs(): void {
-    this.#onSidecarLog = null;
+    this.#onDaemonLog = null;
   }
 
   async write(sessionId: string, bytes: Uint8Array) {
@@ -189,12 +198,13 @@ export interface InstallResult {
 class TerminalDrawerState {
   open = $state(false);
 
-  /** All sessions in display order. The sidecar always sits at index 0. */
+  /** All sessions in display order. The daemon log session always sits
+   *  at index 0. */
   sessions = $state<SessionMeta[]>([
     {
       id: SIDECAR_SESSION_ID,
-      label: "Workhorse sidecar",
-      kind: "sidecar",
+      label: "Daemon logs",
+      kind: "daemon",
       state: "running",
       exit_code: null,
       closable: false,
@@ -255,12 +265,13 @@ class TerminalDrawerState {
     }
   }
 
-  /** Sidecar status dot — updated from sidecar.svelte's state stream
-   *  by the drawer component. The early-out guard is load-bearing:
-   *  the drawer calls this from a `$effect` that reads
-   *  `sidecarStore.status.state`. Without the guard, writing a new
-   *  array reference here re-triggers the effect (sessions becomes a
-   *  read-write dep) and Svelte's infinite-update guard fires. */
+  /** Daemon status dot — updated from the daemon store's state stream
+   *  (daemon-state event) by the drawer component. Export name kept
+   *  stable for the UI. The early-out guard is load-bearing: the drawer
+   *  calls this from a `$effect` that reads `daemonStore.status.state`.
+   *  Without the guard, writing a new array reference here re-triggers
+   *  the effect (sessions becomes a read-write dep) and Svelte's
+   *  infinite-update guard fires. */
   setSidecarState(state: SessionMeta["state"]) {
     const current = this.sessions.find((s) => s.id === SIDECAR_SESSION_ID);
     if (!current || current.state === state) return;

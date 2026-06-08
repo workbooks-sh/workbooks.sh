@@ -1,18 +1,24 @@
 /**
- * Moonshine on-device speech-to-text — wb-xxbm.2.
+ * Moonshine on-device speech-to-text — chat-voice domain (Phase B
+ * locked schema).
+ *
+ * Placement: LOCAL-STORE / renderer-direct. Local STT is wholly
+ * client-side — the ONNX-wasm model runs in the webview, there is no
+ * native invoke() and no runtime control-plane hop. Works fully
+ * offline (model assets aside). Exposed API (start/stop/toggle +
+ * `active`/`disabled`) is the locked surface the chat composer imports.
  *
  * Wraps @moonshine-ai/moonshine-js's MicrophoneTranscriber as a Svelte
  * reactive service so the composer's mic button can toggle dictation
  * and append committed transcripts to the draft text.
  *
- * Permission model: getUserMedia is called by MicrophoneTranscriber on
- * .start(). It triggers the browser's native mic permission prompt the
- * first time. This is a direct user-gesture flow — no Workgate hop. When
- * the wb-80q0.10 Tauri+Svelte modal lands, this service should be
- * refactored to call `Workgate.request('mic', …)` first and only
- * .start() after the permit is granted; today the renderer-side prompt
- * is sufficient because mic access is initiated by an explicit user
- * click.
+ * Mic dependency: getUserMedia is called by MicrophoneTranscriber on
+ * .start() and triggers the browser's native mic prompt on first use.
+ * Like the live voice path, mic access in the WKWebview depends on the
+ * native `webview_enable_media` boot config in the Rust shell; without
+ * it getUserMedia is undefined and .start() rejects. Access is always
+ * initiated by an explicit user click, so no extra permission gate is
+ * needed.
  *
  * Assets: model weights, onnxruntime-web, and Silero VAD are fetched
  * from their respective CDNs (Moonshine's `Settings.BASE_ASSET_PATH`

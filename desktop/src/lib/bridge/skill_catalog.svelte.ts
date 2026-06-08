@@ -1,13 +1,18 @@
-// wb-8285 — SKILL.md catalog store.
+// Phase B — SKILL.md catalog store (runtime, graceful-offline).
 //
-// Mirrors Workbooks.Engine.SkillCatalog (Anthropic-convention SKILL.md
+// Mirrors the runtime SkillCatalog (Anthropic-convention SKILL.md
 // discovery). Distinct from `skills.svelte.ts` which tracks the
 // integration-mediated skill bundles (Composio, Claude Code, ...).
 //
-// Hits GET /api/skills lazily on first access; caches the result
-// for the session. Used by the chat compose's @-picker.
+// Hits GET /api/skills lazily on first access; caches the result for
+// the session. Used by the chat compose's @-picker. When the daemon is
+// offline the catalog degrades to empty rather than throwing — the
+// @-picker simply shows nothing.
 
-import { sidecar } from "$lib/bridge/sidecar.svelte";
+import {
+  engineRequest,
+  EngineApiError,
+} from "$lib/engine-api/gen";
 import { packageStore as workspace } from "$lib/bridge/package.svelte";
 
 export interface SkillMdEntry {
@@ -15,6 +20,16 @@ export interface SkillMdEntry {
   name: string;
   description: string | null;
   source: "project" | "workspace" | "user";
+}
+
+/** True when the failure is "the optional runtime tier isn't running".
+ *  Tolerates both the new `daemon_down` code and the legacy `sidecar_down`
+ *  the transport may still emit until gen.ts is renamed. */
+function isDaemonDown(e: unknown): boolean {
+  return (
+    e instanceof EngineApiError &&
+    (e.code === "daemon_down" || e.code === "sidecar_down")
+  );
 }
 
 class SkillCatalogStore {
@@ -30,28 +45,23 @@ class SkillCatalogStore {
   }
 
   async refresh(): Promise<void> {
-    if (!sidecar.status.url) {
-      this.lastError = "Agent server isn't running.";
-      return;
-    }
     this.loading = true;
     this.lastError = null;
     try {
       const ws = workspace.active?.folders?.[0];
-      const qs = ws ? `?workspace=${encodeURIComponent(ws)}` : "";
-      const res = await fetch(`${sidecar.status.url}/api/skills${qs}`, {
-        headers: { accept: "application/json" },
-      });
-      if (!res.ok) {
-        this.lastError = `GET /api/skills returned ${res.status}`;
-        return;
-      }
-      const body = (await res.json().catch(() => null)) as
-        | { skills?: SkillMdEntry[] }
-        | null;
+      const query = ws ? `?workspace=${encodeURIComponent(ws)}` : "";
+      const body = await engineRequest<{ skills?: SkillMdEntry[] }>(
+        "/api/skills",
+        { query },
+      );
       this.entries = Array.isArray(body?.skills) ? body.skills : [];
       this.#loaded = true;
     } catch (e) {
+      if (isDaemonDown(e)) {
+        // Offline: empty catalog, no error surfaced to the UI.
+        this.entries = [];
+        return;
+      }
       this.lastError = e instanceof Error ? e.message : String(e);
     } finally {
       this.loading = false;

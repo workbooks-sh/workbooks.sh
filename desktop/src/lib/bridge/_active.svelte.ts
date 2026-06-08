@@ -18,7 +18,7 @@ class Active {
    *  hard-coded default in that case. */
   agentSlug = $state<string | null>(null);
 
-  /** First folder of the active Package (the workdir the engine
+  /** First folder of the active Package (the workdir the daemon
    *  runs sessions in). `null` when no Package is active. */
   workdir = $state<string | null>(null);
 }

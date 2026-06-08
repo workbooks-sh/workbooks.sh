@@ -1,26 +1,42 @@
-// wb-i38o.12 — Memory-source bridge.
+// Phase B — Memory-source bridge.
 //
 // Manages the set of workbooks loaded as memory tiers for the OQL
 // agent. Two-phase flow:
-//   1. Tauri command `workbook_load_as_memory` does the scope check
-//      + canonicalises the .html path on the Rust side.
-//   2. The Phoenix WS bridge's `memory:control` channel asks the
-//      Elixir sidecar to actually extract the bundle and index the
+//   1. Native Tauri command `memory_source_resolve` does the scope check
+//      + canonicalises the .html path on the Rust side (offline-safe).
+//   2. The runtime control-plane REST surface (/api/memory/sources)
+//      asks the Elixir daemon to extract the bundle and index the
 //      embedded .org files into the semantic memory tier.
 //
-// Toast surfacing piggybacks on the existing toast store.
+// The runtime tier is optional: when the daemon is offline, list/add/
+// remove degrade gracefully (empty / no-op) instead of throwing to the
+// UI. Toast surfacing piggybacks on the existing toast store.
 
 import { invoke } from "@tauri-apps/api/core";
 import { toasts } from "$lib/bridge/toasts.svelte";
+import { engineRequest, EngineApiError } from "$lib/engine-api/gen";
 import {
-  ws,
   type AddWorkbookResult,
-  type ListWorkbooksResult,
   type RemoveWorkbookResult,
 } from "$lib/bridge/ws.svelte";
 
 interface LoadResolution {
   canonical_path: string;
+}
+
+/** Shape of GET /api/memory/sources. */
+interface ListWorkbooksResult {
+  workbooks: string[];
+}
+
+/** True when the failure is "the optional runtime tier isn't running".
+ *  Tolerates both the new `daemon_down` code and the legacy `sidecar_down`
+ *  the transport may still emit until gen.ts is renamed. */
+function isDaemonDown(e: unknown): boolean {
+  return (
+    e instanceof EngineApiError &&
+    (e.code === "daemon_down" || e.code === "sidecar_down")
+  );
 }
 
 class MemorySourcesStore {
@@ -33,16 +49,21 @@ class MemorySourcesStore {
   /** Last refresh error message, if any. */
   lastError = $state<string | null>(null);
 
-  /** Initial fetch — call once on mount of any UI that displays the set. */
+  /** Initial fetch — call once on mount of any UI that displays the set.
+   *  Daemon offline ⇒ empty set, no error. */
   async refresh(): Promise<void> {
     try {
-      const result = await ws.memoryControl<ListWorkbooksResult>(
-        "list_workbooks",
-        {},
+      const result = await engineRequest<ListWorkbooksResult>(
+        "/api/memory/sources",
       );
       this.loaded = result.workbooks ?? [];
       this.lastError = null;
     } catch (e) {
+      if (isDaemonDown(e)) {
+        this.loaded = [];
+        this.lastError = null;
+        return;
+      }
       this.lastError = e instanceof Error ? e.message : String(e);
     }
   }
@@ -56,16 +77,15 @@ class MemorySourcesStore {
       message: `Loading ${htmlPath} as memory source …`,
     });
     try {
-      // Tauri command: scope check + canonicalise the path.
-      const resolved = await invoke<LoadResolution>(
-        "workbook_load_as_memory",
-        { htmlPath },
-      );
+      // Native: scope check + canonicalise the path (works offline).
+      const resolved = await invoke<LoadResolution>("memory_source_resolve", {
+        htmlPath,
+      });
 
-      // Then ask the Elixir side to index it.
-      const result = await ws.memoryControl<AddWorkbookResult>(
-        "add_workbook",
-        { path: resolved.canonical_path },
+      // Then ask the runtime tier to index it.
+      const result = await engineRequest<AddWorkbookResult>(
+        "/api/memory/sources",
+        { method: "POST", body: { path: resolved.canonical_path } },
       );
 
       // Reflect locally; refresh is overkill since we know the new path.
@@ -79,6 +99,15 @@ class MemorySourcesStore {
       });
       return result;
     } catch (e) {
+      if (isDaemonDown(e)) {
+        toasts.update(toastId, {
+          kind: "error",
+          message:
+            "Memory load needs the agent server, which isn't running.",
+          sticky: true,
+        });
+        return null;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       toasts.update(toastId, {
         kind: "error",
@@ -100,9 +129,9 @@ class MemorySourcesStore {
       message: `Removing memory source ${htmlPath} …`,
     });
     try {
-      const result = await ws.memoryControl<RemoveWorkbookResult>(
-        "remove_workbook",
-        { path: htmlPath },
+      const result = await engineRequest<RemoveWorkbookResult>(
+        "/api/memory/sources",
+        { method: "DELETE", body: { path: htmlPath } },
       );
       this.loaded = this.loaded.filter((p) => p !== htmlPath);
       toasts.update(toastId, {
@@ -111,6 +140,15 @@ class MemorySourcesStore {
       });
       return result;
     } catch (e) {
+      if (isDaemonDown(e)) {
+        toasts.update(toastId, {
+          kind: "error",
+          message:
+            "Memory remove needs the agent server, which isn't running.",
+          sticky: true,
+        });
+        return null;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       toasts.update(toastId, {
         kind: "error",

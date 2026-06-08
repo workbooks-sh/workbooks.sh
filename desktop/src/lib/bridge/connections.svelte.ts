@@ -3,15 +3,24 @@
 // returns redacted records with only the metadata needed to render
 // the connected-service card.
 //
-// Sidecar coupling: each connection forwards an env var into the
-// sidecar at spawn (`COMPOSIO_API_KEY`, `DOPPLER_TOKEN`, etc.) so
-// the Elixir-side SDK calls can authenticate. Changing a connection
-// requires a sidecar restart, surfaced via the shared `dirty` flag
-// the existing IntegrationsSettings panel already handles.
+// Phase B placement:
+//   - NATIVE (offline): connections_list/create/delete read+write the
+//     OS keychain (secrets) + a redacted index on disk. Secrets never
+//     cross IPC — only redacted metadata + key_length come back.
+//   - RUNTIME (graceful-offline): listComposioAccounts hits the
+//     control-plane GET /api/integrations/composio/connections; the
+//     Elixir side reads COMPOSIO_API_KEY from env and calls Composio.
+//     When the daemon is down it returns a typed ComposioListError so
+//     the picker renders an actionable empty-state instead of throwing
+//     a raw transport error.
+//
+// Each connection forwards an env var into the daemon at spawn
+// (`COMPOSIO_API_KEY`, `DOPPLER_TOKEN`, etc.). The runtime
+// connections.changed firehose is pending; for now we refresh the
+// store directly after every mutation.
 
 import { invoke } from "@tauri-apps/api/core";
-import { sidecar } from "./sidecar.svelte";
-import { ws } from "./ws.svelte";
+import { engineRequest, EngineApiError } from "$lib/engine-api/gen";
 
 export type ConnectionService =
   // Cloud integration services.
@@ -51,21 +60,16 @@ class ConnectionsStore {
   lastError = $state<string | null>(null);
 
   /** Mutated by every connect/disconnect; cleared by the shared
-   *  restartSidecar flow over in IntegrationsSettings. */
+   *  restart flow over in IntegrationsSettings. */
   dirty = $state(false);
-
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("connections.org", () => {
-      void this.refresh();
-    });
   }
 
   dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
+    // No live subscription to tear down — runtime connections.changed
+    // firehose is pending; mutations refresh directly.
   }
 
   async refresh() {
@@ -86,8 +90,8 @@ class ConnectionsStore {
     return this.connections.find((c) => c.service === service) ?? null;
   }
 
-  // Mutations: Rust persists the connection (encrypted at rest) then
-  // pushes the new env var to the live sidecar via
+  // Mutations: Rust persists the connection (secret in OS keychain)
+  // then pushes the new env var to the live daemon via
   // /internal/secrets/refresh — no restart needed.
 
   async connect(req: ConnectionCreate): Promise<ConnectionRedacted> {
@@ -103,37 +107,45 @@ class ConnectionsStore {
     await this.refresh();
   }
 
-  /** Fetch the user's connected Composio accounts via the sidecar.
+  /** Fetch the user's connected Composio accounts via the daemon.
    *  The Elixir side reads `COMPOSIO_API_KEY` from env (forwarded by
    *  the Rust spawn) and calls Composio's REST API; the renderer
    *  never sees the API key.
    *
    *  Returns the list, or throws a typed error so the picker modal
-   *  can render an actionable message (missing key, upstream down). */
+   *  can render an actionable message (daemon down, missing key,
+   *  upstream down). */
   async listComposioAccounts(): Promise<ComposioAccount[]> {
-    if (!sidecar.status.url) {
+    try {
+      const body = await engineRequest<{ connections?: ComposioAccount[] }>(
+        "/api/integrations/composio/connections",
+      );
+      return body.connections ?? [];
+    } catch (e) {
+      if (e instanceof EngineApiError) {
+        if (e.code === "daemon_down") {
+          throw new ComposioListError(
+            "daemon_down",
+            "The agent server isn't running yet.",
+          );
+        }
+        if (e.status === 412) {
+          throw new ComposioListError(
+            "no_api_key",
+            e.message ||
+              "Connect Composio in Settings → Integrations to populate this list.",
+          );
+        }
+        throw new ComposioListError(
+          "upstream",
+          e.message || `Composio API returned ${e.status}`,
+        );
+      }
       throw new ComposioListError(
-        "sidecar_down",
-        "The agent server isn't running yet.",
+        "upstream",
+        e instanceof Error ? e.message : String(e),
       );
     }
-    const res = await fetch(
-      `${sidecar.status.url}/api/integrations/composio/connections`,
-      { headers: { accept: "application/json" } },
-    );
-    const body = await res.json().catch(() => ({}));
-    if (res.ok) return body.connections ?? [];
-    if (res.status === 412) {
-      throw new ComposioListError(
-        "no_api_key",
-        body.message ??
-          "Connect Composio in Settings → Integrations to populate this list.",
-      );
-    }
-    throw new ComposioListError(
-      "upstream",
-      body.message ?? `Composio API returned ${res.status}`,
-    );
   }
 }
 
@@ -149,7 +161,7 @@ export interface ComposioAccount {
  *  on `.code` to render the right empty-state. */
 export class ComposioListError extends Error {
   constructor(
-    public code: "sidecar_down" | "no_api_key" | "upstream",
+    public code: "daemon_down" | "no_api_key" | "upstream",
     message: string,
   ) {
     super(message);

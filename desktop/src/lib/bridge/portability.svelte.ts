@@ -1,9 +1,10 @@
-// Portability bridge — wb-unzn.25 P3.
+// files domain — portability bridge (Phase B, native/offline).
 //
-// Shells out (via the Rust `workbook_check_portability` Tauri command)
-// to `wb check --portability <workdir> --json`. The CLI emits the
-// per-cell classification + the workbook's computed tier; we hold the
-// last result in a reactive store and re-fetch on demand.
+// Invokes the native Rust `workbook_check_portability` Tauri command
+// (which runs `wb check --portability <workdir> --json`). The CLI emits
+// the per-cell classification + the workbook's computed tier; we hold the
+// last result in a reactive store and re-fetch on demand. No runtime /
+// control-plane involvement — fully local.
 //
 // Defensive about CLI availability: the rust-agent ships the
 // `--portability` verb under the same epic but may land before/after

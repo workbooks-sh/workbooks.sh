@@ -13,7 +13,6 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export interface Theme {
   id: string;
@@ -47,15 +46,10 @@ class ThemesStore {
     this.themes.find((t) => t.id === this.activeId) ?? null,
   );
 
-  #liveUnsub: (() => void) | null = null;
-
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("themes.org", () => {
-      void this.refresh();
-    });
 
     // React to OS light/dark changes so a theme with both variants
     // re-applies the right one automatically.
@@ -70,7 +64,7 @@ class ThemesStore {
     this.loading = true;
     this.lastError = null;
     try {
-      const snap = await invoke<ThemesSnapshot>("themes_list");
+      const snap = await invoke<ThemesSnapshot>("theme_list");
       this.themes = snap.themes;
       this.activeId = snap.active_id;
     } catch (e) {
@@ -81,7 +75,7 @@ class ThemesStore {
   }
 
   async setActive(id: string | null): Promise<void> {
-    await invoke("themes_set_active", { id });
+    await invoke("theme_set_active", { id });
     this.activeId = id;
     this.applyActive();
   }
@@ -92,7 +86,7 @@ class ThemesStore {
     light_tokens: Record<string, string>,
     dark_tokens: Record<string, string>,
   ): Promise<Theme> {
-    const t = await invoke<Theme>("themes_create", {
+    const t = await invoke<Theme>("theme_create", {
       req: { name, description, light_tokens, dark_tokens },
     });
     await this.refresh();
@@ -106,7 +100,7 @@ class ThemesStore {
     light_tokens: Record<string, string>,
     dark_tokens: Record<string, string>,
   ): Promise<void> {
-    await invoke("themes_update", {
+    await invoke("theme_update", {
       req: { id, name, description, light_tokens, dark_tokens },
     });
     await this.refresh();
@@ -114,7 +108,7 @@ class ThemesStore {
   }
 
   async delete(id: string): Promise<void> {
-    await invoke("themes_delete", { id });
+    await invoke("theme_delete", { id });
     await this.refresh();
     this.applyActive();
   }

@@ -1,19 +1,25 @@
-// Agent defaults bridge — default model used by the oql-agent
-// sidecar when no per-task override is set. Mirrors `agent_settings.rs`.
+// Agent defaults bridge — NATIVE/local cap (offline-capable).
 //
-// The setting persists in `~/.oql/desktop/agent-settings.org` and is
-// pushed into the live sidecar via /internal/secrets/refresh as
-// `WB_AGENT_MODEL`, so a change here takes effect on the next agent
-// call without a restart.
+// `default_model` is the model the runtime agent tier uses when no
+// per-task override is set; `default_agent_slug` pins which agent the
+// chat panel opens to on first load. Both persist host-side via the
+// Rust shell (agent_settings_get / agent_settings_set) so the values
+// survive offline and across restarts.
+//
+// agent_settings_set is best-effort on the runtime side: when the
+// daemon is up the shell also pushes the new model down the live
+// control-plane (so a change takes effect without a daemon restart);
+// when offline it just persists locally and the next daemon boot
+// picks it up. Either way the returned AgentSettings is authoritative
+// for the UI.
 
 import { invoke } from "@tauri-apps/api/core";
-import { ws } from "./ws.svelte";
 
 export interface AgentSettings {
   default_model: string;
   /** Slug of the agent the chat panel opens to on first load (when no
-   *  per-window selection has been persisted to localStorage). Empty
-   *  string = unset, fall back to the catalog default. */
+   *  per-window selection has been persisted locally). Empty string =
+   *  unset, fall back to the catalog default. */
   default_agent_slug: string;
 }
 
@@ -31,20 +37,16 @@ class AgentSettingsStore {
   lastError = $state<string | null>(null);
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
     await this.refresh();
-    this.#liveUnsub = ws.onMonorepoChange("agent-settings.org", () => {
-      void this.refresh();
-    });
   }
 
   dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
+    // No live subscription to tear down — settings are local-native and
+    // refreshed directly after each mutation.
   }
 
   async refresh() {

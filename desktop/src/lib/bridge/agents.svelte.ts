@@ -1,12 +1,16 @@
 // Agents bridge — catalog + selection state.
 //
-// Catalog: fetched from the sidecar's GET /api/agents, which walks
-// project-scope → user-scope → bundled priv/agents and returns
-// parsed metadata per the :agent: entity binding (see
-// packages/oql/plugins/agent/manifest.org).
+// Catalog (RUNTIME cap, graceful-offline): fetched from the runtime
+// control-plane GET /api/agents, which walks project-scope →
+// user-scope → bundled priv/agents and returns parsed metadata per
+// the :agent: entity binding (see packages/oql/plugins/agent/
+// manifest.org). When the daemon is offline (or the route is still
+// pending) the catalog degrades to empty — the picker renders its
+// empty state, never an error.
 //
-// Selection: which agent the chat panel sends to. Persists across
-// reloads via localStorage. When the catalog has no match for the
+// Selection (LOCAL-STORE cap, offline): which agent the chat panel
+// sends to. Persists across reloads via the local agent_selection
+// store (localStorage today). When the catalog has no match for the
 // stored slug (deleted agent, rebuild), falls back to "workhorse" if
 // present, else the first listed entry.
 //
@@ -15,11 +19,13 @@
 // `agent_define` backend tool via the creator agent, and the
 // OrgEditor for in-place edits).
 
-import { sidecar } from "./sidecar.svelte";
-import { enginePath } from "$lib/engine-api/gen";
+import {
+  EngineApiError,
+  enginePath,
+  engineRequest,
+} from "$lib/engine-api/gen";
 import { packageStore as workspace } from "./package.svelte";
 import { agentSettings } from "./agent_settings.svelte";
-import { ws } from "./ws.svelte";
 import { active } from "./_active.svelte";
 
 export type AgentScope = "project" | "user" | "builtin";
@@ -109,7 +115,8 @@ const FALLBACK_TAGLINES: Record<string, string> = {
     "The default Workbooks agent — knows the ecosystem, can do anything reasonable.",
 };
 
-/** localStorage key for the user's last-chosen agent. */
+/** Local-store (agent_selection) key for the user's last-chosen
+ *  agent. Offline-capable — survives with no daemon. */
 const SELECTION_KEY = "wb.chat.selected-agent";
 
 /** Fallback when the stored slug doesn't resolve in the catalog. */
@@ -131,13 +138,13 @@ class AgentsStore {
   );
 
   #initStarted = false;
-  #liveUnsub: (() => void) | null = null;
 
   init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
-    // Restore selection from localStorage first so the picker UI shows
-    // the right value even before the catalog fetch resolves.
+    // Restore selection from the local agent_selection store first so
+    // the picker UI shows the right value even before the catalog
+    // fetch resolves.
     try {
       const stored = localStorage.getItem(SELECTION_KEY);
       if (stored) {
@@ -152,28 +159,16 @@ class AgentsStore {
     // by the time #reconcileSelection runs.
     void agentSettings.init();
     void this.refresh();
-    // Live: any agent .org under the data root changes → refresh
-    // catalog. Covers project-scope (`<pkg>/.oql/agents/`) and
-    // user-scope (`~/Workbooks/Engine/agents/`) — both live under
-    // `~/Workbooks/`, both match this pattern. Builtin agents in
-    // priv/agents/ aren't watched (not under the data root) but
-    // those don't change at runtime anyway.
-    this.#liveUnsub = ws.onMonorepoChange("**/agents/*.org", () => {
-      void this.refresh();
-    });
+    // Live catalog refresh (RUNTIME fs-watch → agents_list) is pending
+    // on the runtime; until it lands we refresh directly on init and
+    // after any nav that re-invokes init/refresh.
   }
 
   dispose() {
-    this.#liveUnsub?.();
-    this.#liveUnsub = null;
+    // No live subscription to tear down.
   }
 
   async refresh(): Promise<void> {
-    const { url } = sidecar.status;
-    if (!url) {
-      // Sidecar not up yet. Settings + chat will retry on next nav.
-      return;
-    }
     this.loading = true;
     this.lastError = null;
     try {
@@ -181,9 +176,10 @@ class AgentsStore {
       const qs = workdir
         ? "?workdir=" + encodeURIComponent(workdir)
         : "";
-      const r = await fetch(`${url}${enginePath.agents_list}${qs}`);
-      if (!r.ok) throw new Error(`GET /api/agents ${r.status}`);
-      const body = (await r.json()) as { agents: AgentCatalogEntry[] };
+      const body = await engineRequest<{ agents?: AgentCatalogEntry[] }>(
+        enginePath.agents_list,
+        { query: qs, timeoutMs: 5_000 },
+      );
       const raw = body.agents ?? [];
       this.agents = raw
         // Drop bundled test fixtures + agents explicitly marked
@@ -202,14 +198,26 @@ class AgentsStore {
         }));
       this.#reconcileSelection();
     } catch (e) {
+      // Daemon offline (or route pending) → degrade to an empty
+      // catalog without surfacing an error to the picker. Any persisted
+      // selection stays put so it re-resolves once the daemon returns.
+      if (
+        e instanceof EngineApiError &&
+        (e.code === "daemon_down" || e.code === "sidecar_down")
+      ) {
+        this.agents = [];
+        this.lastError = null;
+        return;
+      }
       this.lastError = e instanceof Error ? e.message : String(e);
     } finally {
       this.loading = false;
     }
   }
 
-  /** Set the active agent and persist. Mirrors to the shared
-   *  `active` store so ws can read it without importing agents. */
+  /** Set the active agent and persist to the local agent_selection
+   *  store. Mirrors to the shared `active` store so ws can read it
+   *  without importing agents. */
   select(slug: string): void {
     this.selected = slug;
     active.agentSlug = slug;

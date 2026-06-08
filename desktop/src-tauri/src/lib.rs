@@ -1,11 +1,13 @@
-// Workbooks Desktop — a LEAN Tauri shell. It does only what a browser can't:
-//   * drive the runtime daemon via the deploy-kit (`wb deploy local|status|down`)
-//   * read the discovery file the runtime writes (port + token)
-//   * a menu-bar tray = the daemon's UI; the window = the Svelte frontend
+// Workbooks Desktop — the LEAN native shell. Phase B widens it from a daemon
+// supervisor into the full offline-first capability surface the Svelte frontend
+// invoke()s: file tree + watchers, packages/workspaces, bookmarks/themes/MCP/
+// plugins, secrets in the OS keychain, PTY terminals, local identity + WorkOS
+// sign-in. Network/agent features stay graceful when the runtime is down.
 //
-// Everything else (data, agents, settings) the frontend gets by talking HTTP/WS
-// to the runtime at the discovered URL — NOT through Rust IPC. The shell is a
-// supervisor + native chrome, nothing more.
+// Offline-first split:
+//   NATIVE (local, work offline) — fs/doc/tab/workspace/bookmark/theme/terminal
+//   RUNTIME (graceful when down)  — agent/chat/network/publish, over the
+//                                    control-plane at the discovered URL.
 
 use serde::Serialize;
 use tauri::{
@@ -14,10 +16,22 @@ use tauri::{
     AppHandle, Emitter, Manager,
 };
 
+mod agent_settings;
 mod daemon;
 mod fs;
+mod fs_ops;
 mod kernel;
+mod keychain;
+mod network;
+mod orgprops;
+mod packages;
+mod paths;
+mod setup;
+mod store;
 mod tabs;
+mod terminal;
+mod workbooks;
+mod workspaces;
 use daemon::Discovery;
 
 /// What the frontend needs to talk to the runtime: the localhost URL + the
@@ -73,72 +87,160 @@ fn outline(org: String) -> Result<String, String> {
     kernel::call("parse-headlines", &org)
 }
 
-/// Read a workbook file the user picked (via the dialog plugin, main-thread safe).
-/// The dialog returns a path; the actual read/write is plain Rust — no fs-plugin
-/// scope to configure. Part of the "shell = capabilities" model.
-#[tauri::command]
-fn read_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn write_file(path: String, content: String) -> Result<(), String> {
-    std::fs::write(&path, content).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn daemon_status() -> String {
-    daemon::wb(&["deploy", "status", "--json"]).unwrap_or_else(|e| e)
-}
-
-#[tauri::command]
-fn daemon_up() -> String {
-    daemon::wb(&["deploy", "local", "--json"]).unwrap_or_else(|e| e)
-}
-
-#[tauri::command]
-fn daemon_down() -> String {
-    daemon::wb(&["deploy", "down", "--json"]).unwrap_or_else(|e| e)
-}
+/// macOS WKWebView media capture for STT + live-voice. The mic entitlement
+/// itself is granted by Info.plist's NSMicrophoneUsageDescription (bundled at
+/// package time); WKWebView honours getUserMedia once that's present, so this
+/// hook is the documented seam where any future per-config tweak lands. Kept as
+/// a no-op rather than poking WKWebView internals via raw objc, which would tie
+/// the shell to an unstable private API.
+fn enable_webview_media(_app: &AppHandle) {}
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .manage(tabs::TabManager::default())
+        .manage(fs_ops::Watchers::default())
+        .manage(terminal::PtyManager::default())
         .invoke_handler(tauri::generate_handler![
+            // Kernel + runtime discovery.
             weave,
             tangle,
             validate,
             lint,
             outline,
-            read_file,
-            write_file,
             runtime_url,
-            daemon_status,
-            daemon_up,
-            daemon_down,
+            // Daemon control-plane.
+            daemon::daemon_status,
+            daemon::daemon_up,
+            daemon::daemon_down,
+            daemon::daemon_restart,
+            // Tabs.
             tabs::tab_list,
             tabs::tab_open,
             tabs::tab_focus,
             tabs::tab_close,
             tabs::tab_set_dirty,
-            fs::read_dir
+            // Filesystem.
+            fs::fs_tree_walk,
+            fs::fs_dir_read,
+            fs::fs_read_file,
+            fs::fs_write_file,
+            fs_ops::fs_reveal,
+            fs_ops::fs_rename,
+            fs_ops::fs_delete,
+            fs_ops::fs_mkdir,
+            fs_ops::fs_create_file,
+            fs_ops::fs_watch_start,
+            fs_ops::fs_watch_stop,
+            fs_ops::config_watch_start,
+            // Workbooks + memory.
+            workbooks::workbook_spec_read,
+            workbooks::memory_source_resolve,
+            // Packages.
+            packages::package_list,
+            packages::package_get_active,
+            packages::package_load,
+            packages::package_create,
+            packages::package_import_folder,
+            packages::package_set_icon,
+            packages::package_delete,
+            packages::package_add_folder,
+            packages::package_remove_folder,
+            packages::package_set_active,
+            packages::package_refresh_active,
+            packages::package_set_layout,
+            packages::package_set_view_mode,
+            packages::package_set_subtree,
+            packages::package_workbooks,
+            // Workspaces.
+            workspaces::workspace_list,
+            workspaces::workspace_get_active,
+            workspaces::workspace_create,
+            workspaces::workspace_set_active,
+            workspaces::workspace_rename,
+            workspaces::workspace_set_icon,
+            workspaces::workspace_delete,
+            workspaces::workspace_add_package,
+            workspaces::workspace_remove_package,
+            workspaces::workspace_set_subtree,
+            // Bookmarks + themes + MCP + plugins.
+            store::bookmark_list,
+            store::bookmark_create,
+            store::bookmark_rename,
+            store::bookmark_delete,
+            store::bookmark_set_slot,
+            store::theme_list,
+            store::theme_set_active,
+            store::theme_create,
+            store::theme_update,
+            store::theme_delete,
+            store::mcp_list,
+            store::mcp_create,
+            store::mcp_update,
+            store::mcp_delete,
+            store::plugins_list,
+            store::plugins_install,
+            store::plugins_set_enabled,
+            store::plugins_remove,
+            // Agent settings.
+            agent_settings::agent_settings_get,
+            agent_settings::agent_settings_set,
+            // Keychain: keys / env-vars / connections.
+            keychain::keys_list,
+            keychain::keys_known_providers,
+            keychain::keys_create,
+            keychain::keys_rename,
+            keychain::keys_delete,
+            keychain::keys_reveal,
+            keychain::keys_copy_to_clipboard,
+            keychain::env_vars_list,
+            keychain::env_vars_create,
+            keychain::env_vars_update,
+            keychain::env_vars_delete,
+            keychain::env_vars_copy_to_clipboard,
+            keychain::env_vars_bulk_import,
+            keychain::connections_list,
+            keychain::connections_create,
+            keychain::connections_delete,
+            keychain::connections_reveal_api_key,
+            // Identity + WorkOS + packaging.
+            network::identity_load,
+            network::identity_generate,
+            network::identity_set_handle,
+            network::identity_set_workos,
+            network::workspace_package,
+            network::workos_sign_in,
+            network::workos_load_session,
+            network::workos_clear_session,
+            // Terminal.
+            terminal::terminal_spawn,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_kill,
+            // Setup.
+            setup::setup_status,
+            setup::setup_initialize_keychain,
+            setup::setup_complete_first_run,
+            setup::setup_save_model_key,
         ])
         .setup(|app| {
             build_tray(app.handle())?;
+            enable_webview_media(app.handle());
 
-            // Workbook-native: do NOT auto-start the heavy runtime on launch. The
-            // app opens + weaves/edits workbooks via the embedded kernel with no
-            // server. Just CONNECT to a runtime if one is already up (discovery
-            // file present) and report state; starting it is explicit (the tray, or
-            // when the user opens an agent feature).
+            // Workbook-native: do NOT auto-start the heavy runtime on launch.
+            // CONNECT to a running one if its discovery file is present and
+            // report state; starting it is explicit (tray, or an agent feature).
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let state = if Discovery::read().is_some() { "up" } else { "down" };
                 let _ = handle.emit("sidecar-state", state);
             });
+            // Live daemon-state poll (discovery + /health), emits `daemon-state`.
+            daemon::spawn_state_poll(app.handle().clone());
             Ok(())
         })
         // Closing the window HIDES it — the daemon (and tray) keep running. Quit
