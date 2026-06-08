@@ -31,16 +31,21 @@ concurrency:
 
 jobs:
   publish:
-    # Native arm64 runner → no QEMU, ~10× faster than emulated multi-arch. mac-first
-    # local deploys need arm64; WB_PLATFORMS pins it (amd64 cloud = a later matrix arm).
+    # MULTI-ARCH: amd64 (most cloud hosts) + arm64 (mac-first local krunvm). Built on the arm64
+    # runner with QEMU emulating amd64 — ~12 min, and both arches are needed for a replicable
+    # local+cloud deploy. (A native per-arch matrix would be faster but isn't worth the merge
+    # complexity at this cadence; queue-not-cancel above guarantees :latest always advances.)
     runs-on: ubuntu-24.04-arm
     env:
-      WB_PLATFORMS: linux/arm64
+      WB_PLATFORMS: linux/amd64,linux/arm64
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      # QEMU registers binfmt handlers so the arm64 runner can build the amd64 image.
+      - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v3
 
