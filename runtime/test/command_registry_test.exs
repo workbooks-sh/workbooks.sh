@@ -54,6 +54,72 @@ defmodule Workbooks.CommandRegistryTest do
   end
 
   # ---------------------------------------------------------------------------
+  # build_and_register_inline — the agent self-authoring join (wb-rhs.4).
+  # Guard paths only here (no compile): they prove self-authoring cannot poison
+  # the namespace or smuggle an unsupported lang BEFORE any in-sandbox build.
+  # ---------------------------------------------------------------------------
+
+  describe "build_and_register_inline/5 guards (pre-compile)" do
+    test "refuses a reserved built-in name before building" do
+      assert {:error, :reserved_name} =
+               CommandRegistry.build_and_register_inline("jq", "rust", "fn main(){}")
+    end
+
+    test "rejects an empty / non-binary name" do
+      assert {:error, :invalid_name} =
+               CommandRegistry.build_and_register_inline("", "rust", "fn main(){}")
+
+      assert {:error, :invalid_name} =
+               CommandRegistry.build_and_register_inline(nil, "rust", "fn main(){}")
+    end
+
+    test "rejects an exotic-charset name" do
+      assert {:error, :invalid_name} =
+               CommandRegistry.build_and_register_inline("../evil", "rust", "fn main(){}")
+    end
+
+    test "rejects an unsupported language" do
+      assert {:error, {:unsupported_lang, "haskell"}} =
+               CommandRegistry.build_and_register_inline(uniq("t"), "haskell", "main = pure ()")
+    end
+
+    test "rejects empty source" do
+      assert {:error, :empty_source} =
+               CommandRegistry.build_and_register_inline(uniq("t"), "rust", "")
+    end
+
+    test "rejects non-list deps" do
+      assert {:error, :invalid_deps} =
+               CommandRegistry.build_and_register_inline(uniq("t"), "rust", "fn main(){}", "notalist")
+    end
+
+    test "a guard failure registers NOTHING (namespace stays clean)" do
+      name = uniq("ghost")
+      assert {:error, _} =
+               CommandRegistry.build_and_register_inline(name, "haskell", "x")
+      refute name in CommandRegistry.list()
+    end
+
+    @tag :build
+    test "FULL self-authoring loop: inline source → build-in-sandbox → register → run" do
+      # The wb-rhs.4 headline: an agent writes source, builds it ENTIRELY in the
+      # wasm sandbox (Javy here — the fast lane), registers it, and runs it — no
+      # native toolchain, no host escape, all in one call chain.
+      name = uniq("rev")
+
+      # A Javy JS command that reverses stdin (chunked read to EOF).
+      src = ~S|const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const s=new TextDecoder().decode(all).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.split("").reverse().join("")));|
+
+      assert {:ok, path} = CommandRegistry.build_and_register_inline(name, "js", src)
+      # Content-addressed into the commands store (sha256 == filename).
+      assert path =~ ~r/build\/commands\/[0-9a-f]{64}\.wasm$/
+      # The freshly self-authored command is now runnable through the registry.
+      assert name in CommandRegistry.list()
+      assert {:ok, "olleh"} = CommandRegistry.run(name, "hello")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # run/2,3,4 — happy path on real wasm builtins
   # ---------------------------------------------------------------------------
 

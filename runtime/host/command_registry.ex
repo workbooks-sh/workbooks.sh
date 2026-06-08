@@ -172,6 +172,58 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  # Inline languages an agent can self-author a command in. Rust takes crates.io
+  # `deps`; the others ignore them. The compiler for each is itself wasm
+  # (PackageManager → Compilers), so the build never escapes the sandbox.
+  @inline_langs ~w(rust c zig js ts go)
+
+  @doc """
+  The inline self-authoring join (wb-rhs.4): build a command from INLINE SOURCE
+  an agent wrote, then register it — write → build → content-address → register,
+  ENTIRELY in the wasm sandbox. `lang` ∈ #{inspect(@inline_langs)}; `deps` are
+  crates.io specs (rust only). Returns {:ok, addressed_path} | {:error, reason}.
+
+  This is what lets an agent author a toolkit for itself mid-session: no native
+  toolchain, no host escape (the compiler is itself wasm). SECURITY/TRUST: the
+  built command is capped by the Instance's Policy profile exactly like any other
+  command — self-authoring builds and runs, but can NEVER exceed the granted
+  capability set (an ungranted cap is un-importable → un-callable). Reserved
+  built-in names (jq/grep/upper) are refused before any compile.
+  """
+  def build_and_register_inline(name, lang, source, deps \\ [], mode \\ :argv)
+
+  def build_and_register_inline(name, _lang, _source, _deps, _mode)
+      when not is_binary(name) or name == "",
+      do: {:error, :invalid_name}
+
+  def build_and_register_inline(name, lang, source, deps, mode) do
+    cond do
+      name in @reserved ->
+        {:error, :reserved_name}
+
+      not Regex.match?(@name_re, name) ->
+        {:error, :invalid_name}
+
+      lang not in @inline_langs ->
+        {:error, {:unsupported_lang, lang}}
+
+      not is_binary(source) or source == "" ->
+        {:error, :empty_source}
+
+      not is_list(deps) ->
+        {:error, :invalid_deps}
+
+      true ->
+        comp = %{"name" => name, "lang" => lang, "src" => source, "deps" => deps}
+
+        case Workbooks.PackageManager.build(comp) do
+          {^name, ^lang, {:ok, wasm, _}} -> register_artifact(name, wasm, mode)
+          {_, _, {:error, reason}} -> {:error, {:build_failed, reason}}
+          other -> {:error, {:build_failed, other}}
+        end
+    end
+  end
+
   @doc """
   The generic auto-wrap: build an arbitrary upstream Rust CLI crate to
   wasm32-wasip1 and register it as a command — any WASI-clean crate, zero per-CLI

@@ -346,6 +346,28 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  @doc """
+  Inline self-authoring (wb-rhs.4): build a command directly from a SOURCE FILE an
+  agent just wrote — no manifest ceremony. `wb toolkit build-inline <name> <lang>
+  <file>`. The agent writes the file in its workdir, then registers it as a
+  runnable command in one step: write → build-in-sandbox → content-address →
+  register. The built command is capped by the Instance's Policy profile like any
+  other command — self-authoring never widens the granted capability set.
+  """
+  def build_inline_text(name, lang, file) do
+    if File.regular?(file) do
+      case Workbooks.CommandRegistry.build_and_register_inline(name, lang, File.read!(file)) do
+        {:ok, path} ->
+          "built + registered command `#{name}` (#{lang}) → #{path}\nrun it via the Dock: run-command #{name}"
+
+        {:error, reason} ->
+          "build-inline failed for `#{name}` (#{lang}): #{inspect(reason)}"
+      end
+    else
+      "no such source file: #{file}"
+    end
+  end
+
   # A runtime entry is either runtimes/<name>.org (a flat pinned spec) or
   # runtimes/<name>/manifest.org (a dir carrying a build script + assets).
   defp runtime_entries(dir) do

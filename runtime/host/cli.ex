@@ -230,6 +230,7 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
   def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
   def call(["toolkit", "build", id, which], _t), do: Toolkits.build_text(id, which, Toolkits.default_root())
+  def call(["toolkit", "build-inline", name, lang, file], _t), do: Toolkits.build_inline_text(name, lang, file)
 
   def call(["toolkit", "run", id, task | rest], _t),
     do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
@@ -444,6 +445,7 @@ defmodule Workbooks.CLI do
       wb toolkit search <query>            substring search across all skills
       wb toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
       wb toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
+      wb toolkit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
       wb toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
       wb publish init                          scaffold ./publish.org
       wb publish validate                      coherence-check it
