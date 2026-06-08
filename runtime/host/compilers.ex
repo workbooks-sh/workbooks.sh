@@ -142,6 +142,16 @@ defmodule Workbooks.Compilers do
   # ceiling (newer regex pulls regex-automata; syn/serde_derive went to syn-2 / edition-2024). The
   # resolver tries the floor FIRST when it satisfies the caller's req, so a bare `regex` resolves to
   # a buildable version instead of walking 6 doomed newest ones. An explicit pin still wins.
+  # wb-5bv: mrustc can't resolve a RE-EXPORTED proc-macro derive (`use serde::Serialize` →
+  # serde's `pub use serde_derive::*`). Rather than fork the compiler, the BEAM normalizes the
+  # SOURCE: when a proc-macro crate that re-exports derives is in the tree and the user invokes one
+  # of those derives, inject `use <derive_crate>::<Derive>` — which coexists with the user's
+  # `use serde::Serialize` (trait = type namespace, derive = macro namespace; verified). Keyed by
+  # the derive crate (crate_id form) → the derive names it provides.
+  @derive_reexports %{
+    "serde_derive" => ~w(Serialize Deserialize)
+  }
+
   @version_floors %{
     "regex" => "1.5.4",
     "regex-syntax" => "0.6.29",
@@ -473,6 +483,11 @@ defmodule Workbooks.Compilers do
 
         {pm_servers, pm_externs} = build_pm_servers(o, cl, extern_args0)
         extern_args = extern_args0 ++ pm_externs
+
+        # wb-5bv: normalize re-exported derives in the user source (the BEAM-side fix for the serde
+        # idiom — no compiler change). Conservative: only for derive crates actually built, only
+        # derives actually used, only when not already imported directly.
+        if pm_servers != [], do: inject_reexport_imports(Path.join(o, "#{name}.rs"), o)
 
         # wb-mrz: link EVERY compiled dep object present in deps/ (sorted → deterministic) EXCEPT the
         # proc-macro subtree. deps/ was cleaned at build start, so it holds exactly this tree.
@@ -1080,6 +1095,35 @@ defmodule Workbooks.Compilers do
       end
     else
       {:error, reason} -> {:error, {:fetch_failed, name, version, String.slice(inspect(reason), 0, 200)}}
+    end
+  end
+
+  # wb-5bv: inject `use <derive_crate>::<Derive>` for re-exported derives the user invokes. Reads the
+  # proc-macro crates actually built (.pmentry markers), and for each that re-exports derives, adds
+  # the direct import IF the derive is used and not already imported from that crate. Pure source
+  # transform — makes `use serde::Serialize; #[derive(Serialize)]` resolve without a compiler change.
+  defp inject_reexport_imports(src_path, o) do
+    if File.regular?(src_path) do
+      pm_crates =
+        Path.wildcard(Path.join(o, "deps/*.rlib.o.pmentry"))
+        |> Enum.map(fn m -> File.read!(m) |> String.split("\t", parts: 2) |> hd() end)
+
+      src = File.read!(src_path)
+
+      injections =
+        for pm <- pm_crates,
+            derives = Map.get(@derive_reexports, pm),
+            derives != nil,
+            d <- derives,
+            Regex.match?(~r/#\[derive\([^\]]*\b#{d}\b[^\]]*\)\]/, src),
+            not Regex.match?(~r/use\s+#{pm}::(\{[^}]*\b#{d}\b|#{d}\b)/, src),
+            uniq: true do
+          "use #{pm}::#{d};"
+        end
+
+      if injections != [] do
+        File.write!(src_path, Enum.join(Enum.uniq(injections), "\n") <> "\n" <> src)
+      end
     end
   end
 

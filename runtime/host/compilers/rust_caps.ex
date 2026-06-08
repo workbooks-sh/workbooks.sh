@@ -57,10 +57,10 @@ defmodule Workbooks.Compilers.RustCaps do
         },
         %{
           id: :proc_macro_reexport,
-          what: "Re-exported derive macros: `use serde::Serialize; #[derive(Serialize)]` fails (serde re-exports serde_derive's derive).",
-          mitigation: "Import the derive DIRECTLY from its *_derive crate: `use serde_derive::{Serialize, Deserialize};`. Then enable the parent's derive feature so it's pulled.",
-          beam_offload: false,
-          note: "mrustc doesn't resolve re-exported proc-macro derives (resolve/index.cpp TODO). Tracked: wb-5bv."
+          what: "(SOLVED via the BEAM.) `use serde::Serialize; #[derive(Serialize)]` works — serde re-exports serde_derive's derive, which mrustc itself can't resolve.",
+          mitigation: "Nothing needed for the curated crates (serde): the runtime injects `use serde_derive::Serialize` into the source automatically. For a re-export crate not yet curated, import the derive directly from its *_derive crate.",
+          beam_offload: :done,
+          note: "DONE (wb-5bv): rather than fork mrustc, the BEAM normalizes the SOURCE — @derive_reexports + inject_reexport_imports add the direct derive import (coexists with the trait import; verified end-to-end on idiomatic serde). Add a crate to @derive_reexports to extend."
         },
         %{
           id: :no_threads,
