@@ -131,10 +131,12 @@ sequenceDiagram
 
     Note over Tools: shell · fetch · files · search
     You->>Agent: describe the app
+    rect rgba(232, 97, 42, 0.13)
     loop until done
         Agent->>Tools: take a step
         Tools-->>Agent: result
         Agent->>Log: record it
+    end
     end
     Agent-->>You: finished Workbook
 ```
@@ -153,10 +155,14 @@ sequenceDiagram
     Workbook-->>Visitor: 🔒 sealed — needs a key
     Visitor->>Runtime: ask for the key
     alt access allowed
+        rect rgba(40, 200, 90, 0.14)
         Runtime-->>Visitor: 🔑 key
         Visitor->>Workbook: unseal & view
+        end
     else denied
+        rect rgba(220, 70, 70, 0.14)
         Runtime-->>Visitor: ✕ no key
+        end
     end
 ```
 
