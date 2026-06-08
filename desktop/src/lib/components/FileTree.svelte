@@ -98,5 +98,5 @@
   .caret.open { transform: rotate(90deg); }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hint { font-size: 0.74rem; color: var(--color-fg-subtle); padding-top: 2px; padding-bottom: 2px; }
-  .hint.err { color: #e06c75; }
+  .hint.err { color: var(--color-err); }
 </style>

@@ -20,6 +20,7 @@
   import { auth } from "$lib/auth.svelte";
   import { chrome } from "$lib/chrome.svelte";
   import AccountMenu from "./AccountMenu.svelte";
+  import Tip from "./ui/Tip.svelte";
 
   let { router }: { router: IRouter } = $props();
 
@@ -110,92 +111,99 @@
 </script>
 
 <nav class="rail" aria-label="Primary">
-  <button
-    class="ws"
-    style={tileStyle(workspace.icon, wsAccent)}
-    title={workspace.name}
-    aria-label="Switch workspace"
-  >
-    {#if isImageIcon(workspace.icon)}
-      <img src={workspace.icon} alt="" />
-    {:else if workspace.icon}
-      <span class="glyph">{workspace.icon}</span>
-    {:else}
-      <span class="ini">{initials(workspace.name)}</span>
-    {/if}
-  </button>
+  <Tip label={workspace.name}>
+    <button
+      class="ws"
+      style={tileStyle(workspace.icon, wsAccent)}
+      aria-label="Switch workspace"
+    >
+      {#if isImageIcon(workspace.icon)}
+        <img src={workspace.icon} alt="" />
+      {:else if workspace.icon}
+        <span class="glyph">{workspace.icon}</span>
+      {:else}
+        <span class="ini">{initials(workspace.name)}</span>
+      {/if}
+    </button>
+  </Tip>
 
   {#each topTabs as t (t.name)}
     {@const Icon = t.icon}
-    <button
-      class="tab"
-      class:active={activeName === t.name}
-      title={t.label}
-      aria-label={t.label}
-      onclick={() => go(t.name)}
-    >
-      <Icon size={18} strokeWidth={1.8} />
-    </button>
+    <Tip label={t.label}>
+      <button
+        class="tab"
+        class:active={activeName === t.name}
+        aria-label={t.label}
+        onclick={() => go(t.name)}
+      >
+        <Icon size={18} strokeWidth={1.8} />
+      </button>
+    </Tip>
   {/each}
 
   <div class="divider"></div>
 
   {#each packages as p (p.id)}
     {@const acc = iconAccent(p.icon)}
-    <button
-      class="pkg"
-      class:active={p.active && chrome.leftPanel === "files"}
-      style={tileStyle(p.icon, acc)}
-      title={p.name}
-      aria-label={p.name}
-      onclick={() => onPackage(p)}
-    >
-      {#if isImageIcon(p.icon)}
-        <img src={p.icon} alt="" />
-      {:else if p.icon}
-        <span class="glyph">{p.icon}</span>
-      {:else}
-        <span class="ini">{initials(p.name)}</span>
-      {/if}
-    </button>
+    <Tip label={p.name}>
+      <button
+        class="pkg"
+        class:active={p.active && chrome.leftPanel === "files"}
+        style={tileStyle(p.icon, acc)}
+        aria-label={p.name}
+        onclick={() => onPackage(p)}
+      >
+        {#if isImageIcon(p.icon)}
+          <img src={p.icon} alt="" />
+        {:else if p.icon}
+          <span class="glyph">{p.icon}</span>
+        {:else}
+          <span class="ini">{initials(p.name)}</span>
+        {/if}
+      </button>
+    </Tip>
   {/each}
 
-  <button class="tab add" title="New package" aria-label="New package">
-    <Plus size={16} strokeWidth={2} />
-  </button>
+  <Tip label="New package">
+    <button class="tab add" aria-label="New package">
+      <Plus size={16} strokeWidth={2} />
+    </button>
+  </Tip>
 
   <div class="spacer"></div>
 
   {#each bottomTabs as t (t.name)}
     {@const Icon = t.icon}
-    <button
-      class="tab"
-      class:active={activeName === t.name}
-      title={t.label}
-      aria-label={t.label}
-      onclick={() => go(t.name)}
-    >
-      <Icon size={18} strokeWidth={1.8} />
-    </button>
+    <Tip label={t.label}>
+      <button
+        class="tab"
+        class:active={activeName === t.name}
+        aria-label={t.label}
+        onclick={() => go(t.name)}
+      >
+        <Icon size={18} strokeWidth={1.8} />
+      </button>
+    </Tip>
   {/each}
 
-  <button
-    bind:this={accountBtnEl}
-    class="account"
-    class:signed={auth.signedIn}
-    title={auth.signedIn ? (auth.user?.email ?? "Account") : "Sign in"}
-    aria-label="Account"
-    aria-haspopup="menu"
-    aria-expanded={accountMenuOpen}
-    disabled={auth.status === "checking"}
-    onclick={toggleAccountMenu}
-  >
-    {#if auth.signedIn}
-      <span class="ini">{accountInitial()}</span>
-    {:else}
-      <UserIcon size={15} strokeWidth={1.8} />
-    {/if}
-  </button>
+  <Tip label={auth.signedIn ? (auth.user?.email ?? "Account") : "Sign in"}>
+    <button
+      bind:this={accountBtnEl}
+      class="account"
+      class:signed={auth.signedIn}
+      aria-label="Account"
+      aria-haspopup="menu"
+      aria-expanded={accountMenuOpen}
+      disabled={auth.status === "checking"}
+      onclick={toggleAccountMenu}
+    >
+      {#if auth.signedIn}
+        <span class="ini">{accountInitial()}</span>
+      {:else}
+        <UserIcon size={15} strokeWidth={1.8} />
+      {/if}
+    </button>
+  </Tip>
 
   {#if accountMenuOpen}
     <AccountMenu onclose={closeAccountMenu} />

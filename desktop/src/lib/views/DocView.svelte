@@ -215,9 +215,11 @@
   .status {
     display: inline-flex; align-items: center; gap: 0.3rem;
     font-size: 0.78rem; padding: 0.15rem 0.45rem; border-radius: 999px;
-    background: #e06c7522; color: #e06c75;
+    background: color-mix(in srgb, var(--color-err) 14%, transparent); color: var(--color-err);
   }
-  .status.ok { background: #98c37922; color: #98c379; }
+  .status.ok {
+    background: color-mix(in srgb, var(--color-ok) 14%, transparent); color: var(--color-ok);
+  }
   .body { display: flex; gap: 0.75rem; flex: 1; min-height: 0; }
   .outline {
     width: 180px; flex: none; overflow: auto;
@@ -225,7 +227,7 @@
     padding-right: 0.5rem; font-size: 0.82rem;
   }
   .hl { padding: 0.15rem 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; }
-  .hl-state { color: #d19a66; font-style: normal; font-size: 0.72rem; margin-right: 0.35rem; }
+  .hl-state { color: var(--color-warn); font-style: normal; font-size: 0.72rem; margin-right: 0.35rem; }
   .muted { opacity: 0.5; }
   .render {
     flex: 1 1 auto; overflow: auto;
@@ -243,7 +245,7 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85rem; line-height: 1.5;
   }
-  .err { color: #e06c75; font-size: 0.9rem; }
+  .err { color: var(--color-err); font-size: 0.9rem; }
   .empty {
     display: flex; flex-direction: column; gap: 0.4rem; align-items: center;
     justify-content: center; height: 100%; color: var(--color-fg-subtle);

@@ -125,6 +125,6 @@
   }
   .open-cta:hover { background: var(--color-surface-soft); }
   .hint { margin: 0.8rem 0.75rem; font-size: 0.78rem; color: var(--color-fg-subtle); }
-  .hint.err { color: #e06c75; }
+  .hint.err { color: var(--color-err); }
   .tree { flex: 1 1 auto; overflow-y: auto; padding: 4px; }
 </style>

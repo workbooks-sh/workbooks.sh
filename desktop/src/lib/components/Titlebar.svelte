@@ -118,7 +118,7 @@
     height: 36px;
     flex: 0 0 36px;
     padding: 0 0.5rem 0 78px;
-    background: var(--color-surface-soft);
+    background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     user-select: none;
     -webkit-user-select: none;
@@ -131,17 +131,17 @@
     cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s;
   }
   .icon-btn:hover, .icon-btn[aria-pressed="true"] {
-    background: var(--color-page); color: var(--color-fg);
+    background: var(--color-surface-soft); color: var(--color-fg);
   }
   .app-pill {
     display: inline-flex; align-items: center; gap: 0.4rem; align-self: center;
     height: 24px; padding: 0 0.65rem; border: 1px solid var(--color-border);
-    border-radius: 6px; background: var(--color-page); color: var(--color-fg-muted);
+    border-radius: 6px; background: transparent; color: var(--color-fg-muted);
     font-size: 12px; font-family: inherit; cursor: pointer; flex-shrink: 0;
   }
-  .app-pill:hover { color: var(--color-fg); }
+  .app-pill:hover { background: var(--color-surface-soft); color: var(--color-fg); }
   .app-pill.active {
-    background: var(--color-surface); color: var(--color-fg);
+    background: var(--color-surface-soft); color: var(--color-fg);
     border-color: var(--color-border-strong);
   }
   .pill-label { font-weight: 500; letter-spacing: -0.005em; }
@@ -156,9 +156,9 @@
     color: var(--color-fg-muted); min-width: 0; max-width: 200px;
     transition: background 0.1s, color 0.1s;
   }
-  .tab:hover { background: var(--color-page); color: var(--color-fg); }
+  .tab:hover { background: var(--color-surface-soft); color: var(--color-fg); }
   .tab.active {
-    background: var(--color-page); color: var(--color-fg);
+    background: var(--color-surface-soft); color: var(--color-fg);
     border-color: var(--color-border-strong); margin-bottom: -1px; z-index: 1;
   }
   .tab-body {
@@ -193,10 +193,10 @@
   .agent-btn {
     display: inline-flex; align-items: center; gap: 0.4rem; align-self: center;
     height: 24px; padding: 0 0.7rem; border: 1px solid var(--color-border);
-    border-radius: 6px; background: var(--color-page); color: var(--color-fg-muted);
+    border-radius: 6px; background: transparent; color: var(--color-fg-muted);
     font-size: 12px; font-family: inherit; font-weight: 500; cursor: pointer; flex-shrink: 0;
   }
-  .agent-btn:hover { color: var(--color-fg); }
+  .agent-btn:hover { background: var(--color-surface-soft); color: var(--color-fg); }
   .agent-btn.active {
     background: var(--color-fg); color: var(--color-page); border-color: var(--color-fg);
   }
