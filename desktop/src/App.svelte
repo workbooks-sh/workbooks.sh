@@ -70,6 +70,8 @@
 <RouterContext options={routerOptions}>
   {#snippet children(router: IRouter)}
     <div class="app">
+      <Titlebar />
+
       <div class="body">
         <AppRail {router} />
 
@@ -80,7 +82,6 @@
         {/if}
 
         <main class="center">
-          <Titlebar />
           <div class="view">
             {#if chrome.mode === "doc" && tabs.active}
               <DocView />

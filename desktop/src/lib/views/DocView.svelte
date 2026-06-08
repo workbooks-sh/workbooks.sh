@@ -15,7 +15,7 @@
    *
    * Replaces the old "Document viewer lands here" placeholder (wb-jay.7).
    */
-  import { CircleCheck, CircleAlert, Save, Eye, Code2 } from "@lucide/svelte";
+  import { CircleCheck, CircleAlert, Save, Eye, MoreHorizontal } from "@lucide/svelte";
   import { tabs } from "$lib/tabs.svelte";
   import { commands } from "$lib/bindings";
   import { weave, validate, outline, hasLocalKernel } from "$lib/kernel";
@@ -129,17 +129,6 @@
       <span class="title">{active.title}</span>
       <span class="path" title={active.path}>{active.path}</span>
 
-      {#if renderable}
-        <div class="seg" role="tablist" aria-label="view mode">
-          <button class="seg-btn" class:on={mode === "preview"} onclick={() => (mode = "preview")} title="Preview the render">
-            <Eye size={13} strokeWidth={1.8} /> Preview
-          </button>
-          <button class="seg-btn" class:on={mode === "source"} onclick={() => (mode = "source")} title="View the source">
-            <Code2 size={13} strokeWidth={1.8} /> Source
-          </button>
-        </div>
-      {/if}
-
       {#if renderAs === "weave" && issues !== null}
         <span class="status" class:ok={issues === 0}>
           {#if issues === 0}<CircleCheck size={14} />valid{:else}<CircleAlert size={14} />{issues} issue{issues === 1 ? "" : "s"}{/if}
@@ -147,6 +136,14 @@
       {/if}
 
       <span class="spacer"></span>
+      {#if renderable}
+        <!-- Source/edit is secondary: the render is the point. A quiet toggle, not a pill. -->
+        <button class="icon" onclick={() => (mode = mode === "preview" ? "source" : "preview")}
+          title={mode === "preview" ? "View source" : "Back to preview"}
+          aria-label={mode === "preview" ? "View source" : "Back to preview"}>
+          {#if mode === "preview"}<MoreHorizontal size={16} strokeWidth={1.8} />{:else}<Eye size={15} strokeWidth={1.8} />{/if}
+        </button>
+      {/if}
       <button class="ghost" onclick={() => void save()} title="Save (⌘S)" disabled={!active.dirty}>
         <Save size={15} strokeWidth={1.8} />
         Save
@@ -201,17 +198,13 @@
     font-size: 0.75rem; color: var(--color-fg-subtle);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 32ch;
   }
-  .seg {
-    display: inline-flex; border: 1px solid var(--color-border);
-    border-radius: 6px; overflow: hidden;
-  }
-  .seg-btn {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    padding: 0.3rem 0.6rem; font-size: 0.78rem; cursor: pointer;
-    background: var(--color-page); color: var(--color-fg-muted); border: 0;
-  }
-  .seg-btn.on { background: var(--color-surface); color: var(--color-fg); }
   .spacer { flex: 1; }
+  .icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+    border: 0; background: transparent; color: var(--color-fg-muted);
+  }
+  .icon:hover { background: var(--color-surface-soft); color: var(--color-fg); }
   .ghost {
     display: inline-flex; align-items: center; gap: 0.4rem;
     padding: 0.35rem 0.7rem; border-radius: 6px; cursor: pointer;
