@@ -49,115 +49,139 @@
         </div>
         <a href="/docs" class="goto">Read the docs &rarr;</a>
       </div>
-      <p class="lede">A workbook is a single <code>.org</code> file that carries its own code, data, and a query interface over both. One Elixir engine, WASM on the BEAM. Clone it and run it on hardware you own.</p>
+      <p class="lede">A workbook is a single <code>.org</code> file that carries its own code, data, and a query interface over both. One Elixir engine, WASM on the BEAM.</p>
     </div>
 
-    <!-- Interactive workbook cards — click to open a case study -->
-    <div class="hero-right" id="card-stage">
+    <div class="hero-right">
+      <div class="cw" id="cw">
 
-      <div class="wb-card wb-card--1" data-idx="0" role="button" tabindex="0" aria-label="Open case study: Score and Ship">
-        <div class="wb-cover">
-          <div class="wb-cover-lines"></div>
-          <span class="wb-pip">✦</span>
-          <div class="wb-cover-foot">
-            <span class="wb-tag">WORKBOOK</span>
-            <span class="wb-hint">tap to open</span>
+        <div class="cw-chrome">
+          <div class="cw-dots">
+            <span class="cw-dot r"></span>
+            <span class="cw-dot y"></span>
+            <span class="cw-dot g"></span>
+          </div>
+          <div class="cw-tabs" role="tablist">
+            <button class="cw-tab is-active" role="tab" data-pane="0" aria-selected="true">
+              <span class="cw-tab-icon">📄</span> workbook.org
+            </button>
+            <button class="cw-tab" role="tab" data-pane="1" aria-selected="false">
+              <span class="cw-tab-icon">⚡</span> wb query
+            </button>
+            <button class="cw-tab" role="tab" data-pane="2" aria-selected="false">
+              <span class="cw-tab-icon">🚀</span> wb publish
+            </button>
           </div>
         </div>
-        <div class="wb-open">
-          <div class="wb-open-head">
-            <span class="wb-open-label">WORKBOOK</span>
-            <button class="wb-close" aria-label="Close">✕</button>
-          </div>
-          <p class="wb-open-title">Score &amp; Ship</p>
-          <p class="wb-open-desc">A scoring pipeline as one <code>.org</code> file. Query results, run components, publish HTML.</p>
-          <pre class="wb-snippet"><code><span class="s-c">* Score Items</span>   <span class="s-t">:workbook:</span>
-  :in:  items
-  :out: scores
 
-<span class="s-k">#+begin_src</span> javascript
-export function score(items) {
-  return items.map(ml_score);
-}
-<span class="s-k">#+end_src</span></code></pre>
-          <div class="wb-open-foot">
-            <span class="wb-badge">Elixir · WASM · OQL</span>
-            <a href="/docs/the-workbook/source-blocks.html" class="wb-open-cta">See how →</a>
-          </div>
-        </div>
-      </div>
+        <div class="cw-body">
 
-      <div class="wb-card wb-card--2" data-idx="1" role="button" tabindex="0" aria-label="Open case study: Query in Place">
-        <div class="wb-cover">
-          <div class="wb-cover-lines"></div>
-          <span class="wb-pip">✦</span>
-          <div class="wb-cover-foot">
-            <span class="wb-tag">QUERY</span>
-            <span class="wb-hint">tap to open</span>
+          <!-- Pane 0: the workbook source -->
+          <div class="cw-pane is-active" role="tabpanel" id="pane-0">
+            <div class="cw-desc">
+              <strong>Score &amp; Ship</strong> — a scoring pipeline as one <code>.org</code> file. Source, components, and output in one place.
+            </div>
+            <div class="cw-code">
+              <div class="cw-line"><span class="ln">1</span><span class="org-kw">#+TITLE:</span> <span class="org-v">Score Pipeline</span></div>
+              <div class="cw-line"><span class="ln">2</span></div>
+              <div class="cw-line"><span class="ln">3</span><span class="org-h1">* Score Pipeline</span>  <span class="org-tag">:workbook:</span></div>
+              <div class="cw-line"><span class="ln">4</span>  <span class="org-prop">:PROPERTIES:</span></div>
+              <div class="cw-line"><span class="ln">5</span>  <span class="org-key">:WORKBOOK_VERSION:</span> <span class="org-val">1</span></div>
+              <div class="cw-line"><span class="ln">6</span>  <span class="org-prop">:END:</span></div>
+              <div class="cw-line"><span class="ln">7</span></div>
+              <div class="cw-line"><span class="ln">8</span><span class="org-h2">** Score Items</span></div>
+              <div class="cw-line"><span class="ln">9</span>   <span class="org-prop">:PROPERTIES:</span></div>
+              <div class="cw-line"><span class="ln">10</span>   <span class="org-key">:in:</span>  <span class="org-val">items</span></div>
+              <div class="cw-line"><span class="ln">11</span>   <span class="org-key">:out:</span> <span class="org-val">scores</span></div>
+              <div class="cw-line"><span class="ln">12</span>   <span class="org-prop">:END:</span></div>
+              <div class="cw-line"><span class="ln">13</span></div>
+              <div class="cw-line"><span class="ln">14</span><span class="org-block">#+begin_src</span> <span class="org-lang">javascript</span></div>
+              <div class="cw-line"><span class="ln">15</span><span class="js-kw">export function</span> <span class="js-fn">score</span>(<span class="js-arg">items</span>) {</div>
+              <div class="cw-line"><span class="ln">16</span>  <span class="js-kw">return</span> items.<span class="js-fn">map</span>(ml_score);</div>
+              <div class="cw-line"><span class="ln">17</span>}</div>
+              <div class="cw-line"><span class="ln">18</span><span class="org-block">#+end_src</span></div>
+              <div class="cw-line cw-line--cursor"><span class="ln">19</span><span class="cw-cursor"></span></div>
+            </div>
+            <div class="cw-status">
+              <span class="cw-badge cw-badge--orange">WORKBOOK</span>
+              <span class="cw-hint">Elixir · WASM · OQL</span>
+              <a href="/docs/the-workbook/source-blocks.html" class="cw-link">Docs →</a>
+            </div>
           </div>
-        </div>
-        <div class="wb-open">
-          <div class="wb-open-head">
-            <span class="wb-open-label">QUERY</span>
-            <button class="wb-close" aria-label="Close">✕</button>
-          </div>
-          <p class="wb-open-title">Query in Place</p>
-          <p class="wb-open-desc"><code>wb query</code> returns every headline, tag, and property as structured JSON. Your data, live.</p>
-          <pre class="wb-snippet"><code><span class="s-c">$ wb query pipeline.org</span>
-[
-  {
-    <span class="s-k">"title"</span>: <span class="s-v">"Score Items"</span>,
-    <span class="s-k">"tags"</span>: [<span class="s-v">"workbook"</span>],
-    <span class="s-k">"props"</span>: {
-      <span class="s-k">"in"</span>: <span class="s-v">"items"</span>,
-      <span class="s-k">"out"</span>: <span class="s-v">"scores"</span>
-    }
-  }
-]</code></pre>
-          <div class="wb-open-foot">
-            <span class="wb-badge">OQL · JSON · Agents</span>
-            <a href="/docs/runtime/oql.html" class="wb-open-cta">See how →</a>
-          </div>
-        </div>
-      </div>
 
-      <div class="wb-card wb-card--3" data-idx="2" role="button" tabindex="0" aria-label="Open case study: One Command Deploy">
-        <div class="wb-cover">
-          <div class="wb-cover-lines"></div>
-          <span class="wb-pip">✦</span>
-          <div class="wb-cover-foot">
-            <span class="wb-tag">DEPLOY</span>
-            <span class="wb-hint">tap to open</span>
+          <!-- Pane 1: wb query output -->
+          <div class="cw-pane" role="tabpanel" id="pane-1">
+            <div class="cw-desc">
+              <strong>Query in Place</strong> — <code>wb query</code> returns every headline, tag, and property as structured JSON. Live.
+            </div>
+            <div class="cw-code">
+              <div class="cw-line"><span class="ln"> </span><span class="sh-p">$</span> <span class="sh-cmd">wb query</span> score.org</div>
+              <div class="cw-line"><span class="ln"> </span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="json-b">[</span></div>
+              <div class="cw-line"><span class="ln"> </span>  <span class="json-b">{</span></div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"level"</span>: <span class="json-n">1</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"title"</span>: <span class="json-s">"Score Pipeline"</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"tags"</span>: [<span class="json-s">"workbook"</span>],</div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"props"</span>: {</div>
+              <div class="cw-line"><span class="ln"> </span>      <span class="json-k">"WORKBOOK_VERSION"</span>: <span class="json-s">"1"</span></div>
+              <div class="cw-line"><span class="ln"> </span>    }</div>
+              <div class="cw-line"><span class="ln"> </span>  <span class="json-b">}</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>  <span class="json-b">{</span></div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"level"</span>: <span class="json-n">2</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"title"</span>: <span class="json-s">"Score Items"</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>    <span class="json-k">"props"</span>: {</div>
+              <div class="cw-line"><span class="ln"> </span>      <span class="json-k">"in"</span>: <span class="json-s">"items"</span>,</div>
+              <div class="cw-line"><span class="ln"> </span>      <span class="json-k">"out"</span>: <span class="json-s">"scores"</span></div>
+              <div class="cw-line"><span class="ln"> </span>    }</div>
+              <div class="cw-line"><span class="ln"> </span>  <span class="json-b">}</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="json-b">]</span></div>
+            </div>
+            <div class="cw-status">
+              <span class="cw-badge cw-badge--navy">QUERY</span>
+              <span class="cw-hint">OQL · JSON · Agents</span>
+              <a href="/docs/runtime/oql.html" class="cw-link">Docs →</a>
+            </div>
           </div>
-        </div>
-        <div class="wb-open">
-          <div class="wb-open-head">
-            <span class="wb-open-label">DEPLOY</span>
-            <button class="wb-close" aria-label="Close">✕</button>
-          </div>
-          <p class="wb-open-title">One Command</p>
-          <p class="wb-open-desc">Render any workbook to HTML and ship it to Cloudflare, GitHub Pages, or your own runtime.</p>
-          <pre class="wb-snippet"><code><span class="s-c">$ wb publish site web/docs</span>
-<span class="s-ok">✓</span> 18 pages rendered
-<span class="s-ok">✓</span> uploaded 18 files
 
-<span class="s-c">$ wb deploy apply</span>
-<span class="s-ok">✓</span> image built
-<span class="s-ok">✓</span> deployed → :4000</code></pre>
-          <div class="wb-open-foot">
-            <span class="wb-badge">CF Pages · gh-pages · self-hosted</span>
-            <a href="/docs/publishing/wb-publish.html" class="wb-open-cta">See how →</a>
+          <!-- Pane 2: wb publish -->
+          <div class="cw-pane" role="tabpanel" id="pane-2">
+            <div class="cw-desc">
+              <strong>One Command</strong> — render any workbook to HTML and ship it to Cloudflare, GitHub Pages, or your own runtime.
+            </div>
+            <div class="cw-code">
+              <div class="cw-line"><span class="ln"> </span><span class="sh-p">$</span> <span class="sh-cmd">wb publish init</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-ok">✓</span> wrote publish.org</div>
+              <div class="cw-line"><span class="ln"> </span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-p">$</span> <span class="sh-cmd">wb publish validate</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-ok">✓</span> valid — target=cloudflare-pages</div>
+              <div class="cw-line"><span class="ln"> </span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-p">$</span> <span class="sh-cmd">wb publish site</span> web/docs</div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-dim">  rendering 18 pages...</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-ok">✓</span> uploaded 18 files <span class="sh-dim">(1.6s)</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-ok">✓</span> deployed <span class="sh-dim">→</span> <span class="sh-url">workbooks.sh/docs</span></div>
+              <div class="cw-line"><span class="ln"> </span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-p">$</span> <span class="sh-cmd">wb deploy apply</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-dim">  building OCI image...</span></div>
+              <div class="cw-line"><span class="ln"> </span><span class="sh-ok">✓</span> image built</div>
+              <div class="cw-line cw-line--cursor"><span class="ln"> </span><span class="sh-ok">✓</span> engine up · <span class="sh-url">:4000</span><span class="cw-cursor"></span></div>
+            </div>
+            <div class="cw-status">
+              <span class="cw-badge cw-badge--gold">DEPLOY</span>
+              <span class="cw-hint">CF Pages · gh-pages · self-hosted</span>
+              <a href="/docs/publishing/wb-publish.html" class="cw-link">Docs →</a>
+            </div>
           </div>
-        </div>
-      </div>
 
+        </div><!-- /cw-body -->
+      </div><!-- /cw -->
     </div><!-- /hero-right -->
+
   </section>
 
   <section class="prose">
     <article>
       <p class="art-label">WHAT IT IS</p>
-      <p>A self-contained runtime, not a framework you assemble. One Elixir engine supervises everything; your logic compiles to <code>WASM</code> and executes on the <code>BEAM</code> alongside it — concurrency, fault isolation, and process supervision from the platform, not from glue you maintain.</p>
+      <p>A self-contained runtime, not a framework you assemble. One Elixir engine supervises everything; your logic compiles to <code>WASM</code> and executes on the <code>BEAM</code> alongside it — concurrency, fault isolation, and process supervision from the platform, not from glue.</p>
     </article>
     <article>
       <p class="art-label">THE WORKBOOK IS THE UNIT</p>
@@ -165,7 +189,7 @@ export function score(items) {
     </article>
     <article>
       <p class="art-label">BUILT TO SELF-HOST</p>
-      <p>Everything runs on infrastructure you control. One <code>OTP</code> application with no hidden dependency on a hosted backend. Nothing to phone home, nothing to lock you in. Open source under a permissive license — audit the trust boundaries yourself.</p>
+      <p>Everything runs on infrastructure you control. One <code>OTP</code> application with no hidden dependency on a hosted backend. Nothing to phone home, nothing to lock you in. Open source — audit the trust boundaries yourself.</p>
     </article>
   </section>
 
@@ -179,39 +203,31 @@ export function score(items) {
 
 <script>
 (function () {
-  const stage = document.getElementById('card-stage');
-  const cards = Array.from(stage.querySelectorAll('.wb-card'));
+  const tabs = document.querySelectorAll('.cw-tab');
+  const panes = document.querySelectorAll('.cw-pane');
 
-  function openCard(card) {
-    const already = card.classList.contains('is-open');
-    cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
-    if (!already) {
-      card.classList.add('is-open');
-      cards.filter(c => c !== card).forEach(c => c.classList.add('is-dimmed'));
-    }
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const idx = +tab.dataset.pane;
+      tabs.forEach(t => { t.classList.remove('is-active'); t.setAttribute('aria-selected', 'false'); });
+      panes.forEach(p => p.classList.remove('is-active'));
+      tab.classList.add('is-active');
+      tab.setAttribute('aria-selected', 'true');
+      panes[idx].classList.add('is-active');
+    });
+  });
+
+  // Auto-cycle when idle
+  let timer, current = 0;
+  function cycle() {
+    timer = setInterval(() => {
+      current = (current + 1) % tabs.length;
+      tabs[current].click();
+    }, 4000);
   }
-
-  cards.forEach(card => {
-    card.addEventListener('click', e => {
-      if (e.target.closest('.wb-close')) {
-        cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
-        return;
-      }
-      openCard(card);
-      e.stopPropagation();
-    });
-    card.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCard(card); }
-    });
-  });
-
-  document.addEventListener('click', () => {
-    cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
-  });
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
-  });
+  cycle();
+  document.getElementById('cw').addEventListener('mouseenter', () => clearInterval(timer));
+  document.getElementById('cw').addEventListener('mouseleave', () => { clearInterval(timer); cycle(); });
 })();
 </script>
 </body>
