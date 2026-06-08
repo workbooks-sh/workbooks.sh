@@ -53,24 +53,41 @@ CL(){ wasmtime run -W exceptions=y \
       -fwasm-exceptions -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=false \
       -Xclang -disable-llvm-verifier "$@"; }
 
+# Compile one mrustc-emitted crate: mrustc.wasm <args> → .c+.hir, clang.wasm .c→.o, ar into .rlib.
+crate(){  # $1 = label, $2.. = mrustc args
+  local label="$1"; shift
+  local out; out="$(printf '%s ' "$@" | grep -oE '\-o [^ ]+' | head -1 | awk '{print $2}')"
+  echo "[libstd] $label → $(basename "${out:-?}")"
+  MR "$@"
+  if [ -n "$out" ] && [ -f "$out.c" ]; then
+    CL -c "/work/$out.c" -o "/work/$out.o"
+    "$WASI_SDK/bin/llvm-ar" rcs "$out" "$out.o" 2>/dev/null || true
+  else
+    echo "[libstd] WARN: no $out.c emitted for $label"
+  fi
+}
+
 n=0
 while IFS= read -r raw; do
   line="$(printf '%s' "$raw" | sed -e 's#/private/tmp/mr/mrustc/##g' -e 's#/tmp/mr/mrustc/##g')"
   [ -z "$(printf '%s' "$line" | tr -d '[:space:]')" ] && continue
   n=$((n+1))
-  # the -o target (output-wasi/libNAME.rlib)
-  out="$(printf '%s' "$line" | grep -oE '\-o [^ ]+' | head -1 | awk '{print $2}')"
-  name="$(basename "${out:-crate$n}")"
-  echo "[libstd] [$n] mrustc.wasm → $name"
-  # shellcheck disable=SC2086
-  MR $line
-  if [ -n "$out" ] && [ -f "$out.c" ]; then
-    echo "[libstd] [$n] clang.wasm  $name.c → .o"
-    CL -c "/work/$out.c" -o "/work/$out.o"
-    "$WASI_SDK/bin/llvm-ar" rcs "$out" "$out.o" 2>/dev/null || true
-  else
-    echo "[libstd] [$n] WARN: no $out.c emitted"
+
+  # CRITICAL (wb-fm0.3 / PORT-LOG iter 26): minicargo's captured plan OMITS the `wasi` target-dep,
+  # but libstd's os/wasi module references the `wasi` crate (else mrustc aborts "Couldn't find
+  # path component 'wasi'"). So right before the libstd crate, build wasi and add --extern wasi.
+  if printf '%s' "$line" | grep -q 'library/std/src/lib.rs'; then
+    if [ ! -f "$O/libwasi.rlib.o" ]; then
+      CB="$(ls "$O"/libcompiler_builtins-*.rlib | head -1)"
+      crate "[wasi]" rustc-1.54.0-src/vendor/wasi/src/lib.rs --crate-name wasi --crate-type rlib \
+        -L "$O" --out-dir "$O" --target wasm32-wasi --edition 2018 --cfg 'feature=rustc-dep-of-std' \
+        --extern core="$O/libcore.rlib" --extern compiler_builtins="$CB"
+    fi
+    line="$line --extern wasi=$O/libwasi.rlib"
   fi
+
+  # shellcheck disable=SC2086
+  crate "[$n]" $line
 done < "$PLAN"
 
 # ABI sanity: libcore's .hir must be the wasm libc++ __2 namespace (else mrustc.wasm can't read it).

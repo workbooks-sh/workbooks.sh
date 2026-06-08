@@ -530,3 +530,20 @@
   TO CLOSE full-std (Path A): symbol'd/-g mrustc.wasm to locate the Resolve_Absolute_Mod
   recursion on libstd's module tree, fix the mrustc bug (or find the iter-24 cfg that avoided
   it). Until then, the in-sandbox Rust lane ships no_std; std is gated here.
+
+* 2026-06-07 (iter 26) — ★ REPRODUCTION GAP CLOSED: full-std rebuilds from the committed recipe
+  The iter-25 "libstd traps" was NOT a compiler bug. Real root cause (via MRUSTC_DEBUG trace):
+    std/src/os/wasi/fs.rs:456 error: Couldn't find path component 'wasi'
+  libstd's os/wasi module references the `wasi` extern crate, but std-build-plan.txt (captured
+  from minicargo, which SKIPS the wasi target-dep) omitted it — the exact manual step
+  build-libstd.sh warned about. The "Resolve_Absolute_Mod recursion" read was wrong: those were
+  just normal nested-module frames; the trap was an `abort` from a failed name lookup.
+  TWO FIXES (now committed into the recipe, so this never regresses):
+   1. prebuild-libstd.sh builds the `wasi` crate (rustc-1.54.0-src/vendor/wasi) via mrustc.wasm
+      right before libstd, and adds `--extern wasi=output-wasi/libwasi.rlib` to the libstd line.
+   2. std-e2e.sh links `wasi_shim.o` (compilers/zig/wasi_shim.c — bridges the wasi crate's bare
+      imports fd_write/environ_*/fd_* -> wasi-libc __wasi_*) + `--allow-undefined` not needed once
+      the shim defines them. Without the shim: runtime "unknown import: env::fd_write".
+  VERIFIED end-to-end this session: mrustc.wasm e2e.rs -> C -> clang.wasm -> wasm-ld (crt1 +
+  libstd .o + wasi_shim.o + ustub.o + -lsetjmp) -> wasmtime -> "...sum(1..=10) = 55". Full std
+  Rust compiles AND runs in the sandbox FROM THE COMMITTED RECIPE. wb-uja closed.
