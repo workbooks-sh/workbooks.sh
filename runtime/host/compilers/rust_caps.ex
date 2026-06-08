@@ -43,17 +43,17 @@ defmodule Workbooks.Compilers.RustCaps do
         },
         %{
           id: :no_build_script,
-          what: "Crates whose build.rs does CODE GENERATION (include!(env!(\"OUT_DIR\"))), bindgen, or compiles bundled C. (autocfg-style build.rs is fine — it's skipped and the cfgs have fallbacks.)",
-          mitigation: "Pin a version that doesn't generate code, or vendor the generated file. Pure-Rust + autocfg crates work.",
-          beam_offload: true,
-          note: "Offloadable: the BEAM can compile+run the build script in-sandbox and pre-open OUT_DIR (wb-iht). Same lever as proc-macro execution."
+          what: "build.rs that PROBES the compiler (autocfg — tries to compile snippets) can't probe in-sandbox, so those cfgs fall back. bindgen / bundled-C build scripts are also unsupported.",
+          mitigation: "Non-probing build scripts now WORK (their cargo:rustc-cfg is applied — wb-yq0). For probe-based ones, pin a version that doesn't need the probe, or vendor the generated file.",
+          beam_offload: :done,
+          note: "DONE (wb-yq0): the BEAM compiles + runs build.rs in-sandbox (wall-clock bounded) and applies its allowlisted rustc-cfg. autocfg-probe scripts still fall back (no rustc to probe). OUT_DIR codegen is the next slice."
         },
         %{
           id: :version_resolution,
-          what: "The resolver tries the exact pin + the 6 newest in-range versions only. If the only compilable version is older than that window, a bare `dep` fails.",
-          mitigation: "PIN a known-good version explicitly: `regex@1.5.4`, not `regex`. The newest release frequently exceeds the ceiling.",
-          beam_offload: false,
-          note: "Could widen the window / add ceiling-aware ordering (wb-rxi)."
+          what: "The resolver tries the exact pin + a small window of newest in-range versions. A crate with no curated floor whose only buildable version is old may still need a manual pin.",
+          mitigation: "Big ceiling-exceeding crates (regex/syn/serde*/proc-macro2/quote/…) now resolve to a known-good FLOOR automatically — a bare `regex` builds. For others, pin explicitly.",
+          beam_offload: :done,
+          note: "DONE (wb-ctk): @version_floors tries a curated buildable version first when it satisfies the req. Pure Elixir."
         },
         %{
           id: :proc_macro_reexport,
@@ -72,9 +72,9 @@ defmodule Workbooks.Compilers.RustCaps do
         %{
           id: :no_raw_io,
           what: "No raw sockets / filesystem / clock-driven IO at runtime. std::net, std::fs, and real network calls don't reach the OS.",
-          mitigation: "Use the Dock host capabilities (browse-fetch, llm-complete, vfs-query) — Policy-gated host functions the BEAM implements — instead of raw syscalls.",
-          beam_offload: true,
-          note: "This IS the offload model. Dock exists for typed components; wiring it to compiled-Rust core wasm is wb-1mv (declare extern imports + run under Wasmex with allow_undefined)."
+          mitigation: "Use the Dock host capabilities — host_http_get (network), host_vfs_read/write (storage), host_now (clock) — Policy-gated functions the BEAM implements. Compile with allow_undefined so the imports survive; run via Workbooks.RustDock.run.",
+          beam_offload: :done,
+          note: "DONE (wb-1mv): host/rust_dock.ex runs compiled Rust core wasm under Wasmex with those Policy-gated, pure-Elixir host fns (store_limits + timeout). Tested by test/rust_dock_test.exs."
         }
       ],
 
