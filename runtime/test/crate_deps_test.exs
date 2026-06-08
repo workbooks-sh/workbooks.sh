@@ -395,4 +395,32 @@ fn main(){ let r: nom::IResult<&str,&str> = digit1("123abc"); println!("{}", r.u
       {:error, reason} -> IO.puts("\n[skip] nom: #{inspect(reason) |> String.slice(0, 80)}")
     end
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "data-encoding via opts[:dep_features] (alloc, no std)" do
+    src = Path.join(System.tmp_dir!(), "cd_dataenc.rs")
+    File.write!(src, ~S|fn main(){ println!("{}", data_encoding::HEXLOWER.encode(b"AB")); }|)
+
+    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: ["data-encoding@2.3.3"], dep_features: %{"data-encoding" => ["alloc"]}) do
+      {:ok, wasm, _} -> assert PM.run(wasm, "", []) |> String.trim() == "4142"
+      {:error, reason} -> IO.puts("\n[skip] data-encoding: #{inspect(reason) |> String.slice(0, 80)}")
+    end
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "itertools (0.10) via opts[:dep_features] (use_alloc, no std)" do
+    # itertools@0.10 fails to compile with its std default but compiles with use_alloc only.
+    src = Path.join(System.tmp_dir!(), "cd_itertools010.rs")
+    File.write!(src, ~S|use itertools::Itertools;
+fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
+
+    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: ["itertools@0.10.5"], dep_features: %{"itertools" => ["use_alloc"]}) do
+      {:ok, wasm, _} -> assert PM.run(wasm, "", []) |> String.trim() == "21"
+      {:error, reason} -> IO.puts("\n[skip] itertools 0.10: #{inspect(reason) |> String.slice(0, 80)}")
+    end
+  end
 end
