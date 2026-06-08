@@ -387,6 +387,14 @@ defmodule Workbooks.Compilers do
     ensure_rust_obj(o, "wasi_shim", shim_src, cl)
     ensure_rust_obj(o, "ustub", ustub_src, cl)
 
+    # wb-mrz: start each top-level build with an EMPTY deps/ dir. The obj-level cache in
+    # compile_dep returns [] for a cached dep's transitive sub-dep objects; a warm or
+    # cross-program deps/ would therefore drop sub-dep .o files from the final link
+    # (undefined symbols → "flaky" link failures, e.g. regex's aho-corasick/memchr objs).
+    # Building fresh per program + globbing deps/ at link time (below) makes the link list
+    # complete and deterministic regardless of which deps hit the cache mid-tree.
+    File.rm_rf(Path.join(o, "deps"))
+
     # wb-3s8/wb-6lh: fetch + compile each declared crates.io dependency (pure-Rust, in-sandbox)
     # into output-wasi/deps/, returning {extern_args, dep_object_paths}. Errors short-circuit.
     case ensure_deps(Keyword.get(opts, :deps, []), mrdir, o, mr, cl) do
@@ -394,8 +402,16 @@ defmodule Workbooks.Compilers do
         for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
         depserr
 
-      {:ok, extern_args, dep_objs0} ->
-        dep_objs = Enum.uniq(dep_objs0)
+      {:ok, extern_args, _dep_objs0} ->
+        # wb-mrz: link EVERY compiled dep object actually present in deps/ (sorted →
+        # deterministic), not the threaded list — which under-counts when a dep's obj is
+        # cached mid-tree (its sub-dep objs come back as []). deps/ was cleaned at build
+        # start, so it holds exactly this program's full transitive tree.
+        dep_objs =
+          Path.wildcard(Path.join(o, "deps/*.rlib.o"))
+          |> Enum.sort()
+          |> Enum.map(&"/work/output-wasi/deps/#{Path.basename(&1)}")
+
         ldirs = if dep_objs == [], do: [], else: ["-L", "output-wasi/deps"]
 
         log1 =
