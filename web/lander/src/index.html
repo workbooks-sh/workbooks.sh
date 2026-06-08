@@ -17,7 +17,7 @@
 
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Workbooks">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
       <rect x="2" y="4" width="18" height="22" rx="2" stroke="currentColor" stroke-width="2"/>
       <rect x="8" y="2" width="18" height="22" rx="2" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
       <line x1="12" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -34,8 +34,8 @@
 </nav>
 
 <main>
-
   <section class="hero">
+
     <div class="hero-left">
       <p class="eyebrow">OPEN SOURCE &middot; ELIXIR &middot; WASM</p>
       <h1>ONE FILE.<br />THE WHOLE<br />APP.</h1>
@@ -44,7 +44,7 @@
           <span class="cmd-prompt">$</span>
           <span class="cmd-text">wb run app.org</span>
           <a href="https://github.com/workbooks-sh/workbooks.sh" class="cmd-btn" aria-label="View on GitHub">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           </a>
         </div>
         <a href="/docs" class="goto">Read the docs &rarr;</a>
@@ -52,20 +52,106 @@
       <p class="lede">A workbook is a single <code>.org</code> file that carries its own code, data, and a query interface over both. One Elixir engine, WASM on the BEAM. Clone it and run it on hardware you own.</p>
     </div>
 
-    <div class="hero-right" aria-hidden="true">
-      <div class="spine spine-1">
-        <span class="spine-pip">&#10022;</span>
-        <span class="spine-label">WORKBOOK</span>
+    <!-- Interactive workbook cards — click to open a case study -->
+    <div class="hero-right" id="card-stage">
+
+      <div class="wb-card wb-card--1" data-idx="0" role="button" tabindex="0" aria-label="Open case study: Score and Ship">
+        <div class="wb-cover">
+          <div class="wb-cover-lines"></div>
+          <span class="wb-pip">✦</span>
+          <div class="wb-cover-foot">
+            <span class="wb-tag">WORKBOOK</span>
+            <span class="wb-hint">tap to open</span>
+          </div>
+        </div>
+        <div class="wb-open">
+          <div class="wb-open-head">
+            <span class="wb-open-label">WORKBOOK</span>
+            <button class="wb-close" aria-label="Close">✕</button>
+          </div>
+          <p class="wb-open-title">Score &amp; Ship</p>
+          <p class="wb-open-desc">A scoring pipeline as one <code>.org</code> file. Query results, run components, publish HTML.</p>
+          <pre class="wb-snippet"><code><span class="s-c">* Score Items</span>   <span class="s-t">:workbook:</span>
+  :in:  items
+  :out: scores
+
+<span class="s-k">#+begin_src</span> javascript
+export function score(items) {
+  return items.map(ml_score);
+}
+<span class="s-k">#+end_src</span></code></pre>
+          <div class="wb-open-foot">
+            <span class="wb-badge">Elixir · WASM · OQL</span>
+            <a href="/docs/the-workbook/source-blocks.html" class="wb-open-cta">See how →</a>
+          </div>
+        </div>
       </div>
-      <div class="spine spine-2">
-        <span class="spine-pip">&#10022;</span>
-        <span class="spine-label">QUERY</span>
+
+      <div class="wb-card wb-card--2" data-idx="1" role="button" tabindex="0" aria-label="Open case study: Query in Place">
+        <div class="wb-cover">
+          <div class="wb-cover-lines"></div>
+          <span class="wb-pip">✦</span>
+          <div class="wb-cover-foot">
+            <span class="wb-tag">QUERY</span>
+            <span class="wb-hint">tap to open</span>
+          </div>
+        </div>
+        <div class="wb-open">
+          <div class="wb-open-head">
+            <span class="wb-open-label">QUERY</span>
+            <button class="wb-close" aria-label="Close">✕</button>
+          </div>
+          <p class="wb-open-title">Query in Place</p>
+          <p class="wb-open-desc"><code>wb query</code> returns every headline, tag, and property as structured JSON. Your data, live.</p>
+          <pre class="wb-snippet"><code><span class="s-c">$ wb query pipeline.org</span>
+[
+  {
+    <span class="s-k">"title"</span>: <span class="s-v">"Score Items"</span>,
+    <span class="s-k">"tags"</span>: [<span class="s-v">"workbook"</span>],
+    <span class="s-k">"props"</span>: {
+      <span class="s-k">"in"</span>: <span class="s-v">"items"</span>,
+      <span class="s-k">"out"</span>: <span class="s-v">"scores"</span>
+    }
+  }
+]</code></pre>
+          <div class="wb-open-foot">
+            <span class="wb-badge">OQL · JSON · Agents</span>
+            <a href="/docs/runtime/oql.html" class="wb-open-cta">See how →</a>
+          </div>
+        </div>
       </div>
-      <div class="spine spine-3">
-        <span class="spine-pip">&#10022;</span>
-        <span class="spine-label">DEPLOY</span>
+
+      <div class="wb-card wb-card--3" data-idx="2" role="button" tabindex="0" aria-label="Open case study: One Command Deploy">
+        <div class="wb-cover">
+          <div class="wb-cover-lines"></div>
+          <span class="wb-pip">✦</span>
+          <div class="wb-cover-foot">
+            <span class="wb-tag">DEPLOY</span>
+            <span class="wb-hint">tap to open</span>
+          </div>
+        </div>
+        <div class="wb-open">
+          <div class="wb-open-head">
+            <span class="wb-open-label">DEPLOY</span>
+            <button class="wb-close" aria-label="Close">✕</button>
+          </div>
+          <p class="wb-open-title">One Command</p>
+          <p class="wb-open-desc">Render any workbook to HTML and ship it to Cloudflare, GitHub Pages, or your own runtime.</p>
+          <pre class="wb-snippet"><code><span class="s-c">$ wb publish site web/docs</span>
+<span class="s-ok">✓</span> 18 pages rendered
+<span class="s-ok">✓</span> uploaded 18 files
+
+<span class="s-c">$ wb deploy apply</span>
+<span class="s-ok">✓</span> image built
+<span class="s-ok">✓</span> deployed → :4000</code></pre>
+          <div class="wb-open-foot">
+            <span class="wb-badge">CF Pages · gh-pages · self-hosted</span>
+            <a href="/docs/publishing/wb-publish.html" class="wb-open-cta">See how →</a>
+          </div>
+        </div>
       </div>
-    </div>
+
+    </div><!-- /hero-right -->
   </section>
 
   <section class="prose">
@@ -89,7 +175,44 @@
     <a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
     <span>v0</span>
   </footer>
-
 </main>
+
+<script>
+(function () {
+  const stage = document.getElementById('card-stage');
+  const cards = Array.from(stage.querySelectorAll('.wb-card'));
+
+  function openCard(card) {
+    const already = card.classList.contains('is-open');
+    cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
+    if (!already) {
+      card.classList.add('is-open');
+      cards.filter(c => c !== card).forEach(c => c.classList.add('is-dimmed'));
+    }
+  }
+
+  cards.forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.wb-close')) {
+        cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
+        return;
+      }
+      openCard(card);
+      e.stopPropagation();
+    });
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCard(card); }
+    });
+  });
+
+  document.addEventListener('click', () => {
+    cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') cards.forEach(c => c.classList.remove('is-open', 'is-dimmed'));
+  });
+})();
+</script>
 </body>
 </html>
