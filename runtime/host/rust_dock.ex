@@ -76,7 +76,10 @@ defmodule Workbooks.RustDock do
     }
   end
 
-  # VFS — gated on "vfs" cap + a vfs conn. Sandboxed key-value store (no host FS reach).
+  # VFS — gated on "vfs" cap. `vfs` is an Agent pid holding the exqlite conn (the raw conn is NOT
+  # valid on the Wasmex import-callback thread → {:error,:invalid_connection}; running the VFS op
+  # INSIDE the Agent's BEAM process via Agent.get keeps the conn on a real scheduler). Sandboxed
+  # key-value store (no host FS reach). Production: the owning Instance GenServer is that holder.
   defp vfs_caps(vfs) do
     %{
       # host_vfs_write(path_ptr,path_len, data_ptr,data_len) -> i32 (0 ok, -1 err)
@@ -85,7 +88,7 @@ defmodule Workbooks.RustDock do
          fn ctx, pp, pl, dp, dl ->
            path = Wasmex.Memory.read_string(ctx.caller, ctx.memory, pp, pl)
            data = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
-           case Workbooks.VFS.put(vfs, path, data) do
+           case Agent.get(vfs, fn conn -> Workbooks.VFS.put(conn, path, data) end) do
              :ok -> 0
              _ -> -1
            end
@@ -95,7 +98,7 @@ defmodule Workbooks.RustDock do
         {:fn, [:i32, :i32, :i32, :i32], [:i32],
          fn ctx, pp, pl, op, oc ->
            path = Wasmex.Memory.read_string(ctx.caller, ctx.memory, pp, pl)
-           case Workbooks.VFS.get(vfs, path) do
+           case Agent.get(vfs, fn conn -> Workbooks.VFS.get(conn, path) end) do
              {:ok, content} ->
                n = min(byte_size(content), oc)
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(content, 0, n))
