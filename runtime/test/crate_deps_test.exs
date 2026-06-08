@@ -399,14 +399,10 @@ fn main(){ let r: nom::IResult<&str,&str> = digit1("123abc"); println!("{}", r.u
   @tag :build
   @tag :netdeps
   @tag timeout: 900_000
-  test "data-encoding via opts[:dep_features] (alloc, no std)" do
-    src = Path.join(System.tmp_dir!(), "cd_dataenc.rs")
-    File.write!(src, ~S|fn main(){ println!("{}", data_encoding::HEXLOWER.encode(b"AB")); }|)
-
-    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: ["data-encoding@2.3.3"], dep_features: %{"data-encoding" => ["alloc"]}) do
-      {:ok, wasm, _} -> assert PM.run(wasm, "", []) |> String.trim() == "4142"
-      {:error, reason} -> IO.puts("\n[skip] data-encoding: #{inspect(reason) |> String.slice(0, 80)}")
-    end
+  test "data-encoding — AUTOMATIC feature-fallback (std default fails, std→alloc swap recovers, no override)" do
+    # No dep_features: proves the auto-fallback ladder (full default → std→alloc → no-std → none)
+    # recovers a crate whose std default exceeds the ceiling, without the caller knowing.
+    run_with("data-encoding@2.3.3", ~S|fn main(){ println!("{}", data_encoding::HEXLOWER.encode(b"AB")); }|, "4142")
   end
 
   @tag :build

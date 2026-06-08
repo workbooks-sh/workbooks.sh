@@ -540,19 +540,42 @@ defmodule Workbooks.Compilers do
     with {:ok, lib_rs, def_features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
          {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
       rel_src = Path.relative_to(lib_rs, mrdir)
-      # wb-3s8: a caller may override a crate's feature set via opts[:dep_features] (e.g. enable
-      # unicode-perl WITHOUT the full unicode/perf default that exceeds the ceiling). Absent an
-      # override the crate's own default features are used (unchanged behavior).
-      features = Map.get(feats, name, def_features)
-      cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+      cdst = Path.join(o, "deps/lib#{name}.rlib.c")
 
-      mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
-           "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
-          ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+      # Feature sets to try, in order (wb-3s8). A caller override (opts[:dep_features]) is
+      # authoritative — used verbatim, no auto-fallback. Otherwise try the crate's full default,
+      # then AUTO-FALLBACK to progressively reduced sets: drop "std" (the most common ceiling
+      # trigger — keeps alloc/core), then no features. This recovers crates whose ONLY blocker is
+      # a heavy std default (nom/data-encoding/itertools all compile once std is dropped) without
+      # the caller having to know. Variant[0] halts immediately on the common case → zero overhead.
+      variants =
+        case Map.fetch(feats, name) do
+          {:ok, override} ->
+            [override]
 
-      c = Path.join(o, "deps/lib#{name}.rlib.c")
+          :error ->
+            no_std = def_features -- ["std"]
+            # std→alloc swap is the canonical no_std build: many crates gate heap APIs (e.g.
+            # data-encoding's encode→String) behind an "alloc" feature that "std" implies. Dropping
+            # std alone loses it, so try (no_std + alloc) before bare no_std. A spurious "alloc" cfg
+            # on a crate without that feature is a harmless no-op.
+            alloc = if "std" in def_features, do: [["alloc" | no_std]], else: []
+            Enum.uniq([def_features] ++ alloc ++ [no_std, []])
+        end
 
-      if File.regular?(c) do
+      compiled? =
+        Enum.reduce_while(variants, false, fn features, _ ->
+          File.rm(cdst)
+          cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+
+          mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
+               "-L", "output-wasi", "-L", "output-wasi/deps"] ++ sub_externs ++
+              ["--out-dir", "output-wasi/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+
+          if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
+        end)
+
+      if compiled? do
         cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/deps/lib#{name}.rlib.c", "-o", obj_guest])
         if File.regular?(obj_host),
           do: {:ok, rlib_rel, obj_guest, Enum.uniq(sub_objs)},
