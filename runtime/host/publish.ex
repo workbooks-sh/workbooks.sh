@@ -116,8 +116,9 @@ defmodule Workbooks.Publish do
         err("wrangler not found on PATH — install with: npm i -g wrangler", %{target: "cloudflare-pages"})
 
       wrangler ->
+        env = if p["PUBLISH_CF_ACCOUNT"], do: [{"CLOUDFLARE_ACCOUNT_ID", p["PUBLISH_CF_ACCOUNT"]}], else: []
         args = [wrangler, "pages", "deploy", dir, "--project-name", project]
-        case System.cmd("sh", ["-c", Enum.join(args, " ")], stderr_to_stdout: true) do
+        case System.cmd("sh", ["-c", Enum.join(args, " ")], stderr_to_stdout: true, env: env) do
           {out, 0} ->
             url = domain || extract_cf_url(out) || "https://#{project}.pages.dev"
             ok("deployed → #{url}\n#{String.trim(out)}", %{url: url, target: "cloudflare-pages"})
