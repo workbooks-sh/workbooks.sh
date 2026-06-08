@@ -220,4 +220,33 @@ fn main(){ println!("ok"); }|, "ok")
     run_with("maplit@1.0.2", ~S|#[macro_use] extern crate maplit;
 fn main(){ let m = hashmap!{"a" => 1, "b" => 2}; println!("{}", m["a"] + m["b"]); }|, "3")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "itertools (0.9) — iterator adaptors, transitive either" do
+    run_with("itertools@0.9.0", ~S|use itertools::Itertools;
+fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|, "21")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "itoa (0.4) — io::Write integer formatting" do
+    run_with("itoa@0.4.8", ~S|fn main(){ let mut v=Vec::new(); itoa::write(&mut v, 12345u32).unwrap(); println!("{}", String::from_utf8(v).unwrap()); }|, "12345")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "ascii — AsciiChar" do
+    run_with("ascii@1.0.0", ~S|fn main(){ println!("{}", ascii::AsciiChar::A.as_char()); }|, "A")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "vec_map — integer-keyed map" do
+    run_with("vec_map@0.8.2", ~S|fn main(){ let mut m = vec_map::VecMap::new(); m.insert(3, "c"); println!("{}", m[3]); }|, "c")
+  end
 end
