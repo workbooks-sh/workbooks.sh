@@ -15,23 +15,30 @@ defmodule Workbooks.Auth do
   @impl true
   def init(opts), do: opts
 
+  # Public infra endpoints: liveness + the RCP handshake + DID doc. They carry no
+  # tenant data and MUST answer in either tenancy mode (a client reads the
+  # capabilities doc to learn the required auth rung BEFORE it has a credential).
+  @public ~w(/health /.well-known/workbooks-runtime /.well-known/did.json)
+
   @impl true
   def call(conn, _opts) do
-    case bearer(conn) do
-      nil -> no_bearer(conn)
-      token -> verify(conn, token)
+    cond do
+      conn.request_path in @public -> dev_fallback(conn)
+      true ->
+        case bearer(conn) do
+          nil -> no_bearer(conn)
+          token -> verify(conn, token)
+        end
     end
   end
 
   # No credential. Single-tenant allows the dev fallback; multi-tenant does NOT —
   # isolation can't rest on a spoofable header, so a request must be authenticated.
-  # `/health` is infra liveness (no tenant data) — always allowed so load-balancer
-  # and `wb deploy verify` checks work in either mode.
   defp no_bearer(conn) do
-    cond do
-      conn.request_path == "/health" -> dev_fallback(conn)
-      Workbooks.Tenancy.multi?() -> conn |> send_resp(401, "authentication required (multi-tenant)") |> halt()
-      true -> dev_fallback(conn)
+    if Workbooks.Tenancy.multi?() do
+      Workbooks.Web.Error.render(conn, :tenant_required, "authentication required (multi-tenant)")
+    else
+      dev_fallback(conn)
     end
   end
 
@@ -53,7 +60,7 @@ defmodule Workbooks.Auth do
         conn |> assign(:identity, identity) |> assign(:tenant, identity.tenant_id)
 
       {:error, _reason} ->
-        conn |> send_resp(401, "unauthorized") |> halt()
+        Workbooks.Web.Error.render(conn, :unauthorized, "unauthorized")
     end
   end
 

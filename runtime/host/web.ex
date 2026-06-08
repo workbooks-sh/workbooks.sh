@@ -13,6 +13,14 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, "ok")
   end
 
+  # RCP handshake (RUNTIME-CONNECT-PROTOCOL.org §1): unauthenticated capabilities
+  # doc so any client learns the required auth rung + feature surface before
+  # presenting a credential. Public (see Workbooks.Auth @public).
+  get "/.well-known/workbooks-runtime" do
+    json = Jason.encode!(Workbooks.Web.Capabilities.doc())
+    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
+  end
+
   # Parse Org through the OQL kernel.
   post "/oql/parse" do
     {:ok, body, conn} = read_body(conn)
