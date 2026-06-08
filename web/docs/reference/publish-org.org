@@ -1,0 +1,125 @@
+#+TITLE: publish.org Properties
+#+DESCRIPTION: Complete reference for all publish.org and site.org config properties.
+
+* publish.org Properties
+
+=publish.org= (for single-page deploys) and =site.org= (for multi-page site
+builds) share the same property namespace. Single-page properties live in a
+=:PROPERTIES:= drawer on a heading tagged =:publish:=. Site properties are
+=#+KEYWORD:= lines at the top of =site.org=.
+
+** Single-page format (publish.org)
+
+#+begin_src org
+,* publish :publish:
+  :PROPERTIES:
+  :PUBLISH_TARGET:  cloudflare-pages
+  :PUBLISH_PROJECT: my-pages-project
+  :PUBLISH_DOMAIN:  docs.example.com
+  :PUBLISH_TITLE:   My Workbook
+  :PUBLISH_OUTPUT:  dist/index.html
+  :END:
+#+end_src
+
+** Multi-page format (site.org)
+
+#+begin_src org
+,#+TITLE: My Documentation
+,#+PUBLISH_TARGET: cloudflare-pages
+,#+PUBLISH_PROJECT: my-docs-project
+,#+PUBLISH_DOMAIN: docs.example.com
+
+,* Introduction
+  - [[index.org][Overview]]
+#+end_src
+
+** Properties
+
+*** PUBLISH_TARGET
+
+*Required.* The hosting provider.
+
+| Value | Provider |
+|-------+----------|
+| =cloudflare-pages= | Cloudflare Pages via =wrangler pages deploy= |
+| =gh-pages= | GitHub Pages via =git push= to the =gh-pages= branch |
+| =self-hosted= | POST to a running workbooks.sh runtime |
+
+*** PUBLISH_PROJECT
+
+*Required for cloudflare-pages and gh-pages.*
+
+- For =cloudflare-pages=: the Cloudflare Pages project name (must already exist).
+- For =gh-pages=: the GitHub repository in =org/name= format.
+- For =self-hosted=: the workbook ID used in the publish API call.
+
+*** PUBLISH_DOMAIN
+
+*Optional.* Custom domain used for the printed URL after deploy. Does not affect
+where the deploy actually goes — that is controlled by the provider's routing
+config. Set this so =wb publish= prints a useful URL rather than the provider's
+default =*.pages.dev= or =*.github.io= URL.
+
+*** PUBLISH_TITLE
+
+*Optional.* The =<title>= element in the rendered HTML and the =<h1>= in the
+page header. Falls back to =PUBLISH_PROJECT= if not set.
+
+*** PUBLISH_OUTPUT
+
+*Optional.* Local path where the rendered HTML is written before shipping.
+Default: =.publish_out/index.html=. Relative to the current working directory.
+
+For site builds (=wb publish site=), output goes to =dist/= inside the site
+directory regardless of this property — =PUBLISH_OUTPUT= only affects
+single-page deploys.
+
+*** PUBLISH_URL
+
+*Required for self-hosted target only.* Base URL of the running runtime instance.
+The rendered HTML is POSTed to =<PUBLISH_URL>/api/publish=.
+
+** Secrets
+
+Do not put API keys, tokens, account IDs, or other secrets in =publish.org= or
+=site.org=. These files are committed to version control. Use environment
+variables instead:
+
+| Secret | Env var |
+|--------+---------|
+| Cloudflare account ID (multi-account) | =CLOUDFLARE_ACCOUNT_ID= |
+| GitHub token (CI) | =GITHUB_TOKEN= (configure git credential helper) |
+| CF API token | managed by =wrangler login= (stored in =~/.config/wrangler/=) |
+
+=wb publish validate= warns if any property value looks like a hex ID or the
+property name suggests a secret.
+
+** validate and apply
+
+Both commands accept an explicit config file path as an argument. If not
+specified, they default to =./publish.org=:
+
+#+begin_src sh
+wb publish validate                     # → ./publish.org
+wb publish validate config/publish.org  # → explicit
+wb publish apply my.org config/publish.org
+#+end_src
+
+** Full example
+
+#+begin_src org
+,* publish :publish:
+  :PROPERTIES:
+  :PUBLISH_TARGET:  cloudflare-pages
+  :PUBLISH_PROJECT: workbooks-demo
+  :PUBLISH_DOMAIN:  demo.workbooks.sh
+  :PUBLISH_TITLE:   Workbooks Demo
+  :END:
+#+end_src
+
+#+begin_src sh
+export CLOUDFLARE_ACCOUNT_ID=<id>   # only needed for multi-account setups
+wb publish validate
+wb publish apply demo.org
+# → deployed → https://demo.workbooks.sh
+#+end_src

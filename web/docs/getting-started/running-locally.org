@@ -1,0 +1,118 @@
+#+TITLE: Running Locally
+#+DESCRIPTION: iex -S mix, wb deploy local, ports and configuration.
+
+* Running Locally
+
+The runtime is a standard Mix application. You can run it in three modes:
+interactive (=iex -S mix=), as a full server (=wb deploy local=), or as a
+one-shot CLI (=wb <command>=).
+
+** iex -S mix
+
+The primary development mode. Starts the full supervision tree including the OQL
+GenServer, the BEAM HTTP endpoint, and the variable store.
+
+#+begin_src sh
+cd runtime
+iex -S mix
+#+end_src
+
+At the =iex>= prompt you have direct access to every module in the runtime:
+
+#+begin_src elixir
+# parse a workbook
+Workbooks.OQL.parse_headlines(File.read!("my.org"))
+
+# check the build plan
+Workbooks.OQL.tangle_plan(File.read!("my.org"))
+
+# render to HTML
+Workbooks.OQL.render(File.read!("my.org"))
+
+# variable store
+Workbooks.Vars.set("dev", "api_key", "value", false)
+Workbooks.Vars.get("dev", "api_key")
+#+end_src
+
+The OQL GenServer starts as part of the application. First call to any
+=Workbooks.OQL.*= function loads the =oql.wasm= component via Wasmex. Subsequent
+calls reuse the loaded component — no per-call startup cost.
+
+** Ports
+
+Default ports in =config/dev.exs=:
+
+| Service | Default port |
+|---------+--------------|
+| Control plane (HTTP) | 4000 |
+| Public web plane (HTTP) | 4001 |
+
+Override at start time:
+
+#+begin_src sh
+PORT=4000 PUBLIC_PORT=4001 iex -S mix
+#+end_src
+
+The control plane (port 4000) serves the authenticated API, agent events, and the
+workbook runtime API. The public plane (port 4001) serves published workbooks by
+hostname — every request is resolved by the first DNS label of the =Host= header
+to a workbook ID, then served as static HTML.
+
+** wb deploy local
+
+=wb deploy local= runs the full runtime in a container using krunvm (macOS) or
+podman/docker as a fallback. It uses the same OCI image as cloud deployment:
+
+#+begin_src sh
+wb deploy init          # scaffold deployment.org
+wb deploy validate      # check config without running anything
+wb deploy local         # build image + run container
+#+end_src
+
+This is the canonical way to test deployment config before pushing to cloud. The
+container is the same image that =wb deploy apply= ships.
+
+See [[../reference/deployment-org.org][deployment.org Properties]] for the full list of config properties.
+
+** Hot reload
+
+In =iex -S mix=, code reloading works the standard Elixir way:
+
+#+begin_src elixir
+# recompile changed modules
+recompile()
+#+end_src
+
+The OQL kernel (=oql.wasm=) does not hot-reload — if you change the kernel Rust
+source, you need to recompile the kernel and restart:
+
+#+begin_src sh
+cd runtime
+mix compile              # recompiles oql.wasm if changed
+iex -S mix
+#+end_src
+
+** mix run (one-shot)
+
+Run a single expression without the interactive shell:
+
+#+begin_src sh
+mix run -e 'IO.puts Workbooks.OQL.render(File.read!("my.org"))'
+#+end_src
+
+** Environment variables
+
+| Variable | Effect |
+|----------+--------|
+| =PORT= | HTTP control plane port (default: 4000) |
+| =PUBLIC_PORT= | HTTP public plane port (default: 4001) |
+| =WB_TENANT= | Default tenant for the variable store (default: "dev") |
+| =WB_TOOLKIT_EXEC= | Set to =1= to enable toolkit execution (off by default) |
+| =CLOUDFLARE_ACCOUNT_ID= | CF account for =wb publish= multi-account setups |
+
+** Desktop app
+
+The desktop app (Tauri) embeds the OQL kernel and runs workbooks locally without
+any server. It communicates with an optional runtime tier for agents and sync, but
+viewing and editing workbooks works fully offline. Download from the GitHub
+releases page.

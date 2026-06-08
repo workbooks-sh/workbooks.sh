@@ -25,13 +25,15 @@ defmodule Workbooks.Publish do
   @template """
   # Publish configuration — one declarative description of where this workbook lives.
   # Edit, then:  wb publish validate  →  wb publish apply <workbook.org>
+  #
+  # Secrets (API keys, tokens, account IDs) do NOT go here.
+  # Use env vars: CLOUDFLARE_ACCOUNT_ID, etc.
   * publish :publish:
     :PROPERTIES:
     :PUBLISH_TARGET:  cloudflare-pages
     :PUBLISH_PROJECT: <your-pages-project-name>
     :PUBLISH_DOMAIN:  <your-domain-or-pages.dev-url>
     :PUBLISH_TITLE:   <page title>
-    # :PUBLISH_OUTPUT: dist/index.html   (default: .publish_out/index.html)
     :END:
   """
 
@@ -116,7 +118,8 @@ defmodule Workbooks.Publish do
         err("wrangler not found on PATH — install with: npm i -g wrangler", %{target: "cloudflare-pages"})
 
       wrangler ->
-        env = if p["PUBLISH_CF_ACCOUNT"], do: [{"CLOUDFLARE_ACCOUNT_ID", p["PUBLISH_CF_ACCOUNT"]}], else: []
+        account = p["PUBLISH_CF_ACCOUNT"] || System.get_env("CLOUDFLARE_ACCOUNT_ID")
+        env = if account, do: [{"CLOUDFLARE_ACCOUNT_ID", account}], else: []
         args = [wrangler, "pages", "deploy", dir, "--project-name", project]
         case System.cmd("sh", ["-c", Enum.join(args, " ")], stderr_to_stdout: true, env: env) do
           {out, 0} ->

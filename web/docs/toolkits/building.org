@@ -1,0 +1,166 @@
+#+TITLE: Building a Toolkit
+#+DESCRIPTION: How to write a toolkit manifest, skill files, and CLI.
+
+* Building a Toolkit
+
+A toolkit is a =.org= file + a CLI binary on PATH. The org file is the manifest
+and skill documentation; the CLI is what agents call. You need both.
+
+** Minimal example
+
+Create =toolkits/greet.org=:
+
+#+begin_src org
+,* greet :toolkit:
+  :PROPERTIES:
+  :EXEC:     greet
+  :CAPS:     read
+  :ARG_MODE: positional
+  :END:
+
+A simple greeting tool.
+
+,** greet <name>
+
+Print a greeting for =<name>=. Output: a single line to stdout.
+
+#+begin_src text
+hello, <name>!
+#+end_src
+#+end_src
+
+Create the =greet= script (anywhere on PATH):
+
+#+begin_src sh
+#!/bin/sh
+echo "hello, ${1}!"
+#+end_src
+
+#+begin_src sh
+chmod +x greet
+cp greet /usr/local/bin/greet
+#+end_src
+
+Verify discovery:
+
+#+begin_src sh
+wb toolkit list
+# → greet  read  /usr/local/bin/greet
+#+end_src
+
+** The manifest heading
+
+The top-level heading is the manifest. Its title becomes the toolkit display name.
+The =:toolkit:= tag is required for discovery.
+
+Required properties:
+- =EXEC=: the binary name or path. Must be on PATH (or an absolute path).
+
+Recommended properties:
+- =CAPS=: space-separated capability tags. Agents use this to decide whether to
+  allow a toolkit in a given context. Use =read= for read-only tools, =write= for
+  tools that modify files, =network= for tools that make HTTP calls, =exec= for
+  tools that spawn processes.
+- =ARG_MODE=: =positional= (args by position) or =flags= (=--flag value= style).
+  Agents use this when constructing CLI invocations.
+
+** Skill files
+
+The body of the toolkit org file is the skill documentation. Structure it with
+one level-2 heading per subcommand:
+
+#+begin_src org
+,** process <input-file> [--format json|csv]
+
+Read an org file and emit records.
+
+Flags:
+- =--format=: output format (default: json)
+
+Output (JSON):
+#+begin_src json
+[{"id": "...", "title": "...", "tags": [...]}]
+#+end_src
+
+Exit codes: 0 success, 1 parse error, 2 file not found.
+#+end_src
+
+Agents read this content verbatim. Be precise: include expected output format,
+exit codes, and error cases. The more specific the skill file, the fewer
+correction loops an agent needs.
+
+** Build sources
+
+If the toolkit binary is compiled from source, declare the source:
+
+#+begin_src org
+,* my-compiled-tool :toolkit:
+  :PROPERTIES:
+  :EXEC:      my-compiled-tool
+  :BUILD_SRC: src/main.rs
+  :BUILD_LANG: rust
+  :SHA256:    <sha256 of the compiled binary>
+  :END:
+#+end_src
+
+When =BUILD_SRC= is set, =wb toolkit install= knows how to build the binary from
+source. =BUILD_LANG= tells it which compiler to use. =SHA256= is checked after
+build to verify the output.
+
+Currently supported =BUILD_LANG= values: =rust= (via cargo), =zig= (via zig
+build), =c= (via clang).
+
+** Installing from a git URL
+
+#+begin_src sh
+wb toolkit install https://github.com/example/my-toolkit
+#+end_src
+
+This clones the repo into the toolkit search path, builds if =BUILD_SRC= is
+declared, and verifies =SHA256= if present. The toolkit is immediately available
+to =wb toolkit list= and to agents.
+
+** Multi-tool toolkits
+
+One toolkit org file can describe multiple binaries. Use a level-2 heading with a
+=:EXEC:= property override for each:
+
+#+begin_src org
+,* my-suite :toolkit:
+  :PROPERTIES:
+  :EXEC: suite-main
+  :END:
+
+,** sub-tool-a
+   :PROPERTIES:
+   :EXEC: suite-a
+   :END:
+
+   Describe sub-tool-a here.
+
+,** sub-tool-b
+   :PROPERTIES:
+   :EXEC: suite-b
+   :END:
+
+   Describe sub-tool-b here.
+#+end_src
+
+Each subheading with its own =:EXEC:= becomes a separately discoverable CLI
+entry.
+
+** Testing a toolkit
+
+#+begin_src sh
+WB_TOOLKIT_EXEC=1 wb run "use greet to greet Alice"
+#+end_src
+
+Watch the =_steps.jsonl= output to see what command the agent constructed and what
+it received back:
+
+#+begin_src sh
+tail -f _steps.jsonl | jq .
+#+end_src
+
+If the agent constructs the wrong command, improve the skill file: add an example
+invocation, clarify the argument order, or show a concrete expected output.

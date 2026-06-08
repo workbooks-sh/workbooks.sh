@@ -1,0 +1,106 @@
+#+TITLE: Installation
+#+DESCRIPTION: Get the workbooks.sh runtime running locally.
+
+* Installation
+
+The runtime is a single Elixir/Mix project. You need Elixir ≥ 1.16, Erlang ≥ 26,
+and Rust (stable) on PATH. The Rust toolchain is required at build time because the
+OQL kernel (=oql.wasm=) is compiled from source during =mix deps.compile=.
+
+** Prerequisites
+
+*** Elixir + Erlang
+
+Use =asdf= or your system package manager:
+
+#+begin_src sh
+asdf plugin add erlang
+asdf plugin add elixir
+asdf install erlang 27.0
+asdf install elixir 1.17.0-otp-27
+#+end_src
+
+On macOS with Homebrew:
+
+#+begin_src sh
+brew install elixir
+#+end_src
+
+Verify:
+
+#+begin_src sh
+elixir --version
+# Erlang/OTP 27 [erts-15.0] Elixir 1.17.0 (compiled with Erlang/OTP 27)
+#+end_src
+
+*** Rust
+
+The OQL kernel is a Rust project compiled to =wasm32-wasi= via
+=wasm-tools= + =javy=. The provisioning script handles the WASM-specific
+toolchain; you only need a working Rust installation:
+
+#+begin_src sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#+end_src
+
+*** WASM toolchain
+
+The WASM toolchain (=javy=, =wasm-tools=, =wac=, =wasi-adapter=) is
+auto-provisioned by the runtime during =mix deps.compile=. The script lives at
+=scripts/provision-tools.sh= and is idempotent. You do not need to install these
+manually.
+
+To provision manually (e.g. in CI):
+
+#+begin_src sh
+./scripts/provision-tools.sh
+#+end_src
+
+** Clone and compile
+
+#+begin_src sh
+git clone https://github.com/workbooks-sh/workbooks.sh
+cd workbooks.sh/runtime
+mix deps.get
+mix deps.compile   # compiles the OQL kernel to oql.wasm
+#+end_src
+
+=mix deps.compile= will take a few minutes on a cold build — it compiles the OQL
+kernel from Rust, converts it to a WIT component, and embeds it in the NIF that
+Wasmex loads. Subsequent builds are incremental.
+
+** Verify the install
+
+#+begin_src sh
+mix run -e 'IO.inspect(Workbooks.OQL.tangle_plan("* test\n"))'
+#+end_src
+
+Expected output is a JSON map with =worlds=, =components=, =edges=, =imports=, and
+=exports= keys. If the OQL kernel loaded correctly, you will see =%{"worlds" => [], ...}=.
+
+** The wb binary
+
+To use the =wb= CLI outside of =iex -S mix=, compile an escript:
+
+#+begin_src sh
+cd runtime
+mix escript.build   # → wb binary in runtime/wb
+./wb --version
+#+end_src
+
+Or add the built binary to PATH:
+
+#+begin_src sh
+cp wb /usr/local/bin/wb
+#+end_src
+
+** Desktop app
+
+The desktop app bundles the OQL kernel and the Tauri runtime; it does not require
+Elixir or =mix= on the host machine. Download the latest release from the GitHub
+releases page. The app renders workbooks locally without a server.
+
+** Next steps
+
+- [[quick-start.org][Quick Start]] — write and run your first workbook
+- [[running-locally.org][Running Locally]] — =iex -S mix=, =wb deploy local=, ports

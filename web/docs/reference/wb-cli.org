@@ -1,0 +1,207 @@
+#+TITLE: wb CLI Reference
+#+DESCRIPTION: Complete reference for all wb commands.
+
+* wb CLI Reference
+
+=wb= is the workbooks command-line interface. It is compiled as an Elixir escript
+that embeds the full runtime. The =deploy= and =publish= verbs skip the BEAM app
+boot (they use shell-outs + file config); all other verbs start the OQL kernel.
+
+** Syntax
+
+#+begin_src text
+wb <command> [args] [--flags]
+#+end_src
+
+All verbs are non-interactive. Machine-readable output: add =--json= where
+supported. Non-zero exit on failure.
+
+** Workbook commands
+
+*** wb query <file.org>
+
+Parse headlines from an org file. Returns JSON array of headline maps.
+
+#+begin_src sh
+wb query my.org
+wb query my.org | jq '.[].title'
+#+end_src
+
+*** wb tangle <file.org>
+
+Emit the build plan (worlds, components, edges, imports, exports) as JSON.
+
+#+begin_src sh
+wb tangle my.org
+wb tangle my.org | jq '.components'
+#+end_src
+
+*** wb lint <file.org>
+
+Static analysis of the workbook. Returns a JSON array of issues. Currently a
+stub; full analysis is planned.
+
+#+begin_src sh
+wb lint my.org
+#+end_src
+
+*** wb bundle <src.org> <dest.bundle>
+
+Pack the org source and its build plan into a bundle archive.
+
+#+begin_src sh
+wb bundle my.org my.bundle
+#+end_src
+
+** Variable store
+
+The variable store is per-tenant key-value storage with secret support.
+
+*** wb var set <key> <value> [--secret]
+
+Set a variable. =--secret= marks the value as redacted in output.
+
+#+begin_src sh
+wb var set api_url https://api.example.com
+wb var set api_key sk-... --secret
+#+end_src
+
+*** wb var get <key>
+
+Get a variable value. Secrets print as =<secret: N bytes — ref it with {{secret:key}}>= .
+
+#+begin_src sh
+wb var get api_url
+#+end_src
+
+*** wb var list
+
+List all variables and their kinds (plain / secret).
+
+#+begin_src sh
+wb var list
+#+end_src
+
+*** wb var ref <template>
+
+Interpolate variable references in a template string. References use
+={{key}}= syntax; secrets use ={{secret:key}}=.
+
+#+begin_src sh
+wb var ref "POST {{api_url}}/endpoint"
+#+end_src
+
+** Agent
+
+*** wb run <prompt>
+
+Run an agent with the given prompt. The agent has access to shell, search, fetch,
+vfs, wb, and run tools. Prints the result when done.
+
+#+begin_src sh
+wb run "list all workbooks tagged :toolkit: in this directory"
+#+end_src
+
+Options:
+- =--model <id>= — override the LLM model
+- =--timeout <ms>= — wall-clock timeout (default: 60 000)
+- =--workdir <path>= — working directory for shell calls
+
+** Toolkit management
+
+*** wb toolkit list
+
+List all discovered toolkits in the toolkit search path.
+
+#+begin_src sh
+wb toolkit list
+#+end_src
+
+*** wb toolkit show <name>
+
+Print the full manifest and skill text for a toolkit.
+
+#+begin_src sh
+wb toolkit show my-tool
+#+end_src
+
+*** wb toolkit install <url>
+
+Clone a toolkit from a git URL, build if needed, and add to the search path.
+
+#+begin_src sh
+wb toolkit install https://github.com/example/my-toolkit
+#+end_src
+
+** Telemetry
+
+*** wb telemetry
+
+Summarise recent agent runs from =_steps.jsonl= files.
+
+#+begin_src sh
+wb telemetry
+#+end_src
+
+** Publish
+
+See [[publish-org.org][publish.org Properties]] for config reference.
+
+#+begin_src text
+wb publish init                         scaffold publish.org
+wb publish validate [config.org]        coherence-check
+wb publish apply [file.org] [cfg.org]   render + deploy
+wb publish site [dir]                   multi-page site from site.org
+wb publish help
+#+end_src
+
+All publish verbs support =--json= for machine output.
+
+** Deploy
+
+See [[deployment-org.org][deployment.org Properties]] for config reference.
+
+#+begin_src text
+wb deploy init                   scaffold deployment.org
+wb deploy validate [file.org]    coherence-check
+wb deploy apply [file.org]       deploy to cloud
+wb deploy local [preset]         run local container
+wb deploy doctor [file.org]      environment health check
+wb deploy status [file.org]      deployment status
+wb deploy verify [file.org]      post-deploy smoke test
+wb deploy down [file.org]        stop local container
+wb deploy logs [file.org]        tail container logs
+wb deploy build [file.org]       build OCI image only
+wb deploy publish [file.org]     push OCI image to registry
+wb deploy help
+#+end_src
+
+** Global flags
+
+| Flag | Description |
+|------+-------------|
+| =--json= | Machine-readable JSON output (publish/deploy verbs) |
+| =--version= | Print version and exit |
+| =--help= | Print usage |
+
+** Exit codes
+
+| Code | Meaning |
+|------+---------|
+| 0 | Success |
+| 1 | Error (message on stderr or in JSON =message= field) |
+
+** Building the wb binary
+
+#+begin_src sh
+cd runtime
+mix escript.build
+# → runtime/wb
+./wb --version
+#+end_src
+
+Copy to PATH:
+
+#+begin_src sh
+cp wb /usr/local/bin/wb
+#+end_src

@@ -1,0 +1,149 @@
+#+TITLE: Org Mode Basics
+#+DESCRIPTION: The Org conventions the workbooks runtime uses.
+
+* Org Mode Basics
+
+Workbooks are Org files. The runtime uses a specific, minimal subset of Org that
+maps cleanly onto WASM component graphs. You do not need to know all of Org mode —
+just the parts described here.
+
+** File-level keywords
+
+#+begin_src org
+,#+TITLE: My Workbook
+,#+DESCRIPTION: What this workbook does.
+,#+AUTHOR: Your Name
+#+end_src
+
+=#+TITLE:= becomes the =<title>= in the rendered HTML and appears in the page
+header. =#+DESCRIPTION:= is used by =wb publish= as the meta description tag.
+Other standard Org keywords (=#+DATE:=, =#+LANGUAGE:=, etc.) are passed through
+by the OQL renderer.
+
+** Headings and nesting
+
+Standard Org heading syntax. The level is the number of leading =*= characters:
+
+#+begin_src org
+,* Top-level heading (level 1)
+
+,** Section (level 2)
+
+,*** Subsection (level 3)
+#+end_src
+
+The workbook's identity comes from the level-1 heading. There should be exactly
+one level-1 heading, and it must carry =:WORKBOOK_VERSION: 1= in its properties.
+
+** The :PROPERTIES: drawer
+
+Properties are key–value pairs attached to a heading. Every heading can have a
+drawer. The OQL kernel reads properties for both the workbook identity and the
+component wiring.
+
+#+begin_src org
+,* My Workbook
+  :PROPERTIES:
+  :WORKBOOK_VERSION: 1
+  :END:
+
+,** Compute something
+   :PROPERTIES:
+   :in:  x y
+   :out: result
+   :END:
+#+end_src
+
+Spacing: the drawer open/close markers (=:PROPERTIES:= and =:END:=) and each
+property line should be indented one more level than the heading they belong to.
+The OQL parser is lenient about indentation, but consistent formatting is
+recommended.
+
+** Tags
+
+Tags are appended to a heading in =:tag:= notation:
+
+#+begin_src org
+,* My Toolkit :toolkit:
+,** helper :internal:
+#+end_src
+
+The runtime uses tags for toolkit discovery (=:toolkit:=) and publish config
+(=:publish:=). Tags are also returned by =wb query= and can be filtered by agents
+and the query plane.
+
+** Source blocks
+
+Source blocks are the WASM components in a workbook. The language identifier
+determines the WASM toolchain used to compile the block.
+
+#+begin_src org
+,#+begin_src javascript
+export function double(x) { return x * 2; }
+,#+end_src
+#+end_src
+
+Supported languages: =javascript= (via Javy), =rust= (via mrustc.wasm +
+clang.wasm), =c= (via clang.wasm), =zig= (via Zig WASM target).
+
+Source blocks can also carry =:exports code= or =:exports results= headers to
+control what the renderer shows — these are standard Org Babel headers and the OQL
+renderer respects them.
+
+** Named blocks and references
+
+#+begin_src org
+,#+name: my-block
+,#+begin_src javascript
+export function greet() { return "hello"; }
+,#+end_src
+#+end_src
+
+Named blocks can be referenced by other blocks via =:deps:= (see
+[[source-blocks.org][Source Blocks & Components]]).
+
+** Lists and tables
+
+Standard Org list syntax:
+
+#+begin_src org
+- item one
+- item two
+  - nested
+#+end_src
+
+Standard Org table syntax:
+
+#+begin_src org
+| col A | col B |
+|-------+-------|
+| value | value |
+#+end_src
+
+The OQL renderer converts both to semantic HTML. Tables get monospace headers and
+full-width layout.
+
+** Links
+
+Standard Org link syntax:
+
+#+begin_src org
+,[[https://example.com][Link text]]
+,[[file:other.org][Another workbook]]
+,[[#section-id][Internal anchor]]
+#+end_src
+
+External links become =<a href>= tags. =file:= links become relative HTML hrefs.
+Internal anchors use the rendered section ID.
+
+** Comments and export control
+
+#+begin_src org
+,# This is a comment — not rendered.
+
+,#+begin_comment
+Multi-line comment block — not rendered.
+,#+end_comment
+#+end_src
+
+Source blocks with =:exports none= are compiled but not shown in the rendered HTML.

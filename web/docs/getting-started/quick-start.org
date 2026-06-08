@@ -1,0 +1,123 @@
+#+TITLE: Quick Start
+#+DESCRIPTION: Write and run your first workbook in 5 minutes.
+
+* Quick Start
+
+Prerequisites: Elixir ≥ 1.16, Rust stable, the runtime compiled. See
+[[installation.org][Installation]] if you haven't done that yet.
+
+** 1. Write a workbook
+
+Create =hello.org=:
+
+#+begin_src org
+,#+TITLE: Hello
+
+,* Hello
+  :PROPERTIES:
+  :WORKBOOK_VERSION: 1
+  :END:
+
+This workbook says hello.
+
+,** Greet
+   :PROPERTIES:
+   :in:  name
+   :out: greeting
+   :END:
+
+,#+begin_src javascript
+export function greet(name) {
+  return `hello, ${name}!`;
+}
+,#+end_src
+#+end_src
+
+** 2. Inspect the build plan
+
+The build plan is the DAG the runtime uses to wire components. Check it with =wb
+tangle=:
+
+#+begin_src sh
+wb tangle hello.org
+#+end_src
+
+Output (abbreviated):
+
+#+begin_src json
+{
+  "worlds": [
+    {"id": "hello/greet", "lang": "javascript"}
+  ],
+  "components": [
+    {"id": "hello/greet", "world": "hello/greet", "in": ["name"], "out": ["greeting"]}
+  ],
+  "edges": [],
+  "imports": ["name"],
+  "exports": ["greeting"]
+}
+#+end_src
+
+=imports= are the workbook's inputs (=name= is unresolved — no upstream component
+feeds it). =exports= are values the workbook produces.
+
+** 3. Render it
+
+Render the workbook to HTML:
+
+#+begin_src sh
+wb publish apply hello.org
+#+end_src
+
+This writes =.publish_out/index.html=. Open it in a browser. The OQL kernel
+rendered the prose and code blocks; the =:in:= / =:out:= properties appear in the
+component metadata.
+
+If you don't have a =publish.org= yet, scaffold one first:
+
+#+begin_src sh
+wb publish init
+# edit publish.org → set PUBLISH_TARGET, PUBLISH_PROJECT, PUBLISH_DOMAIN
+wb publish validate
+wb publish apply hello.org
+#+end_src
+
+** 4. Run it in iex
+
+Load the runtime and call the OQL kernel directly:
+
+#+begin_src sh
+cd runtime
+iex -S mix
+#+end_src
+
+#+begin_src elixir
+org = File.read!("../hello.org")
+Workbooks.OQL.tangle_plan(org)    # → build plan map
+Workbooks.OQL.render(org)          # → HTML string
+#+end_src
+
+** 5. Query headlines
+
+=wb query= (or =OQL.parse_headlines/1=) returns every heading in the workbook as
+structured JSON, including their tags, properties, and nesting level:
+
+#+begin_src sh
+wb query hello.org
+#+end_src
+
+#+begin_src json
+[
+  {"level": 1, "title": "Hello", "tags": [], "properties": {"WORKBOOK_VERSION": "1"}},
+  {"level": 2, "title": "Greet", "tags": [], "properties": {"in": "name", "out": "greeting"}}
+]
+#+end_src
+
+This is the foundation of toolkit discovery: toolkits are workbooks with a
+=:toolkit:= tag on their top heading.
+
+** Next steps
+
+- [[running-locally.org][Running Locally]] — =iex -S mix=, hot reload, ports
+- [[../the-workbook/source-blocks.org][Source Blocks & Components]] — =:deps:=, =:in:=, =:out:=, =:sig:= in depth
+- [[../publishing/wb-publish.org][wb publish]] — push the rendered workbook to a live URL

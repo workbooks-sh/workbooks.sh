@@ -206,9 +206,8 @@ defmodule Workbooks.Publish.Site do
         {:error, "wrangler not found — install with: npm i -g wrangler", %{}}
 
       wrangler ->
-        env = if config["PUBLISH_CF_ACCOUNT"],
-          do: [{"CLOUDFLARE_ACCOUNT_ID", config["PUBLISH_CF_ACCOUNT"]}],
-          else: []
+        account = config["PUBLISH_CF_ACCOUNT"] || System.get_env("CLOUDFLARE_ACCOUNT_ID")
+        env = if account, do: [{"CLOUDFLARE_ACCOUNT_ID", account}], else: []
 
         args = "#{wrangler} pages deploy #{dist} --project-name #{project} --commit-dirty=true"
 

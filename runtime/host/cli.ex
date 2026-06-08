@@ -309,6 +309,14 @@ defmodule Workbooks.CLI do
           org = pub_org_arg(rest)
           cfg = pub_config_arg(rest)
           pub.apply(org, cfg)
+        ["site" | rest] ->
+          dir = Enum.find(rest, ".", fn a -> not String.starts_with?(a, "-") end)
+          site = Workbooks.Publish.Site
+          case site.build(dir) do
+            {:ok, msg, _data} -> {:ok, msg, %{}}
+            {:error, msg} -> {:error, msg, %{}}
+            {:error, msg, _data} -> {:error, msg, %{}}
+          end
         other ->
           {:error, "unknown verb: wb publish #{Enum.join(other, " ")}", %{}}
       end
@@ -325,6 +333,7 @@ defmodule Workbooks.CLI do
       wb publish init                scaffold ./publish.org
       wb publish validate            coherence-check it (no render, no deploy)
       wb publish apply <file.org>    render + ship → prints the live URL
+      wb publish site [<dir>]        render multi-page site from site.org → deploy
     (config defaults to ./publish.org; workbook defaults to ./workbook.org)
 
     A publish.org describes:

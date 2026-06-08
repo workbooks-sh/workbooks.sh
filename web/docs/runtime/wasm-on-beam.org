@@ -1,0 +1,107 @@
+#+TITLE: WASM on the BEAM
+#+DESCRIPTION: How wasmtime runs inside the Erlang VM via Wasmex.
+
+* WASM on the BEAM
+
+The runtime embeds wasmtime inside the Erlang VM using Wasmex — an Elixir library
+that wraps the wasmtime Rust crate as a NIF (Native Implemented Function). This
+lets the runtime load, compile, and execute WASM modules from Elixir without
+leaving the VM process.
+
+** Why wasmtime
+
+wasmtime is the only WASM runtime the workbooks stack uses. Wasmer and WASIX were
+evaluated and deliberately not adopted — they provide Node.js-level fidelity but
+at a complexity cost that isn't needed here. wasmtime's WASI P1/P2 support covers
+all current requirements.
+
+** Wasmex
+
+Wasmex is the Elixir binding. It exposes a GenServer-based interface for loading
+and calling WASM modules. The OQL kernel and agent engine both run via Wasmex.
+
+Loading a component:
+
+#+begin_src elixir
+{:ok, store} = Wasmex.Store.new()
+{:ok, module} = Wasmex.Module.compile(store, wasm_bytes)
+{:ok, instance} = Wasmex.Instance.new(store, module, imports)
+#+end_src
+
+Calling an export:
+
+#+begin_src elixir
+{:ok, [result]} = Wasmex.Instance.call_exported_function(instance, "render", [org_source], store)
+#+end_src
+
+The OQL GenServer owns a long-lived Wasmex instance. The instance is warm — WASM
+bytecode is already compiled to native by wasmtime's Cranelift backend. Repeated
+calls to =OQL.render/1= pay no compilation cost.
+
+** The WASM Component Model
+
+The runtime uses the WASM Component Model (the =wasm32-wasi= target + WIT
+interfaces). Components are more than modules: they carry explicit interface
+declarations (WIT), can be linked together, and the runtime verifies type
+compatibility at link time.
+
+=wasm-tools= is used to wrap compiled WASM modules into components and to link
+components together. The =wac= tool handles multi-component composition (used for
+workbooks that have multiple interacting source blocks).
+
+** Compiling workbook source to WASM
+
+Each language has a compiler path that produces a =wasm32-wasi= module:
+
+*** JavaScript (Javy)
+
+Javy compiles JavaScript to WASM using QuickJS as the embedded JS engine. The JS
+source is bundled with the QuickJS runtime into a single =.wasm= file.
+
+#+begin_src sh
+javy compile -o out.wasm source.js
+#+end_src
+
+Javy limitations: no DOM, no Node built-ins, no =async/await= in the initial pass.
+The output is a WASM module that runs synchronously.
+
+*** Rust (mrustc + clang inside WASM)
+
+Rust source in workbooks compiles entirely inside the WASM sandbox:
+
+1. =mrustc.wasm= — a port of mrustc (a Rust-to-C transpiler) compiled to WASM.
+   Reads =.rs= source, emits C.
+2. =clang.wasm= — LLVM/Clang compiled to WASM. Compiles the C output to
+   =wasm32-wasi=.
+
+No native Rust toolchain needed at runtime. The compilation runs inside the same
+wasmtime sandbox as user code. 4 GB memory ceiling from WASM linear memory is a
+non-issue for normal source files.
+
+*** C (clang inside WASM)
+
+C source skips the mrustc step and goes directly to =clang.wasm=. C99 with the
+WASI stdlib.
+
+*** Zig
+
+Zig compiles to =wasm32-wasi= natively. The Zig binary must be on PATH; it is not
+embedded in WASM.
+
+** Memory model
+
+Each WASM component instance has its own linear memory (up to 4 GB addressable).
+The Elixir host and the WASM guest share no memory — all data crosses the boundary
+as function arguments and return values, serialized to WIT types. This provides
+strong isolation: a buggy component cannot corrupt the Elixir heap.
+
+** The NIF boundary
+
+Wasmex's NIF is a Rust library that owns the wasmtime engine and all component
+instances. Because NIFs run on Erlang scheduler threads, long-running WASM
+computations block the scheduler. Wasmex mitigates this with dirty schedulers —
+WASM calls are dispatched to dirty CPU threads so normal BEAM scheduling continues.
+
+The OQL GenServer serialises calls to prevent concurrent access to the same
+instance. If OQL becomes a throughput bottleneck, the fix is to pool multiple
+GenServer instances.

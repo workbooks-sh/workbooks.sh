@@ -163,6 +163,105 @@ defmodule Workbooks.PublicWeb do
     """
   end
 
+  @doc """
+  Multi-page site variant of static_page. Takes pre-rendered body HTML, pre-built
+  nav HTML (sidebar), the current page's relative URL (for active-link JS), and the
+  site title. Called by Workbooks.Publish.Site for each page in a site build.
+  """
+  def site_page(title, body_html, nav_html, current_url, site_title) do
+    """
+    <!doctype html><html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>#{escape(title)} — #{escape(site_title)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;600&family=Geist+Mono:wght@400;500&display=swap">
+    <style>
+    :root{--bg:#1a1a1f;--surface:#25252b;--fg:#f4f4f5;--line:rgba(244,244,245,.06);--divider:rgba(244,244,245,.12);--muted:rgba(244,244,245,.55);--dim:rgba(244,244,245,.40);--ok:#34d399;--accent:#6366f1;--sans:"Geist",system-ui,-apple-system,sans-serif;--mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;--sidebar-w:260px}
+    @media(prefers-color-scheme:light){:root{--bg:#f7f7f8;--surface:#fff;--fg:#1a1a1f;--line:rgba(26,26,31,.07);--divider:rgba(26,26,31,.12);--muted:rgba(26,26,31,.58);--dim:rgba(26,26,31,.42);--ok:#059669;--accent:#4f46e5}}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-weight:300;line-height:1.55;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;display:flex;min-height:100vh}
+    /* ── sidebar ── */
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;border-right:1px solid var(--divider);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;padding:0}
+    .sidebar-head{padding:1.5rem 1.25rem 1rem;border-bottom:1px solid var(--divider);display:flex;align-items:center;justify-content:space-between}
+    .sidebar-title{font-family:var(--mono);font-size:.82rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--fg);text-decoration:none}
+    .sidebar-title:hover{color:var(--muted)}
+    .sidebar-close{display:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:.2rem}
+    .nav-body{padding:1rem .75rem 3rem;flex:1}
+    .nav-label{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:.75rem .5rem .35rem;margin-top:.5rem}
+    .nav-body ul{list-style:none;margin-bottom:.25rem}
+    .nav-body li a{display:block;font-size:.875rem;font-weight:300;color:var(--muted);text-decoration:none;padding:.32rem .5rem;border-radius:6px;transition:color .15s,background .15s}
+    .nav-body li a:hover{color:var(--fg);background:var(--surface)}
+    .nav-body li a.active,.nav-body li a[aria-current=page]{color:var(--fg);background:var(--surface);font-weight:400}
+    /* ── main content ── */
+    .page-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+    .page-header{padding:2.5rem 3rem 1.5rem;border-bottom:1px solid var(--divider)}
+    .page-eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.02em;color:var(--muted);margin-bottom:.6rem}
+    .page-title{font-size:clamp(1.6rem,4vw,2.4rem);font-weight:600;line-height:1.1;letter-spacing:-.025em}
+    .page-body{padding:2.5rem 3rem 5rem;max-width:760px}
+    /* ── typography (body) ── */
+    .page-body h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em;margin:clamp(2.5rem,5vh,3rem) 0 .7rem;padding-top:clamp(1.8rem,4vh,2.4rem);border-top:1px solid var(--divider)}
+    .page-body h2:first-child{margin-top:0;padding-top:0;border-top:0}
+    .page-body h3{font-family:var(--mono);font-size:.82rem;font-weight:500;letter-spacing:.02em;color:var(--muted);text-transform:uppercase;margin:1.8rem 0 .5rem}
+    .page-body p{max-width:64ch;font-size:1rem;margin-bottom:.9rem;line-height:1.65}
+    .page-body a{color:var(--fg);text-underline-offset:3px}
+    .page-body a:hover{color:var(--muted)}
+    .page-body code{font-family:var(--mono);font-size:.87em;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:.1em .35em}
+    .page-body pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.3rem;overflow-x:auto;margin:1.1rem 0}
+    .page-body pre code{font-size:.83rem;line-height:1.75;background:none;border:none;padding:0}
+    .page-body table{width:100%;border-collapse:collapse;font-size:.9rem;margin:1.4rem 0}
+    .page-body th{font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--divider)}
+    .page-body td{padding:.5rem .75rem;border-bottom:1px solid var(--line);vertical-align:top}
+    .page-body td code{font-size:.82em}
+    .page-body ul,.page-body ol{padding-left:1.4rem;margin-bottom:.9rem}
+    .page-body li{font-size:1rem;line-height:1.65;margin-bottom:.25rem}
+    .page-body blockquote{border-left:3px solid var(--divider);padding-left:1rem;margin:1rem 0;color:var(--muted)}
+    /* ── mobile ── */
+    .topbar{display:none;align-items:center;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid var(--divider);background:var(--bg);position:sticky;top:0;z-index:10}
+    .topbar-title{font-family:var(--mono);font-size:.82rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--fg);text-decoration:none;flex:1}
+    .menu-btn{background:none;border:1px solid var(--divider);color:var(--muted);cursor:pointer;font-size:.82rem;padding:.35rem .65rem;border-radius:6px;font-family:var(--mono)}
+    @media(max-width:768px){
+      body{flex-direction:column}
+      .topbar{display:flex}
+      .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:20;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+      .sidebar.open{transform:translateX(0)}
+      .sidebar-close{display:block}
+      .page-header,.page-body{padding-left:1.25rem;padding-right:1.25rem}
+    }
+    </style></head>
+    <body>
+    <div class="topbar">
+      <button class="menu-btn" onclick="toggleSidebar()">☰ Menu</button>
+      <a href="/index.html" class="topbar-title">#{escape(site_title)}</a>
+    </div>
+    #{nav_html}
+    <div class="page-wrap">
+      <div class="page-header">
+        <p class="page-eyebrow">#{escape(site_title)}</p>
+        <h1 class="page-title">#{escape(title)}</h1>
+      </div>
+      <div class="page-body">
+        #{body_html}
+      </div>
+    </div>
+    <script>
+    (function(){
+      var url = #{Jason.encode!(current_url)};
+      document.querySelectorAll('.nav-body a[data-url]').forEach(function(a){
+        if(a.getAttribute('data-url')===url){a.classList.add('active');a.setAttribute('aria-current','page')}
+      });
+    })();
+    function toggleSidebar(){
+      var s=document.getElementById('sidebar');
+      s.classList.toggle('open');
+    }
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('sidebar').classList.remove('open')});
+    </script>
+    </body></html>
+    """
+  end
+
   defp escape(s) do
     s
     |> to_string()

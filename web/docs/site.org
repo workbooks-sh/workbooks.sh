@@ -1,0 +1,35 @@
+#+TITLE: Workbooks Documentation
+#+PUBLISH_TARGET: cloudflare-pages
+#+PUBLISH_PROJECT: workbooks-docs
+#+PUBLISH_DOMAIN: docs.workbooks.sh
+
+* [[index.org][Introduction]]
+
+* Getting Started
+  - [[getting-started/installation.org][Installation]]
+  - [[getting-started/quick-start.org][Quick Start]]
+  - [[getting-started/running-locally.org][Running Locally]]
+
+* The Workbook
+  - [[the-workbook/org-basics.org][Org Mode Basics]]
+  - [[the-workbook/source-blocks.org][Source Blocks & Components]]
+  - [[the-workbook/build-plan.org][The Build Plan]]
+
+* Publishing
+  - [[publishing/wb-publish.org][wb publish]]
+  - [[publishing/providers.org][Providers]]
+
+* Runtime
+  - [[runtime/architecture.org][Architecture]]
+  - [[runtime/oql.org][OQL (Org Query Language)]]
+  - [[runtime/agents.org][Agents]]
+  - [[runtime/wasm-on-beam.org][WASM on the BEAM]]
+
+* Toolkits
+  - [[toolkits/discovery.org][Discovery]]
+  - [[toolkits/building.org][Building a Toolkit]]
+
+* Reference
+  - [[reference/wb-cli.org][wb CLI Reference]]
+  - [[reference/publish-org.org][publish.org Properties]]
+  - [[reference/deployment-org.org][deployment.org Properties]]

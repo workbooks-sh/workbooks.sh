@@ -55,7 +55,31 @@ defmodule Workbooks.Publish.Config do
       |> add_if(target == "self-hosted" and blank?(p["PUBLISH_URL"]),
         "PUBLISH_TARGET: self-hosted needs PUBLISH_URL (the runtime base URL)")
 
-    if issues == [], do: :ok, else: {:error, Enum.reverse(issues)}
+    warnings = secret_warnings(p)
+    all = Enum.reverse(issues) ++ warnings
+
+    if all == [], do: :ok, else: {:error, all}
+  end
+
+  # Warn on property values that look like secrets — hex IDs, tokens, keys.
+  # These belong in env vars, not org files.
+  defp secret_warnings(p) do
+    secret_key? = fn k ->
+      Enum.any?(~w(TOKEN KEY SECRET ACCOUNT PASSWORD CREDENTIAL), &String.ends_with?(k, &1))
+    end
+
+    hex_id? = fn v -> Regex.match?(~r/^[a-f0-9]{20,}$/i, to_string(v)) end
+
+    Enum.flat_map(p, fn {k, v} ->
+      cond do
+        secret_key?.(k) ->
+          ["#{k} looks like a secret — use an env var instead of storing it in publish.org"]
+        hex_id?.(v) ->
+          ["#{k}: value looks like a hex ID or token — use an env var if it is sensitive"]
+        true ->
+          []
+      end
+    end)
   end
 
   @doc "One-line human summary of the publish shape."

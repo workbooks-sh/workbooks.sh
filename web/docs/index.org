@@ -1,24 +1,21 @@
-#+TITLE: Workbooks — Documentation
-#+AUTHOR: workbooks.sh
-#+DESCRIPTION: How to write, run, and publish a Workbook.
+#+TITLE: Introduction
+#+DESCRIPTION: What workbooks.sh is and how it works.
 
-* Workbooks
-  :PROPERTIES:
-  :WORKBOOK_VERSION: 1
-  :END:
+* Introduction
 
-A workbook is a single =.org= file that carries its own code, data, and a query
-interface over both. You author it in Org mode; the runtime renders it, runs its
-components in-WASM, and ships a self-contained =.html= artifact. No build
-pipeline. One file in, one file out.
+A workbook is a single =.org= file. It carries prose, code, data, and a query
+interface over all three. You write it in Org mode. The runtime renders it,
+compiles its source blocks to WASM components, wires them together into a build
+plan, and can publish the result as a self-contained =.html= file. No build
+pipeline. No config files. One file in, one URL out.
 
-This page is a workbook. It was rendered by the same engine that runs yours.
+This documentation site is itself a workbook — rendered by the same OQL kernel
+that renders yours.
 
-** What lives in the file
+** The unit of work
 
-A workbook is plain Org with one convention — a =:WORKBOOK_VERSION:= property
-on the top-level heading. Everything else follows standard Org structure:
-headings, prose, source blocks, and =:PROPERTIES:= drawers for configuration.
+Every workbook has exactly one structural requirement: a top-level heading with
+=:WORKBOOK_VERSION: 1= in its =:PROPERTIES:= drawer.
 
 #+begin_src org
 ,#+TITLE: My Workbook
@@ -28,95 +25,39 @@ headings, prose, source blocks, and =:PROPERTIES:= drawers for configuration.
   :WORKBOOK_VERSION: 1
   :END:
 
-Prose goes here. Source blocks are components.
+Prose, source blocks, and property drawers live here.
 #+end_src
 
-Source blocks with a known language compile to WASM components. The engine
-wires them together; you write business logic, not glue.
+Everything else — headings, source blocks, properties — is standard Org. The
+runtime understands Org; you do not learn a new format.
 
-#+begin_src javascript
-export function greet(name) {
-  return `hello, ${name}`;
-}
-#+end_src
+** What the runtime does
 
-** The render path
+The runtime is an Elixir application (~6 k LOC) that embeds the OQL kernel as a
+compiled WASM component. On a workbook read it does four things:
 
-The OQL kernel (=oql.wasm=, embedded in the runtime binary and in the desktop
-app) reads the Org source and produces HTML. The kernel runs in-WASM — there is
-no native code path for rendering, just the component the engine loads.
+1. *Parse* — OQL parses the Org source into a structured headline tree.
+2. *Plan* — OQL emits a build plan: a JSON DAG of WASM worlds, components, and
+   edges derived from the source blocks and their =:in:= / =:out:= args.
+3. *Execute* — wasmtime executes each component in the DAG, feeding outputs to
+   inputs per the edge map.
+4. *Render* — OQL renders the Org source to HTML for human consumption.
 
-#+begin_src text
-org source → OQL kernel → rich HTML → self-contained .html artifact
-#+end_src
+Steps 1–2 are pure (no side effects); 3 involves the WASM sandbox; 4 produces
+the artifact the browser or =wb publish= ships.
 
-The same kernel runs locally in the desktop app, in the server runtime, and at
-publish time. There is no difference between preview and production output.
+** How this docs site works
 
-** Publishing a workbook
+Each page in this documentation is an =.org= file in =web/docs/=. The nav
+manifest is =web/docs/site.org=. Running =wb publish site web/docs= parses the
+manifest, renders each linked =.org= file through the OQL kernel, injects the
+shared sidebar, and writes a flat =dist/= tree that Cloudflare Pages serves.
 
-=wb publish= renders a workbook and ships the HTML to a provider. One command,
-one URL.
+To update any page: edit its =.org= file and run =wb publish site web/docs= again.
 
-*** scaffold the config
+** What to read next
 
-#+begin_src sh :exports code
-wb publish init
-#+end_src
-
-This writes a =publish.org= next to your workbook:
-
-#+begin_src org
-,* publish :publish:
-  :PROPERTIES:
-  :PUBLISH_TARGET:  cloudflare-pages
-  :PUBLISH_PROJECT: my-project
-  :PUBLISH_DOMAIN:  my-project.pages.dev
-  :PUBLISH_TITLE:   My Workbook
-  :END:
-#+end_src
-
-Supported targets: =cloudflare-pages=, =gh-pages=, =self-hosted=.
-
-*** validate and deploy
-
-#+begin_src sh :exports code
-wb publish validate        # coherence-check — no network
-wb publish apply index.org # render + ship → prints live URL
-#+end_src
-
-The HTML is written to =.publish_out/index.html= locally, then the provider
-receives it. For Cloudflare Pages, =wrangler= must be on =PATH= and
-authenticated (=wrangler login=).
-
-** The deploy-kit
-
-=wb publish= is distinct from =wb deploy=. Deploy stands up the full runtime
-(the Elixir server, WASM loaded on the BEAM, agents, the control plane) in a
-container — local or cloud. Publish is lighter: render the workbook, ship the
-HTML. Use publish for static sites and documents; use deploy when you need the
-full runtime behind a URL.
-
-| verb              | what it runs          | when to use                   |
-|-------------------+-----------------------+-------------------------------|
-| =wb publish=      | OQL kernel only       | static page, docs, one workbook |
-| =wb deploy local= | full runtime (local)  | dev, the desktop daemon       |
-| =wb deploy apply= | full runtime (cloud)  | production server             |
-
-** Running locally
-
-#+begin_src sh :exports code
-git clone https://github.com/workbooks-sh/workbooks.sh
-cd workbooks.sh/runtime
-mix deps.get && iex -S mix
-#+end_src
-
-The desktop app ships the OQL kernel and renders workbooks offline with no
-server. Download it from the releases page on GitHub.
-
-** Source
-
-Everything on this page — the runtime, the kernel, the desktop app, and =wb
-publish= itself — is open source.
-
-[[https://github.com/workbooks-sh/workbooks.sh][workbooks-sh/workbooks.sh on GitHub]]
+- [[getting-started/installation.org][Installation]] — prerequisites, clone, verify
+- [[getting-started/quick-start.org][Quick Start]] — write your first workbook in 5 minutes
+- [[the-workbook/org-basics.org][Org Mode Basics]] — the Org conventions the runtime uses
+- [[runtime/oql.org][OQL (Org Query Language)]] — the kernel that does the work

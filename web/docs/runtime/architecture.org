@@ -1,0 +1,109 @@
+#+TITLE: Architecture
+#+DESCRIPTION: The runtime supervision tree, component layers, and data flow.
+
+* Architecture
+
+The workbooks.sh runtime is an Elixir OTP application (~6 k LOC). Its core
+responsibility is to host WASM components (via Wasmex/wasmtime), expose an HTTP
+surface for the control and public planes, and run agents as LLM-driven loops
+over a sandboxed tool set.
+
+** Component layers
+
+#+begin_src text
+┌─────────────────────────────────────────────────────────────┐
+│  Desktop (Tauri)  │  CLI (wb escript)  │  Browser / API     │
+└─────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Elixir Runtime                          │
+│  Control plane (Plug/Bandit, port 4000) — authed           │
+│  Public plane  (Plug/Bandit, port 4001) — anonymous        │
+│  OQL GenServer — wraps oql.wasm via Wasmex                  │
+│  Agent loop — LLM + 8 bash-like tools                       │
+│  Variable store — per-tenant key-value with secrets         │
+│  Toolkits — :toolkit: org files, CLIs on PATH              │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   WASM layer (wasmtime)                     │
+│  oql.wasm     — Rust/orgize; parse, tangle, render, lint   │
+│  engine.wasm  — WIT component; agent run loop              │
+│  user .wasm   — compiled workbook components                │
+└─────────────────────────────────────────────────────────────┘
+#+end_src
+
+** Supervision tree
+
+The OTP supervision tree is started by =Workbooks.Application=:
+
+| Worker | Role |
+|--------+------|
+| =Workbooks.OQL= | GenServer; owns the Wasmex instance hosting =oql.wasm= |
+| =Workbooks.Vars.Store= | ETS-backed per-tenant variable store |
+| =Workbooks.Domains= | Registry mapping hostnames to workbook IDs |
+| =Workbooks.Web.Endpoint= | Bandit/Plug HTTP server — control plane (port 4000) |
+| =Workbooks.PublicWeb.Endpoint= | Bandit/Plug HTTP server — public plane (port 4001) |
+| =Workbooks.Workflow.Telemetry= | Indexes =_steps.jsonl= run logs |
+
+The OQL GenServer is a critical singleton — if it crashes, all parse/render/tangle
+calls fail until it restarts and reloads =oql.wasm=. The supervisor uses
+=:one_for_one= strategy; a crash in one worker does not take down the rest.
+
+** HTTP planes
+
+Two entirely separate Plug routers run on separate ports:
+
+*Control plane* (port 4000): authenticated, serves the workbook API, agent events,
+variable store, and toolkit management. All routes require a session or API key.
+No public content is served here.
+
+*Public plane* (port 4001): anonymous, GET-only, no writes. Resolves the request
+=Host= header to a workbook ID via =Workbooks.Domains=, then serves the published
+HTML. No call-home scripts, no control plane references. This is what CF Pages /
+any CDN proxies in front of a self-hosted deployment.
+
+** The OQL GenServer
+
+=Workbooks.OQL= is a GenServer wrapping a Wasmex component instance. On =init/1=
+it loads =oql.wasm= from the embedded NIF (compiled at build time). All five
+exported OQL functions are synchronous GenServer calls that delegate to Wasmex:
+
+#+begin_src elixir
+Workbooks.OQL.parse_headlines(org)  # → list of headline maps
+Workbooks.OQL.tangle_plan(org)      # → build plan map
+Workbooks.OQL.lint(org)             # → list of issue maps (stub)
+Workbooks.OQL.validate(org)         # → :ok | {:error, issues}
+Workbooks.OQL.render(org)           # → HTML string
+#+end_src
+
+The GenServer serialises all calls through one mailbox — OQL is single-threaded
+per instance. For concurrent rendering, multiple OQL instances can be pooled
+(not yet in the default supervision tree, but straightforward to add).
+
+** Data flow for a workbook render
+
+1. Client posts org source to =/api/workbooks/:id= (control plane)
+2. Runtime calls =OQL.tangle_plan(org)= → build plan JSON
+3. Runtime compiles each world in the plan (via Javy/mrustc/clang in WASM)
+4. Runtime links compiled components per the edge map
+5. Runtime executes the DAG in topological order using wasmtime
+6. Client calls =OQL.render(org)= → HTML
+7. HTML injected into =PublicWeb.static_page/2= shell → served
+
+Steps 3–5 run in the WASM sandbox. Step 6 is OQL rendering — the same call used
+by =wb publish= and the desktop app. The rendered output is identical in all
+contexts.
+
+** The deploy-kit
+
+=wb deploy= stands up the full runtime in a container. The OCI image contains the
+compiled Elixir release + embedded =oql.wasm=. The container model is:
+
+- *local*: krunvm (macOS microVM) or podman/docker fallback — same image
+- *cloud*: pushed to a registry, run on a cloud provider's container service
+
+=deployment.org= is the config file; its =:PROPERTIES:= drawer maps to the
+container runtime parameters. See [[../reference/deployment-org.org][deployment.org Properties]].
