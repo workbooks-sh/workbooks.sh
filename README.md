@@ -20,26 +20,12 @@ control.
 
 ```mermaid
 flowchart LR
-    Author["You + agents<br/>write code + Org"] -->|bundle| Workbook
+    Build["✍️ Write code<br/>you + agents"] --> WB["📄 Workbook<br/>one file = the whole app"]
+    WB --> Run["⚙️ Runtime"]
+    Run --> Where["💻 Laptop &nbsp; 🖥️ Server &nbsp; 🌐 Web"]
 
-    subgraph One["One portable file"]
-        Workbook["app.html<br/>code · data · interface"]
-        Forms["can be a document · database · SPA<br/>desktop app · web page · container"]
-        Workbook -.-> Forms
-    end
-
-    Workbook --> Runtime
-
-    subgraph Runtime["The Runtime · one engine, runs it identically"]
-        Sandbox["sandbox runs real code,<br/>many languages, safely"]
-    end
-
-    Runtime --> Laptop["Your laptop"]
-    Runtime --> Server["Your server"]
-    Runtime --> Web["The web"]
-
-    classDef hero stroke:#e8612a,stroke-width:2px;
-    class Workbook,Sandbox hero;
+    classDef accent stroke:#e8612a,stroke-width:2px;
+    class WB accent
 ```
 
 ## The idea
