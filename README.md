@@ -20,7 +20,7 @@ control.
 
 ```mermaid
 flowchart LR
-    Author["You + agents<br/>author in Org"] -->|tangle| Workbook
+    Author["You + agents<br/>write code + Org"] -->|bundle| Workbook
 
     subgraph One["One portable file"]
         Workbook["app.html<br/>code · data · interface"]
@@ -60,9 +60,10 @@ file is portable. One promise, two halves.
 
 ## What a Workbook is
 
-A Workbook starts as an Org file you (or an agent) write, and ships as a single,
-self-contained `.html`. Because everything it needs is inside that one file, the same
-Workbook can be many things:
+You build a Workbook the normal way — writing real code (Svelte, SolidJS, Rust, and more)
+— with Org as a connective layer that ties the pieces together. The bundler packs all of
+it into a single, self-contained `.html`. Because everything it needs is inside that one
+file, the same Workbook can be many things:
 
 - a **document** you read
 - a **filesystem** of documents
@@ -162,8 +163,13 @@ sequenceDiagram
 
 Workbooks is a handful of small ideas that fit together. Each one does a single job.
 
-**Workbook** — the format. One Org file, one self-contained `.html`. Holds code, data, and
-interface; can be a document, a database, an app, or a container.
+**Workbook** — the format. Your code plus an Org layer that ties it together, bundled into
+one self-contained `.html`. Holds code, data, and interface; can be a document, a database,
+an app, or a container.
+
+**Bundle** — the packer. Takes your source — real code files and the Org that connects
+them — and packs it into the single `.html` (and back out again, so a Workbook is never a
+black box). This is the step that turns a project into one portable file.
 
 **Runtime** — the engine. A single Elixir/BEAM host with WebAssembly (wasmtime) inside.
 Runs Workbooks, drives agents, and records everything it does to a queryable log
