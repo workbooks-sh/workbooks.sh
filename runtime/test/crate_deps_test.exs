@@ -249,4 +249,36 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|, 
   test "vec_map — integer-keyed map" do
     run_with("vec_map@0.8.2", ~S|fn main(){ let mut m = vec_map::VecMap::new(); m.insert(3, "c"); println!("{}", m[3]); }|, "c")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "num-complex — complex arithmetic (transitive num-traits)" do
+    run_with("num-complex@0.4.3", ~S|use num_complex::Complex;
+fn main(){ let c = Complex::new(1.0f64,2.0) * Complex::new(1.0,2.0); println!("{} {}", c.re, c.im); }|, "-3 4")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "num-rational — fraction arithmetic (transitive num-integer+num-traits)" do
+    run_with("num-rational@0.4.1", ~S|use num_rational::Ratio;
+fn main(){ let r = Ratio::new(1,2) + Ratio::new(1,3); println!("{}", r); }|, "5/6")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "unicode-segmentation — grapheme clusters" do
+    run_with("unicode-segmentation@1.9.0", ~S|use unicode_segmentation::UnicodeSegmentation;
+fn main(){ println!("{}", "abc".graphemes(true).count()); }|, "3")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "ordered-float — sortable f64 wrapper" do
+    run_with("ordered-float@2.10.0", ~S|use ordered_float::OrderedFloat;
+fn main(){ let mut v = vec![OrderedFloat(3.0f64), OrderedFloat(1.0)]; v.sort(); println!("{}", v[0].0); }|, "1")
+  end
 end
