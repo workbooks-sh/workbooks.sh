@@ -6,17 +6,25 @@
 @import "tailwindcss";
 
 @theme {
+  /* The FOUR base tokens. A theme only sets these (+ state/aurora); every
+   * secondary token below DERIVES from them via color-mix, so the whole app
+   * retints from one place and nothing is a static off-theme color. */
   --color-page: #fafafa;
   --color-surface: #ffffff;
-  --color-surface-soft: #f4f4f5;
-  --color-border: rgba(15, 15, 15, 0.08);
-  --color-border-strong: rgba(15, 15, 15, 0.16);
   --color-fg: #0f0f0f;
-  --color-fg-muted: rgba(15, 15, 15, 0.56);
-  --color-fg-subtle: rgba(15, 15, 15, 0.36);
   --color-accent: #0f0f0f;
-  --color-ring: rgba(15, 15, 15, 0.32);
-  --color-grid-line: rgba(15, 15, 15, 0.045);
+
+  /* Derived surface — opaque, nudged toward fg so it tracks any theme. */
+  --color-surface-soft: color-mix(in srgb, var(--color-surface), var(--color-fg) 5%);
+
+  /* Derived lines + muted text — fg at low alpha, so they sit correctly on
+   * whatever surface a theme produces. */
+  --color-border: color-mix(in srgb, var(--color-fg) 9%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--color-fg) 17%, transparent);
+  --color-fg-muted: color-mix(in srgb, var(--color-fg) 56%, transparent);
+  --color-fg-subtle: color-mix(in srgb, var(--color-fg) 36%, transparent);
+  --color-ring: color-mix(in srgb, var(--color-fg) 32%, transparent);
+  --color-grid-line: color-mix(in srgb, var(--color-fg) 5%, transparent);
 
   /* Semantic state colors — the only non-monochrome chrome. */
   --color-ok: #10b981;
@@ -39,17 +47,12 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --color-page: #1a1a1f;
-    --color-surface: #25252b;
-    --color-surface-soft: #2e2e35;
-    --color-border: rgba(255, 255, 255, 0.12);
-    --color-border-strong: rgba(255, 255, 255, 0.24);
-    --color-fg: #f4f4f5;
-    --color-fg-muted: rgba(244, 244, 245, 0.62);
-    --color-fg-subtle: rgba(244, 244, 245, 0.38);
-    --color-accent: #f4f4f5;
-    --color-ring: rgba(255, 255, 255, 0.22);
-    --color-grid-line: rgba(255, 255, 255, 0.05);
+    /* Override ONLY the base tokens — every derived token recomputes from
+     * these via the color-mix definitions above (var() resolves per-context). */
+    --color-page: #191919;
+    --color-surface: #242424;
+    --color-fg: #f4f4f4;
+    --color-accent: #f4f4f4;
     --color-ok: #34d399;
     --color-warn: #fbbf24;
     --color-err: #fb7185;
