@@ -502,7 +502,7 @@ defmodule Workbooks.Compilers do
     Enum.reduce_while(deps, {:ok, [], []}, fn dep, {:ok, externs, objs} ->
       {name, version} = parse_dep(dep)
 
-      case compile_dep(name, version, mrdir, o, mr, cl, feats, true) do
+      case compile_dep(name, version, mrdir, o, mr, cl, feats, true, false) do
         {:ok, rlib_rel, obj_guest, dep_objs} ->
           {:cont, {:ok, externs ++ ["--extern", "#{crate_id(name)}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
@@ -528,7 +528,11 @@ defmodule Workbooks.Compilers do
   # Returns {:ok, rlib_rel, obj_guest, dep_objs} where dep_objs are the transitive objects to link.
   # Cached by the .o existing. Pure-Rust only (no proc-macros/build.rs); cycles can't occur (cargo
   # forbids them) and diamonds collapse via the cache.
-  defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?) do
+  # pm_ctx?: this crate is somewhere under a proc-macro crate in the dep tree. Propagated down so
+  # the WHOLE proc-macro subtree (serde_derive → syn/quote/proc-macro2/unicode-ident) compiles with
+  # a target_os-spoofed spec — syn gates parse_macro_input on not(wasm32+wasi), so building it for
+  # os=wasi excludes the macro. See build_dep_version (wb-vqx / wb-zq4 gap #1).
+  defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?, pm_ctx?) do
     rlib_rel = "output-wasi-174/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
     obj_guest = "/work/output-wasi-174/deps/lib#{name}.rlib.o"
@@ -561,7 +565,7 @@ defmodule Workbooks.Compilers do
           Enum.reduce_while(modes, {:error, []}, fn mode, {:error, tried} ->
             inner =
               Enum.reduce_while(candidates, {:error, tried}, fn {version, subdeps}, {:error, tr} ->
-                case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode) do
+                case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?) do
                   {:ok, _, _, _} = ok -> {:halt, ok}
                   {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tr]}})
                 end
@@ -583,14 +587,22 @@ defmodule Workbooks.Compilers do
 
   # Build a SPECIFIC version of a dep under a feature MODE: compile sub-deps first, then it.
   # mode: {:override, feats} verbatim | :full (default features only) | :reduce (no_std variants).
-  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode) do
+  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?) do
     with {:ok, lib_rs, def_features, edition, pm?} <- fetch_crate(name, version, Path.join(o, "deps")),
-         {:ok, sub_externs0, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
+         # wb-vqx: once we know THIS crate is a proc-macro (pm?), its whole sub-tree must be spoofed
+         # too (syn is a sub-dep, not itself a proc-macro crate, yet it carries parse_macro_input).
+         spoof? = pm_ctx? or pm?,
+         {:ok, sub_externs0, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats, spoof?) do
       rel_src = Path.relative_to(lib_rs, mrdir)
       cdst = Path.join(o, "deps/lib#{name}.rlib.c")
       # wb-zq4: proc-macro crate → wire the compiler `proc_macro` crate from the std chain.
       sub_externs =
         if pm?, do: sub_externs0 ++ ["--extern", "proc_macro=output-wasi-174/libproc_macro.rlib"], else: sub_externs0
+
+      # wb-vqx (wb-zq4 gap #1): proc-macro subtree compiles against a target_os-spoofed spec so
+      # syn's `not(all(wasm32, os in (unknown,wasi)))` guard PASSES and parse_macro_input surfaces.
+      # arch stays wasm32 and codegen still targets wasm32-wasi — only target_os cfg flips to linux.
+      dep_target = if spoof?, do: ensure_pm_target_spec(o), else: "wasm32-wasi"
 
       # Feature variants for THIS mode (the two-phase resolver in compile_dep picks the mode order):
       #   :override — caller's exact set, no fallback
@@ -636,7 +648,7 @@ defmodule Workbooks.Compilers do
 
               mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
                    "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
-                  ["--out-dir", "output-wasi-174/deps", "--target", "wasm32-wasi", "--edition", ed] ++ cfgs)
+                  ["--out-dir", "output-wasi-174/deps", "--target", dep_target, "--edition", ed] ++ cfgs)
 
               if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
             end)
@@ -655,13 +667,51 @@ defmodule Workbooks.Compilers do
     end
   end
 
-  defp build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
+  defp build_subdeps(subdeps, mrdir, o, mr, cl, feats, pm_ctx?) do
     Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
-      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats, false) do
+      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats, false, pm_ctx?) do
         {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{crate_id(sn)}=#{srlib}"], objs ++ [sobj | sub_objs]}}
         {:error, _} = e -> {:halt, e}
       end
     end)
+  end
+
+  # wb-vqx (wb-zq4 gap #1): the target spec used to compile proc-macro crates. Identical to mrustc's
+  # built-in wasm32-wasi EXCEPT os-name=linux, so syn's `not(all(wasm32, os in (unknown,wasi)))`
+  # guard around the parse_macro_input module evaluates true and the #[macro_export] macro registers.
+  # arch stays wasm32 (pointer-bits/atomics/alignments verbatim) and codegen still emits wasm32-wasi,
+  # so the produced object is ABI-identical to the normal lane — only the compile-time target_os cfg
+  # differs, which only the token-manipulation proc-macro subtree observes. Written once, cached.
+  @pm_target_spec ~S"""
+  [target]
+  family = ""
+  os-name = "linux"
+  env-name = ""
+
+  [backend.c]
+  variant = "gnu"
+  emulate-i128 = true
+  target = "wasm32-wasi"
+  compiler-opts = ["-ffunction-sections",]
+  linker-opts-pre = []
+  linker-opts-post = ["-Wl,--gc-sections",]
+
+  [arch]
+  name = "wasm32"
+  pointer-bits = 32
+  is-big-endian = false
+  has-atomic-u8 = true
+  has-atomic-u16 = false
+  has-atomic-u32 = true
+  has-atomic-u64 = false
+  has-atomic-ptr = true
+  alignments = { u16 = 2, u32 = 4, u64 = 8, u128 = 16, f32 = 4, f64 = 8, ptr = 4 }
+  """
+  defp ensure_pm_target_spec(o) do
+    rel = "output-wasi-174/wasm32pm.spec"
+    abs = Path.join(o, "wasm32pm.spec")
+    unless File.regular?(abs), do: File.write!(abs, @pm_target_spec)
+    rel
   end
 
   # Remove a half-built dep's transient outputs so the next fallback version starts clean.
