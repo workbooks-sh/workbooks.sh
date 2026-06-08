@@ -500,12 +500,21 @@ defmodule Workbooks.Compilers do
       # to the next-older in-range version until one compiles. Makes transitive deps practical
       # without a newer compiler — bounded to a handful of attempts.
       with {:ok, candidates} <- resolve_via_index(name, req) do
-        Enum.reduce_while(candidates, {:error, {:no_buildable_version, name, req}}, fn {version, subdeps}, _acc ->
-          case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
-            {:ok, _, _, _} = ok -> {:halt, ok}
-            {:error, _} = e -> (clean_dep_artifacts(o, name); {:cont, e})
-          end
-        end)
+        # Try requested-version-first, then newest→older fallback. On total exhaustion report the
+        # FULL list of versions tried (not just the last) so a ceiling crate isn't misdiagnosed as a
+        # resolution miss — e.g. httparse, where every in-range version hits the mrustc ~1.54 wall.
+        result =
+          Enum.reduce_while(candidates, {:error, []}, fn {version, subdeps}, {:error, tried} ->
+            case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
+              {:ok, _, _, _} = ok -> {:halt, ok}
+              {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tried]}})
+            end
+          end)
+
+        case result do
+          {:ok, _, _, _} = ok -> ok
+          {:error, tried} -> {:error, {:dep_compile_failed, name, tried |> Enum.reverse() |> Enum.join(",")}}
+        end
       end
     end
   end
