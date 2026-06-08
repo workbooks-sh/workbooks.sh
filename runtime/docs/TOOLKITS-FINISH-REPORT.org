@@ -3,7 +3,7 @@
 #+EPIC: wb-tk3
 #+BRANCH: feat/toolkits-finish
 #+STATUS: VERIFIED
-#+RELATED: TOOLKITS-V3.org, ARCHITECTURE.org, EXTENSIONS-ORB.org
+#+RELATED: TOOLKITS-V3.org, ARCHITECTURE.org
 
 * Scope
 

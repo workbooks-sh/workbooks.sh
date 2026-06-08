@@ -3,7 +3,7 @@
 #+EPIC: wb-tk3
 #+STATUS: PLAN
 #+SUPERSEDES: TOOLKITS-PLAN.org, TOOLKIT-SKILLS-V2.org, TOOLKIT-DISCOVERY.org (for the clean-room)
-#+RELATED: ARCHITECTURE.org, EXTENSIONS-ORB.org, PLUGINS-PLAN.org, ../../toolkits/AUTHORING.org
+#+RELATED: ARCHITECTURE.org, PLUGINS-PLAN.org, ../../toolkits/AUTHORING.org
 
 * What this doc is
 
@@ -20,8 +20,8 @@
   UNIFICATION (2026-06-08, wb-rhs): "extension" is no longer a separate noun.
   A 3rd-party untrusted WASM component is just a *toolkit* at `#+EXEC: component`
   with `#+TRUST: third-party`. One package, one build, one trust model, one
-  registry, one discovery query `(tags :toolkit:)`. EXTENSIONS-ORB.org is
-  SUPERSEDED; its architecture survives, its "keep two words" call is reversed.
+  registry, one discovery query `(tags :toolkit:)`. The extension-vs-toolkit split is retired; its architecture survives in
+  TOOLKIT-MANIFEST.org, the "keep two words" call reversed.
 
 * The three nouns (settled — do not conflate)
 
@@ -180,7 +180,7 @@
   CLIs to call our typed net-fetch (only works for CLIs written for us — not
   stock). Recommendation: wire wasi:http behind the `net` cap; raw TCP
   (wasi:sockets) behind a stricter cap. The capability gate stays the single
-  telemetry/enforcement chokepoint (per EXTENSIONS-ORB.org).
+  telemetry/enforcement chokepoint (the capability gate is the single chokepoint).
 
 ** The FS bridge — preopen ↔ VFS (widens auto-wrap to file CLIs)
    Three FS layers stack: the deploy container's Linux FS (outer), WASI's preopen FS (the
@@ -332,7 +332,7 @@
    - On each call, append a step `{tool: "toolkit:<id>", exit_code, dur_ms, ts}`
      to `_steps.jsonl` (same shape agent.ex/log_step already writes; surfaced by
      workflow/telemetry.ex summary/1).
-   - The capability gate is the chokepoint (per EXTENSIONS-ORB.org) — wiring the
+   - The capability gate is the chokepoint (the capability gate is the single chokepoint) — wiring the
      hook here makes toolkit usage observable by construction.
 
 ** SQLite / VFS / secrets — give commands a Dock
@@ -463,5 +463,4 @@
   - TOOLKIT-MANIFEST.org — the unified #+EXEC manifest spec (epic wb-rhs).
   - ../../toolkits/AUTHORING.org — the operational standard authors follow.
   - ARCHITECTURE.org §"Command vs Toolkit vs Workflow".
-  - EXTENSIONS-ORB.org — SUPERSEDED; architecture survives, "two words" call reversed.
   - runtime/host/toolkits.ex — the implemented discovery half.

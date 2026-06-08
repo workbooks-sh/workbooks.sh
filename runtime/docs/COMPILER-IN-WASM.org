@@ -2,7 +2,7 @@
 #+DATE: 2026-06-07
 #+EPIC: wb-cwasm
 #+STATUS: PLAN
-#+RELATED: TOOLKITS-V3.org, EXTENSIONS-ORB.org, ../host/command_registry.ex
+#+RELATED: TOOLKITS-V3.org, ../host/command_registry.ex
 #+MEMORY: runtime-engine-wasmtime-only
 
 * STATUS (2026-06-07)

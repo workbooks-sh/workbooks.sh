@@ -2,7 +2,6 @@
 #+DATE: 2026-06-08
 #+EPIC: wb-rhs
 #+STATUS: SPEC
-#+SUPERSEDES: EXTENSIONS-ORB.org (the toolkit-vs-extension split)
 #+RELATED: TOOLKITS-V3.org, ../../toolkits/AUTHORING.org, ARCHITECTURE.org
 
 * What this doc is
@@ -149,7 +148,7 @@
   | =parallel= | parallel-map(jobs)              | BEAM Task.async_stream fan-out (generalizes host_http_get_many) |
   | =frames=   | shared-frame arena              | zero-recopy frame handoff between kernels |
 
-  Adding a cap is the same three-line move every time (per EXTENSIONS-ORB, still
+  Adding a cap is the same three-line move every time (still
   valid): (1) add the typed import to wit/engine.wit; (2) add the Policy cap name
   + put it in the profiles that grant it; (3) add an Instance.Imports clause
   binding it to native Elixir.
@@ -241,5 +240,4 @@
 * See also
   - TOOLKITS-V3.org — the system doc (discovery, build model, security, EXEC modes).
   - ../../toolkits/AUTHORING.org — operational skill-authoring standard.
-  - EXTENSIONS-ORB.org — SUPERSEDED; architecture survives, two-words call reversed.
   - runtime/host/{toolkits,command_registry,package_manager,policy,instance/imports}.ex

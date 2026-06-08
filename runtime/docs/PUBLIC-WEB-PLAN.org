@@ -2,7 +2,7 @@
 #+DATE: 2026-06-07
 #+EPIC: wb-pweb
 #+STATUS: PLAN
-#+RELATED: ARCHITECTURE.org, TOOLKITS-V3.org, EXTENSIONS-ORB.org, SECRETS.org
+#+RELATED: ARCHITECTURE.org, TOOLKITS-V3.org, SECRETS.org
 
 * Provider neutrality (do NOT overbuild for any one vendor)
 
@@ -164,7 +164,7 @@
     =:public= Policy profile — the most restrictive: no secrets, no build, no
     run-command, no net unless explicitly granted; tight memory + CPU + wall-clock.
     This is where our model pays off: public compute is deny-by-default by
-    construction (EXTENSIONS-ORB.org), not bolted-on. The content plane invokes a
+    construction (the capability-gate invariant), not bolted-on. The content plane invokes a
     component the same way the control plane does, but with the =:public= profile and
     NO access to the tenant's secret broker.
 
