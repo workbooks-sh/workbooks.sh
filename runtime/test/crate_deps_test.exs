@@ -194,7 +194,7 @@ fn main(){ println!("{}", g()); }|, "42")
   @tag :netdeps
   @tag timeout: 900_000
   test "scopeguard — RAII guard with closure" do
-    run_with("scopeguard@1.1.0", ~S|fn main(){ let g = scopeguard::guard(7, |_v| {}); println!("{}", *g); }|, "7")
+    run_with("scopeguard@1.1.0", ~S'fn main(){ let g = scopeguard::guard(7, |_v| {}); println!("{}", *g); }', "7")
   end
 
   @tag :build
@@ -311,13 +311,13 @@ fn main(){ let mut b = bytes::BytesMut::new(); b.put_u8(65); b.put_u8(66); print
   test "regex — basic patterns (classes/alternation/captures; non-unicode, deps aho-corasick+memchr+regex-syntax)" do
     # \d/\w need the unicode-perl feature which exceeds the mrustc ceiling (wb-3ev); basic
     # patterns (the common case) work. This also exercises the deterministic-link fix (wb-mrz).
-    run_with("regex@1.5.4", ~S|fn main(){
+    run_with("regex@1.5.4", ~S'fn main(){
   let re = regex::Regex::new("[0-9]+").unwrap();
   let m = re.find("ab123cd").unwrap();
   let re2 = regex::Regex::new("(foo|bar)-([a-z]+)").unwrap();
   let c = re2.captures("bar-baz").unwrap();
   println!("{} {} {}", m.as_str(), &c[1], &c[2]);
-}|, "123 bar baz")
+}', "123 bar baz")
   end
 
   @tag :build
@@ -512,6 +512,6 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
   @tag :netdeps
   @tag timeout: 900_000
   test "regex \\d via feature-hint (auto unicode-perl, no caller dep_features)" do
-    run_with("regex@1.5.4", ~S|fn main(){ let re = regex::Regex::new(r"\\d+").unwrap(); println!("{}", re.find("ab123cd").unwrap().as_str()); }|, "123")
+    run_with("regex@1.5.4", ~S|fn main(){ let re = regex::Regex::new(r"\d+").unwrap(); println!("{}", re.find("ab123cd").unwrap().as_str()); }|, "123")
   end
 end
