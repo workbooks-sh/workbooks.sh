@@ -74,6 +74,18 @@ Workbook can be many things:
 Hand someone a Workbook and they have the working app — not a link to a service you have
 to keep paying to keep alive. And because it's HTML at the surface, it drops into anything.
 
+```mermaid
+mindmap
+  root((A Workbook))
+    Document
+    Filesystem of docs
+    SQLite database
+    Single-page app
+    Desktop app
+    Web page
+    Container
+```
+
 ## What the Runtime is
 
 One Runtime runs your Workbook everywhere. It's built on Elixir, so it stays fast and
@@ -102,6 +114,49 @@ from the file itself — which keeps it on track instead of drifting.
 **Opinionated where it counts.** The Runtime makes a few decisions for you so everything
 speaks the same language and connects to the same data. That's what makes a pile of
 separate tools behave like one system.
+
+## How it works
+
+**An agent builds it.** You describe what you want; the agent works in a loop — taking one
+step at a time with a small set of tools — and records every step so you can see exactly
+what it did.
+
+```mermaid
+sequenceDiagram
+    actor You
+    participant Agent
+    participant Tools
+    participant Log as events.org
+
+    You->>Agent: describe the app
+    loop until done
+        Agent->>Tools: shell · fetch · files · search
+        Tools-->>Agent: result
+        Agent->>Log: record the step
+    end
+    Agent-->>You: a finished Workbook
+```
+
+**Private routes stay sealed.** A route is just a path inside the Workbook. Public paths are
+plain; the ones you mark private are encrypted, and the Runtime hands over the key only
+after an access check. A private page isn't hidden — it's unreadable without permission.
+
+```mermaid
+sequenceDiagram
+    actor Visitor
+    participant Workbook
+    participant Runtime
+
+    Visitor->>Workbook: open a private route
+    Workbook-->>Visitor: it's sealed — needs a key
+    Visitor->>Runtime: ask for the key
+    alt access allowed
+        Runtime-->>Visitor: here's the key
+        Visitor->>Workbook: unseal and view
+    else denied
+        Runtime-->>Visitor: no key — stays unreadable
+    end
+```
 
 ## The primitives
 
