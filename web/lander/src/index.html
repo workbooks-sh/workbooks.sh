@@ -4,75 +4,90 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Workbooks — one runtime, the whole app in a file</title>
-<meta name="description" content="Workbooks is an open-source runtime that turns a single workbook into a complete application — one Elixir engine running WASM on the BEAM, with a queryable single-file artifact at the center. Self-host on hardware you own." />
+<meta name="description" content="An open-source runtime that turns a single workbook into a complete application — one Elixir engine running WASM on the BEAM. Self-host on hardware you own." />
 <meta property="og:title" content="Workbooks — one runtime, the whole app in a file" />
-<meta property="og:description" content="An open-source runtime that turns a single workbook into a complete application. One Elixir engine, WASM on the BEAM, a queryable single-file artifact at the center." />
+<meta property="og:description" content="An open-source runtime that turns a single workbook into a complete application." />
 <meta property="og:type" content="website" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;600&family=Geist+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;800&family=Geist+Mono:wght@400;500&display=swap" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo" aria-label="Workbooks">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="4" width="18" height="22" rx="2" stroke="currentColor" stroke-width="2"/>
+      <rect x="8" y="2" width="18" height="22" rx="2" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+      <line x1="12" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="12" y1="13" x2="22" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="12" y1="17" x2="18" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a></li>
+    <li><a href="/docs/runtime/architecture.html">About</a></li>
+  </ul>
+  <a href="/docs" class="nav-cta">Get started</a>
+</nav>
+
 <main>
 
-  <header class="hero">
-    <p class="eyebrow">Open-source runtime · <span class="mono">Elixir</span> · <span class="mono">WASM</span> on the <span class="mono">BEAM</span></p>
-    <h1>One runtime.<br />The whole app fits in a file.</h1>
-    <p class="lede">Workbooks turns a single workbook into a complete application — one Elixir engine running WASM on the BEAM, with a queryable single-file artifact at the center. No control plane to rent, no functions to wire together. Clone it and run it on hardware you own.</p>
-    <p class="actions">
-      <a class="cta" href="/docs">Documentation</a>
-      <a class="textlink" href="https://github.com/workbooks-sh/workbooks">Read the source on GitHub &rarr;</a>
-    </p>
-  </header>
+  <section class="hero">
+    <div class="hero-left">
+      <p class="eyebrow">OPEN SOURCE &middot; ELIXIR &middot; WASM</p>
+      <h1>ONE FILE.<br />THE WHOLE<br />APP.</h1>
+      <div class="cmd-row">
+        <div class="cmd-wrap">
+          <span class="cmd-prompt">$</span>
+          <span class="cmd-text">wb run app.org</span>
+          <a href="https://github.com/workbooks-sh/workbooks.sh" class="cmd-btn" aria-label="View on GitHub">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          </a>
+        </div>
+        <a href="/docs" class="goto">Read the docs &rarr;</a>
+      </div>
+      <p class="lede">A workbook is a single <code>.org</code> file that carries its own code, data, and a query interface over both. One Elixir engine, WASM on the BEAM. Clone it and run it on hardware you own.</p>
+    </div>
 
-  <section class="terminal" aria-label="Canonical run">
-    <pre><code><span class="c">$</span> git clone https://github.com/workbooks-sh/workbooks
-<span class="c">$</span> cd workbooks <span class="op">&amp;&amp;</span> ./wb run app.workbook
-  <span class="ok">&#9679;</span> engine up      one OTP app · WASM loaded · <span class="dim">:4000</span>
-<span class="c">$</span> open http://localhost:4000</code></pre>
+    <div class="hero-right" aria-hidden="true">
+      <div class="spine spine-1">
+        <span class="spine-pip">&#10022;</span>
+        <span class="spine-label">WORKBOOK</span>
+      </div>
+      <div class="spine spine-2">
+        <span class="spine-pip">&#10022;</span>
+        <span class="spine-label">QUERY</span>
+      </div>
+      <div class="spine spine-3">
+        <span class="spine-pip">&#10022;</span>
+        <span class="spine-label">DEPLOY</span>
+      </div>
+    </div>
   </section>
 
   <section class="prose">
-
     <article>
-      <p class="eyebrow">What it is</p>
-      <p>A self-contained runtime, not a framework you assemble. One Elixir engine supervises everything; your logic compiles to <span class="mono">WASM</span> and executes on the <span class="mono">BEAM</span> alongside it, so concurrency, fault isolation, and process supervision come from the platform instead of from glue you maintain. The whole surface is small enough to read in an afternoon and keep in your head after.</p>
+      <p class="art-label">WHAT IT IS</p>
+      <p>A self-contained runtime, not a framework you assemble. One Elixir engine supervises everything; your logic compiles to <code>WASM</code> and executes on the <code>BEAM</code> alongside it — concurrency, fault isolation, and process supervision from the platform, not from glue you maintain.</p>
     </article>
-
     <article>
-      <p class="eyebrow">The workbook is the unit</p>
-      <p>A workbook is a single file that carries its own data, its own code, and a query interface over both. It is the source you edit, the artifact you ship, and the thing you query in place — no build pipeline turning one representation into three. Query it like a live backend, because that is what it is. Hand someone the file and they have the running app, not a link to one.</p>
+      <p class="art-label">THE WORKBOOK IS THE UNIT</p>
+      <p>A workbook is a single file that carries its own data, its own code, and a query interface over both. It is the source you edit, the artifact you ship, and the thing you query in place. Hand someone the file and they have the running app, not a link to one.</p>
     </article>
-
     <article>
-      <p class="eyebrow">The serverless break</p>
-      <p>Serverless promised less to operate and delivered more to assemble — a function here, a queue there, a managed datastore, an identity provider, and a bill that grows with the diagram. Workbooks collapses that diagram into one runtime with one supervision tree. You trade a sprawl of vendors for a single process you can profile, restart, and reason about. Pay-as-you-go for what you run, and self-host the moment you would rather not pay at all. You stop operating a constellation and start running a program.</p>
+      <p class="art-label">BUILT TO SELF-HOST</p>
+      <p>Everything runs on infrastructure you control. One <code>OTP</code> application with no hidden dependency on a hosted backend. Nothing to phone home, nothing to lock you in. Open source under a permissive license — audit the trust boundaries yourself.</p>
     </article>
-
-    <article>
-      <p class="eyebrow">Built to self-host</p>
-      <p>Everything runs on infrastructure you control — your own machine, your own network. The engine is one <span class="mono">OTP</span> application with no hidden dependency on a hosted backend, so there is nothing to phone home and nothing to lock you in. Open source under a permissive license: audit the trust boundaries yourself, and fork the engine if you disagree. Small enough to read, which means small enough to trust and to fix.</p>
-    </article>
-
-  </section>
-
-  <section class="repo" aria-label="Repository">
-    <div class="repo-head">
-      <span class="mono repo-name">workbooks-sh/workbooks</span>
-      <a class="cta cta-sm" href="https://github.com/workbooks-sh/workbooks">View on GitHub</a>
-    </div>
-    <p class="repo-desc">An open-source runtime that turns a single workbook into a complete, self-hostable application.</p>
-    <p class="chips mono">
-      <span class="chip">Elixir</span>
-      <span class="chip">Rust</span>
-      <span class="chip">WASM</span>
-      <span class="chip">Permissive license</span>
-    </p>
   </section>
 
   <footer>
-    <p class="mono">Permissive license · <a href="/docs">workbooks.sh/docs</a> · <a href="https://github.com/workbooks-sh/workbooks">GitHub</a> · v0</p>
+    <span>Permissive license</span>
+    <a href="/docs">workbooks.sh/docs</a>
+    <a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+    <span>v0</span>
   </footer>
 
 </main>
