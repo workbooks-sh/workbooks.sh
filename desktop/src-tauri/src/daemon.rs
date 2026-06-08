@@ -19,6 +19,12 @@ pub struct Discovery {
     #[serde(default)]
     #[allow(dead_code)]
     pub pid: u32,
+    /// Who manages this runtime: "container" (we booted it via `wb deploy local`,
+    /// so we own its lifecycle and may restart it) or "raw" (launched by hand in
+    /// dev — the tray must never kill it). Absent on legacy runtimes → treated as
+    /// "container" so the old restart behaviour is preserved.
+    #[serde(default)]
+    pub mode: String,
 }
 
 fn default_scheme() -> String {
@@ -67,6 +73,9 @@ pub struct DaemonStatus {
     pub url: String,
     pub pid: u32,
     pub token: String,
+    /// "container" | "raw" | "" (no discovery). Lets the UI label an externally
+    /// managed (raw, dev) runtime the tray won't restart.
+    pub manager: String,
 }
 
 /// Probe the daemon: no discovery → stopped; discovery + /health 200 → running;
@@ -78,6 +87,7 @@ pub fn status() -> DaemonStatus {
             url: String::new(),
             pid: 0,
             token: String::new(),
+            manager: String::new(),
         };
     };
     let url = format!("{}://127.0.0.1:{}", d.scheme, d.port);
@@ -93,11 +103,13 @@ pub fn status() -> DaemonStatus {
         })
         .map(|r| r.status().as_u16() == 200)
         .unwrap_or(false);
+    let manager = if d.mode.is_empty() { "container".into() } else { d.mode };
     DaemonStatus {
         state: if healthy { "running" } else { "unhealthy" }.into(),
         url,
         pid: d.pid,
         token: d.token,
+        manager,
     }
 }
 
@@ -106,30 +118,80 @@ pub fn daemon_status() -> DaemonStatus {
     status()
 }
 
+/// Bring the runtime up — IDEMPOTENT. If one is already healthy (container OR a
+/// raw dev runtime) we leave it alone and never boot a container over it, so the
+/// two dev modes coexist. Only `wb deploy local` when nothing is live.
 #[tauri::command]
 pub fn daemon_up() -> DaemonStatus {
+    let cur = status();
+    if cur.state == "running" {
+        return cur;
+    }
     let _ = wb(&["deploy", "local", "--json"]);
+    wait_for_discovery();
     status()
 }
 
 #[tauri::command]
 pub fn daemon_down() -> DaemonStatus {
+    // Never tear down a raw (externally managed) runtime — it isn't ours to kill.
+    if status().manager == "raw" {
+        return status();
+    }
     let _ = wb(&["deploy", "down", "--json"]);
     status()
 }
 
+/// Recover a wedged runtime. Only valid for a runtime WE manage (a container);
+/// a `raw` dev runtime is left untouched with an explanatory error so the tray
+/// never kills the user's `iex` session out from under them.
 #[tauri::command]
 pub fn daemon_restart() -> Result<DaemonStatus, String> {
+    let cur = status();
+    if cur.manager == "raw" {
+        return Err(
+            "Runtime is running in raw dev mode (e.g. `WB_DESKTOP=1 iex -S mix`) — \
+             the tray doesn't manage it. Restart it where you launched it."
+                .into(),
+        );
+    }
     let _ = wb(&["deploy", "down", "--json"]);
     let _ = wb(&["deploy", "local", "--json"]);
-    // Give the runtime a moment to write its discovery file.
+    wait_for_discovery();
+    Ok(status())
+}
+
+/// Poll up to ~10s for the runtime to write its discovery file after a boot.
+fn wait_for_discovery() {
     for _ in 0..40 {
         if Discovery::read().is_some() {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
-    Ok(status())
+}
+
+/// The tray's single "Start / restart engine" action, made safe:
+///   • nothing live          → start a container (`wb deploy local`)
+///   • live & container-ours → restart it (down + up)
+///   • live & raw (dev)      → no-op; we don't own it
+/// Returns a short human note for logging.
+pub fn tray_engine_action() -> String {
+    let cur = status();
+    match (cur.state.as_str(), cur.manager.as_str()) {
+        ("running", "raw") => "engine: raw dev runtime is healthy — left untouched".into(),
+        ("running", _) => {
+            let _ = wb(&["deploy", "down", "--json"]);
+            let _ = wb(&["deploy", "local", "--json"]);
+            wait_for_discovery();
+            "engine: restarted container".into()
+        }
+        _ => {
+            let _ = wb(&["deploy", "local", "--json"]);
+            wait_for_discovery();
+            "engine: started container".into()
+        }
+    }
 }
 
 /// Background poll: every ~3s re-read discovery + /health and emit

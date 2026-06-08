@@ -42,6 +42,14 @@ defmodule Workbooks.Desktop do
     end
   end
 
+  @doc """
+  How this runtime is managed, written into the discovery file so the tray knows
+  whether it may restart us. `container` = the tray booted us via `wb deploy local`
+  (krunvm sets `WB_DESKTOP_DIR=/disco`) and so owns our lifecycle. `raw` = we were
+  launched by hand (`WB_DESKTOP=1 iex -S mix` in dev); the tray must NOT kill us.
+  """
+  def mode, do: if(System.get_env("WB_DESKTOP_DIR") == "/disco", do: "container", else: "raw")
+
   @doc "Write the discovery file so the Tauri shell can find + authenticate to us."
   def write_discovery! do
     path = discovery_path()
@@ -52,7 +60,8 @@ defmodule Workbooks.Desktop do
         port: port(),
         token: token(),
         pid: System.pid() |> to_string() |> String.to_integer(),
-        scheme: "http"
+        scheme: "http",
+        mode: mode()
       })
 
     # 0600 — the token is a local credential; keep it user-only.
@@ -68,15 +77,18 @@ defmodule Workbooks.Desktop do
   end
 
   @doc """
-  The discovery-file path. `WB_DESKTOP_DIR` overrides; otherwise the per-OS app
-  data dir (macOS Application Support, else XDG-ish ~/.local/share).
+  The discovery-file path. `WB_DESKTOP_DIR` overrides (the container bind-mounts
+  `/disco` here); otherwise the per-OS app-data `disco/` dir. The default MUST end
+  in `disco/` so a raw `WB_DESKTOP=1 iex` (no `WB_DESKTOP_DIR`) writes exactly where
+  the Tauri shell and `Workbooks.Deploy.Krunvm` read — the path is canon on both
+  sides, so raw-dev and container runtimes are discovered identically.
   """
   def discovery_path do
     dir =
       System.get_env("WB_DESKTOP_DIR") ||
         case :os.type() do
-          {:unix, :darwin} -> Path.join([System.user_home!(), "Library", "Application Support", "sh.workbooks"])
-          _ -> Path.join([System.user_home!(), ".local", "share", "sh.workbooks"])
+          {:unix, :darwin} -> Path.join([System.user_home!(), "Library", "Application Support", "sh.workbooks", "disco"])
+          _ -> Path.join([System.user_home!(), ".local", "share", "sh.workbooks", "disco"])
         end
 
     Path.join(dir, "runtime.json")

@@ -269,8 +269,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_window(app),
             "restart" => {
-                let _ = daemon::wb(&["deploy", "down"]);
-                let _ = daemon::wb(&["deploy", "local", "--json"]);
+                // Safe, mode-aware: start if down, restart if it's our container,
+                // leave a raw dev runtime alone. Off-thread so the menu never hangs.
+                std::thread::spawn(|| {
+                    let _ = daemon::tray_engine_action();
+                });
             }
             "quit" => app.exit(0),
             _ => {}

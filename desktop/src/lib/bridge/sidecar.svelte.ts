@@ -21,6 +21,9 @@ export interface DaemonStatus {
   url: string;
   pid: number;
   token: string;
+  /** Who manages the runtime: "container" (tray-owned, restartable) or "raw"
+   *  (hand-launched dev runtime the tray won't touch). "" when down. */
+  manager: "container" | "raw" | "";
 }
 
 // Back-compat vocabulary the UI's status chip + STATE_TONE/STATE_LABEL
@@ -65,7 +68,7 @@ function fromDaemon(d: DaemonStatus): SidecarStatus {
     state,
     url: d.url || null,
     token: d.token || null,
-    mode: null,
+    mode: d.manager === "raw" ? "dev" : d.manager === "container" ? "bundled" : null,
     message: null,
   };
 }
