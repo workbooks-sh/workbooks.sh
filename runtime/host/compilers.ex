@@ -746,6 +746,12 @@ defmodule Workbooks.Compilers do
   end
 
   # Parse the [features] default = [...] list from Cargo.toml (the enabled-by-default features).
+  # Enabled features = the crate's literal `default` list. NOTE: this is intentionally NON-transitive
+  # (does not expand default→unicode→unicode-perl). Full feature-closure expansion is more correct
+  # per cargo semantics, but for heavy crates (regex) it enables unicode-table / perf features that
+  # exceed the mrustc ~1.54 ceiling — regex compiles ONLY with the reduced default set, giving basic
+  # patterns (literals/classes/alternation/repetition) but not unicode-perl \d/\w (wb-3ev). Revisit
+  # transitive expansion together with a per-dep feature-selection API + a newer compiler (wb-1ec).
   defp default_features(cargo) do
     with {:ok, body} <- File.read(cargo),
          [_, list] <- Regex.run(~r/^\s*default\s*=\s*\[([^\]]*)\]/m, body) do

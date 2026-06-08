@@ -304,4 +304,19 @@ fn main(){ let ac = AhoCorasick::new(&["he","she"]); println!("{}", ac.is_match(
     run_with("bytes@1.1.0", ~S|use bytes::BufMut;
 fn main(){ let mut b = bytes::BytesMut::new(); b.put_u8(65); b.put_u8(66); println!("{}", b.len()); }|, "2")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "regex — basic patterns (classes/alternation/captures; non-unicode, deps aho-corasick+memchr+regex-syntax)" do
+    # \d/\w need the unicode-perl feature which exceeds the mrustc ceiling (wb-3ev); basic
+    # patterns (the common case) work. This also exercises the deterministic-link fix (wb-mrz).
+    run_with("regex@1.5.4", ~S|fn main(){
+  let re = regex::Regex::new("[0-9]+").unwrap();
+  let m = re.find("ab123cd").unwrap();
+  let re2 = regex::Regex::new("(foo|bar)-([a-z]+)").unwrap();
+  let c = re2.captures("bar-baz").unwrap();
+  println!("{} {} {}", m.as_str(), &c[1], &c[2]);
+}|, "123 bar baz")
+  end
 end
