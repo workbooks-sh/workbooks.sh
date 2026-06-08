@@ -51,7 +51,9 @@ PY
 CG="$SRC/src/trans/codegen_c.cpp"
 grep -q __wasi__ "$CG" || perl -0pi -e 's/(int ec = )(system\(cmd_ss\.str\(\)\.c_str\(\)\);)/\1\n#if defined(__wasi__)\n            0;\n#else\n            \2\n#endif/g' "$CG"
 PM="$SRC/src/expand/proc_macro.cpp"
-grep -q __wasi__ "$PM" || perl -0pi -e 's{# include <spawn.h>\n# include <sys/wait.h>}{#if !defined(__wasi__)\n# include <spawn.h>\n# include <sys/wait.h>\n#endif}' "$PM"
+# wb-v3d: the committed patch supersedes the old spawn-include perl-patch — it BOTH wasi-guards the
+# spawn headers AND adds the host-import exec-bridge (gated behind -DWB_PROCMACRO_HOST). Idempotent.
+grep -q WB_PROCMACRO_HOST "$PM" || git -C "$SRC" apply "$SD/patches/proc_macro_host.patch"
 
 # --- version defines header ---
 cat > "$ROOT/ver.h" <<EOF
@@ -91,4 +93,23 @@ echo "[rust] linking mrustc.wasm"
   -lwasi-emulated-process-clocks -lunwind -o "$WASM"
 
 [ -f "$WASM" ] || { echo "[rust] no mrustc.wasm after link"; exit 1; }
+
+# --- mrustc_pm.wasm: the proc-macro exec-bridge variant (wb-v3d / wb-zq4 gap #2) ---
+# Same binary EXCEPT proc_macro.cpp is rebuilt with -DWB_PROCMACRO_HOST, which swaps the (wasi-
+# illegal) posix_spawn of a proc-macro executable for two host imports (workbooks.pm_expand /
+# pm_read). It does NOT instantiate on the plain wasmtime CLI (custom imports) — it runs under
+# Wasmex/BEAM (Workbooks.ProcMacroHost), which enables the wasm exception proposal and backs the
+# imports by running the proc-macro SERVER wasm. Only proc_macro.o differs, so reuse every other .o.
+echo "[rust] compiling proc_macro.cpp with -DWB_PROCMACRO_HOST"
+PM_OBJ="$OBJ/zz_proc_macro_pm.o"
+"$CXX" "${FLAGS[@]}" -DWB_PROCMACRO_HOST -c "$PM" -o "$PM_OBJ"
+PM_OBJS=()
+for o in "${OBJS[@]}"; do
+  case "$o" in *_src_expand_proc_macro_cpp.o) ;; *) PM_OBJS+=("$o") ;; esac
+done
+echo "[rust] linking mrustc_pm.wasm"
+"$CXX" --target=wasm32-wasip1 -fwasm-exceptions $NEWEH -Wl,-z,stack-size=67108864 "${PM_OBJS[@]}" "$PM_OBJ" "$ZOBJ"/*.o \
+  -lwasi-emulated-process-clocks -lunwind -o "$ROOT/mrustc_pm.wasm"
+[ -f "$ROOT/mrustc_pm.wasm" ] || { echo "[rust] no mrustc_pm.wasm after link"; exit 1; }
+
 echo "$WASM" 1>&3
