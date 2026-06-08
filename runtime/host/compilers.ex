@@ -832,8 +832,8 @@ defmodule Workbooks.Compilers do
   defp resolve_via_index(name, req, enabled \\ nil) do
     url = "https://index.crates.io/#{index_path(name)}"
 
-    case System.cmd("curl", ["-fsSL", "--max-time", "20", url], stderr_to_stdout: true) do
-      {body, 0} ->
+    case http_get(url) do
+      {:ok, body} ->
         cands =
           body
           |> String.split("\n", trim: true)
@@ -881,8 +881,31 @@ defmodule Workbooks.Compilers do
 
         if ranked == [], do: {:error, {:no_matching_version, name, req}}, else: {:ok, ranked}
 
-      {out, _} ->
-        {:error, {:index_fetch_failed, name, String.slice(to_string(out), 0, 150)}}
+      {:error, reason} ->
+        {:error, {:index_fetch_failed, name, String.slice(inspect(reason), 0, 150)}}
+    end
+  end
+
+  # Pure-Erlang HTTPS GET (:httpc) with VERIFIED TLS via the OS trust store — replaces the curl
+  # binary in the compile path (wb-ova). Follows redirects (static.crates.io). Returns {:ok, body}.
+  defp http_get(url) do
+    :inets.start()
+    :ssl.start()
+
+    ssl_opts = [
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
+      depth: 3
+    ]
+
+    req = {String.to_charlist(url), []}
+    http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000, autoredirect: true]
+
+    case :httpc.request(:get, req, http_opts, body_format: :binary) do
+      {:ok, {{_v, 200, _}, _headers, body}} -> {:ok, body}
+      {:ok, {{_v, code, _}, _headers, _body}} -> {:error, {:http_status, code}}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -1010,8 +1033,11 @@ defmodule Workbooks.Compilers do
     url = "https://static.crates.io/crates/#{name}/#{name}-#{version}.crate"
     tarball = Path.join(into_dir, "#{name}-#{version}.crate")
 
-    with {_, 0} <- System.cmd("curl", ["-fsSL", url, "-o", tarball], stderr_to_stdout: true),
-         {_, 0} <- System.cmd("tar", ["-xzf", tarball, "-C", into_dir], stderr_to_stdout: true) do
+    # Pure-Erlang fetch + extract — no curl/tar binaries (wb-ova). :erl_tar handles the gzipped
+    # .crate (a tar.gz) in-process.
+    with {:ok, body} <- http_get(url),
+         :ok <- File.write(tarball, body),
+         :ok <- :erl_tar.extract(String.to_charlist(tarball), [:compressed, {:cwd, String.to_charlist(into_dir)}]) do
       cdir = Path.join(into_dir, "#{name}-#{version}")
       lib_rs = Enum.find([Path.join(cdir, "src/lib.rs"), Path.join(cdir, "lib.rs")], &File.regular?/1)
       cargo = Path.join(cdir, "Cargo.toml")
@@ -1021,7 +1047,7 @@ defmodule Workbooks.Compilers do
         true -> {:ok, lib_rs, default_features(cargo), crate_edition(cargo), proc_macro_crate?(cargo)}
       end
     else
-      {out, _} -> {:error, {:fetch_failed, name, version, String.slice(to_string(out), 0, 200)}}
+      {:error, reason} -> {:error, {:fetch_failed, name, version, String.slice(inspect(reason), 0, 200)}}
     end
   end
 

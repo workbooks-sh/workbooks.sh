@@ -30,7 +30,9 @@ defmodule Workbooks.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      # :inets/:ssl back the pure-Erlang crate fetch (:httpc) that replaced the curl/tar binaries
+      # (wb-ova) — no external process in the compile path; TLS verified via OTP cacerts.
+      extra_applications: [:logger, :inets, :ssl],
       mod: {Workbooks.Application, []}
     ]
   end

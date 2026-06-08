@@ -40,12 +40,16 @@
    Orchestration (the compile pipeline driver), the resolver, directive parsing, the Dock host
    functions, HTTP serving (bandit/plug), auth (guardian/jose), Postgres (postgrex — pure protocol).
 
+** The COMPILE PATH shells out to NOTHING but wasmtime
+   Crate fetch + extract is pure Erlang (:httpc with VERIFIED TLS via the OS trust store, + :erl_tar)
+   — curl/tar are gone from compilers.ex (wb-ova). So the only external process the compile path
+   starts is `wasmtime` itself (the sandbox), wrapped by `sh` for the watchdog. Everything else —
+   resolution, fetch, parsing, orchestration — is in-BEAM Elixir.
+
 ** Host TOOLING via ports (NOT untrusted code, NOT in the exec path)
-   `wb publish` / dev workflows shell out to git, gh, rad, tea, jj, glab, brandnana, litestream,
-   curl, tar. These are isolated OS processes operating on the operator's own repo/data — they do
-   not compile or execute untrusted workbook code. They are outside the invariant's exec path.
-   (Purity nicety, optional: crate fetch's curl+tar could become :httpc + :erl_tar to drop two
-   external binaries from the compile path — not required for safety; they move data, not code.)
+   `wb publish` / dev workflows shell out to git, gh, rad, tea, jj, glab, brandnana, litestream.
+   These are isolated OS processes operating on the operator's OWN repo/data — they never compile or
+   execute untrusted workbook code, and they are not in the compile path. Outside the invariant.
 
 * WHAT THIS LETS US CLAIM
   "The runtime can compile and run arbitrary Rust (and C/Zig/JS) inside wasm containers, safely:

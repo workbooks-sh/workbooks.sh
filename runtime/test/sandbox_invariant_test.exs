@@ -47,6 +47,22 @@ defmodule Workbooks.SandboxInvariantTest do
            "Native compiler/runtime invoked in #{inspect(offenders)} — untrusted code must compile AND run only in wasm (under wasmtime)."
   end
 
+  test "the compile path runs NO native compiler/runtime/fetcher (only wasmtime + Elixir)" do
+    body = File.read!("host/compilers.ex")
+    # `sh`/`bash` appear only as orchestration wrapping `wasmtime` (stdin/stderr redirection, the JS
+    # build script) — those are fine. What must NEVER appear is a native toolchain or fetcher: that
+    # would mean compiling/running code, or pulling crates, outside the sandbox / outside the BEAM.
+    forbidden = ~w(curl wget tar node npm deno bun javy rustc cargo gcc cc clang clang++ ld ar python python3 ruby)
+
+    present =
+      forbidden
+      |> Enum.filter(fn b -> Regex.match?(~r/System\.cmd\(\s*"#{Regex.escape(b)}"/, body) end)
+
+    assert present == [],
+           "compilers.ex starts native tool(s) #{inspect(present)} — the compile path must fetch via :httpc, " <>
+             "extract via :erl_tar, and compile+run only via wasm under wasmtime."
+  end
+
   test "no rogue NIF: the runtime declares no rustler/NIF dep other than the reviewed ones" do
     # mix.exs is the single place native code can enter the BEAM. Guard against an unreviewed
     # rustler_precompiled / make / C-NIF dep slipping in via a transitive {:dep, ...} addition.
