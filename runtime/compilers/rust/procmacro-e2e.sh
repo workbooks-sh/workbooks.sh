@@ -99,11 +99,25 @@ pub fn hello(input: TokenStream) -> TokenStream {
     out.into()
 }
 RS
-echo "[pm-e2e] 5/5 myderive (USES parse_macro_input!)" >&2
+echo "[pm-e2e] 5/6 myderive (USES parse_macro_input!)" >&2
 MR poc-pm/myderive.rs --crate-name myderive --crate-type proc-macro -o "$D/libmyderive.rlib" -L "$O" -L "$D" \
   --extern proc_macro="$O/libproc_macro.rlib" --extern syn="$D/libsyn.rlib" \
   --extern quote="$D/libquote.rlib" --extern proc_macro2="$D/libproc_macro2.rlib" \
   --out-dir "$D" --target "$SPEC" --edition 2018 >&2
+[ -f "$D/libmyderive.rlib.c" ] || { echo "[pm-e2e] FAILED: myderive did not emit C"; exit 1; }
 
-[ -f "$D/libmyderive.rlib.c" ] && echo "PROC-MACRO-E2E: parse_macro_input! compiled (gap #1 solved)" \
-  || { echo "[pm-e2e] FAILED: myderive did not emit C"; exit 1; }
+# Real serde_derive 1.0.156 (last on syn 1.x). Built --crate-type proc-macro (NOT rlib — mrustc
+# asserts "Procedural macros defined in non proc-macro crate" otherwise) at edition 2015 (it has a
+# module literally named `try`, a reserved word in 2018+). Proves the whole real proc-macro crate
+# compiles, not just our toy. (Executing the derive in a user compile is gap #2, not covered here.)
+echo "[pm-e2e] 6/6 serde_derive 1.0.156 (crate-type proc-macro, ed2015)" >&2
+fetch serde_derive 1.0.156
+SDD=$(ls -d poc-pm/serde_derive-1.0.156)
+MR "$SDD/src/lib.rs" --crate-name serde_derive --crate-type proc-macro -o "$D/libserde_derive.rlib" -L "$O" -L "$D" \
+  --extern proc_macro="$O/libproc_macro.rlib" --extern proc_macro2="$D/libproc_macro2.rlib" \
+  --extern quote="$D/libquote.rlib" --extern syn="$D/libsyn.rlib" \
+  --out-dir "$D" --target "$SPEC" --edition 2015 >&2
+trap 'rm -rf poc-pm "$D"/lib{proc_macro2,unicode_ident,quote,syn,myderive,serde_derive}.* 2>/dev/null || true' EXIT
+
+[ -f "$D/libserde_derive.rlib.c" ] && echo "PROC-MACRO-E2E: parse_macro_input! + real serde_derive compiled (gap #1 solved)" \
+  || { echo "[pm-e2e] FAILED: serde_derive did not emit C"; exit 1; }

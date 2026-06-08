@@ -604,6 +604,10 @@ defmodule Workbooks.Compilers do
       # arch stays wasm32 and codegen still targets wasm32-wasi — only target_os cfg flips to linux.
       dep_target = if spoof?, do: ensure_pm_target_spec(o), else: "wasm32-wasi"
 
+      # wb-rxi: a proc-macro crate (serde_derive etc.) MUST be built --crate-type proc-macro; mrustc
+      # asserts "Procedural macros defined in non proc-macro crate" if such a crate is built as rlib.
+      dep_crate_type = if pm?, do: "proc-macro", else: "rlib"
+
       # Feature variants for THIS mode (the two-phase resolver in compile_dep picks the mode order):
       #   :override — caller's exact set, no fallback
       #   :full     — the crate's full default features (the common, correct case)
@@ -611,14 +615,15 @@ defmodule Workbooks.Compilers do
       #               swap first (heap APIs like data-encoding's encode→String are alloc-gated; a
       #               spurious "alloc" cfg is a harmless no-op), then bare no-std, then none. Skips
       #               def_features itself (already tried in :full).
-      variants =
-        # wb-346: per-crate feature HINTS — curated sets tried FIRST. The literal (non-transitive)
-        # default can both exceed the ceiling AND under-enable capability: regex-syntax default
-        # ["unicode"] compiles but lacks "unicode-perl" (transitively implied in real cargo) → \d =
-        # Syntax error. Hint [std,unicode-perl] gives \d/\w. Applied in :full so sub-deps (which are
-        # :full-only) get it too.
-        hint = Map.get(@feature_hints, name, [])
+      # wb-346: per-crate feature HINTS — curated sets tried FIRST. The literal (non-transitive)
+      # default can both exceed the ceiling AND under-enable capability: regex-syntax default
+      # ["unicode"] compiles but lacks "unicode-perl" (transitively implied in real cargo) → \d =
+      # Syntax error. Hint [std,unicode-perl] gives \d/\w. Applied in :full so sub-deps (which are
+      # :full-only) get it too. NOTE: keep this binding OUTSIDE the `variants =` expression — nesting
+      # it makes `variants` bind to `hint` and silently discards the `case` (wb-rxi regression).
+      hint = Map.get(@feature_hints, name, [])
 
+      variants =
         case mode do
           {:override, override} ->
             [override]
@@ -646,7 +651,7 @@ defmodule Workbooks.Compilers do
             Enum.reduce_while(editions, false, fn ed, _ ->
               File.rm(cdst)
 
-              mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
+              mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", dep_crate_type, "-o", rlib_rel,
                    "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
                   ["--out-dir", "output-wasi-174/deps", "--target", dep_target, "--edition", ed] ++ cfgs)
 
