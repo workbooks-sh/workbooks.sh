@@ -69,19 +69,17 @@
   // prompt fires with context, not as a boot-time surprise), then
   // workspace onboarding. Each stage is non-dismissable; user has
   // to click through.
-  let initialized = $state(false);
-  let engineInstalled = $state(false);
-  let keychainInitialized = $state(false);
-  const showEngineSetup = $derived(initialized && !engineInstalled);
-  const showKeychainSetup = $derived(
-    initialized && engineInstalled && !keychainInitialized,
-  );
-  const showOnboarding = $derived(
-    initialized &&
-      engineInstalled &&
-      keychainInitialized &&
-      workspaces.workspaces.length === 0,
-  );
+  // OFFLINE-FIRST: the app boots and is usable WITHOUT the engine (the
+  // workbook-native local tier needs no server). Engine state is surfaced in
+  // the titlebar, never as a blocking gate. So `initialized` starts true and the
+  // setup/onboarding splashes never block boot — they become opt-in flows later
+  // (Phase B), not a boot wall that hangs when a backend command is missing.
+  let initialized = $state(true);
+  let engineInstalled = $state(true);
+  let keychainInitialized = $state(true);
+  const showEngineSetup = false;
+  const showKeychainSetup = false;
+  const showOnboarding = false;
 
   // Switcher popover state — anchor element + open flag.
   let switcherAnchor = $state<HTMLElement | null>(null);

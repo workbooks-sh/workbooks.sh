@@ -35,6 +35,16 @@
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import type { Tab } from "$lib/tabs/types";
   import { geminiLive } from "$lib/live/gemini.svelte";
+  import { sidecar } from "$lib/bridge/sidecar.svelte";
+
+  // Engine connection state, surfaced (offline-first: the app runs without it).
+  const engine = $derived.by(() => {
+    const s = sidecar.status.state;
+    if (s === "ready") return { label: "Engine", cls: "ok", title: "Engine connected" };
+    if (s === "starting" || s === "restarting")
+      return { label: "Engine…", cls: "pending", title: "Engine starting" };
+    return { label: "No engine", cls: "off", title: "Engine not connected — local features only" };
+  });
 
   function kindGlyph(kind: Tab["kind"]): string {
     switch (kind) {
@@ -158,6 +168,11 @@
 
   <span class="spacer" data-tauri-drag-region></span>
 
+  <span class="engine engine-{engine.cls}" data-tauri-drag-region="false" title={engine.title}>
+    <span class="engine-dot"></span>
+    {engine.label}
+  </span>
+
   <button
     type="button"
     class="agent-btn"
@@ -254,6 +269,31 @@
     font-weight: 500;
     letter-spacing: -0.005em;
   }
+
+  .engine {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: center;
+    height: 22px;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-fg-subtle);
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .engine-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-fg-subtle);
+  }
+  .engine-ok { color: var(--color-fg-muted); }
+  .engine-ok .engine-dot { background: var(--color-ok); }
+  .engine-pending .engine-dot { background: var(--color-warn); }
+  .engine-off .engine-dot { background: var(--color-fg-subtle); }
 
   .tabs {
     display: flex;
