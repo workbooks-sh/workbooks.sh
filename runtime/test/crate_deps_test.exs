@@ -92,6 +92,23 @@ fn main(){ println!("{}", *A); }|, "42")
   @tag :build
   @tag :netdeps
   @tag timeout: 900_000
+  test "anyhow — error handling" do
+    run_with("anyhow@1.0.57", ~S|fn f() -> anyhow::Result<i32> { Ok(42) }
+fn main(){ println!("{}", f().unwrap()); }|, "42")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "once_cell — lazy statics" do
+    run_with("once_cell@1.12.0", ~S'use once_cell::sync::Lazy;
+static N: Lazy<i32> = Lazy::new(|| 6 * 7);
+fn main(){ println!("{}", *N); }', "42")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
   test "serde_json — DEEP transitive tree (serde+itoa+ryu), JSON parse+serialize, no derive" do
     run_with("serde_json@1.0.68", ~S'fn main(){
   let v: serde_json::Value = serde_json::from_str("{\"a\":1,\"b\":[2,3,4]}").unwrap();

@@ -2,7 +2,7 @@
 #+NOTE: Real crates.io crates that compile + run ENTIRELY in the wasm sandbox as workbook deps
 #+NOTE: (fetch from static.crates.io → mrustc.wasm → clang.wasm → link → run). Verified, not toys.
 
-* PROVEN WORKING (16 crates as of 2026-06-07)
+* PROVEN WORKING (23 crates as of 2026-06-07)
   | crate            | ver     | class                                      |
   |------------------+---------+--------------------------------------------|
   | fnv              | 1.0.7   | leaf, std-feature                          |
@@ -22,6 +22,12 @@
   | static_assertions| 1.1.0   | declarative-macro                          |
   | unicode-xid      | 0.2.2   | leaf                                       |
   | arrayvec         | 0.5.2   | leaf (union-backed)                        |
+
+  | anyhow           | 1.0.57  | error handling (leaf)                      |
+  | once_cell        | 1.12.0  | lazy statics (leaf)                        |
+  | log              | 0.4.17  | logging facade (leaf)                      |
+  | bytes            | 1.1.0   | byte buffers (leaf)                        |
+  | regex-syntax     | 0.6.26  | regex AST parser (leaf)                    |
 
 * WORKING CLASSES
   - leaf pure-Rust crates
