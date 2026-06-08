@@ -1,0 +1,245 @@
+#+TITLE: Toolkit Manifest — the unified #+EXEC spec (authoritative)
+#+DATE: 2026-06-08
+#+EPIC: wb-rhs
+#+STATUS: SPEC
+#+SUPERSEDES: EXTENSIONS-ORB.org (the toolkit-vs-extension split)
+#+RELATED: TOOLKITS-V3.org, ../../toolkits/AUTHORING.org, ARCHITECTURE.org
+
+* What this doc is
+
+  The canonical manifest spec for the UNIFIED toolkit. After wb-rhs there is ONE
+  noun — *toolkit* — for every authored, built, and shared unit of WASM
+  capability. What used to be a separate "extension" is just a toolkit at
+  `#+EXEC: component` with `#+TRUST: third-party`. One package, one build
+  pipeline (PackageManager), one trust model (Policy), one registry, one
+  discovery query `(tags :toolkit:)`.
+
+  This doc fixes: the manifest field list, the `#+EXEC` shapes and what each
+  requires, the `#+TRUST` postures, the `#+CAPS` capability block, and the
+  build→register→run lifecycle each shape rides. AUTHORING.org remains the
+  operational *how-to-write-skills* standard; this is the *what-the-manifest-
+  means* contract.
+
+* The model in one paragraph
+
+  A toolkit is { a manifest (front door) + skills (progressive-disclosure
+  recipes) + zero-or-more WASM artifacts (the executable half) }. The manifest's
+  `#+EXEC` field picks the artifact's INVOCATION CONTRACT; `#+TRUST` picks the
+  CONSENT POSTURE; `#+CAPS` declares which Dock capabilities the artifact may
+  reach (gated by Policy, granted by the deployer for third-party). The artifact
+  is built in-sandbox by the compiler fabric, content-addressed, and registered.
+  Nothing about a toolkit is a new core registry entry — bash + the Dock stay
+  the agent's one tool.
+
+* The manifest fields
+
+  Org keywords in =toolkits/<name>/manifest.org=. Required unless marked.
+
+  | Keyword              | Meaning                                                        | Required for |
+  |----------------------+----------------------------------------------------------------+--------------|
+  | =#+TITLE=            | human title                                                    | all          |
+  | =#+TOOLKIT=          | slug == dir name == :ID: (whitespace-free)                     | all          |
+  | =#+VERSION=          | semver                                                         | all          |
+  | =#+STATUS=           | stable / experimental / deprecated                             | all          |
+  | =#+TAGLINE=          | one sentence                                                   | all          |
+  | =#+EXEC=             | invocation contract (see §EXEC shapes)                         | all          |
+  | =#+TRUST=            | first-party (default) / third-party                            | all          |
+  | =#+CAPS=             | space-list of Dock caps the artifact may use                   | non-pure     |
+  | =#+BUILD_LANG=       | rust / zig / c / go / js / ts / orb — picks the build recipe   | built shapes |
+  | =#+BUILD_SRC=        | crate:<n> / git+<url> / path:<dir> / bin:<n> / src (inline)    | built shapes |
+  | =#+CLI_BIN=          | registered command name (the run-command key)                 | command      |
+  | =#+CLI_VERSION_RANGE=| upstream CLI version range (skills assume it)                  | command/posix (opt) |
+  | =#+WIT=              | WIT world the component imports/exports (vs engine.wit)        | component/kernel |
+  | =#+ENTRY=            | exported entrypoint fn name (default: run / process)           | component/kernel (opt) |
+  | =#+REQUIRES=         | extra CLIs/runtimes the skills assume (e.g. "node>=20")        | opt          |
+  | =#+AUTHOR_DID=       | author did:key — provenance for signing/registry              | third-party  |
+  | =#+SIGNATURE=        | Ed25519 over the canonical manifest (registry tier)            | third-party (registry) |
+
+  "non-pure" = anything reaching a host power. A pure compute+stdio command needs
+  no =#+CAPS=. "built shapes" = command / component / kernel (task & federation
+  carry recipes/daemons, not a single compiled artifact).
+
+* The EXEC shapes (the invocation contract)
+
+  | =#+EXEC=    | ABI                              | Consumer          | WIT? | Build? | Status   |
+  |-------------+----------------------------------+-------------------+------+--------+----------|
+  | =command=   | argv + stdin → stdout + exit     | agent, workflow   | no   | yes    | ✅ built  |
+  | =posix=     | native PATH binary in container  | agent, workflow   | no   | no     | ✅ built  |
+  | =task=      | :role bash recipe (wb toolkit run)| agent            | no   | no     | ✅ built  |
+  | =federation=| OQL data-source + sync daemon    | host, OQL         | no   | mixed  | ◐ shaped |
+  | =component= | WIT-typed, in-process call       | component, workflow| yes | yes    | ◐ substrate exists |
+  | =kernel=    | bytes→bytes, instantiate-once-loop| the fabric       | yes  | yes    | ⏳ wb-rhs.5 |
+
+** command — the stdio leaf (default, most portable)
+   A CLI compiled to a WASM module. stdio IS the universal API (TOOLKITS-V3 §94):
+   `run-command(name, argv, stdin) -> stdout`. Zero glue. Registered in
+   CommandRegistry under =#+CLI_BIN=. The ~80% case: text tools, jq-likes, image
+   libs, parsers. Reserved names (jq/grep/upper) cannot be shadowed.
+
+** posix — the native escape hatch
+   For ffmpeg-class CLIs that do not compile clean to WASI (native threads,
+   complex syscalls, GPU). Runs as a native PATH binary under the `posix` Policy
+   profile inside the one deploy container — the OS-isolation boundary makes it
+   safe. Not portable to desktop/browser tiers; declare honestly.
+
+** task — recipe-only, no single CLI
+   Ships =:role task= bash blocks run via `wb toolkit run <tk> <task> -- …`.
+   Default-deny execution (WB_TOOLKIT_EXEC=1, sandboxed, ulimit + wall-clock).
+   For multi-verb NEEDs the toolkit owns but does not compile.
+
+** federation — the three-face SaaS connector
+   manifest + skills (agent face) + plugin/manifest.org (OQL data-source) +
+   sync.org (:daemon: pull). Auth centralized via Plugin.Auth + =#+ENV_KEYS=.
+   See TOOLKITS-V3 §Federation. Long-lived sync lives host-side, never in-wasm.
+
+** component — the typed in-process artifact (absorbs "extension")
+   A WIT-typed component on =engine.wit= (or a declared =#+WIT= world). Typed I/O
+   instead of stringly stdio; called in-process via Wasmex.Components, not
+   spawned per call. This is the old "extension": when authored by a third party
+   it carries =#+TRUST: third-party= and the deployer grants its =#+CAPS=. The
+   capability gate is by construction — a component importing an ungranted WIT
+   function fails to instantiate. Authoring: Rust (cargo component) or JS (jco)
+   today; Orb later (no WIT/component model yet — it is glue-only, no SIMD).
+
+** kernel — the hot-loop artifact (the media/render class)
+   `bytes → bytes`, instantiated ONCE and called millions of times in a tight
+   loop with no per-call stdio marshalling. The fabric (Elixir orchestrator)
+   owns the loop; the kernel is a pure transform (decode-frame, resize, blur,
+   resample). Pairs with the shared-frame-arena cap (wb-rhs.9) to dodge the
+   copy-boundary cost. This is where the FFmpeg/GStreamer exploration lands: a
+   renderer is a graph of kernel-shape toolkits, NOT a monolith. Single-threaded
+   per instance; parallelism is the fabric fanning frames across instances.
+
+* The TRUST postures (the consent contract)
+
+  Orthogonal to EXEC. Governs whether the deployer must consent before the
+  toolkit's declared =#+CAPS= are granted.
+
+  - =first-party= (default) — yours. Runs under the profile's default caps; no
+    extra consent. Self-authored runtime toolkits (incl. agent-self-built, see
+    wb-rhs.4) are first-party but STILL capped by the session profile — authoring
+    a toolkit never widens the blast radius beyond the profile's grant.
+  - =third-party= — untrusted supply chain. The deployer reviews the declared
+    =#+CAPS= and grants a Policy profile explicitly ("this toolkit requests: vfs,
+    browse, llm — approve?"). At the registry tier it must carry =#+AUTHOR_DID= +
+    =#+SIGNATURE= (Ed25519 over the canonical manifest) and install by sha pin.
+
+  Invariant (all tiers, both postures): an ungranted cap is un-importable, so
+  un-callable. Trust posture changes the CONSENT UX, never the enforcement —
+  enforcement is always the Policy-gated Dock.
+
+* The CAPS block (what the artifact may reach)
+
+  =#+CAPS= is a space-list of Dock capabilities. Each maps to a host import bound
+  by Instance.Imports, gated by Policy.caps/1. Declaring a cap not in the granted
+  profile ⇒ fails to instantiate.
+
+  Today (instance/imports.ex, policy.ex):
+  | cap        | Dock import(s)                  | host                         |
+  |------------+---------------------------------+------------------------------|
+  | (none)     | pure compute + stdin/stdout     | —                            |
+  | =vfs=      | vfs-query                       | VFS (workspace/memory/tmp)   |
+  | =commands= | run-command                     | CommandRegistry (composition)|
+  | =llm=      | llm-complete                    | Workbooks.Llm                |
+  | =browse=   | browse-fetch                    | Workbooks.Browse (Route B)   |
+  | =net=      | (wasi:http, gated)              | host egress                  |
+  | =posix=    | fuller syscall surface          | deploy container             |
+
+  Proposed (wb-rhs.9, for the kernel/media class):
+  | =parallel= | parallel-map(jobs)              | BEAM Task.async_stream fan-out (generalizes host_http_get_many) |
+  | =frames=   | shared-frame arena              | zero-recopy frame handoff between kernels |
+
+  Adding a cap is the same three-line move every time (per EXTENSIONS-ORB, still
+  valid): (1) add the typed import to wit/engine.wit; (2) add the Policy cap name
+  + put it in the profiles that grant it; (3) add an Instance.Imports clause
+  binding it to native Elixir.
+
+* The lifecycle each built shape rides
+
+  #+begin_src text
+  AUTHOR    src/ (Dock SDK + #+BUILD_LANG) + skills/*.org + manifest.org
+     │
+  BUILD     wb toolkit build <name>
+     │      → PackageManager picks #+BUILD_LANG recipe
+     │      → compiles ENTIRELY in the wasm sandbox (compiler-in-wasm)
+     │      → content-addresses (sha256 = filename)
+     │      → conformance-checks #+WIT vs engine.wit   (component/kernel only)
+     │
+  REGISTER  CommandRegistry.register(name, sha)         (command/kernel)
+     │      or Instance binds the component               (component)
+     │      dynamic, :persistent_term — hot-swap by re-registering a new sha
+     │
+  RUN       command : run-command via bash (agent) / workflow
+     │      component: Instance.call (in-process, typed)
+     │      kernel   : fabric instantiates once, calls bytes→bytes in a loop
+     │
+  PROMOTE   session-local → workspace (.wbundle) → registry (sign + sha pin)
+  #+end_src
+
+  The compiler is itself WASM, so BUILD never escapes the sandbox and needs no
+  native toolchain — which is what lets an agent self-author a toolkit inside its
+  own container (wb-rhs.4). Build cost gates the real-time path: JS (Javy) / Zig
+  are fast enough to build mid-session; Rust (mrustc) is the build-deploy lane.
+
+* One example per built shape
+
+** command (Rust, stdio)
+   #+begin_src org
+   #+TOOLKIT: jsonsort
+   #+EXEC:    command
+   #+TRUST:   first-party
+   #+CLI_BIN: jsonsort
+   #+BUILD_LANG: rust
+   #+BUILD_SRC:  path:./src
+   #+END_SRC
+   # src reads stdin, writes sorted JSON to stdout. No caps.
+
+** component (third-party, WIT-typed, host caps)
+   #+begin_src org
+   #+TOOLKIT:    brand-enrich
+   #+EXEC:       component
+   #+TRUST:      third-party
+   #+CAPS:       vfs browse
+   #+WIT:        engine
+   #+BUILD_LANG: rust
+   #+BUILD_SRC:  git+https://example/brand-enrich
+   #+AUTHOR_DID: did:key:z6Mk…
+   #+END_SRC
+   # imports browse-fetch + vfs-query; deployer reviews+grants vfs,browse.
+
+** kernel (media hot loop)
+   #+begin_src org
+   #+TOOLKIT:    prores-decode
+   #+EXEC:       kernel
+   #+TRUST:      first-party
+   #+CAPS:       frames
+   #+WIT:        media-kernel
+   #+ENTRY:      decode_frame
+   #+BUILD_LANG: rust
+   #+BUILD_SRC:  path:./src
+   #+END_SRC
+   # decode_frame(bytes) -> bytes; fabric calls it per frame, fans across instances.
+
+* What can and cannot be a toolkit (the limits)
+
+  CAN (today / near-term): any WASI-clean CLI (auto-wrap, proven on `sd`); data
+  transforms, parsers, validators, codegen; typed API clients (via browse/net);
+  IMAGE kernels (decode/resize/convert/filter); AUDIO kernels (decode/encode/
+  resample/mix); INTRA-FRAME video kernels (ProRes/MJPEG/keyframe decode,
+  per-frame filters); LLM-backed tools; agent skills over any of these.
+
+  CANNOT (structural, per the runtime limits): real-time HD INTER-FRAME encode
+  (single-thread WASM CPU); GPU compute (no path; CPU-first by design);
+  working sets >256 MiB (memory cap, no memory64 → 4K uncompressed frames don't
+  fit); native-thread parallelism INSIDE one kernel (parallelism is fabric-level
+  fan-out, not in-wasm threads); persistent daemons / socket servers in-wasm
+  (long-lived sync is `federation`, host-side; egress is host-mediated browse/
+  net, never a raw socket — Route A rejected). The pattern: stateless, bounded,
+  single-shot or hot-loop transforms thrive; long-lived / threaded / huge-memory
+  / GPU workloads do not.
+
+* See also
+  - TOOLKITS-V3.org — the system doc (discovery, build model, security, EXEC modes).
+  - ../../toolkits/AUTHORING.org — operational skill-authoring standard.
+  - EXTENSIONS-ORB.org — SUPERSEDED; architecture survives, two-words call reversed.
+  - runtime/host/{toolkits,command_registry,package_manager,policy,instance/imports}.ex

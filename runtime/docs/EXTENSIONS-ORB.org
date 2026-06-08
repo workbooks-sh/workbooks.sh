@@ -1,6 +1,34 @@
 #+TITLE: Extensions — Orb/WASM runtime extensions for the deploy-kit
 #+DATE: 2026-06-07
-#+STATUS: ASSESSMENT + PLAN (research; not yet built)
+#+STATUS: SUPERSEDED (2026-06-08) by the unified-toolkit model, epic wb-rhs
+#+SUPERSEDED_BY: TOOLKIT-MANIFEST.org (the unified #+EXEC manifest spec), wb-rhs
+
+# ─────────────────────────────────────────────────────────────────────────
+# SUPERSEDED — READ THIS FIRST (2026-06-08, wb-rhs)
+#
+# "Extension" is NO LONGER a separate noun. It is folded into "toolkit".
+# An extension = a toolkit whose manifest declares `#+EXEC: component`
+# (a WIT-typed component on engine.wit) with `#+TRUST: third-party`.
+# One package, one build pipeline, one trust model, one registry — the
+# `#+EXEC` field selects the invocation contract; `#+TRUST` selects the
+# consent posture. See TOOLKIT-MANIFEST.org for the canonical spec.
+#
+# WHAT SURVIVES (still correct, just re-homed under "toolkit"):
+#   - the Dock-imports-ARE-the-host-SDK confirmation (§"host-capability SDK")
+#   - the 3-step host-cap-expansion move (wit + Policy cap + Imports closure)
+#   - the browse-fetch "WASM can't, host provides" pattern
+#   - the container-vs-component sovereignty argument (§"reinventing containers")
+#   - the Orb assessment (alpha; no component model/WIT/WASI; glue-only later)
+#   - the deploy-time grant/consent flow + DID-referenced shared artifacts
+#
+# WHAT IS REVERSED:
+#   - TL;DR #4 and §"Naming + toolkit alignment" recommend KEEPING the words
+#     "toolkit" and "extension" separate ("do not unify the word"). That call
+#     is OVERRIDDEN by wb-rhs: unify the word. There is one noun — toolkit.
+#     "extension" remains only as informal copy for "an untrusted, 3rd-party,
+#     component-shaped toolkit", never as a distinct subsystem or org tag.
+#     Discovery is ONE query: (tags :toolkit:). There is no :extension: tag.
+# ─────────────────────────────────────────────────────────────────────────
 
 This doc assesses *runtime-level extensions authored in Elixir via Orb*
 (Elixir→WebAssembly DSL), compiled to WASM and run in the runtime's existing

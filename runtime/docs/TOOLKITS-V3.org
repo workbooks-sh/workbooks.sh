@@ -15,26 +15,37 @@
   telemetry + SQLite/VFS are first-class.
 
   Read ARCHITECTURE.org for the onion (L0–L4); a toolkit is L4. Read
-  EXTENSIONS-ORB.org for toolkit-vs-extension-vs-capability vocabulary.
+  TOOLKIT-MANIFEST.org for the unified `#+EXEC` manifest spec (epic wb-rhs).
+
+  UNIFICATION (2026-06-08, wb-rhs): "extension" is no longer a separate noun.
+  A 3rd-party untrusted WASM component is just a *toolkit* at `#+EXEC: component`
+  with `#+TRUST: third-party`. One package, one build, one trust model, one
+  registry, one discovery query `(tags :toolkit:)`. EXTENSIONS-ORB.org is
+  SUPERSEDED; its architecture survives, its "keep two words" call is reversed.
 
 * The three nouns (settled — do not conflate)
 
   - *Capability* — a Dock import (a host power: vfs, llm, net, browse), gated by
     Policy. The thing WASM cannot do that the host provides.
-  - *Command* — a CLI converted to a runnable WASM module (stdin→stdout),
-    invoked by name via the `run-command` Dock import. CommandRegistry. The
-    executable leaf. jq, grep, and any toolkit's CLI live here.
-  - *Toolkit* — the AGENT-FACING front door: a `:toolkit:`-tagged org node
-    (manifest) naming a CLI + a SKILL_DIR of progressive-disclosure recipes the
-    agent reads on demand; about agent competence; discovered by `(tags :toolkit:)`.
-    NOT trusted by virtue of being on disk — see "Security model" below. (The
-    earlier "Trusted" label was a trust-model defect: the discovery root is an
-    unauthenticated writable directory, so a toolkit there is untrusted supply
-    chain. Read-only surfaces are open; execution is default-deny + sandboxed.)
+  - *Command* — the stdio executable leaf: a CLI converted to a runnable WASM
+    module (argv+stdin→stdout), invoked by name via the `run-command` Dock
+    import. CommandRegistry. jq, grep live here. (A command is one *shape* a
+    toolkit's artifact takes — `#+EXEC: command`; see the EXEC set below.)
+  - *Toolkit* — the unit you author, build, and share. A `:toolkit:`-tagged org
+    node (manifest) + a SKILL_DIR of progressive-disclosure recipes, plus the
+    WASM artifact(s) it builds. The manifest's `#+EXEC` field selects HOW the
+    artifact is invoked (command / component / kernel / task / federation) and
+    `#+TRUST` selects the consent posture (first-party / third-party). Discovered
+    by `(tags :toolkit:)`. NOT trusted by virtue of being on disk — see
+    "Security model". (The earlier "Trusted" label was a trust-model defect: the
+    discovery root is an unauthenticated writable directory; read-only surfaces
+    are open, execution is default-deny + sandboxed.)
 
-  Nesting: a Toolkit wraps a CLI; that CLI becomes a Command; Workflows
-  orchestrate components that run Commands. A toolkit is NEVER a new core
-  registry entry — bash/the Dock stays the agent's one tool.
+  Consumers (a toolkit serves all four, by EXEC shape): the *agent* reads skills
+  and calls a `command` via bash; a *workflow* orchestrates; another *component*
+  calls via `run-command` / a WIT import; the *fabric* invokes a `kernel` in a
+  hot loop (the media/render class). A toolkit is NEVER a new core registry
+  entry — bash/the Dock stays the agent's one tool.
 
 * What exists today (2026-06-07 audit)
 
@@ -61,11 +72,20 @@
    WASM" or "everything is PATH" law — resolve case-by-case as we re-author.
 
    #+BEGIN_SRC org
-   #+EXEC: command       # CLI_BIN is a registered WASM run-command (jq, grep) — default, most portable
-   #+EXEC: posix         # CLI_BIN is a native PATH binary, run under the `posix` Policy profile inside the deploy container (ffmpeg-class)
+   #+EXEC: command       # argv+stdin→stdout WASM run-command (jq, grep) — default, most portable
+   #+EXEC: posix         # native PATH binary, run under the `posix` Policy profile inside the deploy container (ffmpeg-class)
    #+EXEC: task          # no single CLI; the toolkit ships :role task bash recipes run via `wb toolkit run`
    #+EXEC: federation    # no CLI; a data-source plugin + sync daemon (see §Federation)
+   #+EXEC: component     # WIT-typed component on engine.wit; typed I/O, in-process call (absorbs the old "extension")
+   #+EXEC: kernel        # bytes→bytes hot loop, instantiate-once-call-many; the fabric/media-render class (wb-rhs.5)
    #+END_SRC
+
+   Orthogonal to EXEC, the manifest declares trust posture:
+   #+BEGIN_SRC org
+   #+TRUST: first-party  # yours; default profile, no extra consent (default)
+   #+TRUST: third-party  # untrusted supply chain; deployer must review + grant #+CAPS (the old "extension" consent point)
+   #+END_SRC
+   See TOOLKIT-MANIFEST.org for the full field list and per-shape requirements.
 
    DEPLOYMENT NOTE (corrected 2026-06-07): we are NOT using microVMs. The whole
    runtime is wrapped in ONE portable Linux container (OCI/Docker) for deployment
@@ -367,8 +387,11 @@
     deployer grant prompt from #+CAPS. The dock-pallet assembly for commands.
   - P7 — Re-author + deprecate: rebuild workbooks toolkits with build descriptors;
     federation 3-face for SaaS; retire publish/.
-  - P8 — Extensions (untrusted WASM artifacts) per EXTENSIONS-ORB.org. Later;
-    gated on Orb WIT maturity / the Rust-component authoring path.
+  - P8 — Component/kernel EXEC shapes + third-party trust (the unified-toolkit
+    work, epic wb-rhs). `#+EXEC: component` is the old "extension" (untrusted
+    WIT-typed artifact, deployer grants #+CAPS); `#+EXEC: kernel` is the
+    fabric/media hot-loop path. Authoring on the Rust-component + JS paths today;
+    Orb is glue-only later (no WIT/SIMD). See TOOLKIT-MANIFEST.org.
 
 * Security model (wb-sec — hardening, 2026-06-07)
 
@@ -437,7 +460,8 @@
      are low-harm ambient caps pending the linker refactor.
 
 * See also
+  - TOOLKIT-MANIFEST.org — the unified #+EXEC manifest spec (epic wb-rhs).
   - ../../toolkits/AUTHORING.org — the operational standard authors follow.
   - ARCHITECTURE.org §"Command vs Toolkit vs Workflow".
-  - EXTENSIONS-ORB.org — toolkit (front-door) vs extension (artifact).
+  - EXTENSIONS-ORB.org — SUPERSEDED; architecture survives, "two words" call reversed.
   - runtime/host/toolkits.ex — the implemented discovery half.
