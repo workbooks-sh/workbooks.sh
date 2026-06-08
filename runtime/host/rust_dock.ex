@@ -22,6 +22,27 @@ defmodule Workbooks.RustDock do
              s = Wasmex.Memory.read_string(ctx.caller, ctx.memory, ptr, len)
              IO.puts("[RustDock] host_log: #{s}")
              len
+           end},
+        # host_http_get(url_ptr,url_len, out_ptr,out_cap) -> i32 : network cap. Host reads URL from
+        # wasm mem, BEAM HTTP GET (the IO wasm cant do), writes body into out buffer, returns body
+        # len (or -1 on error / truncates to out_cap). THE offload lever — egress via BEAM, policy-
+        # gated (TODO: gate on caps allow_http; proof-open here).
+        "host_http_get" =>
+          {:fn, [:i32, :i32, :i32, :i32], [:i32],
+           fn ctx, url_ptr, url_len, out_ptr, out_cap ->
+             url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
+             _ = Application.ensure_all_started(:inets)
+             _ = Application.ensure_all_started(:ssl)
+
+             case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, 10_000}], body_format: :binary) do
+               {:ok, {{_, _status, _}, _hdrs, body}} ->
+                 n = min(byte_size(body), out_cap)
+                 :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
+                 n
+
+               _ ->
+                 -1
+             end
            end}
       }
     }
