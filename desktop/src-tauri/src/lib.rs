@@ -15,6 +15,7 @@ use tauri::{
 };
 
 mod daemon;
+mod fs;
 mod kernel;
 mod tabs;
 use daemon::Discovery;
@@ -122,7 +123,8 @@ pub fn run() {
             tabs::tab_open,
             tabs::tab_focus,
             tabs::tab_close,
-            tabs::tab_set_dirty
+            tabs::tab_set_dirty,
+            fs::read_dir
         ])
         .setup(|app| {
             build_tray(app.handle())?;

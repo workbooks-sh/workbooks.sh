@@ -36,11 +36,15 @@
   import { auth } from "$lib/auth.svelte";
   import { chrome } from "$lib/chrome.svelte";
   import { tabs } from "$lib/tabs.svelte";
+  import { workspace } from "$lib/workspace.svelte";
   import { commands } from "$lib/bindings";
 
   onMount(() => {
     void auth.init();
     void tabs.init();
+    // Explorable by default: load the persisted root and show the file tree.
+    void workspace.init();
+    chrome.openFiles();
   });
 
   function onKey(e: KeyboardEvent) {
@@ -126,17 +130,5 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-  }
-  .doc-placeholder {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 2rem;
-    color: var(--color-fg-subtle);
-  }
-  .doc-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--color-fg);
   }
 </style>

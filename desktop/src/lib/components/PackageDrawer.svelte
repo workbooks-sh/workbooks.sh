@@ -1,95 +1,93 @@
 <script lang="ts">
   /**
-   * PackageDrawer — the content-contextual left sidebar (280px) for the
-   * active Package. A header carries the package name + a grid/tree
-   * layout toggle; the body renders the package's files either as an
-   * iOS-springboard grid or a flat tree list. Double-click (grid) or
-   * click (tree) opens the file as a document tab.
+   * PackageDrawer — the explorer sidebar (280px). Opens a folder (a workbook
+   * package, or any directory of .org context) and shows it as a real, lazily-
+   * expanded file tree off the host fs. Click a file → it opens as a document
+   * tab in the DocView surface; click a folder → it expands. The chosen root
+   * persists across restarts (workspace store), so the explorer is there by
+   * default next launch.
    *
-   * Triggered by clicking the active package's avatar in the rail
-   * (chrome.openFiles). The default layout is persisted on the Package
-   * (`viewMode`); the toggle here writes that default back through the
-   * command layer. Files come from the mocked `packageWorkbooks`.
-   *
-   * Deferred: drag/drop reorder, context menus (rename/delete), recursive
-   * folder expand — they belong to the file-tree surface rebuild, not the
-   * layout pass.
+   * Triggered by the active package avatar in the rail (chrome.openFiles).
    */
-  import { LayoutGrid, ListTree } from "@lucide/svelte";
-  import { commands, type Package, type WorkbookEntry } from "$lib/bindings";
-  import { tabs } from "$lib/tabs.svelte";
-  import { chrome } from "$lib/chrome.svelte";
+  import { FolderOpen, RefreshCw } from "@lucide/svelte";
+  import { workspace } from "$lib/workspace.svelte";
+  import { listDir, type DirEntry } from "$lib/files";
+  import FileTree from "./FileTree.svelte";
 
-  let pkg = $state<Package | null>(null);
-  let entries = $state<WorkbookEntry[]>([]);
-
-  // Per-session layout override; falls back to the package's stored mode.
-  let override = $state<Package["viewMode"] | null>(null);
-  const layout = $derived(override ?? pkg?.viewMode ?? "grid");
+  let roots = $state<DirEntry[]>([]);
+  let loading = $state(false);
+  let err = $state("");
+  // Bump to force the tree to remount (collapse + reload) on refresh / root change.
+  let nonce = $state(0);
 
   $effect(() => {
-    void load();
+    // Re-read whenever the root changes.
+    const root = workspace.root;
+    void load(root);
   });
-  async function load() {
-    pkg = await commands.packageGetActive();
-    entries = pkg ? await commands.packageWorkbooks({ name: pkg.name }) : [];
-  }
 
-  async function setLayout(next: Package["viewMode"]) {
-    override = next;
-    if (pkg && pkg.viewMode !== next) await commands.packageSetLayout({ name: pkg.name, viewMode: next });
-  }
-
-  async function openEntry(e: WorkbookEntry) {
-    chrome.mode = "doc";
-    await tabs.open(e.path);
-  }
-
-  function glyph(kind: WorkbookEntry["kind"]): string {
-    switch (kind) {
-      case "workbook": return "◆";
-      case "org": return "◉";
-      case "code": return "{ }";
-      default: return "—";
+  async function load(root: string | null) {
+    err = "";
+    if (!root) {
+      roots = [];
+      return;
     }
+    loading = true;
+    try {
+      roots = await listDir(root);
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e);
+      roots = [];
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function openFolder() {
+    await workspace.openFolder();
+  }
+  function refresh() {
+    nonce++;
+    void load(workspace.root);
   }
 </script>
 
-<aside class="drawer" aria-label="Package files">
+<aside class="drawer" aria-label="Explorer">
   <header class="hdr">
-    <span class="label">{pkg?.name ?? "Package"}</span>
-    <div class="switcher" role="tablist" aria-label="Layout">
-      <button type="button" class="seg" class:active={layout === "grid"} role="tab"
-        aria-selected={layout === "grid"} title="Grid" onclick={() => setLayout("grid")}>
-        <LayoutGrid size={12} strokeWidth={1.8} />
-      </button>
-      <button type="button" class="seg" class:active={layout === "tree"} role="tab"
-        aria-selected={layout === "tree"} title="Tree" onclick={() => setLayout("tree")}>
-        <ListTree size={12} strokeWidth={1.8} />
+    <span class="label" title={workspace.root ?? ""}>{workspace.name}</span>
+    <div class="tools">
+      {#if workspace.root}
+        <button type="button" class="tool" title="Refresh" onclick={refresh}>
+          <RefreshCw size={12} strokeWidth={1.8} />
+        </button>
+      {/if}
+      <button type="button" class="tool" title="Open folder…" onclick={() => void openFolder()}>
+        <FolderOpen size={13} strokeWidth={1.8} />
       </button>
     </div>
   </header>
 
-  {#if entries.length === 0}
-    <p class="empty">No files yet.</p>
-  {:else if layout === "grid"}
-    <div class="grid" role="list">
-      {#each entries as e (e.path)}
-        <button type="button" class="tile" role="listitem" title={e.name} ondblclick={() => openEntry(e)}>
-          <span class="tile-glyph kind-{e.kind}">{glyph(e.kind)}</span>
-          <span class="tile-name">{e.name}</span>
-        </button>
-      {/each}
+  {#if !workspace.root}
+    <div class="empty">
+      <p>No folder open.</p>
+      <button type="button" class="open-cta" onclick={() => void openFolder()}>
+        <FolderOpen size={14} strokeWidth={1.8} /> Open folder
+      </button>
     </div>
+  {:else if loading}
+    <p class="hint">Loading…</p>
+  {:else if err}
+    <p class="hint err">{err}</p>
+  {:else if roots.length === 0}
+    <p class="hint">Empty folder.</p>
   {:else}
-    <div class="tree" role="list">
-      {#each entries as e (e.path)}
-        <button type="button" class="row" role="listitem" title={e.path} onclick={() => openEntry(e)}>
-          <span class="kind kind-{e.kind}">{glyph(e.kind)}</span>
-          <span class="row-name">{e.name}</span>
-        </button>
-      {/each}
-    </div>
+    {#key nonce}
+      <div class="tree" role="tree">
+        {#each roots as entry (entry.path)}
+          <FileTree {entry} />
+        {/each}
+      </div>
+    {/key}
   {/if}
 </aside>
 
@@ -108,52 +106,25 @@
     text-transform: uppercase; letter-spacing: 0.04em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .switcher {
-    display: flex; border: 1px solid var(--color-border); border-radius: 5px;
-    overflow: hidden; background: var(--color-surface-soft);
-  }
-  .seg {
+  .tools { display: flex; gap: 2px; flex-shrink: 0; }
+  .tool {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border: 0; background: transparent;
-    color: var(--color-fg-muted); cursor: pointer;
+    color: var(--color-fg-muted); cursor: pointer; border-radius: 5px;
   }
-  .seg:hover { color: var(--color-fg); }
-  .seg.active { background: var(--color-surface); color: var(--color-fg); }
-  .empty { margin: 1rem 0.75rem; font-size: 0.78rem; color: var(--color-fg-subtle); }
-  .grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-    gap: 6px; padding: 10px; overflow-y: auto;
+  .tool:hover { color: var(--color-fg); background: var(--color-surface-soft); }
+  .empty {
+    display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start;
+    margin: 1rem 0.75rem; font-size: 0.8rem; color: var(--color-fg-subtle);
   }
-  .tile {
-    display: flex; flex-direction: column; align-items: center; gap: 5px;
-    padding: 10px 4px; border: 1px solid transparent; border-radius: 10px;
-    background: transparent; cursor: pointer; color: var(--color-fg);
-    transition: background 0.12s ease;
+  .open-cta {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 0.7rem; border: 1px solid var(--color-border);
+    border-radius: 6px; background: var(--color-page); color: var(--color-fg);
+    cursor: pointer; font-size: 0.8rem;
   }
-  .tile:hover { background: var(--color-surface-soft); }
-  .tile-glyph {
-    display: grid; place-items: center; width: 40px; height: 40px;
-    border-radius: 10px; background: var(--color-surface-soft);
-    border: 1px solid var(--color-border); font-size: 16px;
-    font-family: ui-monospace, monospace;
-  }
-  .tile-name {
-    font-size: 0.68rem; text-align: center; line-height: 1.2;
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .tree { display: flex; flex-direction: column; padding: 4px; overflow-y: auto; }
-  .row {
-    display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-    border: 0; border-radius: 6px; background: transparent; cursor: pointer;
-    color: var(--color-fg); font-size: 0.82rem; text-align: left;
-  }
-  .row:hover { background: var(--color-surface-soft); }
-  .row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .kind {
-    display: inline-flex; width: 14px; justify-content: center; flex-shrink: 0;
-    font-family: ui-monospace, monospace; font-size: 11px; opacity: 0.6;
-  }
-  .kind-workbook { color: #5b8cff; opacity: 0.9; }
-  .kind-org { color: var(--color-ok); opacity: 0.9; }
-  .kind-code { color: #a855f7; opacity: 0.9; }
+  .open-cta:hover { background: var(--color-surface-soft); }
+  .hint { margin: 0.8rem 0.75rem; font-size: 0.78rem; color: var(--color-fg-subtle); }
+  .hint.err { color: #e06c75; }
+  .tree { flex: 1 1 auto; overflow-y: auto; padding: 4px; }
 </style>

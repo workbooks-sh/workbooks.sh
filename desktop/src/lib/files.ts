@@ -13,6 +13,27 @@ export async function readFileText(path: string): Promise<string> {
   return invoke<string>("read_file", { path });
 }
 
+export interface DirEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+}
+
+/** List a directory's immediate children (dirs first). The file-tree explorer
+ *  calls this lazily per folder as it expands. */
+export async function listDir(path: string): Promise<DirEntry[]> {
+  if (!isTauri()) return [];
+  return invoke<DirEntry[]>("read_dir", { path });
+}
+
+/** Prompt for a folder to open as the explorer root. Returns the path or null. */
+export async function pickFolderPath(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const path = await open({ directory: true });
+  return typeof path === "string" ? path : null;
+}
+
 /** Prompt for a workbook/file path (no read). Returns the chosen path or null.
  *  Broader than `.org` so the tab/doc surface can open any text file. */
 export async function pickFilePath(): Promise<string | null> {
