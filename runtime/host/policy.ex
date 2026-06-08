@@ -16,7 +16,7 @@ defmodule Workbooks.Policy do
   @profiles %{
     minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands), timeout: 5_000},
     network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands net llm browse), timeout: 30_000},
-    posix: %{memory: 256 * 1024 * 1024, caps: ~w(vfs commands net llm browse posix), timeout: 60_000}
+    posix: %{memory: 256 * 1024 * 1024, caps: ~w(vfs commands net llm browse posix parallel), timeout: 60_000}
   }
 
   def profiles, do: Map.keys(@profiles)

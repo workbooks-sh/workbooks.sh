@@ -143,9 +143,9 @@
   | =browse=   | browse-fetch                    | Workbooks.Browse (Route B)   |
   | =net=      | (wasi:http, gated)              | host egress                  |
   | =posix=    | fuller syscall surface          | deploy container             |
+  | =parallel= | run-command-many (fan-out)      | Workbooks.Fabric — distribute compute across isolated instances |
 
-  Proposed (wb-rhs.9, for the kernel/media class):
-  | =parallel= | parallel-map(jobs)              | BEAM Task.async_stream fan-out (generalizes host_http_get_many) |
+  Proposed (wb-rhs.5, for the kernel/media class):
   | =frames=   | shared-frame arena              | zero-recopy frame handoff between kernels |
 
   Adding a cap is the same three-line move every time (still

@@ -100,6 +100,27 @@ pub fn session_from(json: &str) -> Result<Session> {
     serde_json::from_str(json).map_err(|e| DockError(format!("decode session: {e}")))
 }
 
+/// Parse the JSON array a `run-command-many` (parallel) Dock call returns into
+/// per-worker results: each element is `{"ok": stdout}` or `{"error": reason}`,
+/// in input order. The outer `Result` is the call itself; each inner `Result` is
+/// one worker.
+pub fn parse_many(json: &str) -> Result<Vec<Result<String>>> {
+    check_error(json)?;
+
+    let arr: Vec<serde_json::Value> =
+        serde_json::from_str(json).map_err(|e| DockError(format!("decode many: {e}")))?;
+
+    Ok(arr
+        .into_iter()
+        .map(|v| match v.get("ok") {
+            Some(serde_json::Value::String(s)) => Ok(s.clone()),
+            _ => Err(DockError(
+                v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown").to_string(),
+            )),
+        })
+        .collect())
+}
+
 /// If `json` is a host error envelope (`{"error": "..."}`), return it as `Err`.
 /// Otherwise `Ok(())`. Public so hand-declared imports can reuse the convention.
 pub fn check_error(json: &str) -> Result<()> {
@@ -176,6 +197,21 @@ macro_rules! bind {
                     Ok(r)
                 }
             }
+
+            #[cfg(feature = "parallel")]
+            pub mod parallel {
+                use super::b;
+                /// Fan a registered command over `inputs` (one stdin each),
+                /// concurrently across isolated instances — the host (BEAM) does
+                /// the distribution a single-threaded wasm instance can't. Returns
+                /// per-input results IN ORDER. This is how an intensive toolkit
+                /// borrows BEAM distribution (the media/render fabric is one user).
+                pub fn map(name: impl AsRef<str>, inputs: &[&str]) -> $crate::Result<Vec<$crate::Result<String>>> {
+                    let inputs_json = serde_json::to_string(inputs)
+                        .map_err(|e| $crate::DockError(format!("encode inputs: {e}")))?;
+                    $crate::parse_many(&b::run_command_many(name.as_ref(), &inputs_json))
+                }
+            }
         }
 
         // Re-export so authors write `dock::llm::ask(..)` etc.
@@ -185,16 +221,12 @@ macro_rules! bind {
 }
 
 // ── Staged-cap guards ──────────────────────────────────────────────────────
-// The surface is documented in DOCK-SDK.org; the host bindings land in wb-rhs.9.
-#[cfg(feature = "parallel")]
-compile_error!(
-    "dock feature `parallel` (BEAM concurrency fan-out, dock::parallel::map) is \
-     not yet available — host cap wb-rhs.9. Remove the feature to build."
-);
+// `parallel` is LIVE (wb-rhs.9): the host binds run-command-many → Workbooks.Fabric.
+// `frames` (shared-frame arena) is still staged — host side is wb-rhs.5.
 #[cfg(feature = "frames")]
 compile_error!(
     "dock feature `frames` (shared-frame arena, dock::frames) is not yet \
-     available — host cap wb-rhs.9. Remove the feature to build."
+     available — host cap wb-rhs.5. Remove the feature to build."
 );
 
 #[cfg(test)]
@@ -232,5 +264,14 @@ mod tests {
         let p = page(r#"{"url":"u","title":"t","text":"x","lang":"en"}"#).unwrap();
         assert_eq!(p.url.as_deref(), Some("u"));
         assert_eq!(p.extra.get("lang").unwrap(), "en");
+    }
+
+    #[test]
+    fn parse_many_splits_ok_and_error_per_worker() {
+        let v = parse_many(r#"[{"ok":"cba"},{"error":"boom"},{"ok":"zyx"}]"#).unwrap();
+        assert_eq!(v.len(), 3);
+        assert_eq!(v[0].as_ref().unwrap(), "cba");
+        assert!(v[1].is_err());
+        assert_eq!(v[2].as_ref().unwrap(), "zyx");
     }
 }

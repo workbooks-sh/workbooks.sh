@@ -55,6 +55,7 @@
   | =commands= | =dock::command::run(name, input, args)=| =String=           | run-command      |
   | =llm=      | =dock::llm::ask(prompt)=               | =String=           | llm-complete     |
   | =browse=   | =dock::browse::fetch(url)=             | =Page=             | browse-fetch     |
+  | =parallel= | =dock::parallel::map(name, inputs)=    | =Vec<Result<String>>= | run-command-many |
 
   All fallible calls return =dock::Result<_>= (a host-error string becomes
   =Err(DockError)=, not a silently-corrupt value). Output:
@@ -62,17 +63,14 @@
   - =dock::rows::<T>(json) / dock::page(json)= — marshalling helpers if you hold
     a raw Dock string (e.g. from a hand-declared import).
 
-* Staged caps (host side not yet wired — wb-rhs.9)
+* Staged caps (host side not yet wired — wb-rhs.5)
 
-  These appear in the SDK behind features that currently =compile_error!= with a
-  "host cap not yet available (wb-rhs.9)" message, so the surface is stable and
-  authors see the intent, but cannot ship against an unbuilt host cap:
-  - =parallel= → =dock::parallel::map(command, inputs) -> Vec<Result<String>>=
-    the BEAM concurrency fan-out (generalizes host_http_get_many): one call →
-    N inputs run concurrently host-side via Task.async_stream → N results. This
-    is how a single-threaded kernel borrows BEAM parallelism.
+  Still staged behind a =compile_error!= until its host side lands:
   - =frames= → =dock::frames::{borrow, commit}= the shared-frame arena: hand a
     frame between kernels by offset, not by re-copying across the NIF boundary.
+
+  (=parallel= used to be here; it is now LIVE — the host binds run-command-many →
+  Workbooks.Fabric, see the capability surface above.)
 
 * JS counterpart (jco-authored components)
 
@@ -92,7 +90,7 @@
 
   - =runtime/sdk/rust/dock= — the Rust crate: =Session=/=Page= types, =out=,
     =rows=, =page=, =DockError=/=Result=, and feature-gated cap modules
-    (vfs/commands/llm/browse live; parallel/frames staged compile_error).
+    (vfs/commands/llm/browse/parallel live; frames staged compile_error).
   - This spec.
   Deferred to follow-ups: the JS package build, the feature↔WIT-subset codegen
   glue (today the author declares the WIT subset by hand + enables matching

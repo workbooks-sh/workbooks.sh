@@ -47,6 +47,15 @@ defmodule Workbooks.Instance.Imports do
   defp add("browse", acc, _vfs, _ctx),
     do: Map.put(acc, "browse-fetch", {:fn, fn url -> browse_fetch(url) end})
 
+  # parallel: fan a registered command over N inputs across isolated instances
+  # (the distributed-compute primitive, Workbooks.Fabric). The component passes a
+  # JSON array of stdin strings; the host runs them concurrently (BEAM does the
+  # parallelism a single-threaded wasm instance can't) and returns a JSON array of
+  # {"ok": stdout} | {"error": reason}, in order. This is how an intensive toolkit
+  # borrows BEAM distribution; the media/render fabric is one consumer.
+  defp add("parallel", acc, _vfs, _ctx),
+    do: Map.put(acc, "run-command-many", {:fn, fn name, inputs_json -> run_command_many(name, inputs_json) end})
+
   defp add(_other, acc, _, _ctx), do: acc
 
   defp run_command(name, input, args, ctx) do
@@ -94,6 +103,28 @@ defmodule Workbooks.Instance.Imports do
     end
   rescue
     e -> Jason.encode!(%{error: inspect(e)})
+  end
+
+  # Fan a command over a JSON array of stdin strings via the Fabric, marshal the
+  # ordered results back as a JSON array. The component never manages concurrency
+  # itself — it hands the host the work and gets the results.
+  defp run_command_many(name, inputs_json) do
+    case Jason.decode(inputs_json) do
+      {:ok, inputs} when is_list(inputs) ->
+        {:ok, results} = Workbooks.Fabric.map(name, Enum.map(inputs, &to_string/1))
+
+        Jason.encode!(
+          Enum.map(results, fn
+            {:ok, out} -> %{"ok" => out}
+            {:error, reason} -> %{"error" => inspect(reason)}
+          end)
+        )
+
+      _ ->
+        Jason.encode!(%{"error" => "run-command-many: inputs must be a JSON array of strings"})
+    end
+  rescue
+    e -> Jason.encode!(%{"error" => inspect(e)})
   end
 
   defp llm_complete(prompt) do
