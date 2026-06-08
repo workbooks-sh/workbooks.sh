@@ -13,7 +13,16 @@ defmodule Workbooks.RustDock do
     %{
       "env" => %{
         # host_now() -> i64 : unix epoch milliseconds (a real cap — wasm has no wall clock)
-        "host_now" => {:fn, [], [:i64], fn _ctx -> System.os_time(:millisecond) end}
+        "host_now" => {:fn, [], [:i64], fn _ctx -> System.os_time(:millisecond) end},
+        # host_log(ptr,len) -> i32 : host READS the string from wasm linear memory + logs it.
+        # Proves memory marshalling (caller.memory) — foundation for all string caps (http/vfs/llm).
+        "host_log" =>
+          {:fn, [:i32, :i32], [:i32],
+           fn ctx, ptr, len ->
+             s = Wasmex.Memory.read_string(ctx.caller, ctx.memory, ptr, len)
+             IO.puts("[RustDock] host_log: #{s}")
+             len
+           end}
       }
     }
   end
