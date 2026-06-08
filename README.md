@@ -124,18 +124,19 @@ what it did.
 
 ```mermaid
 sequenceDiagram
-    actor You
-    participant Agent
-    participant Tools
-    participant Log as events.org
+    participant You as 👤 You
+    participant Agent as 🤖 Agent
+    participant Tools as 🧰 Tools
+    participant Log as 📒 events.org
 
+    Note over Tools: shell · fetch · files · search
     You->>Agent: describe the app
     loop until done
-        Agent->>Tools: shell · fetch · files · search
+        Agent->>Tools: take a step
         Tools-->>Agent: result
-        Agent->>Log: record the step
+        Agent->>Log: record it
     end
-    Agent-->>You: a finished Workbook
+    Agent-->>You: finished Workbook
 ```
 
 **Private routes stay sealed.** A route is just a path inside the Workbook. Public paths are
@@ -144,18 +145,18 @@ after an access check. A private page isn't hidden — it's unreadable without p
 
 ```mermaid
 sequenceDiagram
-    actor Visitor
-    participant Workbook
-    participant Runtime
+    participant Visitor as 👤 Visitor
+    participant Workbook as 📄 Workbook
+    participant Runtime as ⚙️ Runtime
 
     Visitor->>Workbook: open a private route
-    Workbook-->>Visitor: it's sealed — needs a key
+    Workbook-->>Visitor: 🔒 sealed — needs a key
     Visitor->>Runtime: ask for the key
     alt access allowed
-        Runtime-->>Visitor: here's the key
-        Visitor->>Workbook: unseal and view
+        Runtime-->>Visitor: 🔑 key
+        Visitor->>Workbook: unseal & view
     else denied
-        Runtime-->>Visitor: no key — stays unreadable
+        Runtime-->>Visitor: ✕ no key
     end
 ```
 
