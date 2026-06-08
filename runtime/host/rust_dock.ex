@@ -19,10 +19,19 @@ defmodule Workbooks.RustDock do
   """
   def imports(opts \\ []) do
     profile = Keyword.get(opts, :profile, :minimal)
-    base = ambient()
-    env = if Policy.allow_http?(profile), do: Map.merge(base, egress()), else: base
+    caps = Policy.caps(profile)
+    vfs = Keyword.get(opts, :vfs)
+
+    env =
+      ambient()
+      |> maybe(Policy.allow_http?(profile), &egress/0)
+      |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
+
     %{"env" => env}
   end
+
+  defp maybe(map, true, builder), do: Map.merge(map, builder.())
+  defp maybe(map, _false, _builder), do: map
 
   defp ambient do
     %{
@@ -58,6 +67,38 @@ defmodule Workbooks.RustDock do
              {:ok, {{_, _status, _}, _hdrs, body}} ->
                n = min(byte_size(body), out_cap)
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
+               n
+
+             _ ->
+               -1
+           end
+         end}
+    }
+  end
+
+  # VFS — gated on "vfs" cap + a vfs conn. Sandboxed key-value store (no host FS reach).
+  defp vfs_caps(vfs) do
+    %{
+      # host_vfs_write(path_ptr,path_len, data_ptr,data_len) -> i32 (0 ok, -1 err)
+      "host_vfs_write" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, pp, pl, dp, dl ->
+           path = Wasmex.Memory.read_string(ctx.caller, ctx.memory, pp, pl)
+           data = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
+           case Workbooks.VFS.put(vfs, path, data) do
+             :ok -> 0
+             _ -> -1
+           end
+         end},
+      # host_vfs_read(path_ptr,path_len, out_ptr,out_cap) -> i32 (bytes, -1 missing/err)
+      "host_vfs_read" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, pp, pl, op, oc ->
+           path = Wasmex.Memory.read_string(ctx.caller, ctx.memory, pp, pl)
+           case Workbooks.VFS.get(vfs, path) do
+             {:ok, content} ->
+               n = min(byte_size(content), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(content, 0, n))
                n
 
              _ ->
