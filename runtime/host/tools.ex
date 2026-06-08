@@ -49,6 +49,45 @@ defmodule Workbooks.Tools do
     end
   end
 
+  @node_dir Path.expand(Path.join([__DIR__, "..", "node_modules", ".bin"]))
+
+  @doc """
+  Ensure jco/componentize-js are installed (node_modules/.bin/jco) — npm packages run via
+  node, provisioned by `bun install` (or npm) in runtime/. Self-heals the JS typed-component
+  (jco) lane like `ensure/0` self-heals the binary tools. Returns :ok | {:error, _}.
+  """
+  def ensure_jco do
+    if File.exists?(Path.join(@node_dir, "jco")) do
+      :ok
+    else
+      rt = Path.expand(Path.join(__DIR__, ".."))
+
+      installer =
+        cond do
+          System.find_executable("bun") -> ["bun", "install"]
+          System.find_executable("npm") -> ["npm", "install"]
+          true -> nil
+        end
+
+      if installer == nil do
+        {:error, :no_bun_or_npm}
+      else
+        case System.cmd(hd(installer), tl(installer), cd: rt, stderr_to_stdout: true) do
+          {_, 0} -> if File.exists?(Path.join(@node_dir, "jco")), do: :ok, else: {:error, :jco_still_missing}
+          {out, code} -> {:error, {:install_failed, code, String.slice(to_string(out), -400..-1//1)}}
+        end
+      end
+    end
+  end
+
+  @doc "Ensure jco or raise with an actionable message."
+  def ensure_jco! do
+    case ensure_jco() do
+      :ok -> :ok
+      {:error, reason} -> raise "jco not provisioned (#{inspect(reason)}). Run: cd runtime && bun install"
+    end
+  end
+
   @doc "Like `ensure/0` but raises with an actionable message."
   def ensure! do
     case ensure() do

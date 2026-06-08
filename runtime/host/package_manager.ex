@@ -285,6 +285,7 @@ defmodule Workbooks.PackageManager do
   are disabled to slim it. Returns {:ok, wasm, :built_js_component}.
   """
   def build_engine_js(src, world_wit \\ @jsworkbook_wit) do
+    Workbooks.Tools.ensure_jco!()
     File.mkdir_p!(@cache)
     js = Path.join(@cache, "jswb-#{cache_key([src])}.js")
     out = Path.join(@cache, "jswb-#{cache_key([src])}.wasm")
@@ -671,6 +672,7 @@ defmodule Workbooks.PackageManager do
 
   @doc "Componentize JS against a WIT world via jco (real typed component)."
   def componentize_typed(src, wit, world) do
+    Workbooks.Tools.ensure_jco!()
     js = Path.join(System.tmp_dir!(), "wb-jco-#{cache_key([src, world])}.js")
     out = Path.join(@cache, "#{cache_key([src, wit, world])}.typed.wasm")
     File.write!(js, src)
