@@ -565,9 +565,16 @@ defmodule Workbooks.Compilers do
             end
           end)
 
+        # Order to TRY: the exact requested version first (what the crate author tested + most
+        # likely mrustc-1.54-compatible), then newest-first as fallback. Newest-first alone is
+        # the WRONG order under the ceiling — newer releases pull restructured deps (e.g. serde
+        # 1.0.2xx → proc-macro2) or use post-1.54 syntax, and the cap never reaches the older one.
+        exact = req |> String.trim() |> String.trim_leading("=")
+        sorted = Enum.sort_by(cands, fn {sv, _, _} -> sv end, :desc)
+        {req_first, rest} = Enum.split_with(sorted, fn {_, v, _} -> v == exact end)
+
         ranked =
-          cands
-          |> Enum.sort_by(fn {sv, _, _} -> sv end, :desc)
+          (req_first ++ rest)
           |> Enum.take(6)
           |> Enum.map(fn {_, vstr, deps} ->
             norm =
