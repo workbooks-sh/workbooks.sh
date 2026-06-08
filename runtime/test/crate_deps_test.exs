@@ -519,7 +519,7 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
   # detects derive-new is a proc-macro crate, builds it (+ syn/quote/proc-macro2) to a SERVER wasm,
   # and routes the user compile through Workbooks.ProcMacroHost (mrustc_pm.wasm under Wasmex) so
   # #[derive(new)] EXECUTES — the output runs the derive-generated Point::new(3,4) constructor.
-  # Needs the proc-macro toolchain: build.sh's mrustc_pm.wasm + provision-wasmex-pm.sh.
+  # Needs the proc-macro toolchain: build.sh's mrustc_pm.wasm + the vendored exception-enabled wasmex.
   @tag :build
   @tag :netdeps
   @tag :procmacro

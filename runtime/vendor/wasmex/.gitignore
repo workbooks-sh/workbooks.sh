@@ -1,0 +1,4 @@
+# Build artifacts — the NIF is compiled from source (force_build).
+/native/wasmex/target/
+/priv/native/
+/_build/

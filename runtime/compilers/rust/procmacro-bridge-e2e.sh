@@ -8,8 +8,9 @@
 # compile is only possible if the proc-macro actually ran.
 #
 # Expected tail: "PROC-MACRO-BRIDGE: derive executed in-sandbox, user crate compiled (gap #2 DONE)".
-# Prereq: provision-rust-174.sh, build.sh (produces mrustc_pm.wasm), provision-wasmex-pm.sh (Wasmex
-# with exceptions). Network to fetch the foundation crates. Run from runtime/compilers/rust.
+# Prereq: provision-rust-174.sh, build.sh (produces mrustc_pm.wasm), and the vendored wasmex
+# (vendor/wasmex, exception-enabled, built via `mix deps.compile wasmex`). Network to fetch the
+# foundation crates. Run from runtime/compilers/rust.
 set -euo pipefail
 SD="$(cd "$(dirname "$0")" && pwd)"
 RUNTIME="$(cd "$SD/../.." && pwd)"
