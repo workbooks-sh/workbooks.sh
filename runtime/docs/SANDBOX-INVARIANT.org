@@ -1,0 +1,60 @@
+#+TITLE: Runtime execution invariant — the security contract (wb-ova)
+#+NOTE: The one rule the whole runtime is built to honor. Enforced by test/sandbox_invariant_test.exs.
+#+NOTE: If you change a dependency or add a way to execute code, READ THIS and keep the test green.
+
+* THE INVARIANT (one sentence)
+  Untrusted/arbitrary code executes ONLY inside the wasmtime sandbox; the only NIF that runs it is
+  Wasmex; everything else is pure Elixir/Erlang or wasm. No untrusted code ever runs as a native
+  OS process, in any other NIF, or with raw access to the network or filesystem.
+
+* WHY this is the contract
+  The runtime compiles + runs arbitrary user code (Rust, C, Zig, JS, …) as workbook dependencies.
+  That is only safe if "arbitrary code" can never touch the host. wasmtime gives us exactly that:
+  linear-memory isolation, no ambient authority, only the capabilities we hand it. So the entire
+  architecture funnels untrusted execution into that one sandbox, and keeps the host (the BEAM)
+  doing only pure-Elixir orchestration + Policy-gated capability granting.
+
+* WHAT RUNS WHERE (the honest map)
+** Untrusted code → wasmtime ONLY
+   - Compiling user Rust/C/Zig: the COMPILERS themselves are wasm (mrustc.wasm, clang.wasm, zig)
+     run under wasmtime. We never invoke a native rustc/cargo/clang/gcc. (Verified: zero
+     System.cmd to a native compiler.)
+   - Running the compiled output, proc-macro servers, and build scripts: wasm under wasmtime
+     (Wasmex NIF, or the wasmtime CLI as an isolated port — both are the same sandbox).
+   - Untrusted code is wall-clock bounded (watchdog) and reaches net/fs/clock ONLY through
+     Policy-gated host functions (the Dock) — request a cap the Policy didn't grant and the module
+     fails to instantiate.
+
+** The NIFs — and which one is allowed to touch untrusted code
+   It is NOT "one NIF total" — be precise about the boundary that matters:
+   | NIF                     | runs untrusted code? | role                                   |
+   |-------------------------+----------------------+----------------------------------------|
+   | wasmex (wasmtime)       | YES — by design      | THE sandbox. The only untrusted-exec NIF |
+   | exqlite (SQLite)        | no                   | the runtime's OWN storage. Untrusted code reaches it only via the Policy-gated vfs-query cap, parameterized — never arbitrary SQL/code |
+   | :crypto / :ssl (OTP)    | no                   | TLS for trusted outbound (auth/JWKS). Core OTP, unavoidable |
+   | ortex/tokenizers/stb (WB_CLIP) | no            | optional in-BEAM ML; opt-in at build; processes the runtime's own models, not user code |
+   So: **Wasmex is the only NIF that executes untrusted code.** The rest are trusted infrastructure
+   (storage, crypto, optional ML) that never run user code. That is the meaningful security line.
+
+** Pure Elixir / Erlang (the host side — no untrusted code, ever)
+   Orchestration (the compile pipeline driver), the resolver, directive parsing, the Dock host
+   functions, HTTP serving (bandit/plug), auth (guardian/jose), Postgres (postgrex — pure protocol).
+
+** Host TOOLING via ports (NOT untrusted code, NOT in the exec path)
+   `wb publish` / dev workflows shell out to git, gh, rad, tea, jj, glab, brandnana, litestream,
+   curl, tar. These are isolated OS processes operating on the operator's own repo/data — they do
+   not compile or execute untrusted workbook code. They are outside the invariant's exec path.
+   (Purity nicety, optional: crate fetch's curl+tar could become :httpc + :erl_tar to drop two
+   external binaries from the compile path — not required for safety; they move data, not code.)
+
+* WHAT THIS LETS US CLAIM
+  "The runtime can compile and run arbitrary Rust (and C/Zig/JS) inside wasm containers, safely:
+  the code never executes natively, never gets raw net/fs, and is isolated + resource-bounded —
+  the only thing that ever runs it is the wasmtime sandbox."
+
+* ENFORCEMENT (so it can't silently regress)
+  test/sandbox_invariant_test.exs asserts:
+  1. No new dependency appears unreviewed — deps are a security surface; a change forces re-classifying
+     it here (pure-Elixir? trusted-infra NIF? does it run untrusted code? — only Wasmex may).
+  2. host/ contains NO System.cmd to a native compiler/runtime (rustc/cargo/cc/ld/ar/native clang).
+  Keep both green. If you must add an execution path, it goes through wasmtime, full stop.
