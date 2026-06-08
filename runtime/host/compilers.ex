@@ -477,7 +477,7 @@ defmodule Workbooks.Compilers do
     Enum.reduce_while(deps, {:ok, [], []}, fn dep, {:ok, externs, objs} ->
       {name, version} = parse_dep(dep)
 
-      case compile_dep(name, version, mrdir, o, mr, cl, feats) do
+      case compile_dep(name, version, mrdir, o, mr, cl, feats, true) do
         {:ok, rlib_rel, obj_guest, dep_objs} ->
           {:cont, {:ok, externs ++ ["--extern", "#{crate_id(name)}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
@@ -503,7 +503,7 @@ defmodule Workbooks.Compilers do
   # Returns {:ok, rlib_rel, obj_guest, dep_objs} where dep_objs are the transitive objects to link.
   # Cached by the .o existing. Pure-Rust only (no proc-macros/build.rs); cycles can't occur (cargo
   # forbids them) and diamonds collapse via the cache.
-  defp compile_dep(name, req, mrdir, o, mr, cl, feats) do
+  defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?) do
     rlib_rel = "output-wasi/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
     obj_guest = "/work/output-wasi/deps/lib#{name}.rlib.o"
@@ -516,51 +516,73 @@ defmodule Workbooks.Compilers do
       # to the next-older in-range version until one compiles. Makes transitive deps practical
       # without a newer compiler — bounded to a handful of attempts.
       with {:ok, candidates} <- resolve_via_index(name, req) do
-        # Try requested-version-first, then newest→older fallback. On total exhaustion report the
-        # FULL list of versions tried (not just the last) so a ceiling crate isn't misdiagnosed as a
-        # resolution miss — e.g. httparse, where every in-range version hits the mrustc ~1.54 wall.
+        # Feature MODES to try, in order (wb-3s8). A caller override is authoritative (one mode).
+        #   :full   — the crate's FULL default features (the correct, common case)
+        #   :reduce — no_std fallbacks, but ONLY for a TOP-LEVEL dep (top?). A sub-dep must keep
+        #             the features its dependent expects: reducing serde (pulled by serde_json) to
+        #             no-std drops the std/alloc impls serde_json needs → serde_json won't compile.
+        #             So sub-deps are :full-only — version-fallback finds a buildable release at full
+        #             features, exactly as before auto-fallback existed. Reduction is reserved for
+        #             the crate the caller directly asked for (data-encoding/nom), which has no
+        #             dependent to satisfy. This also avoids a combinatorial :reduce pass over a
+        #             heavy sub-tree (serde→proc-macro2 version-walk).
+        modes =
+          case Map.fetch(feats, name) do
+            {:ok, ov} -> [{:override, ov}]
+            :error -> if top?, do: [:full, :reduce], else: [:full]
+          end
+
         result =
-          Enum.reduce_while(candidates, {:error, []}, fn {version, subdeps}, {:error, tried} ->
-            case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats) do
+          Enum.reduce_while(modes, {:error, []}, fn mode, {:error, tried} ->
+            inner =
+              Enum.reduce_while(candidates, {:error, tried}, fn {version, subdeps}, {:error, tr} ->
+                case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode) do
+                  {:ok, _, _, _} = ok -> {:halt, ok}
+                  {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tr]}})
+                end
+              end)
+
+            case inner do
               {:ok, _, _, _} = ok -> {:halt, ok}
-              {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tried]}})
+              {:error, _} = e -> {:cont, e}
             end
           end)
 
         case result do
           {:ok, _, _, _} = ok -> ok
-          {:error, tried} -> {:error, {:dep_compile_failed, name, tried |> Enum.reverse() |> Enum.join(",")}}
+          {:error, tried} -> {:error, {:dep_compile_failed, name, tried |> Enum.reverse() |> Enum.uniq() |> Enum.join(",")}}
         end
       end
     end
   end
 
-  # Build a SPECIFIC version of a dep: compile its sub-deps first, then it. {:ok,...} | {:error,_}.
-  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats) do
+  # Build a SPECIFIC version of a dep under a feature MODE: compile sub-deps first, then it.
+  # mode: {:override, feats} verbatim | :full (default features only) | :reduce (no_std variants).
+  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode) do
     with {:ok, lib_rs, def_features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
          {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
       rel_src = Path.relative_to(lib_rs, mrdir)
       cdst = Path.join(o, "deps/lib#{name}.rlib.c")
 
-      # Feature sets to try, in order (wb-3s8). A caller override (opts[:dep_features]) is
-      # authoritative — used verbatim, no auto-fallback. Otherwise try the crate's full default,
-      # then AUTO-FALLBACK to progressively reduced sets: drop "std" (the most common ceiling
-      # trigger — keeps alloc/core), then no features. This recovers crates whose ONLY blocker is
-      # a heavy std default (nom/data-encoding/itertools all compile once std is dropped) without
-      # the caller having to know. Variant[0] halts immediately on the common case → zero overhead.
+      # Feature variants for THIS mode (the two-phase resolver in compile_dep picks the mode order):
+      #   :override — caller's exact set, no fallback
+      #   :full     — the crate's full default features (the common, correct case)
+      #   :reduce   — no_std fallbacks tried only after :full failed across ALL versions. std→alloc
+      #               swap first (heap APIs like data-encoding's encode→String are alloc-gated; a
+      #               spurious "alloc" cfg is a harmless no-op), then bare no-std, then none. Skips
+      #               def_features itself (already tried in :full).
       variants =
-        case Map.fetch(feats, name) do
-          {:ok, override} ->
+        case mode do
+          {:override, override} ->
             [override]
 
-          :error ->
+          :full ->
+            [def_features]
+
+          :reduce ->
             no_std = def_features -- ["std"]
-            # std→alloc swap is the canonical no_std build: many crates gate heap APIs (e.g.
-            # data-encoding's encode→String) behind an "alloc" feature that "std" implies. Dropping
-            # std alone loses it, so try (no_std + alloc) before bare no_std. A spurious "alloc" cfg
-            # on a crate without that feature is a harmless no-op.
             alloc = if "std" in def_features, do: [["alloc" | no_std]], else: []
-            Enum.uniq([def_features] ++ alloc ++ [no_std, []])
+            (alloc ++ [no_std, []]) |> Enum.uniq() |> Enum.reject(&(&1 == def_features))
         end
 
       compiled? =
@@ -588,7 +610,7 @@ defmodule Workbooks.Compilers do
 
   defp build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
     Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
-      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats) do
+      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats, false) do
         {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{crate_id(sn)}=#{srlib}"], objs ++ [sobj | sub_objs]}}
         {:error, _} = e -> {:halt, e}
       end
