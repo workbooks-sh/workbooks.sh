@@ -1,0 +1,172 @@
+#+TITLE: Runtime Connect Protocol (RCP)
+#+SUBTITLE: One standard for ANY client to find, authenticate to, and talk to ANY runtime
+#+STATUS: draft — the foundational contract for the workbook→app compile target
+
+* Why this exists
+
+A workbook can compile to many client shapes — a Tauri desktop app, a web app, a
+single ~.html~ file opened in a browser, a mobile app. Every one of them needs to
+do the SAME three things against a runtime:
+
+  1. DISCOVER a runtime (where is it, what can it do)
+  2. AUTHENTICATE to it (present a credential the runtime trusts)
+  3. TALK to it (request/response + streaming)
+
+Today that logic is hand-wired inside the desktop app (~daemon.rs~,
+~src/lib/bridge/~). RCP lifts it into ONE versioned contract so the workbook
+compiler can emit a client of any shape with the connection baked in — the author
+writes ZERO connection code. The only thing a deployer ever supplies is *their own
+IDP* (or nothing, for local/trusted mode).
+
+Anchor: think "LSP, but for runtimes." A small, boring, transport-level contract
+that many clients and many servers implement independently. NOT a Tauri-only IPC —
+Tauri is just one client that adds a discovery shortcut on top.
+
+Collision to avoid: this is NOT "the API" (the ~/api/*~ business endpoints are
+*above* RCP). RCP is the connect+auth+transport floor those endpoints ride on.
+
+* Design decisions (locked)
+
+** Wire format: JSON over HTTP + WebSocket — NOT protobuf (yet)
+
+The runtime already speaks HTTP/WS (Bandit). The hardest client to support is the
+raw ~.html~ file with no build step: it must connect with nothing but ~fetch()~
+and ~WebSocket~. Protobuf would force a codegen step on that client. So the floor
+is JSON, described by a published JSON Schema; a thin TS/JS client wraps it.
+Protobuf stays a future OPTIMIZATION for high-throughput native clients behind the
+same contract, not a requirement.
+
+  - request/response → HTTP (POST JSON, get JSON)
+  - streaming (agent runs, logs, live query) → WebSocket frames (JSON)
+  - errors → one envelope (see below), never bare HTTP bodies
+
+** Auth: the runtime is the GATE; the IDP is a PLUGGABLE adapter
+
+The runtime (Guardian, ~host/auth.ex~) validates a Bearer credential and resolves
+~{user_id, tenant_id, session_id}~. There is an AUTH LADDER — a client uses the
+lowest rung the target runtime allows:
+
+  | Rung      | Credential                        | Tenant            | When                                  |
+  |-----------+-----------------------------------+-------------------+---------------------------------------|
+  | trusted   | per-boot discovery token          | "local"           | local desktop / sidecar, single user  |
+  | oidc-jwt  | JWT from an OIDC IDP (RS256+JWKS)  | claim org / sub   | cloud runtime, multi-tenant, org share |
+
+  - The runtime advertises which rung it requires (capabilities, below) and is
+    configured by ~WB_TENANCY_MODE~ (single|multi) + ~WB_JWKS_URL~/~WB_AUTH_ISSUER~.
+  - SWITCHING IDP = point the runtime's JWKS/issuer at a different OIDC provider
+    and use that provider's client adapter. The contract does not change. WorkOS,
+    BetterAuth, Clerk, Auth0, plain OIDC are all just adapters on both ends.
+  - Default native IDP = *BetterAuth* (self-hostable, issues OIDC JWTs + exposes a
+    JWKS). It is the zero-third-party option for when the framework itself needs
+    front-end auth (e.g. gating a compiled workbook). WorkOS is demoted to "one
+    adapter we happen to use for our own network features," not the auth system.
+
+Goal restated: a deployer's only auth work is "connect my IDP" (set JWKS+issuer on
+the runtime, pick the matching client adapter). Everything else is framework.
+
+* The contract
+
+** 1. Discovery — how a client finds a runtime + its capabilities
+
+A client is handed a TARGET, resolved by provider:
+
+  - *local provider* (Tauri/desktop, sidecar): read the discovery file
+    ~runtime.json~ (see ~host/desktop.ex~) → ~{scheme, port, token, mode}~.
+    url = ~scheme://127.0.0.1:port~, credential = ~token~ (trusted rung).
+  - *url provider* (web / html / mobile / cloud): a configured base URL. No file.
+
+Both then GET the capabilities document (unauthenticated, like ~/health~):
+
+  GET /.well-known/workbooks-runtime  →
+    {
+      "rcp": "1",                       // protocol major version
+      "runtime": "0.1.0",
+      "tenancy": "single" | "multi",
+      "auth": { "rung": "trusted" | "oidc-jwt",
+                "issuer": "<oidc issuer or null>",
+                "jwks_url": "<url or null>" },
+      "transports": { "http": true, "ws": "/rcp/socket" },
+      "capabilities": ["query","agent","library","search","publish", ...]
+    }
+
+This is the handshake: the client learns the required auth rung and the feature
+surface BEFORE sending a credential. (Local discovery short-circuits straight to
+trusted; the well-known doc still describes the surface.)
+
+** 2. Authentication — presenting the credential
+
+Every authed call carries:  ~Authorization: Bearer <credential>~
+  - trusted rung → the discovery token
+  - oidc-jwt rung → the IDP-issued JWT
+
+Client-side, the credential comes from an AUTH ADAPTER with one method:
+
+  interface AuthAdapter { getToken(): Promise<string | null> }
+
+  - LocalTokenAdapter   — returns the discovery token (Tauri).  zero user work.
+  - OidcAdapter(config) — runs OAuth/PKCE against the configured IDP, caches +
+                          refreshes the JWT. WorkOSAdapter/BetterAuthAdapter are
+                          thin configs over this.
+  - AnonAdapter         — returns null (single-tenant trusted runtimes allow it).
+
+The connector picks the adapter from the capabilities doc's required rung, so the
+app author does not choose — they only PROVIDE an OIDC config if the target needs
+one.
+
+** 3. Transport — request/response + streaming
+
+  - unary:  POST {base}{path}  Content-Type: application/json, Bearer cred
+            → 2xx JSON  | error envelope
+  - stream: WS {base}/rcp/socket, first frame = ~{ "auth": "<cred>" }~, then
+            JSON frames per op. (Mirrors today's ~ws.svelte.ts~ agent stream.)
+
+** 4. Error envelope — one shape everywhere
+
+  { "error": { "code": "unauthorized" | "tenant_required" | "not_found"
+                       | "unavailable" | "bad_request" | "internal",
+               "message": "human string",
+               "retryable": true|false } }
+
+~unavailable~ is the "runtime is down / unreachable" signal every client degrades
+on (the desktop's ~isDaemonDown~ generalised). Clients NEVER parse raw bodies.
+
+* Client form factors — what each one does
+
+  | Client      | Discovery        | Default rung        | Notes                                   |
+  |-------------+------------------+---------------------+-----------------------------------------|
+  | Tauri/desktop | local file       | trusted (local) or oidc | sidecar OR shared cloud; tray supervises |
+  | Web app     | configured URL   | oidc-jwt            | like a web app → its server             |
+  | Raw .html   | configured URL   | oidc-jwt (cloud) /  | cloud: just works. LOCAL runtime from a |
+  |             |                  | trusted (served)    | browser file needs the runtime to SERVE |
+  |             |                  |                     | the html or hand off a token (CORS +    |
+  |             |                  |                     | no file access) — documented caveat.    |
+  | Mobile      | configured URL   | oidc-jwt            | same HTTP/WS contract                   |
+
+The single ~.html~ caveat is the only place form factor leaks: a browser can't
+read ~runtime.json~ and can't get a loopback token across origins, so "open the
+html against a LOCAL runtime" requires the runtime to serve that html (same
+origin) or a one-time token handoff. Against a CLOUD runtime it is just URL+OIDC,
+no caveat.
+
+* What already exists vs what RCP adds
+
+  | Piece                         | State    | RCP action                                  |
+  |-------------------------------+----------+---------------------------------------------|
+  | HTTP/WS runtime surface       | ✅ exists | formalise under /.well-known + envelope     |
+  | Guardian JWT (RS256/JWKS)     | ✅ exists | this IS the oidc-jwt rung                    |
+  | Desktop discovery + token     | ✅ exists | this IS the local provider + trusted rung   |
+  | Desktop WS bearer transport   | ✅ exists | generalise into the connector               |
+  | WorkOS PKCE sign-in           | ✅ exists | becomes the WorkOS OidcAdapter              |
+  | Capabilities / well-known doc | ❌ TODO   | add to host/web.ex                          |
+  | Error envelope (uniform)      | ⚠️ partial | standardise across endpoints                |
+  | Framework client lib          | ❌ TODO   | extract from desktop/src/lib/bridge          |
+  | Auth-adapter seam             | ❌ TODO   | LocalToken / Oidc / Anon adapters           |
+  | Compiler "→ app" target       | ❌ TODO   | emit a client wired to the connector        |
+
+* Build phases (see beads epic)
+
+  1. Spec + capabilities endpoint + error envelope on the runtime  (foundation)
+  2. Extract the framework client lib + auth-adapter seam (local + anon first)
+  3. OIDC adapter + BetterAuth as default native IDP; WorkOS as an adapter
+  4. Workbook compiler "→ desktop app" target emitting a connector-wired client
+  5. Org-level shared cloud runtime (multi-tenant) — the real near-term driver

@@ -44,3 +44,6 @@ scratch/
 # repo ROOT so nested dirs like runtime/host/deploy/ stay tracked.
 /deploy/
 /projects/
+
+# local-production build-lock (per-machine artifact provenance)
+scripts/.build-lock.tsv
