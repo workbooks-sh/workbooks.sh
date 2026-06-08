@@ -12,9 +12,10 @@
    * enters doc mode. The whole bar is a Tauri drag region except the
    * buttons, which opt out. macOS reserves 78px for traffic lights.
    */
-  import { X, AppWindow, Search, Bookmark, MessageCircle, Terminal as TerminalIcon } from "@lucide/svelte";
+  import { X, AppWindow, Search, Bookmark, MessageCircle, Terminal as TerminalIcon, FolderOpen } from "@lucide/svelte";
   import { chrome } from "$lib/chrome.svelte";
   import { tabs } from "$lib/tabs.svelte";
+  import { pickFilePath } from "$lib/files";
   import type { Tab } from "$lib/bindings";
 
   function kindGlyph(kind: Tab["kind"]): string {
@@ -32,6 +33,13 @@
   function toggleBookmarks() {
     chrome.bookmarksAnchor = bookmarkBtnEl ?? null;
     chrome.bookmarksOpen = !chrome.bookmarksOpen;
+  }
+
+  async function openFile() {
+    const path = await pickFilePath();
+    if (!path) return;
+    chrome.mode = "doc";
+    await tabs.open(path);
   }
 
   async function focusDoc(id: string) {
@@ -61,6 +69,10 @@
       title="Terminal (⌃`)" aria-label="Toggle terminal" aria-pressed={chrome.terminalOpen}
       onclick={() => (chrome.terminalOpen = !chrome.terminalOpen)}>
       <TerminalIcon size={14} strokeWidth={1.8} />
+    </button>
+    <button type="button" class="icon-btn" data-tauri-drag-region="false"
+      title="Open file" aria-label="Open file" onclick={() => void openFile()}>
+      <FolderOpen size={14} strokeWidth={1.8} />
     </button>
   </div>
 

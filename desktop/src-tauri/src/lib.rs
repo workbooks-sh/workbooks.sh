@@ -16,6 +16,7 @@ use tauri::{
 
 mod daemon;
 mod kernel;
+mod tabs;
 use daemon::Discovery;
 
 /// What the frontend needs to talk to the runtime: the localhost URL + the
@@ -104,6 +105,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(tabs::TabManager::default())
         .invoke_handler(tauri::generate_handler![
             weave,
             tangle,
@@ -115,7 +117,12 @@ pub fn run() {
             runtime_url,
             daemon_status,
             daemon_up,
-            daemon_down
+            daemon_down,
+            tabs::tab_list,
+            tabs::tab_open,
+            tabs::tab_focus,
+            tabs::tab_close,
+            tabs::tab_set_dirty
         ])
         .setup(|app| {
             build_tray(app.handle())?;

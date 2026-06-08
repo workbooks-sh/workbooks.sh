@@ -8,6 +8,25 @@ import { isTauri, invoke } from "./tauri";
 
 const ORG_FILTER = [{ name: "Org", extensions: ["org"] }];
 
+/** Read a file by path (host fs). Used by the doc surface to load the active tab. */
+export async function readFileText(path: string): Promise<string> {
+  return invoke<string>("read_file", { path });
+}
+
+/** Prompt for a workbook/file path (no read). Returns the chosen path or null.
+ *  Broader than `.org` so the tab/doc surface can open any text file. */
+export async function pickFilePath(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const path = await open({
+    filters: [
+      { name: "Workbook / text", extensions: ["org", "md", "txt", "json", "toml", "rs", "ts", "js", "py"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+  return typeof path === "string" ? path : null;
+}
+
 /** Open a .org workbook → its path + contents (or null if cancelled / no shell). */
 export async function openWorkbook(): Promise<{ path: string; org: string } | null> {
   if (!isTauri()) return null;

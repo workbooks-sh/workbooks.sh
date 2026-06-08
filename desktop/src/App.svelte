@@ -32,6 +32,7 @@
   import AgentPanel from "$lib/components/AgentPanel.svelte";
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
+  import DocView from "$lib/views/DocView.svelte";
   import { auth } from "$lib/auth.svelte";
   import { chrome } from "$lib/chrome.svelte";
   import { tabs } from "$lib/tabs.svelte";
@@ -78,10 +79,7 @@
           <Titlebar />
           <div class="view">
             {#if chrome.mode === "doc" && tabs.active}
-              <div class="doc-placeholder">
-                <span class="doc-title">{tabs.active.title}</span>
-                <p>Document viewer lands here.</p>
-              </div>
+              <DocView />
             {:else}
               <RouterView {router} />
             {/if}

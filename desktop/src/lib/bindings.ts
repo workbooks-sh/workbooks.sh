@@ -242,11 +242,20 @@ export interface SaveResult {
 
 /* ──────────────────────── Mock helpers ─────────────────────── */
 
-import { isTauri } from "./tauri";
+import { isTauri, invoke } from "./tauri";
 import { rt, daemon } from "./runtime";
 
 const now = () => Date.now();
 const ok = <T>(v: T): Promise<T> => Promise.resolve(v);
+
+/**
+ * `real` — migrate a command from mock → live host. In the desktop shell it
+ * calls the Rust `#[tauri::command]` (snake_case `cmd`); in a plain SPA build it
+ * falls back to `mock()` so the same frontend still runs in a browser. As each
+ * backend command lands, its method body swaps `ok(...)` for `real("cmd", args, () => mock)`.
+ */
+const real = <T>(cmd: string, args: Record<string, unknown>, mock: () => T): Promise<T> =>
+  isTauri() ? invoke<T>(cmd, args) : Promise.resolve(mock());
 
 /* The two seeded built-in themes mirror the on-disk `themes.org`. */
 const BUILTIN_THEMES: Theme[] = [
@@ -546,19 +555,20 @@ export const commands = {
   skillsSetScope: (_req: SkillScopeUpdate): Promise<void> => ok(undefined),
   skillsDelete: (_id: string): Promise<void> => ok(undefined),
 
-  // Tabs
-  tabList: (): Promise<TabsSnapshot> => ok({ tabs: [], activeId: null }),
+  // Tabs — LIVE (host owns the canonical list; wb-jay.7)
+  tabList: (): Promise<TabsSnapshot> =>
+    real("tab_list", {}, () => ({ tabs: [], activeId: null })),
   tabOpen: (args: { path: string }): Promise<TabsSnapshot> =>
-    ok({
+    real("tab_open", args, () => ({
       tabs: [{ id: "tab-1", title: args.path.split("/").pop() ?? args.path, path: args.path, kind: "text", dirty: false }],
       activeId: "tab-1",
-    }),
-  tabClose: (_args: { id: string }): Promise<TabsSnapshot> =>
-    ok({ tabs: [], activeId: null }),
+    })),
+  tabClose: (args: { id: string }): Promise<TabsSnapshot> =>
+    real("tab_close", args, () => ({ tabs: [], activeId: null })),
   tabFocus: (args: { id: string }): Promise<TabsSnapshot> =>
-    ok({ tabs: [], activeId: args.id }),
-  tabSetDirty: (_args: { id: string; dirty: boolean }): Promise<void> =>
-    ok(undefined),
+    real("tab_focus", args, () => ({ tabs: [], activeId: args.id })),
+  tabSetDirty: (args: { id: string; dirty: boolean }): Promise<void> =>
+    real("tab_set_dirty", args, () => undefined),
 
   // Terminal
   terminalSpawn: (_req: SpawnOptions): Promise<{ session_id: string }> =>
