@@ -327,6 +327,126 @@ defmodule Workbooks.Compilers do
     end
   end
 
+  # ── Rust full-std lane (wb-fm0.3) ──────────────────────────────────────────
+  # Recipe + walls: compilers/rust/{PORT-LOG.org,BUILD-STATE.org,std/std-e2e.sh}.
+  @rust_clang_flags ~w(--target=wasm32-wasip1 --sysroot=/usr -O1 -fno-strict-aliasing -w
+                       -fwasm-exceptions -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=false
+                       -Xclang -disable-llvm-verifier)
+
+  @doc """
+  Compile untrusted Rust (full std) → a runnable wasm ARTIFACT entirely in the sandbox:
+  mrustc.wasm (.rs → C) → clang.wasm (C → .o) → wasm-ld (link against the libstd that was
+  prebuilt BY mrustc.wasm, plus wasi_shim + the _Unwind_Resume stub) — zero native execution.
+
+  Requires the one-time libstd prebuild (compilers/rust/std/prebuild-libstd.sh, driven by
+  provision-rust.sh). If it's absent this returns {:error, {:libstd_not_prebuilt, dir}} rather
+  than silently shelling a native rustc — the canon is no native compile for untrusted source.
+  Returns {:ok, wasm_path, log} | {:error, reason}.
+  """
+  def rust_compile_to_wasm(source_path, _opts \\ [], root \\ default_root()) do
+    rd = Path.join(root, "rust")
+    mrdir = Path.expand(Path.join(rd, "mrustc-root/mrustc"))
+    mrwasm = Path.expand(Path.join(rd, "mrustc-root/mrustc_std.wasm"))
+    clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
+    csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
+    shim_src = Path.expand(Path.join([root, "zig", "wasi_shim.c"]))
+    ustub_src = Path.expand(Path.join([rd, "std", "ustub.c"]))
+    o = Path.join(mrdir, "output-wasi")
+
+    cond do
+      not File.regular?(mrwasm) -> {:error, {:mrustc_not_built, mrwasm}}
+      not File.regular?(clang) -> {:error, {:clang_not_built, clang}}
+      not File.regular?(Path.join(o, "libstd.rlib.o")) -> {:error, {:libstd_not_prebuilt, o}}
+      true -> do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src)
+    end
+  end
+
+  defp do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src) do
+    id = Integer.to_string(:erlang.unique_integer([:positive]))
+    name = "wbr#{id}"
+    File.mkdir_p!(Path.join(mrdir, ".mrtmp"))
+    File.mkdir_p!(Path.join(mrdir, ".cctmp"))
+    File.cp!(Path.expand(source_path), Path.join(o, "#{name}.rs"))
+
+    mr = fn args ->
+      wasmtime(
+        ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728",
+         "--env", "MRUSTC_TARGET_VER=1.54", "--env", "STD_ENV_ARCH=wasm32", "--env", "TMPDIR=/tmp",
+         "--dir", "#{mrdir}::.", "--dir", "#{mrdir}/.mrtmp::/tmp", mrwasm | args]
+      )
+    end
+
+    cl = fn args ->
+      wasmtime(
+        ["-W", "exceptions=y", "--dir", "#{csys}::/usr", "--dir", "#{mrdir}::/work",
+         "--dir", "#{mrdir}/.cctmp::/tmp", "--env", "TMPDIR=/tmp", clang | args]
+      )
+    end
+
+    # shared shim + unwind-stub objects (compile once, reused across compiles)
+    ensure_rust_obj(o, "wasi_shim", shim_src, cl)
+    ensure_rust_obj(o, "ustub", ustub_src, cl)
+
+    log1 =
+      mr.(["output-wasi/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
+           "-L", "output-wasi", "--out-dir", "output-wasi", "--target", "wasm32-wasi", "--edition", "2018"])
+
+    result =
+      if File.regular?(Path.join(o, "#{name}.c")) do
+        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
+
+        if File.regular?(Path.join(o, "#{name}.o")) do
+          libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi/#{Path.basename(&1)}")
+
+          ld =
+            ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+             "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
+              libstd ++
+              ["/work/output-wasi/wasi_shim.o", "/work/output-wasi/ustub.o",
+               "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
+               "-o", "/work/output-wasi/#{name}.wasm"]
+
+          log2 = cl.(ld)
+          outw = Path.join(o, "#{name}.wasm")
+
+          if File.regular?(outw) do
+            dest = Path.join(System.tmp_dir!(), "wbrust-#{id}.wasm")
+            File.cp!(outw, dest)
+            {:ok, dest, {log1, log2}}
+          else
+            {:error, {:link_failed, log2}}
+          end
+        else
+          {:error, {:cc_failed, log1}}
+        end
+      else
+        {:error, {:rustc_failed, log1}}
+      end
+
+    # clean this job's transient files (keep the shared libstd/shim/ustub objects)
+    for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+    File.rm(Path.join(o, "lib#{name}.rlib"))
+    result
+  end
+
+  # Compile a shared support object (wasi_shim/ustub) into output-wasi once; reused by every
+  # Rust compile. Plain C, no -disable-verifier needed (these aren't mrustc-emitted).
+  defp ensure_rust_obj(o, name, src, cl) do
+    obj = Path.join(o, "#{name}.o")
+
+    unless File.regular?(obj) do
+      File.cp!(src, Path.join(o, "#{name}.c"))
+      cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w",
+           "-c", "/work/output-wasi/#{name}.c", "-o", "/work/output-wasi/#{name}.o"])
+    end
+  end
+
+  # Run `wasmtime run <args>` and return its combined output (the sandbox executor).
+  defp wasmtime(args) do
+    {out, _} = System.cmd("wasmtime", ["run" | args], stderr_to_stdout: true)
+    out
+  end
+
   defp kw(file, key) do
     with {:ok, body} <- File.read(file),
          [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do

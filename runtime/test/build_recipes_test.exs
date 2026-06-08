@@ -95,6 +95,32 @@ defmodule Workbooks.BuildRecipesTest do
     assert PackageManager.run(wasm, "", []) |> String.trim() =~ "6!=720"
   end
 
+  # wb-fm0.3 — INLINE Rust with FULL STD (Vec/iterators/println!) compiles to a runnable wasm
+  # entirely in the sandbox via mrustc.wasm (.rs→C) → clang.wasm (C→wasm), linked against the
+  # libstd that mrustc.wasm prebuilt — zero native execution (no cargo). Requires the one-time
+  # libstd prebuild (compilers/rust/provision-rust.sh); skipped with a clear message if absent.
+  @tag :build
+  @tag timeout: 900_000
+  test "inline Rust + full std compiles in-sandbox (no native cargo) and runs" do
+    src = """
+    fn main() {
+        let v: Vec<u32> = (1..=10).collect();
+        println!("rust-pm-std={}", v.iter().sum::<u32>());
+    }
+    """
+
+    case PackageManager.build(%{"name" => "rstd", "lang" => "rust", "src" => src}) do
+      {_n, "rust", {:ok, wasm, status}} ->
+        assert status in [:built, :cached]
+        assert File.exists?(wasm)
+        assert PackageManager.run(wasm, "", []) |> String.trim() =~ "rust-pm-std=55"
+
+      {_n, "rust", {:error, {:libstd_not_prebuilt, _}}} ->
+        # CI without the prebuilt libstd: run compilers/rust/provision-rust.sh to enable.
+        IO.puts("\n[skip] Rust libstd not prebuilt — run compilers/rust/provision-rust.sh")
+    end
+  end
+
   # wb-fm0.2 — INLINE Zig compiles to a runnable wasm ARTIFACT entirely in the sandbox
   # (zig1.wasm: .zig → C, then clang.wasm: C → wasm), zero native execution. Proves the
   # PackageManager zig lane routes through Workbooks.Compilers, not a native zig.

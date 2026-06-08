@@ -86,26 +86,28 @@ defmodule Workbooks.PackageManager do
   into a real Component — the path a Workbook takes. A plain crate stays a
   core module (the tool path).
   """
+  # Mode 2 — Rust. Compile a real Rust project dir to a runnable wasm command ENTIRELY in the
+  # sandbox (mrustc.wasm → clang.wasm, full std), zero native execution (wb-fm0.3). The old
+  # native `cargo`/`cargo-component` path is gone: untrusted Rust never touches a native
+  # toolchain. The dir's entry is src/main.rs (or a lone *.rs). NOTE: external cargo
+  # dependencies are NOT yet supported in-sandbox — only std. A crate that declares non-std
+  # deps in Cargo.toml returns {:error, {:rust_deps_unsupported_in_sandbox, _}} rather than
+  # silently falling back to native (which would breach the no-native-compile canon).
   def build_dir(dir, "rust") do
     abs = Path.expand(dir)
     manifest = Path.join(abs, "Cargo.toml")
-    {tool, lead} = if component_crate?(manifest), do: {"cargo-component", ["component"]}, else: {"cargo", []}
-    # SECURITY (wb-sec): a local crate's build.rs / proc-macros are HOSTILE. Build
-    # under Workbooks.Sandbox (network-DENIED, fs-confined) so they cannot
-    # exfiltrate or reach the network. The dir's deps must be vendored/cached
-    # first (the wb-11ck.36 resolve-then-offline-compile pattern). `--offline`
-    # makes cargo fail loudly instead of attempting a (sandbox-blocked) fetch.
-    cmd = lead ++ ["build", "--offline", "--manifest-path", manifest, "--target", "wasm32-wasip1", "--release"]
 
-    case Workbooks.Sandbox.run([tool_bin(tool) | cmd], env: cargo_env()) do
-      {_, 0} ->
-        case Path.wildcard(Path.join([abs, "target", "wasm32-wasip1", "release", "*.wasm"])) do
-          [wasm | _] -> {:ok, wasm, if(lead == [], do: :built_dir, else: :built_component)}
-          [] -> {:error, "no wasm produced"}
-        end
+    entry =
+      cond do
+        File.regular?(Path.join(abs, "src/main.rs")) -> Path.join(abs, "src/main.rs")
+        File.regular?(Path.join(abs, "src/lib.rs")) -> Path.join(abs, "src/lib.rs")
+        true -> List.first(Path.wildcard(Path.join(abs, "**/*.rs")))
+      end
 
-      {err, _} ->
-        {:error, err}
+    cond do
+      has_external_rust_deps?(manifest) -> {:error, {:rust_deps_unsupported_in_sandbox, abs}}
+      is_nil(entry) -> {:error, "no .rs source in #{abs}"}
+      true -> rust_to_wasm(entry, Path.join(@cache, "#{cache_key(["rustdir", abs])}.wasm"))
     end
   end
 
@@ -177,6 +179,13 @@ defmodule Workbooks.PackageManager do
 
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
 
+  # A Cargo.toml with a non-empty [dependencies] table needs vendored crate builds the
+  # in-sandbox single-file mrustc lane doesn't do yet. std-only crates (no deps) are fine.
+  defp has_external_rust_deps?(manifest) do
+    File.exists?(manifest) and
+      Regex.match?(~r/^\[dependencies\]\s*\n\s*\w/m, File.read!(manifest))
+  end
+
   # TinyGo needs a module: if the dir has no go.mod, write a minimal one named
   # after the dir so a single-file `main` package still compiles.
   defp ensure_go_mod(abs) do
@@ -188,13 +197,6 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  defp component_crate?(manifest),
-    do: File.exists?(manifest) and File.read!(manifest) =~ "[package.metadata.component]"
-
-  # cargo-component installs to ~/.cargo/bin; the engine may run without it on PATH.
-  defp tool_bin("cargo-component"), do: Path.expand("~/.cargo/bin/cargo-component")
-  defp tool_bin(other), do: other
-  defp cargo_env, do: [{"PATH", "#{Path.expand("~/.cargo/bin")}:#{System.get_env("PATH")}"}]
 
   defp compile("js", src, out), do: build_js(src, out)
   defp compile("ts", src, out), do: build_ts(src, out)
@@ -253,6 +255,22 @@ defmodule Workbooks.PackageManager do
     File.mkdir_p!(@cache)
 
     case Workbooks.Compilers.zig_compile_to_wasm(src) do
+      {:ok, wasm, _logs} ->
+        File.cp!(wasm, out)
+        File.rm(wasm)
+        {:ok, out, :built}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  # Rust = compile a .rs to a runnable wasm command ENTIRELY in the sandbox via mrustc.wasm →
+  # clang.wasm (full std), zero native execution (wb-fm0.3). Copies the emitted wasm to `out`.
+  defp rust_to_wasm(src, out) do
+    File.mkdir_p!(@cache)
+
+    case Workbooks.Compilers.rust_compile_to_wasm(src) do
       {:ok, wasm, _logs} ->
         File.cp!(wasm, out)
         File.rm(wasm)
@@ -351,40 +369,17 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  # Rust = scaffold a one-file binary crate and compile to wasm32-wasip1.
+  # Rust = compile a one-file program to a runnable wasm command ENTIRELY in the sandbox via
+  # mrustc.wasm (.rs → C) → clang.wasm (C → wasm), linked against the libstd that mrustc.wasm
+  # itself prebuilt — zero native execution (wb-fm0.3). The old native `cargo` path is gone:
+  # untrusted Rust (incl. hostile proc-macros) never touches a native toolchain. Full std is
+  # supported (Vec/iterators/println!). Requires the one-time libstd prebuild
+  # (compilers/rust/provision-rust.sh); absent ⇒ {:error, {:libstd_not_prebuilt, _}}.
   defp build_rust(src, out) do
-    dir = Path.join(@cache, "rust-#{cache_key([src])}")
-    File.mkdir_p!(Path.join(dir, "src"))
-    File.write!(Path.join(dir, "Cargo.toml"), rust_cargo())
-    File.write!(Path.join([dir, "src", "main.rs"]), src)
-
-    # SECURITY (wb-sec): even an inline Rust block can carry hostile proc-macros.
-    # The scaffolded crate has no deps, so build offline + network-DENIED.
-    cmd = ["build", "--offline", "--manifest-path", Path.join(dir, "Cargo.toml"), "--target", "wasm32-wasip1", "--release"]
-
-    case Workbooks.Sandbox.run(["cargo" | cmd], env: cargo_env()) do
-      {_, 0} ->
-        File.cp!(Path.join([dir, "target", "wasm32-wasip1", "release", "comp.wasm"]), out)
-        {:ok, out, :built}
-
-      {err, _} ->
-        {:error, err}
-    end
-  end
-
-  defp rust_cargo do
-    """
-    [package]
-    name = "comp"
-    version = "0.1.0"
-    edition = "2021"
-    [workspace]
-    [[bin]]
-    name = "comp"
-    path = "src/main.rs"
-    [profile.release]
-    opt-level = "z"
-    """
+    File.mkdir_p!(@cache)
+    rs = Path.join(@cache, "rust-#{cache_key([src])}.rs")
+    File.write!(rs, src)
+    rust_to_wasm(rs, out)
   end
 
   @doc """
