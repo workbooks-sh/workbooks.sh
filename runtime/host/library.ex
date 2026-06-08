@@ -441,6 +441,64 @@ defmodule Workbooks.Library do
   end
 
   @doc """
+  INSTALL a toolkit-workbook (wb-rhs.7): register the compiled command artifacts a
+  workbook bundle carries so `run-command` finds them — the one verb the toolkit
+  registry needs that the workbook rails don't already provide. Everything else
+  (publish=store/3, search=search/3, sign=Bundle.ship, share=DID member) is reuse;
+  there is NO separate toolkit package format — a toolkit IS a workbook.
+
+  A packed-with-build workbook carries its commands as `<name>.wasm` parts (the
+  build projection, pack/3 `build: true`). Install writes each to the
+  content-addressed store and registers it. Each registered command is capped by
+  the Instance Policy profile like any other — installing never widens caps.
+
+  SUPPLY-CHAIN GATE: pass `sha:` to PIN the bundle — `sha256(blob)` must equal it
+  before anything is trusted/registered (mirrors fetch_and_register_wasm's pin and
+  the third-party trust posture). Returns `{:ok, %{commands: [name]}}`.
+  """
+  def install(blob, opts \\ []) when is_binary(blob) do
+    with :ok <- pin_ok(blob, opts[:sha]) do
+      parts = Workbooks.Bundle.unpack(blob)
+      tmp = Path.join(System.tmp_dir!(), "wb-install-#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+
+      try do
+        # Accumulate {:ok, names} | {:error, reason}; once an error appears,
+        # later iterations pass it through unchanged (comprehensions can't break).
+        result =
+          for {name, bytes} <- parts, String.ends_with?(name, ".wasm"), reduce: {:ok, []} do
+            {:ok, acc} ->
+              cmd = Path.basename(name, ".wasm")
+              wasm = Path.join(tmp, "#{cmd}.wasm")
+              File.write!(wasm, bytes)
+
+              case Workbooks.CommandRegistry.register_artifact(cmd, wasm) do
+                {:ok, _addressed} -> {:ok, [cmd | acc]}
+                {:error, reason} -> {:error, {:register_failed, cmd, reason}}
+              end
+
+            {:error, _} = err ->
+              err
+          end
+
+        case result do
+          {:ok, names} -> {:ok, %{commands: Enum.reverse(names)}}
+          {:error, _} = err -> err
+        end
+      after
+        File.rm_rf(tmp)
+      end
+    end
+  end
+
+  defp pin_ok(_blob, nil), do: :ok
+
+  defp pin_ok(blob, expected) when is_binary(expected) do
+    actual = :crypto.hash(:sha256, blob) |> Base.encode16(case: :lower)
+    if actual == expected, do: :ok, else: {:error, :sha_mismatch}
+  end
+
+  @doc """
   Compile a workspace's components and return the build report (what became WASM,
   what couldn't). The report behind `wb build` / `pack --build`. Builds a throwaway
   copy of the parts so the tenant repo stays clean.
