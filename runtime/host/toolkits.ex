@@ -368,6 +368,118 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  @doc """
+  PROMOTE a session command to a durable workspace toolkit (wb-rhs.6 — the
+  lifecycle ladder: session → workspace → registry). Takes the source an agent
+  authored inline (which is ephemeral: built into :persistent_term, gone when the
+  Instance dies) and materializes a real, source-owned toolkit dir under the
+  toolkits root: manifest.org (#+EXEC: command, #+TRUST: first-party) + the source
+  in the per-language layout build_dir expects + a skill stub. The result is a
+  normal toolkit — `wb toolkit build` rebuilds it deterministically, it's
+  discoverable by `(tags :toolkit:)`, and it packs into a workbook for the
+  registry (Library.store) and install elsewhere (Library.install).
+
+  This is the "Org owns the spec, WASM owns the artifact" rung: promotion persists
+  the SOURCE (rebuildable), not just the compiled bytes. Trust stays first-party
+  (yours); a third-party consumer grants its #+CAPS on install.
+  """
+  def promote_text(name, lang, src_file, opts \\ []) do
+    root = opts[:root] || default_root()
+    tagline = opts[:tagline] || "Promoted session command."
+
+    cond do
+      name in Workbooks.CommandRegistry.reserved_names() ->
+        "cannot promote: #{inspect(name)} is a reserved built-in command name"
+
+      not Regex.match?(~r/^[A-Za-z0-9_.-]+$/, name) ->
+        "cannot promote: invalid toolkit/command name #{inspect(name)}"
+
+      lang not in ~w(rust c zig js ts go) ->
+        "cannot promote: unsupported language #{inspect(lang)}"
+
+      not File.regular?(src_file) ->
+        "cannot promote: no such source file #{inspect(src_file)}"
+
+      true ->
+        {build_src, entry_rel, extra} = lang_layout(lang, name)
+        dir = Path.join(root, name)
+        source = File.read!(src_file)
+
+        File.mkdir_p!(Path.dirname(Path.join(dir, entry_rel)))
+        File.write!(Path.join(dir, entry_rel), source)
+        for {rel, bytes} <- extra do
+          File.mkdir_p!(Path.dirname(Path.join(dir, rel)))
+          File.write!(Path.join(dir, rel), bytes)
+        end
+
+        File.mkdir_p!(Path.join(dir, "skills"))
+        File.write!(Path.join(dir, "skills/overview.org"), promote_skill(name))
+        File.write!(Path.join(dir, "manifest.org"), promote_manifest(name, lang, build_src, tagline))
+
+        "promoted session command → workspace toolkit `#{name}` at #{dir}\n" <>
+          "  build it: wb toolkit build #{name}\n" <>
+          "  then it packs into a workbook (Library.store) and installs elsewhere (Library.install)"
+    end
+  end
+
+  # Per-language source layout build_dir/2 expects, expressed relative to the
+  # toolkit dir. The #+BUILD_SRC path is resolved against the toolkit dir by
+  # do_build_clause, then build_dir/2 looks for the lang's entry under it.
+  #   rust: build_dir(<tk>) wants <tk>/src/main.rs (+ Cargo.toml) → BUILD_SRC path:.
+  #   js/ts/zig/go/c: build_dir(<tk>/src) wants the entry directly in src/.
+  defp lang_layout("rust", name),
+    do: {".", "src/main.rs", %{"Cargo.toml" => ~s|[package]\nname = "#{name}"\nversion = "0.1.0"\nedition = "2021"\n|}}
+
+  defp lang_layout("js", _name), do: {"src", "src/index.js", %{}}
+  defp lang_layout("ts", _name), do: {"src", "src/index.ts", %{}}
+  defp lang_layout("zig", _name), do: {"src", "src/main.zig", %{}}
+  defp lang_layout("go", _name), do: {"src", "src/main.go", %{}}
+  defp lang_layout("c", _name), do: {"src", "src/main.c", %{}}
+
+  defp promote_manifest(name, lang, build_src, tagline) do
+    """
+    #+TITLE: #{name} toolkit
+    #+TOOLKIT: #{name}
+    #+VERSION: 0.1.0
+    #+STATUS: experimental
+    #+TAGLINE: #{tagline}
+    #+EXEC: command
+    #+TRUST: first-party
+    #+CLI_BIN: #{name}
+    #+BUILD_LANG: #{lang}
+    #+BUILD_SRC: path:#{build_src}
+    #+ARG_MODE: argv
+
+    * #{name} :toolkit:
+    :PROPERTIES:
+    :ID: #{name}
+    :CLI_BIN: #{name}
+    :END:
+    Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
+
+    | need   | skill    |
+    |--------+----------|
+    | use it | overview |
+    """
+  end
+
+  defp promote_skill(name) do
+    """
+    #+TITLE: #{name} — overview
+
+    * When to use this
+    A command promoted from a session. NOT for anything else yet — extend the
+    skill as the toolkit grows.
+
+    * Workflow
+    Run it through the Dock: =run-command #{name}= (argv + stdin → stdout).
+
+    * Verification checklist
+    - [ ] =wb toolkit build #{name}= registers the command
+    - [ ] =run-command #{name}= produces expected output
+    """
+  end
+
   # A runtime entry is either runtimes/<name>.org (a flat pinned spec) or
   # runtimes/<name>/manifest.org (a dir carrying a build script + assets).
   defp runtime_entries(dir) do
