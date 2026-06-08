@@ -499,4 +499,11 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
       {:error, reason} -> IO.puts("\n[skip] itertools 0.10: #{inspect(reason) |> String.slice(0, 80)}")
     end
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "proc-macro2 — TokenStream parse (edition-fallback 2018->2021, proc-macro foundation)" do
+    run_with("proc-macro2@1.0.69", ~S|fn main(){ let ts: proc_macro2::TokenStream = "a + b".parse().unwrap(); println!("{}", ts.into_iter().count()); }|, "3")
+  end
 end

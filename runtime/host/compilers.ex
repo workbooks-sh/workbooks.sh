@@ -603,16 +603,28 @@ defmodule Workbooks.Compilers do
             (alloc ++ [no_std, []]) |> Enum.uniq() |> Enum.reject(&(&1 == def_features))
         end
 
+      # wb-zq4: EDITION-FALLBACK — try the crate's declared edition, then 2021. Some crates declare
+      # 2018 but use 2021-prelude items unqualified (e.g. proc-macro2 1.0.69 → FromIterator), which
+      # mrustc rejects at 2018 but accepts at 2021. Try each (feature-variant × edition) until one
+      # emits the .c. Unblocks proc-macro2/syn (→ derive macros).
+      editions = Enum.uniq([edition, "2021"])
+
       compiled? =
         Enum.reduce_while(variants, false, fn features, _ ->
-          File.rm(cdst)
           cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
-          mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
-               "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
-              ["--out-dir", "output-wasi-174/deps", "--target", "wasm32-wasi", "--edition", edition] ++ cfgs)
+          ok =
+            Enum.reduce_while(editions, false, fn ed, _ ->
+              File.rm(cdst)
 
-          if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
+              mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
+                   "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
+                  ["--out-dir", "output-wasi-174/deps", "--target", "wasm32-wasi", "--edition", ed] ++ cfgs)
+
+              if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
+            end)
+
+          if ok, do: {:halt, true}, else: {:cont, false}
         end)
 
       if compiled? do
