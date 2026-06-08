@@ -33,6 +33,46 @@ defmodule Workbooks.RustDock do
   defp maybe(map, true, builder), do: Map.merge(map, builder.())
   defp maybe(map, _false, _builder), do: map
 
+  @doc """
+  Run a compiled-Rust CORE wasm (built via rust_compile_to_wasm no_exceptions: true) under Wasmex
+  with the profile's gated Dock imports. Manages an in-memory VFS conn (Agent) for the vfs cap.
+  Calls `_start`, returns {:ok, stdout} | {:error, reason}. opts: :profile (default :minimal),
+  :timeout (ms). The single Dock-capable entry for the runtime rust-run path (wb-1mv).
+  """
+  def run(wasm_path, opts \\ []) do
+    profile = Keyword.get(opts, :profile, :minimal)
+    timeout = Keyword.get(opts, :timeout, Policy.timeout(profile))
+    vfs = if "vfs" in Policy.caps(profile), do: vfs_agent(opts), else: nil
+
+    try do
+      {:ok, so} = Wasmex.Pipe.new()
+      bytes = File.read!(wasm_path)
+
+      with {:ok, pid} <-
+             Wasmex.start_link(%{
+               bytes: bytes,
+               store_limits: Policy.store_limits(profile),
+               wasi: %Wasmex.Wasi.WasiOptions{stdout: so},
+               imports: imports(profile: profile, vfs: vfs)
+             }),
+           {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
+        Wasmex.Pipe.seek(so, 0)
+        {:ok, Wasmex.Pipe.read(so)}
+      else
+        {:error, _} = e -> e
+        other -> {:error, other}
+      end
+    after
+      if vfs, do: Agent.stop(vfs)
+    end
+  end
+
+  defp vfs_agent(opts) do
+    db = Keyword.get(opts, :vfs_db, ":memory:")
+    {:ok, agent} = Agent.start_link(fn -> {:ok, conn} = Workbooks.VFS.open(db); conn end)
+    agent
+  end
+
   defp ambient do
     %{
         # host_now() -> i64 : unix epoch milliseconds (a real cap — wasm has no wall clock)
