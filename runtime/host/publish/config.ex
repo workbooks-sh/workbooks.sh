@@ -9,7 +9,7 @@ defmodule Workbooks.Publish.Config do
   publish file is inert config.
   """
 
-  @targets ~w(cloudflare-pages gh-pages self-hosted)
+  @targets ~w(cloudflare-pages gh-pages self-hosted desktop-app)
 
   @doc "Parse a publish.org → the property map (string keys)."
   def parse(path) do
@@ -54,6 +54,8 @@ defmodule Workbooks.Publish.Config do
         "PUBLISH_TARGET: gh-pages needs PUBLISH_PROJECT (the GitHub repo, e.g. org/repo)")
       |> add_if(target == "self-hosted" and blank?(p["PUBLISH_URL"]),
         "PUBLISH_TARGET: self-hosted needs PUBLISH_URL (the runtime base URL)")
+      |> add_if(target == "desktop-app" and blank?(p["PUBLISH_APP_NAME"]) and blank?(p["PUBLISH_TITLE"]),
+        "PUBLISH_TARGET: desktop-app needs PUBLISH_APP_NAME (or PUBLISH_TITLE) for the app/window name")
 
     warnings = secret_warnings(p)
     all = Enum.reverse(issues) ++ warnings

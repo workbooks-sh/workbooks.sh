@@ -102,7 +102,22 @@ defmodule Workbooks.Publish do
       "cloudflare-pages" -> ship_cloudflare(html_path, p)
       "gh-pages" -> ship_gh_pages(html_path, p)
       "self-hosted" -> ship_self_hosted(html_path, p)
+      "desktop-app" -> ship_desktop_app(html_path, p)
       other -> err("unknown PUBLISH_TARGET: #{other}", %{})
+    end
+  end
+
+  # Desktop-app — scaffold a runtime-connected workbook app (RCP-wired frontend +
+  # connector + tauri config). `tauri build` over the emitted dir produces the .app.
+  defp ship_desktop_app(html_path, p) do
+    case Workbooks.Publish.DesktopApp.scaffold(html_path, p) do
+      {:ok, %{dir: dir, files: files, url: url}} ->
+        target = if url == "", do: "local runtime (discovery at boot)", else: url
+        ok("scaffolded desktop-app → #{dir}\n  files: #{Enum.join(files, ", ")}\n  runtime: #{target}\n  next: tauri build (see README.txt)",
+          %{target: "desktop-app", dir: dir, files: files, runtime: url})
+
+      {:error, reason} ->
+        err("desktop-app scaffold failed: #{reason}", %{target: "desktop-app"})
     end
   end
 
