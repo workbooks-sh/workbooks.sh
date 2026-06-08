@@ -294,7 +294,7 @@
     border-radius: 12px; padding: 0.75rem 0.85rem; box-shadow: var(--shadow-pop);
   }
   .voice-dot {
-    width: 8px; height: 8px; border-radius: 999px; background: #10b981;
+    width: 8px; height: 8px; border-radius: 999px; background: var(--color-ok);
     animation: pulse 1200ms ease-in-out infinite;
   }
   .voice-dot.muted { background: var(--color-fg-subtle); animation: none; }
@@ -306,7 +306,7 @@
     color: var(--color-fg-muted); cursor: pointer;
   }
   .voice-btn:hover { color: var(--color-fg); }
-  .voice-btn.end:hover { color: #f43f5e; border-color: #f43f5e; }
+  .voice-btn.end:hover { color: var(--color-err); border-color: var(--color-err); }
 
   .transcript { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; }
   .bubble { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.85rem; color: var(--color-fg); }
@@ -326,10 +326,10 @@
   }
   .voice-chip:hover:not(:disabled) { border-color: var(--color-border-strong); }
   .voice-chip:disabled { opacity: 0.6; cursor: default; }
-  .voice-chip.accepted { color: #10b981; }
+  .voice-chip.accepted { color: var(--color-ok); }
   .voice-chip .detail { font-weight: 400; color: var(--color-fg-muted); }
 
-  .err { margin-top: 0.6rem; color: #f43f5e; font-size: 0.8rem; text-align: center; }
+  .err { margin-top: 0.6rem; color: var(--color-err); font-size: 0.8rem; text-align: center; }
 
   @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 </style>

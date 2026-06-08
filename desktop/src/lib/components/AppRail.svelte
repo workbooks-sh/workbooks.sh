@@ -15,8 +15,8 @@
   import { Plus, User as UserIcon } from "@lucide/svelte";
   import type { IRouter } from "@dvcol/svelte-simple-router/models";
   import type { Component } from "svelte";
-  import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon, List as ListIcon, BookOpen as WorkbookIcon } from "@lucide/svelte";
-  import { iconAccent, accentFill, isImageIcon } from "$lib/iconAccent.svelte";
+  import { Kanban, Network as NetworkIcon, Settings as SettingsIcon, Plus as CreateIcon } from "@lucide/svelte";
+  import { isImageIcon } from "$lib/iconAccent.svelte";
   import { auth } from "$lib/auth.svelte";
   import { chrome } from "$lib/chrome.svelte";
   import AccountMenu from "./AccountMenu.svelte";
@@ -59,10 +59,8 @@
 
   type RailTab = { name: string; label: string; icon: Component };
   const topTabs: RailTab[] = [
-    { name: "workbook", label: "Workbook", icon: WorkbookIcon },
     { name: "create", label: "Create", icon: CreateIcon },
     { name: "kanban", label: "Kanban", icon: Kanban },
-    { name: "entries", label: "Entries", icon: ListIcon },
   ];
   const bottomTabs: RailTab[] = [
     { name: "network", label: "Network", icon: NetworkIcon },
@@ -97,12 +95,6 @@
     return (name || "?").slice(0, 2).toUpperCase();
   }
 
-  const wsAccent = $derived(iconAccent(workspace.icon));
-  function tileStyle(icon: string, accent: string | null): string {
-    if (!accent || isImageIcon(icon)) return "";
-    return `border-color: ${accent}; background: ${accentFill(accent)};`;
-  }
-
   function accountInitial(): string {
     const u = auth.user;
     if (!u) return "";
@@ -114,7 +106,6 @@
   <Tip label={workspace.name}>
     <button
       class="ws"
-      style={tileStyle(workspace.icon, wsAccent)}
       aria-label="Switch workspace"
     >
       {#if isImageIcon(workspace.icon)}
@@ -144,12 +135,10 @@
   <div class="divider"></div>
 
   {#each packages as p (p.id)}
-    {@const acc = iconAccent(p.icon)}
     <Tip label={p.name}>
       <button
         class="pkg"
         class:active={p.active && chrome.leftPanel === "files"}
-        style={tileStyle(p.icon, acc)}
         aria-label={p.name}
         onclick={() => onPackage(p)}
       >
@@ -276,18 +265,21 @@
     width: 28px;
     height: 28px;
     border-radius: 8px;
-    border: 1px solid transparent;
-    background: transparent;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-fg-muted);
     display: grid;
     place-items: center;
     cursor: pointer;
     overflow: hidden;
     padding: 0;
     font-size: 0.95rem;
+    transition: border-color 0.12s ease, background 0.12s ease;
   }
+  .pkg:hover { border-color: var(--color-border-strong); }
   .pkg.active {
     background: var(--color-surface-soft);
-    box-shadow: 0 0 0 1px var(--color-border-strong);
+    border-color: var(--color-fg-muted);
   }
   .pkg img {
     width: 100%;

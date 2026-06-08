@@ -231,17 +231,17 @@
     background: var(--color-fg-muted);
   }
   .dot-ok {
-    background: rgb(34, 160, 105);
+    background: var(--color-ok);
   }
   .dot-pending {
-    background: rgb(220, 165, 30);
+    background: var(--color-warn);
     animation: pulse 1200ms ease-in-out infinite;
   }
   .dot-warn {
-    background: rgb(220, 130, 30);
+    background: var(--color-warn);
   }
   .dot-err {
-    background: rgb(220, 60, 60);
+    background: var(--color-err);
   }
   .dot-idle {
     background: var(--color-fg-muted);

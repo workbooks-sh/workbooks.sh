@@ -48,15 +48,6 @@ export const routerOptions: RouterOptions = {
       },
     },
     {
-      name: "entries",
-      path: "/entries",
-      component: () => import("$lib/views/EntriesView.svelte"),
-      beforeEnter: () => {
-        chrome.section = "Entries";
-        return true;
-      },
-    },
-    {
       name: "network",
       path: "/network",
       component: () => import("$lib/views/NetworkView.svelte"),
@@ -80,17 +71,6 @@ export const routerOptions: RouterOptions = {
       component: () => import("$lib/views/OfflineView.svelte"),
       beforeEnter: () => {
         chrome.section = "Offline";
-        return true;
-      },
-    },
-    {
-      // Workbook-native: the LOCAL embedded kernel weaves Org → HTML, so this view
-      // needs NO runtime (not sidecar-gated). The runtime is optional here.
-      name: "workbook",
-      path: "/workbook",
-      component: () => import("$lib/views/WorkbookView.svelte"),
-      beforeEnter: () => {
-        chrome.section = "Workbook";
         return true;
       },
     },
