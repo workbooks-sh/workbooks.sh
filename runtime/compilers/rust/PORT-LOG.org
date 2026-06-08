@@ -511,3 +511,22 @@
     C→.o → wasm-ld (crt1-command.o + libstd .o + -lsetjmp + _Unwind_Resume stub) → run.
   Memory throughout < ~600MB; the wasm32 4GB ceiling never bit. C/Zig/Rust(no_std)/Rust(std)
   ALL compile+run in the sandbox. wb-zyl.8 COMPLETE.
+
+* 2026-06-07 (iter 25) — ⚠️ REPRODUCTION GAP: committed recipe does NOT rebuild full-std
+  Reran the full-std prebuild from the COMMITTED recipe (std/prebuild-libstd.sh replaying
+  std-build-plan.txt via mrustc_std.wasm + clang.wasm). RESULT: all 16 dep crates build
+  cleanly with consistent __2 ABI (libcore…libpanic_unwind → .hir + .o), but **libstd itself
+  (crate 17) TRAPS in mrustc.wasm**: infinite recursion in `Resolve_Absolute_Mod` at a single
+  address (0x6f3f6a) → `wasm trap: unreachable`. NOT a stack limit (unchanged at -W
+  max-wasm-stack=512MB) and NOT the `--cfg backtrace_in_libstd` external `../../backtrace`
+  module (stripping it still traps). This is the same class of trap as iter 16.
+  SIGNIFICANCE: iter 24's "DONE / sum=55" was real, but the WINNING libstd step was not fully
+  captured — the committed std-build-plan.txt libstd line reproduces the trap, so something in
+  the iter-24 run (a different mrustc.wasm build, a cfg/flag delta, or a manual fixup) is
+  missing from main. Dangling reflog commits checked: they are EARLIER states, no better recipe
+  to recover. So full-std is currently NOT reproducible from committed artifacts.
+  REPRODUCIBLE TODAY (verified this session): C, Zig, Rust **no_std** (e2e.sh — mrustc.wasm +
+  clang.wasm + rustc-src libcore, all present). 16 libstd deps build. Only libstd traps.
+  TO CLOSE full-std (Path A): symbol'd/-g mrustc.wasm to locate the Resolve_Absolute_Mod
+  recursion on libstd's module tree, fix the mrustc bug (or find the iter-24 cfg that avoided
+  it). Until then, the in-sandbox Rust lane ships no_std; std is gated here.

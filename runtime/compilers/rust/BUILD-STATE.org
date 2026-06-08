@@ -18,11 +18,17 @@
   | mrustc-root/mrustc/bin/{mrustc,minicargo}   | 28 M  | make + make -f minicargo.mk          | ~8 m  |
   | mrustc-root/mrustc/output-wasi (libstd)     | 27 M  | std/prebuild-libstd.sh               | ~15 m |
 
-* What "done" means (wb-zyl.8, proven — see PORT-LOG iters 14-24)
-  C / Zig / Rust(no_std) / Rust(full std) ALL compile + run ENTIRELY in the wasm sandbox.
-  Rust std proof: "UNTRUSTED RUST+STD, COMPILED IN-SANDBOX: sum(1..=10) = 55".
-  The two solved walls: (1) hash/ABI consistency → build libstd BY mrustc.wasm (__2);
-  (2) abort_bitcast signext → clang.wasm with -Xclang -disable-llvm-verifier.
+* What's REPRODUCIBLE today (verified 2026-06-07 iter 25) vs proven-once
+  REPRODUCIBLE from committed recipe: C, Zig, Rust **no_std** (e2e.sh). The 16 libstd dep
+  crates also build cleanly via mrustc.wasm (consistent __2).
+  ⚠️ Rust **full std**: proven ONCE (iter 24, "sum=55") but does NOT currently rebuild — the
+  committed std-build-plan.txt libstd line makes mrustc.wasm infinite-recurse in
+  Resolve_Absolute_Mod (PORT-LOG iter 25). The winning iter-24 config wasn't fully captured.
+  Full-std is GATED until that mrustc.wasm recursion is debugged (Path A: -g mrustc.wasm) or
+  the missing iter-24 cfg is rediscovered. Don't claim full-std reproducible until libstd
+  actually emits from prebuild-libstd.sh.
+  The two ALREADY-solved walls (still valid): (1) hash/ABI consistency → build libstd BY
+  mrustc.wasm (__2); (2) abort_bitcast signext → clang.wasm -Xclang -disable-llvm-verifier.
 
 * Wiring into PackageManager (wb-fm0) — the SEPARATE, ongoing task
   Compilers are done; fm0 only routes PackageManager.compile/3 + build_dir/2 away from native
