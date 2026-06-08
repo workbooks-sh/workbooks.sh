@@ -65,4 +65,27 @@ fn main(){ let mut b=[0u8;4]; BigEndian::write_u32(&mut b, 0xCAFE); println!("{}
 bitflags!{ struct F: u32 { const A=1; const B=2; } }
 fn main(){ println!("{}", F::all().bits()); }|, "3")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "num-traits — hyphenated name + autocfg build.rs (skipped)" do
+    run_with("num-traits@0.2.15", ~S|fn main(){ println!("{}", num_traits::pow(2u64,10)); }|, "1024")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "num-integer — TRANSITIVE dep (pulls num-traits) end-to-end" do
+    run_with("num-integer@0.1.45", ~S|fn main(){ println!("{} {}", num_integer::gcd(48,18), num_integer::lcm(4,6)); }|, "6 12")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "lazy_static — declarative-macro crate" do
+    run_with("lazy_static@1.4.0", ~S|#[macro_use] extern crate lazy_static;
+lazy_static!{ static ref A: i32 = 6*7; }
+fn main(){ println!("{}", *A); }|, "42")
+  end
 end
