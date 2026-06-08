@@ -1,0 +1,14 @@
+# The in-sandbox compile TOOLCHAIN as a standalone OCI layer — mrustc/clang/libstd/zig/yaegi/
+# qjs+tsc/c4, the LEAN ~600M slice from runtime/scripts/stage-tools.sh (NOT the ~6.6G provisioned
+# scratch tree). The wasm tools are platform-agnostic, so one image serves amd64 + arm64.
+#
+# WHY a separate image: the tools are gitignored build artifacts from an hours-long provision
+# chain that CI can't reproduce per-build. Publishing them ONCE (when the toolchain changes) as
+# ghcr.io/workbooks-sh/runtime-tools lets the runtime image pull them via `COPY --from=...` — so
+# `wb deploy publish` stays fast and every deployment (cloud + local container) compiles identically.
+#
+# Build CONTEXT = repo root. Run `scripts/stage-tools.sh` first (the deploy verbs do this).
+#   maintainer (provisioned machine):  wb deploy publish-tools   # build + push, when tools change
+#   runtime build:                     COPY --from=<this image> /compilers
+FROM scratch
+COPY runtime/compilers-dist /compilers

@@ -40,9 +40,20 @@ scratch/
 .beads-credential-key
 .beads/
 
-# Not tracked in this repo (server-specific / separate projects). Anchored to the
-# repo ROOT so nested dirs like runtime/host/deploy/ stay tracked.
-/deploy/
+# The deploy-kit RECIPE (Dockerfiles, fly.toml, providers, deploy.sh) is GENERIC infra and must
+# be tracked so CI + fresh clones can build the runtime image. Only server-specific STATE stays
+# out: real deployment configs + secrets. Anchored to the repo ROOT so nested dirs like
+# runtime/host/deploy/ stay tracked.
+/deploy/*
+!/deploy/Dockerfile
+!/deploy/Dockerfile.runtime
+!/deploy/Dockerfile.tools
+!/deploy/fly.toml
+!/deploy/deploy.sh
+!/deploy/storage.env.example
+!/deploy/providers/
+/deploy/deployments/
+/deploy/storage.env
 /projects/
 
 # local-production build-lock (per-machine artifact provenance)

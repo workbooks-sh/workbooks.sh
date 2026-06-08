@@ -1,0 +1,50 @@
+# Production Workbooks engine (the new :workbooks runtime + brandnana toolkit).
+# Built from deploy/Dockerfile, context = repo root. Deploy: bash deploy/deploy.sh
+# Secrets (fly secrets set): OPENROUTER_API_KEY FIRECRAWL_API_KEY BRANDNANA_API_KEY
+#   GEMINI_API_KEY THE_COMPANIES_API_KEY GROQ_API_KEY WB_PUBLIC_BEARER
+
+app = "bn-engine-agents"
+primary_region = "sjc"
+
+[env]
+  WB_WEB = "1"
+  PORT = "4000"
+  WB_REGISTRY = "/data/registry.db"
+  WB_PROFILE_DIR = "/opt/profile"
+  WB_TENANCY_MODE = "single"
+  # Durable storage: tenant repos, ledgers, vectors, signing keystore + any model
+  # cache live on the volume (below), so they survive redeploys/restarts. The
+  # default embed model is BAKED into the image (WB_MODELS_DIR), so it needs no
+  # download even here. See deploy/storage.env.example.
+  WB_DATA = "/data"
+  # Semantic search ON by default — Model2Vec/potion (baked into the image, pure
+  # Elixir, no NIF). The TWO independent knobs:
+  #   WB_EMBED        = which embedder (local = semantic; hash = lexical baseline)
+  #   WB_DATABASE_URL = which vector backend (set → pgvector ANN; unset → SQLite
+  #                     brute-force). Set it (see storage.env.example) at scale.
+  WB_EMBED = "local"
+  # Image (+ cross-modal) is OPT-IN, two ways:
+  #   * In-BEAM ONNX CLIP — deploy with WB_INCLUDE_CLIP=true (bakes the q8 towers,
+  #     ~147 MB) and set WB_EMBED = "clip".
+  #   * External endpoint — set WB_EMBED_IMAGE = "http:http://<host>/embed".
+  # Default: lean (text via Model2Vec, no baked image model).
+
+# The persistent volume (create once: fly volumes create workbooks_data --size 3
+# --region sjc). One machine ↔ one volume (min_machines_running = 1).
+[mounts]
+  source = "workbooks_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Never autostop: brand-book runs are background spawns with no inbound traffic.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Harvest + 2 long-horizon agents + imagemagick — needs headroom.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 4096
