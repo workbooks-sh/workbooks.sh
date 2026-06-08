@@ -1,15 +1,18 @@
-# Publish the runtime image to ghcr — by DOGFOODING the deploy-kit. CI does NOT
-# hand-roll a build pipeline; it runs the same `wb deploy publish` we ship to
-# users (the recipe — Dockerfile, tags, platforms, registry — lives in
-# Workbooks.Deploy.Image, one source of truth). The desktop app likewise calls
-# `wb deploy local`. CI only supplies the buildx driver + registry auth.
+# Publish the runtime image to ghcr — MULTI-ARCH, built per-arch on NATIVE runners.
 #
-# PREREQUISITE: the runtime image pulls its in-sandbox compilers from the compilers
-# layer (`COPY --from=compilers`). CI can't build that layer (the wasm compilers are
-# gitignored artifacts from an hours-long provision chain), so a maintainer publishes
-# it ONCE from a provisioned machine — and again only when the compilers change — via
-# `wb deploy publish-compilers` (Workbooks.Deploy.Image.publish_compilers/1). Until
-# then, the FROM ${COMPILERS_REF} pull below has nothing to fetch.
+# We do NOT emulate: cross-building amd64 under QEMU on an arm runner deterministically tripped a
+# Mix project-reload race in mime/mix.exs ("MixProject is already compiled") that the native build
+# never hits. So each arch builds on its own native runner and pushes BY DIGEST; a merge job then
+# assembles the multi-arch manifest for :latest + the short sha. The Dockerfile, registry, and the
+# compilers layer are still the one source of truth (Workbooks.Deploy.Image.publish/1 remains the
+# local single-arch path; this workflow is the cloud multi-arch assembler).
+#
+# PREREQUISITE: the runtime image pulls its in-sandbox compilers from the compilers layer
+# (`COPY --from=compilers`). CI can't build that layer (the wasm compilers are gitignored artifacts
+# from an hours-long provision chain), so a maintainer publishes it ONCE from a provisioned machine —
+# and again only when the compilers change — via `wb deploy publish-compilers`
+# (Workbooks.Deploy.Image.publish_compilers/1). It is public + multi-arch, so the per-arch FROM
+# ${COMPILERS_REF} pulls the matching variant.
 name: runtime-image
 
 on:
@@ -18,55 +21,94 @@ on:
     paths:
       - "runtime/**"
       - "deploy/Dockerfile.runtime"
+      - "deploy/Dockerfile.compilers"
       - ".github/workflows/runtime-image.yml"
   workflow_dispatch:
 
 concurrency:
   group: runtime-image-${{ github.ref }}
-  # QUEUE, don't cancel: two autoloops push runtime/ every few minutes, and the
-  # multi-arch emulated build is ~12 min — cancel-in-progress meant a build NEVER
-  # finished (the image never published). Queuing guarantees one completes, then
-  # the next runs; :latest always advances.
+  # QUEUE, don't cancel: autoloops push runtime/ every few minutes; queuing guarantees one build
+  # completes (and :latest advances) before the next runs, instead of an endless cancel loop.
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/workbooks-sh/runtime
+  COMPILERS_REF: ghcr.io/workbooks-sh/compilers:latest
+
 jobs:
-  publish:
-    # MULTI-ARCH: amd64 (most cloud hosts) + arm64 (mac-first local krunvm). Built on the arm64
-    # runner with QEMU emulating amd64 — ~12 min, and both arches are needed for a replicable
-    # local+cloud deploy. (A native per-arch matrix would be faster but isn't worth the merge
-    # complexity at this cadence; queue-not-cancel above guarantees :latest always advances.)
-    runs-on: ubuntu-24.04-arm
-    env:
-      WB_PLATFORMS: linux/amd64,linux/arm64
+  build:
+    # One job per arch, each on its NATIVE runner (no QEMU). Pushes by digest; merge assembles.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04 # native amd64 — most cloud hosts
+            platform: linux/amd64
+            arch: amd64
+          - runner: ubuntu-24.04-arm # native arm64 — mac-first local krunvm
+            platform: linux/arm64
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      # QEMU registers binfmt handlers so the arm64 runner can build the amd64 image.
-      - uses: docker/setup-qemu-action@v3
-
       - uses: docker/setup-buildx-action@v3
-
-      # Registry auth (the deploy-kit shells `docker buildx --push`).
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The deploy-kit lives in the Elixir runtime — run its publish verb.
-      - uses: erlef/setup-beam@v1
-        # The arm runner reports ImageOS=ubuntu24-arm64, which setup-beam can't map;
-        # pin the OS family (it has arm64 OTP for ubuntu24).
-        env:
-          ImageOS: ubuntu24
-        with:
-          otp-version: "27"
-          elixir-version: "1.18"
-      - name: wb deploy publish (dogfood)
-        working-directory: runtime
+      - name: Build + push ${{ matrix.platform }} by digest
         run: |
-          mix deps.get
-          mix run --no-start -e 'case Workbooks.Deploy.Image.publish() do {:ok, m} -> IO.puts(m); {:error, e} -> IO.puts(:stderr, e); System.halt(1) end'
+          set -euo pipefail
+          docker buildx build -f deploy/Dockerfile.runtime \
+            --platform "${{ matrix.platform }}" \
+            --build-arg "COMPILERS_REF=${COMPILERS_REF}" \
+            --output "type=image,name=${IMAGE},push-by-digest=true,name-canonical=true,push=true" \
+            --metadata-file /tmp/meta.json .
+          digest="$(jq -r '."containerimage.digest"' /tmp/meta.json)"
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble + push multi-arch manifest
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse --short HEAD)"
+          cd /tmp/digests
+          docker buildx imagetools create \
+            -t "${IMAGE}:latest" \
+            -t "${IMAGE}:${sha}" \
+            $(printf "${IMAGE}@sha256:%s " *)
+          echo "=== published ${IMAGE}:latest (+ ${sha}) ==="
+          docker buildx imagetools inspect "${IMAGE}:latest"
