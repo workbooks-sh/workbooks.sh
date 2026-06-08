@@ -397,7 +397,7 @@ defmodule Workbooks.Compilers do
 
     # wb-3s8/wb-6lh: fetch + compile each declared crates.io dependency (pure-Rust, in-sandbox)
     # into output-wasi/deps/, returning {extern_args, dep_object_paths}. Errors short-circuit.
-    case ensure_deps(Keyword.get(opts, :deps, []), mrdir, o, mr, cl) do
+    case ensure_deps(Keyword.get(opts, :deps, []), mrdir, o, mr, cl, Keyword.get(opts, :dep_features, %{})) do
       {:error, _} = depserr ->
         for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
         depserr
@@ -469,15 +469,15 @@ defmodule Workbooks.Compilers do
   # CDN, compiled (with its default features) via mrustc.wasm→clang.wasm into output-wasi/deps/,
   # cached by name+version. Returns {:ok, extern_args, dep_object_guest_paths} | {:error, _}.
   # Pure-Rust only (no proc-macros / build.rs / transitive deps yet — the next slices).
-  defp ensure_deps([], _mrdir, _o, _mr, _cl), do: {:ok, [], []}
+  defp ensure_deps([], _mrdir, _o, _mr, _cl, _feats), do: {:ok, [], []}
 
-  defp ensure_deps(deps, mrdir, o, mr, cl) do
+  defp ensure_deps(deps, mrdir, o, mr, cl, feats) do
     File.mkdir_p!(Path.join(o, "deps"))
 
     Enum.reduce_while(deps, {:ok, [], []}, fn dep, {:ok, externs, objs} ->
       {name, version} = parse_dep(dep)
 
-      case compile_dep(name, version, mrdir, o, mr, cl) do
+      case compile_dep(name, version, mrdir, o, mr, cl, feats) do
         {:ok, rlib_rel, obj_guest, dep_objs} ->
           {:cont, {:ok, externs ++ ["--extern", "#{crate_id(name)}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
@@ -503,7 +503,7 @@ defmodule Workbooks.Compilers do
   # Returns {:ok, rlib_rel, obj_guest, dep_objs} where dep_objs are the transitive objects to link.
   # Cached by the .o existing. Pure-Rust only (no proc-macros/build.rs); cycles can't occur (cargo
   # forbids them) and diamonds collapse via the cache.
-  defp compile_dep(name, req, mrdir, o, mr, cl) do
+  defp compile_dep(name, req, mrdir, o, mr, cl, feats) do
     rlib_rel = "output-wasi/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
     obj_guest = "/work/output-wasi/deps/lib#{name}.rlib.o"
@@ -521,7 +521,7 @@ defmodule Workbooks.Compilers do
         # resolution miss — e.g. httparse, where every in-range version hits the mrustc ~1.54 wall.
         result =
           Enum.reduce_while(candidates, {:error, []}, fn {version, subdeps}, {:error, tried} ->
-            case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
+            case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats) do
               {:ok, _, _, _} = ok -> {:halt, ok}
               {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tried]}})
             end
@@ -536,10 +536,14 @@ defmodule Workbooks.Compilers do
   end
 
   # Build a SPECIFIC version of a dep: compile its sub-deps first, then it. {:ok,...} | {:error,_}.
-  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl) do
-    with {:ok, lib_rs, features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
-         {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl) do
+  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats) do
+    with {:ok, lib_rs, def_features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
+         {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
       rel_src = Path.relative_to(lib_rs, mrdir)
+      # wb-3s8: a caller may override a crate's feature set via opts[:dep_features] (e.g. enable
+      # unicode-perl WITHOUT the full unicode/perf default that exceeds the ceiling). Absent an
+      # override the crate's own default features are used (unchanged behavior).
+      features = Map.get(feats, name, def_features)
       cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
       mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", "rlib", "-o", rlib_rel,
@@ -559,9 +563,9 @@ defmodule Workbooks.Compilers do
     end
   end
 
-  defp build_subdeps(subdeps, mrdir, o, mr, cl) do
+  defp build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
     Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
-      case compile_dep(sn, sreq, mrdir, o, mr, cl) do
+      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats) do
         {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{crate_id(sn)}=#{srlib}"], objs ++ [sobj | sub_objs]}}
         {:error, _} = e -> {:halt, e}
       end
