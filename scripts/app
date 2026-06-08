@@ -115,8 +115,15 @@ build_image() {
     || die "image build failed (need docker running + skopeo for krunvm staging)"
 }
 build_app() {
-  hdr "app: tauri build (production .app bundle)"
-  ( cd "$ROOT/desktop" && bun run tauri build )
+  # Local-prod produces only the .app — NOT the .dmg. DMG packaging shells to
+  # Finder/AppleScript (bundle_dmg.sh), which fails in a headless/background
+  # session; the .app is all we need to launch. Distribution DMGs are a separate
+  # signed/notarized pipeline (tauri.conf keeps targets "all" for that).
+  # Also disable updater-artifact creation: it signs the .app.tar.gz with the
+  # release private key (TAURI_SIGNING_PRIVATE_KEY), which we don't have locally.
+  # tauri.conf keeps createUpdaterArtifacts:true for the real distribution build.
+  hdr "app: tauri build --bundles app (production .app bundle, no updater/dmg)"
+  ( cd "$ROOT/desktop" && bun run tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}' )
   art_present app || die "tauri build produced no .app bundle"
 }
 
