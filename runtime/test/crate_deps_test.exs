@@ -379,4 +379,20 @@ fn main(){ println!("{}", "hello_world".to_camel_case()); }|, "HelloWorld")
       {:error, reason} -> IO.puts("\n[skip] regex unicode: #{inspect(reason) |> String.slice(0, 80)}")
     end
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "nom — parser combinators via opts[:dep_features] (alloc, no std)" do
+    # nom@6 fails to compile with its full default feature set (std) on mrustc, but compiles with
+    # the reduced alloc-only set — another feature-selection unlock (the std default was the wall).
+    src = Path.join(System.tmp_dir!(), "cd_nom.rs")
+    File.write!(src, ~S|use nom::character::complete::digit1;
+fn main(){ let r: nom::IResult<&str,&str> = digit1("123abc"); println!("{}", r.unwrap().1); }|)
+
+    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: ["nom@6.1.2"], dep_features: %{"nom" => ["alloc"]}) do
+      {:ok, wasm, _} -> assert PM.run(wasm, "", []) |> String.trim() == "123"
+      {:error, reason} -> IO.puts("\n[skip] nom: #{inspect(reason) |> String.slice(0, 80)}")
+    end
+  end
 end
