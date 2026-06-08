@@ -44,8 +44,9 @@ file is portable. One promise, two halves — here's each.
 ### The Workbook — the format
 
 You build a Workbook the normal way: writing real code (Svelte, SolidJS, Rust, and more),
-with Org as a connective layer that ties the pieces together. The bundler packs all of it
-into a single, self-contained `.html` — code, data, and interface in one file. Hand it to
+tied together with **Org** — a plain-text format (think Markdown's older, more capable
+cousin) that keeps writing, structure, and code in one document. The bundler packs all of
+it into a single, self-contained `.html` — code, data, and interface in one file. Hand it to
 someone and they have the working app, not a link to a service you have to keep alive. And
 because it's HTML at the surface, the same Workbook can be many things:
 
