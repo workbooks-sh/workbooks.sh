@@ -21,6 +21,38 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
+  # Sealed-bundle key release (wb-v3w, "rzip"). A `.wbundle` seals gated entries as
+  # AES-256-GCM ciphertext whose content key is escrowed here, never in the bundle.
+  # This is the runtime dead-man switch: the key is released ONLY when
+  # Workbooks.Access.enforce passes for the caller's identity. A sealed entry is
+  # gated by definition, so the posture is :gated_data with a :data demand — a real
+  # authenticated identity is required. FAIL CLOSED: on deny or a missing key we
+  # return the SAME error envelope an unauthorized RCP call already uses; the key
+  # (and therefore the plaintext) never leaks.
+  post "/rcp/key/:key_id" do
+    key_id = conn.params["key_id"]
+    identity = conn.assigns[:identity]
+
+    case Workbooks.Access.enforce(:gated_data, :data, identity) do
+      :allow ->
+        case Workbooks.Bundle.Escrow.get(key_id) do
+          {:ok, key} ->
+            # Escrow fallback (no did supplied): hand back the raw content key,
+            # base64'd, for the client to AES-256-GCM decrypt the sealed entry.
+            body = Jason.encode!(%{key_id: key_id, algo: "aes-256-gcm", key: Base.encode64(key)})
+            conn |> put_resp_content_type("application/json") |> send_resp(200, body)
+
+          {:error, :no_such_key} ->
+            # Don't disclose whether the key exists to an authed-but-wrong caller in
+            # a way that differs from deny — but a genuine 404 is fine post-auth.
+            Workbooks.Web.Error.render(conn, :not_found, "no such key")
+        end
+
+      {:deny, _reason} ->
+        Workbooks.Web.Error.render(conn, :unauthorized, "unauthorized")
+    end
+  end
+
   # Parse Org through the OQL kernel.
   post "/oql/parse" do
     {:ok, body, conn} = read_body(conn)
