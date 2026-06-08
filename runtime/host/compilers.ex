@@ -501,8 +501,9 @@ defmodule Workbooks.Compilers do
             e
 
           {:ok, sub_externs, sub_objs} ->
-            rel_src = "output-wasi/deps/#{name}.rs"
-            File.cp!(lib_rs, Path.join(mrdir, rel_src))
+            # compile the crate's lib.rs IN PLACE (inside the preopen) so its `mod` submodules
+            # under src/ resolve — NOT a flat copy (that loses multi-file crates' module tree).
+            rel_src = Path.relative_to(lib_rs, mrdir)
             cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
 
             mr.([rel_src, "--crate-name", name, "--crate-type", "rlib", "-o", rlib_rel,
