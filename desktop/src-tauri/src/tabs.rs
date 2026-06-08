@@ -48,6 +48,8 @@ impl Inner {
 fn kind_for(path: &str) -> &'static str {
     let ext = path.rsplit('.').next().unwrap_or("").to_lowercase();
     match ext.as_str() {
+        // A workbook is a self-contained .html (the HTML *is* the render).
+        "html" | "htm" | "workbook" => "workbook",
         "org" => "org",
         "rs" | "ts" | "js" | "py" | "go" | "ex" | "exs" | "c" | "zig" | "toml" | "json" => "code",
         _ => "text",
