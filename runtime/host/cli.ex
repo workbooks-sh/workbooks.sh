@@ -24,6 +24,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
+      # (no NIF), just :httpc against the discovered/configured target.
+      ["rt" | rest] ->
+        {out, failed?} = Workbooks.CLI.Runtime.run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       _ ->
         {:ok, _} = Application.ensure_all_started(:workbooks)
         IO.puts(call(argv))
