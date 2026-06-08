@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sealed Workbook — proof of concept</title>
+<style>
+  :root {
+    --bg: #0e0f13; --panel: #16181f; --line: #262a35; --ink: #e7e9ee; --dim: #8b909e;
+    --ok: #3fb950; --fail: #f85149; --warn: #d29922; --accent: #6e9bff; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin: 0 0 28px; max-width: 64ch; }
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  button.sc { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: .12s; }
+  button.sc:hover { border-color: var(--accent); }
+  button.sc[aria-pressed="true"] { border-color: var(--accent); background: #1b2436; color: #fff; }
+  .sc .tag { font-family: var(--mono); margin-right: 6px; }
+  .stage { display: grid; grid-template-columns: 28px 1fr; gap: 14px; position: relative; padding-bottom: 18px; }
+  .stage:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 30px; bottom: -4px; width: 2px; background: var(--line); }
+  .dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel);
+    display: grid; place-items: center; font-size: 13px; color: var(--dim); z-index: 1; transition: .2s; }
+  .stage[data-state="ok"]   .dot { border-color: var(--ok);   color: var(--ok); }
+  .stage[data-state="fail"] .dot { border-color: var(--fail); color: var(--fail); }
+  .stage[data-state="run"]  .dot { border-color: var(--accent); color: var(--accent); }
+  .stage[data-state="skip"] .dot { opacity: .4; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h3 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .pill { font-size: 11px; font-family: var(--mono); padding: 1px 7px; border-radius: 20px; border: 1px solid var(--line); color: var(--dim); }
+  .pill.ok { color: var(--ok); border-color: var(--ok); } .pill.fail { color: var(--fail); border-color: var(--fail); }
+  .pill.run { color: var(--accent); border-color: var(--accent); }
+  .desc { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
+  .bytes { font-family: var(--mono); font-size: 12px; color: #aeb6c6; background: #0b0c10; border: 1px solid var(--line);
+    border-radius: 7px; padding: 8px 10px; margin-top: 10px; white-space: pre-wrap; word-break: break-all; overflow: hidden; }
+  .bytes b { color: var(--accent); font-weight: 600; }
+  .bytes .red { color: var(--fail); }
+  .viewport { margin-top: 26px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .vp-bar { background: #11131a; border-bottom: 1px solid var(--line); padding: 8px 14px; font-size: 12px; color: var(--dim); font-family: var(--mono); }
+  .vp-body { padding: 26px; min-height: 120px; display: grid; place-items: center; text-align: center; }
+  .doc { width: 100%; }
+  .doc h2 { margin: 0 0 6px; font-size: 18px; }
+  .doc p { margin: 0; color: var(--dim); }
+  .locked { color: var(--fail); font-family: var(--mono); font-size: 13px; }
+  .locked .big { font-size: 28px; display: block; margin-bottom: 8px; }
+  .noise { font-family: var(--mono); font-size: 11px; color: #3a3f4b; word-break: break-all; }
+  details { margin-top: 26px; } summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+  pre { font-family: var(--mono); font-size: 12px; background: #0b0c10; border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px; overflow: auto; color: #aeb6c6; }
+  .legend { color: var(--dim); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sealed Workbook — what actually protects the bytes</h1>
+  <p class="sub">A workbook bundle ships a <b style="color:var(--ink)">public shell</b> + a <b style="color:var(--ink)">gated entry</b>.
+  The gated entry is real AES-256-GCM ciphertext; its key is wrapped to your identity (ECDH) and lives at a broker that releases it
+  only if the access posture passes. Pick a scenario — the crypto below is live (WebCrypto), and you can watch where each path fails.</p>
+
+  <div class="scenarios" id="scenarios">
+    <button class="sc" data-sc="ok" aria-pressed="true"><span class="tag">✓</span>Authorized</button>
+    <button class="sc" data-sc="denied"><span class="tag">✗</span>Unauthorized (broker denies)</button>
+    <button class="sc" data-sc="wrongkey"><span class="tag">✗</span>Wrong identity key</button>
+    <button class="sc" data-sc="tamper"><span class="tag">✗</span>Tampered ciphertext</button>
+  </div>
+
+  <div id="pipeline"></div>
+
+  <div class="viewport">
+    <div class="vp-bar" id="vpbar">workbook://demo/private — awaiting open</div>
+    <div class="vp-body" id="vpbody"><span class="noise" id="vpnoise">—</span></div>
+  </div>
+  <p class="legend">The viewport renders the gated content only when the broker releases the key <i>and</i> your key unwraps it.
+  In every failure path the bytes stay ciphertext — there is nothing to "bypass" client-side.</p>
+
+  <details>
+    <summary>Show the real mechanism (the code each stage runs)</summary>
+    <pre id="code"></pre>
+  </details>
+</div>
+
+<script type="module">
+const enc = new TextEncoder(), dec = new TextDecoder();
+const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+const short = (h, n=24) => h.length > n*2 ? h.slice(0,n) + " … " + h.slice(-8) : h;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+const PLAINTEXT = JSON.stringify({ title: "Q3 Board Deck", revenue: "$4.2M", note: "confidential" }, null, 0);
+
+// ---- real crypto: AES-256-GCM seal + ECDH (P-256) key-wrap ----
+async function genContentKey() { return crypto.subtle.generateKey({ name:"AES-GCM", length:256 }, true, ["encrypt","decrypt"]); }
+async function seal(key, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, key, enc.encode(text));
+  return { iv, ct: new Uint8Array(ct) };
+}
+async function open(key, iv, ct) {
+  const pt = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, key, ct); // throws on bad key/tag
+  return dec.decode(pt);
+}
+async function recipient() { return crypto.subtle.generateKey({ name:"ECDH", namedCurve:"P-256" }, true, ["deriveBits"]); }
+async function kekFrom(pub, priv) {
+  const bits = await crypto.subtle.deriveBits({ name:"ECDH", public: pub }, priv, 256);
+  return crypto.subtle.importKey("raw", bits, { name:"AES-GCM" }, false, ["encrypt","decrypt"]);
+}
+async function wrapKey(contentKey, recipientPub) {
+  const eph = await recipient();
+  const kek = await kekFrom(recipientPub, eph.privateKey);
+  const raw = await crypto.subtle.exportKey("raw", contentKey);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, kek, raw));
+  const ephPub = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
+  return { ephPub, iv, ct };
+}
+async function unwrapKey(wrapped, recipientPriv) {
+  const ephPub = await crypto.subtle.importKey("raw", wrapped.ephPub, { name:"ECDH", namedCurve:"P-256" }, false, []);
+  const kek = await kekFrom(ephPub, recipientPriv);
+  const raw = await crypto.subtle.decrypt({ name:"AES-GCM", iv: wrapped.iv }, kek, wrapped.ct); // throws if wrong identity
+  return crypto.subtle.importKey("raw", raw, { name:"AES-GCM" }, true, ["encrypt","decrypt"]);
+}
+
+// ---- pipeline definition ----
+const STAGES = [
+  { id:"seal",    title:"Author seals the gated entry",      desc:"AES-256-GCM over the plaintext → ciphertext + auth tag." },
+  { id:"wrap",    title:"Wrap the content key to your did",  desc:"ECDH to your key-agreement key. The broker stores only this WRAPPED key — never the plaintext key." },
+  { id:"bundle",  title:"Bundle ships",                       desc:"Public shell travels in the clear; the gated entry travels as ciphertext." },
+  { id:"release", title:"Broker checks posture & releases",  desc:"On open, the broker (runtime / edge Worker) enforces access posture, then returns the wrapped key — or denies." },
+  { id:"open",    title:"You unwrap & open",                  desc:"Your private key unwraps the content key; AES-GCM opens the entry. Any failure → the bytes stay noise." },
+];
+
+const pipeEl = document.getElementById("pipeline");
+function renderStages() {
+  pipeEl.innerHTML = STAGES.map(s => `
+    <div class="stage" data-state="idle" id="st-${s.id}">
+      <div class="dot">○</div>
+      <div class="card">
+        <h3>${s.title} <span class="pill" data-pill>idle</span></h3>
+        <p class="desc">${s.desc}</p>
+        <div class="bytes" data-bytes hidden></div>
+      </div>
+    </div>`).join("");
+}
+function setStage(id, state, pill, bytesHtml) {
+  const el = document.getElementById("st-"+id);
+  el.dataset.state = state;
+  el.querySelector(".dot").textContent = state==="ok"?"✓":state==="fail"?"✕":state==="run"?"●":state==="skip"?"·":"○";
+  const p = el.querySelector("[data-pill]"); p.textContent = pill ?? state; p.className = "pill " + (state==="ok"||state==="fail"||state==="run"?state:"");
+  const b = el.querySelector("[data-bytes]");
+  if (bytesHtml) { b.hidden = false; b.innerHTML = bytesHtml; } else { b.hidden = true; }
+}
+
+const vpbar = document.getElementById("vpbar"), vpbody = document.getElementById("vpbody");
+function showResult(kind, payload) {
+  if (kind === "ok") {
+    const d = JSON.parse(payload);
+    vpbar.textContent = "workbook://demo/private — opened ✓";
+    vpbody.innerHTML = `<div class="doc"><h2>${d.title}</h2><p>revenue ${d.revenue} · ${d.note}</p></div>`;
+  } else if (kind === "denied") {
+    vpbar.textContent = "workbook://demo/private — release denied";
+    vpbody.innerHTML = `<div class="locked"><span class="big">🔒</span>broker refused key release (not authenticated for this posture)<br/>content remains ciphertext</div>`;
+  } else {
+    vpbar.textContent = "workbook://demo/private — open failed";
+    vpbody.innerHTML = `<div class="locked"><span class="big">🔒</span>${payload}<br/>the bytes are still just noise →</div>
+      <div class="noise" style="margin-top:10px" id="noiseDump"></div>`;
+  }
+}
+
+// ---- run a scenario end to end ----
+let running = false;
+async function run(scenario) {
+  if (running) return; running = true;
+  renderStages();
+  vpbar.textContent = "workbook://demo/private — running…"; vpbody.innerHTML = `<span class="noise">…</span>`;
+  let sealed, wrapped, you, contentKey, ciphertextForView;
+
+  try {
+    // 1. seal
+    setStage("seal","run","sealing…"); await sleep(280);
+    contentKey = await genContentKey();
+    sealed = await seal(contentKey, PLAINTEXT);
+    ciphertextForView = hex(sealed.ct);
+    setStage("seal","ok","sealed", `plaintext  <b>"${PLAINTEXT.slice(0,40)}…"</b>\niv         ${hex(sealed.iv)}\nciphertext ${short(ciphertextForView)}`);
+
+    // 2. wrap to recipient (your did keyAgreement key)
+    setStage("wrap","run","wrapping…"); await sleep(280);
+    you = await recipient();
+    wrapped = await wrapKey(contentKey, you.publicKey);
+    setStage("wrap","ok","wrapped", `recipient  did:key (your keyAgreement)\nwrapped-key ${short(hex(wrapped.ct))}\nstored at broker — <b>plaintext key kept nowhere</b>`);
+
+    // 3. bundle
+    setStage("bundle","run"); await sleep(200);
+    setStage("bundle","ok","packed", `public/shell.html   <b>cleartext</b>\nprivate/deck.json   <span class="red">ciphertext (${sealed.ct.length} bytes)</span>`);
+
+    // 4. broker posture check + release
+    setStage("release","run","checking posture…"); await sleep(320);
+    if (scenario === "denied") {
+      setStage("release","fail","denied", `posture    gated_data\nidentity   <span class="red">anonymous</span>\nenforce → <span class="red">{deny, auth_required}</span> — no key returned`);
+      setStage("open","skip","skipped");
+      showResult("denied");
+      document.querySelectorAll("#st-open .desc").forEach(()=>{});
+      return;
+    }
+    setStage("release","ok","released", `posture    gated_data\nidentity   you (authenticated)\nenforce → <b>allow</b> — wrapped key handed back`);
+
+    // 5. unwrap + open
+    setStage("open","run","unwrapping…"); await sleep(300);
+    let openKey = contentKey, ct = sealed.ct, label = "";
+    if (scenario === "wrongkey") {
+      const intruder = await recipient();          // a different identity tries to unwrap
+      try { await unwrapKey(wrapped, intruder.privateKey); }
+      catch { setStage("open","fail","unwrap failed", `unwrap with <span class="red">wrong identity key</span> → AES-GCM tag mismatch\nno content key recovered`); showResult("fail","wrong identity — key never recovered"); document.getElementById("noiseDump").textContent = short(ciphertextForView, 80); return; }
+    }
+    if (scenario === "tamper") {
+      ct = sealed.ct.slice(); ct[5] ^= 0x01;        // flip one byte of ciphertext
+      openKey = await unwrapKey(wrapped, you.privateKey);  // key unwraps fine…
+      try { await open(openKey, sealed.iv, ct); }
+      catch { setStage("open","fail","auth tag fail", `key unwrapped OK, but ciphertext byte[5] was flipped\nAES-GCM <span class="red">authentication tag mismatch</span> → refused`); showResult("fail","tampered ciphertext — integrity check failed"); document.getElementById("noiseDump").textContent = short(hex(ct), 80); return; }
+    }
+    // authorized happy path
+    openKey = await unwrapKey(wrapped, you.privateKey);
+    const text = await open(openKey, sealed.iv, ct);
+    setStage("open","ok","opened", `unwrap     content key recovered\nopen       AES-GCM verified + decrypted\nplaintext  <b>${text.slice(0,48)}…</b>`);
+    showResult("ok", text);
+  } catch (e) {
+    showResult("fail", "unexpected: " + (e?.message ?? e));
+  } finally { running = false; }
+}
+
+// ---- wire scenario buttons ----
+const code = `// the real mechanism (this page runs exactly this, live)
+const key   = await genContentKey();                 // AES-256
+const sealed = await seal(key, plaintext);           // → iv + ciphertext+tag
+const wrapped = await wrapKey(key, recipient.pub);   // ECDH-wrap to your did key
+//   broker stores ONLY 'wrapped' — never 'key'
+
+// on open:
+enforce(posture, "data", identity)  // allow | {deny:"auth_required"}
+//   deny  → no key returned, ciphertext stays noise
+const key2 = await unwrapKey(wrapped, your.priv);    // wrong identity → tag mismatch
+const text = await open(key2, sealed.iv, sealed.ct); // tampered bytes → tag mismatch`;
+document.getElementById("code").textContent = code;
+
+const scs = document.getElementById("scenarios");
+scs.addEventListener("click", (e) => {
+  const btn = e.target.closest("button.sc"); if (!btn) return;
+  scs.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b===btn ? "true":"false"));
+  run(btn.dataset.sc);
+});
+renderStages();
+run("ok");
+</script>
+</body>
+</html>
