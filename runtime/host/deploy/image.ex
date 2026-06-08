@@ -11,17 +11,17 @@ defmodule Workbooks.Deploy.Image do
   @registry "ghcr.io/workbooks-sh"
   @name "runtime"
   @dockerfile "deploy/Dockerfile.runtime"
-  # The in-sandbox compile toolchain ships as a SEPARATE layer (Dockerfile.tools) the runtime image
-  # pulls via COPY --from — so CI never rebuilds the hours-long provision chain. See publish_tools/1.
-  @tools_name "runtime-tools"
-  @tools_dockerfile "deploy/Dockerfile.tools"
-  @tools_local "runtime-tools:local"
+  # The in-sandbox compilers ship as a SEPARATE layer (Dockerfile.compilers) the runtime image pulls
+  # via COPY --from — so CI never rebuilds the hours-long provision chain. See publish_compilers/1.
+  @compilers_name "compilers"
+  @compilers_dockerfile "deploy/Dockerfile.compilers"
+  @compilers_local "compilers:local"
 
   @doc "The canonical image reference (overridable via WB_IMAGE for local pins)."
   def ref(tag \\ "latest"), do: System.get_env("WB_IMAGE") || "#{@registry}/#{@name}:#{tag}"
 
-  @doc "The runtime-tools layer reference (overridable via WB_TOOLS_IMAGE)."
-  def tools_ref(tag \\ "latest"), do: System.get_env("WB_TOOLS_IMAGE") || "#{@registry}/#{@tools_name}:#{tag}"
+  @doc "The compilers layer reference (overridable via WB_COMPILERS_IMAGE)."
+  def compilers_ref(tag \\ "latest"), do: System.get_env("WB_COMPILERS_IMAGE") || "#{@registry}/#{@compilers_name}:#{tag}"
 
   @doc """
   Build the runtime image for ONE platform and load it into the local docker (and,
@@ -37,11 +37,11 @@ defmodule Workbooks.Deploy.Image do
     # without it). buildx stays for multi-arch publish/0. BuildKit (default engine)
     # is required for the ARG-driven `COPY --from=${TOOLS_REF}`.
     with {:ok, root} <- repo_root(),
-         {:ok, tools} <- ensure_tools_local(root, opts),
+         {:ok, compilers} <- ensure_compilers_local(root, opts),
          args = ["build", "-f", @dockerfile, "--platform", platform,
-                 "--build-arg", "TOOLS_REF=#{tools}", "-t", tag, "."],
+                 "--build-arg", "COMPILERS_REF=#{compilers}", "-t", tag, "."],
          {:ok, _} <- sh("docker", args, root, [{"DOCKER_BUILDKIT", "1"}]) do
-      if Keyword.get(opts, :into_krunvm, false), do: into_krunvm(tag), else: {:ok, "built #{tag} (#{platform}, tools #{tools})"}
+      if Keyword.get(opts, :into_krunvm, false), do: into_krunvm(tag), else: {:ok, "built #{tag} (#{platform}, compilers #{compilers})"}
     end
   end
 
@@ -55,75 +55,75 @@ defmodule Workbooks.Deploy.Image do
     # an arm runner — which is ~10× faster than emulated multi-arch.
     platforms = Keyword.get(opts, :platforms, System.get_env("WB_PLATFORMS", "linux/amd64,linux/arm64"))
 
-    tools = Keyword.get(opts, :tools_ref, tools_ref("latest"))
+    compilers = Keyword.get(opts, :compilers_ref, compilers_ref("latest"))
 
     with {:ok, root} <- repo_root() do
       sha = git_sha(root)
       tags = ["-t", ref("latest"), "-t", ref(sha)]
       args =
-        ["buildx", "build", "-f", @dockerfile, "--platform", platforms, "--build-arg", "TOOLS_REF=#{tools}"] ++
+        ["buildx", "build", "-f", @dockerfile, "--platform", platforms, "--build-arg", "COMPILERS_REF=#{compilers}"] ++
           tags ++ ["--push", "."]
 
       case sh("docker", args, root) do
-        {:ok, _} -> {:ok, "published #{ref("latest")} + #{ref(sha)} (#{platforms}, tools #{tools})"}
+        {:ok, _} -> {:ok, "published #{ref("latest")} + #{ref(sha)} (#{platforms}, compilers #{compilers})"}
         err -> err
       end
     end
   end
 
   @doc """
-  Build the runtime-tools LAYER locally (the lean compile toolchain, from compilers-dist/) and load
-  it into docker as `runtime-tools:local`. Stages the bundle first via scripts/stage-tools.sh, so it
+  Build the compilers LAYER locally (the lean in-sandbox compilers, from compilers-dist/) and load
+  it into docker as `compilers:local`. Stages the bundle first via scripts/stage-tools.sh, so it
   needs the provisioned compilers/ tree present. `build/1` calls this automatically; run it directly
-  to refresh the local tools layer. Returns {:ok, tag}.
+  to refresh the local compilers layer. Returns {:ok, tag}.
   """
-  def build_tools(opts \\ []) do
-    tag = Keyword.get(opts, :tag, @tools_local)
+  def build_compilers(opts \\ []) do
+    tag = Keyword.get(opts, :tag, @compilers_local)
 
     with {:ok, root} <- repo_root(),
-         :ok <- stage_tools(root),
-         args = ["build", "-f", @tools_dockerfile, "-t", tag, "."],
+         :ok <- stage_compilers(root),
+         args = ["build", "-f", @compilers_dockerfile, "-t", tag, "."],
          {:ok, _} <- sh("docker", args, root) do
       {:ok, tag}
     end
   end
 
   @doc """
-  Build the runtime-tools layer MULTI-ARCH and PUSH to ghcr — run from a PROVISIONED machine (it
-  stages from the local compilers tree). The toolchain rarely changes, so this is occasional; the
-  cloud `publish/1` then references the pushed `runtime-tools:latest`. Tagged `latest` + the git sha.
+  Build the compilers layer MULTI-ARCH and PUSH to ghcr — run from a PROVISIONED machine (it stages
+  from the local compilers tree). The compilers rarely change, so this is occasional; the cloud
+  `publish/1` then references the pushed `compilers:latest`. Tagged `latest` + the git sha.
   Requires a `docker login` to the registry.
   """
-  def publish_tools(opts \\ []) do
+  def publish_compilers(opts \\ []) do
     platforms = Keyword.get(opts, :platforms, System.get_env("WB_PLATFORMS", "linux/amd64,linux/arm64"))
 
     with {:ok, root} <- repo_root(),
-         :ok <- stage_tools(root) do
+         :ok <- stage_compilers(root) do
       sha = git_sha(root)
-      tags = ["-t", tools_ref("latest"), "-t", tools_ref(sha)]
-      args = ["buildx", "build", "-f", @tools_dockerfile, "--platform", platforms] ++ tags ++ ["--push", "."]
+      tags = ["-t", compilers_ref("latest"), "-t", compilers_ref(sha)]
+      args = ["buildx", "build", "-f", @compilers_dockerfile, "--platform", platforms] ++ tags ++ ["--push", "."]
 
       case sh("docker", args, root) do
-        {:ok, _} -> {:ok, "published #{tools_ref("latest")} + #{tools_ref(sha)} (#{platforms})"}
+        {:ok, _} -> {:ok, "published #{compilers_ref("latest")} + #{compilers_ref(sha)} (#{platforms})"}
         err -> err
       end
     end
   end
 
-  # Resolve the tools layer for a LOCAL runtime build: an explicit :tools_ref wins; else reuse an
-  # already-built runtime-tools:local (unless :rebuild_tools); else build it now from compilers-dist.
-  defp ensure_tools_local(_root, opts) do
+  # Resolve the compilers layer for a LOCAL runtime build: an explicit :compilers_ref wins; else
+  # reuse an already-built compilers:local (unless :rebuild_compilers); else build it now.
+  defp ensure_compilers_local(_root, opts) do
     cond do
-      Keyword.get(opts, :tools_ref) -> {:ok, Keyword.get(opts, :tools_ref)}
-      not Keyword.get(opts, :rebuild_tools, false) and image_present?(@tools_local) -> {:ok, @tools_local}
-      true -> build_tools(Keyword.put(opts, :tag, @tools_local))
+      Keyword.get(opts, :compilers_ref) -> {:ok, Keyword.get(opts, :compilers_ref)}
+      not Keyword.get(opts, :rebuild_compilers, false) and image_present?(@compilers_local) -> {:ok, @compilers_local}
+      true -> build_compilers(Keyword.put(opts, :tag, @compilers_local))
     end
   end
 
   defp image_present?(tag), do: match?({:ok, _}, sh("docker", ["image", "inspect", tag], "."))
 
-  # Stage the lean compile toolchain (~600M) into runtime/compilers-dist via scripts/stage-tools.sh.
-  defp stage_tools(root) do
+  # Stage the lean in-sandbox compilers (~600M) into runtime/compilers-dist via scripts/stage-tools.sh.
+  defp stage_compilers(root) do
     script = Path.join(root, "runtime/scripts/stage-tools.sh")
 
     if File.regular?(script) do

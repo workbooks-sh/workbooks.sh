@@ -47,7 +47,7 @@ scratch/
 /deploy/*
 !/deploy/Dockerfile
 !/deploy/Dockerfile.runtime
-!/deploy/Dockerfile.tools
+!/deploy/Dockerfile.compilers
 !/deploy/fly.toml
 !/deploy/deploy.sh
 !/deploy/storage.env.example

@@ -24,3 +24,9 @@ runtime/kernel/target
 # --- the ~6.6G provisioned compile-tool SCRATCH (rustc src, mrustc C++ build, wasi-sdk, .bak) ---
 # Never run, only used to PRODUCE the wasm tools. The lean compilers-dist/ ships instead.
 runtime/compilers
+
+# cargo/rust build artifacts (wrong arch in-image; rebuilt) — esp. vendor/wasmex/native/*/target (~1.1G)
+**/target
+
+# stale prebuilt rustler NIF (host-arch .so) — force deps.compile to build the linux NIF + keep it
+**/priv/native/*.so

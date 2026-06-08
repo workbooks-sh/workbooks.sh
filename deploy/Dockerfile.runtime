@@ -6,12 +6,12 @@
 # Build CONTEXT = repo root. Published multi-arch to ghcr by
 # .github/workflows/runtime-image.yml → ghcr.io/workbooks-sh/runtime:latest.
 
-# The compile-toolchain layer (Dockerfile.tools), referenced as a named stage. Docker forbids a
-# variable in `COPY --from`, but a GLOBAL ARG in `FROM` is allowed — so we alias it to `tools` here
-# and COPY from that stage below. `runtime-tools:local` for a local build (Workbooks.Deploy.Image
-# builds it first); the ghcr ref for publish (push once via `wb deploy publish-tools`).
-ARG TOOLS_REF=runtime-tools:local
-FROM ${TOOLS_REF} AS tools
+# The compilers layer (Dockerfile.compilers), referenced as a named stage. Docker forbids a variable
+# in `COPY --from`, but a GLOBAL ARG in `FROM` is allowed — so we alias it to `compilers` here and
+# COPY from that stage below. `compilers:local` for a local build (Workbooks.Deploy.Image builds it
+# first); the ghcr ref for publish (push once via `wb deploy publish-compilers`).
+ARG COMPILERS_REF=compilers:local
+FROM ${COMPILERS_REF} AS compilers
 
 # --- build: the Elixir release ----------------------------------------------
 FROM elixir:1.18-otp-27 AS build
@@ -27,6 +27,9 @@ RUN mix local.hex --force && mix local.rebar --force
 ARG INCLUDE_CLIP=false
 ENV WB_CLIP=""
 COPY runtime/mix.exs runtime/mix.lock ./
+# wasmex is a VENDORED path dep ({:wasmex, path: "vendor/wasmex"}) — its source must exist before
+# deps.compile, so copy it alongside the manifests (still before the full tree, to keep dep caching).
+COPY runtime/vendor ./vendor
 RUN if [ "$INCLUDE_CLIP" = "true" ]; then export WB_CLIP=1; fi \
     && mix deps.get --only prod && mix deps.compile
 COPY runtime/ .
@@ -57,10 +60,10 @@ RUN mkdir -p /opt/models/potion-base-8M \
 
 COPY --from=build /app/_build/prod/rel/workbooks ./
 COPY --from=build /app/build ./build
-# The in-sandbox compile toolchain, from the standalone runtime-tools LAYER (the `tools` stage above)
-# so CI never rebuilds the hours-long provision chain. default_root() resolves "compilers" at the app
-# CWD, so cloud AND local-container deployments compile Rust/C/Zig/Go/JS identically to dev.
-COPY --from=tools /compilers ./compilers
+# The in-sandbox compilers, from the standalone compilers LAYER (the `compilers` stage above) so CI
+# never rebuilds the hours-long provision chain. default_root() resolves "compilers" at the app CWD,
+# so cloud AND local-container deployments compile Rust/C/Zig/Go/JS identically to dev.
+COPY --from=compilers /compilers ./compilers
 
 EXPOSE 4000
 CMD ["bin/workbooks", "start"]

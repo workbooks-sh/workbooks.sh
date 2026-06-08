@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
     && rm -rf /var/lib/apt/lists/*
 RUN mix local.hex --force && mix local.rebar --force
 COPY mix.exs mix.lock ./
+# wasmex is a VENDORED path dep — its source must exist before deps.compile.
+COPY vendor ./vendor
 RUN mix deps.get --only prod && mix deps.compile
 COPY . .
 # build/oql.wasm is embedded at compile time (@external_resource); it is COPY'd above.

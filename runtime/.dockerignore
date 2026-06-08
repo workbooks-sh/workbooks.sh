@@ -9,3 +9,10 @@ tmp
 
 # the ~6.6G provisioned scratch tree — the lean compilers-dist/ ships instead (stage-tools.sh)
 compilers
+
+# cargo build artifacts (rebuilt in-image)
+**/target
+vendor/**/target
+
+# stale prebuilt rustler NIF (host-arch) — build fresh in-image
+**/priv/native/*.so

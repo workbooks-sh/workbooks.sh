@@ -4,12 +4,12 @@
 # Workbooks.Deploy.Image, one source of truth). The desktop app likewise calls
 # `wb deploy local`. CI only supplies the buildx driver + registry auth.
 #
-# PREREQUISITE: the runtime image pulls its in-sandbox compile toolchain from the
-# runtime-tools layer (`COPY --from=tools`). CI can't build that layer (the wasm
-# tools are gitignored artifacts from an hours-long provision chain), so a
-# maintainer publishes it ONCE from a provisioned machine — and again only when
-# the toolchain changes — via `wb deploy publish-tools` (Workbooks.Deploy.Image
-# .publish_tools/1). Until then, the FROM ${TOOLS_REF} pull below has nothing to fetch.
+# PREREQUISITE: the runtime image pulls its in-sandbox compilers from the compilers
+# layer (`COPY --from=compilers`). CI can't build that layer (the wasm compilers are
+# gitignored artifacts from an hours-long provision chain), so a maintainer publishes
+# it ONCE from a provisioned machine — and again only when the compilers change — via
+# `wb deploy publish-compilers` (Workbooks.Deploy.Image.publish_compilers/1). Until
+# then, the FROM ${COMPILERS_REF} pull below has nothing to fetch.
 name: runtime-image
 
 on:
