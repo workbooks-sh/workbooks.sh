@@ -44,36 +44,24 @@ flowchart LR
 
 ## The idea
 
-Think of a Workbook like a PDF — one file you can open, send, or keep — except the file
-isn't a document, it's a running app.
+Workbooks is two parts that fit together — and those two parts are the whole ecosystem.
 
-That works because of two halves that fit together:
+Think of a Workbook like a PDF: one file you can open, send, or keep — except the file
+isn't a document, it's a running app. That works because of two halves:
 
-- **The Workbook** is the format. It's *what* you build: one portable file with the code,
-  data, and interface inside it. No project folder, no repo to clone, no service that has
-  to stay alive.
-- **The Runtime** is the engine. It's *what runs* the format — identically on your machine,
-  your server, or the web — and it can run real code, in several languages, safely.
+- **The Workbook** is the *format* — what you build, and what you hand to someone.
+- **The Runtime** is the *engine* — what brings the format to life, anywhere.
 
 The file is portable because the engine runs everywhere. The engine matters because the
-file is portable. One promise, two halves.
+file is portable. One promise, two halves — here's each.
 
-## What a Workbook is
+### The Workbook — the format
 
-You build a Workbook the normal way — writing real code (Svelte, SolidJS, Rust, and more)
-— with Org as a connective layer that ties the pieces together. The bundler packs all of
-it into a single, self-contained `.html`. Because everything it needs is inside that one
-file, the same Workbook can be many things:
-
-- a **document** you read
-- a **filesystem** of documents
-- its own **SQLite database** — a real data store inside the app, not just a file tree
-- a **single-page app** (Svelte, SolidJS, plain JSX)
-- a **desktop app** or a plain **web page**
-- a **container** — a sandbox that runs untrusted code safely
-
-Hand someone a Workbook and they have the working app — not a link to a service you have
-to keep paying to keep alive. And because it's HTML at the surface, it drops into anything.
+You build a Workbook the normal way: writing real code (Svelte, SolidJS, Rust, and more),
+with Org as a connective layer that ties the pieces together. The bundler packs all of it
+into a single, self-contained `.html` — code, data, and interface in one file. Hand it to
+someone and they have the working app, not a link to a service you have to keep alive. And
+because it's HTML at the surface, the same Workbook can be many things:
 
 ```mermaid
 mindmap
@@ -87,16 +75,26 @@ mindmap
     Container
 ```
 
-## What the Runtime is
+### The Runtime — the engine
 
-One Runtime runs your Workbook everywhere. It's built on Elixir, so it stays fast and
-parallel under load without you babysitting a scaling dashboard, and it runs real code —
-in several languages — inside a sandbox, so even untrusted code stays in its box. One
-Runtime means one thing to manage, not a fleet.
+One Runtime runs any Workbook the same way everywhere. It's built on Elixir, so it stays
+fast and parallel under load with nothing to babysit, and it runs real code — in several
+languages — inside a sandbox, so even untrusted code stays in its box. One Runtime means
+one thing to manage, not a fleet.
 
-You can run it yourself, for free, on your own machine with your own API keys. When you'd
-rather not manage infrastructure, you can let us run it for you in the cloud — but that's
-a convenience, never a gate.
+Run it yourself for free, on your own machine with your own keys — or let us run it in the
+cloud when you'd rather not manage infrastructure. The managed option is a convenience,
+never a gate.
+
+```mermaid
+flowchart LR
+    WB["📄 Any Workbook"] --> RT["⚙️ One Runtime<br/>sandbox · real code · agents"]
+    RT --> A["💻 Run it yourself<br/>free · your machine · your keys"]
+    RT --> B["☁️ Or let us run it<br/>managed cloud · optional"]
+
+    classDef free fill:#28c84018,stroke:#28c840,stroke-width:1.5px;
+    class A free
+```
 
 ## Why it's built this way
 
