@@ -54,6 +54,30 @@ defmodule Workbooks.StressTest do
   end
 
   @tag :build
+  @tag timeout: 900_000
+  test "Rust: HashMap correct AT SCALE (5000 entries, resize/collisions, iteration)" do
+    # Guards the wb-ar7 fix: the neutered hashbrown debug_assert could have hidden a real
+    # miscompile that only bites large maps. This proves insert/get/iterate are correct at
+    # scale — iter_count must equal len (the exact invariant the assert checked).
+    src = ~S"""
+    use std::collections::HashMap;
+    fn main(){
+      let n: u32 = 5000;
+      let mut m = HashMap::new();
+      for i in 0..n { m.insert(i, i.wrapping_mul(i)); }
+      let mut ok = true;
+      for i in 0..n { if m.get(&i) != Some(&i.wrapping_mul(i)) { ok = false; break; } }
+      let mut count: u64 = 0; let mut sum: u64 = 0;
+      for (k, v) in &m { count += 1; sum = sum.wrapping_add(*v as u64); if *v != k.wrapping_mul(*k) { ok = false; } }
+      let expected: u64 = (0..n).map(|i| i.wrapping_mul(i) as u64).fold(0u64, |a,b| a.wrapping_add(b));
+      println!("len={} ok={} iter_count={} sum_ok={}", m.len(), ok, count, sum == expected);
+    }
+    """
+
+    assert build_run("rust", src, "") == "len=5000 ok=true iter_count=5000 sum_ok=true"
+  end
+
+  @tag :build
   @tag timeout: 300_000
   test "JS: generators + destructuring + Map + regex + JSON" do
     src = ~S"""
