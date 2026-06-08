@@ -20,22 +20,22 @@ A workbook is plain Org with one convention — a =:WORKBOOK_VERSION:= property
 on the top-level heading. Everything else follows standard Org structure:
 headings, prose, source blocks, and =:PROPERTIES:= drawers for configuration.
 
-#+begin_example
-#+TITLE: My Workbook
+#+begin_src org
+,#+TITLE: My Workbook
 
-* My Workbook
+,* My Workbook
   :PROPERTIES:
   :WORKBOOK_VERSION: 1
   :END:
 
 Prose goes here. Source blocks are components.
 
-#+begin_src javascript :exports code
+,#+begin_src javascript
 export function greet(name) {
   return `hello, ${name}`;
 }
+,#+end_src
 #+end_src
-#+end_example
 
 Source blocks with a known language compile to WASM components. The engine
 wires them together; you write business logic, not glue.
@@ -46,9 +46,9 @@ The OQL kernel (=oql.wasm=, embedded in the runtime binary and in the desktop
 app) reads the Org source and produces HTML. The kernel runs in-WASM — there is
 no native code path for rendering, just the component the engine loads.
 
-#+begin_example
+#+begin_src text
 org source → OQL kernel → rich HTML → self-contained .html artifact
-#+end_example
+#+end_src
 
 The same kernel runs locally in the desktop app, in the server runtime, and at
 publish time. There is no difference between preview and production output.
@@ -66,15 +66,15 @@ wb publish init
 
 This writes a =publish.org= next to your workbook:
 
-#+begin_example
-* publish :publish:
+#+begin_src org
+,* publish :publish:
   :PROPERTIES:
   :PUBLISH_TARGET:  cloudflare-pages
   :PUBLISH_PROJECT: my-project
   :PUBLISH_DOMAIN:  my-project.pages.dev
   :PUBLISH_TITLE:   My Workbook
   :END:
-#+end_example
+#+end_src
 
 Supported targets: =cloudflare-pages=, =gh-pages=, =self-hosted=.
 
