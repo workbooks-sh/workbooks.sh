@@ -506,4 +506,12 @@ fn main(){ let s: i32 = (1..=3).interleave(4..=6).sum(); println!("{}", s); }|)
   test "proc-macro2 — TokenStream parse (edition-fallback 2018->2021, proc-macro foundation)" do
     run_with("proc-macro2@1.0.69", ~S|fn main(){ let ts: proc_macro2::TokenStream = "a + b".parse().unwrap(); println!("{}", ts.into_iter().count()); }|, "3")
   end
+
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "regex \\d via feature-hint (auto unicode-perl, no caller dep_features)" do
+    run_with("regex@1.5.4", ~S|fn main(){ let re = regex::Regex::new(r"\\d+").unwrap(); println!("{}", re.find("ab123cd").unwrap().as_str()); }|, "123")
+  end
 end

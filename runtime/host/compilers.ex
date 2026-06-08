@@ -131,6 +131,13 @@ defmodule Workbooks.Compilers do
   @clang_lib_rt "/usr/lib/wasm32-unknown-wasip1"
   @clang_lib_c "/usr/lib/wasm32-wasip1"
 
+  # wb-346: curated reduced-feature sets tried first in the :reduce fallback for crates whose full
+  # default exceeds the mrustc ceiling but a middle set keeps key capability. List-of-feature-sets.
+  @feature_hints %{
+    "regex" => [["std", "unicode-perl"]],
+    "regex-syntax" => [["std", "unicode-perl"]]
+  }
+
   @doc """
   Compile + LINK C source to a RUNNABLE wasm with clang+lld, entirely in the sandbox
   (zero native execution). Two in-sandbox stages: `clang -c` then `wasm-ld` — the clang
@@ -593,17 +600,24 @@ defmodule Workbooks.Compilers do
       #               spurious "alloc" cfg is a harmless no-op), then bare no-std, then none. Skips
       #               def_features itself (already tried in :full).
       variants =
+        # wb-346: per-crate feature HINTS — curated sets tried FIRST. The literal (non-transitive)
+        # default can both exceed the ceiling AND under-enable capability: regex-syntax default
+        # ["unicode"] compiles but lacks "unicode-perl" (transitively implied in real cargo) → \d =
+        # Syntax error. Hint [std,unicode-perl] gives \d/\w. Applied in :full so sub-deps (which are
+        # :full-only) get it too.
+        hint = Map.get(@feature_hints, name, [])
+
         case mode do
           {:override, override} ->
             [override]
 
           :full ->
-            [def_features]
+            (hint ++ [def_features]) |> Enum.uniq()
 
           :reduce ->
             no_std = def_features -- ["std"]
             alloc = if "std" in def_features, do: [["alloc" | no_std]], else: []
-            (alloc ++ [no_std, []]) |> Enum.uniq() |> Enum.reject(&(&1 == def_features))
+            (hint ++ alloc ++ [no_std, []]) |> Enum.uniq() |> Enum.reject(&(&1 == def_features))
         end
 
       # wb-zq4: EDITION-FALLBACK — try the crate's declared edition, then 2021. Some crates declare
