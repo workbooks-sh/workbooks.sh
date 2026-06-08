@@ -31,8 +31,19 @@ defmodule Workbooks.Publish.DesktopApp do
     identifier = p["PUBLISH_IDENTIFIER"] || "sh.workbooks.app.#{slug(name)}"
     # Runtime target: explicit URL (cloud) wins; else "" → local discovery at boot.
     url = p["PUBLISH_URL"] || ""
+    posture = Workbooks.Publish.Config.access(p)
 
-    html = File.read!(html_path) |> inject_bootstrap(url)
+    # POSTURE-AWARE compilation (wb-9io): a gated workbook must NEVER inline its
+    # content — even a "desktop" artifact can be copied to a web host. Public →
+    # inline the rendered page; gated → emit a SHELL that fetches the content from
+    # the runtime AFTER auth (the protected payload never touches the static file).
+    {mode, html} =
+      if Workbooks.Access.static_safe?(posture) do
+        {:inline, File.read!(html_path) |> inject_bootstrap(url)}
+      else
+        content_path = p["PUBLISH_CONTENT_PATH"] || "/api/w/#{slug(name)}/html"
+        {:shell, gated_shell(name, url, content_path)}
+      end
 
     files = [
       {"index.html", html},
@@ -42,7 +53,7 @@ defmodule Workbooks.Publish.DesktopApp do
     ]
 
     Enum.each(files, fn {rel, body} -> File.write!(Path.join(dir, rel), body) end)
-    {:ok, %{dir: dir, files: Enum.map(files, &elem(&1, 0)), url: url}}
+    {:ok, %{dir: dir, files: Enum.map(files, &elem(&1, 0)), url: url, posture: posture, mode: mode}}
   rescue
     e -> {:error, Exception.message(e)}
   end
@@ -67,6 +78,44 @@ defmodule Workbooks.Publish.DesktopApp do
     end
   end
 
+  # The GATED shell — a public page with NO inlined workbook content. It auths via
+  # the RCP connector, then fetches the protected content from the runtime and
+  # injects it. If the runtime refuses (unauthorized), it shows a sign-in prompt.
+  # The protected payload never lives in this file (wb-9io anti-leak).
+  defp gated_shell(name, url, content_path) do
+    """
+    <!doctype html>
+    <html>
+      <head><meta charset="utf-8" /><title>#{html_escape(name)}</title></head>
+      <body>
+        <main id="app" data-state="loading"><p>Loading…</p></main>
+        <div id="auth" hidden><p>This workbook is protected. Please sign in.</p></div>
+        <script type="module">
+          import { createClient } from "./rcp.js";
+          const baseUrl = #{js_string(url)} || (globalThis.__RCP_BASE__ ?? "");
+          const getToken = async () => globalThis.__RCP_TOKEN__ ?? null;
+          const rt = createClient({ baseUrl, getToken });
+          window.runtime = rt;
+          const app = document.getElementById("app");
+          const auth = document.getElementById("auth");
+          try {
+            // Protected content is fetched at runtime, gated by the runtime.
+            const res = await rt.request(#{js_string(content_path)});
+            app.innerHTML = (res && res.html) ? res.html : (typeof res === "string" ? res : "");
+            app.dataset.state = "ready";
+          } catch (e) {
+            const denied = e && (e.code === "unauthorized" || e.code === "tenant_required" || e.code === "forbidden");
+            app.hidden = true;
+            auth.hidden = false;
+            auth.dataset.reason = denied ? "auth" : (e && e.code) || "error";
+          }
+        </script>
+      </body>
+    </html>
+    """
+  end
+
+  defp html_escape(s), do: s |> String.replace("&", "&amp;") |> String.replace("<", "&lt;") |> String.replace(">", "&gt;")
   defp js_string(s), do: Jason.encode!(s)
   defp slug(s), do: s |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.trim("-")
 

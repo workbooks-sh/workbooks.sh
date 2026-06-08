@@ -56,6 +56,12 @@ defmodule Workbooks.Publish.Config do
         "PUBLISH_TARGET: self-hosted needs PUBLISH_URL (the runtime base URL)")
       |> add_if(target == "desktop-app" and blank?(p["PUBLISH_APP_NAME"]) and blank?(p["PUBLISH_TITLE"]),
         "PUBLISH_TARGET: desktop-app needs PUBLISH_APP_NAME (or PUBLISH_TITLE) for the app/window name")
+      |> add_if(not valid_access?(p["PUBLISH_ACCESS"]),
+        "PUBLISH_ACCESS: must be one of public | gated-data | gated-route")
+      # The anti-leak rule (wb-9io): a gated workbook must NOT ship to a public
+      # static host — the file would carry its contents to anyone with the URL.
+      |> add_if(gated?(p["PUBLISH_ACCESS"]) and target in ~w(cloudflare-pages gh-pages),
+        "PUBLISH_ACCESS: #{p["PUBLISH_ACCESS"]} cannot publish to #{target} — a public static host ships the whole workbook to anyone (client-side gating is theater). Use self-hosted (the runtime gates per-request) or desktop-app (local shell).")
 
     warnings = secret_warnings(p)
     all = Enum.reverse(issues) ++ warnings
@@ -97,7 +103,24 @@ defmodule Workbooks.Publish.Config do
   @doc "The title to use in the rendered HTML (falls back to project name)."
   def title(p), do: p["PUBLISH_TITLE"] || p["PUBLISH_PROJECT"] || "Workbook"
 
+  @doc "The declared access posture (`:public` | `:gated_data` | `:gated_route`)."
+  def access(p) do
+    case Workbooks.Access.parse(p["PUBLISH_ACCESS"]) do
+      {:ok, posture} -> posture
+      _ -> :public
+    end
+  end
+
   # ---- helpers ---------------------------------------------------------------
+  defp valid_access?(s), do: match?({:ok, _}, Workbooks.Access.parse(s))
+
+  defp gated?(s) do
+    case Workbooks.Access.parse(s) do
+      {:ok, posture} -> not Workbooks.Access.static_safe?(posture)
+      _ -> false
+    end
+  end
+
   defp enum_check(issues, val, allowed, name) do
     add_if(issues, val == nil or val not in allowed,
       "#{name} must be one of #{Enum.join(allowed, "|")} (got #{inspect(val)})")

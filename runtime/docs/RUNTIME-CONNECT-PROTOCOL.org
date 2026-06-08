@@ -163,6 +163,44 @@ no caveat.
   | Auth-adapter seam             | ❌ TODO   | LocalToken / Oidc / Anon adapters           |
   | Compiler "→ app" target       | ❌ TODO   | emit a client wired to the connector        |
 
+* Routing & access posture (secure hosting — wb-9io)
+
+A self-contained single HTML file CANNOT be authenticated client-side: it ships
+the whole app+data to anyone with the URL, so a client-side "login" is theater —
+the gate and the secret travel together. Security comes from SPLITTING the public
+shell from the gated data, which is exactly what RCP enables. Each workbook/route
+declares an access POSTURE (~Workbooks.Access~), and routing is coupled to auth:
+
+  | Posture        | Shell        | Data/capabilities         | Static-host safe? |
+  |----------------+--------------+---------------------------+-------------------|
+  | public         | public       | public (may be inlined)   | YES               |
+  | gated_data     | public       | runtime-gated, per-request| NO                |
+  | gated_route    | runtime-gated| runtime-gated             | NO                |
+
+  - *public* — fully static; the whole workbook may be baked into one HTML.
+  - *gated_data* — the SHELL is public (no secrets); DATA is fetched from the
+    runtime after auth, tenant-scoped over RCP. The "app behind the page" is the
+    runtime, not the file.
+  - *gated_route* — even the shell/existence is private; the runtime serves it
+    only to an authenticated caller (control-plane /w/:id).
+
+** The anti-leak invariant (enforced)
+A ~gated_*~ workbook must NEVER be rendered into a public static artifact. Two
+guards implement this:
+  1. *Publish boundary* — ~PUBLISH_ACCESS=gated-*~ is REJECTED for the public
+     static targets (cloudflare-pages, gh-pages). Allowed only on ~self-hosted~
+     (the runtime gates per-request) or ~desktop-app~ (local shell).
+  2. *Compiler* — the ~desktop-app~ target compiles a gated workbook to a SHELL
+     that fetches content from the runtime post-auth; the protected payload never
+     touches the static file (even if the artifact is later copied to a web host).
+
+** The serving decision
+~Workbooks.Access.enforce(posture, demand, identity)~ → ~:allow | {:deny, :auth_required}~,
+where demand ∈ ~:shell | :data | :full~. The anonymous dev fallback (user "dev")
+does NOT count as authenticated. This is the primitive the control-plane workbook
+routes call to gate per request; wiring every route to a per-workbook posture
+registry is the follow-on (needs workbook metadata to carry ~:posture~).
+
 * Configuring the IDP (the only auth work a deployer does)
 
 Both ends are pluggable; switching IDP touches config + one client file, never the

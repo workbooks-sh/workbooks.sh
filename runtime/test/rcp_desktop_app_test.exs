@@ -52,7 +52,25 @@ defmodule RcpDesktopAppTest do
     assert js =~ "/.well-known/workbooks-runtime"
     assert js =~ "class RcpError"
     assert js =~ ~s(authorization: "Bearer ")
-    assert js =~ ~s(new RcpError("unavailable")
+    assert js =~ ~s|new RcpError("unavailable"|
+  end
+
+  test "public posture INLINES the rendered content", %{dir: dir, html: html} do
+    assert {:ok, %{mode: :inline, posture: :public}} = DesktopApp.scaffold(html, %{"PUBLISH_APP_NAME" => "Pub"})
+    assert File.read!(Path.join(dir, "index.html")) =~ "<h1>hi</h1>"
+  end
+
+  test "gated posture emits a SHELL with NO inlined content (anti-leak)", %{dir: dir, html: html} do
+    assert {:ok, %{mode: :shell, posture: :gated_data}} =
+             DesktopApp.scaffold(html, %{"PUBLISH_APP_NAME" => "Secret", "PUBLISH_ACCESS" => "gated-data", "PUBLISH_CONTENT_PATH" => "/api/w/secret/html"})
+
+    page = File.read!(Path.join(dir, "index.html"))
+    # the protected content from the rendered html is NOT baked into the artifact
+    refute page =~ "<h1>hi</h1>"
+    # instead it fetches it from the runtime post-auth, and degrades to a sign-in
+    assert page =~ ~s|rt.request("/api/w/secret/html")|
+    assert page =~ ~s(id="auth")
+    assert page =~ "unauthorized"
   end
 
   test "desktop-app is a recognized target requiring an app name" do
