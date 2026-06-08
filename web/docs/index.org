@@ -29,16 +29,16 @@ headings, prose, source blocks, and =:PROPERTIES:= drawers for configuration.
   :END:
 
 Prose goes here. Source blocks are components.
-
-,#+begin_src javascript
-export function greet(name) {
-  return `hello, ${name}`;
-}
-,#+end_src
 #+end_src
 
 Source blocks with a known language compile to WASM components. The engine
 wires them together; you write business logic, not glue.
+
+#+begin_src javascript
+export function greet(name) {
+  return `hello, ${name}`;
+}
+#+end_src
 
 ** The render path
 
