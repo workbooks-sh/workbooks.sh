@@ -26,7 +26,22 @@ mod ffi {
         pub fn host_vfs_read(pp: i32, pl: i32, op: i32, oc: i32) -> i32; // bytes / -1 missing
         // Egress (cap: "http") — the BEAM performs the request; Policy-gated.
         pub fn host_http_get(up: i32, ul: i32, op: i32, oc: i32) -> i32; // body len / -1 err
+        // Batch/concurrent egress — the BEAM fetches all URLs in parallel (Task.async_stream).
+        pub fn host_http_get_many(up: i32, ul: i32, op: i32, oc: i32) -> i32; // marshaled len / -1
     }
+}
+
+#[inline]
+fn rd_u32(b: &[u8], p: &mut usize) -> u32 {
+    let v = u32::from_le_bytes([b[*p], b[*p + 1], b[*p + 2], b[*p + 3]]);
+    *p += 4;
+    v
+}
+#[inline]
+fn rd_i32(b: &[u8], p: &mut usize) -> i32 {
+    let v = i32::from_le_bytes([b[*p], b[*p + 1], b[*p + 2], b[*p + 3]]);
+    *p += 4;
+    v
 }
 
 /// Wall-clock time, provided by the host (wasm has no clock of its own).
@@ -66,5 +81,35 @@ pub mod http {
     /// HTTP GET, decoded as UTF-8 text.
     pub fn get_string(url: &str) -> Option<String> {
         get(url).and_then(|v| String::from_utf8(v).ok())
+    }
+
+    /// CONCURRENT batch GET — one call, the BEAM fetches all URLs in parallel and returns each
+    /// body (None on failure), order-preserved. This is "async" done by the BEAM: the program is
+    /// synchronous, the parallelism is entirely host-side. Result length == urls.len().
+    pub fn get_many(urls: &[&str]) -> Vec<Option<Vec<u8>>> {
+        let joined = urls.join("\n");
+        let mut out = vec![0u8; 16 << 20]; // 16 MiB total cap
+        let n = unsafe {
+            super::ffi::host_http_get_many(joined.as_ptr() as i32, joined.len() as i32, out.as_mut_ptr() as i32, out.len() as i32)
+        };
+        if n < 0 {
+            return urls.iter().map(|_| None).collect();
+        }
+        out.truncate(n as usize);
+
+        let mut p = 0usize;
+        let count = super::rd_u32(&out, &mut p) as usize;
+        let mut res = Vec::with_capacity(count);
+        for _ in 0..count {
+            let len = super::rd_i32(&out, &mut p);
+            if len < 0 {
+                res.push(None);
+            } else {
+                let l = len as usize;
+                res.push(Some(out[p..p + l].to_vec()));
+                p += l;
+            }
+        }
+        res
     }
 }

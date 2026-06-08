@@ -112,6 +112,54 @@ defmodule Workbooks.RustDock do
              _ ->
                -1
            end
+         end},
+      # wb-w5m: host_http_get_many(urls_ptr,urls_len, out_ptr,out_cap) -> i32 — the BATCH/CONCURRENT
+      # primitive (the pragmatic async protocol). The wasm passes newline-joined URLs; the BEAM
+      # fetches them CONCURRENTLY (Task.async_stream across processes — the parallelism wasm can't do)
+      # and marshals the results back: [count:u32][ (len:i32, -1=failed) body ]*. Returns total bytes
+      # written, or -1 if out_cap is too small. One Rust call → N concurrent requests → N results.
+      "host_http_get_many" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, urls_ptr, urls_len, out_ptr, out_cap ->
+           _ = Application.ensure_all_started(:inets)
+           _ = Application.ensure_all_started(:ssl)
+
+           urls =
+             Wasmex.Memory.read_string(ctx.caller, ctx.memory, urls_ptr, urls_len)
+             |> String.split("\n", trim: true)
+
+           results =
+             urls
+             |> Task.async_stream(
+               fn url ->
+                 case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, 10_000}], body_format: :binary) do
+                   {:ok, {{_, _, _}, _, body}} -> body
+                   _ -> :error
+                 end
+               end,
+               max_concurrency: 16,
+               timeout: 15_000,
+               on_timeout: :kill_task
+             )
+             |> Enum.map(fn
+               {:ok, body} when is_binary(body) -> body
+               _ -> :error
+             end)
+
+           blob =
+             [<<length(results)::little-32>>
+              | Enum.map(results, fn
+                  :error -> <<-1::little-signed-32>>
+                  body -> <<byte_size(body)::little-signed-32, body::binary>>
+                end)]
+             |> IO.iodata_to_binary()
+
+           if byte_size(blob) > out_cap do
+             -1
+           else
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, blob)
+             byte_size(blob)
+           end
          end}
     }
   end

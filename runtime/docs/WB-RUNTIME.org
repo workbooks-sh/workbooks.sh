@@ -27,12 +27,16 @@
   Each cap is granted by the run PROFILE's Policy. Request one the profile didn't grant and the
   module fails to instantiate — capability-by-construction.
 
-* Concurrency — already there, at the right layer
-  You rarely need in-program async. The SYSTEM is concurrent: the BEAM runs many wasm instances at
-  once, each its own supervised process, each making blocking `wb::*` calls the BEAM services
-  concurrently. So "fan out N requests" = N programs (or one program the host fans out), not an
-  in-wasm executor. (In-program async/await would need a minimal executor compiled in — possible
-  later, not needed for the common case.)
+* Concurrency — the BEAM does it, two ways (no in-wasm executor)
+  - SYSTEM concurrency: the BEAM runs many wasm instances at once, each a supervised process.
+  - BATCH concurrency (Tier 1, DONE): wb::http::get_many(&[urls]) — ONE synchronous Rust call; the
+    BEAM fetches all URLs in PARALLEL (Task.async_stream) and returns each body, order-preserved.
+    Proven: 3 URLs, one call, 3 results (test/wb_runtime_test.exs). This is the pragmatic "async
+    protocol" — the program stays synchronous, the parallelism is entirely host-side, memory-safe +
+    supervised. Covers the common case ("fire N requests, get N results").
+  - In-program async/await (Tier 2, not built): a minimal executor compiled into the wasm + a
+    BEAM-driven futures reactor (a future parks on a host call, the BEAM completes it and wakes the
+    future). Only needed when ONE program must interleave compute with streaming/overlapping I/O.
 
 * How to build + run
   Compile the program with the host externs left importable, then run it under the Dock:

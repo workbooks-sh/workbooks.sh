@@ -40,4 +40,36 @@ defmodule Workbooks.WbRuntimeTest do
         IO.puts("\n[skip] wb runtime: #{inspect(reason) |> String.slice(0, 100)}")
     end
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "wb::http::get_many — one call, the BEAM fetches N URLs concurrently (Tier-1 async)" do
+    wb = File.read!("compilers/rust/wb/lib.rs")
+
+    program = """
+    mod wb { #{wb} }
+    fn main() {
+        // one synchronous call; the BEAM does the 3 fetches in parallel and returns them all.
+        let urls = ["https://index.crates.io/3/f/fnv",
+                    "https://index.crates.io/lo/g/log",
+                    "https://index.crates.io/by/te/byteorder"];
+        let r = wb::http::get_many(&urls);
+        let ok = r.iter().filter(|x| x.as_ref().map(|b| !b.is_empty()).unwrap_or(false)).count();
+        println!("GET-MANY ok={}/{}", ok, r.len());
+    }
+    """
+
+    src = Path.join(System.tmp_dir!(), "wb_many_#{System.unique_integer([:positive])}.rs")
+    File.write!(src, program)
+
+    case Compilers.rust_compile_to_wasm(src, no_exceptions: true, allow_undefined: true) do
+      {:ok, wasm, _} ->
+        assert {:ok, out} = RustDock.run(wasm, profile: :network)
+        assert String.trim(out) == "GET-MANY ok=3/3"
+
+      {:error, reason} ->
+        IO.puts("\n[skip] wb get_many: #{inspect(reason) |> String.slice(0, 100)}")
+    end
+  end
 end
