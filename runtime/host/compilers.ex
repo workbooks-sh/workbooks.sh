@@ -351,22 +351,40 @@ defmodule Workbooks.Compilers do
     csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
     shim_src = Path.expand(Path.join([root, "zig", "wasi_shim.c"]))
     ustub_src = Path.expand(Path.join([rd, "std", "ustub.c"]))
+    stub_src = Path.expand(Path.join([rd, "std", "setjmp-stub.h"]))
     o = Path.join(mrdir, "output-wasi-174")
 
     cond do
       not File.regular?(mrwasm) -> {:error, {:mrustc_not_built, mrwasm}}
       not File.regular?(clang) -> {:error, {:clang_not_built, clang}}
       not File.regular?(Path.join(o, "libstd.rlib.o")) -> {:error, {:libstd_not_prebuilt, o}}
-      true -> do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, opts)
+      true -> do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, stub_src, opts)
     end
   end
 
-  defp do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, opts) do
+  defp do_rust_compile(source_path, mrdir, mrwasm, clang, csys, o, shim_src, ustub_src, stub_src, opts) do
     id = Integer.to_string(:erlang.unique_integer([:positive]))
     name = "wbr#{id}"
     File.mkdir_p!(Path.join(mrdir, ".mrtmp"))
     File.mkdir_p!(Path.join(mrdir, ".cctmp"))
     File.cp!(Path.expand(source_path), Path.join(o, "#{name}.rs"))
+
+    # wb-49z: no_exceptions lane — emit a wasm WITHOUT the exceptions proposal (sjlj) so it runs
+    # under Wasmex (BEAM) for host-mediated caps (the Dock). Swap clang exception flags for a stub
+    # setjmp.h (-I before sysroot): mrustc's C #includes <setjmp.h> which #errors w/o sjlj; the stub
+    # no-ops setjmp + traps longjmp (safe — no unwind, panic→abort). Assumes no-dep (or all deps
+    # also no-exc); deps still compile with default exception flags, so use only for minimal Dock
+    # programs until dep-lane threading lands.
+    noexc? = Keyword.get(opts, :no_exceptions, false)
+    clang_flags =
+      if noexc? do
+        File.mkdir_p!(Path.join(mrdir, "stubinc"))
+        File.cp!(stub_src, Path.join([mrdir, "stubinc", "setjmp.h"]))
+        ~w(--target=wasm32-wasip1 --sysroot=/usr -I/work/stubinc -O1 -fno-strict-aliasing -w
+           -Xclang -disable-llvm-verifier)
+      else
+        @rust_clang_flags
+      end
 
     mr = fn args ->
       wasmtime(
@@ -421,7 +439,7 @@ defmodule Workbooks.Compilers do
 
         result =
           if File.regular?(Path.join(o, "#{name}.c")) do
-            cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/#{name}.c", "-o", "/work/output-wasi-174/#{name}.o"])
+            cl.(["clang"] ++ clang_flags ++ ["-c", "/work/output-wasi-174/#{name}.c", "-o", "/work/output-wasi-174/#{name}.o"])
 
             if File.regular?(Path.join(o, "#{name}.o")) do
               libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi-174/#{Path.basename(&1)}")
