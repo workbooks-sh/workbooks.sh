@@ -577,10 +577,13 @@ defmodule Workbooks.Compilers do
   # Build a SPECIFIC version of a dep under a feature MODE: compile sub-deps first, then it.
   # mode: {:override, feats} verbatim | :full (default features only) | :reduce (no_std variants).
   defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode) do
-    with {:ok, lib_rs, def_features, edition} <- fetch_crate(name, version, Path.join(o, "deps")),
-         {:ok, sub_externs, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
+    with {:ok, lib_rs, def_features, edition, pm?} <- fetch_crate(name, version, Path.join(o, "deps")),
+         {:ok, sub_externs0, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats) do
       rel_src = Path.relative_to(lib_rs, mrdir)
       cdst = Path.join(o, "deps/lib#{name}.rlib.c")
+      # wb-zq4: proc-macro crate → wire the compiler `proc_macro` crate from the std chain.
+      sub_externs =
+        if pm?, do: sub_externs0 ++ ["--extern", "proc_macro=output-wasi-174/libproc_macro.rlib"], else: sub_externs0
 
       # Feature variants for THIS mode (the two-phase resolver in compile_dep picks the mode order):
       #   :override — caller's exact set, no fallback
@@ -817,10 +820,19 @@ defmodule Workbooks.Compilers do
 
       cond do
         is_nil(lib_rs) -> {:error, {:no_lib_rs, name}}
-        true -> {:ok, lib_rs, default_features(cargo), crate_edition(cargo)}
+        true -> {:ok, lib_rs, default_features(cargo), crate_edition(cargo), proc_macro_crate?(cargo)}
       end
     else
       {out, _} -> {:error, {:fetch_failed, name, version, String.slice(to_string(out), 0, 200)}}
+    end
+  end
+
+  # wb-zq4: proc-macro crate? ([lib] proc-macro = true). Such crates `extern crate proc_macro;`
+  # (the compiler-provided crate, in the std chain) → need --extern proc_macro at build.
+  defp proc_macro_crate?(cargo) do
+    case File.read(cargo) do
+      {:ok, body} -> Regex.match?(~r/(?m)^\s*proc-macro\s*=\s*true/, body)
+      _ -> false
     end
   end
 
