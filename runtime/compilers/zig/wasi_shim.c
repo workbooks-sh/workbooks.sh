@@ -1,6 +1,8 @@
 /* auto-generated: zig's C-backend wasi bare names -> wasi-libc __wasi_ imports.
    Generated from <wasi/wasip1.h> (see compilers/zig/README.org). */
 #include <wasi/wasip1.h>
+__wasi_errno_t args_get(uint8_t **argv, uint8_t *argv_buf) { return __wasi_args_get(argv, argv_buf); }
+__wasi_errno_t args_sizes_get(__wasi_size_t *retptr0, __wasi_size_t *retptr1) { return __wasi_args_sizes_get(retptr0, retptr1); }
 __wasi_errno_t clock_res_get(__wasi_clockid_t id, __wasi_timestamp_t *retptr0) { return __wasi_clock_res_get(id, retptr0); }
 __wasi_errno_t clock_time_get(__wasi_clockid_t id, __wasi_timestamp_t precision, __wasi_timestamp_t *retptr0) { return __wasi_clock_time_get(id, precision, retptr0); }
 __wasi_errno_t environ_get(uint8_t **environ, uint8_t *environ_buf) { return __wasi_environ_get(environ, environ_buf); }
