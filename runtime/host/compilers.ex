@@ -410,9 +410,15 @@ defmodule Workbooks.Compilers do
             if File.regular?(Path.join(o, "#{name}.o")) do
               libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi/#{Path.basename(&1)}")
 
+              # --allow-undefined: leave unresolved externs as wasm IMPORTS instead of erroring
+              # — the path for BEAM-mediated host functions (the Dock) called from compiled Rust
+              # (wb-1mv). Off by default (a real link error should still fail loudly).
+              au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
+
               ld =
-                ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
-                 "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
+                ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1"] ++
+                  au ++
+                  ["/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi/#{name}.o"] ++
                   dep_objs ++ libstd ++
                   ["/work/output-wasi/wasi_shim.o", "/work/output-wasi/ustub.o",
                    "-lc", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
