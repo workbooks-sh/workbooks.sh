@@ -351,6 +351,22 @@ defmodule Workbooks.Compilers do
   Returns {:ok, wasm_path, log} | {:error, reason}.
   """
   def rust_compile_to_wasm(source_path, opts \\ [], root \\ default_root()) do
+    case rust_compile_to_wasm_impl(source_path, opts, root) do
+      {:error, _} = err ->
+        # wb-0sz: classify the failure into an actionable hint so the caller (agent or person) learns
+        # WHICH limitation they hit and WHAT to do — not just a wasm trap. Diagnosis is also returnable
+        # via Workbooks.Compilers.RustCaps.diagnose/1; here we surface it in the log.
+        d = Workbooks.Compilers.RustCaps.diagnose(err)
+        require Logger
+        Logger.warning("[rust] compile failed [#{d.category}]: #{d.summary} — mitigation: #{d.mitigation}")
+        err
+
+      ok ->
+        ok
+    end
+  end
+
+  defp rust_compile_to_wasm_impl(source_path, opts, root) do
     rd = Path.join(root, "rust")
     mrdir = Path.expand(Path.join(rd, "mrustc-root/mrustc"))
     mrwasm = Path.expand(Path.join(rd, "mrustc-root/mrustc_std.wasm"))
