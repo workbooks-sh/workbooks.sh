@@ -4,7 +4,7 @@
 
 # Workbooks
 
-**A file format for whole apps — and the runtime that runs them anywhere.**
+**One file for everything. One runtime for anywhere.**
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7afe.svg)](LICENSE)
 &nbsp;[![Stars](https://img.shields.io/github/stars/workbooks-sh/workbooks.sh?style=flat&color=e8612a)](https://github.com/workbooks-sh/workbooks.sh)
