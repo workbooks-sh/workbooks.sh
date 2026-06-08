@@ -138,4 +138,47 @@ fn main(){ println!("{}", *N); }', "42")
   test "tinyvec — stack-allocated ArrayVec" do
     run_with("tinyvec@1.5.1", ~S|fn main(){ let mut v: tinyvec::ArrayVec<[i32;4]> = Default::default(); v.push(5); v.push(7); v.push(9); println!("{}", v.iter().sum::<i32>()); }|, "21")
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "arrayvec — stack ArrayVec" do
+    run_with("arrayvec@0.5.2", ~S|fn main(){ let mut v = arrayvec::ArrayVec::<[i32;4]>::new(); v.push(3); v.push(4); println!("{}", v.len()); }|, "2")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "unicode-width — display width" do
+    run_with("unicode-width@0.1.9", ~S|use unicode_width::UnicodeWidthStr;
+fn main(){ println!("{}", "hello".width()); }|, "5")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "unicode-xid — identifier classification" do
+    run_with("unicode-xid@0.2.4", ~S|fn main(){ println!("{}", unicode_xid::UnicodeXID::is_xid_start('a')); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "either — Left/Right enum" do
+    run_with("either@1.6.1", ~S|fn main(){ let e: either::Either<i32,i32> = either::Either::Left(5); println!("{}", e.is_left()); }|, "true")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "fnv — custom-hasher HashMap" do
+    run_with("fnv@1.0.7", ~S|fn main(){ let mut m: std::collections::HashMap<&str,i32,fnv::FnvBuildHasher> = Default::default(); m.insert("a",1); m.insert("b",2); println!("{}", m["a"]+m["b"]); }|, "3")
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 900_000
+  test "smallvec — inline small vector" do
+    run_with("smallvec@1.6.1", ~S|fn main(){ let mut v: smallvec::SmallVec<[i32;4]> = smallvec::SmallVec::new(); v.push(7); v.push(8); println!("{}", v.iter().sum::<i32>()); }|, "15")
+  end
 end
