@@ -133,6 +133,27 @@ defmodule Workbooks.ProcMacroHost do
     end
   end
 
+  @doc """
+  Run a wasm COMMAND in the sandbox, wall-clock bounded (the watchdog hard-kills wasmtime on
+  overrun). Generic bounded-exec for untrusted in-sandbox programs (build scripts, etc.) — one
+  place for the time guard. opts: :dirs (["host::guest", …] preopens), :env (["K=V", …]),
+  :exec_timeout_ms (default 30s). Returns {stdout, exit_code}; exit 137 = killed by the watchdog.
+  """
+  def run_wasm_bounded(wasm, argv \\ [], opts \\ []) do
+    runner = Keyword.get(opts, :wasmtime, "wasmtime")
+    secs = max(1, div(Keyword.get(opts, :exec_timeout_ms, 30_000), 1000))
+    dirs = Keyword.get(opts, :dirs, []) |> Enum.flat_map(&["--dir", &1])
+    env = Keyword.get(opts, :env, []) |> Enum.flat_map(&["--env", &1])
+
+    parts =
+      [runner, "run", "-W", "exceptions=y", "-W", "max-wasm-stack=134217728"] ++
+        env ++ dirs ++ [wasm] ++ argv
+
+    run = parts |> Enum.map(&shq/1) |> Enum.join(" ")
+    cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
+    System.cmd("sh", ["-c", cmd], stderr_to_stdout: false)
+  end
+
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
   # mrustc passes whatever it loaded the proc-macro crate from — for a top-level dep that's the

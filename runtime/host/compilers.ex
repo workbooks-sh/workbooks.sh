@@ -138,6 +138,21 @@ defmodule Workbooks.Compilers do
     "regex-syntax" => [["std", "unicode-perl"]]
   }
 
+  # wb-ctk: known-good version FLOORS for crates whose newest releases exceed the mrustc ~1.74
+  # ceiling (newer regex pulls regex-automata; syn/serde_derive went to syn-2 / edition-2024). The
+  # resolver tries the floor FIRST when it satisfies the caller's req, so a bare `regex` resolves to
+  # a buildable version instead of walking 6 doomed newest ones. An explicit pin still wins.
+  @version_floors %{
+    "regex" => "1.5.4",
+    "regex-syntax" => "0.6.29",
+    "syn" => "1.0.109",
+    "serde" => "1.0.156",
+    "serde_derive" => "1.0.156",
+    "proc-macro2" => "1.0.69",
+    "quote" => "1.0.33",
+    "unicode-ident" => "1.0.12"
+  }
+
   @doc """
   Compile + LINK C source to a RUNNABLE wasm with clang+lld, entirely in the sandbox
   (zero native execution). Two in-sandbox stages: `clang -c` then `wasm-ld` — the clang
@@ -728,9 +743,13 @@ defmodule Workbooks.Compilers do
       # emits the .c. Unblocks proc-macro2/syn (→ derive macros).
       editions = Enum.uniq([edition, "2021"])
 
+      # wb-yq0: run this crate's build.rs (if any) in-sandbox once; its allowlisted rustc-cfg flags
+      # apply to every feature/edition attempt.
+      build_cfgs = build_script_flags(name, lib_rs, o, mr, cl)
+
       compiled? =
         Enum.reduce_while(variants, false, fn features, _ ->
-          cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end)
+          cfgs = Enum.flat_map(features, fn f -> ["--cfg", ~s|feature="#{f}"|] end) ++ build_cfgs
 
           ok =
             Enum.reduce_while(editions, false, fn ed, _ ->
@@ -856,7 +875,20 @@ defmodule Workbooks.Compilers do
         # 1.0.2xx → proc-macro2) or use post-1.54 syntax, and the cap never reaches the older one.
         exact = req |> String.trim() |> String.trim_leading("=")
         sorted = Enum.sort_by(cands, fn {sv, _, _, _} -> sv end, :desc)
-        {req_first, rest} = Enum.split_with(sorted, fn {_, v, _, _} -> v == exact end)
+
+        # wb-ctk: CEILING-AWARE ORDERING. For crates whose newest releases exceed the mrustc ~1.74
+        # ceiling (their dep restructurings / syn-2 / edition-2024), newest-first never reaches a
+        # buildable version inside the window. A curated known-good FLOOR is tried first — but ONLY
+        # when it satisfies the caller's req (so an explicit `regex@1.10` is untouched; a bare `regex`
+        # resolves straight to the buildable floor instead of failing the walk).
+        floor = Map.get(@version_floors, name)
+
+        {pinned, others0} =
+          Enum.split_with(sorted, fn {_, v, _, _} -> v == exact or (floor && v == floor) end)
+
+        # exact req first, then the floor, then newest-first.
+        pinned = Enum.sort_by(pinned, fn {_, v, _, _} -> {v == exact, v == floor} end, :desc)
+        {req_first, rest} = {pinned, others0}
 
         ranked =
           (req_first ++ rest)
@@ -1048,6 +1080,90 @@ defmodule Workbooks.Compilers do
       end
     else
       {:error, reason} -> {:error, {:fetch_failed, name, version, String.slice(inspect(reason), 0, 200)}}
+    end
+  end
+
+  # wb-yq0: BEAM-offload of build scripts — compile + RUN a crate's build.rs IN-SANDBOX and return
+  # the `cargo:rustc-cfg` flags it emits (the same orchestrate pattern as proc-macros).
+  # SECURITY: build.rs is untrusted. It runs in the wasm sandbox (no escape/exfiltration), is
+  # wall-clock bounded (run_wasm_bounded), and we ALLOWLIST its output — only `cargo:rustc-cfg=<safe>`
+  # is honored (a validated cfg identifier or key="value"), passed to mrustc as a SINGLE arg (no
+  # shell, no flag injection). Link directives, env, and arbitrary `cargo:` lines are IGNORED.
+  # Scope: std-only scripts that emit cfgs. A script needing build-dependencies or post-1.74 syntax
+  # fails to compile and yields [] — a strict improvement over silently skipping build.rs.
+  defp build_script_flags(name, lib_rs, o, mr, cl) do
+    cdir = Path.dirname(Path.dirname(lib_rs))
+    build_rs = Path.join(cdir, "build.rs")
+
+    if File.regular?(build_rs) do
+      bs = "wbbs_#{crate_id(name)}"
+      rel = Path.relative_to(build_rs, Path.dirname(o))
+      cfile = Path.join(o, "deps/#{bs}.c")
+      File.rm(cfile)
+
+      mr.([rel, "--crate-name", bs, "--crate-type", "bin", "-L", "output-wasi-174",
+           "-L", "output-wasi-174/deps", "--out-dir", "output-wasi-174/deps",
+           "--target", "wasm32-wasi", "--edition", "2018"])
+
+      if File.regular?(cfile) do
+        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/deps/#{bs}.c", "-o", "/work/output-wasi-174/deps/#{bs}.o"])
+
+        if File.regular?(Path.join(o, "deps/#{bs}.o")) do
+          libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/output-wasi-174/#{Path.basename(&1)}")
+
+          cl.(["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1",
+               "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi-174/deps/#{bs}.o"] ++ libstd ++
+              ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o", "-lc", "-lsetjmp",
+               "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a", "-o", "/work/output-wasi-174/deps/#{bs}.wasm"])
+
+          wasm = Path.join(o, "deps/#{bs}.wasm")
+          if File.regular?(wasm), do: run_build_script(wasm, o), else: []
+        else
+          []
+        end
+      else
+        []
+      end
+    else
+      []
+    end
+  end
+
+  defp run_build_script(wasm, o) do
+    out_dir = Path.join(o, "deps/wbbs_out")
+    File.mkdir_p!(out_dir)
+
+    env = ~w(OUT_DIR=/out TARGET=wasm32-wasi HOST=wasm32-wasi PROFILE=release OPT_LEVEL=1
+             CARGO_CFG_TARGET_ARCH=wasm32 CARGO_CFG_TARGET_OS=wasi CARGO_CFG_TARGET_POINTER_WIDTH=32)
+
+    case Workbooks.ProcMacroHost.run_wasm_bounded(wasm, [], dirs: ["#{out_dir}::/out"], env: env, exec_timeout_ms: 30_000) do
+      {out, 0} -> parse_build_cfgs(out)
+      _ -> []
+    end
+  end
+
+  # ALLOWLIST: only `cargo:rustc-cfg=` (and the newer `cargo::` form). Everything else is dropped.
+  defp parse_build_cfgs(out) do
+    out
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(fn line ->
+      cond do
+        String.starts_with?(line, "cargo:rustc-cfg=") -> validate_cfg(String.replace_prefix(line, "cargo:rustc-cfg=", ""))
+        String.starts_with?(line, "cargo::rustc-cfg=") -> validate_cfg(String.replace_prefix(line, "cargo::rustc-cfg=", ""))
+        true -> []
+      end
+    end)
+  end
+
+  # A cfg is honored only if it's a bare identifier or `ident="safe-value"` — no spaces, no shell or
+  # arg metacharacters, nothing that could smuggle a second flag. Passed to mrustc as one arg.
+  defp validate_cfg(raw) do
+    raw = String.trim(raw)
+
+    cond do
+      Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, raw) -> ["--cfg", raw]
+      Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*="[A-Za-z0-9_.\- ]*"$/, raw) -> ["--cfg", raw]
+      true -> []
     end
   end
 
