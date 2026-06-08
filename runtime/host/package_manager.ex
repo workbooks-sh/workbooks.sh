@@ -121,12 +121,10 @@ defmodule Workbooks.PackageManager do
   core module (the tool path).
   """
   # Mode 2 — Rust. Compile a real Rust project dir to a runnable wasm command ENTIRELY in the
-  # sandbox (mrustc.wasm → clang.wasm, full std), zero native execution (wb-fm0.3). The old
-  # native `cargo`/`cargo-component` path is gone: untrusted Rust never touches a native
-  # toolchain. The dir's entry is src/main.rs (or a lone *.rs). NOTE: external cargo
-  # dependencies are NOT yet supported in-sandbox — only std. A crate that declares non-std
-  # deps in Cargo.toml returns {:error, {:rust_deps_unsupported_in_sandbox, _}} rather than
-  # silently falling back to native (which would breach the no-native-compile canon).
+  # sandbox (mrustc.wasm → clang.wasm, full std), zero native execution. The dir's entry is
+  # src/main.rs (or a lone *.rs). Its Cargo.toml [dependencies] are PARSED and fetched+compiled
+  # in-sandbox via the dep pipeline (wb-3s8) — pure-Rust crates.io deps work; proc-macro/codegen-
+  # build.rs/too-new crates are the documented frontier. Native cargo is never invoked.
   def build_dir(dir, "rust") do
     abs = Path.expand(dir)
     manifest = Path.join(abs, "Cargo.toml")
@@ -139,12 +137,13 @@ defmodule Workbooks.PackageManager do
       end
 
     cond do
-      has_external_rust_deps?(manifest) -> {:error, {:rust_deps_unsupported_in_sandbox, abs}}
       is_nil(entry) -> {:error, "no .rs source in #{abs}"}
-      true -> rust_to_wasm(entry, Path.join(@cache, "#{cache_key(["rustdir", abs])}.wasm"))
+      true -> rust_to_wasm(entry, Path.join(@cache, "#{cache_key(["rustdir", abs])}.wasm"), parse_cargo_deps(manifest))
     end
   end
 
+  # Parse [dependencies] from a Cargo.toml → ["name@req", …]. Handles `name = "req"` and
+  # `name = { version = "req", … }`; skips optional = true, and git/path deps (not fetchable).
   # Mode 2 — JS/TS. Compile a project dir's entry (index.js / index.ts) to a runnable wasm
   # command ENTIRELY in the sandbox via QuickJS-ng (wb-fm0.4) — zero native execution, no bun.
   # TS is type-stripped in-sandbox first (build_ts). NOTE: npm-dependency bundling is NOT done
@@ -224,11 +223,38 @@ defmodule Workbooks.PackageManager do
 
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
 
-  # A Cargo.toml with a non-empty [dependencies] table needs vendored crate builds the
-  # in-sandbox single-file mrustc lane doesn't do yet. std-only crates (no deps) are fine.
-  defp has_external_rust_deps?(manifest) do
-    File.exists?(manifest) and
-      Regex.match?(~r/^\[dependencies\]\s*\n\s*\w/m, File.read!(manifest))
+  # Parse [dependencies] from a Cargo.toml → ["name@req", …] for the in-sandbox dep pipeline.
+  # Handles `name = "req"` and `name = { version = "req", … }`; skips optional/git/path deps.
+  defp parse_cargo_deps(manifest) do
+    with true <- File.exists?(manifest),
+         body <- File.read!(manifest),
+         [_, section] <- Regex.run(~r/^\[dependencies\]\s*\n(.*?)(?=\n\[|\z)/ms, body) do
+      section |> String.split("\n", trim: true) |> Enum.flat_map(&parse_dep_line/1)
+    else
+      _ -> []
+    end
+  end
+
+  defp parse_dep_line(line) do
+    cond do
+      m = Regex.run(~r/^\s*([A-Za-z0-9_-]+)\s*=\s*"([^"]+)"\s*$/, line) ->
+        [_, n, v] = m
+        ["#{n}@#{v}"]
+
+      m = Regex.run(~r/^\s*([A-Za-z0-9_-]+)\s*=\s*\{(.+)\}\s*$/, line) ->
+        [_, n, attrs] = m
+        ver = Regex.run(~r/version\s*=\s*"([^"]+)"/, attrs)
+
+        cond do
+          attrs =~ ~r/optional\s*=\s*true/ -> []
+          attrs =~ ~r/\b(git|path)\s*=/ -> []
+          ver -> ["#{n}@#{Enum.at(ver, 1)}"]
+          true -> []
+        end
+
+      true ->
+        []
+    end
   end
 
   # A package.json with a non-empty "dependencies" needs a bundler + registry the in-sandbox
@@ -337,10 +363,10 @@ defmodule Workbooks.PackageManager do
 
   # Rust = compile a .rs to a runnable wasm command ENTIRELY in the sandbox via mrustc.wasm →
   # clang.wasm (full std), zero native execution (wb-fm0.3). Copies the emitted wasm to `out`.
-  defp rust_to_wasm(src, out) do
+  defp rust_to_wasm(src, out, deps \\ []) do
     File.mkdir_p!(@cache)
 
-    case Workbooks.Compilers.rust_compile_to_wasm(src) do
+    case Workbooks.Compilers.rust_compile_to_wasm(src, deps: deps) do
       {:ok, wasm, _logs} ->
         File.cp!(wasm, out)
         File.rm(wasm)
