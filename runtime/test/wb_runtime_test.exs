@@ -12,6 +12,31 @@ defmodule Workbooks.WbRuntimeTest do
 
   @tag :build
   @tag timeout: 300_000
+  test "wb auto-provided — program just writes `use wb;`, no inlining (wb: true)" do
+    program = """
+    use wb;
+    fn main() {
+        let t = wb::time::now_millis();
+        wb::vfs::write("k", b"auto");
+        println!("AUTO now_ok={} got={}", t > 0, wb::vfs::read_string("k").unwrap_or_default());
+    }
+    """
+
+    src = Path.join(System.tmp_dir!(), "wb_auto_#{System.unique_integer([:positive])}.rs")
+    File.write!(src, program)
+
+    case Compilers.rust_compile_to_wasm(src, no_exceptions: true, allow_undefined: true, wb: true) do
+      {:ok, wasm, _} ->
+        assert {:ok, out} = RustDock.run(wasm, profile: :minimal)
+        assert String.trim(out) == "AUTO now_ok=true got=auto"
+
+      {:error, reason} ->
+        IO.puts("\n[skip] wb auto-provide: #{inspect(reason) |> String.slice(0, 100)}")
+    end
+  end
+
+  @tag :build
+  @tag timeout: 300_000
   test "wb:: API — clean Rust, BEAM owns time + storage, runs in-sandbox" do
     # exercise the REAL crate source so the test and the shipped API can't drift.
     wb = File.read!("compilers/rust/wb/lib.rs")

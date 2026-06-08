@@ -482,7 +482,12 @@ defmodule Workbooks.Compilers do
           |> MapSet.new()
 
         {pm_servers, pm_externs} = build_pm_servers(o, cl, extern_args0)
-        extern_args = extern_args0 ++ pm_externs
+
+        # wb-asw: auto-provide the `wb` BEAM-runtime crate so programs can `use wb;` (opt-in).
+        {wb_extern, wb_obj} =
+          if Keyword.get(opts, :wb, false), do: wb_runtime(o, mr, cl, clang_flags), else: {[], []}
+
+        extern_args = extern_args0 ++ pm_externs ++ wb_extern
 
         # wb-5bv: normalize re-exported derives in the user source (the BEAM-side fix for the serde
         # idiom — no compiler change). Conservative: only for derive crates actually built, only
@@ -492,10 +497,10 @@ defmodule Workbooks.Compilers do
         # wb-mrz: link EVERY compiled dep object present in deps/ (sorted → deterministic) EXCEPT the
         # proc-macro subtree. deps/ was cleaned at build start, so it holds exactly this tree.
         dep_objs =
-          all_dep_objs
-          |> Enum.sort()
-          |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(&1)}")
-          |> Enum.reject(&MapSet.member?(pmonly, &1))
+          (all_dep_objs
+           |> Enum.sort()
+           |> Enum.map(&"/work/output-wasi-174/deps/#{Path.basename(&1)}")
+           |> Enum.reject(&MapSet.member?(pmonly, &1))) ++ wb_obj
 
         ldirs = if all_dep_objs == [], do: [], else: ["-L", "output-wasi-174/deps"]
 
@@ -1095,6 +1100,39 @@ defmodule Workbooks.Compilers do
       end
     else
       {:error, reason} -> {:error, {:fetch_failed, name, version, String.slice(inspect(reason), 0, 200)}}
+    end
+  end
+
+  # wb-asw: auto-provide the `wb` runtime crate (compilers/rust/wb/lib.rs) so in-sandbox programs can
+  # just `use wb;` for BEAM-backed I/O instead of declaring the host externs by hand. Compiled fresh
+  # each build (tiny) with the SAME clang flags as the user (so the exception mode matches), into
+  # output-wasi-174/. Returns {extern_args, link_objs}. The host_* symbols stay undefined (the caller
+  # uses allow_undefined) and resolve at run via RustDock. No-op if the crate source is absent.
+  defp wb_runtime(o, mr, cl, clang_flags) do
+    # o = …/compilers/rust/mrustc-root/mrustc/output-wasi-174 ; the crate is at …/compilers/rust/wb
+    src = Path.join(o |> Path.dirname() |> Path.dirname() |> Path.dirname(), "wb/lib.rs")
+
+    if File.regular?(src) do
+      File.cp!(src, Path.join(o, "wbrt.rs"))
+      File.rm(Path.join(o, "wbrt.rlib.c"))
+      # a stale wbrt.rlib.o would be double-linked by the libstd `*.rlib.o` glob — clear it.
+      File.rm(Path.join(o, "wbrt.rlib.o"))
+
+      mr.(["output-wasi-174/wbrt.rs", "--crate-name", "wb", "--crate-type", "rlib",
+           "-o", "output-wasi-174/wbrt.rlib", "-L", "output-wasi-174", "--out-dir", "output-wasi-174",
+           "--target", "wasm32-wasi", "--edition", "2018"])
+
+      # NB: object is wbrt.o (NOT *.rlib.o) so the libstd `*.rlib.o` link glob doesn't ALSO pick it
+      # up — we add it explicitly below; a double-add is a duplicate-symbol link error.
+      with true <- File.regular?(Path.join(o, "wbrt.rlib.c")),
+           _ <- cl.(["clang"] ++ clang_flags ++ ["-c", "/work/output-wasi-174/wbrt.rlib.c", "-o", "/work/output-wasi-174/wbrt.o"]),
+           true <- File.regular?(Path.join(o, "wbrt.o")) do
+        {["--extern", "wb=output-wasi-174/wbrt.rlib"], ["/work/output-wasi-174/wbrt.o"]}
+      else
+        _ -> {[], []}
+      end
+    else
+      {[], []}
     end
   end
 

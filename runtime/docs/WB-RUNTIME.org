@@ -39,10 +39,12 @@
     future). Only needed when ONE program must interleave compute with streaming/overlapping I/O.
 
 * How to build + run
-  Compile the program with the host externs left importable, then run it under the Dock:
-    {:ok, wasm} = Compilers.rust_compile_to_wasm(src, no_exceptions: true, allow_undefined: true)
+  Pass `wb: true` and the crate is auto-provided — the program just writes `wb::*`, no inlining,
+  no hand-declared externs:
+    {:ok, wasm} = Compilers.rust_compile_to_wasm(src, no_exceptions: true, allow_undefined: true, wb: true)
     {:ok, out}  = RustDock.run(wasm, profile: :network)   # or :minimal (no egress)
-  (`mod wb { <lib.rs> }` inline, or — once wired — `--extern wb` as an auto-provided crate.)
+  (`wb: true` compiles compilers/rust/wb/lib.rs fresh, --extern wb, links it; host_* stay importable
+  and resolve at run via RustDock. The crate is also inline-able as `mod wb { <lib.rs> }`.)
 
 * The contract for an agent writing Rust live
   - Do the computation in plain Rust (memory-safe, the ceiling permitting — pin/floor handle deps).
