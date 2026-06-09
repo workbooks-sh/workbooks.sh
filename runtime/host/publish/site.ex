@@ -176,7 +176,8 @@ defmodule Workbooks.Publish.Site do
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="brand-mark"></span>
-        <a href="#{home}" class="sidebar-title">#{esc(site_title)}</a>
+        <a href="/" class="sidebar-title" title="Back to workbooks.sh">workbooks</a>
+        <a href="#{home}" class="sidebar-sub sidebar-sub-link">docs</a>
         <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">✕</button>
       </div>
       <div class="nav-body">

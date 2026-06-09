@@ -1,7 +1,12 @@
 #+TITLE: Workbooks
-#+DESCRIPTION: A workbook is a document that runs. A toolkit is how you make it do more.
+#+DESCRIPTION: One file for everything. One runtime for anywhere. Developer docs for the workbook format, the runtime, and toolkits.
 
 * Workbooks
+
+*One file for everything. One runtime for anywhere.*
+
+These are the developer docs — the format, the runtime, and the toolkits you build
+on them. Looking for the desktop app? That's at [[https://workbooks.sh][workbooks.sh]].
 
 A *workbook* is a single =.org= file that runs. It carries prose, code, and data,
 compiles its source blocks to WebAssembly, and publishes as one self-contained

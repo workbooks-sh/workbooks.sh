@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Workbooks — a document that runs, and the toolkits to extend it</title>
-<meta name="description" content="Workbooks turns one .org file into a live app. Toolkits are the sandboxed-WASM capabilities you build to extend it — any language, run isolated, shipped as a workbook." />
-<meta property="og:title" content="Workbooks — a document that runs" />
-<meta property="og:description" content="One .org file becomes a live app. Toolkits are sandboxed-WASM capabilities you build to extend it." />
+<title>Workbooks — build apps you actually own</title>
+<meta name="description" content="Workbooks is a free desktop app where you and your AI agents build real software — every app is one portable file that runs on your machine, offline, yours to keep." />
+<meta property="og:title" content="Workbooks — build apps you actually own" />
+<meta property="og:description" content="A free desktop app where you and your agents build real apps as one portable file. Local-first, open source." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f3f5f9'/%3E%3Cstop offset='.46' stop-color='%23c9d0db'/%3E%3Cstop offset='1' stop-color='%232f6fe0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" />
@@ -34,114 +35,102 @@ body::after{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradi
 a{color:inherit;text-decoration:none}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 1.6rem}
 
-/* metal accents */
 .metal{height:3px;border-radius:3px;background:linear-gradient(90deg,#b3bbc8,#7c869a 28%,var(--blue) 50%,#7c869a 72%,#b3bbc8);background-size:220% 100%;animation:shimmer 7s linear infinite}
 @keyframes shimmer{to{background-position:-220% 0}}
 .brand-mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#f3f5f9,#c9d0db 46%,var(--blue));box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 2px rgba(35,42,54,.12),0 2px 8px rgba(47,111,224,.24);flex:0 0 auto}
 
-/* nav */
 .nav{position:sticky;top:0;z-index:50;backdrop-filter:saturate(1.5) blur(12px);-webkit-backdrop-filter:saturate(1.5) blur(12px);background:rgba(255,255,255,.66);border-bottom:1px solid var(--line)}
 .nav-in{max-width:var(--maxw);margin:0 auto;padding:.85rem 1.6rem;display:flex;align-items:center;gap:1.4rem}
 .logo{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-weight:600;font-size:1rem;letter-spacing:-.01em}
 .nav-links{list-style:none;display:flex;gap:1.5rem;margin-left:auto;font-size:.92rem;color:var(--ink-soft)}
 .nav-links a:hover{color:var(--blue)}
-.nav-cta{font-size:.9rem;font-weight:500;color:#fff;background:var(--blue);padding:.5rem .95rem;border-radius:9px;box-shadow:0 2px 8px rgba(47,111,224,.28);transition:transform .15s,box-shadow .15s}
+.nav-cta{display:inline-flex;align-items:center;gap:.4rem;font-size:.9rem;font-weight:500;color:#fff;background:var(--blue);padding:.5rem .95rem;border-radius:9px;box-shadow:0 2px 8px rgba(47,111,224,.28);transition:transform .15s,box-shadow .15s}
 .nav-cta:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(47,111,224,.34)}
 @media(max-width:680px){.nav-links{display:none}}
 
-/* hero */
-.hero{padding:5.5rem 0 3rem;position:relative}
-.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:3.2rem;align-items:center}
-@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:2.4rem}.hero{padding:3.5rem 0 2rem}}
-.eyebrow{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--blue);background:var(--blue-faint);border:1px solid rgba(47,111,224,.18);padding:.32rem .7rem;border-radius:100px;margin-bottom:1.4rem}
+.hero{padding:5rem 0 3rem}
+.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:3rem;align-items:center}
+@media(max-width:920px){.hero-grid{grid-template-columns:1fr;gap:2.4rem}.hero{padding:3.2rem 0 2rem}}
+.eyebrow{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--blue);background:var(--blue-faint);border:1px solid rgba(47,111,224,.18);padding:.32rem .7rem;border-radius:100px;margin-bottom:1.4rem}
 .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(31,157,107,.18)}
-h1{font-size:clamp(2.4rem,5.4vw,3.7rem);font-weight:600;line-height:1.04;letter-spacing:-.035em;color:var(--ink)}
+h1{font-size:clamp(2.5rem,5.6vw,4rem);font-weight:600;line-height:1.03;letter-spacing:-.04em;color:var(--ink)}
 h1 .b{background:linear-gradient(120deg,var(--blue),var(--blue-soft));-webkit-background-clip:text;background-clip:text;color:transparent}
-.lede{font-size:1.18rem;line-height:1.6;color:var(--ink-soft);max-width:36ch;margin:1.4rem 0 2rem}
+.lede{font-size:1.18rem;line-height:1.62;color:var(--ink-soft);max-width:40ch;margin:1.4rem 0 1.8rem}
 .cta-row{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center}
-.btn{display:inline-flex;align-items:center;gap:.5rem;font-size:.98rem;font-weight:500;padding:.72rem 1.25rem;border-radius:11px;transition:transform .15s,box-shadow .15s,background .15s}
+.btn{display:inline-flex;align-items:center;gap:.5rem;font-size:.98rem;font-weight:500;padding:.74rem 1.3rem;border-radius:11px;transition:transform .15s,box-shadow .15s,background .15s}
 .btn-primary{color:#fff;background:var(--blue);box-shadow:0 3px 12px rgba(47,111,224,.3)}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(47,111,224,.36)}
 .btn-ghost{color:var(--ink);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)}
 .btn-ghost:hover{transform:translateY(-2px);border-color:var(--silver)}
+.under-cta{margin-top:1rem;font-size:.86rem;color:var(--ink-faint);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.install{display:inline-flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.85rem;background:var(--ink);color:#eef1f6;padding:.5rem .85rem;border-radius:9px;box-shadow:var(--shadow)}
+.install .pr{color:var(--blue-soft)}
+.install button{background:none;border:none;color:#9aa6b8;cursor:pointer;font-family:var(--mono);font-size:.78rem}
+.install button:hover{color:#fff}
 
-/* terminal card */
-.term{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden}
-.term-bar{display:flex;align-items:center;gap:.5rem;padding:.7rem .9rem;border-bottom:1px solid var(--silver-light);background:linear-gradient(180deg,#fff,#f8fafc)}
-.term-bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
-.term-bar i:nth-child(1){background:#e6a4a0}.term-bar i:nth-child(2){background:#e6cfa0}.term-bar i:nth-child(3){background:#a8d6b4}
-.term-bar span{margin-left:.5rem;font-family:var(--mono);font-size:.74rem;color:var(--ink-faint)}
-.term-body{padding:1.2rem 1.3rem;font-family:var(--mono);font-size:.84rem;line-height:1.95;overflow-x:auto}
-.term-body .c{color:var(--ink-faint)}
-.term-body .p{color:var(--blue);font-weight:600}
-.term-body .k{color:var(--ink);font-weight:500}
-.term-body .o{color:var(--green)}
-.term-body .s{color:var(--amber)}
-.cursor{display:inline-block;width:8px;height:1.05em;background:var(--blue);vertical-align:-2px;animation:blink 1.1s step-end infinite}
-@keyframes blink{50%{opacity:0}}
+/* app window mockup */
+.appwin{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden}
+.appwin-bar{display:flex;align-items:center;gap:.5rem;padding:.7rem .9rem;border-bottom:1px solid var(--silver-light);background:linear-gradient(180deg,#fff,#f6f8fb)}
+.appwin-bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.appwin-bar i:nth-child(1){background:#e6a4a0}.appwin-bar i:nth-child(2){background:#e6cfa0}.appwin-bar i:nth-child(3){background:#a8d6b4}
+.appwin-bar span{margin-left:.5rem;font-family:var(--mono);font-size:.74rem;color:var(--ink-faint)}
+.appwin-bar .live{margin-left:auto;font-family:var(--mono);font-size:.66rem;color:var(--green);display:flex;align-items:center;gap:.35rem}
+.appwin-bar .live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(31,157,107,.16)}
+.appwin-body{padding:1.3rem 1.4rem}
+.wb-title{font-size:1.1rem;font-weight:600;letter-spacing:-.02em;margin-bottom:.3rem}
+.wb-prose{font-size:.9rem;color:var(--ink-soft);margin-bottom:.9rem;line-height:1.55}
+.wb-code{font-family:var(--mono);font-size:.78rem;line-height:1.7;background:var(--bg-warm);border:1px solid var(--line);border-radius:9px;padding:.7rem .85rem;overflow-x:auto;margin-bottom:.9rem}
+.wb-code .kw{color:var(--blue);font-weight:600}.wb-code .c{color:var(--ink-faint)}
+.wb-chart{display:flex;align-items:flex-end;gap:.5rem;height:88px;padding:.4rem .2rem 0}
+.wb-chart .bar{flex:1;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--blue-soft),var(--blue));box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.wb-chart .bar:nth-child(odd){background:linear-gradient(180deg,#9fb6e6,#7c92c4)}
+.wb-foot{display:flex;gap:.5rem;margin-top:.8rem;font-family:var(--mono);font-size:.68rem;color:var(--ink-faint)}
+.wb-foot .pill{background:var(--bg-warm);border:1px solid var(--line);border-radius:100px;padding:.18rem .55rem}
 
-/* sections */
-section{padding:4.5rem 0}
-.sec-head{max-width:42rem;margin-bottom:2.6rem}
+section{padding:4.2rem 0}
+.sec-head{max-width:44rem;margin-bottom:2.4rem}
 .sec-eyebrow{font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.7rem}
 .sec-title{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:600;letter-spacing:-.025em;line-height:1.12;color:var(--ink)}
 .sec-sub{font-size:1.06rem;color:var(--ink-soft);margin-top:.9rem;line-height:1.65}
 
-/* two surfaces */
-.surfaces{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem}
-@media(max-width:760px){.surfaces{grid-template-columns:1fr}}
-.surface{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.7rem;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.surface .metal{position:absolute;top:0;left:1.7rem;width:48px}
-.surface h3{font-size:1.18rem;font-weight:600;margin:1rem 0 .5rem;letter-spacing:-.02em}
-.surface .tag{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint)}
-.surface p{color:var(--ink-soft);font-size:.98rem;line-height:1.6}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem}
+@media(max-width:760px){.tri{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:1.5rem;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.card .metal{position:absolute;top:0;left:1.5rem;width:42px}
+.card .ico{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin:.7rem 0 .6rem}
+.card h3{font-size:1.12rem;font-weight:600;margin-bottom:.5rem;letter-spacing:-.02em}
+.card p{color:var(--ink-soft);font-size:.96rem;line-height:1.6}
 
-/* shape grid */
-.shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
-@media(max-width:860px){.shapes{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){.shapes{grid-template-columns:1fr}}
-.shape{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:1.2rem 1.25rem;box-shadow:var(--shadow);transition:transform .18s,box-shadow .18s,border-color .18s}
-.shape:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--silver)}
-.shape .name{font-family:var(--mono);font-size:.92rem;font-weight:600;color:var(--blue);margin-bottom:.4rem}
-.shape p{font-size:.9rem;color:var(--ink-soft);line-height:1.55}
-
-/* panel (mermaid + code) */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);padding:1.8rem;margin-top:1.5rem}
-.mermaid{text-align:center;overflow-x:auto;font-family:var(--mono)}
-.mermaid:not([data-processed]){min-height:60px;color:transparent}
-pre.code{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:1.2rem 1.4rem;overflow-x:auto;font-family:var(--mono);font-size:.85rem;line-height:1.8;color:var(--ink)}
-pre.code .c{color:var(--ink-faint)}
-pre.code .kw{color:var(--blue);font-weight:600}
-pre.code .fn{color:var(--ink);font-weight:600}
-pre.code .st{color:var(--green)}
-
-/* split */
-.split{display:grid;grid-template-columns:1fr 1fr;gap:2.4rem;align-items:center}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:2.6rem;align-items:center}
 @media(max-width:860px){.split{grid-template-columns:1fr;gap:1.6rem}}
 .points{list-style:none;display:flex;flex-direction:column;gap:1.1rem;margin-top:1.2rem}
 .points li{display:flex;gap:.8rem;align-items:flex-start}
-.points .ic{flex:0 0 auto;width:26px;height:26px;border-radius:8px;background:var(--blue-faint);color:var(--blue);display:grid;place-items:center;font-family:var(--mono);font-weight:600;font-size:.8rem;margin-top:.1rem}
+.points .ic{flex:0 0 auto;width:27px;height:27px;border-radius:8px;background:var(--blue-faint);color:var(--blue);display:grid;place-items:center;font-family:var(--mono);font-weight:600;font-size:.85rem;margin-top:.1rem}
 .points strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.1rem}
-.points span{color:var(--ink-soft);font-size:.96rem;line-height:1.55}
+.points span{color:var(--ink-soft);font-size:.97rem;line-height:1.55}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);padding:1.8rem}
+.mermaid{text-align:center;overflow-x:auto;font-family:var(--mono)}
+.mermaid:not([data-processed]){min-height:60px;color:transparent}
 
-/* cta band */
 .band{margin:3rem 0;background:linear-gradient(135deg,#fff,#f1f5fc);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-lg);padding:3rem 2.4rem;text-align:center;position:relative;overflow:hidden}
 .band::after{content:"";position:absolute;inset:0;background:radial-gradient(40rem 20rem at 50% -20%,rgba(47,111,224,.1),transparent 70%);pointer-events:none}
 .band h2{font-size:clamp(1.7rem,3.4vw,2.3rem);font-weight:600;letter-spacing:-.03em}
-.band p{color:var(--ink-soft);margin:.8rem auto 1.6rem;max-width:34rem;font-size:1.05rem}
-.install{display:inline-flex;align-items:center;gap:.7rem;font-family:var(--mono);font-size:.92rem;background:var(--ink);color:#eef1f6;padding:.7rem 1.1rem;border-radius:11px;box-shadow:var(--shadow);margin-bottom:1.4rem}
-.install .pr{color:var(--blue-soft)}
-.install button{background:none;border:none;color:#9aa6b8;cursor:pointer;font-family:var(--mono);font-size:.82rem}
-.install button:hover{color:#fff}
+.band p{color:var(--ink-soft);margin:.8rem auto 1.6rem;max-width:36rem;font-size:1.05rem}
+.platforms{margin-top:1.1rem;font-family:var(--mono);font-size:.82rem;color:var(--ink-faint)}
+.platforms a{color:var(--ink-soft);border-bottom:1px solid var(--line)}
+.platforms a:hover{color:var(--blue)}
 
-/* footer */
+.devnote{display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap;text-align:center;font-size:1rem;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.4rem;box-shadow:var(--shadow)}
+.devnote a{color:var(--blue);font-weight:500;border-bottom:1px solid rgba(47,111,224,.28)}
+.devnote a:hover{border-bottom-color:var(--blue)}
+
 footer{border-top:1px solid var(--line);padding:2.4rem 0;margin-top:2rem;color:var(--ink-faint);font-size:.9rem}
 .foot-in{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
 .foot-in .logo{font-size:.9rem}
 .foot-links{margin-left:auto;display:flex;gap:1.3rem}
 .foot-links a:hover{color:var(--blue)}
 
-/* reveal motion */
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:no-preference){
   .reveal{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
@@ -157,36 +146,35 @@ footer{border-top:1px solid var(--line);padding:2.4rem 0;margin-top:2rem;color:v
     <a class="logo" href="/"><span class="brand-mark"></span> workbooks</a>
     <ul class="nav-links">
       <li><a href="/docs">Docs</a></li>
-      <li><a href="/docs/concepts/what-is-a-toolkit.html">Toolkits</a></li>
       <li><a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a></li>
     </ul>
-    <a class="nav-cta" href="/docs/start/first-toolkit.html">Get started</a>
+    <a class="nav-cta" href="#download">↓ Download</a>
   </div>
 </nav>
 
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow reveal"><span class="dot"></span> open-source runtime · WASM on the BEAM</span>
-      <h1 class="reveal d1">A document that runs.<br/>A <span class="b">toolkit</span> that makes it do more.</h1>
-      <p class="lede reveal d2">A workbook is one <code>.org</code> file — prose, code, and data — that compiles to WebAssembly and publishes as a single <code>.html</code>. A toolkit is how you extend it: sandboxed WASM, any language, run isolated, shipped inside the workbook.</p>
+      <span class="eyebrow reveal"><span class="dot"></span> free desktop app · open source · Apache 2.0</span>
+      <h1 class="reveal d1">Build apps you<br/><span class="b">actually own.</span></h1>
+      <p class="lede reveal d2">Workbooks is a free desktop app where you — and your AI agents — build real software. Every app is one portable file that runs on your machine, offline, yours to keep. No stack to babysit. No service to keep alive.</p>
       <div class="cta-row reveal d3">
-        <a class="btn btn-primary" href="/docs/start/first-toolkit.html">Build your first toolkit →</a>
+        <a class="btn btn-primary" href="#download">Download the desktop app</a>
         <a class="btn btn-ghost" href="/docs">Read the docs</a>
       </div>
+      <div class="under-cta reveal d3">
+        <span class="install"><span class="pr">$</span> curl -fsSL workbooks.sh/install.sh | sh <button onclick="navigator.clipboard&amp;&amp;navigator.clipboard.writeText('curl -fsSL https://workbooks.sh/install.sh | sh')">copy</button></span>
+        <span>macOS · Windows · Linux</span>
+      </div>
     </div>
-    <div class="term reveal d2">
-      <div class="term-bar"><i></i><i></i><i></i><span>~/my-toolkit</span></div>
-      <div class="term-body">
-<span class="c"># write a reverser in any language</span><br/>
-<span class="p">$</span> <span class="k">wb toolkit build-inline</span> rev js ./reverse.js<br/>
-<span class="c">  → compiled in-sandbox · content-addressed · registered</span><br/>
-<br/>
-<span class="p">$</span> <span class="k">run-command</span> rev <span class="c">&lt;&lt;&lt;</span> <span class="s">"hello world"</span><br/>
-<span class="o">  dlrow olleh</span><br/>
-<br/>
-<span class="c"># a toolkit is a workbook — ship it by hash</span><br/>
-<span class="p">$</span> <span class="k">wb pack</span> rev rev.wbundle<span class="cursor"></span><br/>
+    <div class="appwin reveal d2">
+      <div class="appwin-bar"><i></i><i></i><i></i><span>revenue.workbook</span><span class="live">live</span></div>
+      <div class="appwin-body">
+        <div class="wb-title">Q3 Revenue</div>
+        <div class="wb-prose">Pulled from the workbook's own database and grouped by region — recalculates every time it opens.</div>
+        <div class="wb-code"><span class="c">-- runs in the workbook, offline</span><br/><span class="kw">select</span> region, <span class="kw">sum</span>(amount)<br/><span class="kw">from</span> sales <span class="kw">group by</span> region;</div>
+        <div class="wb-chart"><div class="bar" style="height:42%"></div><div class="bar" style="height:68%"></div><div class="bar" style="height:54%"></div><div class="bar" style="height:88%"></div><div class="bar" style="height:71%"></div><div class="bar" style="height:60%"></div></div>
+        <div class="wb-foot"><span class="pill">one file</span><span class="pill">code + data + ui</span><span class="pill">yours</span></div>
       </div>
     </div>
   </div>
@@ -195,51 +183,14 @@ footer{border-top:1px solid var(--line);padding:2.4rem 0;margin-top:2rem;color:v
 <section>
   <div class="wrap">
     <div class="sec-head">
-      <p class="sec-eyebrow">two surfaces</p>
-      <h2 class="sec-title">Workbooks are what you ship. Toolkits are how you make them do more.</h2>
-      <p class="sec-sub">Everything you build is one of two things — and they compose. A toolkit travels inside a workbook; a workbook calls a toolkit live.</p>
+      <p class="sec-eyebrow">what you build</p>
+      <h2 class="sec-title">One file is the whole app.</h2>
+      <p class="sec-sub">A workbook isn't a project folder or a repo full of config. It's a single portable file that carries the code, the data, and the interface together — open it, run it, share it, own it. Like a PDF, except the document is a working app.</p>
     </div>
-    <div class="surfaces">
-      <div class="surface">
-        <div class="metal"></div>
-        <span class="tag">the artifact</span>
-        <h3>Workbook</h3>
-        <p>One <code>.org</code> file that renders and runs. Source blocks compile to WASM; the result publishes as a self-contained <code>.html</code> you can open anywhere. The document <em>is</em> the app.</p>
-      </div>
-      <div class="surface">
-        <div class="metal"></div>
-        <span class="tag">the capability</span>
-        <h3>Toolkit</h3>
-        <p>Sandboxed WASM that does one thing — written in any language, compiled in the sandbox, run isolated, distributed as a workbook. The unit of capability, called by agents, workbooks, and workflows alike.</p>
-      </div>
-    </div>
-    <div class="panel">
-      <pre class="mermaid">
-flowchart LR
-  src["source<br/>any language"] -->|"build in sandbox"| wasm["content-addressed<br/>.wasm"]
-  wasm --> reg(["registered toolkit"])
-  reg --> agent["an agent"]
-  reg --> wb["a workbook"]
-  reg --> ship["pack · sign · install"]
-      </pre>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="sec-head">
-      <p class="sec-eyebrow">one package, six contracts</p>
-      <h2 class="sec-title">A toolkit picks a shape</h2>
-      <p class="sec-sub">One <code>#+EXEC</code> line selects how the artifact is invoked. Same package format, same build pipeline, same trust model.</p>
-    </div>
-    <div class="shapes">
-      <div class="shape"><div class="name">command</div><p>argv + stdin → stdout. A CLI compiled to WASM — the default, the 80% case.</p></div>
-      <div class="shape"><div class="name">component</div><p>A WIT-typed component called in-process, with a real typed API surface.</p></div>
-      <div class="shape"><div class="name">kernel</div><p>A <code>bytes → bytes</code> hot loop. Instantiated once, run millions of times — the render shape.</p></div>
-      <div class="shape"><div class="name">task</div><p>A runnable recipe, no compiled binary. The value is the procedure.</p></div>
-      <div class="shape"><div class="name">federation</div><p>A live data source: <code>SELECT … FROM</code> routes to any JSON API, with an optional sync daemon.</p></div>
-      <div class="shape"><div class="name">posix</div><p>The native escape hatch, for what WASM can't do — contained, deployer opt-in.</p></div>
+    <div class="tri">
+      <div class="card"><div class="metal"></div><div class="ico">code</div><h3>Real code, many languages</h3><p>Write actual software — Rust, Go, Python, JavaScript and more — that runs safely in a sandbox. Not a watered-down builder; the real thing.</p></div>
+      <div class="card"><div class="metal"></div><div class="ico">data</div><h3>Its own data, inside</h3><p>Every workbook can carry its own database. The data travels with the app, queryable in place — nothing to provision, nothing to connect.</p></div>
+      <div class="card"><div class="metal"></div><div class="ico">interface</div><h3>An interface that ships</h3><p>The UI is part of the file. Publish a workbook as one self-contained page that opens in any browser — no server required to view it.</p></div>
     </div>
   </div>
 </section>
@@ -247,24 +198,24 @@ flowchart LR
 <section>
   <div class="wrap split">
     <div>
-      <p class="sec-eyebrow">one substrate, not three</p>
-      <h2 class="sec-title">The document, the runtime, and the package system — collapsed into one.</h2>
+      <p class="sec-eyebrow">on your machine</p>
+      <h2 class="sec-title">It runs where you do.</h2>
+      <p class="sec-sub">Your apps run locally, offline, on hardware you control — not rented from a service that bills per request and has to stay alive for your app to keep working. Bring your own API keys and pay only for what you actually use.</p>
       <ul class="points">
-        <li><span class="ic">1</span><span><strong>The document is the app.</strong><span>A workbook renders and runs — no build pipeline, no config, one file in and one URL out.</span></span></li>
-        <li><span class="ic">2</span><span><strong>The toolkit is the capability.</strong><span>Sandboxed WASM, capability-gated, isolation-tiered — written in the language you already use.</span></span></li>
-        <li><span class="ic">3</span><span><strong>Distribution is the document.</strong><span>A toolkit ships as a workbook; install verifies it by hash. No separate registry to run.</span></span></li>
+        <li><span class="ic">⌂</span><span><strong>Offline-first.</strong><span>The desktop app embeds the runtime, so your workbooks open and run with no server and no internet.</span></span></li>
+        <li><span class="ic">$</span><span><strong>Cheaper by design.</strong><span>One runtime built on Elixir runs many apps on one box — no sprawl of metered functions each with its own bill.</span></span></li>
+        <li><span class="ic">⛁</span><span><strong>Your keys, your data.</strong><span>Plug in your own model provider. Nothing has to leave your machine for an app to work.</span></span></li>
       </ul>
     </div>
     <div class="panel">
       <pre class="mermaid">
 flowchart TB
-  subgraph old["the usual stack — three tools, glued"]
-    d["document"]:::g
-    r["runtime"]:::g
-    p["package system"]:::g
-  end
-  old ==> wb{{"workbooks<br/>one substrate"}}
-  classDef g fill:#eef1f6,stroke:#d6dbe3,color:#3a4453;
+  you["you + your agents"] --> app["Workbooks<br/>desktop app"]
+  app --> rt["embedded runtime<br/>(runs offline)"]
+  rt --> w1["workbook"]
+  rt --> w2["workbook"]
+  rt --> w3["workbook"]
+  app -. "when you choose" .-> cloud["your server<br/>or managed cloud"]
       </pre>
     </div>
   </div>
@@ -275,34 +226,63 @@ flowchart TB
     <div class="panel" style="order:-1">
       <pre class="mermaid">
 flowchart LR
-  i["instance<br/>linear memory"] --> p["os_process<br/>subprocess"]
-  p --> n["node<br/>peer BEAM VM"] --> c["container<br/>kernel boundary"]
-  fp["first-party"] -.-> p
-  tp["third-party"] -.-> n
+  agent["an agent"] -->|writes + runs code| wb{{"workbook<br/>= a sandbox"}}
+  you["you"] --> wb
+  wb --> ship["test · ship · publish"]
+  wb -. "can't break out" .-> host["your machine"]
       </pre>
     </div>
     <div>
-      <p class="sec-eyebrow">safe by construction</p>
-      <h2 class="sec-title">A toolkit can't reach your machine.</h2>
-      <p class="sec-sub">WASM has no ambient authority — no syscalls, no sockets, no filesystem. It does only what the Dock grants, and the host decides how isolated it runs across four escalating tiers.</p>
+      <p class="sec-eyebrow">people + agents</p>
+      <h2 class="sec-title">You and your agents, building together.</h2>
+      <p class="sec-sub">Because a workbook is a sandbox, an agent can write real code and actually run it — with no way to break out. Agents don't just answer here. They build: author a workbook, test it, ship it. You and your agents work on the same files and the same data.</p>
       <ul class="points">
-        <li><span class="ic">↑</span><span><strong>Escalation is one-way.</strong><span>The host can only tighten. More untrusted means more contained — assigned, never requested.</span></span></li>
-        <li><span class="ic">⛨</span><span><strong>The host holds the keys.</strong><span>A toolkit that fetches a URL never sees the API key and never opens a socket.</span></span></li>
+        <li><span class="ic">▷</span><span><strong>They run what they write.</strong><span>An agent's code executes in the same sandbox you trust — safe to let it try, fail, and fix.</span></span></li>
+        <li><span class="ic">≋</span><span><strong>Context stays put.</strong><span>Code and reasoning live side by side in one file, so an agent keeps its place and drifts less the longer it works.</span></span></li>
       </ul>
     </div>
   </div>
 </section>
 
 <section>
+  <div class="wrap split">
+    <div>
+      <p class="sec-eyebrow">own it · ship it</p>
+      <h2 class="sec-title">Keep it forever. Ship it anywhere.</h2>
+      <p class="sec-sub">Every workbook is one self-contained file that opens in any browser — no service that has to stay alive for it to work. When you're ready, send the same file to a container, your own server, or the cloud with a single command. Your app, your infra, your terms.</p>
+      <ul class="points">
+        <li><span class="ic">⊞</span><span><strong>Portable by default.</strong><span>One file is the whole app. Email it, commit it, archive it — it still runs in a year.</span></span></li>
+        <li><span class="ic">→</span><span><strong>Deploy in one command.</strong><span>Run the same workbook locally or push it to where you want it. No pipeline to assemble.</span></span></li>
+      </ul>
+    </div>
+    <div class="card" style="padding:1.8rem">
+      <div class="ico">extend everything</div>
+      <h3 style="font-size:1.18rem">The app is a factory, not a finished product.</h3>
+      <p style="margin-bottom:1rem">Build your own commands, components, and capabilities — in any language — as sandboxed <strong>toolkits</strong>. Hack the runtime itself if you want to. It's all open, and an agent can author a toolkit for you on the spot.</p>
+      <a class="devnote" style="justify-content:flex-start;background:var(--bg-warm)" href="/docs/concepts/what-is-a-toolkit.html">How toolkits work →</a>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:1rem">
+  <div class="wrap">
+    <div class="devnote">
+      Building on the runtime, the format, or the Dock? <a href="/docs">Read the developer docs →</a>
+    </div>
+  </div>
+</section>
+
+<section id="download" style="padding-top:1rem">
   <div class="wrap">
     <div class="band">
-      <h2>Build your first toolkit</h2>
-      <p>No toolchain to install — the compiler is itself WASM, running in the sandbox. Ten minutes from source to a signed, shippable capability.</p>
-      <div class="install"><span class="pr">$</span> curl -fsSL https://workbooks.sh/install.sh | sh <button onclick="navigator.clipboard&amp;&amp;navigator.clipboard.writeText('curl -fsSL https://workbooks.sh/install.sh | sh')">copy</button></div>
+      <h2>Download Workbooks</h2>
+      <p>Free and open source under Apache 2.0 — the desktop app, the runtime, and the format. Bring your own keys; run it all on your machine. Managed cloud is there when you'd rather not babysit infra.</p>
+      <div class="install" style="margin-bottom:1rem"><span class="pr">$</span> curl -fsSL https://workbooks.sh/install.sh | sh <button onclick="navigator.clipboard&amp;&amp;navigator.clipboard.writeText('curl -fsSL https://workbooks.sh/install.sh | sh')">copy</button></div>
       <div class="cta-row" style="justify-content:center">
-        <a class="btn btn-primary" href="/docs/start/first-toolkit.html">Start the walkthrough →</a>
-        <a class="btn btn-ghost" href="/docs/concepts/what-is-a-toolkit.html">What is a toolkit?</a>
+        <a class="btn btn-primary" href="https://github.com/workbooks-sh/workbooks.sh/releases">Download the desktop app</a>
+        <a class="btn btn-ghost" href="/docs/start/first-toolkit.html">Read the docs</a>
       </div>
+      <div class="platforms">macOS · Windows · Linux — or <a href="https://github.com/workbooks-sh/workbooks.sh">star it on GitHub</a></div>
     </div>
   </div>
 </section>
@@ -310,10 +290,10 @@ flowchart LR
 <footer>
   <div class="wrap foot-in">
     <a class="logo" href="/"><span class="brand-mark"></span> workbooks</a>
-    <span>open source · WASM on the BEAM</span>
+    <span>open source · Apache 2.0</span>
     <div class="foot-links">
       <a href="/docs">Docs</a>
-      <a href="/docs/concepts/what-is-a-toolkit.html">Toolkits</a>
+      <a href="#download">Download</a>
       <a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
     </div>
   </div>

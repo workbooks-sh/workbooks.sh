@@ -172,6 +172,7 @@ defmodule Workbooks.PublicWeb do
     """
     <!doctype html><html lang="en"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f3f5f9'/%3E%3Cstop offset='.46' stop-color='%23c9d0db'/%3E%3Cstop offset='1' stop-color='%232f6fe0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3C/svg%3E">
     <title>#{escape(title)} — #{escape(site_title)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -204,7 +205,10 @@ defmodule Workbooks.PublicWeb do
     /* ── sidebar ── */
     .sidebar{width:var(--sidebar-w);flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px)}
     .sidebar-head{padding:1.5rem 1.4rem 1.1rem;display:flex;align-items:center;gap:.6rem}
-    .brand-mark{width:23px;height:23px;border-radius:7px;background:linear-gradient(135deg,#f3f5f9,#c9d0db 46%,var(--blue));box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 2px rgba(35,42,54,.12),0 2px 7px rgba(47,111,224,.22);flex-shrink:0}
+    .brand-mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#f3f5f9,#c9d0db 46%,var(--blue));box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 2px rgba(35,42,54,.12),0 2px 8px rgba(47,111,224,.24);flex:0 0 auto}
+    .sidebar-sub{color:var(--ink-faint);font-weight:400;font-family:var(--mono);font-size:.86rem}
+    .sidebar-sub-link{text-decoration:none;transition:color .15s}
+    .sidebar-sub-link:hover{color:var(--blue)}
     .sidebar-title{font-family:var(--mono);font-size:.86rem;font-weight:600;letter-spacing:.01em;color:var(--ink);text-decoration:none}
     .sidebar-close{display:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:1rem;padding:.2rem;margin-left:auto}
     .nav-body{padding:.5rem .8rem 3rem;flex:1}
@@ -269,7 +273,7 @@ defmodule Workbooks.PublicWeb do
     <div class="grid"></div>
     <div class="topbar">
       <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-      <a href="/index.html" class="topbar-title"><span class="brand-mark"></span> #{escape(site_title)}</a>
+      <a href="/" class="topbar-title"><span class="brand-mark"></span> workbooks <span class="sidebar-sub">docs</span></a>
     </div>
     #{nav_html}
     <div class="page-wrap">
