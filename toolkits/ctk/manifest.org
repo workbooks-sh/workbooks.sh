@@ -43,3 +43,4 @@
   |----------------------+-------------------------------------------------------|
   | =overview=           | First contact — what CTK is, the shell, when to reach |
   | =authoring-a-story=  | Add a component + Org control-spec as a CTK story     |
+  | =runtime-driving=    | Drive a story programmatically (runtime/agent HITL)   |
