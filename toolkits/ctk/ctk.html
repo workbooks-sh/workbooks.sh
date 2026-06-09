@@ -7,27 +7,25 @@
 <!--
   CTK — the Component ToolKit standard shell.
 
-  ONE fixed frame: a story switcher + a VIEW cluster (top bar), a CONTROLS panel
-  (left, generated from the story's Org control-spec), and a STAGE (renders the
-  component). Stories live as separate files under stories/<id>.org; each is an
-  Org spec that BOTH declares the controls (a table) AND carries the component
-  source in a :tangle block. The harness fetches a story, parses the table to
-  build the panel, and imports the tangled source to render — so editing the Org
-  edits the component (tangle/untangle), polyglot by construction.
+  Three kinds of control, never blurred:
+    VIEW   (top bar)   — the lens: zoom / background. Never changes the component.
+    PROPS  (panel top) — the component's shared authored inputs (label, color…).
+    STATES (panel + stage) — the conditions the component can be in. Declared in
+           the spec; rendered SIDE-BY-SIDE on the stage. A state may carry its
+           own per-state controls (e.g. the disabled state's opacity); the panel
+           is a state manager (shared controls + a group per state). A state with
+           no controls just shows on the stage with nothing to tune.
 
-  Roles, inked in:
-    TOP BAR  = how you VIEW it (zoom / background / layout). Never mutates the component.
-    PANEL    = the component's PROPS. The only thing that changes the component.
-
-  Machine-drivable: window.CTK + a postMessage protocol let the runtime/agent
-  read the spec and set controls (the human-in-the-loop substrate). Serve over
-  http (fetch needs it): `python3 -m http.server 5180` in this dir.
+  Stories live as separate files under stories/<id>.org — an Org spec that
+  declares Controls + States and carries the component source in a :tangle block.
+  The harness imports that block to render. Machine-drivable via window.CTK +
+  postMessage. Serve over http (fetch needs it): `python3 -m http.server 5180`.
 -->
 <style>
   :root {
     --vellum: #f7f8fa; --paper: #fff; --ink: #16181d; --ink-2: #565b66;
     --ink-3: #888e99; --line: #e6e8ec; --line-2: #d3d7de; --signal: #2f6fe0;
-    --signal-wash: #eaf1fd; --radius: 10px;
+    --signal-wash: #eaf1fd;
     --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
@@ -35,7 +33,6 @@
   html, body { height: 100%; margin: 0; }
   body { font-family: var(--font); color: var(--ink); background: var(--vellum); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-  /* ── top bar ── */
   .topbar { flex: 0 0 48px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--paper); border-bottom: 1px solid var(--line); }
   .story-pick { display: inline-flex; align-items: center; gap: 8px; }
   .story-pick .tag { font: 600 9px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--signal); background: var(--signal-wash); padding: 4px 6px; border-radius: 5px; }
@@ -49,13 +46,13 @@
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button.on { background: var(--ink); color: #fff; }
 
-  /* ── body: controls | stage ── */
-  .main { flex: 1 1 auto; display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+  .main { flex: 1 1 auto; display: grid; grid-template-columns: 256px 1fr; min-height: 0; }
   .panel { border-right: 1px solid var(--line); background: var(--paper); overflow-y: auto; padding: 16px 14px; }
   .panel-head { margin-bottom: 14px; }
+  .panel-head.mt { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
   .panel-head h2 { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 3px; }
   .panel-head .sub { font-size: 11px; color: var(--ink-3); }
-  .ctrl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .ctrl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
   .ctrl label { font-size: 12px; font-weight: 500; color: var(--ink-2); display: flex; justify-content: space-between; }
   .ctrl label .val { font: 500 11px/1 var(--mono); color: var(--ink-3); }
   .ctrl input[type=text], .ctrl select { font: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--vellum); color: var(--ink); width: 100%; }
@@ -63,34 +60,31 @@
   .ctrl input[type=color] { width: 100%; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); padding: 2px; cursor: pointer; }
   .ctrl .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   .ctrl .toggle input { accent-color: var(--signal); width: 16px; height: 16px; }
-  .panel .src-note { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 12px; }
-  .panel .src-note code { font: 500 11px var(--mono); color: var(--signal); }
+  /* states manager */
+  .state-grp { margin-bottom: 14px; }
+  .state-grp .state-name { font: 600 11px/1 var(--mono); color: var(--ink); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .state-grp .state-name::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+  .state-grp .state-empty { font-size: 11px; color: var(--ink-3); font-style: italic; margin-bottom: 4px; }
+  .src-note { margin-top: 18px; font-size: 11px; line-height: 1.5; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 12px; }
+  .src-note code { font: 500 11px var(--mono); color: var(--signal); }
 
-  /* ── stage ── */
   .stage-wrap { position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 32px; }
   .stage-wrap[data-vibe=light] { background: #fafbfc; }
   .stage-wrap[data-vibe=dark]  { background: #15171c; }
   .stage-wrap[data-vibe=grid]  { background: #fafbfc; background-image: radial-gradient(var(--line-2) 1px, transparent 1px); background-size: 16px 16px; }
   .stage-wrap[data-vibe=dark] .cap { color: #8b90998c; }
   .zoom { transform-origin: center center; transition: transform .12s ease-out; }
-  .gallery { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; justify-content: center; }
-  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .cap { font: 500 10px/1 var(--mono); letter-spacing: .04em; color: var(--ink-3); }
+  .gallery { display: flex; flex-wrap: wrap; gap: 34px; align-items: flex-end; justify-content: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .cap { font: 500 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .mount { display: inline-flex; align-items: center; justify-content: center; }
 </style>
 </head>
 <body>
   <div class="topbar">
-    <span class="story-pick">
-      <span class="tag">Story</span>
-      <select id="story-seg"></select>
-    </span>
-    <span class="group" id="state-group" style="display:none">
-      <span class="lbl" title="Which declared condition to render — inspection, not a free prop">State</span>
-      <span class="seg" id="state-seg"></span>
-    </span>
+    <span class="story-pick"><span class="tag">Story</span><select id="story-seg"></select></span>
     <span class="view">
-      <span class="view-tag" title="These change how you VIEW the component — never the component itself">View</span>
+      <span class="view-tag" title="Changes how you VIEW — never the component">View</span>
       <span class="group"><span class="lbl">Zoom</span><span class="seg" id="zoom-seg"></span></span>
       <span class="group"><span class="lbl">Background</span>
         <span class="seg" id="vibe-seg">
@@ -99,7 +93,7 @@
           <button data-v="grid">Grid</button>
         </span>
       </span>
-      <span class="group"><span class="lbl">Layout</span>
+      <span class="group" id="layout-group"><span class="lbl">Layout</span>
         <span class="seg" id="mode-seg">
           <button data-v="focus" class="on">Focus</button>
           <button data-v="gallery">Gallery</button>
@@ -110,15 +104,16 @@
 
   <div class="main">
     <aside class="panel">
-      <div class="panel-head">
-        <h2>Controls</h2>
-        <span class="sub" id="panel-sub">the component's props</span>
-      </div>
+      <div class="panel-head"><h2>Controls</h2><span class="sub" id="panel-sub">shared props — apply to every state</span></div>
       <div id="controls"></div>
-      <p class="src-note">The panel edits the <em>component</em> (its props, from the
-        story's Org table). The top bar only changes how you <em>view</em> it — it
-        never touches the component. Source comes from the spec's <code>:tangle</code>
-        block. Drive it from code via <code>window.CTK</code>.</p>
+      <div id="states-wrap">
+        <div class="panel-head mt"><h2>States</h2><span class="sub">shown side-by-side on the stage</span></div>
+        <div id="states-mgr"></div>
+      </div>
+      <p class="src-note">Three kinds of control: <em>View</em> (top — the lens),
+        <em>Props</em> (shared inputs), <em>States</em> (conditions, side-by-side;
+        each may have its own per-state controls). Source comes from the spec's
+        <code>:tangle</code> block. Drive it via <code>window.CTK</code>.</p>
     </aside>
     <div class="stage-wrap" id="stage-wrap" data-vibe="light">
       <div class="zoom" id="zoom"><div class="mount" id="stage"></div></div>
@@ -126,29 +121,20 @@
   </div>
 
 <script type="module">
-  // ── CTK harness — generic; story-driven; machine-drivable ─────────────────
   const STORIES = ["folder-icon", "button"];
-  const ZOOM = [
-    { l: "50%", v: 0.5 }, { l: "75%", v: 0.75 }, { l: "100%", v: 1 },
-    { l: "150%", v: 1.5 }, { l: "200%", v: 2 },
-  ];
-
-  // DOM
+  const ZOOM = [{ l: "50%", v: 0.5 }, { l: "75%", v: 0.75 }, { l: "100%", v: 1 }, { l: "150%", v: 1.5 }, { l: "200%", v: 2 }];
   const $ = (id) => document.getElementById(id);
-  const stage = $("stage"), zoomEl = $("zoom"), panel = $("controls");
-  const storySel = $("story-seg"), panelSub = $("panel-sub");
+  const stage = $("stage"), zoomEl = $("zoom"), panel = $("controls"), statesMgr = $("states-mgr");
 
-  // per-story state (reassigned on load)
+  // per-story state
   let defs = [], props = {}, render = null, rangeDef = null, currentOrg = "", currentId = "";
-  let stateDefs = [], stateName = "default"; // declared states (prop-override sets)
-  const inputs = {}; // prop -> <input/select> for programmatic reflection
-  // view state (persists across stories)
+  let stateDefs = [], stateValues = {};   // stateDefs: [{state, overrides, controls}]; stateValues[state][prop]
   let zoom = 1, mode = "focus";
 
-  const coerce = (type, v) =>
-    type === "range" ? Number(v) : type === "toggle" ? (v === "true" || v === true) : v;
+  const coerce = (type, v) => type === "range" ? Number(v) : type === "toggle" ? (v === "true" || v === true) : v;
   const typeOf = (p) => (defs.find((d) => d.prop === p) || {}).type;
 
+  // ── parsing ──
   function parseControls(src) {
     const rows = src.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("|") && !l.includes("---"));
     if (!rows.length) return [];
@@ -156,154 +142,136 @@
     const head = cells(rows[0]).map((h) => h.toLowerCase());
     return rows.slice(1).map((r) => { const c = cells(r); const o = {}; head.forEach((h, i) => (o[h] = c[i])); return o; });
   }
-
-  // States = named prop-override sets. "disabled:true, loading:false" → {disabled:true,loading:false}
+  function parseKV(str) {
+    const o = {};
+    (str || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((kv) => {
+      const [k, v] = kv.split(":").map((x) => x.trim());
+      o[k] = v === "true" ? true : v === "false" ? false : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
+    });
+    return o;
+  }
+  // States: each `*** name` block carries an optional :OVERRIDE: line + an
+  // optional controls table (its per-state controls).
   function parseStates(src) {
-    const rows = src.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("|") && !l.includes("---"));
-    if (!rows.length) return [];
-    const cells = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
-    const head = cells(rows[0]).map((h) => h.toLowerCase());
-    const si = head.indexOf("state"), pi = head.indexOf("props");
-    return rows.slice(1).map((r) => {
-      const c = cells(r);
-      const overrides = {};
-      (c[pi] || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((kv) => {
-        const [k, v] = kv.split(":").map((x) => x.trim());
-        overrides[k] = v === "true" ? true : v === "false" ? false : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
-      });
-      return { state: c[si], overrides };
+    return src.split(/^\*\*\* /m).slice(1).map((b) => {
+      const state = b.split("\n")[0].trim();
+      const ov = (b.match(/:OVERRIDE:\s*(.+)/) || [])[1];
+      return { state, overrides: ov ? parseKV(ov) : {}, controls: parseControls(b) };
     });
   }
 
+  // ── one control widget, reused by shared props + per-state controls ──
+  function makeControl(def, value, onChange) {
+    const wrap = document.createElement("div"); wrap.className = "ctrl";
+    const t = def.type;
+    if (t === "toggle") {
+      wrap.innerHTML = `<label class="toggle"><input type="checkbox" ${value ? "checked" : ""}/> ${def.prop}</label>`;
+      wrap.querySelector("input").addEventListener("change", (e) => onChange(e.target.checked));
+    } else if (t === "color") {
+      wrap.innerHTML = `<label>${def.prop}<span class="val">${value}</span></label><input type="color" value="${value}"/>`;
+      const val = wrap.querySelector(".val");
+      wrap.querySelector("input").addEventListener("input", (e) => { val.textContent = e.target.value; onChange(e.target.value); });
+    } else if (t === "range") {
+      const [range, step] = (def["range/options"] || "0..100").split(":");
+      const [min, max] = range.split("..").map(Number);
+      const st = step ?? (Number.isInteger(min) && Number.isInteger(max) ? 1 : "any");
+      wrap.innerHTML = `<label>${def.prop}<span class="val">${value}</span></label><input type="range" min="${min}" max="${max}" step="${st}" value="${value}"/>`;
+      const val = wrap.querySelector(".val");
+      wrap.querySelector("input").addEventListener("input", (e) => { val.textContent = e.target.value; onChange(Number(e.target.value)); });
+    } else if (t === "select") {
+      const opts = (def["range/options"] || "").split("|").map((o) => o.trim()).filter(Boolean);
+      wrap.innerHTML = `<label>${def.prop}</label><select>${opts.map((o) => `<option ${o === value ? "selected" : ""}>${o}</option>`).join("")}</select>`;
+      wrap.querySelector("select").addEventListener("change", (e) => onChange(e.target.value));
+    } else {
+      wrap.innerHTML = `<label>${def.prop}</label><input type="text" value="${value ?? ""}"/>`;
+      wrap.querySelector("input").addEventListener("input", (e) => onChange(e.target.value));
+    }
+    return wrap;
+  }
+
+  // ── load a story ──
   async function loadStory(id) {
     currentOrg = await (await fetch(`stories/${id}.org`)).text();
     currentId = id;
     const name = (currentOrg.match(/:NAME:\s*(.+)/) || [])[1]?.trim() || id;
-    panelSub.textContent = name + " props — edits the component";
+    $("panel-sub").textContent = `${name} — shared props`;
 
-    const ctrlSection = (currentOrg.split(/^\*\* Controls/m)[1] || "").split(/^\*\* /m)[0];
-    defs = parseControls(ctrlSection);
+    defs = parseControls((currentOrg.split(/^\*\* Controls/m)[1] || "").split(/^\*\* /m)[0]);
+    stateDefs = parseStates((currentOrg.split(/^\*\* States/m)[1] || "").split(/^\*\* /m)[0]);
 
     const src = (currentOrg.match(/:tangle component\.js\s*\n([\s\S]*?)#\+end_src/) || [])[1] || "";
-    const code = src.replace(/^\s{2}/gm, "");
-    const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
-    render = (await import(url)).render;
+    render = (await import(URL.createObjectURL(new Blob([src.replace(/^\s{2}/gm, "")], { type: "text/javascript" })))).render;
 
     props = {};
     defs.forEach((d) => (props[d.prop] = coerce(d.type, d.default)));
     rangeDef = defs.find((d) => d.type === "range");
-
-    const stSection = (currentOrg.split(/^\*\* States/m)[1] || "").split(/^\*\* /m)[0];
-    stateDefs = parseStates(stSection);
-    stateName = stateDefs[0]?.state ?? "default";
+    stateValues = {};
+    stateDefs.forEach((s) => { stateValues[s.state] = {}; s.controls.forEach((d) => (stateValues[s.state][d.prop] = coerce(d.type, d.default))); });
 
     buildPanel();
-    buildStatePicker();
+    buildStates();
+    $("layout-group").style.display = stateDefs.length ? "none" : ""; // matrix is the view when states exist
     draw();
-  }
-
-  function buildStatePicker() {
-    const seg = $("state-seg"), grp = $("state-group");
-    seg.innerHTML = "";
-    if (stateDefs.length < 2) { grp.style.display = "none"; return; } // no states → no picker
-    grp.style.display = "";
-    stateDefs.forEach((s) => {
-      const b = document.createElement("button"); b.textContent = s.state;
-      if (s.state === stateName) b.className = "on";
-      b.onclick = () => { stateName = s.state; [...seg.children].forEach((c) => c.classList.toggle("on", c === b)); draw(); };
-      seg.appendChild(b);
-    });
   }
 
   function buildPanel() {
     panel.innerHTML = "";
-    for (const k in inputs) delete inputs[k];
-    defs.forEach((d) => {
-      const wrap = document.createElement("div");
-      wrap.className = "ctrl";
-      if (d.type === "toggle") {
-        wrap.innerHTML = `<label class="toggle"><input type="checkbox" ${props[d.prop] ? "checked" : ""}/> ${d.prop}</label>`;
-        const inp = wrap.querySelector("input");
-        inp.addEventListener("change", (e) => set(d.prop, e.target.checked));
-        inputs[d.prop] = inp;
-      } else if (d.type === "color") {
-        wrap.innerHTML = `<label>${d.prop}<span class="val">${props[d.prop]}</span></label><input type="color" value="${props[d.prop]}"/>`;
-        const inp = wrap.querySelector("input"), val = wrap.querySelector(".val");
-        inp.addEventListener("input", (e) => { val.textContent = e.target.value; set(d.prop, e.target.value); });
-        inputs[d.prop] = inp;
-      } else if (d.type === "range") {
-        const [min, max] = (d["range/options"] || "0..100").split("..").map(Number);
-        wrap.innerHTML = `<label>${d.prop}<span class="val">${props[d.prop]}</span></label><input type="range" min="${min}" max="${max}" value="${props[d.prop]}"/>`;
-        const inp = wrap.querySelector("input"), val = wrap.querySelector(".val");
-        inp.addEventListener("input", (e) => { val.textContent = e.target.value; set(d.prop, Number(e.target.value)); });
-        inputs[d.prop] = inp;
-      } else if (d.type === "select") {
-        const opts = (d["range/options"] || "").split("|").map((o) => o.trim()).filter(Boolean);
-        wrap.innerHTML = `<label>${d.prop}</label><select>${opts.map((o) => `<option ${o === props[d.prop] ? "selected" : ""}>${o}</option>`).join("")}</select>`;
-        const inp = wrap.querySelector("select");
-        inp.addEventListener("change", (e) => set(d.prop, e.target.value));
-        inputs[d.prop] = inp;
+    defs.forEach((d) => panel.appendChild(makeControl(d, props[d.prop], (v) => { props[d.prop] = v; draw(); })));
+  }
+  function buildStates() {
+    statesMgr.innerHTML = "";
+    $("states-wrap").style.display = stateDefs.length ? "" : "none";
+    stateDefs.forEach((s) => {
+      const grp = document.createElement("div"); grp.className = "state-grp";
+      const nm = document.createElement("div"); nm.className = "state-name"; nm.textContent = s.state;
+      grp.appendChild(nm);
+      if (s.controls.length) {
+        s.controls.forEach((d) => grp.appendChild(makeControl(d, stateValues[s.state][d.prop], (v) => { stateValues[s.state][d.prop] = v; draw(); })));
       } else {
-        wrap.innerHTML = `<label>${d.prop}</label><input type="text" value="${props[d.prop] ?? ""}"/>`;
-        const inp = wrap.querySelector("input");
-        inp.addEventListener("input", (e) => set(d.prop, e.target.value));
-        inputs[d.prop] = inp;
+        const e = document.createElement("div"); e.className = "state-empty"; e.textContent = "no state-specific controls";
+        grp.appendChild(e);
       }
-      panel.appendChild(wrap);
+      statesMgr.appendChild(grp);
     });
   }
 
-  // set a prop. fromUI=false (the default for the CTK API) also reflects the
-  // new value back into the visible control.
-  function set(k, v, fromUI = true) {
-    props[k] = v;
-    if (!fromUI) reflect(k, v);
-    draw();
-  }
-  function reflect(k, v) {
-    const inp = inputs[k]; if (!inp) return;
-    if (inp.type === "checkbox") inp.checked = !!v; else inp.value = v;
-    const val = inp.closest(".ctrl")?.querySelector(".val"); if (val) val.textContent = v;
-  }
+  // effective props for a state's cell = shared ∪ override ∪ per-state values
+  const effective = (s) => ({ ...props, ...s.overrides, ...stateValues[s.state] });
 
   function applyZoom() { zoomEl.style.transform = `scale(${zoom})`; }
-  function curOverrides() { return stateDefs.find((s) => s.state === stateName)?.overrides || {}; }
-  function cellOf(extra, label) {
-    const cell = document.createElement("div"); cell.className = "cell";
+  function cell(fullProps, label) {
+    const c = document.createElement("div"); c.className = "cell";
     const mount = document.createElement("div");
-    render(mount, { ...props, ...extra });
+    render(mount, fullProps);
     const cap = document.createElement("span"); cap.className = "cap"; cap.textContent = label;
-    cell.append(mount, cap); return cell;
+    c.append(mount, cap); return c;
   }
   function draw() {
     if (!render) return;
     stage.innerHTML = "";
-    const ov = curOverrides();
-    if (mode === "gallery" && stateDefs.length > 1) {
-      // state matrix — every declared state, side by side
+    if (stateDefs.length) {
+      // side-by-side state matrix (the default for stateful components)
       const g = document.createElement("div"); g.className = "gallery";
-      stateDefs.forEach((s) => g.appendChild(cellOf(s.overrides, s.state)));
+      stateDefs.forEach((s) => g.appendChild(cell(effective(s), s.state)));
       stage.appendChild(g);
     } else if (mode === "gallery" && rangeDef) {
-      // sweep the first range control (within the active state)
-      const [mn, mx] = (rangeDef["range/options"] || "0..100").split("..").map(Number);
+      const [mn, mx] = (rangeDef["range/options"].split(":")[0] || "0..100").split("..").map(Number);
       const vals = Array.from({ length: 5 }, (_, i) => Math.round(mn + ((mx - mn) * i) / 4));
       const g = document.createElement("div"); g.className = "gallery";
-      vals.forEach((v) => g.appendChild(cellOf({ ...ov, [rangeDef.prop]: v }, `${rangeDef.prop} ${v}`)));
+      vals.forEach((v) => g.appendChild(cell({ ...props, [rangeDef.prop]: v }, `${rangeDef.prop} ${v}`)));
       stage.appendChild(g);
     } else {
-      render(stage, { ...props, ...ov });
+      render(stage, { ...props });
     }
   }
 
-  // ── top bar: story switcher + VIEW controls ──
+  // ── top bar: story + view ──
   STORIES.forEach((id) => {
     const o = document.createElement("option"); o.value = id;
     o.textContent = id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    storySel.appendChild(o);
+    $("story-seg").appendChild(o);
   });
-  storySel.onchange = () => loadStory(storySel.value);
-
+  $("story-seg").onchange = () => loadStory($("story-seg").value);
   ZOOM.forEach(({ l, v }) => {
     const b = document.createElement("button"); b.textContent = l; if (v === zoom) b.className = "on";
     b.onclick = () => { zoom = v; [...$("zoom-seg").children].forEach((c) => c.classList.toggle("on", c === b)); applyZoom(); };
@@ -312,28 +280,25 @@
   $("vibe-seg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; $("stage-wrap").dataset.vibe = b.dataset.v; [...e.currentTarget.children].forEach((c) => c.classList.toggle("on", c === b)); };
   $("mode-seg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mode = b.dataset.v; [...e.currentTarget.children].forEach((c) => c.classList.toggle("on", c === b)); draw(); };
 
-  // ── machine-drivable surface (milestone 3 substrate) ──
-  // The runtime/agent reads the spec + sets controls programmatically. A host
-  // (e.g. the runtime serving this in an iframe) drives it via postMessage;
-  // an agent in devtools drives it via window.CTK directly.
+  // ── machine-drivable surface ──
   window.CTK = {
     stories: STORIES,
     get current() { return currentId; },
     load: (id) => loadStory(id),
-    spec: () => currentOrg,                 // raw Org control-spec
+    spec: () => currentOrg,
     controls: () => defs.map((d) => ({ ...d })),
-    states: () => stateDefs.map((s) => s.state),
-    state: () => stateName,
-    setState: (n) => { if (stateDefs.some((s) => s.state === n)) { stateName = n; buildStatePicker(); draw(); } },
+    states: () => stateDefs.map((s) => ({ state: s.state, overrides: { ...s.overrides }, controls: s.controls.map((c) => ({ ...c })) })),
     props: () => ({ ...props }),
+    stateProps: (name) => ({ ...(stateValues[name] || {}) }),
     get: (p) => props[p],
-    set: (p, v) => set(p, coerce(typeOf(p), v), false),
-    snapshot: () => ({ story: currentId, state: stateName, props: { ...props } }),
+    set: (p, v) => { props[p] = coerce(typeOf(p), v); buildPanel(); draw(); },
+    setStateProp: (name, p, v) => { if (stateValues[name]) { stateValues[name][p] = v; buildStates(); draw(); } },
+    snapshot: () => ({ story: currentId, props: { ...props }, states: Object.fromEntries(stateDefs.map((s) => [s.state, effective(s)])) }),
   };
   window.addEventListener("message", (e) => {
     const m = e.data; if (!m || m.ctk !== true) return;
     if (m.action === "set") window.CTK.set(m.prop, m.value);
-    else if (m.action === "setState") window.CTK.setState(m.state);
+    else if (m.action === "setStateProp") window.CTK.setStateProp(m.state, m.prop, m.value);
     else if (m.action === "load") window.CTK.load(m.story);
     else if (m.action === "snapshot") e.source?.postMessage({ ctk: true, reply: "snapshot", data: window.CTK.snapshot() }, "*");
   });

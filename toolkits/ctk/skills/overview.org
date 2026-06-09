@@ -29,35 +29,37 @@
   kinds of control, and keeping them separate is the whole point:
 
   #+begin_example
-  ┌ Story ▾   State: default·disabled·loading       View: Zoom · Bg · Layout ┐
-  ├───────────────┬───────────────────────────────────────────────────────────┤
-  │ CONTROLS      │                        STAGE                                │
-  │ (props)       │                 renders the component                       │
-  └───────────────┴───────────────────────────────────────────────────────────┘
+  ┌ Story ▾                                          View: Zoom · Background ┐
+  ├──────────────────┬────────────────────────────────────────────────────────┤
+  │ CONTROLS (props) │                                                          │
+  │  label  variant… │   STATE MATRIX — every state rendered side-by-side       │
+  │ ─────────────────│   [ default ]    [ disabled ]    [ loading ]            │
+  │ STATES (manager) │                                                          │
+  │  disabled→opacity│                                                          │
+  └──────────────────┴────────────────────────────────────────────────────────┘
   #+end_example
 
-  - *VIEW* (top bar, right) — the lens: zoom / background / layout. NEVER changes
-    the component; pure inspection.
-  - *STATE* (top bar) — which declared condition to render: default / disabled /
-    loading / … A picker built from the spec's =States= table; gallery shows the
-    whole state matrix at once. This is inspection ("show me this state"), not
-    authoring a value.
-  - *PROPS* (left panel) — the component's free authored inputs: label, variant,
-    color, size. The ONLY free-tune surface; the only thing that mutates the
-    component by value.
+  - *VIEW* (top bar) — the lens: zoom / background. NEVER changes the component.
+  - *PROPS* (panel, top) — the component's shared authored inputs (label,
+    variant, color, size). Apply to every state. The free-tune surface.
+  - *STATES* (panel "manager" + the stage) — the conditions the component can be
+    in (default / disabled / loading / …). They render *side-by-side* on the
+    stage, not flipped via a picker. Each state may carry its OWN per-state
+    controls (e.g. the disabled state's =opacity=); the panel lists a group per
+    state with those controls, or "no state-specific controls."
 
-  The line that resolves the common confusion: a condition like =disabled= is a
-  *state* (you inspect it), not a *prop* (you tune it) — so it lives in the State
-  picker, never the panel. =variant= (which button you chose) IS a prop.
+  The line that resolves the common confusion: a *value you author* is a PROP
+  (=label=, =variant=); a *condition the component can be in* is a STATE
+  (=disabled=, =loading=). A per-state control tunes one state's cell only.
 
   You supply only:
   1. *A component* exposing =render(el, props)= (any language → a module with render).
-  2. *An Org spec* with a =Controls= table (free props), an optional =States= table
-     (named prop-override sets), and the source in a =:tangle= block. The shell
-     imports that block to render — so the Org IS the component (tangle + polyglot).
+  2. *An Org spec* — a =Controls= table (shared props), a =States= section
+     (states with optional per-state controls), and the source in a =:tangle=
+     block. The shell imports that block to render (tangle + polyglot).
 
-  Prop control types: =text=, =color=, =range= (=min..max=), =toggle=, =select=
-  (=a|b|c=). Each binds to a prop and re-renders live.
+  Prop control types: =text=, =color=, =range= (=min..max= or =min..max:step=),
+  =toggle=, =select= (=a|b|c=).
 
 * Workflow — see it now
 

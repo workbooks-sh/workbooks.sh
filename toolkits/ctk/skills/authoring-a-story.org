@@ -53,11 +53,14 @@
     | shape  | select | round   | round|square  |
 
   ,** States
-    | state    | props                    |
-    |----------+--------------------------|
-    | default  |                          |
-    | disabled | disabled:true            |
-    | loading  | loading:true             |
+  ,*** default
+  ,*** disabled
+      :OVERRIDE: disabled:true
+      | prop    | type  | default | range/options |
+      |---------+-------+---------+---------------|
+      | opacity | range | 0.55    | 0..1:0.05     |
+  ,*** loading
+      :OVERRIDE: loading:true
 
   ,** Source
     ,#+begin_src js :tangle component.js
@@ -65,25 +68,29 @@
     ,#+end_src
   #+end_src
 
-  Controls schema:
+  Controls schema (the SHARED props — apply to every state):
   - =prop= — must match a key read in =render=.
   - =type= — =text= | =color= | =range= | =toggle= | =select=.
   - =default= — seeds the prop (coerced by type: range→number, toggle→bool).
-  - =range/options= — =min..max= for range; =a|b|c= for select; blank otherwise.
+  - =range/options= — =min..max= (optionally =min..max:step=) for range; =a|b|c=
+    for select; blank otherwise.
 
   States schema (optional — omit the section if the component has no conditions):
-  - =state= — the condition name shown in the State picker. First row = default.
-  - =props= — comma-separated =key:value= overrides applied on top of the base
-    props when that state is active (=disabled:true=, =loading:true=). Values
-    coerce: =true=/=false=→bool, numeric→number, else string.
+  - Each =*** <name>= headline is a state; it renders as its own cell on the
+    stage, *side-by-side* with the others. The first headline is the base/default.
+  - =:OVERRIDE:= (optional) — comma-separated =key:value= props applied for that
+    state (=disabled:true=). Values coerce: true/false→bool, numeric→number.
+  - An optional controls table under the headline = that state's PER-STATE
+    controls: props you can tune for THAT cell only (e.g. the disabled state's
+    =opacity=). Same columns as =Controls=.
 
   *Props vs States — the rule that prevents the disabled-button confusion:*
   - A *prop* is a value a consumer authors (=label=, =variant=, =color=, =size=).
-    It belongs in =Controls= and the left panel.
+    It belongs in =Controls= (shared, left panel).
   - A *state* is a condition the component can be in (=default=, =disabled=,
-    =loading=, =error=, =empty=). It belongs in =States= and the top-bar State
-    picker — you INSPECT it, you don't tune it. The component still reads it as a
-    plain prop; CTK just decides whether it's a tunable control or a state.
+    =loading=, =error=). It belongs in =States= — rendered side-by-side, not
+    tuned. Give a state its own controls only when something about THAT state is
+    worth tuning (the disabled opacity); otherwise it just shows on the stage.
 
 * Workflow
 

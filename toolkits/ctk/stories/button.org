@@ -12,23 +12,30 @@
   | size    | range  | 14       | 11..20                 |
 
 ** States
-  | state    | props         |
-  |----------+---------------|
-  | default  |               |
-  | disabled | disabled:true |
-  | loading  | loading:true  |
+   States render side-by-side on the stage. A state = a base OVERRIDE (what makes
+   it that state) + optional per-state controls (what you can tune for THAT state
+   only). `default` has neither; `disabled` exposes its own opacity; `loading`
+   just overrides a prop with nothing to tune.
+*** default
+*** disabled
+    :OVERRIDE: disabled:true
+    | prop    | type  | default | range/options |
+    |---------+-------+---------+---------------|
+    | opacity | range | 0.55    | 0..1:0.05     |
+*** loading
+    :OVERRIDE: loading:true
 
 ** Source
   #+begin_src js :tangle component.js
-  // Same render(el, props) contract. Note: `disabled`/`loading` are NOT in the
-  // Controls table — they are declared States (prop-override sets), so the bench
-  // shows a State picker for them instead of free-tune props. The component just
-  // reads them like any prop; CTK decides whether a prop is a tunable control or
-  // a state condition.
+  // render(el, props). `disabled`/`loading` arrive via state OVERRIDEs; `opacity`
+  // arrives from the disabled state's per-state control. The component just reads
+  // props — CTK decides which are shared controls, which are states, and which
+  // are per-state controls.
   export function render(el, props) {
     const { label = "Button", variant = "primary", accent = "#2f6fe0",
-            size = 14, disabled = false, loading = false } = props;
+            size = 14, disabled = false, loading = false, opacity } = props;
     const off = disabled || loading;
+    const op = opacity != null ? opacity : (off ? 0.55 : 1);
     const pad = `${Math.round(size * 0.7)}px ${Math.round(size * 1.3)}px`;
     const radius = `${Math.round(size * 0.7)}px`;
     let bg, fg, border, shadow;
@@ -44,7 +51,7 @@
         font: 600 ${size}px/1 -apple-system,'Geist',system-ui,sans-serif;
         padding:${pad}; border-radius:${radius}; border:${border};
         background:${bg}; color:${fg}; box-shadow:${off ? "none" : shadow};
-        cursor:${off ? "not-allowed" : "pointer"}; opacity:${off ? 0.55 : 1};
+        cursor:${off ? "not-allowed" : "pointer"}; opacity:${op};
         transition:transform .06s; ">${content}</button>`;
     const b = el.querySelector("button");
     if (!off) {

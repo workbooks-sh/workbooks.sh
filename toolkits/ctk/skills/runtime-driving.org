@@ -41,11 +41,14 @@
   | =CTK.current=         | the loaded story id                                     |
   | =CTK.load(id)=        | switch story (re-parses spec, re-imports source)        |
   | =CTK.spec()=          | the raw Org control-spec text of the current story      |
-  | =CTK.controls()=      | parsed control defs: =[{prop,type,default,...}]=        |
-  | =CTK.props()=         | the live prop values                                    |
-  | =CTK.get(prop)=       | one prop value                                          |
-  | =CTK.set(prop, v)=    | set a prop — re-renders AND reflects into the visible control |
-  | =CTK.snapshot()=      | ={ story, props }= — the reviewable state               |
+  | =CTK.controls()=      | shared (prop) control defs: =[{prop,type,default,...}]=  |
+  | =CTK.states()=        | =[{state, overrides, controls}]= — states + per-state controls |
+  | =CTK.props()=         | the live SHARED prop values                             |
+  | =CTK.stateProps(name)=| the live per-state control values for one state         |
+  | =CTK.get(prop)=       | one shared prop value                                   |
+  | =CTK.set(prop, v)=    | set a shared prop — re-renders all states + reflects in panel |
+  | =CTK.setStateProp(name, prop, v)= | set one state's per-state control               |
+  | =CTK.snapshot()=      | ={ story, props, states }= — props + each state's effective props |
 
   =set= coerces by the control's declared type (range→number, toggle→bool), so a
   driver can pass strings safely.
