@@ -146,7 +146,7 @@ pub fn check_error(json: &str) -> Result<()> {
 /// guards below instead.
 #[macro_export]
 macro_rules! bind {
-    ($bindings:path) => {
+    ($bindings:ident) => {
         #[allow(unused_imports)]
         mod dock_caps {
             use super::$bindings as b;
