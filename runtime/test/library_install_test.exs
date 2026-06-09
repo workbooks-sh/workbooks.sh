@@ -115,4 +115,46 @@ defmodule Workbooks.LibraryInstallTest do
     assert {:ok, %{commands: [^cmd]}} = Library.install(blob)
     assert {:ok, "cba"} = CommandRegistry.run(cmd, "abc")
   end
+
+  @tag :build
+  test "signed third-party install: valid signature passes, tampered is rejected" do
+    # wb-pkh.9: a signed toolkit-workbook installs only when its embedded signature
+    # verifies (require_signature: true — the third-party trust posture).
+    prev = System.get_env("WB_DATA")
+    data = Path.join(System.tmp_dir!(), "wbdata-#{System.unique_integer([:positive])}")
+    System.put_env("WB_DATA", data)
+
+    try do
+      tenant = "signer-#{System.unique_integer([:positive])}"
+      Workbooks.Git.ensure_repo(tenant)
+
+      bytes = rev_wasm_bytes()
+      cmd = uniq("rev")
+      html = Workbooks.Manifest.sign(~s|<html><script id="workbook-spec">{"toolkit":"#{cmd}"}</script><body>x</body></html>|, tenant)
+
+      blob = Bundle.pack(%{"workbook.html" => html, "#{cmd}.wasm" => bytes})
+      assert {:ok, %{commands: [^cmd]}} = Library.install(blob, require_signature: true)
+      assert {:ok, "cba"} = CommandRegistry.run(cmd, "abc")
+
+      # Tamper the signed HTML (append content → strip() differs → asset_integrity
+      # fails) → rejected, and nothing new is registered.
+      cmd2 = uniq("rev")
+      tampered = html <> "<!--tampered-after-signing-->"
+      bad = Bundle.pack(%{"workbook.html" => tampered, "#{cmd2}.wasm" => bytes})
+      assert {:error, {:bad_signature, _}} = Library.install(bad, require_signature: true)
+      refute cmd2 in CommandRegistry.list()
+    after
+      if prev, do: System.put_env("WB_DATA", prev), else: System.delete_env("WB_DATA")
+    end
+  end
+
+  @tag :build
+  test "require_signature on an UNSIGNED bundle is rejected" do
+    bytes = rev_wasm_bytes()
+    cmd = uniq("rev")
+    blob = Bundle.pack(%{"#{cmd}.wasm" => bytes})
+    assert {:error, {:unverifiable, _}} = Library.install(blob, require_signature: true)
+    refute cmd in CommandRegistry.list()
+  end
 end
+

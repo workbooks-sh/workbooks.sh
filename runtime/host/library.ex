@@ -457,7 +457,8 @@ defmodule Workbooks.Library do
   the third-party trust posture). Returns `{:ok, %{commands: [name]}}`.
   """
   def install(blob, opts \\ []) when is_binary(blob) do
-    with :ok <- pin_ok(blob, opts[:sha]) do
+    with :ok <- pin_ok(blob, opts[:sha]),
+         :ok <- sig_ok(blob, opts[:require_signature]) do
       parts = Workbooks.Bundle.unpack(blob)
       tmp = Path.join(System.tmp_dir!(), "wb-install-#{:erlang.unique_integer([:positive])}")
       File.mkdir_p!(tmp)
@@ -496,6 +497,21 @@ defmodule Workbooks.Library do
   defp pin_ok(blob, expected) when is_binary(expected) do
     actual = :crypto.hash(:sha256, blob) |> Base.encode16(case: :lower)
     if actual == expected, do: :ok, else: {:error, :sha_mismatch}
+  end
+
+  # Optional signature gate (wb-pkh.9): a third-party/signed toolkit-workbook must
+  # carry a valid embedded signature (Bundle.verify → Manifest.verify over the
+  # workbook.html) before anything is registered. Off by default (first-party local
+  # installs need no signature); pass `require_signature: true` for the
+  # third-party trust posture.
+  defp sig_ok(_blob, sig) when sig in [nil, false], do: :ok
+
+  defp sig_ok(blob, true) do
+    case Workbooks.Bundle.verify(blob) do
+      %{valid: true} -> :ok
+      %{valid: false} = v -> {:error, {:bad_signature, v}}
+      %{error: e} -> {:error, {:unverifiable, e}}
+    end
   end
 
   @doc """
