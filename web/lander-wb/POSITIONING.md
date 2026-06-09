@@ -137,3 +137,12 @@ vs our "it's already running on your machine").
 
 Copy gets written ONLY after these three calls. Then design-from-scratch around
 the locked copy.
+
+---
+
+## v1.1 addendum (founder call, 2026-06-09)
+Keeping-hook approved as PART of the problem — not the hero. Hero = an umbrella
+over the full arc instead: **"Make it. Keep it. It's yours."** The triad is the
+page: chapter 1 MAKE (describe→built, live demo), chapter 2 KEEP (opens with
+"Where did all your AI apps go?", the one-file mechanism), chapter 3 YOURS
+(local/private/free/OSS, nobody-can-take-it-back). Questions + close follow.
