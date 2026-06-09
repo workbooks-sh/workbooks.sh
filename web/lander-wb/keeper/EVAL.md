@@ -98,3 +98,32 @@ only visible in logs. Fix: deploy-kit must set adequate VM memory for the
 runtime image by default (≥1GB, recommend 2GB) + a #+DEPLOY_MEMORY knob; ideally
 poll /health post-apply and surface OOM. Workaround: `fly scale memory 2048`.
 Severity: HIGH — a first-time cloud deploy silently crash-loops.
+
+### Friction #8 — fly serves a STALE :latest; image builds were silently failing (tests 2/7)
+HIGH. `wb deploy apply` pulled ghcr `:latest`, but `:latest` was pinned to a
+pre-auth-fix sha (871bac7) because the runtime-image builds for the newer shas
+had FAILED (wbox.c missing from build context — .dockerignore excluded
+runtime/compilers/). So the deployed engine ran old code: auth lock absent,
+control plane open, despite the secret being present. Diagnosis took a full
+image-digest/commit-ancestry trace. Fixes: (a) the wbox.c path bug was fixed in
+a parallel effort (moved to host/wbox/), :latest now 943a342 with the lock; (b)
+deploy-kit should PIN by sha (not float :latest) and/or verify the running
+digest post-apply. Resolved by redeploying `--image …:943a342`. Lock then
+verified: no-bearer/wrong→401, correct→202, /health→200.
+
+### Friction #9 — BLOCKER: single fly machine doesn't expose the public content plane (test 3)
+The runtime has TWO listeners: control plane (authed, Workbooks.Web, :4000) and
+the anonymous content plane (Workbooks.PublicWeb, :4001, WB_PUBLIC=1). deploy-kit
+brings up only the control plane and fly routes :443→:4000, so GET / hits the
+AUTHED plane → 401; the page-serving plane is neither started nor exposed.
+Serving the lander publicly while keeping an authed control plane for the keeper
+on ONE machine needs a deploy-kit decision:
+  (A) two fly [[services]] / ports — public plane on the exposed port, control
+      plane internal-only (keeper hits localhost; needs the runtime-native
+      scheduler, not GH-cron-over-public-URL);
+  (B) a front-router plug that dispatches by path (/api,/rcp,/w → control;
+      else → public) on one port;
+  (C) public plane on the exposed port + control plane on a second exposed port
+      behind the bearer.
+Recommend (A): also removes any public control-plane exposure (most secure).
+This is the last gap before the page is live; it's an architecture call.
