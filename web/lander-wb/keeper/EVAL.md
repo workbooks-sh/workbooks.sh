@@ -156,3 +156,6 @@ open-tab live updates, public example repo.
 ## #10 + #11 FIXED (root cause = unset production defaults, not architecture)
 - #11: WB_REGISTRY defaulted to `:memory:` and the deploy recipe never set it; site_dir rooted at ephemeral cwd. FIX: recipe sets `WB_REGISTRY=${WB_DATA}/registry.db` (durable volume + litestream); PublicWeb site_dir roots under WB_DATA. Workbook store + static trees now survive restart/scale-to-zero.
 - #10: serve_static already serves HTML verbatim; only the org-render fallback double-wrapped. FIX: static_page detects a complete HTML document and serves it verbatim (org-source still rendered+wrapped). 3 regression tests pass. `wb workbook deploy` of a single-file HTML workbook now works end-to-end AND persists — the in-box github-raw hack is retired.
+
+### #10 + #11 VERIFIED LIVE (2026-06-09)
+Image 29ee42e. Workbook stored in durable registry (/data/registry.db); served VERBATIM (1 doctype, no OQL wrapper, author's title). Survived hard-restart AND full machine stop+cold-start with scale-to-zero re-enabled. Both fully closed — root cause was unset defaults, durable infra already existed.
