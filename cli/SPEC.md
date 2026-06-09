@@ -1,0 +1,110 @@
+# `wb` — Workbooks CLI (spec)
+
+The single canonical command-line tool for Workbooks. **One Rust crate, two build
+targets.** Memory-safe, dependency-free, runs the same logic on a bare OS *and* inside
+the runtime's wasm sandbox.
+
+> Supersedes the legacy Elixir escript (`runtime/host/cli.ex`) and the dead npm
+> `@work.books/cli` / old `substrates` Rust binary. The escript keeps working until the
+> verbs below are migrated; this crate is the canonical home going forward.
+
+## Why Rust (not the escript)
+
+The CLI must run in three places:
+
+1. **Outside the runtime** — a user's laptop / CI, possibly with no Erlang, no Node.
+2. **Inside the runtime** — agents call `wb` to author/build/run workbooks.
+3. **Inside the wasm sandbox** — agents are sandboxed; the CLI must run there too.
+
+An Elixir escript fails (1) and (3): it drags the whole BEAM and can't run in wasm. A
+Rust crate gives **both targets from one source**:
+
+```
+cargo build --release                      # → native `wb` (any OS, static, ~fast)
+cargo build --release --target wasm32-wasip1   # → wb.wasm (in-sandbox, agents)
+```
+
+We do **not** maintain a separate "wasm version." It's the same code, a second target.
+CI emits both: the native binary for OS/curl/npm distribution, the `.wasm` for the
+runtime to run in-sandbox.
+
+## The discipline that makes both targets work: a capability seam
+
+The CLI itself owns almost no logic — it parses args, talks to the **OQL kernel** (already
+Rust, `runtime/kernel/`) for local org ops, and drives the **runtime engine** over RCP for
+the heavy verbs. All I/O goes through one trait so the two targets differ only at the edge:
+
+```
+trait Io {
+    fn http(&self, req: Request) -> Result<Response>;   // talk to the runtime (RCP)
+    fn read(&self, path: &str) -> Result<Vec<u8>>;       // filesystem
+    fn spawn(&self, cmd: Command) -> Result<Output>;     // docker / krunvm / fly (deploy)
+}
+```
+
+- **native** (`cfg(not(target_arch = "wasm32"))`): `reqwest` / `std::fs` / `std::process`.
+- **wasm** (`cfg(target_arch = "wasm32")`): host imports brokered by the runtime's **Dock**
+  (the host-vs-loaded membrane). No raw sockets/process in the sandbox — capabilities are
+  granted, not assumed.
+
+Pure logic + kernel calls are target-agnostic and need no seam.
+
+## What the CLI owns vs. delegates
+
+The current escript is 469 lines of near-pure delegation. Same split here:
+
+| Bucket | Verbs | Implementation |
+|---|---|---|
+| **Kernel (local)** | `query` `tangle` `lint` `bundle` | embed the Rust OQL kernel crate directly (native) / call it in-module (wasm) |
+| **Engine (delegate)** | `build` `publish` `library` `pack` `search` `compiler` `mirror` `sign`/`verify` | thin RCP client → the runtime owns the logic. **Never reimplement the engine in Rust.** |
+| **Client / local** | `rt` `var` `toolkit list` `desktop` | trivial (HTTP / config) |
+| **Bootstrap** | `deploy` | the one verb that must run with **no** runtime up (it brings the runtime up). Orchestrates `docker`/`krunvm`/`fly` + parses `deployment.org`. Lives in `cli/src/deploy/` — see below. |
+
+The rule that keeps this from being over-engineering: **the runtime stays the engine; the
+CLI is a flexible handle.** We port the thin shell, not the Elixir logic.
+
+## `deploy` and the `deploy/` folders (classification)
+
+Investigated the root `deploy/` folder. It is **NOT CLI source** — it is two things, both of
+which should stay out of this crate:
+
+- **Platform release infra ("just us"):** `deploy/Dockerfile{,.runtime,.compilers}`,
+  `fly.toml`, `deploy.sh` — these build *our* ghcr images + deploy *our* production engine,
+  and **`runtime-image.yml` CI references them by path** (`deploy/Dockerfile.runtime`,
+  `deploy/Dockerfile.compilers`). Moving them breaks CI. They stay at root.
+- **Deploy-kit shared assets:** `deploy/deployments/*.org`, `deploy/providers/`,
+  `deploy/storage.env.example`, `Dockerfile.runtime` ("the ONE image the deploy-kit runs").
+  These are consumed by the deploy-kit; they are infra/templates, not Rust source.
+
+So: **`cli/src/deploy/`** holds only the CLI-side `wb deploy` *command* (Rust — parse
+`deployment.org`, orchestrate the provider). The Dockerfiles/fly/configs remain in root
+`deploy/` (platform infra + deploy-kit assets). The deploy-kit *engine* logic currently in
+`runtime/host/deploy*.ex` is migrated into `cli/src/deploy/` over time (it's the bootstrap
+verb that can't depend on a running runtime), or kept runtime-side and driven via RCP.
+
+## Distribution (same CI, NPM_TOKEN + GitHub Release)
+
+One static binary → no Erlang, no Burrito:
+
+- **curl:** `web/lander/src/install.sh` + the CF worker download the matching binary from a
+  GitHub Release.
+- **npm (esbuild-style):** a launcher package `@work.books/cli` with per-platform
+  `optionalDependencies` (`@work.books/cli-darwin-arm64`, …); npm installs only the matching
+  one; a `bin` shim execs it. `npm i -g` works with zero runtime deps.
+- **wasm:** `wb.wasm` published for the runtime to run in-sandbox.
+
+## Layout
+
+```
+cli/
+├── SPEC.md            # this file
+├── Cargo.toml         # crate `wb-cli`, bin `wb`
+└── src/
+    ├── main.rs        # clap parse + dispatch
+    ├── io.rs          # the capability seam (native + wasm impls)
+    ├── kernel.rs      # embed the OQL kernel (local org ops)
+    ├── rcp.rs         # thin runtime client (engine verbs)
+    ├── commands.rs    # verb handlers (delegate)
+    └── deploy/        # the bootstrap `wb deploy` command (Rust)
+        └── mod.rs
+```

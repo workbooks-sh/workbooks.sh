@@ -279,6 +279,68 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
+  # ── RCP engine verbs for the `wb` CLI (token → tenant; see cli/TAXONOMY.md) ──
+  # These mirror the escript's local Library.* calls, but token-authed so the thin
+  # Rust CLI can drive a running engine. Tenant comes from the credential, not a path.
+
+  # `wb build` — compile a workspace's components → WASM.
+  post "/rcp/build" do
+    t = conn.assigns.tenant
+    slug = conn.params["src"] || conn.params["slug"] || "."
+    result = try do
+      Workbooks.Library.build(t, slug)
+    rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  # `wb checkout` / `wb checkin` — borrow a library member / pack it back.
+  post "/rcp/library/checkout" do
+    t = conn.assigns.tenant
+    result = try do
+      Workbooks.Library.checkout(t, conn.params["member"], conn.params["dir"]) |> Map.drop([:member])
+    rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  post "/rcp/library/checkin" do
+    t = conn.assigns.tenant
+    result = try do
+      Workbooks.Library.checkin(t, conn.params["member"], conn.params["dir"]) |> Map.drop([:member])
+    rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  # `wb store` / `wb store --list` — archive a workspace / list stored keys.
+  get "/rcp/store" do
+    t = conn.assigns.tenant
+    result = try do %{stored: Workbooks.Library.stored(t)} rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  post "/rcp/store" do
+    t = conn.assigns.tenant
+    result = try do
+      case Workbooks.Library.store(t, conn.params["slug"] || ".", build: conn.params["build"] == "1") do
+        {:ok, key} -> %{ok: true, key: key}
+        {:error, e} -> %{ok: false, error: to_string(e)}
+        other -> %{ok: true, result: inspect(other)}
+      end
+    rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  # `wb fetch` — restore stored bytes (base64-wrapped; zips aren't JSON-safe raw).
+  get "/rcp/fetch" do
+    t = conn.assigns.tenant
+    result = try do
+      case Workbooks.Library.fetch(t, conn.params["key"]) do
+        {:ok, bytes} -> %{ok: true, b64: Base.encode64(bytes)}
+        :error -> %{error: "not found: #{conn.params["key"]}"}
+      end
+    rescue e -> %{error: Exception.message(e)} end
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # did:web (Phase 2e) — the engine's self-hosted identity document. A standard
   # DID resolver fetches this; the key matches the tenant's did:key + ledger.
   get "/.well-known/did.json" do

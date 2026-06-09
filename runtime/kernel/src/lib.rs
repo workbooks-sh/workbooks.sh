@@ -22,113 +22,145 @@ use orgize::rowan::ast::AstNode;
 use orgize::{Org, SyntaxKind, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
-// cargo-component generates `bindings` from wit/world.wit at build time.
-#[allow(warnings)]
-mod bindings;
-use bindings::Guest;
+// ── Public kernel API ─────────────────────────────────────────────────────
+// Pure string→string functions. The native build (e.g. the `wb` CLI) links
+// these as a normal rlib; the wasm Component below wraps the SAME functions.
+// One logic, both surfaces — there is no "wasm version" of the kernel logic.
 
-struct Component;
-
-impl Guest for Component {
-    fn parse_headlines(org: String) -> String {
-        let arr: Vec<_> = parse(&org)
-            .iter()
-            .map(|h| {
-                serde_json::json!({
-                    "level": h.level,
-                    "title": h.title,
-                    "state": h.state,
-                    "id": h.props.get("ID"),
-                    "tags": h.tags,
-                    "props": h.props,
-                    "scheduled": h.scheduled.as_ref().map(|t| t.json()),
-                    "deadline": h.deadline.as_ref().map(|t| t.json()),
-                })
+pub fn parse_headlines(org: &str) -> String {
+    let arr: Vec<_> = parse(org)
+        .iter()
+        .map(|h| {
+            serde_json::json!({
+                "level": h.level,
+                "title": h.title,
+                "state": h.state,
+                "id": h.props.get("ID"),
+                "tags": h.tags,
+                "props": h.props,
+                "scheduled": h.scheduled.as_ref().map(|t| t.json()),
+                "deadline": h.deadline.as_ref().map(|t| t.json()),
             })
-            .collect();
-        serde_json::to_string(&arr).unwrap_or_else(|_| "[]".into())
-    }
-
-    fn lint(_org: String) -> String {
-        "[]".into()
-    }
-
-    fn tangle_plan(org: String) -> String {
-        build_plan(&org).to_string()
-    }
-
-    fn validate(org: String) -> String {
-        let hs = parse(&org);
-        let mut diags = vec![];
-        for (i, h) in hs.iter().enumerate() {
-            if !h.has_tag("workflow") {
-                continue;
-            }
-            let comps = comps_of(h, &hs, i);
-            let produced: BTreeSet<&str> = comps.iter().filter_map(|c| c.out.as_deref()).collect();
-            for c in &comps {
-                if c.lang.is_none() {
-                    diags.push(diag("error", &c.name, "component has no source block / language"));
-                }
-                if let Some(inp) = &c.inp {
-                    if !produced.contains(inp.as_str()) {
-                        diags.push(diag(
-                            "error",
-                            &c.name,
-                            &format!("input `{}` has no upstream producer", inp),
-                        ));
-                    }
-                }
-            }
-        }
-        serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into())
-    }
-
-    // Diff a deployed Workbook against a new one and gate breaking changes,
-    // WIT/Candid-subtyping style: exports may grow, never shrink; imports may
-    // shrink, never grow; a component's output type may not change. Empty
-    // diagnostics means the upgrade is safe.
-    fn check_upgrade(old: String, new: String) -> String {
-        let old = world_sigs(&old);
-        let new = world_sigs(&new);
-
-        let mut diags = vec![];
-        for (name, os) in &old {
-            let Some(ns) = new.get(name) else {
-                diags.push(diag("error", name, "workflow removed (breaking)"));
-                continue;
-            };
-            for e in &os.exports {
-                if !ns.exports.contains(e) {
-                    diags.push(diag("error", name, &format!("export `{}` removed (breaking)", e)));
-                }
-            }
-            for i in &ns.imports {
-                if !os.imports.contains(i) {
-                    diags.push(diag("warn", name, &format!("new capability `{}` now required", i)));
-                }
-            }
-            for (c, oout) in &os.comp_out {
-                if let Some(nout) = ns.comp_out.get(c) {
-                    if oout != nout {
-                        diags.push(diag(
-                            "error",
-                            name,
-                            &format!("component `{}` output type changed (breaking)", c),
-                        ));
-                    }
-                }
-            }
-        }
-        serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into())
-    }
-
-    fn render(org: String) -> String {
-        Org::parse(&org).to_html()
-    }
+        })
+        .collect();
+    serde_json::to_string(&arr).unwrap_or_else(|_| "[]".into())
 }
 
-bindings::export!(Component with_types_in bindings);
+pub fn lint(_org: &str) -> String {
+    "[]".into()
+}
+
+pub fn tangle_plan(org: &str) -> String {
+    build_plan(org).to_string()
+}
+
+pub fn validate(org: &str) -> String {
+    let hs = parse(org);
+    let mut diags = vec![];
+    for (i, h) in hs.iter().enumerate() {
+        if !h.has_tag("workflow") {
+            continue;
+        }
+        let comps = comps_of(h, &hs, i);
+        let produced: BTreeSet<&str> = comps.iter().filter_map(|c| c.out.as_deref()).collect();
+        for c in &comps {
+            if c.lang.is_none() {
+                diags.push(diag("error", &c.name, "component has no source block / language"));
+            }
+            if let Some(inp) = &c.inp {
+                if !produced.contains(inp.as_str()) {
+                    diags.push(diag(
+                        "error",
+                        &c.name,
+                        &format!("input `{}` has no upstream producer", inp),
+                    ));
+                }
+            }
+        }
+    }
+    serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into())
+}
+
+// Diff a deployed Workbook against a new one and gate breaking changes,
+// WIT/Candid-subtyping style: exports may grow, never shrink; imports may
+// shrink, never grow; a component's output type may not change. Empty
+// diagnostics means the upgrade is safe.
+pub fn check_upgrade(old: &str, new: &str) -> String {
+    let old = world_sigs(old);
+    let new = world_sigs(new);
+
+    let mut diags = vec![];
+    for (name, os) in &old {
+        let Some(ns) = new.get(name) else {
+            diags.push(diag("error", name, "workflow removed (breaking)"));
+            continue;
+        };
+        for e in &os.exports {
+            if !ns.exports.contains(e) {
+                diags.push(diag("error", name, &format!("export `{}` removed (breaking)", e)));
+            }
+        }
+        for i in &ns.imports {
+            if !os.imports.contains(i) {
+                diags.push(diag("warn", name, &format!("new capability `{}` now required", i)));
+            }
+        }
+        for (c, oout) in &os.comp_out {
+            if let Some(nout) = ns.comp_out.get(c) {
+                if oout != nout {
+                    diags.push(diag(
+                        "error",
+                        name,
+                        &format!("component `{}` output type changed (breaking)", c),
+                    ));
+                }
+            }
+        }
+    }
+    serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into())
+}
+
+pub fn render(org: &str) -> String {
+    Org::parse(org).to_html()
+}
+
+// ── wasm Component boundary (the workbooks:oql world) ──────────────────────
+// cargo-component generates `bindings` from wit/world.wit at build time. The
+// Component wraps the pure API above; behavior is identical to before the rlib
+// split. Compiled only for the wasm target so the native rlib stays clean.
+#[cfg(feature = "component")]
+#[allow(warnings)]
+mod bindings;
+
+#[cfg(feature = "component")]
+mod wasm_component {
+    use crate::bindings::{self, Guest};
+
+    struct Component;
+
+    impl Guest for Component {
+        fn parse_headlines(org: String) -> String {
+            crate::parse_headlines(&org)
+        }
+        fn lint(org: String) -> String {
+            crate::lint(&org)
+        }
+        fn tangle_plan(org: String) -> String {
+            crate::tangle_plan(&org)
+        }
+        fn validate(org: String) -> String {
+            crate::validate(&org)
+        }
+        fn check_upgrade(old: String, new: String) -> String {
+            crate::check_upgrade(&old, &new)
+        }
+        fn render(org: String) -> String {
+            crate::render(&org)
+        }
+    }
+
+    bindings::export!(Component with_types_in bindings);
+}
 
 // --- Org timestamps (scheduling) -----------------------------------------
 

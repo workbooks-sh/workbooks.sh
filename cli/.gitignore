@@ -1,0 +1,7 @@
+/target
+Cargo.lock
+# npm launcher: the shim (bin/wb.js) is committed; the downloaded native binary
+# and any auth file are not.
+npm/bin/wb
+npm/bin/wb.exe
+npm/.npmrc

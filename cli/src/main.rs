@@ -1,0 +1,202 @@
+//! `wb` — the Workbooks CLI. One Rust source, native + wasm32-wasip1 targets.
+//!
+//! Verb taxonomy is canonical per cli/TAXONOMY.md. Two execution classes:
+//!   - LOCAL    : kernel ops + assembly + provenance + orchestration, no runtime.
+//!   - ENGINE   : thin RCP calls into a running runtime (it owns compilers,
+//!                wasmtime, the tenant library).
+
+mod commands; // engine-backed verbs
+mod deploy;
+mod io;
+mod kernel;
+mod local;
+mod rcp;
+mod util;
+
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "wb", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    // ── source inspection (local, kernel) ──
+    /// Org → headline rows (the query surface)
+    Query { file: String },
+    /// Org → WIT-world-shaped build plan (literate tangle)
+    Tangle { file: String },
+    /// Diagnostics over a workbook source
+    Lint { file: String },
+
+    // ── workbook lifecycle ──
+    /// Compile the source's code components → WASM (engine-backed)
+    Build { #[arg(default_value = ".")] src: String },
+    /// Assemble org (+ data) → one workbook .wbundle (local)
+    Bundle { #[arg(default_value = ".")] src: String, #[arg(short, long)] out: Option<String> },
+    /// Workbook → source tree (local)
+    Unbundle { file: String, dest: Option<String> },
+    /// Execute a workbook's workflow DAG on the engine
+    Run { file: String, #[arg(trailing_var_arg = true)] input: Vec<String> },
+    /// Ship an assembled workbook to a surface (local orchestration)
+    Publish { #[command(subcommand)] verb: PublishVerb },
+
+    // ── library (engine-backed) ──
+    /// List the tenant's workspaces + members
+    Library,
+    /// Borrow a library member into a working dir
+    Checkout { member: String, dir: String },
+    /// Pack + sign a member back into the library
+    Checkin { member: String, dir: String },
+    /// Archive a workspace to durable storage (--list to enumerate)
+    Store { #[arg(default_value = "")] slug: String, #[arg(long)] list: bool },
+    /// Restore from durable storage
+    Fetch { key: String, #[arg(default_value = "./")] out: String },
+    /// Cross-workbook search (--semantic | --literal | --sql)
+    Search {
+        query: String,
+        #[arg(long)] semantic: bool,
+        #[arg(long)] literal: bool,
+        #[arg(long)] sql: bool,
+    },
+
+    // ── runtime ops (engine-backed) ──
+    /// Run or plan a workflow DAG
+    Workflow { #[command(subcommand)] verb: WorkflowVerb },
+    /// Long-horizon agent runs
+    Agent { #[command(subcommand)] verb: AgentVerb },
+    /// Manage deployed workbooks
+    Workbook { #[command(subcommand)] verb: WorkbookVerb },
+    /// Run index, or one run's summary
+    Telemetry { slug: Option<String> },
+    /// Verify a run's signed ledger
+    Ledger { slug: String },
+
+    // ── provenance + federation ──
+    /// Embed a did:key provenance manifest (local)
+    Sign { file: String, #[arg(short, long)] out: Option<String> },
+    /// Check an artifact's signature + integrity (local)
+    Verify { file: String },
+    /// Mirror the tenant repo to a git host (url, or forge name to auto-provision)
+    Mirror { target: String },
+    /// Federate the tenant repo over Radicle (P2P)
+    Federate,
+
+    // ── engine (the runtime itself) ──
+    /// Stand up / converge the runtime engine
+    Deploy { #[command(subcommand)] verb: deploy::DeployVerb },
+    /// Raw RCP escape hatch (status | get <path> | post <path> [body])
+    Rt { #[arg(trailing_var_arg = true)] args: Vec<String> },
+
+    // ── config (local) ──
+    /// Local variables / secrets (set | get | list | ref)
+    Var { #[arg(trailing_var_arg = true)] args: Vec<String> },
+}
+
+#[derive(Subcommand)]
+enum PublishVerb {
+    /// Scaffold ./publish.org
+    Init,
+    /// Coherence-check publish.org
+    Validate,
+    /// Ship the assembled workbook to the configured surface
+    Apply { #[arg(default_value = "workbook.html")] workbook: String },
+}
+
+#[derive(Subcommand)]
+enum WorkflowVerb {
+    /// Execute the workflow DAG
+    Run { file: String, #[arg(default_value = "")] input: String },
+    /// Show the schedule/plan without executing
+    Plan { file: String },
+}
+
+#[derive(Subcommand)]
+enum AgentVerb {
+    /// Start a long-horizon run (returns an id to poll)
+    Run {
+        task: Vec<String>,
+        #[arg(long, default_value = "You are a careful, capable agent.")] system: String,
+        #[arg(long)] model: Option<String>,
+    },
+    /// Poll a run's status + result
+    Status { id: String },
+}
+
+#[derive(Subcommand)]
+enum WorkbookVerb {
+    /// List deployed workbooks
+    List,
+    /// Show a deployed workbook's org source
+    Show { id: String },
+    /// Deploy an org source under an id
+    Deploy { id: String, file: String },
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let io = io::platform();
+    let io = io.as_ref();
+
+    let out = match cli.cmd {
+        // local kernel
+        Cmd::Query { file } => kernel::query(io, &file)?,
+        Cmd::Tangle { file } => kernel::tangle(io, &file)?,
+        Cmd::Lint { file } => kernel::lint(io, &file)?,
+        // lifecycle
+        Cmd::Build { src } => commands::build(io, &src)?,
+        Cmd::Bundle { src, out } => local::bundle(io, &src, out.as_deref())?,
+        Cmd::Unbundle { file, dest } => local::unbundle(io, &file, dest.as_deref())?,
+        Cmd::Run { file, input } => commands::run(io, &file, &input)?,
+        Cmd::Publish { verb } => match verb {
+            PublishVerb::Init => local::publish(io, "init", None)?,
+            PublishVerb::Validate => local::publish(io, "validate", None)?,
+            PublishVerb::Apply { workbook } => local::publish(io, "apply", Some(&workbook))?,
+        },
+        // library
+        Cmd::Library => commands::library(io)?,
+        Cmd::Checkout { member, dir } => commands::checkout(io, &member, &dir)?,
+        Cmd::Checkin { member, dir } => commands::checkin(io, &member, &dir)?,
+        Cmd::Store { slug, list } => commands::store(io, &slug, list)?,
+        Cmd::Fetch { key, out } => commands::fetch(io, &key, &out)?,
+        Cmd::Search { query, semantic, literal, sql } => {
+            let mode = if semantic { "semantic" } else if literal { "literal" } else if sql { "sql" } else { "hybrid" };
+            commands::search(io, &query, mode)?
+        }
+        // runtime ops
+        Cmd::Workflow { verb } => match verb {
+            WorkflowVerb::Run { file, input } => commands::workflow(io, false, &file, &input)?,
+            WorkflowVerb::Plan { file } => commands::workflow(io, true, &file, "")?,
+        },
+        Cmd::Agent { verb } => match verb {
+            AgentVerb::Run { task, system, model } => commands::agent_run(io, &task.join(" "), &system, model.as_deref())?,
+            AgentVerb::Status { id } => commands::agent_status(io, &id)?,
+        },
+        Cmd::Workbook { verb } => match verb {
+            WorkbookVerb::List => commands::workbook_list(io)?,
+            WorkbookVerb::Show { id } => commands::workbook_show(io, &id)?,
+            WorkbookVerb::Deploy { id, file } => commands::workbook_deploy(io, &id, &file)?,
+        },
+        Cmd::Telemetry { slug } => commands::telemetry(io, slug.as_deref())?,
+        Cmd::Ledger { slug } => commands::ledger(io, &slug)?,
+        // provenance + federation
+        Cmd::Sign { file, out } => local::sign(io, &file, out.as_deref())?,
+        Cmd::Verify { file } => local::verify(io, &file)?,
+        Cmd::Mirror { target } => commands::mirror(io, &target)?,
+        Cmd::Federate => commands::federate(io)?,
+        // engine
+        Cmd::Deploy { verb } => deploy::run(io, verb)?,
+        Cmd::Rt { args } => commands::rt(io, &args)?,
+        // config
+        Cmd::Var { args } => local::var(io, &args)?,
+    };
+
+    if !out.is_empty() {
+        println!("{out}");
+    }
+    Ok(())
+}
