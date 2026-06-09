@@ -46,7 +46,9 @@
     in (default / disabled / loading / …). They render *side-by-side* on the
     stage, not flipped via a picker. Each state may carry its OWN per-state
     controls (e.g. the disabled state's =opacity=); the panel lists a group per
-    state with those controls, or "no state-specific controls."
+    state with those controls, or "no state-specific controls." View them all at
+    once (default) or page through them via *Layout → Tabs* (better for larger
+    components with many states).
 
   The line that resolves the common confusion: a *value you author* is a PROP
   (=label=, =variant=); a *condition the component can be in* is a STATE

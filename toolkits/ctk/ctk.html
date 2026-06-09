@@ -68,7 +68,11 @@
   .src-note { margin-top: 18px; font-size: 11px; line-height: 1.5; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 12px; }
   .src-note code { font: 500 11px var(--mono); color: var(--signal); }
 
-  .stage-wrap { position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .stage-col { min-width: 0; display: flex; flex-direction: column; }
+  .state-tabs { flex: 0 0 auto; display: flex; gap: 4px; padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--line); }
+  .state-tab { border: 1px solid var(--line-2); background: var(--paper); font: 500 12px var(--font); color: var(--ink-2); padding: 5px 12px; border-radius: 8px; cursor: pointer; }
+  .state-tab.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .stage-wrap { flex: 1 1 auto; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 32px; }
   .stage-wrap[data-vibe=light] { background: #fafbfc; }
   .stage-wrap[data-vibe=dark]  { background: #15171c; }
   .stage-wrap[data-vibe=grid]  { background: #fafbfc; background-image: radial-gradient(var(--line-2) 1px, transparent 1px); background-size: 16px 16px; }
@@ -115,8 +119,11 @@
         each may have its own per-state controls). Source comes from the spec's
         <code>:tangle</code> block. Drive it via <code>window.CTK</code>.</p>
     </aside>
-    <div class="stage-wrap" id="stage-wrap" data-vibe="light">
-      <div class="zoom" id="zoom"><div class="mount" id="stage"></div></div>
+    <div class="stage-col">
+      <div class="state-tabs" id="state-tabs" style="display:none"></div>
+      <div class="stage-wrap" id="stage-wrap" data-vibe="light">
+        <div class="zoom" id="zoom"><div class="mount" id="stage"></div></div>
+      </div>
     </div>
   </div>
 
@@ -129,7 +136,7 @@
   // per-story state
   let defs = [], props = {}, render = null, rangeDef = null, currentOrg = "", currentId = "";
   let stateDefs = [], stateValues = {};   // stateDefs: [{state, overrides, controls}]; stateValues[state][prop]
-  let zoom = 1, mode = "focus";
+  let zoom = 1, mode = "focus", activeState = "";   // mode: all|tabs (stateful) or focus|gallery (stateless)
 
   const coerce = (type, v) => type === "range" ? Number(v) : type === "toggle" ? (v === "true" || v === true) : v;
   const typeOf = (p) => (defs.find((d) => d.prop === p) || {}).type;
@@ -210,8 +217,31 @@
 
     buildPanel();
     buildStates();
-    $("layout-group").style.display = stateDefs.length ? "none" : ""; // matrix is the view when states exist
+    activeState = stateDefs[0]?.state ?? "";
+    buildLayoutSeg();
     draw();
+  }
+
+  // Layout options depend on whether the component has states:
+  //   stateful  → All (side-by-side) | Tabs (page through one at a time)
+  //   stateless → Focus (single)     | Gallery (sweep the first range control)
+  function buildLayoutSeg() {
+    const seg = $("mode-seg"); seg.innerHTML = "";
+    const opts = stateDefs.length ? [["all", "All"], ["tabs", "Tabs"]] : [["focus", "Focus"], ["gallery", "Gallery"]];
+    mode = opts[0][0];
+    opts.forEach(([v, l], i) => {
+      const b = document.createElement("button"); b.textContent = l; b.dataset.v = v; if (i === 0) b.className = "on";
+      seg.appendChild(b);
+    });
+  }
+  function buildStateTabs() {
+    const bar = $("state-tabs"); bar.innerHTML = "";
+    if (!stateDefs.some((s) => s.state === activeState)) activeState = stateDefs[0]?.state ?? "";
+    stateDefs.forEach((s) => {
+      const b = document.createElement("button"); b.className = "state-tab" + (s.state === activeState ? " on" : ""); b.textContent = s.state;
+      b.onclick = () => { activeState = s.state; draw(); };
+      bar.appendChild(b);
+    });
   }
 
   function buildPanel() {
@@ -249,6 +279,15 @@
   function draw() {
     if (!render) return;
     stage.innerHTML = "";
+    const tabsBar = $("state-tabs");
+    if (stateDefs.length && mode === "tabs") {
+      // page through states one at a time — for larger components
+      buildStateTabs(); tabsBar.style.display = "";
+      const s = stateDefs.find((x) => x.state === activeState) || stateDefs[0];
+      render(stage, effective(s));
+      return;
+    }
+    tabsBar.style.display = "none";
     if (stateDefs.length) {
       // side-by-side state matrix (the default for stateful components)
       const g = document.createElement("div"); g.className = "gallery";
@@ -293,12 +332,15 @@
     get: (p) => props[p],
     set: (p, v) => { props[p] = coerce(typeOf(p), v); buildPanel(); draw(); },
     setStateProp: (name, p, v) => { if (stateValues[name]) { stateValues[name][p] = v; buildStates(); draw(); } },
+    // focus one state in Tabs layout (switches to tabs if needed)
+    setActiveState: (name) => { if (stateDefs.some((s) => s.state === name)) { activeState = name; if (mode !== "tabs") { mode = "tabs"; buildLayoutSeg(); } draw(); } },
     snapshot: () => ({ story: currentId, props: { ...props }, states: Object.fromEntries(stateDefs.map((s) => [s.state, effective(s)])) }),
   };
   window.addEventListener("message", (e) => {
     const m = e.data; if (!m || m.ctk !== true) return;
     if (m.action === "set") window.CTK.set(m.prop, m.value);
     else if (m.action === "setStateProp") window.CTK.setStateProp(m.state, m.prop, m.value);
+    else if (m.action === "tab") window.CTK.setActiveState(m.state);
     else if (m.action === "load") window.CTK.load(m.story);
     else if (m.action === "snapshot") e.source?.postMessage({ ctk: true, reply: "snapshot", data: window.CTK.snapshot() }, "*");
   });
