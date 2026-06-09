@@ -159,3 +159,12 @@ open-tab live updates, public example repo.
 
 ### #10 + #11 VERIFIED LIVE (2026-06-09)
 Image 29ee42e. Workbook stored in durable registry (/data/registry.db); served VERBATIM (1 doctype, no OQL wrapper, author's title). Survived hard-restart AND full machine stop+cold-start with scale-to-zero re-enabled. Both fully closed — root cause was unset defaults, durable infra already existed.
+
+## Remaining items — status (2026-06-09, "fix the rest")
+- ✅ CF /live proxy: workbooks.sh/live → fly runtime, v3.1 page, x-served-by verified.
+- ✅ Public /_changes feed: anonymous read-only git-log on the content plane; tenant==app aligned (WB_TENANT=wb-lander-live) so commits + feed share the repo. Returns the real commit.
+- ✅ Open-tab live updates (Yjs ask, poll form): footer indicator reads /_changes, shows "maintained live · N edits", reloads on a new edit. Verified in-browser.
+- ✅ Keeper scheduler: Workbooks.Keeper built + deployed (env-gated WB_KEEPER_DEF, supervised, crash-safe).
+- ✅ Observable commit loop PROVEN: workbook deploy → git commit ("every deploy = one commit") → /_changes → live-poll.
+- ✅ Example repo: github.com/workbooks-sh/living-lander (public; keeper's designated push target).
+- ⏳ ONE piece left: enabling the AUTONOMOUS keeper edit loop. Scheduler is ready; deliberately NOT auto-enabled on a public box without a watched validation run (runaway-spend / bad-edit risk). To enable: ship keeper def+toolkit to /data, set WB_KEEPER_DEF + a sane WB_KEEPER_INTERVAL_MS, give the sandboxed agent wb→localhost:4001+bearer + a source checkout + push creds for living-lander, then watch one run. Needs its own focused pass.
