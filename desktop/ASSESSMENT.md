@@ -1,141 +1,93 @@
-# Workbooks Desktop — Promise vs. Delivery Assessment
+# Workbooks Desktop — Re-baseline Assessment
 
-_Audit date: 2026-06-07. Scope: `desktop/` (Tauri shell + Svelte frontend, ~6.9k LOC frontend, 4 Rust files)._
+_Re-baseline date: 2026-06-09. Supersedes the 2026-06-07 audit (kept at
+`ASSESSMENT.2026-06-07.md`), which described a pre-wire-up mock skeleton that no
+longer exists._
 
-## TL;DR
+## TL;DR — the board was stale, not the app
 
-The app is a **fully-built UI skeleton over a 91%-mock backend**. The native shell
-does exactly 3 real things (embedded kernel, file IO, daemon supervision). Everything
-the user _experiences as a feature_ — chat, agent, tabs, settings, network, auth,
-packages — is **theater**: the frontend calls a `commands` object whose 110 methods
-all return hardcoded mock data.
+The 2026-06-07 audit called this a "91%-mock skeleton." A large wire-up landed
+2026-06-08 and that verdict is obsolete. Code truth as of 2026-06-09:
 
-**The keystone gap:** `src/lib/bindings.ts` declares **110 commands** (the contract every
-feature depends on). The Rust backend implements **11**, and **none of them are the same
-commands**. The 11 real ones are invoked directly via `invoke()`, bypassing `bindings.ts`.
-The `tauri-specta` regeneration the whole frontend assumes (`bindings.ts:6-15`) is not even
-a Cargo dependency yet. So the epic is fundamentally: **build the Rust backend that
-`bindings.ts` already specifies the shape of.**
+- **Native Rust shell: done and thin.** 112 `#[tauri::command]`s, all registered;
+  ~all are real OS glue (keychain, fs + watch, PTY terminal, krunvm/daemon
+  supervision, window/tray) or the embedded `oql.wasm` kernel (weave/tangle/
+  validate/lint/outline). Exactly **one** true stub (`plugins_install` writes
+  metadata, doesn't fetch). This is the correct "thin hackable surface" — almost
+  nothing business-logical lives in Rust.
+- **Svelte frontend: ~95% wired**, not mocked. All 25 `src/lib/bridge/*` modules
+  call real backends (Tauri `invoke` for OS/local state, HTTP/WS for runtime data).
+- **WorkOS auth: code-complete** on both sides (loopback + PKCE + keychain, bridge,
+  store). The `mock-bearer` the old audit cited is gone.
 
----
+## The real problem: the desktop is wired to a DEAD runtime contract
 
-## The promise (from README + code)
+**Canonical-source rule: the runtime (`runtime/host/`) is the source of truth.
+The desktop app is the most out-of-date code in the repo.** Where they disagree,
+the desktop is re-pointed onto the runtime — never the reverse.
 
-Two tiers:
-- **App (default, offline):** Tauri shell + embedded `oql.wasm` kernel + Svelte SPA.
-  Open/edit/weave/validate/outline workbooks locally. Needs nothing else.
-- **Runtime (optional):** Elixir BEAM in a container. Agents, multi-tenant, HTTP/WS,
-  vectors, cloud sync. Connected only when wanted, via discovery file `{port, token}`.
+The frontend was built against the **old monorepo's `oql-agent` Phoenix control
+plane**, which is not in this repo. The new runtime (`runtime/host/web.ex`, a
+Plug-style router — no Phoenix channels) exposes a different, smaller surface.
+Net: the desktop's "95% wired" is 95% wired to endpoints that don't exist here.
 
-User-facing promises implied by the UI surface: chat with an agent, voice/Gemini-Live
-brainstorm, open tabs, command palette, terminal, file search, package/workbook browser,
-bookmarks, themes, settings (agents/skills/plugins/MCP/integrations/keys/env), WorkOS
-sign-in, network social feed, publish, auto-update.
+### Contract mismatch (desktop calls → runtime serves)
 
----
-
-## Verdict by bucket
-
-### ✅ DELIVERED — real, works today (desktop build)
-
-| Capability | Evidence |
-|---|---|
-| **Embedded OQL kernel** weave/tangle/validate/lint/outline, in-process via wasmtime | `kernel.rs` (oql.wasm 414KB compiled in, real component-model run); tests pass `kernel.rs:78-91` |
-| **Live workbook editor** — weave+validate+outline as you type (250ms debounce) | `WorkbookView.svelte:68-89`, `kernel.ts:14-46` → real `invoke()` |
-| **File open/save `.org`** — native dialog + Rust `std::fs` | `files.ts:12-33`, `lib.rs:78-84` |
-| **Daemon supervision** — `wb deploy local/status/down`, discovery file read | `daemon.rs`, `lib.rs:88-100` |
-| **Runtime discovery + Bearer token** — reads `{port,token}`, attaches `Authorization` | `runtime.rs`→`runtime_url`, `runtime.ts:21-35` |
-| **Sidecar health check** — real HTTP GET `/health` w/ token | `bindings.ts:525-533` (only command that actually calls `rt()`) |
-| **Offline gate** — reachability guard + real engine restart | `router.ts:23-25`, `OfflineView.svelte:17-25` |
-| **Auto-updater** — real Tauri plugin against GitHub Releases | `updater.ts:15-45`, endpoint in `tauri.conf.json` |
-| **Window chrome** — frameless overlay titlebar, close→hide, tray menu | `lib.rs` tray + window events |
-| **Tab/rail navigation UI + router** | `tabs.svelte.ts`, `router.ts`, `Titlebar.svelte` (store/event plumbing real; data mocked — see below) |
-| **Theme apply** — tokens → `:root` CSS vars, active-id persists to localStorage | `theme.svelte.ts:75-137` |
-
-### 🔌 WIRE-UP — UI + contract exist, backend command is a mock stub
-
-These need a **Rust `#[tauri::command]` implementation** behind an already-defined
-`bindings.ts` signature. Frontend code, types, and UI are done. Swap mock → `invoke()`.
-
-| Capability | Mock location | What's missing |
+| Desktop calls | Runtime actually serves | Verdict |
 |---|---|---|
-| **Tabs (open/focus/close/list)** | `bindings.ts:549-561` | Rust tab manager + `tabs-state` event emit. Store/listener already wired `tabs.svelte.ts:29` |
-| **Packages + workbook browser** | `bindings.ts:458-490` | Real package index / file walk; `packageWorkbooks` returns `[]` |
-| **File search** | uses `packageWorkbooks` | Real corpus; UI + fuzzy filter done `SearchDrawer.svelte` |
-| **Bookmarks (⌘1-9)** | `bindings.ts:340-351` | Persistence + list; UI done |
-| **Agent settings** (default agent/model) | `bindings.ts:303-336` | Persist + serve catalog |
-| **Skills / Plugins / MCP servers** | `bindings.ts:409-423,507-546` | Real list/install/toggle/persist; all return canned arrays |
-| **Integrations / connections (OAuth + local CLI)** | `bindings.ts:354-371` | Real OAuth flow, CLI detection, keychain; all no-ops |
-| **Keys / env vars** | `bindings.ts:379-404` | Real keychain-backed store |
-| **Engine status** | `bindings.ts:374` | Real probe (returns canned `running/pid 4242`) |
-| **Themes list/create/delete** | `bindings.ts:576-601` | Durable theme store (apply + active-id already real) |
-| **Persistent store backend** | `store.svelte.ts:3-79` | Swap localStorage shim → `@tauri-apps/plugin-store` (TODO in-file) |
-| **Settings/tabs cross-session persistence** | — | Falls out of the above; today only theme-id survives restart |
+| `POST /api/agent/run` (`ws.svelte.ts:292`) | `POST /api/run` (`web.ex:154`) | RENAME / re-point |
+| Phoenix `/socket` + 9 channels (`session:`, `runtime:telemetry`, `workspace:control`, `desktop:control`, `memory:control`, `workgate:control`, `engine:env_prompt`, `monorepo:watch`) | **no Phoenix at all**; telemetry is raw WS `GET /api/run/:id/stream` (`web.ex:169`) + poll `GET /api/run/:id` | REWRITE transport |
+| `GET /api/agents/list`, `/api/agents/:slug/system_prompt` | — | MISSING |
+| `GET /api/sessions` | — | MISSING |
+| `GET /api/skills` | — | MISSING |
+| `GET/POST/DELETE /api/memory/sources` | — | MISSING |
+| `GET /api/wizards`, `POST /api/wizard/start`, `/api/wizard/:id/answer` | — | MISSING |
+| `POST/PATCH/GET /api/oql/*` (board) | `POST /oql/parse` (`web.ex:57`) only | re-point / extend |
+| `GET/POST /api/workspaces/sync` | — | MISSING |
+| `POST /v1/network/shares` | — (network broker is external) | broker, see below |
 
-### 🏗️ BUILD — net-new feature, not just wiring
+For each MISSING row the decision is per-endpoint: either the desktop re-points to
+an existing runtime verb, or the runtime is the right place to grow the endpoint
+(canonical) and we add it there — but the desktop never gets a parallel
+implementation in Rust.
 
-These have **UI placeholders but no backend contract and no real design** — the hard
-part is the system behind them, not the IPC glue.
+## Two more real gaps (independent of the contract)
 
-| Capability | State | Evidence |
-|---|---|---|
-| **Chat: send message to agent** | Composer submit only opens the drawer + clears text. No send. | `HomeView.svelte:52-67` (`TODO(chat): chatSession.send`) |
-| **Chat: agent responds / thread** | No thread state, no stream, send button hardcoded `disabled`, no `agent-message` event type | `AgentPanel.svelte:47-56`, `ipc.ts:26-33` |
-| **Voice / Gemini-Live brainstorm** | Mock transcript bubbles, `startVoice()` no-op | `HomeView.svelte:98-122` (`TODO(gemini-live)`) |
-| **Command palette actions** | Only writes text back to composer; no action exec | `PaletteModal.svelte:45-51` |
-| **Terminal drawer** | Static placeholder `<pre>`; no xterm.js, no pty, no session | `TerminalDrawer.svelte:5-7,53` |
-| **WorkOS authentication** | `signIn()` returns `{bearer:"mock-bearer", email:"you@example.com"}` instantly. No browser, no PKCE, no loopback, no keychain, no persistent session | `auth.svelte.ts:116-129`, `bindings.ts:445-448` |
-| **Network identity / DID** | `did:key:zMock` hardcoded; no keygen, no persist | `bindings.ts:426-442` |
-| **Network social feed** | Hardcoded 2-post mock; no fetch despite real reachability gate | `NetworkView.svelte:10-16` |
-| **Publish / fork workbook** | Returns `https://example.invalid/mock` | `bindings.ts:443-444` |
+1. **Auth broker is down + drifted.** `auth.workbooks.sh` 404s on `/v1/auth/authorize`
+   and `/v1/auth/exchange` (Cloudflare-fronted, not deployed; not in this repo). And
+   the path drifts: desktop `network.rs` calls `/v1/auth/authorize`; the publish CLI
+   (`toolkits/publish/bin/src/cmd/auth.rs`) calls `/v1/auth/start`. One contract must win.
+   Until the broker is live, sign-in cannot complete regardless of app code.
+2. **Network/social layer is demo-only.** `src/lib/network/client.ts:18` defaults to
+   `"demo"` mode with no code path to `"live"`; `PreviewPane.svelte` hardcodes
+   `workspace:"daily-driver"` and simulates upstream-pull with a `setTimeout`.
 
----
+## Quality
 
-## The keystone: bindings.ts contract vs. real backend
+`bun run check`: **6 errors, 39 warnings**. Known error: dead `"sidecar"` comparison
+in `TerminalDrawer.svelte:340` (the union is `"daemon" | "shell"`). Clean-up is part
+of the real remaining work, not optional polish.
 
-```
-bindings.ts commands declared:  110
-Rust commands implemented:       11
-Overlap:                          0   ← the 11 real ones bypass bindings.ts via direct invoke()
-tauri-specta in Cargo.toml:      NO
-```
+## Delivered & correct (do not redo)
 
-`bindings.ts:6-15` states the intended mechanism: _"When the Rust backend + tauri-specta
-land, this file is REGENERATED — the real version forwards each call through TAURI_INVOKE."_
-That regeneration has never run; the dependency isn't present. **Every settings panel,
-agent surface, tab, package, network, and auth feature is driven by `commands.*` → 100% mock.**
+Embedded `oql.wasm` kernel; live weave/validate/outline editor; file open/save +
+fs tree + watch; real PTY terminal; krunvm daemon supervise + discovery + Bearer
+token + `/health`; offline gate; auto-updater; window/tray chrome; keychain-backed
+keys/env/connections/identity; bookmarks/themes/MCP/workspaces/packages local stores;
+WorkOS loopback+PKCE client (pending broker).
 
-Real `invoke()` calls live only in `kernel.ts`, `files.ts`, `runtime.ts` (the 11 DELIVERED
-commands) — they never go through `bindings.ts`.
+## The work, restated against the canonical runtime
 
----
-
-## Validation path (how to prove the agent works in this environment)
-
-The user's stated goal: validate that the agent works in the desktop app — chat in,
-agent opens tabs, networking + auth real. Minimum chain, in dependency order:
-
-1. **Backend scaffold:** add `tauri-specta` + `specta` to `src-tauri`; generate `bindings.ts`
-   from real commands. Replaces the mock contract wholesale. _(unblocks everything below)_
-2. **Auth real:** implement `network_workos_*` commands — system-browser + loopback +
-   keychain. Without this, "networking + auth properly implemented" is unmet. `workos` skill applies.
-3. **Runtime data path:** route `agentsList`/`entriesPage`/`network*` through `rt()` (the
-   Bearer+fetch helper that already works) instead of mocks. Proves networking end-to-end.
-4. **Chat backend:** define `chatSession.send` + an `agent-message` event; stream agent
-   replies into `AgentPanel`. This is the core "interface in the chat" promise — net-new.
-5. **Agent→tabs:** give the agent a command to open tabs (`tabOpen` real), so "have it open
-   up tabs in the interface" is demonstrable. Requires #1 (real tab manager) + #4.
-6. **GUI verification:** drive the running app via the `tauri-gui-testing` skill to confirm
-   the full loop (type → agent → tab opens) end-to-end.
-
-Net: **#1 + #2 + #3 + #4 + #5** is the spine of the epic. #1 is the unlock for the entire
-WIRE-UP bucket as a side effect.
-
----
-
-## Shippability blockers (separate from features)
-
-- No Apple signing cert (codesign/notarize) — `README` "Not yet shippable".
-- `wb` bundling undecided (escript needs Erlang → Burrito-wrap ERTS, or reimplement deploy
-  in Rust).
-- Runtime image `ghcr.io/workbooks-sh/runtime` must be public for anonymous pull.
+1. **Re-point the transport.** Replace the Phoenix `Socket/Channel` bridge with the
+   runtime's real shape: `POST /api/run` → `GET /api/run/:id/stream` (WS) → poll
+   `GET /api/run/:id`. Drop the `phoenix` dep. This is the spine — chat + telemetry
+   ride on it.
+2. **Reconcile each HTTP bridge** (agents, skills, memory, wizard, oql/board,
+   sessions, workspaces) to a real runtime endpoint; where the endpoint genuinely
+   belongs in the runtime and is absent, add it **in `runtime/host`**, not the app.
+3. **Stand up the auth broker** + resolve `/authorize` vs `/start` drift.
+4. **Network demo → live** once auth + broker land.
+5. **Green the type-check** (6 errors).
+6. **Design open question (not code): workspaces vs packages vs apps-within-apps** —
+   the desktop has both `workspaces.rs` and `packages.rs` stores; the new product
+   framing ("apps within apps") needs an explicit model before these diverge further.
