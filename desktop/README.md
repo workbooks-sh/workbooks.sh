@@ -21,8 +21,12 @@ The app **never** requires the runtime to open a workbook. Starting it is explic
   - `kernel.rs` — embeds `oql.wasm` (the same 414 KB component the Elixir runtime
     loads) and runs it via `wasmtime` + `wasmtime-wasi`. Exposes `weave`, `tangle`,
     `validate`, `lint`, `outline` as Tauri commands — **fully in-process**.
-  - `daemon.rs` — bridges the deploy-kit: runs the same `wb deploy local/status/down`
-    we ship, reads the runtime discovery file (`{port, token}`).
+  - `daemon.rs` + `machine.rs` — the engine bridge. Boots the runtime the same way
+    `wb deploy local` does (a libkrun microVM via `krunvm`) but **natively from Rust**,
+    so a fresh install needs only the krunvm backend — no Erlang, no `wb` escript.
+    Reads the runtime discovery file (`{host, port, token}`); the install wizard
+    (`src/lib/setup/`) drives the `engine_*` commands (detect / install-backend /
+    boot-local / connect-cloud).
   - `lib.rs` — commands + tray + window (close → hide; frameless overlay titlebar so
     the app's nav bar *is* the window chrome); file `read_file`/`write_file`.
 - **`src/` (Svelte frontend)** — the same SPA runs in a plain browser (mocks) and in

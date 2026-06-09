@@ -64,7 +64,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Tauri auto-updater signing (minisign) — the key matching the pubkey committed in
-          # tauri.conf.json. If unset, builds skip updater signing (fine for verify runs).
+          # tauri.conf.json. Because tauri.conf.json sets createUpdaterArtifacts:true, a build
+          # REQUIRES this key — so verify (non-tag) runs disable updater artifacts via the
+          # tauri.verify.conf.json override below (see `args`), and only tag releases sign.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Apple code-signing + notarization. macOS bundles only — ignored on linux/windows. When
@@ -77,10 +79,28 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: desktop
-          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          # --target on mac (arm/intel split). On NON-tag verify runs, also merge
+          # tauri.verify.conf.json to turn OFF updater artifacts — otherwise the
+          # build demands the signing key (createUpdaterArtifacts:true) and a
+          # secret-less verify run would fail. Tag releases omit it → sign normally.
+          args: >-
+            ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+            ${{ !startsWith(github.ref, 'refs/tags/') && '--config src-tauri/tauri.verify.conf.json' || '' }}
           # On a tag → create/append a GitHub Release with the bundles.
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/') && 'Workbooks Desktop __VERSION__' || '' }}
+          # Same body on every matrix job (idempotent — tauri-action sets it once).
+          # Leads with the one-line CLI install so the release page teaches it.
+          releaseBody: |
+            ### Install
+
+            ```sh
+            curl -fsSL https://workbooks.sh/install.sh | sh
+            ```
+
+            Or download a bundle below. On first launch the app's wizard connects an
+            engine (a local microVM via krunvm, or a cloud engine) — optional;
+            Workbooks runs offline without one.
           releaseDraft: true
           prerelease: false
 
@@ -93,3 +113,27 @@ jobs:
           name: workbooks-${{ matrix.platform }}-${{ matrix.target }}
           path: desktop/src-tauri/target/**/release/bundle/**/*
           if-no-files-found: ignore
+
+  # Attach the curl|sh installer to the release so the script is downloadable
+  # from the release page too (the canonical copy is served at
+  # workbooks.sh/install.sh). Runs ONCE (not per-platform) after the matrix, on
+  # tags only. The installer itself resolves the latest release at runtime, so it
+  # doesn't need to be regenerated per version.
+  installer:
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanity-check the installer (POSIX syntax)
+        run: sh -n web/lander/src/install.sh
+      - name: Attach install.sh to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The release tauri-action created is a draft; --clobber keeps re-runs
+          # idempotent. cp to a stable asset name so the download URL is clean.
+          cp web/lander/src/install.sh install.sh
+          gh release upload "${GITHUB_REF_NAME}" install.sh --clobber --repo "${GITHUB_REPOSITORY}"

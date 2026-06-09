@@ -188,6 +188,18 @@ identified by the same keys above.
 **Deploy** — shipping it. One image runs the Runtime in a local container or on a cloud
 machine. `wb deploy` scaffolds the config and ships it.
 
+## Install the desktop app
+
+```sh
+curl -fsSL https://workbooks.sh/install.sh | sh
+```
+
+Installs the latest [desktop release](https://github.com/workbooks-sh/workbooks.sh/releases)
+(macOS · Linux). Already have the `wb` CLI? `wb desktop install` does the same. Or grab a
+bundle straight from the releases page. On first launch the app's wizard connects an engine
+— a local microVM (via krunvm) or a cloud engine — but it's optional: Workbooks opens and
+weaves workbooks offline without one.
+
 ## Try it
 
 ```bash
