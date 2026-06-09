@@ -20,42 +20,65 @@ defmodule Workbooks.Shell do
   """
   def run(pipeline, stdin \\ "", opts \\ []) when is_binary(pipeline) do
     # `opts[:dirs]` are WASI preopens (host::guest) so commands can read/write the
-    # agent's files (e.g. `cat workdir/x`). Top-level `;` sequences pipelines: each
-    # runs on the original stdin and their outputs concatenate (like a shell).
-    # `&&`/`||` need exit codes (run path) — a follow-up. Final result is trimmed.
+    # agent's files. Control operators `;` `&&` `||` sequence pipelines with
+    # short-circuit on exit status; outputs concatenate. Final result is trimmed.
     dirs = Keyword.get(opts, :dirs, [])
 
     pipeline
-    |> split_top(?;)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.reduce({:ok, []}, fn
-      pipe, {:ok, acc} ->
-        case run_pipe(pipe, stdin, dirs) do
-          {:ok, out} -> {:ok, [out | acc]}
-          err -> err
-        end
+    |> String.to_charlist()
+    |> split_ops()
+    |> eval_ops(stdin, dirs, 0, [])
+  end
 
-      _pipe, err ->
-        err
-    end)
-    |> case do
-      {:ok, outs} -> {:ok, outs |> Enum.reverse() |> Enum.join() |> String.trim()}
-      other -> other
+  # Evaluate [{op, segment}] with short-circuit: `;` always runs the next, `&&`
+  # only if the previous pipeline succeeded (status 0), `||` only if it failed.
+  defp eval_ops([], _stdin, _dirs, _status, acc),
+    do: {:ok, acc |> Enum.reverse() |> Enum.join() |> String.trim()}
+
+  defp eval_ops([{op, seg} | rest], stdin, dirs, status, acc) do
+    skip? = (op == :and and status != 0) or (op == :or and status == 0)
+
+    cond do
+      seg == "" -> eval_ops(rest, stdin, dirs, status, acc)
+      skip? -> eval_ops(rest, stdin, dirs, status, acc)
+      true ->
+        case run_pipe(seg, stdin, dirs) do
+          {:ok, out, st} -> eval_ops(rest, stdin, dirs, st, [out | acc])
+          {:error, _} = err -> err
+        end
     end
   end
 
-  # One `cmd | cmd | …` pipeline. Inter-stage data is byte-exact (exec passes
-  # trim: false, so `wc -l` et al. see trailing newlines).
+  # One `cmd | cmd | …` pipeline → {:ok, out, exit_status} | {:error, _}. The
+  # pipeline's status is its last stage's; inter-stage data is byte-exact.
   defp run_pipe(pipe, stdin, dirs) do
     pipe
     |> split_pipes()
     |> Enum.map(&String.trim/1)
-    |> Enum.reduce({:ok, stdin}, fn
-      stage, {:ok, input} -> exec(stage, input, dirs)
+    |> Enum.reduce({:ok, stdin, 0}, fn
+      stage, {:ok, input, _st} -> exec(stage, input, dirs)
       _stage, err -> err
     end)
   end
+
+  # Split a command line into [{op, segment}] on top-level ; && || (quote-aware).
+  # `op` is the operator PRECEDING the segment (:seq for the first / after `;`).
+  # A single `|` (pipe) is left in the segment for split_pipes.
+  defp split_ops(chars), do: split_ops(chars, [], [], :seq, nil)
+  defp split_ops([], segs, cur, op, _q), do: Enum.reverse([{op, seg_str(cur)} | segs])
+
+  defp split_ops([c | rest], segs, cur, op, q) do
+    cond do
+      is_nil(q) and c in [?', ?"] -> split_ops(rest, segs, [c | cur], op, c)
+      q == c -> split_ops(rest, segs, [c | cur], op, nil)
+      is_nil(q) and c == ?; -> split_ops(rest, [{op, seg_str(cur)} | segs], [], :seq, nil)
+      is_nil(q) and c == ?& and match?([?& | _], rest) -> split_ops(tl(rest), [{op, seg_str(cur)} | segs], [], :and, nil)
+      is_nil(q) and c == ?| and match?([?| | _], rest) -> split_ops(tl(rest), [{op, seg_str(cur)} | segs], [], :or, nil)
+      true -> split_ops(rest, segs, [c | cur], op, q)
+    end
+  end
+
+  defp seg_str(cur), do: cur |> Enum.reverse() |> List.to_string() |> String.trim()
 
   # Split on a top-level separator char only — a `|`/`;` inside quotes (e.g. jq's
   # `.items | length`) stays part of its stage. Proper tokenization, not a split.
@@ -81,9 +104,9 @@ defmodule Workbooks.Shell do
 
   defp exec(stage, input, dirs) do
     case tokenize(stage) do
-      [] -> {:ok, input}
-      [cmd | argv] when cmd in @wbox -> CommandRegistry.run("wbox", input, [cmd | argv], dirs, trim: false)
-      [cmd | argv] -> CommandRegistry.run(cmd, input, argv, dirs, trim: false)
+      [] -> {:ok, input, 0}
+      [cmd | argv] when cmd in @wbox -> CommandRegistry.run_status("wbox", input, [cmd | argv], dirs, trim: false)
+      [cmd | argv] -> CommandRegistry.run_status(cmd, input, argv, dirs, trim: false)
     end
   end
 

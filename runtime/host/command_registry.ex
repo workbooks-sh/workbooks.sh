@@ -605,6 +605,17 @@ defmodule Workbooks.CommandRegistry do
   :argv passes real wasmtime argv; :stdin1 folds argv into the first stdin line.
   """
   def run(name, input, argv, dirs \\ [], ropts \\ []) when is_list(argv) do
+    case run_status(name, input, argv, dirs, ropts) do
+      {:ok, out, _status} -> {:ok, out}
+      other -> other
+    end
+  end
+
+  @doc """
+  Like run/5 but also returns the command's exit status: {:ok, out, status} |
+  {:error, reason}. Workbooks.Shell uses this for &&/|| control flow.
+  """
+  def run_status(name, input, argv, dirs \\ [], ropts \\ []) when is_list(argv) do
     case registry()[name] do
       nil -> {:error, {:unknown_command, name}}
       spec -> run_builtin(spec, input, argv, dirs, ropts)
@@ -620,9 +631,9 @@ defmodule Workbooks.CommandRegistry do
       :ok ->
         {stdin, args} = apply_argmode(mode, input, argv)
 
-        case Workbooks.PackageManager.run(path, stdin, args, dirs, ropts) do
+        case Workbooks.PackageManager.run(path, stdin, args, dirs, [{:with_status, true} | ropts]) do
           {:error, _} = err -> err
-          out -> {:ok, maybe_trim(out, ropts)}
+          {out, status} -> {:ok, maybe_trim(out, ropts), status}
         end
 
       {:error, _} = err ->
@@ -648,9 +659,9 @@ defmodule Workbooks.CommandRegistry do
       {_, _, {:ok, wasm, _}} ->
         {stdin, args} = apply_argmode(mode, input, argv)
 
-        case Workbooks.PackageManager.run(wasm, stdin, args, dirs, ropts) do
+        case Workbooks.PackageManager.run(wasm, stdin, args, dirs, [{:with_status, true} | ropts]) do
           {:error, _} = err -> err
-          out -> {:ok, maybe_trim(out, ropts)}
+          {out, status} -> {:ok, maybe_trim(out, ropts), status}
         end
 
       {_, _, err} ->

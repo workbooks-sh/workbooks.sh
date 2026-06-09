@@ -826,7 +826,7 @@ defmodule Workbooks.PackageManager do
         # JsDock.run returns {:ok, stdout} | {:error, _}; unwrap to match the CLI run shape
         # (bare stdout binary on success).
         case Workbooks.JsDock.run(wasm_path, input, profile: Keyword.get(opts, :profile, :minimal)) do
-          {:ok, out} -> out
+          {:ok, out} -> if Keyword.get(opts, :with_status, false), do: {out, 0}, else: out
           {:error, _} = e -> e
         end
 
@@ -886,8 +886,10 @@ defmodule Workbooks.PackageManager do
       # is the `-W timeout`/`-W fuel` trap above (an infinite loop is killed by
       # wasmtime) plus the input/argv size caps (no silent E2BIG) — not a status
       # check here.
-      {out, _status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
-      out
+      {out, status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
+      # wasmtime exits with the guest's exit code; surface it when asked (for
+      # shell &&/|| control flow). Default stays a bare string (universal contract).
+      if Keyword.get(opts, :with_status, false), do: {out, status}, else: out
     after
       File.rm(inp)
       if gosrc_dir, do: File.rm_rf(gosrc_dir)
