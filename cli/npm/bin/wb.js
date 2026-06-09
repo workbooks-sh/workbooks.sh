@@ -6,15 +6,32 @@ const path = require("path");
 
 const bin = path.join(__dirname, process.platform === "win32" ? "wb.exe" : "wb");
 
-if (!fs.existsSync(bin)) {
-  console.error("[wb] native binary missing — re-run `npm rebuild @work.books/cli`,");
-  console.error("[wb] or install directly:  curl -fsSL https://workbooks.sh/cli.sh | sh");
+function fatal(reason) {
+  process.stderr.write(
+    "\n" +
+    "╔══════════════════════════════════════════════════════════════╗\n" +
+    "║  wb is not installed correctly                               ║\n" +
+    "╚══════════════════════════════════════════════════════════════╝\n" +
+    `  ${reason}\n\n` +
+    "  Fix options:\n" +
+    "    1. Re-run the postinstall:  npm rebuild @work.books/cli\n" +
+    "    2. Install via shell:       curl -fsSL https://workbooks.sh/cli.sh | sh\n\n"
+  );
   process.exit(1);
+}
+
+// Check existence first, then executability (fs.accessSync X_OK).
+if (!fs.existsSync(bin)) {
+  fatal("Native binary not found — the postinstall download likely failed.");
+}
+try {
+  fs.accessSync(bin, fs.constants.X_OK);
+} catch (_) {
+  fatal(`Binary exists but is not executable: ${bin}`);
 }
 
 const r = spawnSync(bin, process.argv.slice(2), { stdio: "inherit" });
 if (r.error) {
-  console.error(`[wb] ${r.error.message}`);
-  process.exit(1);
+  fatal(r.error.message);
 }
 process.exit(r.status === null ? 1 : r.status);

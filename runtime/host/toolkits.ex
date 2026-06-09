@@ -250,7 +250,7 @@ defmodule Workbooks.Toolkits do
             |> Enum.flat_map(fn path ->
               extract_role_blocks(File.read!(path), "pre")
               |> Enum.map(fn body ->
-                {out, code} = run_bash(body, [])
+                {out, code} = run_bash(body, [], dir)
                 {code == 0, "pre #{Path.relative_to(path, dir)}" <> if(code == 0, do: "", else: ": " <> String.trim(out))}
               end)
             end)
@@ -305,13 +305,13 @@ defmodule Workbooks.Toolkits do
 
     cond do
       prop(text, "TASK") != nil -> agent_judge_case(text, name, dir, id)
-      extract_role_blocks(text, "eval") != [] -> deterministic_case(text, name)
+      extract_role_blocks(text, "eval") != [] -> deterministic_case(text, name, dir)
       true -> {:fail, "#{name}: no :role eval block and no :TASK:"}
     end
   end
 
   # Tier 1 — run the sandboxed :role eval block, assert #+EXPECT:.
-  defp deterministic_case(text, name) do
+  defp deterministic_case(text, name, toolkit_dir \\ nil) do
     if not exec_allowed?() do
       {:skip, "#{name}: SKIPPED (set WB_TOOLKIT_EXEC=1 to run sandboxed)"}
     else
@@ -321,7 +321,7 @@ defmodule Workbooks.Toolkits do
           _ -> nil
         end
 
-      {out, code} = run_bash(Enum.join(extract_role_blocks(text, "eval"), "\n"), [])
+      {out, code} = run_bash(Enum.join(extract_role_blocks(text, "eval"), "\n"), [], toolkit_dir)
       ok = code == 0 and (is_nil(expect) or String.contains?(out, expect))
 
       detail =
@@ -974,7 +974,7 @@ defmodule Workbooks.Toolkits do
       with dir when not is_nil(dir) <- tk_dir(id, root),
            path when not is_nil(path) <- skill_path(dir, task),
            [body | _] <- extract_role_blocks(File.read!(path), "task") do
-        {out, _code} = run_bash(body, args)
+        {out, _code} = run_bash(body, args, dir)
         out
       else
         [] -> "no :role task block in #{id}/#{task}"
@@ -1151,10 +1151,21 @@ defmodule Workbooks.Toolkits do
   def exec_allowed?, do: System.get_env("WB_TOOLKIT_EXEC") == "1"
 
   # Run a bash snippet with positional args ($1, $2, …) under the sandbox, capped.
+  # When `toolkit_dir` is given, the subprocess cwd is set to that directory AND
+  # WB_TOOLKIT_DIR is exported — toolkit :role pre/task probes can use relative
+  # paths (e.g. `test -f manifest.org`) or the env var for cwd-independent checks.
   # Returns {output, exit_code}. The caller MUST have checked exec_allowed?.
-  defp run_bash(body, args) do
+  defp run_bash(body, args, toolkit_dir \\ nil) do
     script = @ulimit_prologue <> body
-    task = Task.async(fn -> Workbooks.Sandbox.run(["bash", "-c", script, "bash"] ++ args) end)
+    sandbox_opts =
+      if is_binary(toolkit_dir) and File.dir?(toolkit_dir) do
+        abs_dir = Path.expand(toolkit_dir)
+        [cd: abs_dir, env: [{"WB_TOOLKIT_DIR", abs_dir}]]
+      else
+        []
+      end
+
+    task = Task.async(fn -> Workbooks.Sandbox.run(["bash", "-c", script, "bash"] ++ args, sandbox_opts) end)
 
     case Task.yield(task, @exec_timeout_ms) || Task.shutdown(task, :brutal_kill) do
       {:ok, {out, code}} -> {out, code}

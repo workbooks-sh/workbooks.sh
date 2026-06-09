@@ -9,7 +9,7 @@ live, verbatim, as encountered — they become bd issues.
 
 | # | What's under test | Production surface | Ability | Ergonomics | Friction |
 |---|---|---|---|---|---|
-| 1 | CLI distribution | `npm i -g @work.books/cli` (the v0.11.0 release) | ⚠ works only authed | poor today | #1 #2 #3 |
+| 1 | CLI distribution | `npm i -g @work.books/cli` (the v0.11.0 release) | ✓ installs working wb (repo public) | fixed #1 #2 | #1 #2 #3 RESOLVED |
 | 2 | Deploy-kit → cloud | `wb deploy secrets set` + `wb deploy apply` (fly recipe, prebuilt ghcr image) | | | |
 | 3 | Runtime serves the page | publish the lander INTO the deployed runtime; page at the fly URL | | | |
 | 4 | Instance toolkit | living-lander toolkit (agent + brand north star + analytics + publish skills) | ✓ verify 7/7 | good — native eval caught a real gap | #4 |
@@ -66,3 +66,9 @@ unacceptable default for `wb deploy` cloud targets. Fix: deploy-kit mints
 WB_PUBLIC_BEARER (it already refuses to mint rotating secrets — this one should
 be a persisted operator secret it ASKS for), engine requires it when
 WB_TENANCY_MODE != dev. Severity: HIGH for any real deployment.
+
+### Resolutions
+- #1 PATH-shadow warning + #2 loud postinstall failure: fixed in cli/npm (install.js, bin/wb.js).
+- #3 CRITICAL private-repo 404: RESOLVED — founder made repo public; `npm i -g @work.books/cli` now installs a working wb unauthenticated. Verified.
+- #4 toolkit eval cwd: fixed in toolkits.ex — pre/task blocks run with cwd = toolkit dir + WB_TOOLKIT_DIR exported. verify 7/7.
+- #5 open control plane: in progress (deploy-kit secure-by-default bearer).

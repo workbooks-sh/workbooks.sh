@@ -19,6 +19,28 @@ function assetName() {
   throw new Error(`unsupported platform: ${os}/${arch}`);
 }
 
+// Resolve the first `wb` on PATH that is NOT our just-installed binary.
+// Returns the shadowing path string, or null if no shadow.
+function findShadow(installedBin) {
+  const resolved = path.resolve(installedBin);
+  // Collect every directory on PATH and look for a wb / wb.exe match.
+  const sep = process.platform === "win32" ? ";" : ":";
+  const exeName = process.platform === "win32" ? "wb.exe" : "wb";
+  const dirs = (process.env.PATH || "").split(sep).filter(Boolean);
+  for (const dir of dirs) {
+    const candidate = path.join(dir, exeName);
+    try {
+      const stat = fs.statSync(candidate);
+      if (!stat.isFile()) continue;
+      if (path.resolve(candidate) === resolved) return null; // it's ours — no shadow
+      return candidate; // something else comes first
+    } catch (_) {
+      // not found in this dir
+    }
+  }
+  return null;
+}
+
 function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 10) return reject(new Error("too many redirects"));
@@ -55,10 +77,43 @@ async function main() {
   await download(url, out);
   if (process.platform !== "win32") fs.chmodSync(out, 0o755);
   console.log("[wb] installed.");
+
+  // FIX 1 — PATH-shadow check: warn if another wb will shadow this install.
+  const shadow = findShadow(out);
+  if (shadow) {
+    process.stderr.write(
+      "\n" +
+      "╔══════════════════════════════════════════════════════════════╗\n" +
+      "║  wb PATH SHADOW WARNING                                      ║\n" +
+      "╚══════════════════════════════════════════════════════════════╝\n" +
+      `  Another wb binary was found earlier on your PATH:\n` +
+      `    ${shadow}\n` +
+      `  It will shadow the npm-installed wb. To fix, either:\n` +
+      `    • Remove or rename the old binary:  rm ${shadow}\n` +
+      `    • Or adjust PATH so npm's bin dir comes first.\n\n`
+    );
+  }
 }
 
 main().catch((e) => {
-  console.error(`[wb] install failed: ${e.message}`);
-  console.error("[wb] you can also install via:  curl -fsSL https://workbooks.sh/cli.sh | sh");
-  process.exit(0); // don't hard-fail the whole npm install; the shim re-checks
+  // FIX 2 — LOUD failure banner so users aren't left with a silent broken install.
+  const binOut = path.join(__dirname, "bin", process.platform === "win32" ? "wb.exe" : "wb");
+  const alreadyPresent = (() => { try { return fs.statSync(binOut).isFile(); } catch (_) { return false; } })();
+
+  process.stderr.write(
+    "\n" +
+    "╔══════════════════════════════════════════════════════════════╗\n" +
+    "║  wb install FAILED                                           ║\n" +
+    "╚══════════════════════════════════════════════════════════════╝\n" +
+    `  ${e.message}\n\n` +
+    (alreadyPresent
+      ? "  A previous binary is still present and may work.\n\n"
+      : "  The wb binary was NOT downloaded. Running `wb` will fail.\n\n") +
+    "  To install manually, run:\n" +
+    "    curl -fsSL https://workbooks.sh/cli.sh | sh\n\n" +
+    "  Or retry the download:\n" +
+    "    npm rebuild @work.books/cli\n\n"
+  );
+  // Exit 0 to keep `npm install` non-fatal; the banner above is the signal.
+  process.exit(0);
 });
