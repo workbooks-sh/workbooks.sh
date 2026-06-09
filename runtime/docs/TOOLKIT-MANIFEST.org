@@ -65,7 +65,7 @@
   | =command=   | argv + stdin → stdout + exit     | agent, workflow   | no   | yes    | ✅ built  |
   | =posix=     | native PATH binary in container  | agent, workflow   | no   | no     | ✅ built  |
   | =task=      | :role bash recipe (wb toolkit run)| agent            | no   | no     | ✅ built  |
-  | =federation=| OQL data-source + sync daemon    | host, OQL         | no   | mixed  | ◐ shaped |
+  | =federation=| OQL data-source + sync daemon    | host, OQL         | no   | mixed  | ✅ functional |
   | =component= | WIT-typed, in-process call       | component, workflow| yes | yes    | ◐ substrate exists |
   | =kernel=    | bytes→bytes, instantiate-once-loop| the fabric       | yes  | yes    | ⏳ wb-rhs.5 |
 
@@ -86,10 +86,14 @@
    Default-deny execution (WB_TOOLKIT_EXEC=1, sandboxed, ulimit + wall-clock).
    For multi-verb NEEDs the toolkit owns but does not compile.
 
-** federation — the three-face SaaS connector
-   manifest + skills (agent face) + plugin/manifest.org (OQL data-source) +
-   sync.org (:daemon: pull). Auth centralized via Plugin.Auth + =#+ENV_KEYS=.
-   See TOOLKITS-V3 §Federation. Long-lived sync lives host-side, never in-wasm.
+** federation — the three-face SaaS connector (FUNCTIONAL, wb-39j)
+   Three faces, all wired: (1) READ — =SELECT … FROM <entity>= routes to a
+   data-source plugin (Workbooks.Federation + DataSource, in Library.query); (2)
+   SOURCE — any REST/JSON API via the generic =Workbooks.DataSource.Http= (manifest
+   =#+URL/#+ROWS_PATH/#+ENV_KEYS=), or a custom =query/3= module (Linear/Asana
+   specialize); (3) SYNC — =Workbooks.Plugin.Sync= mirrors a source into =:task:=
+   nodes on an interval, supervised. Auth centralized via =Workbooks.Plugin.Auth=
+   (resolver/broker seam → env). Long-lived sync lives host-side, never in-wasm.
 
 ** component — the typed in-process artifact (absorbs "extension")
    A WIT-typed component on =engine.wit= (or a declared =#+WIT= world). Typed I/O
