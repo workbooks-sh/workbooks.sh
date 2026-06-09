@@ -55,4 +55,64 @@ defmodule Workbooks.LibraryInstallTest do
     blob = Bundle.pack(%{"workbook.html" => "<html><body>just a doc</body></html>"})
     assert {:ok, %{commands: []}} = Library.install(blob)
   end
+
+  @tag :build
+  test "REALISTIC workbook bundle: built artifact + html/vfs/manifest parts → install picks the .wasm, ignores the rest" do
+    # A real .wbundle is workbook.html + vfs.sqlite + manifest.json + the compiled
+    # <name>.wasm parts (build projection). Earlier tests packed a lone .wasm; this
+    # one mirrors the actual ship/pack shape and proves install ignores non-wasm
+    # parts and registers the BUILT command.
+    bytes = rev_wasm_bytes()
+    cmd = uniq("rev")
+
+    parts = %{
+      "workbook.html" =>
+        ~s|<html><script id="workbook-spec">{"toolkit":"#{cmd}"}</script><body>doc</body></html>|,
+      "vfs.sqlite" => <<0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0, 0>>,
+      "manifest.json" => Jason.encode!(%{"id" => cmd, "format" => "wbundle/1", "signed" => false}),
+      "#{cmd}.wasm" => bytes
+    }
+
+    blob = Bundle.pack(parts)
+    assert {:ok, %{commands: [^cmd]}} = Library.install(blob)
+    assert {:ok, "cba"} = CommandRegistry.run(cmd, "abc")
+  end
+
+  @tag :build
+  test "store → fetch → install: the distribution chain via Storage" do
+    # The publish/install round-trip end to end: a built toolkit bundle is STORED
+    # (Storage.put, the registry backend), FETCHED by key (Library.fetch), then
+    # INSTALLED and run. This is wb-pkh.3's chain minus the workspace-pack front
+    # (Library.pack, which produces the bundle and is its own concern).
+    bytes = rev_wasm_bytes()
+    cmd = uniq("rev")
+    blob = Bundle.pack(%{"#{cmd}.wasm" => bytes})
+    tenant = "wbtest_#{System.unique_integer([:positive])}"
+    key = "workbooks/#{cmd}.wbundle"
+
+    assert :ok = Workbooks.Storage.put(tenant, key, blob)
+    assert {:ok, fetched} = Workbooks.Library.fetch(tenant, key)
+    assert fetched == blob
+    assert {:ok, %{commands: [^cmd]}} = Library.install(fetched)
+    assert {:ok, "cba"} = CommandRegistry.run(cmd, "abc")
+
+    Workbooks.Storage.delete(tenant, key)
+  end
+
+  @tag :build
+  test "install round-trips through unpack — the bundle is a plain zip any tool reads" do
+    # Sanity that what install consumes is the same portable .wbundle the rest of
+    # the system produces: pack → unpack returns the parts verbatim, and install
+    # on the packed blob registers the command. (No bespoke install format.)
+    bytes = rev_wasm_bytes()
+    cmd = uniq("rev")
+    blob = Bundle.pack(%{"#{cmd}.wasm" => bytes, "readme.txt" => "hi"})
+
+    parts = Bundle.unpack(blob)
+    assert Map.has_key?(parts, "#{cmd}.wasm")
+    assert parts["readme.txt"] == "hi"
+
+    assert {:ok, %{commands: [^cmd]}} = Library.install(blob)
+    assert {:ok, "cba"} = CommandRegistry.run(cmd, "abc")
+  end
 end
