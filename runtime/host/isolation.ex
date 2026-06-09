@@ -50,9 +50,9 @@ defmodule Workbooks.Isolation do
       isolates: "host-side crash/scheduler; distributes across machines"
     },
     container: %{
-      status: :planned,
+      status: :live,
       boundary: :os_kernel,
-      blurb: "separate container (krunvm|podman) — kernel/tenancy boundary.",
+      blurb: "throwaway container (Workbooks.IsolationContainer — docker|podman, --network none + mem/cpu/pids caps + read-only) — kernel/tenancy boundary. Runtime-gated: needs the runtime + a wasmtime image (IsolationContainer.available?).",
       isolates: "hostile / multi-tenant workloads"
     }
   }

@@ -8,21 +8,21 @@ defmodule Workbooks.IsolationTest do
 
   alias Workbooks.Isolation
 
-  test "tier statuses are honest: instance/os_process/node live, container planned" do
+  test "tier statuses are honest: all four tiers live" do
     # Corrected: commands ALWAYS run as subprocess wasmtime (run_wasmtime), so
     # :os_process is live, not 'available'. :instance is the in-VM kernel/component path.
     assert Isolation.status(:instance) == :live
     assert Isolation.status(:os_process) == :live
     assert Isolation.status(:node) == :live
-    assert Isolation.status(:container) == :planned
+    assert Isolation.status(:container) == :live
     assert Isolation.status(:bogus) == :unknown
   end
 
-  test "instance/os_process/node are live; container is not yet" do
+  test "all four isolation tiers are live" do
     assert Isolation.live?(:instance)
     assert Isolation.live?(:os_process)
     assert Isolation.live?(:node)
-    assert Isolation.known?(:container)
+    assert Isolation.live?(:container)
     refute Isolation.known?(:bogus)
   end
 
@@ -45,7 +45,7 @@ defmodule Workbooks.IsolationTest do
     assert {:ok, :instance} = Isolation.resolve(:instance)
     assert {:ok, :os_process} = Isolation.resolve(:os_process)
     assert {:ok, :node} = Isolation.resolve(:node)
-    assert {:error, {:tier_planned, :container, _}} = Isolation.resolve(:container)
+    assert {:ok, :container} = Isolation.resolve(:container)
     assert {:error, {:unknown_tier, :bogus, _}} = Isolation.resolve(:bogus)
   end
 

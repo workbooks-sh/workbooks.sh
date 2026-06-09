@@ -63,9 +63,8 @@ defmodule Workbooks.FabricTest do
     assert {:ok, [{:ok, "cba"}]} = Fabric.map(cmd, ["abc"], tier: :os_process)
     # :instance doesn't apply to commands (no in-VM command path) — pointed reason.
     assert {:error, {:tier_mismatch, :instance, _}} = Fabric.map(cmd, ["x"], tier: :instance)
-    # :node is now LIVE (wb-pkh.5 — runs on a peer VM); :container is still planned;
-    # :bogus is unknown.
-    assert {:error, {:tier_planned, :container, _}} = Fabric.map(cmd, ["x"], tier: :container)
+    # All real tiers are live now (:os_process, :node, :container); only a bogus
+    # name is unknown.
     assert {:error, {:unknown_tier, :bogus, _}} = Fabric.map(cmd, ["x"], tier: :bogus)
   end
 end

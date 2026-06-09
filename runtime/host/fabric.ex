@@ -63,6 +63,7 @@ defmodule Workbooks.Fabric do
     runner =
       case tier do
         :node -> fn stdin, argv -> Workbooks.IsolationNode.run(name, stdin, argv) end
+        :container -> fn stdin, argv -> Workbooks.IsolationContainer.run(name, stdin, argv) end
         _ -> fn stdin, argv -> Workbooks.CommandRegistry.run(name, stdin, argv, dirs, ropts) end
       end
 
