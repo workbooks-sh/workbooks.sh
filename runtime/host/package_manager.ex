@@ -257,6 +257,121 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Parse npm dependencies for the in-sandbox resolver (wb-spy.T1.1) — the npm analog of
+  # parse_cargo_deps. Returns a sorted list of %{name, req, pin}: `req` is the semver range
+  # requested in package.json; `pin` is an exact version locked by package-lock.json (the
+  # resolver SKIPS network resolution when pin is set) or nil (resolve `req` against the
+  # registry). "dependencies" + "devDependencies" form the requested set. Specs using a
+  # non-registry protocol (git/file/link/workspace/url/github-shorthand) are dropped — they
+  # aren't fetchable from the registry in-sandbox.
+  def parse_package_json_deps(dir) do
+    abs = Path.expand(dir)
+    pj = Path.join(abs, "package.json")
+
+    with true <- File.exists?(pj),
+         {:ok, body} <- File.read(pj),
+         {:ok, json} <- Jason.decode(body),
+         true <- is_map(json) do
+      requested =
+        Map.merge(
+          dep_map(json["dependencies"]),
+          dep_map(json["devDependencies"])
+        )
+
+      pins = lockfile_pins(abs)
+
+      requested
+      |> Enum.flat_map(fn {name, spec} -> npm_dep_entry(name, spec, pins) end)
+      |> Enum.sort_by(& &1.name)
+    else
+      _ -> []
+    end
+  end
+
+  defp dep_map(m) when is_map(m), do: m
+  defp dep_map(_), do: %{}
+
+  # One requested dep → [] (skipped) or [entry]. Only string version specs are
+  # registry-fetchable; protocol-prefixed/shorthand refs are dropped.
+  defp npm_dep_entry(name, spec, pins) when is_binary(spec) do
+    if npm_unfetchable?(spec),
+      do: [],
+      else: [%{name: name, req: spec, pin: Map.get(pins, name)}]
+  end
+
+  defp npm_dep_entry(_name, _spec, _pins), do: []
+
+  # Specs the registry resolver cannot handle: protocol-prefixed (git+/git:/file:/link:/
+  # workspace:/http(s):/github:) or "owner/repo" GitHub shorthand.
+  defp npm_unfetchable?(spec) do
+    spec =~ ~r{^(git\+|git:|file:|link:|workspace:|https?:|github:|[\w.-]+/[\w.-]+(#|$))}
+  end
+
+  # Exact version pins from package-lock.json. Supports lockfileVersion 2/3 ("packages"
+  # keyed by "node_modules/<name>") and v1 ("dependencies" map). Returns %{name => version}.
+  # Missing/unparseable lockfile → %{} (everything resolves by range).
+  defp lockfile_pins(abs) do
+    lock = Path.join(abs, "package-lock.json")
+
+    with true <- File.exists?(lock),
+         {:ok, body} <- File.read(lock),
+         {:ok, json} <- Jason.decode(body) do
+      cond do
+        is_map(json["packages"]) -> pins_from_v3(json["packages"])
+        is_map(json["dependencies"]) -> pins_from_v1(json["dependencies"])
+        true -> %{}
+      end
+    else
+      _ -> %{}
+    end
+  end
+
+  # v2/v3: "packages" keyed by "" (root) and "node_modules/<name>" (possibly nested
+  # ".../node_modules/<name>"). The package name is the segment after the LAST "node_modules/"
+  # (greedy match), so scoped (@scope/pkg) and nested deps resolve correctly. When a name
+  # appears at multiple depths, the SHALLOWEST (top-level) version wins.
+  defp pins_from_v3(packages) do
+    packages
+    |> Enum.flat_map(fn
+      {"", _} ->
+        []
+
+      {path, meta} when is_map(meta) ->
+        case Regex.run(~r{.*node_modules/(.+)$}, path) do
+          [_, name] ->
+            depth = length(String.split(path, "node_modules/")) - 1
+
+            case meta["version"] do
+              v when is_binary(v) -> [{name, v, depth}]
+              _ -> []
+            end
+
+          _ ->
+            []
+        end
+
+      _ ->
+        []
+    end)
+    |> Enum.sort_by(fn {_n, _v, depth} -> -depth end)
+    |> Map.new(fn {n, v, _depth} -> {n, v} end)
+  end
+
+  # v1: nested "dependencies" map; each value has "version" and may nest its own
+  # "dependencies". Walk recursively; the shallower (top-level) version wins.
+  defp pins_from_v1(deps) do
+    Enum.reduce(deps, %{}, fn {name, meta}, acc ->
+      acc =
+        if is_map(meta) and is_binary(meta["version"]),
+          do: Map.put_new(acc, name, meta["version"]),
+          else: acc
+
+      if is_map(meta) and is_map(meta["dependencies"]),
+        do: Map.merge(pins_from_v1(meta["dependencies"]), acc),
+        else: acc
+    end)
+  end
+
   # A package.json with a non-empty "dependencies" needs a bundler + registry the in-sandbox
   # single-file JS lane doesn't do yet. A dep-free single-file project is fine.
   defp js_dir_has_deps?(abs) do
