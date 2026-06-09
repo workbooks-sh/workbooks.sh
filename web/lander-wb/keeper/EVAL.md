@@ -72,3 +72,12 @@ WB_TENANCY_MODE != dev. Severity: HIGH for any real deployment.
 - #3 CRITICAL private-repo 404: RESOLVED — founder made repo public; `npm i -g @work.books/cli` now installs a working wb unauthenticated. Verified.
 - #4 toolkit eval cwd: fixed in toolkits.ex — pre/task blocks run with cwd = toolkit dir + WB_TOOLKIT_DIR exported. verify 7/7.
 - #5 open control plane: RESOLVED — auth.ex 3-rung ladder (WB_PUBLIC_BEARER locks the plane, 401 no-fallback when set); deploy-kit auto-generates+persists the bearer on cloud apply (ensure_cloud_bearer, not rotated); local stays open. 7/7 auth tests. SECURE BY DEFAULT for every wb deploy cloud user, not just our box.
+
+## Hosting decision (founder, 2026-06-09)
+Model A — serve the lander LIVE from the fly runtime (PublicWeb live-render),
+NOT render-and-push to CF static. Rationale: the page rewrites itself; live
+render makes every new load the current page instantly (no publish hop). CF
+stays as the /live/* edge proxy (TLS/cache/DDoS) — free upside. Verified no
+added security risk: public plane is GET-only, non-executing, plane-split;
+control plane now bearer-locked. Caveat recorded: an already-open tab still
+needs a client poll to update without reload (filed, optional).
