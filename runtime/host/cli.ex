@@ -38,6 +38,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb dev …` — the development service: inspect the demo env + drive the
+      # local verify loop (info / up / test). HOST-side, no app boot.
+      ["dev" | rest] ->
+        {out, failed?} = Workbooks.CLI.Dev.run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       # `wb desktop …` installs/launches the GUI app — HOST-side (shells out to
       # the curl|sh installer), no app boot.
       ["desktop" | rest] ->

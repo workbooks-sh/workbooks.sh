@@ -60,6 +60,21 @@ swap providers behind the one Host instead.
 - **Desktop state of truth:** `desktop/ASSESSMENT.md` (the runtime is canonical; the desktop frontend is the most out-of-date code — re-point it onto `runtime/host`, never the reverse).
 - Browser preview: `cd desktop && bun run dev` (port 5178) — runs the real frontend with `$lib/platform/webHost` mocking the providers; no runtime needed.
 
+## Local development & verification — `wb dev`
+
+Never await a CI → production build to verify a change; run it locally at the
+tightest tier that proves it. The methodology is a shipped CLI surface so
+DeployKit users get the same path. **Canon doc:** `docs/DEVELOPMENT.md`.
+
+- **`wb dev info`** — demo-env dashboard (runtime target + `/health`, model key,
+  toolkits root, CTK URL). `wb dev up` / `wb dev test` (= `mix test`).
+- **Runtime:** `WB_WEB=1 iex -S mix` (control plane `:4000`); `mix compile` is the
+  first gate for any runtime edit; `mix test` (~58 files) the suite.
+- **Desktop:** `cd desktop && bun run dev` (`:5178`, real frontend + webHost mock
+  providers, full-reload on every edit).
+- **Toolkits/CTK:** `cd toolkits/ctk && python3 -m http.server 5180`; `wb toolkit verify <id>`.
+- **Prod-parity:** `wb deploy local` (same OCI image, krunvm container).
+
 ## Release / publishing — THREE separate layers. DO NOT CONFLATE THEM.
 
 This tripped up a session badly once. Keep these distinct:
