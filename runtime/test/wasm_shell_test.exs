@@ -29,6 +29,12 @@ defmodule WasmShellTest do
     assert {:ok, "3"} = Workbooks.Shell.run("echo -n abc | wc -c")
   end
 
+  test "buffering applets sort/uniq/tail run in WASM" do
+    assert {:ok, "4\n5"} = Workbooks.Shell.run("seq 5 | tail -n 2")
+    assert {:ok, "a\nb\nc"} = Workbooks.Shell.run("echo 'c\nb\na\nb' | sort -u")
+    assert {:ok, "10\n9"} = Workbooks.Shell.run("seq 10 | sort -n -r | head -n 2")
+  end
+
   test "more coreutils applets + ; sequencing" do
     assert {:ok, "olleh"} = Workbooks.Shell.run("echo hello | rev")
     assert {:ok, "c"} = Workbooks.Shell.run("basename /a/b/c.txt .txt")

@@ -27,6 +27,26 @@ static void w(const char *s, long n) {
 }
 static void ws(const char *s) { w(s, (long)strlen(s)); }
 
+/* Shared 1 MiB input buffer + line index for the buffering applets (sort/uniq/
+ * tail). One applet runs per invocation, so a single shared static is safe; it
+ * lives in BSS (not the stack). Input beyond 1 MiB is truncated. */
+static char g_in[1 << 20];
+static char *g_lines[65536];
+
+static long read_stdin_all(void) {
+  long n = 0, k;
+  while (n < (long)sizeof g_in && (k = read(0, g_in + n, sizeof g_in - n)) > 0) n += k;
+  return n;
+}
+
+static int cmp_str(const void *a, const void *b) {
+  return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+static int cmp_num(const void *a, const void *b) {
+  long x = atol(*(const char *const *)a), y = atol(*(const char *const *)b);
+  return (x > y) - (x < y);
+}
+
 static int cat_fd(int fd) {
   char b[4096];
   long n;
@@ -207,6 +227,73 @@ static int do_tr(int c, char **v) {
   return 0;
 }
 
+static int do_sort(int c, char **v) {
+  long n = read_stdin_all();
+  long nl = 0, start = 0;
+  for (long i = 0; i < n; i++)
+    if (g_in[i] == '\n') { g_in[i] = 0; if (nl < 65536) g_lines[nl++] = &g_in[start]; start = i + 1; }
+  if (start < n) { if (n < (long)sizeof g_in) g_in[n] = 0; if (nl < 65536) g_lines[nl++] = &g_in[start]; }
+  int rev = 0, uniq = 0, num = 0;
+  for (int i = 0; i < c; i++) {
+    if (!strcmp(v[i], "-r")) rev = 1;
+    else if (!strcmp(v[i], "-u")) uniq = 1;
+    else if (!strcmp(v[i], "-n")) num = 1;
+  }
+  qsort(g_lines, nl, sizeof(char *), num ? cmp_num : cmp_str);
+  const char *prev = 0;
+  for (long i = 0; i < nl; i++) {
+    const char *ln = g_lines[rev ? nl - 1 - i : i];
+    if (uniq && prev && !strcmp(prev, ln)) continue;
+    ws(ln);
+    w("\n", 1);
+    prev = ln;
+  }
+  return 0;
+}
+
+static int do_uniq(void) {
+  long n = read_stdin_all(), start = 0;
+  char prev[8192];
+  int hp = 0;
+  for (long i = 0; i <= n; i++) {
+    if (i == n || g_in[i] == '\n') {
+      long len = i - start;
+      int dup = hp && len == (long)strlen(prev) && !strncmp(prev, &g_in[start], len);
+      if (!dup) {
+        w(&g_in[start], len);
+        w("\n", 1);
+        long cl = len < 8191 ? len : 8191;
+        memcpy(prev, &g_in[start], cl);
+        prev[cl] = 0;
+        hp = 1;
+      }
+      start = i + 1;
+      if (i == n) break;
+    }
+  }
+  return 0;
+}
+
+static int do_tail(int c, char **v) {
+  long lim = 10;
+  for (int i = 0; i < c; i++) {
+    if (!strcmp(v[i], "-n") && i + 1 < c) lim = atol(v[i + 1]);
+    else if (!strncmp(v[i], "-n", 2) && v[i][2]) lim = atol(v[i] + 2);
+  }
+  long n = read_stdin_all();
+  if (lim <= 0 || n == 0) return 0;
+  long count = 0;
+  for (long i = 0; i < n; i++) if (g_in[i] == '\n') count++;
+  long total = count + (g_in[n - 1] != '\n' ? 1 : 0);
+  long skip = total > lim ? total - lim : 0;
+  long ln = 0, start = 0;
+  if (skip > 0)
+    for (long i = 0; i < n; i++)
+      if (g_in[i] == '\n') { if (++ln == skip) { start = i + 1; break; } }
+  w(&g_in[start], n - start);
+  return 0;
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) { write(2, "wbox: missing applet\n", 21); return 2; }
   const char *a = argv[1];
@@ -223,6 +310,9 @@ int main(int argc, char **argv) {
   if (!strcmp(a, "basename")) return do_basename(c, v);
   if (!strcmp(a, "dirname")) return do_dirname(c, v);
   if (!strcmp(a, "tr")) return do_tr(c, v);
+  if (!strcmp(a, "sort")) return do_sort(c, v);
+  if (!strcmp(a, "uniq")) return do_uniq();
+  if (!strcmp(a, "tail")) return do_tail(c, v);
   if (!strcmp(a, "true")) return 0;
   if (!strcmp(a, "false")) return 1;
 

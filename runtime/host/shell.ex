@@ -77,7 +77,7 @@ defmodule Workbooks.Shell do
 
   # Coreutils provided by the multicall `wbox` wasm — dispatched as `wbox <applet>`
   # so the shell has real echo/cat/seq/head/wc without N separate binaries (wb-9ja).
-  @wbox ~w(cat echo seq head wc nl rev basename dirname tr true false)
+  @wbox ~w(cat echo seq head wc nl rev basename dirname tr sort uniq tail true false)
 
   defp exec(stage, input, dirs) do
     case tokenize(stage) do
