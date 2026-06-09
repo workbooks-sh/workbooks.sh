@@ -7,6 +7,14 @@ A toolkit doesn't choose its own cage. Based on its =#+TRUST= posture and shape,
 the host runs it at one of four escalating tiers. The direction is one-way: the
 host can only *tighten*.
 
+#+begin_src mermaid
+flowchart LR
+  i["instance<br/>linear memory"] --> p["os_process<br/>subprocess"]
+  p --> n["node<br/>peer BEAM VM"] --> c["container<br/>kernel boundary"]
+  fp["first-party"] -.-> p
+  tp["third-party"] -.-> n
+#+end_src
+
 | tier         | boundary           | isolates against                       |
 |--------------+--------------------+----------------------------------------|
 | =instance=   | linear memory      | memory corruption, ungranted caps      |

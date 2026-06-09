@@ -9,6 +9,17 @@ changes. One package format, one build pipeline, one trust model, six contracts.
 
 Pick the shape by how the thing is *called*, not by what language you wrote it in.
 
+#+begin_src mermaid
+flowchart TB
+  pkg["one toolkit<br/>manifest + skills + wasm"] --> exec{"EXEC shape"}
+  exec --> command["command · stdio"]
+  exec --> component["component · typed"]
+  exec --> kernel["kernel · hot loop"]
+  exec --> task["task · recipe"]
+  exec --> federation["federation · data source"]
+  exec --> posix["posix · native"]
+#+end_src
+
 ** command — the stdio leaf
 
 argv + stdin → stdout. A CLI compiled to WASM, invoked by name. This is the

@@ -41,6 +41,15 @@ for C, Zig, Rust, and Go — and for richer shapes than a stdin→stdout command
 
 [[start/first-toolkit.org][Build your first toolkit →]]
 
+#+begin_src mermaid
+flowchart LR
+  src["source<br/>any language"] -->|"build in sandbox"| wasm["content-addressed<br/>.wasm"]
+  wasm --> reg(["registered<br/>toolkit"])
+  reg --> agent["an agent"]
+  reg --> wb["a workbook"]
+  reg --> ship["pack · sign · install"]
+#+end_src
+
 ** Why it's one substrate, not three
 
 Most stacks split the *document*, the *runtime*, and the *package system* into

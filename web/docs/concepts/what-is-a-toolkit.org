@@ -69,6 +69,18 @@ The host holds the credentials and owns the egress. A toolkit that fetches a URL
 never sees the API key and never opens a socket — it calls a capability, and the
 host does the work. See [[the-dock.org][the Dock & capabilities]].
 
+#+begin_src mermaid
+flowchart TB
+  subgraph s["sandbox — no ambient authority"]
+    tk["toolkit · WASM"]
+  end
+  tk -->|"declares CAPS"| dock{{"the Dock"}}
+  dock --> vfs[("vfs")]
+  dock --> llm["llm"]
+  dock --> net["browse / net"]
+  dock -. "ungranted = does not exist" .-> x["✕"]
+#+end_src
+
 ** The host decides how isolated it runs
 
 You don't choose your own cage. Based on its trust posture, a toolkit runs at one
