@@ -9,7 +9,7 @@ defmodule Workbooks.Deploy.Config do
 
   Parsed with a hand-rolled `:PROPERTIES:` scan — NOT the OQL/org parser, never
   executed — so a deployment file is inert config, exactly as the descriptors
-  in deploy/deployments/ document.
+  in cli/deploy-kit/deployments/ document.
   """
 
   @places ~w(local cloud)

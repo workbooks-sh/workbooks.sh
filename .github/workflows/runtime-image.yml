@@ -20,8 +20,8 @@ on:
     branches: [main]
     paths:
       - "runtime/**"
-      - "deploy/Dockerfile.runtime"
-      - "deploy/Dockerfile.compilers"
+      - "ci/Dockerfile.runtime"
+      - "ci/Dockerfile.compilers"
       - ".github/workflows/runtime-image.yml"
   workflow_dispatch:
 
@@ -64,7 +64,7 @@ jobs:
       - name: Build + push ${{ matrix.platform }} by digest
         run: |
           set -euo pipefail
-          docker buildx build -f deploy/Dockerfile.runtime \
+          docker buildx build -f ci/Dockerfile.runtime \
             --platform "${{ matrix.platform }}" \
             --build-arg "COMPILERS_REF=${COMPILERS_REF}" \
             --output "type=image,name=${IMAGE},push-by-digest=true,name-canonical=true,push=true" \

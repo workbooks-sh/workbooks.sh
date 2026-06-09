@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Workbooks.Deploy.Backend — the provider-neutral recipe spine. Each cloud place
-# is deploy/providers/<place>/bootstrap.sh: it sources THIS, fills the five hooks
+# is cli/deploy-kit/providers/<place>/bootstrap.sh: it sources THIS, fills the five hooks
 #   provider_ensure_app / provider_set_secrets / provider_attach_volume /
 #   provider_deploy_image / provider_public_url
 # plus the lifecycle trio (provider_down / provider_status / provider_logs),

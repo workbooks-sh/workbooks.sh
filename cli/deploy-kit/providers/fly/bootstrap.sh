@@ -5,14 +5,14 @@
 #
 # Two image strategies (the deploy-kit's two faces):
 #   * APP build (default): build an app image ON Fly's remote builder from a
-#     Dockerfile + fly.toml — used for brandnana (deploy/Dockerfile bakes the
+#     Dockerfile + fly.toml — used for brandnana (ci/Dockerfile bakes the
 #     brandnana CLI + profile). WB_FLY_CONFIG + WB_FLY_DOCKERFILE.
 #   * PREBUILT image: deploy a ready runtime image by ref — `wb deploy publish`'s
 #     ghcr output, generic runtime. Set WB_IMAGE and leave WB_FLY_DOCKERFILE unset.
 #
 # Env: WB_FLY_APP (default bn-engine-agents), WB_REGION (default sjc),
 #      WB_FLY_CONFIG (default deploy/fly.toml), WB_FLY_DOCKERFILE (default
-#      deploy/Dockerfile), WB_INCLUDE_CLIP, WB_IMAGE (prebuilt path).
+#      ci/Dockerfile), WB_INCLUDE_CLIP, WB_IMAGE (prebuilt path).
 set -euo pipefail
 source "${WB_PROVIDERS_DIR}/_recipe.sh"
 export WB_RECIPE_PLACE=fly
@@ -25,9 +25,9 @@ FLY="$(command -v fly || command -v flyctl)"
 # WB_FLY_APP overrides; falls back to the brandnana default.
 APP="${WB_FLY_APP:-${WB_APP_NAME:-bn-engine-agents}}"
 REGION="${WB_REGION:-sjc}"
-ROOT="$(cd "${WB_PROVIDERS_DIR}/../.." && pwd)"          # repo root (deploy/providers → repo)
+ROOT="$(cd "${WB_PROVIDERS_DIR}/../../.." && pwd)"          # repo root (cli/deploy-kit/providers → repo)
 CONFIG="${WB_FLY_CONFIG:-deploy/fly.toml}"
-DOCKERFILE="${WB_FLY_DOCKERFILE:-deploy/Dockerfile}"
+DOCKERFILE="${WB_FLY_DOCKERFILE:-ci/Dockerfile}"
 
 # fly.toml + out-of-band `fly secrets` carry app config + the volume mount, so the
 # engine-contract hooks are deploy-time no-ops here; the deploy IS one fly command.

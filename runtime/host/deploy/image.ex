@@ -10,11 +10,11 @@ defmodule Workbooks.Deploy.Image do
   """
   @registry "ghcr.io/workbooks-sh"
   @name "runtime"
-  @dockerfile "deploy/Dockerfile.runtime"
+  @dockerfile "ci/Dockerfile.runtime"
   # The in-sandbox compilers ship as a SEPARATE layer (Dockerfile.compilers) the runtime image pulls
   # via COPY --from — so CI never rebuilds the hours-long provision chain. See publish_compilers/1.
   @compilers_name "compilers"
-  @compilers_dockerfile "deploy/Dockerfile.compilers"
+  @compilers_dockerfile "ci/Dockerfile.compilers"
   @compilers_local "compilers:local"
 
   @doc "The canonical image reference (overridable via WB_IMAGE for local pins)."

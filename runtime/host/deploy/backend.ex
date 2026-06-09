@@ -5,8 +5,8 @@ defmodule Workbooks.Deploy.Backend do
   fills it, selection is one config value (`place`). Two kinds:
 
     * `local` — built-in, the local MACHINE (`Workbooks.Deploy.Machine`; a krunvm microVM on mac).
-    * a CLOUD PROVIDER — a recipe toolkit at `deploy/providers/<place>/bootstrap.sh`
-      that sources the neutral spine (`deploy/providers/_recipe.sh`) and fills the
+    * a CLOUD PROVIDER — a recipe toolkit at `cli/deploy-kit/providers/<place>/bootstrap.sh`
+      that sources the neutral spine (`cli/deploy-kit/providers/_recipe.sh`) and fills the
       five hooks (ensure_app / set_secrets / attach_volume / deploy_image /
       public_url). Adding a provider = drop a directory; the core never changes.
 
@@ -15,7 +15,7 @@ defmodule Workbooks.Deploy.Backend do
   container + volume + secrets + port" — which ports cleanly to any PaaS / host.
   """
 
-  @doc "The providers directory (deploy/providers, found by walking up from CWD)."
+  @doc "The providers directory (cli/deploy-kit/providers, found by walking up from CWD)."
   def providers_dir do
     Enum.reduce_while(0..12, File.cwd!(), fn _, dir ->
       p = Path.join([dir, "deploy", "providers"])
@@ -45,7 +45,7 @@ defmodule Workbooks.Deploy.Backend do
   def resolve(place) do
     case providers_dir() do
       nil ->
-        {:error, "no deploy/providers directory found"}
+        {:error, "no cli/deploy-kit/providers directory found"}
 
       dir ->
         boot = Path.join([dir, place, "bootstrap.sh"])

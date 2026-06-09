@@ -134,7 +134,7 @@ defmodule Workbooks.Deploy do
         end
 
       _ ->
-        err("cloud PROVIDER=#{provider} has no recipe at deploy/providers/#{provider}", %{provider: provider})
+        err("cloud PROVIDER=#{provider} has no recipe at cli/deploy-kit/providers/#{provider}", %{provider: provider})
     end
   end
 
@@ -269,7 +269,7 @@ defmodule Workbooks.Deploy do
         end
 
       _ ->
-        err("cloud PROVIDER=#{provider} has no recipe at deploy/providers/#{provider}", %{provider: provider})
+        err("cloud PROVIDER=#{provider} has no recipe at cli/deploy-kit/providers/#{provider}", %{provider: provider})
     end
   end
 

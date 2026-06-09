@@ -1,5 +1,5 @@
 # Production Workbooks engine (the new :workbooks runtime + brandnana toolkit).
-# Built from deploy/Dockerfile, context = repo root. Deploy: bash deploy/deploy.sh
+# Built from ci/Dockerfile, context = repo root. Deploy: bash ci/deploy.sh
 # Secrets (fly secrets set): OPENROUTER_API_KEY FIRECRAWL_API_KEY BRANDNANA_API_KEY
 #   GEMINI_API_KEY THE_COMPANIES_API_KEY GROQ_API_KEY WB_PUBLIC_BEARER
 

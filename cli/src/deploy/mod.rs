@@ -28,6 +28,8 @@ pub enum DeployVerb {
     Apply,
     /// Inspect the live deployment
     Status,
+    /// Tail the live deployment's logs
+    Logs,
     /// Tear it down
     Down,
     /// Shorthand: scaffold local config if absent, then apply
@@ -45,6 +47,7 @@ pub fn run(io: &dyn Io, verb: DeployVerb) -> Result<String> {
         DeployVerb::Validate => validate(io).map(|c| format!("ok — {} ({})", FILE, c.summary())),
         DeployVerb::Apply => apply(io),
         DeployVerb::Status => status(io),
+        DeployVerb::Logs => logs(io),
         DeployVerb::Down => down(io),
         DeployVerb::Local => {
             if io.read(FILE).is_err() {
@@ -181,6 +184,18 @@ fn status(io: &dyn Io) -> Result<String> {
                 io.spawn(eng, &["ps", "-a", "--filter", &filter, "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"])
             }
             Some("krunvm") => io.spawn("krunvm", &["list"]),
+            _ => bail!("no container engine found"),
+        },
+    }
+}
+
+fn logs(io: &dyn Io) -> Result<String> {
+    let cfg = load(io)?;
+    match cfg.target() {
+        "fly" | "cloud" => io.spawn("fly", &["logs", "-a", cfg.app(), "--no-tail"]),
+        _ => match engine(io) {
+            Some(eng @ ("docker" | "podman")) => io.spawn(eng, &["logs", "--tail", "200", cfg.app()]),
+            Some("krunvm") => bail!("krunvm runs foreground — its logs are on the `krunvm start` terminal"),
             _ => bail!("no container engine found"),
         },
     }
