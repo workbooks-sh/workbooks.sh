@@ -27,6 +27,58 @@ defmodule Workbooks.CLI.Runtime do
   def run(_, _), do: {usage(), true}
 
   @doc """
+  `wb ctk await <run> [timeout_s]` — block until a CTK review (a human clicking
+  Commit in the CTK shell, which POSTs /api/ctk/commit?run=<run>) lands, then
+  print it. Same target + transport as `wb rt`. The agent's open→await→commit
+  primitive (it has only bash; this wraps the poll loop).
+  """
+  def ctk(args, req \\ &http_request/4)
+  def ctk(["await", run], req), do: await_review(run, 600, req)
+  def ctk(["await", run, t], req), do: await_review(run, String.to_integer(t), req)
+  def ctk(_, _), do: {ctk_usage(), true}
+
+  defp await_review(run, timeout_s, req) do
+    case target() do
+      {:error, msg} -> {msg, true}
+      {:ok, t} -> poll_review(t, run, req, System.monotonic_time(:second) + timeout_s)
+    end
+  end
+
+  defp poll_review(t, run, req, deadline) do
+    case req.(:get, t.url <> "/api/ctk/review/#{run}", nil, t.token) do
+      {:ok, 200, decoded} when decoded not in [nil, "", %{}] ->
+        {pretty(decoded), false}
+
+      {:ok, code, _} when code in 200..299 ->
+        if System.monotonic_time(:second) >= deadline do
+          {"timed out waiting for a CTK review on #{run}", true}
+        else
+          Process.sleep(2000)
+          poll_review(t, run, req, deadline)
+        end
+
+      {:ok, 404, _} ->
+        {"no such run: #{run}", true}
+
+      {:ok, code, decoded} ->
+        {pretty(decoded) <> "\n(HTTP #{code})", true}
+
+      {:error, msg} ->
+        {"request failed: #{msg}", true}
+    end
+  end
+
+  defp ctk_usage do
+    """
+    wb ctk await <run> [timeout_s]   block until a CTK review for <run> arrives, then print it
+
+    The human clicks Commit in the CTK shell (POSTs /api/ctk/commit?run=<run>);
+    this polls GET /api/ctk/review/<run> until it lands. Target: WB_RUNTIME_URL
+    (+ WB_TOKEN), else the local discovery file.
+    """
+  end
+
+  @doc """
   Resolve {url, token}. Env wins (remote/CI); else the local discovery file.
   Returns {:ok, %{url, token, source}} | {:error, reason}.
   """

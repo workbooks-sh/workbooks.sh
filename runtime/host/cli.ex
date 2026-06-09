@@ -31,6 +31,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb ctk …` — CTK human-in-the-loop helpers over the runtime HTTP (no app
+      # boot). `wb ctk await <run>` blocks until a review lands, then prints it.
+      ["ctk" | rest] ->
+        {out, failed?} = Workbooks.CLI.Runtime.ctk(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       # `wb desktop …` installs/launches the GUI app — HOST-side (shells out to
       # the curl|sh installer), no app boot.
       ["desktop" | rest] ->
