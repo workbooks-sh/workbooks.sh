@@ -222,6 +222,135 @@ defmodule Workbooks.Npm do
     end
   end
 
+  # ── tarball fetch + transitive node_modules assembly (wb-spy.T1.3) ─────────
+  # The npm analog of Workbooks.Compilers.fetch_crate, extended to walk the dependency
+  # graph. Given the parsed top-level deps (from PackageManager.parse_package_json_deps),
+  # resolve+fetch each from the registry, extract the gzipped .tgz with :erl_tar (no tar
+  # binary), and lay out a FLAT (npm-v3-hoisted) node_modules/ tree under `dest`. First
+  # version installed for a name wins (transitive duplicates are skipped). Pure Elixir.
+
+  @doc """
+  Assemble `dest/node_modules/` from top-level deps `[%{name, req, pin}]`. Returns
+  `{:ok, installed}` (or `{:ok, installed, errors}` if some optional/transitive deps
+  failed) where `installed` is `%{name => version}`.
+  """
+  def install_tree(deps, dest) when is_list(deps) do
+    nm = Path.join(dest, "node_modules")
+    File.mkdir_p!(nm)
+    queue = Enum.map(deps, fn d -> {d.name, d.pin || d.req} end)
+    install_loop(queue, nm, %{}, [])
+  end
+
+  defp install_loop([], _nm, installed, []), do: {:ok, installed}
+  defp install_loop([], _nm, installed, errors), do: {:ok, installed, Enum.reverse(errors)}
+
+  defp install_loop([{name, spec} | rest], nm, installed, errors) do
+    if Map.has_key?(installed, name) do
+      install_loop(rest, nm, installed, errors)
+    else
+      case install_one(name, spec, nm) do
+        {:ok, version, child_deps} ->
+          install_loop(rest ++ child_deps, nm, Map.put(installed, name, version), errors)
+
+        {:error, reason} ->
+          install_loop(rest, nm, installed, [reason | errors])
+      end
+    end
+  end
+
+  defp install_one(name, spec, nm) do
+    with {:ok, version, tarball} <- resolve_target(name, spec),
+         {:ok, pkgdir} <- fetch_tarball(name, version, tarball, nm) do
+      {:ok, version, read_prod_deps(pkgdir)}
+    end
+  end
+
+  # A pin (exact version) skips the packument fetch — the tarball URL is constructed
+  # directly; a range is resolved against the registry.
+  defp resolve_target(name, spec) do
+    cond do
+      exact_version?(spec) ->
+        {:ok, spec, tarball_url(name, spec)}
+
+      true ->
+        case resolve(name, spec) do
+          {:ok, %{version: v, tarball: t}} when is_binary(t) -> {:ok, v, t}
+          {:ok, %{version: v}} -> {:ok, v, tarball_url(name, v)}
+          err -> err
+        end
+    end
+  end
+
+  defp exact_version?(spec), do: spec =~ ~r/^\d+\.\d+\.\d+(-[\w.]+)?$/
+
+  # npm tarball URL: scope is NOT %2F-encoded in this form, and the basename is the
+  # unscoped package name. e.g. @scope/pkg@1.0.0 → .../@scope/pkg/-/pkg-1.0.0.tgz
+  defp tarball_url(name, version) do
+    base = name |> String.split("/") |> List.last()
+    "#{@registry}/#{name}/-/#{base}-#{version}.tgz"
+  end
+
+  # Fetch + extract a .tgz into node_modules/<name>. The tarball's files live under a
+  # top-level "package/" dir (npm convention); we relocate that to the install path.
+  defp fetch_tarball(name, version, url, nm) do
+    tmp = Path.join(nm, ".dl-#{:erlang.phash2({name, version})}")
+    dest = Path.join(nm, name)
+    File.rm_rf(tmp)
+    File.mkdir_p!(tmp)
+    tgz = Path.join(tmp, "p.tgz")
+
+    result =
+      with {:ok, body} <- https_get(url),
+           :ok <- File.write(tgz, body),
+           :ok <-
+             :erl_tar.extract(String.to_charlist(tgz), [
+               :compressed,
+               {:cwd, String.to_charlist(tmp)}
+             ]) do
+        src = Path.join(tmp, "package")
+
+        if File.dir?(src) do
+          File.rm_rf(dest)
+          File.mkdir_p!(Path.dirname(dest))
+          File.cp_r!(src, dest)
+          {:ok, dest}
+        else
+          {:error, {:no_package_dir, name, version}}
+        end
+      else
+        {:error, reason} -> {:error, {:fetch_failed, name, version, brief(reason)}}
+      end
+
+    File.rm_rf(tmp)
+    result
+  end
+
+  # The installed package's PRODUCTION dependencies (devDependencies are not installed
+  # transitively), minus non-registry protocol specs.
+  defp read_prod_deps(pkgdir) do
+    pj = Path.join(pkgdir, "package.json")
+
+    with {:ok, body} <- File.read(pj),
+         {:ok, j} <- Jason.decode(body),
+         true <- is_map(j),
+         deps when is_map(deps) <- j["dependencies"] do
+      Enum.flat_map(deps, fn
+        {n, spec} when is_binary(spec) -> if npm_unfetchable?(spec), do: [], else: [{n, spec}]
+        _ -> []
+      end)
+    else
+      _ -> []
+    end
+  end
+
+  # Specs the registry cannot fetch (protocol-prefixed / github shorthand) — same rule as
+  # PackageManager.npm_unfetchable?/1, applied to transitive deps read off disk.
+  defp npm_unfetchable?(spec) do
+    spec =~ ~r{^(git\+|git:|file:|link:|workspace:|https?:|github:|[\w.-]+/[\w.-]+(#|$))}
+  end
+
+  defp brief(reason), do: reason |> inspect() |> String.slice(0, 200)
+
   # ── network ──────────────────────────────────────────────────────────────
   # Pure-Erlang HTTPS GET with verified TLS via the OS trust store — same shape as
   # Workbooks.Compilers.http_get (wb-ova). No curl binary.
