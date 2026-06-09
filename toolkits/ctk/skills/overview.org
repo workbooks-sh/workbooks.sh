@@ -1,0 +1,85 @@
+#+TITLE: ctk — overview: the standard component canvas
+#+TOOLKIT: ctk
+#+SKILL: overview
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when first deciding whether CTK fits. What the shell is, the story contract, and when to reach for it vs a workbook or CLI toolkit.
+#+TAGS: component canvas preview controls tangle human-in-the-loop render storybook
+#+STATUS: experimental
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     no
+  :DESTRUCTIVE: no
+  :OS:          macos linux
+  :COST:        free
+  :END:
+
+  Reach for CTK when you need to *render one component/page in isolation and
+  tune it* — to review an agent's UI work, iterate "vibes," or hand a human a
+  checkpoint in the loop. It is Storybook-shaped, but Org-tangle-native and
+  itself a toolkit.
+
+  NOT for: shipping a finished, self-contained app — that's a workbook (one
+  =.html=). NOT for CLI automation — that's a =command=/=posix= toolkit. CTK is
+  the *bench*, not the product.
+
+* The mental model — one fixed shell, three variable slots
+
+  The shell never changes; you never design a layout:
+
+  #+begin_example
+  ┌ top bar ── size · vibe(light/dark/grid) · focus|gallery ───────────┐
+  ├───────────────┬────────────────────────────────────────────────────┤
+  │ control panel │                    stage                            │
+  │ (from .org)   │           renders the component                     │
+  └───────────────┴────────────────────────────────────────────────────┘
+  #+end_example
+
+  You supply only:
+  1. *A component* exposing the stage contract =render(el, props)= (any language
+     that compiles/loads to something the stage hosts — plain JS today).
+  2. *An Org control-spec* — a =Controls= table (prop · type · default ·
+     range/options) that the shell turns into widgets, plus the component source
+     in a =:tangle= block. The shell imports that block to render — so the Org IS
+     the component. This is the tangle/untangle + polyglot demonstration.
+  3. *(Optional) stage presets* — sizes/vibes default sensibly; override if a
+     component wants specific backgrounds.
+
+  Control types the panel understands: =text=, =color=, =range= (=min..max=),
+  =toggle=, =select= (=a|b|c=). Each binds to a prop and re-renders live.
+
+* Workflow — see it now
+
+  #+CAPTION: open the reference artifact (self-contained; no build, no runtime)
+  #+begin_src bash
+  open toolkits/ctk/ctk.html      # macOS; or xdg-open / a browser
+  #+end_src
+
+  The FolderIcon story renders in the stage; the left panel (icon/color/size/
+  badge) drives it live; the top bar switches size, vibe, and focus/gallery.
+
+* Common pitfalls
+
+  1. *Treating CTK as the deliverable.* It's the bench. The artifact you tune is
+     a component; the shipped thing is a workbook or a desktop surface. → Keep
+     stories thin; don't grow app logic in the shell.
+  2. *Designing a panel.* The panel is generated from the control table — if you
+     find yourself hand-building inputs, you're off-standard. → Add a table row.
+  3. *Forgetting the render contract.* The stage calls =render(el, props)=; a
+     component that mounts itself elsewhere won't show. → Expose =render=.
+  4. *Drift between controls and source.* The controls table and the =:tangle=
+     props must agree (a control with no matching prop does nothing). → Name them
+     identically; the spec is one source of truth.
+
+* Verification checklist
+
+  - [ ] =open ctk.html= shows the shell (top bar + panel + stage).
+  - [ ] Moving a control re-renders the component live.
+  - [ ] Size + vibe + focus/gallery in the top bar all respond.
+  - [ ] The component came from the =:tangle= block (edit it → output changes).
+
+* See also
+
+  - [[file:authoring-a-story.org][authoring-a-story]] — add your own component + control-spec.
+  - =../ctk.html= — the reference shell + FolderIcon story.
+  - =../../AUTHORING.org= — the toolkit depth/breadth standard.

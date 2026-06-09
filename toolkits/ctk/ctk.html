@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CTK — component toolkit</title>
+<!--
+  CTK — the Component ToolKit standard shell.
+
+  ONE fixed frame, every time: top bar (size / vibe / gallery) · left control
+  panel (generated from the Org control-spec) · stage (renders the component).
+  The only variable parts are the embedded story: an Org spec that BOTH declares
+  the controls AND carries the component source in a :tangle block. The harness
+  parses the table → builds the panel, and imports the tangled source → renders
+  it. Editing the Org edits the component (the tangle/untangle demo), polyglot
+  by construction (the source block can be any language the stage can host).
+
+  This file is one portable artifact (a workbook): harness + story in one HTML.
+-->
+<style>
+  :root {
+    --vellum: #f7f8fa; --paper: #fff; --ink: #16181d; --ink-2: #565b66;
+    --ink-3: #888e99; --line: #e6e8ec; --line-2: #d3d7de; --signal: #2f6fe0;
+    --signal-wash: #eaf1fd; --radius: 10px;
+    --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: var(--font); color: var(--ink); background: var(--vellum); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── top bar ── */
+  .topbar {
+    flex: 0 0 48px; display: flex; align-items: center; gap: 14px; padding: 0 16px;
+    background: var(--paper); border-bottom: 1px solid var(--line);
+  }
+  .topbar .name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+  .topbar .name .kind { font: 500 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--signal); background: var(--signal-wash); padding: 3px 6px; border-radius: 5px; margin-left: 8px; vertical-align: middle; }
+  .topbar .view { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+  .topbar .view-tag { font: 600 9px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); border: 1px solid var(--line-2); padding: 4px 7px; border-radius: 6px; }
+  .topbar .group { display: inline-flex; align-items: center; gap: 6px; }
+  .topbar .lbl { font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: var(--paper); }
+  .seg button { border: 0; background: transparent; font: inherit; font-size: 12px; color: var(--ink-2); padding: 5px 10px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--ink); color: #fff; }
+
+  /* ── body: controls | stage ── */
+  .main { flex: 1 1 auto; display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+  .panel { border-right: 1px solid var(--line); background: var(--paper); overflow-y: auto; padding: 16px 14px; }
+  .panel h2 { font: 600 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; }
+  .ctrl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .ctrl label { font-size: 12px; font-weight: 500; color: var(--ink-2); display: flex; justify-content: space-between; }
+  .ctrl label .val { font: 500 11px/1 var(--mono); color: var(--ink-3); }
+  .ctrl input[type=text], .ctrl select { font: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--vellum); color: var(--ink); width: 100%; }
+  .ctrl input[type=range] { width: 100%; accent-color: var(--signal); }
+  .ctrl input[type=color] { width: 100%; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); padding: 2px; cursor: pointer; }
+  .ctrl .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .ctrl .toggle input { accent-color: var(--signal); width: 16px; height: 16px; }
+  .panel .src-note { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 12px; }
+  .panel .src-note code { font: 500 11px var(--mono); color: var(--signal); }
+
+  /* ── stage ── */
+  .stage-wrap { position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .stage-wrap[data-vibe=light] { background: #fafbfc; }
+  .stage-wrap[data-vibe=dark]  { background: #15171c; }
+  .stage-wrap[data-vibe=grid]  { background: #fafbfc; background-image: radial-gradient(var(--line-2) 1px, transparent 1px); background-size: 16px 16px; }
+  .stage-wrap[data-vibe=dark] .cap { color: #8b90998c; }
+  .gallery { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; justify-content: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .cap { font: 500 10px/1 var(--mono); letter-spacing: .04em; color: var(--ink-3); }
+  .mount { display: inline-flex; align-items: center; justify-content: center; }
+  .zoom { transform-origin: center center; transition: transform .12s ease-out; }
+  .panel-head { margin-bottom: 14px; }
+  .panel-head h2 { margin: 0 0 3px; }
+  .panel-head .sub { font-size: 11px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="name" id="story-name">component<span class="kind" id="story-kind">CTK</span></span>
+    <span class="view">
+      <span class="view-tag" title="These change how you VIEW the component — never the component itself">View</span>
+      <span class="group">
+        <span class="lbl">Zoom</span>
+        <span class="seg" id="zoom-seg"></span>
+      </span>
+      <span class="group">
+        <span class="lbl">Background</span>
+        <span class="seg" id="vibe-seg">
+          <button data-v="light" class="on">Light</button>
+          <button data-v="dark">Dark</button>
+          <button data-v="grid">Grid</button>
+        </span>
+      </span>
+      <span class="group">
+        <span class="lbl">Layout</span>
+        <span class="seg" id="mode-seg">
+          <button data-v="focus" class="on">Focus</button>
+          <button data-v="gallery">Gallery</button>
+        </span>
+      </span>
+    </span>
+  </div>
+
+  <div class="main">
+    <aside class="panel">
+      <div class="panel-head">
+        <h2>Controls</h2>
+        <span class="sub" id="panel-sub">the component's props — edits the component</span>
+      </div>
+      <div id="controls"></div>
+      <p class="src-note">The panel edits the <em>component</em> (its props, from the
+        Org table). The top bar only changes how you <em>view</em> it (zoom,
+        background, layout) — it never touches the component. Source comes from the
+        spec's <code>:tangle</code> block, so editing the Org edits the component.</p>
+    </aside>
+    <div class="stage-wrap" id="stage-wrap" data-vibe="light">
+      <div class="zoom" id="zoom"><div class="mount" id="stage"></div></div>
+    </div>
+  </div>
+
+  <!-- ── THE STORY: an Org control-spec. Controls table + tangled source. ── -->
+  <script id="ctk-spec" type="text/org">
+* Component
+  :PROPERTIES:
+  :NAME: FolderIcon
+  :END:
+
+** Controls
+  | prop  | type   | default | range/options          |
+  |-------+--------+---------+------------------------|
+  | icon  | text   | 📋      |                        |
+  | color | color  | #9a9a9e |                        |
+  | size  | range  | 56      | 20..120                |
+  | badge | toggle | true    |                        |
+
+** Source
+  #+begin_src js :tangle component.js
+  // Frameworkless render(el, props) — the stage hosts any module exposing this.
+  // (In the desktop app this same contract is satisfied by the Svelte FolderIcon;
+  //  here it's plain JS so the artifact is portable + polyglot-by-construction.)
+  export function render(el, props) {
+    const { icon = "", color = "#9a9a9e", size = 56, badge = true } = props;
+    const front = mix(color, "#ffffff", 0.2);
+    const back  = mix(color, "#000000", 0.08);
+    const edge  = mix(color, "#000000", 0.14);
+    const s = size, h = s * 0.84;
+    el.innerHTML = `
+      <span style="position:relative;display:inline-grid;place-items:center;width:${s}px;height:${h}px">
+        <svg viewBox="0 0 48 40" style="width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1px 1.5px rgba(15,15,15,.16))">
+          <path d="M3 7.5C3 5.6 4.6 4 6.5 4h10.2c.9 0 1.8.36 2.5 1l2.3 2.3c.66.63 1.55 1 2.47 1H41.5C43.4 8.3 45 9.9 45 11.8V32c0 1.9-1.6 3.5-3.5 3.5h-35C4.6 35.5 3 33.9 3 32z" fill="${back}"/>
+          <path d="M3 15.5C3 13.6 4.6 12 6.5 12h35c1.9 0 3.5 1.6 3.5 3.5V32c0 1.9-1.6 3.5-3.5 3.5h-35C4.6 35.5 3 33.9 3 32z" fill="${front}" stroke="${edge}" stroke-width="0.5"/>
+        </svg>
+        ${badge && icon ? `<span style="position:absolute;left:2%;bottom:-3%;font-size:${s*0.46}px;line-height:1;filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 1px 1.5px rgba(0,0,0,.3))">${icon}</span>` : ""}
+      </span>`;
+  }
+  function mix(a, b, t) {
+    const pa = hex(a), pb = hex(b);
+    const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
+    return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
+  }
+  function hex(s) { s = s.replace("#", ""); return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16)); }
+  #+end_src
+  </script>
+
+<script type="module">
+  // ── CTK harness — generic; drives any embedded story ──────────────────────
+  // Zoom is a VIEW magnifier (scales the stage), never a component prop.
+  const ZOOM = [
+    { l: "50%", v: 0.5 }, { l: "75%", v: 0.75 }, { l: "100%", v: 1 },
+    { l: "150%", v: 1.5 }, { l: "200%", v: 2 },
+  ];
+
+  // 1. read the embedded Org spec
+  const org = document.getElementById("ctk-spec").textContent;
+
+  // 2. parse the component name
+  const name = (org.match(/:NAME:\s*(.+)/) || [])[1]?.trim() || "component";
+  document.getElementById("story-name").childNodes[0].textContent = name + " ";
+  document.getElementById("panel-sub").textContent = name + " props — edits the component";
+
+  // 3. parse the Controls table → control defs
+  function parseControls(src) {
+    const rows = src
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("|") && !l.includes("---"));
+    if (!rows.length) return [];
+    const cells = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
+    const head = cells(rows[0]).map((h) => h.toLowerCase());
+    return rows.slice(1).map((r) => {
+      const c = cells(r);
+      const o = {};
+      head.forEach((h, i) => (o[h] = c[i]));
+      return o;
+    });
+  }
+  // isolate the Controls section
+  const ctrlSection = (org.split(/^\*\* Controls/m)[1] || "").split(/^\*\* /m)[0];
+  const defs = parseControls(ctrlSection);
+
+  // 4. extract the tangled source block → import as a module
+  const srcBlock = (org.match(/:tangle component\.js\s*\n([\s\S]*?)#\+end_src/) || [])[1] || "";
+  // strip leading indentation the org block carries
+  const code = srcBlock.replace(/^\s{2}/gm, "");
+  const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  const mod = await import(url);
+  const render = mod.render;
+
+  // 5. live props, seeded from control defaults
+  const props = {};
+  const coerce = (type, v) =>
+    type === "range" ? Number(v) : type === "toggle" ? v === "true" || v === true : v;
+  defs.forEach((d) => (props[d.prop] = coerce(d.type, d.default)));
+
+  // 6. build the control panel from the defs
+  const panel = document.getElementById("controls");
+  defs.forEach((d) => {
+    const wrap = document.createElement("div");
+    wrap.className = "ctrl";
+    if (d.type === "toggle") {
+      wrap.innerHTML = `<label class="toggle"><input type="checkbox" ${props[d.prop] ? "checked" : ""}/> ${d.prop}</label>`;
+      wrap.querySelector("input").addEventListener("change", (e) => set(d.prop, e.target.checked));
+    } else if (d.type === "color") {
+      wrap.innerHTML = `<label>${d.prop}<span class="val">${props[d.prop]}</span></label><input type="color" value="${props[d.prop]}"/>`;
+      const val = wrap.querySelector(".val");
+      wrap.querySelector("input").addEventListener("input", (e) => { val.textContent = e.target.value; set(d.prop, e.target.value); });
+    } else if (d.type === "range") {
+      const [min, max] = (d["range/options"] || "0..100").split("..").map(Number);
+      wrap.innerHTML = `<label>${d.prop}<span class="val">${props[d.prop]}</span></label><input type="range" min="${min}" max="${max}" value="${props[d.prop]}"/>`;
+      const val = wrap.querySelector(".val");
+      wrap.querySelector("input").addEventListener("input", (e) => { val.textContent = e.target.value; set(d.prop, Number(e.target.value)); });
+    } else {
+      wrap.innerHTML = `<label>${d.prop}</label><input type="text" value="${props[d.prop] ?? ""}"/>`;
+      wrap.querySelector("input").addEventListener("input", (e) => set(d.prop, e.target.value));
+    }
+    panel.appendChild(wrap);
+  });
+
+  // 7. stage state + render. Zoom = VIEW (scales the stage), never a prop.
+  // Component props (incl. any `size`) live ONLY in the panel.
+  let zoom = 1, mode = "focus";
+  const stage = document.getElementById("stage");
+  const zoomEl = document.getElementById("zoom");
+  const rangeDef = defs.find((d) => d.type === "range"); // gallery sweeps this prop
+  function set(k, v) { props[k] = v; draw(); }
+  function applyZoom() { zoomEl.style.transform = `scale(${zoom})`; }
+  function draw() {
+    stage.innerHTML = "";
+    if (mode === "gallery" && rangeDef) {
+      const [mn, mx] = (rangeDef["range/options"] || "0..100").split("..").map(Number);
+      const steps = 5;
+      const vals = Array.from({ length: steps }, (_, i) =>
+        Math.round(mn + ((mx - mn) * i) / (steps - 1)),
+      );
+      const g = document.createElement("div");
+      g.className = "gallery";
+      vals.forEach((v) => {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        const mount = document.createElement("div");
+        render(mount, { ...props, [rangeDef.prop]: v });
+        const cap = document.createElement("span");
+        cap.className = "cap"; cap.textContent = `${rangeDef.prop} ${v}`;
+        cell.append(mount, cap);
+        g.appendChild(cell);
+      });
+      stage.appendChild(g);
+    } else {
+      render(stage, { ...props });
+    }
+  }
+
+  // 8. top-bar = VIEW controls only (zoom / background / layout)
+  const zoomSeg = document.getElementById("zoom-seg");
+  ZOOM.forEach(({ l, v }) => {
+    const b = document.createElement("button");
+    b.textContent = l; if (v === zoom) b.className = "on";
+    b.onclick = () => { zoom = v; [...zoomSeg.children].forEach((c) => c.classList.toggle("on", c === b)); applyZoom(); };
+    zoomSeg.appendChild(b);
+  });
+  document.getElementById("vibe-seg").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    document.getElementById("stage-wrap").dataset.vibe = b.dataset.v;
+    [...e.currentTarget.children].forEach((c) => c.classList.toggle("on", c === b));
+  };
+  document.getElementById("mode-seg").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.v;
+    [...e.currentTarget.children].forEach((c) => c.classList.toggle("on", c === b));
+    draw();
+  };
+
+  applyZoom();
+  draw();
+</script>
+</body>
+</html>
