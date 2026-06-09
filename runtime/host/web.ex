@@ -503,6 +503,23 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, Workbooks.Toolkits.run_task_text(conn.params["id"], conn.params["task"], args))
   end
 
+  # lander-live (wb-5vm): the page's PUBLIC change feed — the tenant repo's real
+  # git log, newest first. The inspector's "agent" tab reads this; the whole
+  # point is that the changelog is verifiable history, not marketing.
+  get "/rcp/changes" do
+    t = conn.assigns.tenant
+    entries =
+      Workbooks.Git.log(t)
+      |> Enum.take(30)
+      |> Enum.map(fn line ->
+        case String.split(line, " ", parts: 2) do
+          [sha, msg] -> %{sha: sha, msg: msg}
+          [sha] -> %{sha: sha, msg: ""}
+        end
+      end)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{changes: entries}))
+  end
+
   # `wb fetch` — restore stored bytes (base64-wrapped; zips aren't JSON-safe raw).
   get "/rcp/fetch" do
     t = conn.assigns.tenant

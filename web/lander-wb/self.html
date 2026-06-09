@@ -129,6 +129,12 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
 .chg .m{color:#a9aab1;font-size:.72rem}
 .badge{display:inline-block;font-size:.62rem;padding:.12rem .5rem;border-radius:999px;background:#1a1a1f;color:#67686f;margin-left:.4rem}
 .badge.soon{color:var(--blue)}
+.html-head{color:#67686f;font-size:.68rem;padding-bottom:.6rem;border-bottom:1px solid #1c1c21;margin-bottom:.6rem}
+.html-src{font-size:.68rem;line-height:1.55;color:#8a8b92}
+.html-src code{white-space:pre-wrap;word-break:break-all;display:block}
+.note{margin:.5rem 0;padding:.6rem .75rem;border-left:3px solid var(--blue);background:#13131a;color:#c9cad1;
+  font-size:.72rem;line-height:1.5;border-radius:0 8px 8px 0}
+.note .nt{display:block;color:var(--blue);font-weight:700;font-size:.66rem;letter-spacing:.06em;margin-bottom:.2rem}
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
@@ -142,6 +148,8 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
 
 <!-- the page, born hidden -->
 <div class="page">
+  <!-- @note(format) You are reading a workbook: one .html file carrying its
+       interface, data, and source. `wb unbundle page.html` recovers the tree. -->
   <header class="nav" data-step="nav">
     <a class="brand" href="/">
       <svg viewBox="0 0 257 206" fill="none" aria-label="Workbooks"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg>
@@ -155,10 +163,16 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
     <h1 id="h1"><span data-step="h1"></span></h1>
     <p class="lede" data-step="lede">Workbooks is a desktop app where AI builds working software in front of you — and what it builds stays: one file, on your machine, yours.</p>
     <p class="machine" data-step="receipt"><span class="p">$</span> wb agent run "assemble the landing page" <span class="c">· 9 steps ·</span> <span class="ok">you're watching it ✓</span></p>
+    <!-- @note(provenance) Workbooks can be signed: an Ed25519 did:key manifest
+       is embedded in the html (`wb sign` / `wb verify`). Tamper with the file
+       and verification fails — ownership is checkable, not vibes. -->
     <div class="cta" data-step="cta">
       <button class="btn" type="button">Download free</button>
     </div>
 
+    <!-- @note(polyglot) Demo components compile to WebAssembly IN the runtime's
+       sandbox — Rust, Go, C, Zig, JS, Python — zero native execution. The
+       compilers themselves run as wasm. -->
     <div class="demo-wrap" data-step="demo">
       <div class="appframe">
         <div class="af-bar"><i></i><i></i><i></i><span class="t">invoices.wb — built 4 seconds ago</span></div>
@@ -170,6 +184,11 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
     </div>
   </section>
 
+  <!-- @note(encryption) A workbook can seal entries: AES-256-GCM ciphertext
+       whose key is escrowed by the runtime and released only after an access
+       check. Gated content is noise without a posture-approved release. -->
+  <!-- @note(keys) No account, no middleman: you bring your own AI key. The
+       runtime forwards it per-request; we never see or markup usage. -->
   <section class="closing" data-step="close">
     <h2>It can do this for you, too.</h2>
     <span class="machine"><span class="p">$</span> curl -fsSL workbooks.sh/cli.sh | sh</span>
@@ -187,10 +206,12 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
   <div class="tabs">
     <button class="tab on" data-pane="log">build</button>
     <button class="tab" data-pane="src">source</button>
+    <button class="tab" data-pane="html">html</button>
     <button class="tab" data-pane="agent">agent</button>
   </div>
   <div class="pane on" id="log"></div>
   <div class="pane" id="src"></div>
+  <div class="pane" id="html"></div>
   <div class="pane" id="agent">
     <p>This page is maintained by an agent. Each run it reads the page's own
     source, applies its ground rules, and rebuilds what needs rebuilding —
@@ -203,7 +224,11 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;line-hei
     <h4>loop <span class="badge soon">going continuous</span></h4>
     <p style="font-size:.72rem">Today: rebuilt every working session (history below is real).
     Next: a scheduled cloud run — analytics in, one constrained edit out, every few hours.</p>
-    <h4>change history <span class="badge">real git log</span></h4>
+    <h4>this week <span class="badge">keeper.org · cron 0 * * * *</span></h4>
+    <div class="rule">· hero clarity — first screen reads in &lt;5s?</div>
+    <div class="rule">· inspector discoverability</div>
+    <div class="rule">· demo interaction rate</div>
+    <h4>change history <span class="badge" id="chg-src">seeded from git</span></h4>
     <div id="chglog"></div>
   </div>
 </aside>
@@ -328,12 +353,46 @@ async function run() {
 }
 run();
 
+/* live change feed: when this page is served BY the runtime, /rcp/changes is
+   the tenant repo's real git log. Standalone (file://, static host) we fall
+   back to the seeded history above — itself copied verbatim from git. */
+fetch("/rcp/changes").then(r => r.ok ? r.json() : null).then(j => {
+  if (!j || !j.changes) return;
+  $("#chglog").innerHTML = j.changes.map(c =>
+    `<div class="chg"><div class="d">${c.sha.slice(0,7)}</div><div class="m">${c.msg}</div></div>`).join("");
+  $("#chg-src").textContent = "live · runtime git";
+}).catch(() => {});
+
+/* the TRUE html tab: this page's own live source, annotated. Comments written
+   as <!-- @note(topic) text --> render as educational callouts in place. */
+function buildHtmlPane() {
+  const pane = $("#html");
+  const raw = "<!doctype html>\n" + document.documentElement.outerHTML;
+  const esc = t => t.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const out = [];
+  let last = 0;
+  const re = /<!--\s*@note\((\w+)\)([\s\S]*?)-->/g;
+  let m, notes = 0;
+  while ((m = re.exec(raw))) {
+    out.push(`<code>${esc(raw.slice(last, m.index))}</code>`);
+    out.push(`<div class="note"><span class="nt">@${m[1]}</span>${esc(m[2].trim().replace(/\s+/g, " "))}</div>`);
+    last = m.index + m[0].length;
+    notes++;
+  }
+  out.push(`<code>${esc(raw.slice(last))}</code>`);
+  pane.innerHTML =
+    `<div class="html-head">this page's live source · ${(raw.length/1024).toFixed(1)} KB · ${notes} notes — the annotations are for you</div>` +
+    `<div class="html-src">${out.join("")}</div>`;
+}
+
 /* inspector chrome */
+let htmlBuilt = false;
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
   document.querySelectorAll(".pane").forEach(x => x.classList.remove("on"));
   t.classList.add("on");
   document.getElementById(t.dataset.pane).classList.add("on");
+  if (t.dataset.pane === "html" && !htmlBuilt) { htmlBuilt = true; buildHtmlPane(); }
 }));
 $("#min").addEventListener("click", () => $("#insp").classList.toggle("min"));
 
