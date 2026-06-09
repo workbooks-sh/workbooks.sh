@@ -4,7 +4,7 @@
 
 # Workbooks
 
-**One file for everything. One runtime for anywhere.**
+**One file for everything. One runtime for anywhere. One app for everyone.**
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7afe.svg)](LICENSE)
 &nbsp;![Platform](https://img.shields.io/badge/desktop-macOS%20·%20Linux%20·%20Windows-555.svg)
