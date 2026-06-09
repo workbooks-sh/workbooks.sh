@@ -29,7 +29,7 @@ shaped like a Unix filter. If you're not sure, you want =command=.
 #+begin_src org
 #+EXEC: command
 #+CLI_BIN: rev
-#+END_SRC
+#+end_src
 
 ** component — typed, in-process
 

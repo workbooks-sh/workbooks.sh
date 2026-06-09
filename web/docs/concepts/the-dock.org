@@ -11,7 +11,7 @@ A toolkit declares the capabilities it needs in its manifest:
 
 #+begin_src org
 #+CAPS: vfs llm browse
-#+END_SRC
+#+end_src
 
 The host provides *only* the granted capabilities. A toolkit that imports a
 capability its profile doesn't grant simply fails to instantiate — enforcement is

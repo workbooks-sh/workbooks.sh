@@ -17,7 +17,7 @@ it.
 #+URL:       https://api.github.com/repos/acme/app/issues
 #+ROWS_PATH: .
 #+ENV_KEYS:  GITHUB_TOKEN
-#+END_SRC
+#+end_src
 
 *Source.* The credential resolves through a broker — the plugin never holds the
 key, and the host owns the egress.

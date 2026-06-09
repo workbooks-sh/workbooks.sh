@@ -21,7 +21,7 @@ portable. You can always promote to a richer shape later.
 #+TRUST:      first-party
 #+BUILD_LANG: rust
 #+BUILD_SRC:  path:src
-#+END_SRC
+#+end_src
 
 - The shapes in depth: [[../concepts/exec-shapes.org][The six shapes]]
 - Reach the host: [[dock-sdk.org][The Dock SDK]]

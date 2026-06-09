@@ -9,7 +9,7 @@ never request your own isolation — it's assigned, and only ever tightened.
 #+begin_src org
 #+TRUST: first-party     # yours — runs at the shape's natural tier
 #+TRUST: third-party     # untrusted — escalated to a separate VM automatically
-#+END_SRC
+#+end_src
 
 | trust        | a command runs at | a kernel runs at |
 |--------------+-------------------+------------------|
