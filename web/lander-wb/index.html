@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workbooks — make it, keep it, it's yours</title>
-  <meta name="description" content="Workbooks builds real software from plain language and saves every app as one file that runs on your machine. Free, open source, yours.">
+  <title>Workbooks — put agents to work, keep what they make</title>
+  <meta name="description" content="A desktop app where AI agents build real software for you — and everything they make is one file on your machine: private, hackable, permanently yours.">
   <meta property="og:title" content="Workbooks — make it, keep it, it's yours">
-  <meta property="og:description" content="Real software from plain language, saved as one file that runs on your machine. Free, open source, yours.">
+  <meta property="og:description" content="AI agents build real software for you; every app is one file on your machine. Free, open source, yours.">
   <meta name="theme-color" content="#ffffff">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +24,7 @@
     <a href="#make">make</a>
     <a href="#keep">keep</a>
     <a href="#yours">yours</a>
+    <a href="#teams">teams</a>
     <a href="/docs">docs</a>
     <button class="theme-toggle" id="toggle" type="button" aria-label="Toggle theme"><span class="dot"></span><span id="toggle-label">dark</span></button>
     <a class="btn btn-ink sm" href="#get">Download free</a>
@@ -33,13 +34,12 @@
 <!-- HERO — the umbrella triad. Each clause is a chapter of the page. -->
 <section class="hero">
   <div class="hero-in">
-    <p class="kicker">a free desktop app <i>/</i> mac · windows · linux</p>
+    <p class="kicker">your agents <i>·</i> your apps <i>·</i> your machine — a free desktop app</p>
     <h1>
-      <a class="t make" href="#make">Make it.</a>
-      <a class="t keep" href="#keep">Keep it.</a>
-      <a class="t yours" href="#yours">It's yours.</a>
+      <a class="t make" href="#make">Put agents to work.</a>
+      <a class="t keep" href="#keep">Keep what they make.</a>
     </h1>
-    <p class="lede">Workbooks builds real software from plain language — and saves every app as <em>one file</em> that runs on your machine, for as long as you want it.</p>
+    <p class="lede">Workbooks is a desktop app where AI agents build real software for you — and everything they make is <em>one file</em> on your machine: private, hackable, permanently yours.</p>
     <div class="cta">
       <a class="btn btn-ink lg" href="#get">Download free</a>
       <a class="btn btn-text" href="#make">Watch it work →</a>
@@ -58,9 +58,9 @@
     </div>
     <div class="split">
       <div>
-        <h2>Say what you need.<br>It gets built.</h2>
-        <p class="sub">Describe the tool in plain words — a tracker, a dashboard, a little utility — and Workbooks writes it, runs it, and shows you the working thing. Refine it the same way: keep talking.</p>
-        <p class="machine"><span class="p">›</span> build "invoice tracker" <span class="c">…</span> <span class="ok">ready ✓</span></p>
+        <h2>Say what you need.<br>An agent builds it.</h2>
+        <p class="sub">Describe the tool in plain words and hand it off. The agent plans, writes, runs, and fixes — for minutes or for hours — then hands you back working software, not a chat log. Refine it the same way: keep talking.</p>
+        <p class="machine"><span class="p">›</span> agent run "build an invoice tracker" <span class="c">… 14 steps …</span> <span class="ok">ready ✓</span></p>
         <p class="sub small">This demo is live. Click around — it's already yours to break.</p>
       </div>
       <div class="appframe">
@@ -148,13 +148,35 @@
     <div class="split">
       <div>
         <h2>Nobody can take it back.</h2>
-        <p class="sub">It runs on your machine, so it's private by default and works offline. It's free and open source, so there's no plan to outgrow and no company to outlive. If Workbooks vanished tomorrow, your apps wouldn't notice.</p>
+        <p class="sub">It runs on your machine by default — private, offline-friendly. When you want a server, you deploy <em>your own</em> with one command. And it's all open source, so there's no plan to outgrow and no company to outlive: if Workbooks vanished tomorrow, your apps wouldn't notice.</p>
         <p class="machine"><span class="p">$</span> wb verify invoices.html <span class="c">→</span> <span class="ok">"valid": true</span></p>
       </div>
       <div class="own-list">
         <div class="orow"><span class="om">⌂</span><div><strong>On your disk</strong><span>Private by default. Works offline.</span></div></div>
         <div class="orow"><span class="om">○</span><div><strong>No middleman</strong><span>Your AI key, your provider's bill, our zero percent.</span></div></div>
         <div class="orow"><span class="om">∞</span><div><strong>Open source</strong><span>Apache-2.0, end to end. Files don't need us.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAMS — one engine for everyone -->
+<section class="ch" id="teams">
+  <div class="ch-in">
+    <div class="ch-head">
+      <span class="ch-num">+</span>
+      <span class="ch-kicker keep">teams</span>
+    </div>
+    <div class="split">
+      <div>
+        <h2>One engine for the whole team.</h2>
+        <p class="sub">The same runtime that powers your desktop deploys to your own server or cloud with one command — everyone's agents and workbooks on infrastructure <em>you</em> control. Prefer not to run servers? A managed tier, where we host the engine for you, is on the way.</p>
+        <p class="machine"><span class="p">$</span> wb deploy apply <span class="c">→</span> <span class="ok">engine up · your infra</span></p>
+      </div>
+      <div class="own-list teams-list">
+        <div class="orow"><span class="om">⇧</span><div><strong>Self-host today</strong><span>wb deploy puts the engine on your server, your cloud, or a box in the office.</span></div></div>
+        <div class="orow"><span class="om">☁</span><div><strong>Managed tier, coming</strong><span>We run the engine; your team just works. Same format, same ownership.</span></div></div>
+        <div class="orow"><span class="om">⚒</span><div><strong>Build on it</strong><span>Apache-2.0 end to end — embed the runtime, ship your own product.</span></div></div>
       </div>
     </div>
   </div>
@@ -167,7 +189,7 @@
     <div class="qa">
       <div class="q"><h3>Do I have to code?</h3><p>No. Talk, look, refine. If you do code, it's real source — open the file, it's all there.</p></div>
       <div class="q"><h3>Free how?</h3><p>The app costs nothing, forever. AI usage is between you and your AI provider — your key, their bill, our zero percent.</p></div>
-      <div class="q"><h3>Where's my data?</h3><p>In the file. On your disk. We don't run a server it could even go to.</p></div>
+      <div class="q"><h3>Where's my data?</h3><p>In your files, on your machine — by default. If you deploy a server for your team, it's your server: your infrastructure, your keys, your rules.</p></div>
       <div class="q"><h3>What if you shut down?</h3><p>Your apps keep opening. Every workbook carries its own source, and the runtime is open source. Files don't need us.</p></div>
     </div>
     <p class="machine center"><span class="p">$</span> wb unbundle app.wbundle <span class="c">→</span> source/ <span class="ok">· yours to rebuild</span></p>
