@@ -154,8 +154,13 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "run", args: a}, %{exec: true} = st) do
+    # INTERIM: the real-bash escape hatch runs under the host isolator
+    # (Workbooks.Sandbox — bwrap on Linux / seatbelt on macOS), not raw `sh -c`,
+    # so it can't roam the container's fs/processes freely. run_net keeps network
+    # (many native CLIs need it) but stays confined. NORTH STAR: no bash outside
+    # WASM — every CLI/crate/npm becomes a WASM command and this tool is removed.
     {out, code} =
-      System.cmd("sh", ["-c", a["cmd"] || ""], cd: st.workdir, stderr_to_stdout: true, env: st.env)
+      Workbooks.Sandbox.run_net(["sh", "-c", a["cmd"] || ""], cd: st.workdir, env: st.env)
 
     # Capture the exit code — a non-zero is a bash call that broke; record it.
     meta = %{exit_code: code, error: if(code != 0, do: "nonzero exit #{code}", else: nil)}

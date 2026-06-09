@@ -161,10 +161,14 @@ defmodule Workbooks.Web do
     opts =
       [tenant: conn.assigns.tenant, max_steps: params["max_steps"] || 40]
       |> then(&if params["model"], do: [{:model, params["model"]} | &1], else: &1)
-      # exec grants the real-CLI `run` tool (sh -c, toolkit CLIs on PATH). Forwarded
-      # from the request so a caller can run a trusted agent; gate WHO can set it
-      # per deployment (single-tenant/desktop is the trusted local case).
-      |> then(&if params["exec"] == true, do: [{:exec, true} | &1], else: &1)
+      # exec grants the real-CLI `run` tool (real bash — the INTERIM escape hatch
+      # for native CLIs, to be eliminated; see the no-native-exec epic). Honored
+      # ONLY for the trusted local case (single-tenant/desktop) or an explicit
+      # WB_AGENT_EXEC=1 — never for arbitrary/multi-tenant callers.
+      |> then(fn o ->
+        allow? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
+        if params["exec"] == true and allow?, do: [{:exec, true} | o], else: o
+      end)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, task, opts)
     json = Jason.encode!(%{id: id, status: "running"})
