@@ -1459,6 +1459,23 @@ defmodule Workbooks.Compilers do
     end
   end
 
+  @doc """
+  Transpile TypeScript → JavaScript in-sandbox (type-strip via tsc-in-QuickJS), returning the JS
+  string. Public wrapper over `ts_transpile` used by the npm dir/inline pipeline (wb-spy.T1.5) to
+  turn a TS entry into JS the bundler can consume. Returns {:ok, js} | {:error, reason}.
+  """
+  def transpile_ts(ts_src, root \\ default_root()) do
+    jd = Path.join(root, "js")
+    qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
+    tsjob = Path.expand(Path.join(jd, "ts/tsjob.js"))
+
+    unless File.regular?(qrun) and File.regular?(tsjob), do: wasmtime_build_js(jd)
+
+    if File.regular?(qrun) and File.regular?(tsjob),
+      do: ts_transpile(ts_src, qrun, tsjob),
+      else: {:error, {:ts_toolchain_missing, jd}}
+  end
+
   # Run tsc (typescript.js) inside qjs-run.wasm: TS on stdin → JS on stdout. The compiler runs
   # ENTIRELY in the sandbox (QuickJS under wasmtime). Returns {:ok, js} | {:error, reason}.
   defp ts_transpile(ts_src, qrun, tsjob) do

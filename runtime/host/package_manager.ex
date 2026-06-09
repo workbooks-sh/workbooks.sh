@@ -105,6 +105,30 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Inline JS/TS blocks can declare npm deps (comp["deps"], e.g. ["ms@^2.1.3"]) — synthesize a
+  # tiny project dir (index.js + package.json) and route through the dir resolve→bundle pipeline
+  # (wb-spy.T1.5), mirroring the rust inline-deps path. In-sandbox, zero native execution.
+  defp build_inline(lang, src, deps) when lang in ["js", "ts"] and deps != [] do
+    out = Path.join(@cache, "#{cache_key([lang, src, Enum.join(deps, ",")])}.wasm")
+
+    if File.exists?(out) do
+      {:ok, out, :cached}
+    else
+      dir = Path.join(@cache, "npm-inline-#{cache_key([lang, src, Enum.join(deps, ",")])}")
+      File.rm_rf(dir)
+      File.mkdir_p!(dir)
+      ext = if lang == "ts", do: "ts", else: "js"
+      File.write!(Path.join(dir, "index.#{ext}"), src)
+
+      File.write!(
+        Path.join(dir, "package.json"),
+        Jason.encode!(%{"dependencies" => Map.new(deps, &npm_dep_spec/1)})
+      )
+
+      build_npm_dir(dir, lang, out)
+    end
+  end
+
   defp build_inline(lang, src, deps) do
     out = Path.join(@cache, "#{cache_key([lang, src, Enum.join(deps, ",")])}.wasm")
     if File.exists?(out), do: {:ok, out, :cached}, else: compile(lang, src, out)
@@ -146,9 +170,10 @@ defmodule Workbooks.PackageManager do
   # `name = { version = "req", … }`; skips optional = true, and git/path deps (not fetchable).
   # Mode 2 — JS/TS. Compile a project dir's entry (index.js / index.ts) to a runnable wasm
   # command ENTIRELY in the sandbox via QuickJS-ng (wb-fm0.4) — zero native execution, no bun.
-  # TS is type-stripped in-sandbox first (build_ts). NOTE: npm-dependency bundling is NOT done
-  # in-sandbox yet — a dir with a node_modules import graph returns
-  # {:error, {:js_bundling_unsupported_in_sandbox, _}} rather than shelling native bun.
+  # TS is type-stripped in-sandbox first (build_ts). A dir whose package.json declares npm
+  # dependencies is now resolved+fetched+bundled in-sandbox (wb-spy.T1.5): parse → Npm.install_tree
+  # → Compilers.bundle_dir → js lane. node_modules already on disk is trusted (offline); otherwise
+  # it's installed from the registry. Still zero native execution — no npm/node/bun.
   def build_dir(dir, lang) when lang in ["js", "ts"] do
     abs = Path.expand(dir)
     out = Path.join(@cache, "#{cache_key([abs])}.wasm")
@@ -156,8 +181,8 @@ defmodule Workbooks.PackageManager do
     entry = Path.join(abs, "index.#{ext}")
 
     cond do
-      js_dir_has_deps?(abs) -> {:error, {:js_bundling_unsupported_in_sandbox, abs}}
       not File.regular?(entry) -> {:error, "no index.#{ext} in #{abs}"}
+      js_dir_has_deps?(abs) -> build_npm_dir(abs, lang, out)
       lang == "ts" -> build_ts(File.read!(entry), out)
       true -> js_to_wasm(entry, out)
     end
@@ -222,6 +247,66 @@ defmodule Workbooks.PackageManager do
   end
 
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
+
+  # ── npm dir/inline pipeline (wb-spy.T1.5) ──────────────────────────────────
+  # Resolve → install → bundle → compile, all in-sandbox. Ties together the T1.1-1.4 building
+  # blocks. Writes the compiled wasm to `out`.
+  defp build_npm_dir(abs, lang, out) do
+    with :ok <- ensure_node_modules(abs),
+         {:ok, entry_rel} <- prepare_bundle_entry(abs, lang),
+         {:ok, js} <- Workbooks.Compilers.bundle_dir(abs, entry_rel) do
+      bundled_js_to_wasm(js, out)
+    end
+  end
+
+  # node_modules already present (committed / a prior install) is trusted → no network. Otherwise
+  # install the parsed deps from the registry. Transitive/optional failures don't fail the build.
+  defp ensure_node_modules(abs) do
+    if File.dir?(Path.join(abs, "node_modules")) do
+      :ok
+    else
+      case Workbooks.Npm.install_tree(parse_package_json_deps(abs), abs) do
+        {:ok, _} -> :ok
+        {:ok, _installed, _errors} -> :ok
+        {:error, reason} -> {:error, {:npm_install_failed, reason}}
+      end
+    end
+  end
+
+  # The bundler consumes JS. JS entry is used as-is; a TS entry is transpiled to a sibling
+  # index.js (a single TS entry + npm/JS deps works; transitive local *.ts is the documented frontier).
+  defp prepare_bundle_entry(_abs, "js"), do: {:ok, "index.js"}
+
+  defp prepare_bundle_entry(abs, "ts") do
+    case Workbooks.Compilers.transpile_ts(File.read!(Path.join(abs, "index.ts"))) do
+      {:ok, js} -> File.write!(Path.join(abs, "index.js"), js); {:ok, "index.js"}
+      err -> err
+    end
+  end
+
+  defp bundled_js_to_wasm(js, out) do
+    File.mkdir_p!(@cache)
+    tmp = Path.join(@cache, "npmbundle-#{cache_key([js])}.js")
+    File.write!(tmp, js)
+    r = js_to_wasm(tmp, out)
+    File.rm(tmp)
+    r
+  end
+
+  # "name@req" / "name" / "@scope/pkg@req" → {name, req} for a synthesized package.json.
+  defp npm_dep_spec("@" <> rest) do
+    case String.split(rest, "@", parts: 2) do
+      [n, r] -> {"@" <> n, r}
+      [n] -> {"@" <> n, "*"}
+    end
+  end
+
+  defp npm_dep_spec(s) do
+    case String.split(s, "@", parts: 2) do
+      [n, r] -> {n, r}
+      [n] -> {n, "*"}
+    end
+  end
 
   # Parse [dependencies] from a Cargo.toml → ["name@req", …] for the in-sandbox dep pipeline.
   # Handles `name = "req"` and `name = { version = "req", … }`; skips optional/git/path deps.
