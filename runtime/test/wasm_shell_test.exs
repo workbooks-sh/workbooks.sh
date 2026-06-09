@@ -37,6 +37,16 @@ defmodule WasmShellTest do
     assert {:ok, "a\nb"} = Workbooks.Shell.run("echo a ; echo b")
   end
 
+  test "shell commands read preopened files (sandboxed fs access)" do
+    dir = Path.join(System.tmp_dir!(), "wbfs_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, "f.txt"), "a\nb\nc\n")
+    pre = ["#{dir}::#{dir}"]
+    assert {:ok, "a\nb\nc"} = Workbooks.Shell.run("cat #{dir}/f.txt", "", dirs: pre)
+    assert {:ok, "3"} = Workbooks.Shell.run("cat #{dir}/f.txt | wc -l", "", dirs: pre)
+    assert {:ok, "b"} = Workbooks.Shell.run("cat #{dir}/f.txt | grep b", "", dirs: pre)
+  end
+
   test "compiled C commands can use buffered stdio + large stack buffers (8MB stack)" do
     # Regression: a 64KB auto buffer used to blow the 64KB default stack, and
     # buffered FILE* stdio (getchar/putchar/printf) trapped. The 8MB stack fixes both.

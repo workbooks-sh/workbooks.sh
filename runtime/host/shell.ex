@@ -18,17 +18,20 @@ defmodule Workbooks.Shell do
   Run a `|`-separated pipeline over `stdin`. Returns {:ok, output} or the first
   stage error {:error, reason}. Each stage is a registered WASM command.
   """
-  def run(pipeline, stdin \\ "") when is_binary(pipeline) do
-    # Top-level `;` sequences pipelines: each runs on the original stdin and their
-    # outputs concatenate (like a shell). `&&`/`||` need exit codes (see run path) —
-    # a follow-up. The final concatenated result is trimmed for ergonomic output.
+  def run(pipeline, stdin \\ "", opts \\ []) when is_binary(pipeline) do
+    # `opts[:dirs]` are WASI preopens (host::guest) so commands can read/write the
+    # agent's files (e.g. `cat workdir/x`). Top-level `;` sequences pipelines: each
+    # runs on the original stdin and their outputs concatenate (like a shell).
+    # `&&`/`||` need exit codes (run path) — a follow-up. Final result is trimmed.
+    dirs = Keyword.get(opts, :dirs, [])
+
     pipeline
     |> split_top(?;)
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
     |> Enum.reduce({:ok, []}, fn
       pipe, {:ok, acc} ->
-        case run_pipe(pipe, stdin) do
+        case run_pipe(pipe, stdin, dirs) do
           {:ok, out} -> {:ok, [out | acc]}
           err -> err
         end
@@ -44,12 +47,12 @@ defmodule Workbooks.Shell do
 
   # One `cmd | cmd | …` pipeline. Inter-stage data is byte-exact (exec passes
   # trim: false, so `wc -l` et al. see trailing newlines).
-  defp run_pipe(pipe, stdin) do
+  defp run_pipe(pipe, stdin, dirs) do
     pipe
     |> split_pipes()
     |> Enum.map(&String.trim/1)
     |> Enum.reduce({:ok, stdin}, fn
-      stage, {:ok, input} -> exec(stage, input)
+      stage, {:ok, input} -> exec(stage, input, dirs)
       _stage, err -> err
     end)
   end
@@ -76,11 +79,11 @@ defmodule Workbooks.Shell do
   # so the shell has real echo/cat/seq/head/wc without N separate binaries (wb-9ja).
   @wbox ~w(cat echo seq head wc nl rev basename dirname tr true false)
 
-  defp exec(stage, input) do
+  defp exec(stage, input, dirs) do
     case tokenize(stage) do
       [] -> {:ok, input}
-      [cmd | argv] when cmd in @wbox -> CommandRegistry.run("wbox", input, [cmd | argv], [], trim: false)
-      [cmd | argv] -> CommandRegistry.run(cmd, input, argv, [], trim: false)
+      [cmd | argv] when cmd in @wbox -> CommandRegistry.run("wbox", input, [cmd | argv], dirs, trim: false)
+      [cmd | argv] -> CommandRegistry.run(cmd, input, argv, dirs, trim: false)
     end
   end
 

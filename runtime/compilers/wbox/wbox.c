@@ -11,7 +11,8 @@
  * stdio (getchar/putchar/printf) traps under this wasi-libc/heap config
  * (lazy buffer alloc faults in the small linear memory); raw syscalls are safe.
  */
-#include <stdio.h>  /* snprintf only (buffer-only; no FILE* buffered IO — see note) */
+#include <fcntl.h>   /* open (read files from a WASI preopen) */
+#include <stdio.h>   /* snprintf */
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -26,11 +27,23 @@ static void w(const char *s, long n) {
 }
 static void ws(const char *s) { w(s, (long)strlen(s)); }
 
-static int do_cat(void) {
+static int cat_fd(int fd) {
   char b[4096];
   long n;
-  while ((n = read(0, b, sizeof b)) > 0) w(b, n);
+  while ((n = read(fd, b, sizeof b)) > 0) w(b, n);
   return 0;
+}
+
+static int do_cat(int c, char **v) {
+  if (c == 0) return cat_fd(0);  /* no args → stdin */
+  int rc = 0;
+  for (int i = 0; i < c; i++) {
+    int fd = open(v[i], O_RDONLY);
+    if (fd < 0) { write(2, "cat: cannot open file\n", 22); rc = 1; continue; }
+    cat_fd(fd);
+    close(fd);
+  }
+  return rc;
 }
 
 static int do_echo(int c, char **v) {
@@ -200,7 +213,7 @@ int main(int argc, char **argv) {
   int c = argc - 2;
   char **v = argv + 2;
 
-  if (!strcmp(a, "cat")) return do_cat();
+  if (!strcmp(a, "cat")) return do_cat(c, v);
   if (!strcmp(a, "echo")) return do_echo(c, v);
   if (!strcmp(a, "seq")) return do_seq(c, v);
   if (!strcmp(a, "wc")) return do_wc(c, v);

@@ -147,7 +147,9 @@ defmodule Workbooks.Agent do
   defp log_step(_, _), do: :ok
 
   defp exec_one(%{name: "shell", args: a}, st) do
-    case Shell.run(a["pipeline"], a["input"] || "") do
+    # Preopen the agent's workdir so shell commands can read/write its files
+    # (e.g. `cat out.txt`) — files stay inside the sandbox, no host escape.
+    case Shell.run(a["pipeline"], a["input"] || "", dirs: ["#{st.workdir}::#{st.workdir}"]) do
       {:ok, o} -> {o, st, nil}
       {:error, e} -> {"error: #{inspect(e)}", Map.put(st, :last, %{error: inspect(e)}), nil}
     end
