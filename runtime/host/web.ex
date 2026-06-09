@@ -185,6 +185,47 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(reply))
   end
 
+  # ── CTK human-in-the-loop (toolkits/ctk) ──────────────────────────────────
+  # The CTK shell POSTs a `ctk.commit` event here when a human approves a review;
+  # we deliver it into the run's session. The run id comes from the connector URL
+  # the runtime baked when it served CTK (…/api/ctk/commit?run=<id>) or the event
+  # body. The agent (bash-only) then polls GET /api/ctk/review/:id to receive it
+  # and commit the approved snapshot. See toolkits/ctk/skills/commit-connector.org.
+  post "/api/ctk/commit" do
+    {:ok, body, conn} = read_body(conn)
+    conn = fetch_query_params(conn)
+    event = Jason.decode!(body)
+    run_id = conn.query_params["run"] || event["run"]
+
+    {code, reply} =
+      cond do
+        is_nil(run_id) ->
+          {400, %{error: "missing run id (pass ?run=<id> or event.run)"}}
+
+        true ->
+          case Workbooks.AgentSession.put_review(run_id, event) do
+            :ok -> {202, %{ok: true, run: run_id}}
+            :not_found -> {404, %{error: "no such run", run: run_id}}
+          end
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(code, Jason.encode!(reply))
+  end
+
+  # The agent polls this to receive a pending review (204 when none yet).
+  get "/api/ctk/review/:id" do
+    case Workbooks.AgentSession.take_review(conn.params["id"]) do
+      :not_found ->
+        conn |> put_resp_content_type("application/json") |> send_resp(404, Jason.encode!(%{error: "no such run"}))
+
+      nil ->
+        send_resp(conn, 204, "")
+
+      review ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(review))
+    end
+  end
+
   # Run the full brandnana brand book for a domain (harvest → strategist →
   # designer), the real pipeline ported onto the clean-room agent loop. Long-
   # horizon: spawns + returns immediately; poll /api/brand-book/:slug.

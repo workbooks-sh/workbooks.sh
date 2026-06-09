@@ -60,29 +60,42 @@
   With no host and no connector, CTK still captures the payload (console) and
   shows "shared locally" — so the bench is never blocked.
 
-* Runtime side (the integration — NOT yet built)
+* Runtime side (BUILT — runtime/host/web.ex + agent_session.ex)
 
-  The runtime exposes the webhook and routes the event to the agent. Wire it onto
-  the existing agent-run surface (=runtime/host/web.ex=: =POST /api/run= starts a
-  run, =GET /api/run/:id/stream= streams it, =GET /api/run/:id= polls):
+  Two authenticated routes on the agent-run surface deliver the review into the
+  run's session process (=Workbooks.AgentSession=, one GenServer per run, keyed
+  by run id in its Registry):
 
-  - *Add* =POST /api/ctk/commit= — authenticate (same bearer as the rest of the
-    surface), validate the =ctk.commit= shape, and associate it with the run that
-    opened the review (a =run_id= the connector URL carries, e.g.
-    =?connect=…/api/ctk/commit?run=<id>=).
-  - *Deliver to the agent* via one of: (a) resume the paused run with the event as
-    tool input (preferred — the run was awaiting the review), or (b) append it to
-    a per-run inbox the agent polls. There is no resume/inbox path today; this is
-    the net-new runtime work.
-  - *Persist* the approved snapshot with the run so the commit is reproducible.
+  - =POST /api/ctk/commit?run=<id>= — ingest a =ctk.commit= event and
+    =AgentSession.put_review(run_id, event)= (FIFO queue on the session; also
+    pushed to live WS subscribers as ={:agent_review, event}=). 202 on delivery,
+    404 if no such run, 400 if no run id.
+  - =GET /api/ctk/review/:id= — =AgentSession.take_review(id)= pops the oldest
+    pending review. 200 + the event, 204 when none yet, 404 if no such run.
 
-* Agent service side (the consumer — NOT yet built)
+  The run id is carried by the connector URL the runtime bakes when it serves CTK
+  (=ctk.html?connect=…/api/ctk/commit?run=<id>=), so a commit lands on the right
+  run. NEXT: persist the approved snapshot with the run + a true resume (today the
+  review lives in session memory and is polled).
 
-  Part of the toolkit/agent SDK: an agent that uses CTK as a review step must be
-  able to (1) open a CTK review (render the change, hand the human the URL/webview
-  with =?connect=…&run=<id>=), (2) await the =ctk.commit= event, (3) apply the
-  approved snapshot + feedback, and (4) commit (git) / advance the PR. The "wait
-  for a human review event" primitive is the SDK addition.
+* Agent side (bash-only: poll the review endpoint)
+
+  Agents have one tool — bash — so "await a review" is a poll loop, not an
+  in-process call. The agent renders the change in CTK (handing the human a URL
+  with =?connect=…/api/ctk/commit?run=$RUN=), then polls:
+
+  #+begin_src bash
+  # block until the human commits the review, then act on it
+  while :; do
+    review=$(curl -fsS "$RUNTIME/api/ctk/review/$RUN" -H "authorization: Bearer $WB_TOKEN")
+    [ -n "$review" ] && break          # 204 ⇒ empty body ⇒ keep waiting
+    sleep 2
+  done
+  echo "$review"   # {type:ctk.commit, feedback, snapshot:{props,states}} → apply + git commit
+  #+end_src
+
+  NEXT (SDK): a =wb ctk await <run>= subcommand wrapping this poll + a toolkit
+  skill teaching the open→await→commit shape.
 
 * Verification checklist
 
@@ -90,15 +103,18 @@
   - [ ] Open =ctk.html= embedded in a host; Commit → host receives the
         =reply:"commit"= postMessage.
   - [ ] Open =ctk.html= bare; Commit → "shared locally", payload in console.
-  - [ ] (Runtime, when built) =POST /api/ctk/commit= routes to the run and the
-        agent commits the approved snapshot.
+  - [ ] Runtime: =POST /api/ctk/commit?run=<id>= → 202; =GET /api/ctk/review/<id>=
+        returns the event then 204. (=mix compile= clean; live round-trip pending
+        a running run.)
 
 * Status / next
 
-  SHIPPED: the CTK side — Commit button, the modal, the =ctk.commit= event, both
-  transports, and =window.CTK.commit(feedback)=. NEXT (this plan's runtime work):
-  the =POST /api/ctk/commit= route + the agent "await review" SDK primitive. Mark
-  this skill =stable= once a runtime round-trip commits a real change.
+  SHIPPED: the CTK side (Commit button, modal, =ctk.commit= event, both
+  transports, =window.CTK.commit=) AND the runtime routes (=POST /api/ctk/commit=
+  + =GET /api/ctk/review/:id=, delivering into =Workbooks.AgentSession=; =mix
+  compile= clean). NEXT: a =wb ctk await <run>= SDK subcommand + a toolkit skill
+  for the agent's open→await→commit loop, persisting the approved snapshot, and a
+  live round-trip test. Mark =stable= once a real run commits an approved change.
 
 * See also
 

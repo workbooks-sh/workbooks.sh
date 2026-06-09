@@ -22,6 +22,12 @@ defmodule Workbooks.AgentSession do
   @doc "Subscribe the calling process to live `{:agent_step, ev}` / `{:agent_done, result}` messages."
   def subscribe(id), do: call(id, {:subscribe, self()})
 
+  @doc "Deliver a human-in-the-loop CTK review (a `ctk.commit` event) to this run."
+  def put_review(id, review), do: call(id, {:put_review, review})
+
+  @doc "Pop the oldest pending CTK review for this run (FIFO), or nil. The agent polls this."
+  def take_review(id), do: call(id, :take_review)
+
   defp call(id, msg) do
     case Registry.lookup(__MODULE__.Registry, id) do
       [{pid, _}] -> GenServer.call(pid, msg)
@@ -34,7 +40,7 @@ defmodule Workbooks.AgentSession do
 
   @impl true
   def init({id, system, task, opts}) do
-    {:ok, %{id: id, status: :running, run: nil, live: [], subs: []},
+    {:ok, %{id: id, status: :running, run: nil, live: [], subs: [], reviews: []},
      {:continue, {:run, system, task, opts}}}
   end
 
@@ -75,6 +81,17 @@ defmodule Workbooks.AgentSession do
   def handle_call({:subscribe, pid}, _from, state) do
     {:reply, :ok, %{state | subs: [pid | state.subs]}}
   end
+
+  # CTK human-in-the-loop review: store it + push to live subscribers immediately.
+  def handle_call({:put_review, review}, _from, state) do
+    Enum.each(state.subs, &send(&1, {:agent_review, review}))
+    {:reply, :ok, %{state | reviews: state.reviews ++ [review]}}
+  end
+
+  def handle_call(:take_review, _from, %{reviews: []} = state), do: {:reply, nil, state}
+
+  def handle_call(:take_review, _from, %{reviews: [r | rest]} = state),
+    do: {:reply, r, %{state | reviews: rest}}
 
   def handle_call(:status, _from, %{run: nil, status: st, live: live} = state),
     do: {:reply, %{status: st, steps: length(live), live: live}, state}
