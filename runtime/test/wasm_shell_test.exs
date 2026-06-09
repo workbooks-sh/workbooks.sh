@@ -42,6 +42,18 @@ defmodule WasmShellTest do
     assert {:ok, "5"} = Workbooks.Shell.run("X=5 ; seq $X | wc -l")
   end
 
+  test "shell redirection > >> < (confined to preopened dirs)" do
+    dir = Path.join(System.tmp_dir!(), "wbredir_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    pre = ["#{dir}::#{dir}"]
+    assert {:ok, ""} = Workbooks.Shell.run("seq 3 > #{dir}/o.txt", "", dirs: pre)
+    assert File.read!("#{dir}/o.txt") == "1\n2\n3\n"
+    assert {:ok, ""} = Workbooks.Shell.run("echo x >> #{dir}/o.txt", "", dirs: pre)
+    assert {:ok, "4"} = Workbooks.Shell.run("wc -l < #{dir}/o.txt", "", dirs: pre)
+    # confinement: cannot write outside the preopened dir
+    assert {:error, {:outside_sandbox, _}} = Workbooks.Shell.run("echo pwn > /tmp/escape.txt", "", dirs: pre)
+  end
+
   test "buffering applets sort/uniq/tail run in WASM" do
     assert {:ok, "4\n5"} = Workbooks.Shell.run("seq 5 | tail -n 2")
     assert {:ok, "a\nb\nc"} = Workbooks.Shell.run("echo 'c\nb\na\nb' | sort -u")

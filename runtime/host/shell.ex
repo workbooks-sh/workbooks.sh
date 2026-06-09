@@ -55,11 +55,97 @@ defmodule Workbooks.Shell do
             eval_ops(rest, stdin, dirs, 0, acc, Map.put(vars, name, val))
 
           nil ->
-            case run_pipe(expanded, stdin, dirs) do
-              {:ok, out, st} -> eval_ops(rest, stdin, dirs, st, [out | acc], vars)
+            {clean, infile, outfile, append} = parse_redirs(expanded)
+
+            with {:ok, stdin2} <- redir_in(infile, stdin, dirs),
+                 {:ok, out, st} <- run_pipe(clean, stdin2, dirs),
+                 {:ok, seg_out} <- redir_out(outfile, append, out, dirs) do
+              eval_ops(rest, stdin, dirs, st, [seg_out | acc], vars)
+            else
               {:error, _} = err -> err
             end
         end
+    end
+  end
+
+  # Redirection: `< file` feeds file as stdin; `> file` / `>> file` send the
+  # pipeline's stdout to a file (segment then emits nothing). Targets are confined
+  # to the preopened dirs — no writing outside the sandbox.
+  defp redir_in(nil, stdin, _dirs), do: {:ok, stdin}
+
+  defp redir_in(file, _stdin, dirs) do
+    with {:ok, abs} <- confine(file, dirs), {:ok, data} <- File.read(abs), do: {:ok, data}
+  end
+
+  defp redir_out(nil, _append, out, _dirs), do: {:ok, out}
+
+  defp redir_out(file, append, out, dirs) do
+    with {:ok, abs} <- confine(file, dirs),
+         :ok <- File.write(abs, out, if(append, do: [:append], else: [])) do
+      {:ok, ""}
+    end
+  end
+
+  # A redirect target must resolve inside a preopened host dir (host::guest → host).
+  defp confine(file, dirs) do
+    host_dirs = Enum.map(dirs, &(&1 |> String.split("::") |> hd()))
+
+    case host_dirs do
+      [] ->
+        {:error, {:no_writable_dir, file}}
+
+      [base | _] ->
+        abs = Path.expand(file, base)
+        if Enum.any?(host_dirs, &(abs == &1 or String.starts_with?(abs, &1 <> "/"))),
+          do: {:ok, abs},
+          else: {:error, {:outside_sandbox, file}}
+    end
+  end
+
+  # Pull `<`/`>`/`>>` + their filenames out of a segment (quote-aware), leaving the
+  # clean pipeline. Returns {clean, infile, outfile, append?}.
+  defp parse_redirs(seg), do: do_redirs(String.to_charlist(seg), [], nil, nil, false, nil)
+
+  defp do_redirs([], clean, infile, outfile, append, _q),
+    do: {clean |> Enum.reverse() |> List.to_string() |> String.trim(), infile, outfile, append}
+
+  defp do_redirs([c | rest], clean, infile, outfile, append, q) do
+    cond do
+      is_nil(q) and c in [?', ?"] ->
+        do_redirs(rest, [c | clean], infile, outfile, append, c)
+
+      q == c ->
+        do_redirs(rest, [c | clean], infile, outfile, append, nil)
+
+      is_nil(q) and c == ?> ->
+        {ap, rest2} = case rest do
+          [?> | r] -> {true, r}
+          _ -> {false, rest}
+        end
+        {file, rest3} = read_fname(rest2)
+        do_redirs(rest3, clean, infile, file, ap, nil)
+
+      is_nil(q) and c == ?< ->
+        {file, rest2} = read_fname(rest)
+        do_redirs(rest2, clean, file, outfile, append, nil)
+
+      true ->
+        do_redirs(rest, [c | clean], infile, outfile, append, q)
+    end
+  end
+
+  defp read_fname(chars) do
+    chars |> Enum.drop_while(&(&1 in [?\s, ?\t])) |> read_tok([], nil)
+  end
+
+  defp read_tok([], acc, _q), do: {acc |> Enum.reverse() |> List.to_string(), []}
+
+  defp read_tok([c | rest], acc, q) do
+    cond do
+      is_nil(q) and c in [?', ?"] -> read_tok(rest, acc, c)
+      q == c -> read_tok(rest, acc, nil)
+      is_nil(q) and c in [?\s, ?\t, ?>, ?<, ?|] -> {acc |> Enum.reverse() |> List.to_string(), [c | rest]}
+      true -> read_tok(rest, [c | acc], q)
     end
   end
 
