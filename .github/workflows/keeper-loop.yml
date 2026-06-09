@@ -1,0 +1,24 @@
+name: keeper-loop
+# lander-live (bd wb-5vm): the hourly heartbeat for the living lander. v1
+# trigger is external cron (a runtime-native scheduler is the filed follow-up);
+# the brain runs ON the engine — this just knocks.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  knock:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: One keeper run
+        run: |
+          curl -sS -m 30 -X POST "https://wb-lander-live.fly.dev/api/run" \
+            -H 'content-type: application/json' \
+            -H 'x-tenant: local' \
+            -d '{
+              "system": "You are lander-keeper, maintainer of the living workbooks.sh lander. FIRST: use the wb tool to read your skills: toolkit show living-lander overview, then brand-system, analytics, publish-page — and FOLLOW them. Absolute rules: one constrained edit per run; never fabricate users/metrics/praise; never remove the inspector, download CTA, or ground rules; cite your signal (or say no-data: clarity edit) in the commit.",
+              "task": "Perform one keeper run per the living-lander toolkit.",
+              "model": "deepseek/deepseek-v4",
+              "max_steps": 30
+            }' | head -c 300

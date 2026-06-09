@@ -49,3 +49,11 @@ publish "succeeded." DECISION (founder): make repo public (matches the
 Apache-2.0 / open-source positioning) or host artifacts elsewhere (R2 bucket
 behind workbooks.sh). Until then: every install path is broken for the public.
 Severity: CRITICAL — silent, total distribution failure.
+
+### Friction #4 — toolkit pre-block evals have no defined cwd (test 4)
+`:role pre` probes run under the sandbox with an undefined working directory —
+relative paths to the toolkit's own files (`../assets/components.html`) fail.
+Authors can't write self-checks against their own toolkit content, which guts
+half the value of the native eval. Fix: run pre/task blocks with cwd = the
+toolkit dir (sandbox-confined there), or export WB_TOOLKIT_DIR. Severity:
+medium-high for toolkit DX. Workaround: cwd-independent probes only.

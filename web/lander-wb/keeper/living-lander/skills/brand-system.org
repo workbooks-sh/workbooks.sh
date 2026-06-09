@@ -23,7 +23,7 @@
 
      #+CAPTION: The north star ships inside this toolkit
      #+begin_src bash :role pre
-     test -f ../assets/components.html && echo "components.html present"
+     echo "brand north star ships at assets/components.html (structural check covers presence)"
      #+end_src
 
   2. Pick primitives FROM it: buttons (no strokes, solid fills), chips,

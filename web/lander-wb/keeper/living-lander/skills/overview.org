@@ -25,7 +25,7 @@
 
      #+CAPTION: What am I working on; what changed recently
      #+begin_src bash :role pre
-     echo "toolkit reachable"; test -f ../agent/keeper.org && echo "agent def present"
+     echo "exec path live (sandboxed bash reaches here)"
      #+end_src
 
   2. Read =brand-system= before any visual/copy edit.

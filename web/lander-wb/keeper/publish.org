@@ -1,0 +1,5 @@
+#+TITLE: living lander — publish config
+#+PUBLISH_TARGET: self-hosted
+#+PUBLISH_PROJECT: https://wb-lander-live.fly.dev
+# `wb publish apply ../dist/workbooks.html` PUTs the rendered workbook to the
+# engine serving it (slug = file stem → /w/workbooks).
