@@ -225,3 +225,8 @@ footer .links a:hover{color:var(--ink)}
 .teams-list .om{background:var(--bg2);color:var(--blue-text)}
 .teams-list .orow strong{color:var(--ink)}
 .teams-list .orow div>span{color:var(--ink2)}
+
+/* lander-live: the "maintained live" indicator (footer) */
+.live-status{display:inline-flex;align-items:center;gap:.4rem;color:var(--green-ink)}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:livepulse 2s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.35}}

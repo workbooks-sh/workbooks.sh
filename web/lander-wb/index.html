@@ -216,9 +216,52 @@
 <footer>
   <a class="brand" href="/"><svg viewBox="0 0 257 206" fill="none" aria-label="Workbooks"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg><span>Workbooks</span></a>
   <span class="machine" style="opacity:.6">made as a workbook</span>
+  <span class="machine live-status" id="live-status" hidden><span class="live-dot"></span><span id="live-text">live</span></span>
   <div class="links"><a href="#get">download</a><a href="/docs">docs</a><a href="https://github.com/workbooks-sh/workbooks.sh">github</a></div>
 </footer>
 
 <script type="module" src="./main.js"></script>
+<script>
+/* lander-live (wb-5vm): this page is served by the Workbooks runtime and
+   maintained by an agent (lander-keeper). Poll the runtime's own change feed
+   so an open tab reflects the keeper's edits — shows the latest commit, and
+   when a NEW edit lands, reloads to show the rewritten page. Degrades silently
+   when served statically (no /_changes endpoint). */
+(() => {
+  const LIVE = location.pathname.startsWith("/live") ? "/live" : "";
+  const el = document.getElementById("live-status");
+  const txt = document.getElementById("live-text");
+  if (!el) return;
+  let head = null;            // newest sha seen at load
+  const rel = () => {};       // (relative-time computed server-agnostic below)
+  const ago = ts => {
+    const s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 90) return "just now";
+    if (s < 3600) return Math.round(s / 60) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    return Math.round(s / 86400) + "d ago";
+  };
+  async function poll(first) {
+    try {
+      const r = await fetch(LIVE + "/_changes", { cache: "no-store" });
+      if (!r.ok) return;
+      const { changes } = await r.json();
+      if (!changes || !changes.length) return;
+      const top = changes[0];
+      el.hidden = false;
+      txt.textContent = "maintained live · " + (changes.length) + " edits";
+      el.title = "latest: " + (top.msg || top.sha);
+      if (first) { head = top.sha; }
+      else if (top.sha !== head) {
+        // the keeper just shipped an edit — show it, then reveal the new page
+        txt.textContent = "keeper just edited — reloading…";
+        setTimeout(() => location.reload(), 1800);
+      }
+    } catch (_) { /* static host / offline — stay quiet */ }
+  }
+  poll(true);
+  setInterval(() => poll(false), 30000);
+})();
+</script>
 </body>
 </html>
