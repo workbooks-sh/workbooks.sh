@@ -7,7 +7,6 @@
 **One file for everything. One runtime for anywhere.**
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7afe.svg)](LICENSE)
-&nbsp;[![Stars](https://img.shields.io/github/stars/workbooks-sh/workbooks.sh?style=flat&color=e8612a)](https://github.com/workbooks-sh/workbooks.sh)
 &nbsp;![Platform](https://img.shields.io/badge/desktop-macOS%20·%20Linux%20·%20Windows-555.svg)
 &nbsp;![Stack](https://img.shields.io/badge/built%20with-Elixir%20+%20WebAssembly-6b4fbb.svg)
 
