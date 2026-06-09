@@ -1343,12 +1343,15 @@ defmodule Workbooks.Compilers do
   libquickjs objects. Self-heals the toolchain (compilers/js/build.sh) if the objects are
   absent. Returns {:ok, wasm_path, log} | {:error, reason}.
   """
-  def js_compile_to_wasm(source_path, _opts \\ [], root \\ default_root()) do
+  def js_compile_to_wasm(source_path, opts \\ [], root \\ default_root()) do
     jd = Path.join(root, "js")
     clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
     csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
     qsrc = Path.expand(Path.join(jd, "qjs-root/quickjs-ng"))
-    harness = Path.expand(Path.join(jd, "harness.o"))
+    # :dock → link the JsDock harness (env.* host-capability imports → Javy.Net/Javy.VFS, wb-e1x.1);
+    # the resulting command MUST run under Workbooks.JsDock (Wasmex), not the bare wasmtime CLI.
+    harness_name = if Keyword.get(opts, :dock, false), do: "harness_dock.o", else: "harness.o"
+    harness = Path.expand(Path.join(jd, harness_name))
     libobjs = Enum.map(@js_qobjs, &Path.join(qsrc, "#{&1}.o"))
 
     have_toolchain? = File.regular?(harness) and Enum.all?(libobjs, &File.regular?/1)

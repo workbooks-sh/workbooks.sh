@@ -43,6 +43,11 @@ cc_qjs(){ # $1 = basename (no .c)
 # (1) the per-program harness (harness.o) — only js_src.c varies per JS program.
 cc_qjs harness
 
+# (1b) the JsDock per-program harness (harness_dock.o, wb-e1x.1) — harness.o + env.* host-capability
+#      imports (host_http_get / host_vfs_read|write) exposed to JS as Javy.Net / Javy.VFS. A command
+#      linked against this runs under Workbooks.JsDock (Wasmex), never the bare wasmtime CLI.
+cc_qjs harness_dock
+
 # (2) qjs-run.wasm — generic QuickJS that evals a JS file given at runtime; used to run the
 #     TypeScript compiler in-sandbox for the TS lane (wb-fm0.6). Link it (it embeds no source).
 cc_qjs harness_run
