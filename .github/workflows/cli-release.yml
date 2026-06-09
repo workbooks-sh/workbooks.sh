@@ -110,6 +110,20 @@ jobs:
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
           npm publish --access public --registry https://registry.npmjs.org
 
+      # Legacy era (zaius-labs workbook CLI + its support packages) is dead —
+      # nobody used it. Deprecate so installs warn + point at the new CLI.
+      # `|| true`: a permissions miss must never fail a release.
+      - name: Deprecate legacy packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd cli/npm
+          MSG="legacy — replaced by the Rust wb CLI (npm i -g @work.books/cli, or curl -fsSL workbooks.sh/cli.sh | sh)"
+          npm deprecate "@work.books/cli@<=0.10.0" "$MSG" || true
+          npm deprecate "@work.books/runtime" "$MSG" || true
+          npm deprecate "@work.books/runtime-wasm" "$MSG" || true
+          npm deprecate "@work.books/workbench" "$MSG" || true
+
       # 2) GitHub Packages as @workbooks-sh/cli  → shows as "cli" under the repo
       - name: Publish to GitHub Packages
         env:
