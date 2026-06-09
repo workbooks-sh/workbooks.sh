@@ -23,7 +23,21 @@ defmodule Workbooks.CLI.Dev do
   def run(["eval"]), do: {eval_list(), false}
   # Run server-side on the connected runtime (NIFs/LLM work there; the escript can't).
   def run(["eval", id]), do: Workbooks.CLI.Runtime.toolkit(["eval", id])
+  def run(["ctk" | _]), do: {ctk_text(), false}
   def run(_), do: {usage(), true}
+
+  # wb dev ctk — the CTK render shell, served by the connected runtime.
+  defp ctk_text do
+    case Workbooks.CLI.Runtime.target() do
+      {:ok, t} ->
+        "CTK shell (served by the runtime): #{t.url}/ctk/ctk.html\n" <>
+          "Wire a review to a run:            #{t.url}/ctk/ctk.html?connect=#{t.url}/api/ctk/commit?run=<run>\n" <>
+          "Open in a browser; Commit posts back to the runtime, where `wb ctk await <run>` receives it."
+
+      {:error, _} ->
+        "no runtime target — start one (`wb dev up`), then open <runtime>/ctk/ctk.html"
+    end
+  end
 
   # wb dev eval — list toolkits that ship an eval suite (evals/*.org); run one
   # with `wb dev eval <id>` (= wb toolkit eval, sandboxed; set WB_TOOLKIT_EXEC=1).
@@ -137,10 +151,9 @@ defmodule Workbooks.CLI.Dev do
       wb dev info          demo/dev environment at a glance (runtime, health, model key, toolkits, ctk)
       wb dev up            how to start a dev runtime (source mix / prod-parity krunvm)
       wb dev test [args]   run the runtime test suite (mix test) from a source checkout
-      wb dev eval [id]     list toolkit eval suites, or run one (= wb toolkit eval; WB_TOOLKIT_EXEC=1)
+      wb dev eval [id]     list toolkit eval suites, or run one (server-side; Tier 1 + Tier 2)
+      wb dev ctk           the CTK review shell URL served by the runtime
       wb dev help          this help
-
-    Planned: agent+judge eval tier (Tier 2, see toolkits/EVALS.org), wb dev ctk <toolkit>.
     """
   end
 end

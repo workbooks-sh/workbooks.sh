@@ -91,8 +91,19 @@ defmodule Workbooks.AgentSession do
   # to live subscribers immediately.
   def handle_call({:put_review, review}, _from, state) do
     Enum.each(state.subs, &send(&1, {:agent_review, review}))
+    persist_review(state.id, review)
     {:reply, :ok,
      %{state | reviews: state.reviews ++ [review], review_log: state.review_log ++ [review]}}
+  end
+
+  # Durable record: append each approved review to a per-run JSONL so it survives
+  # the run process / a restart (reproducibility), beyond the in-memory log.
+  defp persist_review(id, review) do
+    dir = Path.join([System.tmp_dir!(), "wb-ctk-reviews"])
+    File.mkdir_p(dir)
+    File.write(Path.join(dir, "#{id}.jsonl"), Jason.encode!(review) <> "\n", [:append])
+  rescue
+    _ -> :ok
   end
 
   def handle_call(:take_review, _from, %{reviews: []} = state), do: {:reply, nil, state}

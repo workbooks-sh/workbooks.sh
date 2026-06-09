@@ -373,13 +373,20 @@ defmodule Workbooks.Toolkits do
             tenant: "eval"
           )
 
-        tools = run.events |> Enum.map(& &1.tool) |> Enum.uniq()
-        {verdict, reason} = judge(task, rubric, run.result, tools)
-        {verdict, "#{name} [tools: #{Enum.join(tools, ",")}] — #{reason}"}
+        # Telemetry from the run's tool trace (the universal step record): step
+        # count, tools used, and errors — the judge factors execution, not just text.
+        tel = %{
+          steps: run.steps,
+          tools: run.events |> Enum.map(& &1.tool) |> Enum.uniq(),
+          errors: Enum.count(run.events, &(&1[:error] || (&1[:exit_code] && &1[:exit_code] != 0)))
+        }
+
+        {verdict, reason} = judge(task, rubric, run.result, tel)
+        {verdict, "#{name} [steps:#{tel.steps} tools:#{Enum.join(tel.tools, ",")} errs:#{tel.errors}] — #{reason}"}
     end
   end
 
-  defp judge(task, rubric, result, tools) do
+  defp judge(task, rubric, result, tel) do
     sys =
       "You are a strict evaluator. Given a TASK, a RUBRIC, and an agent's RESULT, decide if the result satisfies the rubric. Respond with a verdict whose FIRST line is exactly PASS or FAIL, then one short line of reasoning."
 
@@ -390,7 +397,7 @@ defmodule Workbooks.Toolkits do
     RUBRIC:
     #{rubric}
 
-    AGENT TOOLS USED: #{Enum.join(tools, ", ")}
+    AGENT TELEMETRY: steps=#{tel.steps}, tools=[#{Enum.join(tel.tools, ", ")}], errors=#{tel.errors}
 
     AGENT RESULT:
     #{String.slice(result || "(no result)", 0, 4000)}
