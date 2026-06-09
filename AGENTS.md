@@ -45,6 +45,21 @@ Work is **not** complete until `git push` succeeds. Before ending a session:
 
 Never stop before pushing; never say "ready to push when you are" — you push.
 
+## Architecture canon — desktop / web / mobile
+
+One frontend, many targets. The UI talks to a **single Host capability surface**
+(the `invoke` seam, generalized — the Dock membrane). Behind it a router
+fulfills each capability from a **provider**: `local` (OS via Tauri, or
+browser-native), `runtime` (a shared server over RCP / HTTP+WS), or `kernel`
+(`oql.wasm`). A *target* (desktop/web/mobile) is just a **routing config** +
+runtime endpoint — not a code fork. Do NOT reintroduce a second "runtime
+contract" the UI manages, and do NOT try to compile the Tauri/OS layer to WASM;
+swap providers behind the one Host instead.
+
+- **Canon doc:** `desktop/docs/platform-model.md` · **epic:** `wb-lk6` · **runtime connect:** RCP `wb-uxn`.
+- **Desktop state of truth:** `desktop/ASSESSMENT.md` (the runtime is canonical; the desktop frontend is the most out-of-date code — re-point it onto `runtime/host`, never the reverse).
+- Browser preview: `cd desktop && bun run dev` (port 5178) — runs the real frontend with `$lib/platform/webHost` mocking the providers; no runtime needed.
+
 ## Release / publishing — THREE separate layers. DO NOT CONFLATE THEM.
 
 This tripped up a session badly once. Keep these distinct:

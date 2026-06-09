@@ -5,6 +5,34 @@
     <link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Workbooks Desktop</title>
+    <script>
+      /* Web-host bootstrap: when there's no Tauri IPC (i.e. a plain browser),
+         stand in for window.__TAURI_INTERNALS__ so the frontend runs as a web
+         preview. invoke() delegates to the router installed by
+         $lib/platform/webHost. In a real Tauri build __TAURI_INTERNALS__
+         already exists and this whole block is skipped. */
+      if (!window.__TAURI_INTERNALS__) {
+        var __cb = 0;
+        window.__WB_DEV_MOCK__ = true;
+        window.__TAURI_INTERNALS__ = {
+          invoke: function (cmd, args) {
+            return window.__WB_MOCK_INVOKE__
+              ? window.__WB_MOCK_INVOKE__(cmd, args)
+              : Promise.resolve(null);
+          },
+          transformCallback: function (cb, once) {
+            var id = ++__cb, prop = "_" + id;
+            Object.defineProperty(window, prop, {
+              value: function (r) { if (once) delete window[prop]; return cb && cb(r); },
+              writable: false, configurable: true,
+            });
+            return id;
+          },
+          unregisterCallback: function (id) { delete window["_" + id]; },
+          convertFileSrc: function (p) { return p; },
+        };
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

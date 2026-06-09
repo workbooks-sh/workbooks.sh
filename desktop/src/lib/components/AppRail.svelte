@@ -19,6 +19,7 @@
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
   import RailTooltip from "./RailTooltip.svelte";
+  import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/ui/iconAccent.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
@@ -292,15 +293,7 @@
             onPackageContext?.(pkg.id, e.clientX, e.clientY);
           }}
         >
-          <span class="pkg-avatar">
-            {#if pkg.icon && pkg.icon.startsWith("data:image/")}
-              <img src={pkg.icon} alt="" />
-            {:else if pkg.icon}
-              <span class="pkg-emoji">{pkg.icon}</span>
-            {:else}
-              {initials(pkg.name)}
-            {/if}
-          </span>
+          <FolderIcon icon={pkg.icon ?? ""} size={36} />
         </button>
       </RailTooltip>
     {/each}
@@ -574,44 +567,9 @@
     color: var(--color-fg);
   }
 
+  /* Packages render as folders (FolderIcon); the active ring lives on the
+   * parent .rail-btn. */
   .rail-btn.pkg { color: var(--color-fg); }
-  .pkg-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    /* Plain — no background, no border. The glyph carries the
-     * identity. Active-state ring lives on the parent .rail-btn so
-     * we don't re-introduce a colored box around the icon itself.
-     * Stripped 2026-05-27 per user preference. */
-    background: transparent;
-    border: 0;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--color-fg);
-    letter-spacing: 0.02em;
-    overflow: hidden;
-  }
-  .pkg-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .pkg-emoji {
-    font-size: 16px;
-    line-height: 1;
-  }
-  /* Active package: don't fill the avatar; the parent rail-btn's
-   * existing .active treatment already signals selection via its
-   * own background. Avoids re-introducing a colored box around the
-   * glyph. */
-  .rail-btn.pkg.active .pkg-avatar {
-    background: transparent;
-    color: var(--color-fg);
-    border: 0;
-  }
 
   .rail-btn.create { color: var(--color-fg-muted); }
   .rail-btn.create:hover { color: var(--color-fg); }

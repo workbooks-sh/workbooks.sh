@@ -1,4 +1,7 @@
 <script lang="ts">
+  // Web-host adapter — must load before any component's onMount so the
+  // capability router is live when stores initialize (browser preview).
+  import "$lib/platform/webHost";
   import { onMount } from "svelte";
   import "../app.css";
   import Titlebar from "$lib/components/Titlebar.svelte";
