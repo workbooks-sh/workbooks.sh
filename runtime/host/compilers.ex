@@ -1487,6 +1487,70 @@ defmodule Workbooks.Compilers do
 
   defp esc(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
+  @bundle_exts ~w(.js .cjs .mjs .json)
+
+  @doc """
+  Bundle a project directory (its entry + assembled node_modules/) into a single self-contained
+  CommonJS JS string, ENTIRELY in the sandbox (wb-spy.T1.4). Mirrors `ts_transpile`: runs a pure-JS
+  bundler (bundle/bundlejob.js) inside qjs-run.wasm, feeding the file tree as a JSON map on stdin
+  and reading the bundle on stdout. Zero native execution — no esbuild/rollup/node/bun.
+
+  `entry_rel` is POSIX-relative to `project_dir` (e.g. "index.js"). Returns {:ok, js} | {:error, _}.
+  """
+  def bundle_dir(project_dir, entry_rel, root \\ default_root()) do
+    jd = Path.join(root, "js")
+    qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
+    bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
+
+    unless File.regular?(qrun), do: wasmtime_build_js(jd)
+
+    cond do
+      not (File.regular?(qrun) and File.regular?(bundlejob)) ->
+        {:error, {:bundler_toolchain_missing, jd}}
+
+      true ->
+        files = collect_bundle_files(Path.expand(project_dir))
+        payload = Jason.encode!(%{"entry" => entry_rel, "files" => files})
+        run_bundler(payload, qrun, bundlejob)
+    end
+  end
+
+  # Collect every bundleable source the bundler may need (the project's own .js/.json + the whole
+  # node_modules/ tree), as %{relpath => content}. One recursive glob covers local nested files and
+  # node_modules alike.
+  defp collect_bundle_files(abs) do
+    Path.wildcard(Path.join(abs, "**/*.{js,cjs,mjs,json}"))
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.filter(fn p -> Path.extname(p) in @bundle_exts end)
+    |> Map.new(fn p -> {Path.relative_to(p, abs), File.read!(p)} end)
+  end
+
+  # Run bundlejob.js in qjs-run.wasm: JSON file-map on stdin → bundled JS on stdout. Same
+  # wasmtime invocation shape as ts_transpile (the bundle/ dir is preopened as /w).
+  defp run_bundler(payload, qrun, bundlejob) do
+    jobdir = Path.dirname(bundlejob)
+    id = Integer.to_string(:erlang.unique_integer([:positive]))
+    sin = Path.join(System.tmp_dir!(), "wbbundle-in-#{id}.json")
+    serr = Path.join(System.tmp_dir!(), "wbbundle-err-#{id}.txt")
+    File.write!(sin, payload)
+
+    cmd =
+      "wasmtime run -W exceptions=y -W max-wasm-stack=134217728 " <>
+        "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/bundlejob.js < #{esc(sin)} 2> #{esc(serr)}"
+
+    try do
+      {out, _status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: false)
+
+      cond do
+        String.trim(out) != "" -> {:ok, out}
+        true -> {:error, {:bundle_failed, String.slice(File.read!(serr), 0, 600)}}
+      end
+    after
+      File.rm(sin)
+      File.rm(serr)
+    end
+  end
+
   defp kw(file, key) do
     with {:ok, body} <- File.read(file),
          [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do
