@@ -152,3 +152,7 @@ verified in-browser. Tests 1,2,3,4 + auth-lock PASS. Remaining for a
 self-sustaining living lander: keeper loop trigger (internal scheduler), CF
 /live proxy deploy, /data persistence (#11), static-publish verb (#10), Yjs
 open-tab live updates, public example repo.
+
+## #10 + #11 FIXED (root cause = unset production defaults, not architecture)
+- #11: WB_REGISTRY defaulted to `:memory:` and the deploy recipe never set it; site_dir rooted at ephemeral cwd. FIX: recipe sets `WB_REGISTRY=${WB_DATA}/registry.db` (durable volume + litestream); PublicWeb site_dir roots under WB_DATA. Workbook store + static trees now survive restart/scale-to-zero.
+- #10: serve_static already serves HTML verbatim; only the org-render fallback double-wrapped. FIX: static_page detects a complete HTML document and serves it verbatim (org-source still rendered+wrapped). 3 regression tests pass. `wb workbook deploy` of a single-file HTML workbook now works end-to-end AND persists — the in-box github-raw hack is retired.

@@ -31,7 +31,10 @@ wb_recipe_init() {
 # auto-generates WB_PUBLIC_BEARER ONCE on first cloud apply and persists it in
 # secrets.env; subsequent applies reuse the stored value forwarded here.
 wb_base_env() {
-  WB_ENGINE_ENV=("WB_WEB=1" "PORT=${WB_PORT}" "WB_DATA=${WB_DATA}" "WB_EMBED=${WB_EMBED:-local}")
+  # WB_REGISTRY defaults to :memory: in the engine — point it at the durable
+  # volume so deployed workbooks survive restarts / scale-to-zero. (litestream
+  # replicates this SQLite db; WB_DATA is the mounted volume.)
+  WB_ENGINE_ENV=("WB_WEB=1" "PORT=${WB_PORT}" "WB_DATA=${WB_DATA}" "WB_EMBED=${WB_EMBED:-local}" "WB_REGISTRY=${WB_DATA}/registry.db")
   local k
   for k in WB_TENANCY_MODE WB_PROFILE_DIR WB_REGION WB_TENANT \
            WB_PUBLIC_BEARER \

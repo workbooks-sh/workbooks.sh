@@ -83,7 +83,9 @@ defmodule Workbooks.PublicWeb do
   defp serve_html(conn, body),
     do: conn |> put_resp_content_type("text/html") |> send_resp(200, inject_marker(body))
 
-  defp site_dir(app), do: Path.join([File.cwd!(), "build", "public", app])
+  # Published static trees live under the durable data dir (WB_DATA → the volume)
+  # so they survive machine restarts / scale-to-zero; fall back to cwd in dev.
+  defp site_dir(app), do: Path.join([System.get_env("WB_DATA") || File.cwd!(), "build", "public", app])
 
   defp index_default(path), do: if(File.dir?(path), do: Path.join(path, "index.html"), else: path)
 
@@ -118,8 +120,27 @@ defmodule Workbooks.PublicWeb do
   authed control plane). Public content is bytes only.
   """
   def static_page(id, org) do
-    rendered = Workbooks.OQL.render(org)
+    # A workbook may already BE a complete HTML document (the "one file" form:
+    # built single-file workbooks, hand-authored pages). Serve those verbatim —
+    # wrapping them in the doc shell below would double-nest <html> and bury the
+    # author's own <head>/title. Only org-source content gets the kernel render
+    # + shell treatment.
+    if complete_html?(org) do
+      org
+    else
+      static_doc(id, Workbooks.OQL.render(org))
+    end
+  end
 
+  # True when the stored content opens as a full HTML document.
+  defp complete_html?(content) do
+    content
+    |> String.trim_leading()
+    |> String.downcase()
+    |> String.starts_with?(["<!doctype html", "<html"])
+  end
+
+  defp static_doc(id, rendered) do
     """
     <!doctype html><html lang="en"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
