@@ -19,5 +19,11 @@ world engine {
   // (wasi:http/sockets are NOT granted). Returns the extracted page as a JSON
   // string. Gated by `browse`.
   import browse-fetch: func(url: string) -> string;
+  // Fan a registered command over N inputs CONCURRENTLY across isolated instances
+  // (the host/BEAM does the parallelism a single-threaded wasm instance can't —
+  // Workbooks.Fabric). `inputs` is a JSON array of stdin strings; returns a JSON
+  // array of {"ok": stdout} | {"error": reason}, in order. Gated by `parallel`.
+  // (Bound in Instance.Imports.for_caps; declared here so a component can import it.)
+  import run-command-many: func(command: string, inputs: string) -> string;
   export run: func(input: string) -> string;
 }
