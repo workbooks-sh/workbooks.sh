@@ -37,6 +37,15 @@ defmodule WasmShellTest do
     assert {:ok, "a\nb"} = Workbooks.Shell.run("echo a ; echo b")
   end
 
+  test "compiled C commands can use buffered stdio + large stack buffers (8MB stack)" do
+    # Regression: a 64KB auto buffer used to blow the 64KB default stack, and
+    # buffered FILE* stdio (getchar/putchar/printf) trapped. The 8MB stack fixes both.
+    src = ~S|#include <stdio.h>
+int main(){ char big[65536]; big[65535]=42; int c,n=0; while((c=getchar())!=EOF){putchar(c); if(c=='\n')n++;} printf("[%d %d]\n", n, big[65535]); return 0; }|
+    assert {:ok, _} = Workbooks.CommandRegistry.build_and_register_inline("stdio_probe", "c", src)
+    assert {:ok, "x\ny\n[2 42]"} = Workbooks.CommandRegistry.run("stdio_probe", "x\ny\n", [])
+  end
+
   test "trim: false preserves byte-exact command output (only the final result is trimmed)" do
     # The pipe must not strip a trailing newline mid-stream; standalone still trims.
     assert {:ok, "1\n2\n3\n"} = Workbooks.CommandRegistry.run("wbox", "", ["seq", "3"], [], trim: false)

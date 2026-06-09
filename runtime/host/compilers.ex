@@ -262,8 +262,13 @@ defmodule Workbooks.Compilers do
             # shim). They must precede the objects/libs so symbol wrapping applies.
             ld_extra = Keyword.get(opts, :ld_args, [])
 
+            # Stack: wasm-ld defaults to a 64 KiB stack, which overflows on modest
+            # automatic buffers (a `char[65536]` blows it → __stack_pointer goes
+            # out of bounds → faults even unrelated frames) and starves buffered
+            # FILE* stdio's lazy buffer. 8 MiB matches native expectations so any
+            # C command compiles to a robust binary. (wb-9ja)
             c2 =
-              ["wasm-ld", "-m", "wasm32", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
+              ["wasm-ld", "-m", "wasm32", "-z", "stack-size=8388608", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
                 ld_extra ++ crt ++ obj_paths ++
                 ["-lc", "#{@clang_lib_rt}/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
 
