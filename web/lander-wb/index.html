@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workbooks — build apps you actually own</title>
-  <meta name="description" content="Workbooks is a free desktop app for building real software with AI. It's made on your computer, it runs on your computer, and it's yours for good.">
-  <meta property="og:title" content="Workbooks — build apps you actually own">
-  <meta property="og:description" content="A free desktop app for building real software with AI. Made on your computer. Runs on your computer. Yours for good.">
+  <title>Workbooks — make it, keep it, it's yours</title>
+  <meta name="description" content="Workbooks builds real software from plain language and saves every app as one file that runs on your machine. Free, open source, yours.">
+  <meta property="og:title" content="Workbooks — make it, keep it, it's yours">
+  <meta property="og:description" content="Real software from plain language, saved as one file that runs on your machine. Free, open source, yours.">
   <meta name="theme-color" content="#ffffff">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,118 +21,143 @@
     <span>Workbooks</span>
   </a>
   <nav>
-    <a href="#build">build</a>
-    <a href="#own">own</a>
+    <a href="#make">make</a>
+    <a href="#keep">keep</a>
+    <a href="#yours">yours</a>
     <a href="/docs">docs</a>
     <button class="theme-toggle" id="toggle" type="button" aria-label="Toggle theme"><span class="dot"></span><span id="toggle-label">dark</span></button>
-    <a class="btn btn-ink sm" href="#download">Download free</a>
+    <a class="btn btn-ink sm" href="#get">Download free</a>
   </nav>
 </header>
 
-<!-- 00 · hero -->
+<!-- HERO — the umbrella triad. Each clause is a chapter of the page. -->
 <section class="hero">
-  <canvas class="ascii hero-bg" data-speed="0.8" aria-hidden="true"></canvas>
   <div class="hero-in">
-    <p class="kicker">free desktop app <i>/</i> mac · windows · linux</p>
-    <h1>Build apps you <em>actually own.</em></h1>
-    <p class="lede">Workbooks is a free desktop app for building real software with AI. It's made on your computer, it runs on your computer, and it's yours for good.</p>
-    <p class="machine"><span class="p">$</span> wb deploy local <span class="c">· engine up · port 4000 · runs on your machine</span></p>
+    <p class="kicker">a free desktop app <i>/</i> mac · windows · linux</p>
+    <h1>
+      <a class="t make" href="#make">Make it.</a>
+      <a class="t keep" href="#keep">Keep it.</a>
+      <a class="t yours" href="#yours">It's yours.</a>
+    </h1>
+    <p class="lede">Workbooks builds real software from plain language — and saves every app as <em>one file</em> that runs on your machine, for as long as you want it.</p>
     <div class="cta">
-      <a class="btn btn-ink" href="#download">Download free</a>
-      <a class="btn btn-text" href="#build">See what you can build →</a>
+      <a class="btn btn-ink lg" href="#get">Download free</a>
+      <a class="btn btn-text" href="#make">Watch it work →</a>
     </div>
     <p class="micro">free &amp; open source · no account · bring your own AI key</p>
   </div>
+  <div class="hero-field"><canvas class="ascii" data-dense data-speed="0.7" aria-hidden="true"></canvas></div>
 </section>
 
-<div class="ticker" aria-hidden="true">
-  <div class="ticker-in">
-    <span>build it yourself</span><b>·</b><span>own it</span><b>·</b><span>runs local</span><b>·</b><span>private by default</span><b>·</b><span>no cloud bill</span><b>·</b><span>one file, whole app</span><b>·</b><span>open source</span><b>·</b>
-    <span>build it yourself</span><b>·</b><span>own it</span><b>·</b><span>runs local</span><b>·</b><span>private by default</span><b>·</b><span>no cloud bill</span><b>·</b><span>one file, whole app</span><b>·</b><span>open source</span><b>·</b>
-  </div>
-</div>
-
-<!-- 01 · what you build -->
-<section class="sec" id="build">
-  <div class="sec-in">
-    <h2>If you can describe it, you can build it.</h2>
-    <p class="sub">The software you'd normally need a developer for — or a pile of subscriptions. Make it yourself, often in an afternoon.</p>
-    <p class="machine"><span class="p">›</span> 24 toolkits loaded <span class="c">· ffmpeg, git, palette…</span></p>
-    <div class="cells">
-      <div class="cell green"><span class="num">01</span>
-        <div><h3>Tools for your team</h3><p>Dashboards and trackers everyone shares, all speaking the same data.</p></div>
-        <svg class="wm" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg></div>
-      <div class="cell blue"><span class="num">02</span>
-        <div><h3>Apps for your clients</h3><p>A private workspace for each client, even the ones who don't code.</p></div>
-        <svg class="wm" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg></div>
-      <div class="cell ink"><span class="num">03</span>
-        <div><h3>Things just for you</h3><p>That little app you always wished existed. Build it today, keep it for years.</p></div>
-        <svg class="wm" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg></div>
+<!-- CH 1 · MAKE -->
+<section class="ch" id="make">
+  <div class="ch-in">
+    <div class="ch-head">
+      <span class="ch-num">1</span>
+      <span class="ch-kicker make">make</span>
+    </div>
+    <div class="split">
+      <div>
+        <h2>Say what you need.<br>It gets built.</h2>
+        <p class="sub">Describe the tool in plain words — a tracker, a dashboard, a little utility — and Workbooks writes it, runs it, and shows you the working thing. Refine it the same way: keep talking.</p>
+        <p class="machine"><span class="p">›</span> build "invoice tracker" <span class="c">…</span> <span class="ok">ready ✓</span></p>
+        <p class="sub small">This demo is live. Click around — it's already yours to break.</p>
+      </div>
+      <div class="appframe">
+        <div class="af-bar"><i></i><i></i><i></i><span class="t">invoices.wb</span><span class="right chip live"><i></i>live</span></div>
+        <div class="af-body">
+          <div class="af-head">
+            <div class="kv"><div class="k">Outstanding</div><div class="v" id="total">$8,400</div></div>
+            <button class="btn btn-soft sm" id="add" type="button">+ Add invoice</button>
+          </div>
+          <div id="list">
+            <div class="lrow" data-amt="3200" data-paid="false"><span class="who">Maple Studio</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></div>
+            <div class="lrow" data-amt="2000" data-paid="false"><span class="who">Northwind Co.</span><span class="amt">$2,000</span><button class="pay" type="button">Mark paid</button></div>
+            <div class="lrow" data-amt="3200" data-paid="false"><span class="who">Harbor &amp; Lane</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="uses">
+      <div class="use"><span class="u-k make">for the team</span><p>Dashboards everyone reads from the same file.</p></div>
+      <div class="use"><span class="u-k keep">for clients</span><p>Hand over an app the way you'd hand over a PDF.</p></div>
+      <div class="use"><span class="u-k yours">for you</span><p>The tool you've wanted for years, built tonight.</p></div>
     </div>
   </div>
 </section>
 
-<!-- 02 · live demo -->
-<section class="sec alt">
-  <div class="sec-in split">
-    <div>
-      <h2>Describe it.<br>Watch it get built.</h2>
-      <p class="sub">Tell Workbooks what you want in plain words. It writes the app, runs it, and hands you something real — not a mockup, not a template. This one's live: mark an invoice paid.</p>
-      <p class="machine"><span class="p">›</span> build "track my freelance invoices" <span class="c">…</span> <span class="ok">ready ✓</span></p>
+<!-- CH 2 · KEEP -->
+<section class="ch band" id="keep">
+  <div class="ch-in">
+    <div class="ch-head">
+      <span class="ch-num">2</span>
+      <span class="ch-kicker keep">keep</span>
     </div>
-    <div class="appframe">
-      <div class="af-bar"><i></i><i></i><i></i><span class="t">invoices.wb</span><span class="right chip live"><i></i>live</span></div>
-      <div class="af-body">
-        <div class="af-head">
-          <div class="kv"><div class="k">Outstanding</div><div class="v" id="total">$8,400</div></div>
-          <button class="btn btn-soft sm" id="add" type="button">+ Add invoice</button>
+    <h2 class="ask">Where did all your AI apps go?</h2>
+    <p class="sub center">Demos in dead tabs. Prototypes on somebody's trial plan. Building was never the hard part — <em>keeping</em> is.</p>
+    <div class="split filecard-row">
+      <figure class="filecard">
+        <div class="file-glyph">
+          <svg viewBox="0 0 96 120" fill="none" aria-hidden="true">
+            <path d="M8 4h56l24 24v88H8z" class="f-body"/>
+            <path d="M64 4v24h24" class="f-fold"/>
+            <path d="M24 56h48M24 72h48M24 88h32" class="f-lines"/>
+          </svg>
+          <span class="file-name machine">invoices.wbundle</span>
         </div>
-        <div id="list">
-          <div class="lrow" data-amt="3200" data-paid="false"><span class="who">Maple Studio</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></div>
-          <div class="lrow" data-amt="2000" data-paid="false"><span class="who">Northwind Co.</span><span class="amt">$2,000</span><button class="pay" type="button">Mark paid</button></div>
-          <div class="lrow" data-amt="3200" data-paid="false"><span class="who">Harbor &amp; Lane</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></div>
-        </div>
+        <figcaption class="machine"><span class="p">$</span> wb bundle . <span class="c">→</span> invoices.wbundle <span class="ok">· source inside</span></figcaption>
+      </figure>
+      <div>
+        <h3>A workbook is different: the whole app is one file.</h3>
+        <p class="sub">Interface, data, even its own source — saved together on your disk. Open it next week or next decade; it's still your app, still running, still editable.</p>
+        <p class="machine"><span class="p">$</span> open invoices.wbundle <span class="c">·</span> <span class="ok">running</span></p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- 03 · one file -->
-<section class="sec">
-  <div class="sec-in split">
-    <figure class="ascii-card">
-      <canvas class="ascii" data-dense data-speed="0.6" data-palette="gb"></canvas>
-      <figcaption class="machine"><span class="p">$</span> wb bundle . <span class="c">→</span> workbook.wbundle <span class="ok">· source travels inside</span></figcaption>
-    </figure>
-    <div>
-      <h2>The whole app, in one file.</h2>
-      <p class="sub">A workbook carries everything — interface, data, even its own source. Email it. Back it up. It opens anywhere and still works in ten years.</p>
+<!-- CH 3 · YOURS -->
+<section class="ch ink-band" id="yours">
+  <canvas class="ascii yours-bg" data-speed="0.5" aria-hidden="true"></canvas>
+  <div class="ch-in">
+    <div class="ch-head">
+      <span class="ch-num">3</span>
+      <span class="ch-kicker yours">yours</span>
+    </div>
+    <div class="split">
+      <div>
+        <h2>Nobody can take it back.</h2>
+        <p class="sub">It runs on your machine, so it's private by default and works offline. It's free and open source, so there's no plan to outgrow and no company to outlive. If Workbooks vanished tomorrow, your apps wouldn't notice.</p>
+        <p class="machine"><span class="p">$</span> wb verify invoices.html <span class="c">→</span> <span class="ok">"valid": true</span></p>
+      </div>
+      <div class="own-list">
+        <div class="orow"><span class="om">⌂</span><div><strong>On your disk</strong><span>Private by default. Works offline.</span></div></div>
+        <div class="orow"><span class="om">○</span><div><strong>No middleman</strong><span>Your AI key, your provider's bill, our zero percent.</span></div></div>
+        <div class="orow"><span class="om">∞</span><div><strong>Open source</strong><span>Apache-2.0, end to end. Files don't need us.</span></div></div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 04 · ownership -->
-<section class="sec alt" id="own">
-  <div class="sec-in split">
-    <div>
-      <h2>Your apps. Your computer. Your rules.</h2>
-      <p class="sub">Everything runs on your own machine. No monthly bill that balloons, no service that quietly disappears, no lock-in. Keep what you build. Share it. Sell it.</p>
-      <p class="machine"><span class="p">$</span> wb verify app.html <span class="c">→</span> <span class="ok">"valid": true · signed, yours</span></p>
+<!-- QUESTIONS -->
+<section class="ch" id="questions">
+  <div class="ch-in">
+    <h2 class="qs-h">Fair questions.</h2>
+    <div class="qa">
+      <div class="q"><h3>Do I have to code?</h3><p>No. Talk, look, refine. If you do code, it's real source — open the file, it's all there.</p></div>
+      <div class="q"><h3>Free how?</h3><p>The app costs nothing, forever. AI usage is between you and your AI provider — your key, their bill, our zero percent.</p></div>
+      <div class="q"><h3>Where's my data?</h3><p>In the file. On your disk. We don't run a server it could even go to.</p></div>
+      <div class="q"><h3>What if you shut down?</h3><p>Your apps keep opening. Every workbook carries its own source, and the runtime is open source. Files don't need us.</p></div>
     </div>
-    <div class="own-list">
-      <div class="orow"><span class="om">⌂</span><div><strong>Runs on your machine</strong><span>Private by default. Works offline.</span></div></div>
-      <div class="orow"><span class="om">○</span><div><strong>No surprise bills</strong><span>One app does the work of a whole cloud setup.</span></div></div>
-      <div class="orow"><span class="om">∞</span><div><strong>Yours to keep</strong><span>Open source, Apache-2.0. It still works in a year.</span></div></div>
-    </div>
+    <p class="machine center"><span class="p">$</span> wb unbundle app.wbundle <span class="c">→</span> source/ <span class="ok">· yours to rebuild</span></p>
   </div>
 </section>
 
-<!-- 05 · download -->
-<section class="sec dl" id="download">
-  <canvas class="ascii dl-bg" data-dense data-speed="0.5" aria-hidden="true"></canvas>
-  <div class="sec-in center">
-    <h2>Own your software.</h2>
-    <p class="sub">Free and open source, for Mac, Windows, and Linux. Bring your own AI key and build as much as you want.</p>
+<!-- CLOSE -->
+<section class="ch close" id="get">
+  <div class="ch-in center">
+    <h2>Make something you get to keep.</h2>
+    <p class="sub center">Free for Mac, Windows, and Linux.</p>
     <div class="cta center">
       <a class="btn btn-ink lg" href="https://github.com/workbooks-sh/workbooks.sh/releases">Download free</a>
       <a class="btn btn-text" href="/docs">Browse the docs →</a>
@@ -148,7 +173,7 @@
 <footer>
   <a class="brand" href="/"><svg viewBox="0 0 257 206" fill="none" aria-label="Workbooks"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg><span>Workbooks</span></a>
   <span class="machine" style="opacity:.6">made as a workbook</span>
-  <div class="links"><a href="#download">download</a><a href="/docs">docs</a><a href="https://github.com/workbooks-sh/workbooks.sh">github</a></div>
+  <div class="links"><a href="#get">download</a><a href="/docs">docs</a><a href="https://github.com/workbooks-sh/workbooks.sh">github</a></div>
 </footer>
 
 <script type="module" src="./main.js"></script>
