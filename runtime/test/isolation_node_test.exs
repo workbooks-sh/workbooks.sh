@@ -25,6 +25,30 @@ defmodule Workbooks.IsolationNodeTest do
     assert {:ok, :node} = Isolation.resolve(:node)
   end
 
+  test "trust roundtrip: default first-party, set/get third-party" do
+    name = "trust_#{System.unique_integer([:positive])}"
+    assert CommandRegistry.trust(name) == "first-party"
+    assert :ok = CommandRegistry.set_trust(name, "third-party")
+    assert CommandRegistry.trust(name) == "third-party"
+    assert {:error, :invalid_trust} = CommandRegistry.set_trust(name, "bogus")
+  end
+
+  @tag :node
+  @tag :build
+  test "run_isolated: first-party runs locally; third-party auto-routes (#+TRUST wiring)" do
+    name = "iso_#{System.unique_integer([:positive])}"
+    rev = ~S|const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const s=new TextDecoder().decode(all).trim();Javy.IO.writeSync(1,new TextEncoder().encode(s.split("").reverse().join("")));|
+    {:ok, _} = CommandRegistry.build_and_register_inline(name, "js", rev)
+
+    # first-party → local path, correct output.
+    assert {:ok, "cba"} = CommandRegistry.run_isolated(name, "abc")
+
+    # third-party → effective_tier :node; runs on a peer VM if distribution is up,
+    # else falls back to local (fail-open). Either way the command runs correctly.
+    :ok = CommandRegistry.set_trust(name, "third-party")
+    assert {:ok, "olleh"} = CommandRegistry.run_isolated(name, "hello")
+  end
+
   @tag :node
   @tag :build
   test "tier :node runs a DYNAMIC command on a separate BEAM VM" do

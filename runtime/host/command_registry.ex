@@ -98,6 +98,44 @@ defmodule Workbooks.CommandRegistry do
   """
   def current(name) when is_binary(name), do: Map.get(registry(), name)
 
+  # ── #+TRUST → isolation (wb-pkh.5) ──────────────────────────────────────────
+  # A command's trust posture (from its toolkit's #+TRUST), recorded at build time.
+  # Drives the isolation tier its calls run at: third-party → :node (a separate
+  # BEAM VM); first-party → local subprocess.
+  @trust {__MODULE__, :trust}
+
+  @doc "Record a command's trust posture (\"first-party\" | \"third-party\")."
+  def set_trust(name, trust) when is_binary(name) and trust in ["first-party", "third-party"] do
+    cur = :persistent_term.get(@trust, %{})
+    :persistent_term.put(@trust, Map.put(cur, name, trust))
+    :ok
+  end
+
+  def set_trust(_name, _trust), do: {:error, :invalid_trust}
+
+  @doc "The recorded trust posture for `name` (default \"first-party\")."
+  def trust(name), do: Map.get(:persistent_term.get(@trust, %{}), name, "first-party")
+
+  @doc """
+  Run a command at the isolation tier its #+TRUST implies (wb-pkh.5): third-party →
+  :node (a separate BEAM VM, Workbooks.IsolationNode), with a GRACEFUL fallback to
+  the local subprocess if distribution can't be brought up (the command still runs,
+  just less isolated — fail-open on availability, never on the work). first-party →
+  the normal local path. This is the auto-application of effective_tier; callers
+  that want an explicit tier use Fabric.map.
+  """
+  def run_isolated(name, input, argv \\ []) do
+    case Workbooks.Isolation.effective_tier("command", trust(name)) do
+      :node ->
+        if Workbooks.IsolationNode.available?(),
+          do: Workbooks.IsolationNode.run(name, input, argv),
+          else: run(name, input, argv)
+
+      _ ->
+        run(name, input, argv)
+    end
+  end
+
   @doc """
   Register a prebuilt wasm CLI under `name` with an arg mode (:argv | :stdin1).
 

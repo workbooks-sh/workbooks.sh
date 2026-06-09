@@ -61,8 +61,11 @@ defmodule Workbooks.Instance.Imports do
   defp run_command(name, input, args, ctx) do
     t0 = System.monotonic_time(:millisecond)
 
+    # Trust-aware run (wb-pkh.5): a third-party command runs at :node (a separate
+    # BEAM VM); first-party runs locally. run_isolated falls back to local if
+    # distribution can't start, so the command always runs.
     {out, exit_code} =
-      case Workbooks.CommandRegistry.run(name, input, args) do
+      case Workbooks.CommandRegistry.run_isolated(name, input, args) do
         {:ok, out} -> {out, 0}
         {:error, e} -> {Jason.encode!(%{error: inspect(e)}), 1}
       end

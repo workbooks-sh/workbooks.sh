@@ -245,6 +245,7 @@ defmodule Workbooks.Toolkits do
   def parse_descriptor(body) do
     %{
       exec: kw(body, "EXEC"),
+      trust: kw(body, "TRUST") || "first-party",
       build_src: parse_build_src(kw(body, "BUILD_SRC")),
       build_lang: kw(body, "BUILD_LANG"),
       caps: (kw(body, "CAPS") || "") |> String.split() ,
@@ -508,9 +509,14 @@ defmodule Workbooks.Toolkits do
   # surface, before any compile runs.) Non-registering modes fall through.
   defp do_build(id, %{cli_bin: bin, exec: exec, build_src: {kind, _}} = d)
        when is_binary(bin) and exec in ["command", nil] and kind in [:crate, :path, :wasm, :archive, :gobuild, :script, :zigbuild] do
-    if bin in Workbooks.CommandRegistry.reserved_names(),
-      do: "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)",
-      else: do_build_clause(id, d)
+    if bin in Workbooks.CommandRegistry.reserved_names() do
+      "cannot build #{id}: CLI_BIN #{inspect(bin)} is a reserved built-in command name (refusing to shadow it)"
+    else
+      # Record the toolkit's #+TRUST so its command runs at the right isolation tier
+      # (third-party → :node). Set before build; harmless if the build then fails.
+      Workbooks.CommandRegistry.set_trust(bin, d[:trust] || "first-party")
+      do_build_clause(id, d)
+    end
   end
 
   defp do_build(id, d), do: do_build_clause(id, d)
