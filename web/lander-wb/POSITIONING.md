@@ -146,3 +146,29 @@ over the full arc instead: **"Make it. Keep it. It's yours."** The triad is the
 page: chapter 1 MAKE (describe→built, live demo), chapter 2 KEEP (opens with
 "Where did all your AI apps go?", the one-file mechanism), chapter 3 YOURS
 (local/private/free/OSS, nobody-can-take-it-back). Questions + close follow.
+
+---
+
+## v1.2 addendum — agent-led trinity (founder direction + research, 2026-06-09)
+
+**Research read (OpenClaw / Manus / Lindy / Devin):** the agentic class sells
+"an assistant that does things." OpenClaw owns local+open+personal. Devin's
+overclaim collapse = the cautionary tale: never promise multi-week autonomy.
+**The unclaimed ground: every agent platform's output is a chat log. Ours is an
+artifact.** Agents that leave something behind.
+
+**The trinity (all three, fused):** AGENTS do the work · WORKBOOKS are what the
+work becomes (one-file artifacts that persist) · the DESKTOP APP is the hackable
+surface where both live. No leg pitched alone.
+
+**Hero v3.1:** H1 "Put agents to work. Keep what they make." — agent-led clause
++ artifact clause. Triad page structure survives (make=agents, keep=artifact,
+yours=ownership).
+
+**Cloud honesty (correction):** never "no cloud / no server ever." Local is the
+DEFAULT, deploying your own server is the option (real today: `wb deploy`), and
+a managed/team tier is the roadmap. Q&A + ch3 reworded accordingly.
+
+**New TEAMS section:** deploy one engine for the whole team on your infra (true
+today), managed tier coming, build-a-product-on-it (Apache-2.0). Placed after
+YOURS, before questions.

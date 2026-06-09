@@ -127,3 +127,15 @@ document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", asyn
   b.textContent = "copied";
   setTimeout(() => b.textContent = "copy", 1200);
 }));
+
+/* ── specimen viewer: switch between embedded live workbooks ── */
+const vFrame = $("#v-frame");
+if (vFrame) {
+  document.querySelectorAll(".v-tab").forEach(tab => tab.addEventListener("click", () => {
+    document.querySelectorAll(".v-tab").forEach(t => t.classList.remove("on"));
+    tab.classList.add("on");
+    vFrame.src = tab.dataset.src;
+    $("#v-size").textContent = `${tab.dataset.size} · one file`;
+    $("#v-open").href = tab.dataset.src;
+  }));
+}

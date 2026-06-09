@@ -203,3 +203,25 @@ footer .links a:hover{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
+
+/* ── specimen: a live workbook embedded ── */
+.specimen .sp-kicker{text-align:center;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--blue-text);font-family:var(--mono)}
+.sp-h{font-size:clamp(2.2rem,5vw,3.6rem);margin-top:.6rem}
+.viewer{margin-top:clamp(1.8rem,3vw,2.6rem);background:var(--card);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.v-bar{display:flex;align-items:center;gap:1rem;padding:.55rem .9rem;background:var(--bg2);border-bottom:1px solid var(--hair)}
+.v-tabs{display:flex;gap:.3rem}
+.v-tab{border:0;cursor:pointer;font-family:var(--mono);font-size:.78rem;color:var(--ink3);background:transparent;
+  padding:.4rem .8rem;border-radius:8px;transition:background .15s,color .15s}
+.v-tab:hover{color:var(--ink)}
+.v-tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 0 rgba(20,20,25,.06)}
+.v-size{margin-left:auto;font-size:.7rem;color:var(--ink3)}
+.v-open{font-size:.7rem;color:var(--blue-text)}
+.v-open:hover{text-decoration:underline}
+@media(max-width:560px){.v-size{display:none}}
+#v-frame{width:100%;height:480px;border:0;display:block;background:var(--bg)}
+
+/* teams list rides the orow primitive on light ground */
+.teams-list .orow{border-bottom:1px solid var(--hair)}
+.teams-list .om{background:var(--bg2);color:var(--blue-text)}
+.teams-list .orow strong{color:var(--ink)}
+.teams-list .orow div>span{color:var(--ink2)}

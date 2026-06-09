@@ -116,6 +116,27 @@
   </div>
 </section>
 
+<!-- SPECIMEN — a real workbook, embedded live -->
+<section class="ch specimen" id="specimen">
+  <div class="ch-in">
+    <p class="sp-kicker mono">specimen</p>
+    <h2 class="center sp-h">This is a workbook.</h2>
+    <p class="sub center">Not a screenshot — a real file, running in this page. Everything in the frame below is one .html document: interface, data, logic, source.</p>
+    <div class="viewer">
+      <div class="v-bar">
+        <div class="v-tabs" role="tablist">
+          <button class="v-tab on" data-src="demos/habits.html" data-size="5.5 KB" role="tab">habits.html</button>
+          <button class="v-tab" data-src="demos/budget.html" data-size="6.6 KB" role="tab">budget.html</button>
+        </div>
+        <span class="v-size machine" id="v-size">5.5 KB · one file</span>
+        <a class="v-open machine" id="v-open" href="demos/habits.html" target="_blank" rel="noopener">open standalone ↗</a>
+      </div>
+      <iframe id="v-frame" src="demos/habits.html" title="a live workbook" loading="lazy"></iframe>
+    </div>
+    <p class="machine center"><span class="p">$</span> ls demos/ <span class="c">→</span> habits.html · budget.html <span class="ok">· each one is the whole app</span></p>
+  </div>
+</section>
+
 <!-- CH 3 · YOURS -->
 <section class="ch ink-band" id="yours">
   <canvas class="ascii yours-bg" data-speed="0.5" aria-hidden="true"></canvas>
