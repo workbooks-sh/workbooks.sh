@@ -7,6 +7,7 @@
   import EnvRequestModal from "$lib/env_request/EnvRequestModal.svelte";
   import SidecarOfflineOverlay from "$lib/auth/SidecarOfflineOverlay.svelte";
   import SignInOverlay from "$lib/auth/SignInOverlay.svelte";
+  import SetupWizard from "$lib/setup/SetupWizard.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
 
@@ -70,6 +71,11 @@
      Renders only when an agent / CLI asked for a credential. Same
      overlay treatment as WorkgateModal. -->
 <EnvRequestModal />
+
+<!-- Engine install wizard. Always mounted; renders only when opened
+     (first run with no engine, or from the titlebar engine chip).
+     Offline-first: fully skippable, never blocks the app. -->
+<SetupWizard />
 
 <style>
   /* Full-viewport shell. Titlebar sticks at the top; .body fills the

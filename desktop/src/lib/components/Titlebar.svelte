@@ -36,14 +36,15 @@
   import type { Tab } from "$lib/tabs/types";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { wizard } from "$lib/setup/wizard.svelte";
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
   const engine = $derived.by(() => {
     const s = sidecar.status.state;
-    if (s === "ready") return { label: "Engine", cls: "ok", title: "Engine connected" };
+    if (s === "ready") return { label: "Engine", cls: "ok", title: "Engine connected — click to manage" };
     if (s === "starting" || s === "restarting")
       return { label: "Engine…", cls: "pending", title: "Engine starting" };
-    return { label: "No engine", cls: "off", title: "Engine not connected — local features only" };
+    return { label: "No engine", cls: "off", title: "Engine not connected — click to set up" };
   });
 
   function kindGlyph(kind: Tab["kind"]): string {
@@ -168,10 +169,17 @@
 
   <span class="spacer" data-tauri-drag-region></span>
 
-  <span class="engine engine-{engine.cls}" data-tauri-drag-region="false" title={engine.title}>
+  <button
+    type="button"
+    class="engine engine-{engine.cls}"
+    data-tauri-drag-region="false"
+    title={engine.title}
+    aria-label={engine.title}
+    onclick={() => wizard.open()}
+  >
     <span class="engine-dot"></span>
     {engine.label}
-  </span>
+  </button>
 
   <button
     type="button"
@@ -277,13 +285,18 @@
     align-self: center;
     height: 22px;
     padding: 0 0.5rem;
+    border: 1px solid transparent;
     border-radius: 999px;
+    background: transparent;
     font-size: 11px;
     font-weight: 500;
+    font-family: inherit;
     color: var(--color-fg-subtle);
     flex-shrink: 0;
+    cursor: pointer;
     user-select: none;
   }
+  .engine:hover { border-color: var(--color-border); background: var(--color-page); }
   .engine-dot {
     width: 6px;
     height: 6px;

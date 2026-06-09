@@ -38,6 +38,7 @@
   import { Pencil, Smile, Trash2 } from "@lucide/svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { wizard } from "$lib/setup/wizard.svelte";
   import { ws } from "$lib/bridge/ws.svelte";
   import { tabs } from "$lib/tabs/store.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
@@ -279,7 +280,10 @@
   }
 
   onMount(() => {
-    sidecar.init();
+    // After the first status snapshot, offer the engine setup wizard if no
+    // engine is configured (and the user hasn't dismissed it). Offline-first:
+    // it's skippable and never blocks the app.
+    sidecar.init().then(() => wizard.maybeAutoOpen());
     ws.init();
     tabs.init();
     packageStore.init();

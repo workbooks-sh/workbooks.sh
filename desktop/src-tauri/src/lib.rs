@@ -22,6 +22,7 @@ mod fs;
 mod fs_ops;
 mod kernel;
 mod keychain;
+mod machine;
 mod network;
 mod orgprops;
 mod packages;
@@ -118,6 +119,14 @@ pub fn run() {
             daemon::daemon_up,
             daemon::daemon_down,
             daemon::daemon_restart,
+            // Install wizard: detect/install the VM backend, boot local, or
+            // connect to a cloud engine.
+            daemon::engine_detect,
+            daemon::engine_install_backend,
+            daemon::engine_boot_local,
+            daemon::engine_probe,
+            daemon::engine_connect_cloud,
+            daemon::engine_disconnect_cloud,
             // Tabs.
             tabs::tab_list,
             tabs::tab_open,
@@ -271,8 +280,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "restart" => {
                 // Safe, mode-aware: start if down, restart if it's our container,
                 // leave a raw dev runtime alone. Off-thread so the menu never hangs.
-                std::thread::spawn(|| {
-                    let _ = daemon::tray_engine_action();
+                let handle = app.clone();
+                std::thread::spawn(move || {
+                    let _ = daemon::tray_engine_action(&handle);
                 });
             }
             "quit" => app.exit(0),

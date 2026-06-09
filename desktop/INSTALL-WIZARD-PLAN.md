@@ -108,6 +108,43 @@ cloud for now" message** in the wizard — do not block those builds. The deploy
 - Every failure shows a real error + retry.
 - Linux/Windows: wizard opens, offers the cloud path, clearly defers local-engine.
 
+## Status — IMPLEMENTED (route B)
+
+The wizard is built. **Decision: route B** — boot the image directly from Rust;
+the host needs ONLY the krunvm backend (no Erlang, no `wb` escript). The `wb`
+escript dependency was removed from the engine bridge entirely.
+
+What landed:
+- `desktop/src-tauri/src/machine.rs` (NEW) — native krunvm orchestration ported
+  from `machine.ex`: `detect()`, `ensure_apfs_volume()`, `install_krunvm()`
+  (streams `engine-setup` events), `create()`/`spawn()`/`boot()`, `down()`, and
+  cloud config (`write_cloud`/`clear_cloud`/`parse_url`). Host port pinned to the
+  guest port 4000 (the guest writes the guest port into discovery).
+- `desktop/src-tauri/src/daemon.rs` — `daemon_up`/`down`/`restart` + tray now
+  drive `machine::*` instead of `wb deploy`. `Discovery` gained an optional
+  `host` (cloud) and a `cloud` manager mode (never torn down locally). New
+  wizard commands: `engine_detect`, `engine_install_backend`, `engine_boot_local`
+  (patient poll through the first image pull), `engine_probe`,
+  `engine_connect_cloud`, `engine_disconnect_cloud`.
+- `desktop/src-tauri/src/lib.rs` — module + commands registered; tray passes the
+  app handle.
+- `desktop/src/lib/setup/wizard.svelte.ts` (NEW) — wizard store + `engine-setup`
+  stream + first-run `maybeAutoOpen` (localStorage dismissal, never nags).
+- `desktop/src/lib/setup/SetupWizard.svelte` (NEW) — the modal: choose → detect →
+  install krunvm → boot (live log) → connect; cloud URL/token path; every step
+  has a real error + retry; fully skippable.
+- Wired into `+layout.svelte` (mounted), `+page.svelte` (auto-open after first
+  status snapshot), and the titlebar engine chip (now a button → `wizard.open()`).
+
+Cross-platform: mac path is live; non-mac returns `supported:false` from
+`engine_detect` and the wizard steers to the cloud path (no local-engine build
+blocked).
+
+Verified: `cargo check` clean (only a pre-existing unrelated warning);
+`svelte-check` clean for the new files (the 6 repo errors are pre-existing —
+vitest types, StoreOptions, TerminalDrawer). NOT yet exercised on a real fresh
+Mac end-to-end — that's the remaining acceptance test.
+
 ## Pointers
 - Engine bridge: `desktop/src-tauri/src/daemon.rs`
 - VM backend (mac): `runtime/host/deploy/machine.ex` (port create/start/discovery if going route B)
