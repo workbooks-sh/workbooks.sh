@@ -4,7 +4,9 @@ defmodule Workbooks.Application do
 
   @impl true
   def start(_type, _args) do
+    trace("begin")
     Workbooks.Auth.Guardian.install_config()
+    trace("guardian ok")
 
     children =
       [
@@ -16,25 +18,59 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ web()
+      ] ++ web() ++ keeper()
 
-    result = Supervisor.start_link(children, strategy: :one_for_one, name: Workbooks.Supervisor)
+    # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
+    # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
+    # the whole app start opaquely.
+    {:ok, sup} = Supervisor.start_link([], strategy: :one_for_one, name: Workbooks.Supervisor)
+
+    Enum.each(children, fn spec ->
+      trace("child start: #{child_label(spec)}")
+
+      case Supervisor.start_child(sup, spec) do
+        {:ok, _} -> trace("child ok: #{child_label(spec)}")
+        {:error, reason} -> trace("child ERR: #{child_label(spec)} -> #{inspect(reason)}")
+      end
+    end)
+
+    trace("all children up")
 
     # Desktop daemon: publish the discovery file (port + per-boot token) so the
     # Tauri shell can find + authenticate to the runtime inside the container.
     if Workbooks.Desktop.enabled?() do
       path = Workbooks.Desktop.write_discovery!()
+      trace("discovery written: #{path}")
       require Logger
       Logger.info("desktop daemon — discovery written: #{path} (port #{Workbooks.Desktop.port()})")
     end
 
-    # Pre-warm the semantic embedder in the background (no-op unless WB_EMBED=local)
-    # so the first search/index isn't blocked on the model download.
-    Workbooks.Embed.Model2Vec.warm()
-    # Surface the search config so the embedder + vector backend aren't opaque.
-    require Logger
-    Logger.info("search config — embed: #{Workbooks.Embed.adapter() |> Module.split() |> List.last()}, vectors: #{Workbooks.DB.backend()}, machine recommends: #{Workbooks.Embed.Capability.recommend()}")
-    result
+    # Pre-warm the semantic embedder in a TASK so a slow/blocking model load can
+    # NEVER block application start (no-op unless WB_EMBED=local).
+    Task.start(fn ->
+      Workbooks.Embed.Model2Vec.warm()
+
+      require Logger
+
+      Logger.info(
+        "search config — embed: #{Workbooks.Embed.adapter() |> Module.split() |> List.last()}, vectors: #{Workbooks.DB.backend()}, machine recommends: #{Workbooks.Embed.Capability.recommend()}"
+      )
+    end)
+
+    trace("start: done")
+    {:ok, sup}
+  end
+
+  defp child_label(spec), do: spec |> inspect() |> String.slice(0, 50)
+
+  # Append a boot phase marker to <WB_DATA>/boot-trace.txt (mapped out of the
+  # container) so a hang in start/2 is pinpointable. Best-effort, never raises.
+  defp trace(msg) do
+    dir = System.get_env("WB_DATA") || System.tmp_dir!()
+    _ = File.write(Path.join(dir, "boot-trace.txt"), "#{msg}\n", [:append])
+    :ok
+  rescue
+    _ -> :ok
   end
 
   # The HTTP surfaces are opt-in so the demo boots without binding a port.
@@ -84,6 +120,18 @@ defmodule Workbooks.Application do
       end
 
     control ++ public ++ public_tls
+  end
+
+  # Keeper (wb-5vm): on-box agent scheduler for deployed engines where the control
+  # plane is internal-only and GitHub-cron can't reach it. Enabled ONLY when
+  # WB_KEEPER_DEF is set; otherwise excluded from the supervision tree entirely so
+  # normal/dev deploys are not affected.
+  defp keeper do
+    if System.get_env("WB_KEEPER_DEF") do
+      [Workbooks.Keeper]
+    else
+      []
+    end
   end
 
   defp port, do: String.to_integer(System.get_env("PORT", "4000"))

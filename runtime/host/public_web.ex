@@ -32,6 +32,32 @@ defmodule Workbooks.PublicWeb do
     send_resp(conn, 200, "ok")
   end
 
+  # Public change feed (wb-5vm / lander-live): the app's git log, newest-first,
+  # capped at 30. Anonymous GET — no auth, no writes. The underscore prefix avoids
+  # any collision with workbook paths. Mirrors web.ex's /rcp/changes but resolves
+  # the app from the public host rather than an authed tenant.
+  get "/_changes" do
+    case app_id(conn) do
+      nil ->
+        send_resp(conn, 404, "no app for host")
+
+      app ->
+        entries =
+          Workbooks.Git.log(app)
+          |> Enum.take(30)
+          |> Enum.map(fn line ->
+            case String.split(line, " ", parts: 2) do
+              [sha, msg] -> %{sha: sha, msg: msg}
+              [sha] -> %{sha: sha, msg: ""}
+            end
+          end)
+
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, Jason.encode!(%{changes: entries}))
+    end
+  end
+
   # GET any path → serve the host's app. Non-GET never matches a `get` clause and
   # falls through to the 404 below — no writes, no Dock on this plane.
   get "/*_glob" do
