@@ -66,6 +66,27 @@ defmodule Workbooks.Kernel do
   @doc "Close the kernel (drop the instance)."
   def close(kernel) when is_pid(kernel), do: GenServer.stop(kernel)
 
+  @doc """
+  Open a kernel, run `inputs` through it in order, close — all in the CALLING
+  process (wb-1mh). One self-contained unit, so the whole hot loop runs on whatever
+  node this is invoked on: `:erpc.call(peer, Kernel, :run_batch, …)` runs the kernel
+  on a separate BEAM VM (the `:node` tier) while keeping the persistent instance.
+  Returns the list of `{:ok, out} | {:error, _}` in input order.
+  """
+  def run_batch(wasm_bytes, inputs, opts \\ []) when is_binary(wasm_bytes) and is_list(inputs) do
+    case open(wasm_bytes, opts) do
+      {:ok, k} ->
+        try do
+          Enum.map(inputs, &call(k, &1))
+        after
+          close(k)
+        end
+
+      {:error, reason} ->
+        Enum.map(inputs, fn _ -> {:error, {:kernel_open_failed, reason}} end)
+    end
+  end
+
   @impl true
   def init({bytes, opts}) do
     with {:ok, pid} <- Wasmex.start_link(%{bytes: bytes}),

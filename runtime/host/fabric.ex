@@ -101,9 +101,11 @@ defmodule Workbooks.Fabric do
   as `map/3`; `:instance` tier today (heavier tiers = wb-rhs.10).
   """
   def map_kernel(wasm_bytes, inputs, opts \\ []) when is_binary(wasm_bytes) and is_list(inputs) do
-    # Kernels are persistent in-VM Wasmex instances — native tier :instance.
+    # Kernels are persistent in-VM Wasmex instances — native tier :instance. :node
+    # runs the persistent kernel on a separate BEAM VM (wb-1mh).
     case resolve_for(:map_kernel, opts[:tier] || :instance) do
-      {:ok, _tier} -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
+      {:ok, :instance} -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
+      {:ok, :node} -> {:ok, Workbooks.IsolationNode.run_kernel(wasm_bytes, inputs, opts)}
       {:error, _} = err -> err
     end
   end
@@ -122,8 +124,10 @@ defmodule Workbooks.Fabric do
   defp resolve_for(:map_kernel, :os_process),
     do: {:error, {:tier_mismatch, :os_process, "kernels need a persistent in-VM :instance; :os_process would respawn per frame and lose reuse"}}
 
-  defp resolve_for(:map_kernel, tier) when tier in [:node, :container],
-    do: {:error, {:tier_unsupported_for_kernel, tier, "running a persistent kernel at #{inspect(tier)} is not yet built (kernels run in-VM :instance today; commands can use :node)"}}
+  defp resolve_for(:map_kernel, :node), do: {:ok, :node}
+
+  defp resolve_for(:map_kernel, :container),
+    do: {:error, {:tier_unsupported_for_kernel, :container, "running a persistent kernel in a per-call :container is not built (kernels use :instance or :node)"}}
 
   defp resolve_for(_fn, tier), do: Workbooks.Isolation.resolve(tier)
 

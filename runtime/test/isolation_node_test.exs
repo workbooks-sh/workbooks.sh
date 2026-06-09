@@ -51,6 +51,23 @@ defmodule Workbooks.IsolationNodeTest do
 
   @tag :node
   @tag :build
+  test "tier :node runs a KERNEL on a separate BEAM VM (wb-1mh)" do
+    if IsolationNode.available?() do
+      {:ok, wasm, _} = Workbooks.Compilers.c_compile_to_kernel(Path.join(__DIR__, "fixtures/kernel/reverse.c"))
+      bytes = File.read!(wasm)
+
+      assert {:ok, results} =
+               Workbooks.Fabric.map_kernel(bytes, ["abc", "hello"], tier: :node, arena: :exports)
+
+      assert Enum.map(results, fn {:ok, o} -> o end) == ["cba", "olleh"]
+      File.rm(wasm)
+    else
+      assert true
+    end
+  end
+
+  @tag :node
+  @tag :build
   test "tier :node runs a DYNAMIC command on a separate BEAM VM" do
     if IsolationNode.available?() do
       # A dynamic (third-party-shaped) command, built locally, run on a peer node:

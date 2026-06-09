@@ -30,6 +30,17 @@ defmodule Workbooks.IsolationNode do
     GenServer.call(@name, {:run, command, input, argv}, 60_000)
   end
 
+  @doc """
+  Run a `bytes → bytes` KERNEL on the peer node (wb-1mh): the kernel is
+  instantiated + looped over `inputs` ENTIRELY on the separate BEAM VM (one erpc,
+  the hot loop stays on the peer). Returns the per-input results in order, or an
+  error if the tier is unavailable.
+  """
+  def run_kernel(wasm_bytes, inputs, opts \\ []) do
+    ensure_started()
+    GenServer.call(@name, {:run_kernel, wasm_bytes, inputs, opts}, 120_000)
+  end
+
   @doc "Is the :node tier usable here (can we bring up distribution + a peer)?"
   def available? do
     ensure_started()
@@ -71,6 +82,28 @@ defmodule Workbooks.IsolationNode do
           catch
             :error, reason -> {:error, {:peer_call_failed, reason}}
             kind, reason -> {:error, {:peer_call_failed, {kind, reason}}}
+          end
+
+        {:reply, result, state}
+
+      {:error, reason, state} ->
+        {:reply, {:error, {:node_tier_unavailable, reason}}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:run_kernel, wasm_bytes, inputs, opts}, _from, state) do
+    case ensure_peer(state) do
+      {:ok, %{node: node} = state} ->
+        # Kernel opts only (arena/entry/offsets); drop tier/vfs/etc. Run the whole
+        # open→loop→close batch on the peer in one call.
+        kopts = Keyword.take(opts, [:arena, :entry, :in_ptr_fn, :out_ptr_fn, :in_off, :out_off, :timeout])
+
+        result =
+          try do
+            :erpc.call(node, Workbooks.Kernel, :run_batch, [wasm_bytes, inputs, kopts], 110_000)
+          catch
+            kind, reason -> Enum.map(inputs, fn _ -> {:error, {:peer_kernel_failed, {kind, reason}}} end)
           end
 
         {:reply, result, state}
