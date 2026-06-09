@@ -280,6 +280,28 @@ defmodule Workbooks.Compilers do
   end
 
   @doc """
+  Source → KERNEL recipe (wb-pkh.1): compile C to a `bytes → bytes` reactor module
+  for the hot kernel path (Workbooks.Kernel), NOT a stdio CLI. Links with
+  `crt: false` + `--no-entry` (no `_start`) so the result is a reactor; the kernel
+  exports its entry + arena pointers.
+
+  KERNEL C ABI — the author writes (export_name does the exports; the recipe drops
+  `_start` and keeps `memory`):
+
+      static unsigned char IN[N], OUT[N];
+      __attribute__((export_name("in_ptr")))  int in_ptr(void)  { return (int)(long)IN; }
+      __attribute__((export_name("out_ptr"))) int out_ptr(void) { return (int)(long)OUT; }
+      __attribute__((export_name("process"))) int process(int in_len) { …; return out_len; }
+
+  Open it with `Workbooks.Kernel.open(bytes, arena: :exports)` — the host queries
+  in_ptr/out_ptr (the linker, not the author, placed the buffers) then loops
+  `process` per frame. Returns {:ok, wasm_path, logs} | {:error, _}.
+  """
+  def c_compile_to_kernel(source_path, root \\ default_root()) do
+    compile_c(source_path, [crt: false, ld_args: ["--no-entry", "--export-memory"]], root)
+  end
+
+  @doc """
   Compile C → wasm with clang in-sandbox, then RUN the emitted wasm in-sandbox. The whole
   pipeline (compile, link, execute) is zero native execution. Returns {:ok, output}.
   """

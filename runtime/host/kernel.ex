@@ -57,19 +57,38 @@ defmodule Workbooks.Kernel do
   def init({bytes, opts}) do
     with {:ok, pid} <- Wasmex.start_link(%{bytes: bytes}),
          {:ok, store} <- Wasmex.store(pid),
-         {:ok, mem} <- Wasmex.memory(pid) do
+         {:ok, mem} <- Wasmex.memory(pid),
+         {:ok, in_off, out_off} <- arena_offsets(pid, opts) do
       {:ok,
        %{
          pid: pid,
          store: store,
          mem: mem,
          entry: opts[:entry] || "process",
-         in_off: opts[:in_off] || @in_off,
-         out_off: opts[:out_off] || @out_off,
+         in_off: in_off,
+         out_off: out_off,
          timeout: opts[:timeout] || @default_timeout
        }}
     else
       {:error, reason} -> {:stop, {:kernel_open_failed, reason}}
+    end
+  end
+
+  # Where the in/out arena lives. `:fixed` (default) trusts configured offsets —
+  # right for a hand-authored module that controls its whole memory. `:exports`
+  # asks the kernel where its buffers are (in_ptr/out_ptr exports) — right for a
+  # COMPILED kernel (C/Zig), where the linker, not the author, places the static
+  # buffers, so the host can't assume a fixed address.
+  defp arena_offsets(pid, opts) do
+    case opts[:arena] || :fixed do
+      :fixed ->
+        {:ok, opts[:in_off] || @in_off, opts[:out_off] || @out_off}
+
+      :exports ->
+        with {:ok, [in_off]} <- Wasmex.call_function(pid, opts[:in_ptr_fn] || "in_ptr", []),
+             {:ok, [out_off]} <- Wasmex.call_function(pid, opts[:out_ptr_fn] || "out_ptr", []) do
+          {:ok, in_off, out_off}
+        end
     end
   end
 

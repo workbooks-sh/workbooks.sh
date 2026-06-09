@@ -84,4 +84,40 @@ defmodule Workbooks.KernelTest do
       assert {:error, {:tier_planned, :node, _}} = Fabric.map_kernel(@reverse, ["x"], tier: :node)
     end
   end
+
+  describe "source→kernel recipe (wb-pkh.1) — author a kernel from C, not a hand-minted fixture" do
+    @kernel_c Path.join(__DIR__, "fixtures/kernel/reverse.c")
+
+    @tag :build
+    test "C source compiles to a reactor kernel and runs through Kernel(:exports)" do
+      # Closes the gap: previously only a hand-authored .wat fixture worked. Now an
+      # author writes C and the compiler fabric emits a bytes→bytes kernel.
+      {:ok, wasm, _logs} = Workbooks.Compilers.c_compile_to_kernel(@kernel_c)
+      {:ok, k} = Kernel.open(File.read!(wasm), arena: :exports)
+
+      assert {:ok, "cba"} = Kernel.call(k, "abc")
+      assert {:ok, "321racecar"} = Kernel.call(k, "racecar123")
+      # Instance + queried arena reused across many calls (the hot loop).
+      for i <- 1..100 do
+        s = "f#{i}"
+        assert {:ok, rev} = Kernel.call(k, s)
+        assert rev == String.reverse(s)
+      end
+
+      Kernel.close(k)
+      File.rm(wasm)
+    end
+
+    @tag :build
+    test "a compiled kernel drives the render fabric (Fabric.map_kernel)" do
+      {:ok, wasm, _logs} = Workbooks.Compilers.c_compile_to_kernel(@kernel_c)
+      bytes = File.read!(wasm)
+      frames = for i <- 1..30, do: "frame#{i}"
+
+      assert {:ok, results} = Workbooks.Fabric.map_kernel(bytes, frames, width: 6, arena: :exports)
+      assert Enum.map(results, fn {:ok, o} -> o end) == Enum.map(frames, &String.reverse/1)
+
+      File.rm(wasm)
+    end
+  end
 end
