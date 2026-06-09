@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workbooks logo lockup — flex bar</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; background: #1d1f24;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8b909a;
+    display: flex; flex-direction: column; gap: 40px; padding: 48px clamp(16px, 5vw, 80px);
+  }
+  .label { font-size: 12px; letter-spacing: .04em; color: #6b7079; margin-bottom: 12px; }
+
+  /* ── the logo lockup ────────────────────────────────────────────
+     Glyph keeps the Figma 258:206 ratio. The bar grows to fill the
+     rest of the row and tucks under the glyph's right edge by the
+     same proportional 11px overlap as the Figma group, so the gray
+     bar reads as the logo's right stroke continuing to the edge. */
+  .wb-lockup {
+    --h: 56px;                                  /* logo height — the one knob */
+    --glyph-w: calc(var(--h) * 258 / 206);
+    --overlap: calc(var(--h) * 11 / 206);
+    --glyph-fill: #ffffff;
+    --bar-fill: #d9d9d9;
+    display: flex; align-items: stretch; width: 100%;
+  }
+  .wb-lockup__glyph {
+    flex: 0 0 auto; width: var(--glyph-w); height: var(--h); color: var(--glyph-fill);
+  }
+  .wb-lockup__glyph svg { display: block; width: 100%; height: 100%; }
+  .wb-lockup__bar {
+    flex: 1 1 0; height: var(--h); background: var(--bar-fill);
+    margin-left: calc(var(--overlap) * -1);     /* overlap → seamless blend */
+    min-width: 0;                               /* allow it to shrink, never overflow */
+  }
+
+  /* demo scaffolding only */
+  .box { background: #26282e; border: 1px solid #34373e; border-radius: 12px; padding: 28px; }
+  .w-narrow { max-width: 320px; }
+  .w-mid { max-width: 620px; }
+  .resize { resize: horizontal; overflow: auto; min-width: 240px; max-width: 100%; }
+  .hint { font-size: 11px; color: #565b63; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div>
+    <p class="label">// full container width</p>
+    <div class="box">
+      <div class="wb-lockup">
+        <span class="wb-lockup__glyph">
+          <svg viewBox="0 0 258 206" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Workbooks" role="img">
+            <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="wb-lockup__bar"></span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="label">// narrower container — bar shrinks, edge still follows</p>
+    <div class="box w-mid">
+      <div class="wb-lockup" style="--h:48px">
+        <span class="wb-lockup__glyph">
+          <svg viewBox="0 0 258 206" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Workbooks" role="img">
+            <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="wb-lockup__bar"></span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="label">// drag the handle at the bottom-right to resize ↘</p>
+    <div class="box resize w-mid">
+      <div class="wb-lockup" style="--h:40px">
+        <span class="wb-lockup__glyph">
+          <svg viewBox="0 0 258 206" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Workbooks" role="img">
+            <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="wb-lockup__bar"></span>
+      </div>
+      <p class="hint">the bar always reaches the right edge of this box</p>
+    </div>
+  </div>
+</body>
+</html>

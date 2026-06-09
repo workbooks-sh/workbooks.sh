@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workbooks — build apps you actually own</title>
+  <meta name="description" content="A free desktop app for building your own software with AI. Tools, dashboards, whole apps — made on your computer, kept private, and yours to keep.">
+  <meta property="og:title" content="Workbooks — build apps you actually own">
+  <meta property="og:description" content="A free desktop app for building your own software with AI. Runs on your computer. Private. Yours.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Spline+Sans+Mono:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="/">
+    <svg viewBox="0 0 257 206" aria-label="Workbooks" role="img"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg>
+    <span>Workbooks</span>
+  </a>
+  <nav>
+    <a href="#build">build</a>
+    <a href="#own">own</a>
+    <a href="#elements">elements</a>
+    <a href="/docs">docs</a>
+    <a class="btn btn-ink sm" href="#download">Download free</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <canvas class="ascii hero-bg" data-mode="light" data-colors="#00ff44,#0080ff,#ff0066" data-speed="0.8" aria-hidden="true"></canvas>
+  <div class="hero-copy">
+    <p class="eyebrow">free desktop app <i>/</i> mac · windows · linux</p>
+    <h1>Build apps you <span class="accent">actually own.</span></h1>
+    <p class="lede">Describe what you want. AI builds it, right on your computer, while you watch. Real, private, and yours to keep. No stack to wire up, no bill that grows.</p>
+    <div class="cta">
+      <a class="btn btn-ink" href="#download">Download free</a>
+      <a class="btn btn-text" href="#build">See what you build →</a>
+    </div>
+    <p class="micro">this page is itself a workbook</p>
+  </div>
+</section>
+
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-row">
+    <span>build it yourself</span><b>·</b><span>own it</span><b>·</b><span>runs local</span><b>·</b><span>private by default</span><b>·</b><span>no cloud bill</span><b>·</b><span>open source</span><b>·</b>
+    <span>build it yourself</span><b>·</b><span>own it</span><b>·</b><span>runs local</span><b>·</b><span>private by default</span><b>·</b><span>no cloud bill</span><b>·</b><span>open source</span><b>·</b>
+  </div>
+</div>
+
+<section class="band" id="build" aria-label="What you build">
+  <div class="cell green">
+    <span class="num">01</span>
+    <div class="cell-txt"><h3>Tools for your team</h3><p>Dashboards and trackers everyone shares, all speaking the same data.</p></div>
+    <svg class="watermark" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg>
+  </div>
+  <div class="cell blue">
+    <span class="num">02</span>
+    <div class="cell-txt"><h3>Apps for your clients</h3><p>A private workspace for each client, even the ones who don't code.</p></div>
+    <svg class="watermark" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg>
+  </div>
+  <div class="cell rose">
+    <span class="num">03</span>
+    <div class="cell-txt"><h3>Things just for you</h3><p>That little app you always wished existed. Build it today, keep it for years.</p></div>
+    <svg class="watermark" viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z"/></svg>
+  </div>
+</section>
+
+<section class="statement" id="own">
+  <h2>Your apps. Your <span class="b">computer.</span> Your <span class="r">rules.</span></h2>
+  <p class="sub">Everything you make runs on your own machine. No bill that balloons, no service that can vanish, no lock-in. Keep it, share it, even sell it. Open source, Apache 2.0.</p>
+</section>
+
+<section class="showcase">
+  <div class="showcase-in">
+    <div>
+      <p class="eyebrow">you + AI</p>
+      <h2>Describe it.<br>Watch it get built.</h2>
+      <p class="sub">Tell Workbooks what you want in plain words. It writes the app, runs it, and the result is a real, working thing you can use right now.</p>
+    </div>
+    <div class="appframe">
+      <div class="af-bar"><i></i><i></i><i></i><span class="t">invoices.wb</span><span class="live">live</span></div>
+      <div class="af-body">
+        <div class="af-head">
+          <div><p class="k">Outstanding</p><p class="total" id="total">$8,400</p></div>
+          <button class="btn btn-soft sm" id="add" type="button">+ Add invoice</button>
+        </div>
+        <ul class="af-list" id="list">
+          <li data-amt="3200" data-paid="false"><span class="who">Maple Studio</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></li>
+          <li data-amt="2000" data-paid="false"><span class="who">Northwind Co.</span><span class="amt">$2,000</span><button class="pay" type="button">Mark paid</button></li>
+          <li data-amt="3200" data-paid="false"><span class="who">Harbor &amp; Lane</span><span class="amt">$3,200</span><button class="pay" type="button">Mark paid</button></li>
+        </ul>
+        <p class="af-foot">A real app, built from one sentence. Try it — mark one paid.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- design-elements kit: experimental pieces that accompany the LP -->
+<section class="kit" id="elements">
+  <p class="eyebrow center">/// elements</p>
+  <div class="kit-grid">
+    <figure class="tile light">
+      <canvas class="ascii" data-mode="light" data-dense data-colors="#00ff44,#0080ff" data-speed="0.7"></canvas>
+      <figcaption>ascii · on white</figcaption>
+    </figure>
+    <figure class="tile light">
+      <canvas class="ascii" data-mode="light" data-dense data-colors="#ff0066,#0080ff,#00ff44" data-speed="1.4"></canvas>
+      <figcaption>ascii · plasma</figcaption>
+    </figure>
+    <figure class="tile swatches">
+      <div class="sw green">#00ff44</div>
+      <div class="sw blue">#0080ff</div>
+      <div class="sw rose">#ff0066</div>
+      <div class="sw ink">#202020</div>
+      <figcaption>palette</figcaption>
+    </figure>
+    <figure class="tile buttons">
+      <a class="btn btn-ink" href="#download">Download free</a>
+      <a class="btn btn-green" href="#build">Solid color</a>
+      <a class="btn btn-text" href="#own">Text link →</a>
+      <figcaption>buttons · no strokes</figcaption>
+    </figure>
+    <figure class="tile logo-tile green">
+      <svg viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="#202020"/></svg>
+      <figcaption>logo · on color</figcaption>
+    </figure>
+    <figure class="tile logo-tile ink">
+      <svg viewBox="0 0 257 206" aria-hidden="true"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="#00ff44"/></svg>
+      <figcaption>logo · on ink</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="download" id="download">
+  <canvas class="ascii dl-ascii" data-colors="#202020,#0c4d1e" data-bg="#00ff44" data-speed="0.6" aria-hidden="true"></canvas>
+  <div class="download-in">
+    <h2>Download Workbooks</h2>
+    <p>Free and open source, for Mac, Windows, and Linux. Bring your own AI key and build as much as you want.</p>
+    <div class="dl-row">
+      <a class="btn btn-ink" href="https://github.com/workbooks-sh/workbooks.sh/releases">Download free</a>
+      <a class="btn btn-text dark" href="/docs">Browse the docs →</a>
+    </div>
+    <p class="term">prefer the terminal? <code>curl -fsSL workbooks.sh/install.sh | sh</code></p>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-in">
+    <a class="brand" href="/"><svg viewBox="0 0 257 206" aria-label="Workbooks" role="img"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg><span>Workbooks</span></a>
+    <span class="foot-note">© 2026 · free &amp; open source · made as a workbook</span>
+    <div class="foot-links">
+      <a href="#download">download</a>
+      <a href="/docs">docs</a>
+      <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>
