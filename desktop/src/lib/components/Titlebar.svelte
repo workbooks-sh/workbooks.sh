@@ -1,21 +1,21 @@
 <script lang="ts">
   /**
-   * Titlebar — the single, always-36px top chrome.
+   * Titlebar — the single, always-36px top chrome, styled as a
+   * Chrome-browser tab strip.
    *
    * Layout (left → right):
    *   [78px traffic-light padding]
-   *   [Search] [Bookmarks] [Terminal]
-   *   [App pill] [doc tab] [doc tab] ...
+   *   [⌄ menu]  — overflow/app menu: Search, Bookmarks, Terminal
+   *   [tab][tab][tab]…  — stretched Chrome-style document tabs
+   *   [+]  — new tab → the Create (home) surface
    *   [spacer]
+   *   [⬤ engine]  — compact engine status icon
+   *   [Agent]
    *
-   * The package file/grid view is reachable per-package from the rail
-   * (selecting a package opens the panel via `chrome.openFiles`); the
-   * search button opens the command palette (⌘K) for cross-package
-   * file lookup (wb-i38o.36).
-   *
-   * The "App pill" is a singular tab that represents the main app
-   * sections (chat / kanban / settings); each remaining tab is a
-   * browser-style document tab from the tabs store.
+   * The Search / Bookmarks / Terminal triggers used to be always-visible
+   * bar buttons; they now live inside the ⌄ menu (their drawers,
+   * features, and keyboard shortcuts are unchanged). The ⌄ menu also
+   * anchors the BookmarksPopover (mounted in +page.svelte).
    *
    * Tauri drag: the bar surface is `data-tauri-drag-region` so the user
    * can drag from any non-interactive part. Buttons opt out with
@@ -24,11 +24,16 @@
    */
   import {
     X,
-    AppWindow,
+    Plus,
+    ChevronDown,
     Search,
     Bookmark,
     MessageCircle,
     Terminal as TerminalIcon,
+    FileText,
+    FileCode,
+    Hash,
+    Box,
   } from "@lucide/svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
@@ -37,40 +42,60 @@
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { wizard } from "$lib/setup/wizard.svelte";
+  import ContextMenu from "$lib/components/ContextMenu.svelte";
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
   const engine = $derived.by(() => {
     const s = sidecar.status.state;
-    if (s === "ready") return { label: "Engine", cls: "ok", title: "Engine connected — click to manage" };
+    if (s === "ready") return { cls: "ok", title: "Engine connected — click to manage" };
     if (s === "starting" || s === "restarting")
-      return { label: "Engine…", cls: "pending", title: "Engine starting" };
-    return { label: "No engine", cls: "off", title: "Engine not connected — click to set up" };
+      return { cls: "pending", title: "Engine starting — click to manage" };
+    return { cls: "off", title: "Engine not connected — click to set up" };
   });
 
-  function kindGlyph(kind: Tab["kind"]): string {
+  function kindIcon(kind: Tab["kind"]) {
     switch (kind) {
-      case "workbook": return "◆";
-      case "org": return "◉";
-      case "code": return "{ }";
+      case "workbook": return Box;
+      case "org": return Hash;
+      case "code": return FileCode;
       case "text":
-      default: return "—";
+      default: return FileText;
     }
   }
 
-  const searchOpen = $derived(chrome.leftPanel === "search");
+  // ── ⌄ overflow / app menu ────────────────────────────────────────
+  let menuOpen = $state(false);
+  let menuBtnEl: HTMLButtonElement | undefined = $state();
+  let menuX = $state(0);
+  let menuY = $state(0);
 
-  // Bookmark popover state owned here; the popover itself is mounted
-  // in +page.svelte so it positions relative to the bookmark button.
-  let bookmarkBtnEl: HTMLButtonElement | undefined = $state();
-  function toggleBookmarks() {
-    chrome.bookmarksAnchor = bookmarkBtnEl ?? null;
-    chrome.bookmarksOpen = !chrome.bookmarksOpen;
+  function toggleMenu() {
+    if (menuOpen) {
+      menuOpen = false;
+      return;
+    }
+    const r = menuBtnEl?.getBoundingClientRect();
+    menuX = r ? r.left : 8;
+    menuY = r ? r.bottom + 4 : 40;
+    menuOpen = true;
   }
 
-  function focusApp() {
-    chrome.mode = "app";
+  function menuSearch() {
+    menuOpen = false;
+    chrome.openSearch();
+  }
+  function menuBookmarks() {
+    menuOpen = false;
+    // Anchor the bookmarks popover to the menu button.
+    chrome.bookmarksAnchor = menuBtnEl ?? null;
+    chrome.bookmarksOpen = true;
+  }
+  function menuTerminal() {
+    menuOpen = false;
+    terminalDrawer.show();
   }
 
+  // ── tabs ─────────────────────────────────────────────────────────
   async function focusDoc(id: string) {
     chrome.mode = "doc";
     await tabsStore.focus(id);
@@ -81,62 +106,35 @@
     await tabsStore.close(id);
     if (tabsStore.tabs.length === 0) chrome.mode = "app";
   }
+
+  // "+" → the Create (home) surface, which is the blank create/home
+  // view. The rail's `active` is owned by +page.svelte; route to it via
+  // the chrome navigation channel and drop out of doc mode.
+  function newTab() {
+    chrome.mode = "app";
+    chrome.navigateTo("home");
+  }
 </script>
 
 <div class="titlebar" data-tauri-drag-region role="presentation">
-  <div class="left-tools">
-    <button
-      type="button"
-      class="icon-btn"
-      data-tauri-drag-region="false"
-      title="Search (⌘K)"
-      aria-label="Search (⌘K)"
-      aria-pressed={searchOpen}
-      onclick={() => chrome.toggleSearch()}
-    >
-      <Search size={14} strokeWidth={1.8} />
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      data-tauri-drag-region="false"
-      title="Bookmarks"
-      aria-label="Bookmarks"
-      aria-pressed={chrome.bookmarksOpen}
-      bind:this={bookmarkBtnEl}
-      onclick={toggleBookmarks}
-    >
-      <Bookmark size={14} strokeWidth={1.8} />
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      data-tauri-drag-region="false"
-      title="Terminal (⌃`)"
-      aria-label="Toggle terminal"
-      aria-pressed={terminalDrawer.open}
-      onclick={() => terminalDrawer.toggle()}
-    >
-      <TerminalIcon size={14} strokeWidth={1.8} />
-    </button>
-  </div>
-
   <button
     type="button"
-    class="pill app-pill"
-    class:active={chrome.mode === "app"}
+    class="menu-btn"
     data-tauri-drag-region="false"
-    title="App ({chrome.section || "main"})"
-    aria-pressed={chrome.mode === "app"}
-    onclick={focusApp}
+    title="Menu"
+    aria-label="Menu"
+    aria-haspopup="menu"
+    aria-expanded={menuOpen}
+    bind:this={menuBtnEl}
+    onclick={toggleMenu}
   >
-    <AppWindow size={12} strokeWidth={2} />
-    <span class="pill-label">{chrome.section || "App"}</span>
+    <ChevronDown size={16} strokeWidth={2} />
   </button>
 
   <div class="tabs" role="tablist">
     {#each tabsStore.tabs as tab (tab.id)}
       {@const active = chrome.mode === "doc" && tabsStore.activeId === tab.id}
+      {@const Icon = kindIcon(tab.kind)}
       <div
         class="tab"
         class:active
@@ -150,7 +148,7 @@
           data-tauri-drag-region="false"
           onclick={() => focusDoc(tab.id)}
         >
-          <span class="kind kind-{tab.kind}">{kindGlyph(tab.kind)}</span>
+          <span class="favicon kind-{tab.kind}"><Icon size={13} strokeWidth={1.8} /></span>
           <span class="title">{tab.title}</span>
           {#if tab.dirty}<span class="dot" aria-label="modified"></span>{/if}
         </button>
@@ -161,10 +159,21 @@
           aria-label="Close tab"
           onclick={(e) => closeDoc(tab.id, e)}
         >
-          <X size={11} strokeWidth={2} />
+          <X size={12} strokeWidth={2} />
         </button>
       </div>
     {/each}
+
+    <button
+      type="button"
+      class="new-tab"
+      data-tauri-drag-region="false"
+      title="New tab"
+      aria-label="New tab"
+      onclick={newTab}
+    >
+      <Plus size={15} strokeWidth={2} />
+    </button>
   </div>
 
   <span class="spacer" data-tauri-drag-region></span>
@@ -178,7 +187,6 @@
     onclick={() => wizard.open()}
   >
     <span class="engine-dot"></span>
-    {engine.label}
   </button>
 
   <button
@@ -204,6 +212,20 @@
   </button>
 </div>
 
+<ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
+  <button class="ctx-item" onclick={menuSearch}>
+    <Search size={13} strokeWidth={1.8} /> Search…
+    <span class="ctx-shortcut">⌘K</span>
+  </button>
+  <button class="ctx-item" onclick={menuBookmarks}>
+    <Bookmark size={13} strokeWidth={1.8} /> Bookmarks
+  </button>
+  <button class="ctx-item" onclick={menuTerminal}>
+    <TerminalIcon size={13} strokeWidth={1.8} /> Terminal
+    <span class="ctx-shortcut">⌃`</span>
+  </button>
+</ContextMenu>
+
 <style>
   .titlebar {
     position: sticky;
@@ -221,19 +243,14 @@
     -webkit-user-select: none;
   }
 
-  .left-tools {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    flex-shrink: 0;
-  }
-
-  .icon-btn {
+  /* ⌄ overflow / app menu trigger */
+  .menu-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 24px;
-    width: 24px;
+    align-self: center;
+    height: 26px;
+    width: 28px;
     border-radius: 6px;
     background: transparent;
     border: 0;
@@ -242,95 +259,45 @@
     flex-shrink: 0;
     transition: background 0.1s, color 0.1s;
   }
-  .icon-btn:hover {
-    background: var(--color-page);
-    color: var(--color-fg);
-  }
-  .icon-btn[aria-pressed="true"] {
+  .menu-btn:hover,
+  .menu-btn[aria-expanded="true"] {
     background: var(--color-page);
     color: var(--color-fg);
   }
 
-  .app-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    align-self: center;
-    height: 24px;
-    padding: 0 0.65rem;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-page);
-    color: var(--color-fg-muted);
-    font-size: 12px;
-    font-family: inherit;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  .app-pill:hover { color: var(--color-fg); }
-  .app-pill.active {
-    background: var(--color-surface);
-    color: var(--color-fg);
-    border-color: var(--color-border-strong);
-  }
-  .pill-label {
-    font-weight: 500;
-    letter-spacing: -0.005em;
-  }
-
-  .engine {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    align-self: center;
-    height: 22px;
-    padding: 0 0.5rem;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: transparent;
-    font-size: 11px;
-    font-weight: 500;
-    font-family: inherit;
+  .ctx-shortcut {
+    margin-left: auto;
     color: var(--color-fg-subtle);
-    flex-shrink: 0;
-    cursor: pointer;
-    user-select: none;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
   }
-  .engine:hover { border-color: var(--color-border); background: var(--color-page); }
-  .engine-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-fg-subtle);
-  }
-  .engine-ok { color: var(--color-fg-muted); }
-  .engine-ok .engine-dot { background: var(--color-ok); }
-  .engine-pending .engine-dot { background: var(--color-warn); }
-  .engine-off .engine-dot { background: var(--color-fg-subtle); }
 
+  /* ── tab strip ────────────────────────────────────────────────── */
   .tabs {
     display: flex;
     flex-direction: row;
     align-items: flex-end;
     gap: 2px;
+    flex: 1 1 auto;
     min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
+    overflow: hidden;
   }
   .tab {
     position: relative;
     display: flex;
     align-items: center;
     height: 28px;
-    margin-bottom: 0;
+    align-self: flex-end;
     border: 1px solid var(--color-border);
     border-bottom: none;
-    border-radius: 7px 7px 0 0;
+    border-radius: 8px 8px 0 0;
     background: transparent;
     color: var(--color-fg-muted);
-    min-width: 0;
-    max-width: 200px;
+    /* Chrome-style: every tab flexes to share the strip width, down to a
+     * floor; titles ellipsize as they get squeezed. */
+    flex: 1 1 0;
+    min-width: 44px;
+    max-width: 240px;
     transition: background 0.1s, color 0.1s;
   }
   .tab:hover { background: var(--color-page); color: var(--color-fg); }
@@ -347,7 +314,7 @@
     gap: 0.4rem;
     background: transparent;
     border: 0;
-    padding: 0 0.45rem 0 0.6rem;
+    padding: 0 0.3rem 0 0.55rem;
     cursor: pointer;
     color: inherit;
     font-size: 12px;
@@ -363,20 +330,18 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+    flex: 1 1 auto;
   }
-  .kind {
+  .favicon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 12px;
-    font-size: 10px;
-    opacity: 0.55;
-    font-family: ui-monospace, SFMono-Regular, monospace;
     flex-shrink: 0;
+    opacity: 0.7;
   }
-  .kind-workbook { color: #5b8cff; opacity: 0.9; }
-  .kind-org { color: #10b981; opacity: 0.9; }
-  .kind-code { color: #a855f7; opacity: 0.9; }
+  .kind-workbook { color: #5b8cff; opacity: 0.95; }
+  .kind-org { color: #10b981; opacity: 0.95; }
+  .kind-code { color: #a855f7; opacity: 0.95; }
   .dot {
     width: 6px;
     height: 6px;
@@ -393,9 +358,10 @@
     border: 0;
     color: var(--color-fg-muted);
     cursor: pointer;
-    padding: 0 0.45rem;
+    padding: 0 0.4rem;
     height: 100%;
-    border-radius: 0 7px 0 0;
+    border-radius: 0 8px 0 0;
+    flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.1s, background 0.1s, color 0.1s;
   }
@@ -407,11 +373,65 @@
     color: var(--color-fg);
   }
 
-  .spacer { flex: 1 1 auto; }
+  /* "+" new-tab button, sits at the right end of the strip */
+  .new-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    height: 26px;
+    width: 28px;
+    border-radius: 6px;
+    background: transparent;
+    border: 0;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-left: 2px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .new-tab:hover { background: var(--color-page); color: var(--color-fg); }
 
-  /* Agent button — pinned to the right edge of the titlebar, mirrors
-   * the App pill weight on the left so the bar reads as
-   * "[tools] [pill]      [agent]". */
+  .spacer { flex: 0 0 0.25rem; }
+
+  /* Compact engine status icon — a colored dot reflecting engine state.
+   * Click opens the engine setup/manage wizard. */
+  .engine {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    height: 24px;
+    width: 24px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    flex-shrink: 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .engine:hover { border-color: var(--color-border); background: var(--color-page); }
+  .engine-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-fg-subtle);
+  }
+  .engine-ok .engine-dot { background: var(--color-ok); }
+  .engine-pending .engine-dot {
+    background: var(--color-warn);
+    animation: engine-pulse 1.4s ease-in-out infinite;
+  }
+  .engine-off .engine-dot { background: var(--color-fg-subtle); }
+  @keyframes engine-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .engine-pending .engine-dot { animation: none; }
+  }
+
+  /* Agent button — pinned to the right edge of the titlebar. */
   .agent-btn {
     display: inline-flex;
     align-items: center;
