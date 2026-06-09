@@ -21,6 +21,13 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # Serialize the matrix: every platform's tauri-action upload does a
+      # read-modify-write on the SAME `latest.json` asset of the one draft
+      # release. Run concurrently, two jobs race the delete-then-recreate and
+      # the loser gets `404 Not Found - update-a-release-asset` (and the merged
+      # manifest loses platforms). One-at-a-time → each job appends to the prior
+      # job's latest.json, so the final manifest carries all four targets.
+      max-parallel: 1
       matrix:
         include:
           - platform: macos-latest # Apple Silicon
