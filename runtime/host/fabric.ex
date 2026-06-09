@@ -77,4 +77,59 @@ defmodule Workbooks.Fabric do
 
   defp normalize({stdin, argv}) when is_binary(stdin) and is_list(argv), do: {stdin, argv}
   defp normalize(stdin) when is_binary(stdin), do: {stdin, []}
+
+  @doc """
+  Map a `bytes → bytes` KERNEL (wb-rhs.5) over `inputs` — the render-fabric shape.
+  Opens a POOL of `:width` persistent kernel instances (Workbooks.Kernel,
+  instantiate-once), partitions `inputs` into contiguous slices, and runs each
+  slice through its own kernel concurrently. So each frame pays one function call
+  + arena copy (not a fresh instance + stdio), and the slices run in parallel
+  across BEAM schedulers — persistent WITHIN a worker, distributed ACROSS workers.
+  This is what a CPU renderer is: N frame-kernels, frames fanned across them.
+
+  `inputs` is a list of binaries (one frame each). Returns `{:ok, [result]}` in
+  order, each `{:ok, out_bytes} | {:error, reason}`. Same `(width, tier)` surface
+  as `map/3`; `:instance` tier today (heavier tiers = wb-rhs.10).
+  """
+  def map_kernel(wasm_bytes, inputs, opts \\ []) when is_binary(wasm_bytes) and is_list(inputs) do
+    case opts[:tier] || :instance do
+      :instance -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
+      other -> {:error, {:unsupported_tier, other}}
+    end
+  end
+
+  defp map_kernel_instances(_wasm, [], _opts), do: []
+
+  defp map_kernel_instances(wasm, inputs, opts) do
+    width = min(opts[:width] || @default_width, length(inputs))
+    per = div(length(inputs) + width - 1, width)
+    timeout = opts[:timeout] || @default_timeout
+
+    inputs
+    |> Enum.chunk_every(per)
+    |> Task.async_stream(
+      fn chunk ->
+        # One persistent kernel per slice — opened once, called per frame, closed.
+        case Workbooks.Kernel.open(wasm, opts) do
+          {:ok, k} ->
+            try do
+              Enum.map(chunk, fn frame -> Workbooks.Kernel.call(k, frame) end)
+            after
+              Workbooks.Kernel.close(k)
+            end
+
+          {:error, reason} ->
+            Enum.map(chunk, fn _ -> {:error, {:kernel_open_failed, reason}} end)
+        end
+      end,
+      max_concurrency: width,
+      timeout: timeout,
+      on_timeout: :kill_task,
+      ordered: true
+    )
+    |> Enum.flat_map(fn
+      {:ok, results} -> results
+      {:exit, reason} -> [{:error, {:worker_exit, reason}}]
+    end)
+  end
 end
