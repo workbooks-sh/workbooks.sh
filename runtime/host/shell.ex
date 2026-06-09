@@ -26,6 +26,12 @@ defmodule Workbooks.Shell do
       stage, {:ok, input} -> exec(stage, input)
       _stage, err -> err
     end)
+    # Inter-stage data is byte-exact (exec passes trim: false, so `wc -l` et al.
+    # see trailing newlines); the final result is trimmed for ergonomic output.
+    |> case do
+      {:ok, out} -> {:ok, String.trim(out)}
+      other -> other
+    end
   end
 
   # Split on top-level `|` only — a `|` inside quotes (e.g. jq's `.items | length`)
@@ -44,10 +50,15 @@ defmodule Workbooks.Shell do
     Enum.reverse([Enum.reverse(cur) | parts]) |> Enum.map(&List.to_string/1)
   end
 
+  # Coreutils provided by the multicall `wbox` wasm — dispatched as `wbox <applet>`
+  # so the shell has real echo/cat/seq/head/wc without N separate binaries (wb-9ja).
+  @wbox ~w(cat echo seq head wc true false)
+
   defp exec(stage, input) do
     case tokenize(stage) do
       [] -> {:ok, input}
-      [cmd | argv] -> CommandRegistry.run(cmd, input, argv)
+      [cmd | argv] when cmd in @wbox -> CommandRegistry.run("wbox", input, [cmd | argv], [], trim: false)
+      [cmd | argv] -> CommandRegistry.run(cmd, input, argv, [], trim: false)
     end
   end
 

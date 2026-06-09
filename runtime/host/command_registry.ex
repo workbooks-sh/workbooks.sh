@@ -28,6 +28,13 @@ defmodule Workbooks.CommandRegistry do
   #             default for auto-wrapped upstream CLIs (e.g. sd, ripgrep).
   #   :stdin1 — args become the FIRST stdin line (our legacy jq/grep protocol,
   #             where the binary reads its filter/pattern from line 1 of stdin).
+  # wbox: a multicall coreutils (echo/cat/seq/head/wc/…) compiled to wasm on first
+  # use — the in-WASM shell's command vocabulary (wb-9ja). Source in
+  # compilers/wbox/wbox.c, embedded here so it ships with the release.
+  @wbox_c_path Path.expand("../compilers/wbox/wbox.c", __DIR__)
+  @external_resource @wbox_c_path
+  @wbox_c File.read!(@wbox_c_path)
+
   @builtins %{
     # A proof command: uppercases stdin. Source-built (Javy) on first use.
     # Chunked read (64 KiB) accumulated until EOF — handles stdin of any size
@@ -42,7 +49,10 @@ defmodule Workbooks.CommandRegistry do
     # Real grep: a regex-crate wrapper (commands/grep/). Stdin protocol: first
     # line = pattern, rest = text; matching lines printed. (ripgrep's recursive
     # file walk doesn't fit a stdin command; line-grep is the command form.)
-    "grep" => {:wasm, "build/commands/grep.wasm", :stdin1}
+    "grep" => {:wasm, "build/commands/grep.wasm", :stdin1},
+    # Multicall coreutils for the in-WASM shell — Workbooks.Shell dispatches
+    # echo/cat/seq/head/wc/true/false here as `wbox <applet> …` (wb-9ja).
+    "wbox" => {:src, "c", @wbox_c, :argv}
   }
 
   # Dynamically registered commands live in :persistent_term (rare writes, fast
@@ -612,7 +622,7 @@ defmodule Workbooks.CommandRegistry do
 
         case Workbooks.PackageManager.run(path, stdin, args, dirs, ropts) do
           {:error, _} = err -> err
-          out -> {:ok, String.trim(out)}
+          out -> {:ok, maybe_trim(out, ropts)}
         end
 
       {:error, _} = err ->
@@ -640,13 +650,18 @@ defmodule Workbooks.CommandRegistry do
 
         case Workbooks.PackageManager.run(wasm, stdin, args, dirs, ropts) do
           {:error, _} = err -> err
-          out -> {:ok, String.trim(out)}
+          out -> {:ok, maybe_trim(out, ropts)}
         end
 
       {_, _, err} ->
         {:error, err}
     end
   end
+
+  # Command output is trimmed for standalone/human use by default, but pipelines
+  # need byte-exact bytes (a stripped trailing "\n" makes `wc -l` undercount).
+  # Workbooks.Shell passes trim: false for inter-stage piping. (wb-9ja)
+  defp maybe_trim(out, ropts), do: if(Keyword.get(ropts, :trim, true), do: String.trim(out), else: out)
 
   # Re-verify a content-addressed artifact's bytes against the sha256 in its
   # filename. Built-in prebuilt artifacts (jq.wasm/grep.wasm) and source-built
