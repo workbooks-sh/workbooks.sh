@@ -24,6 +24,7 @@ use crate::io::Io;
 use crate::util::{self, org_keywords};
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
+use rand_core::{OsRng, RngCore};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -356,6 +357,11 @@ fn apply(io: &dyn Io) -> Result<String> {
     match cfg.target() {
         "local" => apply_local(io, &cfg),
         place => {
+            // Cloud deploy: ensure a persistent bearer token exists.
+            // Generate ONCE and persist in secrets.env — never rotate on subsequent
+            // applies (rotation would 401 all live clients).
+            let bearer_notice = ensure_cloud_bearer(io)?;
+
             let out = recipe_action(io, &cfg, place, "up")?;
             // deployment.org: `#+DEPLOY_TOOLKITS: id:dir id:dir …` — the kit
             // ships the engine AND its toolkits. Write a toolkit, apply, done.
@@ -373,9 +379,38 @@ fn apply(io: &dyn Io) -> Result<String> {
                 }
                 std::env::remove_var("WB_ENGINE_URL");
             }
-            Ok(out + &extra)
+            Ok(out + &extra + &bearer_notice)
         }
     }
+}
+
+/// Ensure WB_PUBLIC_BEARER is staged in secrets.env for cloud deploys.
+/// Generates a strong random token ONCE; subsequent calls reuse the persisted
+/// value (idempotent — never rotates).
+/// Returns a human-readable notice only when a new token was just generated.
+fn ensure_cloud_bearer(io: &dyn Io) -> Result<String> {
+    let mut map = secrets_load(io);
+    if map.contains_key("WB_PUBLIC_BEARER") {
+        return Ok(String::new());
+    }
+    // Not yet set — generate once and persist.
+    let token = generate_bearer();
+    map.insert("WB_PUBLIC_BEARER".into(), token.clone());
+    secrets_save(io, &map)?;
+    Ok(format!(
+        "\n\ncontrol-plane locked — bearer token generated and persisted in secrets.env.\
+         \nTo talk to your engine locally, set:\
+         \n  export WB_ENGINE_TOKEN={token}\
+         \n(stored in {} — will NOT be regenerated on future applies)",
+        secrets_path().display()
+    ))
+}
+
+/// Generate a 32-byte (256-bit) random token, hex-encoded.
+fn generate_bearer() -> String {
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn apply_local(io: &dyn Io, cfg: &Config) -> Result<String> {
@@ -528,4 +563,10 @@ const TEMPLATE_FLY: &str = "\
 # DEPLOY_TARGET names a provider RECIPE (providers/<place>/bootstrap.sh) — fly is
 # the bundled one; add your own place the same way. DEPLOY_IMAGE defaults to
 # ghcr.io/workbooks-sh/runtime:latest (env WB_IMAGE overrides).
+#
+# SECURITY: on first `wb deploy apply` the kit generates a strong random bearer
+# token, persists it as WB_PUBLIC_BEARER in secrets.env, and delivers it to the
+# engine. The control plane rejects any request without that token. To call your
+# engine from the CLI or scripts, set: export WB_ENGINE_TOKEN=<token>
+# (shown once after first apply; also readable from secrets.env).
 ";

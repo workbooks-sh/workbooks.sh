@@ -25,12 +25,16 @@ wb_recipe_init() {
 # forwarded from the deployer's env. `WB_SECRET_KEYS` (space-separated names,
 # from deployment.org `#+DEPLOY_SECRETS:` via the kit) extends the forwarded set
 # — the kit abstracts secrets; providers just receive the pairs. NOTE: generated
-# secrets (WB_SIGNING_KEY / WB_PUBLIC_BEARER) are deliberately NOT minted here —
-# rotating them 401s live clients and breaks the tenant DID.
+# secrets (WB_SIGNING_KEY / WB_PUBLIC_BEARER) are NOT generated here — they must
+# be PERSISTED by the operator (via `wb deploy secrets set`), not rotated on each
+# apply (rotation 401s live clients and breaks the tenant DID). The deploy-kit
+# auto-generates WB_PUBLIC_BEARER ONCE on first cloud apply and persists it in
+# secrets.env; subsequent applies reuse the stored value forwarded here.
 wb_base_env() {
   WB_ENGINE_ENV=("WB_WEB=1" "PORT=${WB_PORT}" "WB_DATA=${WB_DATA}" "WB_EMBED=${WB_EMBED:-local}")
   local k
-  for k in WB_TENANCY_MODE WB_PROFILE_DIR WB_REGION \
+  for k in WB_TENANCY_MODE WB_PROFILE_DIR WB_REGION WB_TENANT \
+           WB_PUBLIC_BEARER \
            WB_STORAGE WB_S3_ENDPOINT WB_S3_BUCKET WB_S3_REGION WB_S3_KEY WB_S3_SECRET \
            WB_DATABASE_URL ${WB_SECRET_KEYS:-}; do
     [ -n "${!k:-}" ] && WB_ENGINE_ENV+=("$k=${!k}")

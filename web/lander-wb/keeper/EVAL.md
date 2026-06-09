@@ -71,4 +71,4 @@ WB_TENANCY_MODE != dev. Severity: HIGH for any real deployment.
 - #1 PATH-shadow warning + #2 loud postinstall failure: fixed in cli/npm (install.js, bin/wb.js).
 - #3 CRITICAL private-repo 404: RESOLVED — founder made repo public; `npm i -g @work.books/cli` now installs a working wb unauthenticated. Verified.
 - #4 toolkit eval cwd: fixed in toolkits.ex — pre/task blocks run with cwd = toolkit dir + WB_TOOLKIT_DIR exported. verify 7/7.
-- #5 open control plane: in progress (deploy-kit secure-by-default bearer).
+- #5 open control plane: RESOLVED — auth.ex 3-rung ladder (WB_PUBLIC_BEARER locks the plane, 401 no-fallback when set); deploy-kit auto-generates+persists the bearer on cloud apply (ensure_cloud_bearer, not rotated); local stays open. 7/7 auth tests. SECURE BY DEFAULT for every wb deploy cloud user, not just our box.
