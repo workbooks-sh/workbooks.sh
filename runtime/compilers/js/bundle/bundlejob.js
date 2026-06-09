@@ -63,15 +63,46 @@ function resolveFile(files, p) {
   return null;
 }
 
-function resolve(files, from, req) {
-  if (req[0] === ".") return resolveFile(files, joinPath(DIR(from), req));
-  // bare: flat node_modules. "ms" -> node_modules/ms ; "ms/foo" -> node_modules/ms/foo ;
+// Node core builtins we shim in-sandbox (wb-spy.T2.5) — injected by Elixir as __shims__/<name>.js.
+var SHIM = { assert: 1, buffer: 1, crypto: 1, events: 1, path: 1, process: 1, querystring: 1, string_decoder: 1, timers: 1, url: 1, util: 1 };
+// Builtins that need native OS/threads/network — not available in this lane → build-time reject.
+var NATIVE = {
+  fs: "no path-based file IO in the QuickJS lane (see wb-spy.T2.2)",
+  net: "use the component lane / browse-fetch (wb-spy.T2.3)",
+  http: "use the component lane / browse-fetch (wb-spy.T2.3)",
+  https: "use the component lane / browse-fetch (wb-spy.T2.3)",
+  http2: "no native network", tls: "no native TLS sockets", dgram: "no UDP", dns: "no resolver",
+  child_process: "no subprocesses in-sandbox", worker_threads: "no threads", cluster: "no clustering",
+  vm: "no nested VM", v8: "no V8 internals", inspector: "no inspector", repl: "no repl",
+  readline: "no TTY", os: "not shimmed yet", stream: "not shimmed yet", zlib: "not shimmed yet"
+};
+
+function resolveBare(files, req) {
+  // flat node_modules. "ms" -> node_modules/ms ; "ms/foo" -> node_modules/ms/foo ;
   // "@scope/pkg/sub" keeps the scope+name as the package root.
   var seg = req.split("/");
   var pkg = req[0] === "@" ? seg.slice(0, 2).join("/") : seg[0];
   var sub = req.slice(pkg.length).replace(/^\//, "");
   var root = "node_modules/" + pkg;
   return resolveFile(files, sub ? joinPath(root, sub) : root);
+}
+
+function resolve(files, from, req) {
+  if (req[0] === ".") return resolveFile(files, joinPath(DIR(from), req));
+
+  var forced = req.indexOf("node:") === 0;          // node:foo always means the builtin
+  var bare = forced ? req.slice(5) : req;
+  var top = bare.split("/")[0];
+
+  if (SHIM[top] || NATIVE[top]) {
+    // A node_modules polyfill (an installed package of the same name) wins for a BARE name; a
+    // node:-scheme request always binds the builtin shim.
+    if (!forced) { var poly = resolveBare(files, req); if (poly) return poly; }
+    if (SHIM[top] && !bare.includes("/")) return "__shims__/" + top + ".js";
+    throw "Unsupported Node builtin '" + bare + "' — " + (NATIVE[top] || "not available in the in-sandbox JS lane");
+  }
+
+  return resolveBare(files, req);
 }
 
 // Minimal ESM→CJS transform for the common forms (only applied to .mjs or sources that use

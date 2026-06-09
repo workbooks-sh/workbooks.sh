@@ -1526,10 +1526,17 @@ defmodule Workbooks.Compilers do
         {:error, {:bundler_toolchain_missing, jd}}
 
       true ->
-        files = collect_bundle_files(Path.expand(project_dir))
+        files = Map.merge(collect_bundle_files(Path.expand(project_dir)), shim_files(jd))
         payload = Jason.encode!(%{"entry" => entry_rel, "files" => files})
         run_bundler(payload, qrun, bundlejob)
     end
+  end
+
+  # The Node core shims (wb-spy.T2.1/T2.4), injected into the bundle file-map under __shims__/ so
+  # the bundler can alias require('events')/require('node:crypto') → these (wb-spy.T2.5). Pure JS.
+  defp shim_files(jd) do
+    Path.wildcard(Path.join(jd, "shims/*.js"))
+    |> Map.new(fn p -> {"__shims__/#{Path.basename(p)}", File.read!(p)} end)
   end
 
   # Collect every bundleable source the bundler may need (the project's own .js/.json + the whole
