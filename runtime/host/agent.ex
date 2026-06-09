@@ -5,30 +5,33 @@ defmodule Workbooks.Agent do
   loop, until the model stops calling tools or signals `done`. Long-horizon by
   construction (bounded by `max_steps`, resumable because state lives in the VFS).
 
-  The clean-room improvement over brandnana's raw `bash`: the agent's tools are
-  the *sandboxed in-WASM shell* (`Workbooks.Shell` over the CommandRegistry —
-  jq/grep/upper) and the *VFS* (its filesystem). No OS shell, no ambient access.
+  The clean-room improvement over brandnana's raw `bash`: the agent's primary tool
+  is the *sandboxed in-WASM shell* (`Workbooks.Shell` over the CommandRegistry —
+  coreutils + jq/grep, pipes, `; && ||`, vars, redirection, workdir files) and the
+  *VFS*. No OS shell by default; the `run` escape hatch (native CLIs, exec-gated +
+  Workbooks.Sandbox) is being retired as CLIs become WASM commands (wb-9ja).
   Every step is appended to an org-mode event log in the VFS (`events.org`) — the
   run is fully observable and OQL-queryable, like brandnana's events.org.
   """
   alias Workbooks.{Llm, Shell, VFS}
 
-  # The real-CLI tool — only granted to trusted agents (opts[:exec]). It execs
-  # toolkit CLIs (brandnana, wb, curl, jq) on PATH in the engine container, the
-  # way the mainline strategist uses bash. Sandboxed by the container, not WASM.
+  # ESCAPE HATCH (deprecated): real OS bash for NATIVE CLIs not yet available as
+  # WASM commands (e.g. ffmpeg, git, gh). Only granted to trusted agents
+  # (opts[:exec]) and run under Workbooks.Sandbox. Prefer the `shell` tool — it is
+  # fully WASM-sandboxed. To be removed once every CLI is a WASM command (wb-9ja).
   @run_tool %{type: "function", function: %{
     name: "run",
-    description: "Run a real shell command (toolkit CLIs on PATH: brandnana, wb, curl, jq, cat, ls, …) in your working directory. Use for data/harvest verbs and reading files. Returns combined stdout+stderr (truncated). e.g. cmd=\"brandnana harvest-all tecovas.com\".",
+    description: "ESCAPE HATCH — only for NATIVE CLIs the `shell` tool can't run yet (e.g. ffmpeg, git, gh). For everything else use `shell` (it has cat/echo/grep/jq/sort/pipes/redirection/files). Runs a real command in your working dir; returns stdout+stderr. e.g. cmd=\"ffmpeg -i in.mp4 out.wav\".",
     parameters: %{type: "object", properties: %{cmd: %{type: "string"}}, required: ["cmd"]}
   }}
 
   @base_tools [
     %{type: "function", function: %{
       name: "shell",
-      description: "Run a pipeline of sandboxed WASM commands. Available commands: jq (filter, e.g. `jq .users[].name`), grep (regex match), upper (uppercase). NO cat/echo/sed — pass data via `input`. Example: pipeline=\"jq .users[].name\", input=<the JSON>. Returns stdout.",
+      description: "Your PRIMARY shell — runs entirely in WebAssembly (no OS process). Commands: cat echo seq head tail wc nl rev sort uniq tr basename dirname true false grep jq upper. Supports pipes (|), control flow (; && ||), variables (X=val then $X / ${X}), redirection (< > >>), and reading/writing files in your working dir. e.g. pipeline=\"cat data.json | jq .users[].name | sort -u\". `input` is optional stdin.",
       parameters: %{type: "object", properties: %{
-        pipeline: %{type: "string", description: "command pipeline, e.g. \"jq .x | grep foo\""},
-        input: %{type: "string", description: "stdin for the pipeline (e.g. the JSON to filter)"}
+        pipeline: %{type: "string", description: "a shell line, e.g. \"cat f.json | jq .x | sort -u > out.txt\""},
+        input: %{type: "string", description: "optional stdin for the pipeline"}
       }, required: ["pipeline"]}
     }},
     %{type: "function", function: %{
