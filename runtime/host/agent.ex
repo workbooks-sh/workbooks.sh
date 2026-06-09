@@ -38,7 +38,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "wb",
-      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only). e.g. args=\"var set acme_color teal\".",
+      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. e.g. args=\"toolkit show ffmpeg extract-audio\".",
       parameters: %{type: "object", properties: %{args: %{type: "string"}}, required: ["args"]}
     }},
     %{type: "function", function: %{

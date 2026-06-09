@@ -154,6 +154,9 @@ pub fn toolkit_search(io: &dyn Io, q: &str) -> Result<String> {
 pub fn toolkit_verify(io: &dyn Io, id: &str) -> Result<String> {
     rcp::call(io, "POST", &format!("/rcp/toolkit/verify?id={}", urlenc(id)), None)
 }
+pub fn toolkit_sign(io: &dyn Io, id: &str) -> Result<String> {
+    rcp::call(io, "POST", &format!("/rcp/toolkit/sign?id={}", urlenc(id)), None)
+}
 pub fn toolkit_build(io: &dyn Io, id: &str, which: Option<&str>) -> Result<String> {
     let path = match which {
         Some(w) => format!("/rcp/toolkit/build?id={}&which={}", urlenc(id), urlenc(w)),

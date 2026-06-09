@@ -126,6 +126,8 @@ enum ToolkitVerb {
     Search { q: Vec<String> },
     /// Check a toolkit's invocation contract (bin present / artifact built)
     Verify { id: String },
+    /// Sign a toolkit manifest (did:key provenance; required for third-party)
+    Sign { id: String },
     /// Build a toolkit's declared artifact (in-sandbox compile + register)
     Build { id: String, which: Option<String> },
     /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
@@ -198,6 +200,7 @@ fn main() -> Result<()> {
             ToolkitVerb::Show { id, skill } => commands::toolkit_show(io, &id, skill.as_deref())?,
             ToolkitVerb::Search { q } => commands::toolkit_search(io, &q.join(" "))?,
             ToolkitVerb::Verify { id } => commands::toolkit_verify(io, &id)?,
+            ToolkitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
             ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
             ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },

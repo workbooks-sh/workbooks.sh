@@ -435,6 +435,40 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, out)
   end
 
+  post "/rcp/toolkit/sign" do
+    send_resp(conn, 200, Workbooks.Toolkits.sign_text(conn.params["id"], conn.assigns.tenant))
+  end
+
+  # Run a registered KERNEL (bytes → bytes) over RCP — the seam that makes
+  # kernel-shape toolkits reachable from ANY client (desktop renderer, CLI,
+  # scripts) without embedding wasmtime themselves. One-shot open/call/close;
+  # hot loops belong engine-side (Workbooks.Fabric), not over HTTP.
+  post "/rcp/kernel/run" do
+    {:ok, body, conn} = read_body(conn, length: 100_000_000)
+
+    result =
+      try do
+        %{"b64" => b64} = Jason.decode!(body)
+        input = Base.decode64!(b64)
+        name = conn.params["name"]
+
+        case Workbooks.KernelRegistry.path(name) do
+          nil ->
+            %{error: "no such kernel: #{name}"}
+
+          path ->
+            case Workbooks.Kernel.run_batch(File.read!(path), [input], arena: :exports) do
+              [{:ok, out}] -> %{ok: true, b64: Base.encode64(out)}
+              [{:error, reason}] -> %{error: inspect(reason)}
+            end
+        end
+      rescue
+        e -> %{error: Exception.message(e)}
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   post "/rcp/toolkit/run" do
     {:ok, body, conn} = read_body(conn)
 

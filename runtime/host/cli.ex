@@ -249,6 +249,7 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "show", id, skill], _t), do: Toolkits.show_skill_text(id, skill)
   def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
+  def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
   def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
   def call(["toolkit", "build", id, which], _t), do: Toolkits.build_text(id, which, Toolkits.default_root())
   def call(["toolkit", "build-inline", name, lang, file], _t), do: Toolkits.build_inline_text(name, lang, file)

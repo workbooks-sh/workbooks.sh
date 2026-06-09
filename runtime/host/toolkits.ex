@@ -129,6 +129,51 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  @doc """
+  The compact TOOLKITS index injected into an org-defined agent's system prompt
+  (V3 §P3) — progressive disclosure tier 1. One short entry per declared toolkit
+  (tagline + skill slugs), plus the ONE query pattern for going deeper. Deliberately
+  minimal: the index tells the agent WHAT exists and HOW to read more; the skill
+  bodies stay on demand (`wb toolkit show <id> <skill>`), never in the prompt.
+  """
+  def injection_text(names, root \\ default_root())
+  def injection_text([], _root), do: ""
+
+  def injection_text(names, root) do
+    tks = discover_dir(root) |> Map.new(&{&1.id, &1})
+
+    rows =
+      names
+      |> Enum.map(fn id ->
+        case tks[id] do
+          nil ->
+            "- #{id}: (not installed)"
+
+          t ->
+            sk = skills(t.dir)
+            {head, rest} = Enum.split(sk, 8)
+            skill_line =
+              cond do
+                head == [] -> ""
+                rest == [] -> "\n  skills: " <> Enum.join(head, ", ")
+                true -> "\n  skills: " <> Enum.join(head, ", ") <> " (+#{length(rest)} more)"
+              end
+
+            "- #{id}: #{manifest_kw(t.dir, "TAGLINE") || "(no tagline)"}" <> skill_line
+        end
+      end)
+
+    """
+    ## Toolkits
+
+    You have these toolkits. Before using one, read the relevant skill — call the
+    `wb` tool: `toolkit show <id> <skill>` (or `toolkit search <query>` to find one).
+
+    #{Enum.join(rows, "\n")}
+    """
+    |> String.trim()
+  end
+
   @doc "`wb toolkit show <id>` — the manifest front door + the skill index."
   def show_text(id, root \\ default_root()) do
     case tk_dir(id, root) do
@@ -193,7 +238,7 @@ defmodule Workbooks.Toolkits do
           [
             {File.exists?(Path.join(dir, "manifest.org")), "manifest.org present"},
             {File.exists?(Path.join([dir, "skills", "overview.org"])), "skills/overview.org present"}
-          ] ++ exec_checks(d) ++ cap_checks(d)
+          ] ++ exec_checks(d) ++ cap_checks(d) ++ trust_checks(dir, d)
 
         # SECURITY (wb-sec): :role pre blocks are arbitrary bash from an untrusted
         # toolkit dir. They run ONLY when execution is opted-in (WB_TOOLKIT_EXEC=1);
@@ -217,6 +262,74 @@ defmodule Workbooks.Toolkits do
         Enum.map_join(struct ++ pre, "\n", fn {ok, label} -> "#{if ok, do: "✓", else: "✗"} #{label}" end)
     end
   end
+
+  # ── Third-party trust: manifest provenance (AUTHOR_DID + SIGNATURE) ────────
+  # A `#+TRUST: third-party` toolkit must carry a did:key signature over its
+  # manifest (Ed25519 over the manifest body with SIGNATURE lines removed,
+  # trimmed — same crypto as Workbooks.Manifest/Git, no new scheme). The dir is
+  # supply-chain input (see the threat model above): the signature binds the
+  # manifest's declared contract (EXEC/CAPS/BUILD_SRC) to an author identity, so
+  # tampering with a vetted third-party toolkit is detectable. First-party
+  # toolkits skip this (location-trust is fine for our own repo).
+
+  @doc "Sign a toolkit's manifest as `tenant`: writes #+AUTHOR_DID + #+SIGNATURE."
+  def sign_text(id, tenant, root \\ default_root()) do
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        path = Path.join(dir, "manifest.org")
+        did = Workbooks.Git.did(tenant)
+
+        body =
+          File.read!(path)
+          |> strip_manifest_lines(["SIGNATURE", "AUTHOR_DID"])
+          |> Kernel.<>("\n#+AUTHOR_DID: #{did}")
+          |> String.trim()
+
+        sig = Workbooks.Git.sign(tenant, body) |> Base.encode64()
+        File.write!(path, body <> "\n#+SIGNATURE: #{sig}\n")
+        "signed #{id} as #{did}"
+    end
+  end
+
+  @doc "Verify a manifest's provenance: {:ok, did} | {:error, reason}."
+  def manifest_provenance(dir) do
+    body = File.read!(Path.join(dir, "manifest.org"))
+    d = parse_descriptor(body)
+
+    cond do
+      is_nil(d.author_did) -> {:error, :no_author_did}
+      is_nil(d.signature) -> {:error, :no_signature}
+      true ->
+        canonical = body |> strip_manifest_lines(["SIGNATURE"]) |> String.trim()
+
+        case Base.decode64(d.signature) do
+          {:ok, sig} ->
+            if Workbooks.Git.verify_sig(d.author_did, canonical, sig),
+              do: {:ok, d.author_did},
+              else: {:error, :bad_signature}
+
+          :error ->
+            {:error, :bad_signature_encoding}
+        end
+    end
+  end
+
+  defp strip_manifest_lines(body, keys) do
+    re = ~r/^[ \t]*#\+(?:#{Enum.join(keys, "|")}):.*\n?/m
+    Regex.replace(re, body, "")
+  end
+
+  defp trust_checks(dir, %{trust: "third-party"}) do
+    case manifest_provenance(dir) do
+      {:ok, did} -> [{true, "third-party signature valid (#{did})"}]
+      {:error, why} -> [{false, "third-party provenance: #{why} (sign with `wb toolkit sign <id>`)"}]
+    end
+  end
+
+  defp trust_checks(_dir, _first_party), do: []
 
   # ── Build descriptor (P4, wb-tk3) ─────────────────────────────────────────
   # The declarative auto-wrap: a few manifest keywords tell the runtime HOW the
@@ -253,7 +366,9 @@ defmodule Workbooks.Toolkits do
       arg_mode: arg_mode(kw(body, "ARG_MODE")),
       sha256: kw(body, "SHA256"),
       wasm_path: kw(body, "WASM_PATH"),
-      preopen: kw(body, "PREOPEN")
+      preopen: kw(body, "PREOPEN"),
+      author_did: kw(body, "AUTHOR_DID"),
+      signature: kw(body, "SIGNATURE")
     }
   end
 
@@ -324,10 +439,16 @@ defmodule Workbooks.Toolkits do
 
       dir ->
         entries = runtime_entries(dir)
+        d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
 
         cond do
+          # Supply-chain gate: an unsigned/tampered third-party toolkit never builds.
+          d.trust == "third-party" and not match?({:ok, _}, manifest_provenance(dir)) ->
+            {:error, why} = manifest_provenance(dir)
+            "#{id}: REFUSED — third-party toolkit with invalid provenance (#{why}); author must `wb toolkit sign #{id}`"
+
           entries == [] ->
-            do_build(id, parse_descriptor(File.read!(Path.join(dir, "manifest.org"))))
+            do_build(id, d)
 
           which not in [nil, ""] ->
             case Enum.find(entries, fn {n, _} -> n == which end) do
