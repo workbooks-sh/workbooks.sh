@@ -59,11 +59,14 @@ take zig/manifest.org
 take go/yaegi-root
 take go/manifest.org
 
-# --- js / ts: QuickJS-ng runner + the tsc bundle + shims ---------------------------------------
+# --- js / ts: QuickJS-ng runner + the tsc bundle + the npm lane (bundler, shims, dock harness) --
 take js/qjs-run.wasm
 take js/ts
 take js/qjs-root
 take js/harness.o
+take js/harness_dock.o   # JsDock harness (env.* host caps → Javy.Net/Javy.VFS) — wb-e1x
+take js/bundle           # the in-sandbox npm bundler (bundlejob.js) — without it bundle_dir fails
+take js/shims            # Node core + dock shims (events/buffer/fs/http/crypto/…) — wb-spy/wb-e1x
 take js/manifest.org
 
 # --- c: the C4 single-file compiler (compiled on demand in-sandbox) -----------------------------
