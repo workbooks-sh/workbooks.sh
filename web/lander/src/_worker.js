@@ -48,6 +48,23 @@ export default {
       }));
     }
 
+    // /live/* — the LIVING LANDER (lander-live, bd wb-5vm): a page hosted BY a
+    // Workbooks runtime on Fly, fronted through Cloudflare here. Proves the
+    // runtime-as-host path end to end: workbooks.sh/live → fly engine →
+    // workbook page (+ its /rcp/changes feed for the inspector).
+    if (url.pathname === "/live" || url.pathname.startsWith("/live/")) {
+      const livePath = url.pathname === "/live" ? "/w/workbooks" : url.pathname.slice("/live".length);
+      const target = new URL(livePath + url.search, "https://wb-lander-live.fly.dev");
+      const upstreamHeaders = new Headers(request.headers);
+      upstreamHeaders.delete("host");
+      return fetch(new Request(target.toString(), {
+        method: request.method,
+        headers: upstreamHeaders,
+        body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+        redirect: "follow",
+      }));
+    }
+
     if (
       url.pathname === "/w" ||
       url.pathname.startsWith("/w/") ||
