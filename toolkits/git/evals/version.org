@@ -1,0 +1,11 @@
+#+TITLE: git toolkit — version sanity
+#+EXPECT: git version
+
+* git is on PATH and reports a version                              :eval:
+  A trivial deterministic (Tier 1) eval: proves the toolkit's CLI is invokable in
+  the sandbox. PASS = exit 0 + stdout contains "git version". Run with
+  `WB_TOOLKIT_EXEC=1 wb toolkit eval git`.
+
+  #+begin_src bash :role eval
+  git --version
+  #+end_src

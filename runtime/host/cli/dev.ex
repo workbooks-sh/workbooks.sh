@@ -20,7 +20,33 @@ defmodule Workbooks.CLI.Dev do
   def run(["info"]), do: {info(), false}
   def run(["up" | _]), do: {up_text(), false}
   def run(["test" | rest]), do: mix(["test" | rest])
+  def run(["eval"]), do: {eval_list(), false}
+  def run(["eval", id]), do: mix(["run", "-e", ~s|IO.puts(Workbooks.CLI.call(["toolkit", "eval", "#{id}"]))|])
   def run(_), do: {usage(), true}
+
+  # wb dev eval — list toolkits that ship an eval suite (evals/*.org); run one
+  # with `wb dev eval <id>` (= wb toolkit eval, sandboxed; set WB_TOOLKIT_EXEC=1).
+  defp eval_list do
+    root = toolkits_root()
+
+    suites =
+      root
+      |> Path.join("*/evals/*.org")
+      |> Path.wildcard()
+      |> Enum.group_by(&Path.basename(Path.dirname(Path.dirname(&1))))
+      |> Enum.sort()
+
+    if suites == [] do
+      "no toolkit eval suites under #{root} (add evals/*.org — see toolkits/EVALS.org)"
+    else
+      body =
+        Enum.map_join(suites, "\n", fn {tk, files} ->
+          "  #{tk}  (#{length(files)} case#{if length(files) == 1, do: "", else: "s"})  →  wb dev eval #{tk}"
+        end)
+
+      "toolkit eval suites:\n#{body}\n\n(run sandboxed; set WB_TOOLKIT_EXEC=1)"
+    end
+  end
 
   # ── wb dev info — the demo/dev environment at a glance ──
   defp info do
@@ -110,9 +136,10 @@ defmodule Workbooks.CLI.Dev do
       wb dev info          demo/dev environment at a glance (runtime, health, model key, toolkits, ctk)
       wb dev up            how to start a dev runtime (source mix / prod-parity krunvm)
       wb dev test [args]   run the runtime test suite (mix test) from a source checkout
+      wb dev eval [id]     list toolkit eval suites, or run one (= wb toolkit eval; WB_TOOLKIT_EXEC=1)
       wb dev help          this help
 
-    Planned: wb dev eval (agent eval suite), wb dev ctk <toolkit> (serve a render toolkit).
+    Planned: agent+judge eval tier (Tier 2, see toolkits/EVALS.org), wb dev ctk <toolkit>.
     """
   end
 end

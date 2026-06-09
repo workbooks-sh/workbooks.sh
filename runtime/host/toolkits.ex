@@ -263,6 +263,69 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  @doc """
+  `wb toolkit eval <id>` — run the toolkit's bundled eval suite (Tier 1,
+  deterministic): each `evals/*.org` case's `:role eval` block runs under the
+  same sandbox as verify (only with WB_TOOLKIT_EXEC=1), and PASSES on exit 0 +
+  stdout containing the case's `#+EXPECT:` substring (when set). See EVALS.org.
+  """
+  def eval_text(id, root \\ default_root()) do
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        cases =
+          Path.wildcard(Path.join([dir, "evals", "*.org"]))
+          |> Enum.filter(&contained?(&1, Path.expand(dir)))
+          |> Enum.sort()
+
+        cond do
+          cases == [] ->
+            "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
+
+          not exec_allowed?() ->
+            "#{id}: #{length(cases)} eval case(s) — SKIPPED (set WB_TOOLKIT_EXEC=1 to run sandboxed)"
+
+          true ->
+            results = Enum.map(cases, &run_eval_case(&1, dir))
+            pass = Enum.count(results, &elem(&1, 0))
+
+            "#{id} evals: #{pass}/#{length(results)} passed\n" <>
+              Enum.map_join(results, "\n", fn {ok, label} -> "  #{if ok, do: "✓", else: "✗"} #{label}" end)
+        end
+    end
+  end
+
+  defp run_eval_case(path, dir) do
+    text = File.read!(path)
+    name = Path.relative_to(path, dir)
+
+    expect =
+      case Regex.run(~r/^#\+EXPECT:\s*(.+)$/m, text) do
+        [_, e] -> String.trim(e)
+        _ -> nil
+      end
+
+    case extract_role_blocks(text, "eval") do
+      [] ->
+        {false, "#{name}: no :role eval block"}
+
+      blocks ->
+        {out, code} = run_bash(Enum.join(blocks, "\n"), [])
+        ok = code == 0 and (is_nil(expect) or String.contains?(out, expect))
+
+        detail =
+          cond do
+            ok -> ""
+            code != 0 -> " — exit #{code}: " <> String.trim(String.slice(out, 0, 160))
+            true -> " — missing #{inspect(expect)}"
+          end
+
+        {ok, name <> detail}
+    end
+  end
+
   # ── Third-party trust: manifest provenance (AUTHOR_DID + SIGNATURE) ────────
   # A `#+TRUST: third-party` toolkit must carry a did:key signature over its
   # manifest (Ed25519 over the manifest body with SIGNATURE lines removed,
