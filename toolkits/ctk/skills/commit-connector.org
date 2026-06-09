@@ -1,0 +1,107 @@
+#+TITLE: ctk — commit connector (closing the human-in-the-loop)
+#+TOOLKIT: ctk
+#+SKILL: commit-connector
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when wiring CTK's Commit button to the agent — the event shape, the two transports (host postMessage + runtime webhook), and what the runtime/agent must do to receive and act on it.
+#+TAGS: commit connector webhook human-in-the-loop hitl runtime agent feedback approve
+#+STATUS: experimental
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     yes
+  :DESTRUCTIVE: no
+  :COST:        free
+  :END:
+
+  Use when CTK is a *review step* in an agent loop: the agent opened a change
+  (a component edit / a PR) and rendered it in CTK; a human tunes + reviews; the
+  *Commit* button sends the result back so the agent can commit. This skill is
+  the contract between the CTK shell, the runtime, and the agent service.
+
+  NOT for read-only inspection (just open CTK), nor for driving controls (see
+  [[file:runtime-driving.org][runtime-driving]]).
+
+* The mental model — three hops
+
+  #+begin_example
+  human clicks Commit  →  CTK posts a `ctk.commit` event  →  runtime ingests  →  agent acts
+        (review)            (host postMessage + webhook)      (route to run)     (commit)
+  #+end_example
+
+  CTK never commits anything itself. It emits one event; the runtime routes it to
+  the agent that opened the change; the agent reviews + commits. CTK is the
+  membrane, not the actor.
+
+* The event — `ctk.commit`
+
+  #+begin_src json
+  {
+    "type": "ctk.commit",
+    "story": "button",
+    "feedback": "ghost variant border is too faint — bump to --line-strong",
+    "snapshot": { "story": "button", "props": {…}, "states": { "default": {…}, "disabled": {…} } },
+    "ts": 1733764800000
+  }
+  #+end_src
+
+  - =snapshot= is the full page state (shared props + every state's effective
+    props) — what the human approved, so the agent commits THAT, not a guess.
+  - =feedback= is the free-text note (may be empty = plain approval).
+
+* The two transports (CTK sends BOTH)
+
+  1. *Host postMessage* — when the runtime serves CTK inside a webview/iframe,
+     CTK posts to its parent: ={ ctk: true, reply: "commit", data: <event> }=.
+     The host (runtime UI) listens and forwards. No URL needed.
+  2. *Connector webhook* — when CTK is served standalone, the runtime passes a
+     URL: =ctk.html?connect=https://runtime/api/ctk/commit=. CTK does
+     =POST <connector>= with the event as JSON; a 2xx = delivered.
+
+  With no host and no connector, CTK still captures the payload (console) and
+  shows "shared locally" — so the bench is never blocked.
+
+* Runtime side (the integration — NOT yet built)
+
+  The runtime exposes the webhook and routes the event to the agent. Wire it onto
+  the existing agent-run surface (=runtime/host/web.ex=: =POST /api/run= starts a
+  run, =GET /api/run/:id/stream= streams it, =GET /api/run/:id= polls):
+
+  - *Add* =POST /api/ctk/commit= — authenticate (same bearer as the rest of the
+    surface), validate the =ctk.commit= shape, and associate it with the run that
+    opened the review (a =run_id= the connector URL carries, e.g.
+    =?connect=…/api/ctk/commit?run=<id>=).
+  - *Deliver to the agent* via one of: (a) resume the paused run with the event as
+    tool input (preferred — the run was awaiting the review), or (b) append it to
+    a per-run inbox the agent polls. There is no resume/inbox path today; this is
+    the net-new runtime work.
+  - *Persist* the approved snapshot with the run so the commit is reproducible.
+
+* Agent service side (the consumer — NOT yet built)
+
+  Part of the toolkit/agent SDK: an agent that uses CTK as a review step must be
+  able to (1) open a CTK review (render the change, hand the human the URL/webview
+  with =?connect=…&run=<id>=), (2) await the =ctk.commit= event, (3) apply the
+  approved snapshot + feedback, and (4) commit (git) / advance the PR. The "wait
+  for a human review event" primitive is the SDK addition.
+
+* Verification checklist
+
+  - [ ] Open =ctk.html?connect=<url>=; Commit → a =ctk.commit= POST hits =<url>=.
+  - [ ] Open =ctk.html= embedded in a host; Commit → host receives the
+        =reply:"commit"= postMessage.
+  - [ ] Open =ctk.html= bare; Commit → "shared locally", payload in console.
+  - [ ] (Runtime, when built) =POST /api/ctk/commit= routes to the run and the
+        agent commits the approved snapshot.
+
+* Status / next
+
+  SHIPPED: the CTK side — Commit button, the modal, the =ctk.commit= event, both
+  transports, and =window.CTK.commit(feedback)=. NEXT (this plan's runtime work):
+  the =POST /api/ctk/commit= route + the agent "await review" SDK primitive. Mark
+  this skill =stable= once a runtime round-trip commits a real change.
+
+* See also
+
+  - [[file:runtime-driving.org][runtime-driving]] — reading the spec + setting controls programmatically.
+  - [[file:overview.org][overview]] — what CTK is and the shell.
+  - =../../../runtime/host/web.ex= — the agent-run surface this hooks onto.
