@@ -168,3 +168,16 @@ Image 29ee42e. Workbook stored in durable registry (/data/registry.db); served V
 - ✅ Observable commit loop PROVEN: workbook deploy → git commit ("every deploy = one commit") → /_changes → live-poll.
 - ✅ Example repo: github.com/workbooks-sh/living-lander (public; keeper's designated push target).
 - ⏳ ONE piece left: enabling the AUTONOMOUS keeper edit loop. Scheduler is ready; deliberately NOT auto-enabled on a public box without a watched validation run (runaway-spend / bad-edit risk). To enable: ship keeper def+toolkit to /data, set WB_KEEPER_DEF + a sane WB_KEEPER_INTERVAL_MS, give the sandboxed agent wb→localhost:4001+bearer + a source checkout + push creds for living-lander, then watch one run. Needs its own focused pass.
+
+## KEEPER LOOP VALIDATED (plan mode, 2026-06-09)
+Scheduler activated (WB_KEEPER_DEF=/data/keeper.org, daily, WB_KEEPER_MODE=plan).
+Manual watched run_once → DeepSeek V4-pro (slug fix: deepseek/deepseek-v4-pro;
+bare -v4 invalid) → created plan.org from seed + honest "Current State" (no
+fabrication: "Pre-launch. No analytics, no metrics") → committed
+"planning: create plan.org from seed backlog" (be87887) → surfaces at /_changes,
+workbooks.sh/live/_changes, and the page's live indicator ("maintained live · 2
+edits"). Full chain proven: tick → agent → plan-mode reason → commit → feed →
+Cloudflare → live page. Respected plan mode (no page edit), no fabrication,
+crash-safe. Nit filed: agent dated its log 2025 (stale model date) — inject real
+date into the task. READY to flip to edit mode (WB_KEEPER_MODE=edit + restart)
+when watched.
