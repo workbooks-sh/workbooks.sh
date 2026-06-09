@@ -230,3 +230,21 @@ footer .links a:hover{color:var(--ink)}
 .live-status{display:inline-flex;align-items:center;gap:.4rem;color:var(--green-ink)}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:livepulse 2s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── self-aware ribbon (sub-hero above the hero) ── */
+.ribbon{position:relative;z-index:60;background:var(--ink);color:var(--bg)}
+.ribbon-in{width:100%;display:flex;align-items:center;gap:.7rem;justify-content:center;flex-wrap:wrap;
+  border:0;cursor:pointer;background:transparent;color:inherit;font-family:var(--mono);font-size:.76rem;
+  padding:.6rem var(--edge);text-align:left}
+.ribbon .rmark{color:var(--green);animation:livepulse 2.4s ease-in-out infinite}
+.ribbon .rtext{opacity:.92}
+.ribbon .rtext em{font-family:var(--serif);font-style:italic;font-size:1.02em;opacity:1}
+.ribbon .rlink{color:var(--bg);text-decoration:underline;text-underline-offset:3px;opacity:.85;white-space:nowrap}
+.ribbon-in:hover .rlink{opacity:1}
+@media(max-width:640px){.ribbon .rtext{font-size:.72rem}}
+.changelog{background:#000;color:#d7d7d2;font-family:var(--mono);font-size:.74rem;
+  max-width:var(--maxw);margin:0 auto;padding:.4rem var(--edge) .9rem}
+.cl-row{display:flex;gap:.7rem;padding:.32rem 0;border-bottom:1px solid #1c1c21}
+.cl-row:last-child{border-bottom:0}
+.cl-row code{color:var(--green);flex:none}
+.cl-row span{color:#a9aab1}

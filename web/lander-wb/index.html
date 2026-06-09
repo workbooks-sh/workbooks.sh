@@ -15,6 +15,17 @@
 </head>
 <body>
 
+<!-- self-aware ribbon: the page announces that it IS a workbook, served live and
+     agent-maintained. The sub-hero above the hero. -->
+<div class="ribbon" id="ribbon">
+  <button class="ribbon-in" id="ribbon-toggle" type="button" aria-expanded="false">
+    <span class="rmark">◆</span>
+    <span class="rtext">You're reading a <em>workbook</em> — one file, served live by a Workbooks runtime, maintained by an agent.</span>
+    <span class="rlink" id="ribbon-link">→ see what it changed</span>
+  </button>
+  <div class="changelog" id="changelog" hidden></div>
+</div>
+
 <header class="nav">
   <a class="brand" href="/">
     <svg viewBox="0 0 257 206" fill="none" aria-label="Workbooks"><path d="M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z" fill="currentColor"/></svg>
@@ -233,14 +244,9 @@
   const txt = document.getElementById("live-text");
   if (!el) return;
   let head = null;            // newest sha seen at load
-  const rel = () => {};       // (relative-time computed server-agnostic below)
-  const ago = ts => {
-    const s = Math.max(0, (Date.now() - ts) / 1000);
-    if (s < 90) return "just now";
-    if (s < 3600) return Math.round(s / 60) + "m ago";
-    if (s < 86400) return Math.round(s / 3600) + "h ago";
-    return Math.round(s / 86400) + "d ago";
-  };
+  const rlink = document.getElementById("ribbon-link");
+  const clog = document.getElementById("changelog");
+  const esc = s => (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   async function poll(first) {
     try {
       const r = await fetch(LIVE + "/_changes", { cache: "no-store" });
@@ -248,19 +254,29 @@
       const { changes } = await r.json();
       if (!changes || !changes.length) return;
       const top = changes[0];
-      el.hidden = false;
-      txt.textContent = "maintained live · " + (changes.length) + " edits";
-      el.title = "latest: " + (top.msg || top.sha);
+      // footer indicator
+      if (el) { el.hidden = false; txt.textContent = "maintained live · " + changes.length + " edits"; el.title = "latest: " + (top.msg || top.sha); }
+      // ribbon link + changelog body
+      if (rlink) rlink.textContent = "→ see what it changed (" + changes.length + ")";
+      if (clog) clog.innerHTML = changes.slice(0, 12).map(c =>
+        `<div class="cl-row"><code>${esc(c.sha).slice(0,7)}</code><span>${esc(c.msg)}</span></div>`).join("");
       if (first) { head = top.sha; }
       else if (top.sha !== head) {
-        // the keeper just shipped an edit — show it, then reveal the new page
-        txt.textContent = "keeper just edited — reloading…";
+        if (txt) txt.textContent = "keeper just edited — reloading…";
         setTimeout(() => location.reload(), 1800);
       }
     } catch (_) { /* static host / offline — stay quiet */ }
   }
   poll(true);
   setInterval(() => poll(false), 30000);
+
+  // changelog reveal
+  const toggle = document.getElementById("ribbon-toggle");
+  if (toggle && clog) toggle.addEventListener("click", () => {
+    const open = clog.hidden;
+    clog.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+  });
 })();
 </script>
 </body>
