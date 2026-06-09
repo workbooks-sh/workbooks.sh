@@ -371,3 +371,57 @@ fn emit_setup(app: &AppHandle, line: &str) {
 fn shquote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_url_defaults_https() {
+        assert_eq!(
+            parse_url("engine.example.com").unwrap(),
+            ("https".into(), "engine.example.com".into(), 443)
+        );
+    }
+
+    #[test]
+    fn parse_url_explicit_scheme_and_port() {
+        assert_eq!(
+            parse_url("http://localhost:4000").unwrap(),
+            ("http".into(), "localhost".into(), 4000)
+        );
+        assert_eq!(
+            parse_url("https://e.example.com:8443/").unwrap(),
+            ("https".into(), "e.example.com".into(), 8443)
+        );
+    }
+
+    #[test]
+    fn parse_url_strips_path_and_query() {
+        assert_eq!(
+            parse_url("https://e.example.com/health?x=1").unwrap(),
+            ("https".into(), "e.example.com".into(), 443)
+        );
+    }
+
+    #[test]
+    fn parse_url_http_default_port_80() {
+        assert_eq!(parse_url("http://box").unwrap().2, 80);
+    }
+
+    #[test]
+    fn parse_url_rejects_garbage_port() {
+        assert!(parse_url("http://h:notaport").is_err());
+    }
+
+    #[test]
+    fn parse_url_rejects_empty() {
+        assert!(parse_url("https://").is_err());
+    }
+
+    #[test]
+    fn shquote_escapes_single_quotes() {
+        assert_eq!(shquote("a'b"), "'a'\\''b'");
+        assert_eq!(shquote("plain"), "'plain'");
+    }
+}
