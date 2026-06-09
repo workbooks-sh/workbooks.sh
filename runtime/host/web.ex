@@ -397,6 +397,56 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
+  # ── `wb toolkit` — the agent-extensibility surface over RCP ─────────────────
+  # Mirrors the escript verbs (Toolkits.*_text) so a REMOTE/containerized engine
+  # is reachable from the thin CLI. Text in/out — these are help-surface +
+  # build/run verbs, not data APIs. Task execution stays server-side gated
+  # (WB_TOOLKIT_EXEC=1 default-deny + Sandbox, see Workbooks.Toolkits).
+
+  get "/rcp/toolkit" do
+    send_resp(conn, 200, Workbooks.Toolkits.list_text())
+  end
+
+  get "/rcp/toolkit/show" do
+    out =
+      case conn.params["skill"] do
+        s when s in [nil, ""] -> Workbooks.Toolkits.show_text(conn.params["id"])
+        skill -> Workbooks.Toolkits.show_skill_text(conn.params["id"], skill)
+      end
+
+    send_resp(conn, 200, out)
+  end
+
+  get "/rcp/toolkit/search" do
+    send_resp(conn, 200, Workbooks.Toolkits.search_text(conn.params["q"] || ""))
+  end
+
+  post "/rcp/toolkit/verify" do
+    send_resp(conn, 200, Workbooks.Toolkits.verify_text(conn.params["id"]))
+  end
+
+  post "/rcp/toolkit/build" do
+    out =
+      case conn.params["which"] do
+        w when w in [nil, ""] -> Workbooks.Toolkits.build_text(conn.params["id"])
+        which -> Workbooks.Toolkits.build_text(conn.params["id"], which, Workbooks.Toolkits.default_root())
+      end
+
+    send_resp(conn, 200, out)
+  end
+
+  post "/rcp/toolkit/run" do
+    {:ok, body, conn} = read_body(conn)
+
+    args =
+      case body do
+        "" -> []
+        b -> Jason.decode!(b)["args"] || []
+      end
+
+    send_resp(conn, 200, Workbooks.Toolkits.run_task_text(conn.params["id"], conn.params["task"], args))
+  end
+
   # `wb fetch` — restore stored bytes (base64-wrapped; zips aren't JSON-safe raw).
   get "/rcp/fetch" do
     t = conn.assigns.tenant

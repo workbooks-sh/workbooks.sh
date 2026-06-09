@@ -137,6 +137,40 @@ pub fn federate(io: &dyn Io) -> Result<String> {
     rcp::call(io, "POST", &format!("/api/radicle/{}/publish", urlenc(&tenant())), Some("{}"))
 }
 
+// ── toolkit (the agent-extensibility surface; engine-backed) ──
+pub fn toolkit_list(io: &dyn Io) -> Result<String> {
+    rcp::call(io, "GET", "/rcp/toolkit", None)
+}
+pub fn toolkit_show(io: &dyn Io, id: &str, skill: Option<&str>) -> Result<String> {
+    let path = match skill {
+        Some(s) => format!("/rcp/toolkit/show?id={}&skill={}", urlenc(id), urlenc(s)),
+        None => format!("/rcp/toolkit/show?id={}", urlenc(id)),
+    };
+    rcp::call(io, "GET", &path, None)
+}
+pub fn toolkit_search(io: &dyn Io, q: &str) -> Result<String> {
+    rcp::call(io, "GET", &format!("/rcp/toolkit/search?q={}", urlenc(q)), None)
+}
+pub fn toolkit_verify(io: &dyn Io, id: &str) -> Result<String> {
+    rcp::call(io, "POST", &format!("/rcp/toolkit/verify?id={}", urlenc(id)), None)
+}
+pub fn toolkit_build(io: &dyn Io, id: &str, which: Option<&str>) -> Result<String> {
+    let path = match which {
+        Some(w) => format!("/rcp/toolkit/build?id={}&which={}", urlenc(id), urlenc(w)),
+        None => format!("/rcp/toolkit/build?id={}", urlenc(id)),
+    };
+    rcp::call(io, "POST", &path, None)
+}
+pub fn toolkit_run(io: &dyn Io, id: &str, task: &str, args: &[String]) -> Result<String> {
+    let body = serde_json::json!({ "args": args });
+    rcp::call(
+        io,
+        "POST",
+        &format!("/rcp/toolkit/run?id={}&task={}", urlenc(id), urlenc(task)),
+        Some(&body.to_string()),
+    )
+}
+
 // ── observability ──
 pub fn telemetry(io: &dyn Io, slug: Option<&str>) -> Result<String> {
     match slug {

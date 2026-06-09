@@ -69,6 +69,10 @@ enum Cmd {
         #[arg(long)] sql: bool,
     },
 
+    // ── toolkit (agent extensibility; engine-backed) ──
+    /// Discover, build, and run toolkits (the agent-extensibility surface)
+    Toolkit { #[command(subcommand)] verb: ToolkitVerb },
+
     // ── runtime ops (engine-backed) ──
     /// Run or plan a workflow DAG
     Workflow { #[command(subcommand)] verb: WorkflowVerb },
@@ -110,6 +114,22 @@ enum PublishVerb {
     Validate,
     /// Ship the assembled workbook to the configured surface
     Apply { #[arg(default_value = "workbook.html")] workbook: String },
+}
+
+#[derive(Subcommand)]
+enum ToolkitVerb {
+    /// List discoverable toolkits (id · status · tagline)
+    List,
+    /// A toolkit's manifest + skill index (or one skill's recipe)
+    Show { id: String, skill: Option<String> },
+    /// Search toolkits + skills
+    Search { q: Vec<String> },
+    /// Check a toolkit's invocation contract (bin present / artifact built)
+    Verify { id: String },
+    /// Build a toolkit's declared artifact (in-sandbox compile + register)
+    Build { id: String, which: Option<String> },
+    /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
+    Run { id: String, task: String, #[arg(trailing_var_arg = true)] args: Vec<String> },
 }
 
 #[derive(Subcommand)]
@@ -172,6 +192,15 @@ fn main() -> Result<()> {
             let mode = if semantic { "semantic" } else if literal { "literal" } else if sql { "sql" } else { "hybrid" };
             commands::search(io, &query, mode)?
         }
+        // toolkit
+        Cmd::Toolkit { verb } => match verb {
+            ToolkitVerb::List => commands::toolkit_list(io)?,
+            ToolkitVerb::Show { id, skill } => commands::toolkit_show(io, &id, skill.as_deref())?,
+            ToolkitVerb::Search { q } => commands::toolkit_search(io, &q.join(" "))?,
+            ToolkitVerb::Verify { id } => commands::toolkit_verify(io, &id)?,
+            ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
+            ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
+        },
         // runtime ops
         Cmd::Workflow { verb } => match verb {
             WorkflowVerb::Run { file, input } => commands::workflow(io, false, &file, &input)?,
