@@ -135,99 +135,105 @@ pub fn check_error(json: &str) -> Result<()> {
     Ok(())
 }
 
-/// Emit the ergonomic, feature-gated cap wrappers (`dock::llm`, `dock::vfs`,
-/// `dock::browse`, `dock::command`) over the author's wit-bindgen `bindings`
-/// module. Call once, passing the path to the generated module. Each wrapper is
-/// `#[cfg(feature = ...)]`-gated, so only the caps you enabled (== the caps your
-/// WIT subset declares == the caps your profile grants) are materialized.
+/// Emit the ergonomic cap wrappers (`dock::llm`, `dock::vfs`, `dock::browse`,
+/// `dock::command`, `dock::parallel`) over the author's wit-bindgen `bindings`
+/// module, for an EXPLICIT cap list that must match the component's WIT world:
 ///
-/// Staged caps (`parallel`, `frames`) are intentionally NOT emitted here; their
-/// host side is wb-rhs.9. Enabling those features trips the `compile_error!`
-/// guards below instead.
+/// ```ignore
+/// mod bindings;                     // cargo-component / wit-bindgen output
+/// dock::bind!(bindings, command, llm);   // only the caps your world imports
+/// ```
+///
+/// Cap-scoping is the LIST (and the WIT world), NOT Cargo features — a feature on
+/// the `dock` dependency is invisible to this macro (it expands in the caller's
+/// crate, whose features differ), which silently emitted nothing. The list is the
+/// fix. A cap with no arm below (e.g. `frames`, not yet built) is a compile error.
 #[macro_export]
 macro_rules! bind {
-    ($bindings:ident) => {
+    ($bindings:ident $(, $cap:ident)* $(,)?) => {
         #[allow(unused_imports)]
         mod dock_caps {
             use super::$bindings as b;
-
-            #[cfg(feature = "llm")]
-            pub mod llm {
-                use super::b;
-                /// Ask the model; the host holds the key, the component never sees it.
-                pub fn ask(prompt: impl AsRef<str>) -> $crate::Result<String> {
-                    let r = b::llm_complete(prompt.as_ref());
-                    $crate::check_error(&r)?;
-                    Ok(r)
-                }
-            }
-
-            #[cfg(feature = "vfs")]
-            pub mod vfs {
-                use super::b;
-                /// Run SQL against the Instance VFS; decode rows into `T`.
-                pub fn query<T: serde::de::DeserializeOwned>(sql: impl AsRef<str>) -> $crate::Result<Vec<T>> {
-                    $crate::rows(&b::vfs_query(sql.as_ref()))
-                }
-                /// Raw JSON form, if you want to inspect before decoding.
-                pub fn query_raw(sql: impl AsRef<str>) -> $crate::Result<String> {
-                    let r = b::vfs_query(sql.as_ref());
-                    $crate::check_error(&r)?;
-                    Ok(r)
-                }
-            }
-
-            #[cfg(feature = "browse")]
-            pub mod browse {
-                use super::b;
-                /// Fetch+extract a URL through the host Browse cap (never holds a socket).
-                pub fn fetch(url: impl AsRef<str>) -> $crate::Result<$crate::Page> {
-                    $crate::page(&b::browse_fetch(url.as_ref()))
-                }
-            }
-
-            #[cfg(feature = "commands")]
-            pub mod command {
-                use super::b;
-                /// Invoke a registered command (argv + stdin → stdout).
-                pub fn run(name: impl AsRef<str>, input: impl AsRef<str>, args: &[&str]) -> $crate::Result<String> {
-                    let argv: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-                    let r = b::run_command(name.as_ref(), input.as_ref(), &argv);
-                    $crate::check_error(&r)?;
-                    Ok(r)
-                }
-            }
-
-            #[cfg(feature = "parallel")]
-            pub mod parallel {
-                use super::b;
-                /// Fan a registered command over `inputs` (one stdin each),
-                /// concurrently across isolated instances — the host (BEAM) does
-                /// the distribution a single-threaded wasm instance can't. Returns
-                /// per-input results IN ORDER. This is how an intensive toolkit
-                /// borrows BEAM distribution (the media/render fabric is one user).
-                pub fn map(name: impl AsRef<str>, inputs: &[&str]) -> $crate::Result<Vec<$crate::Result<String>>> {
-                    let inputs_json = serde_json::to_string(inputs)
-                        .map_err(|e| $crate::DockError(format!("encode inputs: {e}")))?;
-                    $crate::parse_many(&b::run_command_many(name.as_ref(), &inputs_json))
-                }
-            }
+            $( $crate::__dock_cap!($cap); )*
         }
-
-        // Re-export so authors write `dock::llm::ask(..)` etc.
         #[allow(unused_imports)]
         pub use dock_caps::*;
     };
 }
 
-// ── Staged-cap guards ──────────────────────────────────────────────────────
-// `parallel` is LIVE (wb-rhs.9): the host binds run-command-many → Workbooks.Fabric.
-// `frames` (shared-frame arena) is still staged — host side is wb-rhs.5.
-#[cfg(feature = "frames")]
-compile_error!(
-    "dock feature `frames` (shared-frame arena, dock::frames) is not yet \
-     available — host cap wb-rhs.5. Remove the feature to build."
-);
+/// Per-cap wrapper emitter (one arm per Dock capability). Invoked inside
+/// `dock_caps`, so each `pub mod <cap>` sees `super::b` (the bindings alias).
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __dock_cap {
+    (llm) => {
+        pub mod llm {
+            use super::b;
+            /// Ask the model; the host holds the key, the component never sees it.
+            pub fn ask(prompt: impl AsRef<str>) -> $crate::Result<String> {
+                let r = b::llm_complete(prompt.as_ref());
+                $crate::check_error(&r)?;
+                Ok(r)
+            }
+        }
+    };
+    (vfs) => {
+        pub mod vfs {
+            use super::b;
+            /// Run SQL against the Instance VFS; decode rows into `T`.
+            pub fn query<T: serde::de::DeserializeOwned>(sql: impl AsRef<str>) -> $crate::Result<Vec<T>> {
+                $crate::rows(&b::vfs_query(sql.as_ref()))
+            }
+            /// Raw JSON form, if you want to inspect before decoding.
+            pub fn query_raw(sql: impl AsRef<str>) -> $crate::Result<String> {
+                let r = b::vfs_query(sql.as_ref());
+                $crate::check_error(&r)?;
+                Ok(r)
+            }
+        }
+    };
+    (browse) => {
+        pub mod browse {
+            use super::b;
+            /// Fetch+extract a URL through the host Browse cap (never holds a socket).
+            pub fn fetch(url: impl AsRef<str>) -> $crate::Result<$crate::Page> {
+                $crate::page(&b::browse_fetch(url.as_ref()))
+            }
+        }
+    };
+    (command) => {
+        pub mod command {
+            use super::b;
+            /// Invoke a registered command (argv + stdin → stdout).
+            pub fn run(name: impl AsRef<str>, input: impl AsRef<str>, args: &[&str]) -> $crate::Result<String> {
+                let argv: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+                let r = b::run_command(name.as_ref(), input.as_ref(), &argv);
+                $crate::check_error(&r)?;
+                Ok(r)
+            }
+        }
+    };
+    (parallel) => {
+        pub mod parallel {
+            use super::b;
+            /// Fan a registered command over `inputs` (one stdin each), concurrently
+            /// across isolated instances — the host (BEAM) does the distribution a
+            /// single-threaded wasm instance can't. Per-input results, IN ORDER.
+            pub fn map(name: impl AsRef<str>, inputs: &[&str]) -> $crate::Result<Vec<$crate::Result<String>>> {
+                let inputs_json = serde_json::to_string(inputs)
+                    .map_err(|e| $crate::DockError(format!("encode inputs: {e}")))?;
+                $crate::parse_many(&b::run_command_many(name.as_ref(), &inputs_json))
+            }
+        }
+    };
+    // `frames` (shared-frame arena) is not yet built — host side wb-rhs.5/wb-pkh.8.
+    ($other:ident) => {
+        compile_error!(concat!(
+            "dock::bind! — unknown or not-yet-available cap `", stringify!($other),
+            "` (known: command, llm, vfs, browse, parallel)"
+        ));
+    };
+}
 
 #[cfg(test)]
 mod tests {

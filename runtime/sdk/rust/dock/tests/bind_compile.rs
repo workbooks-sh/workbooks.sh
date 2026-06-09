@@ -29,9 +29,10 @@ mod bindings {
     }
 }
 
-// Expand the SDK macro over the stub bindings — this is the thing that had never
-// compiled. If any wrapper is malformed Rust, this test file fails to build.
-dock::bind!(bindings);
+// Expand the SDK macro over the stub bindings with an EXPLICIT cap list (the
+// cap-scoping mechanism — must match the component's WIT world). If any wrapper is
+// malformed Rust, this file fails to build.
+dock::bind!(bindings, llm, vfs, browse, command, parallel);
 
 #[test]
 fn llm_wrapper_returns_ok() {

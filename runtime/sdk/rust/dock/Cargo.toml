@@ -8,18 +8,3 @@ license = "MIT"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# Cap-scoping is by Cargo feature: enable EXACTLY the caps your Policy profile
-# grants and your component's WIT subset world declares. `wb toolkit verify`
-# checks features ⊆ #+CAPS ⊆ granted profile. Enabling a cap you weren't granted
-# makes the component fail to instantiate (enforcement by construction).
-[features]
-default = []
-vfs = []
-commands = []
-llm = []
-browse = []
-# Staged — host cap not yet wired (wb-rhs.9). Enabling triggers a compile_error
-# so the surface is visible but cannot ship against an unbuilt host capability.
-parallel = []
-frames = []
