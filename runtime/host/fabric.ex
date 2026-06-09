@@ -45,9 +45,9 @@ defmodule Workbooks.Fabric do
   (ordered to match `inputs`), or `{:error, {:unsupported_tier, tier}}`.
   """
   def map(name, inputs, opts \\ []) when is_binary(name) and is_list(inputs) do
-    case opts[:tier] || :instance do
-      :instance -> {:ok, map_instances(name, inputs, opts)}
-      other -> {:error, {:unsupported_tier, other}}
+    case Workbooks.Isolation.resolve(opts[:tier] || :instance) do
+      {:ok, :instance} -> {:ok, map_instances(name, inputs, opts)}
+      {:error, _} = err -> err
     end
   end
 
@@ -92,9 +92,9 @@ defmodule Workbooks.Fabric do
   as `map/3`; `:instance` tier today (heavier tiers = wb-rhs.10).
   """
   def map_kernel(wasm_bytes, inputs, opts \\ []) when is_binary(wasm_bytes) and is_list(inputs) do
-    case opts[:tier] || :instance do
-      :instance -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
-      other -> {:error, {:unsupported_tier, other}}
+    case Workbooks.Isolation.resolve(opts[:tier] || :instance) do
+      {:ok, :instance} -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
+      {:error, _} = err -> err
     end
   end
 

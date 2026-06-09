@@ -57,7 +57,12 @@ defmodule Workbooks.FabricTest do
     assert {:ok, []} = Fabric.map(cmd, [])
   end
 
-  test "an unsupported isolation tier is refused (wb-rhs.10 tiers not yet wired)", %{cmd: cmd} do
-    assert {:error, {:unsupported_tier, :node}} = Fabric.map(cmd, ["x"], tier: :node)
+  test "a non-live isolation tier is refused with WHY (wb-rhs.10)", %{cmd: cmd} do
+    # :node is defined but planned — status-aware error, not a bare :unsupported.
+    assert {:error, {:tier_planned, :node, _why}} = Fabric.map(cmd, ["x"], tier: :node)
+    # :os_process exists but isn't wired into the fabric yet.
+    assert {:error, {:tier_not_wired, :os_process, _}} = Fabric.map(cmd, ["x"], tier: :os_process)
+    # an unknown tier name is its own error.
+    assert {:error, {:unknown_tier, :bogus, _}} = Fabric.map(cmd, ["x"], tier: :bogus)
   end
 end

@@ -80,8 +80,8 @@ defmodule Workbooks.KernelTest do
       assert {:ok, []} = Fabric.map_kernel(@reverse, [])
     end
 
-    test "unsupported isolation tier is refused (wb-rhs.10)" do
-      assert {:error, {:unsupported_tier, :node}} = Fabric.map_kernel(@reverse, ["x"], tier: :node)
+    test "a non-live isolation tier is refused with WHY (wb-rhs.10)" do
+      assert {:error, {:tier_planned, :node, _}} = Fabric.map_kernel(@reverse, ["x"], tier: :node)
     end
   end
 end
