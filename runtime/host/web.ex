@@ -161,6 +161,10 @@ defmodule Workbooks.Web do
     opts =
       [tenant: conn.assigns.tenant, max_steps: params["max_steps"] || 40]
       |> then(&if params["model"], do: [{:model, params["model"]} | &1], else: &1)
+      # exec grants the real-CLI `run` tool (sh -c, toolkit CLIs on PATH). Forwarded
+      # from the request so a caller can run a trusted agent; gate WHO can set it
+      # per deployment (single-tenant/desktop is the trusted local case).
+      |> then(&if params["exec"] == true, do: [{:exec, true} | &1], else: &1)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, task, opts)
     json = Jason.encode!(%{id: id, status: "running"})

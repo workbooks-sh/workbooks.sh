@@ -58,6 +58,9 @@ defmodule Workbooks.AgentSession do
           tenant: Keyword.get(opts, :tenant, "dev"),
           model: opts[:model],
           max_steps: Keyword.get(opts, :max_steps, 40),
+          # exec grants the real-CLI `run` tool (sh -c) — forwarded from the run
+          # request so a trusted agent can use real bash + the toolkit CLIs.
+          exec: Keyword.get(opts, :exec, false),
           # WB_RUN lets the agent address its OWN run for CTK reviews — build the
           # ?run= connect URL + `wb ctk await $WB_RUN` (see toolkits/ctk).
           env: [{"WB_RUN", run_id} | Keyword.get(opts, :env, [])],
