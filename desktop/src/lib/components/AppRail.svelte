@@ -20,6 +20,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import RailTooltip from "./RailTooltip.svelte";
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/ui/iconAccent.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
@@ -53,6 +54,7 @@
     onToggleFiles,
     onSwitchWorkspace,
     onSelectPackage,
+    onOpenApp,
     onReorderPackages,
     onCreatePackageMenu,
     onWorkspaceContext,
@@ -70,7 +72,10 @@
     filesOpen?: boolean;
     onToggleFiles?: () => void;
     onSwitchWorkspace?: (anchor: HTMLElement) => void;
+    /** Folder click → open the folder viewer (select + show its grid). */
     onSelectPackage?: (id: string) => void;
+    /** App click → open the app as a window (new content/doc tab). */
+    onOpenApp?: (id: string) => void;
     /** Persist a new order of the dynamic rail items (apps + folders). */
     onReorderPackages?: (orderedIds: string[]) => void;
     onCreatePackageMenu?: (rect: DOMRect) => void;
@@ -118,9 +123,19 @@
     overId = null;
   }
 
-  // Click an inactive package → make active + open files drawer.
-  // Click an already-active package → toggle the files drawer.
+  // Open semantics split by kind:
+  //   • app    → open as a WINDOW = a new content/doc tab (the app's
+  //              workbook). Handled by the parent's onOpenApp.
+  //   • folder → open the FOLDER VIEWER panel: select the package and
+  //              show its grid/springboard (the legacy onSelectPackage +
+  //              files-drawer behavior). Clicking the already-active
+  //              folder toggles the drawer.
   function handlePackage(p: RailPackage) {
+    const kind = p.kind ?? "folder";
+    if (kind === "app") {
+      onOpenApp?.(p.id);
+      return;
+    }
     if (p.isActive) {
       onToggleFiles?.();
     } else {
@@ -344,13 +359,7 @@
             <FolderIcon icon={pkg.icon ?? ""} size={31} />
           {:else}
             <span class="app-icon">
-              {#if pkg.icon && pkg.icon.startsWith("data:image/")}
-                <img src={pkg.icon} alt="" />
-              {:else if pkg.icon}
-                {pkg.icon}
-              {:else}
-                {initials(pkg.name)}
-              {/if}
+              <Icon value={pkg.icon ?? ""} name={pkg.name} size={20} />
             </span>
           {/if}
         </button>
@@ -642,7 +651,9 @@
     letter-spacing: 0.02em;
     overflow: hidden;
   }
-  .app-icon img {
+  /* Image/emoji/lucide/initials are all rendered by the shared Icon
+     component; only the data-URL image case needs sizing here. */
+  .app-icon :global(img) {
     width: 100%;
     height: 100%;
     object-fit: cover;

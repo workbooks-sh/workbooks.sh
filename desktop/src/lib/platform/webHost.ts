@@ -43,15 +43,25 @@ if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
 // Rail items are packages. A package is either an `app` (a workbook — bare
 // icon) or a `folder` (a container — folder glyph). Kanban ships as a default
 // app. Mix of apps + folders so the rail shows the real model + reordering.
+// Default to Lucide icons (lucide:<Name>). Names are verified to exist as
+// canonical exports in @lucide/svelte v1 and are wired in Icon.svelte's
+// LUCIDE map. Reading keeps a plain emoji to prove emoji still renders.
 const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
-  Kanban: { icon: "📋", kind: "app" },
-  Notes: { icon: "📝", kind: "app" },
-  Tracker: { icon: "📈", kind: "app" },
-  Reading: { icon: "📚", kind: "app" },
-  Clients: { icon: "💼", kind: "folder" },
-  "Side Projects": { icon: "🚀", kind: "folder" },
-  Acme: { icon: "📊", kind: "folder" },
-  Internal: { icon: "🔧", kind: "app" },
+  Kanban: { icon: "lucide:SquareKanban", kind: "app" },
+  Notes: { icon: "lucide:NotebookPen", kind: "app" },
+  Tracker: { icon: "lucide:TrendingUp", kind: "app" },
+  Reading: { icon: "📚", kind: "app" }, // emoji example — still supported
+  Clients: { icon: "lucide:Briefcase", kind: "folder" },
+  "Side Projects": { icon: "lucide:Rocket", kind: "folder" },
+  Acme: { icon: "lucide:ChartColumn", kind: "folder" },
+  Internal: { icon: "lucide:Wrench", kind: "app" },
+};
+
+/** Workbook path served per app. The real Kanban workbook lives as a
+ *  static asset (see static/mock/kanban.html); other apps open a clearly
+ *  labeled stub page generated on the fly by `read_file_bytes_base64`. */
+const APP_WORKBOOK_PATH: Record<string, string> = {
+  Kanban: "/mock/kanban.html",
 };
 const PKG_WORKBOOKS: Record<string, { path: string; title: string }[]> = {
   Clients: [
@@ -100,6 +110,13 @@ const IDENTITY = {
 };
 const DAEMON = { state: "running", url: "http://127.0.0.1:8787", pid: 4242, manager: "krunvm" };
 
+/** Resolve the workbook path an `app` package opens as a window/tab.
+ *  Real Kanban workbook for Kanban; a labeled stub path for every other
+ *  app. Folders never call this (they open the folder viewer instead). */
+function appWorkbookPath(name: string): string {
+  return APP_WORKBOOK_PATH[name] ?? `/mock/${name}.html`;
+}
+
 function pkg(name: string) {
   return {
     name,
@@ -125,10 +142,62 @@ function ensureStore(path: string): Record<string, unknown> {
   return stores.get(path)!;
 }
 
+type MockTab = { id: string; path: string; title: string; kind: string; dirty: boolean };
+
+/** Derive a tab title + kind from a path. `.html` → workbook (so the
+ *  WorkbookView renderer + provenance header kick in), else text. */
+function tabFromPath(path: string, id: string): MockTab {
+  const file = path.split("/").pop() ?? path;
+  const base = file.replace(/\.[^.]+$/, "");
+  const title = base.charAt(0).toUpperCase() + base.slice(1);
+  const kind = /\.html?$/i.test(path)
+    ? "workbook"
+    : /\.org$/i.test(path)
+      ? "org"
+      : "text";
+  return { id, path, title, kind, dirty: false };
+}
+
+/** Stub workbook HTML for any app that lacks a real workbook on disk.
+ *  Clearly labeled so it's obvious this is a placeholder, not content. */
+function stubWorkbookHtml(path: string): string {
+  const name = (path.split("/").pop() ?? path).replace(/\.[^.]+$/, "");
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  return `<!doctype html><html><head><meta charset="utf-8">
+<title>${label} (stub)</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; font:15px/1.5 ui-sans-serif,system-ui,sans-serif;
+    color:#1c1d22; background:#f7f8fa; display:grid; place-items:center;
+    min-height:100vh; }
+  .card { text-align:center; padding:40px 48px; border:1px dashed #cdd2da;
+    border-radius:16px; background:#fff; max-width:380px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  p { margin:0; color:#6b7280; font-size:13px; }
+  .tag { display:inline-block; margin-bottom:16px; padding:3px 10px;
+    border-radius:999px; background:#eef2ff; color:#2f6fe0; font-size:11px;
+    font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+</style></head>
+<body><div class="card"><span class="tag">Stub workbook</span>
+<h1>${label}</h1>
+<p>This is a placeholder page. No real workbook is wired for this app yet.</p>
+</div></body></html>`;
+}
+
 // ── the router ─────────────────────────────────────────────────────────────
 function makeInvoke(): Invoke {
   let listenerId = 0;
   let activePackage = "Kanban";
+
+  // Real in-memory tab state. Tauri events aren't bridged in the mock, so
+  // the tabs store can't learn about opens from a `tabs-state` event — but
+  // it DOES apply tab_open/tab_focus/tab_close return values directly
+  // (see tabs/store.svelte.ts #apply(snap)). So as long as we return an
+  // honest snapshot here, clicking an app visibly opens a new tab.
+  let tabs: MockTab[] = [];
+  let activeTabId: string | null = null;
+  let tabSeq = 0;
+  const snap = () => ({ tabs, active: activeTabId });
 
   return async (cmd, args = {}) => {
     const a = args as Record<string, any>;
@@ -196,6 +265,9 @@ function makeInvoke(): Invoke {
       case "package_get_active": return activePackage;
       case "package_load": return pkg(a.name);
       case "package_workbooks": return PKG_WORKBOOKS[a.name] ?? [];
+      // App packages open as a window/tab; resolve the workbook path the
+      // app maps to (real Kanban workbook, or a labeled stub for others).
+      case "package_app_workbook": return appWorkbookPath(a.name);
       case "package_set_active": activePackage = a.name; return pkg(a.name);
       case "package_set_icon": case "package_set_layout": case "package_set_view_mode":
       case "package_set_subtree": case "package_add_folder": case "package_remove_folder":
@@ -203,10 +275,37 @@ function makeInvoke(): Invoke {
       case "package_import_folder": return pkg(a.package ?? activePackage);
       case "package_delete": return null;
 
-      // ── tabs (return-shape only; live events not bridged in preview) ──
-      case "tab_list": return { tabs: [], active_id: null };
-      case "tab_open": case "tab_focus": case "tab_close": case "tab_set_dirty":
-        return { tabs: [], active_id: null };
+      // ── tabs ──
+      // Events aren't bridged in the mock, but the tabs store applies
+      // these return snapshots directly, so opens/closes show up live.
+      case "tab_list":
+        return snap();
+      case "tab_open": {
+        const existing = tabs.find((t) => t.path === a.path);
+        if (existing) {
+          activeTabId = existing.id;
+        } else {
+          const t = tabFromPath(a.path, `tab_${++tabSeq}`);
+          tabs = [...tabs, t];
+          activeTabId = t.id;
+        }
+        return snap();
+      }
+      case "tab_focus":
+        if (tabs.some((t) => t.id === a.id)) activeTabId = a.id;
+        return snap();
+      case "tab_close": {
+        const idx = tabs.findIndex((t) => t.id === a.id);
+        tabs = tabs.filter((t) => t.id !== a.id);
+        if (activeTabId === a.id) {
+          const next = tabs[idx] ?? tabs[idx - 1] ?? tabs[tabs.length - 1];
+          activeTabId = next ? next.id : null;
+        }
+        return snap();
+      }
+      case "tab_set_dirty":
+        tabs = tabs.map((t) => (t.id === a.id ? { ...t, dirty: !!a.dirty } : t));
+        return snap();
 
       // ── bookmarks / themes / settings catalogs ──
       case "bookmark_list": return [];
@@ -231,6 +330,27 @@ function makeInvoke(): Invoke {
       case "fs_write_file": case "fs_create_file": case "fs_mkdir":
       case "fs_rename": case "fs_delete": case "fs_reveal":
       case "fs_watch_start": case "fs_watch_stop": case "config_watch_start": return null;
+
+      // ── workbook bytes (WorkbookView reads base64 → blob → iframe) ──
+      // Real workbooks (e.g. /mock/kanban.html) are served as static
+      // assets under desktop/static; fetch + base64 them. Anything we
+      // can't fetch falls back to a clearly-labeled stub page.
+      case "read_file_bytes_base64": {
+        const path = String(a.path ?? "");
+        let html: string | null = null;
+        try {
+          const res = await fetch(path);
+          if (res.ok) html = await res.text();
+        } catch {
+          /* fall through to stub */
+        }
+        if (html === null) html = stubWorkbookHtml(path);
+        // base64-encode UTF-8 (mirror Rust's read_file_bytes_base64).
+        const bytes = new TextEncoder().encode(html);
+        let bin = "";
+        for (const b of bytes) bin += String.fromCharCode(b);
+        return btoa(bin);
+      }
 
       // ── workbook helpers ──
       case "workbook_spec_read": return null;

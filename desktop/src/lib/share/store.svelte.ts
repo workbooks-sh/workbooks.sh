@@ -103,10 +103,19 @@ class ShareStore {
     }
   }
 
-  /** Reactive accessor — return-or-init. The returned object is a
-   *  proxied Svelte reactive ref, so mutations to its fields drive
-   *  re-render. */
+  /** Reactive accessor — READ-ONLY. Never mutates `byPath`, so it is
+   *  safe to call from inside a `$derived` (a lazy-init write here was
+   *  the source of a `state_unsafe_mutation` crash when ShareButton
+   *  derived off an as-yet-unseen workbook path). Returns the live
+   *  reactive ref when present, else a fresh default snapshot. State is
+   *  materialised by `ensure()` from the explicit lifecycle methods. */
   get(path: string): TabShareState {
+    return this.byPath[path] ?? emptyState();
+  }
+
+  /** Return-or-init the live reactive ref. Used by the mutating
+   *  lifecycle methods (hydrate / share / …) — never from a derived. */
+  private ensure(path: string): TabShareState {
     if (!this.byPath[path]) this.byPath[path] = emptyState();
     return this.byPath[path];
   }
@@ -121,7 +130,7 @@ class ShareStore {
    *  and refreshes the room list from the broker. If absent, sets
    *  "unshared". Idempotent — safe to call on every tab open. */
   async hydrate(workbookPath: string): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     if (st.status === "sharing") return; // mid-flight; let it finish
     st.error = null;
 
@@ -169,7 +178,7 @@ class ShareStore {
     workbookPath: string,
     opts: { access_mode?: RoomAccessMode; password?: string } = {},
   ): Promise<RoomView> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.status = "sharing";
     st.error = null;
     try {
@@ -219,7 +228,7 @@ class ShareStore {
    *  shared workbook. All enabled rooms immediately serve the new
    *  bytes (see plans/live-urls.org §release model). */
   async release(workbookPath: string): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     if (!st.workbook_id) throw new Error("release_called_without_workbook_id");
     st.status = "sharing";
     st.error = null;
@@ -235,7 +244,7 @@ class ShareStore {
   }
 
   async toggleEnabled(workbookPath: string, slug: string, enabled: boolean): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       const updated = await patchRoom({ slug, enabled });
@@ -252,7 +261,7 @@ class ShareStore {
     slug: string,
     args: { access_mode: RoomAccessMode; password?: string },
   ): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       const updated = await patchRoom({ slug, ...args });
@@ -264,7 +273,7 @@ class ShareStore {
   }
 
   async destroy(workbookPath: string, slug: string): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       await deleteRoom(slug);
@@ -345,7 +354,7 @@ class ShareStore {
     slug: string,
     m: { type?: string; [k: string]: unknown },
   ): void {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     switch (m.type) {
       case "presence.list": {
         const peers = (m.peers as RoomPeer[] | undefined) ?? [];
@@ -399,7 +408,7 @@ class ShareStore {
   // ── Comments ──────────────────────────────────────────────────────
 
   async loadComments(workbookPath: string, slug: string): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       const list = await listComments(slug);
@@ -415,7 +424,7 @@ class ShareStore {
     id: string,
     resolved: boolean,
   ): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       const updated = await setCommentResolved({ slug, id, resolved });
@@ -428,7 +437,7 @@ class ShareStore {
   }
 
   async removeComment(workbookPath: string, slug: string, id: string): Promise<void> {
-    const st = this.get(workbookPath);
+    const st = this.ensure(workbookPath);
     st.error = null;
     try {
       await deleteCommentRow({ slug, id });

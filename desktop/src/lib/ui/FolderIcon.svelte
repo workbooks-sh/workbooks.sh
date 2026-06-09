@@ -2,17 +2,21 @@
   /**
    * FolderIcon — a folder glyph (single tint) with the chosen icon dropped
    * bare into the bottom-left corner (no chip/container), sized ~1/3 of the
-   * folder. Icon model matches the app: "" = no badge, data:image/ = image,
-   * else emoji.
+   * folder. Icon model matches the app and is resolved by the shared
+   * Icon component: "" = no badge, lucide:<Name> = Lucide glyph,
+   * data:image/ = image, else emoji.
    */
+  import Icon from "./Icon.svelte";
+
   let {
     icon = "",
     color = "#9a9a9e",
     size = 40,
   }: { icon?: string; color?: string; size?: number } = $props();
 
-  const isImage = $derived(!!icon && icon.startsWith("data:image/"));
   const hasBadge = $derived(!!icon);
+  /** Lucide glyph sized to ~the emoji badge footprint (0.46 of folder). */
+  const badgePx = $derived(Math.round(size * 0.46));
 </script>
 
 <span class="folder" style="--c:{color}; --s:{size}px;">
@@ -28,11 +32,9 @@
   </svg>
 
   {#if hasBadge}
-    {#if isImage}
-      <img class="badge" src={icon} alt="" />
-    {:else}
-      <span class="badge emoji">{icon}</span>
-    {/if}
+    <span class="badge" style="--bs:{badgePx}px;">
+      <Icon value={icon} size={badgePx} strokeWidth={1.75} />
+    </span>
   {/if}
 </span>
 
@@ -62,26 +64,33 @@
     stroke-width: 0.5;
   }
 
-  /* Bare badge — bottom-left corner, no background, ~1/3 of the folder. */
+  /* Bare badge — bottom-left corner, no background, ~1/3 of the folder.
+     Content is rendered by the shared Icon component (emoji span / img /
+     lucide svg); we just position + size the slot here. */
   .badge {
     position: absolute;
     left: 2%;
     bottom: -3%;
+    display: inline-flex;
+    align-items: flex-end;
     line-height: 1;
+    /* emoji glyph scale */
+    font-size: var(--bs);
+    /* The folder front (--c-front) is ALWAYS a light tint (color mixed
+       toward white) in both light and dark themes, so the badge glyph
+       must be DARK to be legible — NOT the theme foreground (which is
+       white in dark mode → white-on-white, invisible). Fixed near-black
+       reads on every folder color. Emoji carry their own colors and
+       ignore this. */
+    color: #1c1d22;
+    /* soft dark drop so the glyph separates from the folder regardless
+       of its tint */
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
   }
-  .badge.emoji {
-    font-size: calc(var(--s) * 0.46);
-    /* thin light halo + soft drop so the glyph separates from the folder
-       regardless of its own colors */
-    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9))
-      drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
-  }
-  img.badge {
-    width: calc(var(--s) * 0.46);
-    height: calc(var(--s) * 0.46);
+  .badge :global(img) {
+    width: var(--bs);
+    height: var(--bs);
     object-fit: contain;
-    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9))
-      drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
   }
 </style>
 

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kanban Board</title>
+<!-- Single-file workbook. The `workbook-spec` marker below is what the
+     desktop's grid scan + provenance verifier key on to recognise a
+     workbook. This board is self-contained (no external runtime) so it
+     renders identically in the desktop app, the mock web host, and a
+     plain browser. -->
+<script id="workbook-spec" type="application/json">
+{
+  "name": "Kanban Board",
+  "version": "0.1.0",
+  "kind": "app",
+  "columns": ["Backlog", "In Progress", "Done"]
+}
+</script>
+<style>
+  :root { color-scheme: light; --bg:#f5f6f8; --surface:#fff; --border:#e3e6ea;
+    --fg:#1c1d22; --muted:#6b7280; --accent:#2f6fe0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
+    color:var(--fg); background:var(--bg); }
+  header { padding:18px 22px 10px; }
+  header h1 { margin:0; font-size:18px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:12px; }
+  .board { display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
+    padding:14px 22px 28px; align-items:start; }
+  .col { background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:10px; min-height:120px; }
+  .col.drag-over { border-color:var(--accent); box-shadow:0 0 0 2px rgba(47,111,224,.18); }
+  .col h2 { margin:2px 4px 10px; font-size:12px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--muted); display:flex; justify-content:space-between; }
+  .count { background:var(--bg); border-radius:999px; padding:0 7px; font-size:11px; }
+  .card { background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; padding:9px 11px; margin-bottom:8px; cursor:grab;
+    box-shadow:0 1px 2px rgba(15,15,15,.04); }
+  .card:active { cursor:grabbing; }
+  .card.dragging { opacity:.45; }
+  .add { width:100%; border:1px dashed var(--border); background:transparent;
+    color:var(--muted); border-radius:8px; padding:7px; font:inherit;
+    font-size:12px; cursor:pointer; }
+  .add:hover { color:var(--accent); border-color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kanban Board</h1>
+  <p>Drag cards between columns. Double-click a column footer to add a card.</p>
+</header>
+<div class="board" id="board"></div>
+<script>
+  const SEED = {
+    Backlog: ["Draft the proposal", "Research competitors", "Collect feedback"],
+    "In Progress": ["Wire up the rail demo", "Default to Lucide icons"],
+    Done: ["Set up the project", "Define the icon model"],
+  };
+  const board = document.getElementById("board");
+  let dragEl = null;
+
+  function makeCard(text) {
+    const c = document.createElement("div");
+    c.className = "card";
+    c.draggable = true;
+    c.textContent = text;
+    c.addEventListener("dragstart", () => { dragEl = c; c.classList.add("dragging"); });
+    c.addEventListener("dragend", () => { c.classList.remove("dragging"); dragEl = null; });
+    return c;
+  }
+
+  function refreshCounts() {
+    document.querySelectorAll(".col").forEach((col) => {
+      const n = col.querySelectorAll(".card").length;
+      col.querySelector(".count").textContent = n;
+    });
+  }
+
+  Object.entries(SEED).forEach(([name, cards]) => {
+    const col = document.createElement("div");
+    col.className = "col";
+    const h = document.createElement("h2");
+    h.innerHTML = `<span>${name}</span><span class="count">0</span>`;
+    col.appendChild(h);
+    const drop = document.createElement("div");
+    drop.className = "drop";
+    cards.forEach((t) => drop.appendChild(makeCard(t)));
+    col.appendChild(drop);
+    const add = document.createElement("button");
+    add.className = "add";
+    add.textContent = "+ Add card";
+    add.addEventListener("click", () => {
+      const t = prompt("Card text:");
+      if (t) { drop.appendChild(makeCard(t)); refreshCounts(); }
+    });
+    col.appendChild(add);
+
+    col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("drag-over"); });
+    col.addEventListener("dragleave", () => col.classList.remove("drag-over"));
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drag-over");
+      if (dragEl) { drop.appendChild(dragEl); refreshCounts(); }
+    });
+    board.appendChild(col);
+  });
+  refreshCounts();
+</script>
+</body>
+</html>

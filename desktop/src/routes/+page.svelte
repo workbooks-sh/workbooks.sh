@@ -5,6 +5,7 @@
     Plus as HomePlus,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import AppRail, {
     type RailTab,
     type RailPackage,
@@ -257,12 +258,26 @@
     }
   }
 
+  // Folder click → open the folder viewer panel (select + show grid).
   async function onSelectPackage(name: string) {
     try {
       await packageStore.setActive(name);
       chrome.openFiles();
     } catch (e) {
       console.warn("[rail] setActive package failed", e);
+    }
+  }
+
+  // App click → open the app as a WINDOW: a new content tab via the
+  // existing tab system, showing the app's workbook (mirrors how the
+  // springboard grid opens a workbook in PackageGridView.open()).
+  async function onOpenApp(name: string) {
+    try {
+      const path = await invoke<string>("package_app_workbook", { name });
+      await tabs.open(path);
+      chrome.mode = "doc";
+    } catch (e) {
+      console.warn("[rail] open app failed", e);
     }
   }
 
@@ -386,6 +401,7 @@
       onToggleFiles={() => chrome.toggleFiles()}
       onSwitchWorkspace={onSwitchWorkspace}
       onSelectPackage={onSelectPackage}
+      onOpenApp={onOpenApp}
       onReorderPackages={onReorderPackages}
       onCreatePackageMenu={onCreatePackageMenu}
       onWorkspaceContext={onWorkspaceContext}
