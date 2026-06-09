@@ -58,3 +58,7 @@ scratch/
 
 # local-production build-lock (per-machine artifact provenance)
 scripts/.build-lock.tsv
+
+# stray publish/test output (not source)
+.publish_out/
+runtime/.publish_out/
