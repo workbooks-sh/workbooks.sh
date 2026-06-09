@@ -280,51 +280,145 @@ defmodule Workbooks.Toolkits do
           |> Enum.filter(&contained?(&1, Path.expand(dir)))
           |> Enum.sort()
 
-        cond do
-          cases == [] ->
-            "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
+        if cases == [] do
+          "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
+        else
+          results = Enum.map(cases, &run_eval_case(&1, dir, id))
+          pass = Enum.count(results, &(elem(&1, 0) == :pass))
+          skip = Enum.count(results, &(elem(&1, 0) == :skip))
+          n = length(results)
+          skipnote = if skip > 0, do: " (#{skip} skipped)", else: ""
 
-          not exec_allowed?() ->
-            "#{id}: #{length(cases)} eval case(s) — SKIPPED (set WB_TOOLKIT_EXEC=1 to run sandboxed)"
-
-          true ->
-            results = Enum.map(cases, &run_eval_case(&1, dir))
-            pass = Enum.count(results, &elem(&1, 0))
-
-            "#{id} evals: #{pass}/#{length(results)} passed\n" <>
-              Enum.map_join(results, "\n", fn {ok, label} -> "  #{if ok, do: "✓", else: "✗"} #{label}" end)
+          "#{id} evals: #{pass}/#{n - skip} passed#{skipnote}\n" <>
+            Enum.map_join(results, "\n", fn {st, label} ->
+              "  #{%{pass: "✓", fail: "✗", skip: "·"}[st]} #{label}"
+            end)
         end
     end
   end
 
-  defp run_eval_case(path, dir) do
+  # Each evals/*.org is one case: Tier 2 (agent + judge) if it declares :TASK:,
+  # else Tier 1 (deterministic :role eval + #+EXPECT:). Returns {:pass|:fail|:skip, label}.
+  defp run_eval_case(path, dir, id) do
     text = File.read!(path)
     name = Path.relative_to(path, dir)
 
-    expect =
-      case Regex.run(~r/^#\+EXPECT:\s*(.+)$/m, text) do
-        [_, e] -> String.trim(e)
-        _ -> nil
-      end
-
-    case extract_role_blocks(text, "eval") do
-      [] ->
-        {false, "#{name}: no :role eval block"}
-
-      blocks ->
-        {out, code} = run_bash(Enum.join(blocks, "\n"), [])
-        ok = code == 0 and (is_nil(expect) or String.contains?(out, expect))
-
-        detail =
-          cond do
-            ok -> ""
-            code != 0 -> " — exit #{code}: " <> String.trim(String.slice(out, 0, 160))
-            true -> " — missing #{inspect(expect)}"
-          end
-
-        {ok, name <> detail}
+    cond do
+      prop(text, "TASK") != nil -> agent_judge_case(text, name, dir, id)
+      extract_role_blocks(text, "eval") != [] -> deterministic_case(text, name)
+      true -> {:fail, "#{name}: no :role eval block and no :TASK:"}
     end
   end
+
+  # Tier 1 — run the sandboxed :role eval block, assert #+EXPECT:.
+  defp deterministic_case(text, name) do
+    if not exec_allowed?() do
+      {:skip, "#{name}: SKIPPED (set WB_TOOLKIT_EXEC=1 to run sandboxed)"}
+    else
+      expect =
+        case Regex.run(~r/^#\+EXPECT:\s*(.+)$/m, text) do
+          [_, e] -> String.trim(e)
+          _ -> nil
+        end
+
+      {out, code} = run_bash(Enum.join(extract_role_blocks(text, "eval"), "\n"), [])
+      ok = code == 0 and (is_nil(expect) or String.contains?(out, expect))
+
+      detail =
+        cond do
+          ok -> ""
+          code != 0 -> " — exit #{code}: " <> String.trim(String.slice(out, 0, 160))
+          true -> " — missing #{inspect(expect)}"
+        end
+
+      {if(ok, do: :pass, else: :fail), name <> detail}
+    end
+  end
+
+  # Tier 2 — run an agent on :TASK: (the toolkit's overview injected so it knows
+  # the surface), then a judge model scores the result + tool trace vs :RUBRIC:.
+  defp agent_judge_case(text, name, dir, id) do
+    task = prop(text, "TASK")
+    rubric = prop(text, "RUBRIC") || "The result correctly and completely satisfies the task."
+    exec? = prop(text, "EXEC") in ["true", "yes", "1"]
+    max = case Integer.parse(prop(text, "MAX_STEPS") || "6") do
+            {n, _} -> n
+            _ -> 6
+          end
+
+    cond do
+      not llm_key?() ->
+        {:skip, "#{name}: SKIPPED (no LLM key — set OPENROUTER_API_KEY)"}
+
+      exec? and not exec_allowed?() ->
+        {:skip, "#{name}: SKIPPED (:EXEC: needs WB_TOOLKIT_EXEC=1)"}
+
+      true ->
+        overview =
+          case File.read(Path.join([dir, "skills", "overview.org"])) do
+            {:ok, o} -> "\n\n#{id} toolkit overview:\n" <> o
+            _ -> ""
+          end
+
+        system =
+          (prop(text, "SYSTEM") ||
+             "You are an agent being evaluated. Use the #{id} toolkit to complete the task; state your final result clearly.") <>
+            overview
+
+        run =
+          Workbooks.Agent.run(system, task,
+            model: System.get_env("WB_EVAL_MODEL"),
+            max_steps: max,
+            exec: exec?,
+            tenant: "eval"
+          )
+
+        tools = run.events |> Enum.map(& &1.tool) |> Enum.uniq()
+        {verdict, reason} = judge(task, rubric, run.result, tools)
+        {verdict, "#{name} [tools: #{Enum.join(tools, ",")}] — #{reason}"}
+    end
+  end
+
+  defp judge(task, rubric, result, tools) do
+    sys =
+      "You are a strict evaluator. Given a TASK, a RUBRIC, and an agent's RESULT, decide if the result satisfies the rubric. Respond with a verdict whose FIRST line is exactly PASS or FAIL, then one short line of reasoning."
+
+    user = """
+    TASK:
+    #{task}
+
+    RUBRIC:
+    #{rubric}
+
+    AGENT TOOLS USED: #{Enum.join(tools, ", ")}
+
+    AGENT RESULT:
+    #{String.slice(result || "(no result)", 0, 4000)}
+    """
+
+    case Workbooks.Llm.complete([%{role: "system", content: sys}, %{role: "user", content: user}], []) do
+      {:ok, %{content: content}} when is_binary(content) ->
+        first = content |> String.split("\n", trim: true) |> List.first() |> to_string() |> String.trim()
+        verdict = if first |> String.upcase() |> String.starts_with?("PASS"), do: :pass, else: :fail
+        {verdict, String.trim(String.slice(content, 0, 200))}
+
+      other ->
+        {:fail, "judge error: #{inspect(other)}"}
+    end
+  end
+
+  # Read a `:KEY: value` property line (PROPERTIES drawer); nil if absent.
+  defp prop(text, key) do
+    case Regex.run(~r/^\s*:#{key}:\s*(.+?)\s*$/m, text) do
+      [_, v] -> String.trim(v)
+      _ -> nil
+    end
+  end
+
+  defp llm_key?,
+    do:
+      System.get_env("OPENROUTER_API_KEY") not in [nil, ""] or
+        System.get_env("WB_LLM_KEY") not in [nil, ""]
 
   # ── Third-party trust: manifest provenance (AUTHOR_DID + SIGNATURE) ────────
   # A `#+TRUST: third-party` toolkit must carry a did:key signature over its

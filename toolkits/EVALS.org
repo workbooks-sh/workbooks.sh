@@ -36,24 +36,31 @@
      ,#+end_src
    #+end_src
 
-** Tier 2 — agent + judge (NEXT, telemetry-scored)
-   For "does an AGENT use this toolkit correctly." A =#+TASK:= (what the agent is
-   asked to do) + a =#+RUBRIC:= (judge criteria). The harness starts a run
-   (=POST /api/run=) with the toolkit in scope, then scores the result + the
-   universal =_steps.jsonl= telemetry (=Workbooks.Workflow.Telemetry=) against the
-   rubric via a judge model (default =xiaomi/mimo-v2.5=). This is the
-   "evaluate against the original author's evaluations" path.
+** Tier 2 — agent + judge (BUILT, telemetry-scored)
+   For "does an AGENT use this toolkit correctly." A case is Tier 2 when it
+   declares a =:TASK:= property. The harness runs an agent on the TASK (the
+   toolkit's =overview= skill is injected so it knows the surface), then a judge
+   model scores the agent's RESULT + its tool trace against the =:RUBRIC:=. This
+   is the "evaluate against the original author's evaluations" path.
 
    #+begin_src org
-   ,* the agent harvests a brand's palette                            :eval:
+   ,* the agent explains what git status shows                        :eval:
      :PROPERTIES:
-     :TASK:    Use the brandnana toolkit to harvest tecovas.com's brand palette.
-     :RUBRIC:  Output names ≥3 hex colors AND calls the harvest verb (not a guess).
+     :TASK:      In one sentence, explain what `git status` shows.
+     :RUBRIC:    Names the working-tree state — staged vs unstaged + untracked.
+     :EXEC:      false      # true ⇒ grant the real-CLI tool (needs WB_TOOLKIT_EXEC)
+     :MAX_STEPS: 2          # optional; agent step cap (default 6)
+     :SYSTEM:    ...        # optional; overrides the default system prompt
      :END:
    #+end_src
 
+   Models: the agent + judge default to =xiaomi/mimo-v2.5= (override the agent
+   with =WB_EVAL_MODEL=, both with =WB_LLM_MODEL=). Needs an LLM key
+   (=OPENROUTER_API_KEY=); =:EXEC: true= additionally needs =WB_TOOLKIT_EXEC=1=.
+   The judge's verdict is its first line (=PASS=/=FAIL=) + one line of reasoning.
+
 * Running
-  - =wb toolkit eval <id>=      — run a toolkit's eval suite (Tier 1 today).
+  - =wb toolkit eval <id>=      — run a toolkit's eval suite (Tier 1 + Tier 2).
   - =wb dev eval [toolkit]=     — dev-service entry: list eval suites / run them.
   - Gating: Tier-1 bash runs only with =WB_TOOLKIT_EXEC=1= (else reported SKIPPED,
     like verify). Tier-2 needs a runtime + an LLM key.
