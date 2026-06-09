@@ -32,15 +32,19 @@ export default {
     // /docs/* — documentation site proxied from workbooks-docs.pages.dev
     // so workbooks.sh/docs/* serves docs under the canonical hostname.
     if (url.pathname === "/docs" || url.pathname.startsWith("/docs/")) {
-      const docPath = url.pathname === "/docs" ? "/index.html" : url.pathname.slice("/docs".length);
+      const docPath = url.pathname === "/docs" ? "/" : url.pathname.slice("/docs".length);
       const target = new URL(docPath + url.search, "https://workbooks-docs.pages.dev");
       const upstreamHeaders = new Headers(request.headers);
       upstreamHeaders.delete("host");
+      // redirect:"follow" — Cloudflare Pages 308-redirects `/foo.html` → clean-URL
+      // `/foo` (no extension). With "manual" that bare, /docs-less redirect leaked to
+      // the browser and dropped the /docs prefix, landing on the lander. Following it
+      // server-side resolves against the docs origin and returns the real page.
       return fetch(new Request(target.toString(), {
         method: request.method,
         headers: upstreamHeaders,
         body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
-        redirect: "manual",
+        redirect: "follow",
       }));
     }
 
