@@ -1517,7 +1517,7 @@ defmodule Workbooks.Compilers do
 
   `entry_rel` is POSIX-relative to `project_dir` (e.g. "index.js"). Returns {:ok, js} | {:error, _}.
   """
-  def bundle_dir(project_dir, entry_rel, root \\ default_root()) do
+  def bundle_dir(project_dir, entry_rel, opts \\ [], root \\ default_root()) do
     jd = Path.join(root, "js")
     qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
     bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
@@ -1530,7 +1530,9 @@ defmodule Workbooks.Compilers do
 
       true ->
         files = Map.merge(collect_bundle_files(Path.expand(project_dir)), shim_files(jd))
-        payload = Jason.encode!(%{"entry" => entry_rel, "files" => files})
+        # :dock → permit the host-brokered fs/http/https shims (run via JsDock); wb-e1x.5.
+        dock = Keyword.get(opts, :dock, false)
+        payload = Jason.encode!(%{"entry" => entry_rel, "files" => files, "dock" => dock})
         run_bundler(payload, qrun, bundlejob)
     end
   end

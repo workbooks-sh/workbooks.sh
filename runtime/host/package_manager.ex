@@ -254,8 +254,11 @@ defmodule Workbooks.PackageManager do
   defp build_npm_dir(abs, lang, out) do
     with :ok <- ensure_node_modules(abs),
          {:ok, entry_rel} <- prepare_bundle_entry(abs, lang),
-         {:ok, js} <- Workbooks.Compilers.bundle_dir(abs, entry_rel) do
-      bundled_js_to_wasm(js, out)
+         # Bundle dock-permissive: a bundle that requires fs/http/https pulls the host-brokered
+         # shims (Javy.VFS/Javy.Net); a pure-compute bundle never references them (wb-e1x.5).
+         {:ok, js} <- Workbooks.Compilers.bundle_dir(abs, entry_rel, dock: true) do
+      dock? = js =~ "Javy.VFS" or js =~ "Javy.Net"
+      bundled_js_to_wasm(js, out, dock?)
     end
   end
 
@@ -284,11 +287,11 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  defp bundled_js_to_wasm(js, out) do
+  defp bundled_js_to_wasm(js, out, dock? \\ false) do
     File.mkdir_p!(@cache)
     tmp = Path.join(@cache, "npmbundle-#{cache_key([js])}.js")
     File.write!(tmp, js)
-    r = js_to_wasm(tmp, out)
+    r = js_to_wasm(tmp, out, dock?)
     File.rm(tmp)
     r
   end
@@ -705,10 +708,12 @@ defmodule Workbooks.PackageManager do
     js_to_wasm(js, out)
   end
 
-  defp js_to_wasm(src, out) do
+  defp js_to_wasm(src, out, dock? \\ false) do
     File.mkdir_p!(@cache)
 
-    case Workbooks.Compilers.js_compile_to_wasm(src) do
+    # dock? → link harness_dock.o (env.host_* imports → Javy.Net/Javy.VFS); the artifact runs via
+    # Workbooks.JsDock, detected at run time from its imports (wb-e1x.5).
+    case Workbooks.Compilers.js_compile_to_wasm(src, dock: dock?) do
       {:ok, wasm, _logs} ->
         File.cp!(wasm, out)
         File.rm(wasm)
@@ -813,8 +818,29 @@ defmodule Workbooks.PackageManager do
       argv_bytes(argv) > @max_argv_bytes ->
         {:error, {:argv_too_large, max: @max_argv_bytes}}
 
+      # A JsDock artifact imports env.host_* (host-brokered fs/net) and CANNOT run on the bare
+      # wasmtime CLI — route it to Workbooks.JsDock (Wasmex + Policy-gated host fns). Detected from
+      # the wasm's import names (wb-e1x.5). Profile defaults to :minimal (vfs yes, net no); a
+      # net-using command needs opts[:profile] = :network.
+      dock_artifact?(wasm_path) ->
+        # JsDock.run returns {:ok, stdout} | {:error, _}; unwrap to match the CLI run shape
+        # (bare stdout binary on success).
+        case Workbooks.JsDock.run(wasm_path, input, profile: Keyword.get(opts, :profile, :minimal)) do
+          {:ok, out} -> out
+          {:error, _} = e -> e
+        end
+
       true ->
         run_wasmtime(wasm_path, input, argv, dirs, opts)
+    end
+  end
+
+  # A command built with the JsDock harness imports env.host_vfs_read / env.host_http_get — the
+  # import names appear literally in the wasm import section.
+  defp dock_artifact?(wasm_path) do
+    case File.read(wasm_path) do
+      {:ok, bytes} -> bytes =~ "host_vfs_read" or bytes =~ "host_http_get"
+      _ -> false
     end
   end
 

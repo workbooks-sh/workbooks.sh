@@ -65,12 +65,16 @@ function resolveFile(files, p) {
 
 // Node core builtins we shim in-sandbox (wb-spy.T2.5) — injected by Elixir as __shims__/<name>.js.
 var SHIM = { assert: 1, buffer: 1, crypto: 1, events: 1, path: 1, process: 1, querystring: 1, string_decoder: 1, timers: 1, url: 1, util: 1 };
-// Builtins that need native OS/threads/network — not available in this lane → build-time reject.
+// Builtins available ONLY in the JsDock lane (wb-e1x): host-brokered fs/http/https shims backed
+// by Javy.VFS / Javy.Net. Permitted when the bundle is dock-targeted (input.dock); otherwise they
+// fall through to NATIVE and are build-rejected (the plain CLI lane has no host caps).
+var DOCKSHIM = { fs: 1, http: 1, https: 1 };
+// Builtins that need native OS/threads/raw sockets — not available in any lane → build-time reject.
 var NATIVE = {
-  fs: "no path-based file IO in the QuickJS lane (see wb-spy.T2.2)",
-  net: "use the component lane / browse-fetch (wb-spy.T2.3)",
-  http: "use the component lane / browse-fetch (wb-spy.T2.3)",
-  https: "use the component lane / browse-fetch (wb-spy.T2.3)",
+  fs: "needs the JsDock lane (host VFS) — not available on the plain CLI lane",
+  net: "raw TCP sockets are not available in-sandbox",
+  http: "needs the JsDock lane (host-brokered fetch) — not available on the plain CLI lane",
+  https: "needs the JsDock lane (host-brokered fetch) — not available on the plain CLI lane",
   http2: "no native network", tls: "no native TLS sockets", dgram: "no UDP", dns: "no resolver",
   child_process: "no subprocesses in-sandbox", worker_threads: "no threads", cluster: "no clustering",
   vm: "no nested VM", v8: "no V8 internals", inspector: "no inspector", repl: "no repl",
@@ -99,6 +103,8 @@ function resolve(files, from, req) {
     // node:-scheme request always binds the builtin shim.
     if (!forced) { var poly = resolveBare(files, req); if (poly) return poly; }
     if (SHIM[top] && !bare.includes("/")) return "__shims__/" + top + ".js";
+    // Dock-targeted bundles get the host-brokered fs/http/https shims (run via JsDock).
+    if (DOCK_OK && DOCKSHIM[top] && !bare.includes("/")) return "__shims__/" + top + ".js";
     throw "Unsupported Node builtin '" + bare + "' — " + (NATIVE[top] || "not available in the in-sandbox JS lane");
   }
 
@@ -179,8 +185,11 @@ function bundle(input) {
   return parts.join("\n");
 }
 
+var DOCK_OK = false; // set from input.dock — permits the host-brokered fs/http/https shims
+
 try {
   var input = JSON.parse(readStdin());
+  DOCK_OK = !!input.dock;
   write(bundle(input));
 } catch (e) {
   die(e + (e && e.stack ? "\n" + e.stack : ""));
