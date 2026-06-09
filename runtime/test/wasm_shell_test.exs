@@ -29,6 +29,19 @@ defmodule WasmShellTest do
     assert {:ok, "3"} = Workbooks.Shell.run("echo -n abc | wc -c")
   end
 
+  test "shell control flow: && || ;" do
+    assert {:ok, "yes"} = Workbooks.Shell.run("true && echo yes")
+    assert {:ok, ""} = Workbooks.Shell.run("false && echo yes")
+    assert {:ok, "no"} = Workbooks.Shell.run("false || echo no")
+    assert {:ok, "a\nb"} = Workbooks.Shell.run("false || echo a && echo b")
+  end
+
+  test "shell variables: assignment + $NAME/${NAME} expansion" do
+    assert {:ok, "hello world"} = Workbooks.Shell.run("X=world ; echo hello $X")
+    assert {:ok, "12"} = Workbooks.Shell.run("A=1 ; B=2 ; echo ${A}${B}")
+    assert {:ok, "5"} = Workbooks.Shell.run("X=5 ; seq $X | wc -l")
+  end
+
   test "buffering applets sort/uniq/tail run in WASM" do
     assert {:ok, "4\n5"} = Workbooks.Shell.run("seq 5 | tail -n 2")
     assert {:ok, "a\nb\nc"} = Workbooks.Shell.run("echo 'c\nb\na\nb' | sort -u")

@@ -27,26 +27,69 @@ defmodule Workbooks.Shell do
     pipeline
     |> String.to_charlist()
     |> split_ops()
-    |> eval_ops(stdin, dirs, 0, [])
+    |> eval_ops(stdin, dirs, 0, [], %{})
   end
 
   # Evaluate [{op, segment}] with short-circuit: `;` always runs the next, `&&`
   # only if the previous pipeline succeeded (status 0), `||` only if it failed.
-  defp eval_ops([], _stdin, _dirs, _status, acc),
+  # Carries a var map: `NAME=value` segments assign (no output); `$NAME`/`${NAME}`
+  # expand in subsequent segments.
+  defp eval_ops([], _stdin, _dirs, _status, acc, _vars),
     do: {:ok, acc |> Enum.reverse() |> Enum.join() |> String.trim()}
 
-  defp eval_ops([{op, seg} | rest], stdin, dirs, status, acc) do
+  defp eval_ops([{op, seg} | rest], stdin, dirs, status, acc, vars) do
     skip? = (op == :and and status != 0) or (op == :or and status == 0)
 
     cond do
-      seg == "" -> eval_ops(rest, stdin, dirs, status, acc)
-      skip? -> eval_ops(rest, stdin, dirs, status, acc)
+      seg == "" ->
+        eval_ops(rest, stdin, dirs, status, acc, vars)
+
+      skip? ->
+        eval_ops(rest, stdin, dirs, status, acc, vars)
+
       true ->
-        case run_pipe(seg, stdin, dirs) do
-          {:ok, out, st} -> eval_ops(rest, stdin, dirs, st, [out | acc])
-          {:error, _} = err -> err
+        expanded = expand_vars(seg, vars)
+
+        case assignment(expanded) do
+          {name, val} ->
+            eval_ops(rest, stdin, dirs, 0, acc, Map.put(vars, name, val))
+
+          nil ->
+            case run_pipe(expanded, stdin, dirs) do
+              {:ok, out, st} -> eval_ops(rest, stdin, dirs, st, [out | acc], vars)
+              {:error, _} = err -> err
+            end
         end
     end
+  end
+
+  # `NAME=value` (value optionally quoted) → {name, value}; else nil.
+  defp assignment(seg) do
+    case Regex.run(~r/^([A-Za-z_]\w*)=(.*)$/, seg) do
+      [_, name, val] -> {name, unquote_val(String.trim(val))}
+      _ -> nil
+    end
+  end
+
+  defp unquote_val(v) do
+    cond do
+      String.length(v) >= 2 and String.starts_with?(v, "\"") and String.ends_with?(v, "\"") -> String.slice(v, 1..-2//1)
+      String.length(v) >= 2 and String.starts_with?(v, "'") and String.ends_with?(v, "'") -> String.slice(v, 1..-2//1)
+      true -> v
+    end
+  end
+
+  # Expand $NAME / ${NAME} from the var map. Unknown names are left LITERAL (not
+  # blanked) so a command's own `$` survives — jq `$var`, a `$` regex, etc.
+  defp expand_vars(seg, vars) when map_size(vars) == 0, do: seg
+
+  defp expand_vars(seg, vars) do
+    Regex.replace(~r/\$\{(\w+)\}|\$(\w+)/, seg, fn full, g1, g2 ->
+      case Map.fetch(vars, g1 <> g2) do
+        {:ok, v} -> v
+        :error -> full
+      end
+    end)
   end
 
   # One `cmd | cmd | …` pipeline → {:ok, out, exit_status} | {:error, _}. The
