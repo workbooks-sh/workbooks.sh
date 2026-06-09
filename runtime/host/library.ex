@@ -111,6 +111,16 @@ defmodule Workbooks.Library do
   silently dropped. Reuses `VFS.open`/`VFS.query_json` — no new query engine.
   """
   def query(tenant, sql) do
+    # Federation (wb-39j): if the FROM names a registered data source, route to the
+    # plugin; otherwise fall through to the local VFS query over workspace members.
+    case Workbooks.Federation.query(sql) do
+      {:ok, rows} -> %{rows: [%{member: "federation", workspace: nil, rows: rows}], skipped: [], federated: true}
+      {:error, reason} -> %{rows: [], skipped: [], error: inspect(reason)}
+      :not_federated -> vfs_query(tenant, sql)
+    end
+  end
+
+  defp vfs_query(tenant, sql) do
     {hits, skipped} =
       members(tenant)
       |> Enum.reduce({[], []}, fn m, {hits, skipped} ->
