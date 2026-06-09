@@ -29,7 +29,7 @@ defmodule Workbooks.Federation do
       with "data-source" <- d.slot,
            mod when is_atom(mod) and not is_nil(mod) <- load_impl(d.impl) do
         for entity <- d.entities do
-          DataSource.register(entity, mod)
+          DataSource.register(entity, mod, d.config)
           {entity, mod}
         end
       else
@@ -50,7 +50,7 @@ defmodule Workbooks.Federation do
       entity ->
         case DataSource.lookup(entity) do
           nil -> :not_federated
-          module -> module.query(entity, %{sql: sql}, opts)
+          module -> module.query(entity, %{sql: sql, config: DataSource.config(entity)}, opts)
         end
     end
   end
@@ -84,13 +84,25 @@ defmodule Workbooks.Federation do
     _ -> nil
   end
 
-  # Parse the few keywords the data-source face declares.
+  # Parse the keywords the data-source face declares. Generic plugins (the HTTP
+  # source) read url/rows_path/auth/env_keys from `config`; specialized modules
+  # ignore what they don't need.
   defp parse_plugin(org) do
+    config =
+      %{
+        "url" => kw(org, "URL"),
+        "rows_path" => kw(org, "ROWS_PATH"),
+        "auth" => kw(org, "AUTH"),
+        "env_keys" => (kw(org, "ENV_KEYS") || "") |> String.split(~r/\s+/, trim: true)
+      }
+      |> Enum.reject(fn {_k, v} -> v in [nil, []] end)
+      |> Map.new()
+
     %{
       slot: kw(org, "SLOT"),
       entities: (kw(org, "ENTITIES") || "") |> String.split(~r/\s+/, trim: true),
       impl: kw(org, "IMPL"),
-      env_keys: (kw(org, "ENV_KEYS") || "") |> String.split(~r/\s+/, trim: true)
+      config: config
     }
   end
 

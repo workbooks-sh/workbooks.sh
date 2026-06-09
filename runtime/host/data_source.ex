@@ -18,15 +18,26 @@ defmodule Workbooks.DataSource do
 
   @registry {__MODULE__, :sources}
 
-  @doc "Register `entity` → a plugin module implementing this behaviour."
-  def register(entity, module) when is_binary(entity) and is_atom(module) do
+  @doc """
+  Register `entity` → a plugin module (implementing this behaviour) with optional
+  per-entity `config` (e.g. a generic HTTP source's url/rows_path/env_keys, parsed
+  from the plugin manifest). Config reaches the plugin as `q.config`.
+  """
+  def register(entity, module, config \\ %{}) when is_binary(entity) and is_atom(module) and is_map(config) do
     cur = :persistent_term.get(@registry, %{})
-    :persistent_term.put(@registry, Map.put(cur, entity, module))
+    :persistent_term.put(@registry, Map.put(cur, entity, {module, config}))
     :ok
   end
 
   @doc "The plugin module registered for `entity`, or nil."
-  def lookup(entity), do: Map.get(:persistent_term.get(@registry, %{}), entity)
+  def lookup(entity) do
+    case Map.get(:persistent_term.get(@registry, %{}), entity), do: ({mod, _cfg} -> mod; _ -> nil)
+  end
+
+  @doc "The per-entity config registered for `entity` (default %{})."
+  def config(entity) do
+    case Map.get(:persistent_term.get(@registry, %{}), entity), do: ({_mod, cfg} -> cfg; _ -> %{})
+  end
 
   @doc "All registered entities."
   def entities, do: Map.keys(:persistent_term.get(@registry, %{}))
