@@ -81,3 +81,20 @@ stays as the /live/* edge proxy (TLS/cache/DDoS) — free upside. Verified no
 added security risk: public plane is GET-only, non-executing, plane-split;
 control plane now bearer-locked. Caveat recorded: an already-open tab still
 needs a client poll to update without reload (filed, optional).
+
+### Friction #6 — declared secrets are all-required, no optional tier (test 2)
+deployment.org `#+DEPLOY_SECRETS` treats every name as mandatory; `wb deploy
+apply` refuses until ALL are set. Good gate, but there's no way to mark a
+secret OPTIONAL (e.g. POSTHOG_API_KEY — analytics is a later phase, keeper
+works without it). Workaround: drop it from the declared list. Fix idea:
+`#+DEPLOY_SECRETS_OPTIONAL:` or a `name?` suffix. Severity: low (real DX paper-cut). Caught by the deploy gate doing its job.
+
+### Friction #7 — deploy-kit doesn't size the machine for the runtime (test 2)
+HIGH. First `wb deploy apply` to fly came up in a CRASH LOOP: beam.smp OOM-killed
+(default shared-cpu-1x ~512MB; BEAM + wasmtime needs >1GB). App bound 0.0.0.0:4000
+then died repeatedly; /health 502; the auto-bearer never persisted because the
+app never got healthy. The fly API "apply" reported success — the failure was
+only visible in logs. Fix: deploy-kit must set adequate VM memory for the
+runtime image by default (≥1GB, recommend 2GB) + a #+DEPLOY_MEMORY knob; ideally
+poll /health post-apply and surface OOM. Workaround: `fly scale memory 2048`.
+Severity: HIGH — a first-time cloud deploy silently crash-loops.

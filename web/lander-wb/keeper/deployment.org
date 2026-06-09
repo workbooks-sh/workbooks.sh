@@ -3,8 +3,10 @@
 #+DEPLOY_APP: wb-lander-live
 #+DEPLOY_REGION: sjc
 #+DEPLOY_PORT: 4000
+#+DEPLOY_MEMORY: 2048   # MB — BEAM+wasmtime OOMs under ~1GB (friction #7)
 # Secret NAMES this deployment needs (values: `wb deploy secrets set KEY=VAL`):
-#+DEPLOY_SECRETS: OPENROUTER_API_KEY POSTHOG_API_KEY
+#+DEPLOY_SECRETS: OPENROUTER_API_KEY
+# (POSTHOG_API_KEY is OPTIONAL — analytics phase; keeper degrades to clarity edits without it)
 # Toolkits the deploy SHIPS to the engine (id:dir, space-separated). Write a
 # toolkit, `wb deploy apply`, done — the kit launches the toolkit to the runtime.
 #+DEPLOY_TOOLKITS: living-lander:./living-lander

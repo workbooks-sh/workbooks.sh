@@ -65,3 +65,4 @@ runtime/.publish_out/
 
 # CLAUDE.md is a local-only symlink → AGENTS.md (single source of truth, vendor-neutral)
 /CLAUDE.md
+secrets.env
