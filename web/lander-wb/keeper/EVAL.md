@@ -127,3 +127,28 @@ on ONE machine needs a deploy-kit decision:
       behind the bearer.
 Recommend (A): also removes any public control-plane exposure (most secure).
 This is the last gap before the page is live; it's an architecture call.
+
+### Friction #10 — public plane org-renders; no verbatim HTML-artifact serving
+PublicWeb get_workbook path runs OQL.render(org) + wraps in its own <head> shell
+→ a prebuilt single-file HTML workbook gets double-wrapped/mangled (title became
+the app-id, body eaten). Correct path is serve_static (checked first, File.dir?)
+which serves bytes verbatim — but there's no clean RCP verb to publish a static
+tree to the engine. Workaround used: in-box fetch from public github raw →
+write to /app/build/public/<app>/. Fix: a `wb publish` static-to-engine verb.
+
+### Friction #11 — content on ephemeral fs wiped by scale-to-zero
+HIGH. Static files written to /app/build/public AND the in-memory ControlPlane
+store do NOT survive a machine auto-stop/cold-start — /app resets to the image,
+state is gone ("no app for host" after idle). Persistence must live on the
+/data volume (or the keeper repopulates on boot, or autostop off). Workaround:
+disabled scale-to-zero to keep the demo warm. Fix: PublicWeb static dir + the
+workbook store must default to the persistent volume.
+
+## OUTCOME — the page is LIVE
+https://wb-lander-live.fly.dev/ serves the full v3.1 lander, rendered live by
+the Workbooks runtime on fly.io, deployed via our own wb CLI + deploy-kit, with
+the control plane bearer-locked and OFF the public internet (option A). Visually
+verified in-browser. Tests 1,2,3,4 + auth-lock PASS. Remaining for a
+self-sustaining living lander: keeper loop trigger (internal scheduler), CF
+/live proxy deploy, /data persistence (#11), static-publish verb (#10), Yjs
+open-tab live updates, public example repo.
