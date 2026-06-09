@@ -6,18 +6,18 @@
 # verified-good artifact is frozen and never rebuilt until you `unlock` it or its
 # source actually changes. This is the "least-finicky, production-faithful" loop.
 #
-#   ./scripts/app status            # what's built / stale / locked / missing
-#   ./scripts/app build [comp...]   # build stale/missing comps (skips locked + unchanged)
-#   ./scripts/app run               # build (respecting locks) then launch the .app
-#   ./scripts/app lock   <comp|all> # freeze: never rebuild (it works — leave it)
-#   ./scripts/app unlock <comp|all> # thaw: allow rebuilds again
-#   ./scripts/app rebuild <comp...> # force rebuild even if unchanged (ignores lock)
+#   ./desktop/scripts/app status            # what's built / stale / locked / missing
+#   ./desktop/scripts/app build [comp...]   # build stale/missing comps (skips locked + unchanged)
+#   ./desktop/scripts/app run               # build (respecting locks) then launch the .app
+#   ./desktop/scripts/app lock   <comp|all> # freeze: never rebuild (it works — leave it)
+#   ./desktop/scripts/app unlock <comp|all> # thaw: allow rebuilds again
+#   ./desktop/scripts/app rebuild <comp...> # force rebuild even if unchanged (ignores lock)
 #
 # Components:  kernel  escript  image  app
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOCK="$ROOT/scripts/.build-lock.tsv"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LOCK="$ROOT/desktop/scripts/.build-lock.tsv"
 COMPONENTS=(kernel escript image app)
 
 # The runtime image ref the local container boots (override with WB_IMAGE).
@@ -35,7 +35,7 @@ src_paths() {
   case "$1" in
     kernel)  echo "runtime/kernel/src runtime/kernel/wit runtime/kernel/Cargo.toml runtime/kernel/Cargo.lock" ;;
     escript) echo "runtime/host runtime/mix.exs runtime/mix.lock" ;;
-    image)   echo "runtime/host deploy/Dockerfile.runtime .dockerignore runtime/scripts/stage-tools.sh runtime/mix.exs runtime/mix.lock" ;;
+    image)   echo "runtime/host ci/Dockerfile.runtime .dockerignore runtime/scripts/stage-tools.sh runtime/mix.exs runtime/mix.lock" ;;
     app)     echo "desktop/src desktop/src-tauri/src desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock desktop/src-tauri/tauri.conf.json desktop/package.json desktop/src-tauri/oql.wasm" ;;
   esac
 }
@@ -168,7 +168,7 @@ cmd_run() {
   hdr "ensuring production build (locks respected)"
   cmd_build
   local appdir; appdir="$(art_path app)"
-  [ -n "$appdir" ] || die "no .app bundle — run ./scripts/app build app"
+  [ -n "$appdir" ] || die "no .app bundle — run ./desktop/scripts/app build app"
   hdr "launching $appdir"
   open "$appdir"
   say "${c_grn}launched.${c_rst} The app owns the tray + boots the runtime container. Sign in via WorkOS in-app."
