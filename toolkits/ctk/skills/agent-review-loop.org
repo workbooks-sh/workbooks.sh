@@ -1,0 +1,106 @@
+#+TITLE: ctk — the agent review loop (open → await → commit)
+#+TOOLKIT: ctk
+#+SKILL: agent-review-loop
+#+VERSION: 0.1.0
+#+DESCRIPTION: Use when an agent wants a human to review + approve a UI/component change before committing. The open→await→commit recipe an agent runs (bash-only) using CTK as the checkpoint.
+#+TAGS: agent human-in-the-loop review commit await loop hitl approve workflow
+#+STATUS: experimental
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     yes
+  :DESTRUCTIVE: no
+  :REQUIRES:    wb curl jq
+  :COST:        free
+  :END:
+
+  Use when YOU (an agent) made a change to a component/page and want a human to
+  see it, tune it, and approve it before you commit — instead of committing
+  blind. CTK is the review surface; the runtime relays the approval back to your
+  run; you apply it and commit.
+
+  NOT for: authoring a CTK story from scratch ([[file:authoring-a-story.org][authoring-a-story]]), or
+  understanding the wire contract ([[file:commit-connector.org][commit-connector]]). This is the *agent's*
+  operating recipe.
+
+* The mental model — you open it, you wait, you commit
+
+  #+begin_example
+  agent renders change as a CTK story
+     → serves CTK to the human with  ?connect=<rt>/api/ctk/commit?run=$WB_RUN
+     → `wb ctk await $WB_RUN`         (blocks until the human clicks Commit)
+     → applies the approved snapshot + feedback → git commit
+  #+end_example
+
+  CTK never edits your files. It returns the human-approved *state* (props +
+  per-state values) + a feedback note; YOU translate that into source edits and
+  the commit. The run id (=$WB_RUN=) ties the review to your run so the approval
+  comes back to you, not another session.
+
+* Workflow
+
+  #+CAPTION: 0. preconditions — wb on PATH, your run id, the runtime target
+  #+begin_src bash :role pre
+  command -v wb >/dev/null || { echo "wb not on PATH"; exit 1; }
+  : "${WB_RUN:?run id not injected}"            # the runtime sets this for your run
+  : "${WB_RUNTIME_URL:?}" ; : "${WB_TOKEN:?}"   # or the local discovery file
+  #+end_src
+
+  #+CAPTION: 1. render the change as a CTK story (the component + its controls)
+  #+begin_src bash
+  # write/update a story so the human sees exactly your change. The story's
+  # :tangle block IS the component you changed (see authoring-a-story).
+  cp my-change.component.js "$WB_TOOLKITS_ROOT/ctk/stories/$STORY.org"  # or author the .org
+  #+end_src
+
+  #+CAPTION: 2. hand the human a CTK URL wired to THIS run, then block on it
+  #+begin_src bash
+  echo "Review: $WB_RUNTIME_URL/ctk/ctk.html?connect=$WB_RUNTIME_URL/api/ctk/commit?run=$WB_RUN"
+  review=$(wb ctk await "$WB_RUN")              # blocks until the human clicks Commit
+  #+end_src
+
+  #+CAPTION: 3. apply the approved snapshot + feedback, then commit
+  #+begin_src bash
+  echo "$review" | jq -r '.feedback'            # what the human asked for
+  echo "$review" | jq '.snapshot'               # approved props + per-state values
+  # translate the approved state into source edits to the real component, then:
+  git add -A && git commit -m "ui: $(echo "$review" | jq -r '.feedback // "apply CTK review"')"
+  #+end_src
+
+  #+CAPTION: 4. confirm the commit landed
+  #+begin_src bash :role post
+  git log -1 --oneline
+  #+end_src
+
+* Common pitfalls
+
+  1. *Missing =?run=$WB_RUN= on the connect URL* — without it the commit can't be
+     routed to your run, and =wb ctk await= blocks forever. Always wire the run id.
+  2. *Treating the snapshot as the source* — the snapshot is the approved *state*
+     (prop values), not your component's code. You still edit the real file; the
+     snapshot tells you WHICH values the human approved.
+  3. *No timeout handling* — =wb ctk await <run> [timeout_s]= defaults to 600s
+     then returns non-zero. Decide whether to re-prompt or abort; don't assume
+     it blocks indefinitely.
+  4. *Not knowing your run id* — =$WB_RUN= must be injected by the runtime when it
+     starts your run. If it's unset, you can't open or await a review (see Next).
+
+* Verification checklist
+
+  - [ ] The connect URL carries =?run=$WB_RUN=.
+  - [ ] =wb ctk await "$WB_RUN"= returns a JSON =ctk.commit= event after the human commits.
+  - [ ] =jq '.snapshot'= shows the props/states you expected.
+  - [ ] A commit lands carrying the human's feedback.
+
+* Next / gaps
+
+  - The runtime must inject =$WB_RUN= (the run/session id) into the agent's env
+    when it starts the run — the one wiring this recipe depends on.
+  - A live end-to-end round-trip (real run → human commit → agent commit) is the
+    remaining verification; mark this skill =stable= once it passes.
+
+* See also
+
+  - [[file:commit-connector.org][commit-connector]] — the wire contract (event, transports, runtime routes).
+  - [[file:authoring-a-story.org][authoring-a-story]] — how to render your change as a story.
+  - [[file:overview.org][overview]] — what CTK is and the shell.

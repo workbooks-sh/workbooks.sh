@@ -40,7 +40,7 @@ defmodule Workbooks.AgentSession do
 
   @impl true
   def init({id, system, task, opts}) do
-    {:ok, %{id: id, status: :running, run: nil, live: [], subs: [], reviews: []},
+    {:ok, %{id: id, status: :running, run: nil, live: [], subs: [], reviews: [], review_log: []},
      {:continue, {:run, system, task, opts}}}
   end
 
@@ -82,10 +82,13 @@ defmodule Workbooks.AgentSession do
     {:reply, :ok, %{state | subs: [pid | state.subs]}}
   end
 
-  # CTK human-in-the-loop review: store it + push to live subscribers immediately.
+  # CTK human-in-the-loop review: queue it for the poller (`reviews`), keep an
+  # append-only `review_log` for the run's record (surfaced in status), and push
+  # to live subscribers immediately.
   def handle_call({:put_review, review}, _from, state) do
     Enum.each(state.subs, &send(&1, {:agent_review, review}))
-    {:reply, :ok, %{state | reviews: state.reviews ++ [review]}}
+    {:reply, :ok,
+     %{state | reviews: state.reviews ++ [review], review_log: state.review_log ++ [review]}}
   end
 
   def handle_call(:take_review, _from, %{reviews: []} = state), do: {:reply, nil, state}
@@ -94,7 +97,7 @@ defmodule Workbooks.AgentSession do
     do: {:reply, r, %{state | reviews: rest}}
 
   def handle_call(:status, _from, %{run: nil, status: st, live: live} = state),
-    do: {:reply, %{status: st, steps: length(live), live: live}, state}
+    do: {:reply, %{status: st, steps: length(live), live: live, reviews: state.review_log}, state}
 
   def handle_call(:status, _from, %{run: r, status: st} = state) do
     reply = %{
@@ -102,7 +105,8 @@ defmodule Workbooks.AgentSession do
       steps: r.steps,
       result: r.result,
       tools: r.events |> Enum.map(& &1.tool) |> Enum.uniq(),
-      events_org: r.log
+      events_org: r.log,
+      reviews: state.review_log
     }
 
     {:reply, reply, state}
