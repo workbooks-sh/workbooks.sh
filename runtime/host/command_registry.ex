@@ -29,9 +29,10 @@ defmodule Workbooks.CommandRegistry do
   #   :stdin1 — args become the FIRST stdin line (our legacy jq/grep protocol,
   #             where the binary reads its filter/pattern from line 1 of stdin).
   # wbox: a multicall coreutils (echo/cat/seq/head/wc/…) compiled to wasm on first
-  # use — the in-WASM shell's command vocabulary (wb-9ja). Source in
-  # compilers/wbox/wbox.c, embedded here so it ships with the release.
-  @wbox_c_path Path.expand("../compilers/wbox/wbox.c", __DIR__)
+  # use — the in-WASM shell's command vocabulary (wb-9ja). Source lives under host/
+  # (NOT compilers/, which .dockerignore excludes) so it's in the release build
+  # context; embedded here at compile time so it ships with the release.
+  @wbox_c_path Path.expand("wbox/wbox.c", __DIR__)
   @external_resource @wbox_c_path
   @wbox_c File.read!(@wbox_c_path)
 
