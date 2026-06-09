@@ -553,6 +553,35 @@ defmodule Workbooks.Toolkits do
     end
   end
 
+  # #+EXEC: kernel — a bytes→bytes reactor (wb-pkh.11), NOT a stdio command. Build
+  # the C source via the source→kernel recipe (Compilers.c_compile_to_kernel) and
+  # register it in KernelRegistry (opened by Workbooks.Kernel / Fabric.map_kernel,
+  # never run-command). cli_bin names the kernel.
+  defp do_build_clause(id, %{exec: "kernel", build_src: {:path, dir}, build_lang: lang, cli_bin: bin})
+       when lang in ["c", nil] do
+    abs = if Path.type(dir) == :absolute, do: dir, else: Path.join(tk_dir(id, default_root()) || ".", dir)
+
+    case Path.wildcard(Path.join(abs, "**/*.c")) do
+      [] ->
+        "#{id}: kernel build — no .c source in #{abs}"
+
+      [entry | _] ->
+        case Workbooks.Compilers.c_compile_to_kernel(entry) do
+          {:ok, wasm, _} ->
+            case Workbooks.KernelRegistry.register(bin, wasm) do
+              {:ok, addressed} -> "#{id}: built C kernel #{entry} → #{addressed}; registered kernel #{inspect(bin)}"
+              {:error, reason} -> "#{id}: kernel built but register FAILED:\n" <> error_text(reason)
+            end
+
+          {:error, reason} ->
+            "#{id}: kernel build FAILED for #{entry}:\n" <> error_text(reason)
+        end
+    end
+  end
+
+  defp do_build_clause(id, %{exec: "kernel", build_lang: lang}),
+    do: "#{id}: #+EXEC: kernel — only #+BUILD_LANG: c is supported today (got #{inspect(lang)}); needs #+BUILD_SRC: path:<dir> with a .c source"
+
   # wasm:<url> — a PREBUILT runtime/compiler (qjs, python, …): fetch the pinned
   # URL, sha-verify, content-address, register. No build step runs (a prebuilt is
   # inert until run in the sandbox); the sha pin is the supply-chain gate.
@@ -726,6 +755,16 @@ defmodule Workbooks.Toolkits do
 
   defp exec_checks(%{exec: "task"}), do: [{true, "exec: task (recipes run via `wb toolkit run`)"}]
   defp exec_checks(%{exec: "federation"}), do: [{true, "exec: federation (data-source/sync faces)"}]
+
+  defp exec_checks(%{exec: "kernel", cli_bin: bin}) do
+    if is_binary(bin) and bin in Workbooks.KernelRegistry.list(),
+      do: [{true, "exec: kernel — #{bin} registered (open via Workbooks.Kernel / Fabric.map_kernel)"}],
+      else: [{true, "exec: kernel — #{bin} not yet built (run `wb toolkit build`)"}]
+  end
+
+  defp exec_checks(%{exec: "component"}),
+    do: [{true, "exec: component (WIT-typed; built via build_dir, run in-VM via Instance)"}]
+
   defp exec_checks(%{exec: other}), do: [{false, "exec: unknown mode #{inspect(other)}"}]
 
   defp tk_dir(id, root) do

@@ -45,6 +45,19 @@ defmodule Workbooks.Kernel do
     GenServer.start_link(__MODULE__, {wasm_bytes, opts})
   end
 
+  @doc """
+  Open a kernel registered in KernelRegistry by name (wb-pkh.11) — the form a
+  toolkit ships as `#+EXEC: kernel`. Resolves the content-addressed `.wasm` and
+  opens it. Compiled kernels place their own buffers, so callers typically pass
+  `arena: :exports`.
+  """
+  def open_named(name, opts \\ []) when is_binary(name) do
+    case Workbooks.KernelRegistry.path(name) do
+      nil -> {:error, {:no_such_kernel, name}}
+      path -> open(File.read!(path), opts)
+    end
+  end
+
   @doc "Call the kernel on `input` bytes → `{:ok, output_bytes}` | `{:error, reason}`. Instance reused."
   def call(kernel, input) when is_pid(kernel) and is_binary(input) do
     GenServer.call(kernel, {:call, input}, :infinity)
