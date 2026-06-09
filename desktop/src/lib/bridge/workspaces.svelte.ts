@@ -238,6 +238,22 @@ class WorkspacesStore {
     });
   }
 
+  /** Reorder a workspace's packages (the rail order) and persist. Names not
+   *  currently in the workspace are ignored; any omitted are appended. */
+  async reorderPackages(
+    workspace_id: string,
+    orderedNames: string[],
+  ): Promise<void> {
+    await this.#mutate((file) => {
+      const w = file.workspaces.find((w) => w.id === workspace_id);
+      if (!w) return;
+      const set = new Set(w.package_names);
+      const next = orderedNames.filter((n) => set.has(n));
+      for (const n of w.package_names) if (!next.includes(n)) next.push(n);
+      w.package_names = next;
+    });
+  }
+
   /** Set or clear the workspace's git-subtree config. Pass null to clear. */
   async setSubtree(id: string, subtree: SubtreeConfig | null): Promise<void> {
     await this.#mutate((file) => {

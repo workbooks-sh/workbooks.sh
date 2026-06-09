@@ -37,6 +37,9 @@
     /** Single emoji / glyph / data-URL image. Empty = fall back to
      *  computed initials. Same single-field model as Workspace. */
     icon?: string;
+    /** `app` (a workbook → bare icon) or `folder` (a container → folder
+     *  glyph). Undefined = treated as a folder. */
+    kind?: "app" | "folder";
   };
 
   let {
@@ -50,6 +53,7 @@
     onToggleFiles,
     onSwitchWorkspace,
     onSelectPackage,
+    onReorderPackages,
     onCreatePackageMenu,
     onWorkspaceContext,
     onPackageContext,
@@ -67,6 +71,8 @@
     onToggleFiles?: () => void;
     onSwitchWorkspace?: (anchor: HTMLElement) => void;
     onSelectPackage?: (id: string) => void;
+    /** Persist a new order of the dynamic rail items (apps + folders). */
+    onReorderPackages?: (orderedIds: string[]) => void;
     onCreatePackageMenu?: (rect: DOMRect) => void;
     onWorkspaceContext?: (x: number, y: number) => void;
     onPackageContext?: (id: string, x: number, y: number) => void;
@@ -76,6 +82,40 @@
     const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
     if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
     return (name || "?").slice(0, 2).toUpperCase();
+  }
+
+  // ── Drag-reorder of the dynamic rail items (apps + folders) ──────────
+  // Order is owned by the workspace; we keep a local mirror for live drag
+  // feedback and emit the new id order on drop so the parent can persist.
+  let order = $state<string[]>([]);
+  let dragId = $state<string | null>(null);
+  let overId = $state<string | null>(null);
+  $effect(() => {
+    if (!dragId) order = packages.map((p) => p.id);
+  });
+  const orderedPackages = $derived(
+    order
+      .map((id) => packages.find((p) => p.id === id))
+      .filter(Boolean) as RailPackage[],
+  );
+  function onDragStart(id: string) {
+    dragId = id;
+  }
+  function onDragOver(e: DragEvent, targetId: string) {
+    e.preventDefault();
+    overId = targetId;
+    if (!dragId || dragId === targetId) return;
+    const from = order.indexOf(dragId);
+    const to = order.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...order];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    order = next;
+  }
+  function onDragEnd() {
+    if (dragId) onReorderPackages?.([...order]);
+    dragId = null;
+    overId = null;
   }
 
   // Click an inactive package → make active + open files drawer.
@@ -279,21 +319,40 @@
       <div class="hairline" aria-hidden="true"></div>
     {/if}
 
-    {#each packages as pkg (pkg.id)}
+    {#each orderedPackages as pkg (pkg.id)}
       <RailTooltip label={pkg.name}>
         <button
           type="button"
           class="rail-btn pkg"
           class:active={pkg.isActive}
+          class:dragging={dragId === pkg.id}
+          class:drop-target={overId === pkg.id && dragId !== pkg.id}
           aria-label={pkg.name}
           aria-pressed={pkg.isActive}
+          draggable="true"
+          ondragstart={() => onDragStart(pkg.id)}
+          ondragover={(e) => onDragOver(e, pkg.id)}
+          ondragend={onDragEnd}
+          ondrop={(e) => e.preventDefault()}
           onclick={() => handlePackage(pkg)}
           oncontextmenu={(e) => {
             e.preventDefault();
             onPackageContext?.(pkg.id, e.clientX, e.clientY);
           }}
         >
-          <FolderIcon icon={pkg.icon ?? ""} size={31} />
+          {#if pkg.kind === "folder"}
+            <FolderIcon icon={pkg.icon ?? ""} size={31} />
+          {:else}
+            <span class="app-icon">
+              {#if pkg.icon && pkg.icon.startsWith("data:image/")}
+                <img src={pkg.icon} alt="" />
+              {:else if pkg.icon}
+                {pkg.icon}
+              {:else}
+                {initials(pkg.name)}
+              {/if}
+            </span>
+          {/if}
         </button>
       </RailTooltip>
     {/each}
@@ -567,9 +626,33 @@
     color: var(--color-fg);
   }
 
-  /* Packages render as folders (FolderIcon); the active ring lives on the
-   * parent .rail-btn. */
-  .rail-btn.pkg { color: var(--color-fg); }
+  /* Rail items: apps render as a bare icon, folders via FolderIcon. The
+   * active ring lives on the parent .rail-btn. */
+  .rail-btn.pkg { color: var(--color-fg); cursor: grab; }
+  .rail-btn.pkg:active { cursor: grabbing; }
+  .app-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    font-size: 19px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+  }
+  .app-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  /* Drag-reorder affordances. */
+  .rail-btn.pkg.dragging { opacity: 0.4; }
+  .rail-btn.pkg.drop-target {
+    box-shadow: inset 0 2px 0 var(--color-fg);
+  }
 
   .rail-btn.create { color: var(--color-fg-muted); }
   .rail-btn.create:hover { color: var(--color-fg); }

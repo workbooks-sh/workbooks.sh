@@ -40,22 +40,20 @@ if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
 }
 
 // ── seed data ─────────────────────────────────────────────────────────────
-// Packages double as the rail items + the springboard. Each has an icon so
-// the rail renders real glyphs. Workbooks are the springboard tiles.
-const PKG_ICON: Record<string, string> = {
-  Budget: "💰",
-  Clients: "💼",
-  "Side Projects": "🚀",
-  Reading: "📚",
-  Home: "🏠",
-  Acme: "📊",
-  Internal: "🔧",
+// Rail items are packages. A package is either an `app` (a workbook — bare
+// icon) or a `folder` (a container — folder glyph). Kanban ships as a default
+// app. Mix of apps + folders so the rail shows the real model + reordering.
+const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
+  Kanban: { icon: "📋", kind: "app" },
+  Notes: { icon: "📝", kind: "app" },
+  Tracker: { icon: "📈", kind: "app" },
+  Reading: { icon: "📚", kind: "app" },
+  Clients: { icon: "💼", kind: "folder" },
+  "Side Projects": { icon: "🚀", kind: "folder" },
+  Acme: { icon: "📊", kind: "folder" },
+  Internal: { icon: "🔧", kind: "app" },
 };
 const PKG_WORKBOOKS: Record<string, { path: string; title: string }[]> = {
-  Budget: [
-    { path: "/mock/Budget/monthly.html", title: "Monthly Budget" },
-    { path: "/mock/Budget/networth.html", title: "Net Worth" },
-  ],
   Clients: [
     { path: "/mock/Clients/acme.html", title: "Acme Dashboard" },
     { path: "/mock/Clients/crm.html", title: "Beta CRM" },
@@ -65,10 +63,6 @@ const PKG_WORKBOOKS: Record<string, { path: string; title: string }[]> = {
     { path: "/mock/Side Projects/recipes.html", title: "Recipe Box" },
     { path: "/mock/Side Projects/trips.html", title: "Trip Planner" },
   ],
-  Reading: [{ path: "/mock/Reading/list.html", title: "Reading List" }],
-  Home: [{ path: "/mock/Home/grocery.html", title: "Grocery" }],
-  Acme: [{ path: "/mock/Acme/sales.html", title: "Sales" }],
-  Internal: [{ path: "/mock/Internal/oncall.html", title: "On-call" }],
 };
 
 const WORKSPACES = [
@@ -76,7 +70,7 @@ const WORKSPACES = [
     id: "ws_personal",
     name: "Personal",
     icon: "🪐",
-    package_names: ["Budget", "Clients", "Side Projects", "Reading", "Home"],
+    package_names: ["Kanban", "Notes", "Clients", "Tracker", "Side Projects", "Reading"],
     created_at: 1_700_000_000_000,
   },
   {
@@ -110,7 +104,8 @@ function pkg(name: string) {
   return {
     name,
     folders: [`/mock/${name}`],
-    icon: PKG_ICON[name] ?? "📦",
+    icon: PKG[name]?.icon ?? "📦",
+    kind: PKG[name]?.kind ?? "folder",
     view_mode: "source",
     layout: "grid",
     subtree: null,
@@ -133,7 +128,7 @@ function ensureStore(path: string): Record<string, unknown> {
 // ── the router ─────────────────────────────────────────────────────────────
 function makeInvoke(): Invoke {
   let listenerId = 0;
-  let activePackage = "Budget";
+  let activePackage = "Kanban";
 
   return async (cmd, args = {}) => {
     const a = args as Record<string, any>;
@@ -197,7 +192,7 @@ function makeInvoke(): Invoke {
       // ── workspaces handled via plugin:store above ──
 
       // ── packages (rail items + springboard) ──
-      case "package_list": return Object.keys(PKG_ICON);
+      case "package_list": return Object.keys(PKG);
       case "package_get_active": return activePackage;
       case "package_load": return pkg(a.name);
       case "package_workbooks": return PKG_WORKBOOKS[a.name] ?? [];

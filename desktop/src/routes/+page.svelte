@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    Kanban,
     Settings as SettingsIcon,
     Network as NetworkIcon,
     Plus as HomePlus,
@@ -49,9 +48,11 @@
   /* Top rail sections — daily-use surfaces. Packages live below the
    * hairline; bottom-pinned utility surfaces (Settings, GitHub) live
    * after the spacer at the very bottom of the rail. */
+  // Only one fixed item at the top: Create (the AI). Everything else
+  // (apps + folders) is dynamic + drag-reorderable below; Kanban now ships
+  // as a default app in that dynamic list, not a fixed tab.
   const railTabs: RailTab[] = [
     { id: "home", label: "Create", icon: HomePlus },
-    { id: "kanban", label: "Kanban", icon: Kanban },
   ];
   const bottomRailTabs: RailTab[] = [
     { id: "network", label: "Network", icon: NetworkIcon },
@@ -231,17 +232,30 @@
     (() => {
       const ws_ = workspaces.active;
       if (!ws_) return [];
-      const allowed = new Set(ws_.package_names);
-      return packageStore.workspaces
-        .filter((name) => allowed.has(name))
+      // Order follows the workspace's package_names (the rail order the user
+      // sets by dragging), filtered to packages that actually exist.
+      const exists = new Set(packageStore.workspaces);
+      return ws_.package_names
+        .filter((name) => exists.has(name))
         .map((name) => ({
           id: name,
           name,
           isActive: packageStore.active?.name === name,
           icon: packageStore.meta[name]?.icon ?? "",
+          kind: packageStore.meta[name]?.kind ?? "folder",
         }));
     })(),
   );
+
+  async function onReorderPackages(orderedIds: string[]) {
+    const ws_ = workspaces.active;
+    if (!ws_) return;
+    try {
+      await workspaces.reorderPackages(ws_.id, orderedIds);
+    } catch (e) {
+      console.warn("[rail] reorder packages failed", e);
+    }
+  }
 
   async function onSelectPackage(name: string) {
     try {
@@ -372,6 +386,7 @@
       onToggleFiles={() => chrome.toggleFiles()}
       onSwitchWorkspace={onSwitchWorkspace}
       onSelectPackage={onSelectPackage}
+      onReorderPackages={onReorderPackages}
       onCreatePackageMenu={onCreatePackageMenu}
       onWorkspaceContext={onWorkspaceContext}
       onPackageContext={onPackageContext}

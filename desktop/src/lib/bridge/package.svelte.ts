@@ -43,6 +43,10 @@ export const DEFAULT_PACKAGE_ICON = "📦";
 
 export interface Package {
   name: string;
+  /** A package is either an `app` (a workbook — rendered as a bare icon) or a
+   *  `folder` (a container — rendered as a folder glyph). Optional in payloads
+   *  from a pre-folder-model backend; treat undefined as `"folder"`. */
+  kind?: "app" | "folder";
   folders: string[];
   /** Single emoji / glyph rendered on the rail avatar and switcher.
    *  Optional in payloads from a pre-wb-i38o.34 backend; treat undefined
