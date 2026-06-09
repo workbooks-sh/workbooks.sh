@@ -1,9 +1,11 @@
-defmodule Workbooks.Deploy.Krunvm do
+defmodule Workbooks.Deploy.Machine do
   @moduledoc """
-  The macOS local-container backend — runs the ONE runtime OCI image in a libkrun
-  microVM via `krunvm`. This is the mac arm of the cross-platform container seam
-  (podman/docker/WSL2 slot in elsewhere behind the same contract: ensure → create
-  → run → status → down). Proven contract (krunvm 0.2.6):
+  The local MACHINE — boots + runs the ONE runtime OCI image on the user's box. This is the
+  layer OUTSIDE the engine; the engine's own wasmtime sandbox (where untrusted code runs) is a
+  separate, inner boundary — don't conflate them. On macOS the machine is a libkrun microVM
+  driven by the `krunvm` tool — the mac arm of the cross-platform seam (podman/docker/WSL2 slot
+  in elsewhere behind the same contract: ensure → create → run → status → down). Proven
+  contract (krunvm 0.2.6):
 
     * needs a case-sensitive APFS volume named `krunvm` (one-time, no sudo)
     * `krunvm create <image> --name N --port H:G --volume H:G`
@@ -16,6 +18,10 @@ defmodule Workbooks.Deploy.Krunvm do
   @vm "workbooks-runtime"
   @guest_port 4000
   @label "sh.workbooks.runtime"
+  # Start the app with NO TTY console (release `start` blocks on a TTY under
+  # krunvm), then park the node alive so the VM stays up; halt non-zero on failure
+  # so it surfaces in `wb deploy logs` instead of hanging.
+  @boot_expr ~S|case Application.ensure_all_started(:workbooks) do {:ok, _} -> Process.sleep(:infinity); err -> IO.inspect(err); System.halt(1) end|
 
   @doc "Backend availability + the one-time prerequisite (the case-sensitive volume)."
   def preflight do
@@ -83,8 +89,12 @@ defmodule Workbooks.Deploy.Krunvm do
       |> Map.merge(%{"WB_DESKTOP" => "1", "WB_DESKTOP_DIR" => "/disco", "WB_DATA" => "/data", "WB_EMBED" => "local"})
       |> Enum.flat_map(fn {k, v} -> ["--env", "#{k}=#{v}"] end)
 
-    # Absolute path to the release entrypoint (robust regardless of guest cwd).
-    ["krunvm", "start", @vm] ++ envs ++ ["--", "/app/bin/workbooks", "start"]
+    # Boot via `eval` + sleep, NOT `bin/workbooks start`. The release `start`
+    # command runs a FOREGROUND console that needs a TTY; under krunvm's no-TTY
+    # guest it blocks at console init before the app boots (silent, no discovery).
+    # `eval` boots the app with no console, then we park the node alive so the VM
+    # stays up. krunvm execs this argv directly (no shell), so the expr is one arg.
+    ["krunvm", "start", @vm] ++ envs ++ ["--", "/app/bin/workbooks", "eval", @boot_expr]
   end
 
   @doc "Is the microVM defined in krunvm's store?"
@@ -140,13 +150,61 @@ defmodule Workbooks.Deploy.Krunvm do
     sh("launchctl", ["bootstrap", domain, path])
   end
 
-  @doc "Stop + remove the LaunchAgent and the microVM."
+  @doc """
+  Spawn the microVM DIRECTLY in the CALLER's session (detached), instead of via a
+  launchd LaunchAgent. macOS virtualization (libkrun) needs the user's GUI/Aqua
+  session — a background LaunchAgent fails with EX_CONFIG (exit 78). The desktop
+  app lives in the Aqua session and shells out to `wb deploy local`, so the krunvm
+  we background here inherits that session and boots cleanly. It survives the app
+  quitting (reparented, not a child of the app); a full logout ends it — use
+  `install_agent/1` for start-on-login. Writes the pid to a pidfile for `down`.
+  """
+  def spawn_direct(env \\ %{}) do
+    argv = start_argv(env)
+    File.mkdir_p!(log_dir())
+    out = Path.join(log_dir(), "runtime.out.log")
+    err = Path.join(log_dir(), "runtime.err.log")
+    cmd = argv |> Enum.map(&shquote/1) |> Enum.join(" ")
+    # nohup + & detaches krunvm from this escript; `echo $!` records its pid.
+    script = "nohup #{cmd} >> #{shquote(out)} 2>> #{shquote(err)} & echo $! > #{shquote(pidfile())}"
+
+    case sh("sh", ["-c", script]) do
+      {:ok, _} -> {:ok, %{pid: read_pidfile(), agent: :direct}}
+      {:error, m} -> {:error, m}
+      :error -> {:error, "could not spawn krunvm (sh failed)"}
+    end
+  end
+
+  @doc "Kill the directly-spawned microVM process (if any)."
+  def kill_direct do
+    case read_pidfile() do
+      nil -> :ok
+      pid -> _ = sh("kill", [to_string(pid)]); _ = File.rm(pidfile()); :ok
+    end
+  end
+
+  @doc "Stop + remove BOTH lifecycles (direct-spawn pid + any LaunchAgent) and the microVM."
   def down do
     domain = "gui/#{uid()}"
     _ = sh("launchctl", ["bootout", domain, plist_path()])
     _ = File.rm(plist_path())
+    _ = kill_direct()
     delete()
   end
+
+  defp log_dir, do: Path.join([System.user_home!(), "Library", "Application Support", "sh.workbooks", "logs"])
+  defp pidfile, do: Path.join([System.user_home!(), "Library", "Application Support", "sh.workbooks", "runtime.pid"])
+
+  defp read_pidfile do
+    with {:ok, s} <- File.read(pidfile()), {n, _} <- Integer.parse(String.trim(s)) do
+      n
+    else
+      _ -> nil
+    end
+  end
+
+  # POSIX single-quote: wrap in '...' and escape embedded quotes as '\''.
+  defp shquote(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
   @doc "Read the discovery file the runtime wrote into the bind-mounted disco dir."
   def discovery do

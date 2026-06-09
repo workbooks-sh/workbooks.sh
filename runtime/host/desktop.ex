@@ -80,7 +80,7 @@ defmodule Workbooks.Desktop do
   The discovery-file path. `WB_DESKTOP_DIR` overrides (the container bind-mounts
   `/disco` here); otherwise the per-OS app-data `disco/` dir. The default MUST end
   in `disco/` so a raw `WB_DESKTOP=1 iex` (no `WB_DESKTOP_DIR`) writes exactly where
-  the Tauri shell and `Workbooks.Deploy.Krunvm` read — the path is canon on both
+  the Tauri shell and `Workbooks.Deploy.Machine` read — the path is canon on both
   sides, so raw-dev and container runtimes are discovered identically.
   """
   def discovery_path do

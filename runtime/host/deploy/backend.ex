@@ -4,7 +4,7 @@ defmodule Workbooks.Deploy.Backend do
   storage seam (`Workbooks.Backend`): the core depends on a contract, a provider
   fills it, selection is one config value (`place`). Two kinds:
 
-    * `local` — built-in, the krunvm microVM (`Workbooks.Deploy.Krunvm`).
+    * `local` — built-in, the local MACHINE (`Workbooks.Deploy.Machine`; a krunvm microVM on mac).
     * a CLOUD PROVIDER — a recipe toolkit at `deploy/providers/<place>/bootstrap.sh`
       that sources the neutral spine (`deploy/providers/_recipe.sh`) and fills the
       five hooks (ensure_app / set_secrets / attach_volume / deploy_image /
@@ -40,7 +40,7 @@ defmodule Workbooks.Deploy.Backend do
   end
 
   @doc "Resolve a place to a backend: {:local, mod} | {:provider, place, bootstrap} | {:error, msg}."
-  def resolve("local"), do: {:local, Workbooks.Deploy.Krunvm}
+  def resolve("local"), do: {:local, Workbooks.Deploy.Machine}
 
   def resolve(place) do
     case providers_dir() do

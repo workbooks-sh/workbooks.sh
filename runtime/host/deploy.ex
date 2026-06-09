@@ -12,10 +12,10 @@ defmodule Workbooks.Deploy do
   Built for AGENTS as much as humans: every verb is non-interactive, idempotent,
   returns a tagged `{:ok | :error, map}` (rendered human OR `--json`), and exits
   non-zero on failure. `doctor` self-heals prereqs; `verify` proves the LIVE
-  runtime answers. Backends sit behind a seam (`Krunvm` today; podman/docker/WSL2
+  runtime answers. Backends sit behind a seam (`Machine` today; podman/docker/WSL2
   later). Reached via `wb deploy <verb> [--json]`.
   """
-  alias Workbooks.Deploy.{Krunvm, Image, Backend, Config}
+  alias Workbooks.Deploy.{Machine, Image, Backend, Config}
 
   @default_file "deployment.org"
 
@@ -140,12 +140,12 @@ defmodule Workbooks.Deploy do
 
   @doc "Check + self-heal prerequisites (idempotent). The first thing an agent runs."
   def doctor do
-    case Krunvm.preflight() do
+    case Machine.preflight() do
       :ok ->
         ok("prereqs OK", %{krunvm: true, apfs_volume: true})
 
       {:error, :apfs_volume_missing, _} ->
-        case Krunvm.ensure_apfs_volume() do
+        case Machine.ensure_apfs_volume() do
           :ok -> ok("created the case-sensitive APFS volume; prereqs OK now", %{krunvm: true, apfs_volume: :created})
           {:error, m} -> err(m, %{krunvm: true, apfs_volume: false})
         end
@@ -162,17 +162,19 @@ defmodule Workbooks.Deploy do
     host_port = Keyword.get(opts, :host_port, free_host_port())
 
     with {:ok, _, _} <- doctor(),
-         {:ok, info} <- Krunvm.create(image, host_port: host_port),
-         {:ok, _} <- Krunvm.install_agent(env) do
-      base = %{url: info.url, image: image, data_dir: info.data_dir, agent: Krunvm.label()}
+         {:ok, info} <- Machine.create(image, host_port: host_port),
+         # Direct-spawn in the caller's GUI/Aqua session (NOT launchd) — libkrun
+         # virtualization fails under a background LaunchAgent (EX_CONFIG / 78).
+         {:ok, _} <- Machine.spawn_direct(env) do
+      base = %{url: info.url, image: image, data_dir: info.data_dir, agent: Machine.label()}
 
-      case await_discovery(15_000) do
+      case await_discovery(20_000) do
         {:ok, disc} ->
-          ok("local runtime up — #{info.url} (runs on login, survives app quit; `wb deploy down` to stop)",
+          ok("local runtime up — #{info.url} (survives app quit; `wb deploy down` to stop)",
              Map.merge(base, %{state: "up", token_preview: String.slice(disc["token"] || "", 0, 8)}))
 
         {:error, :timeout} ->
-          ok("VM + agent installed (#{info.url}) but no discovery yet — `wb deploy logs`/`verify`. Image may still be booting.",
+          ok("VM spawned (#{info.url}) but no discovery yet — `wb deploy logs`/`verify`. Image may still be booting.",
              Map.merge(base, %{state: "starting"}))
       end
     else
@@ -185,16 +187,16 @@ defmodule Workbooks.Deploy do
   def status(file \\ nil), do: lifecycle(file, &local_status/0, "status")
 
   defp local_status do
-    vm? = Krunvm.exists?()
+    vm? = Machine.exists?()
 
     {runtime, fields} =
-      case Krunvm.discovery() do
+      case Machine.discovery() do
         {:ok, d} -> {"up — http://127.0.0.1:#{d["port"]} (pid #{d["pid"]})", %{state: "up", port: d["port"], pid: d["pid"]}}
         _ -> {"no discovery file", %{state: "down"}}
       end
 
     ok("local runtime: microVM #{if(vm?, do: "present", else: "absent")}; runtime #{runtime}",
-       Map.merge(fields, %{microvm: vm?, agent: Krunvm.label()}))
+       Map.merge(fields, %{microvm: vm?, agent: Machine.label()}))
   end
 
   @doc "Prove the LIVE runtime answers — local daemon, or a cloud deployment's URL."
@@ -206,7 +208,7 @@ defmodule Workbooks.Deploy do
   end
 
   defp local_verify do
-    with {:ok, d} <- Krunvm.discovery(),
+    with {:ok, d} <- Machine.discovery(),
          port when is_integer(port) <- d["port"],
          {:ok, status, body} <- http_get("http://127.0.0.1:#{port}/health", d["token"]) do
       if status == 200 and String.contains?(body, "ok"),
@@ -223,7 +225,7 @@ defmodule Workbooks.Deploy do
   def down(file \\ nil), do: lifecycle(file, &local_down/0, "down")
 
   defp local_down do
-    Krunvm.down()
+    Machine.down()
     ok("local runtime down (data + APFS volume preserved)", %{state: "down"})
   end
 
@@ -309,7 +311,7 @@ defmodule Workbooks.Deploy do
   end
 
   defp do_await(deadline) do
-    case Krunvm.discovery() do
+    case Machine.discovery() do
       {:ok, d} ->
         {:ok, d}
 
