@@ -9,10 +9,10 @@ live, verbatim, as encountered — they become bd issues.
 
 | # | What's under test | Production surface | Ability | Ergonomics | Friction |
 |---|---|---|---|---|---|
-| 1 | CLI distribution | `npm i -g @work.books/cli` (the v0.11.0 release) | | | |
+| 1 | CLI distribution | `npm i -g @work.books/cli` (the v0.11.0 release) | ⚠ works only authed | poor today | #1 #2 #3 |
 | 2 | Deploy-kit → cloud | `wb deploy secrets set` + `wb deploy apply` (fly recipe, prebuilt ghcr image) | | | |
 | 3 | Runtime serves the page | publish the lander INTO the deployed runtime; page at the fly URL | | | |
-| 4 | Instance toolkit | author a `lander` toolkit (analytics + publish skills) for the keeper | | | |
+| 4 | Instance toolkit | living-lander toolkit (agent + brand north star + analytics + publish skills) | ✓ verify 7/7 | good — native eval caught a real gap | #4 |
 | 5 | Agent on schedule | keeper (DeepSeek V4) runs hourly via a scheduled trigger → one constrained edit | | | |
 | 6 | Observable loop | /rcp/changes live in the page inspector; commits cite analytics | | | |
 | 7 | CI round-trip | any runtime gap found → fix → push → image rebuilds → redeploy picks it up | | | |
@@ -57,3 +57,12 @@ Authors can't write self-checks against their own toolkit content, which guts
 half the value of the native eval. Fix: run pre/task blocks with cwd = the
 toolkit dir (sandbox-confined there), or export WB_TOOLKIT_DIR. Severity:
 medium-high for toolkit DX. Workaround: cwd-independent probes only.
+
+### Friction #5 — deployed control plane is open by default (test 2)
+Workbooks.Auth: no Bearer → x-tenant dev-header fallback. Fine for local; on a
+public fly app it means ANYONE can hit /api/run (spend money), /rcp/toolkit/install
+(plant a toolkit), PUT /w/:id (replace the page). Acceptable for this demo box,
+unacceptable default for `wb deploy` cloud targets. Fix: deploy-kit mints
+WB_PUBLIC_BEARER (it already refuses to mint rotating secrets — this one should
+be a persisted operator secret it ASKS for), engine requires it when
+WB_TENANCY_MODE != dev. Severity: HIGH for any real deployment.
