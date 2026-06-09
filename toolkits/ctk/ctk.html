@@ -85,6 +85,10 @@
       <span class="tag">Story</span>
       <select id="story-seg"></select>
     </span>
+    <span class="group" id="state-group" style="display:none">
+      <span class="lbl" title="Which declared condition to render — inspection, not a free prop">State</span>
+      <span class="seg" id="state-seg"></span>
+    </span>
     <span class="view">
       <span class="view-tag" title="These change how you VIEW the component — never the component itself">View</span>
       <span class="group"><span class="lbl">Zoom</span><span class="seg" id="zoom-seg"></span></span>
@@ -136,6 +140,7 @@
 
   // per-story state (reassigned on load)
   let defs = [], props = {}, render = null, rangeDef = null, currentOrg = "", currentId = "";
+  let stateDefs = [], stateName = "default"; // declared states (prop-override sets)
   const inputs = {}; // prop -> <input/select> for programmatic reflection
   // view state (persists across stories)
   let zoom = 1, mode = "focus";
@@ -150,6 +155,24 @@
     const cells = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
     const head = cells(rows[0]).map((h) => h.toLowerCase());
     return rows.slice(1).map((r) => { const c = cells(r); const o = {}; head.forEach((h, i) => (o[h] = c[i])); return o; });
+  }
+
+  // States = named prop-override sets. "disabled:true, loading:false" → {disabled:true,loading:false}
+  function parseStates(src) {
+    const rows = src.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("|") && !l.includes("---"));
+    if (!rows.length) return [];
+    const cells = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
+    const head = cells(rows[0]).map((h) => h.toLowerCase());
+    const si = head.indexOf("state"), pi = head.indexOf("props");
+    return rows.slice(1).map((r) => {
+      const c = cells(r);
+      const overrides = {};
+      (c[pi] || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((kv) => {
+        const [k, v] = kv.split(":").map((x) => x.trim());
+        overrides[k] = v === "true" ? true : v === "false" ? false : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
+      });
+      return { state: c[si], overrides };
+    });
   }
 
   async function loadStory(id) {
@@ -170,8 +193,26 @@
     defs.forEach((d) => (props[d.prop] = coerce(d.type, d.default)));
     rangeDef = defs.find((d) => d.type === "range");
 
+    const stSection = (currentOrg.split(/^\*\* States/m)[1] || "").split(/^\*\* /m)[0];
+    stateDefs = parseStates(stSection);
+    stateName = stateDefs[0]?.state ?? "default";
+
     buildPanel();
+    buildStatePicker();
     draw();
+  }
+
+  function buildStatePicker() {
+    const seg = $("state-seg"), grp = $("state-group");
+    seg.innerHTML = "";
+    if (stateDefs.length < 2) { grp.style.display = "none"; return; } // no states → no picker
+    grp.style.display = "";
+    stateDefs.forEach((s) => {
+      const b = document.createElement("button"); b.textContent = s.state;
+      if (s.state === stateName) b.className = "on";
+      b.onclick = () => { stateName = s.state; [...seg.children].forEach((c) => c.classList.toggle("on", c === b)); draw(); };
+      seg.appendChild(b);
+    });
   }
 
   function buildPanel() {
@@ -226,23 +267,32 @@
   }
 
   function applyZoom() { zoomEl.style.transform = `scale(${zoom})`; }
+  function curOverrides() { return stateDefs.find((s) => s.state === stateName)?.overrides || {}; }
+  function cellOf(extra, label) {
+    const cell = document.createElement("div"); cell.className = "cell";
+    const mount = document.createElement("div");
+    render(mount, { ...props, ...extra });
+    const cap = document.createElement("span"); cap.className = "cap"; cap.textContent = label;
+    cell.append(mount, cap); return cell;
+  }
   function draw() {
     if (!render) return;
     stage.innerHTML = "";
-    if (mode === "gallery" && rangeDef) {
+    const ov = curOverrides();
+    if (mode === "gallery" && stateDefs.length > 1) {
+      // state matrix — every declared state, side by side
+      const g = document.createElement("div"); g.className = "gallery";
+      stateDefs.forEach((s) => g.appendChild(cellOf(s.overrides, s.state)));
+      stage.appendChild(g);
+    } else if (mode === "gallery" && rangeDef) {
+      // sweep the first range control (within the active state)
       const [mn, mx] = (rangeDef["range/options"] || "0..100").split("..").map(Number);
       const vals = Array.from({ length: 5 }, (_, i) => Math.round(mn + ((mx - mn) * i) / 4));
       const g = document.createElement("div"); g.className = "gallery";
-      vals.forEach((v) => {
-        const cell = document.createElement("div"); cell.className = "cell";
-        const mount = document.createElement("div");
-        render(mount, { ...props, [rangeDef.prop]: v });
-        const cap = document.createElement("span"); cap.className = "cap"; cap.textContent = `${rangeDef.prop} ${v}`;
-        cell.append(mount, cap); g.appendChild(cell);
-      });
+      vals.forEach((v) => g.appendChild(cellOf({ ...ov, [rangeDef.prop]: v }, `${rangeDef.prop} ${v}`)));
       stage.appendChild(g);
     } else {
-      render(stage, { ...props });
+      render(stage, { ...props, ...ov });
     }
   }
 
@@ -272,14 +322,18 @@
     load: (id) => loadStory(id),
     spec: () => currentOrg,                 // raw Org control-spec
     controls: () => defs.map((d) => ({ ...d })),
+    states: () => stateDefs.map((s) => s.state),
+    state: () => stateName,
+    setState: (n) => { if (stateDefs.some((s) => s.state === n)) { stateName = n; buildStatePicker(); draw(); } },
     props: () => ({ ...props }),
     get: (p) => props[p],
     set: (p, v) => set(p, coerce(typeOf(p), v), false),
-    snapshot: () => ({ story: currentId, props: { ...props } }),
+    snapshot: () => ({ story: currentId, state: stateName, props: { ...props } }),
   };
   window.addEventListener("message", (e) => {
     const m = e.data; if (!m || m.ctk !== true) return;
     if (m.action === "set") window.CTK.set(m.prop, m.value);
+    else if (m.action === "setState") window.CTK.setState(m.state);
     else if (m.action === "load") window.CTK.load(m.story);
     else if (m.action === "snapshot") e.source?.postMessage({ ctk: true, reply: "snapshot", data: window.CTK.snapshot() }, "*");
   });

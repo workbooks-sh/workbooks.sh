@@ -52,17 +52,38 @@
     | filled | toggle | true    |               |
     | shape  | select | round   | round|square  |
 
+  ,** States
+    | state    | props                    |
+    |----------+--------------------------|
+    | default  |                          |
+    | disabled | disabled:true            |
+    | loading  | loading:true             |
+
   ,** Source
     ,#+begin_src js :tangle component.js
     export function render(el, props) { ... }
     ,#+end_src
   #+end_src
 
-  Schema:
+  Controls schema:
   - =prop= — must match a key read in =render=.
   - =type= — =text= | =color= | =range= | =toggle= | =select=.
   - =default= — seeds the prop (coerced by type: range→number, toggle→bool).
   - =range/options= — =min..max= for range; =a|b|c= for select; blank otherwise.
+
+  States schema (optional — omit the section if the component has no conditions):
+  - =state= — the condition name shown in the State picker. First row = default.
+  - =props= — comma-separated =key:value= overrides applied on top of the base
+    props when that state is active (=disabled:true=, =loading:true=). Values
+    coerce: =true=/=false=→bool, numeric→number, else string.
+
+  *Props vs States — the rule that prevents the disabled-button confusion:*
+  - A *prop* is a value a consumer authors (=label=, =variant=, =color=, =size=).
+    It belongs in =Controls= and the left panel.
+  - A *state* is a condition the component can be in (=default=, =disabled=,
+    =loading=, =error=, =empty=). It belongs in =States= and the top-bar State
+    picker — you INSPECT it, you don't tune it. The component still reads it as a
+    plain prop; CTK just decides whether it's a tunable control or a state.
 
 * Workflow
 

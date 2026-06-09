@@ -23,30 +23,41 @@
   =.html=). NOT for CLI automation — that's a =command=/=posix= toolkit. CTK is
   the *bench*, not the product.
 
-* The mental model — one fixed shell, three variable slots
+* The mental model — three kinds of control, never blurred
 
-  The shell never changes; you never design a layout:
+  The shell never changes; you never design a layout. There are THREE distinct
+  kinds of control, and keeping them separate is the whole point:
 
   #+begin_example
-  ┌ top bar ── size · vibe(light/dark/grid) · focus|gallery ───────────┐
-  ├───────────────┬────────────────────────────────────────────────────┤
-  │ control panel │                    stage                            │
-  │ (from .org)   │           renders the component                     │
-  └───────────────┴────────────────────────────────────────────────────┘
+  ┌ Story ▾   State: default·disabled·loading       View: Zoom · Bg · Layout ┐
+  ├───────────────┬───────────────────────────────────────────────────────────┤
+  │ CONTROLS      │                        STAGE                                │
+  │ (props)       │                 renders the component                       │
+  └───────────────┴───────────────────────────────────────────────────────────┘
   #+end_example
 
-  You supply only:
-  1. *A component* exposing the stage contract =render(el, props)= (any language
-     that compiles/loads to something the stage hosts — plain JS today).
-  2. *An Org control-spec* — a =Controls= table (prop · type · default ·
-     range/options) that the shell turns into widgets, plus the component source
-     in a =:tangle= block. The shell imports that block to render — so the Org IS
-     the component. This is the tangle/untangle + polyglot demonstration.
-  3. *(Optional) stage presets* — sizes/vibes default sensibly; override if a
-     component wants specific backgrounds.
+  - *VIEW* (top bar, right) — the lens: zoom / background / layout. NEVER changes
+    the component; pure inspection.
+  - *STATE* (top bar) — which declared condition to render: default / disabled /
+    loading / … A picker built from the spec's =States= table; gallery shows the
+    whole state matrix at once. This is inspection ("show me this state"), not
+    authoring a value.
+  - *PROPS* (left panel) — the component's free authored inputs: label, variant,
+    color, size. The ONLY free-tune surface; the only thing that mutates the
+    component by value.
 
-  Control types the panel understands: =text=, =color=, =range= (=min..max=),
-  =toggle=, =select= (=a|b|c=). Each binds to a prop and re-renders live.
+  The line that resolves the common confusion: a condition like =disabled= is a
+  *state* (you inspect it), not a *prop* (you tune it) — so it lives in the State
+  picker, never the panel. =variant= (which button you chose) IS a prop.
+
+  You supply only:
+  1. *A component* exposing =render(el, props)= (any language → a module with render).
+  2. *An Org spec* with a =Controls= table (free props), an optional =States= table
+     (named prop-override sets), and the source in a =:tangle= block. The shell
+     imports that block to render — so the Org IS the component (tangle + polyglot).
+
+  Prop control types: =text=, =color=, =range= (=min..max=), =toggle=, =select=
+  (=a|b|c=). Each binds to a prop and re-renders live.
 
 * Workflow — see it now
 
