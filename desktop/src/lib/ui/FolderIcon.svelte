@@ -7,7 +7,7 @@
    */
   let {
     icon = "",
-    color = "#9097a1",
+    color = "#9a9a9e",
     size = 40,
   }: { icon?: string; color?: string; size?: number } = $props();
 
@@ -43,9 +43,9 @@
     place-items: center;
     width: var(--s);
     height: calc(var(--s) * 0.84);
-    --c-front: color-mix(in oklab, var(--c) 90%, white);
-    --c-back: color-mix(in oklab, var(--c) 100%, black 8%);
-    --c-edge: color-mix(in oklab, var(--c) 100%, black 14%);
+    --c-front: color-mix(in srgb, var(--c) 80%, white);
+    --c-back: color-mix(in srgb, var(--c) 100%, black 8%);
+    --c-edge: color-mix(in srgb, var(--c) 100%, black 14%);
   }
   .glyph {
     width: 100%;
@@ -70,13 +70,18 @@
     line-height: 1;
   }
   .badge.emoji {
-    font-size: calc(var(--s) * 0.34);
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.28));
+    font-size: calc(var(--s) * 0.46);
+    /* thin light halo + soft drop so the glyph separates from the folder
+       regardless of its own colors */
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9))
+      drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
   }
   img.badge {
-    width: calc(var(--s) * 0.34);
-    height: calc(var(--s) * 0.34);
+    width: calc(var(--s) * 0.46);
+    height: calc(var(--s) * 0.46);
     object-fit: contain;
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.28));
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9))
+      drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
   }
 </style>
+

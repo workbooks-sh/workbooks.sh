@@ -293,7 +293,7 @@
             onPackageContext?.(pkg.id, e.clientX, e.clientY);
           }}
         >
-          <FolderIcon icon={pkg.icon ?? ""} size={36} />
+          <FolderIcon icon={pkg.icon ?? ""} size={31} />
         </button>
       </RailTooltip>
     {/each}

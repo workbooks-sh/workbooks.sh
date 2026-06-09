@@ -1,14 +1,36 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 /* Tauri's dev server consumes Vite on a fixed port and watches
  * src-tauri/ separately. Strict port + ignored src-tauri prevent
  * Vite from triggering a full reload every time Rust recompiles. */
 const host = process.env.TAURI_DEV_HOST;
 
+/* Reliability over granular HMR: any edit under src/ forces a full page
+ * reload so changes ALWAYS propagate. Svelte's hot-swap client can wedge
+ * (a partial update throws once → further updates silently stop applying →
+ * a soft reload doesn't recover), which is maddening during design
+ * iteration. A full reload on every source change makes "I don't see my
+ * change" impossible. Component-level iteration speed comes from the
+ * workbench (small graph), not from in-place hot-swap of the whole app. */
+function fullReloadOnSrcChange(): Plugin {
+  return {
+    name: "wb-full-reload-on-src-change",
+    apply: "serve",
+    handleHotUpdate({ file, server }) {
+      if (file.includes("/src/")) {
+        server.config.logger.info(
+          `[wb] full reload → ${file.split("/src/")[1] ?? file}`,
+        );
+        server.ws.send({ type: "full-reload", path: "*" });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [tailwindcss(), sveltekit(), fullReloadOnSrcChange()],
   clearScreen: false,
   server: {
     port: 5178,
