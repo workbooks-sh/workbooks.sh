@@ -226,6 +226,17 @@ defmodule Workbooks.Web do
     end
   end
 
+  # Serve the CTK render toolkit (shell + stories) from the toolkits root, so the
+  # runtime — not a separate static server — hosts the human-in-the-loop canvas.
+  # The shell POSTs back to /api/ctk/commit on this same origin.
+  get "/ctk" do
+    serve_toolkit_file(conn, "ctk", "ctk.html")
+  end
+
+  get "/ctk/*glob" do
+    serve_toolkit_file(conn, "ctk", Enum.join(conn.path_params["glob"], "/"))
+  end
+
   # Run the full brandnana brand book for a domain (harvest → strategist →
   # designer), the real pipeline ported onto the clean-room agent loop. Long-
   # horizon: spawns + returns immediately; poll /api/brand-book/:slug.
@@ -423,6 +434,13 @@ defmodule Workbooks.Web do
 
   post "/rcp/toolkit/verify" do
     send_resp(conn, 200, Workbooks.Toolkits.verify_text(conn.params["id"]))
+  end
+
+  # Run a toolkit's eval suite server-side (NIFs + LLM available here; bash/agent
+  # execution gated by the runtime's WB_TOOLKIT_EXEC). The thin CLI hits this.
+  post "/rcp/toolkit/eval" do
+    conn = fetch_query_params(conn)
+    send_resp(conn, 200, Workbooks.Toolkits.eval_text(conn.query_params["id"]))
   end
 
   post "/rcp/toolkit/build" do
@@ -638,6 +656,35 @@ defmodule Workbooks.Web do
 
   # The public authority for did:web — prefer the proxy's forwarded host (fly
   # terminates TLS upstream) so the DID id matches the URL clients actually used.
+  # Serve a file from <toolkits_root>/<toolkit>/<rel>, path-contained (no escape).
+  defp serve_toolkit_file(conn, toolkit, rel) do
+    base = Path.expand(Path.join(Workbooks.Toolkits.default_root(), toolkit))
+    path = Path.expand(Path.join(base, rel))
+
+    cond do
+      path != base and not String.starts_with?(path, base <> "/") ->
+        send_resp(conn, 403, "forbidden")
+
+      not File.regular?(path) ->
+        send_resp(conn, 404, "not found")
+
+      true ->
+        conn |> put_resp_content_type(ctk_ctype(path)) |> send_resp(200, File.read!(path))
+    end
+  end
+
+  defp ctk_ctype(path) do
+    case Path.extname(path) do
+      ".html" -> "text/html"
+      ".js" -> "text/javascript"
+      ".css" -> "text/css"
+      ".org" -> "text/plain"
+      ".json" -> "application/json"
+      ".svg" -> "image/svg+xml"
+      _ -> "application/octet-stream"
+    end
+  end
+
   # Make any term JSON-encodable: tuples → inspected strings, recursing through
   # maps/lists. Run/checkout results legitimately carry error tuples (bd wb-ica).
   defp json_safe(%_{} = struct), do: struct

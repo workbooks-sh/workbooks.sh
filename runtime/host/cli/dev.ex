@@ -21,7 +21,8 @@ defmodule Workbooks.CLI.Dev do
   def run(["up" | _]), do: {up_text(), false}
   def run(["test" | rest]), do: mix(["test" | rest])
   def run(["eval"]), do: {eval_list(), false}
-  def run(["eval", id]), do: mix(["run", "-e", ~s|IO.puts(Workbooks.CLI.call(["toolkit", "eval", "#{id}"]))|])
+  # Run server-side on the connected runtime (NIFs/LLM work there; the escript can't).
+  def run(["eval", id]), do: Workbooks.CLI.Runtime.toolkit(["eval", id])
   def run(_), do: {usage(), true}
 
   # wb dev eval — list toolkits that ship an eval suite (evals/*.org); run one

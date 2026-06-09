@@ -38,6 +38,14 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb toolkit …` — toolkit surface over RCP (server-side; the escript can't
+      # load the NIFs). HOST-side HTTP client → /rcp/toolkit/*. In-process callers
+      # (an agent running wb as a tool) still use `call/2` directly.
+      ["toolkit" | rest] ->
+        {out, failed?} = Workbooks.CLI.Runtime.toolkit(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       # `wb dev …` — the development service: inspect the demo env + drive the
       # local verify loop (info / up / test). HOST-side, no app boot.
       ["dev" | rest] ->

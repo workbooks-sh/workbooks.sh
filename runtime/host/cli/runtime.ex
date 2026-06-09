@@ -37,6 +37,34 @@ defmodule Workbooks.CLI.Runtime do
   def ctk(["await", run, t], req), do: await_review(run, String.to_integer(t), req)
   def ctk(_, _), do: {ctk_usage(), true}
 
+  @doc """
+  `wb toolkit …` over RCP — the shipped escript can't load the wasmex/sqlite NIFs
+  from its archive, so toolkit verbs run SERVER-SIDE in the connected runtime
+  (where they work) via /rcp/toolkit/*. Same target + transport as the rest.
+  """
+  def toolkit(args, req \\ &http_request/4)
+  def toolkit(["list"], req), do: do_request(:get, "/rcp/toolkit", nil, req)
+  def toolkit(["show", id], req), do: do_request(:get, "/rcp/toolkit/show?id=#{enc(id)}", nil, req)
+  def toolkit(["show", id, skill], req), do: do_request(:get, "/rcp/toolkit/show?id=#{enc(id)}&skill=#{enc(skill)}", nil, req)
+  def toolkit(["search" | q], req), do: do_request(:get, "/rcp/toolkit/search?q=#{enc(Enum.join(q, " "))}", nil, req)
+  def toolkit(["verify", id], req), do: do_request(:post, "/rcp/toolkit/verify?id=#{enc(id)}", "", req)
+  def toolkit(["eval", id], req), do: do_request(:post, "/rcp/toolkit/eval?id=#{enc(id)}", "", req)
+  def toolkit(["build", id], req), do: do_request(:post, "/rcp/toolkit/build?id=#{enc(id)}", "", req)
+  def toolkit(["build", id, which], req), do: do_request(:post, "/rcp/toolkit/build?id=#{enc(id)}&which=#{enc(which)}", "", req)
+  def toolkit(["sign", id], req), do: do_request(:post, "/rcp/toolkit/sign?id=#{enc(id)}", "", req)
+  def toolkit(_, _), do: {toolkit_usage(), true}
+
+  defp enc(s), do: URI.encode_www_form(to_string(s))
+
+  defp toolkit_usage do
+    """
+    wb toolkit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
+
+    Runs against the connected runtime (toolkit verbs execute server-side; the
+    escript can't load the NIFs). Target: WB_RUNTIME_URL (+ WB_TOKEN) or discovery.
+    """
+  end
+
   defp await_review(run, timeout_s, req) do
     case target() do
       {:error, msg} -> {msg, true}
