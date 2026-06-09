@@ -19,30 +19,52 @@ defmodule Workbooks.Shell do
   stage error {:error, reason}. Each stage is a registered WASM command.
   """
   def run(pipeline, stdin \\ "") when is_binary(pipeline) do
+    # Top-level `;` sequences pipelines: each runs on the original stdin and their
+    # outputs concatenate (like a shell). `&&`/`||` need exit codes (see run path) —
+    # a follow-up. The final concatenated result is trimmed for ergonomic output.
     pipeline
+    |> split_top(?;)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.reduce({:ok, []}, fn
+      pipe, {:ok, acc} ->
+        case run_pipe(pipe, stdin) do
+          {:ok, out} -> {:ok, [out | acc]}
+          err -> err
+        end
+
+      _pipe, err ->
+        err
+    end)
+    |> case do
+      {:ok, outs} -> {:ok, outs |> Enum.reverse() |> Enum.join() |> String.trim()}
+      other -> other
+    end
+  end
+
+  # One `cmd | cmd | …` pipeline. Inter-stage data is byte-exact (exec passes
+  # trim: false, so `wc -l` et al. see trailing newlines).
+  defp run_pipe(pipe, stdin) do
+    pipe
     |> split_pipes()
     |> Enum.map(&String.trim/1)
     |> Enum.reduce({:ok, stdin}, fn
       stage, {:ok, input} -> exec(stage, input)
       _stage, err -> err
     end)
-    # Inter-stage data is byte-exact (exec passes trim: false, so `wc -l` et al.
-    # see trailing newlines); the final result is trimmed for ergonomic output.
-    |> case do
-      {:ok, out} -> {:ok, String.trim(out)}
-      other -> other
-    end
   end
 
-  # Split on top-level `|` only — a `|` inside quotes (e.g. jq's `.items | length`)
-  # stays part of its stage. Proper shell tokenization, not a naive split.
-  defp split_pipes(str) do
+  # Split on a top-level separator char only — a `|`/`;` inside quotes (e.g. jq's
+  # `.items | length`) stays part of its stage. Proper tokenization, not a split.
+  defp split_pipes(str), do: split_top(str, ?|)
+
+  defp split_top(str, sep) do
     {parts, cur, _q} =
       Enum.reduce(String.to_charlist(str), {[], [], nil}, fn ch, {parts, cur, q} ->
         cond do
           is_nil(q) and ch in [?', ?"] -> {parts, [ch | cur], ch}
           q == ch -> {parts, [ch | cur], nil}
-          is_nil(q) and ch == ?| -> {[Enum.reverse(cur) | parts], [], nil}
+          is_nil(q) and ch == sep -> {[Enum.reverse(cur) | parts], [], nil}
           true -> {parts, [ch | cur], q}
         end
       end)
@@ -52,7 +74,7 @@ defmodule Workbooks.Shell do
 
   # Coreutils provided by the multicall `wbox` wasm — dispatched as `wbox <applet>`
   # so the shell has real echo/cat/seq/head/wc without N separate binaries (wb-9ja).
-  @wbox ~w(cat echo seq head wc true false)
+  @wbox ~w(cat echo seq head wc nl rev basename dirname tr true false)
 
   defp exec(stage, input) do
     case tokenize(stage) do

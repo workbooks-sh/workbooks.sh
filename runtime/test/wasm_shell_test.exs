@@ -29,6 +29,14 @@ defmodule WasmShellTest do
     assert {:ok, "3"} = Workbooks.Shell.run("echo -n abc | wc -c")
   end
 
+  test "more coreutils applets + ; sequencing" do
+    assert {:ok, "olleh"} = Workbooks.Shell.run("echo hello | rev")
+    assert {:ok, "c"} = Workbooks.Shell.run("basename /a/b/c.txt .txt")
+    assert {:ok, "/a/b"} = Workbooks.Shell.run("dirname /a/b/c.txt")
+    assert {:ok, "heLLo"} = Workbooks.Shell.run("echo hello | tr l L")
+    assert {:ok, "a\nb"} = Workbooks.Shell.run("echo a ; echo b")
+  end
+
   test "trim: false preserves byte-exact command output (only the final result is trimmed)" do
     # The pipe must not strip a trailing newline mid-stream; standalone still trims.
     assert {:ok, "1\n2\n3\n"} = Workbooks.CommandRegistry.run("wbox", "", ["seq", "3"], [], trim: false)

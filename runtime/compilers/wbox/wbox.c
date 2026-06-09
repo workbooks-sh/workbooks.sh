@@ -99,6 +99,101 @@ static int do_head(int c, char **v) {
   return 0;
 }
 
+static int do_nl(void) {
+  char b[4096];
+  long n, ln = 1;
+  int at_start = 1;
+  while ((n = read(0, b, sizeof b)) > 0) {
+    for (long i = 0; i < n; i++) {
+      if (at_start) {
+        char num[32];
+        w(num, snprintf(num, sizeof num, "%6ld\t", ln));
+        at_start = 0;
+      }
+      w(b + i, 1);
+      if (b[i] == '\n') { ln++; at_start = 1; }
+    }
+  }
+  return 0;
+}
+
+static int do_rev(void) {
+  char line[4096], r[4096], b[4096];
+  long li = 0, n;
+  while ((n = read(0, b, sizeof b)) > 0) {
+    for (long i = 0; i < n; i++) {
+      if (b[i] == '\n') {
+        for (long j = 0; j < li; j++) r[j] = line[li - 1 - j];
+        w(r, li);
+        w("\n", 1);
+        li = 0;
+      } else if (li < (long)sizeof line) {
+        line[li++] = b[i];
+      }
+    }
+  }
+  if (li > 0) {
+    for (long j = 0; j < li; j++) r[j] = line[li - 1 - j];
+    w(r, li);
+  }
+  return 0;
+}
+
+static int do_basename(int c, char **v) {
+  if (c < 1) return 1;
+  char *p = v[0], *s = strrchr(p, '/');
+  char *base = s ? s + 1 : p;
+  long bl = (long)strlen(base);
+  if (c >= 2) {
+    long sl = (long)strlen(v[1]);
+    if (sl > 0 && sl < bl && !strcmp(base + bl - sl, v[1])) bl -= sl;
+  }
+  w(base, bl);
+  w("\n", 1);
+  return 0;
+}
+
+static int do_dirname(int c, char **v) {
+  if (c < 1) { w(".\n", 2); return 1; }
+  char *p = v[0], *s = strrchr(p, '/');
+  if (!s) { w(".\n", 2); return 0; }
+  if (s == p) { w("/\n", 2); return 0; }
+  w(p, s - p);
+  w("\n", 1);
+  return 0;
+}
+
+static int do_tr(int c, char **v) {
+  char b[4096];
+  long n;
+  if (c >= 2 && !strcmp(v[0], "-d")) {
+    const char *set = v[1];
+    char o[4096];
+    while ((n = read(0, b, sizeof b)) > 0) {
+      long oi = 0;
+      for (long i = 0; i < n; i++)
+        if (b[i] && !strchr(set, b[i])) o[oi++] = b[i];
+      w(o, oi);
+    }
+    return 0;
+  }
+  if (c < 2) return 1;
+  const char *s1 = v[0], *s2 = v[1];
+  long l2 = (long)strlen(s2);
+  while ((n = read(0, b, sizeof b)) > 0) {
+    for (long i = 0; i < n; i++) {
+      if (!b[i]) continue;
+      const char *p = strchr(s1, b[i]);
+      if (p) {
+        long idx = p - s1;
+        b[i] = idx < l2 ? s2[idx] : (l2 > 0 ? s2[l2 - 1] : b[i]);
+      }
+    }
+    w(b, n);
+  }
+  return 0;
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) { write(2, "wbox: missing applet\n", 21); return 2; }
   const char *a = argv[1];
@@ -110,6 +205,11 @@ int main(int argc, char **argv) {
   if (!strcmp(a, "seq")) return do_seq(c, v);
   if (!strcmp(a, "wc")) return do_wc(c, v);
   if (!strcmp(a, "head")) return do_head(c, v);
+  if (!strcmp(a, "nl")) return do_nl();
+  if (!strcmp(a, "rev")) return do_rev();
+  if (!strcmp(a, "basename")) return do_basename(c, v);
+  if (!strcmp(a, "dirname")) return do_dirname(c, v);
+  if (!strcmp(a, "tr")) return do_tr(c, v);
   if (!strcmp(a, "true")) return 0;
   if (!strcmp(a, "false")) return 1;
 
