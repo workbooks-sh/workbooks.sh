@@ -193,7 +193,7 @@ defmodule Workbooks.Toolkits do
           [
             {File.exists?(Path.join(dir, "manifest.org")), "manifest.org present"},
             {File.exists?(Path.join([dir, "skills", "overview.org"])), "skills/overview.org present"}
-          ] ++ exec_checks(d)
+          ] ++ exec_checks(d) ++ cap_checks(d)
 
         # SECURITY (wb-sec): :role pre blocks are arbitrary bash from an untrusted
         # toolkit dir. They run ONLY when execution is opted-in (WB_TOOLKIT_EXEC=1);
@@ -676,6 +676,32 @@ defmodule Workbooks.Toolkits do
   #   posix    → CLI_BIN resolves on PATH.
   #   task     → at least one skill carries a :role task block.
   #   federation → a plugin/ data-source face exists.
+  # wb-pkh.6: the #+CAPS cross-check — every declared cap must be GRANTABLE (known
+  # to Policy), and at least one profile must grant the WHOLE declared set, else the
+  # toolkit can never instantiate (it would import a cap no profile provides). Also
+  # report the minimal granting profile(s) so the author knows what to deploy under.
+  defp cap_checks(%{caps: []}), do: []
+
+  defp cap_checks(%{caps: caps}) when is_list(caps) do
+    known = Workbooks.Policy.profiles() |> Enum.flat_map(&Workbooks.Policy.caps/1) |> MapSet.new()
+    unknown = Enum.reject(caps, &MapSet.member?(known, &1))
+    granting = Workbooks.Policy.profiles() |> Enum.filter(fn p -> caps -- Workbooks.Policy.caps(p) == [] end)
+
+    known_check =
+      if unknown == [],
+        do: {true, "caps declared, all grantable: #{Enum.join(caps, " ")}"},
+        else: {false, "caps NOT grantable by any profile: #{Enum.join(unknown, " ")}"}
+
+    grant_check =
+      if granting == [],
+        do: {false, "no single Policy profile grants all declared caps (#{Enum.join(caps, " ")})"},
+        else: {true, "granted by profile(s): #{Enum.map_join(granting, ", ", &to_string/1)}"}
+
+    [known_check, grant_check]
+  end
+
+  defp cap_checks(_), do: []
+
   defp exec_checks(%{exec: nil}), do: [{true, "exec: none declared (discovery-only toolkit)"}]
 
   defp exec_checks(%{exec: "command", cli_bin: bin, build_src: src}) do
