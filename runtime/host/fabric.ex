@@ -45,8 +45,10 @@ defmodule Workbooks.Fabric do
   (ordered to match `inputs`), or `{:error, {:unsupported_tier, tier}}`.
   """
   def map(name, inputs, opts \\ []) when is_binary(name) and is_list(inputs) do
-    case Workbooks.Isolation.resolve(opts[:tier] || :instance) do
-      {:ok, :instance} -> {:ok, map_instances(name, inputs, opts)}
+    # Commands run as per-call subprocess wasmtime (CommandRegistry.run →
+    # run_wasmtime) — their native tier is :os_process, not in-VM :instance.
+    case resolve_for(:map, opts[:tier] || :os_process) do
+      {:ok, _tier} -> {:ok, map_instances(name, inputs, opts)}
       {:error, _} = err -> err
     end
   end
@@ -92,11 +94,28 @@ defmodule Workbooks.Fabric do
   as `map/3`; `:instance` tier today (heavier tiers = wb-rhs.10).
   """
   def map_kernel(wasm_bytes, inputs, opts \\ []) when is_binary(wasm_bytes) and is_list(inputs) do
-    case Workbooks.Isolation.resolve(opts[:tier] || :instance) do
-      {:ok, :instance} -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
+    # Kernels are persistent in-VM Wasmex instances — native tier :instance.
+    case resolve_for(:map_kernel, opts[:tier] || :instance) do
+      {:ok, _tier} -> {:ok, map_kernel_instances(wasm_bytes, inputs, opts)}
       {:error, _} = err -> err
     end
   end
+
+  # Each fan-out function honors only the tier its execution shape can run at
+  # today (commands = subprocess/:os_process, kernels = in-VM/:instance). A
+  # mismatched-but-real tier gets a pointed reason; node/container/unknown defer
+  # to Isolation.resolve (planned/unknown).
+  defp resolve_for(:map, :os_process), do: {:ok, :os_process}
+
+  defp resolve_for(:map, :instance),
+    do: {:error, {:tier_mismatch, :instance, "commands run per-call as :os_process (subprocess wasmtime); for the in-VM :instance tier use map_kernel"}}
+
+  defp resolve_for(:map_kernel, :instance), do: {:ok, :instance}
+
+  defp resolve_for(:map_kernel, :os_process),
+    do: {:error, {:tier_mismatch, :os_process, "kernels need a persistent in-VM :instance; :os_process would respawn per frame and lose reuse"}}
+
+  defp resolve_for(_fn, tier), do: Workbooks.Isolation.resolve(tier)
 
   defp map_kernel_instances(_wasm, [], _opts), do: []
 

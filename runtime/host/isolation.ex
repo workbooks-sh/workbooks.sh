@@ -18,24 +18,29 @@ defmodule Workbooks.Isolation do
     | :node       | planned    | BEAM VM        | host-side crash/scheduler + cross-machine  |
     | :container  | planned    | OS kernel      | hostile / multi-tenant                     |
 
-  `:instance` is live and the default. `:os_process` is *available* — the
-  machinery already exists (proc_macro_host runs CLI wasmtime as a subprocess with
-  a hard-kill watchdog) and is wireable into the fabric. `:node`/`:container` are
-  defined but not yet built. Statuses are honest on purpose — nothing here pretends
-  a tier works before it does.
+  BOTH `:instance` and `:os_process` are LIVE today — and which one a call uses is
+  determined by the artifact SHAPE, not a free knob:
+    * a `command` runs as a per-call subprocess wasmtime (run_wasmtime, `-W fuel`
+      + `-W timeout`) → `:os_process`. (This was always true; an earlier version of
+      this module mislabeled it `:available`.)
+    * a `kernel`/`component` runs in a persistent in-VM Wasmex instance →
+      `:instance`.
+  `:node`/`:container` are defined but not yet built. Use `tier_for_shape/1` to map
+  an `#+EXEC` shape to its real tier. Statuses are honest — nothing pretends a tier
+  works before it does.
   """
 
   @tiers %{
     instance: %{
       status: :live,
       boundary: :linear_memory,
-      blurb: "wasm instance, same BEAM VM — memory-sandboxed, trap-contained, caps-gated. Fast + cheap.",
+      blurb: "persistent in-VM Wasmex instance (KERNELS + components) — instantiate-once, memory-sandboxed, trap-contained, reused across calls. Fast.",
       isolates: "memory corruption, ungranted caps"
     },
     os_process: %{
-      status: :available,
+      status: :live,
       boundary: :os_process,
-      blurb: "separate OS process (CLI wasmtime + hard-kill watchdog) — hard CPU preempt + native-crash containment.",
+      blurb: "per-call subprocess wasmtime (COMMANDS via run_wasmtime — -W fuel/-W timeout, hard-killable). Separate OS process; cannot corrupt the BEAM VM.",
       isolates: "runaway CPU, native-level crash"
     },
     node: %{
@@ -76,6 +81,27 @@ defmodule Workbooks.Isolation do
   def default_for_trust(_first_party_or_nil), do: :instance
 
   @doc """
+  The real isolation tier an `#+EXEC` shape runs at today (the tier is determined
+  by shape, not a free per-call knob):
+    * command  → :os_process  (per-call subprocess wasmtime)
+    * posix    → :os_process  (native binary, separate process)
+    * kernel   → :instance    (persistent in-VM Wasmex)
+    * component→ :instance    (in-VM Wasmex.Components)
+    * task/federation → nil    (no wasm artifact of its own)
+  """
+  def tier_for_shape(exec) when is_binary(exec) do
+    case exec do
+      "command" -> :os_process
+      "posix" -> :os_process
+      "kernel" -> :instance
+      "component" -> :instance
+      _ -> nil
+    end
+  end
+
+  def tier_for_shape(_), do: nil
+
+  @doc """
   Resolve a requested tier to a runnable one, or an explanatory error. Used by the
   fabric so a non-live tier fails with WHY (available-but-unwired vs planned),
   never a bare `:unsupported`.
@@ -84,9 +110,6 @@ defmodule Workbooks.Isolation do
     case status(t) do
       :live ->
         {:ok, t}
-
-      :available ->
-        {:error, {:tier_not_wired, t, "tier #{inspect(t)} is available (machinery exists) but not yet wired into the fabric — wb-rhs.10"}}
 
       :planned ->
         {:error, {:tier_planned, t, "tier #{inspect(t)} is defined but not yet built — wb-rhs.10"}}

@@ -57,12 +57,14 @@ defmodule Workbooks.FabricTest do
     assert {:ok, []} = Fabric.map(cmd, [])
   end
 
-  test "a non-live isolation tier is refused with WHY (wb-rhs.10)", %{cmd: cmd} do
-    # :node is defined but planned — status-aware error, not a bare :unsupported.
-    assert {:error, {:tier_planned, :node, _why}} = Fabric.map(cmd, ["x"], tier: :node)
-    # :os_process exists but isn't wired into the fabric yet.
-    assert {:error, {:tier_not_wired, :os_process, _}} = Fabric.map(cmd, ["x"], tier: :os_process)
-    # an unknown tier name is its own error.
+  @tag :build
+  test "fabric tier handling (wb-rhs.10 / wb-pkh.7)", %{cmd: cmd} do
+    # Commands run as subprocess wasmtime → :os_process is their native LIVE tier.
+    assert {:ok, [{:ok, "cba"}]} = Fabric.map(cmd, ["abc"], tier: :os_process)
+    # :instance doesn't apply to commands (no in-VM command path) — pointed reason.
+    assert {:error, {:tier_mismatch, :instance, _}} = Fabric.map(cmd, ["x"], tier: :instance)
+    # :node is defined but planned; :bogus is unknown.
+    assert {:error, {:tier_planned, :node, _}} = Fabric.map(cmd, ["x"], tier: :node)
     assert {:error, {:unknown_tier, :bogus, _}} = Fabric.map(cmd, ["x"], tier: :bogus)
   end
 end
