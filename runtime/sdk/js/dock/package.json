@@ -1,0 +1,9 @@
+{
+  "name": "dock",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Dock SDK (JS) — ergonomic cap-scoped bindings for jco-authored workbooks:engine components (wb-pkh.9).",
+  "main": "index.js",
+  "scripts": { "test": "node --test" },
+  "license": "MIT"
+}
