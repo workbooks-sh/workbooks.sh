@@ -1,0 +1,18 @@
+#+TITLE: wb CLI
+#+DESCRIPTION: The commands you'll use most.
+
+* wb CLI
+
+| command                                  | does                                  |
+|------------------------------------------+---------------------------------------|
+| =wb toolkit build-inline <n> <lang> <f>= | self-author: build a source file → register |
+| =wb toolkit promote <n> <lang> <f>=      | promote a session command → workspace toolkit |
+| =wb toolkit build <id>=                  | build a declared toolkit              |
+| =wb toolkit list / show / search=        | discover toolkits                     |
+| =wb toolkit verify <id>=                 | structural + capability checks        |
+| =wb pack <id> <out>=                     | package a toolkit-workbook (.wbundle) |
+| =wb install <bundle>=                    | verify + register a toolkit           |
+| =wb publish <workbook.org>=              | compile + ship a workbook             |
+| =wb isolation=                           | show the isolation-tier ladder        |
+
+Run =wb --help= for the full surface.

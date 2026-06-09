@@ -1,0 +1,76 @@
+#+TITLE: The six shapes
+#+DESCRIPTION: One toolkit package, six invocation contracts. #+EXEC selects how the artifact runs.
+
+* The six shapes
+
+A toolkit's manifest declares one =#+EXEC= shape. It's the single most important
+line in the manifest: it selects *how the artifact is invoked* — and nothing else
+changes. One package format, one build pipeline, one trust model, six contracts.
+
+Pick the shape by how the thing is *called*, not by what language you wrote it in.
+
+** command — the stdio leaf
+
+argv + stdin → stdout. A CLI compiled to WASM, invoked by name. This is the
+default and the ~80% case: text tools, parsers, formatters, converters, anything
+shaped like a Unix filter. If you're not sure, you want =command=.
+
+#+begin_src org
+#+EXEC: command
+#+CLI_BIN: rev
+#+END_SRC
+
+** component — typed, in-process
+
+A WIT-typed component on the engine interface. Instead of stringly stdin/stdout,
+it has typed inputs and outputs and is called *in-process* (no per-call spawn).
+Reach for it when you want a real API surface rather than a pipe — and when you
+want to use the [[the-dock.org][Dock]] capabilities through the typed [[../build/dock-sdk.org][SDK]].
+
+** kernel — a hot loop
+
+=bytes → bytes=, instantiated *once* and called millions of times in a tight loop
+with no per-call overhead. This is the media / render shape: decode a frame, resize,
+blur, resample. A renderer is a graph of =kernel= toolkits with frames fanned
+across them by [[../run/fabric.org][the fabric]] — not a monolith.
+
+** task — a recipe, no binary
+
+No compiled artifact. The toolkit ships =:role task= recipes — runnable steps an
+agent executes — for multi-step needs the toolkit owns but doesn't compile. Useful
+when the value is the *procedure*, not a binary.
+
+** federation — a live data source
+
+Turns an external system into something you can query. =SELECT … FROM <entity>=
+routes to a data-source plugin (any JSON API works with zero code), and an optional
+sync daemon mirrors it into local nodes on an interval. Credentials resolve through
+a broker — the plugin never holds the key. See [[../distribute/federation.org][Federation]].
+
+** posix — the native escape hatch
+
+A *native* binary, not WASM, for the things WASM genuinely can't do (native
+threads, complex syscalls, ffmpeg-class tools). It's the one shape with real OS
+access — so it runs only inside the deploy container's boundary, and the deployer
+opts in explicitly. Use it when you must; prefer a WASM shape when you can.
+
+** At a glance
+
+| =#+EXEC=    | ABI                          | invoked by         | needs a build |
+|-------------+------------------------------+--------------------+---------------|
+| =command=   | argv + stdin → stdout        | agent, workflow    | yes           |
+| =component= | WIT-typed, in-process        | component, workflow| yes           |
+| =kernel=    | =bytes → bytes= hot loop     | the fabric         | yes           |
+| =task=      | runnable recipe              | agent              | no            |
+| =federation=| OQL data source + sync       | the query layer    | mixed         |
+| =posix=     | native binary                | agent, workflow    | no            |
+
+** Trust is orthogonal
+
+Whatever shape you pick, the manifest also declares =#+TRUST= —
+=first-party= (yours) or =third-party= (untrusted supply chain). Trust doesn't
+change the shape; it changes how *contained* the toolkit runs. A third-party
+toolkit is automatically pushed to a stronger [[isolation.org][isolation tier]]. The shape is the
+contract; trust is the cage.
+
+[[../build/pick-a-shape.org][Build one of these →]]

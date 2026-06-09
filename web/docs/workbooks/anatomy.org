@@ -1,0 +1,28 @@
+#+TITLE: Anatomy of a workbook
+#+DESCRIPTION: What a workbook is made of and the one rule it must follow.
+
+* Anatomy of a workbook
+
+A workbook is a single =.org= file. The only structural requirement is a top-level
+heading marked as a workbook:
+
+#+begin_src org
+,#+TITLE: My Workbook
+
+,* My Workbook
+  :PROPERTIES:
+  :WORKBOOK_VERSION: 1
+  :END:
+
+Prose, source blocks, and data live here.
+#+end_src
+
+Everything else is standard Org. The runtime understands Org — you don't learn a
+new format. Source blocks become WASM components; the rendered result is a
+self-contained =.html=.
+
+Because it's just Org and just HTML, a workbook carries its own source, ships as
+one file, and can carry toolkits inside it.
+
+- The two surfaces: [[../concepts/two-surfaces.org][Workbooks & toolkits]]
+- How it compiles: [[build-plan.org][The build plan]]

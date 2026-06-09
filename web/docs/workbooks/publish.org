@@ -1,0 +1,17 @@
+#+TITLE: Publish
+#+DESCRIPTION: Turn a workbook into a self-contained .html and put it on the web.
+
+* Publish
+
+Publishing compiles a workbook to a single self-contained =.html= and pushes it to
+a provider.
+
+#+begin_src bash
+wb publish my-workbook.org
+#+end_src
+
+The output is one file: prose, compiled WASM, and the source it tangles from, all
+inline. Open it in any browser — no server required to view. The runtime is the
+optional tier for agents and sync, never a gate on reading.
+
+- What's inside the file: [[anatomy.org][Anatomy of a workbook]]

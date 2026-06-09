@@ -4,33 +4,44 @@
 #+PUBLISH_DOMAIN: docs.workbooks.sh
 #+PUBLISH_BASE_PATH: /docs
 
-* [[index.org][Introduction]]
+* [[index.org][Overview]]
 
-* Getting Started
-  - [[getting-started/installation.org][Installation]]
-  - [[getting-started/quick-start.org][Quick Start]]
-  - [[getting-started/running-locally.org][Running Locally]]
+* Start here
+  - [[start/install.org][Install]]
+  - [[start/first-toolkit.org][Your first toolkit]]
 
-* The Workbook
-  - [[the-workbook/org-basics.org][Org Mode Basics]]
-  - [[the-workbook/source-blocks.org][Source Blocks & Components]]
-  - [[the-workbook/build-plan.org][The Build Plan]]
+* Concepts
+  - [[concepts/what-is-a-toolkit.org][What is a toolkit]]
+  - [[concepts/two-surfaces.org][Workbooks & toolkits]]
+  - [[concepts/exec-shapes.org][The six shapes]]
+  - [[concepts/the-dock.org][The Dock & capabilities]]
+  - [[concepts/isolation.org][Isolation tiers]]
 
-* Publishing
-  - [[publishing/wb-publish.org][wb publish]]
-  - [[publishing/providers.org][Providers]]
+* Build a toolkit
+  - [[build/pick-a-shape.org][Pick a shape]]
+  - [[build/dock-sdk.org][The Dock SDK]]
+  - [[build/skills.org][Authoring skills]]
+  - [[build/languages.org][Language lanes]]
+  - [[build/self-authoring.org][Self-authoring & hot-swap]]
 
-* Runtime
-  - [[runtime/architecture.org][Architecture]]
-  - [[runtime/oql.org][OQL (Org Query Language)]]
-  - [[runtime/agents.org][Agents]]
-  - [[runtime/wasm-on-beam.org][WASM on the BEAM]]
+* Run & isolate
+  - [[run/invoke.org][Invoking a toolkit]]
+  - [[run/fabric.org][The fabric]]
+  - [[run/tiers.org][Isolation tiers & trust]]
 
-* Toolkits
-  - [[toolkits/discovery.org][Discovery]]
-  - [[toolkits/building.org][Building a Toolkit]]
+* Distribute
+  - [[distribute/package.org][Package & sign]]
+  - [[distribute/install.org][Install & registry]]
+  - [[distribute/federation.org][Federation]]
+
+* Workbooks
+  - [[workbooks/anatomy.org][Anatomy of a workbook]]
+  - [[workbooks/build-plan.org][The build plan]]
+  - [[workbooks/publish.org][Publish]]
 
 * Reference
-  - [[reference/wb-cli.org][wb CLI Reference]]
-  - [[reference/publish-org.org][publish.org Properties]]
-  - [[reference/deployment-org.org][deployment.org Properties]]
+  - [[reference/manifest.org][Manifest fields]]
+  - [[reference/exec-shapes.org][#+EXEC shapes]]
+  - [[reference/caps.org][Dock capabilities]]
+  - [[reference/cli.org][wb CLI]]
+  - [[reference/sdk.org][Dock SDK API]]

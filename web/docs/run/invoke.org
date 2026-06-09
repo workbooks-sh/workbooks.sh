@@ -1,0 +1,22 @@
+#+TITLE: Invoking a toolkit
+#+DESCRIPTION: The five ways a toolkit gets called — all the same artifact.
+
+* Invoking a toolkit
+
+A toolkit serves every caller from one artifact. You write it once; the whole
+system can use it.
+
+- *An agent* reads the toolkit's skills and calls a =command= over bash —
+  =run-command <name>=.
+- *A workbook's HTML* calls it live through the Dock (the closed loop: a button
+  that runs the thing, not a "copy as prompt").
+- *A workflow* orchestrates it as one step.
+- *Another toolkit* calls it via the =commands= capability — composition.
+- *The fabric* loops a =kernel= over many inputs at once.
+
+Discovery is one query: a toolkit is a =:toolkit:=-tagged node, found by
+=(tags :toolkit:)=. An agent sees a compact index and reads a skill only when it
+needs it.
+
+- How agents see toolkits: [[../build/skills.org][Authoring skills]]
+- Distribute compute: [[fabric.org][The fabric]]
