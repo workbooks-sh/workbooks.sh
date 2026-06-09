@@ -94,8 +94,10 @@
 
 * Next / gaps
 
-  - The runtime must inject =$WB_RUN= (the run/session id) into the agent's env
-    when it starts the run — the one wiring this recipe depends on.
+  - =$WB_RUN= is now injected into the agent's bash env by =AgentSession= (the run
+    id flows into =Agent.run env:= → =System.cmd env:=). Remaining dependency: the
+    agent's =wb= must reach the runtime — =WB_RUNTIME_URL=/=WB_TOKEN= or the local
+    discovery file present in its container.
   - A live end-to-end round-trip (real run → human commit → agent commit) is the
     remaining verification; mark this skill =stable= once it passes.
 

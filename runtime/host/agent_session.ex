@@ -47,6 +47,7 @@ defmodule Workbooks.AgentSession do
   @impl true
   def handle_continue({:run, system, task, opts}, state) do
     parent = self()
+    run_id = state.id
 
     spawn(fn ->
       {:ok, vfs} = Workbooks.VFS.open(Keyword.get(opts, :vfs, ":memory:"))
@@ -57,6 +58,9 @@ defmodule Workbooks.AgentSession do
           tenant: Keyword.get(opts, :tenant, "dev"),
           model: opts[:model],
           max_steps: Keyword.get(opts, :max_steps, 40),
+          # WB_RUN lets the agent address its OWN run for CTK reviews — build the
+          # ?run= connect URL + `wb ctk await $WB_RUN` (see toolkits/ctk).
+          env: [{"WB_RUN", run_id} | Keyword.get(opts, :env, [])],
           on_step: fn ev -> send(parent, {:step, ev}) end
         )
 
