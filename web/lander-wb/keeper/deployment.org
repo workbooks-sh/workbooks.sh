@@ -22,6 +22,6 @@
 #   wb publish init        # PUBLISH_TARGET: self-hosted → the fly URL
 #   wb publish apply ../dist/workbooks.html
 #
-# Keeper model: deepseek/deepseek-v4 (vision + computer use — it screenshots
+# Keeper model: deepseek/deepseek-v4-pro (vision + computer use — it screenshots
 # the page to verify its own edits). Loop trigger v1: hourly cron hitting
 # POST /api/run with the keeper def; see bd wb-5vm sub-issues.

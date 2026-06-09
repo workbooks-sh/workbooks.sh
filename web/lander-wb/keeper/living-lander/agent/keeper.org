@@ -3,7 +3,7 @@
 * lander-keeper :agent:
   :PROPERTIES:
   :ID:       lander-keeper
-  :MODEL:    deepseek/deepseek-v4
+  :MODEL:    deepseek/deepseek-v4-pro
   :TOOLKITS: git
   :END:
 
