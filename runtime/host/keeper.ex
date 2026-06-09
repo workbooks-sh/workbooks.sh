@@ -12,6 +12,16 @@ defmodule Workbooks.Keeper do
                                 starts but stays idle indefinitely.
     - `WB_KEEPER_INTERVAL_MS` — tick interval in ms (default: 3_600_000 = 1h).
                                 First tick fires after one interval, not on boot.
+    - `WB_KEEPER_MODE`        — `plan` (default) or `edit`. `plan` = the agent
+                                only critiques + updates its backlog, never edits
+                                the page (for watched early runs). Passed into
+                                the task line; the def enforces it.
+    - `WB_TENANT`             — the tenant whose git repo the keeper works in
+                                (default "local"); the run's workdir is that repo,
+                                so the keeper's commits ARE the public changelog.
+
+  `Workbooks.Keeper.run_once/0` triggers one tick immediately (for a watched
+  manual validation run, e.g. over `fly ssh`).
 
   ## Isolation
 
@@ -31,6 +41,9 @@ defmodule Workbooks.Keeper do
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
+
+  @doc "Trigger one keeper tick immediately (watched manual validation run)."
+  def run_once, do: send(__MODULE__, :tick)
 
   # ── GenServer callbacks ──────────────────────────────────────────────────────
 
@@ -80,13 +93,22 @@ defmodule Workbooks.Keeper do
 
   defp schedule, do: Process.send_after(self(), :tick, interval_ms())
 
-  # Run via AgentDef.run/3 — same path as /api/brandnana-ask. The def's :MODEL:
-  # property is honoured by AgentDef.run (it calls Agent.run with Keyword.put_new
-  # :model). We pass sensible defaults and keep max_steps bounded.
+  # Run via AgentDef.run/3 — same path as /api/run. The def's :MODEL: property is
+  # honoured by AgentDef.run. The agent gets a shell (exec: true) and a workdir =
+  # the tenant's git repo, so it reads/edits/commits the page IN its versioned
+  # source of truth and its commits become the public changelog. The task line
+  # carries the mode (plan|edit), which the def enforces.
   defp run_def(org) do
+    mode = System.get_env("WB_KEEPER_MODE", "plan")
+    tenant = System.get_env("WB_TENANT", "local")
+    workdir = Workbooks.Git.repo_path(tenant)
+    Workbooks.Git.ensure_repo(tenant)
+
     Workbooks.AgentDef.run(
       org,
-      "Perform one keeper run per your toolkit/skills.",
+      "MODE: #{mode}\nPerform one keeper run per your loop. Your working directory is this page's git repo.",
+      exec: true,
+      workdir: workdir,
       max_steps: 60
     )
   end
