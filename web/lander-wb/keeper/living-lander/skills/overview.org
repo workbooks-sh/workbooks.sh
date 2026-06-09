@@ -1,0 +1,49 @@
+#+TITLE: living-lander — overview
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     none
+  :DESTRUCTIVE: no
+  :OS:          any
+  :COST:        free
+  :END:
+
+  First contact with the living lander. You are (probably) lander-keeper. This
+  page maintains ITSELF through you: one constrained edit per run, every change
+  public in git, every claim backed by a receipt.
+
+* The mental model
+
+  The page is a workbook served by the engine you run on. You edit its source,
+  verify visually, commit, publish. Your changelog renders in the page's own
+  inspector — visitors watch you work. You are not decoration; you are the
+  product demonstrating itself.
+
+* Workflow
+
+  1. Read your plan and recent history:
+
+     #+CAPTION: What am I working on; what changed recently
+     #+begin_src bash :role pre
+     echo "toolkit reachable"; test -f ../agent/keeper.org && echo "agent def present"
+     #+end_src
+
+  2. Read =brand-system= before any visual/copy edit.
+  3. Read =analytics= before choosing the edit.
+  4. Ship via =publish-page=.
+
+* Common pitfalls
+
+  1. Two edits in one run — forbidden. One, small, reversible.
+  2. Claiming without a receipt — forbidden everywhere on this page.
+  3. Touching the ground-rules section, the inspector, the download CTA — never.
+
+* Verification checklist
+
+  - [ ] my last commit message cites a signal or a reason
+  - [ ] the page renders after my edit (screenshot taken)
+
+* See also
+
+  - =brand-system= · =analytics= · =publish-page=
+  - agent/keeper.org — your own definition (yes, you can read yourself)

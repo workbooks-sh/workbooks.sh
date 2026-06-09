@@ -495,6 +495,43 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
+  # `wb toolkit push` — install a toolkit DIRECTORY onto this engine (zip b64).
+  # The deploy-the-toolkit verb: deployment.org declares it, deploy applies it.
+  # Guards: id charset, zip-slip containment under the toolkits root.
+  post "/rcp/toolkit/install" do
+    {:ok, body, conn} = read_body(conn, length: 50_000_000)
+    id = conn.params["id"] || ""
+
+    out =
+      cond do
+        not Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/, id) ->
+          "refused: bad toolkit id #{inspect(id)}"
+
+        true ->
+          try do
+            %{"b64" => b64} = Jason.decode!(body)
+            root = Path.expand(Workbooks.Toolkits.default_root())
+            dest = Path.join(root, id)
+            File.mkdir_p!(dest)
+
+            for {name, content} <- Workbooks.Bundle.unpack(Base.decode64!(b64)) do
+              path = Path.expand(Path.join(dest, name))
+
+              if String.starts_with?(path, dest <> "/") or path == dest do
+                File.mkdir_p!(Path.dirname(path))
+                File.write!(path, content)
+              end
+            end
+
+            "installed toolkit #{id} → #{dest} (#{length(Workbooks.Toolkits.skills(dest))} skills)"
+          rescue
+            e -> "install failed: " <> Exception.message(e)
+          end
+      end
+
+    send_resp(conn, 200, out)
+  end
+
   post "/rcp/toolkit/run" do
     {:ok, body, conn} = read_body(conn)
 

@@ -130,6 +130,8 @@ enum ToolkitVerb {
     Sign { id: String },
     /// Build a toolkit's declared artifact (in-sandbox compile + register)
     Build { id: String, which: Option<String> },
+    /// Ship a toolkit directory onto the engine (the deploy-the-toolkit verb)
+    Push { id: String, dir: String },
     /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
     Run { id: String, task: String, #[arg(trailing_var_arg = true)] args: Vec<String> },
 }
@@ -202,6 +204,7 @@ fn main() -> Result<()> {
             ToolkitVerb::Verify { id } => commands::toolkit_verify(io, &id)?,
             ToolkitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
             ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
+            ToolkitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
             ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },
         // runtime ops

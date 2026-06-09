@@ -157,6 +157,15 @@ pub fn toolkit_verify(io: &dyn Io, id: &str) -> Result<String> {
 pub fn toolkit_sign(io: &dyn Io, id: &str) -> Result<String> {
     rcp::call(io, "POST", &format!("/rcp/toolkit/sign?id={}", urlenc(id)), None)
 }
+/// `wb toolkit push <id> <dir>` — ship a toolkit DIRECTORY onto the engine
+/// (zip over RCP; the engine unpacks it under its toolkits root). This is the
+/// deploy-the-toolkit verb: write a toolkit, push it, the runtime has it.
+pub fn toolkit_push(io: &dyn Io, id: &str, dir: &str) -> Result<String> {
+    let zip = crate::local::zip_dir(io, dir)?;
+    let body = serde_json::json!({ "b64": base64::engine::general_purpose::STANDARD.encode(&zip) });
+    rcp::call(io, "POST", &format!("/rcp/toolkit/install?id={}", urlenc(id)), Some(&body.to_string()))
+}
+
 pub fn toolkit_build(io: &dyn Io, id: &str, which: Option<&str>) -> Result<String> {
     let path = match which {
         Some(w) => format!("/rcp/toolkit/build?id={}&which={}", urlenc(id), urlenc(w)),

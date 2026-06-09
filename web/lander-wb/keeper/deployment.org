@@ -5,10 +5,13 @@
 #+DEPLOY_PORT: 4000
 # Secret NAMES this deployment needs (values: `wb deploy secrets set KEY=VAL`):
 #+DEPLOY_SECRETS: OPENROUTER_API_KEY POSTHOG_API_KEY
+# Toolkits the deploy SHIPS to the engine (id:dir, space-separated). Write a
+# toolkit, `wb deploy apply`, done — the kit launches the toolkit to the runtime.
+#+DEPLOY_TOOLKITS: living-lander:./living-lander
 
 # The lander-live proof (bd wb-5vm): one small fly machine running the runtime
 # image. It serves the lander (a workbook) over PublicWeb, runs lander-keeper
-# (keeper.org) hourly, and exposes /rcp/changes — the page's real git history —
+# (living-lander/agent/keeper.org) hourly, and exposes /rcp/changes — the page's real git history —
 # to the page's own inspector. Bring up:
 #
 #   cd web/lander-wb/keeper

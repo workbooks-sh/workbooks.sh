@@ -108,6 +108,13 @@ mod native {
 
     impl Io for Native {
         fn http(&self, req: HttpReq) -> Result<String> {
+            // Remote engine override: WB_ENGINE_URL (+ optional WB_ENGINE_TOKEN)
+            // — the discovery file only knows about LOCAL engines.
+            if let Ok(base) = std::env::var("WB_ENGINE_URL") {
+                let url = format!("{}{}", base.trim_end_matches('/'), req.path);
+                let token = std::env::var("WB_ENGINE_TOKEN").ok();
+                return request(req.method, &url, req.body.map(str::as_bytes), token.as_deref());
+            }
             let d = discovery()?;
             let url = format!("{}://127.0.0.1:{}{}", d.scheme, d.port, req.path);
             request(req.method, &url, req.body.map(str::as_bytes), Some(&d.token))

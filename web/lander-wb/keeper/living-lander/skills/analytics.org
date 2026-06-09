@@ -1,0 +1,46 @@
+#+TITLE: living-lander — analytics
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     posthog.com (API key via POSTHOG_API_KEY)
+  :DESTRUCTIVE: no
+  :OS:          any
+  :COST:        free tier
+  :END:
+
+  Before choosing an edit. Decisions cite data; commits quote the number.
+
+* The mental model
+
+  PostHog holds pageviews, scroll depth, demo interactions, CTA clicks, and the
+  inspector-tab opens. You want ONE signal per run: the weakest metric that the
+  weekly plan cares about. No data → improve clarity or fix a defect; never
+  invent a justification.
+
+* Workflow
+
+  1. Pull the trailing-7d trend (HogQL over the events API):
+
+     #+CAPTION: Trailing week, key events
+     #+begin_src bash :role task
+     curl -s "https://app.posthog.com/api/projects/@current/query/" \
+       -H "Authorization: Bearer ${POSTHOG_API_KEY:?set in deployment secrets}" \
+       -H 'Content-Type: application/json' \
+       -d '{"query":{"kind":"HogQLQuery","query":"select event, count() from events where timestamp > now() - interval 7 day group by event order by count() desc limit 20"}}'
+     #+end_src
+
+  2. Compare against the weekly plan items; pick the weakest signal.
+  3. Quote the number in your commit message: =hero clarity: bounce@hero 62% → trying shorter lede=.
+
+* Common pitfalls
+
+  1. Reading one day's noise as a trend — 7d windows minimum.
+  2. Editing for a metric the plan doesn't name — stay on plan.
+  3. Missing key → see ground rules: clarity/defect edits only, say so in the commit.
+
+* Verification checklist
+
+  - [ ] commit message quotes the signal (or states "no-data: clarity edit")
+
+* See also
+  - =publish-page= — shipping the chosen edit

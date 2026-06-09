@@ -355,7 +355,26 @@ fn apply(io: &dyn Io) -> Result<String> {
     }
     match cfg.target() {
         "local" => apply_local(io, &cfg),
-        place => recipe_action(io, &cfg, place, "up"),
+        place => {
+            let out = recipe_action(io, &cfg, place, "up")?;
+            // deployment.org: `#+DEPLOY_TOOLKITS: id:dir id:dir …` — the kit
+            // ships the engine AND its toolkits. Write a toolkit, apply, done.
+            let mut extra = String::new();
+            if let Some(spec) = cfg.0.get("DEPLOY_TOOLKITS") {
+                let url = recipe_action(io, &cfg, place, "url")?.trim().to_string();
+                std::env::set_var("WB_ENGINE_URL", &url);
+                for entry in spec.split_whitespace() {
+                    if let Some((id, dir)) = entry.split_once(':') {
+                        match crate::commands::toolkit_push(io, id, dir) {
+                            Ok(msg) => extra.push_str(&format!("\ntoolkit {id}: {}", msg.trim())),
+                            Err(e) => extra.push_str(&format!("\ntoolkit {id}: push FAILED — {e}")),
+                        }
+                    }
+                }
+                std::env::remove_var("WB_ENGINE_URL");
+            }
+            Ok(out + &extra)
+        }
     }
 }
 
