@@ -74,7 +74,9 @@ defmodule Workbooks.Web do
           do: Workbooks.Workflow.list(org),
           else: Workbooks.Workflow.run(org, Map.get(params, "input", ""))
 
-      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(out))
+      # Run results can carry error TUPLES ({:error, {:input_too_large, …}});
+      # encode-safe them instead of 500ing on Jason.Encoder (bd wb-ica).
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(json_safe(out)))
     rescue
       e -> conn |> put_resp_content_type("application/json") |> send_resp(500, Jason.encode!(%{error: Exception.message(e)}))
     end
@@ -294,20 +296,45 @@ defmodule Workbooks.Web do
   end
 
   # `wb checkout` / `wb checkin` — borrow a library member / pack it back.
+  # BYTES over RCP: the CLI may be on a different machine than the engine (the
+  # engine usually runs in a container), so working trees can't be engine-side
+  # paths. checkout zips the member's tree back to the caller; checkin accepts a
+  # zip and writes it back into the library. The zip is the same :zip format as
+  # Workbooks.Bundle.
   post "/rcp/library/checkout" do
     t = conn.assigns.tenant
     result = try do
-      Workbooks.Library.checkout(t, conn.params["member"], conn.params["dir"]) |> Map.drop([:member])
+      tmp = Path.join(System.tmp_dir!(), "wb-co-#{System.unique_integer([:positive])}")
+      case Workbooks.Library.checkout(t, conn.params["member"], tmp) do
+        %{error: e} -> %{error: e}
+        ok ->
+          parts =
+            Path.wildcard(Path.join(tmp, "**"))
+            |> Enum.filter(&File.regular?/1)
+            |> Map.new(fn p -> {Path.relative_to(p, tmp), File.read!(p)} end)
+          File.rm_rf!(tmp)
+          %{ok: true, scope: ok[:scope], b64: Base.encode64(Workbooks.Bundle.pack(parts))}
+      end
     rescue e -> %{error: Exception.message(e)} end
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(json_safe(result)))
   end
 
   post "/rcp/library/checkin" do
     t = conn.assigns.tenant
+    {:ok, body, conn} = read_body(conn, length: 100_000_000)
     result = try do
-      Workbooks.Library.checkin(t, conn.params["member"], conn.params["dir"]) |> Map.drop([:member])
+      %{"b64" => b64} = Jason.decode!(body)
+      tmp = Path.join(System.tmp_dir!(), "wb-ci-#{System.unique_integer([:positive])}")
+      for {name, content} <- Workbooks.Bundle.unpack(Base.decode64!(b64)) do
+        dest = Path.join(tmp, name)
+        File.mkdir_p!(Path.dirname(dest))
+        File.write!(dest, content)
+      end
+      out = Workbooks.Library.checkin(t, conn.params["member"], tmp) |> Map.drop([:member])
+      File.rm_rf!(tmp)
+      out
     rescue e -> %{error: Exception.message(e)} end
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(json_safe(result)))
   end
 
   # `wb store` / `wb store --list` — archive a workspace / list stored keys.
@@ -486,6 +513,14 @@ defmodule Workbooks.Web do
 
   # The public authority for did:web — prefer the proxy's forwarded host (fly
   # terminates TLS upstream) so the DID id matches the URL clients actually used.
+  # Make any term JSON-encodable: tuples → inspected strings, recursing through
+  # maps/lists. Run/checkout results legitimately carry error tuples (bd wb-ica).
+  defp json_safe(%_{} = struct), do: struct
+  defp json_safe(m) when is_map(m), do: Map.new(m, fn {k, v} -> {k, json_safe(v)} end)
+  defp json_safe(l) when is_list(l), do: Enum.map(l, &json_safe/1)
+  defp json_safe(t) when is_tuple(t), do: inspect(t)
+  defp json_safe(other), do: other
+
   defp host_authority(conn) do
     case Plug.Conn.get_req_header(conn, "x-forwarded-host") do
       [h | _] when is_binary(h) and h != "" -> h

@@ -74,6 +74,9 @@ pub fn bundle(io: &dyn Io, src: &str, out: Option<&str>) -> Result<String> {
             .compression_method(zip::CompressionMethod::Deflated);
         z.start_file("workbook.html", o)?;
         z.write_all(html.as_bytes())?;
+        // source travels with the artifact — recipients can unbundle + re-author
+        z.start_file("workbook.org", o)?;
+        z.write_all(org.as_bytes())?;
         if let Some(v) = &vfs {
             z.start_file("vfs.sqlite", o)?;
             z.write_all(&io.read(&v.to_string_lossy())?)?;
@@ -96,25 +99,63 @@ pub fn unbundle(io: &dyn Io, file: &str, dest: Option<&str>) -> Result<String> {
     let dest = dest.map(str::to_string).unwrap_or_else(|| {
         std::path::Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string()
     });
+    let n = unzip_bytes_to(io, &blob, &dest)?;
+    Ok(format!("unbundled {file} → {dest}/ ({n} files)"))
+}
+
+/// Extract a zip blob into `dest` (zip-slip guarded). Returns the file count.
+/// Shared by `unbundle` and `checkout` (bytes-over-RCP).
+pub fn unzip_bytes_to(io: &dyn Io, blob: &[u8], dest: &str) -> Result<usize> {
     let mut z = zip::ZipArchive::new(std::io::Cursor::new(blob)).context("not a workbook bundle (zip)")?;
-    let mut names = Vec::new();
+    let mut count = 0;
     for i in 0..z.len() {
         let mut f = z.by_index(i)?;
         if !f.is_file() {
             continue;
         }
         let name = f.name().to_string();
-        // zip-slip guard: refuse absolute / parent-escaping entries
         if name.starts_with('/') || name.split('/').any(|c| c == "..") {
             bail!("refusing unsafe entry path in bundle: {name}");
         }
         let mut bytes = Vec::new();
         std::io::copy(&mut f, &mut bytes)?;
-        let path = format!("{dest}/{name}");
-        io.write(&path, &bytes)?;
-        names.push(name);
+        io.write(&format!("{dest}/{name}"), &bytes)?;
+        count += 1;
     }
-    Ok(format!("unbundled {file} → {dest}/ ({})", names.join(", ")))
+    Ok(count)
+}
+
+/// Zip a directory tree (relative entry names). Shared by `checkin`.
+pub fn zip_dir(io: &dyn Io, dir: &str) -> Result<Vec<u8>> {
+    fn walk(root: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(String, std::path::PathBuf)>) -> Result<()> {
+        for e in std::fs::read_dir(dir)? {
+            let p = e?.path();
+            if p.is_dir() {
+                walk(root, &p, out)?;
+            } else if p.is_file() {
+                let rel = p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+                out.push((rel, p));
+            }
+        }
+        Ok(())
+    }
+    let root = std::path::Path::new(dir);
+    let mut files = Vec::new();
+    walk(root, root, &mut files).with_context(|| format!("walk {dir}"))?;
+    if files.is_empty() {
+        bail!("{dir} has no files to check in");
+    }
+    let mut buf = Vec::new();
+    {
+        let mut z = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let o = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (rel, path) in files {
+            z.start_file(rel, o)?;
+            z.write_all(&io.read(&path.to_string_lossy())?)?;
+        }
+        z.finish()?;
+    }
+    Ok(buf)
 }
 
 // ─────────────────────── provenance (sign / verify) ───────────────────────
@@ -183,6 +224,12 @@ fn signing_key(io: &dyn Io) -> Result<ed25519_dalek::SigningKey> {
         &(path.to_string_lossy().to_string() + ".pub"),
         hex_encode(key.verifying_key().as_bytes()).as_bytes(),
     )?;
+    // private half is a local credential — user-only, like the runtime keystore
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
     Ok(key)
 }
 

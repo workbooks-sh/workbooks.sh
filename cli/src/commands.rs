@@ -31,19 +31,35 @@ pub fn run(io: &dyn Io, file: &str, input: &[String]) -> Result<String> {
 pub fn library(io: &dyn Io) -> Result<String> {
     rcp::call(io, "GET", &format!("/api/library/{}", urlenc(&tenant())), None)
 }
+/// `wb checkout` — the engine zips the member's tree back to us (the engine
+/// usually runs in a container; its filesystem is not ours). We unzip locally.
 pub fn checkout(io: &dyn Io, member: &str, dir: &str) -> Result<String> {
-    rcp::call(io, "POST", &format!("/rcp/library/checkout?member={}&dir={}", urlenc(member), urlenc(dir)), None)
+    let resp = rcp::call(io, "POST", &format!("/rcp/library/checkout?member={}", urlenc(member)), None)?;
+    let v: serde_json::Value = serde_json::from_str(&resp).context("bad checkout response")?;
+    if let Some(err) = v["error"].as_str() {
+        bail!("{err}");
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(v["b64"].as_str().context("checkout response missing bytes")?)?;
+    let files = crate::local::unzip_bytes_to(io, &bytes, dir)?;
+    Ok(format!("checked out {member} → {dir}/ ({files} files)"))
 }
+
+/// `wb checkin` — zip the local working dir, upload; the engine writes it back.
 pub fn checkin(io: &dyn Io, member: &str, dir: &str) -> Result<String> {
-    rcp::call(io, "POST", &format!("/rcp/library/checkin?member={}&dir={}", urlenc(member), urlenc(dir)), None)
+    let zip = crate::local::zip_dir(io, dir)?;
+    let body = serde_json::json!({ "b64": base64::engine::general_purpose::STANDARD.encode(&zip) });
+    rcp::call(io, "POST", &format!("/rcp/library/checkin?member={}", urlenc(member)), Some(&body.to_string()))
 }
-pub fn store(io: &dyn Io, slug: &str, list: bool) -> Result<String> {
+
+pub fn store(io: &dyn Io, slug: &str, list: bool, build: bool) -> Result<String> {
     if list {
         rcp::call(io, "GET", "/rcp/store", None)
     } else if slug.is_empty() {
-        bail!("usage: wb store <slug> | wb store --list")
+        bail!("usage: wb store <slug> [--build] | wb store --list")
     } else {
-        rcp::call(io, "POST", &format!("/rcp/store?slug={}", urlenc(slug)), None)
+        let b = if build { "&build=1" } else { "" };
+        rcp::call(io, "POST", &format!("/rcp/store?slug={}{b}", urlenc(slug)), None)
     }
 }
 
@@ -66,6 +82,12 @@ pub fn fetch(io: &dyn Io, key: &str, out: &str) -> Result<String> {
 }
 
 pub fn search(io: &dyn Io, query: &str, mode: &str) -> Result<String> {
+    // --sql is the cross-workbook OQL query-through — a DIFFERENT engine surface
+    // than ranked search (Library.search only knows hybrid/semantic/literal).
+    if mode == "sql" {
+        let body = serde_json::json!({ "sql": query });
+        return rcp::call(io, "POST", &format!("/api/library/{}/query", urlenc(&tenant())), Some(&body.to_string()));
+    }
     let body = serde_json::json!({ "query": query, "mode": mode });
     rcp::call(io, "POST", &format!("/api/search/{}", urlenc(&tenant())), Some(&body.to_string()))
 }

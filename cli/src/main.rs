@@ -53,7 +53,12 @@ enum Cmd {
     /// Pack + sign a member back into the library
     Checkin { member: String, dir: String },
     /// Archive a workspace to durable storage (--list to enumerate)
-    Store { #[arg(default_value = "")] slug: String, #[arg(long)] list: bool },
+    Store {
+        #[arg(default_value = "")] slug: String,
+        #[arg(long)] list: bool,
+        /// Compile components → WASM before storing
+        #[arg(long)] build: bool,
+    },
     /// Restore from durable storage
     Fetch { key: String, #[arg(default_value = "./")] out: String },
     /// Cross-workbook search (--semantic | --literal | --sql)
@@ -161,7 +166,7 @@ fn main() -> Result<()> {
         Cmd::Library => commands::library(io)?,
         Cmd::Checkout { member, dir } => commands::checkout(io, &member, &dir)?,
         Cmd::Checkin { member, dir } => commands::checkin(io, &member, &dir)?,
-        Cmd::Store { slug, list } => commands::store(io, &slug, list)?,
+        Cmd::Store { slug, list, build } => commands::store(io, &slug, list, build)?,
         Cmd::Fetch { key, out } => commands::fetch(io, &key, &out)?,
         Cmd::Search { query, semantic, literal, sql } => {
             let mode = if semantic { "semantic" } else if literal { "literal" } else if sql { "sql" } else { "hybrid" };

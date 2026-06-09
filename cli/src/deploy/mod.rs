@@ -116,8 +116,12 @@ fn apply(io: &dyn Io) -> Result<String> {
         "local" => {
             let (app, image, port) = (cfg.app(), cfg.image(), cfg.port());
             let disco = util::app_dir().join("disco");
+            let data = util::app_dir().join("data");
             std::fs::create_dir_all(&disco).ok();
+            std::fs::create_dir_all(&data).ok();
             let disco_mount = format!("{}:/disco", disco.to_string_lossy());
+            // tenant data (library, git repos, keys) survives container removal
+            let data_mount = format!("{}:/data", data.to_string_lossy());
             let port_map = format!("{port}:{port}");
             let port_env = format!("PORT={port}");
 
@@ -129,8 +133,8 @@ fn apply(io: &dyn Io) -> Result<String> {
                         "run", "-d", "--name", app,
                         "-p", &port_map,
                         "-e", "WB_WEB=1", "-e", "WB_DESKTOP=1",
-                        "-e", &port_env, "-e", "WB_DESKTOP_DIR=/disco",
-                        "-v", &disco_mount,
+                        "-e", &port_env, "-e", "WB_DESKTOP_DIR=/disco", "-e", "WB_DATA=/data",
+                        "-v", &disco_mount, "-v", &data_mount,
                         &image,
                     ])?;
                     Ok(format!(
@@ -146,6 +150,7 @@ fn apply(io: &dyn Io) -> Result<String> {
                         "--cpus", vcpus, "--mem", "2048",
                         "--port", &port_map,
                         "--volume", &disco_mount,
+                        "--volume", &data_mount,
                     ])?;
                     Ok(format!(
                         "microVM `{app}` created from {image}.\nkrunvm runs foreground — start it with:  krunvm start {app}\n(then `wb rt status` from another shell)"

@@ -1,5 +1,5 @@
 /target
-Cargo.lock
+# Cargo.lock IS committed — this is a binary crate; builds must be reproducible.
 # npm launcher: the shim (bin/wb.js) is committed; the downloaded native binary
 # and any auth file are not.
 npm/bin/wb
