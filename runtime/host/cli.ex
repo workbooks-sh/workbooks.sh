@@ -31,6 +31,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb desktop …` installs/launches the GUI app — HOST-side (shells out to
+      # the curl|sh installer), no app boot.
+      ["desktop" | rest] ->
+        {out, failed?} = Workbooks.CLI.Desktop.run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       _ ->
         {:ok, _} = Application.ensure_all_started(:workbooks)
         IO.puts(call(argv))
@@ -454,6 +461,8 @@ defmodule Workbooks.CLI do
       wb publish init                          scaffold ./publish.org
       wb publish validate                      coherence-check it
       wb publish apply <file.org>              render + deploy → live URL
+      wb desktop install [--version=X]         install the desktop app (curl | sh)
+      wb desktop open                          launch the installed desktop app
       wb version
     """
   end
