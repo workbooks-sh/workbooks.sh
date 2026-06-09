@@ -80,8 +80,11 @@ defmodule Workbooks.KernelTest do
       assert {:ok, []} = Fabric.map_kernel(@reverse, [])
     end
 
-    test "a non-live isolation tier is refused with WHY (wb-rhs.10)" do
-      assert {:error, {:tier_planned, :node, _}} = Fabric.map_kernel(@reverse, ["x"], tier: :node)
+    test "a non-applicable isolation tier is refused with WHY (wb-rhs.10 / wb-pkh.5)" do
+      # kernels run in-VM :instance; :node (live for commands) isn't built for the
+      # persistent kernel path yet → a pointed reason, not a silent mis-run.
+      assert {:error, {:tier_unsupported_for_kernel, :node, _}} =
+               Fabric.map_kernel(@reverse, ["x"], tier: :node)
     end
   end
 

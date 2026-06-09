@@ -46,24 +46,31 @@ defmodule Workbooks.Fabric do
   """
   def map(name, inputs, opts \\ []) when is_binary(name) and is_list(inputs) do
     # Commands run as per-call subprocess wasmtime (CommandRegistry.run →
-    # run_wasmtime) — their native tier is :os_process, not in-VM :instance.
+    # run_wasmtime) — native tier :os_process. tier: :node runs each on a separate
+    # BEAM VM (Workbooks.IsolationNode) for full VM isolation (wb-pkh.5).
     case resolve_for(:map, opts[:tier] || :os_process) do
-      {:ok, _tier} -> {:ok, map_instances(name, inputs, opts)}
+      {:ok, tier} -> {:ok, map_instances(name, inputs, tier, opts)}
       {:error, _} = err -> err
     end
   end
 
-  defp map_instances(name, inputs, opts) do
+  defp map_instances(name, inputs, tier, opts) do
     width = opts[:width] || @default_width
     timeout = opts[:timeout] || @default_timeout
     dirs = opts[:dirs] || []
     ropts = opts[:ropts] || []
 
+    runner =
+      case tier do
+        :node -> fn stdin, argv -> Workbooks.IsolationNode.run(name, stdin, argv) end
+        _ -> fn stdin, argv -> Workbooks.CommandRegistry.run(name, stdin, argv, dirs, ropts) end
+      end
+
     inputs
     |> Task.async_stream(
       fn item ->
         {stdin, argv} = normalize(item)
-        Workbooks.CommandRegistry.run(name, stdin, argv, dirs, ropts)
+        runner.(stdin, argv)
       end,
       max_concurrency: width,
       timeout: timeout,
@@ -114,6 +121,9 @@ defmodule Workbooks.Fabric do
 
   defp resolve_for(:map_kernel, :os_process),
     do: {:error, {:tier_mismatch, :os_process, "kernels need a persistent in-VM :instance; :os_process would respawn per frame and lose reuse"}}
+
+  defp resolve_for(:map_kernel, tier) when tier in [:node, :container],
+    do: {:error, {:tier_unsupported_for_kernel, tier, "running a persistent kernel at #{inspect(tier)} is not yet built (kernels run in-VM :instance today; commands can use :node)"}}
 
   defp resolve_for(_fn, tier), do: Workbooks.Isolation.resolve(tier)
 

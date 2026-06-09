@@ -44,9 +44,9 @@ defmodule Workbooks.Isolation do
       isolates: "runaway CPU, native-level crash"
     },
     node: %{
-      status: :planned,
+      status: :live,
       boundary: :beam_node,
-      blurb: "peer BEAM node (:peer) — full VM isolation AND cross-machine scale (the render farm spread across boxes).",
+      blurb: "peer BEAM node (:peer, Workbooks.IsolationNode) — full VM isolation AND cross-machine scale (the render farm spread across boxes). Runtime-gated: needs distribution (IsolationNode.available?).",
       isolates: "host-side crash/scheduler; distributes across machines"
     },
     container: %{
@@ -77,7 +77,7 @@ defmodule Workbooks.Isolation do
   declare picks a sane containment default; first-party stays cheap, third-party
   gets the killable boundary. Overridable per call.
   """
-  def default_for_trust("third-party"), do: :os_process
+  def default_for_trust("third-party"), do: :node
   def default_for_trust(_first_party_or_nil), do: :instance
 
   @doc """
@@ -100,6 +100,24 @@ defmodule Workbooks.Isolation do
   end
 
   def tier_for_shape(_), do: nil
+
+  @doc """
+  The EFFECTIVE isolation tier a toolkit runs at, combining its `#+EXEC` shape
+  default with its `#+TRUST` posture (wb-pkh.5). First-party runs at the shape
+  default; third-party (untrusted supply chain) ESCALATES to the strongest live
+  tier — `:node`, a separate BEAM VM — so a NIF-level crash or runaway can't touch
+  the runtime. Observable: this is the tier a call SHOULD run at; the executor
+  honors it where the path exists (commands today).
+  """
+  def effective_tier(exec, trust)
+  def effective_tier(exec, "third-party"), do: escalate(tier_for_shape(exec))
+  def effective_tier(exec, _first_party_or_nil), do: tier_for_shape(exec)
+
+  # Escalate one rung toward stronger isolation, capped at the strongest LIVE tier.
+  defp escalate(:instance), do: :node
+  defp escalate(:os_process), do: :node
+  defp escalate(:node), do: :node
+  defp escalate(other), do: other
 
   @doc """
   Resolve a requested tier to a runnable one, or an explanatory error. Used by the

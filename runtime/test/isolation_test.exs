@@ -8,20 +8,20 @@ defmodule Workbooks.IsolationTest do
 
   alias Workbooks.Isolation
 
-  test "tier statuses are honest: instance + os_process live, node/container planned" do
+  test "tier statuses are honest: instance/os_process/node live, container planned" do
     # Corrected: commands ALWAYS run as subprocess wasmtime (run_wasmtime), so
     # :os_process is live, not 'available'. :instance is the in-VM kernel/component path.
     assert Isolation.status(:instance) == :live
     assert Isolation.status(:os_process) == :live
-    assert Isolation.status(:node) == :planned
+    assert Isolation.status(:node) == :live
     assert Isolation.status(:container) == :planned
     assert Isolation.status(:bogus) == :unknown
   end
 
-  test "instance + os_process are live; node/container are not yet" do
+  test "instance/os_process/node are live; container is not yet" do
     assert Isolation.live?(:instance)
     assert Isolation.live?(:os_process)
-    refute Isolation.live?(:node)
+    assert Isolation.live?(:node)
     assert Isolation.known?(:container)
     refute Isolation.known?(:bogus)
   end
@@ -38,13 +38,13 @@ defmodule Workbooks.IsolationTest do
   test "default tier derives from #+TRUST posture" do
     assert Isolation.default_for_trust("first-party") == :instance
     assert Isolation.default_for_trust(nil) == :instance
-    assert Isolation.default_for_trust("third-party") == :os_process
+    assert Isolation.default_for_trust("third-party") == :node
   end
 
   test "resolve gives a runnable tier or a status-aware reason" do
     assert {:ok, :instance} = Isolation.resolve(:instance)
     assert {:ok, :os_process} = Isolation.resolve(:os_process)
-    assert {:error, {:tier_planned, :node, _}} = Isolation.resolve(:node)
+    assert {:ok, :node} = Isolation.resolve(:node)
     assert {:error, {:tier_planned, :container, _}} = Isolation.resolve(:container)
     assert {:error, {:unknown_tier, :bogus, _}} = Isolation.resolve(:bogus)
   end
