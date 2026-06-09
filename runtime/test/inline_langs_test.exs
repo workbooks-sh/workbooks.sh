@@ -59,10 +59,13 @@ defmodule Workbooks.InlineLangsTest do
   end
 
   @tag :build
-  test "Zig stdio command is a KNOWN GAP — fails at link (wb-pkh.10)" do
-    # Documents the current limit: zig std.io (stdin/stdout) → _start undefined at
-    # link. When wb-pkh.10 fixes the zig→C→wasi_shim entry wiring, flip this to
-    # assert {:ok, "cba"}.
+  test "Zig stdio command is a KNOWN GAP — but now fails with a MEANINGFUL error (wb-pkh.10)" do
+    # Root cause (diagnosed wb-pkh.10): the bundled zig std lacks `std.io` — its
+    # std.zig has no `io` member (a minimal std; std.debug works, std.io doesn't).
+    # So it's a provisioning/bundle-completeness issue, NOT a recipe bug.
+    # Previously this slipped through as an empty out.c → misleading "_start
+    # undefined" link error. Now the empty-output guard surfaces the real compile
+    # failure. When the zig std is re-provisioned with std.io, flip to {:ok,"cba"}.
     src = ~S|
     const std = @import("std");
     pub fn main() void {
@@ -74,6 +77,8 @@ defmodule Workbooks.InlineLangsTest do
     }
     |
     name = uniq("il_zig")
-    assert {:error, _} = CR.build_and_register_inline(name, "zig", src)
+    # A COMPILE failure (the real zig1 error), not the old misleading link failure.
+    assert {:error, {:build_failed, {:compile_failed, _}}} =
+             CR.build_and_register_inline(name, "zig", src)
   end
 end

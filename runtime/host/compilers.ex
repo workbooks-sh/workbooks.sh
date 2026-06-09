@@ -114,8 +114,15 @@ defmodule Workbooks.Compilers do
         log = CommandRegistry.run(cli, "", argv, ["#{base}::."], ropts)
         outc = Path.join(job, "out.c")
 
+        # An EMPTY out.c is a FAILED compile, not success — zig1 can emit a 0-byte
+        # out.c on error (e.g. a std feature its bootstrap C-backend can't lower),
+        # which previously slipped through as {:ok, ""} and then link-failed with a
+        # misleading "_start undefined". Require non-empty output so zig1's real
+        # error surfaces in the log (wb-pkh.10).
+        produced? = File.regular?(outc) and File.stat!(outc).size > 0
+
         result =
-          case {File.regular?(outc), log} do
+          case {produced?, log} do
             {true, _} -> {:ok, File.read!(outc), log}
             {false, {:ok, l}} -> {:error, {:compile_failed, l}}
             {false, {:error, _} = e} -> e
