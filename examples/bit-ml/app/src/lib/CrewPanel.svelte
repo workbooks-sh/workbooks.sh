@@ -53,13 +53,6 @@
   function openMember(name) { selected = name; }
   function backToGrid() { selected = null; }
 
-  // ── profile crop reveal: step face → bust → full ───────────────────────
-  const CROPS = ['circle', 'bust', 'full'];
-  const CROP_LABEL = { circle: 'face', bust: 'bust', full: 'full' };
-  let cropIdx = $state(0);
-  $effect(() => { selected; cropIdx = 0; });   // reset the reveal per member
-  const crop = $derived(CROPS[cropIdx]);
-  const nextCrop = () => { cropIdx = (cropIdx + 1) % CROPS.length; };
 
   // this member's authored commits (match on author name)
   const myCommits = $derived(
@@ -136,20 +129,8 @@
         <button class="back mono" onclick={backToGrid} aria-label="back to the crew">← crew</button>
 
         <div class="pfig">
-          <button
-            class="reveal"
-            onclick={nextCrop}
-            title="step the crop: face → bust → full"
-            aria-label="reveal more of {member.name}"
-          >
-            <Avatar seed={member.avatarSeed ?? member.name} name={member.name}
-                    size="xl" {crop} live={member.state !== 'idle'} />
-          </button>
-          <div class="cropdots" aria-hidden="true">
-            {#each CROPS as c, i}
-              <button class="dot" class:on={i === cropIdx} onclick={() => (cropIdx = i)} title={CROP_LABEL[c]}></button>
-            {/each}
-          </div>
+          <Avatar seed={member.avatarSeed ?? member.name} name={member.name}
+                  size="xl" crop="full" live={member.state !== 'idle'} />
         </div>
 
         <div class="pname">{member.name}</div>
@@ -177,7 +158,7 @@
       <div class="grid">
         {#each agents as a}
           <button class="card" class:hit={filter === a.name} onclick={() => openMember(a.name)}>
-            <Avatar seed={a.avatarSeed ?? a.name} name={a.name} size="lg" live={a.state !== 'idle'} />
+            <Avatar seed={a.avatarSeed ?? a.name} name={a.name} size="lg" crop="bust" live={a.state !== 'idle'} />
             <span class="cname">{a.name}</span>
             <span class="cjob mono">{jobOf(a)}</span>
             <span class="badge mono" class:live={a.state !== 'idle'}>
@@ -357,13 +338,6 @@
     transition: transform .14s ease;
   }
   .reveal:hover { transform: scale(1.02); }
-  .cropdots { display: flex; gap: 7px; }
-  .cropdots .dot {
-    width: 7px; height: 7px; border-radius: 999px; border: 0; padding: 0;
-    background: var(--rule); cursor: pointer;
-    transition: background .14s ease;
-  }
-  .cropdots .dot.on { background: var(--wire); }
   .pname { text-align: center; font-size: 22px; font-weight: 600; color: var(--ink); letter-spacing: -0.02em; }
   .prole {
     text-align: center; font-size: 10.5px; text-transform: uppercase;
