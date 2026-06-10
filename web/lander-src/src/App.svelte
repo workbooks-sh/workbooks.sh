@@ -36,7 +36,8 @@
   <Who />
   <Get />
 
-  <!-- the agent appends new sections here (sections/grown/*.svelte) -->
+  <!-- the agent's runtime-loaded sections + blog listing inject here
+       (content/sections/*.html + content/blog.json — no build step) -->
   <Grown />
 
   <footer class="foot">
