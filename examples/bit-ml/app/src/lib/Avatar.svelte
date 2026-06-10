@@ -10,8 +10,15 @@
 
   const px = { sm: 28, md: 44, lg: 64 };
   const dim = $derived(px[size] ?? px.md);
+  // COLOR (founder: not b/w): DiceBear picks deterministically per seed from
+  // these palettes — pastel circle, vivid clothing, natural skin tones. The
+  // peeps are the one place the monochrome page gets to have fun.
+  const BG = 'b6e3f4,c0aede,ffd5dc,ffdfbf,d1f4d9';
+  const CLOTHES = '0a52e0,e05a4e,2e9e6b,e0a82e,7a4988';
+  const SKIN = 'ffdbb4,edb98a,d08b5b,ae5d29,694d3d';
   const src = $derived(
-    `https://api.dicebear.com/9.x/open-peeps/svg?seed=${encodeURIComponent(seed ?? name)}`
+    `https://api.dicebear.com/9.x/open-peeps/svg?seed=${encodeURIComponent(seed ?? name)}` +
+    `&backgroundType=solid&backgroundColor=${BG}&clothingColor=${CLOTHES}&skinColor=${SKIN}`
   );
 </script>
 
@@ -28,7 +35,7 @@
   .face {
     width: 100%; height: 100%;
     border-radius: 999px;
-    background: var(--wash);          /* #f5f5f5 circle bg, round-cropped */
+    background: var(--wash);          /* fallback while the svg loads */
     object-fit: cover; display: block;
   }
   .badge {
