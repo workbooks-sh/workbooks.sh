@@ -25,6 +25,7 @@
   import { onMount, tick } from "svelte";
   import { ImageSquare as ImagePlus, Smiley as Smile, TextT as Type } from "phosphor-svelte";
   import EmojiPicker from "./EmojiPicker.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
 
   let {
     value = $bindable(""),
@@ -201,7 +202,11 @@
   {#if kind === "image"}
     <img src={value} alt="" class="img" />
   {:else if kind === "emoji"}
-    <span class="emoji" aria-hidden="true">{value}</span>
+    <!-- Shared resolver: handles glyph values (lucide:<Name>) as well as
+         plain emoji — a raw {value} printed the literal "lucide:…" string. -->
+    <span class="emoji" aria-hidden="true">
+      <Icon {value} {name} size={Math.round(size * 0.5)} />
+    </span>
   {:else}
     <span class="initials" aria-hidden="true">{initials(name)}</span>
   {/if}
