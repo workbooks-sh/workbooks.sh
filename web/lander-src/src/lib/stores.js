@@ -41,6 +41,127 @@ export function reveal(node) {
   io.observe(node);
   return { destroy() { io.disconnect(); } };
 }
+// apply reveal to an already-injected element (the action above is for Svelte
+// markup; injected partials are plain DOM, so wire the same observer by hand).
+function revealEl(node) {
+  if (reduced) { node.classList.add('on'); return; }
+  const io = new IntersectionObserver(
+    (es) => es.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
+    }),
+    { threshold: 0.18 }
+  );
+  io.observe(node);
+}
+
+/* ── the content CMS: runtime-loaded agent sections ───────────────
+   Agent-grown sections are no longer compiled in. They live as a manifest
+   (/content/sections.json) + HTML partials (/content/sections/NN-slug.html),
+   fetched at RUNTIME and injected into #grown — exactly like the blog ships as
+   static HTML. Adding a section is a manifest row + a partial file; it appears
+   on the next load with zero build. Empty/missing manifest → nothing rendered,
+   no errors; fetch failures degrade silently. Partials are first-party content
+   the agent committed to this same-origin repo, so raw-HTML injection is safe
+   (no third-party/user input → no sanitizer). ─────────────────────── */
+
+// fetch a JSON manifest from the site root; [] on any failure (degrade silent).
+async function loadManifest(path) {
+  try {
+    const res = await fetch(path, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
+}
+// ordering law: order asc, but any entry pinned "last" (the faq) sorts after
+// every un-pinned one regardless of its number.
+const sortSections = (list) => [...list].sort((a, b) => {
+  const pa = a.pin === 'last' ? 1 : 0, pb = b.pin === 'last' ? 1 : 0;
+  return pa - pb || (a.order || 0) - (b.order || 0);
+});
+const pad2 = (n) => String(n).padStart(2, '0');
+// the data-grown hook the follow resolver looks for: NN-slug (NN from the
+// manifest order, so it's always correct even if files are renamed/reordered).
+const grownHook = (entry) => `${pad2(entry.order)}-${entry.slug}`;
+
+// fetch one partial and wrap it as a .grown-host (the diff/streaming code keys
+// off this exact wrapper shape). Stamps data-grown + renumbers the kicker so the
+// "NN · …" prefix always reflects the manifest position. null on failure.
+async function fetchSection(entry, position) {
+  let html = '';
+  try {
+    const res = await fetch('/' + entry.file, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    html = await res.text();
+  } catch { return null; }
+  const host = document.createElement('div');
+  host.className = 'grown-host';
+  host.style.display = 'contents';
+  host.innerHTML = html;
+  const sec = host.querySelector('section');
+  if (!sec) return null;                       // partial must be a <section>
+  const hook = grownHook(entry);
+  host.setAttribute('data-grown', hook);
+  sec.setAttribute('data-grown', hook);
+  // renumber the kicker from the page position (manifest order), keeping any
+  // trailing label the agent wrote after the "·".
+  const kick = sec.querySelector('.kicker');
+  if (kick) {
+    const rest = kick.textContent.replace(/^\s*\d+\s*·?\s*/, '');
+    kick.textContent = `${pad2(position)} · ${rest}`.trim();
+    kick.classList.add('reveal');
+  }
+  // reveal-on-scroll: tag the heading + paragraphs so they animate in like the
+  // human-curated sections (which use the `reveal` action).
+  sec.querySelectorAll('h2, p').forEach((n) => n.classList.add('reveal'));
+  return host;
+}
+
+// build the full grown list (manifest order) into a detached container. Shared
+// by the initial mount and the live diff (refreshGrown) so both render identically.
+async function buildGrownContainer() {
+  const frag = document.createElement('div');
+  const list = sortSections(await loadManifest('/content/sections.json'));
+  // numbering follows position, not the raw order field — so 04,07,12 still
+  // print 04,05,06 down the page.
+  const hosts = await Promise.all(list.map((e, i) => fetchSection(e, e.order ?? i + 4)));
+  for (const h of hosts) if (h) frag.appendChild(h);
+  return frag;
+}
+
+// initial mount: fetch the manifest, inject sections, wire reveal. Runs once
+// when #grown is in the DOM (called from Grown.svelte's $effect).
+let grownMounted = false;
+export async function mountGrown(host) {
+  if (!host || grownMounted) return; grownMounted = true;
+  const frag = await buildGrownContainer();
+  // observe reveal targets AFTER they're in the live document
+  host.append(...frag.children);
+  host.querySelectorAll('.reveal').forEach(revealEl);
+}
+
+/* ── "from the agent's desk": the on-page blog listing ────────────
+   Manifest-driven from /content/blog.json — the SAME source the blog index
+   reads — so a new post can't be present on the index yet missing here. Empty
+   manifest → the section stays hidden (no empty shell). ──────────── */
+export async function mountAgentsDesk(host) {
+  if (!host) return;
+  const posts = await loadManifest('/content/blog.json');
+  if (!posts.length) return;                   // nothing to show → render nothing
+  const rows = posts.map((p) => `
+    <a class="deskrow reveal" href="/${escH(p.file)}">
+      <span class="deskmeta">${escH(p.tag || 'post')} · ${escH(p.date || '')}</span>
+      <span class="deskttl">${escH(p.title || p.slug)}</span>
+      <span class="deskex">${escH(p.excerpt || '')}</span>
+    </a>`).join('');
+  host.innerHTML = `
+    <section class="grown" id="desk">
+      <div class="kicker reveal">from the agent's desk</div>
+      <h2 class="reveal">Notes, posts, and proof</h2>
+      <div class="desklist">${rows}</div>
+    </section>`;
+  host.querySelectorAll('.reveal').forEach(revealEl);
+}
 
 /* ── panel visibility ─────────────────────────────────────────── */
 export const openPanel = () => { document.body.classList.add('panel-open', 'panel-was-open'); };
@@ -452,20 +573,22 @@ async function mergeGrown(here, next) {
   return firstNew;
 }
 
-/* a fresh add: commit may mean a new section — pull it into the open page */
+/* a fresh add: commit may mean a new section — pull it into the open page.
+   The page is now a runtime CMS, so we don't re-fetch / (it no longer SSRs the
+   grown sections); we rebuild the grown list from the manifest and diff it into
+   the live #grown, preserving the type-in streaming below. */
 async function refreshGrown() {
   try {
-    const res = await fetch('/', { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-    const next = doc.querySelector('#grown');
+    const next = await buildGrownContainer();          // freshly fetched manifest
     const here = document.querySelector('#grown');
-    if (next && next.innerHTML.trim() !== here.innerHTML.trim()) {
+    if (next.children.length && next.innerHTML.trim() !== here.innerHTML.trim()) {
       const firstNew = await mergeGrown(here, next);
+      // reveal any sections the merge inserted but that scrolled into view
+      here.querySelectorAll('.reveal:not(.on)').forEach(revealEl);
       const secs = document.querySelectorAll('#grown section');
-      return firstNew || secs[0] || null;     // newest lands first (agent prepends)
+      return firstNew || secs[secs.length - 1] || null;
     }
-  } catch { /* same-origin only — fine on localhost */ }
+  } catch { /* degrade silently — changes still land on next load */ }
   return null;
 }
 
@@ -526,15 +649,18 @@ const stepTarget = (step) => {
     const el = node || document.querySelector('#tlList .node');
     return el ? { git: true, el } : {};
   }
-  // a grown section: map to its on-page element when rendered; else the file view
-  const grown = /src\/sections\/grown\/(\d{2}-[\w-]+)\.svelte/.exec(t);
+  // a grown section: the agent now commits content/sections/NN-slug.html (the
+  // runtime CMS partial). Map to its on-page element when rendered; else show
+  // the committed file. (Old .svelte path kept for back-compat with history.)
+  const grown = /content\/sections\/(\d{2}-[\w-]+)\.html|src\/sections\/grown\/(\d{2}-[\w-]+)\.svelte/.exec(t);
   if (grown) {
-    const el = document.querySelector(`[data-grown="${grown[1]}"]`);
+    const hook = grown[1] || grown[2];
+    const el = document.querySelector(`[data-grown="${hook}"]`);
     if (el) return { el };
-    return { file: `src/sections/grown/${grown[1]}.svelte`, verb };
+    return { file: grown[1] ? `content/sections/${hook}.html` : `src/sections/grown/${hook}.svelte`, verb };
   }
   // any other tracked source file → the viewer reads the committed bytes
-  const file = /((?:src\/[\w./-]+\.svelte)|(?:(?:strategy|skills|rem)\/[\w./-]+\.org)|plan\.org|(?:blog\/[\w-]+\.html))/.exec(t);
+  const file = /((?:src\/[\w./-]+\.svelte)|(?:content\/[\w./-]+\.(?:html|json))|(?:(?:strategy|skills|rem)\/[\w./-]+\.org)|plan\.org|(?:blog\/[\w-]+\.html))/.exec(t);
   if (file) {
     const f = file[1];
     if (f.startsWith('blog/')) {
