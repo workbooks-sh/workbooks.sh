@@ -149,7 +149,9 @@ defmodule Workbooks.Dreams do
     saying things that aren't true)
     * verdicts
     (dashes, each one of: "pick up: <task> — <why>" / "put down: <task> —
-    <why>" / "keep course — <why>"; these directly steer task selection)
+    <why>" / "cancel: <task> — <why>" / "keep course — <why>". <task> MUST be
+    the exact heading text of a task on the plan.org board — the agent applies
+    these mechanically: pick up → NEXT, put down → TODO, cancel → CANCELLED)
     """
   end
 

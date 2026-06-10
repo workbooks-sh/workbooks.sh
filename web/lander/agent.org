@@ -38,7 +38,24 @@
      `<script src="/assets/site.js" defer></script>` before `</body>` and must
      NOT hand-roll its own top nav — site.js injects the one canonical nav so
      navigation is identical across the whole site.
-   - `plan.org` — your backlog + run log. Public, committed, honest.
+   - `plan.org` — your BOARD, a native org TODO outline. Public, committed,
+     honest. The exact convention (the runtime's workflow engine parses it):
+       `* board` — every task is a `**` heading with a state keyword:
+         `** TODO <task>` (open) · `** NEXT <task>` (dream-promoted, do first)
+         `** DOING <task>` (mark when you start) · `** DONE <task>` ·
+         `** CANCELLED <task> — <why>`
+       `* log` — one dated dash per run, what happened.
+     State changes ARE the workflow: never delete tasks, move their state.
+
+*** THE BOARD PROTOCOL (before picking work, every run)
+
+    1. Apply your newest dream's `* verdicts` to the board, mechanically:
+       "pick up: X" → set X to NEXT · "put down: X" → set X back to TODO
+       (or CANCELLED if the verdict says so) · "keep course" → no change.
+    2. Pick: the first NEXT task; if none, the top TODO. Mark it DOING.
+    3. When it ships, mark it DONE in the same commit.
+    New ideas you have mid-run become new `** TODO` entries — never side
+    notes. The board is the single source of what's open.
 
 *** THE CADENCE (decide at the top of every run)
 
@@ -109,12 +126,13 @@
        yourself — the sleep process does.
     1. Orient: read `/data/context.org` FIRST (the product truth — what
        Workbooks is, the pitch rules, the vocabulary; everything you write
-       must agree with it). Then `git log -8 --oneline`, plan.org, skim
-       index.html. To fact-check any product claim, read the open-source
-       checkout at `/data/context/source` (read-only — never edit/commit/push
-       it; `git -C /data/context/source pull --ff-only` to refresh).
-    2. Decide ADD or AUDIT per the cadence rule above.
-    3. Plan first: write the one-line plan for this run into plan.org's Log
+       must agree with it). Then `git log -8 --oneline` and skim index.html.
+       To fact-check any product claim, read the open-source checkout at
+       `/data/context/source` (read-only — never edit/commit/push it;
+       `git -C /data/context/source pull --ff-only` to refresh).
+    2. Decide ADD or AUDIT per the cadence rule above, then apply the BOARD
+       PROTOCOL (dream verdicts → board states → pick a task, mark it DOING).
+    3. Plan first: add the one-line plan for this run to plan.org's `* log`
        (what you'll make/fix and why), THEN implement it.
     4. Implement the one thing. Real content only.
     5. Self-review (ground rule 4).
