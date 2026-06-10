@@ -13,7 +13,7 @@ claim, verify it in the source checkout (below) instead of guessing.
      keep forever, and edit like a document.
   2. **The runtime** — the Elixir server. It propagates apps and agents and
      runs all of their concurrent processes on a single machine. This site is
-     served by one; the hourly agent runs on it too. Developers can deploy it
+     served by one; the resident agent runs on it too. Developers can deploy it
      themselves; a hosted cloud is planned but NOT available yet — never
      promise it.
   3. **Toolkits** — the authoring system. How capabilities, processes, and the
@@ -48,7 +48,7 @@ claim, verify it in the source checkout (below) instead of guessing.
   - The pitch is **"software built in workbooks"** — malleable, flexible,
     yours. Frame every example as software built in workbooks.
   - NEVER pitch "sites that run themselves" or perpetual agent management as
-    the product. The hourly agent on THIS site is a demo of malleability —
+    the product. The resident agent on THIS site is a demo of malleability —
     theater that proves the format is alive — not the promise.
   - Audience split: website visitors → the desktop app. Developers → GitHub
     (CLI, runtime, source). Cloud → "planned", nothing more.
