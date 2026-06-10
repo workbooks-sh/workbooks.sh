@@ -108,6 +108,11 @@
           <Loader weight="bold" size={18} class="spin" /> Booting a microVM. The first run
           downloads the engine image — this is slow once, then cached.
         </p>
+        {#if wizard.pull?.total}
+          {@const pct = Math.min(100, Math.round((wizard.pull.done / wizard.pull.total) * 100))}
+          <div class="pull-bar"><div class="pull-fill" style="width: {pct}%"></div></div>
+          <p class="pull-label">{pct}% · {(wizard.pull.done / 1048576).toFixed(0)} / {(wizard.pull.total / 1048576).toFixed(0)} MB</p>
+        {/if}
         <div class="log" bind:this={logEl}>
           {#each wizard.log as line}<div class="ll">{line}</div>{/each}
           {#if !wizard.log.length}<div class="ll dim">working…</div>{/if}
@@ -317,4 +322,24 @@
 
   :global(.spin) { animation: wiz-spin 900ms linear infinite; }
   @keyframes wiz-spin { to { transform: rotate(360deg); } }
+  .pull-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--color-surface-soft);
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .pull-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-brand);
+    transition: width 0.6s ease;
+  }
+  .pull-label {
+    margin: 0 0 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--color-fg-muted);
+    text-align: center;
+  }
 </style>

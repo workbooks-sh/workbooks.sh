@@ -164,8 +164,10 @@ pub fn install_krunvm(app: &AppHandle) -> Result<(), String> {
 
 /// (Re)create the microVM, mapping host 4000 → guest 4000, the data dir → /data,
 /// and the disco dir → /disco. Idempotent: deletes any existing VM of the same
-/// name first so port/volume changes actually take.
-fn create() -> Result<(), String> {
+/// name first so port/volume changes actually take. While the create runs (the
+/// image pull lives inside it), a sampler thread emits real `engine-pull`
+/// progress: bytes landed in the buildah store vs the manifest's layer total.
+fn create(app: &AppHandle) -> Result<(), String> {
     let data = data_dir().ok_or("no data dir")?;
     let disco = disco_dir().ok_or("no disco dir")?;
     std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
@@ -189,7 +191,106 @@ fn create() -> Result<(), String> {
         "--volume", &data_vol,
         "--volume", &disco_vol,
     ];
-    sh_ok("krunvm", &args).map(|_| ()).map_err(|e| format!("krunvm create failed: {e}"))
+
+    // Pull-progress sampler: best-effort manifest size from the registry +
+    // 1s du of the buildah store. Extracted layers outgrow the compressed
+    // manifest total, so the percent is clamped frontend-side.
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let stop = stop.clone();
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let total = registry_total_size();
+            let base = storage_bytes();
+            loop {
+                if stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                let done = storage_bytes().saturating_sub(base);
+                let _ = app.emit(
+                    "engine-pull",
+                    serde_json::json!({ "done": done, "total": total }),
+                );
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            // Terminal event so the bar can complete/clear.
+            let _ = app.emit("engine-pull", serde_json::json!({ "done": 0, "total": null }));
+        });
+    }
+    let res = sh_ok("krunvm", &args).map(|_| ()).map_err(|e| format!("krunvm create failed: {e}"));
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    res
+}
+
+/// Bytes currently in the krunvm/buildah image store. `du -sk` over the
+/// storage root — cheap at 1Hz and tracks the pull as layers land.
+fn storage_bytes() -> u64 {
+    sh("du", &["-sk", "/Volumes/krunvm/root"])
+        .ok()
+        .and_then(|out| {
+            out.split_whitespace()
+                .next()
+                .and_then(|kb| kb.parse::<u64>().ok())
+        })
+        .map(|kb| kb * 1024)
+        .unwrap_or(0)
+}
+
+/// Total compressed size of the runtime image from the registry manifest
+/// (anonymous ghcr token → manifest/index → sum of layer sizes for this
+/// machine's linux arch). Best-effort: None on any hiccup.
+fn registry_total_size() -> Option<u64> {
+    let img = image();
+    let rest = img.strip_prefix("ghcr.io/")?;
+    let (repo, tag) = rest.rsplit_once(':').unwrap_or((rest, "latest"));
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .ok()?;
+    let tok: serde_json::Value = client
+        .get(format!("https://ghcr.io/token?scope=repository:{repo}:pull"))
+        .send()
+        .ok()?
+        .json()
+        .ok()?;
+    let tok = tok["token"].as_str()?;
+    let accept = "application/vnd.oci.image.manifest.v1+json, \
+                  application/vnd.docker.distribution.manifest.v2+json, \
+                  application/vnd.oci.image.index.v1+json, \
+                  application/vnd.docker.distribution.manifest.list.v2+json";
+    let mut man: serde_json::Value = client
+        .get(format!("https://ghcr.io/v2/{repo}/manifests/{tag}"))
+        .bearer_auth(tok)
+        .header("Accept", accept)
+        .send()
+        .ok()?
+        .json()
+        .ok()?;
+    // Multi-arch index → resolve the linux manifest for this CPU.
+    if let Some(list) = man["manifests"].as_array() {
+        let want_arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "amd64" };
+        let digest = list
+            .iter()
+            .find(|m| {
+                m["platform"]["os"] == "linux" && m["platform"]["architecture"] == want_arch
+            })
+            .and_then(|m| m["digest"].as_str())?
+            .to_string();
+        man = client
+            .get(format!("https://ghcr.io/v2/{repo}/manifests/{digest}"))
+            .bearer_auth(tok)
+            .header("Accept", accept)
+            .send()
+            .ok()?
+            .json()
+            .ok()?;
+    }
+    let total: u64 = man["layers"]
+        .as_array()?
+        .iter()
+        .filter_map(|l| l["size"].as_u64())
+        .sum();
+    (total > 0).then_some(total)
 }
 
 /// Spawn the microVM DETACHED in the caller's GUI/Aqua session (libkrun
@@ -230,13 +331,22 @@ fn spawn() -> Result<(), String> {
     sh_ok("sh", &["-c", &script]).map(|_| ()).map_err(|e| format!("could not spawn krunvm: {e}"))
 }
 
-/// The full local boot: ensure the APFS volume, (re)create the VM, spawn it.
-/// Emits `engine-setup` progress at each step. The caller waits for discovery.
+/// The full local boot: ensure the APFS volume, tear down any previous
+/// instance, (re)create the VM, spawn it. Emits `engine-setup` progress at
+/// each step. The caller waits for discovery.
 pub fn boot(app: &AppHandle) -> Result<(), String> {
     emit_setup(app, "Preparing the krunvm volume…");
     ensure_apfs_volume()?;
+    // A previous instance still holding the VM lock makes `krunvm start`
+    // fail with "Couldn't acquire lock file" — and retries used to strand
+    // one zombie process per attempt (pidfile only knew the latest). Kill
+    // by pattern, then by pidfile, then delete the VM definition.
+    emit_setup(app, "Stopping any previous engine instance…");
+    let _ = sh("pkill", &["-f", &format!("krunvm start {VM}")]);
+    let _ = down();
+    std::thread::sleep(std::time::Duration::from_millis(300));
     emit_setup(app, "Creating the microVM (first run pulls the engine image — this is slow once)…");
-    create()?;
+    create(app)?;
     emit_setup(app, "Booting the engine…");
     spawn()?;
     Ok(())

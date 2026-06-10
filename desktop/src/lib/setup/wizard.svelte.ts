@@ -37,6 +37,9 @@ class WizardStore {
   backend = $state<BackendStatus | null>(null);
   /** Streaming setup log (krunvm install / image pull). Newest last. */
   log = $state<string[]>([]);
+  /** Live image-pull progress: bytes landed vs manifest total (null total
+   *  = unknown size or pull finished). Driven by `engine-pull` events. */
+  pull = $state<{ done: number; total: number | null } | null>(null);
   error = $state<string | null>(null);
   busy = $state(false);
 
@@ -45,14 +48,22 @@ class WizardStore {
   cloudToken = $state("");
 
   #unlisten: UnlistenFn | null = null;
+  #unlistenPull: UnlistenFn | null = null;
 
-  /** Wire the `engine-setup` progress stream once. Idempotent. */
+  /** Wire the `engine-setup` + `engine-pull` streams once. Idempotent. */
   async init() {
     if (this.#unlisten) return;
     this.#unlisten = await listen<string>("engine-setup", (e) => {
       // Keep the tail bounded so a chatty image pull can't grow unbounded.
       this.log = [...this.log, e.payload].slice(-200);
     });
+    this.#unlistenPull = await listen<{ done: number; total: number | null }>(
+      "engine-pull",
+      (e) => {
+        // Terminal event (total null + done 0) clears the bar.
+        this.pull = e.payload.total === null && e.payload.done === 0 ? null : e.payload;
+      },
+    );
   }
 
   /** Open the wizard at the choose step. */
@@ -194,6 +205,8 @@ class WizardStore {
   destroy() {
     this.#unlisten?.();
     this.#unlisten = null;
+    this.#unlistenPull?.();
+    this.#unlistenPull = null;
   }
 }
 

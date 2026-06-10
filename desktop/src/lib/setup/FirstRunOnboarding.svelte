@@ -295,6 +295,18 @@
               <div class="status pending">
                 {wizard.step === "local-booting" ? "Booting the engine…" : wizard.step === "local-detect" ? "Checking this machine…" : "Installing krunvm…"}
               </div>
+              {#if wizard.pull?.total}
+                {@const pct = Math.min(100, Math.round((wizard.pull.done / wizard.pull.total) * 100))}
+                <div class="pull">
+                  <div class="pull-bar">
+                    <div class="pull-fill" style="width: {pct}%"></div>
+                  </div>
+                  <span class="pull-label">
+                    Downloading engine image — {pct}% ·
+                    {(wizard.pull.done / 1048576).toFixed(0)} / {(wizard.pull.total / 1048576).toFixed(0)} MB
+                  </span>
+                </div>
+              {/if}
               {#if wizard.log.length}
                 <div class="boot-log">
                   {#each wizard.log.slice(-4) as line, i (i)}
@@ -576,6 +588,30 @@
     width: 100%;
     align-items: stretch;
   }
+  .pull {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .pull-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: #191c22;
+    overflow: hidden;
+  }
+  .pull-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #3fe081, #2f6fe0);
+    transition: width 0.6s ease;
+  }
+  .pull-label {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #8b909a;
+  }
+
   .boot-log {
     width: 100%;
     padding: 8px 10px;
