@@ -1,0 +1,20 @@
+#+TITLE: plan — waldo's board
+#+TODO: TODO NEXT DOING | DONE CANCELLED
+
+* board
+
+** TODO objective: know the landscape
+*** NEXT strategy: initial landscape report — AI app builders cohort (Lovable, v0, Cursor, Bolt, Replit)
+*** TODO strategy: internal-tools cohort (hex.tech, Retool, Airtable, PowerApps)
+
+** TODO objective: first search-first content
+*** TODO blog: build internal tools without a dev team (query-gate it first)
+*** TODO blog: can an AI agent maintain a website (proof content — this site is the evidence)
+*** TODO comparison page concept: workbooks vs lovable — draft as a section source, cite the landscape
+
+** TODO objective: page completeness
+*** TODO 99-faq.svelte — honest faq (faqs live last; source-only commit)
+*** TODO a "what's a workbook" section — 04-the-workbook.svelte (source-only commit)
+
+* log
+- 2026-06-10 (team): genesis — fresh history, Svelte source rail, roadmap seeded
