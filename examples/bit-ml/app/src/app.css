@@ -1,0 +1,119 @@
+/* ════════════════════════════════════════════════════════════════════
+   bit.ml — design tokens (DESIGN.md §3) + base type cast (§2)
+   The contract: components style from vars only. Light is canonical;
+   [data-theme=terminal] is the panel + night reading, not a tinted clone.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {                          /* paper */
+  --paper:   #faf9f6;           /* warm newsprint white, not #fff */
+  --ink:     #111213;           /* near-black, warm */
+  --ink-2:   #55585c;           /* deks, secondary */
+  --ink-3:   #9a9da1;           /* meta resting state */
+  --rule:    #e4e2dc;           /* hairlines — visible, never loud */
+  --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
+  --up:      #0a7d4f;
+  --down:    #c4322e;           /* market semantics only */
+
+  /* section identity ticks (§3): tag color, not a tinted card */
+  --sec-ai:      #0a52e0;       /* AI — wire blue */
+  --sec-markets: #0a7d4f;       /* MARKETS — up-green */
+  --sec-chips:   #b8860b;       /* CHIPS — amber */
+  --sec-policy:  #7a4988;       /* POLICY — plum */
+
+  /* faces — three voices, strictly cast (§2) */
+  --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --sans:  'Switzer', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:  'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --col: 720px;                 /* §4.4 single column */
+  color-scheme: light;
+}
+
+[data-theme=terminal] {          /* the panel + dark mode */
+  --paper: #0d0e10;
+  --ink:   #e9eaec;
+  --ink-2: #8d9197;
+  --ink-3: #5b5f66;
+  --rule:  #23262b;
+  --wire:  #5b8cff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: -0.011em;     /* Switzer set tight (§2: −1~−2%) */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background .15s ease, color .15s ease;
+}
+
+/* ── the three voices ─────────────────────────────────────────────── */
+.serif { font-family: var(--serif); font-weight: 500; letter-spacing: -0.005em; }
+.mono  { font-family: var(--mono); font-weight: 400; }
+
+/* meta — the data uniform (§2: 11/1 mono uppercase +0.06em) */
+.meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+a { color: var(--wire); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* focus = wire blue, the only voice of interactivity (§3) */
+:focus-visible { outline: 2px solid var(--wire); outline-offset: 2px; }
+
+/* hairline — visible, never loud (§3) */
+.hair { height: 1px; background: var(--rule); border: 0; margin: 0; }
+
+button { font-family: inherit; cursor: pointer; }
+
+/* the page shell — paper, the column, the rhythm. NOT a storybook. */
+.sheet {
+  max-width: var(--col);
+  margin: 0 auto;
+  padding: 0 24px 120px;
+}
+
+/* specimen scaffolding: every component is labelled like a type specimen —
+   a mono caption naming the component + the rule it embodies. The label is
+   chrome around the live component, set apart so the component reads pure. */
+.spec { margin: 0; padding: 56px 0 0; }
+.spec-label {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.spec-name {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink);
+}
+.spec-rule {
+  font-family: var(--mono); font-size: 11px; font-weight: 400;
+  letter-spacing: 0.02em; color: var(--ink-3);
+}
+.spec-rule::before { content: "— "; color: var(--rule); }
+
+/* a live demo well — barely-there inset so the component sits on paper,
+   not in a box. No card chrome (DESIGN law). */
+.well { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
