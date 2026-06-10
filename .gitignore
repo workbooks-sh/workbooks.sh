@@ -67,7 +67,9 @@ runtime/.publish_out/
 /CLAUDE.md
 secrets.env
 
-# project skills ARE shipped (the rest of .claude/ stays local)
+# only the workbooks-system skill symlink ships from .claude/ (rest stays local)
 !.claude/
 .claude/*
 !.claude/skills/
+.claude/skills/*
+!.claude/skills/workbooks-system

@@ -58,8 +58,19 @@ below is organized around them:
 
 ## Where to go next
 
+Concept layer (what the pieces ARE) — then the surface layer (every command,
+route, spec, env var — by what you're DOING):
+
 | Task | Read |
 |---|---|
-| author, bundle, unbundle, publish a workbook; understand the artifact | `references/workbooks.md` |
-| run/operate/extend your own runtime; deploy engines; environment contract | `references/deploykit.md` |
+| author/bundle/unbundle/publish a workbook; the artifact | `references/workbooks.md` |
+| run/operate/extend your own runtime; deploy engines; env contract | `references/deploykit.md` |
 | build commands, toolkits, agent skills; convert anything to WASM | `references/toolkit.md` |
+| find a `wb` command by purpose (the whole tree at a glance) | `references/cli/index.md` |
+| author/bundle/sign/publish/query a workbook (need→action→output) | `references/cli/workbook.md` |
+| stand up / inspect a runtime (`wb deploy …`) | `references/cli/deploy.md` |
+| discover/build/run/eval toolkits + the compiler lane (`wb toolkit …`) | `references/cli/toolkit.md` |
+| talk to a running engine, configure vars, dev loop (`wb rt/dev/var/desktop`) | `references/cli/engine.md` |
+| the two HTTP planes' full route tables + auth ladder | `references/http.md` |
+| the org-file specs the runtime executes (agent/workflow/lifecycle/manifest) | `references/org-specs.md` |
+| every `WB_*` env var — purpose, default, subsystem | `references/env.md` |
