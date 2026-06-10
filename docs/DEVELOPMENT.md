@@ -51,7 +51,7 @@ CI/CD → cloud build.
 ## Evals ("workbench")
 The agent eval / trajectory suite is the runtime's behavioral test (distinct from
 the CTK *component* bench). `wb dev eval` will front it; today brandnana evals
-live at `projects/brandnana/evals`. Default eval model: `xiaomi/mimo-v2.5`.
+live at `examples/brandnana/evals`. Default eval model: `xiaomi/mimo-v2.5`.
 
 ## What you need
 - **Elixir/OTP** (compile + run the runtime), **bun** (desktop), **python3**

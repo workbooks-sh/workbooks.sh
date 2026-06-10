@@ -135,12 +135,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Sanity-check the installer (POSIX syntax)
-        run: sh -n web/lander/src/install.sh
+        run: sh -n desktop/scripts/install.sh
       - name: Attach install.sh to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # The release tauri-action created is a draft; --clobber keeps re-runs
           # idempotent. cp to a stable asset name so the download URL is clean.
-          cp web/lander/src/install.sh install.sh
+          cp desktop/scripts/install.sh install.sh
           gh release upload "${GITHUB_REF_NAME}" install.sh --clobber --repo "${GITHUB_REPOSITORY}"

@@ -54,7 +54,12 @@ scratch/
 !/deploy/providers/
 /deploy/deployments/
 /deploy/storage.env
-/projects/
+# unaudited example trees stay local until a secrets-scrub pass publishes them;
+# their README.md stubs ARE public (the gallery shows every example honestly)
+/examples/brandnana/*
+!/examples/brandnana/README.md
+/examples/adbuy/*
+!/examples/adbuy/README.md
 
 # local-production build-lock (per-machine artifact provenance)
 scripts/.build-lock.tsv

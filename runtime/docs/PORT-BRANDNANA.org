@@ -22,14 +22,14 @@ brand book, deployed as its own engine — *without* disturbing the live =bn-eng
     workdir. Compiles. Needs a deployed engine (the harvest keys) to fully run.
 
 * The brandnana CLI — build from SOURCE (the local v0.1.0 lacks harvest-all)
-  Source: =projects/brandnana/apps/cli/= (bun + TS; =src/commands/harvest-all.ts=).
+  Source: =examples/brandnana/apps/cli/= (bun + TS; =src/commands/harvest-all.ts=).
   Build (mirror =deploy-kit/cloud/Dockerfile.engine-profile= lines 88-94):
   #+begin_src dockerfile
   FROM oven/bun:1 AS brandnana-cli
   WORKDIR /src/brandnana
-  COPY projects/brandnana/package.json projects/brandnana/bun.lock ./
-  COPY projects/brandnana/packages ./packages
-  COPY projects/brandnana/apps/cli ./apps/cli
+  COPY examples/brandnana/package.json examples/brandnana/bun.lock ./
+  COPY examples/brandnana/packages ./packages
+  COPY examples/brandnana/apps/cli ./apps/cli
   RUN bun install --ignore-scripts && bash apps/cli/scripts/build-binary.sh linux-x64
   # -> apps/cli/dist/brandnana-linux-x64
   #+end_src
@@ -44,7 +44,7 @@ brand book, deployed as its own engine — *without* disturbing the live =bn-eng
   NOTE: the build context must be the MONOREPO ROOT (=/Users/shinyobjectz/apps/
   workbooks=), since brandnana CLI + profile live there, not in the worktree —
   so the Dockerfile + a build script that runs `docker build` from the root,
-  COPYing both the clean-room runtime and projects/brandnana + substrates/brandnana.
+  COPYing both the clean-room runtime and examples/brandnana + substrates/brandnana.
 
 * Deploy target — a NEW app, never touch live bn-engine
   =fly apps create bn-engine-clean= (or reuse the pending =bn-engine-agents=).

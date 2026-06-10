@@ -86,7 +86,7 @@ verb that can't depend on a running runtime), or kept runtime-side and driven vi
 
 One static binary → no Erlang, no Burrito:
 
-- **curl:** `web/lander/src/install.sh` + the CF worker download the matching binary from a
+- **curl:** `desktop/scripts/install.sh` + the CF worker download the matching binary from a
   GitHub Release.
 - **npm (esbuild-style):** a launcher package `@work.books/cli` with per-platform
   `optionalDependencies` (`@work.books/cli-darwin-arm64`, …); npm installs only the matching
