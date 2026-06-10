@@ -819,10 +819,12 @@ async function follow() {
   await cursorEnter();
   think('let me show you what I\'m doing');
   work(true);
-  let redirected = false;
+  let redirected = false, misses = 0;
   while (following) {
     const act = await fetchActivity();
+    if (!act && ++misses === 3) think('(his live feed is warming up — changes still land below)');
     if (act) {
+      misses = 0;
       if (!act.agent || !act.agent.running) {
         think('done — shipping it');
         await sleep(1600);
