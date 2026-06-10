@@ -188,8 +188,13 @@ defmodule Workbooks.Keeper do
 
     case Task.yield(task, run_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} ->
-        Logger.info("Keeper: tick done — #{inspect(String.slice(result.result || "", 0, 120))}")
-        :done
+        out = result.result || ""
+        Logger.info("Keeper: tick done — #{inspect(String.slice(out, 0, 120))}")
+
+        # wb-2ku.10: the agent signals "nothing my run-kind may do" by BEGINNING
+        # its done result with NO-WORK. The lifecycle collapses this state's
+        # remaining repeats instead of burning more slots on it.
+        if String.match?(out, ~r/\A\s*NO-WORK\b/i), do: :no_work, else: :done
 
       {:exit, reason} ->
         Logger.error("Keeper: tick failed — #{inspect(reason)}")

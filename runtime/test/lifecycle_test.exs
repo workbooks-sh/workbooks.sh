@@ -170,4 +170,17 @@ defmodule Workbooks.Keeper.LifecycleTest do
       assert Lifecycle.status() == nil
     end
   end
+  describe "no_work fast-forward (wb-2ku.10)" do
+    test "advance(:no_work) collapses remaining repeats — one state forward, nothing skipped" do
+      # at hit 0 of 3 in wake_add, a no-work run jumps straight to the NEXT state
+      assert Lifecycle.current().state == "wake_add"
+      assert Lifecycle.advance(:no_work).state == "wake_audit"
+      # audit steps on normally too (repeat 1, so :no_work == :done here)
+      assert Lifecycle.advance(:no_work).state == "rem"
+      # rem loops home; the declared order was never skipped, only repeats
+      assert Lifecycle.advance(:no_work).state == "wake_add"
+      assert Lifecycle.current().hits == 0
+    end
+  end
+
 end

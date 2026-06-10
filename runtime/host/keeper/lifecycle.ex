@@ -100,8 +100,13 @@ defmodule Workbooks.Keeper.Lifecycle do
   @doc """
   Step the machine after a tick. `outcome`:
 
-    * `:done`   — a successful run: increment hits; once hits == :REPEAT:, take
+    * `:done`    — a successful run: increment hits; once hits == :REPEAT:, take
       `:NEXT:` and reset hits to 0.
+    * `:no_work` — the run found NOTHING its state's kind may do (wb-2ku.10:
+      e.g. a wake_add facing a board whose only NEXT is plan-run work). The
+      state's remaining :REPEAT: hits are collapsed — take `:NEXT:` NOW. This
+      is a fast-forward of repeats only, never a skip: every state in the
+      declared order still runs, so audits and dreams keep their cadence.
     * `:failed` / `:killed` — retry the SAME state next tick; position unchanged
       (the cadence is preserved across crashes/timeouts).
 
@@ -120,6 +125,9 @@ defmodule Workbooks.Keeper.Lifecycle do
           case outcome do
             :done ->
               if hits + 1 >= s.repeat, do: {s.next || name, 0}, else: {name, hits + 1}
+
+            :no_work ->
+              {s.next || name, 0}
 
             _ ->
               # :failed | :killed → hold position, retry the same state next tick.
