@@ -43,18 +43,18 @@ if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
 // Rail items are packages. A package is either an `app` (a workbook — bare
 // icon) or a `folder` (a container — folder glyph). Kanban ships as a default
 // app. Mix of apps + folders so the rail shows the real model + reordering.
-// Default to glyph icons (lucide:<Name> — the prefix is a legacy storage
-// format; names resolve through Icon.svelte's GLYPHS map of phosphor-svelte
-// components). Reading keeps a plain emoji to prove emoji still renders.
+// Canonical icon form is mi:<def> (Material Icon Theme — the universal
+// icon library). One lucide: legacy value stays on purpose to prove the
+// legacy→material mapping; Reading keeps a plain emoji to prove emoji.
 const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
-  Kanban: { icon: "lucide:Kanban", kind: "app" },
-  Notes: { icon: "lucide:Notebook", kind: "app" },
-  Tracker: { icon: "lucide:TrendUp", kind: "app" },
+  Kanban: { icon: "mi:todo", kind: "app" },
+  Notes: { icon: "mi:document", kind: "app" },
+  Tracker: { icon: "lucide:TrendUp", kind: "app" }, // legacy-mapping example
   Reading: { icon: "📚", kind: "app" }, // emoji example — still supported
-  Clients: { icon: "lucide:Briefcase", kind: "folder" },
-  "Side Projects": { icon: "lucide:Rocket", kind: "folder" },
-  Acme: { icon: "lucide:ChartBar", kind: "folder" },
-  Internal: { icon: "lucide:Wrench", kind: "app" },
+  Clients: { icon: "mi:lib", kind: "folder" },
+  "Side Projects": { icon: "mi:rocket", kind: "folder" },
+  Acme: { icon: "mi:table", kind: "folder" },
+  Internal: { icon: "mi:settings", kind: "app" },
 };
 
 /** Workbook path served per app. The real Kanban workbook lives as a

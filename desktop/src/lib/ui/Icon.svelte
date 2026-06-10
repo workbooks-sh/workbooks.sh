@@ -1,40 +1,23 @@
 <script lang="ts" module>
   /**
-   * Icon name → Phosphor component lookup (solid / weight="fill" app-wide).
-   * Keyed by the bare `<Name>` that follows the `lucide:` prefix in stored
-   * icon values — the prefix predates the Phosphor migration and stays for
-   * backward compatibility with icons persisted on disk; old Lucide names
-   * are aliased to their Phosphor equivalents.
+   * Legacy stored values (lucide:<Name>) → Material Icon Theme defs.
+   * The phosphor glyph era is over for item icons — old values persisted
+   * on disk resolve to their closest material icon instead.
    */
-  import {
-    Kanban,
-    Notebook,
-    TrendUp,
-    BookOpen,
-    Briefcase,
-    Rocket,
-    ChartBar,
-    Wrench,
-    Package as PackageIcon,
-  } from "phosphor-svelte";
-
-  type IconComponent = typeof Kanban;
-
-  export const GLYPHS: Record<string, IconComponent> = {
-    Kanban,
-    Notebook,
-    TrendUp,
-    BookOpen,
-    Briefcase,
-    Rocket,
-    ChartBar,
-    Wrench,
-    Package: PackageIcon,
-    // Legacy Lucide names persisted in package/workspace metadata.
-    SquareKanban: Kanban,
-    NotebookPen: Notebook,
-    TrendingUp: TrendUp,
-    ChartColumn: ChartBar,
+  export const LEGACY_GLYPHS: Record<string, string> = {
+    Kanban: "todo",
+    SquareKanban: "todo",
+    Notebook: "document",
+    NotebookPen: "document",
+    TrendUp: "table",
+    TrendingUp: "table",
+    ChartBar: "table",
+    ChartColumn: "table",
+    BookOpen: "readme",
+    Briefcase: "lib",
+    Rocket: "rocket",
+    Wrench: "settings",
+    Package: "zip",
   };
 </script>
 
@@ -44,10 +27,10 @@
    * (the universal icon library, wb-5fl.15):
    *
    *   value === ""                     → initials(name)
-   *   value.startsWith("lucide:")      → the named glyph component (solid)
    *   value.startsWith("mi:")          → Material Icon Theme svg (by name)
    *   value.startsWith("lobe:")        → LobeHub brand svg (AI/dev logos,
    *                                      fetched + browser-cached)
+   *   value.startsWith("lucide:")      → legacy → mapped material icon
    *   value.startsWith("data:image/")  → <img>
    *   otherwise (non-empty)            → emoji / glyph text
    */
@@ -74,34 +57,33 @@
     return (n || "?").slice(0, 2).toUpperCase();
   }
 
-  const glyphName = $derived(
-    value.startsWith("lucide:") ? value.slice("lucide:".length) : null,
-  );
-  const GlyphComp = $derived(glyphName ? GLYPHS[glyphName] ?? null : null);
-  const isImage = $derived(value.startsWith("data:image/"));
-  /** mi:<definition-name> → Material Icon Theme asset (e.g. mi:rust,
-   *  mi:folder-client). */
-  const miUrl = $derived(
-    value.startsWith("mi:")
-      ? materialIconUrl(value.slice("mi:".length))
-      : null,
-  );
+  /** mi:<def> directly, or a legacy lucide:<Name> mapped to its def. */
+  const miUrl = $derived.by(() => {
+    if (value.startsWith("mi:")) return materialIconUrl(value.slice(3));
+    if (value.startsWith("lucide:")) {
+      const def = LEGACY_GLYPHS[value.slice("lucide:".length)];
+      return def ? materialIconUrl(def) : null;
+    }
+    return null;
+  });
   const lobeUrl = $derived(
     value.startsWith("lobe:")
       ? `${LOBE_BASE}/${value.slice("lobe:".length)}.svg`
       : null,
   );
+  const isImage = $derived(value.startsWith("data:image/"));
+  /** Unresolvable prefixed values fall through to initials, never to
+   *  raw text like "lucide:Foo". */
+  const isPrefixed = $derived(/^(lucide|mi|lobe):/.test(value));
 </script>
 
-{#if GlyphComp}
-  <GlyphComp {size} weight="fill" aria-hidden="true" />
-{:else if miUrl}
+{#if miUrl}
   <img src={miUrl} alt="" style="width: {size}px; height: {size}px;" />
 {:else if lobeUrl}
   <img src={lobeUrl} alt="" style="width: {size}px; height: {size}px;" loading="lazy" />
 {:else if isImage}
   <img src={value} alt="" />
-{:else if value}
+{:else if value && !isPrefixed}
   <span class="emoji" aria-hidden="true">{value}</span>
 {:else}
   <span class="initials" aria-hidden="true">{initials(name)}</span>
