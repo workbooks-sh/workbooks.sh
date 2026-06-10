@@ -824,6 +824,29 @@ defmodule Workbooks.PackageManager do
   def capture_help(wasm_path, flag \\ "--help"), do: run(wasm_path, "", [flag])
 
   @doc "Run a built WASM component with input, returning its output (WASI stdin/stdout)."
+
+  @doc """
+  Wasmtime compilation-cache args, shared by EVERY wasmtime CLI invocation in
+  the runtime. Without the cache, every run JIT-compiles the module from
+  scratch — ~1s on a fast core but MINUTES on a throttled shared vCPU, which
+  presented as "the wasm shell hangs" (wb-91j: every echo recompiled wbox).
+  With it, a module compiles once per content-hash and loads instantly after.
+  Cache lives under WB_DATA so it survives deploys; falls back to tmp.
+  """
+  def wasmtime_cache_args do
+    dir = Path.join(System.get_env("WB_DATA", System.tmp_dir!()), "cache/wasmtime")
+    cfg = Path.join(dir, "config.toml")
+
+    unless File.exists?(cfg) do
+      File.mkdir_p!(dir)
+      File.write!(cfg, "[cache]\ndirectory = \"#{dir}\"\n")
+    end
+
+    ["-C", "cache=y", "-C", "cache-config=#{cfg}"]
+  end
+
+  def wasmtime_cache_flags, do: Enum.join(wasmtime_cache_args(), " ")
+
   def run(wasm_path, input), do: run(wasm_path, input, [])
 
   @doc """
@@ -913,7 +936,7 @@ defmodule Workbooks.PackageManager do
       # memory64=y → compilers-in-wasm (wb-cwasm) that exceed the wasm32 4GB ceiling on
       # large inputs (LLVM-class). Both harmless for modules that don't use them.
       # (Wasm 3.0 / W3C standard; wasmtime implements them.)
-      wopts = ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+      wopts = wasmtime_cache_args() ++ ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
       envs = Enum.flat_map(env, &["--env", &1])
       parts = wopts ++ envs ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
       cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
@@ -1051,7 +1074,7 @@ defmodule Workbooks.PackageManager do
     end
 
     preopens = Enum.flat_map(Enum.uniq(dirs), fn d -> ["--dir", "#{d}::#{d}"] end)
-    System.cmd("wasmtime", ["run", "-W", "exceptions=y"] ++ preopens ++ [@wasm_tools_wasm | args],
+    System.cmd("wasmtime", ["run"] ++ wasmtime_cache_args() ++ ["-W", "exceptions=y"] ++ preopens ++ [@wasm_tools_wasm | args],
       stderr_to_stdout: true)
   end
 

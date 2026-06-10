@@ -1331,7 +1331,7 @@ defmodule Workbooks.Compilers do
 
   # Run `wasmtime run <args>` and return its combined output (the sandbox executor).
   defp wasmtime(args) do
-    {out, _} = System.cmd("wasmtime", ["run" | args], stderr_to_stdout: true)
+    {out, _} = System.cmd("wasmtime", ["run"] ++ Workbooks.PackageManager.wasmtime_cache_args() ++ args, stderr_to_stdout: true)
     out
   end
 
@@ -1494,7 +1494,7 @@ defmodule Workbooks.Compilers do
     File.write!(tin, ts_src)
 
     cmd =
-      "wasmtime run -W exceptions=y -W max-wasm-stack=134217728 " <>
+      "wasmtime run #{Workbooks.PackageManager.wasmtime_cache_flags()} -W exceptions=y -W max-wasm-stack=134217728 " <>
         "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/tsjob.js < #{esc(tin)} 2> #{esc(terr)}"
 
     try do
@@ -1642,7 +1642,7 @@ defmodule Workbooks.Compilers do
     File.write!(sin, payload)
 
     cmd =
-      "wasmtime run -W exceptions=y -W max-wasm-stack=134217728 " <>
+      "wasmtime run #{Workbooks.PackageManager.wasmtime_cache_flags()} -W exceptions=y -W max-wasm-stack=134217728 " <>
         "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/#{jobname} < #{esc(sin)} 2> #{esc(serr)}"
 
     try do

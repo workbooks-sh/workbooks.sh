@@ -119,7 +119,7 @@ defmodule Workbooks.ProcMacroHost do
 
     try do
       # stdin redirection via sh -c matches the validated `server.wasm <name> < blob` round-trip.
-      run = "#{runner} run -W exceptions=y -W max-wasm-stack=536870912 #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
+      run = "#{runner} run #{Workbooks.PackageManager.wasmtime_cache_flags()} -W exceptions=y -W max-wasm-stack=536870912 #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
       # watchdog: run in bg, kill -9 after `secs`, propagate the real exit code.
       cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
 
@@ -146,7 +146,7 @@ defmodule Workbooks.ProcMacroHost do
     env = Keyword.get(opts, :env, []) |> Enum.flat_map(&["--env", &1])
 
     parts =
-      [runner, "run", "-W", "exceptions=y", "-W", "max-wasm-stack=134217728"] ++
+      [runner, "run"] ++ Workbooks.PackageManager.wasmtime_cache_args() ++ ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728"] ++
         env ++ dirs ++ [wasm] ++ argv
 
     run = parts |> Enum.map(&shq/1) |> Enum.join(" ")
