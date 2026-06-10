@@ -1,0 +1,521 @@
+<script lang="ts">
+  /**
+   * FirstRunOnboarding — the first-run gate (wb-hhf).
+   *
+   * Steps: Welcome → Account (optional, FIRST — signing in can resolve
+   * a cloud/org runtime credential before we offer a local install,
+   * wb-hhf.1) → Runtime (required) → Model key (required). Every
+   * step's "done" state derives from REAL probes, never from "user
+   * clicked next":
+   *
+   *   account  → auth.status === "signed-in"       (live store)
+   *   runtime  → daemon.status.state === "ready"   (live store)
+   *   key      → setup_status.has_model_key        (re-probed on save)
+   *
+   * GATE: the app is unusable until runtime + key verify; account is
+   * educational/optional. Completion is plain app-directory data
+   * (setup.json first_run_done via setup_complete_first_run) — NOT
+   * tied to the auth token, so a signed-out user who passed once is
+   * never re-gated.
+   *
+   * Runtime install runs IN-APP (the SetupWizard overlay drives
+   * engine_detect / install / boot) — no separate OS installer.
+   *
+   * Target-awareness (web later): the runtime step reads capabilities
+   * from probe results, not platform sniffing. On the web target the
+   * probes report a hosted cloud runtime (paid) and only copy + CTA
+   * swap — the verification skeleton stays.
+   */
+  import {
+    RocketLaunch,
+    Cpu,
+    Key,
+    UserCircle,
+    CheckCircle,
+    ArrowRight,
+    CloudArrowUp,
+    UsersThree,
+    Globe,
+    SquaresFour,
+  } from "phosphor-svelte";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
+  import { invoke } from "@tauri-apps/api/core";
+  import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import {
+    setupStatus,
+    setupSaveModelKey,
+    setupCompleteFirstRun,
+  } from "$lib/bridge/setup.svelte";
+  import { auth } from "$lib/auth/store.svelte";
+  import { wizard } from "$lib/setup/wizard.svelte";
+
+  let { oncomplete }: { oncomplete: () => void } = $props();
+
+  const STEPS = ["welcome", "account", "runtime", "key"] as const;
+  type Step = (typeof STEPS)[number];
+  let step = $state<Step>("welcome");
+  const stepIdx = $derived(STEPS.indexOf(step));
+
+  // ── live verification ────────────────────────────────────────────
+  const runtimeReady = $derived(sidecar.status.state === "ready");
+  const runtimeStarting = $derived(
+    sidecar.status.state === "starting" || sidecar.status.state === "restarting",
+  );
+  let hasModelKey = $state(false);
+  const signedIn = $derived(auth.status === "signed-in");
+
+  async function probeSetup() {
+    try {
+      const s = await setupStatus();
+      hasModelKey = s.has_model_key;
+    } catch {
+      /* fail-open — probe again on save */
+    }
+  }
+  $effect(() => {
+    void probeSetup();
+  });
+
+  // ── model key form ───────────────────────────────────────────────
+  let keyValue = $state("");
+  let keyBusy = $state(false);
+  let keyError = $state<string | null>(null);
+
+  async function saveKey() {
+    const v = keyValue.trim();
+    if (!v || keyBusy) return;
+    keyBusy = true;
+    keyError = null;
+    try {
+      await setupSaveModelKey({
+        name: "OpenRouter",
+        provider: "openrouter",
+        value: v,
+      });
+      keyValue = "";
+      await probeSetup();
+    } catch (e) {
+      keyError = e instanceof Error ? e.message : String(e);
+    } finally {
+      keyBusy = false;
+    }
+  }
+
+  // ── cloud runtime via auth (wb-hhf.1) — graceful absence ─────────
+  // When signed in, ask the broker for runtime credentials (an org or
+  // hosted runtime). The Tauri command doesn't exist yet; the probe
+  // fails silently and the local-install path renders instead.
+  let cloudCreds = $state<{ url: string; token?: string } | null>(null);
+  let cloudConnectBusy = $state(false);
+  let cloudChecked = $state(false);
+  $effect(() => {
+    if (!signedIn || cloudChecked) return;
+    cloudChecked = true;
+    void (async () => {
+      try {
+        cloudCreds = await invoke<{ url: string; token?: string } | null>(
+          "runtime_creds_fetch",
+        );
+      } catch {
+        cloudCreds = null;
+      }
+    })();
+  });
+  async function connectCloudRuntime() {
+    if (!cloudCreds || cloudConnectBusy) return;
+    cloudConnectBusy = true;
+    try {
+      await invoke("engine_connect_cloud", {
+        url: cloudCreds.url,
+        token: cloudCreds.token ?? "",
+      });
+    } catch (e) {
+      console.warn("[onboarding] cloud connect failed", e);
+    } finally {
+      cloudConnectBusy = false;
+    }
+  }
+
+  // ── sign-in ──────────────────────────────────────────────────────
+  let signInBusy = $state(false);
+  async function doSignIn() {
+    if (signInBusy) return;
+    signInBusy = true;
+    try {
+      await auth.signIn();
+    } catch {
+      /* auth store surfaces errors */
+    } finally {
+      signInBusy = false;
+    }
+  }
+
+  // ── navigation ───────────────────────────────────────────────────
+  function next() {
+    const i = STEPS.indexOf(step);
+    if (i < STEPS.length - 1) step = STEPS[i + 1];
+    else void finish();
+  }
+  function back() {
+    const i = STEPS.indexOf(step);
+    if (i > 0) step = STEPS[i - 1];
+  }
+  let finishing = $state(false);
+  async function finish() {
+    // The gate: requirements must VERIFY, not just be clicked through.
+    if (finishing || !runtimeReady || !hasModelKey) return;
+    finishing = true;
+    try {
+      await setupCompleteFirstRun();
+    } catch (e) {
+      console.warn("[onboarding] complete_first_run failed", e);
+    }
+    oncomplete();
+  }
+</script>
+
+<div class="screen">
+  <div class="card">
+    <!-- progress dots -->
+    <div class="dots" role="presentation">
+      {#each STEPS as s, i (s)}
+        <button
+          type="button"
+          class="dot"
+          class:on={i === stepIdx}
+          class:past={i < stepIdx}
+          aria-label={s}
+          onclick={() => {
+            if (i <= stepIdx) step = s;
+          }}
+        ></button>
+      {/each}
+    </div>
+
+    {#key step}
+      <div class="body" in:fly={{ x: 16, duration: 200, easing: cubicOut }}>
+        {#if step === "welcome"}
+          <div class="hero"><RocketLaunch size={30} weight="fill" /></div>
+          <h1>Welcome to Workbooks</h1>
+          <p class="sub">
+            Software that builds itself — workbooks are living apps your
+            agents create and grow. A couple of quick steps and you're
+            running.
+          </p>
+          <button type="button" class="primary" onclick={next}>
+            Get started <ArrowRight size={14} weight="bold" />
+          </button>
+
+        {:else if step === "account"}
+          <div class="hero"><UserCircle size={30} weight="fill" /></div>
+          <h1>Sign in — optional</h1>
+          <p class="sub">
+            Workbooks works fully without an account. Signing in first
+            lets us connect you to a cloud or team runtime automatically,
+            and adds the connected layer:
+          </p>
+          <ul class="benefits">
+            <li><Globe size={15} weight="fill" /> Join the network — share and discover workbooks</li>
+            <li><CloudArrowUp size={15} weight="fill" /> One-click cloud deploys — we host your runtime</li>
+            <li><UsersThree size={15} weight="fill" /> Team &amp; enterprise sharing, shared runtime credentials</li>
+            <li><SquaresFour size={15} weight="fill" /> Manage every deployment from this app</li>
+          </ul>
+          {#if signedIn}
+            <div class="status ok">
+              <CheckCircle size={16} weight="fill" />
+              Signed in as {auth.user?.displayName ?? auth.user?.email}
+            </div>
+          {:else}
+            <button type="button" class="primary" onclick={doSignIn} disabled={signInBusy}>
+              {signInBusy ? "Opening sign-in…" : "Sign in to Workbooks"}
+            </button>
+          {/if}
+          <div class="nav">
+            <button type="button" class="ghost" onclick={back}>Back</button>
+            <button type="button" class={signedIn ? "primary" : "ghost"} onclick={next}>
+              {signedIn ? "Continue" : "Continue without account"}
+            </button>
+          </div>
+
+        {:else if step === "runtime"}
+          <div class="hero"><Cpu size={30} weight="fill" /></div>
+          <h1>Your runtime</h1>
+          <p class="sub">
+            The runtime is the engine that runs agents and builds
+            workbooks. Install it right here — it runs privately on this
+            machine and your files never leave it.
+          </p>
+          {#if runtimeReady}
+            <div class="status ok">
+              <CheckCircle size={16} weight="fill" />
+              Runtime connected{sidecar.status.url ? ` — ${sidecar.status.url}` : ""}
+            </div>
+          {:else if runtimeStarting}
+            <div class="status pending">Starting…</div>
+          {:else}
+            {#if cloudCreds}
+              <button
+                type="button"
+                class="primary"
+                onclick={() => void connectCloudRuntime()}
+                disabled={cloudConnectBusy}
+              >
+                <CloudArrowUp size={14} weight="fill" />
+                {cloudConnectBusy ? "Connecting…" : "Connect your cloud runtime"}
+              </button>
+              <button type="button" class="ghost" onclick={() => wizard.open()}>
+                Install locally instead
+              </button>
+            {:else}
+              <div class="status idle">Not running yet</div>
+              <button type="button" class="primary" onclick={() => wizard.open()}>
+                Set up runtime
+              </button>
+            {/if}
+          {/if}
+          <div class="nav">
+            <button type="button" class="ghost" onclick={back}>Back</button>
+            <button
+              type="button"
+              class="primary"
+              onclick={next}
+              disabled={!runtimeReady}
+              title={runtimeReady ? "" : "A connected runtime is required"}
+            >
+              Continue
+            </button>
+          </div>
+
+        {:else}
+          <div class="hero"><Key size={30} weight="fill" /></div>
+          <h1>Connect a model</h1>
+          <p class="sub">
+            Agents think with a language model. Paste an
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter key</a>
+            — one key, every model — and it's stored in your OS keychain,
+            then handed to the runtime.
+          </p>
+          {#if hasModelKey}
+            <div class="status ok">
+              <CheckCircle size={16} weight="fill" /> Model key saved
+            </div>
+          {:else}
+            <form
+              class="key-form"
+              onsubmit={(e) => {
+                e.preventDefault();
+                void saveKey();
+              }}
+            >
+              <input
+                type="password"
+                placeholder="sk-or-…"
+                bind:value={keyValue}
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button type="submit" class="primary" disabled={!keyValue.trim() || keyBusy}>
+                {keyBusy ? "Saving…" : "Save"}
+              </button>
+            </form>
+            {#if keyError}<p class="err">{keyError}</p>{/if}
+          {/if}
+          <div class="nav">
+            <button type="button" class="ghost" onclick={back}>Back</button>
+            <button
+              type="button"
+              class="primary"
+              onclick={() => void finish()}
+              disabled={!hasModelKey || finishing}
+              title={hasModelKey ? "" : "A model key is required"}
+            >
+              {finishing ? "Finishing…" : "Finish"}
+            </button>
+          </div>
+        {/if}
+      </div>
+    {/key}
+  </div>
+</div>
+
+<style>
+  .screen {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--color-chrome);
+    overflow: auto;
+  }
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-pop);
+    padding: 1.5rem 2rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .dots {
+    display: flex;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 1.1rem;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    background: var(--color-border-strong);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .dot.on {
+    background: var(--color-brand);
+    transform: scale(1.25);
+  }
+  .dot.past { background: color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong)); }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.9rem;
+  }
+  .hero {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--color-brand-soft);
+    color: var(--color-brand);
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: var(--color-fg-muted);
+    max-width: 36ch;
+  }
+  .sub a { color: var(--color-brand); }
+
+  .benefits {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    text-align: left;
+    font-size: 0.83rem;
+    color: var(--color-fg);
+  }
+  .benefits li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .benefits :global(svg) { color: var(--color-brand); flex-shrink: 0; }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+  .status.ok {
+    background: color-mix(in srgb, var(--color-ok) 12%, var(--color-surface));
+    color: var(--color-ok);
+  }
+  .status.pending {
+    background: color-mix(in srgb, var(--color-warn) 12%, var(--color-surface));
+    color: var(--color-warn);
+  }
+  .status.idle {
+    background: var(--color-surface-soft);
+    color: var(--color-fg-muted);
+  }
+
+  .key-form {
+    display: flex;
+    gap: 7px;
+    width: 100%;
+  }
+  .key-form input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 11px;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-page);
+    color: var(--color-fg);
+    font: inherit;
+    font-size: 0.84rem;
+  }
+  .key-form input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-brand) 50%, var(--color-border));
+  }
+  .err {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #ef4444;
+  }
+
+  .primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 18px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--color-brand);
+    color: #fff;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.12s, transform 0.12s;
+  }
+  .primary:hover:not(:disabled) { filter: brightness(1.06); }
+  .primary:active:not(:disabled) { transform: scale(0.985); }
+  .primary:disabled { opacity: 0.55; cursor: default; }
+
+  .ghost {
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font: inherit;
+    font-size: 0.84rem;
+    cursor: pointer;
+  }
+  .ghost:hover { color: var(--color-fg); }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 0.4rem;
+  }
+</style>

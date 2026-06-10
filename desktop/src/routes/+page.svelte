@@ -26,6 +26,7 @@
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
   import KeychainOnboarding from "$lib/setup/KeychainOnboarding.svelte";
   import EngineOnboarding from "$lib/setup/EngineOnboarding.svelte";
+  import FirstRunOnboarding from "$lib/setup/FirstRunOnboarding.svelte";
   import { setupStatus } from "$lib/bridge/setup.svelte";
   import { engineStatus } from "$lib/bridge/engine.svelte";
   import WorkspaceSwitcher from "$lib/workspace/WorkspaceSwitcher.svelte";
@@ -82,6 +83,10 @@
   let initialized = $state(true);
   let engineInstalled = $state(true);
   let keychainInitialized = $state(true);
+  // First-run onboarding (wb-hhf) — durable flag in setup.json; starts
+  // true (fail-open) and flips from the setup_status probe. `?onboarding`
+  // forces it for preview/testing.
+  let firstRunDone = $state(true);
   const showEngineSetup = false;
   const showKeychainSetup = false;
   const showOnboarding = false;
@@ -420,9 +425,16 @@
     // Cheap, non-prompting check — reads ~/Workbooks/Engine/setup.json.
     // If the keychain marker is set, skip the splash. If not, the
     // KeychainOnboarding splash renders first.
+    // Preview/testing hook: ?onboarding forces the first-run flow
+    // (and wins over the probe below).
+    const forceOnboarding = new URLSearchParams(window.location.search).has(
+      "onboarding",
+    );
+    if (forceOnboarding) firstRunDone = false;
     setupStatus()
       .then((s) => {
         keychainInitialized = s.keychain_initialized;
+        if (!forceOnboarding) firstRunDone = s.first_run_done;
       })
       .catch((e) => {
         console.warn("[setup] status check failed:", e);
@@ -489,6 +501,8 @@
   <KeychainOnboarding oncomplete={onKeychainSetupComplete} />
 {:else if showOnboarding}
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
+{:else if !firstRunDone}
+  <FirstRunOnboarding oncomplete={() => (firstRunDone = true)} />
 {:else}
   <div class="app">
     <div
