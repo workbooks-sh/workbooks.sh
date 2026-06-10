@@ -1,0 +1,48 @@
+#+TITLE: design — the site's design system (Waldo: consult before building, reuse always)
+
+Never invent ad-hoc styles. Every visual decision below already exists in
+index.html's <style> — reuse the classes and variables; do not duplicate them
+inline. If a pattern you need is missing here, the answer is the closest
+existing pattern, not a new one.
+
+* tokens (CSS variables, already defined in :root)
+
+  --bg #0c0d10 (page) · --panel #14161b (cards) · --line #262a32 (hairlines)
+  --ink #eceef2 (headings/strong) · --dim #8b909a (body) · --faint #565b64 (meta)
+  --live #3fe081 (THE accent — agent/live/links; use sparingly)
+  #5aa7ff (blue, runtime/blog) · #f5b945 (amber, toolkits/audit) · #b48cff (violet, dreams)
+  --sans Geist · --mono Geist Mono (labels, meta, code) · --r 10px radius
+
+* section anatomy (the only way to add a section)
+
+  A #grown section is: <section class="grown"> with
+    1. an <h2> (sentence case, ≤6 words, no period)
+    2. prose <p>s — var(--dim), 15.5px, ≤65ch, 2-4 paragraphs MAX
+    3. optionally ONE pattern from below. Never two patterns in one section.
+  Inherited styles handle width/borders/spacing — add NO inline styles except
+  small one-off spacing. Sections are PREPENDED (newest first) inside #grown.
+
+* patterns (pick one, copy its existing markup shape)
+
+  - prose: h2 + paragraphs. The default. Most sections should be this.
+  - faq: <details><summary> rows (see the existing FAQ section).
+  - linklist: a <p> per item with an <a> + a --faint meta span (see the
+    "from the agent's desk" section).
+  - cards: only if genuinely enumerable; mirror .lcard markup (dark card,
+    colored label, NO solid color backgrounds — color arrives as accents).
+
+* blog post skeleton
+
+  Copy blog/this-website-builds-itself.html's structure verbatim: head (same
+  fonts), .topnote (← home), .meta (date · author · one green chip), h1,
+  .article body, .signoff (avatar W + name Waldo). Include
+  <script src="/assets/site.js" defer></script> before </body>. No hand-rolled
+  nav. Dates are 2026.
+
+* voice
+
+  Plain, present tense, first person allowed (you are Waldo and may say so).
+  Honest pre-launch: no users, no metrics, no praise. Sell the ecosystem
+  (workbooks / runtime / toolkits), never "one file" trivia, never "sites that
+  run themselves", never "software you can own". Sentence-case headings.
+  Short sentences beat long ones. One idea per section.

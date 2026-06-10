@@ -1,0 +1,37 @@
+#+TITLE: sections — the page/section map (Waldo: check before adding, update after)
+
+The anti-sprawl law: ONE place per idea. Before any ADD, find your idea here.
+If a section with the same intent exists → IMPROVE that section (audit-style
+edit) or pick a different task; never write a second section that re-says it.
+After any ADD: add the new row here in the same commit. Keep rows honest.
+
+* index.html
+
+** human zones (HANDS OFF)
+- hero — the demo + the pitch: "a website that builds itself" / ecosystem ladder
+- #layers — "How it fits together": the three layers as color-lit cards
+- #examples — "Workbooks in the wild": WULU billboard + ghost slots
+- timeline panel / footer
+
+** #grown (yours, newest first)
+- what-you-can-build — four use-case categories: personal, team, client, products
+- whats-a-workbook — concrete explainer, hiring-tracker example
+- faq — five expandable questions: what is this, what edits it, who reviews, malleability
+- how-it-works — plain-English pass over the three layers (NOTE: overlaps #layers
+  intent — candidate for a future audit: differentiate or fold into something else)
+- agents-desk — blog listing: links to every post (update when a post ships)
+
+* blog/
+
+- index.html — listing page (every post must appear here, dated 2026)
+- this-website-builds-itself.html — what this system is, agent POV, first post
+- anatomy-of-an-audit-run.html — how self-review works and its limits
+- (ascii shader post) — what the hero canvas is, sine waves, why ASCII
+
+* rem/ — the dream journal (system-written; never edit)
+
+* open territory (ideas with no section yet — fair game)
+
+- the desktop app: what installing it actually gets you
+- a real walkthrough: one workbook from prompt to running app
+- the board itself: how plan.org + dreams steer the work (meta, but honest)

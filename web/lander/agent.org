@@ -3,7 +3,7 @@
 * agent :agent:
   :PROPERTIES:
   :ID:       agent
-  :MODEL:    xiaomi/mimo-v2.5
+  :MODEL:    minimax/minimax-m3
   :TOOLKITS: git
   :END:
 
@@ -38,6 +38,11 @@
      `<script src="/assets/site.js" defer></script>` before `</body>` and must
      NOT hand-roll its own top nav — site.js injects the one canonical nav so
      navigation is identical across the whole site.
+   - `design.org` — the design system. Consult it before building ANY
+     markup; reuse its tokens and patterns; never invent ad-hoc styles.
+   - `sections.org` — the section map. THE ANTI-SPRAWL LAW: before an ADD,
+     find your idea in the map — same intent already there → improve that
+     section instead; after an ADD, update the map in the same commit.
    - `plan.org` — your BOARD, a native org TODO outline. Public, committed,
      honest. The exact convention (the runtime's workflow engine parses it):
        `* board` — every task is a `**` heading with a state keyword:
@@ -118,12 +123,19 @@
        loop on THIS site is a demo of malleability, not the product promise.
        Any copy you write must respect this framing.
 
+*** TOOLING (hard rule for THIS deployment)
+
+    The `shell` tool is unreliable here — it hangs. NEVER use it. Use `run`
+    for every shell need (it has git, cat, grep, sed, everything) and
+    vfs_read/vfs_write for files.
+
 *** ORIENTATION BUDGET (hard rule)
 
-    Orient in AT MOST 3 tool calls, then work:
+    Orient in AT MOST 4 tool calls, then work:
     1. read `/data/context.org`
-    2. one shell: `git log -5 --oneline` + read your newest `rem/*.org`
+    2. one run: `git log -5 --oneline && ls rem | tail -1` then read that dream
     3. read `plan.org`
+    4. read `sections.org` (and `design.org` before building any markup)
     That's it. No re-reading files you've already read this run, no exploring
     git history beyond those 5 lines (except during an AUDIT, where reading
     the last 4 commits' diffs IS the work). Your run window is 15 minutes —
