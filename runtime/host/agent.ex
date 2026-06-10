@@ -8,23 +8,42 @@ defmodule Workbooks.Agent do
   The clean-room improvement over brandnana's raw `bash`: the agent's primary tool
   is the *sandboxed in-WASM shell* (`Workbooks.Shell` over the CommandRegistry —
   coreutils + jq/grep, pipes, `; && ||`, vars, redirection, workdir files) and the
-  *VFS*. No OS shell by default; the `run` escape hatch (native CLIs, exec-gated +
-  Workbooks.Sandbox) is being retired as CLIs become WASM commands (wb-9ja).
+  *VFS*. There is NO OS shell at all: the old `run` escape hatch (real native bash)
+  was DELETED (wb-9ja). It is by construction IMPOSSIBLE for the agent to execute
+  native code — the tool surface exposes only the in-WASM `shell`, the VFS, and a
+  handful of HOST-BROKERED capabilities (`git`, `publish`, `fetch`, `wb`) that
+  trusted host Elixir performs on the agent's behalf. The agent never shells out.
   Every step is appended to an org-mode event log in the VFS (`events.org`) — the
   run is fully observable and OQL-queryable, like brandnana's events.org.
   """
   require Logger
   alias Workbooks.{Llm, Shell, VFS}
 
-  # ESCAPE HATCH (deprecated): real OS bash for NATIVE CLIs not yet available as
-  # WASM commands (e.g. ffmpeg, git, gh). Only granted to trusted agents
-  # (opts[:exec]) and run under Workbooks.Sandbox. Prefer the `shell` tool — it is
-  # fully WASM-sandboxed. To be removed once every CLI is a WASM command (wb-9ja).
-  @run_tool %{type: "function", function: %{
-    name: "run",
-    description: "ESCAPE HATCH — only for NATIVE CLIs the `shell` tool can't run yet (e.g. ffmpeg, git, gh). For everything else use `shell` (it has cat/echo/grep/jq/sort/pipes/redirection/files). Runs a real command in your working dir; returns stdout+stderr. e.g. cmd=\"ffmpeg -i in.mp4 out.wav\".",
-    parameters: %{type: "object", properties: %{cmd: %{type: "string"}}, required: ["cmd"]}
-  }}
+  # HOST-BROKERED tools — only granted to trusted (exec) agents. These let the
+  # keeper agent (Waldo) commit/push and publish to the site WITHOUT any native
+  # exec from the agent: the agent calls the TOOL, trusted host Elixir
+  # (Workbooks.Git / File.cp) runs git / copies files. The agent itself never
+  # forks a process. This is what replaced the deleted native `run` hatch (wb-9ja).
+  #
+  # WHY this is not "native execution by the agent": running native code on behalf
+  # of the agent is fine when the HOST decides exactly what runs (a fixed
+  # `git commit && git push`, a constrained File.cp into the public dir). The ban
+  # is on the AGENT choosing an arbitrary native command line — that capability no
+  # longer exists in the tool surface.
+  @exec_tools [
+    %{type: "function", function: %{
+      name: "git",
+      description: "Commit all changes in your working dir and push (host-brokered — you do NOT run git yourself; the host commits + pushes your repo). Use after you've written your changes. e.g. message=\"add: how-it-works section\".",
+      parameters: %{type: "object", properties: %{
+        message: %{type: "string", description: "the commit message"}
+      }, required: ["message"]}
+    }},
+    %{type: "function", function: %{
+      name: "publish",
+      description: "Publish your changed content to the LIVE public site (host-brokered host File copy — no shell). Copies content/** and blog/** from your working dir to the public web root so it appears on the page. Call after writing content. No args.",
+      parameters: %{type: "object", properties: %{}, required: []}
+    }}
+  ]
 
   @base_tools [
     %{type: "function", function: %{
@@ -67,9 +86,19 @@ defmodule Workbooks.Agent do
     }}
   ]
 
-  # The tool surface for a run — the real-CLI `run` tool only when exec is granted.
-  defp tools(%{exec: true}), do: [@run_tool | @base_tools]
+  # The tool surface for a run. Trusted (exec) agents additionally get the
+  # HOST-BROKERED git/publish tools — never a native-exec tool (the `run` hatch is
+  # gone, wb-9ja). So no path here can hand the agent native code execution.
+  defp tools(%{exec: true}), do: @exec_tools ++ @base_tools
   defp tools(_), do: @base_tools
+
+  @doc false
+  # Test-only window onto the tool surface (used by no_native_exec_test to assert,
+  # by construction, that no native-exec tool is ever exposed). opts: [exec: bool].
+  def __tool_names_for_test__(opts) do
+    st = %{exec: Keyword.get(opts, :exec, false)}
+    tools(st) |> Enum.map(& &1.function.name)
+  end
 
   @doc """
   Run an agent to completion. `system` is the system prompt, `task` the user's
@@ -86,7 +115,10 @@ defmodule Workbooks.Agent do
       step: 0,
       max: opts[:max_steps] || 12,
       events: [],
-      # exec: grant the real-CLI `run` tool (trusted agents). workdir/env scope it.
+      # exec: a TRUST flag for the keeper/brandnana agents. It grants the
+      # host-brokered git/publish tools and routes the filesystem tools at the OS
+      # workdir (the shared substrate) instead of the in-memory VFS. It NO LONGER
+      # grants any native execution — the `run` hatch was removed (wb-9ja).
       exec: opts[:exec] || false,
       workdir: opts[:workdir] || System.tmp_dir!(),
       env: opts[:env] || [],
@@ -153,8 +185,8 @@ defmodule Workbooks.Agent do
   defp log_step(_, _), do: :ok
 
   # EVERY tool call is wall-clock bounded (150s): any wedged tool — sqlite,
-  # network, native CLI — surfaces as a tool error the model can react to.
-  # (The `run` tool keeps its own tighter inner bound as well.)
+  # network, a host-brokered git push — surfaces as a tool error the model can
+  # react to, never a stalled run.
   defp exec_bounded(call, st) do
     task = Task.async(fn -> exec_one(call, st) end)
 
@@ -185,45 +217,35 @@ defmodule Workbooks.Agent do
     end
   end
 
-  defp exec_one(%{name: "run", args: a}, %{exec: true} = st) do
-    # INTERIM: the real-bash escape hatch runs under the host isolator
-    # (Workbooks.Sandbox — bwrap on Linux / seatbelt on macOS), not raw `sh -c`,
-    # so it can't roam the container's fs/processes freely. run_net keeps network
-    # (many native CLIs need it) but stays confined. NORTH STAR: no bash outside
-    # WASM — every CLI/crate/npm becomes a WASM command and this tool is removed.
-    # Wall-clock bound per command (WB_RUN_TOOL_TIMEOUT_MS, default 120s): a
-    # hung CLI (wedged push, curl with no -m, interactive prompt) must surface
-    # as a tool error the model can react to — never stall the whole run.
-    task =
-      Task.async(fn ->
-        try do
-          Workbooks.Sandbox.run_net(["sh", "-c", a["cmd"] || ""], cd: st.workdir, env: st.env)
-        catch
-          kind, e -> {"run error: #{inspect({kind, e})}", 126}
-        end
-      end)
+  # HOST-BROKERED git: commit ALL changes in the agent's workdir + push, run by
+  # trusted host Elixir (Workbooks.Git, which itself uses System.cmd git on ITS
+  # OWN repos — host infrastructure, NOT the agent running native code). The agent
+  # supplies only a commit message; it can never choose the command line. This is
+  # the replacement for the deleted `run` hatch's git add/commit/push usage.
+  defp exec_one(%{name: "git", args: a}, %{exec: true} = st) do
+    msg = to_string(a["message"] || "agent update")
 
-    {out, code} =
-      case Task.yield(task, run_tool_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
-        {:ok, result} -> result
-        _ -> {"run timed out after #{div(run_tool_timeout_ms(), 1000)}s (command killed)", 124}
-      end
-
-    # Capture the exit code — a non-zero is a bash call that broke; record it.
-    meta = %{exit_code: code, error: if(code != 0, do: "nonzero exit #{code}", else: nil)}
-    {String.slice(out, 0, 8000), Map.put(st, :last, meta), nil}
-  catch
-    kind, e -> {"run error: #{inspect({kind, e})}", Map.put(st, :last, %{error: inspect({kind, e})}), nil}
-  end
-
-  defp exec_one(%{name: "run"}, st), do: {"run not permitted (no exec capability)", st, nil}
-
-  defp run_tool_timeout_ms do
-    case System.get_env("WB_RUN_TOOL_TIMEOUT_MS") do
-      nil -> 120_000
-      s -> String.to_integer(s)
+    case Workbooks.Git.commit_and_push(st.workdir, msg, st.tenant) do
+      {:ok, info} -> {"committed + pushed: #{info}", st, nil}
+      {:nochange, _} -> {"nothing to commit (working tree clean)", st, nil}
+      {:error, reason} -> {"git error: #{inspect(reason)}", Map.put(st, :last, %{error: inspect(reason)}), nil}
     end
   end
+
+  defp exec_one(%{name: "git"}, st), do: {"git not permitted (no exec capability)", st, nil}
+
+  # HOST-BROKERED publish: copy the agent's content (content/** + blog/**) from its
+  # workdir to the public site dir, by host File ops (File.cp — no shell). The agent
+  # picks nothing about HOW the copy runs; the host owns the source/dest contract.
+  # Replaces the `run` hatch's `cp/mkdir` publish step from agent.org step 6.
+  defp exec_one(%{name: "publish"}, %{exec: true} = st) do
+    case Workbooks.SitePublish.publish(st.workdir, st.tenant) do
+      {:ok, n} -> {"published #{n} file(s) to the live site", st, nil}
+      {:error, reason} -> {"publish error: #{inspect(reason)}", Map.put(st, :last, %{error: inspect(reason)}), nil}
+    end
+  end
+
+  defp exec_one(%{name: "publish"}, st), do: {"publish not permitted (no exec capability)", st, nil}
 
   # Semantic recall over the agent's working org/code context — the files ARE the
   # memory (no separate store to drift). Stateless: always the current files.

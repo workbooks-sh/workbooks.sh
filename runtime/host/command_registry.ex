@@ -324,39 +324,19 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
-  defp do_build_and_register_crate(name, crate, mode) do
-    # The temp root is derived from a now-validated crate token, but still expand
-    # to be safe and to avoid surprises from a future relaxed charset.
-    root = Path.expand(Path.join(System.tmp_dir!(), "wbcmd-#{crate}"))
-
-    # SECURITY (wb-sec): `--` terminates option parsing so `crate` can never be
-    # read as a flag (kills cargo option-injection). The compile runs FS-confined
-    # via Workbooks.Sandbox.run_net. RESIDUAL RISK: `cargo install` MUST reach the
-    # registry to fetch the crate, so the network cannot be denied around the
-    # fetch — a fetched crate's build.rs still runs with network during install.
-    # This is the documented inherent trust boundary of installing an arbitrary
-    # published crate (callers must allowlist/review crate names). The offline,
-    # network-DENIED path is build_dir/2 for a local, already-vendored source tree.
-    # Options FIRST, then `--`, then the crate spec — so `crate` can never be read
-    # as an option (cargo parses everything after `--` as positional crate specs).
-    case Workbooks.Sandbox.run_net(
-           ["cargo", "install", "--target", "wasm32-wasip1", "--root", root, "--no-track", "--", crate],
-           env: cargo_env()
-         ) do
-      {_, 0} ->
-        case Path.wildcard(Path.join([root, "bin", "*.wasm"])) do
-          [wasm | _] ->
-            # Content-address the build output so the registry points at a stable
-            # build/commands/<sha>.wasm, not cargo's transient --root temp dir.
-            register_artifact(name, wasm, mode)
-
-          [] ->
-            {:error, :no_wasm}
-        end
-
-      {err, _} ->
-        {:error, err}
-    end
+  # NATIVE-COMPILE FALLBACK REMOVED (wb-9ja). This used to `cargo install` an
+  # arbitrary crate with the NATIVE cargo toolchain — exactly the native execution
+  # the no-native-exec canon forbids. There is no honest in-sandbox equivalent for
+  # "fetch + build an arbitrary upstream binary crate" yet (cargo's registry
+  # resolve + build.rs don't run as a wasmtime guest), so we return an explicit
+  # lane-unavailable error rather than silently shell out to native cargo.
+  #
+  # SUBSTRATE DISTINCTION (read before "fixing" this): wasmtime running a `.wasm`
+  # IS the architecture and stays. NATIVE binaries (cargo/rustc/zig/go) are BANNED.
+  # Build inline Rust source via build_and_register_inline/5 (lang "rust") instead —
+  # it compiles through mrustc.wasm → clang.wasm entirely in-sandbox.
+  defp do_build_and_register_crate(_name, _crate, _mode) do
+    {:error, {:lane_unavailable, :rust_crate_native_build}}
   end
 
   # A Go package path (optionally @version). Discrete System.cmd args (no shell), so
@@ -383,70 +363,44 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
-  defp do_build_and_register_go(name, pkg, mode) do
-    root = Path.join(System.tmp_dir!(), "wbgo-#{:erlang.unique_integer([:positive])}")
-    File.mkdir_p!(root)
-    out = Path.join(root, "out.wasm")
-    base = pkg |> String.split("@") |> hd()
-    env = go_env(root)
-
-    with {_, 0} <- Workbooks.Sandbox.run_net(["go", "mod", "init", "wbgo"], cd: root, env: env),
-         {_, 0} <- Workbooks.Sandbox.run_net(["go", "get", pkg], cd: root, env: env),
-         {_, 0} <- Workbooks.Sandbox.run_net(["go", "build", "-o", out, base], cd: root, env: env) do
-      if File.regular?(out), do: register_artifact(name, out, mode), else: {:error, :no_wasm}
-    else
-      {err, _} -> {:error, err}
-    end
-  end
-
-  defp go_env(root) do
-    [
-      {"GOOS", "wasip1"},
-      {"GOARCH", "wasm"},
-      {"GOPATH", Path.join(root, "gp")},
-      {"GOCACHE", Path.join(root, "gc")},
-      {"GOMODCACHE", Path.join(root, "gm")},
-      {"PATH", "/opt/homebrew/bin:/usr/local/go/bin:#{System.get_env("PATH")}"}
-    ]
+  # NATIVE-COMPILE FALLBACK REMOVED (wb-9ja). This used to drive the NATIVE go
+  # toolchain (`go mod`/`go get`/`go build`) to cross-compile a package to wasm.
+  # That is native execution of a fetched package's build — banned. Run Go SOURCE
+  # in-sandbox via the yaegi interpreter lane (PackageManager build, lang "go")
+  # instead; fetching+building an arbitrary upstream Go package natively is gone.
+  defp do_build_and_register_go(_name, _pkg, _mode) do
+    {:error, {:lane_unavailable, :go_package_native_build}}
   end
 
   @doc """
-  Compile a Zig SOURCE file to a wasm32-wasi command (native zig) and register it.
-  Zig has no sandboxed interpreter (compiler-in-wasm is the LLVM mountain) — it is a
-  compile-to-wasm AUTHORING language: write a tool in Zig, get a sandboxed command.
-  Offline build (no deps fetched); zig cache pinned to a temp dir.
+  REMOVED (wb-9ja): native-zig compile of a .zig file. The NATIVE `zig build-exe`
+  toolchain is banned. Compile Zig SOURCE in-sandbox via the Zig lane
+  (PackageManager build/build_dir, lang "zig" → zig1.wasm → clang.wasm). This entry
+  point returns lane-unavailable rather than shelling out to native zig.
   """
-  def build_and_register_zig(name, zig_file, mode \\ :argv) do
+  def build_and_register_zig(name, _zig_file, _mode \\ :argv) do
     cond do
       not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
       name in @reserved -> {:error, :reserved_name}
-      not File.regular?(zig_file) -> {:error, :no_source}
-      true ->
-        out = Path.join(System.tmp_dir!(), "wbzig-#{:erlang.unique_integer([:positive])}.wasm")
-        cache = Path.join(System.tmp_dir!(), "wbzigc-#{:erlang.unique_integer([:positive])}")
-
-        env = [
-          {"PATH", "/opt/homebrew/bin:#{System.get_env("PATH")}"},
-          {"ZIG_GLOBAL_CACHE_DIR", cache},
-          {"ZIG_LOCAL_CACHE_DIR", cache}
-        ]
-
-        case Workbooks.Sandbox.run(
-               ["zig", "build-exe", zig_file, "-target", "wasm32-wasi", "-O", "ReleaseSmall", "-femit-bin=#{out}"],
-               env: env
-             ) do
-          {_, 0} -> if File.regular?(out), do: register_artifact(name, out, mode), else: {:error, :no_wasm}
-          {err, _} -> {:error, err}
-        end
+      true -> {:error, {:lane_unavailable, :zig_native_build}}
     end
   end
 
   @doc """
-  Run a committed build SCRIPT that compiles a language from source (e.g. Lua via
-  wasi-sdk) and prints the output wasm path as its LAST stdout line; content-address
-  + register it. For build-from-source runtimes with no upstream prebuilt. The
-  script is first-party (lives in the toolkit dir), runs network-permitted (it may
-  fetch a pinned source tarball + toolchain).
+  Run a FIRST-PARTY, in-repo build SCRIPT that PROVISIONS a trusted compiler/runtime
+  wasm (e.g. `compilers/<lang>/build.sh` building qjs/lua), printing the output wasm
+  path as its LAST stdout line; content-address + register it.
+
+  ── SUBSTRATE, NOT a native-compile fallback (wb-9ja) ────────────────────────
+  This is TRUSTED PROVISIONING — the same category as PackageManager's `ensure_yaegi`
+  / `wasm-tools build.sh`: it builds the trusted TOOLS (the wasm compilers), never
+  untrusted USER source. So it runs the script via plain `System.cmd("bash", …)`
+  (host provisioning), exactly like those siblings. It is NOT reachable from the
+  in-sandbox agent: the only agent-facing caller (`wb toolkit build` with a
+  `script:` #+BUILD_SRC from an untrusted toolkit dir) is DISABLED in
+  Workbooks.Toolkits. The ban is on the AGENT running native code / the runtime
+  native-compiling UNTRUSTED source — not on the host provisioning its own trusted
+  compiler wasms from in-repo scripts. Callers must only pass first-party scripts.
   """
   def build_and_register_script(name, script, mode \\ :argv) do
     cond do
@@ -454,7 +408,7 @@ defmodule Workbooks.CommandRegistry do
       name in @reserved -> {:error, :reserved_name}
       not File.regular?(script) -> {:error, :no_script}
       true ->
-        case Workbooks.Sandbox.run_net(["bash", script]) do
+        case System.cmd("bash", [script], stderr_to_stdout: true) do
           {out, 0} ->
             wasm = out |> String.split("\n", trim: true) |> List.last() |> to_string() |> String.trim()
 
@@ -494,14 +448,16 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  # FETCHING a prebuilt .wasm IS the substrate (category A — kept), NOT native
+  # compilation. The only thing that changed for wb-9ja: the download no longer
+  # shells out to the `curl` BINARY via the (deleted) Sandbox — it uses a pure
+  # Erlang/TLS GET (no native process). The fetched prebuilt is inert bytes,
+  # sha-pinned before anything trusts it, and only ever RUN in the wasm sandbox.
   defp do_fetch_and_register_wasm(name, url, sha256, mode) do
     tmp = Path.join(System.tmp_dir!(), "wbwasm-#{:erlang.unique_integer([:positive])}.wasm")
 
-    # -f fail on HTTP error, --proto =https forbids downgrade/file:, `--` ends opts
-    # so the URL can never be read as a flag. Fetch needs network; the prebuilt is
-    # then sha-verified before anything trusts it.
-    case Workbooks.Sandbox.run_net(["curl", "-fsSL", "--proto", "=https", "-o", tmp, "--", url]) do
-      {_, 0} ->
+    case https_get_to_file(url, tmp) do
+      :ok ->
         got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
 
         cond do
@@ -519,9 +475,9 @@ defmodule Workbooks.CommandRegistry do
             end
         end
 
-      {err, _} ->
+      {:error, reason} ->
         File.rm(tmp)
-        {:error, {:fetch_failed, err}}
+        {:error, {:fetch_failed, reason}}
     end
   end
 
@@ -546,8 +502,11 @@ defmodule Workbooks.CommandRegistry do
   defp do_fetch_and_register_archive(name, url, sha256, wasm_rel, preopen, mode) do
     tmp = Path.join(System.tmp_dir!(), "wbarc-#{:erlang.unique_integer([:positive])}.tgz")
 
-    case Workbooks.Sandbox.run_net(["curl", "-fsSL", "--proto", "=https", "-o", tmp, "--", url]) do
-      {_, 0} ->
+    # Same as the .wasm fetch: pure Erlang/TLS GET (no curl binary), sha-pinned. The
+    # tarball is a prebuilt wasm runtime + its companion files — the substrate, not
+    # a native compile. (tar unpack below is a host file op on inert, pinned bytes.)
+    case https_get_to_file(url, tmp) do
+      :ok ->
         got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
 
         cond do
@@ -581,9 +540,32 @@ defmodule Workbooks.CommandRegistry do
             end
         end
 
-      {err, _} ->
+      {:error, reason} ->
         File.rm(tmp)
-        {:error, {:fetch_failed, err}}
+        {:error, {:fetch_failed, reason}}
+    end
+  end
+
+  # Pure Erlang/TLS HTTPS GET → file (no curl binary; no native subprocess). Mirrors
+  # Workbooks.Npm.https_get / Workbooks.Compilers.http_get (wb-ova: "no curl binary").
+  # Verified TLS via the OS trust store; only https URLs reach here (callers gate).
+  defp https_get_to_file(url, dest) do
+    :inets.start()
+    :ssl.start()
+
+    ssl_opts = [
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
+      depth: 3
+    ]
+
+    http_opts = [ssl: ssl_opts, timeout: 60_000, connect_timeout: 15_000, autoredirect: true]
+
+    case :httpc.request(:get, {String.to_charlist(url), []}, http_opts, body_format: :binary) do
+      {:ok, {{_v, 200, _}, _headers, body}} -> File.write(dest, body)
+      {:ok, {{_v, code, _}, _headers, _body}} -> {:error, {:http_status, code}}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -695,8 +677,6 @@ defmodule Workbooks.CommandRegistry do
       :ok
     end
   end
-
-  defp cargo_env, do: [{"PATH", "#{Path.expand("~/.cargo/bin")}:#{System.get_env("PATH")}"}]
 
   # :argv → args go to wasmtime as argv. :stdin1 → args become the first stdin
   # line (legacy), so the wasm sees no argv. Empty argv is a no-op either way.

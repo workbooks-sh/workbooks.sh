@@ -25,11 +25,10 @@ defmodule Workbooks.Toolkits do
     * READ-ONLY surfaces (list / show / search) are open, but slugs/roots are
       path-contained (no `..`/separator traversal; files must resolve inside the
       toolkit) and $WB_TOOLKITS_ROOT is honored only if it is an existing dir.
-    * EXECUTION surfaces (`verify` pre blocks, `run` task blocks) are DEFAULT-DENY.
-      A :role bash block is arbitrary host code; it runs ONLY when the operator
-      opts in via `WB_TOOLKIT_EXEC=1`, and even then it runs under
-      `Workbooks.Sandbox` (network-denied, fs-confined) with a wall-clock cap and
-      a `ulimit` prologue (anti fork-bomb), never bare host bash.
+    * EXECUTION surfaces (`verify` pre blocks, `run` task blocks) are DISABLED
+      (wb-9ja). A :role bash block is arbitrary NATIVE bash; native execution is
+      banned, so this lane never shells out — `exec_allowed?` is always false and
+      `run_bash` is a no-op. Ship the toolkit's CLI as a WASM command instead.
     * BUILD (`build`) refuses to register a command under a reserved built-in
       name (jq/grep/upper); compilers run under the sandbox (see PackageManager).
 
@@ -240,24 +239,11 @@ defmodule Workbooks.Toolkits do
             {File.exists?(Path.join([dir, "skills", "overview.org"])), "skills/overview.org present"}
           ] ++ exec_checks(d) ++ cap_checks(d) ++ trust_checks(dir, d)
 
-        # SECURITY (wb-sec): :role pre blocks are arbitrary bash from an untrusted
-        # toolkit dir. They run ONLY when execution is opted-in (WB_TOOLKIT_EXEC=1);
-        # otherwise verify reports them as skipped (structural checks still run).
-        pre =
-          if exec_allowed?() do
-            Path.wildcard(Path.join([dir, "skills", "**", "*.org"]))
-            |> Enum.filter(&contained?(&1, Path.expand(dir)))
-            |> Enum.flat_map(fn path ->
-              extract_role_blocks(File.read!(path), "pre")
-              |> Enum.map(fn body ->
-                {out, code} = run_bash(body, [], dir)
-                {code == 0, "pre #{Path.relative_to(path, dir)}" <> if(code == 0, do: "", else: ": " <> String.trim(out))}
-              end)
-            end)
-          else
-            n = pre_block_count(dir)
-            if n == 0, do: [], else: [{true, "pre checks SKIPPED (#{n} block(s); set WB_TOOLKIT_EXEC=1 to run sandboxed)"}]
-          end
+        # :role pre blocks are arbitrary NATIVE bash. Native execution is banned
+        # (wb-9ja), so verify never runs them — the structural checks above are the
+        # gate; any pre blocks are reported as disabled (not skipped-pending-flag).
+        n = pre_block_count(dir)
+        pre = if n == 0, do: [], else: [{true, "pre checks DISABLED (#{n} block(s); native :role bash execution removed — wb-9ja)"}]
 
         Enum.map_join(struct ++ pre, "\n", fn {ok, label} -> "#{if ok, do: "✓", else: "✗"} #{label}" end)
     end
@@ -310,29 +296,11 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  # Tier 1 — run the sandboxed :role eval block, assert #+EXPECT:.
-  defp deterministic_case(text, name, toolkit_dir \\ nil) do
-    if not exec_allowed?() do
-      {:skip, "#{name}: SKIPPED (set WB_TOOLKIT_EXEC=1 to run sandboxed)"}
-    else
-      expect =
-        case Regex.run(~r/^#\+EXPECT:\s*(.+)$/m, text) do
-          [_, e] -> String.trim(e)
-          _ -> nil
-        end
-
-      {out, code} = run_bash(Enum.join(extract_role_blocks(text, "eval"), "\n"), [], toolkit_dir)
-      ok = code == 0 and (is_nil(expect) or String.contains?(out, expect))
-
-      detail =
-        cond do
-          ok -> ""
-          code != 0 -> " — exit #{code}: " <> String.trim(String.slice(out, 0, 160))
-          true -> " — missing #{inspect(expect)}"
-        end
-
-      {if(ok, do: :pass, else: :fail), name <> detail}
-    end
+  # Tier 1 — deterministic :role eval blocks ran NATIVE bash. Native execution is
+  # banned (wb-9ja), so this tier can no longer run; report it disabled. (Tier 2,
+  # the agent+judge case below, still works — it runs the in-WASM agent, no native.)
+  defp deterministic_case(_text, name, _toolkit_dir) do
+    {:skip, "#{name}: DISABLED (native :role bash eval removed — wb-9ja)"}
   end
 
   # Tier 2 — run an agent on :TASK: (the toolkit's overview injected so it knows
@@ -349,9 +317,6 @@ defmodule Workbooks.Toolkits do
     cond do
       not llm_key?() ->
         {:skip, "#{name}: SKIPPED (no LLM key — set OPENROUTER_API_KEY)"}
-
-      exec? and not exec_allowed?() ->
-        {:skip, "#{name}: SKIPPED (:EXEC: needs WB_TOOLKIT_EXEC=1)"}
 
       true ->
         overview =
@@ -816,13 +781,11 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  defp do_build_clause(id, %{exec: exec, build_src: {:crate, crate}, cli_bin: bin, arg_mode: mode})
-       when exec in ["command", nil] do
-    case Workbooks.CommandRegistry.build_and_register_crate(bin, crate, mode) do
-      {:ok, wasm} -> "#{id}: built crate #{crate} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
-      {:error, reason} -> "#{id}: build FAILED for crate #{crate}:\n" <> error_text(reason)
-    end
-  end
+  # crate:<name> — NATIVE cargo build of an upstream binary crate REMOVED (wb-9ja).
+  # Build inline/dir Rust SOURCE in-sandbox instead (path:<dir> → the rust lane).
+  defp do_build_clause(id, %{exec: exec, build_src: {:crate, crate}})
+       when exec in ["command", nil],
+       do: "#{id}: native cargo build of crate #{crate} removed (wb-9ja) — fetching+building an upstream binary crate natively is banned; vendor the source and use path:<dir> (in-sandbox rust lane)"
 
   defp do_build_clause(id, %{exec: exec, build_src: {:path, dir}, build_lang: lang, cli_bin: bin, arg_mode: mode})
        when exec in ["command", nil] do
@@ -904,49 +867,23 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  # gobuild:<pkg> — build a Go package to wasip1 (e.g. a Go interpreter like yaegi)
-  # and register it so untrusted .go source runs in the sandbox.
-  defp do_build_clause(id, %{exec: exec, build_src: {:gobuild, pkg}, cli_bin: bin, arg_mode: mode})
-       when exec in ["command", nil] do
-    case Workbooks.CommandRegistry.build_and_register_go(bin, pkg, mode) do
-      {:ok, wasm} -> "#{id}: built go #{pkg} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
-      {:error, reason} -> "#{id}: build FAILED for go #{pkg}:\n" <> error_text(reason)
-    end
-  end
+  # gobuild / zigbuild / script — NATIVE build lanes REMOVED (wb-9ja). These drove
+  # the native go/zig toolchains or a native bash build script to produce a wasm.
+  # Native execution is banned; CommandRegistry now returns lane-unavailable for
+  # them, so the toolkit build surface honestly reports the lane is gone rather
+  # than shelling out. (Run Go/Zig SOURCE in-sandbox via the language lanes, or
+  # fetch a prebuilt wasm via wasm:/archive: #+BUILD_SRC.)
+  defp do_build_clause(id, %{exec: exec, build_src: {:gobuild, pkg}})
+       when exec in ["command", nil],
+       do: "#{id}: native go build of #{pkg} removed (wb-9ja) — no in-sandbox lane for fetching+building an upstream Go package; use a prebuilt wasm:/archive: source or the in-sandbox go SOURCE lane"
 
-  # zigbuild:<file.zig> — compile a Zig source file (in the runtime's dir) to a
-  # wasm32-wasi command with native zig. Zig = compile-to-wasm authoring (no interpreter).
-  defp do_build_clause(id, %{exec: exec, build_src: {:zigbuild, rel}, cli_bin: bin, arg_mode: mode, src_dir: sdir})
-       when exec in ["command", nil] do
-    zfile = Path.join(sdir, rel)
+  defp do_build_clause(id, %{exec: exec, build_src: {:zigbuild, rel}})
+       when exec in ["command", nil],
+       do: "#{id}: native zig build of #{rel} removed (wb-9ja) — compile Zig SOURCE in-sandbox via the zig lane instead"
 
-    if not File.regular?(zfile) do
-      "#{id}: zig source not found: #{zfile}"
-    else
-      case Workbooks.CommandRegistry.build_and_register_zig(bin, zfile, mode) do
-        {:ok, wasm} -> "#{id}: compiled zig #{rel} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
-        {:error, reason} -> "#{id}: zig build FAILED for #{rel}:\n" <> error_text(reason)
-      end
-    end
-  end
-
-  # script:<file> — run a build script (in the runtime's own dir) that compiles a
-  # language from source (e.g. Lua via wasi-sdk) and prints the output wasm path as
-  # its LAST stdout line; we content-address + register it. For build-from-source
-  # runtimes with no prebuilt (Lua, Zig).
-  defp do_build_clause(id, %{exec: exec, build_src: {:script, rel}, cli_bin: bin, arg_mode: mode, src_dir: sdir})
-       when exec in ["command", nil] do
-    script = Path.join(sdir, rel)
-
-    if not File.regular?(script) do
-      "#{id}: build script not found: #{script}"
-    else
-      case Workbooks.CommandRegistry.build_and_register_script(bin, script, mode) do
-        {:ok, wasm} -> "#{id}: ran build script #{rel} → #{wasm}; registered command #{inspect(bin)} (mode #{mode})"
-        {:error, reason} -> "#{id}: build script FAILED for #{rel}:\n" <> error_text(reason)
-      end
-    end
-  end
+  defp do_build_clause(id, %{exec: exec, build_src: {:script, rel}})
+       when exec in ["command", nil],
+       do: "#{id}: native build script #{rel} removed (wb-9ja) — native bash build scripts are banned; fetch a prebuilt wasm via wasm:/archive: #+BUILD_SRC"
 
   defp do_build_clause(id, %{build_src: nil}),
     do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir> | wasm:<url> | archive:<url>)"
@@ -961,26 +898,14 @@ defmodule Workbooks.Toolkits do
   defp error_text(reason), do: inspect(reason)
 
   @doc """
-  `wb toolkit run <id> <task> -- <args...>` — extract the `:role task` bash block
-  from the `<task>` skill and run it with positional `$1 $2 …` from <args>.
+  `wb toolkit run <id> <task> -- <args...>` — DISABLED (wb-9ja). A `:role task`
+  block is arbitrary NATIVE bash; native execution is banned, and this surface is
+  reachable by the in-sandbox agent (its `wb` tool), so it must never run native
+  code. The toolkit's CLI is meant to ship as a WASM command (the Dock-gated
+  `run-command` path); convert it and invoke that instead.
   """
-  def run_task_text(id, task, args, root \\ default_root()) do
-    # SECURITY (wb-sec, findings #4/#15/#16): the task slug is path-contained by
-    # skill_path; the body is arbitrary bash, so execution is default-deny and
-    # only runs sandboxed when opted-in (WB_TOOLKIT_EXEC=1).
-    if not exec_allowed?() do
-      "refusing to run #{id}/#{task}: toolkit bash execution is disabled (set WB_TOOLKIT_EXEC=1 to run sandboxed)"
-    else
-      with dir when not is_nil(dir) <- tk_dir(id, root),
-           path when not is_nil(path) <- skill_path(dir, task),
-           [body | _] <- extract_role_blocks(File.read!(path), "task") do
-        {out, _code} = run_bash(body, args, dir)
-        out
-      else
-        [] -> "no :role task block in #{id}/#{task}"
-        _ -> "no such toolkit/skill: #{id}/#{task}"
-      end
-    end
+  def run_task_text(id, task, _args, _root \\ default_root()) do
+    "refusing to run #{id}/#{task}: native :role bash execution removed (wb-9ja). Ship the toolkit CLI as a WASM command and run it via the Dock-gated run-command path."
   end
 
   # Count :role pre blocks across a toolkit's skills (for the verify SKIPPED note).
@@ -1122,56 +1047,22 @@ defmodule Workbooks.Toolkits do
     |> Enum.map(fn [_, body] -> body end)
   end
 
-  # ── SECURITY TRUST BOUNDARY (wb-sec, findings #3/#13/#14/#15/#16/#17) ────────
+  # ── NO NATIVE EXECUTION (wb-9ja) ── the :role-bash lane is DISABLED ──────────
   #
-  # Executing a :role bash block from a discovered toolkit dir is REMOTE CODE
-  # EXECUTION by design — the block body is arbitrary bash. The discovery root is
-  # an unauthenticated, writable directory ($WB_TOOLKITS_ROOT or ./toolkits), so a
-  # toolkit dropped there is UNTRUSTED supply-chain input, NOT "first-party".
+  # A :role bash block from a discovered toolkit dir is arbitrary NATIVE bash. The
+  # no-native-exec canon makes it IMPOSSIBLE for the in-sandbox agent (and the
+  # toolkit verify/eval/run surfaces it reaches via `wb toolkit run`) to execute
+  # native code. So this lane no longer shells out at all — `Workbooks.Sandbox`
+  # (the old bwrap/seatbelt native isolator) was DELETED, and `run_bash` returns an
+  # honest "disabled" result instead of forking bash.
   #
-  # Defenses applied here:
-  #   1. DEFAULT-DENY: bash execution is OFF unless the operator opts in via
-  #      WB_TOOLKIT_EXEC=1 (an explicit, auditable trust grant). Read-only
-  #      surfaces (list/show/search) never execute and stay open.
-  #   2. SANDBOX: when execution IS granted, the snippet runs under
-  #      Workbooks.Sandbox (network-DENIED, fs-confined) — not bare host bash.
-  #   3. RESOURCE CAPS: a `ulimit` prologue (CPU seconds, max user processes,
-  #      file size) blunts fork bombs / runaway loops, and a BEAM-side wall-clock
-  #      watchdog kills the OS process tree on timeout so nothing wedges the host.
-  #
-  # The intended SANDBOXED surface for toolkit CLIs is the WASM `run-command`
-  # path (Dock-gated). Host bash from skill files bypasses that entirely and is
-  # therefore gated, capped, and isolated here.
-  @exec_timeout_ms 30_000
-  # ulimit prologue: -t CPU seconds, -u max user processes (anti fork-bomb),
-  # -f max file size (512MB blocks * ... actually blocks), executed before the body.
-  @ulimit_prologue "ulimit -t 30 -u 256 -f 1048576 2>/dev/null || true\n"
+  # SUBSTRATE DISTINCTION: a toolkit's CLI is meant to ship as a WASM command (the
+  # Dock-gated `run-command` path — wasmtime running a `.wasm`, which IS the
+  # architecture and stays). Native bash from a skill file is the banned thing.
+  # Convert the toolkit CLI to a WASM command; this host-bash leg is gone for good.
 
-  @doc "Whether :role bash execution from discovered toolkits is opted-in (WB_TOOLKIT_EXEC=1)."
-  def exec_allowed?, do: System.get_env("WB_TOOLKIT_EXEC") == "1"
-
-  # Run a bash snippet with positional args ($1, $2, …) under the sandbox, capped.
-  # When `toolkit_dir` is given, the subprocess cwd is set to that directory AND
-  # WB_TOOLKIT_DIR is exported — toolkit :role pre/task probes can use relative
-  # paths (e.g. `test -f manifest.org`) or the env var for cwd-independent checks.
-  # Returns {output, exit_code}. The caller MUST have checked exec_allowed?.
-  defp run_bash(body, args, toolkit_dir \\ nil) do
-    script = @ulimit_prologue <> body
-    sandbox_opts =
-      if is_binary(toolkit_dir) and File.dir?(toolkit_dir) do
-        abs_dir = Path.expand(toolkit_dir)
-        [cd: abs_dir, env: [{"WB_TOOLKIT_DIR", abs_dir}]]
-      else
-        []
-      end
-
-    task = Task.async(fn -> Workbooks.Sandbox.run(["bash", "-c", script, "bash"] ++ args, sandbox_opts) end)
-
-    case Task.yield(task, @exec_timeout_ms) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {out, code}} -> {out, code}
-      _ -> {"timed out after #{@exec_timeout_ms}ms", 124}
-    end
-  end
+  @doc "Whether :role bash execution is opted-in. DISABLED (wb-9ja): always false — native exec is banned, regardless of WB_TOOLKIT_EXEC."
+  def exec_allowed?, do: false
 
   defp agent(hs, id), do: Enum.find(hs, &("agent" in &1["tags"] and &1["id"] == id))
 

@@ -27,9 +27,9 @@ defmodule Workbooks.PackageManager do
       it runs StarlingMonkey (a JS engine) + wizer under Node to pre-init the JS,
       which can't be a wasmtime guest. See `build_engine_js`.
   `wasm-tools` (component new / validate) now runs IN the sandbox via wasm-tools.wasm
-  (fm0.8). `Workbooks.Sandbox` (bwrap/sandbox-exec) remains as defense-in-depth around
-  the whole runtime container, but is no longer the untrusted-COMPILE boundary — the
-  wasm sandbox is.
+  (fm0.8). The old native build isolator `Workbooks.Sandbox` (bwrap/sandbox-exec) was
+  DELETED (wb-9ja): with every untrusted compile in-wasm, there is no native compile
+  to isolate. The wasm sandbox (wasmtime) IS the boundary now.
   """
 
   @tools Path.expand(Path.join([__DIR__, "..", "build", "tools"]))

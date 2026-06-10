@@ -14,11 +14,14 @@ defmodule Workbooks.Build do
     * source    → the source inputs (what a human reads + diffs on GitHub)
     * archive   → both
 
-  REAL, not stubbed: uses the toolchains actually present (`cargo component` for
-  crates, `rustc --target wasm32-*` for a lone `.rs`). A component whose toolchain
-  is missing (e.g. JS needs `jco`) is returned UNBUILT with the reason — never
-  faked (honest TODO at the boundary). Same builder runs locally and in a cloud
-  engine; the output `.wasm` is what the Wasmex Instance loads either way.
+  REAL, not stubbed, and NATIVE-FREE (wb-9ja): every compile routes through the
+  in-sandbox wasm lanes (Workbooks.PackageManager / Compilers — mrustc.wasm →
+  clang.wasm for Rust, etc.), never a native toolchain. The old native fallbacks
+  (`cargo component`, `rustc --target wasm32-*`, `bun/npm run build`) are removed.
+  A component whose lane has no in-sandbox path (e.g. a full JS framework `run
+  build`) is returned UNBUILT with an honest reason — never faked, never shelled
+  out natively. Same builder runs locally and in a cloud engine; the output `.wasm`
+  is what the Wasmex Instance loads either way.
   """
 
   @wasm_magic <<0x00, 0x61, 0x73, 0x6D>>
@@ -93,73 +96,46 @@ defmodule Workbooks.Build do
   end
 
   # ── build one (→ list of results) ────────────────────────────────────────────
-  defp build_one({:crate, crate_dir}, root, opts) do
+  #
+  # NO NATIVE COMPILATION (wb-9ja). Untrusted component source is compiled ONLY
+  # through the in-sandbox wasm lanes (Workbooks.PackageManager → Compilers:
+  # mrustc.wasm → clang.wasm, etc.). The old native fallbacks — `cargo component`,
+  # `rustc --target wasm32-*`, and `bun/npm run build` — are DELETED. A lane with
+  # no in-sandbox equivalent yields an honest `unbuilt` entry, never a native shell.
+  #
+  # SUBSTRATE NOTE: the lanes ultimately run `wasmtime` on `.wasm` compilers — that
+  # IS the architecture (wasm executed by the native wasmtime host) and is fine. A
+  # NATIVE language toolchain binary (cargo/rustc/bun/npm) is what's banned.
+  defp build_one({:crate, crate_dir}, root, _opts) do
     name = Path.relative_to(crate_dir, root)
 
-    if has?("cargo-component") do
-      case sh(["cargo", "component", "build", "--release"], crate_dir, opts) do
-        {:ok, _} ->
-          case Path.wildcard(Path.join(crate_dir, "target/wasm32-*/release/*.wasm")) |> List.first() do
-            nil -> [{:unbuilt, %{name: name, reason: "cargo component built but no .wasm found"}}]
-            wasm -> [emit_wasm(name, wasm)]
-          end
-
-        {:error, out} -> [{:unbuilt, %{name: name, reason: "cargo component failed: #{snippet(out)}"}}]
-      end
-    else
-      [{:unbuilt, %{name: name, reason: "cargo-component not installed"}}]
+    # A Rust crate dir compiles in-sandbox via the rust lane (its Cargo.toml deps
+    # are parsed + fetched + compiled in-sandbox; the native cargo path is gone).
+    case Workbooks.PackageManager.build_dir(crate_dir, "rust") do
+      {:ok, wasm, _} -> [emit_wasm(name, wasm)]
+      {:error, reason} -> [{:unbuilt, %{name: name, reason: "rust lane: #{inspect(reason)}"}}]
     end
   end
 
-  defp build_one({:rs, src}, root, opts) do
+  defp build_one({:rs, src}, root, _opts) do
     name = Path.relative_to(src, root)
 
-    if has?("rustc") do
-      out = src <> ".wasm"
-
-      case sh(["rustc", "--target", "wasm32-unknown-unknown", "--crate-type", "cdylib", "-O", src, "-o", out], Path.dirname(src), opts) do
-        {:ok, _} -> [emit_wasm(name, out)]
-        {:error, o} -> [{:unbuilt, %{name: name, reason: "rustc failed: #{snippet(o)}"}}]
-      end
-    else
-      [{:unbuilt, %{name: name, reason: "rustc not installed"}}]
+    # A lone .rs compiles in-sandbox via the rust lane (mrustc.wasm → clang.wasm).
+    case Workbooks.Compilers.rust_compile_to_wasm(src) do
+      {:ok, wasm, _logs} -> [emit_wasm(name, wasm)]
+      {:error, reason} -> [{:unbuilt, %{name: name, reason: "rust lane: #{inspect(reason)}"}}]
     end
   end
 
-  # A JS/UI project builds ITSELF (its package.json carries the framework + the
-  # build script), so we don't special-case Svelte vs Astro vs Solid — we run the
-  # project's own toolchain (bun, falling back to npm) and collect its output
-  # bundle. The compiled JS/CSS is the OUTPUT (embeds in the workbook view); the
-  # source + node_modules are inputs that don't ship to the runnable form.
-  defp build_one({:js_project, dir}, root, opts) do
+  # A JS/UI project (Svelte/Astro/Solid/…) builds via its OWN node toolchain
+  # (`bun/npm run build` + a framework's vite/rollup). That is NATIVE execution of
+  # an untrusted project's build scripts — banned (wb-9ja), and there is no
+  # in-sandbox equivalent for a full framework dev-server build here. Honest
+  # unbuilt: the JS WASM lanes (PackageManager js/ts/svelte) cover single-entry
+  # bundles; a whole framework `run build` does not move in-sandbox yet.
+  defp build_one({:js_project, dir}, root, _opts) do
     name = Path.relative_to(dir, root)
-    pm = cond do has?("bun") -> "bun"; has?("npm") -> "npm"; true -> nil end
-
-    cond do
-      is_nil(pm) ->
-        [{:unbuilt, %{name: name, reason: "no JS package manager (bun/npm) installed"}}]
-
-      true ->
-        with {:ok, _} <- sh([pm, "install"], dir, opts),
-             {:ok, _} <- sh(build_cmd(pm), dir, opts) do
-          case js_outputs(dir, root) do
-            [] -> [{:unbuilt, %{name: name, reason: "build ran but produced no dist/build/.output"}}]
-            outs -> outs
-          end
-        else
-          {:error, o} -> [{:unbuilt, %{name: name, reason: "#{pm} build failed: #{snippet(o)}"}}]
-        end
-    end
-  end
-
-  defp build_cmd("bun"), do: ["bun", "run", "build"]
-  defp build_cmd("npm"), do: ["npm", "run", "build"]
-
-  defp js_outputs(dir, root) do
-    ~w(dist build .output)
-    |> Enum.flat_map(fn out -> dir |> Path.join(out) |> Path.join("**/*") |> Path.wildcard() end)
-    |> Enum.filter(&File.regular?/1)
-    |> Enum.map(fn f -> {:built, %{name: Path.relative_to(f, root), rel: Path.basename(f), bytes: File.read!(f)}} end)
+    [{:unbuilt, %{name: name, reason: "lane_unavailable: native JS framework build (bun/npm run build) removed — no in-sandbox lane for a full framework build (wb-9ja)"}}]
   end
 
   defp emit_wasm(name, wasm_path) do
@@ -170,15 +146,4 @@ defmodule Workbooks.Build do
       _ -> {:unbuilt, %{name: name, reason: "output is not valid wasm (bad magic)"}}
     end
   end
-
-  # ── shell ─────────────────────────────────────────────────────────────────────
-  defp sh([cmd | args], cwd, opts) do
-    {out, code} = System.cmd(cmd, args, cd: cwd, stderr_to_stdout: true, env: opts[:env] || [])
-    if code == 0, do: {:ok, out}, else: {:error, out}
-  rescue
-    e -> {:error, Exception.message(e)}
-  end
-
-  defp has?(bin), do: match?({_, 0}, System.cmd("sh", ["-c", "command -v #{bin}"], stderr_to_stdout: true))
-  defp snippet(out), do: out |> String.split("\n", trim: true) |> Enum.take(-2) |> Enum.join(" ")
 end
