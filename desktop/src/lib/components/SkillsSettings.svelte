@@ -17,7 +17,7 @@
    * agent call.
    */
   import { onMount } from "svelte";
-  import { Sparkles, Trash2, HelpCircle, Layers } from "@lucide/svelte";
+  import { Sparkle as Sparkles, Trash as Trash2, Question as HelpCircle, Stack as Layers } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { skills, type Skill, type SkillScope } from "$lib/bridge/skills.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
@@ -177,7 +177,7 @@
                   title={s.description}
                   aria-label="About {s.name}"
                 >
-                  <HelpCircle size={12} strokeWidth={1.8} />
+                  <HelpCircle weight="fill" size={12} />
                 </button>
               {/if}
             </div>
@@ -197,7 +197,7 @@
             title="Remove skill"
             onclick={() => remove(s)}
           >
-            <Trash2 size={13} strokeWidth={1.8} />
+            <Trash2 weight="fill" size={13} />
           </button>
         </article>
       {/each}

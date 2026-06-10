@@ -10,16 +10,7 @@
    * adding section heads + buckets between the trigger and the
    * "+ Add agent" row is the natural extension point.
    */
-  import {
-    ChevronDown,
-    ChevronRight,
-    Folder,
-    Plus,
-    Pencil,
-    FileText,
-    Clipboard,
-    MoreHorizontal,
-  } from "@lucide/svelte";
+  import { CaretDown as ChevronDown, CaretRight as ChevronRight, Folder, Plus, PencilSimple as Pencil, FileText, Clipboard, DotsThree as MoreHorizontal } from "phosphor-svelte";
   import { tick } from "svelte";
   import { agents, type AgentCatalogEntry } from "$lib/bridge/agents.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
@@ -282,11 +273,11 @@
           aria-expanded={!isCollapsed}
         >
           {#if isCollapsed}
-            <ChevronRight size={12} strokeWidth={2} class="twirl" aria-hidden="true" />
+            <ChevronRight weight="bold" size={12} class="twirl" aria-hidden="true" />
           {:else}
-            <ChevronDown size={12} strokeWidth={2} class="twirl" aria-hidden="true" />
+            <ChevronDown weight="bold" size={12} class="twirl" aria-hidden="true" />
           {/if}
-          <Folder size={12} strokeWidth={1.8} class="folder-glyph" aria-hidden="true" />
+          <Folder weight="fill" size={12} class="folder-glyph" aria-hidden="true" />
           <span class="folder-name">{node.name}</span>
         </button>
         {#if !isCollapsed}
@@ -317,9 +308,9 @@
             aria-expanded={!kidsCollapsed}
           >
             {#if kidsCollapsed}
-              <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />
+              <ChevronRight weight="bold" size={12} aria-hidden="true" />
             {:else}
-              <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
+              <ChevronDown weight="bold" size={12} aria-hidden="true" />
             {/if}
           </button>
         {:else}
@@ -361,7 +352,7 @@
           aria-expanded={moreFor === a.slug}
           onclick={(e) => openMore(e, a.slug)}
         >
-          <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+          <MoreHorizontal weight="bold" size={14} aria-hidden="true" />
         </button>
       </div>
       {#if hasKids && !kidsCollapsed}
@@ -392,7 +383,7 @@
       {/if}
     </span>
     <span class="t-title">{selected?.title ?? "Pick an agent"}</span>
-    <ChevronDown size={12} strokeWidth={2} class="chev" aria-hidden="true" />
+    <ChevronDown weight="bold" size={12} class="chev" aria-hidden="true" />
   </button>
 
   {#if open}
@@ -416,7 +407,7 @@
           onmouseenter={() => (highlight = flatVisible.length)}
         >
           <span class="row-icon dashed" aria-hidden="true">
-            <Plus size={12} strokeWidth={2} />
+            <Plus weight="bold" size={12} />
           </span>
           <span class="add-label">Add agent</span>
         </button>
@@ -436,7 +427,7 @@
     style="top: {moreAt.top}px; right: {moreAt.right}px;"
   >
     <button type="button" class="action" role="menuitem" onclick={() => gotoEdit(moreFor!)}>
-      <Pencil size={12} strokeWidth={1.8} aria-hidden="true" />
+      <Pencil weight="fill" size={12} aria-hidden="true" />
       <span>Edit agent</span>
     </button>
     <button
@@ -446,11 +437,11 @@
       disabled={!moreAgent.path}
       onclick={() => viewSource(moreAgent)}
     >
-      <FileText size={12} strokeWidth={1.8} aria-hidden="true" />
+      <FileText weight="fill" size={12} aria-hidden="true" />
       <span>View source</span>
     </button>
     <button type="button" class="action" role="menuitem" onclick={() => copySlug(moreFor!)}>
-      <Clipboard size={12} strokeWidth={1.8} aria-hidden="true" />
+      <Clipboard weight="fill" size={12} aria-hidden="true" />
       <span>Copy slug</span>
     </button>
   </div>

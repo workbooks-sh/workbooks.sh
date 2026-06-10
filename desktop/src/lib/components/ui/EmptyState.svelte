@@ -3,7 +3,7 @@
    * EmptyState — a consistent "nothing here yet" affordance.
    *
    * Two slots:
-   *   - icon: large muted glyph (lucide component passed via prop)
+   *   - icon: large muted glyph (phosphor component passed via prop)
    *   - cta: optional action snippet shown beneath the prompt
    *
    * Used by every settings panel + chat / kanban empty states so the
@@ -18,7 +18,7 @@
     description,
     cta,
   }: {
-    icon?: typeof import("@lucide/svelte").Check;
+    icon?: typeof import("phosphor-svelte").Check;
     title: string;
     description?: string;
     cta?: Snippet;
@@ -28,7 +28,7 @@
 <div class="empty-state" role="status">
   {#if icon}
     {@const Icon = icon}
-    <div class="icon"><Icon size={20} strokeWidth={1.6} /></div>
+    <div class="icon"><Icon size={20} weight="fill" /></div>
   {/if}
   <h3>{title}</h3>
   {#if description}<p>{description}</p>{/if}

@@ -15,9 +15,7 @@
    * current claim's assertions only).
    */
   import { onMount } from "svelte";
-  import {
-    GitFork, GitCommitVertical, Clock, Hash,
-  } from "@lucide/svelte";
+  import { GitFork, GitCommit as GitCommitVertical, Clock, Hash } from "phosphor-svelte";
   import {
     resolveDid, DemoModeError, type BrokerIdentity,
   } from "../client";
@@ -123,7 +121,7 @@
 
 <div class="tree">
   <div class="head">
-    <GitCommitVertical size={14} strokeWidth={2.25} />
+    <GitCommitVertical weight="fill" size={14} />
     <span>Provenance chain</span>
     <span class="muted">{report.claim_chain.length === 0 ? "genesis only" : `${report.claim_chain.length + 1} claims`}</span>
   </div>
@@ -146,7 +144,7 @@
           <div class="card-head">
             <div class="who">
               {#if isCurrent && forkedFromHandle}
-                <GitFork size={12} strokeWidth={2.25} class="fork-icon" />
+                <GitFork weight="fill" size={12} class="fork-icon" />
               {/if}
               {#if ident}
                 <span class="handle">@{ident.handle}</span>
@@ -161,20 +159,20 @@
               </span>
             </div>
             <div class="ts" title={issuedAt}>
-              <Clock size={10} strokeWidth={2.25} />
+              <Clock weight="fill" size={10} />
               {relativeTime(issuedAt)}
             </div>
           </div>
           {#if isCurrent && forkedFromHandle}
             <div class="annotation">
-              <GitFork size={11} strokeWidth={2.25} />
+              <GitFork weight="fill" size={11} />
               forked from <strong>@{forkedFromHandle}</strong>
             </div>
           {/if}
           <div class="meta">
             <span class="gen">{generator}</span>
             <span class="hash" title={assetHash}>
-              <Hash size={10} strokeWidth={2.25} />
+              <Hash weight="fill" size={10} />
               {shortHash(assetHash)}
             </span>
           </div>

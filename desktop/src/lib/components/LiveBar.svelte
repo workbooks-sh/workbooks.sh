@@ -25,7 +25,7 @@
    * scroll speed and saturation.
    */
 
-  import { Mic, MicOff, Pause, Play } from "@lucide/svelte";
+  import { Microphone as Mic, MicrophoneSlash as MicOff, Pause, Play } from "phosphor-svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
 
@@ -147,9 +147,9 @@
               aria-label={geminiLive.muted ? "Unmute" : "Mute"}
             >
               {#if geminiLive.muted}
-                <MicOff size={13} strokeWidth={2} />
+                <MicOff weight="fill" size={13} />
               {:else}
-                <Mic size={13} strokeWidth={2} />
+                <Mic weight="fill" size={13} />
               {/if}
             </button>
             <button
@@ -159,7 +159,7 @@
               title="Pause — keeps session for resume"
               aria-label="Pause session"
             >
-              <Pause size={13} strokeWidth={2} />
+              <Pause weight="fill" size={13} />
             </button>
           {:else if geminiLive.state === "paused"}
             <button
@@ -169,7 +169,7 @@
               title="Resume — pick up where you left off"
               aria-label="Resume session"
             >
-              <Play size={13} strokeWidth={2} />
+              <Play weight="fill" size={13} />
               <span>Resume</span>
             </button>
           {/if}

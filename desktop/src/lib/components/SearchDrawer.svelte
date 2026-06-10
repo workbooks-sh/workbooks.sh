@@ -11,7 +11,7 @@
    *
    * Searches every file across every Package in the active Workspace.
    */
-  import { Search, File as FileIcon, X } from "@lucide/svelte";
+  import { MagnifyingGlass as Search, File as FileIcon, X } from "phosphor-svelte";
   import { fileTree, type FsEntry } from "$lib/bridge/fs_tree.svelte";
   import {
     packageStore,
@@ -156,7 +156,7 @@
 
 <aside class="drawer" aria-label="Search">
     <div class="search-row">
-      <Search size={13} strokeWidth={2} />
+      <Search weight="bold" size={13} />
       <input
         bind:this={inputEl}
         bind:value={query}
@@ -172,7 +172,7 @@
           aria-label="Clear search"
           onclick={() => (query = "")}
         >
-          <X size={11} strokeWidth={2.4} />
+          <X weight="bold" size={11} />
         </button>
       {/if}
     </div>
@@ -198,7 +198,7 @@
             onclick={() => openResult(i)}
             title={r.entry.path}
           >
-            <FileIcon size={12} strokeWidth={1.8} />
+            <FileIcon weight="fill" size={12} />
             <span class="name">{r.entry.name}</span>
             <span class="path">{r.pkg} · {relPath(r.root, r.entry.rel)}</span>
           </button>

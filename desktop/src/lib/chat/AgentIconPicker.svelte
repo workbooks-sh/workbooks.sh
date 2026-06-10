@@ -19,7 +19,7 @@
    * Picking dismisses the popover and fires `onchange`.
    */
   import { onMount, tick } from "svelte";
-  import { Smile, Shapes, X, Search } from "@lucide/svelte";
+  import { Smiley as Smile, Shapes, X, MagnifyingGlass as Search } from "phosphor-svelte";
   import AgentIcon from "./AgentIcon.svelte";
   import { LUCIDE_NAMES } from "./agent_lucide_map";
   import EmojiPicker from "$lib/workspace/EmojiPicker.svelte";
@@ -186,16 +186,16 @@
     {#if stage === "menu"}
       <div class="menu">
         <button class="opt" type="button" onclick={() => (stage = "emoji")}>
-          <Smile size={14} strokeWidth={1.8} aria-hidden="true" />
+          <Smile weight="fill" size={14} aria-hidden="true" />
           <span>Pick emoji</span>
         </button>
         <button class="opt" type="button" onclick={() => (stage = "lucide")}>
-          <Shapes size={14} strokeWidth={1.8} aria-hidden="true" />
+          <Shapes weight="fill" size={14} aria-hidden="true" />
           <span>Icon library</span>
         </button>
         <div class="sep"></div>
         <button class="opt muted" type="button" onclick={clearIcon}>
-          <X size={14} strokeWidth={1.8} aria-hidden="true" />
+          <X weight="bold" size={14} aria-hidden="true" />
           <span>Clear (use initials)</span>
         </button>
       </div>
@@ -212,7 +212,7 @@
         <span class="count">{lucideFiltered.length}</span>
       </header>
       <div class="search">
-        <Search size={12} strokeWidth={1.8} aria-hidden="true" />
+        <Search weight="bold" size={12} aria-hidden="true" />
         <input
           type="text"
           placeholder="Search {LUCIDE_NAMES.length} icons…"

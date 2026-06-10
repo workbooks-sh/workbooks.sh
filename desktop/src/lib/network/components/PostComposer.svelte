@@ -9,7 +9,7 @@
    * In Phase 1 this calls Workhorse.Publisher; in the demo it just
    * closes on submit.
    */
-  import { X, FolderOpen, Check, ShieldCheck } from "@lucide/svelte";
+  import { X, FolderOpen, Check, ShieldCheck } from "phosphor-svelte";
   import { untrack } from "svelte";
   import { fly, fade, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -96,7 +96,7 @@
   <header class="head">
     <h2>New post</h2>
     <button type="button" class="x" onclick={onclose} aria-label="Close">
-      <X size={16} strokeWidth={2} />
+      <X weight="bold" size={16} />
     </button>
   </header>
 
@@ -125,7 +125,7 @@
       <div class="row-head">
         <span class="lbl">What are you sharing?</span>
         <button type="button" class="browse">
-          <FolderOpen size={12} strokeWidth={2} />
+          <FolderOpen weight="fill" size={12} />
           Browse files…
         </button>
       </div>
@@ -150,7 +150,7 @@
               <span class="wb-blurb">{a.blurb}</span>
             </span>
             {#if selected?.id === a.id}
-              <span class="picked"><Check size={13} strokeWidth={2.5} /></span>
+              <span class="picked"><Check weight="bold" size={13} /></span>
             {/if}
           </button>
         {:else}
@@ -178,7 +178,7 @@
   <footer class="foot">
     <div class="signed">
       <Avatar handle={handle ?? "?"} avatar={null} size="xs" />
-      <ShieldCheck size={11} strokeWidth={2.25} class="signed-shield" />
+      <ShieldCheck weight="fill" size={11} class="signed-shield" />
       <span>
         {#if handle}
           Signed as <strong>@{handle}</strong>

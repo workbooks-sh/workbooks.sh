@@ -13,7 +13,7 @@
    * two splash screens feel like one continuous onboarding even
    * though they're rendered separately.
    */
-  import { Lock } from "@lucide/svelte";
+  import { Lock } from "phosphor-svelte";
   import { setupInitializeKeychain } from "$lib/bridge/setup.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
@@ -39,7 +39,7 @@
   <div class="card">
     <div class="icon-row">
       <div class="icon">
-        <Lock size={28} strokeWidth={2.2} />
+        <Lock weight="fill" size={28} />
       </div>
     </div>
 

@@ -8,7 +8,7 @@
    * Pairs with KeychainOnboarding.svelte (same visual shape) so
    * the two splashes feel like one continuous onboarding.
    */
-  import { Cpu } from "@lucide/svelte";
+  import { Cpu } from "phosphor-svelte";
   import { engineInstall, engineStatus } from "$lib/bridge/engine.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
@@ -49,7 +49,7 @@
   <div class="card">
     <div class="icon-row">
       <div class="icon">
-        <Cpu size={28} strokeWidth={2.2} />
+        <Cpu weight="fill" size={28} />
       </div>
     </div>
 

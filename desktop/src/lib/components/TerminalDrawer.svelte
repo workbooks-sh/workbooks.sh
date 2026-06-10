@@ -30,7 +30,7 @@
   import { Terminal as Xterm } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import "@xterm/xterm/css/xterm.css";
-  import { X, Plus, Pin, Terminal as TerminalIcon, Download } from "@lucide/svelte";
+  import { X, Plus, PushPin as Pin, Terminal as TerminalIcon, DownloadSimple as Download } from "phosphor-svelte";
   import {
     terminal,
     terminalDrawer,
@@ -336,11 +336,11 @@
       {#if activeMeta()}
         {@const m = activeMeta()!}
         {#if m.kind === "install"}
-          <Download size={13} strokeWidth={1.8} />
+          <Download weight="fill" size={13} />
         {:else if m.kind === "sidecar"}
-          <Pin size={13} strokeWidth={1.8} />
+          <Pin weight="fill" size={13} />
         {:else}
-          <TerminalIcon size={13} strokeWidth={1.8} />
+          <TerminalIcon weight="fill" size={13} />
         {/if}
         <span class="label">{m.label}</span>
         {#if m.state !== "running"}
@@ -357,7 +357,7 @@
         title="Close terminal"
         aria-label="Close terminal"
       >
-        <X size={13} strokeWidth={2} />
+        <X weight="bold" size={13} />
       </button>
     </header>
 
@@ -382,7 +382,7 @@
                 ></span>
                 <span class="tab-label">{s.label}</span>
                 {#if !s.closable}
-                  <Pin size={10} strokeWidth={1.8} />
+                  <Pin weight="fill" size={10} />
                 {/if}
               </button>
               {#if s.closable}
@@ -393,7 +393,7 @@
                   aria-label="Close session"
                   title="Close"
                 >
-                  <X size={10} strokeWidth={2.4} />
+                  <X weight="bold" size={10} />
                 </button>
               {/if}
             </li>
@@ -405,7 +405,7 @@
           onclick={newShell}
           title="Spawn a new shell"
         >
-          <Plus size={12} strokeWidth={2} /> New shell
+          <Plus weight="bold" size={12} /> New shell
         </button>
       </aside>
     </div>

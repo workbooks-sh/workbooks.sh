@@ -11,7 +11,7 @@
    *   - http  — URL (remote MCP server over SSE/HTTP)
    */
   import { onMount } from "svelte";
-  import { Plus, Trash2, Pencil, Check, X, Server } from "@lucide/svelte";
+  import { Plus, Trash as Trash2, PencilSimple as Pencil, Check, X, HardDrives as Server } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import {
     mcp,
@@ -157,7 +157,7 @@
         <li>
           <div class="srv-row">
             <div class="srv-meta">
-              <Server size={13} strokeWidth={1.8} />
+              <Server weight="fill" size={13} />
               <span class="srv-name">{s.name}</span>
               <span class="transport">{s.transport}</span>
               {#if !s.enabled}
@@ -171,7 +171,7 @@
                 aria-label="edit server"
                 onclick={() => openEdit(s)}
               >
-                <Pencil size={13} strokeWidth={1.8} />
+                <Pencil weight="fill" size={13} />
               </button>
               <button
                 type="button"
@@ -179,7 +179,7 @@
                 aria-label="delete server"
                 onclick={() => del(s)}
               >
-                <Trash2 size={13} strokeWidth={1.8} />
+                <Trash2 weight="fill" size={13} />
               </button>
             </div>
           </div>
@@ -264,14 +264,14 @@
           class="primary"
           disabled={!fName.trim() || !fCommandOrUrl.trim()}
         >
-          <Check size={13} strokeWidth={1.8} />
+          <Check weight="bold" size={13} />
           {editingId ? "save" : "add server"}
         </button>
       </div>
     </form>
   {:else}
     <button type="button" class="add-card" onclick={openAdd}>
-      <Plus size={13} strokeWidth={2} />
+      <Plus weight="bold" size={13} />
       <span>Add an MCP server</span>
     </button>
   {/if}

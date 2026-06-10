@@ -1,21 +1,21 @@
 <script lang="ts">
   import {
-    Settings as SettingsIcon,
-    Network as NetworkIcon,
+    GearSix as SettingsIcon,
+    ShareNetwork as NetworkIcon,
     Plus as HomePlus,
-  } from "@lucide/svelte";
+  } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import AppRail, {
+  import Sidebar, {
     type RailTab,
     type RailPackage,
-  } from "$lib/components/AppRail.svelte";
+  } from "$lib/components/Sidebar.svelte";
   import SettingsContainer from "$lib/components/settings/SettingsContainer.svelte";
   import AgentPanel from "$lib/components/AgentPanel.svelte";
   import HomePanel from "$lib/home/HomePanel.svelte";
   import PackageTreeDrawer from "$lib/components/PackageTreeDrawer.svelte";
   import BoardPanel from "$lib/board/BoardPanel.svelte";
-  import { FolderInput, Plus as PlusIcon } from "@lucide/svelte";
+  import { FolderOpen, Plus as PlusIcon } from "phosphor-svelte";
   import CreatePackageModal from "$lib/home/CreatePackageModal.svelte";
   import { createPackage } from "$lib/home/createPackage.svelte";
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
@@ -35,7 +35,7 @@
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import { themes } from "$lib/bridge/themes.svelte";
-  import { Pencil, Smile, Trash2 } from "@lucide/svelte";
+  import { PencilSimple as Pencil, Smiley as Smile, Trash as Trash2 } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { wizard } from "$lib/setup/wizard.svelte";
@@ -268,6 +268,16 @@
     }
   }
 
+  // Workbook row inside an expanded sidebar folder → open as a tab.
+  async function onOpenWorkbook(path: string) {
+    try {
+      await tabs.open(path);
+      chrome.mode = "doc";
+    } catch (e) {
+      console.warn("[sidebar] open workbook failed", e);
+    }
+  }
+
   // App click → open the app as a WINDOW: a new content tab via the
   // existing tab system, showing the app's workbook (mirrors how the
   // springboard grid opens a workbook in PackageGridView.open()).
@@ -363,6 +373,9 @@
     if (e.key === "k") {
       e.preventDefault();
       chrome.toggleSearch();
+    } else if (e.key === "b") {
+      e.preventDefault();
+      chrome.toggleSidebar();
     } else if (e.key === "j") {
       e.preventDefault();
       chrome.agentOpen = !chrome.agentOpen;
@@ -390,23 +403,29 @@
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
 {:else}
   <div class="app">
-    <AppRail
-      tabs={railTabs}
-      bottomTabs={bottomRailTabs}
-      bind:active
-      packages={railPackages}
-      workspaceName={workspaces.active?.name ?? ""}
-      workspaceIcon={workspaces.active?.icon ?? ""}
-      filesOpen={chrome.leftPanel === "files"}
-      onToggleFiles={() => chrome.toggleFiles()}
-      onSwitchWorkspace={onSwitchWorkspace}
-      onSelectPackage={onSelectPackage}
-      onOpenApp={onOpenApp}
-      onReorderPackages={onReorderPackages}
-      onCreatePackageMenu={onCreatePackageMenu}
-      onWorkspaceContext={onWorkspaceContext}
-      onPackageContext={onPackageContext}
-    />
+    <div
+      class="sidebar-host"
+      class:closed={!chrome.sidebarOpen}
+      inert={!chrome.sidebarOpen}
+    >
+      <Sidebar
+        tabs={railTabs}
+        bottomTabs={bottomRailTabs}
+        bind:active
+        packages={railPackages}
+        workspaceName={workspaces.active?.name ?? ""}
+        workspaceIcon={workspaces.active?.icon ?? ""}
+        onSwitchWorkspace={onSwitchWorkspace}
+        onSelectPackage={onSelectPackage}
+        onOpenApp={onOpenApp}
+        onOpenWorkbook={onOpenWorkbook}
+        loadWorkbooks={(id) => packageStore.workbooks(id)}
+        onReorderPackages={onReorderPackages}
+        onCreatePackageMenu={onCreatePackageMenu}
+        onWorkspaceContext={onWorkspaceContext}
+        onPackageContext={onPackageContext}
+      />
+    </div>
 
     {#if chrome.leftPanel === "files"}
       <PackageTreeDrawer />
@@ -447,24 +466,33 @@
 
     <ContextMenu bind:open={wsMenuOpen} x={wsMenuX} y={wsMenuY}>
       <button class="ctx-item" onclick={wsRenameClick}>
-        <Pencil size={13} strokeWidth={1.8} /> Rename workspace
+        <Pencil size={13} weight="fill" /> Rename workspace
       </button>
       <button class="ctx-item" onclick={wsIconClick}>
-        <Smile size={13} strokeWidth={1.8} /> Change icon…
+        <Smile size={13} weight="fill" /> Change icon…
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item danger" onclick={wsDeleteClick}>
-        <Trash2 size={13} strokeWidth={1.8} /> Delete workspace
+        <Trash2 size={13} weight="fill" /> Delete workspace
       </button>
     </ContextMenu>
 
     <ContextMenu bind:open={pkgMenuOpen} x={pkgMenuX} y={pkgMenuY}>
+      <button
+        class="ctx-item"
+        onclick={() => {
+          pkgMenuOpen = false;
+          if (pkgMenuTarget) void onSelectPackage(pkgMenuTarget);
+        }}
+      >
+        <FolderOpen size={13} weight="fill" /> Open folder view
+      </button>
       <button class="ctx-item" onclick={pkgRenameClick} disabled>
-        <Pencil size={13} strokeWidth={1.8} /> Rename (soon)
+        <Pencil size={13} weight="fill" /> Rename (soon)
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item danger" onclick={pkgDeleteClick}>
-        <Trash2 size={13} strokeWidth={1.8} /> Remove from workspace
+        <Trash2 size={13} weight="fill" /> Remove from workspace
       </button>
     </ContextMenu>
 
@@ -507,10 +535,10 @@
   y={createPackage.menuY}
 >
   <button class="ctx-item" onclick={() => createPackage.chooseCreate()}>
-    <PlusIcon size={13} strokeWidth={1.8} /> Create new package
+    <PlusIcon size={13} weight="fill" /> Create new package
   </button>
   <button class="ctx-item" onclick={() => void createPackage.chooseImport()}>
-    <FolderInput size={13} strokeWidth={1.8} /> Import folder…
+    <FolderOpen size={13} weight="fill" /> Import folder…
   </button>
 </ContextMenu>
 
@@ -533,6 +561,33 @@
     min-width: 0;
     width: 100%;
     overflow: hidden;
+  }
+  /* Sidebar slides via width on this host (content stays 232px wide
+   * inside so rows don't reflow mid-animation). */
+  .sidebar-host {
+    flex: 0 0 auto;
+    width: 232px;
+    display: flex;
+    overflow: hidden;
+    transition: width 0.22s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .sidebar-host.closed {
+    width: 0;
+  }
+  .sidebar-host :global(.sidebar) {
+    transition:
+      transform 0.22s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.16s ease;
+  }
+  .sidebar-host.closed :global(.sidebar) {
+    transform: translateX(-28px);
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-host,
+    .sidebar-host :global(.sidebar) {
+      transition: none;
+    }
   }
   .main {
     flex: 1 1 auto;

@@ -1,0 +1,967 @@
+<script lang="ts">
+  /**
+   * Sidebar — Arc-browser-style collapsible left panel (replaces the old
+   * 56px AppRail). Layout, top to bottom:
+   *
+   *   1. Workspace header — icon + name; click opens the WorkspaceSwitcher
+   *      popover, right-click the workspace context menu.
+   *   2. Main nav rows (Create).
+   *   3. Hairline.
+   *   4. Folders + apps — one row per package in the active workspace.
+   *      • folder → solid folder icon; click expands inline to list the
+   *        workbooks inside; click a workbook to open it as a tab.
+   *      • app    → bare icon; click opens the app's workbook as a tab.
+   *      Rows drag-reorder; order persists on the workspace.
+   *   5. "+ New" row.
+   *   6. Spacer, bottom nav rows (Network / Settings), account row.
+   *
+   * Tabs stay in the Titlebar (browser model) — the sidebar holds the
+   * library, not the open windows.
+   */
+  import {
+    Plus,
+    SignIn,
+    SignOut,
+    ArrowsClockwise,
+    User as UserIcon,
+    CaretRight,
+    CaretUpDown,
+    Cube,
+  } from "phosphor-svelte";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
+  import { slide } from "svelte/transition";
+  import { invoke } from "@tauri-apps/api/core";
+  import FolderIcon from "$lib/ui/FolderIcon.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
+  import { tintFor, tintWash } from "$lib/ui/tint";
+  import { auth } from "$lib/auth/store.svelte";
+  import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import type { WorkbookEntry } from "$lib/bridge/package.svelte";
+
+  export type RailTab = {
+    id: string;
+    label: string;
+    /** A phosphor-svelte icon component (rendered weight="fill"). */
+    icon: typeof Plus;
+  };
+
+  export type RailPackage = {
+    id: string;
+    name: string;
+    isActive: boolean;
+    /** Single emoji / glyph / data-URL image. Empty = initials fallback. */
+    icon?: string;
+    /** `app` (a workbook → bare icon) or `folder` (a container → solid
+     *  folder glyph + inline expansion). Undefined = folder. */
+    kind?: "app" | "folder";
+  };
+
+  let {
+    tabs,
+    bottomTabs = [],
+    active = $bindable(),
+    packages = [],
+    workspaceName = "",
+    workspaceIcon = "",
+    onSwitchWorkspace,
+    onSelectPackage,
+    onOpenApp,
+    onOpenWorkbook,
+    loadWorkbooks,
+    onReorderPackages,
+    onCreatePackageMenu,
+    onWorkspaceContext,
+    onPackageContext,
+  }: {
+    tabs: RailTab[];
+    bottomTabs?: RailTab[];
+    active: string;
+    packages?: RailPackage[];
+    workspaceName?: string;
+    workspaceIcon?: string;
+    onSwitchWorkspace?: (anchor: HTMLElement) => void;
+    /** Folder "open grid view" (context menu) — the legacy drawer. */
+    onSelectPackage?: (id: string) => void;
+    /** App click → open the app's workbook as a tab. */
+    onOpenApp?: (id: string) => void;
+    /** Workbook row (inside an expanded folder) → open as a tab. */
+    onOpenWorkbook?: (path: string) => void;
+    /** Lazy-load the workbooks inside a folder package. */
+    loadWorkbooks?: (id: string) => Promise<WorkbookEntry[]>;
+    onReorderPackages?: (orderedIds: string[]) => void;
+    onCreatePackageMenu?: (rect: DOMRect) => void;
+    onWorkspaceContext?: (x: number, y: number) => void;
+    onPackageContext?: (id: string, x: number, y: number) => void;
+  } = $props();
+
+  function initials(name: string): string {
+    const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return (name || "?").slice(0, 2).toUpperCase();
+  }
+
+  // ── Folder expansion — lazy workbook listing ─────────────────────────
+  let expanded = $state<Record<string, boolean>>({});
+  let folderBooks = $state<Record<string, WorkbookEntry[] | "loading">>({});
+
+  async function toggleFolder(p: RailPackage) {
+    const open = !expanded[p.id];
+    expanded = { ...expanded, [p.id]: open };
+    if (open && folderBooks[p.id] === undefined && loadWorkbooks) {
+      folderBooks = { ...folderBooks, [p.id]: "loading" };
+      try {
+        const books = await loadWorkbooks(p.id);
+        folderBooks = { ...folderBooks, [p.id]: books };
+      } catch {
+        folderBooks = { ...folderBooks, [p.id]: [] };
+      }
+    }
+  }
+
+  // ── Drag-reorder of the dynamic items (apps + folders) ──────────────
+  let order = $state<string[]>([]);
+  let dragId = $state<string | null>(null);
+  let overId = $state<string | null>(null);
+  $effect(() => {
+    if (!dragId) order = packages.map((p) => p.id);
+  });
+  const orderedPackages = $derived(
+    order
+      .map((id) => packages.find((p) => p.id === id))
+      .filter(Boolean) as RailPackage[],
+  );
+  /** Apps render as a pinned tile grid (Arc-style); folders as rows. */
+  const appTiles = $derived(orderedPackages.filter((p) => p.kind === "app"));
+  const folderRows = $derived(
+    orderedPackages.filter((p) => (p.kind ?? "folder") === "folder"),
+  );
+  function onDragStart(id: string) {
+    dragId = id;
+  }
+  function onDragOver(e: DragEvent, targetId: string) {
+    e.preventDefault();
+    overId = targetId;
+    if (!dragId || dragId === targetId) return;
+    const from = order.indexOf(dragId);
+    const to = order.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...order];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    order = next;
+  }
+  function onDragEnd() {
+    if (dragId) onReorderPackages?.([...order]);
+    dragId = null;
+    overId = null;
+  }
+
+  let switchBtnEl: HTMLButtonElement | undefined = $state();
+
+  // ── Account row (anonymous → signed-in avatar) ──────────────────────
+  let accountMenuOpen = $state(false);
+  let accountBtnEl: HTMLButtonElement | undefined = $state();
+  let accountBusy = $state(false);
+
+  function accountInitial(): string {
+    const u = auth.user;
+    if (!u) return "";
+    const src = u.displayName?.trim() || u.email;
+    return (src?.[0] ?? "?").toUpperCase();
+  }
+
+  function closeAccountMenu() {
+    accountMenuOpen = false;
+  }
+
+  function handleAccountClick() {
+    if (auth.status === "checking") return;
+    accountMenuOpen = !accountMenuOpen;
+  }
+
+  async function doSignIn() {
+    if (accountBusy) return;
+    accountBusy = true;
+    try {
+      closeAccountMenu();
+      await auth.signIn();
+    } catch {
+      // signIn surfaces errors on its own via lastError
+    } finally {
+      accountBusy = false;
+    }
+  }
+
+  async function handleSignOut() {
+    closeAccountMenu();
+    accountBusy = true;
+    try {
+      await auth.signOut();
+    } finally {
+      accountBusy = false;
+    }
+  }
+
+  let resetting = $state(false);
+  async function resetLocalSession() {
+    if (resetting) return;
+    resetting = true;
+    closeAccountMenu();
+    try {
+      await auth.signOut();
+    } finally {
+      resetting = false;
+    }
+  }
+
+  async function restartEngine() {
+    if (accountBusy) return;
+    accountBusy = true;
+    try {
+      try {
+        await invoke("sidecar_restart");
+      } catch {
+        /* ignore — refresh below reflects new state regardless */
+      }
+      await auth.refresh();
+    } finally {
+      accountBusy = false;
+    }
+  }
+
+  const sidecarStatus = $derived.by(() => {
+    const s = sidecar.status.state;
+    if (s === "ready") return { label: "Running", dot: "ok" as const };
+    if (s === "starting" || s === "restarting")
+      return { label: "Starting…", dot: "pending" as const };
+    if (s === "unhealthy") return { label: "Unhealthy", dot: "warn" as const };
+    if (s === "crashed") return { label: "Crashed", dot: "err" as const };
+    return { label: "Stopped", dot: "err" as const };
+  });
+  const accountRow = $derived.by(() => {
+    if (auth.status === "signed-in")
+      return { label: "Signed in", dot: "ok" as const };
+    if (auth.status === "sidecar-offline")
+      return { label: "Unavailable", dot: "warn" as const };
+    if (auth.status === "checking")
+      return { label: "Checking…", dot: "pending" as const };
+    return { label: "Not signed in", dot: "idle" as const };
+  });
+  const identityRow = $derived.by(() => {
+    if (auth.identity?.handle)
+      return { label: `@${auth.identity.handle}`, dot: "ok" as const };
+    if (auth.status === "signed-in")
+      return { label: "Not connected", dot: "idle" as const };
+    return { label: "—", dot: "idle" as const };
+  });
+
+  const accountLabel = $derived.by(() => {
+    if (auth.status === "signed-in")
+      return auth.user?.displayName ?? auth.user?.email ?? "Account";
+    if (auth.status === "sidecar-offline") return "Engine offline";
+    if (auth.status === "checking") return "Checking…";
+    return "Sign in";
+  });
+
+  function handleMenuKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && accountMenuOpen) closeAccountMenu();
+  }
+
+  function onWindowClick(e: MouseEvent) {
+    if (!accountMenuOpen) return;
+    const t = e.target as Node;
+    if (accountBtnEl?.contains(t)) return;
+    const menu = document.querySelector("[data-account-menu]");
+    if (menu && menu.contains(t)) return;
+    closeAccountMenu();
+  }
+</script>
+
+<svelte:window onclick={onWindowClick} onkeydown={handleMenuKey} />
+
+<nav class="sidebar" aria-label="Primary">
+  <!-- Workspace header -->
+  <button
+    type="button"
+    class="ws-header"
+    aria-label="Switch workspace ({workspaceName || 'none'})"
+    bind:this={switchBtnEl}
+    onclick={() => switchBtnEl && onSwitchWorkspace?.(switchBtnEl)}
+    oncontextmenu={(e) => {
+      e.preventDefault();
+      onWorkspaceContext?.(e.clientX, e.clientY);
+    }}
+  >
+    <span class="ws-tile" class:has-image={workspaceIcon.startsWith("data:image/")}>
+      {#if workspaceIcon.startsWith("data:image/")}
+        <img class="ws-img" src={workspaceIcon} alt="" />
+      {:else if workspaceIcon}
+        <span class="ws-glyph">{workspaceIcon}</span>
+      {:else}
+        <span class="ws-initials">{initials(workspaceName)}</span>
+      {/if}
+    </span>
+    <span class="ws-name">{workspaceName || "Workspace"}</span>
+    <CaretUpDown size={13} weight="bold" class="ws-caret" aria-hidden="true" />
+  </button>
+
+  <!-- Pinned apps — Arc-style tile grid -->
+  {#if appTiles.length > 0}
+    <div class="tile-grid">
+      {#each appTiles as pkg (pkg.id)}
+        {@const tint = tintFor(pkg.name)}
+        <button
+          type="button"
+          class="tile"
+          class:dragging={dragId === pkg.id}
+          class:drop-target={overId === pkg.id && dragId !== pkg.id}
+          style="--tint:{tint}; --tint-wash:{tintWash(tint)};"
+          title={pkg.name}
+          aria-label={pkg.name}
+          draggable="true"
+          ondragstart={() => onDragStart(pkg.id)}
+          ondragover={(e) => onDragOver(e, pkg.id)}
+          ondragend={onDragEnd}
+          ondrop={(e) => e.preventDefault()}
+          onclick={() => onOpenApp?.(pkg.id)}
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            onPackageContext?.(pkg.id, e.clientX, e.clientY);
+          }}
+        >
+          <Icon value={pkg.icon ?? ""} name={pkg.name} size={17} />
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- Main nav rows -->
+  {#each tabs as tab (tab.id)}
+    {@const TabIcon = tab.icon}
+    <button
+      type="button"
+      class="row"
+      class:active={active === tab.id}
+      aria-pressed={active === tab.id}
+      onclick={() => (active = tab.id)}
+    >
+      <span class="row-icon"><TabIcon size={16} weight="fill" aria-hidden="true" /></span>
+      <span class="row-label">{tab.label}</span>
+    </button>
+  {/each}
+
+  {#if packages.length > 0 || onCreatePackageMenu}
+    <div class="hairline" aria-hidden="true"></div>
+  {/if}
+
+  <!-- Folders -->
+  <div class="library">
+    {#each folderRows as pkg (pkg.id)}
+      <button
+          type="button"
+          class="row folder-row"
+          class:active={pkg.isActive}
+          class:dragging={dragId === pkg.id}
+          class:drop-target={overId === pkg.id && dragId !== pkg.id}
+          draggable="true"
+          ondragstart={() => onDragStart(pkg.id)}
+          ondragover={(e) => onDragOver(e, pkg.id)}
+          ondragend={onDragEnd}
+          ondrop={(e) => e.preventDefault()}
+          onclick={() => toggleFolder(pkg)}
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            onPackageContext?.(pkg.id, e.clientX, e.clientY);
+          }}
+          aria-expanded={!!expanded[pkg.id]}
+        >
+          <span class="caret" class:open={expanded[pkg.id]}>
+            <CaretRight size={11} weight="bold" aria-hidden="true" />
+          </span>
+          <span class="row-icon"><FolderIcon size={17} /></span>
+          <span class="row-label">{pkg.name}</span>
+        </button>
+
+        {#if expanded[pkg.id]}
+          {@const books = folderBooks[pkg.id]}
+          <div class="folder-children" transition:slide={{ duration: 140, easing: cubicOut }}>
+            {#if books === "loading"}
+              <span class="child-note">Loading…</span>
+            {:else if !books || books.length === 0}
+              <span class="child-note">No workbooks</span>
+            {:else}
+              {#each books as book (book.path)}
+                <button
+                  type="button"
+                  class="row child"
+                  onclick={() => onOpenWorkbook?.(book.path)}
+                  title={book.path}
+                >
+                  <span class="row-icon book"><Cube size={14} weight="fill" aria-hidden="true" /></span>
+                  <span class="row-label">{book.title}</span>
+                </button>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+    {/each}
+
+    {#if onCreatePackageMenu}
+      <button
+        type="button"
+        class="row create"
+        aria-label="Create a new package"
+        onclick={(e) =>
+          onCreatePackageMenu?.(e.currentTarget.getBoundingClientRect())}
+      >
+        <span class="row-icon"><Plus size={15} weight="bold" aria-hidden="true" /></span>
+        <span class="row-label">New</span>
+      </button>
+    {/if}
+  </div>
+
+  <span class="bottom-spacer" aria-hidden="true"></span>
+
+  {#if bottomTabs.length > 0}
+    <div class="hairline" aria-hidden="true"></div>
+    {#each bottomTabs as tab (tab.id)}
+      {@const TabIcon = tab.icon}
+      <button
+        type="button"
+        class="row"
+        class:active={active === tab.id}
+        aria-pressed={active === tab.id}
+        onclick={() => (active = tab.id)}
+      >
+        <span class="row-icon"><TabIcon size={16} weight="fill" aria-hidden="true" /></span>
+        <span class="row-label">{tab.label}</span>
+      </button>
+    {/each}
+  {/if}
+
+  <!-- Account row -->
+  <button
+    type="button"
+    class="row account"
+    bind:this={accountBtnEl}
+    aria-haspopup="menu"
+    aria-expanded={accountMenuOpen}
+    onclick={handleAccountClick}
+    disabled={auth.status === "checking" || accountBusy}
+  >
+    <span class="row-icon">
+      {#if auth.status === "signed-in"}
+        {#if auth.user?.picture}
+          <img class="account-avatar account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
+        {:else}
+          <span class="account-avatar">{accountInitial()}</span>
+        {/if}
+      {:else if auth.status === "sidecar-offline"}
+        <span class="account-anon offline">
+          <ArrowsClockwise size={12} weight="fill" class={accountBusy ? "spinning" : ""} />
+        </span>
+      {:else}
+        <span class="account-anon"><UserIcon size={13} weight="fill" /></span>
+      {/if}
+    </span>
+    <span class="row-label">{accountLabel}</span>
+  </button>
+
+  {#if accountMenuOpen}
+    <div
+      class="account-menu"
+      role="menu"
+      data-account-menu
+      transition:fly={{ y: 4, duration: 140, easing: cubicOut }}
+    >
+      <div class="account-menu-head">
+        {#if auth.status === "signed-in"}
+          {#if auth.user?.picture}
+            <img class="account-avatar lg account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
+          {:else}
+            <span class="account-avatar lg">{accountInitial()}</span>
+          {/if}
+          <div class="account-menu-meta">
+            {#if auth.user?.displayName}
+              <span class="account-name">{auth.user.displayName}</span>
+            {/if}
+            <span class="account-email">{auth.user?.email}</span>
+          </div>
+        {:else}
+          <span class="account-avatar lg muted"><UserIcon size={16} weight="fill" /></span>
+          <div class="account-menu-meta">
+            <span class="account-name muted">Not signed in</span>
+            <span class="account-email">Workbooks works without an account — sign in to use the network.</span>
+          </div>
+        {/if}
+      </div>
+
+      <div class="account-menu-divider"></div>
+
+      <div class="status-block">
+        <div class="status-row">
+          <span class="status-dot dot-{sidecarStatus.dot}"></span>
+          <span class="status-label">Engine</span>
+          <span class="status-val">{sidecarStatus.label}</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-{accountRow.dot}"></span>
+          <span class="status-label">Account</span>
+          <span class="status-val">{accountRow.label}</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-{identityRow.dot}"></span>
+          <span class="status-label">Network ID</span>
+          <span class="status-val">{identityRow.label}</span>
+        </div>
+      </div>
+
+      <div class="account-menu-divider"></div>
+
+      {#if auth.status === "signed-in"}
+        <button
+          type="button"
+          class="account-menu-item"
+          role="menuitem"
+          onclick={handleSignOut}
+          disabled={accountBusy}
+        >
+          <SignOut size={13} weight="fill" />
+          Sign out
+        </button>
+      {:else if auth.status === "signed-out"}
+        <button
+          type="button"
+          class="account-menu-item"
+          role="menuitem"
+          onclick={doSignIn}
+          disabled={accountBusy}
+        >
+          <SignIn size={13} weight="fill" />
+          {accountBusy ? "Opening sign-in…" : "Sign in to Workbooks"}
+        </button>
+        <button
+          type="button"
+          class="account-menu-item subtle"
+          role="menuitem"
+          onclick={resetLocalSession}
+          disabled={resetting}
+        >
+          <ArrowsClockwise size={13} weight="fill" class={resetting ? "spinning" : ""} />
+          {resetting ? "Resetting…" : "Reset local sign-in"}
+        </button>
+      {/if}
+
+      {#if sidecar.status.state !== "ready" && sidecar.status.state !== "starting"}
+        <button
+          type="button"
+          class="account-menu-item"
+          role="menuitem"
+          onclick={restartEngine}
+          disabled={accountBusy}
+        >
+          <ArrowsClockwise size={13} weight="fill" class={accountBusy ? "spinning" : ""} />
+          Restart engine
+        </button>
+      {/if}
+    </div>
+  {/if}
+</nav>
+
+<style>
+  .sidebar {
+    flex-shrink: 0;
+    width: 232px;
+    height: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.6rem 0.5rem 0.75rem;
+    /* A touch grayer than the canvas so active rows (white cards) and
+     * tinted tiles read as sitting ON the sidebar — the Dia/Arc depth
+     * model. Faint top light line for a finished edge. */
+    background: color-mix(in srgb, var(--color-surface-soft) 55%, var(--color-page));
+    border-right: 1px solid var(--color-border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+    position: relative;
+    z-index: 100;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* ── pinned app tiles ─────────────────────────────────────────── */
+  .tile-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 2px 2px 6px;
+  }
+  .tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--tint) 18%, var(--color-border));
+    background: var(--tint-wash);
+    color: var(--tint);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 1.5px rgba(15, 15, 15, 0.05);
+    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.14s, border-color 0.14s;
+  }
+  .tile:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--tint) 38%, var(--color-border));
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--tint) 16%, rgba(15, 15, 15, 0.08));
+  }
+  .tile:active {
+    transform: translateY(0) scale(0.97);
+    box-shadow: 0 1px 1.5px rgba(15, 15, 15, 0.05);
+  }
+  .tile :global(img) {
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+  .tile.dragging { opacity: 0.4; }
+  .tile.drop-target { box-shadow: inset 0 0 0 2px var(--tint); }
+
+  /* ── workspace header ─────────────────────────────────────────── */
+  .ws-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 6px;
+    margin-bottom: 0.35rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    color: var(--color-fg);
+    text-align: left;
+    transition: background 0.12s;
+  }
+  .ws-header:hover { background: var(--color-surface-soft); }
+  .ws-header :global(.ws-caret) {
+    margin-left: auto;
+    color: var(--color-fg-subtle);
+    flex-shrink: 0;
+  }
+  .ws-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--color-fg);
+    color: var(--color-page);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .ws-tile.has-image { background: transparent; }
+  .ws-initials { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+  .ws-glyph { font-size: 14px; line-height: 1; }
+  .ws-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ws-name {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* ── rows ─────────────────────────────────────────────────────── */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
+  }
+  .row:hover {
+    background: color-mix(in srgb, var(--color-fg) 5%, transparent);
+    color: var(--color-fg);
+  }
+  /* Selection = a raised card (Dia's white pill), not a darker wash. */
+  .row.active {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font-weight: 500;
+    box-shadow:
+      0 1px 2px rgba(15, 15, 15, 0.07),
+      inset 0 0 0 1px var(--color-border);
+  }
+  .row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    flex-shrink: 0;
+    /* Slate-blue lean instead of raw fg — kills the "white icon on
+     * gray" unfinished look without going full rainbow. */
+    color: color-mix(in srgb, var(--color-brand) 26%, var(--color-fg-muted));
+  }
+  .row.active .row-icon,
+  .row:hover .row-icon {
+    color: color-mix(in srgb, var(--color-brand) 55%, var(--color-fg-muted));
+  }
+  .row-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .library {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-height: 0;
+  }
+
+  /* folder rows */
+  .caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    flex-shrink: 0;
+    color: var(--color-fg-subtle);
+    transition: transform 0.12s;
+  }
+  .caret.open { transform: rotate(90deg); }
+  .folder-row { color: var(--color-fg); cursor: grab; }
+  .folder-row:active { cursor: grabbing; }
+  .row.dragging { opacity: 0.4; }
+  .row.drop-target { box-shadow: inset 0 2px 0 var(--color-fg); }
+
+  .folder-children {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-left: 18px;
+  }
+  .row.child {
+    height: 27px;
+    font-size: 12.5px;
+    color: var(--color-fg-muted);
+  }
+  .row.child .row-icon.book { color: var(--color-fg-subtle); }
+  .row.child:hover .row-icon.book { color: var(--color-brand); }
+  .child-note {
+    padding: 4px 8px 5px 26px;
+    font-size: 11.5px;
+    color: var(--color-fg-subtle);
+  }
+
+  .row.create { color: var(--color-fg-muted); }
+  .row.create:hover { color: var(--color-fg); }
+
+  .hairline {
+    height: 1px;
+    background: var(--color-border);
+    margin: 0.4rem 6px;
+    flex-shrink: 0;
+  }
+  .bottom-spacer {
+    flex: 1 1 auto;
+    min-height: 0.4rem;
+  }
+
+  /* ── account row + menu ───────────────────────────────────────── */
+  .row.account { margin-top: 0.15rem; }
+  .row.account:disabled { opacity: 0.6; cursor: default; }
+  .account-anon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--color-surface-soft);
+    border: 1px dashed var(--color-border);
+    color: var(--color-fg-muted);
+  }
+  .account-anon.offline {
+    border-style: solid;
+    border-color: rgba(220, 130, 30, 0.45);
+    color: rgb(190, 110, 25);
+  }
+  .account-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--color-fg);
+    color: var(--color-page);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--color-fg);
+  }
+  .account-avatar.lg {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  .account-avatar-img {
+    object-fit: cover;
+    background: var(--color-surface-soft);
+    color: transparent;
+  }
+  :global(.spinning) {
+    animation: spin 900ms linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .account-menu {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 44px;
+    padding: 8px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: 0 6px 22px rgba(15, 15, 15, 0.10);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .account-menu-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 8px;
+  }
+  .account-menu-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1px;
+  }
+  .account-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .account-email {
+    font-size: 0.72rem;
+    color: var(--color-fg-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .account-menu-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 2px 0;
+  }
+  .account-avatar.muted {
+    background: var(--color-surface-soft);
+    color: var(--color-fg-muted);
+    border-color: var(--color-border);
+  }
+  .account-name.muted { color: var(--color-fg-muted); font-weight: 500; }
+
+  .status-block {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 0;
+  }
+  .status-row {
+    display: grid;
+    grid-template-columns: 8px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-fg-muted);
+  }
+  .status-dot.dot-ok      { background: rgb(34, 160, 105); }
+  .status-dot.dot-pending { background: rgb(220, 165, 30); animation: pulse 1200ms ease-in-out infinite; }
+  .status-dot.dot-warn    { background: rgb(220, 130, 30); }
+  .status-dot.dot-err     { background: rgb(220, 60, 60); }
+  .status-dot.dot-idle    { background: var(--color-fg-muted); opacity: 0.45; }
+  .status-label {
+    font-size: 0.72rem;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+  }
+  .status-val {
+    font-size: 0.78rem;
+    color: var(--color-fg);
+    font-weight: 500;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+  .account-menu-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: 0;
+    color: var(--color-fg);
+    font: inherit;
+    font-size: 0.84rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .account-menu-item:hover:not(:disabled) {
+    background: var(--color-surface-soft);
+  }
+  .account-menu-item:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .account-menu-item.subtle {
+    color: var(--color-fg-muted);
+    font-size: 0.78rem;
+  }
+  .account-menu-item.subtle:hover:not(:disabled) {
+    color: var(--color-fg);
+  }
+</style>

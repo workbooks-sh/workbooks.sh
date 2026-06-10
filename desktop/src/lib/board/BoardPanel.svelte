@@ -15,7 +15,7 @@
    *     drops a "create a new task on this board" prompt scoped to
    *     the active board.
    */
-  import { Plus, LayoutGrid, Play, Pause } from "@lucide/svelte";
+  import { Plus, SquaresFour as LayoutGrid, Play, Pause } from "phosphor-svelte";
   import { onMount, onDestroy } from "svelte";
   import { packageStore as workspace } from "$lib/bridge/package.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
@@ -538,9 +538,9 @@
             aria-label={`Board is ${currentBoardState}. Click to flip.`}
           >
             {#if isDispatching}
-              <Pause size={12} strokeWidth={2} />
+              <Pause weight="fill" size={12} />
             {:else}
-              <Play size={12} strokeWidth={2} />
+              <Play weight="fill" size={12} />
             {/if}
             <span class="state-label">{currentBoardState}</span>
           </button>
@@ -555,9 +555,9 @@
             aria-expanded={stateMenuOpen}
           >
             {#if isDispatching}
-              <Play size={12} strokeWidth={2} />
+              <Play weight="fill" size={12} />
             {:else}
-              <Pause size={12} strokeWidth={2} />
+              <Pause weight="fill" size={12} />
             {/if}
             <span class="state-label">{currentBoardState}</span>
           </button>
@@ -585,7 +585,7 @@
     <div class="spacer"></div>
     {#if activeView}
       <button type="button" class="action" onclick={newTask} title={actionLabel}>
-        <Plus size={14} strokeWidth={2} />
+        <Plus weight="bold" size={14} />
         <span>{actionLabel}</span>
       </button>
     {/if}
@@ -605,7 +605,7 @@
     {:else if emptyKind === "no_board"}
       <div class="empty-hero">
         <div class="empty-illustration" aria-hidden="true">
-          <LayoutGrid size={28} strokeWidth={1.5} />
+          <LayoutGrid weight="fill" size={28} />
         </div>
         <div class="empty-copy">
           <h2 class="empty-title">No board yet</h2>
@@ -616,7 +616,7 @@
           </p>
         </div>
         <button type="button" class="primary" onclick={createBoard}>
-          <Plus size={14} strokeWidth={2.25} />
+          <Plus weight="bold" size={14} />
           <span>Create board</span>
         </button>
       </div>
@@ -633,7 +633,7 @@
     {:else if headlines.length === 0}
       <div class="empty-hero">
         <div class="empty-illustration" aria-hidden="true">
-          <LayoutGrid size={28} strokeWidth={1.5} />
+          <LayoutGrid weight="fill" size={28} />
         </div>
         <div class="empty-copy">
           <h2 class="empty-title">Nothing on this board yet</h2>
@@ -644,7 +644,7 @@
           </p>
         </div>
         <button type="button" class="primary" onclick={newTask}>
-          <Plus size={14} strokeWidth={2.25} />
+          <Plus weight="bold" size={14} />
           <span>{actionLabel}</span>
         </button>
       </div>

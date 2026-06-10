@@ -16,7 +16,7 @@
    *   - Dismiss — collapses the banner. Persists per-RID-per-session
    *     (caller responsibility — we just emit the event).
    */
-  import { ShieldAlert, RefreshCw, X } from "@lucide/svelte";
+  import { ShieldWarning as ShieldAlert, ArrowsClockwise as RefreshCw, X } from "phosphor-svelte";
 
   let {
     by = null,
@@ -34,7 +34,7 @@
 </script>
 
 <div class="banner" role="alert" aria-live="polite">
-  <ShieldAlert size={16} strokeWidth={2.25} class="icon" />
+  <ShieldAlert weight="fill" size={16} class="icon" />
   <div class="body">
     <div class="title">
       This file's bytes don't match what {by ? `@${by}` : "the publisher"} signed.
@@ -52,11 +52,11 @@
       disabled={fetching || !rid}
       title={!rid ? "No RID available — can't pull authoritative copy" : ""}
     >
-      <RefreshCw size={12} strokeWidth={2.25} class={fetching ? "spinning" : ""} />
+      <RefreshCw weight="fill" size={12} class={fetching ? "spinning" : ""} />
       {fetching ? "Fetching…" : "Fetch authoritative"}
     </button>
     <button type="button" class="btn ghost" onclick={ondismiss} aria-label="Dismiss warning">
-      <X size={13} strokeWidth={2.25} />
+      <X weight="bold" size={13} />
     </button>
   </div>
 </div>

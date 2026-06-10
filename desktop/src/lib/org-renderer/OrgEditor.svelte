@@ -26,7 +26,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
-  import { Eye, Columns2, Pencil, ShieldCheck } from "@lucide/svelte";
+  import { Eye, Columns as Columns2, PencilSimple as Pencil, ShieldCheck } from "phosphor-svelte";
   import OrgView from "./OrgView.svelte";
   import OrgSourcePane from "./OrgSourcePane.svelte";
   import PortabilitySidebar from "$lib/components/PortabilitySidebar.svelte";
@@ -250,7 +250,7 @@
         title="Render only"
         onclick={() => (mode = "render")}
       >
-        <Eye size={14} strokeWidth={1.8} />
+        <Eye weight="fill" size={14} />
       </button>
       <button
         type="button"
@@ -262,7 +262,7 @@
         title="Split — preview + source"
         onclick={() => (mode = "split")}
       >
-        <Columns2 size={14} strokeWidth={1.8} />
+        <Columns2 weight="fill" size={14} />
       </button>
       <button
         type="button"
@@ -274,7 +274,7 @@
         title="Source only"
         onclick={() => (mode = "source")}
       >
-        <Pencil size={14} strokeWidth={1.8} />
+        <Pencil weight="fill" size={14} />
       </button>
     </div>
 
@@ -305,7 +305,7 @@
       title="Toggle portability sidebar"
       onclick={() => (showPortability = !showPortability)}
     >
-      <ShieldCheck size={14} strokeWidth={1.8} />
+      <ShieldCheck weight="fill" size={14} />
     </button>
   </div>
 

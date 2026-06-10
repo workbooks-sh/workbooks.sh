@@ -23,7 +23,7 @@
    */
 
   import { onMount } from "svelte";
-  import { LogIn, LogOut, RefreshCw } from "@lucide/svelte";
+  import { SignIn as LogIn, SignOut as LogOut, ArrowsClockwise as RefreshCw } from "phosphor-svelte";
   import { sidecar, type SidecarState } from "$lib/bridge/sidecar.svelte";
   import { ws } from "$lib/bridge/ws.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -239,10 +239,10 @@
         </div>
         <div class="who-actions">
           <button type="button" class="ghost" onclick={refreshSession} disabled={busy} title="Refresh session">
-            <RefreshCw size={13} strokeWidth={2.2} />
+            <RefreshCw weight="fill" size={13} />
           </button>
           <button type="button" class="ghost danger" onclick={signOut} disabled={busy} title="Sign out">
-            <LogOut size={13} strokeWidth={2.2} />
+            <LogOut weight="fill" size={13} />
           </button>
         </div>
       </div>
@@ -258,7 +258,7 @@
       <div class="signed-out-body">
         <p class="lede">Sign in to publish workbooks, message friends, and sync across devices.</p>
         <button type="button" class="primary" onclick={signIn} disabled={busy}>
-          <LogIn size={14} strokeWidth={2.2} />
+          <LogIn weight="fill" size={14} />
           {busy ? "Opening sign-in…" : "Sign in to Workbooks"}
         </button>
       </div>

@@ -14,7 +14,7 @@
   import { resolveDid, DemoModeError, type BrokerIdentity } from "../client";
   import ModifiedWarningBanner from "./ModifiedWarningBanner.svelte";
   import LineageTree from "./LineageTree.svelte";
-  import { GitCommitVertical, ChevronDown, ChevronUp } from "@lucide/svelte";
+  import { GitCommit as GitCommitVertical, CaretDown as ChevronDown, CaretUp as ChevronUp } from "phosphor-svelte";
 
   let {
     html,
@@ -148,12 +148,12 @@
         onclick={() => (lineageOpen = !lineageOpen)}
         aria-expanded={lineageOpen}
       >
-        <GitCommitVertical size={11} strokeWidth={2.25} />
+        <GitCommitVertical weight="fill" size={11} />
         {lineageOpen ? "Hide" : "See"} provenance chain
         {#if lineageOpen}
-          <ChevronUp size={11} strokeWidth={2.25} />
+          <ChevronUp weight="bold" size={11} />
         {:else}
-          <ChevronDown size={11} strokeWidth={2.25} />
+          <ChevronDown weight="bold" size={11} />
         {/if}
       </button>
     {/if}

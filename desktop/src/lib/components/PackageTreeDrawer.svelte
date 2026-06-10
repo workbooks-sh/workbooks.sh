@@ -15,7 +15,7 @@
    * See docs/canonical-model.md for the User → Workspace → Package
    * hierarchy.
    */
-  import { LayoutGrid, ListTree } from "@lucide/svelte";
+  import { SquaresFour as LayoutGrid, TreeView as ListTree } from "phosphor-svelte";
   import FileTreePanel from "./FileTreePanel.svelte";
   import PackageGridView from "./PackageGridView.svelte";
   import { packageStore, type Layout } from "$lib/bridge/package.svelte";
@@ -50,7 +50,7 @@
         aria-label="Grid layout"
         onclick={() => setLayout("grid")}
       >
-        <LayoutGrid size={12} strokeWidth={1.8} aria-hidden="true" />
+        <LayoutGrid weight="fill" size={12} aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -62,7 +62,7 @@
         aria-label="Tree layout"
         onclick={() => setLayout("tree")}
       >
-        <ListTree size={12} strokeWidth={1.8} aria-hidden="true" />
+        <ListTree weight="fill" size={12} aria-hidden="true" />
       </button>
     </div>
   </header>

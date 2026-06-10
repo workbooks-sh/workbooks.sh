@@ -6,7 +6,7 @@
    *
    * Click outside or press Escape to cancel.
    */
-  import { Check } from "@lucide/svelte";
+  import { Check } from "phosphor-svelte";
 
   let {
     title,
@@ -73,7 +73,7 @@
           class="btn primary"
           disabled={busy || !value.trim()}
         >
-          <Check size={13} strokeWidth={2.4} /> Save
+          <Check weight="bold" size={13} /> Save
         </button>
       </div>
     </form>

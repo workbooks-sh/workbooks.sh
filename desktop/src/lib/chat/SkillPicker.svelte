@@ -7,7 +7,7 @@
    * create-skill wizard. Distinct from the SkillsSettings list (which
    * manages integration-skills like Composio).
    */
-  import { ChevronDown, Plus, Wand2 } from "@lucide/svelte";
+  import { CaretDown as ChevronDown, Plus, MagicWand as Wand2 } from "phosphor-svelte";
   import { tick } from "svelte";
   import { skillCatalog, type SkillMdEntry } from "$lib/bridge/skill_catalog.svelte";
 
@@ -94,9 +94,9 @@
     aria-expanded={open}
     title="Attach a skill"
   >
-    <Plus size={11} strokeWidth={2.25} />
+    <Plus weight="bold" size={11} />
     <span>Skill</span>
-    <ChevronDown size={11} strokeWidth={2} aria-hidden="true" />
+    <ChevronDown weight="bold" size={11} aria-hidden="true" />
   </button>
 
   {#if open}
@@ -123,7 +123,7 @@
             onmouseenter={() => (highlight = i)}
           >
             <span class="row-icon" aria-hidden="true">
-              <Wand2 size={14} strokeWidth={1.7} />
+              <Wand2 weight="fill" size={14} />
             </span>
             <span class="row-body">
               <span class="row-title">{s.name}</span>
@@ -145,7 +145,7 @@
             onmouseenter={() => (highlight = rows.length)}
           >
             <span class="row-icon dashed" aria-hidden="true">
-              <Plus size={12} strokeWidth={2} />
+              <Plus weight="bold" size={12} />
             </span>
             <span class="add-label">Create skill</span>
           </button>

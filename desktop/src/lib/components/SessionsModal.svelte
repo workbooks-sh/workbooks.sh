@@ -20,7 +20,7 @@
    * is the default.
    */
   import { onDestroy } from "svelte";
-  import { Search, X } from "@lucide/svelte";
+  import { MagnifyingGlass as Search, X } from "phosphor-svelte";
   import { listSessions, type SessionRow, type SessionStatus } from "$lib/sessions/api";
 
   let {
@@ -226,13 +226,13 @@
           aria-label="Close"
           onclick={onclose}
         >
-          <X size={14} strokeWidth={2} />
+          <X weight="bold" size={14} />
         </button>
       </header>
 
       <div class="filters">
         <div class="search">
-          <Search size={12} strokeWidth={2} aria-hidden="true" />
+          <Search weight="bold" size={12} aria-hidden="true" />
           <input
             type="text"
             placeholder="Search prompt, agent, id…"

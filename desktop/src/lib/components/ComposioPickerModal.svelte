@@ -14,7 +14,7 @@
    * picked row. Per-app brand logos (Slack, Gmail, …) get fetched
    * from Composio's `/api/v3/toolkits/{slug}` endpoint in a follow-up.
    */
-  import { Check, ExternalLink, AlertCircle, Loader2 } from "@lucide/svelte";
+  import { Check, ArrowSquareOut as ExternalLink, WarningCircle as AlertCircle, CircleNotch as Loader2 } from "phosphor-svelte";
   import {
     connections,
     ComposioListError,
@@ -147,12 +147,12 @@
 
     {#if loading}
       <div class="state loading">
-        <Loader2 size={16} strokeWidth={2} class="spin" />
+        <Loader2 weight="bold" size={16} class="spin" />
         <span>Loading your Composio connections…</span>
       </div>
     {:else if loadError}
       <div class="state error" role="alert">
-        <AlertCircle size={16} strokeWidth={2} />
+        <AlertCircle weight="fill" size={16} />
         <div>
           <p class="state-title">
             {loadError.code === "no_api_key"
@@ -177,7 +177,7 @@
           rel="noopener noreferrer"
           class="dash-link"
         >
-          Open Composio <ExternalLink size={11} strokeWidth={2} />
+          Open Composio <ExternalLink weight="fill" size={11} />
         </a>
       </div>
     {:else}
@@ -201,9 +201,9 @@
               onclick={() => pick(account)}
             >
               {#if added}
-                <Check size={12} strokeWidth={2.4} /> Added
+                <Check weight="bold" size={12} /> Added
               {:else if picking}
-                <Loader2 size={12} strokeWidth={2} class="spin" /> Adding…
+                <Loader2 weight="bold" size={12} class="spin" /> Adding…
               {:else}
                 Add
               {/if}

@@ -14,7 +14,7 @@
    * chips (typed by hand or imported from an existing file) — they
    * stay selected until removed but don't appear in the picker.
    */
-  import { X, Plus, Check } from "@lucide/svelte";
+  import { X, Plus, Check } from "phosphor-svelte";
 
   let {
     value = $bindable(""),
@@ -133,7 +133,7 @@
         aria-label="Remove {item}"
         onclick={() => remove(item)}
       >
-        <X size={10} strokeWidth={2.2} aria-hidden="true" />
+        <X weight="bold" size={10} aria-hidden="true" />
       </button>
     </span>
   {/each}
@@ -145,7 +145,7 @@
       onclick={togglePicker}
       aria-expanded={pickerOpen}
     >
-      <Plus size={11} strokeWidth={2} aria-hidden="true" />
+      <Plus weight="bold" size={11} aria-hidden="true" />
       <span>{placeholder}</span>
     </button>
     {#if pickerOpen && pos}
@@ -167,7 +167,7 @@
               toggle(item);
             }}
           >
-            <Check size={11} strokeWidth={2} class="invisible" aria-hidden="true" />
+            <Check weight="bold" size={11} class="invisible" aria-hidden="true" />
             <span>{item}</span>
           </button>
         {/each}

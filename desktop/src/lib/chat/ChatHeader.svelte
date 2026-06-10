@@ -16,12 +16,7 @@
    *   - emits `oncreate` → host shows the CreateAgentDialog
    *   - emits `onreset` → host clears the active session
    */
-  import {
-    Clock,
-    Plus,
-    AlertCircle,
-    Paperclip,
-  } from "@lucide/svelte";
+  import { Clock, Plus, WarningCircle as AlertCircle, Paperclip } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { agents, type AgentCatalogEntry } from "$lib/bridge/agents.svelte";
   import { tabs } from "$lib/tabs/store.svelte";
@@ -105,7 +100,7 @@
     </button>
   {:else if agents.lastError}
     <span class="error-chip" title={agents.lastError}>
-      <AlertCircle size={11} strokeWidth={2} aria-hidden="true" />
+      <AlertCircle weight="fill" size={11} aria-hidden="true" />
       <span>catalog error</span>
     </span>
   {/if}
@@ -118,7 +113,7 @@
         title={`${att.label} brief\n${att.path}`}
         onclick={() => tabs.open(att.path)}
       >
-        <Paperclip size={10} strokeWidth={2} aria-hidden="true" />
+        <Paperclip weight="fill" size={10} aria-hidden="true" />
         <span class="att-label">{att.label}</span>
       </button>
     {/each}
@@ -135,7 +130,7 @@
     aria-expanded={sessionsOpen}
     onclick={() => (sessionsOpen = true)}
   >
-    <Clock size={13} strokeWidth={1.8} />
+    <Clock weight="fill" size={13} />
     {#if historyCount > 0}
       <span class="badge">{historyCount > 99 ? "99+" : historyCount}</span>
     {/if}
@@ -148,7 +143,7 @@
     aria-label="New session"
     onclick={onreset}
   >
-    <Plus size={13} strokeWidth={1.8} />
+    <Plus weight="bold" size={13} />
   </button>
 </header>
 

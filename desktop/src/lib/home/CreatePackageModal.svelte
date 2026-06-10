@@ -14,7 +14,7 @@
    * UX is identical apart from a "Source folder" line under the title
    * when importing.
    */
-  import { Check } from "@lucide/svelte";
+  import { Check } from "phosphor-svelte";
   import IconPickerMenu from "$lib/workspace/IconPickerMenu.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
@@ -107,7 +107,7 @@
         class="btn primary"
         disabled={busy || !name.trim()}
       >
-        <Check size={14} strokeWidth={2.4} />
+        <Check weight="bold" size={14} />
         {data.mode === "import" ? "Import" : "Create"}
       </button>
     </div>

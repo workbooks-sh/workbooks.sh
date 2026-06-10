@@ -12,13 +12,7 @@
    * Submission: Cmd/Ctrl+Enter sends, plain Enter inserts newline.
    */
 
-  import {
-    AudioWaveform,
-    Loader2,
-    Mic,
-    Send,
-    Square,
-  } from "@lucide/svelte";
+  import { Waveform as AudioWaveform, CircleNotch as Loader2, Microphone as Mic, PaperPlaneRight as Send, Stop as Square } from "phosphor-svelte";
   import type { Snippet } from "svelte";
 
   let {
@@ -119,7 +113,7 @@
       aria-pressed={micActive}
       title="Dictate (Moonshine)"
     >
-      <Mic size={13} strokeWidth={2} aria-hidden="true" />
+      <Mic weight="fill" size={13} aria-hidden="true" />
     </button>
 
     <button
@@ -132,7 +126,7 @@
       aria-pressed={liveActive}
       title="Live (Gemini)"
     >
-      <AudioWaveform size={13} strokeWidth={2} aria-hidden="true" />
+      <AudioWaveform weight="fill" size={13} aria-hidden="true" />
     </button>
 
     {#if canCancel}
@@ -143,7 +137,7 @@
         aria-label="Cancel session"
         title="Cancel"
       >
-        <Square size={12} strokeWidth={2} aria-hidden="true" />
+        <Square weight="fill" size={12} aria-hidden="true" />
       </button>
     {:else}
       <button
@@ -154,9 +148,9 @@
         title="Send (Cmd+Enter)"
       >
         {#if sending}
-          <Loader2 size={13} strokeWidth={2} class="spin" />
+          <Loader2 weight="bold" size={13} class="spin" />
         {:else}
-          <Send size={13} strokeWidth={2} />
+          <Send weight="fill" size={13} />
         {/if}
       </button>
     {/if}

@@ -12,7 +12,7 @@
    * the editor.
    */
   import { onMount } from "svelte";
-  import { Check, Copy, Trash2, Palette } from "@lucide/svelte";
+  import { Check, Copy, Trash as Trash2, Palette } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { themes, type Theme } from "$lib/bridge/themes.svelte";
   import SettingsPanel from "./settings/SettingsPanel.svelte";
@@ -88,7 +88,7 @@
         title="Capture the current rendering as a new theme"
         onclick={() => (cloning = true)}
       >
-        <Copy size={13} strokeWidth={1.8} /> Clone current
+        <Copy weight="fill" size={13} /> Clone current
       </button>
     {/if}
   {/snippet}
@@ -105,7 +105,7 @@
         autofocus
       />
       <button type="submit" class="btn primary" disabled={!newName.trim()}>
-        <Check size={13} strokeWidth={2.4} /> Save clone
+        <Check weight="bold" size={13} /> Save clone
       </button>
       <button
         type="button"
@@ -150,7 +150,7 @@
               {/if}
             </div>
             {#if isActive}
-              <Check size={14} strokeWidth={2.4} class="active-tick" />
+              <Check weight="bold" size={14} class="active-tick" />
             {/if}
           </button>
           {#if !t.builtin}
@@ -161,7 +161,7 @@
               aria-label="Delete theme"
               onclick={() => deleteTheme(t)}
             >
-              <Trash2 size={13} strokeWidth={1.8} />
+              <Trash2 weight="fill" size={13} />
             </button>
           {/if}
         </article>

@@ -9,7 +9,7 @@
    *
    * Per docs/canonical-model.md.
    */
-  import { Check } from "@lucide/svelte";
+  import { Check } from "phosphor-svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import IconPickerMenu from "./IconPickerMenu.svelte";
 
@@ -61,7 +61,7 @@
         class="btn primary"
         disabled={busy || !name.trim()}
       >
-        <Check size={14} strokeWidth={2.4} /> Create workspace
+        <Check weight="bold" size={14} /> Create workspace
       </button>
     </form>
 

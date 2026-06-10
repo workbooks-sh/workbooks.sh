@@ -16,7 +16,7 @@
    * API mirrors `<select>` minimally: `value` is $bindable, `items`
    * is the option list, `placeholder` shows when value is unset.
    */
-  import { ChevronDown, Check } from "@lucide/svelte";
+  import { CaretDown as ChevronDown, Check } from "phosphor-svelte";
   import type { DropdownItem } from "./Dropdown.types";
 
   let {
@@ -156,10 +156,10 @@
 >
   {#if selected?.icon}
     {@const Icon = selected.icon}
-    <span class="trigger-icon"><Icon size={13} strokeWidth={1.8} /></span>
+    <span class="trigger-icon"><Icon size={13} weight="fill" /></span>
   {/if}
   <span class="trigger-label">{selected?.label ?? placeholder}</span>
-  <ChevronDown size={12} strokeWidth={2} class="chev" />
+  <ChevronDown weight="bold" size={12} class="chev" />
 </button>
 
 {#if open && pos}
@@ -185,7 +185,7 @@
       >
         {#if it.icon}
           {@const Icon = it.icon}
-          <span class="item-icon"><Icon size={13} strokeWidth={1.8} /></span>
+          <span class="item-icon"><Icon size={13} weight="fill" /></span>
         {/if}
         <span class="item-body">
           <span class="item-label">{it.label}</span>
@@ -194,7 +194,7 @@
           {/if}
         </span>
         {#if it.value === value}
-          <Check size={12} strokeWidth={2.4} class="check" />
+          <Check weight="bold" size={12} class="check" />
         {/if}
       </button>
     {/each}

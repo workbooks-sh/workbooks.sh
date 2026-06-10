@@ -8,7 +8,7 @@
    * parent panel routes that to the chat compose with a pre-filled
    * prompt scoped to a board-authoring agent.
    */
-  import { ChevronDown, Plus } from "@lucide/svelte";
+  import { CaretDown as ChevronDown, Plus } from "phosphor-svelte";
   import { tick } from "svelte";
   import AgentIcon from "$lib/chat/AgentIcon.svelte";
   import type { BoardView } from "./api";
@@ -111,7 +111,7 @@
       {/if}
     </span>
     <span class="t-title">{selected?.name ?? "Pick a board"}</span>
-    <ChevronDown size={12} strokeWidth={2} class="chev" aria-hidden="true" />
+    <ChevronDown weight="bold" size={12} class="chev" aria-hidden="true" />
   </button>
 
   {#if open}
@@ -161,7 +161,7 @@
           onmouseenter={() => (highlight = rows.length)}
         >
           <span class="row-icon dashed" aria-hidden="true">
-            <Plus size={12} strokeWidth={2} />
+            <Plus weight="bold" size={12} />
           </span>
           <span class="add-label">Create board</span>
         </button>

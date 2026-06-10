@@ -17,7 +17,7 @@
    */
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { X, Trash2, Save } from "@lucide/svelte";
+  import { X, Trash as Trash2, FloppyDisk as Save } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { agents, type AgentCatalogEntry } from "$lib/bridge/agents.svelte";
   import { agentSessions } from "./agent_sessions.svelte";
@@ -394,7 +394,7 @@
         title="Close (Esc)"
         onclick={oncancel}
       >
-        <X size={14} strokeWidth={1.8} />
+        <X weight="bold" size={14} />
       </button>
     </header>
 
@@ -500,7 +500,7 @@
           onclick={del}
           disabled={busy}
         >
-          <Trash2 size={12} strokeWidth={1.8} />
+          <Trash2 weight="fill" size={12} />
           Delete
         </button>
       {/if}
@@ -510,7 +510,7 @@
       </button>
       {#if !isReadOnly}
         <button type="button" class="primary" onclick={save} disabled={busy}>
-          <Save size={12} strokeWidth={1.8} />
+          <Save weight="fill" size={12} />
           {isNew ? "Create" : "Save"}
         </button>
       {/if}

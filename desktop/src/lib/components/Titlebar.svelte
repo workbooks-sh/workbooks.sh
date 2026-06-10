@@ -25,16 +25,19 @@
   import {
     X,
     Plus,
-    ChevronDown,
-    Search,
-    Bookmark,
-    MessageCircle,
+    CaretDown as ChevronDown,
+    MagnifyingGlass as Search,
+    BookmarkSimple as Bookmark,
+    ChatCircle as MessageCircle,
     Terminal as TerminalIcon,
     FileText,
     FileCode,
     Hash,
-    Box,
-  } from "@lucide/svelte";
+    Cube as Box,
+    SidebarSimple,
+  } from "phosphor-svelte";
+  import { fly, fade } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
@@ -120,6 +123,19 @@
   <button
     type="button"
     class="menu-btn"
+    class:menu-active={chrome.sidebarOpen}
+    data-tauri-drag-region="false"
+    title="Toggle sidebar (⌘B)"
+    aria-label="Toggle sidebar"
+    aria-pressed={chrome.sidebarOpen}
+    onclick={() => chrome.toggleSidebar()}
+  >
+    <SidebarSimple size={16} weight={chrome.sidebarOpen ? "fill" : "regular"} />
+  </button>
+
+  <button
+    type="button"
+    class="menu-btn"
     data-tauri-drag-region="false"
     title="Menu"
     aria-label="Menu"
@@ -128,7 +144,7 @@
     bind:this={menuBtnEl}
     onclick={toggleMenu}
   >
-    <ChevronDown size={16} strokeWidth={2} />
+    <ChevronDown size={15} weight="bold" />
   </button>
 
   <div class="tabs" role="tablist">
@@ -141,6 +157,8 @@
         role="tab"
         aria-selected={active}
         title={tab.path}
+        in:fly={{ y: 8, duration: 180, easing: cubicOut }}
+        out:fade={{ duration: 90 }}
       >
         <button
           type="button"
@@ -148,7 +166,7 @@
           data-tauri-drag-region="false"
           onclick={() => focusDoc(tab.id)}
         >
-          <span class="favicon kind-{tab.kind}"><Icon size={13} strokeWidth={1.8} /></span>
+          <span class="favicon kind-{tab.kind}"><Icon size={13} weight="fill" /></span>
           <span class="title">{tab.title}</span>
           {#if tab.dirty}<span class="dot" aria-label="modified"></span>{/if}
         </button>
@@ -159,7 +177,7 @@
           aria-label="Close tab"
           onclick={(e) => closeDoc(tab.id, e)}
         >
-          <X size={12} strokeWidth={2} />
+          <X size={12} weight="bold" />
         </button>
       </div>
     {/each}
@@ -172,7 +190,7 @@
       aria-label="New tab"
       onclick={newTab}
     >
-      <Plus size={15} strokeWidth={2} />
+      <Plus size={15} weight="bold" />
     </button>
   </div>
 
@@ -204,7 +222,7 @@
     aria-pressed={chrome.agentOpen}
     onclick={() => (chrome.agentOpen = !chrome.agentOpen)}
   >
-    <MessageCircle size={12} strokeWidth={2} />
+    <MessageCircle size={12} weight="fill" />
     <span>Agent</span>
     {#if geminiLive.active}
       <span class="live-dot" class:muted={geminiLive.muted} aria-hidden="true"></span>
@@ -214,14 +232,14 @@
 
 <ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
   <button class="ctx-item" onclick={menuSearch}>
-    <Search size={13} strokeWidth={1.8} /> Search…
+    <Search size={13} weight="bold" /> Search…
     <span class="ctx-shortcut">⌘K</span>
   </button>
   <button class="ctx-item" onclick={menuBookmarks}>
-    <Bookmark size={13} strokeWidth={1.8} /> Bookmarks
+    <Bookmark size={13} weight="fill" /> Bookmarks
   </button>
   <button class="ctx-item" onclick={menuTerminal}>
-    <TerminalIcon size={13} strokeWidth={1.8} /> Terminal
+    <TerminalIcon size={13} weight="fill" /> Terminal
     <span class="ctx-shortcut">⌃`</span>
   </button>
 </ContextMenu>

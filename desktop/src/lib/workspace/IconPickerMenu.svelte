@@ -23,7 +23,7 @@
    * resize. SVGs pass through unmodified.
    */
   import { onMount, tick } from "svelte";
-  import { ImagePlus, Smile, Type } from "@lucide/svelte";
+  import { ImageSquare as ImagePlus, Smiley as Smile, TextT as Type } from "phosphor-svelte";
   import EmojiPicker from "./EmojiPicker.svelte";
 
   let {
@@ -225,16 +225,16 @@
   >
     {#if stage === "menu"}
       <button class="item" type="button" onclick={() => (stage = "emoji")}>
-        <span class="item-icon"><Smile size={16} strokeWidth={1.8} /></span>
+        <span class="item-icon"><Smile weight="fill" size={16} /></span>
         <span class="item-label">Pick emoji</span>
         <span class="chev">›</span>
       </button>
       <button class="item" type="button" onclick={pickImageClick}>
-        <span class="item-icon"><ImagePlus size={16} strokeWidth={1.8} /></span>
+        <span class="item-icon"><ImagePlus weight="fill" size={16} /></span>
         <span class="item-label">Upload image…</span>
       </button>
       <button class="item" type="button" onclick={pickInitials}>
-        <span class="item-icon"><Type size={16} strokeWidth={1.8} /></span>
+        <span class="item-icon"><Type weight="fill" size={16} /></span>
         <span class="item-label">Use initials</span>
       </button>
       {#if error}<div class="err">{error}</div>{/if}

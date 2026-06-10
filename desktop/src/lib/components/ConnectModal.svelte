@@ -19,7 +19,7 @@
    * The plaintext value lives in `$state` only for the duration of
    * the modal; on submit/cancel it's discarded.
    */
-  import { Check, ExternalLink } from "@lucide/svelte";
+  import { Check, ArrowSquareOut as ExternalLink } from "phosphor-svelte";
 
   let {
     serviceName,
@@ -92,7 +92,7 @@
             rel="noopener noreferrer"
             class="get-key"
           >
-            Get one here <ExternalLink size={11} strokeWidth={2} />
+            Get one here <ExternalLink weight="fill" size={11} />
           </a>
         </span>
         <input
@@ -133,7 +133,7 @@
           class="btn primary"
           disabled={busy || !apiKey.trim()}
         >
-          <Check size={13} strokeWidth={2.4} />
+          <Check weight="bold" size={13} />
           {busy ? "Connecting…" : "Connect"}
         </button>
       </div>

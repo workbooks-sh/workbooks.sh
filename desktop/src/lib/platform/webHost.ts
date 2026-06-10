@@ -43,17 +43,17 @@ if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
 // Rail items are packages. A package is either an `app` (a workbook — bare
 // icon) or a `folder` (a container — folder glyph). Kanban ships as a default
 // app. Mix of apps + folders so the rail shows the real model + reordering.
-// Default to Lucide icons (lucide:<Name>). Names are verified to exist as
-// canonical exports in @lucide/svelte v1 and are wired in Icon.svelte's
-// LUCIDE map. Reading keeps a plain emoji to prove emoji still renders.
+// Default to glyph icons (lucide:<Name> — the prefix is a legacy storage
+// format; names resolve through Icon.svelte's GLYPHS map of phosphor-svelte
+// components). Reading keeps a plain emoji to prove emoji still renders.
 const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
-  Kanban: { icon: "lucide:SquareKanban", kind: "app" },
-  Notes: { icon: "lucide:NotebookPen", kind: "app" },
-  Tracker: { icon: "lucide:TrendingUp", kind: "app" },
+  Kanban: { icon: "lucide:Kanban", kind: "app" },
+  Notes: { icon: "lucide:Notebook", kind: "app" },
+  Tracker: { icon: "lucide:TrendUp", kind: "app" },
   Reading: { icon: "📚", kind: "app" }, // emoji example — still supported
   Clients: { icon: "lucide:Briefcase", kind: "folder" },
   "Side Projects": { icon: "lucide:Rocket", kind: "folder" },
-  Acme: { icon: "lucide:ChartColumn", kind: "folder" },
+  Acme: { icon: "lucide:ChartBar", kind: "folder" },
   Internal: { icon: "lucide:Wrench", kind: "app" },
 };
 

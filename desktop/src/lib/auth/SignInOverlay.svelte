@@ -4,7 +4,7 @@
    * Copy avoids naming the underlying auth provider — to the user,
    * this is just "sign in to Workbooks."
    */
-  import { LogIn } from "@lucide/svelte";
+  import { SignIn as LogIn } from "phosphor-svelte";
   import EmptyState from "$lib/network/components/EmptyState.svelte";
   import { auth } from "./store.svelte";
 
@@ -35,7 +35,7 @@
     {#snippet cta()}
       <div class="cta-stack">
         <button type="button" class="btn primary" onclick={signIn} disabled={signingIn}>
-          <LogIn size={13} strokeWidth={2.25} />
+          <LogIn weight="fill" size={13} />
           {signingIn ? "Opening sign-in…" : "Sign in to Workbooks"}
         </button>
         {#if signInError}

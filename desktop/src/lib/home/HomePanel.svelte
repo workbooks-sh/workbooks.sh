@@ -19,24 +19,7 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import {
-    ArrowRight,
-    Plus,
-    Sparkles,
-    BookOpen,
-    Wand2,
-    Kanban,
-    Undo2,
-    AudioLines,
-    Mic,
-    MicOff,
-    PhoneOff,
-    AlertCircle,
-    Wrench,
-    Loader2,
-    Check,
-    XCircle,
-  } from "@lucide/svelte";
+  import { ArrowRight, Plus, Sparkle as Sparkles, BookOpen, MagicWand as Wand2, Kanban, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
@@ -372,7 +355,7 @@
       aria-label="Ask the workspace anything"
       title="Ask the workspace (⌘/)"
     >
-      <Sparkles size={12} strokeWidth={2} aria-hidden="true" />
+      <Sparkles weight="fill" size={12} aria-hidden="true" />
       <span>Ask the workspace anything…</span>
       <kbd>⌘/</kbd>
     </button>
@@ -412,7 +395,7 @@
             title="Talk to Workhorse by voice"
             aria-label="Start voice session"
           >
-            <AudioLines size={13} strokeWidth={2} />
+            <AudioLines weight="fill" size={13} />
           </button>
           <button
             type="submit"
@@ -420,7 +403,7 @@
             disabled={!canSend}
           >
             {sending ? "…" : ""}
-            <ArrowRight size={13} strokeWidth={2} />
+            <ArrowRight weight="bold" size={13} />
           </button>
         </div>
       </form>
@@ -460,9 +443,9 @@
               aria-label={geminiLive.muted ? "Unmute" : "Mute"}
             >
               {#if geminiLive.muted}
-                <MicOff size={14} strokeWidth={2} />
+                <MicOff weight="fill" size={14} />
               {:else}
-                <Mic size={14} strokeWidth={2} />
+                <Mic weight="fill" size={14} />
               {/if}
             </button>
             <button
@@ -472,7 +455,7 @@
               title="End session"
               aria-label="End voice session"
             >
-              <PhoneOff size={14} strokeWidth={2} />
+              <PhoneOff weight="fill" size={14} />
             </button>
           </div>
         </div>
@@ -489,7 +472,7 @@
         title="Revert to your previous prompt"
         aria-label="Undo palette rewrite"
       >
-        <Undo2 size={11} strokeWidth={2} aria-hidden="true" />
+        <Undo2 weight="bold" size={11} aria-hidden="true" />
         <span>Undo</span>
       </button>
     {/if}
@@ -497,28 +480,28 @@
     {#if !voiceMode}
       <div class="quick" in:fade={{ duration: 180 }}>
         <button type="button" class="chip" onclick={newPackage}>
-          <Plus size={11} strokeWidth={2} /> Package
+          <Plus weight="bold" size={11} /> Package
         </button>
         <button
           type="button"
           class="chip"
           onclick={() => openWizardInPalette("create-board", "Create a kanban board")}
         >
-          <Kanban size={11} strokeWidth={2} /> Board
+          <Kanban weight="fill" size={11} /> Board
         </button>
         <button
           type="button"
           class="chip"
           onclick={() => openWizardInPalette("create-workbook", "Create a workbook")}
         >
-          <BookOpen size={11} strokeWidth={2} /> Workbook
+          <BookOpen weight="fill" size={11} /> Workbook
         </button>
         <button
           type="button"
           class="chip"
           onclick={() => openWizardInPalette("create-skill", "Create a skill")}
         >
-          <Wand2 size={11} strokeWidth={2} /> Skill
+          <Wand2 weight="fill" size={11} /> Skill
         </button>
       </div>
     {:else}
@@ -555,14 +538,14 @@
               onclick={() => (toolExpanded[b.callId] = !toolExpanded[b.callId])}
             >
               <span class="tool-head">
-                <Wrench size={11} strokeWidth={2} aria-hidden="true" />
+                <Wrench weight="fill" size={11} aria-hidden="true" />
                 <span class="tool-name">terminal</span>
                 {#if b.status === "running"}
-                  <Loader2 size={11} strokeWidth={2} aria-hidden="true" class="spin" />
+                  <Loader2 weight="bold" size={11} aria-hidden="true" class="spin" />
                 {:else if b.status === "ok"}
-                  <Check size={11} strokeWidth={2.5} aria-hidden="true" />
+                  <Check weight="bold" size={11} aria-hidden="true" />
                 {:else}
-                  <XCircle size={11} strokeWidth={2} aria-hidden="true" />
+                  <XCircle weight="fill" size={11} aria-hidden="true" />
                 {/if}
               </span>
               <code class="tool-cmd">{b.command}</code>
@@ -596,7 +579,7 @@
         {/each}
         {#if voiceError}
           <div class="voice-err">
-            <AlertCircle size={12} strokeWidth={2} />
+            <AlertCircle weight="fill" size={12} />
             <span>{voiceError}</span>
           </div>
         {/if}

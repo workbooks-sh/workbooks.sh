@@ -6,34 +6,35 @@
    * field:
    *
    *   emoji:<glyph>       → render the emoji as text
-   *   lucide:<IconName>   → look up the named lucide component
+   *   lucide:<IconName>   → look up the named glyph component (the
+   *                         prefix predates the Phosphor migration and
+   *                         stays for persisted-icon compatibility)
    *   (anything else)     → fall back to initials from `title`/`slug`
    *
-   * Lucide-name resolution uses a curated map below — adding a new
-   * icon to an agent's :ICON: means adding its component import here.
-   * The picker (when it lands) exposes the same curated set, so
-   * authors never reference an icon the renderer can't draw.
+   * Glyph-name resolution uses a curated map — adding a new icon to an
+   * agent's :ICON: means adding its component to agent_lucide_map.
+   * The picker exposes the same curated set, so authors never
+   * reference an icon the renderer can't draw.
    */
-  import type { Component } from "svelte";
   import { LUCIDE_MAP } from "./agent_lucide_map";
+
+  type IconComponent = (typeof LUCIDE_MAP)[string];
 
   let {
     icon = null,
     title = "",
     slug = "",
     size = 16,
-    strokeWidth = 1.8,
   }: {
     icon?: string | null;
     title?: string;
     slug?: string;
     size?: number;
-    strokeWidth?: number;
   } = $props();
 
   type Decoded =
     | { kind: "emoji"; value: string }
-    | { kind: "lucide"; component: Component<{ size?: number; strokeWidth?: number }> }
+    | { kind: "lucide"; component: IconComponent }
     | { kind: "initials"; value: string };
 
   function initialsOf(t: string, s: string): string {
@@ -79,7 +80,7 @@
     {decoded.value}
   {:else if decoded.kind === "lucide"}
     {@const Comp = decoded.component}
-    <Comp size={Math.round(size * 0.8)} strokeWidth={strokeWidth} />
+    <Comp size={Math.round(size * 0.8)} weight="fill" />
   {:else}
     <span class="ini" style:font-size="{Math.round(size * 0.45)}px">{decoded.value}</span>
   {/if}

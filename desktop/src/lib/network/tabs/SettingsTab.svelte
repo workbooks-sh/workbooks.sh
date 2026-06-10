@@ -8,7 +8,7 @@
    * Workhorse settings when those endpoints land.
    */
   import { onMount } from "svelte";
-  import { KeyRound, AtSign, ShieldCheck, Bell, Copy } from "@lucide/svelte";
+  import { Key as KeyRound, At as AtSign, ShieldCheck, Bell, Copy } from "phosphor-svelte";
   import Avatar from "../components/Avatar.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import { loadIdentity, type IdentityView } from "$lib/bridge/network.svelte";
@@ -40,7 +40,7 @@
   {#if me}
     <section class="card">
       <div class="card-head">
-        <AtSign size={15} strokeWidth={2} />
+        <AtSign weight="fill" size={15} />
         <h3>Identity</h3>
       </div>
       <div class="ident">
@@ -59,7 +59,7 @@
               onclick={() => navigator.clipboard?.writeText(me!.did)}
               title="Copy DID"
             >
-              <Copy size={12} strokeWidth={2.25} />
+              <Copy weight="fill" size={12} />
             </button>
           </div>
         </div>
@@ -68,7 +68,7 @@
 
     <section class="card">
       <div class="card-head">
-        <ShieldCheck size={15} strokeWidth={2} />
+        <ShieldCheck weight="fill" size={15} />
         <h3>Verification</h3>
       </div>
       <div class="row">
@@ -88,7 +88,7 @@
 
     <section class="card">
       <div class="card-head">
-        <KeyRound size={15} strokeWidth={2} />
+        <KeyRound weight="fill" size={15} />
         <h3>Keys</h3>
       </div>
       <div class="row">
@@ -107,7 +107,7 @@
 
   <section class="card">
     <div class="card-head">
-      <Bell size={15} strokeWidth={2} />
+      <Bell weight="fill" size={15} />
       <h3>Notifications</h3>
     </div>
     <label class="toggle-row">

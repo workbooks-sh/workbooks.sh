@@ -10,7 +10,7 @@
    */
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import { X, ArrowLeft, ArrowRight, Plus, KeyRound, Lock, Globe, Users, Sparkles } from "@lucide/svelte";
+  import { X, ArrowLeft, ArrowRight, Plus, Key as KeyRound, Lock, Globe, Users, Sparkle as Sparkles } from "phosphor-svelte";
 
   let {
     onclose,
@@ -66,7 +66,7 @@
   <header class="head">
     {#if screen !== "choice"}
       <button type="button" class="back" onclick={back} aria-label="Back">
-        <ArrowLeft size={15} strokeWidth={2} />
+        <ArrowLeft weight="bold" size={15} />
       </button>
     {/if}
     <h2>
@@ -76,27 +76,27 @@
       {/if}
     </h2>
     <button type="button" class="x" onclick={onclose} aria-label="Close">
-      <X size={15} strokeWidth={2} />
+      <X weight="bold" size={15} />
     </button>
   </header>
 
   {#if screen === "choice"}
     <div class="choice">
       <button type="button" class="choice-card" onclick={() => (screen = "create")}>
-        <span class="ico"><Plus size={20} strokeWidth={2} /></span>
+        <span class="ico"><Plus weight="bold" size={20} /></span>
         <span class="t">
           <span class="t-name">Create a network</span>
           <span class="t-sub">A circle of friends, a project group, or a team space you own.</span>
         </span>
-        <ArrowRight size={14} strokeWidth={2} class="arrow" />
+        <ArrowRight weight="bold" size={14} class="arrow" />
       </button>
       <button type="button" class="choice-card" onclick={() => (screen = "join")}>
-        <span class="ico"><KeyRound size={18} strokeWidth={2} /></span>
+        <span class="ico"><KeyRound weight="fill" size={18} /></span>
         <span class="t">
           <span class="t-name">Join with an invite</span>
           <span class="t-sub">Paste a code or link someone shared with you.</span>
         </span>
-        <ArrowRight size={14} strokeWidth={2} class="arrow" />
+        <ArrowRight weight="bold" size={14} class="arrow" />
       </button>
       <p class="hint">
         Workbooks Network is invite-only by design. There's no public directory.
@@ -130,7 +130,7 @@
         <div class="radio-grid">
           <label class="radio" class:active={cKind === "personal"}>
             <input type="radio" bind:group={cKind} value="personal" />
-            <Users size={14} strokeWidth={2} />
+            <Users weight="fill" size={14} />
             <span class="r-body">
               <span class="r-name">Personal circle</span>
               <span class="r-sub">A small group you hand-pick.</span>
@@ -138,7 +138,7 @@
           </label>
           <label class="radio" class:active={cKind === "project"}>
             <input type="radio" bind:group={cKind} value="project" />
-            <Sparkles size={14} strokeWidth={2} />
+            <Sparkles weight="fill" size={14} />
             <span class="r-body">
               <span class="r-name">Project</span>
               <span class="r-sub">Bound to a topic or shared work.</span>
@@ -152,17 +152,17 @@
         <div class="radio-row">
           <label class="seg" class:active={cJoin === "invite"}>
             <input type="radio" bind:group={cJoin} value="invite" />
-            <Lock size={12} strokeWidth={2} />
+            <Lock weight="fill" size={12} />
             Invite-only
           </label>
           <label class="seg" class:active={cJoin === "request"}>
             <input type="radio" bind:group={cJoin} value="request" />
-            <KeyRound size={12} strokeWidth={2} />
+            <KeyRound weight="fill" size={12} />
             Request
           </label>
           <label class="seg" class:active={cJoin === "open"}>
             <input type="radio" bind:group={cJoin} value="open" />
-            <Globe size={12} strokeWidth={2} />
+            <Globe weight="fill" size={12} />
             Open
           </label>
         </div>

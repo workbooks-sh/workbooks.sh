@@ -18,10 +18,7 @@
    */
   import { fly, fade, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import {
-    X, ArrowRight, ArrowLeft, Check, ShieldCheck, Copy,
-    KeyRound, AlertTriangle, Sparkles,
-  } from "@lucide/svelte";
+  import { X, ArrowRight, ArrowLeft, Check, ShieldCheck, Copy, Key as KeyRound, Warning as AlertTriangle, Sparkle as Sparkles } from "phosphor-svelte";
   import {
     generateIdentity, setHandle,
   } from "$lib/bridge/network.svelte";
@@ -252,7 +249,7 @@
     <div class="step-pill">Step {stepNumber} of 5</div>
     {#if step !== "generating" && step !== "done"}
       <button type="button" class="x" onclick={onclose} aria-label="Close">
-        <X size={15} strokeWidth={2} />
+        <X weight="bold" size={15} />
       </button>
     {/if}
   </header>
@@ -260,7 +257,7 @@
   {#if step === "welcome"}
     <div class="body">
       <div class="hero">
-        <span class="hero-glyph"><Sparkles size={24} strokeWidth={1.8} /></span>
+        <span class="hero-glyph"><Sparkles weight="fill" size={24} /></span>
         <h2>Create your network identity</h2>
         <p>
           Claim a handle and mint a cryptographic identity so you can publish
@@ -276,7 +273,7 @@
           onclick={continueFromWelcome}
         >
           Get started
-          <ArrowRight size={14} strokeWidth={2} />
+          <ArrowRight weight="bold" size={14} />
         </button>
       </footer>
     </div>
@@ -302,7 +299,7 @@
                              class:av-available={availability === "available"}
                              class:av-taken={availability === "taken"}
                              class:av-invalid={availability === "invalid"}>
-          {#if availability === "checking"}<span class="spinner" aria-hidden="true"></span>{:else if availability === "available"}<Check size={13} strokeWidth={2.5} />{:else if availability === "taken"}<X size={13} strokeWidth={2.5} />{:else if availability === "invalid"}<AlertTriangle size={13} strokeWidth={2.5} />{/if}
+          {#if availability === "checking"}<span class="spinner" aria-hidden="true"></span>{:else if availability === "available"}<Check weight="bold" size={13} />{:else if availability === "taken"}<X weight="bold" size={13} />{:else if availability === "invalid"}<AlertTriangle weight="fill" size={13} />{/if}
         </div>
       </div>
 
@@ -324,7 +321,7 @@
 
       <footer class="foot">
         <button type="button" class="btn ghost" onclick={() => (step = "welcome")}>
-          <ArrowLeft size={14} strokeWidth={2} /> Back
+          <ArrowLeft weight="bold" size={14} /> Back
         </button>
         <button
           type="button"
@@ -332,7 +329,7 @@
           disabled={!canContinueHandle}
           onclick={next}
         >
-          Continue <ArrowRight size={14} strokeWidth={2} />
+          Continue <ArrowRight weight="bold" size={14} />
         </button>
       </footer>
     </div>
@@ -347,7 +344,7 @@
   {:else if step === "backup"}
     <div class="body">
       <div class="hero compact">
-        <span class="hero-glyph warn"><ShieldCheck size={20} strokeWidth={1.8} /></span>
+        <span class="hero-glyph warn"><ShieldCheck weight="fill" size={20} /></span>
         <h2>Save your key</h2>
         <p>
           Your private key signs every workbook you publish. If you lose it
@@ -373,14 +370,14 @@
           {#if copiedDid}
             <span class="copied">copied</span>
           {:else}
-            <Copy size={11} strokeWidth={2} />
+            <Copy weight="fill" size={11} />
           {/if}
         </button>
       </div>
 
       <div class="kv">
         <span class="kv-label key-label">
-          <KeyRound size={11} strokeWidth={2} /> Private key
+          <KeyRound weight="fill" size={11} /> Private key
         </span>
         <button
           type="button"
@@ -392,7 +389,7 @@
           {#if copiedKey}
             <span class="copied">copied</span>
           {:else}
-            <Copy size={11} strokeWidth={2} />
+            <Copy weight="fill" size={11} />
           {/if}
         </button>
       </div>
@@ -410,14 +407,14 @@
           disabled={!backupAcked}
           onclick={() => (step = "done")}
         >
-          Continue <ArrowRight size={14} strokeWidth={2} />
+          Continue <ArrowRight weight="bold" size={14} />
         </button>
       </footer>
     </div>
   {:else}
     <div class="body">
       <div class="hero">
-        <span class="hero-glyph ok"><Check size={24} strokeWidth={2.25} /></span>
+        <span class="hero-glyph ok"><Check weight="bold" size={24} /></span>
         <h2>You're on the Network</h2>
         <p>
           @{handle.trim().toLowerCase()} is yours. Next: add a friend by handle,

@@ -25,18 +25,8 @@
    */
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import {
-    Plus,
-    Copy,
-    Trash2,
-    ClipboardPaste,
-    Check,
-    KeyRound,
-    Sparkles,
-    Layers,
-    Boxes,
-  } from "@lucide/svelte";
-  import { ExternalLink, Unlink, HelpCircle } from "@lucide/svelte";
+  import { Plus, Copy, Trash as Trash2, ClipboardText as ClipboardPaste, Check, Key as KeyRound, Sparkle as Sparkles, Stack as Layers, Cube as Boxes } from "phosphor-svelte";
+  import { ArrowSquareOut as ExternalLink, LinkBreak as Unlink, Question as HelpCircle } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { keys, providerEnvVar, providerLabel } from "$lib/bridge/keys.svelte";
   import {
@@ -777,7 +767,7 @@ exec gws auth setup`,
           aria-label="About {svc.name}"
           title={svc.description}
         >
-          <HelpCircle size={13} strokeWidth={1.8} />
+          <HelpCircle weight="fill" size={13} />
         </button>
         <span class="spacer"></span>
         {#if conn}
@@ -792,7 +782,7 @@ exec gws auth setup`,
             aria-label="Open {svc.name} dashboard"
             title="Open {svc.name} dashboard"
           >
-            <ExternalLink size={12} strokeWidth={2} />
+            <ExternalLink weight="fill" size={12} />
           </a>
           <button
             type="button"
@@ -801,7 +791,7 @@ exec gws auth setup`,
             aria-label="Disconnect {svc.name}"
             title="Disconnect"
           >
-            <Unlink size={12} strokeWidth={2} />
+            <Unlink weight="fill" size={12} />
           </button>
         {:else}
           {@const pending = oauthPendingServiceId === svc.id}
@@ -880,7 +870,7 @@ exec gws auth setup`,
           class="btn ghost small"
           onclick={() => (pasteOpen = true)}
         >
-          <ClipboardPaste size={12} strokeWidth={1.8} /> Paste .env
+          <ClipboardPaste weight="fill" size={12} /> Paste .env
         </button>
       {/if}
       {#if !creating}
@@ -889,7 +879,7 @@ exec gws auth setup`,
           class="btn ghost small"
           onclick={() => (creating = true)}
         >
-          <Plus size={12} strokeWidth={2} /> Add value
+          <Plus weight="bold" size={12} /> Add value
         </button>
       {/if}
     </div>
@@ -946,7 +936,7 @@ exec gws auth setup`,
           onclick={() => { pasteOpen = false; pasteText = ""; pasteResult = null; }}
         >Cancel</button>
         <button type="submit" class="btn primary" disabled={!pasteText.trim()}>
-          <Check size={13} strokeWidth={2.4} /> Import
+          <Check weight="bold" size={13} /> Import
         </button>
       </div>
       {#if pasteResult}
@@ -974,7 +964,7 @@ exec gws auth setup`,
           aria-checked={newKind === "api-key"}
           onclick={() => (newKind = "api-key")}
         >
-          <KeyRound size={12} strokeWidth={1.8} /> API key
+          <KeyRound weight="fill" size={12} /> API key
         </button>
         <button
           type="button"
@@ -984,7 +974,7 @@ exec gws auth setup`,
           aria-checked={newKind === "env-var"}
           onclick={() => (newKind = "env-var")}
         >
-          <Layers size={12} strokeWidth={1.8} /> Env var
+          <Layers weight="fill" size={12} /> Env var
         </button>
       </div>
 
@@ -1050,7 +1040,7 @@ exec gws auth setup`,
           onclick={() => { creating = false; newName = ""; newValue = ""; }}
         >Cancel</button>
         <button type="submit" class="btn primary" disabled={!newName.trim() || !newValue}>
-          <Check size={13} strokeWidth={2.4} /> Save
+          <Check weight="bold" size={13} /> Save
         </button>
       </div>
     </form>
@@ -1096,8 +1086,8 @@ exec gws auth setup`,
             {/if}
           </div>
           <div class="row-perms" aria-label="Permissions">
-            <span class="perm" title="Agent: read"><Sparkles size={11} strokeWidth={1.8} /> read</span>
-            <span class="perm muted" title="Workbook: none"><Boxes size={11} strokeWidth={1.8} /> none</span>
+            <span class="perm" title="Agent: read"><Sparkles weight="fill" size={11} /> read</span>
+            <span class="perm muted" title="Workbook: none"><Boxes weight="fill" size={11} /> none</span>
           </div>
           <div class="row-actions">
             <button
@@ -1111,9 +1101,9 @@ exec gws auth setup`,
               onclick={() => copyRow(r)}
             >
               {#if copiedAt[r.id] !== undefined}
-                <Check size={13} strokeWidth={2} />
+                <Check weight="bold" size={13} />
               {:else}
-                <Copy size={13} strokeWidth={1.8} />
+                <Copy weight="fill" size={13} />
               {/if}
             </button>
             <button
@@ -1123,7 +1113,7 @@ exec gws auth setup`,
               title="Delete"
               onclick={() => deleteRow(r)}
             >
-              <Trash2 size={13} strokeWidth={1.8} />
+              <Trash2 weight="fill" size={13} />
             </button>
           </div>
         </article>

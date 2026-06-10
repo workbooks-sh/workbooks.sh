@@ -1,36 +1,40 @@
 <script lang="ts" module>
   /**
-   * Icon name → Lucide component lookup. We import the specific icons we
-   * use (tree-shakeable) and key them by the bare `<Name>` that follows
-   * the `lucide:` prefix in an icon value. Canonical Lucide v1 names —
-   * deprecated aliases (KanbanSquare, BarChart3, Trello) are avoided.
+   * Icon name → Phosphor component lookup (solid / weight="fill" app-wide).
+   * Keyed by the bare `<Name>` that follows the `lucide:` prefix in stored
+   * icon values — the prefix predates the Phosphor migration and stays for
+   * backward compatibility with icons persisted on disk; old Lucide names
+   * are aliased to their Phosphor equivalents.
    */
   import {
-    SquareKanban,
     Kanban,
-    NotebookPen,
-    TrendingUp,
+    Notebook,
+    TrendUp,
     BookOpen,
     Briefcase,
     Rocket,
-    ChartColumn,
+    ChartBar,
     Wrench,
     Package as PackageIcon,
-  } from "@lucide/svelte";
+  } from "phosphor-svelte";
 
-  type LucideComponent = typeof SquareKanban;
+  type IconComponent = typeof Kanban;
 
-  export const LUCIDE: Record<string, LucideComponent> = {
-    SquareKanban,
+  export const GLYPHS: Record<string, IconComponent> = {
     Kanban,
-    NotebookPen,
-    TrendingUp,
+    Notebook,
+    TrendUp,
     BookOpen,
     Briefcase,
     Rocket,
-    ChartColumn,
+    ChartBar,
     Wrench,
     Package: PackageIcon,
+    // Legacy Lucide names persisted in package/workspace metadata.
+    SquareKanban: Kanban,
+    NotebookPen: Notebook,
+    TrendingUp: TrendUp,
+    ChartColumn: ChartBar,
   };
 </script>
 
@@ -39,25 +43,20 @@
    * Icon — the single resolver for the project-wide icon model:
    *
    *   value === ""                     → initials(name)
-   *   value.startsWith("lucide:")      → the named Lucide component
+   *   value.startsWith("lucide:")      → the named glyph component (solid)
    *   value.startsWith("data:image/")  → <img>
    *   otherwise (non-empty)            → emoji / glyph text
-   *
-   * Both the rail's bare app icon (AppRail) and the folder badge
-   * (FolderIcon) route through here so the model has exactly one home.
    */
   let {
     value = "",
     name = "",
     size = 18,
-    strokeWidth = 1.8,
   }: {
     value?: string;
     /** Fallback label for the initials case. */
     name?: string;
-    /** Lucide glyph size (px). Emoji/initials are sized by the host CSS. */
+    /** Glyph size (px). Emoji/initials are sized by the host CSS. */
     size?: number;
-    strokeWidth?: number;
   } = $props();
 
   function initials(n: string): string {
@@ -66,15 +65,15 @@
     return (n || "?").slice(0, 2).toUpperCase();
   }
 
-  const lucideName = $derived(
+  const glyphName = $derived(
     value.startsWith("lucide:") ? value.slice("lucide:".length) : null,
   );
-  const LucideComp = $derived(lucideName ? LUCIDE[lucideName] ?? null : null);
+  const GlyphComp = $derived(glyphName ? GLYPHS[glyphName] ?? null : null);
   const isImage = $derived(value.startsWith("data:image/"));
 </script>
 
-{#if LucideComp}
-  <svelte:component this={LucideComp} {size} {strokeWidth} aria-hidden="true" />
+{#if GlyphComp}
+  <GlyphComp {size} weight="fill" aria-hidden="true" />
 {:else if isImage}
   <img src={value} alt="" />
 {:else if value}

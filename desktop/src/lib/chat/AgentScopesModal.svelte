@@ -6,7 +6,7 @@
    * preview. Refers users to the agent's .org file for the full
    * source (link opens it as a doc tab).
    */
-  import { X, FileText, Cpu, Wrench, Shield, ArrowRight } from "@lucide/svelte";
+  import { X, FileText, Cpu, Wrench, Shield, ArrowRight } from "phosphor-svelte";
   import type { AgentCatalogEntry } from "$lib/bridge/agents.svelte";
   import { tabs } from "$lib/tabs/store.svelte";
   import AgentIcon from "./AgentIcon.svelte";
@@ -67,7 +67,7 @@
         aria-label="Close"
         onclick={oncancel}
       >
-        <X size={14} strokeWidth={1.8} />
+        <X weight="bold" size={14} />
       </button>
     </header>
 
@@ -79,7 +79,7 @@
         </section>
       {:else}
         <section class="prop-row">
-          <Cpu size={13} strokeWidth={1.8} aria-hidden="true" />
+          <Cpu weight="fill" size={13} aria-hidden="true" />
           <div>
             <div class="prop-label">Model</div>
             <div class="prop-value">
@@ -90,7 +90,7 @@
 
         {@const toolkits = agent.toolkits ?? agent.packages ?? []}
         <section class="prop-row">
-          <Wrench size={13} strokeWidth={1.8} aria-hidden="true" />
+          <Wrench weight="fill" size={13} aria-hidden="true" />
           <div>
             <div class="prop-label">
               Toolkits ({toolkits.length})
@@ -109,7 +109,7 @@
 
         {#if agent.tools && agent.tools.length > 0}
           <section class="prop-row">
-            <Wrench size={13} strokeWidth={1.8} aria-hidden="true" />
+            <Wrench weight="fill" size={13} aria-hidden="true" />
             <div>
               <div class="prop-label">
                 Tools allowlist ({agent.tools.length})
@@ -124,7 +124,7 @@
         {/if}
 
         <section class="prop-row">
-          <Shield size={13} strokeWidth={1.8} aria-hidden="true" />
+          <Shield weight="fill" size={13} aria-hidden="true" />
           <div>
             <div class="prop-label">
               Capabilities ({agent.capabilities?.length ?? 0})
@@ -143,7 +143,7 @@
 
         {#if agent.allow_spawn || (agent.max_children ?? 0) > 0}
           <section class="prop-row">
-            <ArrowRight size={13} strokeWidth={1.8} aria-hidden="true" />
+            <ArrowRight weight="bold" size={13} aria-hidden="true" />
             <div>
               <div class="prop-label">Sub-agents</div>
               <div class="prop-value">
@@ -169,7 +169,7 @@
 
     <footer class="foot">
       <button type="button" class="ghost" onclick={openSource}>
-        <FileText size={12} strokeWidth={1.8} />
+        <FileText weight="fill" size={12} />
         Open source
       </button>
       <button type="button" class="primary" onclick={oncancel}>Done</button>

@@ -11,7 +11,7 @@
    * decided yet). Clicking it surfaces a console hint for now.
    */
   import { onMount } from "svelte";
-  import { Plus, FilePlus } from "@lucide/svelte";
+  import { Plus, FilePlus } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { packageStore, type WorkbookEntry } from "$lib/bridge/package.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
@@ -87,7 +87,7 @@
   {:else if entries.length === 0}
     <div class="empty centered">
       <span class="empty-glyph" aria-hidden="true">
-        <FilePlus size={28} strokeWidth={1.5} />
+        <FilePlus weight="fill" size={28} />
       </span>
       <p class="empty-title">No workbooks here yet</p>
       <p class="hint">
@@ -95,7 +95,7 @@
         files in this package.
       </p>
       <button type="button" class="cta" onclick={onCreateWorkbook}>
-        <Plus size={14} strokeWidth={2} />
+        <Plus weight="bold" size={14} />
         New workbook
       </button>
     </div>
@@ -122,7 +122,7 @@
         onclick={onCreateWorkbook}
       >
         <span class="icon ghost" aria-hidden="true">
-          <Plus size={20} strokeWidth={1.8} />
+          <Plus weight="bold" size={20} />
         </span>
         <span class="title">New</span>
       </button>

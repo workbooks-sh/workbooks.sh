@@ -8,7 +8,7 @@
    * hit POST /v1/network/shares/:id/{accept,decline} in live mode.
    */
   import { onMount } from "svelte";
-  import { Check, X } from "@lucide/svelte";
+  import { Check, X } from "phosphor-svelte";
   import { fly, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import Avatar from "../components/Avatar.svelte";
@@ -198,7 +198,7 @@
                 class="btn decline"
                 onclick={() => settle(s.id, "declined")}
               >
-                <X size={13} strokeWidth={2.25} />
+                <X weight="bold" size={13} />
                 Decline
               </button>
               <button
@@ -206,7 +206,7 @@
                 class="btn accept"
                 onclick={() => settle(s.id, "accepted")}
               >
-                <Check size={13} strokeWidth={2.25} />
+                <Check weight="bold" size={13} />
                 Accept · add to workspace
               </button>
             </div>

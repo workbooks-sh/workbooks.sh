@@ -8,7 +8,7 @@
    * are subtle text-only until hovered. Vibe dots make networks visually
    * distinct without screaming.
    */
-  import { Sparkles, Inbox as InboxIcon, Plus, Users as FriendsIcon, UsersRound as GroupsIcon, Bell as SubsIcon } from "@lucide/svelte";
+  import { Sparkle as Sparkles, Tray as InboxIcon, Plus, Users as FriendsIcon, UsersThree as GroupsIcon, Bell as SubsIcon } from "phosphor-svelte";
   import { tick } from "svelte";
 
   export type Destination =
@@ -70,7 +70,7 @@
     class:active={isActive({ kind: "all" })}
     onclick={() => select({ kind: "all" })}
   >
-    <Sparkles size={13} strokeWidth={2} />
+    <Sparkles weight="fill" size={13} />
     <span>All</span>
   </button>
 
@@ -80,7 +80,7 @@
     class:active={isActive({ kind: "inbox" })}
     onclick={() => select({ kind: "inbox" })}
   >
-    <InboxIcon size={13} strokeWidth={2} />
+    <InboxIcon weight="fill" size={13} />
     <span>Inbox</span>
     {#if inboxCount > 0}
       <span class="count">{inboxCount}</span>
@@ -93,7 +93,7 @@
     class:active={isActive({ kind: "friends" })}
     onclick={() => select({ kind: "friends" })}
   >
-    <FriendsIcon size={13} strokeWidth={2} />
+    <FriendsIcon weight="fill" size={13} />
     <span>Friends</span>
     {#if friendsCount > 0}
       <span class="count">{friendsCount}</span>
@@ -106,7 +106,7 @@
     class:active={isActive({ kind: "groups" })}
     onclick={() => select({ kind: "groups" })}
   >
-    <GroupsIcon size={13} strokeWidth={2} />
+    <GroupsIcon weight="fill" size={13} />
     <span>Groups</span>
   </button>
 
@@ -116,7 +116,7 @@
     class:active={isActive({ kind: "subs" })}
     onclick={() => select({ kind: "subs" })}
   >
-    <SubsIcon size={13} strokeWidth={2} />
+    <SubsIcon weight="fill" size={13} />
     <span>Subs</span>
     {#if subsUpdateCount > 0}
       <span class="count">{subsUpdateCount}</span>
@@ -145,7 +145,7 @@
     aria-label="Create or join a network"
     title="Create or join a network"
   >
-    <Plus size={14} strokeWidth={2.25} />
+    <Plus weight="bold" size={14} />
   </button>
 </div>
 

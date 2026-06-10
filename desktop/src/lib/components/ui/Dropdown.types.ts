@@ -8,6 +8,6 @@ export type DropdownItem<V> = {
   value: V;
   label: string;
   description?: string;
-  icon?: typeof import("@lucide/svelte").Check;
+  icon?: typeof import("phosphor-svelte").Check;
   disabled?: boolean;
 };

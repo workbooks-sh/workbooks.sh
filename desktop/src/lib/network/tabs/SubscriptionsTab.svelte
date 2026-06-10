@@ -13,7 +13,7 @@
   import { onMount } from "svelte";
   import { fly, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import { Bell, BellOff, Sparkles, ExternalLink } from "@lucide/svelte";
+  import { Bell, BellSlash as BellOff, Sparkle as Sparkles, ArrowSquareOut as ExternalLink } from "phosphor-svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PreviewPane from "../components/PreviewPane.svelte";
   import {
@@ -163,13 +163,13 @@
             </span>
             {#if updates}
               <span class="badge update" transition:slide={{ duration: 180 }}>
-                <Sparkles size={11} strokeWidth={2.25} /> Update
+                <Sparkles weight="fill" size={11} /> Update
               </span>
             {/if}
-            <ExternalLink size={12} strokeWidth={2} class="row-arrow" />
+            <ExternalLink weight="fill" size={12} class="row-arrow" />
           </button>
           <button type="button" class="unsub" onclick={() => unsubscribe(sub.rid)} title="Unsubscribe">
-            <BellOff size={13} strokeWidth={2} />
+            <BellOff weight="fill" size={13} />
           </button>
         </div>
       {/each}

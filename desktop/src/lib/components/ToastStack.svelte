@@ -9,7 +9,7 @@
    * Semantic-colour rule from CLAUDE.md:
    *   progress = amber, success = emerald, error = rose
    */
-  import { CircleCheck, CircleAlert, Loader, X } from "@lucide/svelte";
+  import { CheckCircle as CircleCheck, WarningCircle as CircleAlert, CircleNotch as Loader, X } from "phosphor-svelte";
   import { toasts, type Toast } from "$lib/bridge/toasts.svelte";
 
   function dismiss(id: number) {
@@ -35,7 +35,7 @@
     {@const Icon = iconFor(toast.kind)}
     <div class="toast toast-{toast.kind}" role="status">
       <span class="icon" class:spin={toast.kind === "progress"}>
-        <Icon size={14} strokeWidth={1.8} />
+        <Icon size={14} weight={toast.kind === "progress" ? "bold" : "fill"} />
       </span>
       <span class="msg">{toast.message}</span>
       <button
@@ -44,7 +44,7 @@
         title="Dismiss"
         onclick={() => dismiss(toast.id)}
       >
-        <X size={12} strokeWidth={1.8} />
+        <X weight="bold" size={12} />
       </button>
     </div>
   {/each}

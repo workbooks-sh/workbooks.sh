@@ -26,19 +26,7 @@
    *   4. Compiled view with no .html files (wb-i38o.14)
    */
   import { onMount, onDestroy } from "svelte";
-  import {
-    FileText,
-    Folder,
-    FolderOpen,
-    ExternalLink,
-    Copy,
-    Package,
-    PackageOpen,
-    Code2,
-    Database,
-    Search,
-    X,
-  } from "@lucide/svelte";
+  import { FileText, Folder, FolderOpen, ArrowSquareOut as ExternalLink, Copy, Package, Package as PackageOpen, Code as Code2, Database, MagnifyingGlass as Search, X } from "phosphor-svelte";
   import { fileTree, type FsEntry } from "$lib/bridge/fs_tree.svelte";
   import {
     packageStore,
@@ -401,7 +389,7 @@
            toggle inline-right. -->
       <div class="ws-row">
         {#if searchActive}
-          <Search size={14} strokeWidth={1.8} />
+          <Search weight="bold" size={14} />
           <input
             bind:this={searchInputEl}
             bind:value={searchQuery}
@@ -418,7 +406,7 @@
             title="Close search"
             onclick={closeInlineSearch}
           >
-            <X size={14} strokeWidth={2} />
+            <X weight="bold" size={14} />
           </button>
         {:else}
           <span class="name" title={ws.name}>{ws.name}</span>
@@ -429,7 +417,7 @@
             title="Find in tree"
             onclick={openInlineSearch}
           >
-            <Search size={14} strokeWidth={1.8} />
+            <Search weight="bold" size={14} />
           </button>
           <div
             class="view-toggle"
@@ -445,7 +433,7 @@
               disabled={!packageStore.active}
               onclick={() => setViewMode("source")}
             >
-              <Code2 size={14} strokeWidth={1.8} />
+              <Code2 weight="fill" size={14} />
             </button>
             <button
               class="seg"
@@ -456,7 +444,7 @@
               disabled={!packageStore.active}
               onclick={() => setViewMode("compiled")}
             >
-              <Package size={14} strokeWidth={1.8} />
+              <Package weight="fill" size={14} />
             </button>
           </div>
         {/if}
@@ -488,9 +476,9 @@
               title={pkgName}
             >
               {#if pkgOpen}
-                <FolderOpen size={12} strokeWidth={1.8} />
+                <FolderOpen weight="fill" size={12} />
               {:else}
-                <Folder size={12} strokeWidth={1.8} />
+                <Folder weight="fill" size={12} />
               {/if}
               <span class="name">{pkgName}</span>
               {#if isActivePkg}<span class="active-dot" aria-label="active"></span>{/if}
@@ -531,9 +519,9 @@
                       title={root}
                     >
                       {#if isOpen}
-                        <FolderOpen size={12} strokeWidth={1.8} />
+                        <FolderOpen weight="fill" size={12} />
                       {:else}
-                        <Folder size={12} strokeWidth={1.8} />
+                        <Folder weight="fill" size={12} />
                       {/if}
                       <span class="name">{rootBasename(root)}</span>
                       {#if tree?.truncated}
@@ -584,9 +572,9 @@
           title={node.entry.path}
         >
           {#if open}
-            <FolderOpen size={12} strokeWidth={1.8} />
+            <FolderOpen weight="fill" size={12} />
           {:else}
-            <Folder size={12} strokeWidth={1.8} />
+            <Folder weight="fill" size={12} />
           {/if}
           <span class="name">{node.entry.name}</span>
         </summary>
@@ -606,7 +594,7 @@
           ? `${node.entry.path} — loaded as memory source`
           : node.entry.path}
       >
-        <FileText size={12} strokeWidth={1.6} />
+        <FileText weight="fill" size={12} />
         <span class="name">{node.entry.name}</span>
         {#if loadedAsMemory}
           <span class="memory-dot" aria-label="Loaded as memory source"></span>
@@ -618,11 +606,11 @@
 
 <ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
   <button class="ctx-item" onclick={openInOs}>
-    <ExternalLink size={12} strokeWidth={1.8} />
+    <ExternalLink weight="fill" size={12} />
     Open in OS
   </button>
   <button class="ctx-item" onclick={copyPath}>
-    <Copy size={12} strokeWidth={1.8} />
+    <Copy weight="fill" size={12} />
     Copy path
   </button>
   {#if menuIsDir || menuIsHtml}
@@ -638,7 +626,7 @@
         ? `Output: ${workbookIo.bundleOutputFor(menuPath)}`
         : ""}
     >
-      <Package size={12} strokeWidth={1.8} />
+      <Package weight="fill" size={12} />
       {bundleInFlight ? "Bundling…" : "Bundle directory to workbook"}
     </button>
   {/if}
@@ -652,7 +640,7 @@
         ? `Output: ${workbookIo.unbundleOutputFor(menuPath)}/`
         : ""}
     >
-      <PackageOpen size={12} strokeWidth={1.8} />
+      <PackageOpen weight="fill" size={12} />
       {unbundleInFlight ? "Unbundling…" : "Unbundle workbook to directory"}
     </button>
     <!-- wb-i38o.12 — add / remove .html workbook as a memory source. -->
@@ -663,7 +651,7 @@
         disabled={memoryInFlight}
         title="Remove this workbook's entries from the agent's memory"
       >
-        <Database size={12} strokeWidth={1.8} />
+        <Database weight="fill" size={12} />
         {memoryInFlight ? "Removing…" : "Remove as memory source"}
       </button>
     {:else}
@@ -673,7 +661,7 @@
         disabled={memoryInFlight}
         title="Index this workbook's .org files into the agent's semantic memory"
       >
-        <Database size={12} strokeWidth={1.8} />
+        <Database weight="fill" size={12} />
         {memoryInFlight ? "Loading…" : "Add as memory source"}
       </button>
     {/if}

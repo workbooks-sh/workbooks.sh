@@ -9,7 +9,7 @@
   import { onMount } from "svelte";
   import { fly, slide, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import { Plus, X, Trash2, Crown, ShieldHalf, UserPlus, ChevronLeft } from "@lucide/svelte";
+  import { Plus, X, Trash as Trash2, Crown, ShieldCheckered as ShieldHalf, UserPlus, CaretLeft as ChevronLeft } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import Avatar from "../components/Avatar.svelte";
   import HandleChip from "../components/HandleChip.svelte";
@@ -190,7 +190,7 @@
       </p>
     </div>
     <button type="button" class="btn primary" onclick={() => (creating = true)}>
-      <Plus size={13} strokeWidth={2.25} /> Create group
+      <Plus weight="bold" size={13} /> Create group
     </button>
   </header>
 
@@ -224,9 +224,9 @@
         >
           <div class="card-head">
             {#if g.my_role === "owner"}
-              <span class="role-tag owner"><Crown size={10} strokeWidth={2.5} /> owner</span>
+              <span class="role-tag owner"><Crown weight="fill" size={10} /> owner</span>
             {:else if g.my_role === "admin"}
-              <span class="role-tag admin"><ShieldHalf size={10} strokeWidth={2.5} /> admin</span>
+              <span class="role-tag admin"><ShieldHalf weight="fill" size={10} /> admin</span>
             {/if}
             <span class="vis">{g.visibility}</span>
           </div>
@@ -245,7 +245,7 @@
     <header class="modal-head">
       <h2>New group</h2>
       <button type="button" class="x" onclick={() => (creating = false)} aria-label="Close">
-        <X size={14} strokeWidth={2} />
+        <X weight="bold" size={14} />
       </button>
     </header>
     <div class="modal-body">
@@ -285,11 +285,11 @@
   <div class="modal lg" role="dialog" aria-modal="true" transition:fly={{ y: 10, duration: 220, easing: cubicOut }}>
     <header class="modal-head">
       <button type="button" class="back" onclick={() => (openGroup = null)} aria-label="Back">
-        <ChevronLeft size={15} strokeWidth={2} />
+        <ChevronLeft weight="bold" size={15} />
       </button>
       <h2>{openGroup.name}</h2>
       <button type="button" class="x" onclick={() => (openGroup = null)} aria-label="Close">
-        <X size={14} strokeWidth={2} />
+        <X weight="bold" size={14} />
       </button>
     </header>
     <div class="modal-body">
@@ -306,7 +306,7 @@
             <span class="at">@</span>
             <input type="text" bind:value={addMemberHandle} placeholder="handle" autocomplete="off" spellcheck={false} />
             <button type="button" class="btn primary sm" disabled={addingMember || !addMemberHandle.trim()} onclick={addMember}>
-              <UserPlus size={12} strokeWidth={2.25} /> Add
+              <UserPlus weight="fill" size={12} /> Add
             </button>
           </div>
         </section>
@@ -320,14 +320,14 @@
               <Avatar handle={m.handle} size="xs" />
               <HandleChip handle={m.handle} variant="inline" />
               {#if m.role === "owner"}
-                <span class="role-tag owner sm"><Crown size={9} strokeWidth={2.5} /> owner</span>
+                <span class="role-tag owner sm"><Crown weight="fill" size={9} /> owner</span>
               {:else if m.role === "admin"}
-                <span class="role-tag admin sm"><ShieldHalf size={9} strokeWidth={2.5} /> admin</span>
+                <span class="role-tag admin sm"><ShieldHalf weight="fill" size={9} /> admin</span>
               {/if}
               <span class="spacer"></span>
               {#if m.role !== "owner" && (openGroup.my_role === "owner" || openGroup.my_role === "admin")}
                 <button type="button" class="kebab" onclick={() => removeMember(m.handle)} aria-label="Remove">
-                  <X size={11} strokeWidth={2.25} />
+                  <X weight="bold" size={11} />
                 </button>
               {/if}
             </div>
@@ -342,7 +342,7 @@
     {#if openGroup.my_role === "owner"}
       <footer class="modal-foot">
         <button type="button" class="btn ghost danger" onclick={destroy}>
-          <Trash2 size={12} strokeWidth={2.25} /> Delete group
+          <Trash2 weight="fill" size={12} /> Delete group
         </button>
       </footer>
     {/if}

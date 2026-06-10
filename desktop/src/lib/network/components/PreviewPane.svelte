@@ -9,10 +9,7 @@
    * Install reveals an inline permissions panel that mirrors the
    * Workgate prompt the user would see if they confirm.
    */
-  import {
-    X, ExternalLink, Download, Bell, BellOff, GitFork,
-    Folder, Globe, Terminal, ShieldCheck, ArrowRight,
-  } from "@lucide/svelte";
+  import { X, ArrowSquareOut as ExternalLink, DownloadSimple as Download, Bell, BellSlash as BellOff, GitFork, Folder, Globe, Terminal, ShieldCheck, ArrowRight } from "phosphor-svelte";
   import { fly, fade, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { onMount } from "svelte";
@@ -233,7 +230,7 @@
   <header class="head">
     <span class="role">{roleLabel[artifact.kind]}</span>
     <button type="button" class="x" onclick={onclose} aria-label="Close">
-      <X size={16} strokeWidth={2} />
+      <X weight="bold" size={16} />
     </button>
   </header>
 
@@ -263,7 +260,7 @@
 
     {#if upstreamAdvance}
       <div class="upstream-advance">
-        <GitFork size={12} strokeWidth={2.25} />
+        <GitFork weight="fill" size={12} />
         Upstream <strong>@{upstreamAdvance.upstreamHandle}</strong> has new changes since this fork was rebased.
         <button type="button" class="pull-btn" onclick={doPullUpstream} disabled={pullPending}>
           {pullPending ? "Pulling…" : "Pull"}
@@ -275,22 +272,22 @@
   {#if installing && perms}
     <div class="perms" transition:slide={{ duration: 220, easing: cubicOut }}>
       <div class="perms-head">
-        <ShieldCheck size={14} strokeWidth={2} />
+        <ShieldCheck weight="fill" size={14} />
         <span>@{artifact.authorHandle}'s {artifact.kind} requests:</span>
       </div>
       <ul class="perm-list">
         {#if perms.fs.length}
-          <li><Folder size={13} strokeWidth={2} /> <span><strong>Files:</strong> {perms.fs.join(", ")}</span></li>
+          <li><Folder weight="fill" size={13} /> <span><strong>Files:</strong> {perms.fs.join(", ")}</span></li>
         {/if}
         {#if perms.net.length}
-          <li><Globe size={13} strokeWidth={2} /> <span><strong>Network:</strong> {perms.net.join(", ")}</span></li>
+          <li><Globe weight="fill" size={13} /> <span><strong>Network:</strong> {perms.net.join(", ")}</span></li>
         {/if}
         {#if perms.tools.length}
-          <li><Terminal size={13} strokeWidth={2} /> <span><strong>Tools:</strong> {perms.tools.join(", ")}</span></li>
+          <li><Terminal weight="fill" size={13} /> <span><strong>Tools:</strong> {perms.tools.join(", ")}</span></li>
         {/if}
       </ul>
       <div class="perms-scope">
-        Active in <button type="button" class="scope-picker">daily-driver workspace <ArrowRight size={11} strokeWidth={2} /></button>
+        Active in <button type="button" class="scope-picker">daily-driver workspace <ArrowRight weight="bold" size={11} /></button>
       </div>
     </div>
   {/if}
@@ -306,10 +303,10 @@
         : "Get a notification whenever the author publishes a new version."}
     >
       {#if subscribed}
-        <Bell size={13} strokeWidth={2.25} />
+        <Bell weight="fill" size={13} />
         Subscribed
       {:else}
-        <BellOff size={13} strokeWidth={2} />
+        <BellOff weight="fill" size={13} />
         Subscribe
       {/if}
     </button>
@@ -326,18 +323,18 @@
       </button>
     {:else}
       <button type="button" class="btn ghost" onclick={doFork} disabled={forkPending} title="Fork this workbook into your workspace">
-        <GitFork size={13} strokeWidth={2.25} />
+        <GitFork weight="fill" size={13} />
         {forkPending ? "Forking…" : "Fork"}
       </button>
       <button type="button" class="btn ghost">
-        <Download size={13} strokeWidth={2} />
+        <Download weight="fill" size={13} />
         Save copy
       </button>
       <button type="button" class="btn primary" onclick={primaryAction}>
         {#if isExecutable}
-          <ShieldCheck size={13} strokeWidth={2.25} />
+          <ShieldCheck weight="fill" size={13} />
         {:else}
-          <ExternalLink size={13} strokeWidth={2} />
+          <ExternalLink weight="fill" size={13} />
         {/if}
         {primaryLabel}
       </button>

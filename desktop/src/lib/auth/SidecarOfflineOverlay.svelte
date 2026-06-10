@@ -10,7 +10,7 @@
    * recover. After the restart, auth.refresh() picks up the new state.
    */
   import { invoke } from "@tauri-apps/api/core";
-  import { RefreshCw } from "@lucide/svelte";
+  import { ArrowsClockwise as RefreshCw } from "phosphor-svelte";
   import EmptyState from "$lib/network/components/EmptyState.svelte";
   import { auth } from "./store.svelte";
 
@@ -41,7 +41,7 @@
   >
     {#snippet cta()}
       <button type="button" class="btn primary" onclick={retry} disabled={retrying}>
-        <RefreshCw size={13} strokeWidth={2.25} class={retrying ? "spinning" : ""} />
+        <RefreshCw weight="fill" size={13} class={retrying ? "spinning" : ""} />
         {retrying ? "Trying again…" : "Try again"}
       </button>
     {/snippet}

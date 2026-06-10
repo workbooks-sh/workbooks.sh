@@ -10,7 +10,7 @@
    * + tagline + actions, dashed "+ Create new agent" at the bottom.
    */
   import { onMount } from "svelte";
-  import { Plus, AlertCircle, Star, Bot, MoreHorizontal, Trash2, Pencil } from "@lucide/svelte";
+  import { Plus, WarningCircle as AlertCircle, Star, Robot as Bot, DotsThree as MoreHorizontal, Trash as Trash2, PencilSimple as Pencil } from "phosphor-svelte";
   import { agents, type AgentCatalogEntry } from "$lib/bridge/agents.svelte";
   import { agentSettings } from "$lib/bridge/agent_settings.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
@@ -118,7 +118,7 @@
   <span class="count">{agents.agents.length}</span>
   <span class="spacer"></span>
   <button type="button" class="primary" onclick={openCreate}>
-    <Plus size={12} strokeWidth={2} aria-hidden="true" />
+    <Plus weight="bold" size={12} aria-hidden="true" />
     New agent
   </button>
 </header>
@@ -133,12 +133,12 @@
   <div class="state">Loading catalog…</div>
 {:else if agents.lastError && agents.agents.length === 0}
   <div class="state err">
-    <AlertCircle size={12} strokeWidth={2} />
+    <AlertCircle weight="fill" size={12} />
     {agents.lastError}
   </div>
 {:else if agents.agents.length === 0}
   <div class="state">
-    <Bot size={14} strokeWidth={1.8} />
+    <Bot weight="fill" size={14} />
     No agents yet. Workhorse and any user-scope agents will appear here.
   </div>
 {:else}
@@ -175,9 +175,8 @@
           aria-label={isPinned ? "Unpin as default" : "Pin as default"}
           onclick={() => togglePin(a)}
         >
-          <Star
+          <Star weight="fill"
             size={13}
-            strokeWidth={1.8}
             fill={isPinned ? "currentColor" : "none"}
             aria-hidden="true"
           />
@@ -189,14 +188,14 @@
           aria-label="More"
           onclick={(e) => openMenu(e, a)}
         >
-          <MoreHorizontal size={13} strokeWidth={1.8} aria-hidden="true" />
+          <MoreHorizontal weight="bold" size={13} aria-hidden="true" />
         </button>
       </li>
     {/each}
     <li>
       <button type="button" class="row create" onclick={openCreate}>
         <span class="row-icon dashed">
-          <Plus size={12} strokeWidth={2} aria-hidden="true" />
+          <Plus weight="bold" size={12} aria-hidden="true" />
         </span>
         <span class="row-body">
           <span class="row-title">Create new agent</span>
@@ -211,11 +210,11 @@
   {#snippet children()}
     {#if menuTarget}
       <button class="ctx-item" onclick={() => openEdit(menuTarget!)}>
-        <Pencil size={12} strokeWidth={1.8} aria-hidden="true" />
+        <Pencil weight="fill" size={12} aria-hidden="true" />
         <span>Edit</span>
       </button>
       <button class="ctx-item" onclick={() => togglePin(menuTarget!)}>
-        <Star size={12} strokeWidth={1.8} aria-hidden="true" />
+        <Star weight="fill" size={12} aria-hidden="true" />
         <span>
           {menuTarget.slug === agentSettings.settings.default_agent_slug
             ? "Unpin as default"

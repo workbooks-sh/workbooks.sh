@@ -5,7 +5,7 @@
    * network's "vibe" (a deterministic hash of the id) for restrained
    * personal-color flair without overpowering the monochrome chrome.
    */
-  import { Users, Lock, KeyRound, Globe } from "@lucide/svelte";
+  import { Users, Lock, Key as KeyRound, Globe } from "phosphor-svelte";
   import type { Network } from "../types";
 
   let {
@@ -44,10 +44,10 @@
   <span class="name">{network.name}</span>
   {#if showCount}
     <span class="sep">·</span>
-    <Users size={11} strokeWidth={2} />
+    <Users weight="fill" size={11} />
     <span class="count">{network.memberCount}</span>
   {/if}
-  <JoinIcon size={11} strokeWidth={2} class="join-icon" />
+  <JoinIcon size={11} weight="fill" class="join-icon" />
 </button>
 
 <style>

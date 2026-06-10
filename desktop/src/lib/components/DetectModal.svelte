@@ -16,14 +16,7 @@
    *   - error:   binary exists but `--version` blew up; show the error
    */
   import { invoke } from "@tauri-apps/api/core";
-  import {
-    Check,
-    Loader2,
-    ExternalLink,
-    AlertCircle,
-    SearchCheck,
-    Download,
-  } from "@lucide/svelte";
+  import { Check, CircleNotch as Loader2, ArrowSquareOut as ExternalLink, WarningCircle as AlertCircle, ListMagnifyingGlass as SearchCheck, DownloadSimple as Download } from "phosphor-svelte";
   import { connections } from "$lib/bridge/connections.svelte";
   import type { ConnectionService } from "$lib/bridge/connections.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -253,12 +246,12 @@
 
     {#if probing}
       <div class="state loading">
-        <Loader2 size={16} strokeWidth={2} class="spin" />
+        <Loader2 weight="bold" size={16} class="spin" />
         <span>Looking for <code>{binaryName}</code> on your PATH…</span>
       </div>
     {:else if probe?.found && probe.path && !probe.error}
       <div class="state ok">
-        <SearchCheck size={16} strokeWidth={2} />
+        <SearchCheck weight="fill" size={16} />
         <div class="state-body">
           <p class="state-title">Found it.</p>
           <dl class="probe-meta">
@@ -273,7 +266,7 @@
       </div>
     {:else if probe && probe.found && probe.error}
       <div class="state warn" role="alert">
-        <AlertCircle size={16} strokeWidth={2} />
+        <AlertCircle weight="fill" size={16} />
         <div class="state-body">
           <p class="state-title">
             Found <code>{binaryName}</code>, but it didn't respond.
@@ -314,9 +307,9 @@
             disabled={installRunning}
           >
             {#if installRunning}
-              <Loader2 size={12} strokeWidth={2} class="spin" /> Installing…
+              <Loader2 weight="bold" size={12} class="spin" /> Installing…
             {:else}
-              <Download size={12} strokeWidth={1.8} /> Install for me
+              <Download weight="fill" size={12} /> Install for me
             {/if}
           </button>
         </div>
@@ -329,9 +322,8 @@
           rel="noopener noreferrer"
           class="dash-link"
         >
-          {serviceName} install docs <ExternalLink
+          {serviceName} install docs <ExternalLink weight="fill"
             size={11}
-            strokeWidth={2}
           />
         </a>
       </div>
@@ -358,12 +350,12 @@
           disabled={connecting}
         >
           {#if connecting}
-            <Loader2 size={13} strokeWidth={2} class="spin" />
+            <Loader2 weight="bold" size={13} class="spin" />
             {signInScript ? "Setting up…" : "Connecting…"}
           {:else if signInScript}
-            <Check size={13} strokeWidth={2.4} /> Connect & sign in
+            <Check weight="bold" size={13} /> Connect & sign in
           {:else}
-            <Check size={13} strokeWidth={2.4} /> Connect
+            <Check weight="bold" size={13} /> Connect
           {/if}
         </button>
       {:else}

@@ -5,7 +5,7 @@
    * workbook tile. Always shows the text label (not just an icon) so the
    * meaning reads at a glance; the tooltip explains why.
    */
-  import { ShieldCheck, ShieldAlert, ShieldOff } from "@lucide/svelte";
+  import { ShieldCheck, ShieldWarning as ShieldAlert, ShieldSlash as ShieldOff } from "phosphor-svelte";
 
   type State = "verified" | "unverified" | "modified";
   type Subject = "person" | "artifact";
@@ -68,7 +68,7 @@
 </script>
 
 <span class="badge {state}" class:compact class:verified-real-name={isVerifiedRealName} title={tooltip}>
-  <Icon size={compact ? 10 : 11} strokeWidth={2.25} />
+  <Icon size={compact ? 10 : 11} weight="fill" />
   <span>{label}</span>
 </span>
 

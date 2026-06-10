@@ -11,7 +11,7 @@
    * /v1/network/friends with the entered handle.
    */
   import { onMount } from "svelte";
-  import { Check, X, UserPlus, MoreHorizontal } from "@lucide/svelte";
+  import { Check, X, UserPlus, DotsThree as MoreHorizontal } from "phosphor-svelte";
   import { fly, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import Avatar from "../components/Avatar.svelte";
@@ -185,7 +185,7 @@
         disabled={adding || !addHandle.trim()}
         onclick={submitAddFriend}
       >
-        <UserPlus size={12} strokeWidth={2.25} />
+        <UserPlus weight="fill" size={12} />
         {adding ? "Sending…" : "Send request"}
       </button>
     </div>
@@ -219,10 +219,10 @@
               <span class="ts">requested {relTime(f.created_at)}</span>
             </div>
             <button type="button" class="btn ghost sm" onclick={() => settle(f.handle, "decline")}>
-              <X size={12} strokeWidth={2.25} /> Decline
+              <X weight="bold" size={12} /> Decline
             </button>
             <button type="button" class="btn primary sm" onclick={() => settle(f.handle, "accept")}>
-              <Check size={12} strokeWidth={2.25} /> Accept
+              <Check weight="bold" size={12} /> Accept
             </button>
           </div>
         {/each}
@@ -273,7 +273,7 @@
               <span class="ts">friends since {relTime(f.updated_at)}</span>
             </div>
             <button type="button" class="kebab" aria-label="More" onclick={() => remove(f.handle)} title="Remove friend">
-              <MoreHorizontal size={14} strokeWidth={2} />
+              <MoreHorizontal weight="bold" size={14} />
             </button>
           </div>
         {/each}

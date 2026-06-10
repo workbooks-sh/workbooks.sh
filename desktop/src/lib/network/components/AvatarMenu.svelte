@@ -5,7 +5,7 @@
    * every social app; pulls Profile + Settings out of the primary nav
    * so the chip rail can stay focused on networks.
    */
-  import { User, Settings as SettingsIcon, LogOut } from "@lucide/svelte";
+  import { User, GearSix as SettingsIcon, SignOut as LogOut } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import Avatar from "./Avatar.svelte";
@@ -80,7 +80,7 @@
         role="menuitem"
         onclick={() => { close(); onnavigate("profile"); }}
       >
-        <User size={14} strokeWidth={2} />
+        <User weight="fill" size={14} />
         Your profile
       </button>
       <button
@@ -89,12 +89,12 @@
         role="menuitem"
         onclick={() => { close(); onnavigate("settings"); }}
       >
-        <SettingsIcon size={14} strokeWidth={2} />
+        <SettingsIcon weight="fill" size={14} />
         Settings
       </button>
       <div class="divider"></div>
       <button type="button" class="item subtle" role="menuitem" onclick={close}>
-        <LogOut size={14} strokeWidth={2} />
+        <LogOut weight="fill" size={14} />
         Sign out
       </button>
     </div>

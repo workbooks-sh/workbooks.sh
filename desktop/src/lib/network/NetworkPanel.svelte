@@ -26,7 +26,7 @@
   import SubscriptionsTab from "./tabs/SubscriptionsTab.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import EmptyState from "./components/EmptyState.svelte";
-  import { LogIn } from "@lucide/svelte";
+  import { SignIn as LogIn } from "phosphor-svelte";
 
   // Chip-rail counts. Real counts are surfaced inside each tab's
   // header; the chip-rail badges sit at zero until a cross-tab event
@@ -145,7 +145,7 @@
             class="signin-cta"
             onclick={() => auth.signIn()}
           >
-            <LogIn size={13} strokeWidth={2.25} />
+            <LogIn weight="fill" size={13} />
             Sign in to Workbooks
           </button>
         {/snippet}

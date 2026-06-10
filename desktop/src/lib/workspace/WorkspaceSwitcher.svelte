@@ -9,7 +9,7 @@
    *
    * Per docs/canonical-model.md.
    */
-  import { Check, Plus } from "@lucide/svelte";
+  import { Check, Plus } from "phosphor-svelte";
   import { workspaces, type Workspace } from "$lib/bridge/workspaces.svelte";
   import IconPickerMenu from "./IconPickerMenu.svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/ui/iconAccent.svelte";
@@ -127,7 +127,7 @@
               {/if}
             </span>
             <span class="row-name">{w.name}</span>
-            {#if isActive}<Check size={12} strokeWidth={2.4} />{/if}
+            {#if isActive}<Check weight="bold" size={12} />{/if}
           </button>
         {/each}
         <button
@@ -135,7 +135,7 @@
           class="row create"
           onclick={() => (mode = "create")}
         >
-          <span class="row-icon plus"><Plus size={14} strokeWidth={2} /></span>
+          <span class="row-icon plus"><Plus weight="bold" size={14} /></span>
           <span class="row-name">New workspace</span>
         </button>
       </div>

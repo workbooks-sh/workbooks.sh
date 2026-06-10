@@ -28,14 +28,7 @@
    * stays cheap.
    */
 
-  import {
-    AlertCircle,
-    CheckCircle2,
-    ChevronDown,
-    Loader2,
-    Wrench,
-    X,
-  } from "@lucide/svelte";
+  import { WarningCircle as AlertCircle, CheckCircle as CheckCircle2, CaretDown as ChevronDown, CircleNotch as Loader2, Wrench, X } from "phosphor-svelte";
   import { onMount, tick } from "svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { chatSession } from "./session.svelte";
@@ -359,9 +352,8 @@
                 <div class="agent-head">
                   <span class="agent-label">{b.label}</span>
                   {#if b.pending}
-                    <Loader2
+                    <Loader2 weight="bold"
                       size={11}
-                      strokeWidth={2}
                       class="spin"
                       aria-hidden="true"
                     />
@@ -387,31 +379,27 @@
                 onclick={() => (openTools[t.key] = !openTools[t.key])}
               >
                 <span class="tool-head">
-                  <Wrench size={11} strokeWidth={2} aria-hidden="true" />
+                  <Wrench weight="fill" size={11} aria-hidden="true" />
                   <span class="tool-name">{t.toolName}</span>
                   {#if t.pending}
-                    <Loader2
+                    <Loader2 weight="bold"
                       size={11}
-                      strokeWidth={2}
                       class="spin"
                       aria-hidden="true"
                     />
                   {:else if t.status === "error"}
-                    <AlertCircle
+                    <AlertCircle weight="fill"
                       size={11}
-                      strokeWidth={2}
                       aria-hidden="true"
                     />
                   {:else}
-                    <CheckCircle2
+                    <CheckCircle2 weight="fill"
                       size={11}
-                      strokeWidth={2}
                       aria-hidden="true"
                     />
                   {/if}
-                  <ChevronDown
+                  <ChevronDown weight="bold"
                     size={10}
-                    strokeWidth={2}
                     class="tool-chev"
                     aria-hidden="true"
                   />
@@ -445,7 +433,7 @@
 
       {#if chatSession.sendError}
         <div class="footer-error">
-          <AlertCircle size={12} strokeWidth={2} aria-hidden="true" />
+          <AlertCircle weight="fill" size={12} aria-hidden="true" />
           <span>{chatSession.sendError}</span>
         </div>
       {/if}
@@ -502,7 +490,7 @@
               onclick={() => detachSkill(slug)}
               aria-label={`Remove ${slug}`}
             >
-              <X size={10} strokeWidth={2.25} />
+              <X weight="bold" size={10} />
             </button>
           </span>
         {/each}

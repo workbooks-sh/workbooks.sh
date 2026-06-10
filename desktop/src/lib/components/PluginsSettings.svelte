@@ -8,7 +8,7 @@
    * read it without schema churn.
    */
   import { onMount } from "svelte";
-  import { Plus, Trash2, Check, Puzzle } from "@lucide/svelte";
+  import { Plus, Trash as Trash2, Check, PuzzlePiece as Puzzle } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import {
     plugins,
@@ -102,7 +102,7 @@
         <li>
           <div class="p-row">
             <div class="p-meta">
-              <Puzzle size={13} strokeWidth={1.8} />
+              <Puzzle weight="fill" size={13} />
               <span class="p-name">{p.name}</span>
               {#if p.version}
                 <span class="version">v{p.version}</span>
@@ -127,7 +127,7 @@
                 aria-label="remove plugin"
                 onclick={() => remove(p)}
               >
-                <Trash2 size={13} strokeWidth={1.8} />
+                <Trash2 weight="fill" size={13} />
               </button>
             </div>
           </div>
@@ -181,7 +181,7 @@
           class="primary"
           disabled={!fName.trim() || !fSource.trim()}
         >
-          <Check size={13} strokeWidth={1.8} /> install
+          <Check weight="bold" size={13} /> install
         </button>
       </div>
     </form>
@@ -191,7 +191,7 @@
       class="add-card"
       onclick={() => (showCreate = true)}
     >
-      <Plus size={13} strokeWidth={2} />
+      <Plus weight="bold" size={13} />
       <span>Install a plugin</span>
     </button>
   {/if}

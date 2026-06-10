@@ -27,6 +27,23 @@ class ChromeStore {
   /** Active rail-tab label (shown after the product name when in app mode). */
   section = $state<string>("");
 
+  /** Arc-style left sidebar (folders + apps). Open by default; the
+   *  titlebar toggle + ⌘B flip it. Persisted so the choice survives
+   *  relaunch. */
+  sidebarOpen = $state<boolean>(
+    typeof localStorage === "undefined"
+      ? true
+      : localStorage.getItem("chrome.sidebarOpen") !== "0",
+  );
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+    try {
+      localStorage.setItem("chrome.sidebarOpen", this.sidebarOpen ? "1" : "0");
+    } catch {
+      /* private mode etc. — non-fatal */
+    }
+  }
+
   /** Whether the main area renders the rail section or the active doc tab. */
   mode = $state<ChromeMode>("app");
 

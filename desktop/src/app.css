@@ -25,6 +25,14 @@
   --color-ring: rgba(15, 15, 15, 0.32);
   --color-grid-line: rgba(15, 15, 15, 0.045);
 
+  /* Brand + status colors (slate / silver / blue light theme). Brand
+   * blue is the one saturated constant across both schemes; soft is
+   * its wash for chips/tiles. */
+  --color-brand: #2f6fe0;
+  --color-brand-soft: rgba(47, 111, 224, 0.10);
+  --color-ok: #22a069;
+  --color-warn: #dca51e;
+
   /* Aurora palette — four blob colors for the reusable theme gradient.
    * Used by the Gemini Live edge glow and any other "Apple Intelligence"
    * surface that needs a vibrant multi-color wash. Themes override these
@@ -56,6 +64,10 @@
     --color-accent: #f4f4f5;
     --color-ring: rgba(255, 255, 255, 0.22);
     --color-grid-line: rgba(255, 255, 255, 0.05);
+    --color-brand: #5b8cff;
+    --color-brand-soft: rgba(91, 140, 255, 0.14);
+    --color-ok: #34d399;
+    --color-warn: #fbbf24;
     /* Slightly cooler aurora in dark mode so it reads against the
      * darker page background. */
     --gradient-aurora-a: #818cf8;

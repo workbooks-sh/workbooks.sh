@@ -74,11 +74,11 @@
 
       <section class="stage">
         <div class="big light">
-          <FolderIcon {icon} {color} {size} />
+          <FolderIcon {color} {size} />
           <span class="cap">light</span>
         </div>
         <div class="big dark">
-          <FolderIcon {icon} {color} {size} />
+          <FolderIcon {color} {size} />
           <span class="cap">dark</span>
         </div>
       </section>
@@ -88,7 +88,7 @@
         <div class="sizes">
           {#each SIZES as s}
             <div class="szcell">
-              <FolderIcon {icon} {color} size={s} />
+              <FolderIcon {color} size={s} />
               <span class="cap">{s}</span>
             </div>
           {/each}
@@ -101,7 +101,7 @@
           {#each RAIL as it}
             <div class="rail-cell" title={it.name}>
               {#if it.kind === "folder"}
-                <FolderIcon icon={it.icon} {color} size={31} />
+                <FolderIcon {color} size={31} />
               {:else}
                 <span class="bare">{it.icon}</span>
               {/if}

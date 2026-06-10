@@ -18,7 +18,7 @@
    * routes to a non-OpenRouter provider directly, that consumer
    * will read the same string and route appropriately.
    */
-  import { ChevronDown, Loader2, Search } from "@lucide/svelte";
+  import { CaretDown as ChevronDown, CircleNotch as Loader2, MagnifyingGlass as Search } from "phosphor-svelte";
   import { onMount } from "svelte";
 
   interface Model {
@@ -219,7 +219,7 @@
     {:else}
       <span class="placeholder">{placeholder}</span>
     {/if}
-    <ChevronDown size={12} strokeWidth={2} class="chev" aria-hidden="true" />
+    <ChevronDown weight="bold" size={12} class="chev" aria-hidden="true" />
   </button>
 
   {#if open && pos}
@@ -232,7 +232,7 @@
       style:width="{pos.width}px"
     >
       <div class="search">
-        <Search size={11} strokeWidth={2} aria-hidden="true" />
+        <Search weight="bold" size={11} aria-hidden="true" />
         <input
           bind:this={searchEl}
           type="text"
@@ -248,7 +248,7 @@
       <div class="list">
         {#if loading}
           <div class="state">
-            <Loader2 size={12} strokeWidth={2} class="spin" />
+            <Loader2 weight="bold" size={12} class="spin" />
             Loading OpenRouter catalog…
           </div>
         {:else if loadError}

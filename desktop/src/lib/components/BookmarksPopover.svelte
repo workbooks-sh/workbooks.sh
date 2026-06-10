@@ -12,7 +12,7 @@
    * Picking from the file tree → "Bookmark this file" via the
    * existing right-click context menu is a follow-up.
    */
-  import { Bookmark as BookmarkIcon, Plus, Trash2, X } from "@lucide/svelte";
+  import { BookmarkSimple as BookmarkIcon, Plus, Trash as Trash2, X } from "phosphor-svelte";
   import { bookmarks, type Bookmark } from "$lib/bridge/bookmarks.svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import Dropdown from "./ui/Dropdown.svelte";
@@ -108,7 +108,7 @@
     {style}
   >
     <header class="head">
-      <BookmarkIcon size={13} strokeWidth={1.8} />
+      <BookmarkIcon weight="fill" size={13} />
       <span class="title">Bookmarks</span>
       <span class="spacer"></span>
       {#if tabsStore.active}
@@ -118,7 +118,7 @@
           title="Bookmark current tab ({tabsStore.active.title})"
           onclick={addCurrentTab}
         >
-          <Plus size={11} strokeWidth={2} /> Add
+          <Plus weight="bold" size={11} /> Add
         </button>
       {/if}
     </header>
@@ -167,7 +167,7 @@
                 aria-label="Delete bookmark"
                 onclick={() => remove(b)}
               >
-                <Trash2 size={12} strokeWidth={1.8} />
+                <Trash2 weight="fill" size={12} />
               </button>
             </div>
           </article>

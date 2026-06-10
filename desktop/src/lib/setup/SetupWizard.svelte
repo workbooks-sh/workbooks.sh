@@ -10,16 +10,7 @@
    * +layout.svelte; renders only when `wizard.step !== "closed"`.
    */
   import { onMount } from "svelte";
-  import {
-    Cpu,
-    Cloud,
-    Download,
-    Check,
-    X,
-    RefreshCw,
-    Loader,
-    AlertCircle,
-  } from "@lucide/svelte";
+  import { Cpu, Cloud, DownloadSimple as Download, Check, X, ArrowsClockwise as RefreshCw, CircleNotch as Loader, WarningCircle as AlertCircle } from "phosphor-svelte";
   import { wizard } from "./wizard.svelte";
 
   onMount(() => {
@@ -52,7 +43,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="card" role="dialog" aria-modal="true" aria-label="Engine setup" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       <button type="button" class="close" aria-label="Skip setup" onclick={() => wizard.close()}>
-        <X size={15} strokeWidth={2} />
+        <X weight="bold" size={15} />
       </button>
 
       {#if wizard.step === "choose"}
@@ -63,21 +54,21 @@
         </p>
         <div class="choices">
           <button type="button" class="choice" onclick={() => wizard.chooseLocal()}>
-            <Cpu size={20} strokeWidth={1.75} />
+            <Cpu weight="fill" size={20} />
             <span class="ct">Run on this machine</span>
             <span class="cd">A sandboxed microVM, fully local. macOS.</span>
           </button>
           <button type="button" class="choice" onclick={() => wizard.chooseCloud()}>
-            <Cloud size={20} strokeWidth={1.75} />
+            <Cloud weight="fill" size={20} />
             <span class="ct">Connect to a cloud engine</span>
             <span class="cd">Point at a hosted engine by URL.</span>
           </button>
         </div>
-        {#if wizard.error}<p class="err"><AlertCircle size={13} /> {wizard.error}</p>{/if}
+        {#if wizard.error}<p class="err"><AlertCircle weight="fill" size={13} /> {wizard.error}</p>{/if}
 
       {:else if wizard.step === "local-detect"}
         <h2>Checking this machine…</h2>
-        <p class="lede center"><Loader size={18} class="spin" /> Looking for the VM backend.</p>
+        <p class="lede center"><Loader weight="bold" size={18} class="spin" /> Looking for the VM backend.</p>
 
       {:else if wizard.step === "local-install"}
         <h2>Install the VM backend</h2>
@@ -87,7 +78,7 @@
         </p>
         {#if wizard.backend && !wizard.backend.brew}
           <p class="err">
-            <AlertCircle size={13} /> Homebrew isn't installed. Get it at
+            <AlertCircle weight="fill" size={13} /> Homebrew isn't installed. Get it at
             <code>brew.sh</code>, or run
             <code>brew tap slp/krun &amp;&amp; brew install krunvm</code> yourself, then retry.
           </p>
@@ -97,7 +88,7 @@
             {#each wizard.log as line}<div class="ll">{line}</div>{/each}
           </div>
         {/if}
-        {#if wizard.error}<p class="err"><AlertCircle size={13} /> {wizard.error}</p>{/if}
+        {#if wizard.error}<p class="err"><AlertCircle weight="fill" size={13} /> {wizard.error}</p>{/if}
         <div class="actions">
           <button type="button" class="btn ghost" onclick={() => wizard.retry()}>Back</button>
           <button
@@ -106,7 +97,7 @@
             disabled={wizard.busy || (wizard.backend ? !wizard.backend.brew : false)}
             onclick={() => wizard.installBackend()}
           >
-            <Download size={14} strokeWidth={2} />
+            <Download weight="fill" size={14} />
             {wizard.busy ? "Installing…" : "Install krunvm"}
           </button>
         </div>
@@ -114,7 +105,7 @@
       {:else if wizard.step === "local-booting"}
         <h2>Starting the engine</h2>
         <p class="lede center">
-          <Loader size={18} class="spin" /> Booting a microVM. The first run
+          <Loader weight="bold" size={18} class="spin" /> Booting a microVM. The first run
           downloads the engine image — this is slow once, then cached.
         </p>
         <div class="log" bind:this={logEl}>
@@ -122,11 +113,11 @@
           {#if !wizard.log.length}<div class="ll dim">working…</div>{/if}
         </div>
         {#if wizard.error}
-          <p class="err"><AlertCircle size={13} /> {wizard.error}</p>
+          <p class="err"><AlertCircle weight="fill" size={13} /> {wizard.error}</p>
           <div class="actions">
             <button type="button" class="btn ghost" onclick={() => wizard.retry()}>Back</button>
             <button type="button" class="btn primary" onclick={() => wizard.bootLocal()}>
-              <RefreshCw size={14} strokeWidth={2} /> Retry
+              <RefreshCw weight="fill" size={14} /> Retry
             </button>
           </div>
         {/if}
@@ -142,7 +133,7 @@
           <span>Token <em>(optional)</em></span>
           <input type="password" placeholder="bearer token" bind:value={wizard.cloudToken} />
         </label>
-        {#if wizard.error}<p class="err"><AlertCircle size={13} /> {wizard.error}</p>{/if}
+        {#if wizard.error}<p class="err"><AlertCircle weight="fill" size={13} /> {wizard.error}</p>{/if}
         <div class="actions">
           <button type="button" class="btn ghost" onclick={() => wizard.retry()}>Back</button>
           <button type="button" class="btn primary" disabled={wizard.busy} onclick={() => wizard.connectCloud()}>
@@ -152,11 +143,11 @@
 
       {:else if wizard.step === "cloud-connecting"}
         <h2>Connecting…</h2>
-        <p class="lede center"><Loader size={18} class="spin" /> Probing the engine.</p>
+        <p class="lede center"><Loader weight="bold" size={18} class="spin" /> Probing the engine.</p>
 
       {:else if wizard.step === "done"}
         <div class="done">
-          <span class="check"><Check size={26} strokeWidth={2.5} /></span>
+          <span class="check"><Check weight="bold" size={26} /></span>
           <h2>Engine connected</h2>
           <p class="lede center">You're all set.</p>
         </div>

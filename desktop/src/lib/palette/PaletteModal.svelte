@@ -19,19 +19,7 @@
    *                    (wb-5hc0.5).
    */
   import { tick } from "svelte";
-  import {
-    Sparkles,
-    ArrowUp,
-    AlertCircle,
-    CheckCircle2,
-    Kanban,
-    ListChecks,
-    Bot,
-    Package,
-    Wand2,
-    BookOpen,
-    type Icon as LucideIcon,
-  } from "@lucide/svelte";
+  import { Sparkle as Sparkles, ArrowUp, WarningCircle as AlertCircle, CheckCircle as CheckCircle2, Kanban, ListChecks, Robot as Bot, Package, MagicWand as Wand2, BookOpen } from "phosphor-svelte";
   import { askPalette, type PaletteResult } from "./api";
   import {
     startWizard,
@@ -158,10 +146,11 @@
     return out;
   }
 
-  /** Lucide icon for a wizard id, or null if there's no convention.
+  /** Phosphor icon for a wizard id, or null if there's no convention.
    *  Matches the same icons the start-surface chips use so the header
    *  reads as "the thing the chip launched, just opened." */
-  const WIZARD_ICONS: Record<string, typeof LucideIcon> = {
+  type IconComponent = typeof Kanban;
+  const WIZARD_ICONS: Record<string, IconComponent> = {
     "create-board": Kanban,
     "create-task": ListChecks,
     "create-agent": Bot,
@@ -169,7 +158,7 @@
     "create-skill": Wand2,
     "create-workbook": BookOpen,
   };
-  const wizardIcon = $derived<typeof LucideIcon | null>(
+  const wizardIcon = $derived<IconComponent | null>(
     activeWizard ? (WIZARD_ICONS[activeWizard.id] ?? null) : null,
   );
 
@@ -402,7 +391,7 @@
           <div class="wizard-head">
             {#if wizardIcon}
               {@const Icon = wizardIcon}
-              <Icon size={13} strokeWidth={2} aria-hidden="true" />
+              <Icon size={13} weight="fill" aria-hidden="true" />
             {/if}
             <span class="wizard-head-label">{activeWizard?.title ?? ""}</span>
           </div>
@@ -427,7 +416,7 @@
                 aria-label="Start wizard"
                 title="Continue (Enter)"
               >
-                <ArrowUp size={14} strokeWidth={2.5} aria-hidden="true" />
+                <ArrowUp weight="bold" size={14} aria-hidden="true" />
               </button>
             </div>
           {/if}
@@ -463,21 +452,21 @@
                 disabled={busy || wizardRequiredUnanswered}
               >
                 <span>{wizardRequiredUnanswered ? "Fill required fields" : "Continue"}</span>
-                <ArrowUp size={13} strokeWidth={2.5} aria-hidden="true" />
+                <ArrowUp weight="bold" size={13} aria-hidden="true" />
               </button>
             </div>
           {/if}
 
           {#if wizardPhase === "done" && !busy}
             <div class="wizard-row wizard-done-row">
-              <CheckCircle2 size={14} strokeWidth={2} aria-hidden="true" />
+              <CheckCircle2 weight="fill" size={14} aria-hidden="true" />
               <span>Brief saved. Opening the chat to execute…</span>
             </div>
           {/if}
 
           {#if error && !busy}
             <div class="wizard-row wizard-err-row">
-              <AlertCircle size={12} strokeWidth={2} aria-hidden="true" />
+              <AlertCircle weight="fill" size={12} aria-hidden="true" />
               <span>{error}</span>
             </div>
           {/if}
@@ -498,7 +487,7 @@
              composer, not here (wb-nlts). -->
         <div class="bar" class:busy>
           <span class="leading" aria-hidden="true">
-            <Sparkles size={15} strokeWidth={2} />
+            <Sparkles weight="fill" size={15} />
           </span>
           <textarea
             bind:this={inputEl}
@@ -521,7 +510,7 @@
               aria-label="Send"
               title="Send (Enter)"
             >
-              <ArrowUp size={14} strokeWidth={2.5} aria-hidden="true" />
+              <ArrowUp weight="bold" size={14} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -552,7 +541,7 @@
 
         {#if error && !busy}
           <div class="result err">
-            <AlertCircle size={12} strokeWidth={2} aria-hidden="true" />
+            <AlertCircle weight="fill" size={12} aria-hidden="true" />
             <span>{error}</span>
           </div>
         {/if}
