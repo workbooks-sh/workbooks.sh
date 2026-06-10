@@ -197,6 +197,8 @@ body {
 .node .msg { font: 400 11.5px/1.5 var(--mono); color: var(--ink); overflow-wrap: anywhere; margin-bottom: 3px; }
 .node.t-sys .msg { color: var(--dim); }
 .node .nmeta { display: flex; gap: 10px; font: 400 10px/1 var(--mono); color: var(--faint); }
+.node .nmeta a { color: var(--faint); text-decoration: none; border-bottom: 1px dotted var(--line); }
+.node .nmeta a:hover { color: var(--live); border-color: var(--live); }
 
 /* ── responsive: panel stacks under the page on small screens ── */
 @media (max-width: 960px) {
@@ -384,7 +386,7 @@ function renderTimeline(list) {
     const k = kind(c.msg);
     return `<div class="node t-${k}${c.sha === freshSha ? ' fresh' : ''}">
       <div class="msg">${c.msg.replace(/^(add|audit):\s*/i, '').replace(/</g, '&lt;')}</div>
-      <div class="nmeta"><span>${c.sha}</span><span>${rel(c.ts)}</span></div>
+      <div class="nmeta"><a href="https://github.com/workbooks-sh/living-lander/commit/${c.sha}" target="_blank" rel="noopener">${c.sha}</a><span>${rel(c.ts)}</span></div>
     </div>`;
   }).join('');
 }

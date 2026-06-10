@@ -69,6 +69,10 @@ defmodule Workbooks.Keeper do
 
   @impl true
   def init(_opts) do
+    # Runs execute in a linked Task (see :tick) so they can be killed on
+    # timeout; trap exits so a crashing run never takes the keeper down.
+    Process.flag(:trap_exit, true)
+
     case def_path() do
       nil ->
         Logger.info("Keeper: WB_KEEPER_DEF not set — idle")
@@ -96,19 +100,29 @@ defmodule Workbooks.Keeper do
     Logger.info("Keeper: tick — running #{path}")
     put_status(%{running: true, last_run: System.system_time(:second)})
 
-    try do
-      org = File.read!(path)
-      result = run_def(org)
-      Logger.info("Keeper: tick done — #{inspect(String.slice(result.result || "", 0, 120))}")
-    rescue
-      e ->
-        Logger.error("Keeper: tick failed — #{Exception.message(e)}")
+    # Hard wall-clock bound per run (WB_KEEPER_RUN_TIMEOUT_MS, default 15m): a
+    # wedged run (e.g. a hung provider call) is killed and the next tick simply
+    # retries — the keeper must never stay stuck until a human restarts the box.
+    task = Task.async(fn -> run_def(File.read!(path)) end)
+
+    case Task.yield(task, run_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} ->
+        Logger.info("Keeper: tick done — #{inspect(String.slice(result.result || "", 0, 120))}")
+
+      {:exit, reason} ->
+        Logger.error("Keeper: tick failed — #{inspect(reason)}")
+
+      nil ->
+        Logger.error("Keeper: tick killed — exceeded #{run_timeout_ms()}ms wall clock")
     end
 
     schedule()
     put_status(%{running: false, next_run: System.system_time(:second) + div(interval_ms(), 1000)})
     {:noreply, state}
   end
+
+  # trap_exit is on: absorb EXITs from run tasks (normal or killed).
+  def handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state}
 
   # ── private helpers ──────────────────────────────────────────────────────────
 
@@ -117,6 +131,15 @@ defmodule Workbooks.Keeper do
   defp interval_ms do
     case System.get_env("WB_KEEPER_INTERVAL_MS") do
       nil -> @default_interval_ms
+      s -> String.to_integer(s)
+    end
+  end
+
+  @default_run_timeout_ms 900_000
+
+  defp run_timeout_ms do
+    case System.get_env("WB_KEEPER_RUN_TIMEOUT_MS") do
+      nil -> @default_run_timeout_ms
       s -> String.to_integer(s)
     end
   end

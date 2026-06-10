@@ -86,7 +86,11 @@
        Then fetch http://localhost:4000/ and confirm your change is in the
        served bytes.
     7. Commit everything (`add: …` or `audit: …`), update plan.org's Log with
-       one line on what happened. Stop.
+       one line on what happened.
+    8. Publish to GitHub — your repo mirrors to a public one and the timeline
+       links every sha to it: `git push origin main`. If the push fails, note
+       it in plan.org's Log and stop anyway (never retry-loop on the network).
+       Stop.
 
 *** SEED BACKLOG (create plan.org from this if it's missing)
 
