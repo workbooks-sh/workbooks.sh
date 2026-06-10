@@ -72,9 +72,19 @@ CrewPanel) are reinterpreted as light Notion surfaces.
   --up:      #0a7d4f;  --down: #c4322e;   /* market semantics only */
   /* the ONE Notion lift — soft shadow now sanctioned on floating surfaces */
   --shadow:  0 1px 3px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.12);
+
+  /* section badge accent colors — ONLY for the badge pill, nowhere else */
+  --sec-ai:      #0a52e0;   /* wire blue */
+  --sec-markets: #0a7d4f;   /* up-green */
+  --sec-chips:   #b8860b;   /* amber */
+  --sec-policy:  #7a4988;   /* plum */
 }
 ```
 
+- **Section colors return ONLY as badge accents (founder note, 2026-06-10).**
+  The page stays monochrome. The section badge pill (§4.3) is the sole carrier
+  of section color: tinted wash bg (color ~10% via `color-mix`), colored icon +
+  tag text. No tinted cards, no colored bands, no chromatic section headers.
 - **The Notion dial (founder, 2026-06-10):** fun / clean / whitespace. Cards
   are white or gray-25 (`--surface` #fafafa max), NO strokes (surface law
   stands), and a soft **lift shadow is now sanctioned** on floating surfaces
@@ -88,10 +98,8 @@ CrewPanel) are reinterpreted as light Notion surfaces.
   blue, it's wrong.
 - **Grayscale discipline (founder, 2026-06-10):** the base is WHITE and BLACK —
   true black ink on pure white, one grey for resting meta, generous white space (air IS
-  the aesthetic). Section identity is TYPOGRAPHIC (the mono tag names the
-  desk; ticks are ink), never chromatic. The only colors on a page:
-  wire blue (interactivity/liveness) and up/down green/red inside market
-  data. Nothing else.
+  the aesthetic). The only colors on a page: wire blue (interactivity/liveness),
+  up/down green/red inside market data, and section badge accents (§4.3). Nothing else.
 - No gradients anywhere except the presence system (the one inherited
   gradient: the live-agent rim, which signals "machine at work").
 - **Surface laws (founder, 2026-06-10):** backgrounds are #fff or the
@@ -116,15 +124,20 @@ bit.ml      AI  MARKETS  CHIPS  POLICY        14:02:33 UTC   ◉ crew
 
 ### 4.2 The Wire (front-page lead band)
 Not a hero — a LEAD. The newest/most load-bearing bite at display size:
-mono dateline, Newsreader 44px head, one-sentence dek, source row.
-Optionally one image, full-bleed within column, mono caption. Below it,
-a hairline, then the stack.
+mono dateline with **section badge** (§4.3), Newsreader 44px head, one-sentence
+dek, source row. Optionally one banner image (§4.5, note 3) below the dek,
+full-column within the layout column, `border-radius: var(--r)`, no border.
+Below, a hairline, then the stack.
+
+**Whitespace dial (founder, 2026-06-10):** generous and rhythmic. Dateline
+`margin-bottom: 20px`, dek `margin-top: 18px`, foot `margin-top: 24px`,
+padding `8px 0 36px`.
 
 ### 4.3 Bite card — the atomic unit
 The product is the bite: scannable in five seconds, honest in thirty.
 
 ```
-│ AI                                    14:02 UTC · 40s read
+│ [✦ AI]                                14:02 UTC · 40s read
 │
 │ DeepMind's new weather model beats the
 │ supercomputers it replaced
@@ -135,12 +148,34 @@ The product is the bite: scannable in five seconds, honest in thirty.
 │ sources: Nature · DeepMind blog        by desk/wren · ed. hale
 ```
 
-Anatomy (top→bottom): section tick+tag with timestamp+read-time right-
-aligned (mono) · headline (Newsreader, 2 lines max, sentence case) ·
+**Section badge spec (founder note, 2026-06-10):**
+
+| property | value |
+|---|---|
+| anatomy | `[icon 12px] [TAG text]` |
+| font | Geist Mono, 9.5px, uppercase, letter-spacing 0.07em |
+| background | `color-mix(in srgb, <section-color> 10%, transparent)` |
+| text color | `<section-color>` (full saturation) |
+| border-radius | `999px` |
+| padding | `3px 8px` |
+| icon | 12px inline SVG, `stroke="currentColor"`, 24-viewBox clean path |
+| section colors | ai `#0a52e0` · markets `#0a7d4f` · chips `#b8860b` · policy `#7a4988` |
+| icons | ai = sparkle/circuit · markets = trending line · chips = chip outline · policy = bank/columns |
+
+The badge is the ONLY color on the page (besides wire blue for interactivity
+and up/down in market data). Everything else: monochrome. No big tag pills,
+no tinted card backgrounds, no colored section bands.
+
+Anatomy (top→bottom): section badge + timestamp+read-time right-aligned (mono) ·
+headline (Switzer tight grotesk, 2 lines max, sentence case) ·
 dek (Switzer, ≤2 sentences, the actual information) · footer row:
 sources left, **agent byline right** (mono — see 4.7). Hairline below.
-No card background, no border-radius, no shadow: the stack IS rules and
-rhythm, like a front page, like a Linear issue list.
+Bite cards are Notion cards: white bg, `border-radius: var(--r)`, soft `--shadow`
+lift, lift-on-hover. **No banner on Bite** — the stack stays fast.
+
+**Whitespace dial (founder, 2026-06-10):** generous, rhythmic.
+Card `padding: 26px 28px 22px`. Stack `gap: 20px`. Top margin `margin-bottom: 14px`.
+Dek `margin: 10px 0 0`. Foot `margin-top: 18px`.
 
 States: `unread` (full ink) · `read` (head drops to --ink-2) ·
 `LIVE` (being written now — wire-blue pulsing dot + the head renders
@@ -152,6 +187,10 @@ Section fronts = same stack filtered. Every 8th position: a **market
 strip** (4.6) instead of a bite. Infinite-feel pagination, mono
 "older →" link, no spinners (Linear rule: nothing loads visibly).
 
+Section front header uses the **section badge** (§4.3, slightly larger
+variant: 11px, padding 4px 10px) as the sole section identity — color
+accent on a monochrome page.
+
 ### 4.5 Story page (the full bite)
 Same anatomy enlarged, then body at 68ch. Pull-quotes get a 2px wire
 rule left. Numbers in body inherit mono. At the foot, **the receipt**:
@@ -160,6 +199,20 @@ lift) listing the pipeline trail — assigned 13:40 → researched 13:51 (6
 sources) → drafted 13:58 → edited 14:02 — each row linking to the commit.
 The receipt is the "agent-run" proof artifact, and it's also just a good
 colophon.
+
+**Banner images (founder note 3, 2026-06-10):** manifest rows may carry
+`"banner": "content/images/<file>"` (+ optional `"bannerAlt"`). Rendered
+on the story page as a full-column image above the org body:
+`border-radius: var(--r)`, no border, `object-fit: cover`.
+On WireLead: rendered below the dek, calm placement, same radius.
+On Bite cards: **no banner** — the stack stays fast.
+Missing/404 → renders nothing; `onerror` hides the element, no broken-image icon.
+
+**Whitespace dial (founder, 2026-06-10):** story `padding-top: 36px`,
+meta-top `margin-bottom: 22px`, dek `margin: 22px 0 0`,
+byline-row `margin: 30px 0 0`, story-hr `margin-top: 28px`,
+banner `margin-top: 32px`, org-mount `margin-top: 36px`,
+receipt-wrap `margin-top: 52px`.
 
 ### 4.6 Market strip
 A mono single-line band between hairlines: `NVDA +2.4 ▲ · BTC 97,210 ▼ ·
@@ -229,6 +282,25 @@ One hairline. Mono: `bit.ml — written by machines, signed by machines,
 read by you. runs on workbooks · source · the crew`. No newsletter modal.
 Ever.
 
+### 4.11 Interactive story blocks (full-bleed)
+The story page lets orgitorial breakout blocks escape the 68ch body column.
+
+**Width contract (page side — implemented in `app.css` + `Story.svelte`):**
+
+| `data-width` | behaviour |
+|---|---|
+| `wide` | `width: min(92vw, calc(68ch + 24rem))`, centered via `left:50%` + `translateX(-50%)` |
+| `full` | `width: 100vw`, `margin-inline: calc(50% - 50vw)` — true full-bleed |
+
+Containers must NOT clip: `overflow: visible` is set on both `.org-mount`
+and `.org-mount .org-doc` in `app.css`.
+
+**`Orgitorial.activate(mountEl)`:** after the story body renders into the
+DOM, `Story.svelte` calls `window.Orgitorial.activate(mountEl)` if the
+vendored orgitorial exposes it (guarded: `typeof window.Orgitorial?.activate === 'function'`).
+This is a forward-compatible no-op until the new vendor build lands. The
+guard lives in a `$effect` that re-runs whenever `pending` clears.
+
 ## 5. Motion
 Linear's law: **fast or absent.** 120–180ms ease-out for state changes;
 zero fades between routes (instant swap, shell persists); the ONLY slow
@@ -250,3 +322,6 @@ a sharp colleague, not a hype account.
   per-agent identity + `avatarSeed` (epic wb-wc0 item 2).
 - **One theme — light only.** No `data-theme`, no toggle, no terminal skin.
   Every surface (the receipt, the crew org chart) is a light Notion surface.
+- **Section colors: badge-only.** `--sec-*` vars exist in CSS for reference
+  but section color logic lives in `sections.js` as literal hex (one home).
+  Components read `sec.color` directly for `color-mix` tinting.

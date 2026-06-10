@@ -1,8 +1,9 @@
 // Bundle dist/ into ONE self-contained HTML workbook: inline the JS module,
-// the CSS, the content manifest, and every story org — open it from disk,
-// no server. (Remote fonts/avatars stay remote: they're URLs, not files.)
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+// the CSS, the content manifest, every story org, and any banner images as
+// base64 data-URIs. Open it from disk, no server.
+// (Remote fonts/avatars stay remote: they're URLs, not files.)
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, extname } from 'node:path';
 
 const dist = new URL('../dist', import.meta.url).pathname;
 let html = readFileSync(join(dist, 'index.html'), 'utf8');
@@ -19,6 +20,22 @@ for (const f of readdirSync(join(dist, 'content/stories'))) {
   const org = readFileSync(join(dist, 'content/stories', f), 'utf8');
   blocks += `<script type="text/org" data-slug="${slug}">${org.replace(/</g, '\\u003c')}</script>\n`;
 }
+
+// Inline banner images as base64 data-URIs so the single-file workbook is
+// fully self-contained. Each image gets a <script type="x-image"> block;
+// the app's stories.svelte.js image loader checks these before fetching.
+const MIME = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+const imgDir = join(dist, 'content/images');
+if (existsSync(imgDir)) {
+  for (const f of readdirSync(imgDir)) {
+    const mime = MIME[extname(f).toLowerCase()];
+    if (!mime) continue;
+    const data = readFileSync(join(imgDir, f));
+    const b64 = data.toString('base64');
+    blocks += `<script type="x-image" data-path="content/images/${f}" data-mime="${mime}">${b64}</script>\n`;
+  }
+}
+
 // data blocks BEFORE the app module so the loader finds them at boot
 html = html.replace('</body>', `${blocks}<script type="module">\n${js}\n</script>\n</body>`);
 

@@ -1,8 +1,8 @@
 <script>
-  // Section front (DESIGN.md §4.4: "same stack filtered"). A mono section
-  // header (the desk name, typographic — never a tinted band), then the stack
-  // filtered to this section. The newest in-section story leads at display
-  // size; the rest are bites.
+  // Section front (DESIGN.md §4.4: "same stack filtered"). Section header uses
+  // the section badge (§4.3) for typographic identity with color accent. Then
+  // the stack filtered to this section. The newest in-section story leads at
+  // display size; the rest are bites.
   import WireLead from '../lib/WireLead.svelte';
   import Bite from '../lib/Bite.svelte';
   import { manifest, bySection } from '../lib/stories.svelte.js';
@@ -21,8 +21,11 @@
 
 {#if rows}
   <header class="secfront">
-    <span class="tick"></span>
-    <span class="name mono" style="color:{sec.color}">{sec.tag}</span>
+    <!-- section badge as the header identity (§4.3 — badge is the accent) -->
+    <span
+      class="sec-badge sec-badge--lg"
+      style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
+    >{@html sec.icon}{sec.tag}</span>
     <span class="count mono">{inSection.length} {inSection.length === 1 ? 'story' : 'stories'}</span>
   </header>
   <hr class="hair" />
@@ -46,16 +49,16 @@
 
 <style>
   .secfront {
-    display: flex; align-items: baseline; gap: 10px;
-    padding: 28px 0 12px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 36px 0 16px;
   }
-  .tick { width: 2px; height: 14px; background: var(--ink); align-self: center; }
-  .name {
-    font-size: 13px; font-weight: 500; text-transform: uppercase;
-    letter-spacing: 0.1em;
+  /* slightly larger badge variant for the section front header */
+  .sec-badge--lg {
+    font-size: 11px !important;
+    padding: 4px 10px !important;
   }
-  .count { font-size: 11px; color: var(--ink-3); margin-left: auto; letter-spacing: 0.04em; }
-  .lead-wrap { padding-top: 18px; }
-  .stack { margin-top: 8px; }
-  .empty { padding: 40px 0; color: var(--ink-3); font-size: 12px; }
+  .count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-left: auto; letter-spacing: 0.04em; }
+  .lead-wrap { padding-top: 24px; }
+  .stack { margin-top: 20px; display: flex; flex-direction: column; gap: 20px; }
+  .empty { padding: 48px 0; color: var(--ink-3); font-size: 12px; font-family: var(--mono); }
 </style>

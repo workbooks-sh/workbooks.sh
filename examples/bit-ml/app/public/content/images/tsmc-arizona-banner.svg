@@ -1,0 +1,28 @@
+<!-- SPECIMEN BANNER — proves the banner path round-trip (§4.5 note 3).
+     Replace with a real photograph once the asset pipeline ships.
+     Gradient: amber→ink (CHIPS section color palette). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 480" width="1200" height="480">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b8860b" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#2a1f00" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+    <!-- grid lines evoking a wafer reticle -->
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0 L0 0 0 60" fill="none" stroke="#b8860b" stroke-width="0.5" stroke-opacity="0.25"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="480" fill="url(#g)"/>
+  <rect width="1200" height="480" fill="url(#grid)"/>
+  <!-- centre reticle crosshair -->
+  <line x1="600" y1="160" x2="600" y2="320" stroke="#b8860b" stroke-width="1" stroke-opacity="0.5"/>
+  <line x1="520" y1="240" x2="680" y2="240" stroke="#b8860b" stroke-width="1" stroke-opacity="0.5"/>
+  <circle cx="600" cy="240" r="40" fill="none" stroke="#b8860b" stroke-width="1" stroke-opacity="0.4"/>
+  <circle cx="600" cy="240" r="6" fill="#b8860b" fill-opacity="0.6"/>
+  <!-- label -->
+  <text x="600" y="380" text-anchor="middle"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="11" letter-spacing="0.1em" fill="#b8860b" fill-opacity="0.5"
+        text-transform="uppercase">TSMC ARIZONA · N2 LEADING-EDGE · SPECIMEN</text>
+</svg>

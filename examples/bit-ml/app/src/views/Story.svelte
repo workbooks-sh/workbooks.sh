@@ -1,9 +1,17 @@
 <script>
   // Story page (DESIGN.md §4.5). Full bite anatomy ENLARGED — serif head
-  // 32–36, dek, byline row — then the orgitorial-rendered org body at 68ch,
+  // 36, dek, byline row — then the orgitorial-rendered org body at 68ch,
   // then the Receipt (only if the manifest row carries one), then
   // "more from <section>" (3 bites). The serif lives here: story headlines
   // ARE the serif's home (§2 the Linear-forward dial).
+  //
+  // Banner (§4.5 note 3): manifest row may carry "banner" path + optional
+  // "bannerAlt". Rendered full-column above body, radius var(--r), no border.
+  // Missing/404 → nothing (onerror hides the img).
+  //
+  // Full-bleed blocks (§4.11): .org-block[data-width=wide/full] breakout via
+  // CSS in app.css. After body mounts, call Orgitorial.activate(mountEl) if
+  // the vendored orgitorial exposes it (typeof guard — forward-compatible).
   import Bite from '../lib/Bite.svelte';
   import Byline from '../lib/Byline.svelte';
   import Receipt from '../lib/Receipt.svelte';
@@ -21,10 +29,25 @@
   // fetch + render the org body once the row is known (cached in the store)
   let body = $state('');
   let pending = $state(true);
+  let mountEl = $state(null);
+
   $effect(() => {
     if (!story) return;
     pending = true; body = '';
-    storyBody(slug).then((html) => { body = html; pending = false; });
+    storyBody(slug).then((html) => {
+      body = html;
+      pending = false;
+    });
+  });
+
+  // After body renders into the DOM, activate orgitorial if available (§4.11).
+  // typeof guard makes this forward-compatible: no-op until the vendored
+  // orgitorial lands with an activate() export.
+  $effect(() => {
+    if (pending || !mountEl) return;
+    if (typeof window !== 'undefined' && typeof window.Orgitorial?.activate === 'function') {
+      window.Orgitorial.activate(mountEl);
+    }
   });
 </script>
 
@@ -34,7 +57,11 @@
   <article class="story">
     <!-- enlarged bite anatomy -->
     <div class="meta-top mono">
-      <span class="sec"><span class="tick"></span><span class="tag" style="color:{sec.color}">{sec.tag}</span></span>
+      <!-- section badge with color accent (§4.3) -->
+      <span
+        class="sec-badge"
+        style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
+      >{@html sec.icon}{sec.tag}</span>
       <span class="when">{story.time} · {story.read} read</span>
     </div>
 
@@ -46,12 +73,24 @@
       {#if story.byline}<Byline {...bylineProps(story.byline)} {onagent} avatar />{/if}
     </div>
 
-    <hr class="hair" />
+    <hr class="hair story-hr" />
+
+    {#if story.banner}
+      <!-- full-column banner above body (§4.5 note 3); onerror hides on 404 -->
+      <img
+        class="story-banner"
+        src={story.banner}
+        alt={story.bannerAlt ?? ''}
+        loading="lazy"
+        onerror={(e) => { e.currentTarget.style.display = 'none'; }}
+      />
+    {/if}
 
     <!-- the org body — orgitorial returns <article class="org-doc">…</article>;
          --org-* vars are mapped onto bit.ml tokens in app.css so it reads
-         native (serif sub-heads, Switzer body at 68ch, Geist Mono meta) -->
-    <div class="org-mount">
+         native (serif sub-heads, Switzer body at 68ch, Geist Mono meta).
+         overflow:visible on .org-mount lets wide/full blocks escape column. -->
+    <div class="org-mount" bind:this={mountEl}>
       {#if pending}<p class="loading mono">…</p>{:else}{@html body}{/if}
     </div>
 
@@ -68,24 +107,23 @@
     <section class="more">
       <header class="more-head mono">more from {sec.tag.toLowerCase()}</header>
       <hr class="hair" />
-      {#each more as row (row.slug)}
-        <Bite {...biteProps(row)} href={`/story/${row.slug}`} {onagent} />
-      {/each}
+      <div class="more-stack">
+        {#each more as row (row.slug)}
+          <Bite {...biteProps(row)} href={`/story/${row.slug}`} {onagent} />
+        {/each}
+      </div>
     </section>
   {/if}
 {/if}
 
 <style>
-  .story { padding-top: 26px; }
+  .story { padding-top: 36px; }
 
   .meta-top {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; margin-bottom: 16px;
+    gap: 12px; margin-bottom: 22px;
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
   }
-  .sec { display: inline-flex; align-items: center; gap: 8px; }
-  .tick { width: 2px; height: 12px; background: var(--ink); display: inline-block; }
-  .tag { font-weight: 500; }
   .when { color: var(--ink-3); white-space: nowrap; }
 
   .head {
@@ -97,31 +135,42 @@
   }
 
   .dek {
-    margin: 16px 0 0;
+    margin: 22px 0 0;
     font-size: 19px; line-height: 1.5; color: var(--ink-2);
     letter-spacing: -0.01em; max-width: 60ch;
   }
 
   .byline-row {
     display: flex; align-items: baseline; justify-content: space-between;
-    gap: 16px; margin: 22px 0 0; flex-wrap: wrap;
+    gap: 16px; margin: 30px 0 0; flex-wrap: wrap;
   }
   .sources { font-size: 11px; color: var(--ink-3); }
   .sources a { color: var(--ink-2); }
 
-  .byline-row + .hair { margin-top: 22px; }
+  .story-hr { margin-top: 28px; }
 
-  .receipt-wrap { margin-top: 40px; }
+  .story-banner {
+    display: block; width: 100%; margin-top: 32px;
+    border-radius: var(--r); object-fit: cover;
+    /* no border per §4.5 note 3 */
+  }
 
-  .more { margin-top: 72px; }
+  .org-mount { margin-top: 36px; }
+
+  .receipt-wrap { margin-top: 52px; }
+
+  .more { margin-top: 88px; }
   .more-head {
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--ink); margin-bottom: 12px;
+    color: var(--ink); margin-bottom: 16px;
   }
-  .loading { color: var(--ink-3); padding: 24px 0; }
-  .missing { color: var(--ink-3); padding: 60px 0; font-size: 12px; }
+  .more-stack { display: flex; flex-direction: column; gap: 20px; margin-top: 16px; }
+
+  .loading { color: var(--ink-3); padding: 32px 0; }
+  .missing { color: var(--ink-3); padding: 72px 0; font-size: 12px; }
 
   @media (max-width: 600px) {
     .head { font-size: 28px; }
+    .story { padding-top: 24px; }
   }
 </style>

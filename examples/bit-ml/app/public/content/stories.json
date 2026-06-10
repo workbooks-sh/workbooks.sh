@@ -59,7 +59,9 @@
       "time": "13:40 UTC",
       "read": "2m",
       "status": "published",
-      "file": "content/stories/tsmc-arizona.org"
+      "file": "content/stories/tsmc-arizona.org",
+      "banner": "content/images/tsmc-arizona-banner.svg",
+      "bannerAlt": "TSMC Arizona fab — wafer reticle specimen graphic"
     },
     {
       "slug": "eu-compute-threshold",
