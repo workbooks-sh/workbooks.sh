@@ -248,3 +248,74 @@ footer .links a:hover{color:var(--ink)}
 .cl-row:last-child{border-bottom:0}
 .cl-row code{color:var(--green);flex:none}
 .cl-row span{color:#a9aab1}
+
+/* ════ self-presenting workbook: composed reveal · presence · inspector ════ */
+
+/* composed reveal — content rises in as if placed. Calm, premium easing. */
+body.reveal-on [data-reveal]{opacity:0;transform:translateY(16px);
+  transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+body.reveal-on [data-reveal].shown{opacity:1;transform:none}
+h1 .h-line{display:inline-block}
+
+/* agent presence — a quiet marker, not a terminal. Top-center pill. */
+.presence{position:fixed;top:4rem;left:50%;transform:translateX(-50%);z-index:45;
+  display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;
+  font-family:var(--mono);font-size:.72rem;color:var(--ink2);
+  background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);
+  border:1px solid var(--hair);border-radius:999px;padding:.4rem .85rem;
+  box-shadow:0 8px 24px -16px rgba(20,20,25,.4);transition:opacity .6s ease,color .3s}
+.presence.fade{opacity:0;pointer-events:none}
+.presence .p-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);
+  box-shadow:0 0 0 0 color-mix(in srgb,var(--blue) 60%,transparent);animation:ppulse 1.8s ease-out infinite}
+.presence.settled .p-dot{background:var(--green);animation:livepulse 2.4s ease-in-out infinite}
+@keyframes ppulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--blue) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.presence:hover{color:var(--ink)}
+@media(max-width:560px){.presence{font-size:.66rem}}
+
+/* inspector — refined side panel, editorial. Collapsed handle by default. */
+.insp{position:fixed;top:0;right:0;bottom:0;z-index:65;display:flex;align-items:stretch;
+  transform:translateX(100%);transition:transform .45s cubic-bezier(.2,.7,.2,1);pointer-events:none}
+.insp[data-open="true"]{transform:none}
+.insp .insp-body,.insp .insp-tab-handle{pointer-events:auto}
+.insp-tab-handle{position:absolute;right:100%;top:50%;transform:translateY(-50%) rotate(180deg);
+  writing-mode:vertical-rl;border:1px solid var(--hair);border-right:0;background:var(--bg);
+  color:var(--ink2);font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;
+  padding:.9rem .45rem;border-radius:10px 0 0 10px;cursor:pointer;box-shadow:var(--shadow)}
+.insp-tab-handle:hover{color:var(--ink)}
+.insp-body{width:min(420px,92vw);background:var(--card);border-left:1px solid var(--hair);
+  display:flex;flex-direction:column;box-shadow:-24px 0 48px -32px rgba(20,20,25,.4)}
+.insp header{display:flex;align-items:center;gap:.5rem;padding:.85rem 1rem;border-bottom:1px solid var(--hair)}
+.insp header .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.insp header .ttl{font-family:var(--serif);font-weight:600;font-size:1.05rem}
+.insp header .sub-id{font-family:var(--mono);font-size:.72rem;color:var(--ink3)}
+.insp .tabs{display:flex;gap:.2rem;padding:.5rem .6rem;border-bottom:1px solid var(--hair)}
+.insp .tab{border:0;background:transparent;color:var(--ink3);font-family:var(--mono);font-size:.74rem;
+  padding:.35rem .75rem;border-radius:8px;cursor:pointer}
+.insp .tab:hover{color:var(--ink)} .insp .tab.on{background:var(--bg2);color:var(--ink)}
+.insp .pane{flex:1;overflow-y:auto;padding:1rem;display:none;font-size:.84rem;line-height:1.6}
+.insp .pane.on{display:block}
+.insp .pane p{color:var(--ink2);font-size:.86rem;max-width:none}
+.insp .pane p b{color:var(--ink)} .insp .pane p em{color:var(--ink);font-style:italic}
+.insp h4{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--ink3);font-weight:700;margin:1.1rem 0 .5rem}
+.insp .rule{font-family:var(--mono);font-size:.72rem;color:var(--ink2);padding:.18rem 0}
+.insp .badge{font-family:var(--mono);font-size:.62rem;color:var(--blue-text);background:color-mix(in srgb,var(--blue) 12%,var(--bg));
+  padding:.12rem .5rem;border-radius:999px;margin-left:.3rem}
+.cl-row{display:flex;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--hair)}
+.cl-row:last-child{border-bottom:0}
+.cl-row code{font-family:var(--mono);font-size:.72rem;color:var(--green-ink);flex:none}
+.cl-row .cl-msg{font-size:.8rem;color:var(--ink2)}
+.src-note{margin-bottom:.7rem} .src-note code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:.05em .3em;border-radius:4px}
+.src-head{font-family:var(--mono);font-size:.66rem;color:var(--ink3);padding-bottom:.5rem;border-bottom:1px solid var(--hair);margin-bottom:.6rem}
+.src-code{font-family:var(--mono);font-size:.66rem;line-height:1.55;color:var(--ink2)}
+.src-code code{white-space:pre-wrap;word-break:break-all;display:block}
+.insp .note{margin:.5rem 0;padding:.55rem .7rem;border-left:3px solid var(--blue);background:var(--bg2);
+  color:var(--ink);font-size:.72rem;line-height:1.5;border-radius:0 8px 8px 0}
+.insp .note .nt{display:block;color:var(--blue-text);font-weight:700;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.2rem}
+
+/* proof list shares the ownership-row primitive on the band */
+.proof-list{max-width:640px;margin:clamp(2rem,4vw,3rem) auto 0}
+.proof-list .om{background:var(--card);color:var(--blue-text)}
+
+/* nudge the hero down a touch so the presence pill clears it */
+.hero{padding-top:clamp(4.5rem,9vw,7rem)}
