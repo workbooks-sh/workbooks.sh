@@ -75,6 +75,15 @@ defmodule Workbooks.CLI do
   @doc "Run a wb subcommand, returning its output. `tenant` scopes the variable store."
   def call(argv, tenant \\ "dev")
 
+  def call(["content", "check"], tenant) do
+    dir = if tenant in [nil, "dev"], do: ".", else: Workbooks.Git.repo_path(tenant)
+
+    case Workbooks.Content.check(dir) do
+      {:ok, summary} -> summary
+      {:error, problems} -> "content check FAILED (#{length(problems)}):\n" <> Enum.map_join(problems, "\n", &("  - " <> &1))
+    end
+  end
+
   def call(["query", f], _t), do: f |> File.read!() |> OQL.parse_headlines() |> json()
   def call(["tangle", f], _t), do: f |> File.read!() |> OQL.tangle_plan() |> json()
   def call(["lint", f], _t), do: f |> File.read!() |> OQL.lint() |> json()
