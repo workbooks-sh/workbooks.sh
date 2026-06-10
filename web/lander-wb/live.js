@@ -20,55 +20,62 @@ function selectTab(name) {
   document.querySelectorAll(".dt-tab").forEach(t => t.classList.toggle("on", t.dataset.pane === name));
   document.querySelectorAll(".dt-pane").forEach(p => p.classList.toggle("on", p.id === "dt-" + name));
   if (name === "elements") buildTree();
-  if (name === "sources") buildSource();
 }
 document.querySelectorAll(".dt-tab").forEach(t => t.addEventListener("click", () => selectTab(t.dataset.pane)));
 
-/* ── Elements: render the page's REAL DOM as a colorized tree ── */
+/* ── HTML: the page's REAL DOM as a colorized, COLLAPSIBLE tree ── */
 let treeBuilt = false;
 function buildTree() {
   if (treeBuilt) return; treeBuilt = true;
-  const out = [];
-  const squash = (s, n = 90) => { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
-  function render(node, depth) {
-    const pad = "  ".repeat(depth);
-    if (node.nodeType === 8) {
-      const t = squash(node.textContent, 120);
-      out.push(`<span class="row cm">${pad}&lt;!-- ${esc(t)} --&gt;</span>`); return;
-    }
-    if (node.nodeType === 3) { const t = squash(node.textContent); if (t) out.push(`<span class="row tx">${pad}${esc(t)}</span>`); return; }
-    if (node.nodeType !== 1) return;
-    if (node.id === "insp" || node.id === "insp-handle" || node.id === "presence") return; // don't inspect the tools
-    const tag = node.tagName.toLowerCase();
-    let attrs = "";
-    for (const a of node.attributes) {
-      let v = a.value; if (v.length > 36) v = v.slice(0, 30) + "…";
-      attrs += ` <span class="an">${esc(a.name)}</span>=<span class="av">"${esc(v)}"</span>`;
-    }
-    const VOID = ["meta","link","br","img","input","hr","source","path","use"];
-    const opaque = ["script", "style", "svg", "canvas", "iframe", "path"].includes(tag);
-    const kids = [...node.childNodes].filter(n => n.nodeType === 1 || n.nodeType === 8 || (n.nodeType === 3 && n.textContent.trim()));
-    if (VOID.includes(tag)) { out.push(`<span class="row"><span class="tag">${pad}&lt;${tag}</span>${attrs}<span class="tag">&gt;</span></span>`); return; }
-    if (!kids.length || opaque) {
-      out.push(`<span class="row"><span class="tag">${pad}&lt;${tag}</span>${attrs}<span class="tag">&gt;</span>${opaque && kids.length ? '<span class="cm">…</span>' : ""}<span class="tag">&lt;/${tag}&gt;</span></span>`);
-      return;
-    }
-    out.push(`<span class="row"><span class="tag">${pad}&lt;${tag}</span>${attrs}<span class="tag">&gt;</span></span>`);
-    if (depth < 7) for (const k of kids) render(k, depth + 1);
-    else out.push(`<span class="row cm">${pad}  …</span>`);
-    out.push(`<span class="row"><span class="tag">${pad}&lt;/${tag}&gt;</span></span>`);
-  }
-  out.push(`<span class="row cm">&lt;!DOCTYPE html&gt;</span>`);
-  render(docEl, 0);
-  $("#dom-tree").innerHTML = out.join("");
-}
+  const squash = (s, n = 80) => { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "\u2026" : s; };
+  const VOID = ["meta","link","br","img","input","hr","source","path","use"];
+  const OPAQUE = ["script","style","svg","canvas","iframe"];
+  // nodes deeper than this, or opaque, start collapsed — opens clean, expand to explore
+  const root = document.createElement("div");
 
-/* ── Sources: the workbook's own source ── */
-let srcBuilt = false;
-function buildSource() {
-  if (srcBuilt) return; srcBuilt = true;
-  const raw = "<!doctype html>\n" + docEl.outerHTML;
-  $("#src-body").textContent = raw.length > 60000 ? raw.slice(0, 60000) + "\n…" : raw;
+  function attrsOf(node) {
+    let a = "";
+    for (const at of node.attributes) {
+      let v = at.value; if (v.length > 32) v = v.slice(0, 26) + "\u2026";
+      a += ` <span class="an">${esc(at.name)}</span>=<span class="av">"${esc(v)}"</span>`;
+    }
+    return a;
+  }
+  function build(node, depth, parent) {
+    if (node.nodeType === 8) {
+      const r = document.createElement("div"); r.className = "row cm leaf";
+      r.innerHTML = `&lt;!-- ${esc(squash(node.textContent, 110))} --&gt;`; parent.appendChild(r); return;
+    }
+    if (node.nodeType === 3) { const t = squash(node.textContent); if (!t) return;
+      const r = document.createElement("div"); r.className = "row tx leaf"; r.textContent = t; parent.appendChild(r); return; }
+    if (node.nodeType !== 1) return;
+    if (["insp","insp-handle","presence"].includes(node.id)) return;
+    const tag = node.tagName.toLowerCase();
+    const kids = [...node.childNodes].filter(n => n.nodeType === 1 || n.nodeType === 8 || (n.nodeType === 3 && n.textContent.trim()));
+    const open = `<span class="tag">&lt;${tag}</span>${attrsOf(node)}<span class="tag">&gt;</span>`;
+    if (VOID.includes(tag)) { const r = document.createElement("div"); r.className = "row leaf"; r.innerHTML = open; parent.appendChild(r); return; }
+    if (!kids.length) { const r = document.createElement("div"); r.className = "row leaf"; r.innerHTML = `${open}<span class="tag">&lt;/${tag}&gt;</span>`; parent.appendChild(r); return; }
+
+    const nodeEl = document.createElement("div"); nodeEl.className = "node";
+    const opaque = OPAQUE.includes(tag);
+    if (opaque || depth >= 2) nodeEl.classList.add("collapsed");
+    const openRow = document.createElement("div"); openRow.className = "row open";
+    openRow.innerHTML = `<span class="caret">\u25be</span>${open}<span class="tail"><span class="cm">\u2026</span><span class="tag">&lt;/${tag}&gt;</span></span>`;
+    nodeEl.appendChild(openRow);
+    const childWrap = document.createElement("div"); childWrap.className = "children";
+    if (opaque) { const r = document.createElement("div"); r.className = "row cm leaf"; r.textContent = "\u2026"; childWrap.appendChild(r); }
+    else if (depth < 8) kids.forEach(k => build(k, depth + 1, childWrap));
+    nodeEl.appendChild(childWrap);
+    const closeRow = document.createElement("div"); closeRow.className = "row close";
+    closeRow.innerHTML = `<span class="tag">&lt;/${tag}&gt;</span>`;
+    nodeEl.appendChild(closeRow);
+    openRow.addEventListener("click", () => nodeEl.classList.toggle("collapsed"));
+    parent.appendChild(nodeEl);
+  }
+  const dt = document.createElement("div"); dt.className = "row cm leaf"; dt.innerHTML = "&lt;!DOCTYPE html&gt;";
+  root.appendChild(dt);
+  build(docEl, 0, root);
+  $("#dom-tree").replaceChildren(...root.childNodes);
 }
 
 /* ── Console: the agent's log ── */

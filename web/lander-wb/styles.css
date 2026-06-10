@@ -414,3 +414,16 @@ html[data-insp="open"] .devtools{transform:none}
 #dt-agent h4{color:#9aa0a6;font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin:1rem 0 .45rem}
 #dt-agent .rule{color:#b0b0b0;padding:.16rem 0}
 #dt-agent .badge{color:#7ad97a;background:#22351f;padding:.1rem .45rem;border-radius:999px;font-size:10px;margin-left:.3rem}
+
+/* clearer inspector: hints + a collapsible HTML tree (carets like real devtools) */
+.dt-hint{font-size:11px;color:#83878d;padding:.5rem .7rem;border-bottom:1px solid #2a2a2d;line-height:1.4}
+.dom-tree{white-space:normal}
+.dom-tree .children{padding-left:1.05rem}
+.dom-tree .row{position:relative;padding:1px 0 1px 1.1rem;white-space:pre-wrap;word-break:break-word}
+.dom-tree .row.open{cursor:pointer;border-radius:3px}
+.dom-tree .row.open:hover{background:#2a2a2d}
+.dom-tree .caret{position:absolute;left:0;width:1rem;text-align:center;color:#9aa0a6;font-size:9px;display:inline-block;transition:transform .12s}
+.dom-tree .node.collapsed > .row.open .caret{transform:rotate(-90deg)}
+.dom-tree .node.collapsed > .children,.dom-tree .node.collapsed > .row.close{display:none}
+.dom-tree .tail{display:none}
+.dom-tree .node.collapsed > .row.open .tail{display:inline}

@@ -30,26 +30,22 @@
   <div class="dt-bar">
     <span class="dt-icons"><span class="dt-ic">⌖</span><span class="dt-ic">▢</span></span>
     <div class="dt-tabs">
-      <button class="dt-tab on" data-pane="elements" type="button">Elements</button>
-      <button class="dt-tab" data-pane="console" type="button">Console</button>
-      <button class="dt-tab" data-pane="sources" type="button">Sources</button>
-      <button class="dt-tab" data-pane="agent" type="button">Agent</button>
+      <button class="dt-tab on" data-pane="elements" type="button">HTML</button>
+      <button class="dt-tab" data-pane="console" type="button">Agent log</button>
+      <button class="dt-tab" data-pane="agent" type="button">About</button>
     </div>
     <span class="dt-right"><span class="dt-err" id="dt-err" hidden>● 0</span><button class="dt-close" id="insp-close" type="button" aria-label="Close inspector">✕</button></span>
   </div>
 
   <div class="dt-pane on" id="dt-elements">
+    <div class="dt-hint">The live HTML of this page — one file, the whole app. Click ▸ to fold a section.</div>
     <div id="dom-tree" class="dom-tree"></div>
-    <div class="dt-crumbs" id="dt-crumbs">html · body · section.hero · div.hero-in</div>
+    <div class="dt-crumbs" id="dt-crumbs">html › body › section.hero</div>
   </div>
 
   <div class="dt-pane" id="dt-console">
+    <div class="dt-hint">What the agent did to build and maintain this page.</div>
     <div id="console-log" class="console-log"></div>
-  </div>
-
-  <div class="dt-pane" id="dt-sources">
-    <div class="src-head">workbooks.html — the workbook's own source (an agent wrote it; <code>wb unbundle</code> recovers the tree)</div>
-    <div id="src-body" class="src-code"></div>
   </div>
 
   <div class="dt-pane" id="dt-agent">
