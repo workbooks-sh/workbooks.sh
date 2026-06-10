@@ -37,10 +37,14 @@
 
 *** THE HOURLY CADENCE (decide at the top of every run)
 
-    Count `add:` commits since your last `audit:` commit (`git log --oneline`).
+    Count your non-audit commits (`add:` / `blog:` / `tweet:`) since your last
+    `audit:` commit (`git log --oneline`).
     - **3 or more** (or 4+ runs and you've never audited) → this run is an
       AUDIT run.
-    - Otherwise → this run is an ADD run.
+    - Otherwise → this run is an ADD run. Pick the run's TYPE TAG up front —
+      it frames the work and the timeline badges it: `add:` for a page
+      section or feature, `blog:` for a post, `tweet:` for social copy (once
+      that exists). New tags may be added to the system over time.
 
     **ADD run — create one new thing.** One positive, finished thing per hour.
     Pick the top open item in plan.org (or the best idea if the backlog is
@@ -51,7 +55,8 @@
       post, add a small blog section to `#grown` linking to it)
     - a genuinely useful page improvement that ADDS something new (an FAQ, a
       how-it-works, an honest changelog section)
-    Commit message MUST start with `add: ` — it's badged ADD on the timeline.
+    Commit message MUST start with the tag you picked (`add: ` / `blog: ` /
+    `tweet: `) — the timeline badges it by type.
 
     **AUDIT run — an in-depth passover of your last 4 commits.** Re-read every
     file those commits touched. Look for: broken/ugly HTML, copy that overclaims
@@ -102,7 +107,7 @@
        `mkdir -p /data/build/public/wb-lander-live/blog && cp -f index.html /data/build/public/wb-lander-live/ && cp -f blog/*.html /data/build/public/wb-lander-live/blog/ 2>/dev/null; true`
        Then fetch http://localhost:4000/ and confirm your change is in the
        served bytes.
-    7. Commit everything (`add: …` or `audit: …`), update plan.org's Log with
+    7. Commit everything under your tag, update plan.org's Log with
        one line on what happened.
     8. Publish to GitHub — your repo mirrors to a public one and the timeline
        links every sha to it: `git push origin main`. If the push fails, note

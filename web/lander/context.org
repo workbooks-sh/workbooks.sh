@@ -5,7 +5,7 @@ claim, verify it in the source checkout (below) instead of guessing.
 
 * What Workbooks is
 
-  Workbooks is software you can own — an **ecosystem of three layers**. Always
+  Workbooks is an **ecosystem for building software** — three layers. Always
   explain the product through these three; they are the core realities:
 
   1. **Workbooks** — the apps. A workbook is a client package: a complete app
@@ -30,6 +30,9 @@ claim, verify it in the source checkout (below) instead of guessing.
     workbook is "a single HTML file" is an interesting ergonomic detail —
     NEVER a headline, NEVER the selling point. Don't lean on "one file"
     language.
+  - BANNED COPY: "software you can own" / "own your software" and any
+    ownership-as-the-point framing. It says nothing — good software is about
+    working, being maintained, being good. Define what Workbooks IS instead.
   - The pitch is **"software built in workbooks"** — malleable, flexible,
     yours. Frame every example as software built in workbooks.
   - NEVER pitch "sites that run themselves" or perpetual agent management as
