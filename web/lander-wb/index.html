@@ -23,37 +23,46 @@
   <span class="p-dot"></span><span id="p-text">lander-keeper composed this page</span>
 </div>
 
-<!-- the inspector: docked, persistent. the substance behind the claim. -->
-<aside id="insp" class="insp" aria-label="workbook inspector" data-open="false">
-  <button class="insp-tab-handle" id="insp-handle" type="button" aria-label="Toggle inspector">inspect ❯</button>
-  <div class="insp-body">
-    <header>
-      <span class="dot"></span><span class="ttl">workbooks.sh</span><span class="sub-id">· a live workbook</span>
-    </header>
-    <div class="tabs">
-      <button class="tab on" data-pane="agent" type="button">agent</button>
-      <button class="tab" data-pane="html" type="button">html</button>
-      <button class="tab" data-pane="source" type="button">source</button>
+<!-- the inspector: a real DevTools-style panel that SHIFTS the layout (a pane,
+     not an overlay). Elements = the page's live DOM · Console = the agent's log
+     + changelog · Sources = the workbook's own source. -->
+<aside id="insp" class="devtools" aria-label="workbook inspector">
+  <div class="dt-bar">
+    <span class="dt-icons"><span class="dt-ic">⌖</span><span class="dt-ic">▢</span></span>
+    <div class="dt-tabs">
+      <button class="dt-tab on" data-pane="elements" type="button">Elements</button>
+      <button class="dt-tab" data-pane="console" type="button">Console</button>
+      <button class="dt-tab" data-pane="sources" type="button">Sources</button>
+      <button class="dt-tab" data-pane="agent" type="button">Agent</button>
     </div>
-    <div class="pane on" id="pane-agent">
-      <p>This page is composed and maintained by an agent, <b>lander-keeper</b>.
-      It runs on a schedule, reads the page, makes one constrained change, and
-      commits it. This changelog <em>is</em> its work — live.</p>
-      <h4>ground rules</h4>
-      <div class="rule">· never fabricate users, metrics, or praise</div>
-      <div class="rule">· one constrained edit per run · always reversible</div>
-      <div class="rule">· never remove the download, the ownership claims, or this inspector</div>
-      <h4>changelog <span class="badge" id="chg-src">live · /_changes</span></h4>
-      <div id="chglog"><div class="cl-row"><span class="cl-msg">loading…</span></div></div>
-    </div>
-    <div class="pane" id="pane-html"></div>
-    <div class="pane" id="pane-source">
-      <p class="src-note">This page's source — what an agent wrote. A workbook
-      carries its own; <code>wb unbundle</code> recovers the full tree.</p>
-      <div id="src-body"></div>
-    </div>
+    <span class="dt-right"><span class="dt-err" id="dt-err" hidden>● 0</span><button class="dt-close" id="insp-close" type="button" aria-label="Close inspector">✕</button></span>
+  </div>
+
+  <div class="dt-pane on" id="dt-elements">
+    <div id="dom-tree" class="dom-tree"></div>
+    <div class="dt-crumbs" id="dt-crumbs">html · body · section.hero · div.hero-in</div>
+  </div>
+
+  <div class="dt-pane" id="dt-console">
+    <div id="console-log" class="console-log"></div>
+  </div>
+
+  <div class="dt-pane" id="dt-sources">
+    <div class="src-head">workbooks.html — the workbook's own source (an agent wrote it; <code>wb unbundle</code> recovers the tree)</div>
+    <div id="src-body" class="src-code"></div>
+  </div>
+
+  <div class="dt-pane" id="dt-agent">
+    <p>This page is composed and maintained by an agent, <b>lander-keeper</b>, running on the Workbooks engine. It reads the page on a schedule, makes one constrained change, and commits it — so the changelog below <em>is</em> its work, live.</p>
+    <h4>ground rules</h4>
+    <div class="rule">· never fabricate users, metrics, or praise</div>
+    <div class="rule">· one constrained edit per run · always reversible</div>
+    <div class="rule">· never remove the download or this inspector</div>
+    <h4>changelog <span class="badge" id="chg-src">live · /_changes</span></h4>
+    <div id="chglog"><div class="cl-row"><span class="cl-msg">loading…</span></div></div>
   </div>
 </aside>
+<button class="insp-handle" id="insp-handle" type="button" aria-label="Open inspector">⌗ inspect</button>
 
 <header class="nav">
   <a class="brand" href="/">
@@ -74,14 +83,14 @@
 <section class="hero">
   <canvas class="ascii hero-bg" data-dense data-speed="0.7" aria-hidden="true"></canvas>
   <div class="hero-in skeletonable" data-build>
-    <p class="kicker">a single file · composed by an agent · served live</p>
+    <p class="kicker">a new engine for living software</p>
     <h1><span class="h-line">This is</span> <span class="h-line">a workbook.</span></h1>
-    <p class="lede">One file that holds an entire app — what you see, the data behind it, and the source that runs it. An agent composed this page, a runtime serves it, and it edits itself on a loop. <em>Make your own just by describing it.</em></p>
+    <p class="lede">This whole page is one — built and run by an agent on the Workbooks engine, quietly improving itself as you read. It's a new way to make software that's <em>alive</em>: working for you, running anywhere, open all the way down.</p>
     <div class="cta">
-      <a class="btn btn-ink lg" href="#get">Download free</a>
-      <a class="btn btn-text" href="#what">What's a workbook? →</a>
+      <a class="btn btn-ink lg" href="#get">Download the app</a>
+      <a class="btn btn-text" id="cta-inspect" href="#">Inspect this page →</a>
     </div>
-    <p class="micro">free &amp; open source · runs on your machine · bring your own AI key</p>
+    <p class="micro">free desktop app · macOS · Windows · Linux</p>
   </div>
 </section>
 
