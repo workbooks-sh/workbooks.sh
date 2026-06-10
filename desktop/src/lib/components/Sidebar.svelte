@@ -36,8 +36,7 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
-  import { tintFor, tintWash, tints } from "$lib/ui/tint.svelte";
-  import TintArc from "$lib/ui/TintArc.svelte";
+  import { tintFor, tintWash } from "$lib/ui/tint.svelte";
   import { fileIconUrl, folderIconUrl } from "$lib/ui/materialIcon";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
@@ -665,8 +664,6 @@
           <span class="row-icon">
             {#if emojiIcon(pkg.icon)}
               <Icon value={pkg.icon ?? ""} name={pkg.name} size={16} />
-            {:else if tints.overrides[pkg.name]}
-              <FolderIcon size={17} color={tintFor(pkg.name)} />
             {:else}
               <img
                 class="mi"
@@ -878,7 +875,6 @@
 </nav>
 
 <ContextMenu bind:open={bmMenuOpen} x={bmMenuX} y={bmMenuY}>
-  {#if bmMenuTarget}<TintArc name={bmMenuTarget.title} />{/if}
   <button
     class="ctx-item"
     onclick={() => {
@@ -910,7 +906,6 @@
 </ContextMenu>
 
 <ContextMenu bind:open={wbMenuOpen} x={wbMenuX} y={wbMenuY}>
-  {#if wbMenuTarget}<TintArc name={wbMenuTarget.title} />{/if}
   <button
     class="ctx-item"
     onclick={() => {

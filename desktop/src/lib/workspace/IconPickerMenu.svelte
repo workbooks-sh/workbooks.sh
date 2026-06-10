@@ -22,10 +22,13 @@
    * workspaces.json compact). No crop modal in v1 — center-crop on
    * resize. SVGs pass through unmodified.
    */
-  import { onMount, tick } from "svelte";
-  import { ImageSquare as ImagePlus, Smiley as Smile, TextT as Type } from "phosphor-svelte";
-  import EmojiPicker from "./EmojiPicker.svelte";
+  import { tick } from "svelte";
+  import { ImageSquare as ImagePlus, TextT as Type } from "phosphor-svelte";
   import Icon from "$lib/ui/Icon.svelte";
+  import {
+    materialIconUrl,
+    searchMaterialIcons,
+  } from "$lib/ui/materialIcon";
 
   let {
     value = $bindable(""),
@@ -38,16 +41,76 @@
     size?: number;
   } = $props();
 
-  type Stage = "menu" | "emoji";
-
   let open = $state(false);
-  let stage = $state<Stage>("menu");
   let triggerEl = $state<HTMLButtonElement | null>(null);
   let popoverEl = $state<HTMLDivElement | null>(null);
   let popoverPos = $state<{ top: number; left: number } | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
+  let searchEl = $state<HTMLInputElement | null>(null);
   let busy = $state(false);
   let error = $state<string | null>(null);
+
+  // ── one search over the universal icon library ───────────────────
+  // Material icons by def name + emoji (emoji-picker-element's search
+  // database) in a single result grid.
+  let query = $state("");
+  /** Curated starter grid shown before the user types. */
+  const STARTER_DEFS = [
+    "todo", "document", "readme", "table", "database", "settings",
+    "rocket", "lib", "zip", "email", "image", "video",
+    "audio", "pdf", "markdown", "json", "html", "css",
+    "javascript", "typescript", "python", "rust", "go", "java",
+  ];
+  const matResults = $derived(
+    query.trim()
+      ? searchMaterialIcons(query, 48)
+      : STARTER_DEFS.map((def) => ({ def, url: materialIconUrl(def)! })).filter(
+          (x) => x.url,
+        ),
+  );
+
+  type EmojiHit = { unicode: string; annotation: string };
+  let emojiResults = $state<EmojiHit[]>([]);
+  let emojiDb: { getEmojiBySearchQuery(q: string): Promise<unknown[]> } | null =
+    null;
+  $effect(() => {
+    const q = query.trim();
+    if (!q || q.length < 2) {
+      emojiResults = [];
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!emojiDb) {
+          const { default: Database } = await import(
+            "emoji-picker-element/database"
+          );
+          emojiDb = new Database();
+        }
+        const hits = (await emojiDb.getEmojiBySearchQuery(q)) as {
+          unicode?: string;
+          annotation?: string;
+        }[];
+        if (!cancelled) {
+          emojiResults = hits
+            .filter((h) => h.unicode)
+            .slice(0, 24)
+            .map((h) => ({ unicode: h.unicode!, annotation: h.annotation ?? "" }));
+        }
+      } catch {
+        if (!cancelled) emojiResults = [];
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function pickMaterial(def: string) {
+    value = `mi:${def}`;
+    open = false;
+  }
 
   function kindOf(v: string): "image" | "emoji" | "initials" {
     if (!v) return "initials";
@@ -65,18 +128,19 @@
   async function openMenu() {
     if (busy) return;
     if (open) { open = false; return; }
-    stage = "menu";
+    query = "";
     open = true;
     error = null;
     await positionPopover();
+    searchEl?.focus();
   }
 
   async function positionPopover() {
     await tick();
     if (!triggerEl) return;
     const r = triggerEl.getBoundingClientRect();
-    const popW = stage === "emoji" ? 340 : 240;
-    const popH = stage === "emoji" ? 420 : 180;
+    const popW = 340;
+    const popH = 400;
     let left = r.right + 8;
     let top = r.top;
     if (left + popW > window.innerWidth - 8) left = Math.max(8, r.left - popW - 8);
@@ -103,12 +167,6 @@
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };
-  });
-
-  $effect(() => {
-    if (!open) return;
-    void stage;
-    void positionPopover();
   });
 
   function pickEmoji(unicode: string) {
@@ -223,31 +281,55 @@
 {#if open && popoverPos}
   <div
     bind:this={popoverEl}
-    class="popover"
-    class:wide={stage === "emoji"}
+    class="popover wide"
     role="menu"
     style="top: {popoverPos.top}px; left: {popoverPos.left}px;"
   >
-    {#if stage === "menu"}
-      <button class="item" type="button" onclick={() => (stage = "emoji")}>
-        <span class="item-icon"><Smile weight="fill" size={16} /></span>
-        <span class="item-label">Pick emoji</span>
-        <span class="chev">›</span>
+    <input
+      bind:this={searchEl}
+      bind:value={query}
+      class="search"
+      type="text"
+      placeholder="Search icons & emoji…"
+      spellcheck="false"
+    />
+    <div class="grid-scroll">
+      {#if matResults.length === 0 && emojiResults.length === 0}
+        <p class="none">No matches</p>
+      {:else}
+        <div class="icon-grid">
+          {#each matResults as m (m.def)}
+            <button
+              type="button"
+              class="cell"
+              title={m.def}
+              onclick={() => pickMaterial(m.def)}
+            >
+              <img src={m.url} alt={m.def} loading="lazy" />
+            </button>
+          {/each}
+          {#each emojiResults as em (em.unicode)}
+            <button
+              type="button"
+              class="cell"
+              title={em.annotation}
+              onclick={() => pickEmoji(em.unicode)}
+            >
+              <span class="em">{em.unicode}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    <div class="foot">
+      <button class="foot-btn" type="button" onclick={pickImageClick}>
+        <ImagePlus weight="fill" size={13} /> Image…
       </button>
-      <button class="item" type="button" onclick={pickImageClick}>
-        <span class="item-icon"><ImagePlus weight="fill" size={16} /></span>
-        <span class="item-label">Upload image…</span>
+      <button class="foot-btn" type="button" onclick={pickInitials}>
+        <Type weight="fill" size={13} /> Initials
       </button>
-      <button class="item" type="button" onclick={pickInitials}>
-        <span class="item-icon"><Type weight="fill" size={16} /></span>
-        <span class="item-label">Use initials</span>
-      </button>
-      {#if error}<div class="err">{error}</div>{/if}
-    {:else}
-      <div class="emoji-host">
-        <EmojiPicker onpick={pickEmoji} />
-      </div>
-    {/if}
+      {#if error}<span class="err">{error}</span>{/if}
+    </div>
   </div>
 {/if}
 
@@ -302,39 +384,85 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .item {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
+  .search {
     width: 100%;
-    padding: 0.5rem 0.6rem;
-    background: transparent;
-    border: 0;
-    border-radius: 7px;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-page);
     color: var(--color-fg);
     font: inherit;
     font-size: 0.85rem;
-    text-align: left;
-    cursor: pointer;
+    outline: none;
   }
-  .item:hover { background: var(--color-surface-soft); }
-  .item-icon {
+  .search:focus { border-color: var(--color-border-strong); }
+
+  .grid-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+  }
+  .cell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    color: var(--color-fg-muted);
-    flex-shrink: 0;
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.1s;
   }
-  .item-label { flex: 1 1 auto; }
-  .chev { color: var(--color-fg-subtle); font-size: 1rem; }
+  .cell:hover { background: var(--color-surface-soft); }
+  .cell img {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+  .cell .em {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .none {
+    margin: 1.2rem 0;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--color-fg-muted);
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--color-border);
+  }
+  .foot-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .foot-btn:hover { color: var(--color-fg); border-color: var(--color-border-strong); }
 
   .err {
-    margin: 0.4rem 0.4rem 0.2rem;
-    font-size: 0.75rem;
+    margin-left: auto;
+    font-size: 0.72rem;
     color: #ef4444;
   }
-
-  .emoji-host { padding: 0; }
 </style>

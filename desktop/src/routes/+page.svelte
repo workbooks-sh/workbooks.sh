@@ -47,7 +47,6 @@
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
-  import TintArc from "$lib/ui/TintArc.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
 
   /* Sidebar sections. Create is the branded CTA above the bottom nav
@@ -571,7 +570,6 @@
     </ContextMenu>
 
     <ContextMenu bind:open={pkgMenuOpen} x={pkgMenuX} y={pkgMenuY}>
-      {#if pkgMenuTarget}<TintArc name={pkgMenuTarget} />{/if}
       {#if pkgMenuKind === "app"}
         <button
           class="ctx-item"

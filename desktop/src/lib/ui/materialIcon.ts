@@ -37,6 +37,29 @@ export function materialIconUrl(def: string): string | null {
   return urlFor(def);
 }
 
+const PREFIX = "/node_modules/material-icon-theme/icons/";
+const ALL_DEFS: string[] = Object.keys(URLS).map((p) =>
+  p.slice(PREFIX.length, -".svg".length),
+);
+
+/** Search the whole set by name — exact > prefix > substring. */
+export function searchMaterialIcons(
+  query: string,
+  limit = 60,
+): { def: string; url: string }[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const ranked: { def: string; rank: number }[] = [];
+  for (const def of ALL_DEFS) {
+    const rank = def === q ? 0 : def.startsWith(q) ? 1 : def.includes(q) ? 2 : -1;
+    if (rank >= 0) ranked.push({ def, rank });
+  }
+  ranked.sort((a, b) => a.rank - b.rank || a.def.localeCompare(b.def));
+  return ranked
+    .slice(0, limit)
+    .map(({ def }) => ({ def, url: urlFor(def)! }));
+}
+
 /** Icon URL for a file, by its name (basename or full path). */
 export function fileIconUrl(name: string): string {
   const base = name.split("/").pop()?.toLowerCase() ?? "";
