@@ -13,13 +13,13 @@ After any ADD: add the new row here in the same commit. Keep rows honest.
 - #examples — "Workbooks in the wild": WULU billboard + ghost slots
 - timeline panel / footer
 
-** #grown (yours, newest first)
+** #grown (yours, newest first; faq is ALWAYS last)
 - what-you-can-build — four use-case categories: personal, team, client, products
 - whats-a-workbook — concrete explainer, hiring-tracker example
-- faq — five expandable questions: what is this, what edits it, who reviews, malleability
-- how-it-works — plain-English pass over the three layers (NOTE: overlaps #layers
-  intent — candidate for a future audit: differentiate or fold into something else)
 - agents-desk — blog listing: links to every post (update when a post ships)
+- faq — five expandable questions: what is this, what edits it, who reviews, malleability
+- (removed 2026-06-10: how-it-works — duplicated #layers' intent; the law
+  worked, the team applied it)
 
 * blog/
 

@@ -76,8 +76,10 @@
     commits since your last `audit:` commit — 3+ → AUDIT, else ADD.
     - For an ADD run, pick the run's TYPE TAG up front —
       it frames the work and the timeline badges it: `add:` for a page
-      section or feature, `blog:` for a post, `tweet:` for social copy (once
-      that exists). New tags may be added to the system over time.
+      section or feature, `blog:` for a post, `strategy:` for landscape/
+      competitive research that updates `strategy/landscape.org` and seeds
+      board tasks, `tweet:` for social copy (once that exists). New tags may
+      be added to the system over time.
 
     **ADD run — create one new thing.** One positive, finished thing per run.
     Pick the top open item in plan.org (or the best idea if the backlog is
@@ -111,7 +113,7 @@
     3b. HANDS OFF the human-curated zones: the hero, `<section id="layers">`,
        `<section id="examples">`, and the panel markup. You never edit inside
        them — not even in an audit. Your territory is `#grown`, `blog/`, and
-       plan.org only.
+       plan.org, and `strategy/` only.
     3c. SURGICAL EDITS ONLY on index.html: read the file, change the minimal
        region, and NEVER write the whole file from memory — if a vfs_write to
        index.html would make it dramatically smaller than what you read, you

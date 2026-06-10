@@ -20,7 +20,9 @@ existing pattern, not a new one.
     2. prose <p>s — var(--dim), 15.5px, ≤65ch, 2-4 paragraphs MAX
     3. optionally ONE pattern from below. Never two patterns in one section.
   Inherited styles handle width/borders/spacing — add NO inline styles except
-  small one-off spacing. Sections are PREPENDED (newest first) inside #grown.
+  small one-off spacing. Sections are PREPENDED (newest first) inside #grown,
+  with ONE exception: an faq section always sits LAST in #grown — FAQs live
+  at the bottom of pages, always.
 
 * patterns (pick one, copy its existing markup shape)
 

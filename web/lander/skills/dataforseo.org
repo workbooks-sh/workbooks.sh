@@ -38,6 +38,8 @@ exploratory loops. All endpoints: POST JSON arrays to api.dataforseo.com/v3.
 
 * budget rules
 
-  - blog ADD run: ≤2 calls (volume gate + optional SERP scan)
-  - audit run: ≤1 call (ranked keywords, and only every few audits)
-  - never loop on the API; never call it from daydreams/dreams
+  - strategy runs (landscape research): exploratory loops are FINE — up to
+    ~12 calls; map a whole cohort's queries and SERPs properly
+  - blog/section ADD run: ≤2 calls (volume gate + optional SERP scan)
+  - audit run: ≤1 call (ranked keywords, every few audits)
+  - never call it from daydreams/dreams

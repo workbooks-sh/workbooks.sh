@@ -1,5 +1,20 @@
 #+TITLE: skill: content — what to write about (strategy, not vibes)
 
+* strategy ownership (you maintain the map, not just the content)
+
+  `strategy/landscape.org` is YOUR living competitive landscape — create it
+  if missing, refresh a cohort when it's stale or a dream asks. Two cohorts:
+  1. AI app builders: Lovable, v0, Cursor, Bolt, Replit — prompt-to-app for
+     builders. Our wedge: what you build here is yours — portable apps, your
+     runtime, no platform leash.
+  2. Internal tools / data apps: hex.tech, Retool, Airtable, PowerApps — team
+     tooling. Our wedge: one ecosystem from personal tool to shipped product;
+     the desktop app means it starts on YOUR machine.
+  Per cohort keep: who they are, what queries they own (use
+  skills/dataforseo.org — exploratory loops are FINE in strategy work), what
+  they can't say that we can, which comparison pages we've shipped or should.
+  Landscape findings become board tasks; content cites the landscape.
+
 * the content ladder (pick from the top)
 
   1. PROBLEM content — the searcher has a pain, we have the shape of the
