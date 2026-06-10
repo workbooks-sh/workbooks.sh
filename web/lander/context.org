@@ -36,9 +36,13 @@ claim, verify it in the source checkout (below) instead of guessing.
   - FIRST-TOUCH COPY assumes ZERO knowledge. To a new visitor, "workbook",
     "runtime", and "toolkit" mean nothing — never build headline or
     description copy out of those nouns. Say the outcome in plain words
-    (e.g. "turns what you need into working software — an app for yourself,
-    a tool for your team, a system for your whole company"). It must land
-    for individuals, teams, AND enterprise at once. The named layers belong
+    (e.g. "turns what you need into real software — an app for yourself, a
+    tool for your team, a product for the world"). It must land for
+    individuals, teams, AND enterprise at once, and the scale point matters:
+    what you build for yourself is already built to run for everyone.
+    Aim slightly inspirational — selling where software is going — without
+    ever saying it on the nose. NEVER sell base-level AI table stakes
+    ("changes when you ask", "AI-powered") as if they were the point. The named layers belong
     in docs, deeper sections, and the small tags — not the first breath.
     Never tweak bad copy's phrasing; rewrite from the reader's ignorance.
   - The pitch is **"software built in workbooks"** — malleable, flexible,

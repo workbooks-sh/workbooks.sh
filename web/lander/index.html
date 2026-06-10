@@ -121,15 +121,19 @@ body.panel-open .nav { left: calc((100vw - var(--panel-w)) / 2); }
 .btn.primary:hover { background: #fff; }
 .btn.ghost { color: var(--dim); border-color: var(--line); background: transparent; }
 .btn.ghost:hover { color: var(--ink); border-color: var(--faint); }
-.cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-.card {
-  display: flex; align-items: baseline; gap: 10px;
-  background: color-mix(in srgb, var(--panel) 75%, transparent);
-  border: 1px solid var(--line); border-radius: var(--r);
-  padding: 13px 16px; text-align: left; backdrop-filter: blur(8px);
+/* ── the three layers: vibrant color cards ───────────────────── */
+#layers {
+  width: min(880px, calc(100% - 64px)); margin: 0 auto; padding: 80px 0 8px;
 }
-.card .k { font: 500 12px/1 var(--mono); color: var(--live); }
-.card .v { font: 400 13px/1.2 var(--sans); color: var(--dim); }
+#layers h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 24px; }
+.lgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 760px) { .lgrid { grid-template-columns: 1fr; } }
+.lcard { border-radius: 16px; padding: 22px 22px 26px; min-height: 210px; display: flex; flex-direction: column; gap: 12px; }
+.lcard .lk { font: 500 11.5px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; opacity: .72; }
+.lcard p { margin: auto 0 0; font: 450 14.5px/1.5 var(--sans); letter-spacing: -.005em; }
+.lcard.c-green { background: var(--live); color: #04130a; }
+.lcard.c-blue  { background: #5ea2ff; color: #061226; }
+.lcard.c-amber { background: #f5b945; color: #241503; }
 
 /* ── agent-grown sections land below the hero ────────────────────
    The agent appends <section class="grown"> blocks here. Give them a
@@ -347,22 +351,42 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
     <h1 class="blk" id="b-h1"><span id="h1text"></span><span class="caret" id="caret" hidden></span></h1>
 
     <p class="sub blk" id="b-sub">
-      <b>Workbooks</b> turns what you need into working software — an app for
-      yourself, a tool for your team, a system for your whole company. Built
-      on your desktop. Runs anywhere. Changes whenever you need it to.
+      <b>Workbooks</b> turns what you need into real software — an app for
+      yourself, a tool for your team, a product for the world. The thing you
+      build in an afternoon is already built to run at any scale. This is how
+      software gets made now.
     </p>
 
     <div class="ctas blk" id="b-ctas">
       <a class="btn primary" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="heroDl">download for desktop</a>
       <a class="btn ghost" href="#timeline">watch it work →</a>
     </div>
-
-    <div class="cards blk" id="b-cards">
-      <div class="card" data-card="workbooks"><span class="k">workbooks</span><span class="v">your apps, as portable client packages</span></div>
-      <div class="card" data-card="runtime"><span class="k">runtime</span><span class="v">one server runs your apps & their agents</span></div>
-      <div class="card" data-card="toolkits"><span class="k">toolkits</span><span class="v">the authoring system for every capability</span></div>
-    </div>
   </main>
+
+  <!-- the three layers: human-curated. The agent never edits this section. -->
+  <section id="layers">
+    <h2>Three things to know</h2>
+    <div class="lgrid">
+      <div class="lcard c-green">
+        <span class="lk">workbooks</span>
+        <p>The apps. Everything an app is — its data, its logic, its interface —
+        travels as one piece you can open anywhere, share like a file, and
+        reshape like a document.</p>
+      </div>
+      <div class="lcard c-blue">
+        <span class="lk">the runtime</span>
+        <p>The engine. One server runs your apps, their agents, and everything
+        they do — on a laptop, across a company, or for the open internet,
+        without changing a line.</p>
+      </div>
+      <div class="lcard c-amber">
+        <span class="lk">toolkits</span>
+        <p>How it grows. Every capability — charts, AI, payments, whatever's
+        next — is authored the same way, so what you start with is never what
+        you're stuck with.</p>
+      </div>
+    </div>
+  </section>
 
   <!-- examples: human-curated. The agent never edits this section. -->
   <section id="examples">
@@ -471,7 +495,6 @@ async function build() {
   work(false);
   await place('#b-sub');
   await place('#b-ctas');
-  await place('#b-cards');
   await cursorExit();
   openPanel();        // the timeline reveals itself only after the agent leaves
 }
