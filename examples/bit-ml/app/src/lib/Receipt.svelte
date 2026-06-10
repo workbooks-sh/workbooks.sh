@@ -29,10 +29,9 @@
 
 <style>
   .receipt {
-    border-radius: 10px; overflow: hidden;
+    border-radius: var(--r); overflow: hidden;
     background: var(--paper);   /* resolves to terminal #0d0e10 via data-theme */
     color: var(--ink);
-    border: 1px solid var(--rule);
     padding: 16px 18px 18px;
     font-family: var(--mono);
   }

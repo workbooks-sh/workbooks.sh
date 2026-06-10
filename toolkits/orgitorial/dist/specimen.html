@@ -84,22 +84,23 @@ body { background: var(--org-paper, #fbf9f4); transition: background .2s ease; }
 }
 
 [data-org-theme="dark"] {
-  --org-paper:        #15140f;
-  --org-ink:          #ece6d8;
-  --org-ink-soft:     #c2bbac;
-  --org-faint:        #8a8174;
-  --org-accent:       #e08a4a;
-  --org-accent-soft:  #3a2a1c;
-  --org-rule:         #2c2a23;
-  --org-rule-strong:  #3d3a30;
-  --org-panel:        #1c1a14;
-  --org-panel-bar:    #24211a;
-  --org-todo-bg:      #e08a4a;
-  --org-todo-ink:     #1a1610;
-  --org-done-bg:      #7fa56a;
-  --org-done-ink:     #14140f;
-  --org-mark:         #5a4f20;
-  --org-selection:    #3a2a1c;
+  /* true black, like the light side is true white — never a tinted dark */
+  --org-paper:        #000000;
+  --org-ink:          #ffffff;
+  --org-ink-soft:     #d6d6d6;
+  --org-faint:        #8c8c8c;
+  --org-accent:       #ffffff;
+  --org-accent-soft:  #161616;
+  --org-rule:         #1c1c1c;
+  --org-rule-strong:  #333333;
+  --org-panel:        #0f0f0f;
+  --org-panel-bar:    #181818;
+  --org-todo-bg:      #ffffff;
+  --org-todo-ink:     #000000;
+  --org-done-bg:      #000000;
+  --org-done-ink:     #ffffff;
+  --org-mark:         #1c1c1c;
+  --org-selection:    #2e2e2e;
 }
 
 /* ---------- document frame ---------- */

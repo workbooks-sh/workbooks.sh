@@ -10,6 +10,9 @@
   --ink-2:   #2e2e2e;           /* deks: still essentially black */
   --ink-3:   #757575;           /* meta resting state — the ONLY grey */
   --rule:    #ededed;           /* hairlines — barely there */
+  /* ONE radius scale — every rounded surface uses these, nothing freelances */
+  --r:   12px;                  /* floating surfaces: panels, receipt, portal */
+  --r-s: 6px;                   /* chips, keycaps */
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;
   --down:    #c4322e;           /* market semantics only */
@@ -31,12 +34,14 @@
   color-scheme: light;
 }
 
-[data-theme=terminal] {          /* the panel + dark mode */
-  --paper: #0d0e10;
-  --ink:   #e9eaec;
-  --ink-2: #8d9197;
-  --ink-3: #5b5f66;
-  --rule:  #23262b;
+[data-theme=terminal] {          /* the panel + dark mode: TRUE BLACK, like
+                                    the light side is true white — never a
+                                    tinted workbooks-gray */
+  --paper: #000000;
+  --ink:   #ffffff;
+  --ink-2: #d6d6d6;
+  --ink-3: #8c8c8c;
+  --rule:  #1c1c1c;
   --wire:  #5b8cff;
   color-scheme: dark;
 }

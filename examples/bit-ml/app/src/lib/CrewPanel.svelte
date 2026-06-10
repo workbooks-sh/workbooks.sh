@@ -79,7 +79,7 @@
     transform: translateX(100%);
     transition: transform .15s ease-out;   /* §4.8 slide-in 150ms */
     box-shadow: -8px 0 40px -20px rgba(0,0,0,.5);
-    border-radius: 12px 0 0 12px;
+    border-radius: var(--r) 0 0 var(--r);
     /* the faint top glow — Linear's dark-surface signature, barely there */
     background-image: radial-gradient(120% 60% at 50% -10%, rgba(91,140,255,.07), transparent 60%);
   }
@@ -88,7 +88,6 @@
   /* inline specimen */
   .crew.inline {
     width: 100%; padding: 18px 18px 20px;
-    border: 1px solid var(--rule);
   }
 
   .phead {

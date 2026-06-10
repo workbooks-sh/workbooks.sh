@@ -51,7 +51,7 @@
 
   .kbd {
     font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
-    border: 1px solid var(--rule); border-radius: 6px; padding: 3px 7px;
+    border: 1px solid var(--rule); border-radius: var(--r-s); padding: 3px 7px;
     background: color-mix(in srgb, var(--ink) 2%, transparent);
   }
 

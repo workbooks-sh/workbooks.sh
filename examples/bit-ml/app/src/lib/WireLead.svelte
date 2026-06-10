@@ -20,7 +20,7 @@
 
 <article class="lead">
   <div class="dateline mono">
-    <span class="tick" style="background:{sec.color}"></span>
+    <span class="tick"></span>
     <span class="tag" style="color:{sec.color}">{sec.tag}</span>
     <span class="dot">·</span>
     <span class="when">{dateline}</span>
@@ -45,7 +45,7 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
     margin-bottom: 16px;
   }
-  .tick { width: 2px; height: 12px; display: inline-block; }
+  .tick { width: 2px; height: 12px; display: inline-block; background: var(--ink); }
   .tag { font-weight: 500; }
   .dot { color: var(--rule); }
   .when { color: var(--ink-3); }

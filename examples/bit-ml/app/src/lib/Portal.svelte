@@ -32,7 +32,7 @@
      the rim by the inner background. Kept thin (1px padding). */
   .portal {
     position: relative; width: 260px;
-    border-radius: 11px; padding: 1px; overflow: hidden;
+    border-radius: var(--r); padding: 1px; overflow: hidden;
   }
   .portal::before {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -44,7 +44,7 @@
   @keyframes sweep { to { --pang: 360deg; } }
 
   .inner {
-    position: relative; border-radius: 10px;
+    position: relative; border-radius: calc(var(--r) - 1px);
     padding: 12px 13px 12px;
     background: var(--paper);
   }

@@ -64,9 +64,9 @@ terminal — for the inspect panel and night reading, not a tinted clone.
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;  --down: #c4322e;   /* market semantics only */
 }
-[data-theme=terminal] {          /* the panel + dark mode */
-  --paper: #0d0e10; --ink: #e9eaec; --ink-2: #8d9197; --ink-3: #5b5f66;
-  --rule: #23262b; --wire: #5b8cff;
+[data-theme=terminal] {          /* the panel + dark mode: TRUE BLACK */
+  --paper: #000000; --ink: #ffffff; --ink-2: #d6d6d6; --ink-3: #8c8c8c;
+  --rule: #1c1c1c; --wire: #5b8cff;
 }
 ```
 
@@ -81,6 +81,11 @@ terminal — for the inspect panel and night reading, not a tinted clone.
   data. Nothing else.
 - No gradients anywhere except the presence system (the one inherited
   gradient: the live-agent rim, which signals "machine at work").
+- **Surface laws (founder, 2026-06-10):** backgrounds are #000 or #fff —
+  never a tinted gray. NO STROKES ON CARDS — a card separates by contrast
+  alone (black on white needs no outline); borders survive only on small
+  product chrome (pills, keycaps). ONE radius scale: --r 12px for floating
+  surfaces, --r-s 6px for chips — nothing freelances its roundness.
 
 ## 4. The components
 

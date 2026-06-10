@@ -47,7 +47,7 @@
 <article class="bite {status}">
   <div class="top mono">
     <span class="sec">
-      <span class="tick" style="background:{sec.color}"></span>
+      <span class="tick"></span>
       <span class="tag" style="color:{sec.color}">{sec.tag}</span>
       {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
     </span>
@@ -73,7 +73,7 @@
     gap: 12px; margin-bottom: 12px;
   }
   .sec { display: inline-flex; align-items: center; gap: 8px; }
-  .tick { width: 2px; height: 12px; display: inline-block; }
+  .tick { width: 2px; height: 12px; display: inline-block; background: var(--ink); }
   .tag {
     font-size: 11px; font-weight: 500; text-transform: uppercase;
     letter-spacing: 0.07em;
