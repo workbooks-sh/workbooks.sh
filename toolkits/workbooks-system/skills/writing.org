@@ -1,0 +1,86 @@
+#+TITLE: workbooks-system — writing
+#+TOOLKIT: workbooks-system
+#+SKILL: writing
+#+TAGS: writing product-facts positioning voice framings
+#+STATUS: experimental
+
+* When to use this
+
+Read this whenever you are WRITING prose ABOUT Workbooks — a landing page, a
+README, docs, a description, ad copy, an answer to "what is Workbooks". It is
+the context skill that keeps the product facts straight and the framing
+honest. For the mechanics of the platform, read =concepts=; this skill is
+about getting the story right.
+
+* The three layers (always frame around these)
+
+Workbooks is an ecosystem for building software, in three layers — name them
+correctly:
+
+1. *Workbooks* — the apps: an entire app bundled into one HTML artifact
+   (data, logic, interface, and an embedded WASM kernel when it computes).
+2. *The runtime* — one Elixir/BEAM server that serves workbooks, hosts
+   agents, and executes all compute as WebAssembly.
+3. *Toolkits* — the authoring + capability system: commands plus org skills.
+
+Frame Workbooks as an *ecosystem* with two doors, not as a single trick.
+
+* What ships, and as what
+
+Two products, one open-source codebase (Apache-2.0):
+
+- *The repository* — the ecosystem for builders: the runtime engine, the
+  =wb= CLI, the compiler lanes (C/Zig/Rust/JS-TS-npm → WASM), the toolkits,
+  and the desktop app's own source. Everything is inspectable.
+- *The desktop app* — the front door for everyone else: a signed,
+  cross-platform (macOS / Windows / Linux; Tauri) application that puts the
+  ecosystem on one machine with no server and no account. It is
+  workbook-native (embeds the kernel, runs workbooks locally), offline-first
+  (boots without any engine; a runtime connection is an optional tier for
+  agents/sync, shown, never a blocking gate), and the same UI runs against
+  local OS, a connected runtime, or the in-process kernel.
+
+Positioning: *the website sells the desktop app; developers are routed to
+the repository.* They are the same ecosystem at two doors — an app made in
+the desktop app runs on a deployed runtime unchanged.
+
+* License
+
+Apache-2.0. Say "open source" / "Apache-2.0", accurately.
+
+* Cloud — planned, not promised
+
+A hosted cloud is a *planned tier*. Never describe it as available, never
+promise it, never imply sign-up. If asked, say it is planned.
+
+* Banned framings (do not use these — they are wrong or misleading)
+
+- *Never sell "one file" as the point.* The single-HTML artifact is a real
+  mechanic, but the selling story is the three-layer ecosystem and
+  bundle⇄unbundle, not "it's just one file". (Many real workbooks are
+  multi-page sites with assets.)
+- *Never "sites that run themselves".* Workbooks don't autonomously run
+  themselves; the runtime executes them and agents act under policy. Don't
+  imply magic autonomy.
+- *Never "own your software".* Don't use ownership-slogan framing. Say what
+  is true: it's open source (Apache-2.0), inspectable, and every deploy is a
+  public git commit.
+
+* What IS true and worth saying
+
+- Every deploy is *one public git commit* — an inspectable changelog.
+- All compute is *WebAssembly on wasmtime*; nothing native runs on a
+  deployed runtime.
+- *Bundle ⇄ unbundle* round-trips losslessly: source ↔ artifact.
+- The desktop app is *offline-first* and needs no server to view a workbook.
+- It's *Apache-2.0* and fully inspectable.
+
+* Voice rules
+
+- Generalize: no project history, no internal issue ids, no naming a
+  specific deployment or agent. This is published prose for strangers.
+- State the fact, not the hype. Prefer concrete mechanics over slogans.
+- Don't reach for SKU-style codes, version numbers, or internal jargon as
+  decoration — they read as catalog-labeling, not writing.
+- When unsure whether a capability is shipped vs. planned, say "planned" or
+  omit it; never over-promise.

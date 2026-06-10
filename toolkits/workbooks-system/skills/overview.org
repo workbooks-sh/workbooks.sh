@@ -1,0 +1,81 @@
+#+TITLE: workbooks-system — overview
+#+TOOLKIT: workbooks-system
+#+SKILL: overview
+#+TAGS: platform system invariants orientation
+#+STATUS: experimental
+
+* When to use this
+
+Read this when you are an agent running inside a Workbooks runtime and the
+task touches the platform itself — a workbook, =wb=, a toolkit, a workflow,
+or anything saying "bundle", "unbundle", "publish", "toolkit", or "WASM".
+Read it BEFORE inventing a mechanism: the platform almost always already
+provides one.
+
+* The ecosystem — three layers
+
+Everything is organized around three layers. Learn the words once:
+
+1. *Workbooks* — the apps. A workbook is one HTML artifact that IS an entire
+   app: data, logic, interface, and (when it computes) an embedded
+   WebAssembly kernel. → read =concepts=, then =authoring=.
+2. *The runtime* — one server (Elixir/BEAM) that serves workbooks, hosts
+   agents like you, and executes ALL compute as WebAssembly on wasmtime.
+   You live here. → =concepts=.
+3. *Toolkits* — the authoring + capability system: commands on PATH plus org
+   skill files read progressively. How you gain abilities. → =toolkits=.
+
+* Facts — what things are (and are not)
+
+- A *workbook* is both document and program. Its defining mechanic is
+  *bundle ⇄ unbundle*: a project of source files compiles INTO the artifact,
+  and the artifact unbundles BACK into editable source. Never hand-edit the
+  artifact.
+- The *runtime* is not a per-app server. One runtime propagates many apps
+  and agents on a single machine, concurrently.
+- A *toolkit* is not a plugin API. To you, it is CLI commands on PATH plus
+  org skill files. You have one tool worldview — a shell — and capabilities
+  arrive as commands, not new tool entries.
+- A *workflow* is not a DSL. A native org outline IS the workflow: TODO
+  keywords are states, nesting is sub-workflows, properties are edges/gates.
+- The *Dock* is the membrane between a workbook's WASM and the host:
+  filesystem / network / time are host-brokered imports granted by policy —
+  never ambient, never inherited.
+
+* Rules of engagement (invariants, not preferences)
+
+- *No native execution.* All compute is WASM on wasmtime. You cannot install
+  node/python/cargo. Need a missing capability → a compiler lane converts it
+  (see =toolkits=), you do not install it.
+- *Two HTTP planes, never blended.* The public content plane is anonymous
+  and GET-only; the control plane is bearer-authed and owns every write.
+  Never add a write to the public plane.
+- *HOST vs LOADED.* Host engine code is fixed at deploy time. Loaded
+  artifacts — workbooks, toolkits, agent defs, workflow/lifecycle specs,
+  boards — hot-swap on a live engine. You edit LOADED, never HOST. (Editing
+  loaded artifacts is why self-modification is safe.)
+- *Build inputs never ship in the runnable artifact* unless they are WASM or
+  a built bundle. Source lives on the git rail; the artifact carries outputs.
+- *Your commits are public.* Every publish is one git commit in the tenant
+  repo — the public, inspectable changelog. Write commit messages for
+  strangers.
+- *Every action is wall-clock bounded.* Prefer the cheapest verb that proves
+  the work; don't loop.
+
+* Out of scope for you (operator territory)
+
+Provisioning machines, building/pushing the runtime OCI image, =wb deploy=,
+=fly= and other cloud lifecycle, and editing host engine code are
+*host-level* operations done by operators OUTSIDE the runtime. You cannot do
+them from in here and should not try; if a task seems to need one, it
+belongs to an operator.
+
+* Which skill next
+
+| Your task                                          | Read       |
+|----------------------------------------------------+------------|
+| "What exactly IS a workbook / Dock / runtime?"     | =concepts= |
+| Create / edit workbook content, then publish it    | =authoring=|
+| You need a capability you don't have yet           | =toolkits= |
+| Drive a TODO board, workflow DAG, or lifecycle     | =workflows=|
+| Write copy / docs ABOUT Workbooks (get facts right)| =writing=  |
