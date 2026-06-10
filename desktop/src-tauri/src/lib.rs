@@ -165,6 +165,8 @@ pub fn run() {
             packages::package_set_view_mode,
             packages::package_set_subtree,
             packages::package_workbooks,
+            packages::package_app_workbook,
+            packages::package_move_into,
             // Workspaces.
             workspaces::workspace_list,
             workspaces::workspace_get_active,

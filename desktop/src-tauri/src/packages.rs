@@ -33,6 +33,10 @@ pub struct Subtree {
 #[derive(Serialize)]
 pub struct Package {
     pub name: String,
+    /// "app" (a workbook opened as a window) or "folder" (a container
+    /// listed with inline workbooks). Stored as the `:kind:` orgprop;
+    /// absent on older descriptors → "folder".
+    pub kind: String,
     pub folders: Vec<String>,
     pub icon: String,
     pub view_mode: String,
@@ -65,6 +69,7 @@ fn parse_package(name: &str, body: &str) -> Package {
     };
     Package {
         name: name.to_string(),
+        kind: orgprops::get(body, "kind").unwrap_or_else(|| "folder".into()),
         folders: orgprops::get_list(body, "folders"),
         icon: orgprops::get(body, "icon").unwrap_or_else(|| DEFAULT_ICON.to_string()),
         view_mode: orgprops::get(body, "view-mode").unwrap_or_else(|| "source".into()),
@@ -149,10 +154,14 @@ pub fn package_create(
     app: AppHandle,
     name: String,
     icon: Option<String>,
+    kind: Option<String>,
 ) -> Result<Package, String> {
     let mut body = String::new();
     body = orgprops::set(&body, "folders", "");
     body = orgprops::set(&body, "icon", &icon.unwrap_or_else(|| DEFAULT_ICON.to_string()));
+    if let Some(k) = kind {
+        body = orgprops::set(&body, "kind", &k);
+    }
     write_body(&name, &body)?;
     emit_tree_changed(&app);
     load_package(&name)
@@ -333,4 +342,75 @@ pub fn package_workbooks(name: String) -> Result<Vec<WorkbookEntry>, String> {
         .collect();
     entries.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
     Ok(entries)
+}
+
+/// First workbook reachable from the package's folders — the file an
+/// `app` package opens as its window (wb-5fl.12; the webHost mock's
+/// package_app_workbook contract, now real).
+#[tauri::command]
+pub fn package_app_workbook(name: String) -> Result<String, String> {
+    let entries = package_workbooks(name.clone())?;
+    entries
+        .first()
+        .map(|e| e.path.clone())
+        .ok_or_else(|| format!("package {name} has no workbook"))
+}
+
+/// Move an item INTO a folder package (wb-5fl.12; drag-into-folder).
+///   kind "workbook" → `item` is a file path; move it into the folder's
+///                     first bound directory.
+///   kind "app"      → `item` is a package name; move its workbooks into
+///                     the folder, then delete the app package descriptor
+///                     (the workspace binding self-heals frontend-side via
+///                     the exists-filter).
+#[tauri::command]
+pub fn package_move_into(
+    app: AppHandle,
+    item: String,
+    kind: String,
+    folder: String,
+) -> Result<(), String> {
+    let dest_pkg = load_package(&folder)?;
+    if dest_pkg.kind == "app" {
+        return Err(format!("{folder} is an app, not a folder"));
+    }
+    let dest_dir = dest_pkg
+        .folders
+        .first()
+        .cloned()
+        .ok_or_else(|| format!("folder {folder} has no bound directory"))?;
+    std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+
+    let move_file = |src: &str| -> Result<(), String> {
+        let file = std::path::Path::new(src)
+            .file_name()
+            .ok_or_else(|| format!("bad path {src}"))?;
+        let dst = std::path::Path::new(&dest_dir).join(file);
+        // rename first (same volume); fall back to copy+remove across volumes.
+        if std::fs::rename(src, &dst).is_err() {
+            std::fs::copy(src, &dst).map_err(|e| e.to_string())?;
+            std::fs::remove_file(src).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    };
+
+    match kind.as_str() {
+        "workbook" => move_file(&item)?,
+        "app" => {
+            for wb in package_workbooks(item.clone())? {
+                move_file(&wb.path)?;
+            }
+            // Drop the app's descriptor; clear active if it pointed here.
+            let _ = std::fs::remove_file(descriptor_path(&item));
+            let mut st = load_active_state();
+            if st.active.as_deref() == Some(item.as_str()) {
+                st.active = None;
+                paths::write_json(&state_path(), &st)?;
+                emit_scope(&app);
+            }
+        }
+        other => return Err(format!("unknown move kind: {other}")),
+    }
+    emit_tree_changed(&app);
+    Ok(())
 }
