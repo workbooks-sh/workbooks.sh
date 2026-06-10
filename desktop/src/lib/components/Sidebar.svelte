@@ -143,11 +143,6 @@
       .map((id) => packages.find((p) => p.id === id))
       .filter(Boolean) as RailPackage[],
   );
-  /** Apps render as a pinned tile grid (Arc-style); folders as rows. */
-  const appTiles = $derived(orderedPackages.filter((p) => p.kind === "app"));
-  const folderRows = $derived(
-    orderedPackages.filter((p) => (p.kind ?? "folder") === "folder"),
-  );
   function onDragStart(id: string) {
     dragId = id;
   }
@@ -200,7 +195,13 @@
     return [...ordered, ...rest];
   });
 
-  const bookmarkDraggable = $derived(dnd.payload?.type === "workbook");
+  /** Anything that resolves to a real file can be bookmarked: workbooks
+   *  (path) and apps (their workbook path). The grid never creates
+   *  anything — it only holds references to docs that live in real
+   *  folders. */
+  const bookmarkDraggable = $derived(
+    dnd.payload?.type === "workbook" || dnd.payload?.type === "app",
+  );
   /** Insertion index while a workbook drag hovers the grid (visual gap). */
   let bmInsertIdx = $state<number | null>(null);
 
@@ -216,10 +217,13 @@
     const p = dnd.payload;
     const idx = bmInsertIdx ?? orderedBookmarks.length;
     bmInsertIdx = null;
-    if (p?.type !== "workbook") return;
+    if (p?.type !== "workbook" && p?.type !== "app") return;
     e.preventDefault();
+    const path = await dnd.resolvePath();
+    const title = p.type === "app" ? p.name : p.title;
     dnd.end();
-    const existing = bookmarks.bookmarks.find((b) => b.path === p.path);
+    if (!path) return;
+    const existing = bookmarks.bookmarks.find((b) => b.path === path);
     if (existing) {
       // Reorder: move the existing bookmark to the insertion point.
       const ids = orderedBookmarks.map((b) => b.id).filter((id) => id !== existing.id);
@@ -234,7 +238,7 @@
       return;
     }
     try {
-      const b = await bookmarks.create(p.title, p.path);
+      const b = await bookmarks.create(title, path);
       const ids = orderedBookmarks.map((x) => x.id).filter((id) => id !== b.id);
       ids.splice(Math.min(idx, ids.length), 0, b.id);
       bmOrder = ids;
@@ -451,10 +455,11 @@
     <CaretUpDown size={13} weight="bold" class="ws-caret" aria-hidden="true" />
   </button>
 
-  <!-- Bookmarks — Arc-style tile grid: app packages + bookmarked
-       workbooks. Drop a dragged workbook here (or between tiles) to
-       bookmark it at that spot. Max 3 rows of 4. -->
-  {#if appTiles.length > 0 || bookmarks.bookmarks.length > 0 || bookmarkDraggable}
+  <!-- Bookmarks — Arc-style tile grid. Holds ONLY what was explicitly
+       dragged in (apps or workbooks — every tile is a reference to a
+       real file in a real folder; nothing is created here). Drop
+       between tiles to insert. Max 3 rows of 4. -->
+  {#if bookmarks.bookmarks.length > 0 || bookmarkDraggable}
     <div
       class="tile-grid"
       class:pin-target={bookmarkDraggable}
@@ -471,36 +476,6 @@
       }}
       ondrop={bookmarkDrop}
     >
-      {#each appTiles as pkg (pkg.id)}
-        {@const tint = tintFor(pkg.name)}
-        <button
-          type="button"
-          class="tile"
-          class:dragging={dragId === pkg.id}
-          class:drop-target={overId === pkg.id && dragId !== pkg.id}
-          style="--tint:{tint}; --tint-wash:{tintWash(tint)};"
-          title={pkg.name}
-          aria-label={pkg.name}
-          draggable="true"
-          ondragstart={(e) => {
-            onDragStart(pkg.id);
-            dnd.start({ type: "app", id: pkg.id, name: pkg.name }, e);
-          }}
-          ondragover={(e) => onDragOver(e, pkg.id)}
-          ondragend={() => {
-            onDragEnd();
-            dnd.end();
-          }}
-          ondrop={(e) => e.preventDefault()}
-          onclick={() => onOpenApp?.(pkg.id)}
-          oncontextmenu={(e) => {
-            e.preventDefault();
-            onPackageContext?.(pkg.id, e.clientX, e.clientY);
-          }}
-        >
-          <Icon value={pkg.icon ?? ""} name={pkg.name} size={17} />
-        </button>
-      {/each}
       {#each orderedBookmarks as b, i (b.id)}
         {@const tint = tintFor(b.title)}
         {@const identity = docIcons.iconFor(b.path)}
@@ -557,9 +532,39 @@
     <div class="hairline" aria-hidden="true"></div>
   {/if}
 
-  <!-- Folders -->
+  <!-- Library — folders (expandable) + apps as rows. Apps drag into
+       the bookmark grid above to pin them. -->
   <div class="library">
-    {#each folderRows as pkg (pkg.id)}
+    {#each orderedPackages as pkg (pkg.id)}
+      {#if (pkg.kind ?? "folder") === "app"}
+        <button
+          type="button"
+          class="row app-row"
+          class:dragging={dragId === pkg.id}
+          class:drop-target={overId === pkg.id && dragId !== pkg.id}
+          draggable="true"
+          ondragstart={(e) => {
+            onDragStart(pkg.id);
+            dnd.start({ type: "app", id: pkg.id, name: pkg.name }, e);
+          }}
+          ondragover={(e) => onDragOver(e, pkg.id)}
+          ondragend={() => {
+            onDragEnd();
+            dnd.end();
+          }}
+          ondrop={(e) => e.preventDefault()}
+          onclick={() => onOpenApp?.(pkg.id)}
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            onPackageContext?.(pkg.id, e.clientX, e.clientY);
+          }}
+        >
+          <span class="row-icon app">
+            <Icon value={pkg.icon ?? ""} name={pkg.name} size={16} />
+          </span>
+          <span class="row-label">{pkg.name}</span>
+        </button>
+      {:else}
       <button
           type="button"
           class="row folder-row"
@@ -622,8 +627,8 @@
             {/if}
           </div>
         {/if}
+      {/if}
     {/each}
-
   </div>
 
   <span class="bottom-spacer" aria-hidden="true"></span>
@@ -945,7 +950,8 @@
     50% { opacity: 1; }
   }
 
-  /* ── Create CTA — the one juicy branded button ─────────────────── */
+  /* ── Create CTA — flat secondary; the brand only speaks on hover,
+     as an animated gradient stroke sweeping the border. ───────────── */
   .create-cta {
     display: flex;
     align-items: center;
@@ -954,43 +960,49 @@
     width: 100%;
     height: 34px;
     margin-bottom: 0.2rem;
-    border: 0;
+    border: 1px solid transparent;
     border-radius: 10px;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-brand) 86%, white),
-      var(--color-brand)
-    );
-    color: #fff;
+    /* Two-layer background: flat surface fill clipped to padding-box,
+       border-box layer carries the (normally invisible) stroke. */
+    background:
+      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+      linear-gradient(var(--color-border), var(--color-border)) border-box;
+    color: var(--color-fg-muted);
     font: inherit;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: 0.01em;
     cursor: pointer;
     flex-shrink: 0;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      0 1px 2px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1)),
-      0 4px 12px color-mix(in srgb, var(--color-brand) 22%, transparent);
-    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.14s, filter 0.14s;
+    transition: color 0.16s;
   }
-  .create-cta:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.05);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      0 2px 4px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1)),
-      0 6px 18px color-mix(in srgb, var(--color-brand) 30%, transparent);
+  .create-cta:hover,
+  .create-cta.engaged {
+    color: var(--color-fg);
+    background:
+      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+      linear-gradient(
+          110deg,
+          var(--color-border),
+          var(--color-brand),
+          #7c3aed,
+          var(--color-brand),
+          var(--color-border)
+        )
+        border-box;
+    background-size: 100% 100%, 220% 100%;
+    animation: stroke-sweep 1.8s linear infinite;
   }
   .create-cta:active {
-    transform: translateY(0) scale(0.985);
-    filter: brightness(0.98);
+    transform: scale(0.99);
   }
-  .create-cta.engaged {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      0 0 0 2px color-mix(in srgb, var(--color-brand) 30%, transparent),
-      0 1px 2px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1));
+  @keyframes stroke-sweep {
+    from { background-position: 0 0, 0% 0; }
+    to { background-position: 0 0, 220% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .create-cta:hover,
+    .create-cta.engaged { animation: none; }
   }
 
   /* ── workspace header ─────────────────────────────────────────── */
@@ -1118,6 +1130,20 @@
   .caret.open { transform: rotate(90deg); }
   .folder-row { color: var(--color-fg); cursor: grab; }
   .folder-row:active { cursor: grabbing; }
+  .app-row { color: var(--color-fg); cursor: grab; }
+  .app-row:active { cursor: grabbing; }
+  .app-row .row-icon.app {
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 600;
+    overflow: hidden;
+  }
+  .app-row .row-icon.app :global(img) {
+    width: 18px;
+    height: 18px;
+    object-fit: cover;
+    border-radius: 5px;
+  }
   .row.dragging { opacity: 0.4; }
   .row.drop-target { box-shadow: inset 0 2px 0 var(--color-fg); }
 
