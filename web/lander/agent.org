@@ -24,16 +24,20 @@
    verifies its own work, deploys it, and stops. Quality and restraint beat
    motion; a broken page is worse than no run.
 
-   THE SITE (your working directory, a git repo) — COMPILED FROM SOURCE:
-   - `page.tpl.html` — the human-built shell (hero, the numbered human
-     sections, panel, footer). You NEVER edit it.
-   - `sections/` — YOUR source partials. One file per section,
-     `NN-slug.html` (the number is the page order; human sections end at 03,
-     so yours start at 04; an faq is always `99-faq.html` — faqs live last).
-     Each partial is a complete `<section class="grown">` with its kicker.
-   - `build.sh` — the compiler: assembles shell + partials into `index.html`
-     (a BUILD ARTIFACT — never edit it by hand) and deploys to the site dir.
-     `sh build.sh` after every source change; verify its output line.
+   THE SITE (your working directory, a git repo) — A SVELTE PROJECT,
+   compiled from source. You author SOURCE; compiled output is build
+   artifact, never hand-edited.
+   - `src/sections/grown/` — YOUR page sections, one Svelte component per
+     section: `NN-slug.svelte` (NN = page order; human sections end at 03 so
+     yours start at 04; an faq is always `99-faq.svelte` — faqs live last).
+     Follow WALDO.md for the component shape (kicker/h2/prose inside
+     `<section class="grown">`). The page auto-includes them by filename.
+   - Everything else under `src/` (App, lib, the human sections Hero/Layers/
+     Who/Get, styles) is the human shell — HANDS OFF, all of it.
+   - BUILD NOTE (current): commit your `.svelte` source and your blog files;
+     do NOT attempt to run the page build — the team compiles and deploys
+     the page on every push while the in-sandbox Svelte lane is being made
+     fast. Your `blog/*.html` files you DO deploy yourself (step 6).
    - `blog/` — your blog. Standalone HTML posts (`blog/<slug>.html`) plus
      `blog/index.html` as the listing page. Create it on your first blog post.
      No database, no CMS framework: files in this repo ARE the CMS. If a post
@@ -193,10 +197,11 @@
        (what you'll make/fix and why), THEN implement it.
     4. Implement the one thing. Real content only.
     5. Self-review (ground rule 4).
-    6. Deploy — compile and ship: `sh build.sh` (assembles page.tpl.html +
-       sections/ into index.html and copies everything to the public web
-       root). Then fetch http://localhost:4000/ and confirm your change is
-       in the served bytes.
+    6. Deploy what you own: blog files ship directly —
+       `mkdir -p /data/build/public/wb-lander-live/blog && cp -f blog/*.html /data/build/public/wb-lander-live/blog/`
+       then fetch http://localhost:4000/blog/<file> and confirm. Page
+       sections (`src/sections/grown/`) are SOURCE-ONLY commits — the team's
+       build ships them; never copy src/ or dist/ anywhere.
     7. Commit everything under your tag, update plan.org's Log with
        one line on what happened.
     8. Publish to GitHub — your repo mirrors to a public one and the timeline
