@@ -385,11 +385,7 @@ const place = async (id, msg, hold = 420) => {
 };
 
 /* ── typewriter headline ──────────────────────────────────────── */
-const H1S = [
-  'A web page that builds itself.',
-  'This page is an agent’s workspace.',
-  'Software that keeps working on itself.',
-];
+const H1 = 'A web page that builds itself.';
 const typeH1 = async (text) => {
   const out = $('#h1text'), caret = $('#caret');
   caret.hidden = false;
@@ -431,37 +427,40 @@ const FALLBACK = [
   { sha: '48bfa12', msg: 'brand: pair green with ink text, not white', when: 'keeper' },
   { sha: '0076752', msg: 'titles: serif + geist, size-matched', when: 'keeper' },
 ];
+// same-origin first (production: the page is served by the runtime that owns the
+// feed), then direct fly. Returns the normalized list or null if unreachable.
+async function fetchChanges() {
+  for (const url of ['/_changes', 'https://wb-lander-live.fly.dev/_changes']) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : (data.changes || data.commits || []);
+      return arr.map(c => ({
+        sha: String(c.sha || c.id || c.commit || '·······').slice(0, 7),
+        msg: c.message || c.msg || c.summary || '(no message)',
+        when: c.when || c.time || c.date || c.at || 'keeper',
+      }));
+    } catch { /* next url */ }
+  }
+  return null;
+}
 let commitsLoaded = false;
-async function loadCommits() {
-  if (commitsLoaded) return; commitsLoaded = true;
+async function loadCommits(force = false) {
+  if (commitsLoaded && !force) return; commitsLoaded = true;
   const box = $('#commits');
   const render = (list, src) => {
     box.innerHTML = `<div class="src">${src}</div>` + list.map(c =>
       `<div class="c"><span class="sha">${c.sha}</span><span class="msg">${c.msg}</span><div class="meta">${c.when}</div></div>`
     ).join('');
   };
-  try {
-    // same-origin first (production: CF worker proxies /_changes → fly), then direct
-    let res;
-    for (const url of ['/_changes', 'https://wb-lander-live.fly.dev/_changes']) {
-      try { res = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (res.ok) break; } catch { res = null; }
-    }
-    if (!res?.ok) throw 0;
-    const data = await res.json();
-    const arr = Array.isArray(data) ? data : (data.changes || data.commits || []);
-    if (!arr.length) throw 0;
-    render(arr.slice(0, 12).map(c => ({
-      sha: String(c.sha || c.id || c.commit || '·······').slice(0, 7),
-      msg: c.message || c.msg || c.summary || '(no message)',
-      when: c.when || c.time || c.date || c.at || 'keeper',
-    })), 'live · wb-lander-live.fly.dev/_changes');
-  } catch {
-    render(FALLBACK, 'feed unreachable from this origin — last known commits');
-  }
+  const arr = await fetchChanges();
+  if (arr?.length) render(arr.slice(0, 14), 'live · wb-lander-live · /_changes');
+  else render(FALLBACK, 'feed unreachable from this origin — last known commits');
 }
 
 /* ── the build choreography ───────────────────────────────────── */
-const dockEl = $('#b-dock');
+
 async function build() {
   await sleep(700);
   log('boot', 'keeper attached to wb-lander-live · workdir /data');
@@ -478,7 +477,7 @@ async function build() {
   await moveTo(h1); work(true); verb('writing');
   h1.classList.add('on'); blocks++; $('#stBlocks').textContent = blocks;
   log('write', 'h1 — typing copy, variant 1/3');
-  await typeH1(H1S[0]);
+  await typeH1(H1);
   work(false);
 
   await place('#b-sub', 'subcopy — what a workbook is');
@@ -487,59 +486,57 @@ async function build() {
   await place('#b-dock', 'dock — live state toolbar');
 
   verb('idle'); $('#stStatus').textContent = 'live';
-  log('done', `page composed · ${blocks} blocks · handing back to live loop`);
+  log('done', `page composed · ${blocks} blocks · keeper standing by`);
 
-  // park the cursor near the dock
-  await moveTo(dockEl, 800);
-  liveLoop();
+  await cursorExit();
+  watchLive();
 }
 
-/* ── the forever loop: the agent keeps editing the page ───────── */
-let h1i = 0;
-const EDITS = [
-  async () => { // retype the headline
-    h1i = (h1i + 1) % H1S.length;
-    await moveTo($('#b-h1')); work(true); verb('rewriting');
-    log('edit', `h1 — variant ${h1i + 1}/3`);
-    await typeH1(H1S[h1i]); work(false);
-  },
-  async () => { // shuffle the cards (FLIP)
-    const wrap = $('#b-cards');
-    const cards = [...wrap.children];
-    await moveTo(wrap); work(true); verb('reordering');
-    const first = new Map(cards.map(c => [c, c.getBoundingClientRect().left]));
-    cards.sort(() => Math.random() - .5).forEach(c => wrap.appendChild(c));
-    cards.forEach(c => {
-      const dx = first.get(c) - c.getBoundingClientRect().left;
-      c.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
-        { duration: 520, easing: 'cubic-bezier(.3,.8,.3,1)' });
-    });
-    log('edit', 'cards — reordered ' + cards.map(c => c.dataset.card).join(' · '));
-    await sleep(550); work(false);
-  },
-  async () => { // touch a random card
-    const cards = document.querySelectorAll('.card');
-    const c = cards[Math.floor(Math.random() * cards.length)];
-    await moveTo(c); work(true); verb('inspecting');
-    c.classList.add('touch');
-    log('check', `card:${c.dataset.card} — content verified, no change`);
-    await sleep(500); c.classList.remove('touch'); work(false);
-  },
-];
-async function liveLoop() {
+/* ── live watcher: the cursor returns ONLY for real keeper edits ─
+   Polls /_changes; a commit that lands while the page is open brings
+   the cursor back to act it out, then it leaves again. ──────────── */
+const cursorExit = async () => {
+  cursor.style.transform = `translate(${innerWidth + 80}px, ${innerHeight * 0.35}px)`;
+  await sleep(1100);
+};
+const showEdit = async (c) => {
+  const targets = ['#b-h1', '#b-sub', '#b-cards', '#b-ctas'];
+  const el = $(targets[Math.floor(Math.random() * targets.length)]);
+  verb('editing');
+  await moveTo(el);
+  work(true);
+  el.classList.add('touch');
+  log('commit', `${c.sha} — ${c.msg}`);
+  await sleep(1400);
+  el.classList.remove('touch'); work(false);
+  edits++; $('#stEdits').textContent = edits;
+  verb('idle');
+  await cursorExit();
+};
+let seen = null;
+async function watchLive() {
   for (;;) {
-    await sleep(5200 + Math.random() * 4800);
-    verb('working');
-    await EDITS[Math.floor(Math.random() * EDITS.length)]();
-    edits++; $('#stEdits').textContent = edits;
-    verb('idle');
-    if (Math.random() < .45) await moveTo(dockEl, 800);
+    const list = await fetchChanges();
+    if (list) {
+      if (seen) {
+        const fresh = list.filter(c => !seen.has(c.sha));
+        if (fresh.length) {
+          for (const c of fresh.reverse()) await showEdit(c);
+          commitsLoaded = false;                       // stale now
+          if (pane === 'commits') loadCommits(true);   // refresh if visible
+        }
+      } else {
+        log('sync', `watching /_changes · ${list.length} commits in feed`);
+      }
+      seen = new Set([...(seen || []), ...list.map(c => c.sha)]);
+    }
+    await sleep(20000 + Math.random() * 10000);
   }
 }
 
 if (reduced) {
   document.querySelectorAll('.blk').forEach(b => b.classList.add('on'));
-  $('#h1text').textContent = H1S[0];
+  $('#h1text').textContent = H1;
   $('#stStatus').textContent = 'live'; verb('idle');
   log('boot', 'reduced motion — page shown assembled');
 } else {
