@@ -44,14 +44,8 @@ ENV LANG=C.UTF-8 WB_WEB=1 PORT=4000
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++6 openssl libncurses6 ca-certificates curl xz-utils \
-      git jq sqlite3 openssh-client unzip \
+      git jq sqlite3 openssh-client \
     && rm -rf /var/lib/apt/lists/*
-
-# bun — the JS toolchain the build engine shells to for js_project workbooks
-# (Workbooks.Build: a Svelte/Vite project builds ITSELF; bun runs the build).
-RUN curl -fsSL https://bun.sh/install | bash \
-    && mv /root/.bun/bin/bun /usr/local/bin/bun \
-    && bun --version
 RUN curl -fsSL https://wasmtime.dev/install.sh | bash \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
 
