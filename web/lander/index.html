@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workbooks — a page that builds itself</title>
+<meta name="description" content="One file, served live, maintained by an agent. You're watching it work.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0d10;
+  --panel: #14161b;
+  --panel-2: #191c22;
+  --line: #262a32;
+  --line-soft: rgba(255,255,255,.05);
+  --ink: #eceef2;
+  --dim: #8b909a;
+  --faint: #565b64;
+  --live: #3fe081;
+  --live-dim: rgba(63,224,129,.14);
+  --sans: "Geist", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 10px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; height: 100dvh; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); -webkit-font-smoothing: antialiased;
+}
+
+/* ── canvas: blueprint grid + vignette + grain ───────────────── */
+.canvas {
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(1200px 700px at 50% 38%, rgba(255,255,255,.025), transparent 60%),
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: auto, 56px 56px, 56px 56px;
+  background-position: center, center, center;
+  opacity: 0; animation: canvas-in 1.4s .2s ease forwards;
+}
+@keyframes canvas-in { to { opacity: 1; } }
+.canvas::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.5));
+}
+
+/* ── materialization: every block the agent places uses this ─── */
+.blk { opacity: 0; }
+.blk.on {
+  opacity: 1;
+  animation: place .55s cubic-bezier(.2,.9,.25,1.05);
+}
+@keyframes place {
+  0% { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); }
+  60% { filter: blur(0); }
+  100% { opacity: 1; transform: none; }
+}
+.blk.touch { box-shadow: 0 0 0 1px var(--live), 0 0 24px -6px var(--live); transition: box-shadow .2s; }
+
+/* ── top floating nav ────────────────────────────────────────── */
+.nav {
+  position: fixed; top: 18px; left: 50%; translate: -50% 0; z-index: 40;
+  display: flex; align-items: center; gap: 22px;
+  padding: 9px 10px 9px 14px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--line); border-radius: 999px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 32px -16px rgba(0,0,0,.8);
+}
+.nav .glyph { width: 22px; height: 18px; color: var(--ink); display: block; }
+.nav .glyph svg { display: block; width: 100%; height: 100%; }
+.nav .word { font: 500 13.5px/1 var(--sans); letter-spacing: .01em; margin-right: 4px; }
+.nav a { color: var(--dim); text-decoration: none; font: 400 13px/1 var(--sans); transition: color .15s; }
+.nav a:hover { color: var(--ink); }
+.nav .cta {
+  color: var(--bg); background: var(--ink); border-radius: 999px;
+  padding: 7px 13px; font: 500 12.5px/1 var(--mono); letter-spacing: -.01em;
+}
+.nav .cta:hover { background: #fff; color: #000; }
+
+/* ── hero (the whole site) ───────────────────────────────────── */
+.hero {
+  position: relative; z-index: 10;
+  height: 100dvh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  padding: 0 24px; gap: 0;
+}
+.hero .mark { width: 92px; height: 73px; color: var(--ink); margin-bottom: 34px; }
+.hero .mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 8px 30px rgba(0,0,0,.6)); }
+
+.hero h1 {
+  margin: 0 0 18px; font: 600 clamp(34px, 5.4vw, 64px)/1.04 var(--sans);
+  letter-spacing: -.035em; max-width: 17ch; min-height: 2.1em;
+}
+.hero h1 .caret {
+  display: inline-block; width: .06em; height: .92em; margin-left: .06em;
+  background: var(--live); vertical-align: -.12em;
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.hero .sub {
+  margin: 0 0 34px; color: var(--dim);
+  font: 400 clamp(15px, 1.5vw, 17.5px)/1.55 var(--sans); max-width: 52ch;
+}
+.hero .sub b { color: var(--ink); font-weight: 500; }
+
+.ctas { display: flex; gap: 12px; align-items: center; margin-bottom: 48px; }
+.btn {
+  border-radius: var(--r); text-decoration: none; cursor: pointer;
+  font: 500 13.5px/1 var(--mono); padding: 13px 18px; letter-spacing: -.01em;
+  border: 1px solid transparent; transition: .15s;
+}
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.primary:hover { background: #fff; }
+.btn.ghost { color: var(--dim); border-color: var(--line); background: transparent; }
+.btn.ghost:hover { color: var(--ink); border-color: var(--faint); }
+
+/* the three blocks the agent keeps reorganizing */
+.cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.card {
+  display: flex; align-items: baseline; gap: 10px;
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  border: 1px solid var(--line); border-radius: var(--r);
+  padding: 13px 16px; text-align: left;
+  backdrop-filter: blur(8px);
+}
+.card .k { font: 500 12px/1 var(--mono); color: var(--live); }
+.card .v { font: 400 13px/1.2 var(--sans); color: var(--dim); }
+
+/* ── the agent cursor ────────────────────────────────────────── */
+#cursor {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+  transform: translate(-40px, 110vh);
+  transition: transform 1s cubic-bezier(.45,.05,.2,1);
+  filter: drop-shadow(0 2px 10px rgba(63,224,129,.45));
+}
+#cursor svg { display: block; }
+#cursor .tag {
+  position: absolute; left: 15px; top: 15px; white-space: nowrap;
+  background: var(--live); color: #04130a;
+  font: 500 10.5px/1 var(--mono); letter-spacing: .02em;
+  padding: 4px 7px; border-radius: 4px 999px 999px 999px;
+}
+#cursor.working .tag::after { content: " ·"; animation: workdots 1s steps(3) infinite; }
+@keyframes workdots { 33% { content: " ··"; } 66% { content: " ···"; } }
+
+/* ── bottom-right toolbar ────────────────────────────────────── */
+.dock {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px 7px 13px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  border: 1px solid var(--line); border-radius: 999px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 32px -16px rgba(0,0,0,.8);
+  font-family: var(--mono);
+}
+.dock .pulse {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--live);
+  margin-right: 8px; position: relative;
+}
+.dock .pulse::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  border: 1px solid var(--live); animation: ring 1.8s ease-out infinite;
+}
+@keyframes ring { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+.dock #dockStatus { font: 400 11.5px/1 var(--mono); color: var(--dim); margin-right: 10px; min-width: 120px; }
+.dock #dockStatus b { color: var(--live); font-weight: 500; }
+.dock button {
+  appearance: none; border: 1px solid transparent; background: transparent;
+  color: var(--dim); font: 500 11.5px/1 var(--mono); letter-spacing: .01em;
+  padding: 7px 11px; border-radius: 999px; cursor: pointer; transition: .15s;
+}
+.dock button:hover { color: var(--ink); background: var(--panel-2); }
+.dock button.open { color: var(--live); background: var(--live-dim); }
+
+/* ── floating windows ────────────────────────────────────────── */
+.win {
+  position: fixed; z-index: 55; width: min(390px, calc(100vw - 36px));
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 28px 70px -24px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.4);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  display: none; flex-direction: column; overflow: hidden;
+  opacity: 0; transform: translateY(8px) scale(.985);
+}
+.win.open { display: flex; animation: win-in .22s cubic-bezier(.2,.9,.3,1.1) forwards; }
+@keyframes win-in { to { opacity: 1; transform: none; } }
+.win header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; cursor: grab; user-select: none;
+  border-bottom: 1px solid var(--line);
+  font: 500 11.5px/1 var(--mono); color: var(--dim); letter-spacing: .02em;
+}
+.win header:active { cursor: grabbing; }
+.win header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
+.win header .ttl { flex: 1; }
+.win header .x {
+  appearance: none; border: 0; background: transparent; color: var(--faint);
+  font: 400 14px/1 var(--mono); cursor: pointer; padding: 2px 4px; border-radius: 4px;
+}
+.win header .x:hover { color: var(--ink); background: var(--panel-2); }
+.win .body {
+  font: 400 11.5px/1.7 var(--mono); padding: 10px 12px;
+  max-height: 290px; overflow-y: auto; scrollbar-width: thin;
+}
+
+/* agent log */
+#log .row { display: flex; gap: 10px; }
+#log .t { color: var(--faint); flex: 0 0 auto; }
+#log .a { color: var(--live); flex: 0 0 auto; min-width: 7.5ch; }
+#log .m { color: var(--dim); overflow-wrap: anywhere; }
+
+/* commits */
+#commits .c { padding: 7px 2px; border-bottom: 1px dashed var(--line); }
+#commits .c:last-child { border-bottom: 0; }
+#commits .sha { color: var(--live); margin-right: 9px; }
+#commits .msg { color: var(--ink); }
+#commits .meta { color: var(--faint); font-size: 10.5px; margin-top: 2px; }
+#commits .src { color: var(--faint); font-size: 10.5px; padding: 4px 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+
+/* state */
+#state .kv { display: flex; justify-content: space-between; gap: 16px; padding: 4.5px 2px; border-bottom: 1px dashed var(--line); }
+#state .kv:last-child { border-bottom: 0; }
+#state .k { color: var(--faint); }
+#state .v { color: var(--ink); text-align: right; }
+#state .v.live { color: var(--live); }
+
+@media (max-width: 640px) {
+  .nav { gap: 14px; } .nav .word { display: none; }
+  .dock #dockStatus { display: none; }
+  .hero .mark { width: 64px; height: 51px; margin-bottom: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="canvas" aria-hidden="true"></div>
+
+<!-- agent cursor -->
+<div id="cursor" aria-hidden="true">
+  <svg width="17" height="19" viewBox="0 0 17 19" fill="none">
+    <path d="M1 1L16 8.6L9.4 10.7L7 18L1 1Z" fill="#3fe081" stroke="#04130a" stroke-width="1.2"/>
+  </svg>
+  <span class="tag">keeper</span>
+</div>
+
+<!-- floating nav -->
+<nav class="nav blk" id="b-nav" aria-label="Primary">
+  <span class="glyph">
+    <svg viewBox="0 0 258 206" fill="none" aria-label="Workbooks" role="img">
+      <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+    </svg>
+  </span>
+  <span class="word">workbooks</span>
+  <a href="https://wb-lander-live.fly.dev/_changes">changes</a>
+  <a href="https://github.com/workbooks-sh/living-lander">github</a>
+  <a class="cta" href="https://workbooks.sh">curl workbooks.sh | sh</a>
+</nav>
+
+<!-- the entire site -->
+<main class="hero">
+  <span class="mark blk" id="b-mark" aria-hidden="true">
+    <svg viewBox="0 0 258 206" fill="none">
+      <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+    </svg>
+  </span>
+
+  <h1 class="blk" id="b-h1"><span id="h1text"></span><span class="caret" id="caret" hidden></span></h1>
+
+  <p class="sub blk" id="b-sub">
+    <b>Workbooks</b> is one file that is an entire app — served live and
+    maintained by an agent. This page is one. The agent is on it right now.
+  </p>
+
+  <div class="ctas blk" id="b-ctas">
+    <a class="btn primary" href="https://workbooks.sh">install the cli</a>
+    <a class="btn ghost" href="#" data-open="agent">watch the agent →</a>
+  </div>
+
+  <div class="cards blk" id="b-cards">
+    <div class="card" data-card="file"><span class="k">one file</span><span class="v">app, data, runtime — a single .html</span></div>
+    <div class="card" data-card="live"><span class="k">served live</span><span class="v">fly.io · scale-to-zero · durable</span></div>
+    <div class="card" data-card="kept"><span class="k">agent-kept</span><span class="v">edits & commits while you read</span></div>
+  </div>
+</main>
+
+<!-- bottom-right toolbar -->
+<div class="dock blk" id="b-dock" role="toolbar" aria-label="Live workbook state">
+  <span class="pulse" aria-hidden="true"></span>
+  <span id="dockStatus">live · <b id="dockVerb">waking</b></span>
+  <button data-open="agent">agent</button>
+  <button data-open="commits">commits</button>
+  <button data-open="state">state</button>
+</div>
+
+<!-- windows -->
+<section class="win" id="w-agent" aria-label="Agent activity">
+  <header><span class="dot"></span><span class="ttl">keeper — live activity</span><button class="x" data-close="agent">×</button></header>
+  <div class="body" id="log"></div>
+</section>
+
+<section class="win" id="w-commits" aria-label="Commits">
+  <header><span class="dot"></span><span class="ttl">wb-lander-live · /_changes</span><button class="x" data-close="commits">×</button></header>
+  <div class="body" id="commits"><div class="src">fetching feed…</div></div>
+</section>
+
+<section class="win" id="w-state" aria-label="Workbook state">
+  <header><span class="dot"></span><span class="ttl">workbook — live state</span><button class="x" data-close="state">×</button></header>
+  <div class="body" id="state">
+    <div class="kv"><span class="k">app</span><span class="v">wb-lander-live (fly.io)</span></div>
+    <div class="kv"><span class="k">region</span><span class="v">sjc · 2GB · scale-to-zero</span></div>
+    <div class="kv"><span class="k">planes</span><span class="v">public :4000 / control :4001</span></div>
+    <div class="kv"><span class="k">registry</span><span class="v">/data/registry.db</span></div>
+    <div class="kv"><span class="k">artifact</span><span class="v">single .html workbook</span></div>
+    <div class="kv"><span class="k">status</span><span class="v live" id="stStatus">building</span></div>
+    <div class="kv"><span class="k">session</span><span class="v" id="stUptime">0:00</span></div>
+    <div class="kv"><span class="k">blocks placed</span><span class="v" id="stBlocks">0</span></div>
+    <div class="kv"><span class="k">edits applied</span><span class="v" id="stEdits">0</span></div>
+  </div>
+</section>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
+
+/* ── stats / dock ─────────────────────────────────────────────── */
+const t0 = Date.now();
+let blocks = 0, edits = 0;
+const verb = v => { $('#dockVerb').textContent = v; };
+setInterval(() => {
+  const s = Math.floor((Date.now() - t0) / 1000);
+  $('#stUptime').textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}, 1000);
+
+/* ── agent log ────────────────────────────────────────────────── */
+const log = (action, msg) => {
+  const t = new Date().toTimeString().slice(0, 8);
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `<span class="t">${t}</span><span class="a">${action}</span><span class="m">${msg}</span>`;
+  const el = $('#log');
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+};
+
+/* ── cursor ───────────────────────────────────────────────────── */
+const cursor = $('#cursor');
+const moveTo = async (el, ms = 950) => {
+  const r = el.getBoundingClientRect();
+  cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
+  cursor.style.transform = `translate(${r.left + r.width * (0.18 + Math.random() * 0.62)}px, ${r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
+  await sleep(ms + 60);
+};
+const work = on => cursor.classList.toggle('working', on);
+
+/* ── place a block ────────────────────────────────────────────── */
+const place = async (id, msg, hold = 420) => {
+  const el = $(id);
+  await moveTo(el);
+  work(true); verb('composing');
+  await sleep(hold);
+  el.style.opacity = '';
+  el.classList.add('on');
+  el.classList.add('touch');
+  setTimeout(() => el.classList.remove('touch'), 600);
+  work(false);
+  blocks++; $('#stBlocks').textContent = blocks;
+  log('place', msg);
+};
+
+/* ── typewriter headline ──────────────────────────────────────── */
+const H1S = [
+  'A web page that builds itself.',
+  'This page is an agent’s workspace.',
+  'Software that keeps working on itself.',
+];
+const typeH1 = async (text) => {
+  const out = $('#h1text'), caret = $('#caret');
+  caret.hidden = false;
+  // erase
+  while (out.textContent.length) { out.textContent = out.textContent.slice(0, -1); await sleep(11); }
+  for (const ch of text) { out.textContent += ch; await sleep(26 + Math.random() * 38); }
+  caret.hidden = true;
+};
+
+/* ── windows: open/close/drag ─────────────────────────────────── */
+const winPos = { agent: null, commits: null, state: null };
+const placeWin = (name) => {
+  const w = $('#w-' + name);
+  if (winPos[name]) return;
+  const dock = $('#b-dock').getBoundingClientRect();
+  const idx = ['agent','commits','state'].indexOf(name);
+  w.style.right = (18 + idx * 26) + 'px';
+  w.style.bottom = (dock.height + 30 + idx * 26) + 'px';
+};
+const openWin = (name) => {
+  placeWin(name);
+  $('#w-' + name).classList.add('open');
+  document.querySelector(`.dock [data-open="${name}"]`)?.classList.add('open');
+  if (name === 'commits') loadCommits();
+};
+const closeWin = (name) => {
+  $('#w-' + name).classList.remove('open');
+  document.querySelector(`.dock [data-open="${name}"]`)?.classList.remove('open');
+};
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); openWin(o.dataset.open); }
+  const c = e.target.closest('[data-close]'); if (c) closeWin(c.dataset.close);
+});
+// drag by titlebar
+document.querySelectorAll('.win').forEach(w => {
+  const bar = w.querySelector('header');
+  bar.addEventListener('pointerdown', e => {
+    if (e.target.closest('.x')) return;
+    const r = w.getBoundingClientRect();
+    const dx = e.clientX - r.left, dy = e.clientY - r.top;
+    w.style.right = 'auto'; w.style.bottom = 'auto';
+    winPos[w.id.slice(2)] = true;
+    const mv = ev => {
+      w.style.left = Math.max(6, Math.min(innerWidth - r.width - 6, ev.clientX - dx)) + 'px';
+      w.style.top = Math.max(6, Math.min(innerHeight - 60, ev.clientY - dy)) + 'px';
+    };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+    bar.setPointerCapture?.(e.pointerId);
+  });
+});
+
+/* ── commits: real /_changes feed from the fly deployment ─────── */
+const FALLBACK = [
+  { sha: 'be87887', msg: 'keeper: plan.org — daily pass, no fabrication', when: 'keeper · plan mode' },
+  { sha: 'a5e5451', msg: 'compose lander from the component kit', when: 'keeper' },
+  { sha: '48bfa12', msg: 'brand: pair green with ink text, not white', when: 'keeper' },
+  { sha: '0076752', msg: 'titles: serif + geist, size-matched', when: 'keeper' },
+];
+let commitsLoaded = false;
+async function loadCommits() {
+  if (commitsLoaded) return; commitsLoaded = true;
+  const box = $('#commits');
+  const render = (list, src) => {
+    box.innerHTML = `<div class="src">${src}</div>` + list.map(c =>
+      `<div class="c"><span class="sha">${c.sha}</span><span class="msg">${c.msg}</span><div class="meta">${c.when}</div></div>`
+    ).join('');
+  };
+  try {
+    // same-origin first (production: CF worker proxies /_changes → fly), then direct
+    let res;
+    for (const url of ['/_changes', 'https://wb-lander-live.fly.dev/_changes']) {
+      try { res = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (res.ok) break; } catch { res = null; }
+    }
+    if (!res?.ok) throw 0;
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : (data.changes || data.commits || []);
+    if (!arr.length) throw 0;
+    render(arr.slice(0, 12).map(c => ({
+      sha: String(c.sha || c.id || c.commit || '·······').slice(0, 7),
+      msg: c.message || c.msg || c.summary || '(no message)',
+      when: c.when || c.time || c.date || c.at || 'keeper',
+    })), 'live · wb-lander-live.fly.dev/_changes');
+  } catch {
+    render(FALLBACK, 'feed unreachable from this origin — last known commits');
+  }
+}
+
+/* ── the build choreography ───────────────────────────────────── */
+const dockEl = $('#b-dock');
+async function build() {
+  await sleep(700);
+  log('boot', 'keeper attached to wb-lander-live · workdir /data');
+  verb('waking');
+  // cursor enters
+  cursor.style.transform = `translate(${innerWidth * 0.5}px, ${innerHeight * 0.62}px)`;
+  await sleep(1100);
+
+  await place('#b-nav', 'nav — glyph, links, install cta');
+  await place('#b-mark', 'hero mark — W glyph 258:206');
+
+  // headline: place then type
+  const h1 = $('#b-h1');
+  await moveTo(h1); work(true); verb('writing');
+  h1.classList.add('on'); blocks++; $('#stBlocks').textContent = blocks;
+  log('write', 'h1 — typing copy, variant 1/3');
+  await typeH1(H1S[0]);
+  work(false);
+
+  await place('#b-sub', 'subcopy — what a workbook is');
+  await place('#b-ctas', 'ctas — install + watch');
+  await place('#b-cards', 'cards — file / live / kept');
+  await place('#b-dock', 'dock — live state toolbar');
+
+  verb('idle'); $('#stStatus').textContent = 'live';
+  log('done', `page composed · ${blocks} blocks · handing back to live loop`);
+
+  // park the cursor near the dock
+  await moveTo(dockEl, 800);
+  liveLoop();
+}
+
+/* ── the forever loop: the agent keeps editing the page ───────── */
+let h1i = 0;
+const EDITS = [
+  async () => { // retype the headline
+    h1i = (h1i + 1) % H1S.length;
+    await moveTo($('#b-h1')); work(true); verb('rewriting');
+    log('edit', `h1 — variant ${h1i + 1}/3`);
+    await typeH1(H1S[h1i]); work(false);
+  },
+  async () => { // shuffle the cards (FLIP)
+    const wrap = $('#b-cards');
+    const cards = [...wrap.children];
+    await moveTo(wrap); work(true); verb('reordering');
+    const first = new Map(cards.map(c => [c, c.getBoundingClientRect().left]));
+    cards.sort(() => Math.random() - .5).forEach(c => wrap.appendChild(c));
+    cards.forEach(c => {
+      const dx = first.get(c) - c.getBoundingClientRect().left;
+      c.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
+        { duration: 520, easing: 'cubic-bezier(.3,.8,.3,1)' });
+    });
+    log('edit', 'cards — reordered ' + cards.map(c => c.dataset.card).join(' · '));
+    await sleep(550); work(false);
+  },
+  async () => { // touch a random card
+    const cards = document.querySelectorAll('.card');
+    const c = cards[Math.floor(Math.random() * cards.length)];
+    await moveTo(c); work(true); verb('inspecting');
+    c.classList.add('touch');
+    log('check', `card:${c.dataset.card} — content verified, no change`);
+    await sleep(500); c.classList.remove('touch'); work(false);
+  },
+];
+async function liveLoop() {
+  for (;;) {
+    await sleep(5200 + Math.random() * 4800);
+    verb('working');
+    await EDITS[Math.floor(Math.random() * EDITS.length)]();
+    edits++; $('#stEdits').textContent = edits;
+    verb('idle');
+    if (Math.random() < .45) await moveTo(dockEl, 800);
+  }
+}
+
+if (reduced) {
+  document.querySelectorAll('.blk').forEach(b => b.classList.add('on'));
+  $('#h1text').textContent = H1S[0];
+  $('#stStatus').textContent = 'live'; verb('idle');
+  log('boot', 'reduced motion — page shown assembled');
+} else {
+  build();
+}
+})();
+</script>
+</body>
+</html>
