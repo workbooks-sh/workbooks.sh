@@ -42,19 +42,11 @@ defmodule Workbooks.PublicWeb do
         send_resp(conn, 404, "no app for host")
 
       app ->
-        entries =
-          Workbooks.Git.log(app)
-          |> Enum.take(30)
-          |> Enum.map(fn line ->
-            case String.split(line, " ", parts: 2) do
-              [sha, msg] -> %{sha: sha, msg: msg}
-              [sha] -> %{sha: sha, msg: ""}
-            end
-          end)
+        entries = Workbooks.Git.log_entries(app) |> Enum.take(30)
 
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(200, Jason.encode!(%{changes: entries}))
+        |> send_resp(200, Jason.encode!(%{changes: entries, agent: Workbooks.Keeper.status()}))
     end
   end
 

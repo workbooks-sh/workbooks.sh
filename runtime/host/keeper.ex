@@ -45,6 +45,26 @@ defmodule Workbooks.Keeper do
   @doc "Trigger one keeper tick immediately (watched manual validation run)."
   def run_once, do: send(__MODULE__, :tick)
 
+  @doc """
+  Live keeper status for the public plane (read via `:persistent_term`, never a
+  GenServer call — ticks run synchronously in the GenServer, so a call would
+  block for the whole run). Times are unix seconds; `next_run` is best-effort
+  (last schedule + interval).
+  """
+  def status do
+    :persistent_term.get({__MODULE__, :status}, %{
+      active: false,
+      running: false,
+      last_run: nil,
+      next_run: nil,
+      interval_ms: nil
+    })
+  end
+
+  defp put_status(patch) do
+    :persistent_term.put({__MODULE__, :status}, Map.merge(status(), patch))
+  end
+
   # ── GenServer callbacks ──────────────────────────────────────────────────────
 
   @impl true
@@ -57,6 +77,14 @@ defmodule Workbooks.Keeper do
       path ->
         Logger.info("Keeper: activated — def=#{path} interval=#{interval_ms()}ms")
         schedule()
+
+        put_status(%{
+          active: true,
+          running: false,
+          interval_ms: interval_ms(),
+          next_run: System.system_time(:second) + div(interval_ms(), 1000)
+        })
+
         {:ok, %{active: true, def_path: path}}
     end
   end
@@ -66,6 +94,7 @@ defmodule Workbooks.Keeper do
 
   def handle_info(:tick, %{def_path: path} = state) do
     Logger.info("Keeper: tick — running #{path}")
+    put_status(%{running: true, last_run: System.system_time(:second)})
 
     try do
       org = File.read!(path)
@@ -77,6 +106,7 @@ defmodule Workbooks.Keeper do
     end
 
     schedule()
+    put_status(%{running: false, next_run: System.system_time(:second) + div(interval_ms(), 1000)})
     {:noreply, state}
   end
 

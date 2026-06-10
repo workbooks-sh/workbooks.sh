@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Workbooks — a page that builds itself</title>
-<meta name="description" content="One file, served live, maintained by an agent. You're watching it work.">
+<title>Workbooks — a website that builds itself</title>
+<meta name="description" content="One file, served live, maintained by an agent on the clock. Stick around and watch it work.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,42 +20,35 @@
   --faint: #565b64;
   --live: #3fe081;
   --live-dim: rgba(63,224,129,.14);
+  --amber: #e0b34a;
   --sans: "Geist", system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --r: 10px;
+  --panel-w: 352px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
 body {
-  margin: 0; height: 100dvh; overflow: hidden;
+  margin: 0; min-height: 100dvh;
   background: var(--bg); color: var(--ink);
   font-family: var(--sans); -webkit-font-smoothing: antialiased;
 }
 
-/* ── canvas: blueprint grid + vignette + grain ───────────────── */
+/* ── canvas: blueprint grid + vignette ───────────────────────── */
 .canvas {
-  position: fixed; inset: 0;
+  position: fixed; inset: 0; z-index: 0;
   background:
-    radial-gradient(1200px 700px at 50% 38%, rgba(255,255,255,.025), transparent 60%),
+    radial-gradient(1200px 700px at 42% 30%, rgba(255,255,255,.025), transparent 60%),
     linear-gradient(var(--line-soft) 1px, transparent 1px),
     linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
   background-size: auto, 56px 56px, 56px 56px;
-  background-position: center, center, center;
   opacity: 0; animation: canvas-in 1.4s .2s ease forwards;
 }
 @keyframes canvas-in { to { opacity: 1; } }
-.canvas::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.5));
-}
 
-/* ── materialization: every block the agent places uses this ─── */
+/* ── materialization ─────────────────────────────────────────── */
 .blk { opacity: 0; }
-.blk.on {
-  opacity: 1;
-  animation: place .55s cubic-bezier(.2,.9,.25,1.05);
-}
+.blk.on { opacity: 1; animation: place .55s cubic-bezier(.2,.9,.25,1.05); }
 @keyframes place {
   0% { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); }
   60% { filter: blur(0); }
@@ -63,9 +56,13 @@ body {
 }
 .blk.touch { box-shadow: 0 0 0 1px var(--live), 0 0 24px -6px var(--live); transition: box-shadow .2s; }
 
-/* ── top floating nav ────────────────────────────────────────── */
+/* ── shell: scrollable content + fixed right panel ───────────── */
+.content { position: relative; z-index: 10; margin-right: var(--panel-w); }
+
+/* ── top floating nav (centered in the content column) ───────── */
 .nav {
-  position: fixed; top: 18px; left: 50%; translate: -50% 0; z-index: 40;
+  position: fixed; top: 18px; left: calc((100vw - var(--panel-w)) / 2);
+  translate: -50% 0; z-index: 40;
   display: flex; align-items: center; gap: 22px;
   padding: 9px 10px 9px 14px;
   background: color-mix(in srgb, var(--panel) 82%, transparent);
@@ -84,18 +81,16 @@ body {
 }
 .nav .cta:hover { background: #fff; color: #000; }
 
-/* ── hero (the whole site) ───────────────────────────────────── */
+/* ── hero ────────────────────────────────────────────────────── */
 .hero {
-  position: relative; z-index: 10;
-  height: 100dvh; display: flex; flex-direction: column;
+  min-height: 100dvh; display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center;
-  padding: 0 24px; gap: 0;
+  padding: 96px 32px 64px;
 }
-.hero .mark { width: 92px; height: 73px; color: var(--ink); margin-bottom: 34px; }
+.hero .mark { width: 88px; height: 70px; color: var(--ink); margin-bottom: 32px; }
 .hero .mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 8px 30px rgba(0,0,0,.6)); }
-
 .hero h1 {
-  margin: 0 0 18px; font: 600 clamp(34px, 5.4vw, 64px)/1.04 var(--sans);
+  margin: 0 0 18px; font: 600 clamp(32px, 4.6vw, 58px)/1.05 var(--sans);
   letter-spacing: -.035em; max-width: 17ch; min-height: 2.1em;
 }
 .hero h1 .caret {
@@ -105,12 +100,11 @@ body {
 }
 @keyframes blink { 50% { opacity: 0; } }
 .hero .sub {
-  margin: 0 0 34px; color: var(--dim);
-  font: 400 clamp(15px, 1.5vw, 17.5px)/1.55 var(--sans); max-width: 52ch;
+  margin: 0 0 32px; color: var(--dim);
+  font: 400 clamp(15px, 1.4vw, 17px)/1.55 var(--sans); max-width: 52ch;
 }
 .hero .sub b { color: var(--ink); font-weight: 500; }
-
-.ctas { display: flex; gap: 12px; align-items: center; margin-bottom: 48px; }
+.ctas { display: flex; gap: 12px; align-items: center; margin-bottom: 44px; }
 .btn {
   border-radius: var(--r); text-decoration: none; cursor: pointer;
   font: 500 13.5px/1 var(--mono); padding: 13px 18px; letter-spacing: -.01em;
@@ -120,18 +114,27 @@ body {
 .btn.primary:hover { background: #fff; }
 .btn.ghost { color: var(--dim); border-color: var(--line); background: transparent; }
 .btn.ghost:hover { color: var(--ink); border-color: var(--faint); }
-
-/* the three blocks the agent keeps reorganizing */
 .cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .card {
   display: flex; align-items: baseline; gap: 10px;
   background: color-mix(in srgb, var(--panel) 75%, transparent);
   border: 1px solid var(--line); border-radius: var(--r);
-  padding: 13px 16px; text-align: left;
-  backdrop-filter: blur(8px);
+  padding: 13px 16px; text-align: left; backdrop-filter: blur(8px);
 }
 .card .k { font: 500 12px/1 var(--mono); color: var(--live); }
 .card .v { font: 400 13px/1.2 var(--sans); color: var(--dim); }
+
+/* ── agent-grown sections land below the hero ────────────────────
+   The agent appends <section class="grown"> blocks here. Give them a
+   sane default so its first sections inherit the page's look. */
+#grown { display: flex; flex-direction: column; align-items: center; gap: 0; }
+#grown section.grown {
+  width: min(880px, calc(100% - 64px)); margin: 0 auto; padding: 72px 0;
+  border-top: 1px solid var(--line);
+}
+#grown h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 14px; }
+#grown p { color: var(--dim); font: 400 15.5px/1.65 var(--sans); max-width: 64ch; }
+#grown a { color: var(--live); }
 
 /* ── the agent cursor ────────────────────────────────────────── */
 #cursor {
@@ -150,99 +153,60 @@ body {
 #cursor.working .tag::after { content: " ·"; animation: workdots 1s steps(3) infinite; }
 @keyframes workdots { 33% { content: " ··"; } 66% { content: " ···"; } }
 
-/* ── bottom-right HUD: dock pill + drawer that extends it ────── */
-.hud {
-  position: fixed; right: 18px; bottom: 18px; z-index: 50;
-  display: flex; flex-direction: column; align-items: stretch;
-  width: min(400px, calc(100vw - 36px));
-}
-.dock {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 8px 7px 13px;
-  background: color-mix(in srgb, var(--panel) 86%, transparent);
-  border: 1px solid var(--line); border-radius: 999px;
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 12px 32px -16px rgba(0,0,0,.8);
+/* ── right panel: the timeline ───────────────────────────────── */
+.panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w); z-index: 30;
+  display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border-left: 1px solid var(--line);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   font-family: var(--mono);
 }
-.hud.open .dock { border-radius: 0 0 16px 16px; border-top-color: transparent; }
-.dock .pulse {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--live);
-  margin-right: 8px; position: relative;
-}
-.dock .pulse::after {
+.panel .ribbon { padding: 18px 20px 0; }
+.panel .ribbon p { margin: 0; font: 400 12.5px/1.6 var(--sans); color: var(--dim); }
+
+.panel .status { padding: 16px 20px; border-bottom: 1px solid var(--line); display: grid; gap: 9px; }
+.panel .status .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.panel .status .k { font: 400 11px/1 var(--mono); color: var(--faint); }
+.panel .status .v { font: 400 11px/1 var(--mono); color: var(--faint); text-align: right; }
+.panel .status .v.on { color: var(--live); }
+.panel .status .state { display: flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); color: var(--ink); }
+.panel .status .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); position: relative; }
+.panel.running .status .pulse { background: var(--live); }
+.panel.running .status .pulse::after {
   content: ""; position: absolute; inset: -4px; border-radius: 50%;
-  border: 1px solid var(--live); animation: ring 1.8s ease-out infinite;
+  border: 1px solid var(--live); animation: ring 1.6s ease-out infinite;
 }
 @keyframes ring { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
-.dock #dockStatus { font: 400 11.5px/1 var(--mono); color: var(--dim); margin-right: 10px; min-width: 120px; }
-.dock #dockStatus b { color: var(--live); font-weight: 500; }
-.dock button {
-  appearance: none; border: 1px solid transparent; background: transparent;
-  color: var(--dim); font: 500 11.5px/1 var(--mono); letter-spacing: .01em;
-  padding: 7px 11px; border-radius: 999px; cursor: pointer; transition: .15s;
-}
-.dock button:hover { color: var(--ink); background: var(--panel-2); }
-.dock button.open { color: var(--live); background: var(--live-dim); }
 
-/* ── drawer: slides up out of the dock, one pane at a time ───── */
-.drawer {
-  display: grid; grid-template-rows: 0fr; overflow: hidden;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line); border-bottom: 0;
-  border-radius: 16px 16px 0 0;
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 28px 70px -24px rgba(0,0,0,.9);
-  opacity: 0; translate: 0 6px;
-  transition: grid-template-rows .32s cubic-bezier(.3,.8,.3,1),
-              opacity .22s ease, translate .32s cubic-bezier(.3,.8,.3,1);
+.panel .tl { flex: 1; overflow-y: auto; padding: 18px 20px; scrollbar-width: thin; }
+.node { position: relative; padding: 0 0 20px 20px; }
+.node::before {                                  /* rail */
+  content: ""; position: absolute; left: 3px; top: 12px; bottom: -2px;
+  width: 1px; background: var(--line);
 }
-.hud.open .drawer { grid-template-rows: 1fr; opacity: 1; translate: 0 0; }
-.drawer > .inner { min-height: 0; display: flex; flex-direction: column; }
-.drawer header {
-  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
-  padding: 10px 13px; user-select: none;
-  border-bottom: 1px solid var(--line);
-  font: 500 11.5px/1 var(--mono); color: var(--dim); letter-spacing: .02em;
+.node:last-child::before { display: none; }
+.node::after {                                   /* dot: color = kind */
+  content: ""; position: absolute; left: 0; top: 4px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--faint);
 }
-.drawer header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
-.drawer header .ttl { flex: 1; }
-.drawer header .x {
-  appearance: none; border: 0; background: transparent; color: var(--faint);
-  font: 400 14px/1 var(--mono); cursor: pointer; padding: 2px 4px; border-radius: 4px;
+.node.t-add::after { background: var(--live); }
+.node.t-audit::after { background: var(--amber); }
+.node.fresh::after { box-shadow: 0 0 10px var(--live); }
+.node .msg { font: 400 11.5px/1.5 var(--mono); color: var(--ink); overflow-wrap: anywhere; margin-bottom: 3px; }
+.node.t-sys .msg { color: var(--dim); }
+.node .nmeta { display: flex; gap: 10px; font: 400 10px/1 var(--mono); color: var(--faint); }
+
+/* ── responsive: panel stacks under the page on small screens ── */
+@media (max-width: 960px) {
+  .content { margin-right: 0; }
+  .nav { left: 50%; }
+  .panel { position: static; width: 100%; height: auto; border-left: 0; border-top: 1px solid var(--line); }
+  .panel .tl { max-height: 50vh; }
 }
-.drawer header .x:hover { color: var(--ink); background: var(--panel-2); }
-.pane {
-  display: none; font: 400 11.5px/1.7 var(--mono); padding: 10px 13px;
-  height: 268px; overflow-y: auto; scrollbar-width: thin;
-}
-.pane.on { display: block; }
-
-/* agent log */
-#log .row { display: flex; gap: 10px; }
-#log .t { color: var(--faint); flex: 0 0 auto; }
-#log .a { color: var(--live); flex: 0 0 auto; min-width: 7.5ch; }
-#log .m { color: var(--dim); overflow-wrap: anywhere; }
-
-/* commits */
-#commits .c { padding: 7px 2px; border-bottom: 1px dashed var(--line); }
-#commits .c:last-child { border-bottom: 0; }
-#commits .sha { color: var(--live); margin-right: 9px; }
-#commits .msg { color: var(--ink); }
-#commits .meta { color: var(--faint); font-size: 10.5px; margin-top: 2px; }
-#commits .src { color: var(--faint); font-size: 10.5px; padding: 4px 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
-
-/* state */
-#state .kv { display: flex; justify-content: space-between; gap: 16px; padding: 4.5px 2px; border-bottom: 1px dashed var(--line); }
-#state .kv:last-child { border-bottom: 0; }
-#state .k { color: var(--faint); }
-#state .v { color: var(--ink); text-align: right; }
-#state .v.live { color: var(--live); }
-
 @media (max-width: 640px) {
   .nav { gap: 14px; } .nav .word { display: none; }
-  .dock #dockStatus { display: none; }
-  .hero .mark { width: 64px; height: 51px; margin-bottom: 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -258,7 +222,7 @@ body {
   <svg width="17" height="19" viewBox="0 0 17 19" fill="none">
     <path d="M1 1L16 8.6L9.4 10.7L7 18L1 1Z" fill="#3fe081" stroke="#04130a" stroke-width="1.2"/>
   </svg>
-  <span class="tag">keeper</span>
+  <span class="tag">agent</span>
 </div>
 
 <!-- floating nav -->
@@ -269,69 +233,58 @@ body {
     </svg>
   </span>
   <span class="word">workbooks</span>
-  <a href="https://wb-lander-live.fly.dev/_changes">changes</a>
+  <a href="/_changes">changes</a>
   <a href="https://github.com/workbooks-sh/living-lander">github</a>
   <a class="cta" href="https://workbooks.sh">curl workbooks.sh | sh</a>
 </nav>
 
-<!-- the entire site -->
-<main class="hero">
-  <span class="mark blk" id="b-mark" aria-hidden="true">
-    <svg viewBox="0 0 258 206" fill="none">
-      <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
-    </svg>
-  </span>
+<div class="content">
+  <main class="hero">
+    <span class="mark blk" id="b-mark" aria-hidden="true">
+      <svg viewBox="0 0 258 206" fill="none">
+        <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
+      </svg>
+    </span>
 
-  <h1 class="blk" id="b-h1"><span id="h1text"></span><span class="caret" id="caret" hidden></span></h1>
+    <h1 class="blk" id="b-h1"><span id="h1text"></span><span class="caret" id="caret" hidden></span></h1>
 
-  <p class="sub blk" id="b-sub">
-    <b>Workbooks</b> is one file that is an entire app — served live and
-    maintained by an agent. This page is one. The agent is on it right now.
-  </p>
+    <p class="sub blk" id="b-sub">
+      <b>Workbooks</b> is one file that is an entire app — served live and
+      maintained by an agent. This site is one. The agent is on the clock.
+    </p>
 
-  <div class="ctas blk" id="b-ctas">
-    <a class="btn primary" href="https://workbooks.sh">install the cli</a>
-    <a class="btn ghost" href="#" data-open="agent">watch the agent →</a>
-  </div>
-
-  <div class="cards blk" id="b-cards">
-    <div class="card" data-card="file"><span class="k">one file</span><span class="v">app, data, runtime — a single .html</span></div>
-    <div class="card" data-card="live"><span class="k">served live</span><span class="v">fly.io · scale-to-zero · durable</span></div>
-    <div class="card" data-card="kept"><span class="k">agent-kept</span><span class="v">edits & commits while you read</span></div>
-  </div>
-</main>
-
-<!-- bottom-right HUD: drawer + toolbar -->
-<div class="hud blk" id="b-dock">
-  <section class="drawer" id="drawer" aria-label="Live workbook detail">
-    <div class="inner">
-      <header>
-        <span class="dot"></span><span class="ttl" id="drawerTitle">keeper — live activity</span>
-        <button class="x" data-close aria-label="Close drawer">×</button>
-      </header>
-      <div class="pane" id="log" data-pane="agent"></div>
-      <div class="pane" id="commits" data-pane="commits"><div class="src">fetching feed…</div></div>
-      <div class="pane" id="state" data-pane="state">
-        <div class="kv"><span class="k">app</span><span class="v">wb-lander-live (fly.io)</span></div>
-        <div class="kv"><span class="k">region</span><span class="v">sjc · 2GB · scale-to-zero</span></div>
-        <div class="kv"><span class="k">planes</span><span class="v">public :4000 / control :4001</span></div>
-        <div class="kv"><span class="k">registry</span><span class="v">/data/registry.db</span></div>
-        <div class="kv"><span class="k">artifact</span><span class="v">single .html workbook</span></div>
-        <div class="kv"><span class="k">status</span><span class="v live" id="stStatus">building</span></div>
-        <div class="kv"><span class="k">session</span><span class="v" id="stUptime">0:00</span></div>
-        <div class="kv"><span class="k">blocks placed</span><span class="v" id="stBlocks">0</span></div>
-        <div class="kv"><span class="k">edits applied</span><span class="v" id="stEdits">0</span></div>
-      </div>
+    <div class="ctas blk" id="b-ctas">
+      <a class="btn primary" href="https://workbooks.sh">install the cli</a>
+      <a class="btn ghost" href="#timeline">watch it work →</a>
     </div>
-  </section>
-  <div class="dock" role="toolbar" aria-label="Live workbook state">
-    <span class="pulse" aria-hidden="true"></span>
-    <span id="dockStatus">live · <b id="dockVerb">waking</b></span>
-    <button data-open="agent">agent</button>
-    <button data-open="commits">commits</button>
-    <button data-open="state">state</button>
-  </div>
+
+    <div class="cards blk" id="b-cards">
+      <div class="card" data-card="file"><span class="k">one file</span><span class="v">app, data, runtime — a single .html</span></div>
+      <div class="card" data-card="live"><span class="k">served live</span><span class="v">fly.io · scale-to-zero · durable</span></div>
+      <div class="card" data-card="kept"><span class="k">agent-kept</span><span class="v">grows & audits while you read</span></div>
+    </div>
+  </main>
+
+  <!-- the agent appends new sections here, one per hour -->
+  <div id="grown"></div>
 </div>
+
+<!-- fixed right panel: the live timeline -->
+<aside class="panel blk" id="timeline" aria-label="Agent timeline">
+  <div class="ribbon">
+    <p>An agent maintains this site — every change shows up here.</p>
+  </div>
+
+  <div class="status">
+    <div class="row">
+      <span class="state"><span class="pulse"></span><span id="stState">connecting…</span></span>
+      <span class="v" id="stLast"></span>
+    </div>
+    <div class="row"><span class="k">next check-in</span><span class="v on" id="stNext">—</span></div>
+  </div>
+
+  <div class="tl"><div id="tlList"></div></div>
+</aside>
 
 <script>
 (() => {
@@ -339,28 +292,9 @@ const $ = s => document.querySelector(s);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
 
-/* ── stats / dock ─────────────────────────────────────────────── */
-const t0 = Date.now();
-let blocks = 0, edits = 0;
-const verb = v => { $('#dockVerb').textContent = v; };
-setInterval(() => {
-  const s = Math.floor((Date.now() - t0) / 1000);
-  $('#stUptime').textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-}, 1000);
-
-/* ── agent log ────────────────────────────────────────────────── */
-const log = (action, msg) => {
-  const t = new Date().toTimeString().slice(0, 8);
-  const row = document.createElement('div');
-  row.className = 'row';
-  row.innerHTML = `<span class="t">${t}</span><span class="a">${action}</span><span class="m">${msg}</span>`;
-  const el = $('#log');
-  el.appendChild(row);
-  el.scrollTop = el.scrollHeight;
-};
-
 /* ── cursor ───────────────────────────────────────────────────── */
 const cursor = $('#cursor');
+let cursorIn = false;
 const moveTo = async (el, ms = 950) => {
   const r = el.getBoundingClientRect();
   cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
@@ -368,180 +302,180 @@ const moveTo = async (el, ms = 950) => {
   await sleep(ms + 60);
 };
 const work = on => cursor.classList.toggle('working', on);
-
-/* ── place a block ────────────────────────────────────────────── */
-const place = async (id, msg, hold = 420) => {
-  const el = $(id);
-  await moveTo(el);
-  work(true); verb('composing');
-  await sleep(hold);
-  el.style.opacity = '';
-  el.classList.add('on');
-  el.classList.add('touch');
-  setTimeout(() => el.classList.remove('touch'), 600);
-  work(false);
-  blocks++; $('#stBlocks').textContent = blocks;
-  log('place', msg);
-};
-
-/* ── typewriter headline ──────────────────────────────────────── */
-const H1 = 'A web page that builds itself.';
-const typeH1 = async (text) => {
-  const out = $('#h1text'), caret = $('#caret');
-  caret.hidden = false;
-  // erase
-  while (out.textContent.length) { out.textContent = out.textContent.slice(0, -1); await sleep(11); }
-  for (const ch of text) { out.textContent += ch; await sleep(26 + Math.random() * 38); }
-  caret.hidden = true;
-};
-
-/* ── drawer: one pane at a time, extends the toolbar upward ───── */
-const TITLES = {
-  agent: 'keeper — live activity',
-  commits: 'wb-lander-live · /_changes',
-  state: 'workbook — live state',
-};
-const hud = $('#b-dock');
-let pane = null;
-const setPane = (name) => {
-  pane = name;
-  hud.classList.toggle('open', !!name);
-  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
-  document.querySelectorAll('.dock [data-open]').forEach(b => b.classList.toggle('open', b.dataset.open === name));
-  if (name) { $('#drawerTitle').textContent = TITLES[name]; if (name === 'commits') loadCommits(); }
-};
-document.addEventListener('click', e => {
-  const o = e.target.closest('[data-open]');
-  if (o) {
-    e.preventDefault();
-    const toggle = o.closest('.dock') && o.dataset.open === pane;   // dock buttons toggle; hero CTA always opens
-    setPane(toggle ? null : o.dataset.open);
-  }
-  if (e.target.closest('[data-close]')) setPane(null);
-});
-
-/* ── commits: real /_changes feed from the fly deployment ─────── */
-const FALLBACK = [
-  { sha: 'be87887', msg: 'keeper: plan.org — daily pass, no fabrication', when: 'keeper · plan mode' },
-  { sha: 'a5e5451', msg: 'compose lander from the component kit', when: 'keeper' },
-  { sha: '48bfa12', msg: 'brand: pair green with ink text, not white', when: 'keeper' },
-  { sha: '0076752', msg: 'titles: serif + geist, size-matched', when: 'keeper' },
-];
-// same-origin first (production: the page is served by the runtime that owns the
-// feed), then direct fly. Returns the normalized list or null if unreachable.
-async function fetchChanges() {
-  for (const url of ['/_changes', 'https://wb-lander-live.fly.dev/_changes']) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : (data.changes || data.commits || []);
-      return arr.map(c => ({
-        sha: String(c.sha || c.id || c.commit || '·······').slice(0, 7),
-        msg: c.message || c.msg || c.summary || '(no message)',
-        when: c.when || c.time || c.date || c.at || 'keeper',
-      }));
-    } catch { /* next url */ }
-  }
-  return null;
-}
-let commitsLoaded = false;
-async function loadCommits(force = false) {
-  if (commitsLoaded && !force) return; commitsLoaded = true;
-  const box = $('#commits');
-  const render = (list, src) => {
-    box.innerHTML = `<div class="src">${src}</div>` + list.map(c =>
-      `<div class="c"><span class="sha">${c.sha}</span><span class="msg">${c.msg}</span><div class="meta">${c.when}</div></div>`
-    ).join('');
-  };
-  const arr = await fetchChanges();
-  if (arr?.length) render(arr.slice(0, 14), 'live · wb-lander-live · /_changes');
-  else render(FALLBACK, 'feed unreachable from this origin — last known commits');
-}
-
-/* ── the build choreography ───────────────────────────────────── */
-
-async function build() {
-  await sleep(700);
-  log('boot', 'keeper attached to wb-lander-live · workdir /data');
-  verb('waking');
-  // cursor enters
-  cursor.style.transform = `translate(${innerWidth * 0.5}px, ${innerHeight * 0.62}px)`;
-  await sleep(1100);
-
-  await place('#b-nav', 'nav — glyph, links, install cta');
-  await place('#b-mark', 'hero mark — W glyph 258:206');
-
-  // headline: place then type
-  const h1 = $('#b-h1');
-  await moveTo(h1); work(true); verb('writing');
-  h1.classList.add('on'); blocks++; $('#stBlocks').textContent = blocks;
-  log('write', 'h1 — typing copy, variant 1/3');
-  await typeH1(H1);
-  work(false);
-
-  await place('#b-sub', 'subcopy — what a workbook is');
-  await place('#b-ctas', 'ctas — install + watch');
-  await place('#b-cards', 'cards — file / live / kept');
-  await place('#b-dock', 'dock — live state toolbar');
-
-  verb('idle'); $('#stStatus').textContent = 'live';
-  log('done', `page composed · ${blocks} blocks · keeper standing by`);
-
-  await cursorExit();
-  watchLive();
-}
-
-/* ── live watcher: the cursor returns ONLY for real keeper edits ─
-   Polls /_changes; a commit that lands while the page is open brings
-   the cursor back to act it out, then it leaves again. ──────────── */
 const cursorExit = async () => {
+  if (!cursorIn) return; cursorIn = false;
   cursor.style.transform = `translate(${innerWidth + 80}px, ${innerHeight * 0.35}px)`;
   await sleep(1100);
 };
-const showEdit = async (c) => {
-  const targets = ['#b-h1', '#b-sub', '#b-cards', '#b-ctas'];
-  const el = $(targets[Math.floor(Math.random() * targets.length)]);
-  verb('editing');
-  await moveTo(el);
-  work(true);
-  el.classList.add('touch');
-  log('commit', `${c.sha} — ${c.msg}`);
-  await sleep(1400);
-  el.classList.remove('touch'); work(false);
-  edits++; $('#stEdits').textContent = edits;
-  verb('idle');
-  await cursorExit();
+const cursorEnter = async () => {
+  if (cursorIn) return; cursorIn = true;
+  cursor.style.transitionDuration = '0ms';
+  cursor.style.transform = `translate(-40px, ${innerHeight * 0.6}px)`;
+  await sleep(30);
+  await moveTo($('#b-h1'), 900);
 };
-let seen = null;
-async function watchLive() {
+
+/* ── build choreography ───────────────────────────────────────── */
+const place = async (id, hold = 380) => {
+  const el = $(id);
+  await moveTo(el);
+  work(true); await sleep(hold);
+  el.classList.add('on', 'touch');
+  setTimeout(() => el.classList.remove('touch'), 600);
+  work(false);
+};
+const H1 = 'A website that builds itself.';
+const typeH1 = async (text) => {
+  const out = $('#h1text'), caret = $('#caret');
+  caret.hidden = false;
+  for (const ch of text) { out.textContent += ch; await sleep(26 + Math.random() * 38); }
+  caret.hidden = true;
+};
+async function build() {
+  await sleep(700);
+  cursorIn = true;
+  cursor.style.transform = `translate(${innerWidth * 0.42}px, ${innerHeight * 0.62}px)`;
+  await sleep(1100);
+  await place('#b-nav');
+  await place('#b-mark');
+  const h1 = $('#b-h1');
+  await moveTo(h1); work(true);
+  h1.classList.add('on');
+  await typeH1(H1);
+  work(false);
+  await place('#b-sub');
+  await place('#b-ctas');
+  await place('#b-cards');
+  await place('#timeline', 500);
+  await cursorExit();
+}
+
+/* ── live feed: /_changes = commits + agent status ────────────── */
+async function fetchFeed() {
+  for (const url of ['/_changes', 'https://wb-lander-live.fly.dev/_changes']) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) return await res.json();
+    } catch { /* next */ }
+  }
+  return null;
+}
+
+/* classify a commit by its message prefix */
+const kind = m => /^add:/i.test(m) ? 'add' : /^audit:/i.test(m) ? 'audit' : 'sys';
+const rel = ts => {
+  if (!ts) return '';
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+};
+const fmtIn = s => {
+  if (s <= 0) return 'any moment';
+  const m = Math.floor(s / 60), sec = s % 60;
+  if (m >= 60) return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+  return m + ':' + String(sec).padStart(2, '0');
+};
+
+let freshSha = null;
+function renderTimeline(list) {
+  $('#tlList').innerHTML = list.slice(0, 40).map(c => {
+    const k = kind(c.msg);
+    return `<div class="node t-${k}${c.sha === freshSha ? ' fresh' : ''}">
+      <div class="msg">${c.msg.replace(/^(add|audit):\s*/i, '').replace(/</g, '&lt;')}</div>
+      <div class="nmeta"><span>${c.sha}</span><span>${rel(c.ts)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+/* agent status → panel header + countdown */
+let agentInfo = null;
+function renderStatus() {
+  const a = agentInfo;
+  const panel = $('#timeline');
+  if (!a || !a.active) {
+    $('#stState').textContent = a ? 'agent offline' : 'connecting…';
+    return;
+  }
+  panel.classList.toggle('running', !!a.running);
+  $('#stState').textContent = a.running ? 'agent working' : 'agent idle';
+  $('#stLast').textContent = a.last_run ? 'last run ' + rel(a.last_run) : '';
+  $('#stNext').textContent = a.running ? 'in progress' :
+    a.next_run ? 'in ' + fmtIn(a.next_run - Math.floor(Date.now() / 1000)) : '—';
+}
+setInterval(renderStatus, 1000);
+
+/* a fresh add: commit may mean a new section — pull it into the open page */
+async function refreshGrown() {
+  try {
+    const res = await fetch('/', { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const next = doc.querySelector('#grown');
+    if (next && next.innerHTML.trim() !== $('#grown').innerHTML.trim()) {
+      $('#grown').innerHTML = next.innerHTML;
+      const secs = document.querySelectorAll('#grown section');
+      return secs[0] || null;            // newest lands first (agent prepends)
+    }
+  } catch { /* same-origin only — fine on localhost */ }
+  return null;
+}
+
+/* act a fresh commit out on the page */
+async function showEdit(c) {
+  await cursorEnter();
+  work(true);
+  let el = null;
+  if (kind(c.msg) === 'add') el = await refreshGrown();
+  if (!el) {
+    const grown = document.querySelectorAll('#grown section');
+    el = grown.length ? grown[grown.length - 1] : $('#b-h1');
+  }
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  await sleep(400);
+  await moveTo(el);
+  el.classList.add('touch');
+  freshSha = c.sha;
+  await sleep(1400);
+  el.classList.remove('touch');
+  work(false);
+}
+
+/* ── the watch loop ───────────────────────────────────────────── */
+let seen = null, wasRunning = false;
+async function watch() {
   for (;;) {
-    const list = await fetchChanges();
-    if (list) {
+    const feed = await fetchFeed();
+    if (feed) {
+      agentInfo = feed.agent || null;
+      const list = feed.changes || [];
       if (seen) {
         const fresh = list.filter(c => !seen.has(c.sha));
-        if (fresh.length) {
-          for (const c of fresh.reverse()) await showEdit(c);
-          commitsLoaded = false;                       // stale now
-          if (pane === 'commits') loadCommits(true);   // refresh if visible
-        }
+        for (const c of fresh.reverse()) { await showEdit(c); renderTimeline(list); }
       } else {
-        log('sync', `watching /_changes · ${list.length} commits in feed`);
+        renderTimeline(list);
       }
       seen = new Set([...(seen || []), ...list.map(c => c.sha)]);
+
+      const running = !!(agentInfo && agentInfo.running);
+      if (running && !wasRunning) await cursorEnter();
+      if (!running && wasRunning) await cursorExit();
+      if (running) work(true);
+      wasRunning = running;
+      renderStatus();
     }
-    await sleep(20000 + Math.random() * 10000);
+    await sleep(15000 + Math.random() * 5000);
   }
 }
 
 if (reduced) {
   document.querySelectorAll('.blk').forEach(b => b.classList.add('on'));
   $('#h1text').textContent = H1;
-  $('#stStatus').textContent = 'live'; verb('idle');
-  log('boot', 'reduced motion — page shown assembled');
 } else {
   build();
 }
+watch();
 })();
 </script>
 </body>
