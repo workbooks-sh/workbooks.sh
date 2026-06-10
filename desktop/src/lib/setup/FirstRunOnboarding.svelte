@@ -41,6 +41,7 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
+  import AsciiShader from "$lib/ui/AsciiShader.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import {
     setupStatus,
@@ -176,6 +177,8 @@
 </script>
 
 <div class="screen">
+  <AsciiShader />
+  <div class="fade" aria-hidden="true"></div>
   <div class="card">
     <!-- progress dots -->
     <div class="dots" role="presentation">
@@ -340,26 +343,41 @@
 </div>
 
 <style>
+  /* Lander skin (web/lander) — this screen is the brand moment, so it
+   * uses the lander's own dark tokens regardless of app color scheme:
+   * bg #0c0d10, panel #14161b, line #262a32, ink #eceef2, dim #8b909a,
+   * live green #3fe081 primary, mono CTAs. */
   .screen {
     flex: 1 1 auto;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 2rem;
-    background: var(--color-chrome);
-    overflow: auto;
+    background: #0c0d10;
+    overflow: hidden;
+  }
+  .fade {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 40%;
+    background: linear-gradient(transparent, #0c0d10);
+    pointer-events: none;
   }
   .card {
+    position: relative;
     width: 100%;
     max-width: 440px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, #14161b 88%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid #262a32;
     border-radius: 14px;
-    box-shadow: var(--shadow-pop);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
     padding: 1.5rem 2rem 1.75rem;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    color: #eceef2;
   }
   .dots {
     display: flex;
@@ -373,15 +391,15 @@
     border-radius: 50%;
     border: 0;
     padding: 0;
-    background: var(--color-border-strong);
+    background: #262a32;
     cursor: pointer;
     transition: background 0.15s, transform 0.15s;
   }
   .dot.on {
-    background: var(--color-brand);
+    background: #3fe081;
     transform: scale(1.25);
   }
-  .dot.past { background: color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong)); }
+  .dot.past { background: rgba(63, 224, 129, 0.45); }
 
   .body {
     display: flex;
@@ -396,23 +414,24 @@
     width: 56px;
     height: 56px;
     border-radius: 16px;
-    background: var(--color-brand-soft);
-    color: var(--color-brand);
+    background: rgba(63, 224, 129, 0.14);
+    color: #3fe081;
   }
   h1 {
     margin: 0;
     font-size: 1.25rem;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: -0.01em;
+    color: #eceef2;
   }
   .sub {
     margin: 0;
     font-size: 0.86rem;
     line-height: 1.55;
-    color: var(--color-fg-muted);
+    color: #8b909a;
     max-width: 36ch;
   }
-  .sub a { color: var(--color-brand); }
+  .sub a { color: #3fe081; }
 
   .benefits {
     list-style: none;
@@ -423,14 +442,14 @@
     gap: 7px;
     text-align: left;
     font-size: 0.83rem;
-    color: var(--color-fg);
+    color: #eceef2;
   }
   .benefits li {
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  .benefits :global(svg) { color: var(--color-brand); flex-shrink: 0; }
+  .benefits :global(svg) { color: #3fe081; flex-shrink: 0; }
 
   .status {
     display: inline-flex;
@@ -440,18 +459,19 @@
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 500;
+    font-family: var(--mono, ui-monospace, monospace);
   }
   .status.ok {
-    background: color-mix(in srgb, var(--color-ok) 12%, var(--color-surface));
-    color: var(--color-ok);
+    background: rgba(63, 224, 129, 0.14);
+    color: #3fe081;
   }
   .status.pending {
-    background: color-mix(in srgb, var(--color-warn) 12%, var(--color-surface));
-    color: var(--color-warn);
+    background: rgba(224, 179, 74, 0.14);
+    color: #e0b34a;
   }
   .status.idle {
-    background: var(--color-surface-soft);
-    color: var(--color-fg-muted);
+    background: #191c22;
+    color: #8b909a;
   }
 
   .key-form {
@@ -463,16 +483,17 @@
     flex: 1 1 auto;
     min-width: 0;
     padding: 8px 11px;
-    border: 1px solid var(--color-border);
+    border: 1px solid #262a32;
     border-radius: 9px;
-    background: var(--color-page);
-    color: var(--color-fg);
+    background: #0c0d10;
+    color: #eceef2;
     font: inherit;
     font-size: 0.84rem;
+    font-family: ui-monospace, monospace;
   }
   .key-form input:focus {
     outline: none;
-    border-color: color-mix(in srgb, var(--color-brand) 50%, var(--color-border));
+    border-color: rgba(63, 224, 129, 0.5);
   }
   .err {
     margin: 0;
@@ -480,37 +501,39 @@
     color: #ef4444;
   }
 
+  /* Lander CTA: live green, dark ink text, mono. */
   .primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
-    padding: 9px 18px;
+    padding: 11px 18px;
     border: 0;
     border-radius: 10px;
-    background: var(--color-brand);
-    color: #fff;
-    font: inherit;
-    font-size: 0.86rem;
-    font-weight: 600;
+    background: #3fe081;
+    color: #04130a;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
     cursor: pointer;
     transition: filter 0.12s, transform 0.12s;
   }
-  .primary:hover:not(:disabled) { filter: brightness(1.06); }
+  .primary:hover:not(:disabled) { filter: brightness(1.08); }
   .primary:active:not(:disabled) { transform: scale(0.985); }
-  .primary:disabled { opacity: 0.55; cursor: default; }
+  .primary:disabled { opacity: 0.45; cursor: default; }
 
   .ghost {
     padding: 9px 14px;
     border: 0;
     border-radius: 10px;
     background: transparent;
-    color: var(--color-fg-muted);
+    color: #8b909a;
     font: inherit;
     font-size: 0.84rem;
     cursor: pointer;
   }
-  .ghost:hover { color: var(--color-fg); }
+  .ghost:hover { color: #eceef2; }
 
   .nav {
     display: flex;

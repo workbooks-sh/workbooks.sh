@@ -7,14 +7,14 @@
  * was retired with the material migration.
  */
 const PALETTE = [
-  "#2f6fe0", // brand blue
+  "#149157", // lander green (brand)
   "#0d9488", // teal
   "#7c3aed", // violet
   "#d97706", // amber
-  "#0284c7", // sky
+  "#b08a2e", // lander amber-gold
   "#dc2626", // red
   "#c026d3", // fuchsia
-  "#4f46e5", // indigo
+  "#2f6fe0", // blue (demoted — one tint among many)
 ];
 
 export function tintFor(name: string): string {

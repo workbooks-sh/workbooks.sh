@@ -25,11 +25,11 @@
   --color-ring: rgba(15, 15, 15, 0.32);
   --color-grid-line: rgba(15, 15, 15, 0.045);
 
-  /* Brand + status colors (slate / silver / blue light theme). Brand
-   * blue is the one saturated constant across both schemes; soft is
-   * its wash for chips/tiles. */
-  --color-brand: #2f6fe0;
-  --color-brand-soft: rgba(47, 111, 224, 0.10);
+  /* Brand + status colors — the lander's palette (web/lander): live
+   * green leads; blue demoted to one tint among many. Light mode gets
+   * a deepened green so it reads on white. */
+  --color-brand: #149157;
+  --color-brand-soft: rgba(20, 145, 87, 0.10);
   --color-ok: #22a069;
   --color-warn: #dca51e;
 
@@ -68,8 +68,8 @@
     --color-accent: #f4f4f5;
     --color-ring: rgba(255, 255, 255, 0.22);
     --color-grid-line: rgba(255, 255, 255, 0.05);
-    --color-brand: #5b8cff;
-    --color-brand-soft: rgba(91, 140, 255, 0.14);
+    --color-brand: #3fe081;
+    --color-brand-soft: rgba(63, 224, 129, 0.14);
     --color-ok: #34d399;
     --color-warn: #fbbf24;
     /* Slightly cooler aurora in dark mode so it reads against the
