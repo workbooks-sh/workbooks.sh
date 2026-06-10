@@ -150,9 +150,13 @@ body {
 #cursor.working .tag::after { content: " ·"; animation: workdots 1s steps(3) infinite; }
 @keyframes workdots { 33% { content: " ··"; } 66% { content: " ···"; } }
 
-/* ── bottom-right toolbar ────────────────────────────────────── */
-.dock {
+/* ── bottom-right HUD: dock pill + drawer that extends it ────── */
+.hud {
   position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  display: flex; flex-direction: column; align-items: stretch;
+  width: min(400px, calc(100vw - 36px));
+}
+.dock {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 8px 7px 13px;
   background: color-mix(in srgb, var(--panel) 86%, transparent);
@@ -161,6 +165,7 @@ body {
   box-shadow: 0 12px 32px -16px rgba(0,0,0,.8);
   font-family: var(--mono);
 }
+.hud.open .dock { border-radius: 0 0 16px 16px; border-top-color: transparent; }
 .dock .pulse {
   width: 7px; height: 7px; border-radius: 50%; background: var(--live);
   margin-right: 8px; position: relative;
@@ -180,36 +185,38 @@ body {
 .dock button:hover { color: var(--ink); background: var(--panel-2); }
 .dock button.open { color: var(--live); background: var(--live-dim); }
 
-/* ── floating windows ────────────────────────────────────────── */
-.win {
-  position: fixed; z-index: 55; width: min(390px, calc(100vw - 36px));
-  background: color-mix(in srgb, var(--panel) 94%, transparent);
-  border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: 0 28px 70px -24px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.4);
+/* ── drawer: slides up out of the dock, one pane at a time ───── */
+.drawer {
+  display: grid; grid-template-rows: 0fr; overflow: hidden;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line); border-bottom: 0;
+  border-radius: 16px 16px 0 0;
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-  display: none; flex-direction: column; overflow: hidden;
-  opacity: 0; transform: translateY(8px) scale(.985);
+  box-shadow: 0 28px 70px -24px rgba(0,0,0,.9);
+  opacity: 0; translate: 0 6px;
+  transition: grid-template-rows .32s cubic-bezier(.3,.8,.3,1),
+              opacity .22s ease, translate .32s cubic-bezier(.3,.8,.3,1);
 }
-.win.open { display: flex; animation: win-in .22s cubic-bezier(.2,.9,.3,1.1) forwards; }
-@keyframes win-in { to { opacity: 1; transform: none; } }
-.win header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px; cursor: grab; user-select: none;
+.hud.open .drawer { grid-template-rows: 1fr; opacity: 1; translate: 0 0; }
+.drawer > .inner { min-height: 0; display: flex; flex-direction: column; }
+.drawer header {
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+  padding: 10px 13px; user-select: none;
   border-bottom: 1px solid var(--line);
   font: 500 11.5px/1 var(--mono); color: var(--dim); letter-spacing: .02em;
 }
-.win header:active { cursor: grabbing; }
-.win header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
-.win header .ttl { flex: 1; }
-.win header .x {
+.drawer header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
+.drawer header .ttl { flex: 1; }
+.drawer header .x {
   appearance: none; border: 0; background: transparent; color: var(--faint);
   font: 400 14px/1 var(--mono); cursor: pointer; padding: 2px 4px; border-radius: 4px;
 }
-.win header .x:hover { color: var(--ink); background: var(--panel-2); }
-.win .body {
-  font: 400 11.5px/1.7 var(--mono); padding: 10px 12px;
-  max-height: 290px; overflow-y: auto; scrollbar-width: thin;
+.drawer header .x:hover { color: var(--ink); background: var(--panel-2); }
+.pane {
+  display: none; font: 400 11.5px/1.7 var(--mono); padding: 10px 13px;
+  height: 268px; overflow-y: auto; scrollbar-width: thin;
 }
+.pane.on { display: block; }
 
 /* agent log */
 #log .row { display: flex; gap: 10px; }
@@ -294,40 +301,37 @@ body {
   </div>
 </main>
 
-<!-- bottom-right toolbar -->
-<div class="dock blk" id="b-dock" role="toolbar" aria-label="Live workbook state">
-  <span class="pulse" aria-hidden="true"></span>
-  <span id="dockStatus">live · <b id="dockVerb">waking</b></span>
-  <button data-open="agent">agent</button>
-  <button data-open="commits">commits</button>
-  <button data-open="state">state</button>
-</div>
-
-<!-- windows -->
-<section class="win" id="w-agent" aria-label="Agent activity">
-  <header><span class="dot"></span><span class="ttl">keeper — live activity</span><button class="x" data-close="agent">×</button></header>
-  <div class="body" id="log"></div>
-</section>
-
-<section class="win" id="w-commits" aria-label="Commits">
-  <header><span class="dot"></span><span class="ttl">wb-lander-live · /_changes</span><button class="x" data-close="commits">×</button></header>
-  <div class="body" id="commits"><div class="src">fetching feed…</div></div>
-</section>
-
-<section class="win" id="w-state" aria-label="Workbook state">
-  <header><span class="dot"></span><span class="ttl">workbook — live state</span><button class="x" data-close="state">×</button></header>
-  <div class="body" id="state">
-    <div class="kv"><span class="k">app</span><span class="v">wb-lander-live (fly.io)</span></div>
-    <div class="kv"><span class="k">region</span><span class="v">sjc · 2GB · scale-to-zero</span></div>
-    <div class="kv"><span class="k">planes</span><span class="v">public :4000 / control :4001</span></div>
-    <div class="kv"><span class="k">registry</span><span class="v">/data/registry.db</span></div>
-    <div class="kv"><span class="k">artifact</span><span class="v">single .html workbook</span></div>
-    <div class="kv"><span class="k">status</span><span class="v live" id="stStatus">building</span></div>
-    <div class="kv"><span class="k">session</span><span class="v" id="stUptime">0:00</span></div>
-    <div class="kv"><span class="k">blocks placed</span><span class="v" id="stBlocks">0</span></div>
-    <div class="kv"><span class="k">edits applied</span><span class="v" id="stEdits">0</span></div>
+<!-- bottom-right HUD: drawer + toolbar -->
+<div class="hud blk" id="b-dock">
+  <section class="drawer" id="drawer" aria-label="Live workbook detail">
+    <div class="inner">
+      <header>
+        <span class="dot"></span><span class="ttl" id="drawerTitle">keeper — live activity</span>
+        <button class="x" data-close aria-label="Close drawer">×</button>
+      </header>
+      <div class="pane" id="log" data-pane="agent"></div>
+      <div class="pane" id="commits" data-pane="commits"><div class="src">fetching feed…</div></div>
+      <div class="pane" id="state" data-pane="state">
+        <div class="kv"><span class="k">app</span><span class="v">wb-lander-live (fly.io)</span></div>
+        <div class="kv"><span class="k">region</span><span class="v">sjc · 2GB · scale-to-zero</span></div>
+        <div class="kv"><span class="k">planes</span><span class="v">public :4000 / control :4001</span></div>
+        <div class="kv"><span class="k">registry</span><span class="v">/data/registry.db</span></div>
+        <div class="kv"><span class="k">artifact</span><span class="v">single .html workbook</span></div>
+        <div class="kv"><span class="k">status</span><span class="v live" id="stStatus">building</span></div>
+        <div class="kv"><span class="k">session</span><span class="v" id="stUptime">0:00</span></div>
+        <div class="kv"><span class="k">blocks placed</span><span class="v" id="stBlocks">0</span></div>
+        <div class="kv"><span class="k">edits applied</span><span class="v" id="stEdits">0</span></div>
+      </div>
+    </div>
+  </section>
+  <div class="dock" role="toolbar" aria-label="Live workbook state">
+    <span class="pulse" aria-hidden="true"></span>
+    <span id="dockStatus">live · <b id="dockVerb">waking</b></span>
+    <button data-open="agent">agent</button>
+    <button data-open="commits">commits</button>
+    <button data-open="state">state</button>
   </div>
-</section>
+</div>
 
 <script>
 (() => {
@@ -395,47 +399,29 @@ const typeH1 = async (text) => {
   caret.hidden = true;
 };
 
-/* ── windows: open/close/drag ─────────────────────────────────── */
-const winPos = { agent: null, commits: null, state: null };
-const placeWin = (name) => {
-  const w = $('#w-' + name);
-  if (winPos[name]) return;
-  const dock = $('#b-dock').getBoundingClientRect();
-  const idx = ['agent','commits','state'].indexOf(name);
-  w.style.right = (18 + idx * 26) + 'px';
-  w.style.bottom = (dock.height + 30 + idx * 26) + 'px';
+/* ── drawer: one pane at a time, extends the toolbar upward ───── */
+const TITLES = {
+  agent: 'keeper — live activity',
+  commits: 'wb-lander-live · /_changes',
+  state: 'workbook — live state',
 };
-const openWin = (name) => {
-  placeWin(name);
-  $('#w-' + name).classList.add('open');
-  document.querySelector(`.dock [data-open="${name}"]`)?.classList.add('open');
-  if (name === 'commits') loadCommits();
-};
-const closeWin = (name) => {
-  $('#w-' + name).classList.remove('open');
-  document.querySelector(`.dock [data-open="${name}"]`)?.classList.remove('open');
+const hud = $('#b-dock');
+let pane = null;
+const setPane = (name) => {
+  pane = name;
+  hud.classList.toggle('open', !!name);
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+  document.querySelectorAll('.dock [data-open]').forEach(b => b.classList.toggle('open', b.dataset.open === name));
+  if (name) { $('#drawerTitle').textContent = TITLES[name]; if (name === 'commits') loadCommits(); }
 };
 document.addEventListener('click', e => {
-  const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); openWin(o.dataset.open); }
-  const c = e.target.closest('[data-close]'); if (c) closeWin(c.dataset.close);
-});
-// drag by titlebar
-document.querySelectorAll('.win').forEach(w => {
-  const bar = w.querySelector('header');
-  bar.addEventListener('pointerdown', e => {
-    if (e.target.closest('.x')) return;
-    const r = w.getBoundingClientRect();
-    const dx = e.clientX - r.left, dy = e.clientY - r.top;
-    w.style.right = 'auto'; w.style.bottom = 'auto';
-    winPos[w.id.slice(2)] = true;
-    const mv = ev => {
-      w.style.left = Math.max(6, Math.min(innerWidth - r.width - 6, ev.clientX - dx)) + 'px';
-      w.style.top = Math.max(6, Math.min(innerHeight - 60, ev.clientY - dy)) + 'px';
-    };
-    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
-    addEventListener('pointermove', mv); addEventListener('pointerup', up);
-    bar.setPointerCapture?.(e.pointerId);
-  });
+  const o = e.target.closest('[data-open]');
+  if (o) {
+    e.preventDefault();
+    const toggle = o.closest('.dock') && o.dataset.open === pane;   // dock buttons toggle; hero CTA always opens
+    setPane(toggle ? null : o.dataset.open);
+  }
+  if (e.target.closest('[data-close]')) setPane(null);
 });
 
 /* ── commits: real /_changes feed from the fly deployment ─────── */
