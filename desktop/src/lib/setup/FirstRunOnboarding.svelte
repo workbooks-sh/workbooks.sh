@@ -60,9 +60,6 @@
 
   // ── live verification ────────────────────────────────────────────
   const runtimeReady = $derived(sidecar.status.state === "ready");
-  const runtimeStarting = $derived(
-    sidecar.status.state === "starting" || sidecar.status.state === "restarting",
-  );
   let hasModelKey = $state(false);
   const signedIn = $derived(auth.status === "signed-in");
 
@@ -109,6 +106,21 @@
   // fail-opens to supported (the wizard re-checks before installing).
   let localSupported = $state(true);
   let detectChecked = $state(false);
+  // Entering the runtime step arms the embedded wizard flow (same store
+  // as the modal, rendered inline here; the modal stays hidden).
+  $effect(() => {
+    if (step !== "runtime") return;
+    void wizard.init();
+    if (!runtimeReady && wizard.step === "closed") wizard.openEmbedded();
+  });
+  // The inline flow finished — refresh the daemon mirror immediately
+  // (idempotent: daemon_up leaves a healthy runtime alone) instead of
+  // waiting on the 3s state poll, so Continue unlocks right away.
+  $effect(() => {
+    if (step === "runtime" && wizard.step === "done" && !runtimeReady) {
+      void sidecar.up().catch(() => {});
+    }
+  });
   $effect(() => {
     if (step !== "runtime" || detectChecked) return;
     detectChecked = true;
@@ -191,6 +203,9 @@
     } catch (e) {
       console.warn("[onboarding] complete_first_run failed", e);
     }
+    // Release the wizard store back to its modal skin (titlebar chip).
+    wizard.embedded = false;
+    wizard.step = "closed";
     oncomplete();
   }
 </script>
@@ -273,42 +288,88 @@
               <CheckCircle size={16} weight="fill" />
               Runtime connected{sidecar.status.url ? ` — ${sidecar.status.url}` : ""}
             </div>
-          {:else if runtimeStarting}
-            <div class="status pending">Starting…</div>
           {:else}
-            {#if cloudCreds}
-              <button
-                type="button"
-                class="primary"
-                onclick={() => void connectCloudRuntime()}
-                disabled={cloudConnectBusy}
-              >
-                <CloudArrowUp size={14} weight="fill" />
-                {cloudConnectBusy ? "Connecting…" : "Connect your cloud runtime"}
-              </button>
-              {#if localSupported}
-                <button type="button" class="ghost" onclick={() => wizard.open()}>
-                  Install locally instead
-                </button>
+            <!-- The whole local/cloud flow runs INLINE here (the wizard
+                 store in embedded mode — no separate modal). -->
+            {#if wizard.step === "local-booting" || wizard.step === "local-detect" || (wizard.busy && wizard.step === "local-install")}
+              <div class="status pending">
+                {wizard.step === "local-booting" ? "Booting the engine…" : wizard.step === "local-detect" ? "Checking this machine…" : "Installing krunvm…"}
+              </div>
+              {#if wizard.log.length}
+                <div class="boot-log">
+                  {#each wizard.log.slice(-4) as line, i (i)}
+                    <div class="log-line">{line}</div>
+                  {/each}
+                </div>
               {/if}
-            {:else if localSupported}
-              <div class="status idle">Not running yet</div>
-              <button type="button" class="primary" onclick={() => wizard.open()}>
-                Set up runtime
+            {:else if wizard.step === "local-install"}
+              <p class="sub">
+                The microVM backend (krunvm) isn't installed yet — install it
+                via Homebrew right here.
+              </p>
+              <button type="button" class="primary" onclick={() => void wizard.installBackend()}>
+                Install backend
               </button>
-            {:else}
-              <!-- OS can't host a local runtime — cloud is the only path. -->
-              <div class="status idle">Local runtime isn't supported on this OS</div>
-              <button
-                type="button"
-                class="primary"
-                onclick={() => {
-                  wizard.open();
-                  wizard.chooseCloud();
+            {:else if wizard.step === "cloud-form" || wizard.step === "cloud-connecting"}
+              <form
+                class="key-form"
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  void wizard.connectCloud();
                 }}
               >
-                <CloudArrowUp size={14} weight="fill" /> Connect a cloud runtime
-              </button>
+                <input
+                  type="text"
+                  placeholder="https://your-runtime.example.com"
+                  bind:value={wizard.cloudUrl}
+                  spellcheck="false"
+                />
+                <input
+                  type="password"
+                  placeholder="token"
+                  bind:value={wizard.cloudToken}
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+                <button type="submit" class="primary" disabled={wizard.busy}>
+                  {wizard.step === "cloud-connecting" ? "Connecting…" : "Connect"}
+                </button>
+              </form>
+              {#if localSupported}
+                <button type="button" class="ghost" onclick={() => void wizard.chooseLocal()}>
+                  Run on this machine instead
+                </button>
+              {/if}
+            {:else}
+              <!-- choice — both options inline, side by side -->
+              <div class="rt-choices">
+                {#if localSupported}
+                  <button type="button" class="primary" onclick={() => void wizard.chooseLocal()}>
+                    <Cpu size={14} weight="fill" /> Run on this machine
+                  </button>
+                {/if}
+                {#if cloudCreds}
+                  <button
+                    type="button"
+                    class="primary"
+                    onclick={() => void connectCloudRuntime()}
+                    disabled={cloudConnectBusy}
+                  >
+                    <CloudArrowUp size={14} weight="fill" />
+                    {cloudConnectBusy ? "Connecting…" : "Connect your cloud runtime"}
+                  </button>
+                {:else}
+                  <button type="button" class={localSupported ? "ghost" : "primary"} onclick={() => wizard.chooseCloud()}>
+                    <CloudArrowUp size={14} weight="fill" /> Connect to cloud
+                  </button>
+                {/if}
+              </div>
+              {#if !localSupported}
+                <p class="sub">Local runtime isn't supported on this OS.</p>
+              {/if}
+            {/if}
+            {#if wizard.error}
+              <p class="err">{wizard.error}</p>
             {/if}
           {/if}
           <div class="nav">
@@ -507,6 +568,32 @@
     background: #191c22;
     color: #8b909a;
   }
+
+  .rt-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    align-items: stretch;
+  }
+  .boot-log {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: #0c0d10;
+    border: 1px solid #262a32;
+    text-align: left;
+  }
+  .log-line {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #8b909a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .log-line:last-child { color: #3fe081; }
 
   .key-form {
     display: flex;

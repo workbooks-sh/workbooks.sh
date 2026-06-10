@@ -34,7 +34,7 @@
   });
 </script>
 
-{#if wizard.step !== "closed"}
+{#if wizard.step !== "closed" && !wizard.embedded}
   <div
     class="scrim"
     role="presentation"

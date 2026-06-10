@@ -272,7 +272,7 @@ function makeInvoke(): Invoke {
       case "daemon_up": case "daemon_down":
       case "daemon_restart": return DAEMON;
       case "sidecar_restart": return null;
-      case "engine_detect": return { os: "macos", has_krunvm: true, has_homebrew: true, has_volume: true };
+      case "engine_detect": return { os: "macos", supported: true, krunvm: true, apfsVolume: true, brew: true };
       case "engine_probe": return true;
       case "engine_boot_local": case "engine_connect_cloud":
         freshState.runtime = true;

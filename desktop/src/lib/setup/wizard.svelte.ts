@@ -31,6 +31,9 @@ const DISMISS_KEY = "wb.engineWizardDismissed";
 
 class WizardStore {
   step = $state<Step>("closed");
+  /** When true the flow renders INLINE (onboarding runtime step) and
+   *  the SetupWizard modal stays hidden. Same store, two skins. */
+  embedded = $state(false);
   backend = $state<BackendStatus | null>(null);
   /** Streaming setup log (krunvm install / image pull). Newest last. */
   log = $state<string[]>([]);
@@ -56,6 +59,15 @@ class WizardStore {
   open() {
     this.error = null;
     this.log = [];
+    this.embedded = false;
+    this.step = "choose";
+  }
+
+  /** Drive the same flow inline (no modal) — onboarding's runtime step. */
+  openEmbedded() {
+    this.error = null;
+    this.log = [];
+    this.embedded = true;
     this.step = "choose";
   }
 
@@ -129,16 +141,12 @@ class WizardStore {
     this.log = [];
     this.step = "local-booting";
     try {
+      // engine_boot_local now waits for a passing /health and THROWS if
+      // the engine never reports healthy (a stale discovery file used to
+      // sneak through as success here via the old `|| status.url` check).
       await invoke("engine_boot_local");
       await daemon.init();
-      // engine_boot_local already waited for discovery; reflect it.
-      if (daemon.status.state === "ready" || daemon.status.url) {
-        this.step = "done";
-      } else {
-        throw new Error(
-          "The engine booted but didn't report healthy in time. Check the tray → engine logs, then retry.",
-        );
-      }
+      this.step = "done";
     } catch (e) {
       this.fail(e);
     }

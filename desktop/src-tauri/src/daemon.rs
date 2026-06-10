@@ -120,49 +120,63 @@ pub fn daemon_status() -> DaemonStatus {
 /// dev, or cloud) we leave it alone. Otherwise boot a local microVM natively
 /// (machine::boot). The wizard uses `engine_boot_local` for a richer, longer
 /// boot with progress; this is the tray's quick path.
+/// Bring the runtime up — IDEMPOTENT, ASYNC (the boot can take seconds to
+/// minutes; a sync command would run on the main thread and freeze the UI).
 #[tauri::command]
-pub fn daemon_up(app: AppHandle) -> DaemonStatus {
-    let cur = status();
-    if cur.state == "running" {
-        return cur;
-    }
-    let _ = machine::boot(&app);
-    wait_for_discovery(40);
-    status()
+pub async fn daemon_up(app: AppHandle) -> Result<DaemonStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cur = status();
+        if cur.state == "running" {
+            return cur;
+        }
+        let _ = machine::boot(&app);
+        wait_for_discovery(40);
+        status()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn daemon_down() -> DaemonStatus {
-    // Never tear down an externally managed runtime — a raw dev runtime isn't
-    // ours to kill, and a cloud engine isn't local. Just stop ours.
-    let m = status().manager;
-    if m == "raw" || m == "cloud" {
-        return status();
-    }
-    let _ = machine::down();
-    status()
+pub async fn daemon_down() -> Result<DaemonStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // Never tear down an externally managed runtime — a raw dev runtime
+        // isn't ours to kill, and a cloud engine isn't local. Just stop ours.
+        let m = status().manager;
+        if m == "raw" || m == "cloud" {
+            return status();
+        }
+        let _ = machine::down();
+        status()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Recover a wedged runtime. Only valid for a runtime WE manage (a container);
 /// a `raw` dev runtime is left untouched with an explanatory error so the tray
 /// never kills the user's `iex` session out from under them.
 #[tauri::command]
-pub fn daemon_restart(app: AppHandle) -> Result<DaemonStatus, String> {
-    let cur = status();
-    if cur.manager == "raw" {
-        return Err(
-            "Runtime is running in raw dev mode (e.g. `WB_DESKTOP=1 iex -S mix`) — \
-             the tray doesn't manage it. Restart it where you launched it."
-                .into(),
-        );
-    }
-    if cur.manager == "cloud" {
-        return Err("Connected to a cloud engine — nothing local to restart.".into());
-    }
-    let _ = machine::down();
-    machine::boot(&app)?;
-    wait_for_discovery(40);
-    Ok(status())
+pub async fn daemon_restart(app: AppHandle) -> Result<DaemonStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cur = status();
+        if cur.manager == "raw" {
+            return Err(
+                "Runtime is running in raw dev mode (e.g. `WB_DESKTOP=1 iex -S mix`) — \
+                 the tray doesn't manage it. Restart it where you launched it."
+                    .into(),
+            );
+        }
+        if cur.manager == "cloud" {
+            return Err("Connected to a cloud engine — nothing local to restart.".into());
+        }
+        let _ = machine::down();
+        machine::boot(&app)?;
+        wait_for_discovery(40);
+        Ok(status())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Poll for the runtime to write its discovery file after a boot. `ticks` ×
@@ -212,59 +226,101 @@ pub fn engine_detect() -> machine::BackendStatus {
 }
 
 /// Install the local VM backend (krunvm via Homebrew). Streams `engine-setup`
-/// progress lines to the frontend. Surfaces the real error on failure.
+/// progress lines to the frontend. ASYNC — a brew install takes minutes and
+/// must never run on the main thread.
 #[tauri::command]
-pub fn engine_install_backend(app: AppHandle) -> Result<machine::BackendStatus, String> {
-    machine::install_krunvm(&app)?;
-    Ok(machine::detect())
+pub async fn engine_install_backend(app: AppHandle) -> Result<machine::BackendStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        machine::install_krunvm(&app)?;
+        Ok(machine::detect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Boot the local engine and wait — through a first-run image pull — for it to
-/// come up. Emits `engine-setup` progress; polls discovery up to ~6 min, then
-/// returns whatever status we have (the caller decides on a non-running result).
+/// come up HEALTHY. Two old bugs fixed here:
+///   • sync command → the up-to-6-minute wait ran ON THE MAIN THREAD and froze
+///     the entire app. Now async + spawn_blocking.
+///   • the wait broke on the discovery FILE existing — a stale runtime.json
+///     from a previous run satisfied it instantly while nothing was running
+///     ("set up" with no engine). Stale non-cloud discovery is purged before
+///     boot, and the wait now requires a passing /health, not a file.
 #[tauri::command]
-pub fn engine_boot_local(app: AppHandle) -> Result<DaemonStatus, String> {
-    machine::boot(&app)?;
-    // First boot pulls the multi-hundred-MB image — poll patiently, nudging the
-    // wizard every few seconds so it never looks hung.
-    for i in 0..720 {
-        if Discovery::read().is_some() {
-            break;
+pub async fn engine_boot_local(app: AppHandle) -> Result<DaemonStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(d) = Discovery::read() {
+            let stale = d.mode != "cloud" && status().state != "running";
+            if stale {
+                if let Some(p) = discovery_path() {
+                    let _ = std::fs::remove_file(p);
+                    let _ = app.emit("engine-setup", "cleared stale runtime discovery");
+                }
+            }
         }
-        if i > 0 && i % 16 == 0 {
-            let _ = app.emit("engine-setup", "still pulling the engine image…");
+        machine::boot(&app)?;
+        // First boot pulls the multi-hundred-MB image — poll patiently, nudging
+        // the UI every few seconds so it never looks hung.
+        for i in 0..720 {
+            if status().state == "running" {
+                break;
+            }
+            if i > 0 && i % 16 == 0 {
+                let _ = app.emit("engine-setup", "still pulling the engine image…");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-    Ok(status())
+        let fin = status();
+        if fin.state != "running" {
+            return Err(
+                "The engine booted but never reported healthy. Check the tray → engine logs, then retry.".into(),
+            );
+        }
+        Ok(fin)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
-/// Probe an arbitrary engine URL + token (cloud path) WITHOUT persisting it, so
-/// the wizard can validate before committing. Returns true on /health 200.
-#[tauri::command]
-pub fn engine_probe(url: String, token: String) -> Result<bool, String> {
-    let (scheme, host, port) = machine::parse_url(&url)?;
+/// Blocking /health probe shared by engine_probe + engine_connect_cloud.
+fn probe_health(url: &str, token: &str) -> Result<bool, String> {
+    let (scheme, host, port) = machine::parse_url(url)?;
     let probe = format!("{scheme}://{host}:{port}/health");
     let resp = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .map_err(|e| e.to_string())?
         .get(&probe)
-        .bearer_auth(&token)
+        .bearer_auth(token)
         .send()
         .map_err(|e| format!("could not reach {probe}: {e}"))?;
     Ok(resp.status().as_u16() == 200)
 }
 
+/// Probe an arbitrary engine URL + token (cloud path) WITHOUT persisting it, so
+/// the wizard can validate before committing. Returns true on /health 200.
+#[tauri::command]
+pub async fn engine_probe(url: String, token: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || probe_health(&url, &token))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Connect to a cloud engine: probe it, and only on a healthy 200 persist the
 /// cloud discovery so the rest of the app targets it. Returns the folded status.
 #[tauri::command]
-pub fn engine_connect_cloud(url: String, token: String) -> Result<DaemonStatus, String> {
-    if !engine_probe(url.clone(), token.clone())? {
-        return Err("Engine reached but /health did not return 200 — check the URL and token.".into());
-    }
-    machine::write_cloud(&url, &token)?;
-    Ok(status())
+pub async fn engine_connect_cloud(url: String, token: String) -> Result<DaemonStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !probe_health(&url, &token)? {
+            return Err(
+                "Engine reached but /health did not return 200 — check the URL and token.".into(),
+            );
+        }
+        machine::write_cloud(&url, &token)?;
+        Ok(status())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Disconnect from a cloud engine (removes the cloud discovery). No-op if the
