@@ -1,29 +1,54 @@
-// Regenerate dist/specimen.html from dist/open-avatars.js +
-// packs/open-peeps/pack.bundle.json.  Self-contained, zero deps.  run:
-//   node test/build-specimen.mjs
+// Regenerate dist/specimen.html — a UNIFIED gallery of every avatar style from
+// the single avatar() API. One section per pack, all showing the SAME seed set
+// so you can see one identity across every art style. Plus a global seed input
+// that updates every style at once.  Self-contained, zero deps.
+//   run: node test/build-specimen.mjs
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
+const json = (p) => JSON.parse(read(p));
 
-// inline (non-module) script: drop the ES `export` statements (SyntaxError in a
-// plain <script>); window.OpenAvatars is still set, module.exports is guarded.
-const js = read("dist/open-avatars.js")
+// Inline (non-module) renderer: drop ES `export` lines; window.OpenAvatars set.
+const coreJs = read("dist/open-avatars.js")
   .replace(/\nexport \{[^}]*\};\n/, "\n")
   .replace(/\nexport default OpenAvatars;\n/, "\n");
 
-const bundleRaw = read("packs/open-peeps/pack.bundle.json");
-const bundleSafe = bundleRaw.replace(/<\/script>/g, "<\\/script>");
+// Turn a procedural generate.js ES module into a plain script that assigns a
+// global `OA_<name>` = { generate }.  We strip the `export` keywords and the
+// trailing default export, then append the global assignment.
+function proceduralScript(name) {
+  let src = read(`packs/${name}/generate.js`);
+  src = src
+    .replace(/export function generate/, "function generate")
+    .replace(/\nexport default[^\n]*\n/, "\n");
+  return src + `\nwindow.OA_${name} = { generate: generate };\n`;
+}
 
 const SEEDS = [
-  "desk", "moss", "wren", "hale",
-  "river", "ember", "atlas", "wolf", "fern", "sol",
-  "indigo", "cove", "birch", "echo", "vale", "north",
-  "pike", "marlow", "june", "cyan", "onyx", "lark",
-  "reed", "ash",
+  "bit.ml", "ada", "grace", "linus", "margaret",
+  "river", "ember", "atlas", "wren", "sol", "indigo", "cyan",
 ];
+
+const peeps = read("packs/open-peeps/pack.bundle.json").replace(/<\/script>/g, "<\\/script>");
+const trans = read("packs/transhumans/pack.bundle.json").replace(/<\/script>/g, "<\\/script>");
+const pixIds = read("packs/pixabots/pixabots.ids.json").replace(/<\/script>/g, "<\\/script>");
+
+const peepsMeta = json("packs/open-peeps/pack.json");
+const transMeta = json("packs/transhumans/pack.json");
+
+// per-pack note metadata for the UI
+const NOTES = {
+  "open-peeps": { type: "assembled", license: peepsMeta.license, source: "openpeeps.com" },
+  transhumans: { type: "gallery · svg", license: transMeta.license, source: "transhuman.club" },
+  pixabots: { type: "gallery · raster", license: "see LICENSE.txt", source: "pixabots" },
+  boring: { type: "procedural", license: "MIT", source: "boringdesigners/boring-avatars" },
+  jdenticon: { type: "procedural", license: "MIT", source: "dmester/jdenticon" },
+  minidenticons: { type: "procedural", license: "MIT", source: "laurentpayot/minidenticons" },
+  pixitar: { type: "procedural", license: "MIT", source: "ptcodes/pixitar" },
+};
 
 const page = `<!doctype html>
 <html lang="en">
@@ -32,7 +57,6 @@ const page = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>open-avatars — specimen</title>
 <style>
-/* page chrome — NOT part of the toolkit, just the specimen frame */
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
@@ -40,160 +64,164 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 4.5rem 2rem 6rem; }
-header.spec { margin-bottom: 4rem; }
-.kicker {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
-  color: #999;
-}
-h1 { font-size: 2.1rem; font-weight: 650; letter-spacing: -.02em; margin: .5rem 0 .6rem; }
-.lede { color: #555; max-width: 46ch; line-height: 1.55; font-size: 1.02rem; }
-section { margin-top: 4.5rem; }
-.section-label {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
-  color: #aaa; border-bottom: 1px solid #eee; padding-bottom: .6rem; margin-bottom: 2rem;
-}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 4.5rem 2rem 7rem; }
+header.spec { margin-bottom: 3rem; }
+.kicker { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .72rem;
+  letter-spacing: .18em; text-transform: uppercase; color: #999; }
+h1 { font-size: 2.3rem; font-weight: 650; letter-spacing: -.02em; margin: .5rem 0 .7rem; }
+.lede { color: #555; max-width: 54ch; line-height: 1.6; font-size: 1.05rem; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: .92em; color: #333; }
 
-/* the avatar grid */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 2rem 1.5rem; }
+.globalseed { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px); border-bottom: 1px solid #eee; padding: 1rem 0 1.1rem;
+  margin: 2.5rem 0 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.globalseed label { font-family: ui-monospace, Menlo, monospace; font-size: .68rem;
+  letter-spacing: .14em; text-transform: uppercase; color: #aaa; }
+.globalseed input { font: inherit; font-size: 1.05rem; padding: .55rem .9rem; min-width: 260px;
+  border: 1px solid #ddd; border-radius: 10px; background: #fafafa; color: #111; }
+.globalseed input:focus { outline: none; border-color: #111; background: #fff; }
+.globalseed .hint { font-size: .8rem; color: #bbb; }
+
+section { margin-top: 3.5rem; }
+.section-head { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+  border-bottom: 1px solid #eee; padding-bottom: .7rem; margin-bottom: 1.8rem; }
+.section-head h2 { font-size: 1.15rem; font-weight: 620; margin: 0; letter-spacing: -.01em; }
+.section-head .meta { font-family: ui-monospace, Menlo, monospace; font-size: .7rem;
+  letter-spacing: .04em; color: #aaa; }
+.section-head .meta b { color: #777; font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 1.8rem 1.3rem; }
 .cell { text-align: center; }
-.cell .av { width: 100%; max-width: 120px; margin: 0 auto; }
-.cell .av svg { width: 100%; height: auto; display: block; }
-.cell .name {
-  margin-top: .85rem;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: .74rem; color: #888; letter-spacing: .02em;
-}
+.cell .av { width: 100%; max-width: 104px; margin: 0 auto; aspect-ratio: 1; }
+.cell .av svg, .cell .av img { width: 100%; height: 100%; display: block; border-radius: 12px; }
+.cell .name { margin-top: .7rem; font-family: ui-monospace, Menlo, monospace;
+  font-size: .72rem; color: #999; letter-spacing: .01em; word-break: break-all; }
 
-/* live seed input */
-.try { display: flex; flex-wrap: wrap; align-items: center; gap: 2.5rem; margin-top: 1rem; }
-.try .preview { width: 200px; height: 200px; flex: 0 0 auto; }
-.try .preview svg { width: 100%; height: 100%; display: block; }
-.controls { flex: 1 1 280px; min-width: 260px; }
-.controls label {
-  display: block; font-family: ui-monospace, Menlo, monospace;
-  font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: #aaa; margin-bottom: .5rem;
-}
-input[type=text] {
-  width: 100%; font: inherit; font-size: 1.05rem; padding: .7rem .9rem;
-  border: 1px solid #ddd; border-radius: 10px; background: #fafafa; color: #111;
-}
-input[type=text]:focus { outline: none; border-color: #111; background: #fff; }
-.crops { display: inline-flex; margin-top: 1.4rem; border: 1px solid #ddd; border-radius: 999px; overflow: hidden; }
-.crops button {
-  font: inherit; font-size: .82rem; cursor: pointer; padding: .5em 1.1em;
-  background: #fff; color: #555; border: 0; border-right: 1px solid #eee;
-  text-transform: capitalize;
-}
-.crops button:last-child { border-right: 0; }
-.crops button[aria-pressed=true] { background: #111; color: #fff; }
-.pick {
-  margin-top: 1.3rem; font-family: ui-monospace, Menlo, monospace;
-  font-size: .76rem; color: #999; line-height: 1.7;
-}
-.pick b { color: #444; font-weight: 600; }
 footer.spec { margin-top: 6rem; padding-top: 2rem; border-top: 1px solid #eee; color: #bbb;
-  font-family: ui-monospace, Menlo, monospace; font-size: .72rem; letter-spacing: .04em; }
+  font-family: ui-monospace, Menlo, monospace; font-size: .72rem; letter-spacing: .04em; line-height: 1.7; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header class="spec">
-    <div class="kicker">open-avatars · open-peeps (mono)</div>
-    <h1>Deterministic SVG avatars</h1>
-    <p class="lede">One seed string → one avatar, forever. Open Peeps atoms by
-      Pablo Stanley, composed black-on-white. No randomness, no recoloring —
-      pure string&nbsp;→&nbsp;string.</p>
+    <div class="kicker">open-avatars · many styles, one API</div>
+    <h1>One seed, every art style</h1>
+    <p class="lede">A single <code>avatar(pack, seed, opts)</code> renders seven
+      avatar styles — assembled, gallery (SVG &amp; raster), and four procedural
+      generators. The <em>same seed set</em> runs down every section, so you see
+      one identity wear every art style. Deterministic: same seed → byte-identical
+      output, forever.</p>
   </header>
 
-  <section>
-    <div class="section-label">Try a seed</div>
-    <div class="try">
-      <div class="preview" id="preview"></div>
-      <div class="controls">
-        <label for="seed">seed</label>
-        <input type="text" id="seed" value="desk" autocomplete="off" spellcheck="false">
-        <div class="crops" id="crops">
-          <button data-crop="circle" aria-pressed="true">circle</button>
-          <button data-crop="bust" aria-pressed="false">bust</button>
-          <button data-crop="full" aria-pressed="false">full</button>
-        </div>
-        <div class="pick" id="pick"></div>
-      </div>
-    </div>
-  </section>
+  <div class="globalseed">
+    <label for="gseed">global seed</label>
+    <input type="text" id="gseed" value="" placeholder="type to set every style at once" autocomplete="off" spellcheck="false">
+    <span class="hint">blank = the seed set below</span>
+  </div>
 
-  <section>
-    <div class="section-label">The crew &amp; twenty-two more — circle crop</div>
-    <div class="grid" id="grid"></div>
-  </section>
+  <div id="sections"></div>
 
-  <footer class="spec">open-avatars v0.1.0 · CC0 atoms · zero dependencies</footer>
+  <footer class="spec">
+    open-avatars v0.2.0 · type-dispatched avatar engine · zero dependencies<br>
+    open-peeps + transhumans art © Pablo Stanley (free for commercial use) ·
+    boring-avatars / jdenticon / minidenticons / pixitar are MIT ·
+    pixabots per its own LICENSE. See LICENSES.md.
+  </footer>
 </div>
 
-<!-- the pack bundle (pure JSON) -->
-<script type="application/json" id="oa-bundle">
-${bundleSafe}
-</script>
+<!-- bundles (pure JSON) -->
+<script type="application/json" id="b-peeps">${peeps}</script>
+<script type="application/json" id="b-trans">${trans}</script>
+<script type="application/json" id="b-pix">${pixIds}</script>
 
-<!-- the toolkit renderer (inline, sets window.OpenAvatars) -->
-<script id="oa-js">
-${js}
-</script>
+<!-- the toolkit renderer -->
+<script id="oa-core">${coreJs}</script>
+
+<!-- procedural generators (each sets window.OA_<name>) -->
+<script>${proceduralScript("boring")}</script>
+<script>${proceduralScript("jdenticon")}</script>
+<script>${proceduralScript("minidenticons")}</script>
+<script>${proceduralScript("pixitar")}</script>
 
 <!-- specimen wiring -->
 <script>
 (function () {
-  var bundle = JSON.parse(document.getElementById("oa-bundle").textContent);
   var OA = window.OpenAvatars;
-  OA.register(bundle);
-
   var SEEDS = ${JSON.stringify(SEEDS)};
+  var NOTES = ${JSON.stringify(NOTES)};
 
-  // grid of seeded avatars at circle crop
-  var grid = document.getElementById("grid");
-  grid.innerHTML = SEEDS.map(function (s) {
-    return '<div class="cell"><div class="av">' +
-      OA.avatar(bundle, s, { crop: "circle", background: "#f4f4f2" }) +
-      '</div><div class="name">' + s + '</div></div>';
-  }).join("");
+  var peeps = JSON.parse(document.getElementById("b-peeps").textContent);
+  var trans = JSON.parse(document.getElementById("b-trans").textContent);
+  var pix = JSON.parse(document.getElementById("b-pix").textContent);
 
-  // live preview
-  var seedEl = document.getElementById("seed");
-  var preview = document.getElementById("preview");
-  var pickEl = document.getElementById("pick");
-  var crop = "circle";
-
-  function fmtPick(p) {
-    return Object.keys(p).map(function (k) {
-      return k + ': <b>' + p[k] + '</b>';
-    }).join("<br>");
+  // procedural packs: a pack object whose generate is the global fn.
+  function proc(name) {
+    return { type: "procedural", name: name, generate: window["OA_" + name].generate };
   }
+  var boring = proc("boring");
+  var boringBeam = proc("boring");
+  var jdenticon = proc("jdenticon");
+  var minidenticons = proc("minidenticons");
+  var pixitar = proc("pixitar");
+
+  // pixabots renders from disk: base points at the pack's webp dir, relative to
+  // this specimen page (which lives in dist/, so the pack dir is one level up).
+  var PIX_BASE = "../packs/pixabots/webp/";
+
+  // Each style is { id, title, render(seed) -> html string }
+  var STYLES = [
+    { id: "open-peeps", title: "Open Peeps", render: function (s) {
+        return OA.avatar(peeps, s, { crop: "circle", background: "#f4f4f2" }); } },
+    { id: "transhumans", title: "Transhumans", render: function (s) {
+        return OA.avatar(trans, s, { background: "#f4f4f2" }); } },
+    { id: "pixabots", title: "Pixabots", render: function (s) {
+        return OA.avatar(pix, s, { base: PIX_BASE }); } },
+    { id: "boring", title: "Boring Avatars (marble)", render: function (s) {
+        return OA.avatar(boring, s, {}); } },
+    { id: "boring", title: "Boring Avatars (beam)", render: function (s) {
+        return OA.avatar(boringBeam, s, { variant: "beam" }); } },
+    { id: "jdenticon", title: "Jdenticon", render: function (s) {
+        return OA.avatar(jdenticon, s, { size: 200, background: "#f4f4f2" }); } },
+    { id: "minidenticons", title: "Minidenticons", render: function (s) {
+        return OA.avatar(minidenticons, s, {}); } },
+    { id: "pixitar", title: "Pixitar (pixel)", render: function (s) {
+        return OA.avatar(pixitar, s, {}); } },
+  ];
+
+  var container = document.getElementById("sections");
+
+  function buildSection(style) {
+    var note = NOTES[style.id] || {};
+    var sec = document.createElement("section");
+    sec.innerHTML =
+      '<div class="section-head">' +
+      '<h2>' + style.title + '</h2>' +
+      '<span class="meta"><b>' + (note.type || "") + '</b> · ' +
+      (note.license || "") + ' · ' + (note.source || "") + '</span>' +
+      '</div><div class="grid"></div>';
+    sec._grid = sec.querySelector(".grid");
+    container.appendChild(sec);
+    return sec;
+  }
+  var sections = STYLES.map(buildSection);
 
   function paint() {
-    var seed = seedEl.value || "";
-    preview.innerHTML = OA.avatar(bundle, seed, {
-      crop: crop,
-      background: crop === "circle" ? "#f4f4f2" : "#ffffff",
+    var override = document.getElementById("gseed").value.trim();
+    var seeds = override ? [override] : SEEDS;
+    STYLES.forEach(function (style, i) {
+      var grid = sections[i]._grid;
+      grid.innerHTML = seeds.map(function (s) {
+        return '<div class="cell"><div class="av">' + style.render(s) +
+          '</div><div class="name">' + escHtml(s) + '</div></div>';
+      }).join("");
     });
-    pickEl.innerHTML = fmtPick(OA.pick(bundle, seed));
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  seedEl.addEventListener("input", paint);
-
-  document.getElementById("crops").addEventListener("click", function (e) {
-    var btn = e.target.closest("button");
-    if (!btn) return;
-    crop = btn.getAttribute("data-crop");
-    [].forEach.call(this.querySelectorAll("button"), function (b) {
-      b.setAttribute("aria-pressed", b === btn ? "true" : "false");
-    });
-    paint();
-  });
-
+  document.getElementById("gseed").addEventListener("input", paint);
   paint();
 })();
 </script>
@@ -202,4 +230,4 @@ ${js}
 `;
 
 fs.writeFileSync(path.join(root, "dist/specimen.html"), page);
-console.log(`specimen.html written (${(page.length / 1024).toFixed(1)} KB)`);
+console.log(`specimen.html written (${(page.length / 1024 / 1024).toFixed(2)} MB)`);

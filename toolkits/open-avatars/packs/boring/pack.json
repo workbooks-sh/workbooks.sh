@@ -1,0 +1,10 @@
+{
+  "name": "boring",
+  "title": "Boring Avatars",
+  "type": "procedural",
+  "module": "generate.js",
+  "license": "MIT",
+  "credit": "boring-avatars by Boring Designers — https://github.com/boringdesigners/boring-avatars (MIT). Geometric gradient avatars; 'marble' + 'beam' variants ported.",
+  "source": "https://github.com/boringdesigners/boring-avatars",
+  "palette": ["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]
+}

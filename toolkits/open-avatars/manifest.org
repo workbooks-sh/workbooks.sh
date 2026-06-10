@@ -1,10 +1,12 @@
 #+TITLE: open-avatars toolkit
 #+TOOLKIT: open-avatars
-#+VERSION: 0.1.0
+#+VERSION: 0.2.0
 #+KIND: knowledge+assets
 #+STATUS: experimental
-#+TAGLINE: Deterministic, seed-based SVG avatars you plug into any site — a zero-dependency renderer (browser / Node / QuickJS-wasm) that composes "avatar packs" of monochrome SVG atoms into a stable avatar per seed. Same seed → same face, forever. First pack: Open Peeps (Pablo Stanley, CC0), black-and-white.
-#+FLOW: read this front door → pick the one skill your task needs (integrate to plug it in, packs to author or add a pack, authoring for seed/crop/theme semantics). cat a skill only when you reach its step. The renderer lives in dist/open-avatars.js; a working proof page is dist/specimen.html.
+#+TAGLINE: Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine (browser / Node / QuickJS-wasm): a single avatar(pack, seed, opts) routes by a pack's TYPE — assembled (composed atoms), gallery (pick one whole avatar, SVG or raster), or procedural (a generator the pack ships). Same seed → byte-identical avatar across every style, forever. Seven styles ship: open-peeps, transhumans, pixabots, boring, jdenticon, minidenticons, pixitar.
+#+FLOW: read this front door → pick the one skill your task needs (integrate to plug it in, packs to author or add a pack of any type, authoring for seed/crop/theme semantics). cat a skill only when you reach its step. The renderer lives in dist/open-avatars.js; the unified proof page is dist/specimen.html (every style, one seed set); licenses in LICENSES.md.
+
+#+SHIPPED-STYLES: open-peeps (assembled, CC0) · transhumans (gallery/svg, free-commercial) · pixabots (gallery/raster, own LICENSE) · boring (procedural, MIT) · jdenticon (procedural, MIT) · minidenticons (procedural, MIT) · pixitar (procedural, MIT). Attribution: LICENSES.md.
 
 * open-avatars — deterministic SVG avatars for any site            :toolkit:
   :PROPERTIES:
@@ -12,42 +14,56 @@
   :KIND:      knowledge+assets
   :STATUS:    experimental
   :SKILL_DIR: skills/
-  :ASSETS:    dist/open-avatars.js, dist/specimen.html, packs/open-peeps/pack.json, packs/open-peeps/pack.bundle.json
+  :ASSETS:    dist/open-avatars.js, dist/specimen.html, LICENSES.md, packs/*/pack.json, packs/*/pack.bundle.json
   :END:
 
-  A *knowledge + assets* toolkit: a tiny avatar engine you drop into any site.
-  Parts that ship together —
+  A *knowledge + assets* toolkit: a tiny, type-dispatched avatar engine —
+  "many art styles, one DiceBear-like API." Parts that ship together —
 
   - =dist/open-avatars.js= — the renderer. One self-contained file, *zero
-    dependencies*. Pure string→string (=avatar(pack, seed, opts) -> svg=), so it
-    runs in a browser =<script>= (as =window.OpenAvatars=), as an ES module, in
-    Node at build time, and in the runtime's QuickJS wasm JS lane. No DOM, no
-    Node APIs, no =fetch=. Bad input degrades to a 1×1 canvas, never throws.
-  - =packs/<pack>/= — an *avatar pack*: a directory of monochrome SVG atoms
-    grouped by category (=body/ head/ face/ facial-hair/ accessories/=), a
-    =pack.json= that calibrates each category's position on a shared canvas, and
-    a generated =pack.bundle.json= (the atoms + calibration as one pure JSON
-    object the renderer consumes).
-  - =scripts/bundle-pack.mjs= — the build step. Reads a pack's atoms, strips the
-    Sketch export cruft down to the inner drawable, and emits =pack.bundle.json=.
-  - =skills/= — how to use it: plug-in recipes, the pack format + how to add new
-    packs, and the seed/crop/monochrome authoring semantics.
+    dependencies*. Pure string→string (=avatar(pack, seed, opts)=), so it runs in
+    a browser =<script>= (as =window.OpenAvatars=), as an ES module, in Node at
+    build time, and in the runtime's QuickJS wasm JS lane. No DOM, no Node APIs,
+    no =fetch=. =avatar()= routes by a pack's =type= (assembled / gallery /
+    procedural). Bad input degrades to a 1×1 canvas, never throws.
+  - =packs/<pack>/= — an *avatar pack*. Each declares a =type=:
+    - *assembled* — a directory of SVG atoms grouped by category + a =pack.json=
+      that calibrates each category on a shared canvas (open-peeps).
+    - *gallery* — a list of whole avatars; =kind:svg= inlines them, =kind:raster=
+      records an id list + path template and returns an =<img>= (transhumans,
+      pixabots).
+    - *procedural* — ships a pure =generate(seed,opts)→svg= the core calls
+      (boring, jdenticon, minidenticons, pixitar).
+  - =scripts/bundle-pack.mjs= — the build step. Type-aware: strips assembled
+    atoms / gallery-svg figures to inner drawables, or writes the tiny raster id
+    list, or copies a procedural =pack.json=.
+  - =LICENSES.md= — honest per-pack attribution (all MIT or free-for-commercial).
+  - =skills/= — how to use it: plug-in recipes, the pack types + how to add each,
+    and the seed/crop/monochrome authoring semantics.
 
-  *Determinism is the whole point.* A seed string is hashed (FNV-1a) to pick one
-  atom per category; the same seed always yields byte-identical SVG — the
-  DiceBear contract. No randomness, no timestamps, no per-render state.
+  *Determinism is the whole point.* A seed string is hashed (FNV-1a) — over a
+  sorted category list (assembled) or a sorted id list (gallery), or by the
+  pack's own generator (procedural). The same seed always yields byte-identical
+  output — the DiceBear contract. No randomness, no timestamps, no per-render
+  state. (Ports keep their source library's exact hash for byte-parity:
+  jdenticon =d=-strings and minidenticons rects match the upstream npm packages.)
 
-  *Monochrome by law.* Open Peeps atoms ship black-on-white and the renderer
-  *never* recolors them. To theme, set =opts.background= (a backplate behind the
-  figure) or style the host =<svg>= from CSS — ink stays black, fills stay white.
-  See =skills/authoring=.
+  *Monochrome is a stance, not a law.* Assembled open-peeps atoms ship
+  black-on-white and the renderer never recolors them. *Gallery* and *procedural*
+  packs keep their native color by default (transhumans/pixabots/boring are
+  colorful); procedural identicons that allow it expose an =opts.monochrome= B&W
+  switch. To theme an assembled avatar, set =opts.background= or style the host
+  =<svg>= from CSS. See =skills/authoring=.
 
-  The first pack is *Open Peeps* (by Pablo Stanley, https://openpeeps.com, CC0 /
-  public domain): 132 atoms across 5 categories, calibrated to the official
-  composition (=packs/open-peeps/reference/bust.svg= is the witness for every
-  offset and the z-order).
+  The shipped styles: *open-peeps* (assembled, Pablo Stanley/CC0, 132 atoms),
+  *transhumans* (gallery/svg, 38 colorful figures, Pablo Stanley free-commercial),
+  *pixabots* (gallery/raster, 2000 robot bitmaps, served by id from a base path),
+  *boring* (procedural marble+beam, MIT), *jdenticon* (procedural, MIT),
+  *minidenticons* (procedural 5×5 mirrored, MIT), *pixitar* (procedural pixel
+  grid, MIT). Full attribution in =LICENSES.md=.
 
-  Three crops frame the same figure:
+  Three crops frame an *assembled* figure (gallery/procedural packs ship one
+  fixed framing each):
 
   | Crop     | Frames                          | Draws                       |
   |----------+---------------------------------+-----------------------------|
@@ -55,16 +71,17 @@
   | =bust=   | head + shoulders                | all categories              |
   | =full=   | the whole figure on the canvas  | all categories              |
 
-  Quick proof: open =dist/specimen.html= — one self-contained page (the renderer
-  + the Open Peeps bundle inlined) that renders a grid of ~24 seeded avatars at
-  circle crop, plus a live "type a seed → see the avatar" input and a crop
-  toggle. Rebuild it with =node test/build-specimen.mjs=. Tests:
-  =node test/avatar.test.mjs=.
+  Quick proof: open =dist/specimen.html= — one self-contained page (renderer +
+  the four procedural generators + the open-peeps & transhumans bundles inlined)
+  that renders *every style* down the same seed set, so you see one identity wear
+  each art style, plus a global seed input that updates them all at once. Pixabots
+  rasters render from =../packs/pixabots/webp/= on disk. Rebuild it with
+  =node test/build-specimen.mjs=. Tests: =node test/avatar.test.mjs= (90 checks).
 
   Skill index (read on demand):
 
   | Skill        | Use when                                                              |
   |--------------+----------------------------------------------------------------------|
   | =integrate=  | Plugging the renderer into a site (browser, Node build-time, wasm, framework) |
-  | =packs=      | The =pack.json= format + how to ADD A NEW PACK (new style)            |
+  | =packs=      | The pack TYPES (assembled/gallery/procedural) + how to ADD each kind  |
   | =authoring=  | Seed semantics, the three crops, the B&W/monochrome stance + theming |
