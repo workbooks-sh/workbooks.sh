@@ -678,8 +678,13 @@ const stepTarget = (step) => {
   if (file) {
     const f = file[1];
     if (f.startsWith('blog/')) {
-      // a blog page: redirect only when following + not already there; else view it
-      const page = '/' + f;
+      // a blog page: follow it there in-shell; ON the page, the cursor works
+      // over the article itself; otherwise glimpse the file in the viewer.
+      const page = '/' + f.replace(/\.html$/, '');
+      if (location.pathname === page || location.pathname === '/' + f) {
+        const el = document.querySelector('.blogpost article');
+        if (el) return { el };
+      }
       if (following && location.pathname !== page) return { page };
       return { file: f, verb };
     }
@@ -770,8 +775,8 @@ async function follow() {
         if (t.page) {                                // another lander page — go there
           think('working over here — come on');
           await sleep(1400);
-          if (following) location.assign(t.page);
-          return;
+          if (following) routerPush(t.page);         // in-shell: the session survives
+          continue;                                  // next tick re-places on the new DOM
         }
         if (t.url || t.file) {                        // off-page → the viewer window
           if (openViewer(t)) { if (!absorbed) await absorbCursor(); }
@@ -797,6 +802,14 @@ async function follow() {
 }
 // the button toggles: start when idle, stop when following
 export const toggleFollow = () => { following ? stopFollow() : follow(); };
+
+// Cursor placement is PER-ROUTE: when the route changes, the old target's DOM
+// is gone — hide the cursor (the viewer card, global chrome, may stay) and
+// drop the dedup key so the next step re-resolves against the new page.
+addEventListener('wb:route', () => {
+  lastKey = null;
+  if (following && !absorbed && refs.cursor) refs.cursor.style.opacity = '0';
+});
 
 /* ── the watch loop ───────────────────────────────────────────── */
 let seen = null, wasRunning = false;

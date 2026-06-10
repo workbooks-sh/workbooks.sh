@@ -34,6 +34,9 @@ export function push(path) {
   if (next.name === 'external') { location.assign(path); return; }
   if (path !== location.pathname) history.pushState({}, '', path);
   _route = next;
+  // the engine listens: cursor placement is per-route (a target on the old
+  // route's DOM means nothing on the new one).
+  dispatchEvent(new CustomEvent('wb:route'));
   scrollTo({ top: 0, behavior: 'instant' in scrollTo ? 'instant' : 'auto' });
 }
 
@@ -61,5 +64,5 @@ export function startRouter() {
     if (shouldIntercept(a, ev)) { ev.preventDefault(); push(new URL(a.href).pathname); }
   });
   // back/forward: re-parse the (now-current) location — no pushState, just sync
-  addEventListener('popstate', () => { _route = parse(location.pathname); });
+  addEventListener('popstate', () => { _route = parse(location.pathname); dispatchEvent(new CustomEvent('wb:route')); });
 }
