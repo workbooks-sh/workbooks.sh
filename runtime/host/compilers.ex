@@ -1542,6 +1542,64 @@ defmodule Workbooks.Compilers do
     end
   end
 
+  @doc """
+  Svelte sibling of `bundle_dir/4` (wb-2ku.5): compile a project dir's `.svelte` components AND
+  bundle them into a single self-contained CommonJS JS string, ENTIRELY in the sandbox. Runs the
+  Svelte compiler (`svelte/compiler`, required from the project's hoisted node_modules) inside
+  qjs-run.wasm via compilers/svelte/sveltejob.js — which is CONCATENATED before bundlejob.js so it
+  reuses bundlejob's resolver + `bundle()` (one bundler, one resolver; the lane is a pre-bundle
+  transform). css is injected at runtime → exactly ONE output. Zero native execution — no
+  node/bun/vite/rollup.
+
+  `entry_rel` is POSIX-relative to `project_dir` (e.g. "src/main.js" or "App.svelte"). The project's
+  node_modules must already contain the `svelte` package (the npm lane hoists it; see
+  PackageManager). Returns {:ok, js} | {:error, _}.
+  """
+  def svelte_bundle_dir(project_dir, entry_rel, opts \\ [], root \\ default_root()) do
+    jd = Path.join(root, "js")
+    sd = Path.join(root, "svelte")
+    qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
+    bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
+    sveltejob = Path.expand(Path.join(sd, "sveltejob.js"))
+
+    unless File.regular?(qrun), do: wasmtime_build_js(jd)
+
+    cond do
+      not (File.regular?(qrun) and File.regular?(bundlejob) and File.regular?(sveltejob)) ->
+        {:error, {:svelte_toolchain_missing, sd}}
+
+      true ->
+        abs = Path.expand(project_dir)
+        # .svelte sources aren't in @bundle_exts, so collect them alongside the JS/JSON tree.
+        files =
+          collect_bundle_files(abs)
+          |> Map.merge(collect_svelte_files(abs))
+          |> Map.merge(shim_files(jd))
+
+        dock = Keyword.get(opts, :dock, false)
+
+        payload =
+          %{"entry" => entry_rel, "files" => files, "dock" => dock}
+          |> maybe_put("svelteOptions", Keyword.get(opts, :svelte_options))
+          |> Jason.encode!()
+
+        # The job script = sveltejob.js ++ bundlejob.js (svelte FIRST: it sets __wbDeferMain before
+        # bundlejob's standalone auto-run sees it, registers the pre-bundle hook, then drives main).
+        script = File.read!(sveltejob) <> "\n" <> File.read!(bundlejob)
+        run_bundler(payload, qrun, {script, "sveltejob.js"})
+    end
+  end
+
+  defp maybe_put(map, _k, nil), do: map
+  defp maybe_put(map, k, v), do: Map.put(map, k, v)
+
+  # Collect .svelte component sources (the only exts the JS-tree glob in collect_bundle_files skips).
+  defp collect_svelte_files(abs) do
+    Path.wildcard(Path.join(abs, "**/*.svelte"))
+    |> Enum.filter(&File.regular?/1)
+    |> Map.new(fn p -> {Path.relative_to(p, abs), File.read!(p)} end)
+  end
+
   # The Node core shims (wb-spy.T2.1/T2.4), injected into the bundle file-map under __shims__/ so
   # the bundler can alias require('events')/require('node:crypto') → these (wb-spy.T2.5). Pure JS.
   defp shim_files(jd) do
@@ -1559,18 +1617,33 @@ defmodule Workbooks.Compilers do
     |> Map.new(fn p -> {Path.relative_to(p, abs), File.read!(p)} end)
   end
 
-  # Run bundlejob.js in qjs-run.wasm: JSON file-map on stdin → bundled JS on stdout. Same
-  # wasmtime invocation shape as ts_transpile (the bundle/ dir is preopened as /w).
-  defp run_bundler(payload, qrun, bundlejob) do
-    jobdir = Path.dirname(bundlejob)
+  # Run a bundler job in qjs-run.wasm: JSON file-map on stdin → bundled JS on stdout. Same wasmtime
+  # invocation shape as ts_transpile (the job's dir is preopened as /w). `job` is either the path to
+  # an on-disk job script (the JS lane's bundlejob.js) OR {script_source, name} — the svelte lane
+  # passes the CONCATENATED sveltejob.js++bundlejob.js source to run from a throwaway job dir, so the
+  # two lanes share this one runner (DRY).
+  defp run_bundler(payload, qrun, job) do
     id = Integer.to_string(:erlang.unique_integer([:positive]))
+
+    {jobdir, jobname, cleanup_dir?} =
+      case job do
+        {script, name} when is_binary(script) ->
+          d = Path.join(System.tmp_dir!(), "wbbundle-job-#{id}")
+          File.mkdir_p!(d)
+          File.write!(Path.join(d, name), script)
+          {d, name, true}
+
+        path when is_binary(path) ->
+          {Path.dirname(path), Path.basename(path), false}
+      end
+
     sin = Path.join(System.tmp_dir!(), "wbbundle-in-#{id}.json")
     serr = Path.join(System.tmp_dir!(), "wbbundle-err-#{id}.txt")
     File.write!(sin, payload)
 
     cmd =
       "wasmtime run -W exceptions=y -W max-wasm-stack=134217728 " <>
-        "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/bundlejob.js < #{esc(sin)} 2> #{esc(serr)}"
+        "--dir #{esc(jobdir)}::/w #{esc(qrun)} /w/#{jobname} < #{esc(sin)} 2> #{esc(serr)}"
 
     try do
       {out, _status} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: false)
@@ -1582,6 +1655,7 @@ defmodule Workbooks.Compilers do
     after
       File.rm(sin)
       File.rm(serr)
+      if cleanup_dir?, do: File.rm_rf(jobdir)
     end
   end
 

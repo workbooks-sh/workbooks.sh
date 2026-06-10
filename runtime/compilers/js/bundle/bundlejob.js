@@ -187,9 +187,20 @@ function bundle(input) {
 
 var DOCK_OK = false; // set from input.dock — permits the host-brokered fs/http/https shims
 
+// Helpers a sibling lane reuses (publish them so the sibling doesn't re-implement resolution). This
+// runs at load (before the driver below), so they're available when the hook fires.
+globalThis.__wbBundle = { resolve: resolve, resolveFile: resolveFile, joinPath: joinPath, DIR: DIR, esmToCjs: esmToCjs, bundle: bundle };
+
+// Single driver for every JS lane. A SIBLING lane (e.g. the Svelte lane, sveltejob.js) is
+// concatenated BEFORE this file by the Elixir side and registers a pre-bundle hook on
+// globalThis.__wbPreBundle — it rewrites input.files (e.g. .svelte → emitted JS modules) using the
+// helpers above before the unchanged bundle() runs. ONE driver + ONE bundle path is the DRY win: a
+// lane is "a transform over the file-map", not a forked bundler. The sibling only registers the
+// hook; THIS driver (always at the bottom of the concatenated source) reads stdin and runs it.
 try {
   var input = JSON.parse(readStdin());
   DOCK_OK = !!input.dock;
+  if (typeof globalThis.__wbPreBundle === "function") input = globalThis.__wbPreBundle(input);
   write(bundle(input));
 } catch (e) {
   die(e + (e && e.stack ? "\n" + e.stack : ""));

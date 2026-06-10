@@ -246,7 +246,45 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  # Mode 2 — Svelte. Compile a project dir's .svelte components AND bundle them into a single
+  # runnable wasm command ENTIRELY in the sandbox (wb-2ku.5): the Svelte compiler (from the project's
+  # node_modules, resolved+fetched via the same npm lane as JS) runs inside qjs-run.wasm, then the
+  # emitted JS is bundled (bundlejob) + compiled (JS lane) → wasm. Zero native execution — no
+  # node/bun/vite. Entry: src/main.js, else index.js, else the lone *.svelte (mounted by the bundle).
+  def build_dir(dir, "svelte") do
+    abs = Path.expand(dir)
+    out = Path.join(@cache, "#{cache_key(["sveltedir", abs])}.wasm")
+
+    case svelte_entry(abs) do
+      nil -> {:error, "no svelte entry (src/main.js, index.js, or a single *.svelte) in #{abs}"}
+      entry_rel -> build_svelte_dir(abs, entry_rel, out)
+    end
+  end
+
   def build_dir(_dir, lang), do: {:error, {:unsupported_dir_lang, lang}}
+
+  # The entry the svelte bundle mounts from, POSIX-relative to the project dir.
+  defp svelte_entry(abs) do
+    cond do
+      File.regular?(Path.join(abs, "src/main.js")) -> "src/main.js"
+      File.regular?(Path.join(abs, "index.js")) -> "index.js"
+      true ->
+        case Path.wildcard(Path.join(abs, "**/*.svelte")) do
+          [only] -> Path.relative_to(only, abs)
+          _ -> nil
+        end
+    end
+  end
+
+  # Svelte sibling of build_npm_dir: ensure the svelte package is installed (npm lane), then
+  # compile+bundle the .svelte tree + entry in-sandbox and compile the bundle to a wasm command.
+  defp build_svelte_dir(abs, entry_rel, out) do
+    with :ok <- ensure_node_modules(abs),
+         {:ok, js} <- Workbooks.Compilers.svelte_bundle_dir(abs, entry_rel, dock: true) do
+      dock? = js =~ "Javy.VFS" or js =~ "Javy.Net"
+      bundled_js_to_wasm(js, out, dock?)
+    end
+  end
 
   # ── npm dir/inline pipeline (wb-spy.T1.5) ──────────────────────────────────
   # Resolve → install → bundle → compile, all in-sandbox. Ties together the T1.1-1.4 building

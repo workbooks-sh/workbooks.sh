@@ -1,0 +1,9 @@
+#+COMPILER: svelte
+#+CLI_BIN: qjs
+#+KIND: bundle
+#+SOURCE: Svelte component compiler run IN-SANDBOX. sveltejob.js (this dir) is concatenated before
+  compilers/js/bundle/bundlejob.js and fed to qjs-run.wasm via the Javy.IO stdin→stdout contract.
+  It requires `svelte/compiler` from the project's hoisted node_modules (the wb-spy npm lane), runs
+  svelte.compile() on each .svelte source (css:injected → one bundle output), then reuses bundlejob's
+  resolver + bundle() over the rewritten file-map. Zero native execution — no node/bun/vite/rollup.
+  Driver: Workbooks.Compilers.svelte_bundle_dir. STATUS: WORKING (svelte 4). wb-2ku.5.
