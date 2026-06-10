@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="en" data-org-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>orgitorial — specimen</title>
+<style>
+/* page chrome — NOT part of the toolkit, just the specimen frame */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--org-paper, #fbf9f4); transition: background .2s ease; }
+.spec-bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: .6rem 1.2rem;
+  font-family: var(--org-mono, ui-monospace, monospace);
+  font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--org-faint, #8a8378);
+  background: color-mix(in oklab, var(--org-paper, #fbf9f4) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--org-rule, #e4ddd0);
+}
+.spec-brand { font-weight: 700; color: var(--org-ink, #1f1d1a); }
+.spec-brand b { color: var(--org-accent, #b3411f); }
+.spec-toggle {
+  font: inherit; cursor: pointer;
+  color: var(--org-ink, #1f1d1a);
+  background: var(--org-panel, #f4efe6);
+  border: 1px solid var(--org-rule-strong, #cfc6b5);
+  border-radius: 999px; padding: .35em 1em;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.spec-toggle:hover { border-color: var(--org-accent, #b3411f); color: var(--org-accent, #b3411f); }
+</style>
+<style id="orgitorial-css">
+/*!
+ * orgitorial.css — editorial skin for the orgitorial class contract.
+ * Zero dependencies. Theme entirely via the custom properties below.
+ * Dark theme: set [data-org-theme="dark"] on the .org-doc or any ancestor.
+ *
+ * Re-theme by overriding the --org-* vars (see skills/theming.org). bit.ml
+ * and the living-lander map their brand tokens straight onto these.
+ */
+
+:root,
+[data-org-theme="light"] {
+  /* palette */
+  --org-paper:        #fbf9f4;   /* warm editorial paper            */
+  --org-ink:          #1f1d1a;   /* near-black, warm                */
+  --org-ink-soft:     #4a4640;   /* secondary text                 */
+  --org-faint:        #8a8378;   /* metadata, captions             */
+  --org-accent:       #b3411f;   /* terracotta — links, marks      */
+  --org-accent-soft:  #f0e3d8;   /* accent wash                    */
+  --org-rule:         #e4ddd0;   /* hairlines                      */
+  --org-rule-strong:  #cfc6b5;
+  --org-panel:        #f4efe6;   /* src/example/drawer surfaces     */
+  --org-panel-bar:    #ece5d8;   /* src header bar                  */
+  --org-todo-bg:      #b3411f;   /* TODO chip                       */
+  --org-todo-ink:     #fff;
+  --org-done-bg:      #6f8f5f;   /* DONE chip                       */
+  --org-done-ink:     #fff;
+  --org-mark:         #fbe6a2;   /* (reserved) highlight            */
+  --org-selection:    #f3d9c8;
+
+  /* type */
+  --org-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --org-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --org-mono:  "SF Mono", "JetBrains Mono", "Fira Code", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* rhythm */
+  --org-measure: 68ch;
+  --org-fs:      1.125rem;     /* base font size      */
+  --org-lh:      1.7;          /* base line-height    */
+  --org-s0: 0.25rem;
+  --org-s1: 0.5rem;
+  --org-s2: 0.75rem;
+  --org-s3: 1rem;
+  --org-s4: 1.5rem;
+  --org-s5: 2.25rem;
+  --org-s6: 3.5rem;
+  --org-radius: 6px;
+}
+
+[data-org-theme="dark"] {
+  --org-paper:        #15140f;
+  --org-ink:          #ece6d8;
+  --org-ink-soft:     #c2bbac;
+  --org-faint:        #8a8174;
+  --org-accent:       #e08a4a;
+  --org-accent-soft:  #3a2a1c;
+  --org-rule:         #2c2a23;
+  --org-rule-strong:  #3d3a30;
+  --org-panel:        #1c1a14;
+  --org-panel-bar:    #24211a;
+  --org-todo-bg:      #e08a4a;
+  --org-todo-ink:     #1a1610;
+  --org-done-bg:      #7fa56a;
+  --org-done-ink:     #14140f;
+  --org-mark:         #5a4f20;
+  --org-selection:    #3a2a1c;
+}
+
+/* ---------- document frame ---------- */
+
+.org-doc {
+  font-family: var(--org-serif);
+  font-size: var(--org-fs);
+  line-height: var(--org-lh);
+  color: var(--org-ink);
+  background: var(--org-paper);
+  max-width: var(--org-measure);
+  margin-inline: auto;
+  padding: var(--org-s6) var(--org-s4);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "kern", "liga", "onum", "pnum";
+  hanging-punctuation: first last;
+}
+.org-doc ::selection { background: var(--org-selection); }
+
+/* ---------- header / metadata ---------- */
+
+.org-header {
+  margin-bottom: var(--org-s5);
+  padding-bottom: var(--org-s3);
+  border-bottom: 2px solid var(--org-ink);
+}
+.org-title {
+  font-size: clamp(2rem, 1.2rem + 3.4vw, 3.1rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  margin: 0 0 var(--org-s2);
+  text-wrap: balance;
+}
+.org-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--org-s1) var(--org-s3);
+  font-family: var(--org-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+}
+.org-author { font-weight: 600; color: var(--org-ink-soft); }
+.org-author::before { content: "by "; color: var(--org-faint); font-weight: 400; }
+.org-date::before { content: "· "; color: var(--org-rule-strong); }
+.org-keywords { display: inline-flex; flex-wrap: wrap; gap: var(--org-s0); }
+
+/* ---------- headlines ---------- */
+
+.org-h {
+  font-family: var(--org-serif);
+  color: var(--org-ink);
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+  margin: var(--org-s5) 0 var(--org-s2);
+  scroll-margin-top: var(--org-s4);
+}
+h2.org-h { font-size: 1.85rem; font-weight: 700; padding-bottom: var(--org-s1); border-bottom: 1px solid var(--org-rule); }
+h3.org-h { font-size: 1.4rem;  font-weight: 700; }
+h4.org-h { font-size: 1.15rem; font-weight: 700; }
+h5.org-h { font-size: 1rem;    font-weight: 700; font-family: var(--org-mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--org-ink-soft); }
+
+/* TODO / DONE keyword chip */
+.org-todo-kw {
+  font-family: var(--org-mono);
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  vertical-align: 0.18em;
+  padding: 0.18em 0.5em;
+  border-radius: 999px;
+  margin-right: 0.15em;
+}
+.org-todo > .org-todo-kw { background: var(--org-todo-bg); color: var(--org-todo-ink); }
+.org-done > .org-todo-kw { background: var(--org-done-bg); color: var(--org-done-ink); }
+.org-done { text-decoration-color: var(--org-faint); }
+.org-done { color: var(--org-ink-soft); }
+
+/* tags */
+.org-tag {
+  font-family: var(--org-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--org-accent);
+  background: var(--org-accent-soft);
+  border: 1px solid var(--org-rule-strong);
+  border-radius: 999px;
+  padding: 0.12em 0.6em;
+  vertical-align: 0.18em;
+  margin-left: 0.25em;
+  white-space: nowrap;
+}
+
+/* ---------- prose ---------- */
+
+.org-p { margin: 0 0 var(--org-s3); }
+.org-p + .org-p { text-indent: 0; }
+
+.org-doc strong { font-weight: 700; }
+.org-doc em { font-style: italic; }
+.org-doc u { text-decoration: underline; text-decoration-thickness: 0.08em; text-underline-offset: 0.14em; }
+.org-doc del { color: var(--org-faint); }
+
+.org-verbatim,
+.org-code {
+  font-family: var(--org-mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.36em;
+  border-radius: 4px;
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  color: var(--org-ink);
+}
+.org-code { color: var(--org-accent); }
+
+/* links */
+.org-link,
+.org-link-url {
+  color: var(--org-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
+  text-decoration-color: color-mix(in oklab, var(--org-accent) 45%, transparent);
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+.org-link:hover,
+.org-link-url:hover { text-decoration-color: var(--org-accent); }
+.org-link-url { font-family: var(--org-mono); font-size: 0.92em; }
+
+.org-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--org-s4) auto;
+  border-radius: var(--org-radius);
+  border: 1px solid var(--org-rule);
+}
+
+/* timestamps */
+.org-ts {
+  font-family: var(--org-mono);
+  font-size: 0.82em;
+  color: var(--org-ink-soft);
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-radius: 4px;
+  padding: 0.04em 0.4em;
+  white-space: nowrap;
+}
+
+/* ---------- lists ---------- */
+
+.org-list { margin: 0 0 var(--org-s3); padding-left: 1.4em; }
+.org-list .org-list { margin: var(--org-s1) 0 var(--org-s1); }
+ul.org-list { list-style: none; }
+ul.org-list > .org-item { position: relative; }
+ul.org-list > .org-item::before {
+  content: "";
+  position: absolute;
+  left: -1.05em;
+  top: 0.66em;
+  width: 0.42em;
+  height: 0.42em;
+  border-radius: 2px;
+  background: var(--org-accent);
+  transform: rotate(45deg);
+}
+ul.org-list .org-list > .org-item::before { background: var(--org-rule-strong); }
+ol.org-list { list-style: decimal; }
+ol.org-list::marker,
+ol.org-list > li::marker { font-family: var(--org-mono); color: var(--org-faint); }
+.org-item { margin: var(--org-s0) 0; padding-left: 0.15em; }
+
+/* checkbox items */
+.org-check {
+  list-style: none;
+  position: relative;
+  margin: var(--org-s0) 0;
+  padding-left: 0.15em;
+}
+.org-check::before {
+  content: "";
+  position: absolute;
+  left: -1.35em;
+  top: 0.32em;
+  width: 1.05em;
+  height: 1.05em;
+  border: 1.5px solid var(--org-rule-strong);
+  border-radius: 4px;
+  background: var(--org-paper);
+  box-sizing: border-box;
+}
+.org-check[data-checked="true"]::before {
+  background: var(--org-done-bg);
+  border-color: var(--org-done-bg);
+}
+.org-check[data-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: -1.02em;
+  top: 0.46em;
+  width: 0.34em;
+  height: 0.6em;
+  border: solid var(--org-done-ink);
+  border-width: 0 0.16em 0.16em 0;
+  transform: rotate(42deg);
+}
+.org-check[data-checked="partial"]::before {
+  background: var(--org-accent-soft);
+  border-color: var(--org-accent);
+}
+.org-check[data-checked="partial"]::after {
+  content: "";
+  position: absolute;
+  left: -1.12em;
+  top: 0.78em;
+  width: 0.62em;
+  height: 0.16em;
+  background: var(--org-accent);
+  border-radius: 1px;
+}
+.org-check[data-checked="true"] { color: var(--org-ink-soft); }
+
+/* ---------- source / example / verse ---------- */
+
+.org-src {
+  position: relative;
+  margin: var(--org-s4) 0;
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-radius: var(--org-radius);
+  overflow: hidden;
+}
+.org-src::before {
+  content: attr(data-lang);
+  display: block;
+  font-family: var(--org-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+  background: var(--org-panel-bar);
+  border-bottom: 1px solid var(--org-rule);
+  padding: 0.5em 1em;
+}
+.org-src[data-lang=""]::before,
+.org-src:not([data-lang])::before { content: "src"; }
+.org-src-code {
+  display: block;
+  font-family: var(--org-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--org-ink);
+  padding: var(--org-s3) var(--org-s3);
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.org-example {
+  margin: var(--org-s4) 0;
+  font-family: var(--org-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--org-ink-soft);
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-left: 3px solid var(--org-rule-strong);
+  border-radius: var(--org-radius);
+  padding: var(--org-s3);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.org-verse {
+  font-family: var(--org-serif);
+  font-style: italic;
+  color: var(--org-ink-soft);
+  margin: var(--org-s4) 0;
+  padding-left: var(--org-s3);
+  border-left: 2px solid var(--org-rule-strong);
+  line-height: 1.9;
+}
+
+/* ---------- quote ---------- */
+
+.org-quote {
+  margin: var(--org-s4) 0;
+  padding: var(--org-s1) 0 var(--org-s1) var(--org-s4);
+  border-left: 3px solid var(--org-accent);
+  position: relative;
+  font-size: 1.18em;
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--org-ink-soft);
+}
+.org-quote p { margin: 0 0 var(--org-s2); }
+.org-quote p:last-child { margin-bottom: 0; }
+.org-quote::before {
+  content: "\201C";
+  position: absolute;
+  left: 0.1em;
+  top: -0.1em;
+  font-size: 2.4em;
+  line-height: 1;
+  color: var(--org-accent);
+  opacity: 0.25;
+  font-family: var(--org-serif);
+}
+
+/* ---------- table ---------- */
+
+.org-table {
+  width: 100%;
+  margin: var(--org-s4) 0;
+  border-collapse: collapse;
+  font-size: 0.94em;
+  font-variant-numeric: tabular-nums;
+}
+.org-table th,
+.org-table td {
+  text-align: left;
+  padding: var(--org-s1) var(--org-s2);
+  border-bottom: 1px solid var(--org-rule);
+}
+.org-table thead th {
+  font-family: var(--org-mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+  border-bottom: 2px solid var(--org-ink);
+}
+.org-table tbody tr:last-child td { border-bottom: 1px solid var(--org-rule-strong); }
+.org-table tbody tr:hover { background: color-mix(in oklab, var(--org-accent-soft) 50%, transparent); }
+
+/* ---------- drawer ---------- */
+
+.org-drawer {
+  margin: var(--org-s3) 0;
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-radius: var(--org-radius);
+  overflow: hidden;
+}
+.org-drawer-name {
+  cursor: pointer;
+  font-family: var(--org-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+  padding: 0.55em 1em;
+  list-style: none;
+  user-select: none;
+}
+.org-drawer-name::-webkit-details-marker { display: none; }
+.org-drawer-name::before { content: "▸ "; color: var(--org-rule-strong); }
+.org-drawer[open] .org-drawer-name::before { content: "▾ "; }
+.org-drawer[open] .org-drawer-name { border-bottom: 1px solid var(--org-rule); }
+.org-prop {
+  font-family: var(--org-mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  padding: 0.1em 1em;
+  color: var(--org-ink-soft);
+}
+.org-prop:first-of-type { padding-top: 0.5em; }
+.org-prop:last-of-type { padding-bottom: 0.5em; }
+.org-prop-key { color: var(--org-accent); font-weight: 600; }
+.org-prop-key::after { content: ":"; }
+
+/* ---------- footnotes ---------- */
+
+.org-fnref {
+  font-size: 0.7em;
+  vertical-align: super;
+  line-height: 0;
+}
+.org-fnref a {
+  color: var(--org-accent);
+  text-decoration: none;
+  font-family: var(--org-mono);
+  padding: 0 0.1em;
+}
+.org-fnref a:hover { text-decoration: underline; }
+
+.org-footnotes {
+  margin-top: var(--org-s6);
+  padding-top: var(--org-s3);
+  border-top: 1px solid var(--org-rule);
+}
+.org-fn-title {
+  font-family: var(--org-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+  margin: 0 0 var(--org-s2);
+}
+.org-fn-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--org-ink-soft);
+}
+.org-fn {
+  display: flex;
+  gap: 0.6em;
+  margin: var(--org-s1) 0;
+  line-height: 1.55;
+}
+.org-fn-back {
+  font-family: var(--org-mono);
+  font-weight: 700;
+  color: var(--org-accent);
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.org-fn:target { background: var(--org-accent-soft); border-radius: 4px; }
+
+/* ---------- rule + raw ---------- */
+
+.org-rule {
+  border: 0;
+  height: 1px;
+  background: var(--org-rule-strong);
+  margin: var(--org-s5) auto;
+  width: 38%;
+  position: relative;
+}
+.org-rule::after {
+  content: "✳";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--org-paper);
+  color: var(--org-faint);
+  padding: 0 0.6em;
+  font-size: 0.8rem;
+}
+
+.org-raw {
+  font-family: var(--org-mono);
+  font-size: 0.84rem;
+  color: var(--org-ink-soft);
+  background: var(--org-panel);
+  border: 1px dashed var(--org-rule-strong);
+  border-radius: var(--org-radius);
+  padding: var(--org-s2);
+  margin: var(--org-s3) 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .org-doc { padding: var(--org-s5) var(--org-s3); --org-fs: 1.06rem; }
+  .org-title { font-size: clamp(1.7rem, 6vw, 2.4rem); }
+}
+
+</style>
+</head>
+<body>
+<div class="spec-bar">
+  <span class="spec-brand"><b>orgitorial</b> · specimen</span>
+  <button class="spec-toggle" id="themeBtn" type="button">Dark</button>
+</div>
+
+<!-- the source document, verbatim -->
+<script type="text/plain" id="org-source">
+#+TITLE: Writing for the Web in Org-mode
+#+AUTHOR: The Orgitorial Team
+#+DATE: 2031-11-22
+#+keywords: org-mode, writing, publishing, plain-text
+
+Plain text outlives every CMS. This post is itself an =.org= file, rendered
+to the page you're reading by *orgitorial* — a single zero-dependency
+renderer. It doubles as a kitchen sink: every construct below is live proof
+that the toolkit handles it. If you can write a blog post, you already know
+enough org-mode to ship.
+
+* Why org-mode :rationale:
+
+Org-mode is a /plain-text/ outline format. It started as an Emacs mode for
+notes and to-do lists, but the markup is small, legible, and *durable* —
+which is exactly what you want for content you'll keep for a decade. You get
+structure (~headlines~), rich text, lists, tables, and code, with none of the
+lock-in of a database-backed editor.
+
+The pitch in one line: write once in =.org=, render anywhere with one file.
+
+** Emphasis you'll actually use
+
+You can make text *bold*, /italic/, _underlined_, or +struck through+.
+Inline code comes in two flavors: =verbatim= (literal) and ~code~ (a token).
+Links are first-class: [[https://orgmode.org][the org-mode home page]], or a
+bare URL like https://workbooks.sh that auto-links. Footnotes[fn:1] keep your
+prose clean while still citing your sources.
+
+** Timestamps and tags
+
+Org has native dates. This post was filed <2031-11-22 Sat>, and headlines can
+carry =:tags:= (see the heading above) for lightweight categorization.
+
+* Lists, the workhorse :lists:
+
+Unordered lists use a dash:
+
+- One renderer file, zero dependencies
+- A complete CSS library, themed by custom properties
+- Skills that document the class contract
+  - Nesting just works — indent two spaces
+  - Go as deep as the idea requires
+
+Ordered lists count for you:
+
+1. Write your post in =.org=
+2. Run it through ~render()~
+3. Drop in the stylesheet
+4. Ship
+
+And checkboxes track real state:
+
+- [X] Renderer ships as one file
+- [X] CSS themed entirely via variables
+- [-] Syntax highlighting (the class hook is there; bring your own)
+- [ ] Your next post
+
+An image link renders as an =<img>= — point it at any =.png/.jpg/.svg=:
+
+[[data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='200'%3E%3Crect width='720' height='200' fill='%23b3411f'/%3E%3Ctext x='50%25' y='50%25' fill='%23fbf9f4' font-family='monospace' font-size='28' text-anchor='middle' dominant-baseline='middle'%3Eorgitorial%3C/text%3E%3C/svg%3E.svg][orgitorial banner]]
+
+* Tables without the pain :tables:
+
+A header row is separated by a rule line (=|---|=):
+
+| Construct   | Org syntax        | HTML class      |
+|-------------+-------------------+-----------------|
+| Headline    | =* Title=         | =h2.org-h=      |
+| Source      | =#+begin_src=     | =pre.org-src=   |
+| Quote       | =#+begin_quote=   | =blockquote=    |
+| Checkbox    | =- [ ] item=      | =li.org-check=  |
+
+* Code, quoted and highlighted :code:
+
+Source blocks preserve whitespace, escape your HTML, and label the language:
+
+#+begin_src javascript
+import { render } from "./orgitorial.js";
+
+const html = render(orgText);          // string in, string out
+document.querySelector("#post").innerHTML = html;
+#+end_src
+
+A plain example block (no language bar) is for literal output:
+
+#+begin_example
+$ node -e "import('./dist/orgitorial.js').then(m => console.log(m.render('* hi')))"
+<article class="org-doc"><h2 class="org-h">hi</h2></article>
+#+end_example
+
+And a quote, for when someone said it better:
+
+#+begin_quote
+The best format is the one you can still read in twenty years.
+#+end_quote
+
+A verse block keeps your line breaks — handy for a pull-stanza or a snippet of
+poetry:
+
+#+begin_verse
+Plain text in,
+clean HTML out —
+one file does it,
+no build to doubt.
+#+end_verse
+
+* Drawers for metadata :advanced:
+
+Property drawers fold away the machinery so the prose stays clean. They render
+collapsed by default — click to expand:
+
+:PROPERTIES:
+:ID:       writing-for-the-web
+:CATEGORY: tutorial
+:READTIME: 4 min
+:END:
+
+* Roadmap, as headline state :roadmap:
+
+Headlines can carry TODO/DONE keywords — org's native way to track work.
+orgitorial renders the keyword as a colored state chip:
+
+** DONE One-file renderer
+** DONE Editorial CSS, themed by variables
+** TODO Pluggable syntax highlighting
+** TODO Your contribution
+
+* Where it goes :ship:
+
+orgitorial is built to plug into anything: a static site, the workbooks
+living-lander blog, a bit.ml story. The renderer is pure string→string, so it
+runs in a browser tag, in Node at build time, and in the runtime's QuickJS
+wasm lane. Re-theme it by setting a few CSS variables; the class contract is
+the whole API.
+
+-----
+
+That's the kitchen sink. Everything above this rule is a supported construct,
+rendered by the same one file you'd ship.
+
+[fn:1] A footnote is reference-and-definition: drop =[fn:1]= inline, define it
+later with =[fn:1] the text=. orgitorial collects them into a Footnotes
+section at the end, with backlinks.
+
+</script>
+
+<!-- the toolkit renderer (inline, sets window.Orgitorial) -->
+<script id="orgitorial-js">
+/*!
+ * orgitorial — org-mode → HTML renderer (zero dependencies)
+ *
+ * Pure string → string. Runs in a browser <script> tag (window.Orgitorial),
+ * as an ES module (export { render }), in Node, and in QuickJS-wasm. No DOM,
+ * no Node APIs. Malformed input never throws — it degrades to paragraphs.
+ *
+ * API:
+ *   render(orgText, opts) -> string            // article HTML
+ *   render(orgText, { meta: true }) -> { html, meta }
+ *   parseMeta(orgText) -> { title, author, date, keywords:[] }
+ *
+ * opts:
+ *   header   (bool, default true)  render an <header class="org-header"> from metadata
+ *   meta     (bool, default false) return { html, meta } instead of a string
+ *
+ * The CLASS CONTRACT (stable API — see skills/components.org):
+ *   article.org-doc            document root
+ *   header.org-header          metadata header  (h1.org-title, .org-meta)
+ *   h2..h5.org-h               headlines (level N+1); .org-todo/.org-done state
+ *   span.org-todo-kw           TODO/DONE keyword chip
+ *   span.org-tag               :tag: pill
+ *   p.org-p                    paragraph
+ *   p.org-raw                  unsupported construct, escaped & preserved
+ *   strong/em/u/del            bold/italic/underline/strike
+ *   code.org-verbatim          =verbatim=
+ *   code.org-code              ~code~
+ *   a.org-link / a.org-link-url    [[link][desc]] / bare url
+ *   img.org-img                image link
+ *   ul.org-list / ol.org-list  lists (nested)
+ *   li.org-item                list item
+ *   li.org-check[data-checked] checkbox item ("true"|"false"|"partial")
+ *   pre.org-src[data-lang]     #+begin_src  (header bar + code.language-<lang>)
+ *   blockquote.org-quote       #+begin_quote
+ *   pre.org-example            #+begin_example
+ *   p.org-verse                #+begin_verse
+ *   table.org-table            tables (thead/tbody, th/td)
+ *   details.org-drawer         :PROPERTIES: drawer (summary.org-drawer-name)
+ *   sup.org-fnref / .org-fn    footnote ref / definition list
+ *   hr.org-rule                horizontal rule
+ *   time.org-ts                inline <timestamp>
+ */
+
+// Placeholder sentinels: private-use code points that never occur in org prose,
+// are not regex-special, and are untouched by HTML escaping. A protected span
+// becomes  PH_OPEN + index + PH_CLOSE  and is restored verbatim at the end.
+var PH_OPEN = String.fromCharCode(1);
+var PH_CLOSE = String.fromCharCode(2);
+
+// ---------- helpers ----------
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function attr(s) {
+  return esc(s);
+}
+
+var TODO_KEYWORDS = ["TODO", "NEXT", "WAITING", "STARTED", "IN-PROGRESS"];
+var DONE_KEYWORDS = ["DONE", "CANCELLED", "CANCELED"];
+var IMG_RE = /\.(png|jpe?g|gif|svg|webp|avif|bmp)$/i;
+var PH_RE = new RegExp(PH_OPEN + "(\\d+)" + PH_CLOSE, "g");
+var PH_SPLIT = new RegExp("(" + PH_OPEN + "\\d+" + PH_CLOSE + ")");
+var PH_TEST = new RegExp("^" + PH_OPEN + "\\d+" + PH_CLOSE + "$");
+
+// ---------- inline markup ----------
+//
+// Order matters. We tokenize protected spans (code/verbatim/links/footnotes/
+// timestamps) first so their contents are not re-processed, then apply
+// emphasis to the remaining text, then restore the protected spans.
+
+function inline(text) {
+  if (text == null) return "";
+  var slots = [];
+  var hold = function (html) {
+    slots.push(html);
+    return PH_OPEN + (slots.length - 1) + PH_CLOSE;
+  };
+
+  var s = String(text);
+
+  // Code spans FIRST: their contents are literal and must be protected before
+  // any other inline rule can see (and mangle) them — e.g. =[fn:1]= or =[[x]]=.
+  // =verbatim=
+  s = s.replace(/(^|[\s(])=([^=\s](?:[^=]*[^=\s])?)=(?=[\s.,;:!?)]|$)/g, function (m, pre, body) {
+    return pre + hold('<code class="org-verbatim">' + esc(body) + "</code>");
+  });
+  // ~code~
+  s = s.replace(/(^|[\s(])~([^~\s](?:[^~]*[^~\s])?)~(?=[\s.,;:!?)]|$)/g, function (m, pre, body) {
+    return pre + hold('<code class="org-code">' + esc(body) + "</code>");
+  });
+
+  // footnote references: [fn:NAME] or [fn:NAME:inline def]
+  s = s.replace(/\[fn:([^\]:]+)(?::([^\]]*))?\]/g, function (_, name) {
+    var id = esc(name);
+    return hold(
+      '<sup class="org-fnref" id="fnref-' + id + '"><a href="#fn-' + id + '">[' + id + "]</a></sup>"
+    );
+  });
+
+  // links: [[target][desc]] or [[target]]
+  s = s.replace(/\[\[([^\]]+?)\](?:\[([^\]]*?)\])?\]/g, function (_, target, desc) {
+    var t = target.trim();
+    if (IMG_RE.test(t) && !desc) {
+      return hold('<img class="org-img" src="' + attr(t) + '" alt="' + attr(t) + '">');
+    }
+    if (IMG_RE.test(t) && desc) {
+      return hold('<img class="org-img" src="' + attr(t) + '" alt="' + attr(desc) + '">');
+    }
+    var label = desc != null && desc !== "" ? inlineEmph(desc) : esc(t);
+    return hold('<a class="org-link" href="' + attr(t) + '">' + label + "</a>");
+  });
+
+  // bare urls (not already inside a held link)
+  s = s.replace(/(^|[\s(])((?:https?|mailto):[^\s)<>\]]+)/g, function (m, pre, url) {
+    return pre + hold('<a class="org-link-url" href="' + attr(url) + '">' + esc(url) + "</a>");
+  });
+
+  // inline timestamps <YYYY-MM-DD ...> and [YYYY-MM-DD ...]
+  s = s.replace(/[<\[](\d{4}-\d{2}-\d{2}(?:[^>\]]*)?)[>\]]/g, function (_, ts) {
+    var clean = ts.trim();
+    return hold('<time class="org-ts" datetime="' + attr(clean.slice(0, 10)) + '">' + esc(clean) + "</time>");
+  });
+
+  // escape what's left, then emphasis
+  s = inlineEmph(s);
+
+  // restore protected slots (loop: a slot may itself contain a placeholder)
+  var guard = 0;
+  while (PH_RE.test(s) && guard++ < slots.length + 2) {
+    PH_RE.lastIndex = 0;
+    s = s.replace(PH_RE, function (_, i) {
+      return slots[+i] != null ? slots[+i] : "";
+    });
+  }
+  PH_RE.lastIndex = 0;
+  return s;
+}
+
+// emphasis on already-protected text; escapes html in the unprotected parts
+function inlineEmph(text) {
+  var parts = String(text).split(PH_SPLIT);
+  return parts
+    .map(function (part) {
+      if (PH_TEST.test(part)) return part;
+      var s = esc(part);
+      // *bold*  /italic/  _underline_  +strike+
+      s = s.replace(/(^|[\s(])\*([^*\s](?:[^*]*[^*\s])?)\*(?=[\s.,;:!?)]|$)/g, "$1<strong>$2</strong>");
+      s = s.replace(/(^|[\s(])\/([^/\s](?:[^/]*[^/\s])?)\/(?=[\s.,;:!?)]|$)/g, "$1<em>$2</em>");
+      s = s.replace(/(^|[\s(])_([^_\s](?:[^_]*[^_\s])?)_(?=[\s.,;:!?)]|$)/g, "$1<u>$2</u>");
+      s = s.replace(/(^|[\s(])\+([^+\s](?:[^+]*[^+\s])?)\+(?=[\s.,;:!?)]|$)/g, "$1<del>$2</del>");
+      return s;
+    })
+    .join("");
+}
+
+// ---------- metadata ----------
+
+function parseMeta(orgText) {
+  var meta = { title: "", author: "", date: "", keywords: [] };
+  var lines = String(orgText == null ? "" : orgText).split(/\r?\n/);
+  for (var k = 0; k < lines.length; k++) {
+    var m = /^#\+(\w+):\s*(.*)$/.exec(lines[k]);
+    if (!m) continue;
+    var key = m[1].toLowerCase();
+    var val = m[2].trim();
+    if (key === "title") meta.title = val;
+    else if (key === "author") meta.author = val;
+    else if (key === "date") meta.date = val;
+    else if (key === "keywords" || key === "tags")
+      meta.keywords = val.split(/[,\s]+/).filter(Boolean);
+  }
+  return meta;
+}
+
+// ---------- block parser ----------
+
+function headlineLevel(line) {
+  var m = /^(\*+)\s+(.*)$/.exec(line);
+  if (!m) return null;
+  return { stars: m[1].length, rest: m[2] };
+}
+
+function renderHeadline(stars, rest) {
+  // level 1 org -> h2 (h1 reserved for title); cap at h5
+  var level = Math.min(stars + 1, 5);
+  var text = rest;
+  var kw = "";
+  var stateClass = "";
+
+  var kwMatch = /^([A-Z][A-Z-]+)\s+/.exec(text);
+  if (kwMatch) {
+    var word = kwMatch[1];
+    if (TODO_KEYWORDS.indexOf(word) >= 0) {
+      kw = word;
+      stateClass = " org-todo";
+      text = text.slice(kwMatch[0].length);
+    } else if (DONE_KEYWORDS.indexOf(word) >= 0) {
+      kw = word;
+      stateClass = " org-done";
+      text = text.slice(kwMatch[0].length);
+    }
+  }
+
+  // trailing :tag:tag:
+  var tagsHtml = "";
+  var tagMatch = /\s+(:(?:[\w@#%]+:)+)\s*$/.exec(text);
+  if (tagMatch) {
+    var tags = tagMatch[1].split(":").filter(Boolean);
+    tagsHtml =
+      " " +
+      tags
+        .map(function (t) {
+          return '<span class="org-tag">' + esc(t) + "</span>";
+        })
+        .join("");
+    text = text.slice(0, tagMatch.index);
+  }
+
+  var kwHtml = kw ? '<span class="org-todo-kw">' + esc(kw) + "</span> " : "";
+  return (
+    "<h" + level + ' class="org-h' + stateClass + '">' +
+    kwHtml + inline(text.trim()) + tagsHtml +
+    "</h" + level + ">"
+  );
+}
+
+function renderTable(rows) {
+  var parse = function (line) {
+    return line
+      .replace(/^\s*\|/, "")
+      .replace(/\|\s*$/, "")
+      .split("|")
+      .map(function (c) {
+        return c.trim();
+      });
+  };
+  var isRule = function (line) {
+    return /^\s*\|[-+|\s]*\|?\s*$/.test(line) && /-/.test(line);
+  };
+
+  var headerRows = [];
+  var bodyRows = [];
+  var sawRule = false;
+  for (var r = 0; r < rows.length; r++) {
+    var line = rows[r];
+    if (isRule(line)) {
+      if (!sawRule && bodyRows.length) {
+        headerRows = bodyRows;
+        bodyRows = [];
+        sawRule = true;
+      }
+      continue;
+    }
+    bodyRows.push(parse(line));
+  }
+
+  var cell = function (c, tag) {
+    return "<" + tag + ">" + inline(c) + "</" + tag + ">";
+  };
+  var html = '<table class="org-table">';
+  if (headerRows.length) {
+    html += "<thead>";
+    for (var h = 0; h < headerRows.length; h++)
+      html +=
+        "<tr>" +
+        headerRows[h]
+          .map(function (c) {
+            return cell(c, "th");
+          })
+          .join("") +
+        "</tr>";
+    html += "</thead>";
+  }
+  html += "<tbody>";
+  for (var b = 0; b < bodyRows.length; b++)
+    html +=
+      "<tr>" +
+      bodyRows[b]
+        .map(function (c) {
+          return cell(c, "td");
+        })
+        .join("") +
+      "</tr>";
+  html += "</tbody></table>";
+  return html;
+}
+
+// list parsing: indentation-aware, ordered/unordered, checkboxes
+function renderList(items) {
+  var i = 0;
+  function build(minIndent) {
+    var ordered = items[i].ordered;
+    var tag = ordered ? "ol" : "ul";
+    var html = "<" + tag + ' class="org-list">';
+    while (i < items.length && items[i].indent >= minIndent) {
+      var it = items[i];
+      if (it.indent > minIndent) break;
+      var liClass = "org-item";
+      var dataAttr = "";
+      if (it.checkbox != null) {
+        liClass = "org-check";
+        dataAttr = ' data-checked="' + it.checkbox + '"';
+      }
+      var liInner = inline(it.text);
+      i++;
+      if (i < items.length && items[i].indent > it.indent) {
+        liInner += build(items[i].indent);
+      }
+      html += '<li class="' + liClass + '"' + dataAttr + ">" + liInner + "</li>";
+    }
+    html += "</" + tag + ">";
+    return html;
+  }
+  return build(items[0].indent);
+}
+
+function renderDrawer(name, lines) {
+  var body = lines
+    .map(function (l) {
+      var m = /^\s*:([^:]+):\s*(.*)$/.exec(l);
+      if (m)
+        return (
+          '<div class="org-prop"><span class="org-prop-key">' +
+          esc(m[1]) +
+          '</span> <span class="org-prop-val">' +
+          inline(m[2]) +
+          "</span></div>"
+        );
+      return '<div class="org-prop">' + inline(l.trim()) + "</div>";
+    })
+    .join("");
+  return (
+    '<details class="org-drawer"><summary class="org-drawer-name">' +
+    esc(name) +
+    "</summary>" +
+    body +
+    "</details>"
+  );
+}
+
+// ---------- main render ----------
+
+function render(orgText, opts) {
+  opts = opts || {};
+  var wantMeta = !!opts.meta;
+  var header = opts.header !== false;
+  var src = String(orgText == null ? "" : orgText);
+  var meta = parseMeta(src);
+
+  var body = "";
+  try {
+    body = renderBody(src);
+  } catch (e) {
+    // honor the never-throw contract: degrade whole doc to escaped paragraphs
+    body = src
+      .split(/\n{2,}/)
+      .map(function (p) {
+        return '<p class="org-raw">' + esc(p) + "</p>";
+      })
+      .join("\n");
+  }
+
+  var head = "";
+  if (header && (meta.title || meta.author || meta.date)) {
+    var m = "";
+    if (meta.author) m += '<span class="org-author">' + inline(meta.author) + "</span>";
+    if (meta.date) m += '<time class="org-date">' + esc(meta.date) + "</time>";
+    if (meta.keywords.length)
+      m +=
+        '<span class="org-keywords">' +
+        meta.keywords
+          .map(function (k) {
+            return '<span class="org-tag">' + esc(k) + "</span>";
+          })
+          .join("") +
+        "</span>";
+    head =
+      '<header class="org-header">' +
+      (meta.title ? '<h1 class="org-title">' + inline(meta.title) + "</h1>" : "") +
+      (m ? '<div class="org-meta">' + m + "</div>" : "") +
+      "</header>";
+  }
+
+  var html = '<article class="org-doc">' + head + body + "</article>";
+  return wantMeta ? { html: html, meta: meta } : html;
+}
+
+function renderBody(src) {
+  var lines = src.split(/\r?\n/);
+  var out = [];
+  var footnotes = [];
+  var i = 0;
+  var para = [];
+
+  var flushPara = function () {
+    if (!para.length) return;
+    var text = para.join(" ").trim();
+    if (text) out.push('<p class="org-p">' + inline(text) + "</p>");
+    para = [];
+  };
+
+  while (i < lines.length) {
+    var line = lines[i];
+
+    // metadata keyword lines (handled separately) and comments
+    if (/^#\+\w+:/.test(line) && !/^#\+begin_/i.test(line)) {
+      flushPara();
+      i++;
+      continue;
+    }
+    if (/^#\s/.test(line) || line === "#") {
+      i++;
+      continue;
+    }
+
+    // blank line -> paragraph break
+    if (/^\s*$/.test(line)) {
+      flushPara();
+      i++;
+      continue;
+    }
+
+    // horizontal rule: 5+ dashes
+    if (/^\s*-{5,}\s*$/.test(line)) {
+      flushPara();
+      out.push('<hr class="org-rule">');
+      i++;
+      continue;
+    }
+
+    // footnote definition: [fn:NAME] text...
+    var fnDef = /^\[fn:([^\]:]+)\]\s*(.*)$/.exec(line);
+    if (fnDef) {
+      flushPara();
+      var id = esc(fnDef[1]);
+      var txt = fnDef[2];
+      i++;
+      while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^\[fn:/.test(lines[i])) {
+        txt += " " + lines[i];
+        i++;
+      }
+      footnotes.push({
+        id: id,
+        html:
+          '<li class="org-fn" id="fn-' +
+          id +
+          '"><a class="org-fn-back" href="#fnref-' +
+          id +
+          '">' +
+          id +
+          '</a> <span class="org-fn-body">' +
+          inline(txt.trim()) +
+          "</span></li>",
+      });
+      continue;
+    }
+
+    // headline
+    var hl = headlineLevel(line);
+    if (hl) {
+      flushPara();
+      out.push(renderHeadline(hl.stars, hl.rest));
+      i++;
+      continue;
+    }
+
+    // PROPERTIES / generic drawer
+    var drawerOpen = /^\s*:([A-Za-z][\w-]*):\s*$/.exec(line);
+    if (drawerOpen && drawerOpen[1].toUpperCase() !== "END") {
+      flushPara();
+      var name = drawerOpen[1];
+      var drawerLines = [];
+      i++;
+      while (i < lines.length && !/^\s*:END:\s*$/i.test(lines[i])) {
+        drawerLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++; // consume :END:
+      out.push(renderDrawer(name, drawerLines));
+      continue;
+    }
+
+    // blocks: #+begin_X ... #+end_X
+    var blockOpen = /^\s*#\+begin_(\w+)\b(.*)$/i.exec(line);
+    if (blockOpen) {
+      flushPara();
+      var kind = blockOpen[1].toLowerCase();
+      var rest = blockOpen[2].trim();
+      var content = [];
+      i++;
+      while (i < lines.length && !new RegExp("^\\s*#\\+end_" + kind + "\\b", "i").test(lines[i])) {
+        content.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++; // consume end
+      out.push(renderBlock(kind, rest, content));
+      continue;
+    }
+
+    // table
+    if (/^\s*\|/.test(line)) {
+      flushPara();
+      var trows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) {
+        trows.push(lines[i]);
+        i++;
+      }
+      out.push(renderTable(trows));
+      continue;
+    }
+
+    // list (unordered -/+/* or ordered N. / N))
+    var listItem = matchListItem(line);
+    if (listItem) {
+      flushPara();
+      var items = [];
+      while (i < lines.length) {
+        var it = matchListItem(lines[i]);
+        if (it) {
+          items.push(it);
+          i++;
+        } else if (/^\s+\S/.test(lines[i]) && items.length) {
+          items[items.length - 1].text += " " + lines[i].trim();
+          i++;
+        } else {
+          break;
+        }
+      }
+      out.push(renderList(items));
+      continue;
+    }
+
+    // default: paragraph text
+    para.push(line.trim());
+    i++;
+  }
+  flushPara();
+
+  if (footnotes.length) {
+    out.push(
+      '<section class="org-footnotes"><h2 class="org-fn-title">Footnotes</h2><ol class="org-fn-list">' +
+        footnotes
+          .map(function (f) {
+            return f.html;
+          })
+          .join("") +
+        "</ol></section>"
+    );
+  }
+
+  return out.join("\n");
+}
+
+function matchListItem(line) {
+  var m = /^(\s*)([-+*]|\d+[.)])\s+(.*)$/.exec(line);
+  if (!m) return null;
+  var indent = m[1].length;
+  var bullet = m[2];
+  var ordered = /\d/.test(bullet);
+  var text = m[3];
+  var checkbox = null;
+  var cb = /^\[([ xX-])\]\s*(.*)$/.exec(text);
+  if (cb) {
+    var c = cb[1];
+    checkbox = c === "x" || c === "X" ? "true" : c === "-" ? "partial" : "false";
+    text = cb[2];
+  }
+  return { indent: indent, ordered: ordered, checkbox: checkbox, text: text };
+}
+
+function renderBlock(kind, rest, content) {
+  if (kind === "src") {
+    var lang = (rest.split(/\s+/)[0] || "").toLowerCase();
+    var code = content.map(esc).join("\n");
+    var langAttr = lang ? ' data-lang="' + attr(lang) + '"' : "";
+    var langClass = lang ? " language-" + attr(lang) : "";
+    return (
+      '<pre class="org-src"' + langAttr + '><code class="org-src-code' + langClass + '">' +
+      code +
+      "</code></pre>"
+    );
+  }
+  if (kind === "example") {
+    return '<pre class="org-example">' + content.map(esc).join("\n") + "</pre>";
+  }
+  if (kind === "quote") {
+    var inner = content
+      .join("\n")
+      .split(/\n{2,}/)
+      .map(function (p) {
+        return "<p>" + inline(p.replace(/\n/g, " ").trim()) + "</p>";
+      })
+      .join("");
+    return '<blockquote class="org-quote">' + inner + "</blockquote>";
+  }
+  if (kind === "verse") {
+    return (
+      '<p class="org-verse">' +
+      content
+        .map(function (l) {
+          return inline(l);
+        })
+        .join("<br>") +
+      "</p>"
+    );
+  }
+  // unknown block -> preserve, escaped, never vanish
+  return '<pre class="org-raw" data-block="' + attr(kind) + '">' + content.map(esc).join("\n") + "</pre>";
+}
+
+// ---------- exports ----------
+
+var Orgitorial = { render: render, parseMeta: parseMeta, version: "0.1.0" };
+
+// Browser global
+if (typeof window !== "undefined") {
+  window.Orgitorial = Orgitorial;
+}
+// CommonJS / QuickJS-with-module shim tolerance
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = Orgitorial;
+}
+
+
+</script>
+
+<!-- render + theme toggle -->
+<script>
+(function () {
+  var src = document.getElementById("org-source").textContent;
+  document.body.insertAdjacentHTML("beforeend", window.Orgitorial.render(src));
+  var html = document.documentElement;
+  var btn = document.getElementById("themeBtn");
+  function set(t) { html.setAttribute("data-org-theme", t); btn.textContent = t === "dark" ? "Light" : "Dark"; }
+  btn.addEventListener("click", function () {
+    set(html.getAttribute("data-org-theme") === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
