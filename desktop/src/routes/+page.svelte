@@ -2,7 +2,6 @@
   import {
     GearSix as SettingsIcon,
     ShareNetwork as NetworkIcon,
-    Plus as HomePlus,
   } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -21,6 +20,7 @@
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
   import NetworkPanel from "$lib/network/NetworkPanel.svelte";
   import DocViewer from "$lib/viewer/DocViewer.svelte";
+  import DropOverlay from "$lib/viewer/DropOverlay.svelte";
   import ToastStack from "$lib/components/ToastStack.svelte";
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
   import KeychainOnboarding from "$lib/setup/KeychainOnboarding.svelte";
@@ -44,22 +44,21 @@
   import { packageStore } from "$lib/bridge/package.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
 
-  /* Top rail sections — daily-use surfaces. Packages live below the
-   * hairline; bottom-pinned utility surfaces (Settings, GitHub) live
-   * after the spacer at the very bottom of the rail. */
-  // Only one fixed item at the top: Create (the AI). Everything else
-  // (apps + folders) is dynamic + drag-reorderable below; Kanban now ships
-  // as a default app in that dynamic list, not a fixed tab.
-  const railTabs: RailTab[] = [
-    { id: "home", label: "Create", icon: HomePlus },
-  ];
+  /* Sidebar sections. Create is the branded CTA above the bottom nav
+   * (not a plain row); Network/Settings are bottom-pinned utility rows. */
   const bottomRailTabs: RailTab[] = [
     { id: "network", label: "Network", icon: NetworkIcon },
     { id: "settings", label: "Settings", icon: SettingsIcon },
   ];
-  const allRailTabs = [...railTabs, ...bottomRailTabs];
+  const sectionLabels: Record<string, string> = {
+    home: "Create",
+    network: "Network",
+    settings: "Settings",
+    kanban: "Kanban",
+  };
 
   let active = $state("home");
   let lastRail = $state("home");
@@ -199,8 +198,7 @@
 
   // Push the active rail label up to the titlebar.
   $effect(() => {
-    const t = allRailTabs.find((x) => x.id === active);
-    chrome.section = t?.label ?? "";
+    chrome.section = sectionLabels[active] ?? "";
     if (active !== lastRail) {
       chrome.mode = "app";
       lastRail = active;
@@ -212,7 +210,7 @@
   $effect(() => {
     const req = chrome.requestedSection;
     if (!req) return;
-    if (allRailTabs.find((x) => x.id === req)) {
+    if (req in sectionLabels) {
       active = req;
       chrome.mode = "app";
     }
@@ -247,6 +245,18 @@
         }));
     })(),
   );
+
+  // Feed the doc-icon registry: every app's workbook path gets the
+  // app's stored icon, so tabs / bookmarks / folder rows all show the
+  // same identity for the same document.
+  $effect(() => {
+    for (const p of railPackages) {
+      if (p.kind !== "app" || !p.icon) continue;
+      void invoke<string>("package_app_workbook", { name: p.id })
+        .then((path) => docIcons.register(path, p.icon))
+        .catch(() => {});
+    }
+  });
 
   async function onReorderPackages(orderedIds: string[]) {
     const ws_ = workspaces.active;
@@ -409,8 +419,9 @@
       inert={!chrome.sidebarOpen}
     >
       <Sidebar
-        tabs={railTabs}
         bottomTabs={bottomRailTabs}
+        onCreate={() => (active = "home")}
+        createActive={active === "home" && chrome.mode === "app"}
         bind:active
         packages={railPackages}
         workspaceName={workspaces.active?.name ?? ""}
@@ -435,6 +446,7 @@
 
     <main class="main">
       <div class="main-content">
+        <DropOverlay />
         {#if chrome.mode === "doc"}
           <DocViewer />
         {:else if active === "home"}
@@ -607,6 +619,8 @@
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+    /* Anchor for the absolutely-positioned DropOverlay. */
+    position: relative;
   }
   /* Style danger context-menu items — ContextMenu uses :global(.ctx-item),
    * so this hook also has to be :global. */

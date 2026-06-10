@@ -40,6 +40,9 @@
   import { cubicOut } from "svelte/easing";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { dnd } from "$lib/ui/dnd.svelte";
+  import { docIcons } from "$lib/ui/docIcon.svelte";
+  import IconResolver from "$lib/ui/Icon.svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import type { Tab } from "$lib/tabs/types";
   import { geminiLive } from "$lib/live/gemini.svelte";
@@ -117,6 +120,26 @@
     chrome.mode = "app";
     chrome.navigateTo("home");
   }
+
+  // ── strip as drop target: drag a workbook/app here → new tab ──────
+  let stripHot = $state(false);
+  function stripOver(e: DragEvent) {
+    const p = dnd.payload;
+    if (!p || p.type === "tab") return;
+    e.preventDefault();
+    stripHot = true;
+  }
+  async function stripDrop(e: DragEvent) {
+    const p = dnd.payload;
+    stripHot = false;
+    if (!p || p.type === "tab") return;
+    e.preventDefault();
+    const path = await dnd.resolvePath();
+    dnd.end();
+    if (!path) return;
+    await tabsStore.open(path);
+    chrome.mode = "doc";
+  }
 </script>
 
 <div class="titlebar" data-tauri-drag-region role="presentation">
@@ -147,16 +170,31 @@
     <ChevronDown size={15} weight="bold" />
   </button>
 
-  <div class="tabs" role="tablist">
+  <div
+    class="tabs"
+    class:drop-hot={stripHot}
+    role="tablist"
+    ondragover={stripOver}
+    ondragleave={() => (stripHot = false)}
+    ondrop={stripDrop}
+  >
     {#each tabsStore.tabs as tab (tab.id)}
       {@const active = chrome.mode === "doc" && tabsStore.activeId === tab.id}
       {@const Icon = kindIcon(tab.kind)}
+      {@const identity = docIcons.iconFor(tab.path)}
       <div
         class="tab"
         class:active
         role="tab"
         aria-selected={active}
         title={tab.path}
+        draggable="true"
+        ondragstart={(e) =>
+          dnd.start(
+            { type: "tab", tabId: tab.id, path: tab.path, title: tab.title },
+            e,
+          )}
+        ondragend={() => dnd.end()}
         in:fly={{ y: 8, duration: 180, easing: cubicOut }}
         out:fade={{ duration: 90 }}
       >
@@ -166,7 +204,13 @@
           data-tauri-drag-region="false"
           onclick={() => focusDoc(tab.id)}
         >
-          <span class="favicon kind-{tab.kind}"><Icon size={13} weight="fill" /></span>
+          <span class="favicon kind-{tab.kind}">
+            {#if identity}
+              <IconResolver value={identity} name={tab.title} size={13} />
+            {:else}
+              <Icon size={13} weight="fill" />
+            {/if}
+          </span>
           <span class="title">{tab.title}</span>
           {#if tab.dirty}<span class="dot" aria-label="modified"></span>{/if}
         </button>
@@ -299,6 +343,11 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    border-radius: 6px;
+    transition: box-shadow 0.12s;
+  }
+  .tabs.drop-hot {
+    box-shadow: inset 0 -2px 0 var(--color-brand);
   }
   .tab {
     position: relative;

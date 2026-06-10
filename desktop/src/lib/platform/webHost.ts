@@ -199,6 +199,16 @@ function makeInvoke(): Invoke {
   let tabSeq = 0;
   const snap = () => ({ tabs, active: activeTabId });
 
+  // Stateful bookmark mock — backs the sidebar bookmark grid.
+  let bookmarksMock: {
+    id: string;
+    title: string;
+    path: string;
+    command_slot: number | null;
+    created_at: number;
+  }[] = [];
+  let bookmarkSeq = 0;
+
   return async (cmd, args = {}) => {
     const a = args as Record<string, any>;
 
@@ -308,9 +318,38 @@ function makeInvoke(): Invoke {
         return snap();
 
       // ── bookmarks / themes / settings catalogs ──
-      case "bookmark_list": return [];
-      case "bookmark_create": case "bookmark_rename": case "bookmark_delete":
-      case "bookmark_set_slot": return [];
+      // Bookmarks are stateful so the sidebar's bookmark grid (pin by
+      // drag, reorder, unpin) is demoable in the browser preview.
+      case "bookmark_list": return bookmarksMock;
+      case "bookmark_create": {
+        const req = a.req as { title: string; path: string; command_slot: number | null };
+        const b = {
+          id: `bm-${++bookmarkSeq}`,
+          title: req.title,
+          path: req.path,
+          command_slot: req.command_slot ?? null,
+          created_at: bookmarkSeq,
+        };
+        bookmarksMock = [...bookmarksMock, b];
+        return b;
+      }
+      case "bookmark_rename": {
+        const req = a.req as { id: string; title: string };
+        bookmarksMock = bookmarksMock.map((b) =>
+          b.id === req.id ? { ...b, title: req.title } : b,
+        );
+        return null;
+      }
+      case "bookmark_delete":
+        bookmarksMock = bookmarksMock.filter((b) => b.id !== a.id);
+        return null;
+      case "bookmark_set_slot": {
+        const req = a.req as { id: string; slot: number | null };
+        bookmarksMock = bookmarksMock.map((b) =>
+          b.id === req.id ? { ...b, command_slot: req.slot } : b,
+        );
+        return null;
+      }
       case "theme_list": return { active_id: null, themes: [] };
       case "theme_set_active": case "theme_create": case "theme_update":
       case "theme_delete": return { active_id: null, themes: [] };

@@ -15,6 +15,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { packageStore, type WorkbookEntry } from "$lib/bridge/package.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { dnd } from "$lib/ui/dnd.svelte";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
 
   let entries = $state<WorkbookEntry[]>([]);
@@ -106,6 +107,13 @@
           type="button"
           class="tile"
           aria-label={entry.title}
+          draggable="true"
+          ondragstart={(e) =>
+            dnd.start(
+              { type: "workbook", path: entry.path, title: entry.title },
+              e,
+            )}
+          ondragend={() => dnd.end()}
           ondblclick={() => open(entry)}
           onkeydown={(e) => {
             if (e.key === "Enter") open(entry);

@@ -35,8 +35,11 @@
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
   import { tintFor, tintWash } from "$lib/ui/tint";
+  import { dnd } from "$lib/ui/dnd.svelte";
+  import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
   export type RailTab = {
@@ -58,8 +61,10 @@
   };
 
   let {
-    tabs,
+    tabs = [],
     bottomTabs = [],
+    onCreate,
+    createActive = false,
     active = $bindable(),
     packages = [],
     workspaceName = "",
@@ -74,8 +79,11 @@
     onWorkspaceContext,
     onPackageContext,
   }: {
-    tabs: RailTab[];
+    tabs?: RailTab[];
     bottomTabs?: RailTab[];
+    /** The branded Create CTA pinned above the bottom nav. */
+    onCreate?: () => void;
+    createActive?: boolean;
     active: string;
     packages?: RailPackage[];
     workspaceName?: string;
@@ -154,6 +162,93 @@
     if (dragId) onReorderPackages?.([...order]);
     dragId = null;
     overId = null;
+  }
+
+  // ── Bookmarks — the tile grid (drag a workbook in to bookmark it) ───
+  // Backed by the bookmarks store (same one behind ⌘1..⌘9). The store
+  // has no order field (Rust contract), so grid order is presentation
+  // state: an id list persisted locally. Max 12 (3 rows of 4); drops
+  // between tiles insert at that position.
+  const MAX_BOOKMARKS = 12;
+  const BM_ORDER_KEY = "sidebar.bookmarkOrder";
+  let bmOrder = $state<string[]>(
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(BM_ORDER_KEY) ?? "[]");
+      } catch {
+        return [];
+      }
+    })(),
+  );
+  function saveBmOrder() {
+    try {
+      localStorage.setItem(BM_ORDER_KEY, JSON.stringify(bmOrder));
+    } catch {
+      /* non-fatal */
+    }
+  }
+  const orderedBookmarks = $derived.by(() => {
+    const byId = new Map(bookmarks.bookmarks.map((b) => [b.id, b]));
+    const ordered = bmOrder
+      .map((id) => byId.get(id))
+      .filter(Boolean) as typeof bookmarks.bookmarks;
+    const rest = bookmarks.bookmarks.filter((b) => !bmOrder.includes(b.id));
+    return [...ordered, ...rest];
+  });
+
+  const bookmarkDraggable = $derived(dnd.payload?.type === "workbook");
+  /** Insertion index while a workbook drag hovers the grid (visual gap). */
+  let bmInsertIdx = $state<number | null>(null);
+
+  function bmTileOver(e: DragEvent, idx: number) {
+    if (!bookmarkDraggable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    bmInsertIdx = e.clientX - r.left < r.width / 2 ? idx : idx + 1;
+  }
+
+  async function bookmarkDrop(e: DragEvent) {
+    const p = dnd.payload;
+    const idx = bmInsertIdx ?? orderedBookmarks.length;
+    bmInsertIdx = null;
+    if (p?.type !== "workbook") return;
+    e.preventDefault();
+    dnd.end();
+    const existing = bookmarks.bookmarks.find((b) => b.path === p.path);
+    if (existing) {
+      // Reorder: move the existing bookmark to the insertion point.
+      const ids = orderedBookmarks.map((b) => b.id).filter((id) => id !== existing.id);
+      const from = orderedBookmarks.findIndex((b) => b.id === existing.id);
+      ids.splice(from >= 0 && from < idx ? idx - 1 : idx, 0, existing.id);
+      bmOrder = ids;
+      saveBmOrder();
+      return;
+    }
+    if (bookmarks.bookmarks.length >= MAX_BOOKMARKS) {
+      console.warn("[sidebar] bookmark grid full (max %d)", MAX_BOOKMARKS);
+      return;
+    }
+    try {
+      const b = await bookmarks.create(p.title, p.path);
+      const ids = orderedBookmarks.map((x) => x.id).filter((id) => id !== b.id);
+      ids.splice(Math.min(idx, ids.length), 0, b.id);
+      bmOrder = ids;
+      saveBmOrder();
+    } catch (err) {
+      console.warn("[sidebar] bookmark failed", err);
+    }
+  }
+
+  async function removeBookmark(id: string, title: string) {
+    if (!window.confirm(`Remove bookmark "${title}"?`)) return;
+    try {
+      await bookmarks.delete(id);
+      bmOrder = bmOrder.filter((x) => x !== id);
+      saveBmOrder();
+    } catch (err) {
+      console.warn("[sidebar] remove bookmark failed", err);
+    }
   }
 
   let switchBtnEl: HTMLButtonElement | undefined = $state();
@@ -305,9 +400,26 @@
     <CaretUpDown size={13} weight="bold" class="ws-caret" aria-hidden="true" />
   </button>
 
-  <!-- Pinned apps — Arc-style tile grid -->
-  {#if appTiles.length > 0}
-    <div class="tile-grid">
+  <!-- Bookmarks — Arc-style tile grid: app packages + bookmarked
+       workbooks. Drop a dragged workbook here (or between tiles) to
+       bookmark it at that spot. Max 3 rows of 4. -->
+  {#if appTiles.length > 0 || bookmarks.bookmarks.length > 0 || bookmarkDraggable}
+    <div
+      class="tile-grid"
+      class:pin-target={bookmarkDraggable}
+      role="group"
+      aria-label="Bookmarks"
+      ondragover={(e) => {
+        if (bookmarkDraggable) {
+          e.preventDefault();
+          if (bmInsertIdx === null) bmInsertIdx = orderedBookmarks.length;
+        }
+      }}
+      ondragleave={(e) => {
+        if (e.target === e.currentTarget) bmInsertIdx = null;
+      }}
+      ondrop={bookmarkDrop}
+    >
       {#each appTiles as pkg (pkg.id)}
         {@const tint = tintFor(pkg.name)}
         <button
@@ -319,9 +431,15 @@
           title={pkg.name}
           aria-label={pkg.name}
           draggable="true"
-          ondragstart={() => onDragStart(pkg.id)}
+          ondragstart={(e) => {
+            onDragStart(pkg.id);
+            dnd.start({ type: "app", id: pkg.id, name: pkg.name }, e);
+          }}
           ondragover={(e) => onDragOver(e, pkg.id)}
-          ondragend={onDragEnd}
+          ondragend={() => {
+            onDragEnd();
+            dnd.end();
+          }}
           ondrop={(e) => e.preventDefault()}
           onclick={() => onOpenApp?.(pkg.id)}
           oncontextmenu={(e) => {
@@ -332,6 +450,43 @@
           <Icon value={pkg.icon ?? ""} name={pkg.name} size={17} />
         </button>
       {/each}
+      {#each orderedBookmarks as b, i (b.id)}
+        {@const tint = tintFor(b.title)}
+        {@const identity = docIcons.iconFor(b.path)}
+        <button
+          type="button"
+          class="tile"
+          class:insert-before={bmInsertIdx === i}
+          class:insert-after={bmInsertIdx === i + 1 &&
+            i === orderedBookmarks.length - 1}
+          style="--tint:{tint}; --tint-wash:{tintWash(tint)};"
+          title={b.title}
+          aria-label={b.title}
+          draggable="true"
+          ondragstart={(e) =>
+            dnd.start({ type: "workbook", path: b.path, title: b.title }, e)}
+          ondragend={() => {
+            dnd.end();
+            bmInsertIdx = null;
+          }}
+          ondragover={(e) => bmTileOver(e, i)}
+          ondrop={bookmarkDrop}
+          onclick={() => onOpenWorkbook?.(b.path)}
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            void removeBookmark(b.id, b.title);
+          }}
+        >
+          {#if identity}
+            <Icon value={identity} name={b.title} size={17} />
+          {:else}
+            <Cube size={17} weight="fill" aria-hidden="true" />
+          {/if}
+        </button>
+      {/each}
+      {#if bookmarkDraggable && bookmarks.bookmarks.length < MAX_BOOKMARKS}
+        <span class="pin-slot" aria-hidden="true"></span>
+      {/if}
     </div>
   {/if}
 
@@ -391,13 +546,27 @@
               <span class="child-note">No workbooks</span>
             {:else}
               {#each books as book (book.path)}
+                {@const identity = docIcons.iconFor(book.path)}
                 <button
                   type="button"
                   class="row child"
+                  draggable="true"
+                  ondragstart={(e) =>
+                    dnd.start(
+                      { type: "workbook", path: book.path, title: book.title },
+                      e,
+                    )}
+                  ondragend={() => dnd.end()}
                   onclick={() => onOpenWorkbook?.(book.path)}
                   title={book.path}
                 >
-                  <span class="row-icon book"><Cube size={14} weight="fill" aria-hidden="true" /></span>
+                  <span class="row-icon book">
+                    {#if identity}
+                      <Icon value={identity} name={book.title} size={14} />
+                    {:else}
+                      <Cube size={14} weight="fill" aria-hidden="true" />
+                    {/if}
+                  </span>
                   <span class="row-label">{book.title}</span>
                 </button>
               {/each}
@@ -421,6 +590,18 @@
   </div>
 
   <span class="bottom-spacer" aria-hidden="true"></span>
+
+  {#if onCreate}
+    <button
+      type="button"
+      class="create-cta"
+      class:engaged={createActive}
+      onclick={onCreate}
+    >
+      <Plus size={15} weight="bold" aria-hidden="true" />
+      Create
+    </button>
+  {/if}
 
   {#if bottomTabs.length > 0}
     <div class="hairline" aria-hidden="true"></div>
@@ -629,6 +810,84 @@
   }
   .tile.dragging { opacity: 0.4; }
   .tile.drop-target { box-shadow: inset 0 0 0 2px var(--tint); }
+  /* Insertion marker while dragging a workbook between bookmark tiles. */
+  .tile.insert-before,
+  .tile.insert-after {
+    position: relative;
+  }
+  .tile.insert-before::before,
+  .tile.insert-after::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--color-brand);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--color-brand) 55%, transparent);
+  }
+  .tile.insert-before::before { left: -4.5px; }
+  .tile.insert-after::after { right: -4.5px; }
+  /* While a workbook drag is live, show the open slot it would land in. */
+  .pin-slot {
+    height: 40px;
+    border-radius: 10px;
+    border: 1.5px dashed color-mix(in srgb, var(--color-brand) 45%, transparent);
+    background: var(--color-brand-soft);
+    animation: pin-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes pin-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  /* ── Create CTA — the one juicy branded button ─────────────────── */
+  .create-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    height: 34px;
+    margin-bottom: 0.2rem;
+    border: 0;
+    border-radius: 10px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-brand) 86%, white),
+      var(--color-brand)
+    );
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 1px 2px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1)),
+      0 4px 12px color-mix(in srgb, var(--color-brand) 22%, transparent);
+    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.14s, filter 0.14s;
+  }
+  .create-cta:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 2px 4px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1)),
+      0 6px 18px color-mix(in srgb, var(--color-brand) 30%, transparent);
+  }
+  .create-cta:active {
+    transform: translateY(0) scale(0.985);
+    filter: brightness(0.98);
+  }
+  .create-cta.engaged {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 0 0 2px color-mix(in srgb, var(--color-brand) 30%, transparent),
+      0 1px 2px color-mix(in srgb, var(--color-brand) 35%, rgba(15, 15, 15, 0.1));
+  }
 
   /* ── workspace header ─────────────────────────────────────────── */
   .ws-header {
@@ -660,12 +919,15 @@
     width: 24px;
     height: 24px;
     border-radius: 7px;
-    background: var(--color-fg);
-    color: var(--color-page);
+    /* Theme-following chip — a dark tile in light mode read as a bug. */
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 1px 1.5px rgba(15, 15, 15, 0.05);
     flex-shrink: 0;
     overflow: hidden;
   }
-  .ws-tile.has-image { background: transparent; }
+  .ws-tile.has-image { background: transparent; border: 0; }
   .ws-initials { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
   .ws-glyph { font-size: 14px; line-height: 1; }
   .ws-img { width: 100%; height: 100%; object-fit: cover; display: block; }
