@@ -40,13 +40,22 @@
 
 <script lang="ts">
   /**
-   * Icon — the single resolver for the project-wide icon model:
+   * Icon — the single resolver for the project-wide icon model
+   * (the universal icon library, wb-5fl.15):
    *
    *   value === ""                     → initials(name)
    *   value.startsWith("lucide:")      → the named glyph component (solid)
+   *   value.startsWith("mi:")          → Material Icon Theme svg (by name)
+   *   value.startsWith("lobe:")        → LobeHub brand svg (AI/dev logos,
+   *                                      fetched + browser-cached)
    *   value.startsWith("data:image/")  → <img>
    *   otherwise (non-empty)            → emoji / glyph text
    */
+  import { materialIconUrl } from "$lib/ui/materialIcon";
+
+  const LOBE_BASE =
+    "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons";
+
   let {
     value = "",
     name = "",
@@ -70,10 +79,26 @@
   );
   const GlyphComp = $derived(glyphName ? GLYPHS[glyphName] ?? null : null);
   const isImage = $derived(value.startsWith("data:image/"));
+  /** mi:<definition-name> → Material Icon Theme asset (e.g. mi:rust,
+   *  mi:folder-client). */
+  const miUrl = $derived(
+    value.startsWith("mi:")
+      ? materialIconUrl(value.slice("mi:".length))
+      : null,
+  );
+  const lobeUrl = $derived(
+    value.startsWith("lobe:")
+      ? `${LOBE_BASE}/${value.slice("lobe:".length)}.svg`
+      : null,
+  );
 </script>
 
 {#if GlyphComp}
   <GlyphComp {size} weight="fill" aria-hidden="true" />
+{:else if miUrl}
+  <img src={miUrl} alt="" style="width: {size}px; height: {size}px;" />
+{:else if lobeUrl}
+  <img src={lobeUrl} alt="" style="width: {size}px; height: {size}px;" loading="lazy" />
 {:else if isImage}
   <img src={value} alt="" />
 {:else if value}

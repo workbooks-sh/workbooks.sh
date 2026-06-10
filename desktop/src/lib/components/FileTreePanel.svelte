@@ -26,7 +26,8 @@
    *   4. Compiled view with no .html files (wb-i38o.14)
    */
   import { onMount, onDestroy } from "svelte";
-  import { FileText, Folder, FolderOpen, ArrowSquareOut as ExternalLink, Copy, Package, Package as PackageOpen, Code as Code2, Database, MagnifyingGlass as Search, X } from "phosphor-svelte";
+  import { ArrowSquareOut as ExternalLink, Copy, Package, Package as PackageOpen, Code as Code2, Database, MagnifyingGlass as Search, X } from "phosphor-svelte";
+  import { fileIconUrl, folderIconUrl } from "$lib/ui/materialIcon";
   import { fileTree, type FsEntry } from "$lib/bridge/fs_tree.svelte";
   import {
     packageStore,
@@ -475,11 +476,7 @@
               }}
               title={pkgName}
             >
-              {#if pkgOpen}
-                <FolderOpen weight="fill" size={12} />
-              {:else}
-                <Folder weight="fill" size={12} />
-              {/if}
+              <img class="mi-tree" src={folderIconUrl(pkgName, pkgOpen)} alt="" />
               <span class="name">{pkgName}</span>
               {#if isActivePkg}<span class="active-dot" aria-label="active"></span>{/if}
             </summary>
@@ -518,11 +515,7 @@
                       oncontextmenu={(e) => onContextMenu(e, root, true)}
                       title={root}
                     >
-                      {#if isOpen}
-                        <FolderOpen weight="fill" size={12} />
-                      {:else}
-                        <Folder weight="fill" size={12} />
-                      {/if}
+                      <img class="mi-tree" src={folderIconUrl(rootBasename(root), isOpen)} alt="" />
                       <span class="name">{rootBasename(root)}</span>
                       {#if tree?.truncated}
                         <span class="tag" title="Walk hit entry cap; narrow the root">truncated</span>
@@ -571,11 +564,7 @@
           oncontextmenu={(e) => onContextMenu(e, node.entry.path, true)}
           title={node.entry.path}
         >
-          {#if open}
-            <FolderOpen weight="fill" size={12} />
-          {:else}
-            <Folder weight="fill" size={12} />
-          {/if}
+          <img class="mi-tree" src={folderIconUrl(node.entry.name, open)} alt="" />
           <span class="name">{node.entry.name}</span>
         </summary>
         {@render renderChildren(node.children, depth + 1)}
@@ -594,7 +583,7 @@
           ? `${node.entry.path} — loaded as memory source`
           : node.entry.path}
       >
-        <FileText weight="fill" size={12} />
+        <img class="mi-tree" src={fileIconUrl(node.entry.name)} alt="" />
         <span class="name">{node.entry.name}</span>
         {#if loadedAsMemory}
           <span class="memory-dot" aria-label="Loaded as memory source"></span>
@@ -701,6 +690,12 @@
     font-weight: 600;
     letter-spacing: -0.005em;
     border-bottom: 1px solid var(--color-border);
+  }
+  .mi-tree {
+    width: 14px;
+    height: 14px;
+    display: block;
+    flex-shrink: 0;
   }
   .ws-row .name {
     flex: 1 1 auto;

@@ -16,6 +16,7 @@
   import { packageStore, type WorkbookEntry } from "$lib/bridge/package.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
+  import { fileIconUrl } from "$lib/ui/materialIcon";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
 
   let entries = $state<WorkbookEntry[]>([]);
@@ -119,7 +120,9 @@
             if (e.key === "Enter") open(entry);
           }}
         >
-          <span class="icon" aria-hidden="true">◆</span>
+          <span class="icon" aria-hidden="true">
+            <img class="mi" src={fileIconUrl(entry.path)} alt="" />
+          </span>
           <span class="title">{entry.title}</span>
         </button>
       {/each}
@@ -176,6 +179,11 @@
   .tile:focus-visible {
     outline: 2px solid var(--color-fg);
     outline-offset: 1px;
+  }
+  .icon :global(.mi) {
+    width: 28px;
+    height: 28px;
+    display: block;
   }
   .icon {
     width: 48px;

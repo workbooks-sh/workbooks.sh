@@ -36,8 +36,9 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
-  import { tintFor, tintWash } from "$lib/ui/tint.svelte";
+  import { tintFor, tintWash, tints } from "$lib/ui/tint.svelte";
   import TintArc from "$lib/ui/TintArc.svelte";
+  import { fileIconUrl, folderIconUrl } from "$lib/ui/materialIcon";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -122,6 +123,13 @@
     const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
     if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
     return (name || "?").slice(0, 2).toUpperCase();
+  }
+
+  /** Emoji / image icons win over the material set; legacy glyph
+   *  values (lucide:<Name>) don't — material is the new default. */
+  function emojiIcon(icon: string | undefined): string | null {
+    if (!icon || icon.startsWith("lucide:")) return null;
+    return icon;
   }
 
   // ── Folder expansion — lazy workbook listing ─────────────────────────
@@ -567,7 +575,7 @@
           {#if identity}
             <Icon value={identity} name={b.title} size={17} />
           {:else}
-            <Cube size={17} weight="fill" aria-hidden="true" />
+            <img class="mi" src={fileIconUrl(b.path)} alt="" />
           {/if}
         </button>
       {/each}
@@ -654,7 +662,19 @@
           <span class="caret" class:open={expanded[pkg.id]}>
             <CaretRight size={11} weight="bold" aria-hidden="true" />
           </span>
-          <span class="row-icon"><FolderIcon size={17} color={tintFor(pkg.name)} /></span>
+          <span class="row-icon">
+            {#if emojiIcon(pkg.icon)}
+              <Icon value={pkg.icon ?? ""} name={pkg.name} size={16} />
+            {:else if tints.overrides[pkg.name]}
+              <FolderIcon size={17} color={tintFor(pkg.name)} />
+            {:else}
+              <img
+                class="mi"
+                src={folderIconUrl(pkg.name, !!expanded[pkg.id])}
+                alt=""
+              />
+            {/if}
+          </span>
           <span class="row-label">{pkg.name}</span>
         </button>
 
@@ -682,11 +702,11 @@
                   oncontextmenu={(e) => onWorkbookContext(book, e)}
                   title={book.path}
                 >
-                  <span class="row-icon book" style="color: {tintFor(book.title)};">
+                  <span class="row-icon book">
                     {#if identity}
                       <Icon value={identity} name={book.title} size={14} />
                     {:else}
-                      <Cube size={14} weight="fill" aria-hidden="true" />
+                      <img class="mi sm" src={fileIconUrl(book.path)} alt="" />
                     {/if}
                   </span>
                   <span class="row-label">{book.title}</span>
@@ -1179,6 +1199,16 @@
     text-overflow: ellipsis;
     min-width: 0;
     flex: 1 1 auto;
+  }
+  /* Material file/folder icons (img assets). */
+  .mi {
+    width: 17px;
+    height: 17px;
+    display: block;
+  }
+  .mi.sm {
+    width: 15px;
+    height: 15px;
   }
 
   .library {
