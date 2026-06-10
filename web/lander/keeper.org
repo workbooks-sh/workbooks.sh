@@ -74,8 +74,10 @@
     5. After committing a page edit, deploy it so the live page updates:
        `curl -fsS -X PUT --data-binary @wb-lander-live.org \
          -H "Authorization: Bearer $WB_PUBLIC_BEARER" \
-         http://localhost:$PORT/w/wb-lander-live`
-       (This also writes the deploy commit visitors see acted out.)
+         http://localhost:4001/w/wb-lander-live`
+       Port 4001 exactly — the CONTROL plane. Port 4000 is the public
+       GET-only plane and will 404 on PUT. Only deploy after a page edit,
+       never after a plan.org-only commit.
     6. Commit with a message stating WHAT changed, WHY (the backlog item or
        signal — or "planning" / "no-data clarity"), and the expected effect.
        Mark the backlog item done. Append one line to plan.org's Log.
