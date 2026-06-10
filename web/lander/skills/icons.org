@@ -1,0 +1,39 @@
+#+TITLE: skill: icons — real brand/tech logos (never draw your own)
+
+When a section or post names a brand or tech (Lovable, v0, Cursor, React,
+Svelte, OpenAI…), use its REAL logo — never approximate one in CSS. INLINE
+the SVG into the component (don't hotlink): self-contained is the workbook
+way, and a hotlink rots. Fetch, sanity-check, inline.
+
+* which source (try in this order for the case)
+
+  - AI / LLM / dev-tool brands → LOBEHUB (best quality, monochrome
+    `currentColor` so it themes into the dark page):
+    https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-svg/icons/<slug>.svg
+    slugs: openai, claude, gemini, cursor, vercel, ollama, huggingface…
+  - General brand, want FULL COLOR (brand identity matters) → SVGL:
+    GET https://api.svgl.app?search=<brand>  → returns JSON; take `.route`
+    (e.g. https://svgl.app/library/lovable.svg), then fetch that.
+  - Broad coverage / simple monochrome fallback → SIMPLE-ICONS:
+    https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/<slug>.svg
+    slug = lowercase, no spaces/dots (react, svelte, nextdotjs, x).
+  - Arbitrary company by domain (no entry above) → `wb` brand fetch if the
+    toolkit offers it; else a clean text label is fine — never invent a mark.
+
+* recipe (run via the run tool)
+
+  S=$(curl -fsS "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-svg/icons/cursor.svg")
+  case "$S" in "<svg"*|"<?xml"*) echo "$S" ;; *) echo "MISS — try next source" ;; esac
+
+  Only inline output that starts with `<svg`/`<?xml`. On a miss, fall to the
+  next source; if all miss, use a styled text label — a wrong/blurry logo is
+  worse than none. Monochrome marks (lobehub/simple-icons) inherit page color
+  via `currentColor` — set the wrapper's color. Full-color (svgl) keeps brand
+  color; give it room to breathe, don't recolor it.
+
+* always
+
+  Strip any tracking/comment cruft, keep the `<svg>` viewBox. Size with the
+  wrapper (width/height on a span), not by editing the SVG. Respect
+  trademarks: a brand's mark shown to identify/compare it is fine; never
+  imply endorsement.
