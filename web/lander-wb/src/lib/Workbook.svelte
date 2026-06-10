@@ -10,9 +10,9 @@
   .wb{background:var(--card);border:1px solid var(--hair);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;
     display:flex;flex-direction:column;margin:0}
   .green{--c:var(--green)} .blue{--c:var(--blue)} .rose{--c:var(--rose)}
-  .bar{display:flex;align-items:baseline;justify-content:space-between;padding:.8rem 1.1rem .55rem}
+  .bar{display:flex;align-items:baseline;justify-content:space-between;padding:1.1rem 1.3rem .7rem}
   .n{font-size:.84rem;font-weight:500} .s{font-size:.66rem;color:var(--ink3)}
   iframe{width:100%;border:0;flex:1;min-height:300px;background:var(--bg)}
-  figcaption{padding:.7rem 1.1rem 1rem;font-size:.82rem;color:var(--ink2)}
+  figcaption{padding:.9rem 1.3rem 1.3rem;font-size:.84rem;color:var(--ink2);line-height:1.55}
   .mono{font-family:var(--mono)}
 </style>

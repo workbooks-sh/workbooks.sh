@@ -10,18 +10,16 @@
   </div>
 </div>
 <style>
-  .lc{position:relative;overflow:hidden;border-radius:18px;padding:1.5rem;min-height:150px;
+  .lc{position:relative;overflow:hidden;border-radius:20px;padding:var(--pad-card);min-height:190px;
     display:flex;flex-direction:column;justify-content:flex-end;box-shadow:var(--shadow);border:1px solid transparent}
   .wm{position:absolute;right:-8%;bottom:-26%;width:58%;height:auto;pointer-events:none}
-  .body{position:relative;display:flex;flex-direction:column;gap:.5rem}
-  .g{font-size:1.3rem;margin-bottom:.2rem;opacity:.9}
-  strong{font-size:1.05rem;font-weight:700} .b{font-size:.9rem;opacity:.82;line-height:1.5}
-  /* full-color tints; ink text reads on them in both themes; W = a deeper shade */
-  .green{background:color-mix(in srgb,var(--green) 22%,var(--card));color:var(--ink)}
-  .green .wm{fill:color-mix(in srgb,var(--green) 72%,var(--ink) 8%);opacity:.5}
-  .blue{background:color-mix(in srgb,var(--blue) 20%,var(--card));color:var(--ink)}
-  .blue .wm{fill:color-mix(in srgb,var(--blue) 70%,var(--ink) 6%);opacity:.5}
-  .rose{background:color-mix(in srgb,var(--rose) 18%,var(--card));color:var(--ink)}
-  .rose .wm{fill:color-mix(in srgb,var(--rose) 70%,var(--ink) 6%);opacity:.5}
-  .ink{background:var(--ink);color:var(--bg)} .ink .wm{fill:color-mix(in srgb,var(--bg) 22%,transparent);opacity:1}
+  .body{position:relative;display:flex;flex-direction:column;gap:.65rem}
+  .g{font-size:1.3rem;margin-bottom:.2rem;opacity:.85}
+  strong{font-size:1.05rem;font-weight:700} .b{font-size:.9rem;opacity:.8;line-height:1.5}
+  /* SATURATED color backgrounds; the W-mark is the subtle, lighter tone (a soft
+     white wash over the fill). Text contrast chosen per color. */
+  .green{background:var(--green);color:#093116} .green .wm{fill:#fff;opacity:.26}
+  .blue{background:var(--blue);color:#fff} .blue .wm{fill:#fff;opacity:.2}
+  .rose{background:var(--rose);color:#fff} .rose .wm{fill:#fff;opacity:.2}
+  .ink{background:var(--ink);color:var(--bg)} .ink .wm{fill:currentColor;opacity:.12}
 </style>

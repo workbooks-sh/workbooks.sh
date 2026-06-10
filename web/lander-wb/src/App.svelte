@@ -82,7 +82,7 @@
       <LogoCard accent="blue" title="Served live">the runtime renders the current file on request.</LogoCard>
       <LogoCard accent="rose" title="Open source">Apache-2.0, end to end. Files don't need us.</LogoCard>
     </div>
-    <div class="g2" style="margin-top:1rem">
+    <div class="g2" style="margin-top:var(--s4)">
       <Card><h3>Plain surface</h3><p class="body">Panel, hairline, soft shadow, radius — the quiet base everything sits on.</p></Card>
       <LogoCard accent="ink" title="Inverted">For a single emphatic statement — the ink card with a ghost mark.</LogoCard>
     </div>
@@ -99,7 +99,7 @@
       <Workbook name="habits.html" size="5.5 KB" html={habits} caption="A real workbook, running in the sheet. Tap the grid — data stays in your browser." />
       <Card>
         <div class="kv"><span class="k mono">OUTSTANDING</span><span class="v">$8,400</span></div>
-        <p class="body" style="margin-top:.6rem">Key-value, list rows, app frames — the surfaces a workbook composes from.</p>
+        <p class="body" style="margin-top:var(--s2)">Key-value, list rows, app frames — the surfaces a workbook composes from.</p>
         <VoicePair>
           {#snippet receipt()}<span class="p">$</span> wb run app.html <span class="ok">· ready</span>{/snippet}
         </VoicePair>
@@ -134,30 +134,30 @@
 </main>
 
 <style>
-  .head{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:.9rem;padding:.9rem var(--edge);
+  .head{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:.9rem;padding:1.1rem var(--edge);
     background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--hair)}
   .brand{display:flex;align-items:center;gap:.5rem;font-family:var(--serif);font-weight:600;font-size:1.3rem}
   .brand svg{height:19px;fill:currentColor} .tag{font-size:.72rem;color:var(--ink3)} .sp{flex:1} .mono{font-family:var(--mono)}
   .tt{display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;border:0;font-family:var(--mono);font-size:.72rem;color:var(--ink2);background:var(--bg2);padding:.42rem .75rem;border-radius:999px}
   .tt .dot{width:9px;height:9px;border-radius:50%;background:var(--ink)} :global([data-theme="dark"]) .tt .dot{background:var(--green)}
 
-  .sheet{max-width:1100px;margin:0 auto;padding:0 var(--edge) 7rem}
-  .spec{margin-top:3.8rem}
-  .sh{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;border-bottom:1px solid var(--hair);padding-bottom:.7rem;margin-bottom:1.6rem}
+  .sheet{max-width:1100px;margin:0 auto;padding:var(--s5) var(--edge) var(--s8)}
+  .spec{margin-top:var(--s8)}
+  .sh{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;border-bottom:1px solid var(--hair);padding-bottom:1.1rem;margin-bottom:var(--s6)}
   .sh h2{font-size:1.4rem} .no{font-size:.72rem;color:var(--ink3)} .note{font-size:.78rem;color:var(--ink3);margin-left:auto}
 
-  .hero-spec{display:grid;grid-template-columns:auto 1fr;gap:2rem;align-items:center;margin-top:3rem}
+  .hero-spec{display:grid;grid-template-columns:auto 1fr;gap:var(--s7);align-items:center;margin-top:var(--s7);padding-block:var(--s4)}
   @media(max-width:680px){.hero-spec{grid-template-columns:1fr}}
   .mark svg{width:120px;height:auto;fill:var(--ink)}
   .xl{font-size:clamp(2.4rem,5.5vw,4rem)} .l{font-size:clamp(1.8rem,3.5vw,2.6rem)}
-  .lead{color:var(--ink2);font-size:1.05rem;max-width:60ch;margin-top:1rem} .lead b{color:var(--ink);font-weight:600}
-  .typ{display:flex;flex-direction:column;gap:1.1rem}
+  .lead{color:var(--ink2);font-size:1.08rem;line-height:1.6;max-width:58ch;margin-top:var(--s4)} .lead b{color:var(--ink);font-weight:600}
+  .typ{display:flex;flex-direction:column;gap:var(--s4)}
   .body{font-family:var(--serif);font-size:1.1rem;color:var(--ink2);max-width:56ch}
   .machine{font-family:var(--mono);font-size:.85rem;color:var(--ink2)} .machine .p{color:var(--green-ink);font-weight:700} .machine .c{color:var(--ink3)} .machine .ok{color:var(--green-ink)}
 
-  .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
-  .g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem}
-  .row{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center}
+  .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--s4)}
+  .g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:var(--s4)}
+  .row{display:flex;gap:var(--s3);flex-wrap:wrap;align-items:center}
   h3{font-size:1.2rem}
 
   .sw{background:var(--card);border:1px solid var(--hair);border-radius:14px;overflow:hidden}
