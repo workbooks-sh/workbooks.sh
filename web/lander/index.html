@@ -195,7 +195,7 @@ body.panel-open .nav { left: calc((100vw - var(--panel-w)) / 2); }
 
 /* ── the agent cursor ────────────────────────────────────────── */
 #cursor {
-  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+  position: absolute; left: 0; top: 0; z-index: 60; pointer-events: none;
   transform: translate(-40px, 110vh);
   transition: transform 1s cubic-bezier(.45,.05,.2,1);
   filter: drop-shadow(0 2px 10px rgba(63,224,129,.45));
@@ -307,7 +307,7 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
   <svg width="17" height="19" viewBox="0 0 17 19" fill="none">
     <path d="M1 1L16 8.6L9.4 10.7L7 18L1 1Z" fill="#3fe081" stroke="#04130a" stroke-width="1.2"/>
   </svg>
-  <span class="tag">agent</span>
+  <span class="tag">waldo</span>
 </div>
 
 <!-- floating nav -->
@@ -384,7 +384,7 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
   <div class="pcard hello">
     <button class="phide" id="phide" aria-label="Hide timeline">×</button>
     <h3>This site is a workbook.</h3>
-    <p>An agent ships to it every hour, in public. You're looking at its desk.</p>
+    <p>Waldo — a <b>W</b>orkbook <b>A</b>utonomous <b>L</b>ive <b>D</b>ocument <b>O</b>perator — ships to it every hour, in public. You're looking at his desk.</p>
   </div>
 
   <div class="pcard status">
@@ -412,19 +412,19 @@ let cursorIn = false;
 const moveTo = async (el, ms = 950) => {
   const r = el.getBoundingClientRect();
   cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
-  cursor.style.transform = `translate(${r.left + r.width * (0.18 + Math.random() * 0.62)}px, ${r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
+  cursor.style.transform = `translate(${scrollX + r.left + r.width * (0.18 + Math.random() * 0.62)}px, ${scrollY + r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
   await sleep(ms + 60);
 };
 const work = on => cursor.classList.toggle('working', on);
 const cursorExit = async () => {
   if (!cursorIn) return; cursorIn = false;
-  cursor.style.transform = `translate(${innerWidth + 80}px, ${innerHeight * 0.35}px)`;
+  cursor.style.transform = `translate(${scrollX + innerWidth + 80}px, ${scrollY + innerHeight * 0.35}px)`;
   await sleep(1100);
 };
 const cursorEnter = async () => {
   if (cursorIn) return; cursorIn = true;
   cursor.style.transitionDuration = '0ms';
-  cursor.style.transform = `translate(-40px, ${innerHeight * 0.6}px)`;
+  cursor.style.transform = `translate(${scrollX - 40}px, ${scrollY + innerHeight * 0.6}px)`;
   await sleep(30);
   await moveTo($('#b-h1'), 900);
 };
@@ -448,7 +448,7 @@ const typeH1 = async (text) => {
 async function build() {
   await sleep(700);
   cursorIn = true;
-  cursor.style.transform = `translate(${innerWidth * 0.42}px, ${innerHeight * 0.62}px)`;
+  cursor.style.transform = `translate(${scrollX + innerWidth * 0.42}px, ${scrollY + innerHeight * 0.62}px)`;
   await sleep(1100);
   await place('#b-nav');
   await place('#b-mark');
@@ -528,11 +528,11 @@ function renderStatus() {
   const a = agentInfo;
   const panel = $('#timeline');
   if (!a || !a.active) {
-    $('#stState').textContent = a ? 'agent offline' : 'connecting…';
+    $('#stState').textContent = a ? 'waldo offline' : 'connecting…';
     return;
   }
   panel.classList.toggle('running', !!a.running);
-  $('#stState').textContent = a.running ? 'agent working' : 'agent idle';
+  $('#stState').textContent = a.running ? 'waldo working' : 'waldo idle';
   $('#stLast').textContent = a.last_run ? 'last run ' + rel(a.last_run) : '';
   $('#stNext').textContent = a.running ? 'in progress' :
     a.next_run ? 'in ' + fmtIn(a.next_run - Math.floor(Date.now() / 1000)) : '—';
