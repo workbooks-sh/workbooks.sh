@@ -55,7 +55,7 @@ body {
   60% { filter: blur(0); }
   100% { opacity: 1; transform: none; }
 }
-.blk.touch { box-shadow: 0 0 0 1px var(--live), 0 0 24px -6px var(--live); transition: box-shadow .2s; }
+.blk.touch, .node.touch { box-shadow: 0 0 0 1px var(--live), 0 0 24px -6px var(--live); transition: box-shadow .2s; border-radius: 8px; }
 
 /* ── shell: scrollable content + fixed right panel ──────────────
    The panel does NOT exist visually until the build finishes: no
@@ -274,6 +274,9 @@ footer.foot .tail { margin-left: auto; }
   opacity: 0; translate: 0 -4px; transition: opacity .35s ease, translate .35s ease;
 }
 #cursor .think.show { opacity: 1; translate: 0 0; }
+#cursor.flip svg { transform: scaleX(-1); }
+#cursor.flip .tag { left: auto; right: 15px; border-radius: 999px 3px 999px 999px; }
+#cursor.flip .think { left: auto; right: 15px; border-radius: 10px 3px 10px 10px; }
 
 .pcard.status .follow {
   appearance: none; cursor: pointer; margin-top: 2px;
@@ -550,15 +553,21 @@ const cursor = $('#cursor');
 let cursorIn = false;
 const moveTo = async (el, ms = 950) => {
   const r = el.getBoundingClientRect();
+  const x = r.left + r.width * (0.18 + Math.random() * 0.62);
+  // near the right edge (or inside the right panel): flip the tag + bubble to
+  // the cursor's left so nothing runs off screen or covers what he's touching
+  cursor.classList.toggle('flip', x > innerWidth - 280);
   cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
-  cursor.style.transform = `translate(${scrollX + r.left + r.width * (0.18 + Math.random() * 0.62)}px, ${scrollY + r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
+  cursor.style.transform = `translate(${scrollX + x}px, ${scrollY + r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
   await sleep(ms + 60);
 };
 const work = on => cursor.classList.toggle('working', on);
+const trimWords = (t, max = 90) =>
+  !t || t.length <= max ? t : t.slice(0, max).replace(/\s+\S*$/, '') + ' …';
 const think = (text) => {
   const el = $('#think');
   if (!text) { el.classList.remove('show'); return; }
-  el.textContent = text;
+  el.textContent = trimWords(text);
   el.classList.add('show');
 };
 const cursorExit = async () => {
@@ -769,7 +778,7 @@ async function refreshGrown() {
 async function showEdit(c) {
   if (following) return;            // already watching live — no re-enactment
   await cursorEnter();
-  think(c.msg.replace(/^[a-z]+:\s*/i, '').slice(0, 60));
+  think(c.msg.replace(/^[a-z]+:\s*/i, ''));
   work(true);
   let el = null;
   if (kind(c.msg) === 'add') el = await refreshGrown();
@@ -803,13 +812,23 @@ async function fetchActivity() {
   return null;
 }
 const stepTarget = (t) => {
+  // git history work → inspect the actual commit node in the panel
+  if (/git\s+(log|show|diff)|^git\b/.test(t || '')) {
+    const sha = /\b([0-9a-f]{7,40})\b/.exec(t || '');
+    let node = null;
+    if (sha) {
+      for (const a of document.querySelectorAll('#tlList .nmeta a'))
+        if (a.textContent && sha[1].startsWith(a.textContent)) { node = a.closest('.node'); break; }
+    }
+    return { git: true, el: node || document.querySelector('#tlList .node') };
+  }
   const blog = /blog\/([\w-]+\.html)/.exec(t || '');
   if (blog) return { page: '/blog/' + blog[1] };
   if (/index\.html/.test(t || '')) {
     const grown = document.querySelectorAll('#grown section');
     return { el: grown[0] || $('#grown') || $('#b-h1') };
   }
-  if (/plan\.org|_steps/.test(t || '')) return { el: $('#timeline') };
+  if (/plan\.org|_steps|rem\//.test(t || '')) return { el: $('#timeline') };
   return { el: $('#b-h1') };
 };
 async function follow() {
@@ -845,8 +864,17 @@ async function follow() {
           location.assign(t.page);
           return;
         }
-        if (t.el) {
-          t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        if (t.git && !document.body.classList.contains('panel-open')) {
+          // he's reading history; the panel is closed — he works out of sight
+          cursor.style.opacity = '0';
+        } else if (t.el) {
+          cursor.style.opacity = '1';
+          if (t.git) {
+            t.el.classList.add('touch');
+            setTimeout(() => t.el.classList.remove('touch'), 1800);
+          } else {
+            t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          }
           await sleep(350);
           await moveTo(t.el);
         }
