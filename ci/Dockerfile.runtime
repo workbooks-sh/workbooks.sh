@@ -46,7 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++6 openssl libncurses6 ca-certificates curl xz-utils \
       git jq sqlite3 openssh-client \
     && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL https://wasmtime.dev/install.sh | bash \
+# Pinned: install.sh's "latest" lookup hits the GitHub API unauthenticated and
+# rate-limits on shared CI runners (resolves the version to "{").
+ARG WASMTIME_VERSION=v45.0.1
+RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
 
 # Bake the default semantic embedding model (Model2Vec/potion, ~30 MB) so the
