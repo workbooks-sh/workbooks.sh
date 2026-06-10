@@ -30,6 +30,9 @@ h1,h2,h3,.serif{font-family:var(--serif);font-weight:600;letter-spacing:-.02em;l
 body{transition:padding-right .35s cubic-bezier(.2,.7,.2,1)}
 html[data-insp="open"] body{padding-right:var(--dt-w)}
 .wb-about-toast,[class*="about-toast"]{display:none!important}
-/* two voices INSIDE a headline: emphasized run shifts to mono, same ink */
-.mixed em{font-style:normal;font-family:var(--mono);font-weight:500;font-size:.74em;letter-spacing:-.01em;color:inherit}
-.mixed i{font-style:italic;font-family:var(--serif);color:inherit}
+/* two-font titles: serif (human) + a clean grotesque (Geist), size-MATCHED on a
+   shared baseline. No color tint, no shrink, no monospace in display type. */
+:root{--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif}
+.mixed{font-feature-settings:"ss01"}
+.mixed em{font-style:normal;font-family:var(--sans);font-weight:500;font-size:.92em;letter-spacing:-.025em;color:inherit}
+.mixed i{font-style:italic;font-family:var(--serif);font-weight:500;color:inherit}
