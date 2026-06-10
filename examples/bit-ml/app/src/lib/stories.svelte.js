@@ -20,6 +20,12 @@ export function manifest() { return _manifest; }
 // Kick the manifest fetch once. Idempotent. Components read manifest() reactively.
 export function loadManifest() {
   if (_manifest || _loading) return;
+  // WORKBOOK MODE: a bundled single-file artifact carries the manifest inline
+  // (<script type="application/json" id="wb-stories">) — no server, no fetch.
+  const inline = typeof document !== 'undefined' && document.getElementById('wb-stories');
+  if (inline) {
+    try { _manifest = JSON.parse(inline.textContent).stories || []; return; } catch { /* fall through */ }
+  }
   _loading = true;
   fetch(url('content/stories.json'))
     .then((r) => r.json())
@@ -64,7 +70,11 @@ export async function storyBody(slug) {
   if (_bodies.has(slug)) return _bodies.get(slug);
   const row = storyBySlug(slug);
   if (!row) return '';
-  const org = await fetch(url(row.file)).then((r) => r.text());
+  // WORKBOOK MODE: org bodies travel inline as <script type="text/org" data-slug>.
+  const inline = typeof document !== 'undefined' &&
+    document.querySelector(`script[type="text/org"][data-slug="${slug}"]`);
+  const org = inline ? inline.textContent
+    : await fetch(url(row.file)).then((r) => r.text());
   const html = render(org, { header: false });
   _bodies.set(slug, html);
   return html;

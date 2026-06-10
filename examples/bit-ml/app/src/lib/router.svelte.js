@@ -37,7 +37,9 @@ function parse(pathname) {
 export function push(path) {
   const next = parse(path);
   if (next.name === 'external') { location.assign(path); return; }
-  if (path !== location.pathname) history.pushState({}, '', path);
+  // file:// (an opened workbook) forbids pushState — navigation still works
+  // in-memory, the URL bar just stays put.
+  try { if (path !== location.pathname) history.pushState({}, '', path); } catch { /* workbook mode */ }
   _route = next;
   dispatchEvent(new CustomEvent('wb:route'));
   scrollTo({ top: 0, behavior: 'auto' });

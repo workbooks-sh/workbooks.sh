@@ -48,8 +48,7 @@
 <article class="bite {status}">
   <div class="top mono">
     <span class="sec">
-      <span class="tick"></span>
-      <span class="tag" style="color:{sec.color}">{sec.tag}</span>
+      <span class="tag">{sec.tag}</span>
       {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
     </span>
     <span class="when">{time}{#if read} · {read} read{/if}</span>
@@ -67,20 +66,27 @@
     {#if byline}<Byline {...byline} {onagent} />{/if}
   </div>
 </article>
-<hr class="hair" />
 
 <style>
-  .bite { padding: 22px 0 18px; }
+  /* a Notion card: soft, rounded, lifts on hover — the fun, friendly read */
+  .bite {
+    background: var(--paper);
+    border-radius: var(--r);
+    padding: 22px 24px 18px;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .bite:has(.headlink):hover { transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 14px 36px -12px rgba(0,0,0,.16); }
 
   .top {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; margin-bottom: 12px;
   }
   .sec { display: inline-flex; align-items: center; gap: 8px; }
-  .tick { width: 2px; height: 12px; display: inline-block; background: var(--ink); }
   .tag {
-    font-size: 11px; font-weight: 500; text-transform: uppercase;
-    letter-spacing: 0.07em;
+    background: var(--wash); border-radius: 999px; padding: 4px 10px;
+    letter-spacing: .06em;
   }
   .when {
     font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em;
