@@ -48,10 +48,29 @@ export default {
       }));
     }
 
-    // /live/* — the LIVING LANDER (lander-live, bd wb-5vm): a page hosted BY a
-    // Workbooks runtime on Fly, fronted through Cloudflare here. Proves the
-    // runtime-as-host path end to end: workbooks.sh/live → fly engine →
-    // workbook page (+ its /rcp/changes feed for the inspector).
+    // ROOT — workbooks.sh IS a live workbook (lander-live, bd wb-5vm). The
+    // homepage and its change-feed are served BY the Workbooks runtime on Fly,
+    // fronted (and edge-cached) through Cloudflare so a cold/asleep box never
+    // means a slow or down homepage. The page is a self-contained workbook
+    // (CSS/JS/demos inlined), so only the document + /_changes proxy here.
+    if (url.pathname === "/" || url.pathname === "/_changes") {
+      const flyPath = url.pathname === "/" ? "/w/wb-lander-live" : "/_changes";
+      const target = new URL(flyPath + url.search, "https://wb-lander-live.fly.dev");
+      const upstreamHeaders = new Headers(request.headers);
+      upstreamHeaders.delete("host");
+      // Edge-cache the homepage briefly; the live-poll reloads open tabs when
+      // the keeper commits, and new visitors see fresh within the TTL.
+      const cacheTtl = url.pathname === "/" ? 60 : 0;
+      return fetch(new Request(target.toString(), {
+        method: request.method,
+        headers: upstreamHeaders,
+        body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+        redirect: "follow",
+        cf: cacheTtl ? { cacheTtl, cacheEverything: true } : undefined,
+      }));
+    }
+
+    // /live/* — alias for the living lander (kept for direct access / sharing).
     if (url.pathname === "/live" || url.pathname.startsWith("/live/")) {
       const livePath = url.pathname === "/live" ? "/w/workbooks" : url.pathname.slice("/live".length);
       const target = new URL(livePath + url.search, "https://wb-lander-live.fly.dev");
