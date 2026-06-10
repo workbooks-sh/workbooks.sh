@@ -79,14 +79,20 @@ defmodule Workbooks.Keeper do
         {:ok, %{active: false}}
 
       path ->
-        Logger.info("Keeper: activated — def=#{path} interval=#{interval_ms()}ms")
-        schedule()
+        # Catch-up scheduling: restarts must not reset the cadence clock. The
+        # last tick time persists on the data volume; if a full interval has
+        # already elapsed (or we've never run), tick ~60s after boot instead
+        # of waiting a whole fresh interval.
+        delay = next_delay_ms()
+        Logger.info("Keeper: activated — def=#{path} interval=#{interval_ms()}ms first-tick-in=#{delay}ms")
+        Process.send_after(self(), :tick, delay)
 
         put_status(%{
           active: true,
           running: false,
           interval_ms: interval_ms(),
-          next_run: System.system_time(:second) + div(interval_ms(), 1000)
+          last_run: read_last_run(),
+          next_run: System.system_time(:second) + div(delay, 1000)
         })
 
         {:ok, %{active: true, def_path: path}}
@@ -98,6 +104,7 @@ defmodule Workbooks.Keeper do
 
   def handle_info(:tick, %{def_path: path} = state) do
     Logger.info("Keeper: tick — running #{path}")
+    write_last_run()
     put_status(%{running: true, last_run: System.system_time(:second)})
 
     # Hard wall-clock bound per run (WB_KEEPER_RUN_TIMEOUT_MS, default 15m): a
@@ -127,6 +134,33 @@ defmodule Workbooks.Keeper do
   # ── private helpers ──────────────────────────────────────────────────────────
 
   defp def_path, do: System.get_env("WB_KEEPER_DEF")
+
+  # ── cadence persistence (survives restarts/redeploys) ───────────────────────
+
+  defp last_run_path, do: Path.join(System.get_env("WB_DATA") || File.cwd!(), "keeper-last-run")
+
+  defp write_last_run do
+    File.write(last_run_path(), Integer.to_string(System.system_time(:second)))
+  rescue
+    _ -> :ok
+  end
+
+  defp read_last_run do
+    with {:ok, s} <- File.read(last_run_path()), {ts, _} <- Integer.parse(String.trim(s)), do: ts, else: (_ -> nil)
+  end
+
+  @boot_grace_ms 60_000
+
+  defp next_delay_ms do
+    case read_last_run() do
+      nil ->
+        @boot_grace_ms
+
+      ts ->
+        elapsed_ms = (System.system_time(:second) - ts) * 1000
+        max(@boot_grace_ms, interval_ms() - elapsed_ms)
+    end
+  end
 
   defp interval_ms do
     case System.get_env("WB_KEEPER_INTERVAL_MS") do
