@@ -34,6 +34,10 @@
      or section ever needs data, embed it in the file. Keep every page
      self-contained (inline CSS or copy the page's <style>; match its look —
      dark canvas, Geist/Geist Mono, the green #3fe081 accent used sparingly).
+     LAYOUT RULE: every page you create MUST include
+     `<script src="/assets/site.js" defer></script>` before `</body>` and must
+     NOT hand-roll its own top nav — site.js injects the one canonical nav so
+     navigation is identical across the whole site.
    - `plan.org` — your backlog + run log. Public, committed, honest.
 
 *** THE CADENCE (decide at the top of every run)
