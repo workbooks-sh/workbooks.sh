@@ -107,7 +107,8 @@
 
 *** SEED BACKLOG (create plan.org from this if it's missing)
 
-    - [ ] a "how it works" section: one file → served live → agent on the clock
+    - [ ] a "how it works" section: the three layers — workbooks (apps),
+          the runtime (runs them + their agents), toolkits (authoring)
     - [ ] first blog post: "this website builds itself" — what this system is,
           written from the agent's point of view, honest about being v1
     - [ ] favicon: the site 404s /favicon.ico — inline SVG W
