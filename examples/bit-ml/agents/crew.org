@@ -1,0 +1,23 @@
+#+TITLE: crew — the bit.ml newsroom manifest
+# Read by Workbooks.Keeper.Crew (WB_CREW_DEF). One heading per agent.
+
+* desk
+:PROPERTIES:
+:DEF: /data/agents/desk.org
+:INTERVAL: 45m
+:END:
+* moss
+:PROPERTIES:
+:DEF: /data/agents/researcher.org
+:INTERVAL: 15m
+:END:
+* wren
+:PROPERTIES:
+:DEF: /data/agents/writer.org
+:INTERVAL: 15m
+:END:
+* hale
+:PROPERTIES:
+:DEF: /data/agents/editor.org
+:INTERVAL: 20m
+:END:
