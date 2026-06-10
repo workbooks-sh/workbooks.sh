@@ -145,9 +145,18 @@ defmodule Workbooks.Workflow.Todo do
     end
   end
 
+  # Acceptance checks run in the IN-WASM shell (Workbooks.Shell over the
+  # CommandRegistry) — NEVER native (wb-9ja: no native execution anywhere, and
+  # a workflow's check command is author-supplied, so it must not be a native
+  # exec vector). Fail-closed: a check that uses a command the WASM shell can't
+  # run does not pass (the task stays un-DONE) rather than escaping to `sh`.
   defp sh_ok(cmd, workdir) do
-    {_, code} = System.cmd("sh", ["-c", cmd], cd: workdir, stderr_to_stdout: true)
-    code == 0
+    sentinel = "__WB_CHECK_OK__"
+
+    case Workbooks.Shell.run("#{cmd} && echo #{sentinel}", "", dirs: ["#{workdir}::#{workdir}"]) do
+      {:ok, out} -> String.contains?(out, sentinel)
+      _ -> false
+    end
   rescue
     _ -> false
   end
