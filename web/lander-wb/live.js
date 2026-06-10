@@ -1,42 +1,68 @@
-// live.js — the page as a live workbook: composed reveal of the tiles, the
-// agent's real changelog (in its tile + the inspector), a typing make-prompt,
-// and the inspector (agent · the real HTML · source). Calm, no terminal cosplay.
+// live.js — the page builds itself: a grandiose skeleton "full build" (sections
+// stand in as shimmer, then resolve top-down while the inspector streams a build
+// log), then the inspector becomes the live dashboard (agent · html · source ·
+// the real changelog). The webpage stays a webpage; the inspector holds the meta.
 
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (s, r = document) => r.querySelector(s);
 const LIVE = location.pathname.startsWith("/live") ? "/live" : "";
 const esc = s => (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const wait = ms => new Promise(r => setTimeout(r, ms));
 
-/* ── composed reveal — tiles place themselves in ── */
-const reveals = [...document.querySelectorAll("[data-reveal]")];
+const insp = $("#insp");
+const setInsp = on => insp?.setAttribute("data-open", String(on));
 const presence = $("#presence"), ptext = $("#p-text");
-if (reduce) {
-  reveals.forEach(el => el.classList.add("shown"));
-  if (ptext) ptext.textContent = "composed by lander-keeper";
-} else {
-  document.body.classList.add("reveal-on");
-  if (ptext) ptext.textContent = "lander-keeper is composing this page";
-  // stagger whatever is in view at load; reveal the rest on scroll
-  const vh = innerHeight;
-  let above = reveals.filter(el => el.getBoundingClientRect().top < vh * 0.95);
-  above.forEach((el, i) => setTimeout(() => el.classList.add("shown"), 200 + i * 110));
-  setTimeout(() => {
-    if (ptext) ptext.textContent = "composed just now · maintained live";
-    presence?.classList.add("settled");
-    setTimeout(() => presence?.classList.add("fade"), 4200);
-  }, 260 + above.length * 110);
-  const io = new IntersectionObserver(es => es.forEach(e => {
-    if (e.isIntersecting) { e.target.classList.add("shown"); io.unobserve(e.target); }
-  }), { rootMargin: "0px 0px -6% 0px", threshold: 0.04 });
-  reveals.filter(el => !above.includes(el)).forEach(el => io.observe(el));
+
+/* ── the build ──────────────────────────────────────────────────────────── */
+const blocks = [...document.querySelectorAll("[data-build]")];
+// a human label per block, in document order, for the build log
+const labelFor = el =>
+  el.closest(".hero") ? "hero" :
+  (el.closest("section")?.id || "section");
+
+async function build() {
+  if (reduce) { blocks.forEach(b => b.classList.add("built")); afterBuild(); return; }
+
+  blocks.forEach(b => b.classList.add("building"));
+  if (ptext) ptext.textContent = "lander-keeper is building this page";
+
+  // open the inspector and stream a build log — the "full build", visible
+  setInsp(true);
+  const agentPane = $("#pane-agent");
+  const log = document.createElement("div"); log.id = "buildlog";
+  agentPane?.prepend(log);
+  const line = (html) => { const d = document.createElement("div"); d.className = "bl"; d.innerHTML = html; log.appendChild(d); };
+
+  line(`<span class="ok">$</span> wb agent run "compose workbooks.sh"`);
+  await wait(650);
+
+  for (const b of blocks) {
+    const name = labelFor(b);
+    line(`composing <b>${esc(name)}</b> …`);
+    await wait(520);
+    b.classList.remove("building"); b.classList.add("built");
+    log.lastChild.innerHTML = `composing <b>${esc(name)}</b> <span class="ok">✓</span>`;
+    await wait(180);
+  }
+  line(`rendered ${blocks.length} blocks · <span class="ok">live</span>`);
+  await wait(700);
+  afterBuild(log);
 }
 
-/* ── inspector ── */
-const insp = $("#insp");
-const openInsp = on => insp?.setAttribute("data-open", String(on));
-$("#insp-handle")?.addEventListener("click", () => openInsp(insp.getAttribute("data-open") !== "true"));
-$("#agent-inspect")?.addEventListener("click", () => openInsp(true));
-presence?.addEventListener("click", () => openInsp(true));
+function afterBuild(log) {
+  if (ptext) { ptext.textContent = "composed just now · maintained live"; presence?.classList.add("settled"); }
+  setTimeout(() => presence?.classList.add("fade"), 4500);
+  // retire the build log, hand the inspector back to the live dashboard
+  setTimeout(() => { log?.remove(); setInsp(false); }, 1400);
+  poll(true);
+  setInterval(() => poll(false), 30000);
+  startMakePrompt();
+}
+build();
+
+/* ── inspector chrome ───────────────────────────────────────────────────── */
+$("#insp-handle")?.addEventListener("click", () => setInsp(insp.getAttribute("data-open") !== "true"));
+presence?.addEventListener("click", () => setInsp(true));
 document.querySelectorAll(".insp .tab").forEach(t => t.addEventListener("click", () => {
   document.querySelectorAll(".insp .tab").forEach(x => x.classList.remove("on"));
   document.querySelectorAll(".insp .pane").forEach(x => x.classList.remove("on"));
@@ -63,8 +89,9 @@ function buildSource() {
 }
 
 /* ── make-prompt: cycle example requests, typed ── */
-const mp = $("#mp-text");
-if (mp && !reduce) {
+function startMakePrompt() {
+  const mp = $("#mp-text"); if (!mp) return;
+  if (reduce) { mp.textContent = "a reading list with covers"; return; }
   const ex = ["a reading list with covers", "a workout log", "a client CRM", "a recipe box", "a standup tracker"];
   let i = 0;
   (async function cycle() {
@@ -76,11 +103,10 @@ if (mp && !reduce) {
       await wait(350); i++;
     }
   })();
-} else if (mp) { mp.textContent = "a reading list with covers"; }
-function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+}
 
-/* ── live changelog: agent tile feed + inspector + footer status ── */
-const feed = $("#agent-feed"), clog = $("#chglog"), chgSrc = $("#chg-src");
+/* ── live changelog: inspector + footer status ── */
+const clog = $("#chglog"), chgSrc = $("#chg-src");
 const liveStatus = $("#live-status"), liveText = $("#live-text");
 let headSha = null;
 async function poll(first) {
@@ -89,8 +115,6 @@ async function poll(first) {
     if (!r.ok) return;
     const { changes } = await r.json();
     if (!changes || !changes.length) return;
-    if (feed) feed.innerHTML = changes.slice(0, 5).map(c =>
-      `<div class="af-row"><span class="af-sha">${esc(c.sha).slice(0, 7)}</span><span class="af-msg">${esc(c.msg)}</span></div>`).join("");
     if (clog) clog.innerHTML = changes.slice(0, 14).map(c =>
       `<div class="cl-row"><code>${esc(c.sha).slice(0, 7)}</code><span class="cl-msg">${esc(c.msg)}</span></div>`).join("");
     if (chgSrc) chgSrc.textContent = changes.length + " commits · live";
@@ -100,5 +124,3 @@ async function poll(first) {
     else if (top !== headSha) { if (liveText) liveText.textContent = "keeper just edited — reloading…"; setTimeout(() => location.reload(), 1800); }
   } catch (_) { if (chgSrc) chgSrc.textContent = "offline"; }
 }
-poll(true);
-setInterval(() => poll(false), 30000);
