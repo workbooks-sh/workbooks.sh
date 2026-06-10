@@ -1,6 +1,7 @@
 <script>
   import Cursor from './lib/Cursor.svelte';
   import Panel from './lib/Panel.svelte';
+  import Viewer from './lib/Viewer.svelte';
   import Wmark from './lib/Wmark.svelte';
   import Hero from './sections/Hero.svelte';
   import Layers from './sections/Layers.svelte';
@@ -16,6 +17,9 @@
 
 <!-- agent cursor -->
 <Cursor />
+
+<!-- follow-mode off-page window: what Waldo is reading when his step is off-page -->
+<Viewer />
 
 <!-- floating nav -->
 <nav class="nav blk" id="b-nav" aria-label="Primary">

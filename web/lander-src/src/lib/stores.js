@@ -10,6 +10,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, reduced ? 0 : ms));
 
 const H1 = 'A website that builds itself.';
 
+// the tenant repo mirrors publicly; last-COMMITTED file bytes live here. The
+// viewer reads from this so it shows the same source you'd see on github (a
+// not-yet-committed write 404s — handled as a "first draft" card).
+const RAW = 'https://raw.githubusercontent.com/workbooks-sh/living-lander/main/';
+
 /* nodes wired up by components on mount */
 const refs = {
   cursor: null,   // #cursor
@@ -17,6 +22,10 @@ const refs = {
   h1text: null,   // #h1text
   caret: null,    // #caret
   tlList: null,   // #tlList
+  viewer: null,        // #viewer (follow-mode off-page window)
+  viewerVerb: null,    // its title-bar verb + target
+  viewerThought: null, // the thought line, shown here while the cursor is absorbed
+  viewerBody: null,    // the rendered file / url preview
 };
 export const registerRef = (name, el) => { refs[name] = el; };
 
@@ -76,7 +85,145 @@ const cursorEnter = async () => {
   cursor.style.opacity = '1';
   await sleep(30);
   await moveTo(document.querySelector('#b-h1'), 900);
+}
+
+/* ── viewer absorption: when Waldo's step goes off-page the cursor flies into
+   the viewer window and is absorbed (scale down + fade at its top-left corner),
+   then the window pops/glows as it lands. While absorbed the thought lives in
+   the viewer's header bar, not the cursor bubble. popCursor reverses it: the
+   cursor springs back out at the on-page element that's coming into focus. ── */
+let absorbed = false;
+const absorbCursor = async () => {
+  const cursor = refs.cursor, win = refs.viewer;
+  if (!cursor || !win || absorbed) return; absorbed = true;
+  think(null);                                   // the bubble hands off to the header
+  const r = win.getBoundingClientRect();
+  cursor.style.transitionDuration = '620ms';
+  // aim at the window's top-left corner (where the verb sits) and shrink in
+  cursor.style.transform =
+    `translate(${scrollX + r.left + 14}px, ${scrollY + r.top + 14}px) scale(.18)`;
+  cursor.style.opacity = '0';
+  await sleep(440);
+  win.classList.add('land');                     // the pop/glow as it lands
+  setTimeout(() => win.classList.remove('land'), 520);
+  await sleep(220);
 };
+const popCursor = async (el) => {
+  const cursor = refs.cursor;
+  if (!cursor || !absorbed) return; absorbed = false;
+  const r = (refs.viewer || cursor).getBoundingClientRect();
+  // re-materialize small at the window corner, then spring to the element
+  cursor.style.transitionDuration = '0ms';
+  cursor.style.transform =
+    `translate(${scrollX + r.left + 14}px, ${scrollY + r.top + 14}px) scale(.18)`;
+  await sleep(20);
+  cursor.style.transitionDuration = '560ms';
+  cursor.style.opacity = '1';
+  cursor.style.transform =
+    `translate(${scrollX + r.left + 14}px, ${scrollY + r.top + 14}px) scale(1)`;
+  await sleep(200);
+  if (el) await moveTo(el, 700);
+};
+
+/* ── the viewer window (follow mode only) ─────────────────────────
+   Shows what Waldo reads when a step lands off the visible page: a remote
+   URL (iframe, or a favicon card when unframeable) or a repo file (the
+   last-committed bytes from RAW, rendered as numbered monospace; org headings
+   tinted). Open/close ride the cursor absorption above. ──────────── */
+let viewerKey = null;                  // dedup: only re-render when the target changes
+const escH = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const VERB = { vfs_read: 'reading', vfs_write: 'writing', fetch: 'reading',
+               run: 'running', http: 'reading' };
+const verbFor = (tool, fallback) => VERB[tool] || fallback || 'reading';
+// known never-frameable hosts (X-Frame-Options/CSP deny) — skip straight to the card
+const NO_FRAME = /(^|\.)(github\.com|google\.com|twitter\.com|x\.com|youtube\.com|reddit\.com)$/i;
+
+function viewerHead(verb, target, thought) {
+  if (refs.viewerVerb) refs.viewerVerb.textContent = `${verb} ${trimWords(target, 38)}`;
+  if (refs.viewerThought) refs.viewerThought.textContent = trimWords(thought || '', 60);
+}
+
+function urlCard(u) {
+  // styled fallback when an iframe won't load: favicon + domain + url + "reading"
+  let host = u; try { host = new URL(u).host; } catch { /* keep raw */ }
+  const fav = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  return `<div class="vcard">
+    <img class="vfav" src="${escH(fav)}" alt="" width="32" height="32"
+         onerror="this.style.visibility='hidden'">
+    <div class="vdom">${escH(host)}</div>
+    <div class="vurl">${escH(trimWords(u, 90))}</div>
+    <div class="vtag">reading</div>
+  </div>`;
+}
+
+function showUrl(u) {
+  const body = refs.viewerBody;
+  let host = ''; try { host = new URL(u).host; } catch { /* unframeable below */ }
+  if (!host || NO_FRAME.test(host)) { body.innerHTML = urlCard(u); return; }
+  // try an iframe; if it errors or never loads, fall back to the card
+  body.innerHTML =
+    `<iframe class="vframe" sandbox="allow-scripts allow-same-origin"
+       referrerpolicy="no-referrer" src="${escH(u)}"></iframe>`;
+  const fr = body.querySelector('iframe');
+  let settled = false;
+  const fail = () => { if (settled) return; settled = true; body.innerHTML = urlCard(u); };
+  fr.addEventListener('error', fail);
+  fr.addEventListener('load', () => { settled = true; });    // it framed — keep it
+  setTimeout(fail, 3200);                                     // many denials are silent
+}
+
+// code → numbered monospace lines; .org headings (lines starting with *) tinted
+const codeHtml = (text, isOrg) => {
+  const lines = text.split('\n');
+  return `<pre class="vcode"><table>${lines.map((ln, i) => {
+    const head = isOrg && /^\*+\s/.test(ln);
+    return `<tr><td class="vln">${i + 1}</td><td class="vsrc${head ? ' vorg' : ''}">${escH(ln) || ' '}</td></tr>`;
+  }).join('')}</table></pre>`;
+};
+
+async function showFile(path, verb) {
+  const body = refs.viewerBody;
+  body.innerHTML = `<div class="vload">${escH(path)}</div>`;
+  let res = null;
+  try { res = await fetch(RAW + path, { signal: AbortSignal.timeout(7000) }); }
+  catch { /* offline → 404 card below */ }
+  if (!res || !res.ok) {
+    // not yet committed: be honest — it's a draft only Waldo can see right now
+    body.innerHTML = `<div class="vcard">
+      <div class="vdom">${escH(path)}</div>
+      <div class="vurl">${escH(verb)} ${escH(path.split('/').pop())} — first draft, not yet committed</div>
+      <div class="vtag">${escH(verb)}</div>
+    </div>`;
+    return;
+  }
+  body.innerHTML = codeHtml(await res.text(), /\.org$/.test(path));
+}
+
+function isViewerOpen() { return refs.viewer && refs.viewer.classList.contains('open'); }
+function closeViewer() {
+  const win = refs.viewer;
+  if (!win || !win.classList.contains('open')) return;
+  win.classList.remove('open');
+  viewerKey = null;
+  if (refs.viewerBody) refs.viewerBody.innerHTML = '';   // drop the iframe so it stops loading
+}
+// open (or re-point) the viewer for an off-page target. `t` is the resolved
+// target from stepTarget(); returns true when it opened/updated.
+function openViewer(t) {
+  const win = refs.viewer;
+  if (!win || !following) return false;
+  if (innerWidth <= 640) return false;                   // no room — handled by caller
+  const key = t.url ? 'u:' + t.url : 'f:' + t.file;
+  if (key === viewerKey && win.classList.contains('open')) {
+    viewerHead(t.verb, t.url || t.file, t.thought);      // same target, refresh header only
+    return true;
+  }
+  viewerKey = key;
+  win.classList.add('open');
+  viewerHead(t.verb, t.url || t.file, t.thought);
+  if (t.url) showUrl(t.url); else showFile(t.file, t.verb);
+  return true;
+}
 
 /* ── build choreography ───────────────────────────────────────── */
 const place = async (id, hold = 380, thought = null) => {
@@ -231,7 +378,78 @@ function renderStatus() {
   document.querySelector('#stLast').textContent = a.last_run ? 'last run ' + rel(a.last_run) : '';
   document.querySelector('#stNext').textContent = a.running ? 'in progress' :
     a.next_run ? 'in ' + fmtIn(a.next_run - Math.floor(Date.now() / 1000)) : '—';
-  document.querySelector('#followBtn').hidden = !a.running || following;
+  // the button is a toggle: visible while running OR while following; hidden
+  // only when idle and not following. Its label is owned by setFollowBtn.
+  document.querySelector('#followBtn').hidden = !a.running && !following;
+}
+
+/* ── landed-diff type-in ──────────────────────────────────────────
+   When a commit lands new/changed grown sections, don't hard-swap the DOM.
+   Animate the merge so it reads like Waldo writing: brand-new sections TYPE
+   their heading + first paragraph (cursor parked at the type point, the rest
+   fades in); changed text blocks get a brief green wash; removed blocks
+   collapse and fade. This is cosmetic streaming over a plain swap — it is NOT
+   a real CRDT, just a DOM diff keyed by data-grown. ────────────────── */
+// each grown entry is a .grown-host wrapper (display:contents) around one
+// <section>. Key by data-grown (set at runtime) or the heading text — the
+// latter is what's available in fetched static HTML, where the action hasn't run.
+const innerSec = (host) => (host.tagName === 'SECTION' ? host : host.querySelector('section'));
+// key by heading text first: it's the one stable identity on BOTH sides of the
+// diff — the live page has data-grown (runtime action) but the fetched static
+// HTML does not, so data-grown can't align the two. Heading text can.
+const grownKey = (host) => {
+  const s = innerSec(host);
+  return s?.querySelector('h2')?.textContent?.trim()
+    || (s && s.getAttribute('data-grown')) || host.outerHTML.length + '';
+};
+const typeInto = async (el, text) => {
+  el.textContent = '';
+  // ~38 chars/sec; park the cursor at the element so it looks authored
+  if (cursorIn) { await moveTo(el, 600); work(true); }
+  for (const ch of text) { el.textContent += ch; await sleep(reduced ? 0 : 26); }
+  if (cursorIn) work(false);
+};
+async function streamNewSection(host) {
+  // type the heading + first paragraph; let everything after fade in
+  const sec = innerSec(host) || host;
+  const h = sec.querySelector('h2'), p = sec.querySelector('p');
+  const htext = h ? h.textContent : '', ptext = p ? p.textContent : '';
+  sec.classList.add('landing');
+  if (h) await typeInto(h, htext);
+  if (p) await typeInto(p, ptext);
+  sec.classList.remove('landing');
+  sec.classList.add('landed');                    // fades the remainder in
+  setTimeout(() => sec.classList.remove('landed'), 1400);
+}
+async function mergeGrown(here, next) {
+  const haveNow = new Map([...here.children].map((s) => [grownKey(s), s]));
+  const wantKeys = [...next.children].map(grownKey);
+  // removed: in the page but gone from the new render → collapse + fade out
+  for (const [k, host] of haveNow) {
+    if (!wantKeys.includes(k)) {
+      (innerSec(host) || host).classList.add('leaving');
+      setTimeout(() => host.remove(), 520);
+    }
+  }
+  let firstNew = null;
+  // walk the wanted order; insert new, wash changed, keep same
+  for (let i = 0; i < next.children.length; i++) {
+    const src = next.children[i], k = wantKeys[i], cur = haveNow.get(k);
+    if (!cur) {                                    // brand-new section
+      const host = src.cloneNode(true);
+      here.insertBefore(host, here.children[i] || null);
+      if (!firstNew) firstNew = innerSec(host) || host;
+      await streamNewSection(host);
+    } else {
+      const a = innerSec(cur), b = innerSec(src);
+      if (a && b && a.innerHTML.trim() !== b.innerHTML.trim()) {
+        a.innerHTML = b.innerHTML;                 // changed → swap + green wash
+        a.classList.add('changed');
+        setTimeout(() => a.classList.remove('changed'), 1200);
+      }
+    }
+  }
+  return firstNew;
 }
 
 /* a fresh add: commit may mean a new section — pull it into the open page */
@@ -243,9 +461,9 @@ async function refreshGrown() {
     const next = doc.querySelector('#grown');
     const here = document.querySelector('#grown');
     if (next && next.innerHTML.trim() !== here.innerHTML.trim()) {
-      here.innerHTML = next.innerHTML;
+      const firstNew = await mergeGrown(here, next);
       const secs = document.querySelectorAll('#grown section');
-      return secs[0] || null;            // newest lands first (agent prepends)
+      return firstNew || secs[0] || null;     // newest lands first (agent prepends)
     }
   } catch { /* same-origin only — fine on localhost */ }
   return null;
@@ -288,79 +506,146 @@ async function fetchActivity() {
   }
   return null;
 }
-const stepTarget = (t) => {
+// resolve a step (its `target` snippet + `tool` verb) to ONE of:
+//   { el }            — an on-page element: move the cursor there, glow it
+//   { page }          — another lander page: redirect (follow + not already there)
+//   { url } / { file }— off-page: the viewer window shows it
+//   {}                — nothing specific: HOLD position (never default to the headline)
+const stepTarget = (step) => {
+  const t = (step && step.target) || '';
+  const tool = step && step.tool;
+  const verb = verbFor(tool);
   // git history work → inspect the actual commit node in the panel
-  if (/git\s+(log|show|diff)|^git\b/.test(t || '')) {
-    const sha = /\b([0-9a-f]{7,40})\b/.exec(t || '');
+  if (/git\s+(log|show|diff)|^git\b/.test(t)) {
+    const sha = /\b([0-9a-f]{7,40})\b/.exec(t);
     let node = null;
     if (sha) {
       for (const a of document.querySelectorAll('#tlList .nmeta a'))
         if (a.textContent && sha[1].startsWith(a.textContent)) { node = a.closest('.node'); break; }
     }
-    return { git: true, el: node || document.querySelector('#tlList .node') };
+    const el = node || document.querySelector('#tlList .node');
+    return el ? { git: true, el } : {};
   }
-  const blog = /blog\/([\w-]+\.html)/.exec(t || '');
-  if (blog) return { page: '/blog/' + blog[1] };
-  if (/index\.html/.test(t || '')) {
-    const grown = document.querySelectorAll('#grown section');
-    return { el: grown[0] || document.querySelector('#grown') || document.querySelector('#b-h1') };
+  // a grown section: map to its on-page element when rendered; else the file view
+  const grown = /src\/sections\/grown\/(\d{2}-[\w-]+)\.svelte/.exec(t);
+  if (grown) {
+    const el = document.querySelector(`[data-grown="${grown[1]}"]`);
+    if (el) return { el };
+    return { file: `src/sections/grown/${grown[1]}.svelte`, verb };
   }
-  if (/plan\.org|_steps|rem\//.test(t || '')) return { el: document.querySelector('#timeline') };
-  return { el: document.querySelector('#b-h1') };
+  // any other tracked source file → the viewer reads the committed bytes
+  const file = /((?:src\/[\w./-]+\.svelte)|(?:(?:strategy|skills|rem)\/[\w./-]+\.org)|plan\.org|(?:blog\/[\w-]+\.html))/.exec(t);
+  if (file) {
+    const f = file[1];
+    if (f.startsWith('blog/')) {
+      // a blog page: redirect only when following + not already there; else view it
+      const page = '/' + f;
+      if (following && location.pathname !== page) return { page };
+      return { file: f, verb };
+    }
+    return { file: f, verb };
+  }
+  if (/index\.html/.test(t)) {
+    const sec = document.querySelectorAll('#grown section');
+    const el = sec[0] || document.querySelector('#grown');
+    return el ? { el } : {};
+  }
+  // a bare http(s) url (fetch tool / reading the web) → the viewer frames it
+  const url = /(https?:\/\/[^\s"'<>]+)/.exec(t);
+  if (url) return { url: url[1], verb };
+  // nothing we can place — hold. (Do NOT fall back to the headline.)
+  return {};
 };
+// the follow button reflects engine state: a toggle, not a one-shot. The panel
+// re-reads this on its status tick.
+const setFollowBtn = (on) => {
+  const b = document.querySelector('#followBtn');
+  if (!b) return;
+  b.classList.toggle('on', on);
+  b.textContent = on ? 'following ✓ — click to stop' : 'follow along — it\'s working now';
+};
+// last resolved target — the cursor only MOVES when this changes, so repeated
+// same-target steps don't make it twitch around the page.
+let lastKey = null;
+const targetKey = (t) =>
+  t.page ? 'p:' + t.page : t.url ? 'u:' + t.url : t.file ? 'f:' + t.file :
+  t.git ? 'g:' + (t.el ? [...t.el.parentNode.children].indexOf(t.el) : '?') :
+  t.el ? 'e:' + (t.el.dataset.grown || t.el.id || t.el.tagName) : '';
+
+async function stopFollow() {
+  if (!following) return;
+  following = false;                 // ends the poll loop on its next check
+  setFollowBtn(false);
+  closeViewer();
+  think(null); work(false);
+  await cursorExit();
+  lastKey = null;
+}
+
 async function follow() {
-  if (following) return;
   following = true;
-  document.querySelector('#followBtn').hidden = true;
+  setFollowBtn(true);
+  document.querySelector('#followBtn').hidden = false;
   await cursorEnter();
   think('let me show you what I\'m doing');
   work(true);
-  let redirected = false, misses = 0;
+  let misses = 0;
   while (following) {
     const act = await fetchActivity();
     if (!act && ++misses === 3) think('(its live feed is warming up — changes still land below)');
     if (act) {
       misses = 0;
-      if (!act.agent || !act.agent.running) {
+      if (!act.agent || !act.agent.running) {       // run ended → auto-stop
         think('done — shipping it');
         await sleep(1600);
-        think(null); work(false);
-        await cursorExit();
-        following = false;
+        await stopFollow();
         break;
       }
-      if (act.thought) think(act.thought);
+      // header thought always tracks; bubble only when the cursor is out (not absorbed)
+      if (act.thought && !absorbed) think(act.thought);
+      if (act.thought && isViewerOpen()) viewerHead(
+        refs.viewerVerb?.textContent?.split(' ')[0] || 'reading',
+        viewerKey ? viewerKey.slice(2) : '', act.thought);
+
       const last = (act.steps || [])[act.steps.length - 1];
       if (last && last.ts > lastStepTs) {
         lastStepTs = last.ts;
-        const t = stepTarget(last.target);
-        if (t.page && !redirected && location.pathname !== t.page) {
-          redirected = true;
+        const t = stepTarget(last);
+        t.thought = act.thought;
+        const key = targetKey(t);
+        if (!key || key === lastKey) { await sleep(2500); continue; }  // unchanged → hold
+        lastKey = key;
+
+        if (t.page) {                                // another lander page — go there
           think('working over here — come on');
           await sleep(1400);
-          location.assign(t.page);
+          if (following) location.assign(t.page);
           return;
         }
-        if (t.git && !document.body.classList.contains('panel-open')) {
-          // it's reading history; the panel is closed — it works out of sight
-          refs.cursor.style.opacity = '0';
-        } else if (t.el) {
-          refs.cursor.style.opacity = '1';
-          if (t.git) {
-            t.el.classList.add('touch');
-            setTimeout(() => t.el.classList.remove('touch'), 1800);
-          } else {
+        if (t.url || t.file) {                        // off-page → the viewer window
+          if (openViewer(t)) { if (!absorbed) await absorbCursor(); }
+          else { refs.cursor.style.opacity = '0'; }   // ≤640px: no viewer, just hide
+        } else if (t.git && !document.body.classList.contains('panel-open')) {
+          if (isViewerOpen()) { await popCursor(null); closeViewer(); }
+          refs.cursor.style.opacity = '0';            // reading history out of sight
+        } else if (t.el) {                            // on-page → cursor returns here
+          if (isViewerOpen()) { closeViewer(); await popCursor(t.el); }
+          else {
+            refs.cursor.style.opacity = '1';
             t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+            await sleep(350);
+            await moveTo(t.el);
           }
-          await sleep(350);
-          await moveTo(t.el);
+          t.el.classList.add('touch');
+          setTimeout(() => t.el.classList.remove('touch'), 1600);
         }
       }
     }
     await sleep(2500);
   }
 }
-export const startFollow = () => follow();
+// the button toggles: start when idle, stop when following
+export const toggleFollow = () => { following ? stopFollow() : follow(); };
 
 /* ── the watch loop ───────────────────────────────────────────── */
 let seen = null, wasRunning = false;

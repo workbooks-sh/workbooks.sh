@@ -2,7 +2,7 @@
   // The live timeline: peek chip, hide/show drawer behaviors, and the feed
   // list (#tlList) which the engine fills imperatively. Status text + follow
   // button are likewise engine-driven through their ids.
-  import { registerRef, openPanel, closePanel, startFollow } from './stores.js';
+  import { registerRef, openPanel, closePanel, toggleFollow } from './stores.js';
   let tlListEl;
   $effect(() => { registerRef('tlList', tlListEl); });
 </script>
@@ -22,7 +22,7 @@
       <span class="v" id="stLast"></span>
     </div>
     <div class="row"><span class="k">next check-in</span><span class="v on" id="stNext">—</span></div>
-    <button class="follow" id="followBtn" onclick={startFollow} hidden>follow along — it's working now</button>
+    <button class="follow" id="followBtn" onclick={toggleFollow} hidden>follow along — it's working now</button>
   </div>
 
   <div class="tl"><div id="tlList" bind:this={tlListEl}></div></div>

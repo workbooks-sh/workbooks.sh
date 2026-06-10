@@ -323,6 +323,85 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
 .tgroup .node { margin-top: 16px; }
 .tgroup .node:last-child { padding-bottom: 0; }
 
+/* ── the viewer window (follow mode) ──────────────────────────────
+   Fixed bottom-right pane showing what Waldo reads off-page. The animated
+   gradient stroke is a ::before that's 2px larger on each side, sweeping a
+   conic green→blue→violet; the inner bg masks all but the rim. ────────── */
+.viewer {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  width: 360px; height: 260px; border-radius: 12px;
+  padding: 2px;                              /* the rim width */
+  opacity: 0; transform: translateY(14px) scale(.96); pointer-events: none;
+  transition: opacity .4s ease, transform .45s cubic-bezier(.2,.9,.25,1.05);
+  overflow: hidden;
+}
+.viewer.open { opacity: 1; transform: none; }
+.viewer.land { animation: vland .5s cubic-bezier(.2,.9,.25,1.05); }
+@keyframes vland {
+  0% { transform: scale(.96); } 45% { transform: scale(1.035); box-shadow: 0 0 32px -4px var(--live); }
+  100% { transform: none; }
+}
+.viewer::before {                            /* the animated gradient stroke */
+  content: ""; position: absolute; inset: 0; z-index: 0; border-radius: inherit;
+  background: conic-gradient(from var(--vang, 0deg),
+    #3fe081, #5ea2ff, #b48cff, #3fe081);
+  animation: vsweep 5.5s linear infinite;
+}
+@property --vang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes vsweep { to { --vang: 360deg; } }
+.vhead, .vbody {                             /* sit above the rim, masking it */
+  position: relative; z-index: 1; background: var(--bg);
+}
+.vhead {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+.vverb { font: 500 11px/1.3 var(--mono); color: var(--live); white-space: nowrap; }
+.vthought {
+  font: 400 10.5px/1.3 var(--mono); color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.vbody { height: calc(100% - 36px); border-radius: 0 0 10px 10px; overflow: auto; scrollbar-width: thin; }
+.vframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.vload { padding: 14px; font: 400 11px/1.4 var(--mono); color: var(--faint); }
+/* committed source → numbered monospace, syntax-less; org headings tinted */
+.vcode { margin: 0; padding: 8px 0; font: 400 10.5px/1.55 var(--mono); }
+.vcode table { border-collapse: collapse; width: 100%; }
+.vcode .vln { width: 1%; text-align: right; padding: 0 10px 0 12px; color: var(--faint);
+  user-select: none; white-space: nowrap; }
+.vcode .vsrc { color: var(--dim); white-space: pre-wrap; word-break: break-word; padding-right: 12px; }
+.vcode .vorg { color: #ff9e7a; }
+/* fallback / not-yet-committed card */
+.vcard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; height: 100%; text-align: center; padding: 18px;
+}
+.vcard .vfav { border-radius: 6px; }
+.vcard .vdom { font: 500 13px/1.3 var(--mono); color: var(--ink); word-break: break-all; }
+.vcard .vurl { font: 400 10.5px/1.4 var(--mono); color: var(--faint); word-break: break-all; }
+.vcard .vtag {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--live); border: 1px solid color-mix(in srgb, var(--live) 35%, transparent);
+  border-radius: 999px; padding: 4px 9px;
+}
+
+/* ── landed-diff type-in: how a fresh commit's sections arrive ──────── */
+#grown section.landing > :not(h2):not(p) { opacity: 0; }   /* hold the rest while typing */
+#grown section.landed { animation: landfade .9s ease; }
+@keyframes landfade { from { opacity: .35; } to { opacity: 1; } }
+#grown section.changed { animation: changewash 1.2s ease; }
+@keyframes changewash {
+  0% { background: var(--live-dim); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 30%, transparent); }
+  100% { background: transparent; box-shadow: none; }
+}
+#grown section.leaving {
+  overflow: hidden; opacity: 0;
+  max-height: 0 !important; margin: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important;
+  border: 0 !important;
+  transition: opacity .35s ease, max-height .5s ease, padding .5s ease, margin .5s ease;
+}
+
 /* ── responsive: on small screens the panel is a bottom sheet ── */
 @media (max-width: 960px) {
   body.panel-open .content { margin-right: 0; }
@@ -336,9 +415,13 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
   }
   body.panel-open .panel { transform: none; }
   body:not(.panel-open) .peek { display: flex; }
+  /* the viewer docks above the bottom sheet so it never sits under the panel */
+  .viewer { width: min(360px, calc(100% - 36px)); }
+  body.panel-open .viewer { bottom: calc(86vh + 12px); }
 }
 @media (max-width: 640px) {
   .nav { gap: 14px; } .nav .word { display: none; }
+  .viewer { display: none; }              /* no room — follow runs without it (engine guards) */
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
