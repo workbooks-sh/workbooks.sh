@@ -88,7 +88,7 @@ defmodule Workbooks.Application do
           [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, ip: Workbooks.Desktop.bind_ip(), port: Workbooks.Desktop.port(), thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]}, id: :control_web)]
 
         System.get_env("WB_WEB") == "1" ->
-          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, port: port()}, id: :control_web)]
+          [Supervisor.child_spec({Bandit, [plug: Workbooks.Web, scheme: :http, port: port()] ++ dual_stack()}, id: :control_web)]
 
         true ->
           []
@@ -96,7 +96,7 @@ defmodule Workbooks.Application do
 
     public =
       if System.get_env("WB_PUBLIC") == "1" do
-        [Supervisor.child_spec({Bandit, plug: Workbooks.PublicWeb, scheme: :http, port: public_port()}, id: :public_web)]
+        [Supervisor.child_spec({Bandit, [plug: Workbooks.PublicWeb, scheme: :http, port: public_port()] ++ dual_stack()}, id: :public_web)]
       else
         []
       end
@@ -121,6 +121,11 @@ defmodule Workbooks.Application do
 
     control ++ public ++ public_tls
   end
+
+  # Every plane listens dual-stack: private platform networks (6PN tunnels)
+  # are IPv6-only while local clients dial IPv4 — one listener serves both.
+  defp dual_stack,
+    do: [ip: {0, 0, 0, 0, 0, 0, 0, 0}, thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]]
 
   # Keeper (wb-5vm): on-box agent scheduler for deployed engines where the control
   # plane is internal-only and GitHub-cron can't reach it. Enabled ONLY when
