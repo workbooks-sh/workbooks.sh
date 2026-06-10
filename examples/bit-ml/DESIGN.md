@@ -56,11 +56,11 @@ terminal — for the inspect panel and night reading, not a tinted clone.
 
 ```css
 :root {                          /* paper */
-  --paper:   #ffffff;           /* pure white — grayscale, no warm cast */
-  --ink:     #141414;           /* neutral near-black */
-  --ink-2:   #595959;           /* deks, secondary */
-  --ink-3:   #9e9e9e;           /* meta resting state */
-  --rule:    #ebebeb;           /* hairlines — barely there */
+  --paper:   #ffffff;           /* pure white */
+  --ink:     #000000;           /* true black — contrast IS the palette */
+  --ink-2:   #2e2e2e;           /* deks: still essentially black */
+  --ink-3:   #757575;           /* meta resting state — the ONLY grey */
+  --rule:    #ededed;           /* hairlines — barely there */
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;  --down: #c4322e;   /* market semantics only */
 }
@@ -73,8 +73,8 @@ terminal — for the inspect panel and night reading, not a tinted clone.
 - **Wire blue is the only voice of interactivity and liveness.** Links,
   the live dot, focus rings, the inspect toggle. If something else is
   blue, it's wrong.
-- **Grayscale discipline (founder, 2026-06-10):** the base is pure
-  monochrome — white paper, neutral grays, generous white space (air IS
+- **Grayscale discipline (founder, 2026-06-10):** the base is WHITE and BLACK —
+  true black ink on pure white, one grey for resting meta, generous white space (air IS
   the aesthetic). Section identity is TYPOGRAPHIC (the mono tag names the
   desk; ticks are ink), never chromatic. The only colors on a page:
   wire blue (interactivity/liveness) and up/down green/red inside market

@@ -5,11 +5,11 @@
    ════════════════════════════════════════════════════════════════════ */
 
 :root {                          /* paper */
-  --paper:   #ffffff;           /* pure white — grayscale, no warm cast */
-  --ink:     #141414;           /* neutral near-black */
-  --ink-2:   #595959;           /* deks, secondary */
-  --ink-3:   #9e9e9e;           /* meta resting state */
-  --rule:    #ebebeb;           /* hairlines — barely there */
+  --paper:   #ffffff;           /* pure white */
+  --ink:     #000000;           /* true black — contrast IS the palette */
+  --ink-2:   #2e2e2e;           /* deks: still essentially black */
+  --ink-3:   #757575;           /* meta resting state — the ONLY grey */
+  --rule:    #ededed;           /* hairlines — barely there */
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;
   --down:    #c4322e;           /* market semantics only */

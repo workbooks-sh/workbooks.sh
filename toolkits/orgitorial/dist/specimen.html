@@ -45,22 +45,24 @@ body { background: var(--org-paper, #fbf9f4); transition: background .2s ease; }
 :root,
 [data-org-theme="light"] {
   /* palette */
-  --org-paper:        #fbf9f4;   /* warm editorial paper            */
-  --org-ink:          #1f1d1a;   /* near-black, warm                */
-  --org-ink-soft:     #4a4640;   /* secondary text                 */
-  --org-faint:        #8a8378;   /* metadata, captions             */
-  --org-accent:       #b3411f;   /* terracotta — links, marks      */
-  --org-accent-soft:  #f0e3d8;   /* accent wash                    */
-  --org-rule:         #e4ddd0;   /* hairlines                      */
-  --org-rule-strong:  #cfc6b5;
-  --org-panel:        #f4efe6;   /* src/example/drawer surfaces     */
-  --org-panel-bar:    #ece5d8;   /* src header bar                  */
-  --org-todo-bg:      #b3411f;   /* TODO chip                       */
-  --org-todo-ink:     #fff;
-  --org-done-bg:      #6f8f5f;   /* DONE chip                       */
-  --org-done-ink:     #fff;
-  --org-mark:         #fbe6a2;   /* (reserved) highlight            */
-  --org-selection:    #f3d9c8;
+  /* DEFAULT SKIN: white & black — contrast is the identity. Warmth or brand
+     color is something a consumer OPTS INTO by setting these vars. */
+  --org-paper:        #ffffff;   /* pure white                      */
+  --org-ink:          #000000;   /* true black                      */
+  --org-ink-soft:     #2e2e2e;   /* secondary text — still black    */
+  --org-faint:        #757575;   /* metadata, captions — the one grey */
+  --org-accent:       #000000;   /* links are black, underlined     */
+  --org-accent-soft:  #f2f2f2;   /* accent wash                     */
+  --org-rule:         #ececec;   /* hairlines                       */
+  --org-rule-strong:  #d6d6d6;
+  --org-panel:        #f7f7f7;   /* src/example/drawer surfaces     */
+  --org-panel-bar:    #efefef;   /* src header bar                  */
+  --org-todo-bg:      #000000;   /* TODO chip: black                */
+  --org-todo-ink:     #ffffff;
+  --org-done-bg:      #ffffff;   /* DONE chip: outlined             */
+  --org-done-ink:     #000000;
+  --org-mark:         #f2f2f2;
+  --org-selection:    #e8e8e8;
 
   /* type */
   --org-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
@@ -177,7 +179,7 @@ h5.org-h { font-size: 1rem;    font-weight: 700; font-family: var(--org-mono); t
   margin-right: 0.15em;
 }
 .org-todo > .org-todo-kw { background: var(--org-todo-bg); color: var(--org-todo-ink); }
-.org-done > .org-todo-kw { background: var(--org-done-bg); color: var(--org-done-ink); }
+.org-done > .org-todo-kw { background: var(--org-done-bg); color: var(--org-done-ink); box-shadow: inset 0 0 0 1px var(--org-ink); }
 .org-done { text-decoration-color: var(--org-faint); }
 .org-done { color: var(--org-ink-soft); }
 
@@ -298,8 +300,8 @@ ol.org-list > li::marker { font-family: var(--org-mono); color: var(--org-faint)
   box-sizing: border-box;
 }
 .org-check[data-checked="true"]::before {
-  background: var(--org-done-bg);
-  border-color: var(--org-done-bg);
+  background: var(--org-ink);
+  border-color: var(--org-ink);
 }
 .org-check[data-checked="true"]::after {
   content: "";
@@ -308,7 +310,7 @@ ol.org-list > li::marker { font-family: var(--org-mono); color: var(--org-faint)
   top: 0.46em;
   width: 0.34em;
   height: 0.6em;
-  border: solid var(--org-done-ink);
+  border: solid var(--org-paper);
   border-width: 0 0.16em 0.16em 0;
   transform: rotate(42deg);
 }
