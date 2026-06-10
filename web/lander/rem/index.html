@@ -41,6 +41,13 @@ h1 { font: 600 clamp(28px, 4vw, 44px)/1.1 var(--sans); letter-spacing: -.025em; 
 .lede { color: var(--dim); font: 400 15px/1.6 var(--sans); max-width: 56ch; margin: 0 0 36px; }
 .lede a { color: var(--dream); }
 
+.day {
+  display: flex; gap: 12px; align-items: baseline; margin: 0 0 26px;
+  padding: 14px 16px; border: 1px dashed var(--line); border-radius: 12px;
+}
+.day .dk { font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dream); flex: 0 0 auto; }
+.day #dayText { color: var(--dim); font: 400 13.5px/1.55 var(--sans); font-style: italic; }
+
 .picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 28px; }
 .picker button {
   appearance: none; cursor: pointer; background: transparent; color: var(--faint);
@@ -82,6 +89,11 @@ h1 { font: 600 clamp(28px, 4vw, 44px)/1.1 var(--sans); letter-spacing: -.025em; 
   commits, the telemetry, the backlog — into one structured entry: a tale,
   goals, blue-sky ideas, fears, and verdicts that steer his next waking run.
   This journal is generated, committed, and <a href="https://github.com/workbooks-sh/living-lander/tree/main/rem">public</a>.</p>
+
+  <div class="day" id="day" hidden>
+    <span class="dk">daydream</span>
+    <span id="dayText"></span>
+  </div>
 
   <div class="picker" id="picker"></div>
   <div class="entry" id="entry"><div class="empty">no dreams yet — the first cycle hasn't slept</div></div>
@@ -175,8 +187,20 @@ async function load() {
     render(parseOrg(t), entries[0]);
   } catch { /* page degrades to the empty state */ }
 }
-load();
+async function daydream() {
+  try {
+    const res = await fetch('/rem/daydreams.json', { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return;
+    const { daydreams } = await res.json();
+    if (daydreams && daydreams.length) {
+      document.querySelector('#dayText').textContent = daydreams[0].text;
+      document.querySelector('#day').hidden = false;
+    }
+  } catch { /* none yet */ }
+}
+load(); daydream();
 setInterval(load, 60000);
+setInterval(daydream, 90000);
 })();
 </script>
 </body>

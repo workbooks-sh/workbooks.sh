@@ -65,12 +65,24 @@ defmodule Workbooks.PublicWeb do
         body = %{
           agent: status,
           steps: steps,
-          thought: Workbooks.Thoughts.current(steps, status[:running] == true)
+          thought:
+            Workbooks.Thoughts.current(steps, status[:running] == true) ||
+              latest_daydream(app)
         }
 
         conn
         |> put_resp_content_type("application/json")
         |> send_resp(200, Jason.encode!(body))
+    end
+  end
+
+  # The dreaming state's voice: when no live thought, the newest daydream.
+  defp latest_daydream(app) do
+    with {:ok, j} <- File.read(Path.join(site_dir(app), "rem/daydreams.json")),
+         {:ok, %{"daydreams" => [%{"text" => t} | _]}} <- Jason.decode(j) do
+      t
+    else
+      _ -> nil
     end
   end
 

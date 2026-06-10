@@ -20,24 +20,42 @@ defmodule Workbooks.Dreams do
   @default_model "inception/mercury-2"
   @default_min_interval_ms 3_000_000
 
-  @doc "Dream if the newest entry is old enough (or absent). Safe to fire blind."
+  @doc """
+  Post-run cadence (founder, 2026-06-10): a FULL dream only after an audit run
+  (the hourly review is the natural sleep trigger); every other run gets at
+  most a DAYDREAM — one ≤40-word ephemeral musing, written to the public site
+  only (never committed), so the timeline carries no dream noise and the agent
+  never looks like it's burning cycles. Safe to fire blind.
+  """
   def maybe_dream(tenant) do
     repo = Workbooks.Git.repo_path(tenant)
     dir = Path.join(repo, "rem")
 
-    fresh_ms =
-      case newest_entry(dir) do
-        nil -> :infinity
-        path -> System.system_time(:millisecond) - file_mtime_ms(path)
+    last_subject =
+      case System.cmd("git", ["log", "-1", "--format=%s"], cd: repo, stderr_to_stdout: true) do
+        {out, 0} -> String.trim(out)
+        _ -> ""
       end
 
-    if fresh_ms == :infinity or fresh_ms >= min_interval_ms() do
-      dream(tenant)
-    else
-      :ok
+    cond do
+      String.starts_with?(last_subject, "audit:") and stale?(dir, min_interval_ms()) ->
+        dream(tenant)
+
+      daydream_stale?(tenant) ->
+        daydream(tenant)
+
+      true ->
+        :ok
     end
   rescue
     e -> Logger.warning("Dreams: skipped — #{Exception.message(e)}")
+  end
+
+  defp stale?(dir, interval) do
+    case newest_entry(dir) do
+      nil -> true
+      path -> System.system_time(:millisecond) - file_mtime_ms(path) >= interval
+    end
   end
 
   @doc "One REM cycle: gather → mercury → validate → write/commit/publish."
@@ -68,6 +86,74 @@ defmodule Workbooks.Dreams do
 
       other ->
         Logger.warning("Dreams: no dream this cycle — #{inspect(other)}")
+    end
+  end
+
+  # ── daydreams: ephemeral, public-site only, never committed ─────────────────
+
+  @daydream_min_ms 720_000
+
+  defp daydreams_path(tenant),
+    do: Path.join([System.get_env("WB_DATA") || File.cwd!(), "build", "public", tenant, "rem", "daydreams.json"])
+
+  defp daydream_stale?(tenant) do
+    case File.stat(daydreams_path(tenant), time: :posix) do
+      {:ok, %{mtime: t}} -> System.system_time(:second) - t >= div(@daydream_min_ms, 1000)
+      _ -> true
+    end
+  end
+
+  @doc "One passing daydream — a ≤40-word musing for the dreaming state. Ephemeral."
+  def daydream(tenant) do
+    repo = Workbooks.Git.repo_path(tenant)
+
+    steps =
+      case File.read(Path.join(repo, "_steps.jsonl")) do
+        {:ok, s} ->
+          s |> String.split("\n", trim: true) |> Enum.take(-6)
+          |> Enum.map_join("; ", fn line ->
+            case Jason.decode(line) do
+              {:ok, ev} -> to_string(ev["tool"])
+              _ -> ""
+            end
+          end)
+
+        _ -> "(quiet)"
+      end
+
+    board =
+      case File.read(Path.join(repo, "plan.org")) do
+        {:ok, s} -> String.slice(s, 0, 1200)
+        _ -> ""
+      end
+
+    case Workbooks.Llm.complete(
+           [
+             %{role: "system", content: "You are Waldo, an agent maintaining a website, drifting between runs — daydreaming. ONE passing thought, max 40 words, lowercase, present tense, a little wistful, about the work or the site. No quotes."},
+             %{role: "user", content: "recent activity: #{steps}\nboard:\n#{board}"}
+           ],
+           model: System.get_env("WB_DREAM_MODEL", @default_model),
+           retries: 0,
+           temperature: 1.0
+         ) do
+      {:ok, %{content: text}} when is_binary(text) ->
+        path = daydreams_path(tenant)
+        File.mkdir_p!(Path.dirname(path))
+
+        existing =
+          with {:ok, j} <- File.read(path),
+               {:ok, %{"daydreams" => d}} when is_list(d) <- Jason.decode(j) do
+            d
+          else
+            _ -> []
+          end
+
+        entry = %{ts: System.system_time(:second), text: text |> String.trim() |> String.slice(0, 240)}
+        File.write!(path, Jason.encode!(%{daydreams: Enum.take([entry | existing], 60)}))
+        Logger.info("Dreams: daydreamed")
+
+      other ->
+        Logger.warning("Dreams: no daydream — #{inspect(other)}")
     end
   end
 
