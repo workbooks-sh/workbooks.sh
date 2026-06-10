@@ -121,26 +121,83 @@ body.panel-open .nav { left: calc((100vw - var(--panel-w)) / 2); }
 .btn.primary:hover { background: #fff; }
 .btn.ghost { color: var(--dim); border-color: var(--line); background: transparent; }
 .btn.ghost:hover { color: var(--ink); border-color: var(--faint); }
-/* ── the three layers: vibrant color cards ───────────────────── */
-#layers {
-  width: min(880px, calc(100% - 64px)); margin: 0 auto; padding: 80px 0 8px;
+/* ── section system: full-bleed bands with a shared inner column ─
+   Real sections, not one homogenized scroll: alternating background
+   bands, numbered kickers, one container width. ──────────────── */
+section.band { position: relative; padding: 92px 0; }
+section.band > .inner { width: min(960px, calc(100% - 64px)); margin: 0 auto; }
+section.band.alt {
+  background: #0f1116;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
 }
-#layers h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 24px; }
+.kicker {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+  font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--live);
+}
+.kicker::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+section.band h2 { font: 600 clamp(24px, 2.8vw, 34px)/1.12 var(--sans); letter-spacing: -.022em; margin: 0 0 14px; }
+section.band .lede { color: var(--dim); font: 400 15px/1.6 var(--sans); max-width: 60ch; margin: 0 0 32px; }
+
+/* footer: the page ends like a website, not a scroll runout */
+footer.foot { border-top: 1px solid var(--line); padding: 36px 0 44px; }
+footer.foot .inner {
+  width: min(960px, calc(100% - 64px)); margin: 0 auto;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+footer.foot .glyph { width: 18px; height: 14px; color: var(--faint); }
+footer.foot .glyph svg { display: block; width: 100%; height: 100%; }
+footer.foot span, footer.foot a { font: 400 12px/1 var(--mono); color: var(--faint); text-decoration: none; }
+footer.foot a:hover { color: var(--ink); }
+footer.foot .tail { margin-left: auto; }
+
+/* ── the three layers: dark cards, each lit by its color ─────── */
 .lgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 760px) { .lgrid { grid-template-columns: 1fr; } }
-.lcard { border-radius: 16px; padding: 22px 22px 26px; min-height: 210px; display: flex; flex-direction: column; gap: 12px; }
-.lcard .lk { font: 500 11.5px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; opacity: .72; }
-.lcard p { margin: auto 0 0; font: 450 14.5px/1.5 var(--sans); letter-spacing: -.005em; }
-.lcard.c-green { background: var(--live); color: #04130a; }
-.lcard.c-blue  { background: #5ea2ff; color: #061226; }
-.lcard.c-amber { background: #f5b945; color: #241503; }
+.lcard {
+  position: relative; overflow: hidden;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line); border-radius: 14px;
+  padding: 24px 22px 26px; min-height: 228px;
+  display: flex; flex-direction: column;
+  transition: transform .35s cubic-bezier(.2,.8,.2,1), border-color .35s;
+}
+.lcard:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--lc) 45%, var(--line)); }
+.lcard::before {                       /* the color, as light */
+  content: ""; position: absolute; top: -130px; right: -90px;
+  width: 260px; height: 260px; border-radius: 50%;
+  background: var(--lc); filter: blur(48px); opacity: .14;
+  transition: opacity .4s;
+}
+.lcard:hover::before { opacity: .26; }
+.lcard::after {                        /* hairline accent along the top */
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--lc), transparent 72%); opacity: .8;
+}
+.lcard .lk { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--lc); }
+.lcard p { margin: auto 0 0; font: 400 14.5px/1.55 var(--sans); letter-spacing: -.005em; color: var(--dim); position: relative; }
+.lcard p b { color: var(--ink); font-weight: 550; }
+.lcard .num {
+  position: absolute; right: 16px; bottom: 6px;
+  font: 600 68px/1 var(--sans); letter-spacing: -.04em;
+  color: var(--lc); opacity: .09; pointer-events: none;
+}
+.lcard.c-green { --lc: var(--live); }
+.lcard.c-blue  { --lc: #5ea2ff; }
+.lcard.c-amber { --lc: #f5b945; }
+
+/* ── scroll reveal: below-the-fold content arrives, it doesn't sit ─ */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+.reveal.on { opacity: 1; transform: none; }
+.lgrid .lcard:nth-child(2) { transition-delay: .1s; }
+.lgrid .lcard:nth-child(3) { transition-delay: .2s; }
 
 /* ── agent-grown sections land below the hero ────────────────────
    The agent appends <section class="grown"> blocks here. Give them a
    sane default so its first sections inherit the page's look. */
 #grown { display: flex; flex-direction: column; align-items: center; gap: 0; }
 #grown section.grown {
-  width: min(880px, calc(100% - 64px)); margin: 0 auto; padding: 72px 0;
+  width: min(960px, calc(100% - 64px)); margin: 0 auto; padding: 72px 0;
   border-top: 1px solid var(--line);
 }
 #grown h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 14px; }
@@ -148,12 +205,6 @@ body.panel-open .nav { left: calc((100vw - var(--panel-w)) / 2); }
 #grown a { color: var(--live); }
 
 /* ── examples: human-curated showcase (agent-untouchable) ────── */
-#examples {
-  width: min(880px, calc(100% - 64px)); margin: 0 auto; padding: 80px 0;
-  border-top: 1px solid var(--line);
-}
-#examples h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 12px; }
-#examples .xsub { color: var(--dim); font: 400 15px/1.6 var(--sans); max-width: 60ch; margin: 0 0 28px; }
 .xgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .poster.featured { grid-column: 1 / -1; aspect-ratio: 16 / 6.8; }
 .poster.featured .pimg {
@@ -364,37 +415,45 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
   </main>
 
   <!-- the three layers: human-curated. The agent never edits this section. -->
-  <section id="layers">
-    <h2>Three things to know</h2>
+  <section id="layers" class="band">
+   <div class="inner">
+    <div class="kicker reveal">01 · the stack</div>
+    <h2 class="reveal">How it fits together</h2>
     <div class="lgrid">
-      <div class="lcard c-green">
+      <div class="lcard c-green reveal">
         <span class="lk">workbooks</span>
-        <p>The apps. Everything an app is — its data, its logic, its interface —
-        travels as one piece you can open anywhere, share like a file, and
-        reshape like a document.</p>
+        <p><b>The apps.</b> Everything an app is — its data, its logic, its
+        interface — travels as one piece you can open anywhere, share like a
+        file, and reshape like a document.</p>
+        <span class="num">01</span>
       </div>
-      <div class="lcard c-blue">
+      <div class="lcard c-blue reveal">
         <span class="lk">the runtime</span>
-        <p>The engine. One server runs your apps, their agents, and everything
-        they do — on a laptop, across a company, or for the open internet,
-        without changing a line.</p>
+        <p><b>The engine.</b> One server runs your apps, their agents, and
+        everything they do — on a laptop, across a company, or for the open
+        internet, without changing a line.</p>
+        <span class="num">02</span>
       </div>
-      <div class="lcard c-amber">
+      <div class="lcard c-amber reveal">
         <span class="lk">toolkits</span>
-        <p>How it grows. Every capability — charts, AI, payments, whatever's
-        next — is authored the same way, so what you start with is never what
-        you're stuck with.</p>
+        <p><b>How it grows.</b> Every capability — charts, AI, payments,
+        whatever's next — is authored the same way, so what you start with is
+        never what you're stuck with.</p>
+        <span class="num">03</span>
       </div>
     </div>
+   </div>
   </section>
 
   <!-- examples: human-curated. The agent never edits this section. -->
-  <section id="examples">
-    <h2>Workbooks in the wild</h2>
-    <p class="xsub">Software built in workbooks — real sites and tools with real
+  <section id="examples" class="band alt">
+   <div class="inner">
+    <div class="kicker reveal">02 · in the wild</div>
+    <h2 class="reveal">Workbooks in the wild</h2>
+    <p class="lede reveal">Software built in workbooks — real sites and tools with real
     jobs, running on this same runtime. This page is one of them.</p>
     <div class="xgrid">
-      <a class="poster featured" href="#" aria-disabled="true">
+      <a class="poster featured reveal" href="#" aria-disabled="true">
         <div class="pbg"></div>
         <div class="pimg"></div>
         <div class="pscrim"></div>
@@ -405,14 +464,25 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
         </div>
         <span class="pstatus">in production</span>
       </a>
-      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
-      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
-      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
+      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
+      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
+      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
     </div>
+   </div>
   </section>
 
   <!-- the agent appends new sections here, one per hour -->
   <div id="grown"></div>
+
+  <footer class="foot">
+    <div class="inner">
+      <span class="glyph"><svg viewBox="0 0 258 206" fill="none"><path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/></svg></span>
+      <span>workbooks</span>
+      <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
+      <a href="https://github.com/workbooks-sh/living-lander">this site's source</a>
+      <span class="tail">served live by the workbooks runtime · kept by waldo</span>
+    </div>
+  </footer>
 </div>
 
 <!-- fixed right panel: the live timeline -->
@@ -497,6 +567,14 @@ async function build() {
   await place('#b-ctas');
   await cursorExit();
   openPanel();        // the timeline reveals itself only after the agent leaves
+}
+
+/* ── scroll reveal ────────────────────────────────────────────── */
+{
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
+  }), { threshold: 0.18 });
+  document.querySelectorAll('.reveal').forEach(el => reduced ? el.classList.add('on') : io.observe(el));
 }
 
 /* ── platform-aware desktop download ──────────────────────────── */
