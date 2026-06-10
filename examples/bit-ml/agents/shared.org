@@ -18,6 +18,9 @@ your role def adds only your territory and hand-offs.
   - `shell` — the in-WASM shell (echo/cat/grep/jq/sd pipelines). Real, fast.
   - `wb` — the engine CLI. `wb content check` validates manifests/partials.
   - `fetch` — HTTP GET. Your only window to the web.
+  - `image` — host-brokered image generation. Budget: 2 images per run.
+    Written to `content/images/<slug>-banner.webp`. See skills/design.org
+    banner law for when a story earns one.
   - `git` — host-brokered commit+push of your workdir. You supply only the
     message; the host runs git.
   - `publish` — host-brokered copy of content/** to the live site dir.
@@ -61,3 +64,7 @@ your role def adds only your territory and hand-offs.
   `wb content check` must pass. A story partial renders from its org via
   orgitorial — if your change breaks rendering (malformed org), fix before
   advancing. The site never ships a broken manifest.
+
+  A story with a broken interactive block (mermaid that fails activate(),
+  :app that errors, :width that clips) does not advance. Fix or remove the
+  block. A story with a banner that has text in the image does not advance.
