@@ -24,6 +24,12 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb content check [dir]` validates a tenant CMS content tree (manifests
+      # vs files, dup orders, faq-last, partial shape) — pure file reads, no app
+      # boot. The agent's pre-publish gate so a broken page can't ship silently.
+      ["content", "check"] -> content_check(".")
+      ["content", "check", dir] -> content_check(dir)
+
       # `wb rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
       # (no NIF), just :httpc against the discovered/configured target.
       ["rt" | rest] ->
@@ -490,4 +496,17 @@ defmodule Workbooks.CLI do
       wb version
     """
   end
+
+  defp content_check(dir) do
+    case Workbooks.Content.check(dir) do
+      {:ok, summary} ->
+        IO.puts(summary)
+
+      {:error, problems} ->
+        IO.puts("content check FAILED (#{length(problems)}):")
+        Enum.each(problems, &IO.puts("  - #{&1}"))
+        System.halt(1)
+    end
+  end
+
 end

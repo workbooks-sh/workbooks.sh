@@ -207,12 +207,10 @@
     4. Implement the one thing. Real content only.
     5. Self-review (ground rule 4).
     6. VALIDATE then DEPLOY (the content is the page — get it consistent):
-       a. Every manifest row points at a file that exists, and every file has
-          a row (no orphans). Check with the run tool, e.g.
-          `for f in $(jq -r '.[].file' content/sections.json); do test -f "$f" || echo "MISSING $f"; done`
-          and the reverse (ls content/sections/*.html, confirm each is in the
-          manifest). No duplicate `order`. Each section file has exactly one
-          `<section class="grown">` and one `<h2>`.
+       a. Run `wb content check` — it validates the whole tree (every manifest
+          row has a file, every file has a row, no duplicate orders, faq pinned
+          last, each section has one <section class="grown"> + an <h2>). Fix
+          everything it reports before deploying. A clean check is the gate.
        b. Publish to the live site root (this is what makes it appear — there
           is no build): copy your changed content to the public web root:
           `D=/data/build/public/wb-lander-live; mkdir -p $D/content/sections $D/blog;
