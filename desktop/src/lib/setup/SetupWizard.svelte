@@ -230,8 +230,8 @@
     cursor: pointer;
     transition: border-color 0.12s, transform 0.12s;
   }
-  .choice :global(svg) { grid-row: 1 / 3; align-self: center; color: var(--color-accent, #2f6fe0); }
-  .choice:hover { border-color: var(--color-accent, #2f6fe0); transform: translateY(-1px); }
+  .choice :global(svg) { grid-row: 1 / 3; align-self: center; color: var(--color-brand, #149157); }
+  .choice:hover { border-color: var(--color-brand, #149157); transform: translateY(-1px); }
   .ct { font-size: 0.9rem; font-weight: 600; color: var(--color-fg); }
   .cd { font-size: 0.78rem; color: var(--color-fg-subtle); }
 
@@ -249,8 +249,8 @@
   }
   .field input:focus {
     outline: none;
-    border-color: var(--color-accent, #2f6fe0);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #2f6fe0) 18%, transparent);
+    border-color: var(--color-brand, #149157);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand, #149157) 18%, transparent);
   }
 
   .log {
@@ -283,9 +283,9 @@
     border: 1px solid transparent;
   }
   .btn.primary {
-    background: var(--color-accent, #2f6fe0);
+    background: var(--color-brand, #149157);
     color: #fff;
-    border-color: var(--color-accent, #2f6fe0);
+    border-color: var(--color-brand, #149157);
   }
   .btn.primary:hover:not(:disabled) { filter: brightness(1.05); }
   .btn.ghost { background: transparent; border-color: var(--color-border); color: var(--color-fg-muted); }

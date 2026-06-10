@@ -655,9 +655,9 @@
     flex-shrink: 0;
     opacity: 0.7;
   }
-  .kind-workbook { color: #5b8cff; opacity: 0.95; }
-  .kind-org { color: #10b981; opacity: 0.95; }
-  .kind-code { color: #a855f7; opacity: 0.95; }
+  .kind-workbook { color: var(--color-fg-muted); }
+  .kind-org { color: var(--color-fg-muted); }
+  .kind-code { color: var(--color-fg-muted); }
   .dot {
     width: 6px;
     height: 6px;

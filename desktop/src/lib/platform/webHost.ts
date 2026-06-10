@@ -36,7 +36,7 @@ declare global {
 if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
   window.__WB_MOCK_INVOKE__ = makeInvoke();
   // eslint-disable-next-line no-console
-  console.info("%c[webHost] mock backend active — browser preview, no runtime", "color:#2f6fe0");
+  console.info("%c[webHost] mock backend active — browser preview, no runtime", "color:#149157");
 }
 
 // ── seed data ─────────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ function stubWorkbookHtml(path: string): string {
   h1 { font-size:20px; margin:0 0 8px; }
   p { margin:0; color:#6b7280; font-size:13px; }
   .tag { display:inline-block; margin-bottom:16px; padding:3px 10px;
-    border-radius:999px; background:#eef2ff; color:#2f6fe0; font-size:11px;
+    border-radius:999px; background:rgba(20,145,87,.10); color:#149157; font-size:11px;
     font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
 </style></head>
 <body><div class="card"><span class="tag">Stub workbook</span>

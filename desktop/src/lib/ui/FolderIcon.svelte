@@ -10,7 +10,7 @@
   import Icon from "$lib/ui/Icon.svelte";
 
   let {
-    color = "var(--color-brand, #2f6fe0)",
+    color = "var(--color-brand, #149157)",
     badge = "",
     name = "",
     size = 18,

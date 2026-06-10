@@ -103,6 +103,25 @@
     }
   }
 
+  // ── local-install capability (OS gate) ───────────────────────────
+  // engine_detect says whether THIS machine can host a local runtime.
+  // Unsupported OS → only cloud options render. Probe failure
+  // fail-opens to supported (the wizard re-checks before installing).
+  let localSupported = $state(true);
+  let detectChecked = $state(false);
+  $effect(() => {
+    if (step !== "runtime" || detectChecked) return;
+    detectChecked = true;
+    void (async () => {
+      try {
+        const d = await invoke<{ supported?: boolean } | null>("engine_detect");
+        if (d && d.supported === false) localSupported = false;
+      } catch {
+        /* fail-open */
+      }
+    })();
+  });
+
   // ── cloud runtime via auth (wb-hhf.1) — graceful absence ─────────
   // When signed in, ask the broker for runtime credentials (an org or
   // hosted runtime). The Tauri command doesn't exist yet; the probe
@@ -267,13 +286,28 @@
                 <CloudArrowUp size={14} weight="fill" />
                 {cloudConnectBusy ? "Connecting…" : "Connect your cloud runtime"}
               </button>
-              <button type="button" class="ghost" onclick={() => wizard.open()}>
-                Install locally instead
-              </button>
-            {:else}
+              {#if localSupported}
+                <button type="button" class="ghost" onclick={() => wizard.open()}>
+                  Install locally instead
+                </button>
+              {/if}
+            {:else if localSupported}
               <div class="status idle">Not running yet</div>
               <button type="button" class="primary" onclick={() => wizard.open()}>
                 Set up runtime
+              </button>
+            {:else}
+              <!-- OS can't host a local runtime — cloud is the only path. -->
+              <div class="status idle">Local runtime isn't supported on this OS</div>
+              <button
+                type="button"
+                class="primary"
+                onclick={() => {
+                  wizard.open();
+                  wizard.chooseCloud();
+                }}
+              >
+                <CloudArrowUp size={14} weight="fill" /> Connect a cloud runtime
               </button>
             {/if}
           {/if}
