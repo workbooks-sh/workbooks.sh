@@ -19,6 +19,15 @@ defmodule Workbooks.Keeper do
     - `WB_TENANT`             — the tenant whose git repo the keeper works in
                                 (default "local"); the run's workdir is that repo,
                                 so the keeper's commits ARE the public changelog.
+    - `WB_LIFECYCLE_DEF`      — OPTIONAL path to a lifecycle state-machine spec
+                                (see `Workbooks.Keeper.Lifecycle`). When set and
+                                parseable, the keeper consults it for what each
+                                tick IS (`wake_add | wake_audit | rem`) instead of
+                                relying on count-based prose in the agent def: a
+                                `wake` state runs the def with the state PREPENDED
+                                to the task line; a `rem` state skips the run and
+                                dreams directly. Unset / unparseable → exactly the
+                                env+prose behavior below (zero regression).
 
   `Workbooks.Keeper.run_once/0` triggers one tick immediately (for a watched
   manual validation run, e.g. over `fly ssh`).
@@ -52,13 +61,18 @@ defmodule Workbooks.Keeper do
   (last schedule + interval).
   """
   def status do
-    :persistent_term.get({__MODULE__, :status}, %{
-      active: false,
-      running: false,
-      last_run: nil,
-      next_run: nil,
-      interval_ms: nil
-    })
+    base =
+      :persistent_term.get({__MODULE__, :status}, %{
+        active: false,
+        running: false,
+        last_run: nil,
+        next_run: nil,
+        interval_ms: nil
+      })
+
+    # Surface the declared lifecycle position when a spec is active; nil otherwise
+    # (read straight through to /_activity, which returns status verbatim).
+    Map.put(base, :lifecycle, Workbooks.Keeper.Lifecycle.status())
   end
 
   defp put_status(patch) do
@@ -103,38 +117,89 @@ defmodule Workbooks.Keeper do
   def handle_info(:tick, %{active: false} = state), do: {:noreply, state}
 
   def handle_info(:tick, %{def_path: path} = state) do
-    Logger.info("Keeper: tick — running #{path}")
     write_last_run()
     put_status(%{running: true, last_run: System.system_time(:second)})
 
-    # Hard wall-clock bound per run (WB_KEEPER_RUN_TIMEOUT_MS, default 15m): a
-    # wedged run (e.g. a hung provider call) is killed and the next tick simply
-    # retries — the keeper must never stay stuck until a human restarts the box.
-    task = Task.async(fn -> run_def(File.read!(path)) end)
-
-    case Task.yield(task, run_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
-      {:ok, result} ->
-        Logger.info("Keeper: tick done — #{inspect(String.slice(result.result || "", 0, 120))}")
-
-      {:exit, reason} ->
-        Logger.error("Keeper: tick failed — #{inspect(reason)}")
-
-      nil ->
-        Logger.error("Keeper: tick killed — exceeded #{run_timeout_ms()}ms wall clock")
-    end
+    # When a lifecycle spec is active it decides what THIS tick is (wake vs rem,
+    # and which wake state); otherwise we fall back to the env+prose path exactly
+    # as before (zero regression when WB_LIFECYCLE_DEF is unset). wb-2ku.3.
+    run_tick(path, Workbooks.Keeper.Lifecycle.current())
 
     schedule()
     put_status(%{running: false, next_run: System.system_time(:second) + div(interval_ms(), 1000)})
-
-    # REM: after waking work, maybe dream (time-gated, fire-and-forget — a
-    # failed or slow dream can never touch the run loop). wb-2ku.
-    Task.start(fn -> Workbooks.Dreams.maybe_dream(System.get_env("WB_TENANT", "local")) end)
-
     {:noreply, state}
   end
 
   # trap_exit is on: absorb EXITs from run tasks (normal or killed).
   def handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state}
+
+  # ── tick dispatch ─────────────────────────────────────────────────────────────
+
+  # No lifecycle spec → original behavior: run the def, then maybe-dream (the
+  # time gate lives in Dreams). The agent def decides add-vs-audit from prose.
+  defp run_tick(path, nil) do
+    Logger.info("Keeper: tick — running #{path}")
+    wake(path, nil)
+    # REM: after waking work, maybe dream (time-gated, fire-and-forget — a failed
+    # or slow dream can never touch the run loop). wb-2ku.
+    Task.start(fn -> Workbooks.Dreams.maybe_dream(System.get_env("WB_TENANT", "local")) end)
+  end
+
+  # A gated state (rem before its min-interval elapsed, say) → no-op tick that
+  # holds cadence position: advance(:done) is NOT called, so we re-evaluate the
+  # same state next tick once the gate opens.
+  defp run_tick(_path, %{gated: true, state: s}) do
+    Logger.info("Keeper: tick — #{s} gated (min-interval not elapsed), holding position")
+  end
+
+  # rem state: skip the agent run; dream directly (the time gate now lives in the
+  # spec, not Dreams). A successful dream advances the lifecycle; a failed one
+  # holds position (retry next tick).
+  defp run_tick(_path, %{kind: :rem, state: s}) do
+    Logger.info("Keeper: tick — #{s} (rem) dreaming")
+    Workbooks.Keeper.Lifecycle.mark_ran(s)
+
+    outcome =
+      try do
+        Workbooks.Dreams.dream(System.get_env("WB_TENANT", "local"))
+        :done
+      rescue
+        e ->
+          Logger.error("Keeper: rem tick failed — #{Exception.message(e)}")
+          :failed
+      end
+
+    Workbooks.Keeper.Lifecycle.advance(outcome)
+  end
+
+  # wake state: run the def with the lifecycle state PREPENDED to the task line,
+  # so the def no longer needs count-based prose to choose add vs audit.
+  defp run_tick(path, %{kind: :wake, state: s}) do
+    Logger.info("Keeper: tick — #{s} (wake) running #{path}")
+    Workbooks.Keeper.Lifecycle.mark_ran(s)
+    Workbooks.Keeper.Lifecycle.advance(wake(path, s))
+  end
+
+  # Run the agent def under the wall-clock bound; returns the tick OUTCOME
+  # (:done | :failed | :killed) for the lifecycle to step on. `lifecycle_state`
+  # (nil in the env+prose path) is prepended to the task line when present.
+  defp wake(path, lifecycle_state) do
+    task = Task.async(fn -> run_def(File.read!(path), lifecycle_state) end)
+
+    case Task.yield(task, run_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} ->
+        Logger.info("Keeper: tick done — #{inspect(String.slice(result.result || "", 0, 120))}")
+        :done
+
+      {:exit, reason} ->
+        Logger.error("Keeper: tick failed — #{inspect(reason)}")
+        :failed
+
+      nil ->
+        Logger.error("Keeper: tick killed — exceeded #{run_timeout_ms()}ms wall clock")
+        :killed
+    end
+  end
 
   # ── private helpers ──────────────────────────────────────────────────────────
 
@@ -190,15 +255,20 @@ defmodule Workbooks.Keeper do
   # the tenant's git repo, so it reads/edits/commits the page IN its versioned
   # source of truth and its commits become the public changelog. The task line
   # carries the mode (plan|edit), which the def enforces.
-  defp run_def(org) do
+  defp run_def(org, lifecycle_state) do
     mode = System.get_env("WB_KEEPER_MODE", "plan")
     tenant = System.get_env("WB_TENANT", "local")
     workdir = Workbooks.Git.repo_path(tenant)
     Workbooks.Git.ensure_repo(tenant)
 
+    # When the lifecycle is driving, the state IS the add-vs-audit decision —
+    # prepend it so the def stops counting commits to decide. Absent → the def's
+    # own prose decides (the env+prose fallback).
+    lifecycle_line = if lifecycle_state, do: "LIFECYCLE: #{lifecycle_state}\n", else: ""
+
     Workbooks.AgentDef.run(
       org,
-      "MODE: #{mode}\nPerform one keeper run per your loop. Your working directory is this page's git repo.",
+      "MODE: #{mode}\n#{lifecycle_line}Perform one keeper run per your loop. Your working directory is this page's git repo.",
       exec: true,
       workdir: workdir,
       max_steps: 60
