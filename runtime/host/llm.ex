@@ -1,4 +1,5 @@
 defmodule Workbooks.Llm do
+  require Logger
   @moduledoc """
   The LLM client — OpenRouter (OpenAI-compatible chat/completions). The API key
   lives host-side (`OPENROUTER_API_KEY`); a Workbook/agent never sees it (the
@@ -27,7 +28,29 @@ defmodule Workbooks.Llm do
       |> maybe_put(:tool_choice, opts[:tools] && "auto")
       |> Jason.encode!()
 
-    post(body, opts[:retries] || 2)
+    # Hard outer bound: the per-request :httpc timeout has been observed not to
+    # fire (runs stalling 10+ min inside one completion call), so the whole
+    # post-with-retries is additionally wrapped in a killable Task. Worst case
+    # is (retries+1) × 120s; the bound sits just above it.
+    retries = opts[:retries] || 2
+    deadline = (retries + 1) * 120_000 + 15_000
+    t0 = System.monotonic_time(:millisecond)
+    task = Task.async(fn -> post(body, retries) end)
+
+    result =
+      case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
+        {:ok, r} -> r
+        {:exit, reason} -> {:error, {:llm_crash, reason}}
+        nil -> {:error, :llm_hard_timeout}
+      end
+
+    ms = System.monotonic_time(:millisecond) - t0
+
+    if ms > 30_000 or match?({:error, _}, result) do
+      Logger.info("Llm.complete: #{inspect(elem(result, 0))} after #{ms}ms")
+    end
+
+    result
   end
 
   defp post(body, retries) do

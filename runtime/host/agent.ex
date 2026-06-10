@@ -13,6 +13,7 @@ defmodule Workbooks.Agent do
   Every step is appended to an org-mode event log in the VFS (`events.org`) — the
   run is fully observable and OQL-queryable, like brandnana's events.org.
   """
+  require Logger
   alias Workbooks.{Llm, Shell, VFS}
 
   # ESCAPE HATCH (deprecated): real OS bash for NATIVE CLIs not yet available as
@@ -117,6 +118,8 @@ defmodule Workbooks.Agent do
 
   defp exec_tools(calls, st) do
     Enum.reduce(calls, {[], st, nil}, fn call, {msgs, s, done} ->
+      # step-start marker: if a run stalls, the logs show what was in flight
+      Logger.info("agent: step #{s.step} #{call.name} starting")
       t0 = System.monotonic_time(:millisecond)
       {out, s2, d} = exec_one(call, Map.put(s, :last, %{}))
       meta = Map.get(s2, :last, %{})
