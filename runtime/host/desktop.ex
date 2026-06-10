@@ -34,22 +34,24 @@ defmodule Workbooks.Desktop do
   def bind_ip, do: {0, 0, 0, 0, 0, 0, 0, 0}
 
   @doc """
-  Control-plane listener options, mode-gated (wb-ryw). krunvm's TSI
-  wedges the guest's virtio transport under many concurrent accepts on
-  one socket AND under :inet6 transport options — so the container
-  binds plain IPv4 with a single acceptor (proven safe in-guest; the
-  host port map fronts it). Raw dev keeps the dual-stack listener so
-  localhost-as-::1 connects work.
-
-  startup_log must stay OFF in-container: Bandit's startup-log path
-  (ThousandIsland.listener_info from the listener process) deadlocks the
-  whole virtio transport under TSI (libkrun 1.18–1.19) — file I/O and all
-  sockets freeze guest-wide. Bisected in-guest: identical listener is
-  green with startup_log: false, wedges with it on.
+  Control-plane listener options, mode-gated (wb-ryw). Under krunvm, TSI
+  serializes guest socket control ops behind a parked blocking accept (see
+  `Workbooks.Desktop.TsiTcp`), so the container listener must use the
+  polling-accept transport, plain IPv4, a single acceptor, and no Bandit
+  startup log (its `listener_info`/sockname call is exactly the kind of op
+  that parks behind the acceptor — it blocked boot forever). Raw dev keeps
+  the stock dual-stack listener so localhost-as-::1 connects work.
   """
   def listener_opts do
     if mode() == "container" do
-      [ip: {0, 0, 0, 0}, startup_log: false, thousand_island_options: [num_acceptors: 1]]
+      [
+        ip: {0, 0, 0, 0},
+        startup_log: false,
+        thousand_island_options: [
+          num_acceptors: 1,
+          transport_module: Workbooks.Desktop.TsiTcp
+        ]
+      ]
     else
       [ip: bind_ip(), thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]]
     end
