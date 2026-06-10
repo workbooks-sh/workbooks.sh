@@ -1,0 +1,180 @@
+#+TITLE: orgitorial — authoring
+#+TOOLKIT: orgitorial
+#+SKILL: authoring
+#+TAGS: authoring org-syntax writing metadata subset
+#+STATUS: experimental
+
+* When to use this
+
+Read this when you are *writing post content* in org for orgitorial to render.
+It is the map of the supported subset — what to type and what it becomes. If
+you can write a to-do list, you already know enough. For how the rendered
+classes are styled, see =components=; for plugging the output into a site, see
+=integrate=.
+
+* The mental model
+
+A post is one =.org= file: a metadata block at the top, then prose organized by
+=*= headlines. orgitorial supports the *blogging 90%* of org — the constructs
+you actually reach for in an article. Anything outside the subset is *not
+dropped*: it is preserved as escaped text in a =.org-raw= block so nothing
+silently vanishes. Malformed markup never breaks the render; it degrades to a
+paragraph.
+
+* Metadata (the header)
+
+Put keyword lines at the top. They become the article =<header>= (unless you
+render with =header:false=) and are also returned by =parseMeta= for page
+titles / OG tags / indexes.
+
+#+begin_src org
+#+TITLE: Writing for the Web in Org-mode
+#+AUTHOR: The Orgitorial Team
+#+DATE: 2031-11-22
+#+keywords: org-mode, writing, publishing
+#+end_src
+
+- =#+TITLE:= → =h1.org-title=
+- =#+AUTHOR:= → =.org-author=
+- =#+DATE:= → =.org-date= (any string; an ISO date also feeds inline
+  timestamps elsewhere)
+- =#+keywords:= (or =#+tags:=) → comma/space separated → tag pills in the header
+
+Other =#+keyword:= lines you don't need are ignored safely.
+
+* Headlines, TODO state, and tags
+
+Stars set depth. org level 1 renders as =h2= (=h1= is reserved for the title),
+levels 2–4 as =h3=–=h5=.
+
+#+begin_src org
+* Section                     -> h2.org-h
+** Subsection                 -> h3.org-h
+*** Sub-subsection            -> h4.org-h
+* TODO Ship the renderer      -> state chip "TODO"  (h2.org-h.org-todo)
+* DONE Editorial CSS          -> state chip "DONE"  (h2.org-h.org-done)
+* Roadmap :planning:urgent:   -> trailing :tags: become pills
+#+end_src
+
+Recognized TODO keywords: =TODO NEXT WAITING STARTED IN-PROGRESS= (rendered as
+=org-todo=); DONE keywords: =DONE CANCELLED CANCELED= (=org-done=). They must be
+ALL-CAPS and lead the headline. Tags are =:colon:delimited:= at the line end.
+
+* Inline markup
+
+| You type        | You get             | Class               |
+|-----------------+---------------------+---------------------|
+| =*bold*=        | *bold*              | =strong=            |
+| =/italic/=      | /italic/            | =em=                |
+| =_underline_=   | underline           | =u=                 |
+| =+strike+=      | strike              | =del=               |
+| ==verbatim==    | literal text        | =code.org-verbatim= |
+| =~code~=        | a code token        | =code.org-code=     |
+
+Emphasis follows org's rule: the marker hugs the word (no space just inside),
+and is bounded by whitespace or punctuation. =a * b= is not bold.
+
+* Links, images, timestamps
+
+#+begin_src org
+[[https://orgmode.org][the org-mode site]]   -> a.org-link with description
+[[https://workbooks.sh]]                       -> a.org-link, url as text
+https://workbooks.sh                           -> bare url auto-links
+[[diagram.png]]                                -> img.org-img (image extensions)
+[[photo.jpg][A caption]]                        -> img with alt="A caption"
+<2031-11-22 Sat>                               -> time.org-ts (inline timestamp)
+#+end_src
+
+Image extensions detected: png jpg jpeg gif svg webp avif bmp.
+
+* Lists and checkboxes
+
+Indent two spaces to nest. Mix is fine.
+
+#+begin_src org
+- unordered item              (dash, plus, or star bullet)
+- second
+  - nested (indent 2)
+1. ordered item               (N. or N) )
+2. second
+
+- [ ] not done                -> li.org-check[data-checked="false"]
+- [X] done                    -> li.org-check[data-checked="true"]
+- [-] partial                 -> li.org-check[data-checked="partial"]
+#+end_src
+
+* Tables
+
+Pipe-delimited. A rule line (=|---|=, any =|-+-|= shape) marks the row *above*
+it as the header.
+
+#+begin_src org
+| Name  | Role     |
+|-------+----------|
+| Ada   | author   |
+| Linus | reviewer |
+#+end_src
+
+* Blocks
+
+#+begin_src org
+,#+begin_src python          -> pre.org-src[data-lang="python"], escaped,
+print("hi")                     code.org-src-code.language-python
+,#+end_src
+
+,#+begin_quote                -> blockquote.org-quote
+A line worth quoting.
+,#+end_quote
+
+,#+begin_example              -> pre.org-example (literal, no language bar)
+raw output, preserved
+,#+end_example
+
+,#+begin_verse                -> p.org-verse (line breaks preserved)
+Roses are red
+Violets are blue
+,#+end_verse
+#+end_src
+
+(The leading comma above is org's escape for a nested block in a source block —
+drop it when you write a real block.) Source blocks escape HTML and label the
+language; bring your own highlighter by targeting =.org-src-code.language-*=.
+
+* Drawers, footnotes, rules
+
+#+begin_src org
+:PROPERTIES:                  -> details.org-drawer (collapsed by default)
+:ID:       my-post
+:CATEGORY: tutorial
+:END:
+
+Text with a note[fn:1].       -> sup.org-fnref linking to the definition
+
+[fn:1] The definition.        -> collected into a Footnotes section at the end
+
+-----                         -> hr.org-rule  (5+ dashes on their own line)
+#+end_src
+
+* What is NOT in the subset (and what happens)
+
+Consciously excluded — these pass through as escaped =.org-raw=, never lost:
+
+- =#+begin_src= *execution / results* (=:results=, =#+RESULTS:=) — render-only,
+  no code runs.
+- *LaTeX math* (=\(...\)=, =$...$=, =#+begin_math=) — passes through verbatim.
+- =#+INCLUDE:=, macros (=#+MACRO:= / ={{{...}}}=), babel noweb references.
+- *Radio targets*, internal =<<targets>>= / =[[*Headline]]= cross-links,
+  =#+NAME:=/=#+CAPTION:= affiliated keywords.
+- Description lists (=term :: def=), =#+begin_center/comment=, clock/scheduling
+  drawers, column view.
+- *Subscripts/superscripts* (=a^2=, =H_2O=) and entities (=\alpha=).
+
+If you need one of these, it is a deliberate scope decision — author around it,
+or extend the renderer (and update =components=). The contract: unsupported ≠
+silent. You will see it preserved, escaped, in the output.
+
+* Done-when
+
+The post reads as you intend, every construct you used is in the subset table
+above (or you accept it rendering as =.org-raw=), and =parseMeta= returns the
+title/author/date you set. Verify by rendering once — don't guess.

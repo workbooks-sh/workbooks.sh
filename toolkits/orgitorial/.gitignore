@@ -1,0 +1,4 @@
+# orgitorial ships its renderer + CSS + specimen as source artifacts,
+# not build output — override the repo-wide **/dist/ ignore for this toolkit.
+!dist/
+!dist/**

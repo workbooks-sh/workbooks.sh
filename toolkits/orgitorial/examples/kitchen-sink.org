@@ -1,0 +1,144 @@
+#+TITLE: Writing for the Web in Org-mode
+#+AUTHOR: The Orgitorial Team
+#+DATE: 2031-11-22
+#+keywords: org-mode, writing, publishing, plain-text
+
+Plain text outlives every CMS. This post is itself an =.org= file, rendered
+to the page you're reading by *orgitorial* — a single zero-dependency
+renderer. It doubles as a kitchen sink: every construct below is live proof
+that the toolkit handles it. If you can write a blog post, you already know
+enough org-mode to ship.
+
+* Why org-mode :rationale:
+
+Org-mode is a /plain-text/ outline format. It started as an Emacs mode for
+notes and to-do lists, but the markup is small, legible, and *durable* —
+which is exactly what you want for content you'll keep for a decade. You get
+structure (~headlines~), rich text, lists, tables, and code, with none of the
+lock-in of a database-backed editor.
+
+The pitch in one line: write once in =.org=, render anywhere with one file.
+
+** Emphasis you'll actually use
+
+You can make text *bold*, /italic/, _underlined_, or +struck through+.
+Inline code comes in two flavors: =verbatim= (literal) and ~code~ (a token).
+Links are first-class: [[https://orgmode.org][the org-mode home page]], or a
+bare URL like https://workbooks.sh that auto-links. Footnotes[fn:1] keep your
+prose clean while still citing your sources.
+
+** Timestamps and tags
+
+Org has native dates. This post was filed <2031-11-22 Sat>, and headlines can
+carry =:tags:= (see the heading above) for lightweight categorization.
+
+* Lists, the workhorse :lists:
+
+Unordered lists use a dash:
+
+- One renderer file, zero dependencies
+- A complete CSS library, themed by custom properties
+- Skills that document the class contract
+  - Nesting just works — indent two spaces
+  - Go as deep as the idea requires
+
+Ordered lists count for you:
+
+1. Write your post in =.org=
+2. Run it through ~render()~
+3. Drop in the stylesheet
+4. Ship
+
+And checkboxes track real state:
+
+- [X] Renderer ships as one file
+- [X] CSS themed entirely via variables
+- [-] Syntax highlighting (the class hook is there; bring your own)
+- [ ] Your next post
+
+An image link renders as an =<img>= — point it at any =.png/.jpg/.svg=:
+
+[[data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='200'%3E%3Crect width='720' height='200' fill='%23b3411f'/%3E%3Ctext x='50%25' y='50%25' fill='%23fbf9f4' font-family='monospace' font-size='28' text-anchor='middle' dominant-baseline='middle'%3Eorgitorial%3C/text%3E%3C/svg%3E.svg][orgitorial banner]]
+
+* Tables without the pain :tables:
+
+A header row is separated by a rule line (=|---|=):
+
+| Construct   | Org syntax        | HTML class      |
+|-------------+-------------------+-----------------|
+| Headline    | =* Title=         | =h2.org-h=      |
+| Source      | =#+begin_src=     | =pre.org-src=   |
+| Quote       | =#+begin_quote=   | =blockquote=    |
+| Checkbox    | =- [ ] item=      | =li.org-check=  |
+
+* Code, quoted and highlighted :code:
+
+Source blocks preserve whitespace, escape your HTML, and label the language:
+
+#+begin_src javascript
+import { render } from "./orgitorial.js";
+
+const html = render(orgText);          // string in, string out
+document.querySelector("#post").innerHTML = html;
+#+end_src
+
+A plain example block (no language bar) is for literal output:
+
+#+begin_example
+$ node -e "import('./dist/orgitorial.js').then(m => console.log(m.render('* hi')))"
+<article class="org-doc"><h2 class="org-h">hi</h2></article>
+#+end_example
+
+And a quote, for when someone said it better:
+
+#+begin_quote
+The best format is the one you can still read in twenty years.
+#+end_quote
+
+A verse block keeps your line breaks — handy for a pull-stanza or a snippet of
+poetry:
+
+#+begin_verse
+Plain text in,
+clean HTML out —
+one file does it,
+no build to doubt.
+#+end_verse
+
+* Drawers for metadata :advanced:
+
+Property drawers fold away the machinery so the prose stays clean. They render
+collapsed by default — click to expand:
+
+:PROPERTIES:
+:ID:       writing-for-the-web
+:CATEGORY: tutorial
+:READTIME: 4 min
+:END:
+
+* Roadmap, as headline state :roadmap:
+
+Headlines can carry TODO/DONE keywords — org's native way to track work.
+orgitorial renders the keyword as a colored state chip:
+
+** DONE One-file renderer
+** DONE Editorial CSS, themed by variables
+** TODO Pluggable syntax highlighting
+** TODO Your contribution
+
+* Where it goes :ship:
+
+orgitorial is built to plug into anything: a static site, the workbooks
+living-lander blog, a bit.ml story. The renderer is pure string→string, so it
+runs in a browser tag, in Node at build time, and in the runtime's QuickJS
+wasm lane. Re-theme it by setting a few CSS variables; the class contract is
+the whole API.
+
+-----
+
+That's the kitchen sink. Everything above this rule is a supported construct,
+rendered by the same one file you'd ship.
+
+[fn:1] A footnote is reference-and-definition: drop =[fn:1]= inline, define it
+later with =[fn:1] the text=. orgitorial collects them into a Footnotes
+section at the end, with backlinks.
