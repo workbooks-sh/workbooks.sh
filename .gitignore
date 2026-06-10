@@ -66,3 +66,8 @@ runtime/.publish_out/
 # CLAUDE.md is a local-only symlink → AGENTS.md (single source of truth, vendor-neutral)
 /CLAUDE.md
 secrets.env
+
+# project skills ARE shipped (the rest of .claude/ stays local)
+!.claude/
+.claude/*
+!.claude/skills/
