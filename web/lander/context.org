@@ -33,6 +33,14 @@ claim, verify it in the source checkout (below) instead of guessing.
   - BANNED COPY: "software you can own" / "own your software" and any
     ownership-as-the-point framing. It says nothing — good software is about
     working, being maintained, being good. Define what Workbooks IS instead.
+  - FIRST-TOUCH COPY assumes ZERO knowledge. To a new visitor, "workbook",
+    "runtime", and "toolkit" mean nothing — never build headline or
+    description copy out of those nouns. Say the outcome in plain words
+    (e.g. "turns what you need into working software — an app for yourself,
+    a tool for your team, a system for your whole company"). It must land
+    for individuals, teams, AND enterprise at once. The named layers belong
+    in docs, deeper sections, and the small tags — not the first breath.
+    Never tweak bad copy's phrasing; rewrite from the reader's ignorance.
   - The pitch is **"software built in workbooks"** — malleable, flexible,
     yours. Frame every example as software built in workbooks.
   - NEVER pitch "sites that run themselves" or perpetual agent management as
