@@ -266,6 +266,25 @@ footer.foot .tail { margin-left: auto; }
 }
 #cursor.working .tag::after { content: " ·"; animation: workdots 1s steps(3) infinite; }
 @keyframes workdots { 33% { content: " ··"; } 66% { content: " ···"; } }
+#cursor .think {
+  position: absolute; left: 15px; top: 40px; width: max-content; max-width: 200px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--line); border-radius: 3px 10px 10px 10px;
+  padding: 6px 9px; font: 400 10.5px/1.45 var(--mono); color: var(--dim);
+  opacity: 0; translate: 0 -4px; transition: opacity .35s ease, translate .35s ease;
+}
+#cursor .think.show { opacity: 1; translate: 0 0; }
+
+.pcard.status .follow {
+  appearance: none; cursor: pointer; margin-top: 2px;
+  background: var(--live-dim); color: var(--live);
+  border: 1px solid color-mix(in srgb, var(--live) 35%, transparent);
+  border-radius: 8px; padding: 8px 10px;
+  font: 500 11.5px/1 var(--mono); letter-spacing: .02em;
+  transition: .15s;
+}
+.pcard.status .follow:hover { background: color-mix(in srgb, var(--live) 24%, transparent); }
+.pcard.status .follow.on { background: var(--live); color: #04130a; }
 
 /* ── right panel: the timeline. Hidden until the build finishes
    (body.panel-open), and hideable any time after that. ───────── */
@@ -383,6 +402,7 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
     <path d="M1 1L16 8.6L9.4 10.7L7 18L1 1Z" fill="#3fe081" stroke="#04130a" stroke-width="1.2"/>
   </svg>
   <span class="tag">waldo</span>
+  <span class="think" id="think"></span>
 </div>
 
 <!-- floating nav -->
@@ -509,6 +529,7 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
       <span class="v" id="stLast"></span>
     </div>
     <div class="row"><span class="k">next check-in</span><span class="v on" id="stNext">—</span></div>
+    <button class="follow" id="followBtn" hidden>follow along — he&#39;s working now</button>
   </div>
 
   <div class="tl"><div id="tlList"></div></div>
@@ -532,6 +553,12 @@ const moveTo = async (el, ms = 950) => {
   await sleep(ms + 60);
 };
 const work = on => cursor.classList.toggle('working', on);
+const think = (text) => {
+  const el = $('#think');
+  if (!text) { el.classList.remove('show'); return; }
+  el.textContent = text;
+  el.classList.add('show');
+};
 const cursorExit = async () => {
   if (!cursorIn) return; cursorIn = false;
   // drift toward the edge and fade — never park outside the page (it would
@@ -550,8 +577,9 @@ const cursorEnter = async () => {
 };
 
 /* ── build choreography ───────────────────────────────────────── */
-const place = async (id, hold = 380) => {
+const place = async (id, hold = 380, thought = null) => {
   const el = $(id);
+  if (thought) think(thought);
   await moveTo(el);
   work(true); await sleep(hold);
   el.classList.add('on', 'touch');
@@ -570,15 +598,20 @@ async function build() {
   cursorIn = true;
   cursor.style.transform = `translate(${scrollX + innerWidth * 0.42}px, ${scrollY + innerHeight * 0.62}px)`;
   await sleep(1100);
-  await place('#b-nav');
-  await place('#b-mark');
+  think('morning. building the page');
+  await place('#b-nav', 380, 'pinning the nav up top');
+  await place('#b-mark', 380, 'the W goes here');
   const h1 = $('#b-h1');
+  think('typing the headline');
   await moveTo(h1); work(true);
   h1.classList.add('on');
   await typeH1(H1);
   work(false);
-  await place('#b-sub');
-  await place('#b-ctas');
+  await place('#b-sub', 380, 'one honest paragraph');
+  await place('#b-ctas', 380, 'wiring the buttons');
+  think('all yours — back on the clock');
+  await sleep(900);
+  think(null);
   await cursorExit();
   // desktop: the timeline reveals itself after the agent leaves; on mobile it
   // stays tucked behind the chip so it never covers the page uninvited
@@ -708,6 +741,7 @@ function renderStatus() {
   $('#stLast').textContent = a.last_run ? 'last run ' + rel(a.last_run) : '';
   $('#stNext').textContent = a.running ? 'in progress' :
     a.next_run ? 'in ' + fmtIn(a.next_run - Math.floor(Date.now() / 1000)) : '—';
+  $('#followBtn').hidden = !a.running || following;
 }
 setInterval(renderStatus, 1000);
 
@@ -729,7 +763,9 @@ async function refreshGrown() {
 
 /* act a fresh commit out on the page */
 async function showEdit(c) {
+  if (following) return;            // already watching live — no re-enactment
   await cursorEnter();
+  think(c.msg.replace(/^[a-z]+:\s*/i, '').slice(0, 60));
   work(true);
   let el = null;
   if (kind(c.msg) === 'add') el = await refreshGrown();
@@ -746,6 +782,74 @@ async function showEdit(c) {
   el.classList.remove('touch');
   work(false);
 }
+
+/* ── follow along: live-stream Waldo's run onto the page ──────────
+   Polls /_activity (keeper status + the run's step feed + a narrated
+   thought). The cursor rides the steps: it moves to whatever he's
+   touching, thinks out loud, and if he's working on another page you
+   get taken there. ────────────────────────────────────────────── */
+let following = false, lastStepTs = 0;
+async function fetchActivity() {
+  for (const url of ['/_activity', 'https://wb-lander-live.fly.dev/_activity']) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      if (res.ok) return await res.json();
+    } catch { /* next */ }
+  }
+  return null;
+}
+const stepTarget = (t) => {
+  const blog = /blog\/([\w-]+\.html)/.exec(t || '');
+  if (blog) return { page: '/blog/' + blog[1] };
+  if (/index\.html/.test(t || '')) {
+    const grown = document.querySelectorAll('#grown section');
+    return { el: grown[0] || $('#grown') || $('#b-h1') };
+  }
+  if (/plan\.org|_steps/.test(t || '')) return { el: $('#timeline') };
+  return { el: $('#b-h1') };
+};
+async function follow() {
+  if (following) return;
+  following = true;
+  $('#followBtn').hidden = true;
+  await cursorEnter();
+  think('let me show you what I\'m doing');
+  work(true);
+  let redirected = false;
+  while (following) {
+    const act = await fetchActivity();
+    if (act) {
+      if (!act.agent || !act.agent.running) {
+        think('done — shipping it');
+        await sleep(1600);
+        think(null); work(false);
+        await cursorExit();
+        following = false;
+        break;
+      }
+      if (act.thought) think(act.thought);
+      const last = (act.steps || [])[act.steps.length - 1];
+      if (last && last.ts > lastStepTs) {
+        lastStepTs = last.ts;
+        const t = stepTarget(last.target);
+        if (t.page && !redirected && location.pathname !== t.page) {
+          redirected = true;
+          think('working over here — come on');
+          await sleep(1400);
+          location.assign(t.page);
+          return;
+        }
+        if (t.el) {
+          t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          await sleep(350);
+          await moveTo(t.el);
+        }
+      }
+    }
+    await sleep(2500);
+  }
+}
+document.addEventListener('click', e => { if (e.target.closest('#followBtn')) follow(); });
 
 /* ── the watch loop ───────────────────────────────────────────── */
 let seen = null, wasRunning = false;

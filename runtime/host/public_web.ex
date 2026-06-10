@@ -50,6 +50,60 @@ defmodule Workbooks.PublicWeb do
     end
   end
 
+  # Live activity for follow-along (lander): keeper status + the tail of the
+  # agent's step telemetry (_steps.jsonl in the tenant repo) + a cosmetic
+  # narration line. Anonymous GET, read-only — same plane rules as /_changes.
+  get "/_activity" do
+    case app_id(conn) do
+      nil ->
+        send_resp(conn, 404, "no app for host")
+
+      app ->
+        status = Workbooks.Keeper.status()
+        steps = activity_tail(app)
+
+        body = %{
+          agent: status,
+          steps: steps,
+          thought: Workbooks.Thoughts.current(steps, status[:running] == true)
+        }
+
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, Jason.encode!(body))
+    end
+  end
+
+  # Last 8 step events, slimmed to what the page needs (tool + target + ts).
+  defp activity_tail(app) do
+    path = Path.join(Workbooks.Git.repo_path(app), "_steps.jsonl")
+
+    case File.read(path) do
+      {:ok, data} ->
+        data
+        |> String.split("\n", trim: true)
+        |> Enum.take(-8)
+        |> Enum.flat_map(fn line ->
+          case Jason.decode(line) do
+            {:ok, ev} ->
+              args = ev["args"] || %{}
+
+              target =
+                args["path"] || args["cmd"] || args["pipeline"] || args["query"] ||
+                  args["url"] || ""
+
+              [%{tool: ev["tool"], ts: ev["ts"], target: String.slice(to_string(target), 0, 120)}]
+
+            _ ->
+              []
+          end
+        end)
+
+      _ ->
+        []
+    end
+  end
+
   # GET any path → serve the host's app. Non-GET never matches a `get` clause and
   # falls through to the 404 below — no writes, no Dock on this plane.
   get "/*_glob" do

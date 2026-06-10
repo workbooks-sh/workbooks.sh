@@ -121,7 +121,7 @@ defmodule Workbooks.Agent do
       # step-start marker: if a run stalls, the logs show what was in flight
       Logger.info("agent: step #{s.step} #{call.name} starting")
       t0 = System.monotonic_time(:millisecond)
-      {out, s2, d} = exec_one(call, Map.put(s, :last, %{}))
+      {out, s2, d} = exec_bounded(call, Map.put(s, :last, %{}))
       meta = Map.get(s2, :last, %{})
 
       ev = %{
@@ -151,6 +151,22 @@ defmodule Workbooks.Agent do
   end
 
   defp log_step(_, _), do: :ok
+
+  # EVERY tool call is wall-clock bounded (150s): any wedged tool — sqlite,
+  # network, native CLI — surfaces as a tool error the model can react to.
+  # (The `run` tool keeps its own tighter inner bound as well.)
+  defp exec_bounded(call, st) do
+    task = Task.async(fn -> exec_one(call, st) end)
+
+    case Task.yield(task, 150_000) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} ->
+        result
+
+      _ ->
+        {"tool error: #{call.name} timed out after 150s (killed)",
+         Map.put(st, :last, %{error: "tool timeout"}), nil}
+    end
+  end
 
   defp exec_one(%{name: "shell", args: a}, st) do
     # Preopen the agent's workdir so shell commands can read/write its files

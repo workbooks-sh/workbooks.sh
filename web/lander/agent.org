@@ -82,6 +82,10 @@
        `<section id="examples">`, and the panel markup. You never edit inside
        them — not even in an audit. Your territory is `#grown`, `blog/`, and
        plan.org only.
+    3c. SURGICAL EDITS ONLY on index.html: read the file, change the minimal
+       region, and NEVER write the whole file from memory — if a vfs_write to
+       index.html would make it dramatically smaller than what you read, you
+       are about to destroy the page; stop and re-read instead.
     4. Self-review EVERY run before deploying: re-read the full file(s) you
        changed and confirm (a) the change is present and complete, (b) the
        HTML parses (balanced tags, nothing truncated), (c) rule 3 intact.
