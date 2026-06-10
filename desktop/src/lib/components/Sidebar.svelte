@@ -37,7 +37,7 @@
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
   import { tintFor, tintWash } from "$lib/ui/tint.svelte";
-  import { fileIconUrl, folderIconUrl } from "$lib/ui/materialIcon";
+  import { fileIconUrl } from "$lib/ui/materialIcon";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -124,11 +124,11 @@
     return (name || "?").slice(0, 2).toUpperCase();
   }
 
-  /** Emoji / image icons win over the material set; legacy glyph
-   *  values (lucide:<Name>) don't — material is the new default. */
+  /** Any explicit icon value becomes the folder's corner badge (the
+   *  Icon resolver handles mi:/lobe:/emoji/data: and maps legacy
+   *  lucide: names to material defs). Empty = plain folder. */
   function emojiIcon(icon: string | undefined): string | null {
-    if (!icon || icon.startsWith("lucide:")) return null;
-    return icon;
+    return icon || null;
   }
 
   // ── Folder expansion — lazy workbook listing ─────────────────────────
@@ -662,15 +662,14 @@
             <CaretRight size={11} weight="bold" aria-hidden="true" />
           </span>
           <span class="row-icon">
-            {#if emojiIcon(pkg.icon)}
-              <Icon value={pkg.icon ?? ""} name={pkg.name} size={16} />
-            {:else}
-              <img
-                class="mi"
-                src={folderIconUrl(pkg.name, !!expanded[pkg.id])}
-                alt=""
-              />
-            {/if}
+            <!-- A folder is ALWAYS a folder: base shape + color, with the
+                 chosen icon as a corner badge (composable, not swapped). -->
+            <FolderIcon
+              size={20}
+              color={tintFor(pkg.name)}
+              badge={emojiIcon(pkg.icon) ?? ""}
+              name={pkg.name}
+            />
           </span>
           <span class="row-label">{pkg.name}</span>
         </button>
