@@ -15,7 +15,7 @@
   onMount(applyTheme);
 
   const W = "M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z";
-  const trio = [["green", "#00ff44", "go · live · positive"], ["blue", "#0080ff", "running · links · focus"], ["rose", "#ff0066", "alert · error · accent"]];
+  const trio = [["green", "#0a9d44", "go · live · positive"], ["blue", "#0080ff", "running · links · focus"], ["rose", "#ff0066", "alert · error · accent"]];
   const neutrals = [["bg", "page"], ["bg2", "subtle fill"], ["card", "surface"], ["ink", "text"], ["ink2", "muted"], ["ink3", "faint"], ["hair", "hairline"]];
 </script>
 

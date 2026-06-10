@@ -5,14 +5,14 @@
   let canvas;
   const RAMP = " ·:-=+*o#%@";
   const hex = h => { const n = parseInt(h.slice(1), 16); return [n>>16&255, n>>8&255, n&255]; };
-  const PAL = { dark:[hex("#00ff44"),hex("#0080ff"),hex("#ff0066")], light:[hex("#0a7a2a"),hex("#0064d6"),hex("#d60055")] };
+  const PAL = { dark:[hex("#00ff44"),hex("#0080ff"),hex("#ff0066")], light:[hex("#0a9d44"),hex("#0a6fe6"),hex("#e0005c")] };
   const mix = (s,t)=>{const seg=(s.length-1)*Math.min(.999,Math.max(0,t));const i=Math.floor(seg),f=seg-i,a=s[i],b=s[i+1]||s[i];return `rgb(${a[0]+(b[0]-a[0])*f|0},${a[1]+(b[1]-a[1])*f|0},${a[2]+(b[2]-a[2])*f|0})`;};
   onMount(() => {
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const ctx = canvas.getContext("2d", { alpha:true });
     const cw=9, ch=15, dpr=Math.min(2, devicePixelRatio||1);
     let cols, rows, stops, skip, raf, running=false, last=0;
-    function th(){ const d=theme.mode==="dark"; stops=PAL[d?"dark":"light"]; skip=d?(dense?.22:.38):(dense?.34:.5); }
+    function th(){ const d=theme.mode==="dark"; stops=PAL[d?"dark":"light"]; skip=d?(dense?.22:.38):(dense?.12:.26); }
     function resize(){ const r=canvas.getBoundingClientRect(); cols=Math.max(8,Math.floor(r.width/cw)); rows=Math.max(4,Math.floor(r.height/ch));
       canvas.width=r.width*dpr; canvas.height=r.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.font="13px 'Spline Sans Mono',monospace"; ctx.textBaseline="top"; }
     function draw(t){ ctx.clearRect(0,0,canvas.width/dpr,canvas.height/dpr); const T=t*.001*speed;
