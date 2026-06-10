@@ -16,6 +16,7 @@
   import BoardPanel from "$lib/board/BoardPanel.svelte";
   import { FolderOpen, Plus as PlusIcon } from "phosphor-svelte";
   import CreatePackageModal from "$lib/home/CreatePackageModal.svelte";
+  import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { createPackage } from "$lib/home/createPackage.svelte";
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
   import NetworkPanel from "$lib/network/NetworkPanel.svelte";
@@ -309,6 +310,49 @@
     }
   }
 
+  // Drag an app/workbook onto a folder row → move it inside. Backed by
+  // package_move_into (real backend pending — wb-5fl.12; the webHost
+  // mock implements it for the preview). False return leaves the
+  // sidebar untouched.
+  async function onMoveIntoFolder(
+    payload:
+      | { type: "app"; id: string; name: string }
+      | { type: "workbook"; path: string; title: string },
+    folderId: string,
+  ): Promise<boolean> {
+    try {
+      await invoke("package_move_into", {
+        item: payload.type === "app" ? payload.id : payload.path,
+        kind: payload.type,
+        folder: folderId,
+      });
+      await packageStore.refresh();
+      await workspaces.refresh();
+      return true;
+    } catch (e) {
+      console.warn("[sidebar] move into folder failed (backend pending, wb-5fl.12)", e);
+      return false;
+    }
+  }
+
+  // Folder context-menu "New workbook…" — the same create-workbook
+  // wizard the folder grid uses, scoped to the folder.
+  let pkgPaletteOpen = $state(false);
+  let pkgPaletteWizard = $state<{ id: string; title: string } | null>(null);
+  async function pkgNewWorkbook() {
+    const id = pkgMenuTarget;
+    pkgMenuOpen = false;
+    if (!id) return;
+    try {
+      await packageStore.setActive(id);
+    } catch (e) {
+      console.warn("[pkg] setActive failed", e);
+      return;
+    }
+    pkgPaletteWizard = { id: "create-workbook", title: "Create a workbook" };
+    pkgPaletteOpen = true;
+  }
+
   // Context-menu "Open in split" — open and pair with the visible doc.
   async function onOpenWorkbookSplit(path: string) {
     try {
@@ -464,6 +508,7 @@
         onOpenApp={onOpenApp}
         onOpenWorkbook={onOpenWorkbook}
         onOpenWorkbookSplit={onOpenWorkbookSplit}
+        onMoveIntoFolder={onMoveIntoFolder}
         loadWorkbooks={(id) => packageStore.workbooks(id)}
         onReorderPackages={onReorderPackages}
         onCreatePackageMenu={onCreatePackageMenu}
@@ -547,6 +592,9 @@
         >
           <FolderOpen size={13} weight="fill" /> Open folder view
         </button>
+        <button class="ctx-item" onclick={pkgNewWorkbook}>
+          <PlusIcon size={13} weight="bold" /> New workbook…
+        </button>
       {/if}
       <button class="ctx-item" onclick={pkgIconClick}>
         <Smile size={13} weight="fill" /> Change icon…
@@ -609,6 +657,17 @@
     onclose={() => createPackage.closeModal()}
   />
 {/if}
+
+<PaletteModal
+  open={pkgPaletteOpen}
+  workdir={packageStore.active?.folders?.[0] ?? null}
+  wizardMode={pkgPaletteWizard}
+  onclose={() => {
+    pkgPaletteOpen = false;
+    pkgPaletteWizard = null;
+  }}
+  onwizardfinish={() => void packageStore.refresh()}
+/>
 
 <style>
   .loading {

@@ -284,6 +284,30 @@ function makeInvoke(): Invoke {
       case "package_create": case "package_refresh_active": return pkg(a.name ?? activePackage);
       case "package_import_folder": return pkg(a.package ?? activePackage);
       case "package_delete": return null;
+      // Move an app (its workbook) or a workbook file into a folder
+      // package. Mock-stateful so the preview demos the drag; the real
+      // Rust command is wb-5fl.12.
+      case "package_move_into": {
+        const folder = a.folder as string;
+        if (PKG[folder]?.kind !== "folder") throw new Error(`not a folder: ${folder}`);
+        const list = (PKG_WORKBOOKS[folder] ??= []);
+        if (a.kind === "app") {
+          const name = a.item as string;
+          if (!PKG[name]) throw new Error(`unknown app: ${name}`);
+          list.push({ path: appWorkbookPath(name), title: name });
+          delete PKG[name];
+        } else {
+          const path = a.item as string;
+          for (const k of Object.keys(PKG_WORKBOOKS)) {
+            const idx = PKG_WORKBOOKS[k].findIndex((w) => w.path === path);
+            if (idx >= 0) {
+              list.push(...PKG_WORKBOOKS[k].splice(idx, 1));
+              break;
+            }
+          }
+        }
+        return null;
+      }
 
       // ── tabs ──
       // Events aren't bridged in the mock, but the tabs store applies

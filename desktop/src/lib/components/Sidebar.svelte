@@ -27,6 +27,7 @@
     CaretRight,
     CaretUpDown,
     Cube,
+    BookmarkSimple,
   } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -75,6 +76,7 @@
     onOpenApp,
     onOpenWorkbook,
     onOpenWorkbookSplit,
+    onMoveIntoFolder,
     loadWorkbooks,
     onReorderPackages,
     onCreatePackageMenu,
@@ -99,6 +101,14 @@
     onOpenWorkbook?: (path: string) => void;
     /** Open as a right-hand split pane (context menus). */
     onOpenWorkbookSplit?: (path: string) => void;
+    /** Move a dragged app/workbook into a folder package. Resolve true
+     *  on success so the folder listing refreshes. */
+    onMoveIntoFolder?: (
+      payload:
+        | { type: "app"; id: string; name: string }
+        | { type: "workbook"; path: string; title: string },
+      folderId: string,
+    ) => Promise<boolean>;
     /** Lazy-load the workbooks inside a folder package. */
     loadWorkbooks?: (id: string) => Promise<WorkbookEntry[]>;
     onReorderPackages?: (orderedIds: string[]) => void;
@@ -117,17 +127,55 @@
   let expanded = $state<Record<string, boolean>>({});
   let folderBooks = $state<Record<string, WorkbookEntry[] | "loading">>({});
 
+  async function loadFolder(id: string) {
+    if (!loadWorkbooks) return;
+    folderBooks = { ...folderBooks, [id]: "loading" };
+    try {
+      const books = await loadWorkbooks(id);
+      folderBooks = { ...folderBooks, [id]: books };
+    } catch {
+      folderBooks = { ...folderBooks, [id]: [] };
+    }
+  }
+
   async function toggleFolder(p: RailPackage) {
     const open = !expanded[p.id];
     expanded = { ...expanded, [p.id]: open };
-    if (open && folderBooks[p.id] === undefined && loadWorkbooks) {
-      folderBooks = { ...folderBooks, [p.id]: "loading" };
-      try {
-        const books = await loadWorkbooks(p.id);
-        folderBooks = { ...folderBooks, [p.id]: books };
-      } catch {
-        folderBooks = { ...folderBooks, [p.id]: [] };
-      }
+    if (open && folderBooks[p.id] === undefined) await loadFolder(p.id);
+  }
+
+  // ── move-into-folder drop (wb-5fl.13): drag an app or workbook onto
+  // a folder row to move it inside. Apps dragged between rows still
+  // reorder; hovering a FOLDER while carrying an app/workbook means
+  // "put it in here". ──────────────────────────────────────────────
+  let folderHotId = $state<string | null>(null);
+
+  function folderOver(e: DragEvent, pkg: RailPackage) {
+    const p = dnd.payload;
+    const movable =
+      p && (p.type === "workbook" || (p.type === "app" && p.id !== pkg.id));
+    if (movable) {
+      e.preventDefault();
+      e.stopPropagation();
+      folderHotId = pkg.id;
+      return;
+    }
+    onDragOver(e, pkg.id);
+  }
+
+  async function folderDrop(e: DragEvent, pkg: RailPackage) {
+    const p = dnd.payload;
+    folderHotId = null;
+    e.preventDefault();
+    if (!p || (p.type !== "workbook" && p.type !== "app")) return;
+    e.stopPropagation();
+    dnd.end();
+    const ok = await onMoveIntoFolder?.(p, pkg.id);
+    if (ok) {
+      // Refresh the folder's listing (and the source folder's, cheaply:
+      // drop all caches — they reload lazily on expand).
+      folderBooks = {};
+      if (expanded[pkg.id]) await loadFolder(pkg.id);
     }
   }
 
@@ -458,8 +506,23 @@
   <!-- Bookmarks — Arc-style tile grid. Holds ONLY what was explicitly
        dragged in (apps or workbooks — every tile is a reference to a
        real file in a real folder; nothing is created here). Drop
-       between tiles to insert. Max 3 rows of 4. -->
-  {#if bookmarks.bookmarks.length > 0 || bookmarkDraggable}
+       between tiles to insert. Max 3 rows of 4. Empty state is a
+       persistent dashed slot with a bookmark glyph — always there to
+       drag onto, no words. -->
+  {#if orderedBookmarks.length === 0}
+    <div
+      class="bm-empty"
+      class:pin-target={bookmarkDraggable}
+      role="group"
+      aria-label="Bookmarks"
+      ondragover={(e) => {
+        if (bookmarkDraggable) e.preventDefault();
+      }}
+      ondrop={bookmarkDrop}
+    >
+      <BookmarkSimple size={15} weight="fill" aria-hidden="true" />
+    </div>
+  {:else}
     <div
       class="tile-grid"
       class:pin-target={bookmarkDraggable}
@@ -571,11 +634,15 @@
           class:active={pkg.isActive}
           class:dragging={dragId === pkg.id}
           class:drop-target={overId === pkg.id && dragId !== pkg.id}
+          class:folder-hot={folderHotId === pkg.id}
           draggable="true"
           ondragstart={() => onDragStart(pkg.id)}
-          ondragover={(e) => onDragOver(e, pkg.id)}
+          ondragover={(e) => folderOver(e, pkg)}
+          ondragleave={() => {
+            if (folderHotId === pkg.id) folderHotId = null;
+          }}
           ondragend={onDragEnd}
-          ondrop={(e) => e.preventDefault()}
+          ondrop={(e) => folderDrop(e, pkg)}
           onclick={() => toggleFolder(pkg)}
           oncontextmenu={(e) => {
             e.preventDefault();
@@ -937,6 +1004,26 @@
   }
   .tile.insert-before::before { left: -4.5px; }
   .tile.insert-after::after { right: -4.5px; }
+  /* Empty bookmarks shelf — wordless dashed slot, always present so
+     there's always something to drag onto. */
+  .bm-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    margin: 2px 2px 6px;
+    border-radius: 10px;
+    border: 1.5px dashed var(--color-border-strong);
+    color: var(--color-fg-subtle);
+    transition: border-color 0.14s, color 0.14s, background 0.14s;
+  }
+  .bm-empty.pin-target {
+    border-color: color-mix(in srgb, var(--color-brand) 55%, transparent);
+    color: var(--color-brand);
+    background: var(--color-brand-soft);
+    animation: pin-pulse 1.1s ease-in-out infinite;
+  }
+
   /* While a workbook drag is live, show the open slot it would land in. */
   .pin-slot {
     height: 40px;
@@ -1130,6 +1217,12 @@
   .caret.open { transform: rotate(90deg); }
   .folder-row { color: var(--color-fg); cursor: grab; }
   .folder-row:active { cursor: grabbing; }
+  /* Carrying an app/workbook over a folder = "drop inside" affordance. */
+  .folder-row.folder-hot {
+    background: var(--color-brand-soft);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-brand) 50%, transparent);
+    color: var(--color-fg);
+  }
   .app-row { color: var(--color-fg); cursor: grab; }
   .app-row:active { cursor: grabbing; }
   .app-row .row-icon.app {
