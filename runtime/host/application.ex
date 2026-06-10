@@ -85,7 +85,18 @@ defmodule Workbooks.Application do
     control =
       cond do
         Workbooks.Desktop.enabled?() ->
-          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, ip: Workbooks.Desktop.bind_ip(), port: Workbooks.Desktop.port(), thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]}, id: :control_web)]
+          # Listener options are MODE-GATED (wb-ryw): krunvm's TSI
+          # (transparent socket impersonation) wedges the entire guest
+          # virtio transport when ThousandIsland parks many concurrent
+          # accepts on one socket, and its inet6 transport options wedge
+          # it too — Bandit.start_link never returns, boot hangs at
+          # control_web, and even file writes stop. Proven in-guest by
+          # bisect (2026-06-10): v4 + num_acceptors:1 is healthy; 10+
+          # acceptors or :inet6 opts freeze. Container mode therefore
+          # binds plain IPv4 with one acceptor (plenty for a localhost
+          # control plane behind the host port map); raw dev mode keeps
+          # the dual-stack listener so ::1 connects work on the host.
+          [Supervisor.child_spec({Bandit, [plug: Workbooks.Web, scheme: :http, port: Workbooks.Desktop.port()] ++ Workbooks.Desktop.listener_opts()}, id: :control_web)]
 
         System.get_env("WB_WEB") == "1" ->
           [Supervisor.child_spec({Bandit, [plug: Workbooks.Web, scheme: :http, port: port()] ++ dual_stack()}, id: :control_web)]

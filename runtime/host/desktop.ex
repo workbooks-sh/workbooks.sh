@@ -33,6 +33,22 @@ defmodule Workbooks.Desktop do
   # networks (e.g. 6PN tunnels) are IPv6-only, while local clients dial v4.
   def bind_ip, do: {0, 0, 0, 0, 0, 0, 0, 0}
 
+  @doc """
+  Control-plane listener options, mode-gated (wb-ryw). krunvm's TSI
+  wedges the guest's virtio transport under many concurrent accepts on
+  one socket AND under :inet6 transport options — so the container
+  binds plain IPv4 with a single acceptor (proven safe in-guest; the
+  host port map fronts it). Raw dev keeps the dual-stack listener so
+  localhost-as-::1 connects work.
+  """
+  def listener_opts do
+    if mode() == "container" do
+      [ip: {0, 0, 0, 0}, thousand_island_options: [num_acceptors: 1]]
+    else
+      [ip: bind_ip(), thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]]
+    end
+  end
+
   @doc "The per-boot bearer token shared with the shell via the discovery file."
   def token do
     case :persistent_term.get(@pt_token, nil) do
