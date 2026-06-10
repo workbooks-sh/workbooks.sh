@@ -53,7 +53,7 @@ defmodule Workbooks.Thoughts do
                  temperature: 0.9
                ) do
             {:ok, %{content: text}} when is_binary(text) ->
-              t = text |> String.trim() |> String.slice(0, 80)
+              t = text |> tidy() |> String.slice(0, 80)
               :persistent_term.put(@pt, {System.monotonic_time(:millisecond), t})
 
             _ ->
@@ -72,5 +72,15 @@ defmodule Workbooks.Thoughts do
     :ok
   rescue
     _ -> :ok
+  end
+  # Small narration models love to wrap output in quotes/backticks despite the
+  # prompt; strip wrapping + stray edge punctuation so the bubble reads clean.
+  defp tidy(text) do
+    text
+    |> String.trim()
+    |> String.trim(~s("))
+    |> String.trim(~s('))
+    |> String.trim("`")
+    |> String.trim()
   end
 end

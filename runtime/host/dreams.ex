@@ -148,7 +148,10 @@ defmodule Workbooks.Dreams do
             _ -> []
           end
 
-        entry = %{ts: System.system_time(:second), text: text |> String.trim() |> String.slice(0, 240)}
+        clean =
+          text |> String.trim() |> String.trim(~s(")) |> String.trim(~s(')) |> String.trim("`") |> String.trim()
+
+        entry = %{ts: System.system_time(:second), text: String.slice(clean, 0, 240)}
         File.write!(path, Jason.encode!(%{daydreams: Enum.take([entry | existing], 60)}))
         Logger.info("Dreams: daydreamed")
 
