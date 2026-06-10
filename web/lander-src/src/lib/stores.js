@@ -142,8 +142,12 @@ let grownMounted = false;
 export async function mountGrown(host) {
   if (!host || grownMounted) return; grownMounted = true;
   const frag = await buildGrownContainer();
-  // observe reveal targets AFTER they're in the live document
   host.append(...frag.children);
+  // the "agent's desk" blog listing is the LAST section INSIDE #grown (not a
+  // sibling) so it inherits the #grown width/spacing — outside it, .grown has
+  // no width constraint and goes full-bleed.
+  const desk = await buildDesk();
+  if (desk) host.append(desk);
   host.querySelectorAll('.reveal').forEach(revealEl);
 }
 
@@ -151,23 +155,23 @@ export async function mountGrown(host) {
    Manifest-driven from /content/blog.json — the SAME source the blog index
    reads — so a new post can't be present on the index yet missing here. Empty
    manifest → the section stays hidden (no empty shell). ──────────── */
-export async function mountAgentsDesk(host) {
-  if (!host) return;
+async function buildDesk() {
   const posts = await loadManifest('/content/blog.json');
-  if (!posts.length) return;                   // nothing to show → render nothing
+  if (!posts.length) return null;              // nothing to show → render nothing
+  const slug = (p) => (p.slug || (p.file || '').replace(/^blog\//, '').replace(/\.html$/, ''));
   const rows = posts.map((p) => `
-    <a class="deskrow reveal" href="/${escH(p.file)}">
+    <a class="deskrow reveal" href="/blog/${escH(slug(p))}">
       <span class="deskmeta">${escH(p.tag || 'post')} · ${escH(p.date || '')}</span>
-      <span class="deskttl">${escH(p.title || p.slug)}</span>
+      <span class="deskttl">${escH(p.title || slug(p))}</span>
       <span class="deskex">${escH(p.excerpt || '')}</span>
     </a>`).join('');
-  host.innerHTML = `
-    <section class="grown" id="desk">
-      <div class="kicker reveal">from the agent's desk</div>
-      <h2 class="reveal">Notes, posts, and proof</h2>
-      <div class="desklist">${rows}</div>
-    </section>`;
-  host.querySelectorAll('.reveal').forEach(revealEl);
+  const sec = document.createElement('section');
+  sec.className = 'grown'; sec.id = 'desk';
+  sec.innerHTML = `
+    <div class="kicker reveal">from the agent's desk</div>
+    <h2 class="reveal">Notes, posts, and proof</h2>
+    <div class="desklist">${rows}</div>`;
+  return sec;
 }
 
 /* ── panel visibility ─────────────────────────────────────────── */

@@ -517,3 +517,29 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
 .vcall .vpulse { width: 12px; height: 12px; border-radius: 50%; background: var(--live);
   box-shadow: 0 0 0 0 var(--live); animation: vcallpulse 1.6s ease-out infinite; }
 @keyframes vcallpulse { to { box-shadow: 0 0 0 12px rgba(63,224,129,0); opacity: .6; } }
+
+/* ── blog index: real post cards (not a bullet list) ─────────── */
+.postgrid { display: grid; gap: 14px; margin-top: 8px; }
+@media (min-width: 720px) { .postgrid { grid-template-columns: 1fr 1fr; } }
+.postcard {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 22px 22px 20px; border: 1px solid var(--line); border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  text-decoration: none; transition: border-color .18s ease, transform .18s ease, background .18s ease;
+}
+.postcard:hover { border-color: color-mix(in srgb, var(--live) 40%, var(--line));
+  transform: translateY(-2px); background: color-mix(in srgb, var(--panel) 85%, transparent); }
+.pc-meta { display: flex; align-items: center; gap: 10px;
+  font: 500 10.5px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
+.pc-tag { color: #04130a; background: var(--live); padding: 3px 8px; border-radius: 999px; }
+.pc-title { font: 600 19px/1.3 var(--sans); color: var(--ink); letter-spacing: -.01em; }
+.postcard:hover .pc-title { color: var(--live); }
+.pc-excerpt { font: 400 14px/1.6 var(--sans); color: var(--dim); }
+.pc-read { margin-top: 4px; font: 500 12px/1 var(--mono); color: var(--faint); }
+.postcard:hover .pc-read { color: var(--live); }
+
+/* ── in-shell blog post: one clean back-link, post owns its body ── */
+.blogpost .blogback { display: inline-block; margin-bottom: 22px;
+  font: 500 12px/1 var(--mono); color: var(--faint); text-decoration: none; }
+.blogpost .blogback:hover { color: var(--live); }
+.blogpost article { display: block; max-width: 720px; }

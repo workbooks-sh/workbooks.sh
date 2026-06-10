@@ -7,7 +7,6 @@
   // work (the old import.meta.glob only updated on a Vite rebuild that never ran).
   // See WALDO.md for the content layout.
   import { mountGrown } from '../lib/stores.js';
-  import AgentsDesk from './AgentsDesk.svelte';
 
   let host;
   // do the runtime fetch+inject once #grown is in the DOM. mountGrown owns the
@@ -22,6 +21,3 @@
      No sanitizer dependency. -->
 <div id="grown" bind:this={host}></div>
 
-<!-- "from the agent's desk" — manifest-driven from /content/blog.json so a new
-     post can never be forgotten from the on-page listing. -->
-<AgentsDesk />

@@ -22,10 +22,11 @@
         // the article body: .wrap inner if present, else <body> minus the
         // injected nav/panel/script chrome that the shell already supplies.
         let body = doc.querySelector('.wrap');
-        if (!body) {
-          body = doc.body;
-          body.querySelectorAll('nav, script, .wbp, .wbpeek, #timeline').forEach((n) => n.remove());
-        }
+        if (!body) body = doc.body;
+        // the shell supplies the chrome AND the "← blog" breadcrumb, so strip
+        // the post's own nav/script/panel AND its top back-link (.topnote) —
+        // otherwise the page shows two stacked breadcrumbs.
+        body.querySelectorAll('nav, script, .wbp, .wbpeek, #timeline, .topnote').forEach((n) => n.remove());
         // keep the post's own typography <style> (inlined into the node so it
         // travels with the content and is removed when we navigate away).
         const styles = [...doc.querySelectorAll('style')].map((s) => s.textContent).join('\n');

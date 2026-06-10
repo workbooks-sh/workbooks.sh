@@ -38,20 +38,19 @@
   {:else if posts.length === 0}
     <p class="lede">No posts yet.</p>
   {:else}
-    <ul class="bloglist">
+    <div class="postgrid">
       {#each posts as p (p.slug)}
-        <li>
-          <a href={`/blog/${p.slug}`}>
-            <span class="bl-title">{p.title || p.slug}</span>
-            {#if p.excerpt}<span class="bl-excerpt">{p.excerpt}</span>{/if}
-            <span class="bl-meta">
-              {#if p.tag}<span class="bl-tag">{p.tag}</span>{/if}
-              {#if p.date}<span>{fmtDate(p.date)}</span>{/if}
-            </span>
-          </a>
-        </li>
+        <a class="postcard" href={`/blog/${p.slug}`}>
+          <span class="pc-meta">
+            {#if p.tag}<span class="pc-tag">{p.tag}</span>{/if}
+            {#if p.date}<span class="pc-date">{fmtDate(p.date)}</span>{/if}
+          </span>
+          <span class="pc-title">{p.title || p.slug}</span>
+          {#if p.excerpt}<span class="pc-excerpt">{p.excerpt}</span>{/if}
+          <span class="pc-read">read →</span>
+        </a>
       {/each}
-    </ul>
+    </div>
   {/if}
  </div>
 </section>
