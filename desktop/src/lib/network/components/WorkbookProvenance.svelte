@@ -35,6 +35,10 @@
      *  canonical bytes via Radicle (Workhorse-side). When omitted,
      *  the button is rendered disabled. */
     onfetchauthoritative = null,
+    /** Banner-only mode (wb-5fl.7): render NOTHING unless the artifact
+     *  is modified-after-publish — the loud warning stays, the everyday
+     *  badge moves to the tab context menu. Implies showModifiedBanner. */
+    bannerOnly = false,
   }: {
     html: string;
     showDuringCheck?: boolean;
@@ -42,6 +46,7 @@
     showLineageToggle?: boolean;
     rid?: string | null;
     onfetchauthoritative?: (() => void) | null;
+    bannerOnly?: boolean;
   } = $props();
 
   let lineageOpen = $state(false);
@@ -119,13 +124,13 @@
   });
 </script>
 
-{#if status === "checking" && showDuringCheck}
+{#if status === "checking" && showDuringCheck && !bannerOnly}
   <span class="checking" aria-label="Verifying provenance">
     <span class="spinner" aria-hidden="true"></span>
     verifying…
   </span>
 {:else if status !== "checking"}
-  {#if showModifiedBanner && badgeState === "modified" && !bannerDismissed}
+  {#if (showModifiedBanner || bannerOnly) && badgeState === "modified" && !bannerDismissed}
     <ModifiedWarningBanner
       by={issuerHandle}
       {rid}
@@ -134,6 +139,9 @@
       ondismiss={() => (bannerDismissed = true)}
     />
   {/if}
+  {#if bannerOnly}
+    <!-- banner-only: badge + lineage live in the tab context menu now -->
+  {:else}
   <div class="row">
     <ProvenanceBadge
       state={badgeState}
@@ -160,6 +168,7 @@
   </div>
   {#if showLineageToggle && lineageOpen && result?.ok}
     <LineageTree report={result} />
+  {/if}
   {/if}
 {/if}
 

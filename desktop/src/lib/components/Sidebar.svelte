@@ -32,6 +32,7 @@
   import { cubicOut } from "svelte/easing";
   import { slide } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
+  import ContextMenu from "$lib/components/ContextMenu.svelte";
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
   import { tintFor, tintWash } from "$lib/ui/tint";
@@ -73,6 +74,7 @@
     onSelectPackage,
     onOpenApp,
     onOpenWorkbook,
+    onOpenWorkbookSplit,
     loadWorkbooks,
     onReorderPackages,
     onCreatePackageMenu,
@@ -95,6 +97,8 @@
     onOpenApp?: (id: string) => void;
     /** Workbook row (inside an expanded folder) → open as a tab. */
     onOpenWorkbook?: (path: string) => void;
+    /** Open as a right-hand split pane (context menus). */
+    onOpenWorkbookSplit?: (path: string) => void;
     /** Lazy-load the workbooks inside a folder package. */
     loadWorkbooks?: (id: string) => Promise<WorkbookEntry[]>;
     onReorderPackages?: (orderedIds: string[]) => void;
@@ -240,14 +244,50 @@
     }
   }
 
-  async function removeBookmark(id: string, title: string) {
-    if (!window.confirm(`Remove bookmark "${title}"?`)) return;
+  async function removeBookmark(id: string) {
     try {
       await bookmarks.delete(id);
       bmOrder = bmOrder.filter((x) => x !== id);
       saveBmOrder();
     } catch (err) {
       console.warn("[sidebar] remove bookmark failed", err);
+    }
+  }
+
+  // ── bookmark tile + workbook row context menus (wb-5fl.8) ──────────
+  let bmMenuOpen = $state(false);
+  let bmMenuX = $state(0);
+  let bmMenuY = $state(0);
+  let bmMenuTarget = $state<{ id: string; path: string; title: string } | null>(null);
+  function onBookmarkContext(b: { id: string; path: string; title: string }, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    bmMenuTarget = b;
+    bmMenuX = e.clientX;
+    bmMenuY = e.clientY;
+    bmMenuOpen = true;
+  }
+
+  let wbMenuOpen = $state(false);
+  let wbMenuX = $state(0);
+  let wbMenuY = $state(0);
+  let wbMenuTarget = $state<WorkbookEntry | null>(null);
+  function onWorkbookContext(book: WorkbookEntry, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    wbMenuTarget = book;
+    wbMenuX = e.clientX;
+    wbMenuY = e.clientY;
+    wbMenuOpen = true;
+  }
+  async function wbBookmark() {
+    const b = wbMenuTarget;
+    wbMenuOpen = false;
+    if (!b || bookmarks.bookmarks.some((x) => x.path === b.path)) return;
+    try {
+      await bookmarks.create(b.title, b.path);
+    } catch (err) {
+      console.warn("[sidebar] bookmark failed", err);
     }
   }
 
@@ -374,7 +414,18 @@
 
 <svelte:window onclick={onWindowClick} onkeydown={handleMenuKey} />
 
-<nav class="sidebar" aria-label="Primary">
+<nav
+  class="sidebar"
+  aria-label="Primary"
+  oncontextmenu={(e) => {
+    // Empty-space right-click → the New menu (create / import). Any
+    // interactive child handles its own context menu and stops here.
+    const t = e.target as HTMLElement;
+    if (t.closest("button")) return;
+    e.preventDefault();
+    onCreatePackageMenu?.(new DOMRect(e.clientX, e.clientY, 0, 0));
+  }}
+>
   <!-- Workspace header -->
   <button
     type="button"
@@ -472,10 +523,7 @@
           ondragover={(e) => bmTileOver(e, i)}
           ondrop={bookmarkDrop}
           onclick={() => onOpenWorkbook?.(b.path)}
-          oncontextmenu={(e) => {
-            e.preventDefault();
-            void removeBookmark(b.id, b.title);
-          }}
+          oncontextmenu={(e) => onBookmarkContext(b, e)}
         >
           {#if identity}
             <Icon value={identity} name={b.title} size={17} />
@@ -558,6 +606,7 @@
                     )}
                   ondragend={() => dnd.end()}
                   onclick={() => onOpenWorkbook?.(book.path)}
+                  oncontextmenu={(e) => onWorkbookContext(book, e)}
                   title={book.path}
                 >
                   <span class="row-icon book">
@@ -575,18 +624,6 @@
         {/if}
     {/each}
 
-    {#if onCreatePackageMenu}
-      <button
-        type="button"
-        class="row create"
-        aria-label="Create a new package"
-        onclick={(e) =>
-          onCreatePackageMenu?.(e.currentTarget.getBoundingClientRect())}
-      >
-        <span class="row-icon"><Plus size={15} weight="bold" aria-hidden="true" /></span>
-        <span class="row-label">New</span>
-      </button>
-    {/if}
   </div>
 
   <span class="bottom-spacer" aria-hidden="true"></span>
@@ -749,6 +786,76 @@
   {/if}
 </nav>
 
+<ContextMenu bind:open={bmMenuOpen} x={bmMenuX} y={bmMenuY}>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      bmMenuOpen = false;
+      if (bmMenuTarget) onOpenWorkbook?.(bmMenuTarget.path);
+    }}
+  >
+    Open
+  </button>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      bmMenuOpen = false;
+      if (bmMenuTarget) onOpenWorkbookSplit?.(bmMenuTarget.path);
+    }}
+  >
+    Open in split
+  </button>
+  <div class="ctx-sep"></div>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      bmMenuOpen = false;
+      if (bmMenuTarget) void removeBookmark(bmMenuTarget.id);
+    }}
+  >
+    Remove bookmark
+  </button>
+</ContextMenu>
+
+<ContextMenu bind:open={wbMenuOpen} x={wbMenuX} y={wbMenuY}>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      wbMenuOpen = false;
+      if (wbMenuTarget) onOpenWorkbook?.(wbMenuTarget.path);
+    }}
+  >
+    Open
+  </button>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      wbMenuOpen = false;
+      if (wbMenuTarget) onOpenWorkbookSplit?.(wbMenuTarget.path);
+    }}
+  >
+    Open in split
+  </button>
+  <div class="ctx-sep"></div>
+  <button
+    class="ctx-item"
+    onclick={wbBookmark}
+    disabled={!!wbMenuTarget &&
+      bookmarks.bookmarks.some((b) => b.path === wbMenuTarget?.path)}
+  >
+    Bookmark
+  </button>
+  <button
+    class="ctx-item"
+    onclick={() => {
+      wbMenuOpen = false;
+      if (wbMenuTarget) void navigator.clipboard.writeText(wbMenuTarget.path);
+    }}
+  >
+    Copy path
+  </button>
+</ContextMenu>
+
 <style>
   .sidebar {
     flex-shrink: 0;
@@ -759,12 +866,9 @@
     flex-direction: column;
     gap: 1px;
     padding: 0.6rem 0.5rem 0.75rem;
-    /* A touch grayer than the canvas so active rows (white cards) and
-     * tinted tiles read as sitting ON the sidebar — the Dia/Arc depth
-     * model. Faint top light line for a finished edge. */
-    background: color-mix(in srgb, var(--color-surface-soft) 55%, var(--color-page));
-    border-right: 1px solid var(--color-border);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+    /* The shared chrome surface (same as the titlebar) so the shell
+     * reads as one frame; the canvas floats inside it. */
+    background: var(--color-chrome);
     position: relative;
     z-index: 100;
     overflow-y: auto;
@@ -1035,9 +1139,6 @@
     font-size: 11.5px;
     color: var(--color-fg-subtle);
   }
-
-  .row.create { color: var(--color-fg-muted); }
-  .row.create:hover { color: var(--color-fg); }
 
   .hairline {
     height: 1px;

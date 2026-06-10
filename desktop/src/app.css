@@ -33,6 +33,10 @@
   --color-ok: #22a069;
   --color-warn: #dca51e;
 
+  /* The one chrome surface — titlebar + sidebar share it so the shell
+   * reads as a single frame around the floating content canvas. */
+  --color-chrome: color-mix(in srgb, var(--color-surface-soft) 55%, var(--color-page));
+
   /* Aurora palette — four blob colors for the reusable theme gradient.
    * Used by the Gemini Live edge glow and any other "Apple Intelligence"
    * surface that needs a vibrant multi-color wash. Themes override these

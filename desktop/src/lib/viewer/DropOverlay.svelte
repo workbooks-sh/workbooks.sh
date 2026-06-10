@@ -70,10 +70,15 @@
 
     // A dragged tab is already open — route its existing id. Anything
     // else opens (or refocuses) via the tabs store first.
-    const prevActive = tabs.activeId;
+    let prevActive = tabs.activeId;
     let tabId: string | null = null;
     if (p.type === "tab") {
       tabId = p.tabId;
+      // Dragging the visible doc itself: pair it with another open tab
+      // so the edge-drop still produces a split instead of a no-op.
+      if (prevActive === tabId) {
+        prevActive = tabs.tabs.find((t) => t.id !== tabId)?.id ?? null;
+      }
     } else {
       const path = await dnd.resolvePath();
       if (path) {

@@ -34,6 +34,7 @@
   import SearchDrawer from "$lib/components/SearchDrawer.svelte";
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
+  import { panes } from "$lib/viewer/panes.svelte";
   import { themes } from "$lib/bridge/themes.svelte";
   import { PencilSimple as Pencil, Smiley as Smile, Trash as Trash2 } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
@@ -99,7 +100,7 @@
   let pkgMenuTarget = $state<string | null>(null);
 
   // Modal state for rename / icon-change. Driven from context menu items.
-  type ModalKind = "ws-rename" | "ws-icon" | "pkg-rename" | null;
+  type ModalKind = "ws-rename" | "ws-icon" | "pkg-icon" | null;
   let modal = $state<ModalKind>(null);
   let modalBusy = $state(false);
   let modalError = $state<string | null>(null);
@@ -166,10 +167,32 @@
   }
 
   // Package context-menu actions.
-  function pkgRenameClick() {
+  function pkgIconClick() {
     pkgMenuOpen = false;
     modalError = null;
-    modal = "pkg-rename";
+    modal = "pkg-icon";
+  }
+  async function commitPkgIcon(icon: string) {
+    const id = pkgMenuTarget;
+    if (!id) return;
+    try {
+      await packageStore.setIcon(id, icon);
+    } catch (e) {
+      modalError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  async function pkgBookmarkApp() {
+    const id = pkgMenuTarget;
+    pkgMenuOpen = false;
+    if (!id) return;
+    try {
+      const path = await invoke<string>("package_app_workbook", { name: id });
+      if (!bookmarks.bookmarks.some((b) => b.path === path)) {
+        await bookmarks.create(id, path);
+      }
+    } catch (e) {
+      console.warn("[pkg] bookmark app failed", e);
+    }
   }
   async function pkgDeleteClick() {
     pkgMenuOpen = false;
@@ -188,12 +211,6 @@
     } catch (e) {
       console.warn("[pkg] delete failed", e);
     }
-  }
-  async function commitPkgRename(name: string) {
-    // Rust workspace.rs doesn't expose a rename — for v1, the user has
-    // to delete + re-create. Surface that nicely.
-    modalError = "Package rename isn't supported yet — delete and re-create with the new name.";
-    modalBusy = false;
   }
 
   // Push the active rail label up to the titlebar.
@@ -258,6 +275,10 @@
     }
   });
 
+  const pkgMenuKind = $derived(
+    railPackages.find((p) => p.id === pkgMenuTarget)?.kind ?? "folder",
+  );
+
   async function onReorderPackages(orderedIds: string[]) {
     const ws_ = workspaces.active;
     if (!ws_) return;
@@ -285,6 +306,18 @@
       chrome.mode = "doc";
     } catch (e) {
       console.warn("[sidebar] open workbook failed", e);
+    }
+  }
+
+  // Context-menu "Open in split" — open and pair with the visible doc.
+  async function onOpenWorkbookSplit(path: string) {
+    try {
+      const prev = tabs.activeId;
+      await tabs.open(path);
+      if (tabs.activeId) panes.splitWith(tabs.activeId, "right", prev);
+      chrome.mode = "doc";
+    } catch (e) {
+      console.warn("[sidebar] open split failed", e);
     }
   }
 
@@ -430,6 +463,7 @@
         onSelectPackage={onSelectPackage}
         onOpenApp={onOpenApp}
         onOpenWorkbook={onOpenWorkbook}
+        onOpenWorkbookSplit={onOpenWorkbookSplit}
         loadWorkbooks={(id) => packageStore.workbooks(id)}
         onReorderPackages={onReorderPackages}
         onCreatePackageMenu={onCreatePackageMenu}
@@ -490,17 +524,32 @@
     </ContextMenu>
 
     <ContextMenu bind:open={pkgMenuOpen} x={pkgMenuX} y={pkgMenuY}>
-      <button
-        class="ctx-item"
-        onclick={() => {
-          pkgMenuOpen = false;
-          if (pkgMenuTarget) void onSelectPackage(pkgMenuTarget);
-        }}
-      >
-        <FolderOpen size={13} weight="fill" /> Open folder view
-      </button>
-      <button class="ctx-item" onclick={pkgRenameClick} disabled>
-        <Pencil size={13} weight="fill" /> Rename (soon)
+      {#if pkgMenuKind === "app"}
+        <button
+          class="ctx-item"
+          onclick={() => {
+            pkgMenuOpen = false;
+            if (pkgMenuTarget) void onOpenApp(pkgMenuTarget);
+          }}
+        >
+          <FolderOpen size={13} weight="fill" /> Open
+        </button>
+        <button class="ctx-item" onclick={pkgBookmarkApp}>
+          <PlusIcon size={13} weight="bold" /> Bookmark
+        </button>
+      {:else}
+        <button
+          class="ctx-item"
+          onclick={() => {
+            pkgMenuOpen = false;
+            if (pkgMenuTarget) void onSelectPackage(pkgMenuTarget);
+          }}
+        >
+          <FolderOpen size={13} weight="fill" /> Open folder view
+        </button>
+      {/if}
+      <button class="ctx-item" onclick={pkgIconClick}>
+        <Smile size={13} weight="fill" /> Change icon…
       </button>
       <div class="ctx-sep"></div>
       <button class="ctx-item danger" onclick={pkgDeleteClick}>
@@ -526,13 +575,13 @@
         onchange={commitWsIcon}
         oncancel={() => (modal = null)}
       />
-    {:else if modal === "pkg-rename" && pkgMenuTarget}
-      <EditNameModal
-        title="Rename package"
-        initial={pkgMenuTarget}
-        busy={modalBusy}
+    {:else if modal === "pkg-icon" && pkgMenuTarget}
+      <EditIconModal
+        title="Package icon"
+        name={pkgMenuTarget}
+        initial={packageStore.meta[pkgMenuTarget]?.icon ?? ""}
         error={modalError}
-        onsubmit={commitPkgRename}
+        onchange={commitPkgIcon}
         oncancel={() => (modal = null)}
       />
     {/if}
@@ -621,6 +670,16 @@
     overflow: hidden;
     /* Anchor for the absolutely-positioned DropOverlay. */
     position: relative;
+    /* The floating canvas (inset style): rounded opening with a gap on
+     * the bottom + right so content reads as a card set into the
+     * chrome frame. */
+    margin: 0 8px 8px 0;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-page);
+    box-shadow:
+      0 1px 2px rgba(15, 15, 15, 0.05),
+      0 4px 16px rgba(15, 15, 15, 0.04);
   }
   /* Style danger context-menu items — ContextMenu uses :global(.ctx-item),
    * so this hook also has to be :global. */

@@ -27,7 +27,6 @@
   import { onMount, onDestroy } from "svelte";
   import { themes } from "$lib/bridge/themes.svelte";
   import WorkbookProvenance from "$lib/network/components/WorkbookProvenance.svelte";
-  import ShareButton from "$lib/share/ShareButton.svelte";
 
   let { path }: { path: string } = $props();
 
@@ -161,17 +160,10 @@
   {:else if phase === "error"}
     <div class="status err">Failed to load: {error}</div>
   {:else if blobUrl && htmlText}
-    <!-- wb-u2o0.5.2 — provenance header surfaces verification state at
-         the top of every workbook frame. Modified-after-publish gets the
-         full warning banner (wb-u2o0.5.3) via showModifiedBanner. -->
-    <div class="provenance-header">
-      <div class="prov-row">
-        <div class="prov-grow">
-          <WorkbookProvenance html={htmlText} showModifiedBanner={true} showLineageToggle={true} />
-        </div>
-        <ShareButton {path} />
-      </div>
-    </div>
+    <!-- wb-5fl.7 — banner-only: the everyday verified badge + Share
+         moved to the tab context menu; only the modified-after-publish
+         warning still interrupts the page (it's a security signal). -->
+    <WorkbookProvenance html={htmlText} bannerOnly={true} />
     <iframe
       bind:this={iframeEl}
       src={blobUrl}
@@ -188,21 +180,6 @@
     display: flex;
     flex-direction: column;
   }
-  .provenance-header {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 12px;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-  }
-  .prov-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .prov-grow { flex: 1 1 auto; min-width: 0; }
   iframe {
     flex: 1 1 auto;
     border: 0;

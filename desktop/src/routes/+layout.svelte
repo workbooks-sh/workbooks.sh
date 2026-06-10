@@ -95,6 +95,9 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    /* Chrome frame color shows through the gaps around the floating
+     * content canvas (inset style). */
+    background: var(--color-chrome);
   }
   .body {
     flex: 1 1 auto;

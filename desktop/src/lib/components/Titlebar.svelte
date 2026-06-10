@@ -38,12 +38,17 @@
   } from "phosphor-svelte";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
+  import { invoke } from "@tauri-apps/api/core";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import IconResolver from "$lib/ui/Icon.svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
+  import { panes } from "$lib/viewer/panes.svelte";
+  import { bookmarks } from "$lib/bridge/bookmarks.svelte";
+  import ShareDrawer from "$lib/share/ShareDrawer.svelte";
+  import WorkbookProvenance from "$lib/network/components/WorkbookProvenance.svelte";
   import type { Tab } from "$lib/tabs/types";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
@@ -121,6 +126,141 @@
     chrome.navigateTo("home");
   }
 
+  // ── tab context menu (wb-5fl.8) — Share / provenance / splits live
+  // here now instead of as page chrome on every workbook. ───────────
+  let tabMenuOpen = $state(false);
+  let tabMenuX = $state(0);
+  let tabMenuY = $state(0);
+  let tabMenuTarget = $state<Tab | null>(null);
+
+  function onTabContext(tab: Tab, e: MouseEvent) {
+    e.preventDefault();
+    tabMenuTarget = tab;
+    tabMenuX = e.clientX;
+    tabMenuY = e.clientY;
+    tabMenuOpen = true;
+  }
+
+  /** Base for a split started from the menu: the visible doc, or any
+   *  other tab when the target IS the visible doc. */
+  function splitBaseFor(id: string): string | null {
+    const cur = tabsStore.activeId;
+    if (cur && cur !== id) return cur;
+    return tabsStore.tabs.find((t) => t.id !== id)?.id ?? null;
+  }
+  function menuSplit(side: "left" | "right") {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (!t) return;
+    panes.splitWith(t.id, side, splitBaseFor(t.id));
+    chrome.mode = "doc";
+  }
+  async function menuBookmarkTab() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (!t || bookmarks.bookmarks.some((b) => b.path === t.path)) return;
+    try {
+      await bookmarks.create(t.title, t.path);
+    } catch (e) {
+      console.warn("[titlebar] bookmark failed", e);
+    }
+  }
+  function menuCopyPath() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (t) void navigator.clipboard.writeText(t.path);
+  }
+  async function menuCloseOthers() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (!t) return;
+    for (const x of [...tabsStore.tabs]) {
+      if (x.id !== t.id) await tabsStore.close(x.id);
+    }
+  }
+  function menuClose() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (t) void tabsStore.close(t.id);
+  }
+
+  // Share drawer + provenance popover, opened from the tab menu.
+  let sharePath = $state<string | null>(null);
+  function menuShare() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (t) sharePath = t.path;
+  }
+  let provTitle = $state<string | null>(null);
+  let provHtml = $state<string | null>(null);
+  let provLoading = $state(false);
+  async function menuProvenance() {
+    const t = tabMenuTarget;
+    tabMenuOpen = false;
+    if (!t) return;
+    provTitle = t.title;
+    provHtml = null;
+    provLoading = true;
+    try {
+      const b64 = await invoke<string>("read_file_bytes_base64", { path: t.path });
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      provHtml = new TextDecoder("utf-8").decode(bytes);
+    } catch (e) {
+      console.warn("[titlebar] provenance read failed", e);
+      provTitle = null;
+    } finally {
+      provLoading = false;
+    }
+  }
+  function closeProv() {
+    provTitle = null;
+    provHtml = null;
+  }
+
+  // ── combined tab (wb-5fl.10): a split shows as ONE pill in the
+  // strip — segments per pane, one close for the whole split. ───────
+  const splitIds = $derived(
+    panes.isSplit ? panes.panes.map((p) => p.tabId) : [],
+  );
+  const stripTabs = $derived(
+    tabsStore.tabs.filter(
+      (t) => !splitIds.includes(t.id) || t.id === splitIds[0],
+    ),
+  );
+  function tabById(id: string): Tab | null {
+    return tabsStore.tabs.find((t) => t.id === id) ?? null;
+  }
+  async function focusSegment(idx: number, id: string) {
+    panes.focused = idx;
+    chrome.mode = "doc";
+    await tabsStore.focus(id);
+  }
+  async function closeSplit() {
+    const ids = [...splitIds];
+    for (const id of ids) await tabsStore.close(id);
+  }
+
+  // Tab-onto-tab merge: drop one tab on another → split (the combined
+  // pill animates in as both tabs leave the strip).
+  let mergeHotId = $state<string | null>(null);
+  function tabDragOver(tab: Tab, e: DragEvent) {
+    const p = dnd.payload;
+    if (p?.type !== "tab" || p.tabId === tab.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    mergeHotId = tab.id;
+  }
+  function tabDrop(tab: Tab, e: DragEvent) {
+    const p = dnd.payload;
+    mergeHotId = null;
+    if (p?.type !== "tab" || p.tabId === tab.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    panes.splitWith(p.tabId, "right", tab.id);
+    chrome.mode = "doc";
+    dnd.end();
+  }
+
   // ── strip as drop target: drag a workbook/app here → new tab ──────
   let stripHot = $state(false);
   function stripOver(e: DragEvent) {
@@ -178,52 +318,112 @@
     ondragleave={() => (stripHot = false)}
     ondrop={stripDrop}
   >
-    {#each tabsStore.tabs as tab (tab.id)}
-      {@const active = chrome.mode === "doc" && tabsStore.activeId === tab.id}
-      {@const Icon = kindIcon(tab.kind)}
-      {@const identity = docIcons.iconFor(tab.path)}
-      <div
-        class="tab"
-        class:active
-        role="tab"
-        aria-selected={active}
-        title={tab.path}
-        draggable="true"
-        ondragstart={(e) =>
-          dnd.start(
-            { type: "tab", tabId: tab.id, path: tab.path, title: tab.title },
-            e,
-          )}
-        ondragend={() => dnd.end()}
-        in:fly={{ y: 8, duration: 180, easing: cubicOut }}
-        out:fade={{ duration: 90 }}
-      >
-        <button
-          type="button"
-          class="tab-body"
-          data-tauri-drag-region="false"
-          onclick={() => focusDoc(tab.id)}
+    {#each stripTabs as tab (tab.id)}
+      {#if splitIds[0] === tab.id}
+        <!-- combined tab — one pill for the whole split -->
+        <div
+          class="tab combined"
+          class:active={chrome.mode === "doc"}
+          class:merge-hot={mergeHotId === tab.id}
+          role="tab"
+          aria-selected={chrome.mode === "doc"}
+          ondragover={(e) => tabDragOver(tab, e)}
+          ondragleave={() => (mergeHotId = null)}
+          ondrop={(e) => tabDrop(tab, e)}
+          in:fly={{ y: 8, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 90 }}
         >
-          <span class="favicon kind-{tab.kind}">
-            {#if identity}
-              <IconResolver value={identity} name={tab.title} size={13} />
-            {:else}
-              <Icon size={13} weight="fill" />
+          {#each splitIds as segId, i (segId)}
+            {@const seg = tabById(segId)}
+            {#if seg}
+              {@const SegIcon = kindIcon(seg.kind)}
+              {@const segIdentity = docIcons.iconFor(seg.path)}
+              {#if i > 0}<span class="seg-divider" aria-hidden="true"></span>{/if}
+              <button
+                type="button"
+                class="tab-body segment"
+                class:seg-focused={panes.focused === i}
+                data-tauri-drag-region="false"
+                title={seg.path}
+                oncontextmenu={(e) => onTabContext(seg, e)}
+                onclick={() => focusSegment(i, segId)}
+              >
+                <span class="favicon kind-{seg.kind}">
+                  {#if segIdentity}
+                    <IconResolver value={segIdentity} name={seg.title} size={13} />
+                  {:else}
+                    <SegIcon size={13} weight="fill" />
+                  {/if}
+                </span>
+                <span class="title">{seg.title}</span>
+              </button>
             {/if}
-          </span>
-          <span class="title">{tab.title}</span>
-          {#if tab.dirty}<span class="dot" aria-label="modified"></span>{/if}
-        </button>
-        <button
-          type="button"
-          class="close"
-          data-tauri-drag-region="false"
-          aria-label="Close tab"
-          onclick={(e) => closeDoc(tab.id, e)}
+          {/each}
+          <button
+            type="button"
+            class="close"
+            data-tauri-drag-region="false"
+            aria-label="Close split"
+            onclick={() => void closeSplit()}
+          >
+            <X size={12} weight="bold" />
+          </button>
+        </div>
+      {:else}
+        {@const active = chrome.mode === "doc" && tabsStore.activeId === tab.id && !panes.isSplit}
+        {@const Icon = kindIcon(tab.kind)}
+        {@const identity = docIcons.iconFor(tab.path)}
+        <div
+          class="tab"
+          class:active
+          class:merge-hot={mergeHotId === tab.id}
+          role="tab"
+          aria-selected={active}
+          title={tab.path}
+          draggable="true"
+          ondragstart={(e) =>
+            dnd.start(
+              { type: "tab", tabId: tab.id, path: tab.path, title: tab.title },
+              e,
+            )}
+          ondragend={() => {
+            dnd.end();
+            mergeHotId = null;
+          }}
+          ondragover={(e) => tabDragOver(tab, e)}
+          ondragleave={() => (mergeHotId = null)}
+          ondrop={(e) => tabDrop(tab, e)}
+          oncontextmenu={(e) => onTabContext(tab, e)}
+          in:fly={{ y: 8, duration: 180, easing: cubicOut }}
+          out:fade={{ duration: 90 }}
         >
-          <X size={12} weight="bold" />
-        </button>
-      </div>
+          <button
+            type="button"
+            class="tab-body"
+            data-tauri-drag-region="false"
+            onclick={() => focusDoc(tab.id)}
+          >
+            <span class="favicon kind-{tab.kind}">
+              {#if identity}
+                <IconResolver value={identity} name={tab.title} size={13} />
+              {:else}
+                <Icon size={13} weight="fill" />
+              {/if}
+            </span>
+            <span class="title">{tab.title}</span>
+            {#if tab.dirty}<span class="dot" aria-label="modified"></span>{/if}
+          </button>
+          <button
+            type="button"
+            class="close"
+            data-tauri-drag-region="false"
+            aria-label="Close tab"
+            onclick={(e) => closeDoc(tab.id, e)}
+          >
+            <X size={12} weight="bold" />
+          </button>
+        </div>
+      {/if}
     {/each}
 
     <button
@@ -274,6 +474,54 @@
   </button>
 </div>
 
+<ContextMenu bind:open={tabMenuOpen} x={tabMenuX} y={tabMenuY}>
+  {#if tabMenuTarget?.kind === "workbook"}
+    <button class="ctx-item" onclick={menuShare}>Share…</button>
+    <button class="ctx-item" onclick={menuProvenance}>
+      {provLoading ? "Verifying…" : "Provenance…"}
+    </button>
+    <div class="ctx-sep"></div>
+  {/if}
+  <button class="ctx-item" onclick={() => menuSplit("left")}>Split left</button>
+  <button class="ctx-item" onclick={() => menuSplit("right")}>Split right</button>
+  <button
+    class="ctx-item"
+    onclick={menuBookmarkTab}
+    disabled={!!tabMenuTarget &&
+      bookmarks.bookmarks.some((b) => b.path === tabMenuTarget?.path)}
+  >
+    Bookmark
+  </button>
+  <button class="ctx-item" onclick={menuCopyPath}>Copy path</button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" onclick={menuClose}>Close</button>
+  <button
+    class="ctx-item"
+    onclick={menuCloseOthers}
+    disabled={tabsStore.tabs.length < 2}
+  >
+    Close others
+  </button>
+</ContextMenu>
+
+{#if sharePath}
+  <ShareDrawer path={sharePath} onclose={() => (sharePath = null)} />
+{/if}
+
+{#if provTitle && provHtml}
+  <div class="prov-scrim" role="presentation" onclick={closeProv}>
+    <div class="prov-card" role="dialog" aria-label="Provenance" onclick={(e) => e.stopPropagation()}>
+      <div class="prov-head">
+        <span class="prov-title">{provTitle}</span>
+        <button type="button" class="close" aria-label="Close" onclick={closeProv}>
+          <X size={13} weight="bold" />
+        </button>
+      </div>
+      <WorkbookProvenance html={provHtml} showLineageToggle={true} />
+    </div>
+  </div>
+{/if}
+
 <ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
   <button class="ctx-item" onclick={menuSearch}>
     <Search size={13} weight="bold" /> Search…
@@ -299,8 +547,8 @@
     height: 36px;
     flex: 0 0 36px;
     padding: 0 0.5rem 0 78px;
-    background: var(--color-surface-soft);
-    border-bottom: 1px solid var(--color-border);
+    /* Blends with the sidebar — one chrome frame, no seam. */
+    background: var(--color-chrome);
     user-select: none;
     -webkit-user-select: none;
   }
@@ -460,6 +708,70 @@
   .new-tab:hover { background: var(--color-page); color: var(--color-fg); }
 
   .spacer { flex: 0 0 0.25rem; }
+
+  /* ── combined tab (split pill) ─────────────────────────────────── */
+  .tab.combined {
+    max-width: 360px;
+    border-color: color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+  }
+  .tab.combined.active {
+    border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong));
+  }
+  .tab-body.segment {
+    border-radius: 6px 6px 0 0;
+    transition: background 0.1s;
+  }
+  .tab-body.segment.seg-focused {
+    color: var(--color-fg);
+    font-weight: 500;
+  }
+  .seg-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--color-border-strong);
+    flex-shrink: 0;
+  }
+  .tab.merge-hot {
+    box-shadow: inset 0 0 0 2px var(--color-brand);
+    transform: scale(1.02);
+  }
+
+  /* provenance popover */
+  .prov-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    background: rgba(15, 15, 15, 0.18);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 80px;
+  }
+  .prov-card {
+    width: min(480px, calc(100vw - 48px));
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-pop);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .prov-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .prov-head .close { opacity: 0.7; }
+  .prov-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* Compact engine status icon — a colored dot reflecting engine state.
    * Click opens the engine setup/manage wizard. */
