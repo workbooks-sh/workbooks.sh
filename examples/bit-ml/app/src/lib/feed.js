@@ -7,24 +7,31 @@
 // FUTURE /_activity shape this will consume (do not drift from it):
 //   {
 //     agents: [
-//       { name: 'wren', role: 'writer', doing: 'drafting: deepmind weather', live: true }
+//       { name: 'wren', role: 'writer', doing: 'drafting: deepmind weather',
+//         live: true, avatarSeed: 'wren' }
 //     ],
 //     wire: [ { time: '14:01', who: 'wren', msg: 'draft: deepmind-weather.org' } ],
 //     pipeline: { assigned: 2, research: 1, writing: 1, edit: 0 }
 //   }
 //
+// `avatarSeed` (defaults to name) drives the OpenPeeps avatar (DiceBear, CC0 —
+// see DESIGN.md "the crew are characters"). `desk` is the assignment lead: it
+// sits atop the org chart (CrewPanel) and ASSIGNS the three reports beneath it.
+//
 // Until then `crewFeed()` returns the static specimen below. The CrewPanel
 // renders a "specimen data" tag so the placeholder is honest. The component
-// maps `live`→ the wire dot and formats `pipeline` to the mono counts string.
+// maps `live`→ the live badge and formats `pipeline` to the mono counts string.
 
 export function crewFeed() {
   return {
     specimen: true, // honest flag — flips false once /_activity is wired
+    // desk first — it's the assignment lead at the top of the org chart;
+    // the next three (moss · wren · hale) are its reports, left→right.
     agents: [
-      { name: 'wren', role: 'writer',     doing: 'drafting: deepmind weather', live: true },
-      { name: 'moss', role: 'research',   doing: 'pulling: nature paper',       live: true },
-      { name: 'hale', role: 'editor',     doing: 'idle — next pass in 4m',      live: false },
-      { name: 'desk', role: 'assignment', doing: 'thinking',                    live: true },
+      { name: 'desk', role: 'assignment', doing: 'assigning: deepmind weather', live: true,  avatarSeed: 'desk' },
+      { name: 'moss', role: 'research',   doing: 'pulling: nature paper',       live: true,  avatarSeed: 'moss' },
+      { name: 'wren', role: 'writer',     doing: 'drafting: deepmind weather',  live: true,  avatarSeed: 'wren' },
+      { name: 'hale', role: 'editor',     doing: 'next pass in 4m',             live: false, avatarSeed: 'hale' },
     ],
     wire: [
       { time: '14:01', who: 'wren', msg: 'draft: deepmind-weather.org' },

@@ -43,7 +43,7 @@
 
     <div class="byline-row">
       <span class="sources mono">{#if story.sources?.length}sources: {#each story.sources as s, i}<a href={s.url} target="_blank" rel="noopener">{s.label}</a>{#if i < story.sources.length - 1} · {/if}{/each}{/if}</span>
-      {#if story.byline}<Byline {...bylineProps(story.byline)} {onagent} />{/if}
+      {#if story.byline}<Byline {...bylineProps(story.byline)} {onagent} avatar />{/if}
     </div>
 
     <hr class="hair" />

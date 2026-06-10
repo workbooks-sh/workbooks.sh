@@ -1,8 +1,9 @@
 <script>
   // The PERSISTENT SHELL (DESIGN.md §7 — same architecture as the lander).
-  // Masthead, CrewPanel, Footer, and the theme toggle mount ONCE and never
-  // unmount; only the CONTENT REGION (#route) swaps as the client router
-  // changes. Zero fades between routes (§5: instant swap, shell persists).
+  // Masthead, CrewPanel, and Footer mount ONCE and never unmount; only the
+  // CONTENT REGION (#route) swaps as the client router changes. Zero fades
+  // between routes (§5: instant swap, shell persists). ONE theme — light
+  // only (the terminal page theme + toggle were retired, founder 2026-06-10).
   //
   // Routes (lib/router.svelte.js):
   //   /            → Front     · /s/<section> → Section
@@ -21,12 +22,6 @@
   startRouter();
   loadManifest();                       // runtime CMS — fetch the manifest once
   const r = $derived(route());
-
-  // ── page theme toggle (paper ↔ terminal) — proves the token system ──────
-  let theme = $state('light');
-  $effect(() => {
-    document.documentElement.dataset.theme = theme === 'terminal' ? 'terminal' : '';
-  });
 
   // ── crew panel state (toggled from the masthead, footer, or a byline) ───
   let crewOpen = $state(false);
@@ -68,7 +63,7 @@
   <Footer oncrew={() => (crewOpen = !crewOpen)} />
 </div>
 
-<!-- the docked, toggleable crew panel (always terminal-skinned) -->
+<!-- the docked, toggleable crew panel — the fun org chart (light, Notion lift) -->
 <CrewPanel
   open={crewOpen}
   filter={crewFilter}
@@ -79,20 +74,3 @@
   {clock}
   onclose={() => (crewOpen = false)}
 />
-
-<!-- floating mono theme toggle (bottom-left) — proves the token system -->
-<button class="theme-toggle mono" onclick={() => (theme = theme === 'terminal' ? 'light' : 'terminal')}>
-  {theme === 'terminal' ? '○ paper' : '● terminal'}
-</button>
-
-<style>
-  .theme-toggle {
-    position: fixed; left: 18px; bottom: 18px; z-index: 70;
-    background: var(--paper); color: var(--ink-2);
-    border: 1px solid var(--rule); border-radius: 999px;
-    padding: 7px 13px; font-size: 11px; letter-spacing: 0.04em;
-    box-shadow: 0 2px 14px -8px rgba(0,0,0,.3);
-    transition: color .15s ease, border-color .15s ease;
-  }
-  .theme-toggle:hover { color: var(--wire); border-color: color-mix(in srgb, var(--wire) 40%, var(--rule)); }
-</style>

@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════
    bit.ml — design tokens (DESIGN.md §3) + base type cast (§2)
-   The contract: components style from vars only. Light is canonical;
-   [data-theme=terminal] is the panel + night reading, not a tinted clone.
+   The contract: components style from vars only. ONE theme: white paper,
+   black ink — Notion-style editorial (fun, clean, lots of whitespace).
+   The terminal page theme + toggle were retired (founder, 2026-06-10).
    ════════════════════════════════════════════════════════════════════ */
 
 :root {                          /* paper */
@@ -10,9 +11,13 @@
   --ink-2:   #2e2e2e;           /* deks: still essentially black */
   --ink-3:   #757575;           /* meta resting state — the ONLY grey */
   --rule:    #ededed;           /* hairlines — barely there */
+  --wash:    #f5f5f5;           /* Notion hover wash on interactive rows */
+  --surface: #fafafa;           /* the lightest gray a card may carry (#fafafa max) */
   /* ONE radius scale — every rounded surface uses these, nothing freelances */
   --r:   12px;                  /* floating surfaces: panels, receipt, portal */
   --r-s: 6px;                   /* chips, keycaps */
+  /* the ONE Notion lift — soft shadow now sanctioned on floating surfaces */
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.12);
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;
   --down:    #c4322e;           /* market semantics only */
@@ -32,18 +37,6 @@
 
   --col: 720px;                 /* §4.4 single column */
   color-scheme: light;
-}
-
-[data-theme=terminal] {          /* the panel + dark mode: TRUE BLACK, like
-                                    the light side is true white — never a
-                                    tinted workbooks-gray */
-  --paper: #000000;
-  --ink:   #ffffff;
-  --ink-2: #d6d6d6;
-  --ink-3: #8c8c8c;
-  --rule:  #1c1c1c;
-  --wire:  #5b8cff;
-  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -131,7 +124,7 @@ button { font-family: inherit; cursor: pointer; }
    <article class="org-doc">; we mount it inside .org-mount on the story page.
    We remap orgitorial's --org-* vars onto bit.ml tokens so rendered stories
    LOOK native. Scoped to .org-mount (beats orgitorial's own :root defaults
-   without !important) and follows the live [data-theme] via the bit.ml tokens.
+   without !important) and inherits the one light theme via the bit.ml tokens.
 
    DESIGN.md §4.5 story body: 17/1.65 Switzer, 68ch. The serif is RESERVED for
    headlines (§2 Linear-forward dial) — story sub-heads (.org-h) ARE the serif's

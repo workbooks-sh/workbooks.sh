@@ -1,9 +1,9 @@
 <script>
   // /design — the living styleguide (DESIGN.md is law; this stays the specimen
   // sheet). Every component from the real library renders live, labelled like a
-  // type specimen. This is the page that PROVES the token system: the theme
-  // toggle and the docked crew panel live in the shell, but the MarketStrip and
-  // the inline crew specimen live here (the real front page omits the strip —
+  // type specimen. This is the page that PROVES the token system: the docked
+  // crew panel lives in the shell, but the MarketStrip and the inline crew
+  // org-chart specimen live here (the real front page omits the strip —
   // §4.6 forbids placeholder numbers).
   import WireLead from '../lib/WireLead.svelte';
   import Bite from '../lib/Bite.svelte';
@@ -48,7 +48,7 @@
 <section class="spec" id="tokens">
   <div class="spec-label">
     <span class="spec-name">tokens.css</span>
-    <span class="spec-rule">paper, ink, one wire — light + [data-theme=terminal]</span>
+    <span class="spec-rule">paper, ink, one wire — one theme, light only</span>
   </div>
   <div class="swatches">
     {#each tokens as t}
@@ -142,7 +142,7 @@
 <section class="spec" id="receipt">
   <div class="spec-label">
     <span class="spec-name">Receipt.svelte</span>
-    <span class="spec-rule">the pipeline trail — terminal-skinned, dark on the light page</span>
+    <span class="spec-rule">the pipeline trail — a light Notion card, soft lift, no stroke</span>
   </div>
   <Receipt title="deepmind-weather.org — the run" rows={[
     { stage: 'assigned',   time: '13:40', note: 'desk · weather model', sha: 'a1c4e9' },
@@ -165,7 +165,7 @@
 <section class="spec" id="crew">
   <div class="spec-label">
     <span class="spec-name">CrewPanel.svelte</span>
-    <span class="spec-rule">always terminal skin — toggle it from the masthead, or read it here</span>
+    <span class="spec-rule">the org chart — desk assigns, three reports beneath; toggle it from the masthead, or read it here</span>
   </div>
   <CrewPanel inline agents={crew} wire={feed.wire} {pipeline} specimen clock="14:02:33" />
 </section>
