@@ -813,12 +813,17 @@ async function watch() {
   running = true; frame(); cv.classList.add('on');
 })();
 
-if (reduced) {
+/* the intro build plays once per browser — return visits load assembled */
+const seenIntro = (() => { try { return localStorage.getItem('wb_intro') === '1'; } catch { return false; } })();
+const markIntro = () => { try { localStorage.setItem('wb_intro', '1'); } catch { /* private mode */ } };
+
+if (reduced || seenIntro) {
   document.querySelectorAll('.blk').forEach(b => b.classList.add('on'));
   $('#h1text').textContent = H1;
-  openPanel();
+  if (matchMedia('(min-width: 961px)').matches) openPanel();
+  else document.body.classList.add('panel-was-open');
 } else {
-  build();
+  build().then(markIntro);
 }
 watch();
 })();
