@@ -128,14 +128,18 @@ defmodule Workbooks.Application do
     do: [ip: {0, 0, 0, 0, 0, 0, 0, 0}, thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]]
 
   # Keeper (wb-5vm): on-box agent scheduler for deployed engines where the control
-  # plane is internal-only and GitHub-cron can't reach it. Enabled ONLY when
-  # WB_KEEPER_DEF is set; otherwise excluded from the supervision tree entirely so
-  # normal/dev deploys are not affected.
+  # plane is internal-only and GitHub-cron can't reach it.
+  #
+  # Two MUTUALLY EXCLUSIVE modes (wb-wc0.2):
+  #   * WB_CREW_DEF set → CREW: Workbooks.Keeper.Crew supervises one keeper worker
+  #     per declared agent (bit.ml multi-agent). Takes precedence.
+  #   * else WB_KEEPER_DEF set → SINGLETON: the lone Workbooks.Keeper (the lander).
+  #   * else neither → excluded from the tree entirely (normal/dev deploys).
   defp keeper do
-    if System.get_env("WB_KEEPER_DEF") do
-      [Workbooks.Keeper]
-    else
-      []
+    cond do
+      System.get_env("WB_CREW_DEF") -> [Workbooks.Keeper.Crew]
+      System.get_env("WB_KEEPER_DEF") -> [Workbooks.Keeper]
+      true -> []
     end
   end
 
