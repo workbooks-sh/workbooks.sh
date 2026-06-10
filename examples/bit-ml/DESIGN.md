@@ -47,11 +47,11 @@ terminal — for the inspect panel and night reading, not a tinted clone.
 
 ```css
 :root {                          /* paper */
-  --paper:   #faf9f6;           /* warm newsprint white, not #fff */
-  --ink:     #111213;           /* near-black, warm */
-  --ink-2:   #55585c;           /* deks, secondary */
-  --ink-3:   #9a9da1;           /* meta resting state */
-  --rule:    #e4e2dc;           /* hairlines — visible, never loud */
+  --paper:   #ffffff;           /* pure white — grayscale, no warm cast */
+  --ink:     #141414;           /* neutral near-black */
+  --ink-2:   #595959;           /* deks, secondary */
+  --ink-3:   #9e9e9e;           /* meta resting state */
+  --rule:    #ebebeb;           /* hairlines — barely there */
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;  --down: #c4322e;   /* market semantics only */
 }
@@ -64,9 +64,12 @@ terminal — for the inspect panel and night reading, not a tinted clone.
 - **Wire blue is the only voice of interactivity and liveness.** Links,
   the live dot, focus rings, the inspect toggle. If something else is
   blue, it's wrong.
-- Section identity = a 2px tick + mono tag, NOT tinted cards:
-  `AI` wire blue · `MARKETS` up-green · `CHIPS` amber `#b8860b` ·
-  `POLICY` plum `#7a4988`. The tick sits left of the section tag only.
+- **Grayscale discipline (founder, 2026-06-10):** the base is pure
+  monochrome — white paper, neutral grays, generous white space (air IS
+  the aesthetic). Section identity is TYPOGRAPHIC (the mono tag names the
+  desk; ticks are ink), never chromatic. The only colors on a page:
+  wire blue (interactivity/liveness) and up/down green/red inside market
+  data. Nothing else.
 - No gradients anywhere except the presence system (the one inherited
   gradient: the live-agent rim, which signals "machine at work").
 
