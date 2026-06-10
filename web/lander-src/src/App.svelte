@@ -22,6 +22,9 @@
   // every #b-* node present and every ref registered. The intro itself only
   // plays on first load of `/` (guarded inside boot via wb_intro + the home
   // route); the watch/follow loops run regardless of route.
+  // ?embed=1 → this instance renders inside the portal's live-view iframe:
+  // hide the shell chrome (nav/panel/viewer/cursor) so only the page shows.
+  if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');
   $effect(() => { boot(); });
 </script>
 

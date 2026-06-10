@@ -324,6 +324,18 @@ async function showFile(path, verb) {
   ).join('\n')}</pre>`;
 }
 
+// another page of THIS site: a live scaled embed (the real page, ?embed=1 so
+// its shell chrome hides) with a roaming activity dot. The CARD is a link —
+// clicking jumps there; the page NEVER navigates on its own (no redirects).
+function showPage(page) {
+  refs.viewer.classList.add('haslink');
+  refs.viewer.dataset.jump = page;
+  refs.viewerBody.innerHTML = `<div class="vpagewrap">
+    <iframe class="vpage" src="${escH(page)}?embed=1" loading="lazy" title="live view"></iframe>
+    <span class="vcur" aria-hidden="true"></span>
+  </div><div class="vjump">click to open ${escH(page)} →</div>`;
+}
+
 // a private/external call: NEVER the args or response — a labelled pulse only.
 function showCall(label) {
   refs.viewerBody.innerHTML = `<div class="vrow"><span class="vpulse"></span><span class="vdom">${escH(label)}</span></div>`;
@@ -343,8 +355,9 @@ function openViewer(t) {
   const win = refs.viewer;
   if (!win || !following) return false;
   if (innerWidth <= 640) return false;                   // no room — handled by caller
-  const head = t.url || t.file || t.call;
-  const key = t.url ? 'u:' + t.url : t.file ? 'f:' + t.file : 'c:' + t.call;
+  const head = t.pageEmbed || t.url || t.file || t.call;
+  const key = t.pageEmbed ? 'pg:' + t.pageEmbed :
+    t.url ? 'u:' + t.url : t.file ? 'f:' + t.file : 'c:' + t.call;
   if (key === viewerKey && win.classList.contains('open')) {
     viewerHead(t.verb, head, t.thought);                 // same target, refresh header only
     return true;
@@ -352,7 +365,9 @@ function openViewer(t) {
   viewerKey = key;
   win.classList.add('open');
   viewerHead(t.verb, head, t.thought);
-  if (t.url) showUrl(t.url);
+  if (!t.pageEmbed) { refs.viewer.classList.remove('haslink'); delete refs.viewer.dataset.jump; }
+  if (t.pageEmbed) showPage(t.pageEmbed);
+  else if (t.url) showUrl(t.url);
   else if (t.file) showFile(t.file, t.verb);
   else showCall(t.call);                                 // sanitized — label only, no data
   return true;
@@ -785,11 +800,16 @@ async function follow() {
       t.thought = act.thought;
       const key = fresh ? targetKey(t) : null;
 
-      if (t.page && key !== lastKey) {               // another lander page — go there
+      if (t.page && key !== lastKey) {
+        // another lander page: NEVER redirect the visitor — show a live embed
+        // in the portal instead; clicking it is THEIR choice to jump.
         lastKey = key;
-        if (!absorbed && cursorIn) { think('working over here — come on'); await sleep(1200); }
-        if (following) routerPush(t.page);
-        continue;                                    // next tick re-places on the new DOM
+        if (openViewer({ pageEmbed: t.page, verb: 'working on', thought: t.thought })) {
+          if (!absorbed && cursorIn) await absorbCursor();
+        }
+        if (refs.cursor && (absorbed || !cursorIn)) refs.cursor.style.opacity = '0';
+        await sleep(2500);
+        continue;
       }
 
       if (fresh && t.el) {
@@ -800,8 +820,8 @@ async function follow() {
           else {
             if (!cursorIn) await cursorEnter();
             refs.cursor.style.opacity = '1';
-            t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-            await sleep(350);
+            // no scrollIntoView: the page never moves under the visitor —
+            // the cursor works where the work is; you can scroll and find it.
             await moveTo(t.el);
           }
           t.el.classList.add('touch');
@@ -841,6 +861,13 @@ async function follow() {
 }
 // the button toggles: start when idle, stop when following
 export const toggleFollow = () => { following ? stopFollow() : follow(); };
+
+// the portal card is a LINK when it embeds another page — jumping is always
+// the visitor's click, never an automatic redirect.
+export function viewerJump() {
+  const page = refs.viewer && refs.viewer.dataset.jump;
+  if (page) { closeViewer(); routerPush(page); }
+}
 
 // Cursor placement is PER-ROUTE: when the route changes, the old target's DOM
 // is gone — hide the cursor (the viewer card, global chrome, may stay) and

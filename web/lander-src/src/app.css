@@ -404,24 +404,50 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
    conic green→blue→violet; the inner bg masks all but the rim. ────────── */
 .viewer {
   /* compact action card, docked LEFT of the inspect panel (layout-level — when
-     the panel is open it sits beside it, never over it; panel hidden → edge). */
+     the panel is open it sits beside it, never over it; panel hidden → edge).
+     The 1px animated GRADIENT RIM is the ::before behind .vinner. */
   position: fixed; right: 18px; bottom: 18px; z-index: 50;
-  width: 232px; border-radius: 10px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  border-left: 2px solid color-mix(in srgb, var(--live) 55%, var(--line));
-  box-shadow: 0 14px 34px -18px rgba(0, 0, 0, .8);
-  padding: 10px 12px 11px;
+  width: 232px; border-radius: 11px; padding: 1px;
   opacity: 0; transform: translateY(10px) scale(.97); pointer-events: none;
   transition: opacity .35s ease, transform .4s cubic-bezier(.2, .9, .25, 1.05), right .45s cubic-bezier(.3, .8, .3, 1);
+  overflow: hidden; cursor: default;
+}
+.viewer::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: conic-gradient(from var(--vang, 0deg), #3fe081, #5ea2ff, #b48cff, #3fe081);
+  animation: vsweep 6s linear infinite; opacity: .85;
+}
+@property --vang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes vsweep { to { --vang: 360deg; } }
+.vinner {
+  position: relative; border-radius: 10px; padding: 10px 12px 11px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
 }
 body.panel-open .viewer { right: calc(var(--panel-w) + 14px); }
-.viewer.open { opacity: 1; transform: none; }
+.viewer.open { opacity: 1; transform: none; pointer-events: auto; }
+.viewer.haslink { cursor: pointer; }
+.viewer.haslink:hover .vinner { background: color-mix(in srgb, var(--panel) 96%, transparent); }
 .viewer.land { animation: vland .45s ease; }
 @keyframes vland {
   0% { transform: scale(.97); } 45% { box-shadow: 0 0 22px -6px var(--live); }
   100% { transform: none; }
 }
+/* live page embed: the real page, scaled — a window onto where it works.
+   pointer-events off (the CARD is the click target → jump to the page). */
+.vpagewrap { position: relative; margin-top: 8px; width: 100%; height: 138px;
+  border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
+.vpage { width: 920px; height: 560px; border: 0; transform: scale(.227); transform-origin: 0 0;
+  pointer-events: none; background: var(--bg); }
+.vcur { position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--live); box-shadow: 0 0 0 2px color-mix(in srgb, var(--live) 30%, transparent);
+  animation: vroam 9s ease-in-out infinite; }
+@keyframes vroam {
+  0%   { left: 22%; top: 28%; } 22%  { left: 58%; top: 42%; }
+  45%  { left: 38%; top: 70%; } 68%  { left: 72%; top: 56%; }
+  100% { left: 22%; top: 28%; }
+}
+.vjump { margin-top: 6px; font: 500 9.5px/1 var(--mono); color: var(--faint); }
+.viewer.haslink:hover .vjump { color: var(--live); }
 .vhead { display: flex; align-items: center; gap: 7px; }
 .vdot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); flex: 0 0 auto;
   animation: vbreathe 2.6s ease-in-out infinite; }
@@ -536,3 +562,8 @@ body.panel-open .viewer { right: calc(var(--panel-w) + 14px); }
   font: 500 12px/1 var(--mono); color: var(--faint); text-decoration: none; }
 .blogpost .blogback:hover { color: var(--live); }
 .blogpost article { display: block; max-width: 720px; }
+
+/* embed mode (?embed=1): this instance lives inside the portal's live-view
+   iframe — only the page content shows, no shell chrome, no nested portals. */
+body.embed .nav, body.embed .panel, body.embed .peek,
+body.embed .viewer, body.embed .cursor, body.embed #cursor { display: none !important; }
