@@ -57,3 +57,29 @@ existing pattern, not a new one.
   (workbooks / runtime / toolkits), never "one file" trivia, never "sites that
   run themselves", never "software you can own". Sentence-case headings.
   Short sentences beat long ones. One idea per section.
+
+* the one-idea law (anti-repetition — checked every audit)
+
+  The shell already tells the pitch: 01 names the three layers, 02 tells the
+  person→team→world ladder, the hero sells the ecosystem. Those beats —
+  "interface, logic, and data travel as one unit", "no sign-up, starts on your
+  machine", "the same artifact scales" — are TOLD ONCE, in the shell, and are
+  BANNED from grown sections and banned from appearing twice anywhere. A grown
+  section earns its place with ONE idea the page does not already have, stated
+  in its own words. Before writing one, list each existing section's single
+  idea; if yours collides, improve that section instead. An audit that finds
+  the same beat told twice cuts the second telling.
+
+  Comparisons live in blog/ — the landing page never carries a prose twin of
+  a post (the agent's-desk listing already links every post). If a comparison
+  earns a page presence, it is a compact TABLE (rows of facts), not prose.
+
+* the band design law (compose, don't drip)
+
+  The grown band is DESIGNED AS A WHOLE before it is built. In a PLAN run:
+  decide what the page is missing as a set — 2 to 4 sections, each named with
+  its one idea, its order, and why a first-time reader needs it — and write
+  that design into the board as an objective whose child tasks are the
+  sections. ADD runs then fill slots from the design; no section ships without
+  a slot. When the page's needs change, redesign the band in the next plan
+  run — never bolt a section onto the end because a run needed something to do.
