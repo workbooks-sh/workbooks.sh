@@ -318,9 +318,9 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
     </svg>
   </span>
   <span class="word">workbooks</span>
-  <a href="/_changes">changes</a>
-  <a href="https://github.com/workbooks-sh/living-lander">github</a>
-  <a class="cta" href="https://workbooks.sh">curl workbooks.sh | sh</a>
+  <a href="https://github.com/workbooks-sh/workbooks.sh">docs</a>
+  <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
+  <a class="cta" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="navDl">download</a>
 </nav>
 
 <div class="content">
@@ -335,12 +335,13 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
     <h1 class="blk" id="b-h1"><span id="h1text"></span><span class="caret" id="caret" hidden></span></h1>
 
     <p class="sub blk" id="b-sub">
-      <b>Workbooks</b> is one file that is an entire app — served live and
-      maintained by an agent. This site is one. The agent is on the clock.
+      <b>Workbooks</b> is software you can own: an entire app — data, logic,
+      interface — in one file. The desktop app builds and runs workbooks on
+      your machine, no cloud required. This site is one of them, live.
     </p>
 
     <div class="ctas blk" id="b-ctas">
-      <a class="btn primary" href="https://workbooks.sh">install the cli</a>
+      <a class="btn primary" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="heroDl">download the desktop app</a>
       <a class="btn ghost" href="#timeline">watch it work →</a>
     </div>
 
@@ -462,6 +463,17 @@ async function build() {
   await cursorExit();
   openPanel();        // the timeline reveals itself only after the agent leaves
 }
+
+/* ── platform-aware desktop download ──────────────────────────── */
+(() => {
+  const R = 'https://github.com/workbooks-sh/workbooks.sh/releases/download/desktop-v0.1.0/';
+  const ua = navigator.userAgent;
+  const asset =
+    /Mac/.test(ua) ? R + 'Workbooks_0.1.0_aarch64.dmg' :
+    /Win/.test(ua) ? R + 'Workbooks_0.1.0_x64-setup.exe' :
+    /Linux/.test(ua) ? R + 'Workbooks_0.1.0_amd64.AppImage' : null;
+  if (asset) ['#navDl', '#heroDl'].forEach(s => { const a = $(s); if (a) a.href = asset; });
+})();
 
 /* ── panel visibility ─────────────────────────────────────────── */
 const openPanel = () => { document.body.classList.add('panel-open', 'panel-was-open'); };

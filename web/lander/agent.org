@@ -83,7 +83,12 @@
 
 *** Every run, in order
 
-    1. Orient: `git log -8 --oneline`, read plan.org, skim index.html.
+    1. Orient: read `/data/context.org` FIRST (the product truth — what
+       Workbooks is, the pitch rules, the vocabulary; everything you write
+       must agree with it). Then `git log -8 --oneline`, plan.org, skim
+       index.html. To fact-check any product claim, read the open-source
+       checkout at `/data/context/source` (read-only — never edit/commit/push
+       it; `git -C /data/context/source pull --ff-only` to refresh).
     2. Decide ADD or AUDIT per the cadence rule above.
     3. Plan first: write the one-line plan for this run into plan.org's Log
        (what you'll make/fix and why), THEN implement it.

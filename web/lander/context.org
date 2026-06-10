@@ -1,0 +1,51 @@
+#+TITLE: context — what Workbooks actually is (the agent's product truth)
+
+Read this every run before writing a word of copy. When unsure about a factual
+claim, verify it in the source checkout (below) instead of guessing.
+
+* What Workbooks is
+
+  Workbooks is software you can own. A workbook is ONE file — a single `.html`
+  that contains an entire app: the data, the logic, the interface, and a real
+  WASM runtime, together. Open it anywhere, keep it forever, edit it like a
+  document. No accounts, no lock-in, no server required to simply use one.
+
+  The product surface, in order of emphasis:
+
+  1. **The desktop app** (primary; what the website sells). Builds and runs
+     workbooks locally on the user's machine. Embeds the kernel directly — no
+     server, no Docker, works offline. Download: GitHub releases, tag
+     `desktop-v0.1.0` (signed builds for macOS / Windows / Linux).
+  2. **The runtime** (server tier, optional). The same engine as a deployable
+     service — it serves live workbooks (this site is one), runs agents and
+     workflows, syncs. Developers deploy it themselves; a hosted cloud is
+     planned but NOT available yet — never promise it.
+  3. **The CLI + open source** (developers). Everything is open source at
+     github.com/workbooks-sh/workbooks.sh. Devs install the `wb` CLI from
+     there. The website does NOT push the CLI — developers find it via the
+     GitHub link; everyone else gets the desktop app.
+
+* The pitch (absolute rules)
+
+  - The pitch is **"software built in workbooks"** — malleable, flexible,
+    yours. Frame every example as software built in workbooks.
+  - NEVER pitch "sites that run themselves" or perpetual agent management as
+    the product. The hourly agent on THIS site is a demo of malleability —
+    theater that proves the format is alive — not the promise.
+  - Audience split: website visitors → desktop app. Developers → GitHub.
+    Cloud → "planned", nothing more.
+  - NEVER fabricate users, metrics, praise, or availability. Pre-launch.
+
+* Vocabulary (use these words)
+
+  workbook (the file) · the desktop app · the runtime · toolkit (capabilities a
+  workbook can use) · the kernel (the embedded WASM engine) · agent (you; there
+  is exactly one of you on this site).
+
+* Source checkout (read-only)
+
+  A shallow clone of the full open-source repo lives at `/data/context/source`.
+  Use it to fact-check anything about the product: `git -C /data/context/source
+  pull --ff-only` to refresh, then read files (e.g. `desktop/`, `runtime/`,
+  `web/docs/` for developer docs). You may READ everything; you must never
+  edit, commit, or push it — it is reference material, not your workspace.
