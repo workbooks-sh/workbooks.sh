@@ -1047,7 +1047,7 @@
     width: 100%;
     height: 34px;
     margin-bottom: 0.2rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
     border-radius: 10px;
     background: var(--color-surface);
     color: var(--color-fg-muted);
@@ -1057,18 +1057,23 @@
     letter-spacing: 0.01em;
     cursor: pointer;
     flex-shrink: 0;
-    transition: color 0.14s, border-color 0.14s, background 0.14s;
+    /* Faint depth: hairline of light along the top, a breath of
+       darkness pooling at the bottom — no drop shadow. */
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
+      inset 0 -2px 3px -1px rgba(15, 15, 15, 0.08);
+    transition: color 0.14s, border-color 0.14s;
   }
-  .create-cta:hover {
-    color: var(--color-fg);
-    border-color: var(--color-border-strong);
-  }
+  .create-cta:hover,
   .create-cta.engaged {
     color: var(--color-fg);
-    border-color: color-mix(in srgb, var(--color-brand) 40%, var(--color-border));
+    border-color: var(--color-border);
   }
   .create-cta:active {
     transform: scale(0.99);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 20%, transparent),
+      inset 0 2px 3px -1px rgba(15, 15, 15, 0.08);
   }
 
   /* ── workspace header ─────────────────────────────────────────── */
