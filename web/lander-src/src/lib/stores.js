@@ -5,8 +5,15 @@
    preserves the shared closures (cursor ⇄ build ⇄ watch ⇄ follow) that the
    choreography depends on. */
 
+import { push as routerPush } from './router.svelte.js';
+
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep = (ms) => new Promise((r) => setTimeout(r, reduced ? 0 : ms));
+
+// the engine only enacts the build/edit choreography when the homepage content
+// is actually mounted in #route (its #b-* and #grown nodes exist). On the blog
+// routes those nodes are absent, so guard against driving a torn-down page.
+const onHome = () => location.pathname === '/' || location.pathname === '';
 
 const H1 = 'A website that builds itself.';
 
@@ -256,6 +263,24 @@ const escH = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').repla
 const VERB = { vfs_read: 'reading', vfs_write: 'writing', fetch: 'reading',
                run: 'running', http: 'reading' };
 const verbFor = (tool, fallback) => VERB[tool] || fallback || 'reading';
+// PRIVATE/EXTERNAL calls never show their args or response — a tool call is
+// rendered as a clean label only (no URLs with query params, no API keys, no
+// SEO/LLM data). Map a step to a human label; everything unknown → "working".
+const CALL_LABELS = [
+  [/dataforseo|serpapi|semrush|ahrefs|search[_-]?volume|keywords?_data/i, 'checking search data'],
+  [/openrouter|api\.x\.ai|anthropic|openai|llm|inference|completion/i, 'thinking'],
+  [/api\.x\.com|\/2\/tweets|oauth2\/token/i, 'posting an update'],
+  [/raw\.githubusercontent|api\.github/i, 'reading the repo'],
+];
+// Any external API host is private by default — show the host's nature, not the URL.
+const PRIVATE_API = /(^|\.)(api\.|.*\.amazonaws\.com|.*\.googleapis\.com)/i;
+function callLabel(target, tool) {
+  for (const [re, label] of CALL_LABELS) if (re.test(target)) return label;
+  if (tool === 'search') return 'searching its notes';
+  if (tool === 'run') return 'running a command';
+  if (tool === 'fetch') return 'reading the web';
+  return 'working';
+}
 // known never-frameable hosts (X-Frame-Options/CSP deny) — skip straight to the card
 const NO_FRAME = /(^|\.)(github\.com|google\.com|twitter\.com|x\.com|youtube\.com|reddit\.com)$/i;
 
@@ -320,6 +345,15 @@ async function showFile(path, verb) {
   body.innerHTML = codeHtml(await res.text(), /\.org$/.test(path));
 }
 
+// a private/external call: NEVER the args or response — a labelled pulse only.
+function showCall(label) {
+  refs.viewerBody.innerHTML = `<div class="vcard vcall">
+    <div class="vpulse" aria-hidden="true"></div>
+    <div class="vdom">${escH(label)}</div>
+    <div class="vurl">off-page — nothing private is shown here</div>
+  </div>`;
+}
+
 function isViewerOpen() { return refs.viewer && refs.viewer.classList.contains('open'); }
 function closeViewer() {
   const win = refs.viewer;
@@ -334,15 +368,18 @@ function openViewer(t) {
   const win = refs.viewer;
   if (!win || !following) return false;
   if (innerWidth <= 640) return false;                   // no room — handled by caller
-  const key = t.url ? 'u:' + t.url : 'f:' + t.file;
+  const head = t.url || t.file || t.call;
+  const key = t.url ? 'u:' + t.url : t.file ? 'f:' + t.file : 'c:' + t.call;
   if (key === viewerKey && win.classList.contains('open')) {
-    viewerHead(t.verb, t.url || t.file, t.thought);      // same target, refresh header only
+    viewerHead(t.verb, head, t.thought);                 // same target, refresh header only
     return true;
   }
   viewerKey = key;
   win.classList.add('open');
-  viewerHead(t.verb, t.url || t.file, t.thought);
-  if (t.url) showUrl(t.url); else showFile(t.file, t.verb);
+  viewerHead(t.verb, head, t.thought);
+  if (t.url) showUrl(t.url);
+  else if (t.file) showFile(t.file, t.verb);
+  else showCall(t.call);                                 // sanitized — label only, no data
   return true;
 }
 
@@ -649,18 +686,21 @@ const stepTarget = (step) => {
     const el = node || document.querySelector('#tlList .node');
     return el ? { git: true, el } : {};
   }
-  // a grown section: the agent now commits content/sections/NN-slug.html (the
-  // runtime CMS partial). Map to its on-page element when rendered; else show
-  // the committed file. (Old .svelte path kept for back-compat with history.)
-  const grown = /content\/sections\/(\d{2}-[\w-]+)\.html|src\/sections\/grown\/(\d{2}-[\w-]+)\.svelte/.exec(t);
+  // a CMS section partial: map to its on-page element when rendered; else file view
+  const grown = /content\/sections\/(\d{2}-[\w-]+)\.html/.exec(t);
   if (grown) {
-    const hook = grown[1] || grown[2];
+    const hook = grown[1];
     const el = document.querySelector(`[data-grown="${hook}"]`);
     if (el) return { el };
-    return { file: grown[1] ? `content/sections/${hook}.html` : `src/sections/grown/${hook}.svelte`, verb };
+    return { file: `content/sections/${hook}.html`, verb };
   }
-  // any other tracked source file → the viewer reads the committed bytes
-  const file = /((?:src\/[\w./-]+\.svelte)|(?:content\/[\w./-]+\.(?:html|json))|(?:(?:strategy|skills|rem)\/[\w./-]+\.org)|plan\.org|(?:blog\/[\w-]+\.html))/.exec(t);
+  // a private/external API or tool call → a SANITIZED label card, never the URL
+  const bareUrl = /(https?:\/\/[^\s"'<>]+)/.exec(t);
+  if (bareUrl && PRIVATE_API.test(new URL(bareUrl[1]).host.replace(/^/, 'api.') ) || /dataforseo|serpapi|openrouter|oauth2\/token|\/2\/tweets/i.test(t)) {
+    return { call: callLabel(t, tool), verb };
+  }
+  // any other tracked content/source file → the viewer reads the committed bytes
+  const file = /((?:content\/sections\/[\w./-]+\.html)|(?:src\/[\w./-]+\.svelte)|(?:(?:strategy|skills|rem|content)\/[\w./-]+\.(?:org|json))|plan\.org|(?:blog\/[\w-]+\.html))/.exec(t);
   if (file) {
     const f = file[1];
     if (f.startsWith('blog/')) {
@@ -678,8 +718,17 @@ const stepTarget = (step) => {
   }
   // a bare http(s) url (fetch tool / reading the web) → the viewer frames it
   const url = /(https?:\/\/[^\s"'<>]+)/.exec(t);
-  if (url) return { url: url[1], verb };
-  // nothing we can place — hold. (Do NOT fall back to the headline.)
+  if (url) {
+    let host = ''; try { host = new URL(url[1]).host; } catch {}
+    // an API host (or query string carrying params) is private → label only
+    if (/^api\.|\?/.test(url[1].replace(/^https?:\/\//, '')) || /^api\./.test(host)) {
+      return { call: callLabel(t, tool), verb };
+    }
+    return { url: url[1], verb };
+  }
+  // a bare tool action with no path we can place → a sanitized label, not nothing
+  if (tool === 'search' || tool === 'run' || tool === 'fetch') return { call: callLabel(t, tool), verb };
+  // nothing to place — hold. (Do NOT fall back to the headline.)
   return {};
 };
 // the follow button reflects engine state: a toggle, not a one-shot. The panel
