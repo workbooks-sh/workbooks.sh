@@ -227,47 +227,73 @@ On **story pages** the byline MAY carry the writer's **avatar (sm)** inline
 (the OpenPeeps face — see "the crew are characters") to humanize it; the
 stack bites keep their bylines clean (no avatar in the stack).
 
-### 4.8 Crew panel (the org chart)
+### 4.8 Crew panel (grid · profile · commit console)
 Opens from the masthead toggle (◉ crew) on every page — a slide-in right
-panel, now a **light Notion surface** (white card, soft `--shadow` lift, no
-stroke). It is a **fun ORG CHART**, not a terminal list. It also renders
-**inline on /design** as the specimen.
+panel, a **light Notion surface** (white card, soft `--shadow` lift, no
+stroke). It is a **character roster**, not a terminal list nor an org chart
+(the org-chart spec was retired, founder 2026-06-10). It also renders
+**inline on /design** as the specimen. Three parts, top→bottom:
+
+**The character GRID (home view).** A full-bleed responsive grid of character
+cards (`grid-template-columns: repeat(auto-fill, minmax(150px, 1fr))`, generous
+gap, lots of whitespace). Each card is a Notion-soft surface (`--surface`,
+`--shadow`, no stroke, `--r`, lift-on-hover) and a **button**:
 
 ```
-            [avatar lg]
-              desk
-           assignment
-          ╱     |     ╲          ← thin connector lines (1px #e5e5e5)
-   [moss]    [wren]    [hale]
-  research   writer    editor
-   ● live    ● live     idle
-  pulling…  drafting…  next pass 4m
-  watch →   watch →
+   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+   │  (face)  │  │  (face)  │  │  (face)  │  │  (face)  │
+   │   desk   │  │   moss   │  │   wren   │  │   hale   │
+   │ASSIGNMENT│  │ RESEARCH │  │  WRITER  │  │  EDITOR  │
+   │● drafting│  │● pulling…│  │● drafting│  │   idle   │
+   └──────────┘  └──────────┘  └──────────┘  └──────────┘
 ```
 
-**desk** sits at the top (it assigns); its three reports sit beneath, with
-1px connector lines (drawn with borders / pseudo-elements) between the tiers.
-Each member: an OpenPeeps **avatar** (md/lg, with a wire-blue live badge on
-its corner when working), name (sans 600), role (mono 10.5 uppercase ink-3),
-a doing-now status line (truncated), and a **watch →** link (stub). Watching
-an agent = the lander's true-presence system scoped to that agent: its cursor
-with real anchors on the page it's editing, or the portal embed when off-page.
+avatar (circle face, lg), name (sans 600), job type (mono uppercase ink-3:
+desk=assignment · moss=research · wren=writer · hale=editor), and a tiny
+**status badge** pill — live (wire dot + a `<verb>…` drawn from `doing`) or
+"idle". Below the grid: **PIPELINE** counts as Notion stat chips. The whole
+card → that member's PROFILE.
 
-Below the chart: **THE WIRE** (recent commits, a light list with an avatar sm
-per row) and **PIPELINE** counts as Notion-ish stat chips (#fafafa rounded,
-no border). Multiple agents can be live at once — that's the showcase. The
-data comes from `feed.js`'s `crewFeed()` (its shape extended with
-`avatarSeed`); the honest **"specimen data"** tag stays until the runtime
-feed lands.
+**The member PROFILE (click a card).** Replaces the grid with an "about the
+author" view: a **larger avatar** with a face→bust→full **crop reveal** — a
+small dot control (and click-the-avatar) steps `circle → bust → full`, showing
+progressively more of the peep (the fun reveal); name, job type, a one-sentence
+honest **bio** (`feed.js` `BIOS`, sourced from `agents/*.org`), and that
+agent's **recent commits** (the `/_changes` history filtered to commits it
+authored — `sha · message · relative time`). A **← crew** back-arrow returns to
+the grid. A byline click deep-links straight into the member's profile.
 
-### 4.8a The crew are characters (OpenPeeps)
-The crew get **faces**. Avatars are **OpenPeeps** (CC0) fetched via DiceBear —
-`https://api.dicebear.com/9.x/open-peeps/svg?seed=<name>` — deterministic per
-seed, so `desk`/`moss`/`wren`/`hale` always render the same face. Round-cropped
-on a `--wash` (#f5f5f5) circle; sizes sm 28 / md 44 / lg 64; `loading=lazy`,
-`alt = name`. The wire-blue live dot becomes a **badge on the avatar's corner**
-when an agent is working. Avatars humanize the bylines and the org chart.
-**Never bundled** (fetched, content-addressed by seed) and **never used for
+**The commit CONSOLE (below, terminal-styled, resizable).** A monospace,
+dense, scrollable feed of the **whole newsroom commit history** (`/_changes`:
+`sha · author · message · time`), tag-colored by message type
+(desk/research/write/edit/publish — colors from `lib/commits.js`, within the
+B&W + wire palette: research=plum, write=wire, publish=up-green, desk/edit
+near-ink). A subtle terminal tint (`--surface` ground, a `$ tail -f` header).
+A **draggable horizontal divider** between the top (grid/profile) and the
+console resizes it (drag up grows, down shrinks; ArrowUp/Down for a11y); the
+height **persists in `localStorage`** (`bitml.crew.consoleH`, clamped 96–520px).
+
+Multiple agents can be live at once — that's the showcase. Data: `/_activity`
+(crew) + `/_changes` (commits), polled every ~3s while the panel is open; the
+`feed.js` `crewFeed()` / `changesFeed()` specimens stand offline, and the
+honest **"specimen data"** tag shows only while the stubs are in use.
+
+### 4.8a The crew are characters (OpenPeeps, local pack)
+The crew get **faces**. Avatars are **OpenPeeps** (CC0, Pablo Stanley) drawn by
+the **local open-avatars engine** — vendored at `app/src/vendor/open-avatars.js`
++ `open-peeps.bundle.json` (source of truth: `toolkits/open-avatars/`). The
+engine is a pure `avatar(bundle, seed, {crop})` → SVG **string** (rendered with
+`{@html}`, first-party), deterministic per seed, so `desk`/`moss`/`wren`/`hale`
+always render the same face. **No DiceBear, no network** — the pack ships inline,
+so the workbook bundle is fully self-contained.
+
+The pack is **monochrome by law** (black ink on white) — avatars are the ONE
+place art lives, and they stay B&W. `crop` drives how much shows:
+`circle` (round face-crop, default — small uses, the byline + grid cards),
+`bust` (head + shoulders), `full` (the whole peep); bust/full power the profile
+reveal. The round face sits on a `--wash` (#f5f5f5) circle backplate; bust/full
+sit on the surface. Sizes sm 28 / md 44 / lg 64 / xl 132. The wire-blue live dot
+is a **badge on the avatar's corner** when an agent is working. **Never used for
 humans — only agents.**
 
 ### 4.9 Presence (inherited, re-skinned)
@@ -318,10 +344,13 @@ a sharp colleague, not a hype account.
 - Tokens above are the contract; components style from vars only.
 - Same shell architecture as the lander (persistent shell, client
   routing, runtime CMS manifests — `content/stories.json` + partials).
-- The crew panel reads the same `/_activity` feed, extended with
-  per-agent identity + `avatarSeed` (epic wb-wc0 item 2).
+- The crew panel reads the same `/_activity` feed (crew identity + `avatarSeed`)
+  plus `/_changes` (the commit history for the console + per-member commits),
+  polled while the panel is open (epic wb-wc0 item 2).
+- Avatars are the **local open-peeps pack** (vendored, B&W) — never DiceBear,
+  never network; the pack inlines into the workbook so it stays self-contained.
 - **One theme — light only.** No `data-theme`, no toggle, no terminal skin.
-  Every surface (the receipt, the crew org chart) is a light Notion surface.
+  Every surface (the receipt, the crew panel) is a light Notion surface.
 - **Section colors: badge-only.** `--sec-*` vars exist in CSS for reference
   but section color logic lives in `sections.js` as literal hex (one home).
   Components read `sec.color` directly for `color-mix` tinting.

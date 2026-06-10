@@ -1,29 +1,42 @@
-<script>
-  // Avatar — the crew are CHARACTERS (DESIGN.md "the crew are characters").
-  // OpenPeeps via DiceBear (CC0, deterministic per seed): a round-cropped,
-  // gray-circle-backed illustrated face that humanizes the bylines + the org
-  // chart. NEVER used for humans — only agents. Fetched, never bundled.
-  //   url: https://api.dicebear.com/9.x/open-peeps/svg?seed=<seed>
-  // Sizes: sm 28 · md 44 · lg 64. A wire-blue live badge sits on the corner
-  // when the agent is working (the live dot, relocated onto the face).
-  let { seed, name = seed, size = 'md', live = false } = $props();
+<script module>
+  // Avatar — the crew are CHARACTERS (DESIGN.md §4.8a). Faces come from the
+  // LOCAL open-peeps pack (CC0, B&W), rendered by the vendored open-avatars
+  // engine — deterministic per seed, so desk/moss/wren/hale always render the
+  // same face. No network: the engine + pack are vendored (src/vendor), so the
+  // SVG is composed in-page and the workbook bundle is fully self-contained.
+  //   engine: src/vendor/open-avatars.js  ·  pack: src/vendor/open-peeps.bundle.json
+  //
+  // The pack is monochrome by law (black ink on white). We don't recolor it;
+  // crops drive how much of the figure shows:
+  //   'circle' → round face-crop (default, small uses, byline + grid cards)
+  //   'bust'   → head + shoulders (the profile reveal)
+  //   'full'   → the whole peep (the deepest profile reveal)
+  import { avatar } from '../vendor/open-avatars.js';
+  import bundle from '../vendor/open-peeps.bundle.json';
+</script>
 
-  const px = { sm: 28, md: 44, lg: 64 };
+<script>
+  // Props (DESIGN §4.8a): {seed, name, size, crop, live}.
+  //   crop ∈ 'circle' | 'bust' | 'full'  (default 'circle')
+  // The SVG is a first-party string → rendered with {@html} (we vendor it).
+  let { seed, name = seed, size = 'md', crop = 'circle', live = false } = $props();
+
+  const px = { sm: 28, md: 44, lg: 64, xl: 132 };
   const dim = $derived(px[size] ?? px.md);
-  // COLOR (founder: not b/w): DiceBear picks deterministically per seed from
-  // these palettes — pastel circle, vivid clothing, natural skin tones. The
-  // peeps are the one place the monochrome page gets to have fun.
-  const BG = 'b6e3f4,c0aede,ffd5dc,ffdfbf,d1f4d9';
-  const CLOTHES = '0a52e0,e05a4e,2e9e6b,e0a82e,7a4988';
-  const SKIN = 'ffdbb4,edb98a,d08b5b,ae5d29,694d3d';
-  const src = $derived(
-    `https://api.dicebear.com/9.x/open-peeps/svg?seed=${encodeURIComponent(seed ?? name)}` +
-    `&backgroundType=solid&backgroundColor=${BG}&clothingColor=${CLOTHES}&skinColor=${SKIN}`
+
+  // circle gets a --wash backplate (the B&W face wants a soft disc behind it);
+  // bust/full sit on the surface directly (no plate — they bleed past a disc).
+  const svg = $derived(
+    avatar(bundle, seed ?? name, {
+      crop,
+      title: String(name ?? seed ?? ''),
+      ...(crop === 'circle' ? { background: '#f5f5f5' } : {}),
+    })
   );
 </script>
 
-<span class="av {size}" style="--dim:{dim}px">
-  <img class="face" {src} alt={name} loading="lazy" width={dim} height={dim} />
+<span class="av {size} {crop}" style="--dim:{dim}px">
+  <span class="face" class:circle={crop === 'circle'} aria-hidden="true">{@html svg}</span>
   {#if live}<span class="badge" aria-label="live"></span>{/if}
 </span>
 
@@ -32,15 +45,23 @@
     position: relative; display: inline-block;
     width: var(--dim); height: var(--dim); flex: 0 0 auto;
   }
+  /* bust/full are taller than wide — let the box grow vertically for them */
+  .av.bust { height: calc(var(--dim) * 0.79); }
+  .av.full { height: calc(var(--dim) * 1.35); }
+
   .face {
-    width: 100%; height: 100%;
-    border-radius: 999px;
-    background: var(--wash);          /* fallback while the svg loads */
-    object-fit: cover; display: block;
+    display: block; width: 100%; height: 100%;
+    background: var(--wash);            /* the circle backplate (§4.8a) */
   }
+  .face.circle { border-radius: 999px; overflow: hidden; }
+  .av.bust .face, .av.full .face { background: transparent; }
+
+  .face :global(svg) { display: block; width: 100%; height: 100%; }
+
   .badge {
     position: absolute; right: 0; bottom: 0;
     width: 28%; height: 28%; min-width: 8px; min-height: 8px;
+    max-width: 14px; max-height: 14px;
     border-radius: 999px;
     background: var(--wire);
     box-shadow: 0 0 0 2px var(--paper);   /* punch through the face cleanly */

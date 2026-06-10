@@ -17,7 +17,7 @@
   import Design from './views/Design.svelte';
   import { route, startRouter } from './lib/router.svelte.js';
   import { loadManifest } from './lib/stories.svelte.js';
-  import { crewFeed, pipelineLine } from './lib/feed.js';
+  import { crewFeed, changesFeed, pipelineLine, fetchActivity, fetchChanges } from './lib/feed.js';
 
   startRouter();
   loadManifest();                       // runtime CMS — fetch the manifest once
@@ -27,6 +27,9 @@
   let crewOpen = $state(false);
   let crewFilter = $state(null);
   function openCrew(name = null) { crewFilter = name; crewOpen = true; }
+  // the masthead/footer toggle opens the GRID (no member filter)
+  function toggleCrew() { crewFilter = null; crewOpen = !crewOpen; }
+  function closeCrew() { crewOpen = false; crewFilter = null; }
 
   // ── live UTC clock for the crew panel header ────────────────────────────
   let clock = $state(new Date().toISOString().slice(11, 19));
@@ -35,17 +38,41 @@
     return () => clearInterval(id);
   });
 
-  // ── crew feed (specimen for now; future = /_activity, see lib/feed.js) ──
-  const feed = crewFeed();
-  const crewAgents = feed.agents.map((a) => ({ ...a, state: a.live ? 'live' : 'idle' }));
-  const pipeline = pipelineLine(feed.pipeline);
+  // ── crew feed: specimen by default; poll the runtime live while the panel
+  //    is open (every ~3s). /_activity → agents/doing/live + pipeline;
+  //    /_changes → the commit history. When offline, the specimen stands and
+  //    the honest "specimen data" tag stays. (DESIGN §4.8 / §7.)
+  const aFeed = crewFeed();
+  const cFeed = changesFeed();
+  let agentsRaw = $state(aFeed.agents);
+  let pipelineObj = $state(aFeed.pipeline);
+  let commits = $state(cFeed.commits);
+  let specimen = $state(true);          // flips false once a live fetch lands
+
+  const crewAgents = $derived(agentsRaw.map((a) => ({ ...a, state: a.live ? 'live' : 'idle' })));
+  const pipeline = $derived(pipelineLine(pipelineObj));
+
+  async function pollCrew() {
+    const [act, chg] = await Promise.all([fetchActivity(), fetchChanges()]);
+    let liveHit = false;
+    if (act) { agentsRaw = act.agents; if (act.pipeline) pipelineObj = act.pipeline; liveHit = true; }
+    if (chg) { commits = chg.commits; liveHit = true; }
+    if (liveHit) specimen = false;
+  }
+  // poll only while the panel is open — no work when it's closed
+  $effect(() => {
+    if (!crewOpen) return;
+    pollCrew();
+    const id = setInterval(pollCrew, 3000);
+    return () => clearInterval(id);
+  });
 </script>
 
 <div id="top"></div>
 
 <!-- ── PERSISTENT SHELL — mounted once, outside #route ── -->
 <div class="sheet">
-  <Masthead oncrew={() => (crewOpen = !crewOpen)} {crewOpen} />
+  <Masthead oncrew={toggleCrew} {crewOpen} />
 
   <!-- ── CONTENT REGION — the only thing navigation swaps ── -->
   <main id="route">
@@ -60,17 +87,17 @@
     {/if}
   </main>
 
-  <Footer oncrew={() => (crewOpen = !crewOpen)} />
+  <Footer oncrew={toggleCrew} />
 </div>
 
-<!-- the docked, toggleable crew panel — the fun org chart (light, Notion lift) -->
+<!-- the docked crew panel — character grid + profile + commit console (§4.8) -->
 <CrewPanel
   open={crewOpen}
   filter={crewFilter}
   agents={crewAgents}
-  wire={feed.wire}
+  commits={commits}
   {pipeline}
-  specimen={feed.specimen}
+  {specimen}
   {clock}
-  onclose={() => (crewOpen = false)}
+  onclose={closeCrew}
 />

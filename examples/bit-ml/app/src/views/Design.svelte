@@ -12,13 +12,14 @@
   import CrewPanel from '../lib/CrewPanel.svelte';
   import Portal from '../lib/Portal.svelte';
   import Byline from '../lib/Byline.svelte';
-  import { crewFeed, pipelineLine } from '../lib/feed.js';
+  import { crewFeed, changesFeed, pipelineLine } from '../lib/feed.js';
 
   let { onagent } = $props();
 
   // specimen data drives the inline crew specimen + market strip
   const feed = crewFeed();
   const crew = feed.agents.map((a) => ({ ...a, state: a.live ? 'live' : 'idle' }));
+  const commits = changesFeed().commits;
   const pipeline = pipelineLine(feed.pipeline);
 
   const market = [
@@ -165,9 +166,9 @@
 <section class="spec" id="crew">
   <div class="spec-label">
     <span class="spec-name">CrewPanel.svelte</span>
-    <span class="spec-rule">the org chart — desk assigns, three reports beneath; toggle it from the masthead, or read it here</span>
+    <span class="spec-rule">the character grid + profile + a terminal commit console; toggle it from the masthead, or read it here</span>
   </div>
-  <CrewPanel inline agents={crew} wire={feed.wire} {pipeline} specimen clock="14:02:33" />
+  <CrewPanel inline agents={crew} {commits} {pipeline} specimen clock="14:02:33" />
 </section>
 
 <!-- ── PORTAL ─────────────────────────────────────────────────────── -->
