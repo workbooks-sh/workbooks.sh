@@ -151,7 +151,7 @@
       section="AI"
       time="14:02 UTC"
       read="40s"
-      state="live"
+      status="live"
       head="Anthropic ships a smaller model that holds the long-context crown"
       dek="The benchmark table, the price drop, and why the context window stopped being the headline number."
       sources={['paper', 'model card']}
@@ -163,7 +163,7 @@
       section="CHIPS"
       time="13:40 UTC"
       read="1m"
-      state="unread"
+      status="unread"
       head="TSMC's Arizona fab clears its first leading-edge wafers"
       dek="Two years late, but running — what the yield numbers say about whether onshoring the leading node actually pencils out."
       sources={['TSMC', 'filing']}
@@ -177,7 +177,7 @@
       section="MARKETS"
       time="13:12 UTC"
       read="35s"
-      state="unread"
+      status="unread"
       head="Nvidia's data-center revenue laps the rest of the segment combined"
       dek="The quarter in three lines: backlog, gross margin, and the one customer-concentration footnote analysts keep circling."
       sources={['10-Q', 'transcript']}
@@ -189,7 +189,7 @@
       section="POLICY"
       time="11:58 UTC"
       read="2m"
-      state="read"
+      status="read"
       head="The EU's compute threshold for frontier models takes effect"
       dek="What the training-FLOP line actually triggers, who has to file, and the carve-out that open-weight labs lobbied for."
       sources={['Official Journal', 'analysis']}

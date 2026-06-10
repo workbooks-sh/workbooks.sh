@@ -20,7 +20,7 @@
     dek = '',
     sources = [],
     byline,
-    state = 'unread',
+    status = 'unread',
     onagent,
   } = $props();
 
@@ -30,7 +30,7 @@
   // exception, ~30cps). prefers-reduced-motion shows the full head at once.
   let typed = $state('');
   $effect(() => {
-    if (state !== 'live') { typed = head; return; }
+    if (status !== 'live') { typed = head; return; }
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce) { typed = head; return; }
     typed = '';
@@ -44,17 +44,17 @@
   });
 </script>
 
-<article class="bite {state}">
+<article class="bite {status}">
   <div class="top mono">
     <span class="sec">
       <span class="tick" style="background:{sec.color}"></span>
       <span class="tag" style="color:{sec.color}">{sec.tag}</span>
-      {#if state === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
+      {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
     </span>
     <span class="when">{time}{#if read} · {read} read{/if}</span>
   </div>
 
-  <h2 class="head serif">{typed}{#if state === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</h2>
+  <h2 class="head serif">{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</h2>
 
   {#if dek}<p class="dek">{dek}</p>{/if}
 
