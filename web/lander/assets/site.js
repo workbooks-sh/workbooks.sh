@@ -4,6 +4,9 @@
 (() => {
   if (document.querySelector('.nav')) return;
 
+  // one nav means ONE: any page-local top bar gets replaced, not stacked under
+  document.querySelectorAll('body > nav').forEach(el => el.remove());
+
   const css = `
   .nav{position:fixed;top:18px;left:50%;translate:-50% 0;z-index:40;display:flex;align-items:center;gap:22px;
     padding:9px 10px 9px 14px;background:color-mix(in srgb,#14161b 82%,transparent);border:1px solid #262a32;
