@@ -726,7 +726,8 @@ let lastKey = null;
 const targetKey = (t) =>
   t.page ? 'p:' + t.page : t.url ? 'u:' + t.url : t.file ? 'f:' + t.file :
   t.git ? 'g:' + (t.el ? [...t.el.parentNode.children].indexOf(t.el) : '?') :
-  t.el ? 'e:' + (t.el.dataset.grown || t.el.id || t.el.tagName) : '';
+  t.el ? 'e:' + (t.el.dataset.grown || t.el.id || t.el.tagName) :
+  t.call ? 'c:' + t.call : '';
 
 async function stopFollow() {
   if (!following) return;
@@ -738,55 +739,65 @@ async function stopFollow() {
   lastKey = null;
 }
 
+/* ── "where is the agent" — one state machine, one truth ──────────
+   The agent is always in exactly ONE of three places, derived every poll
+   from the live feed (not from edge-triggered "new step" events):
+
+     on-page   — its CURRENT step targets something on THIS route's DOM
+                 → the cursor is out, at that element, thought in the bubble.
+     off-page  — its current step is a file / url / api call
+                 → the cursor lives absorbed in the portal card, which names
+                   the action; thought rides the card.
+     thinking  — the latest step is stale (the model is generating between
+                 tool calls — most of an agent's wall time)
+                 → portal card says "thinking", live thought, no cursor.
+
+   Honest-by-derivation: everything shown comes from the feed (steps + the
+   narrated thought). When the feed can't place it, we say "thinking" — which
+   is what the agent is actually doing between steps. ~90% real beats 100%
+   theatrical. */
+const STEP_FRESH_MS = 25_000;     // a step older than this → it's thinking again
+
 async function follow() {
   following = true;
   setFollowBtn(true);
   document.querySelector('#followBtn').hidden = false;
-  await cursorEnter();
-  think('let me show you what I\'m doing');
-  work(true);
   let misses = 0;
+
   while (following) {
     const act = await fetchActivity();
-    if (!act && ++misses === 3) think('(its live feed is warming up — changes still land below)');
+    if (!act && ++misses === 3 && refs.viewerThought)
+      refs.viewerThought.textContent = 'live feed warming up — changes still land below';
+
     if (act) {
       misses = 0;
-      if (!act.agent || !act.agent.running) {       // run ended → auto-stop
-        think('done — shipping it');
-        await sleep(1600);
+      if (!act.agent || !act.agent.running) {        // run ended → auto-stop
+        if (!absorbed && cursorIn) think('done — shipping it');
+        await sleep(1400);
         await stopFollow();
         break;
       }
-      // header thought always tracks; bubble only when the cursor is out (not absorbed)
-      if (act.thought && !absorbed) think(act.thought);
-      if (act.thought && isViewerOpen()) viewerHead(
-        refs.viewerVerb?.textContent?.split(' ')[0] || 'reading',
-        viewerKey ? viewerKey.slice(2) : '', act.thought);
 
       const last = (act.steps || [])[act.steps.length - 1];
-      if (last && last.ts > lastStepTs) {
-        lastStepTs = last.ts;
-        const t = stepTarget(last);
-        t.thought = act.thought;
-        const key = targetKey(t);
-        if (!key || key === lastKey) { await sleep(2500); continue; }  // unchanged → hold
-        lastKey = key;
+      const fresh = last && (Date.now() / 1000 - last.ts) * 1000 < STEP_FRESH_MS;
+      const t = fresh ? stepTarget(last) : {};
+      t.thought = act.thought;
+      const key = fresh ? targetKey(t) : null;
 
-        if (t.page) {                                // another lander page — go there
-          think('working over here — come on');
-          await sleep(1400);
-          if (following) routerPush(t.page);         // in-shell: the session survives
-          continue;                                  // next tick re-places on the new DOM
-        }
-        if (t.url || t.file) {                        // off-page → the viewer window
-          if (openViewer(t)) { if (!absorbed) await absorbCursor(); }
-          else { refs.cursor.style.opacity = '0'; }   // ≤640px: no viewer, just hide
-        } else if (t.git && !document.body.classList.contains('panel-open')) {
-          if (isViewerOpen()) { await popCursor(null); closeViewer(); }
-          refs.cursor.style.opacity = '0';            // reading history out of sight
-        } else if (t.el) {                            // on-page → cursor returns here
+      if (t.page && key !== lastKey) {               // another lander page — go there
+        lastKey = key;
+        if (!absorbed && cursorIn) { think('working over here — come on'); await sleep(1200); }
+        if (following) routerPush(t.page);
+        continue;                                    // next tick re-places on the new DOM
+      }
+
+      if (fresh && t.el) {
+        // ON-PAGE: the cursor manifests at the element (only on target change)
+        if (key !== lastKey) {
+          lastKey = key;
           if (isViewerOpen()) { closeViewer(); await popCursor(t.el); }
           else {
+            if (!cursorIn) await cursorEnter();
             refs.cursor.style.opacity = '1';
             t.el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
             await sleep(350);
@@ -794,6 +805,33 @@ async function follow() {
           }
           t.el.classList.add('touch');
           setTimeout(() => t.el.classList.remove('touch'), 1600);
+        }
+        if (act.thought && !absorbed) think(act.thought);
+      } else if (fresh && (t.url || t.file || t.call)) {
+        // OFF-PAGE: the portal owns it; the page cursor is absorbed away
+        if (key !== lastKey) {
+          lastKey = key;
+          if (openViewer(t)) { if (!absorbed && cursorIn) await absorbCursor(); }
+          if (refs.cursor && (absorbed || !cursorIn)) refs.cursor.style.opacity = '0';
+        } else if (act.thought && isViewerOpen()) {
+          viewerHead(refs.viewerVerb?.textContent?.split(' ')[0] || 'reading',
+            viewerKey ? viewerKey.slice(2) : '', act.thought);
+        }
+      } else if (fresh && t.git) {
+        // history work → the panel tells it; no cursor theater
+        if (key !== lastKey) { lastKey = key; }
+        if (!document.body.classList.contains('panel-open') && refs.cursor && !absorbed)
+          refs.cursor.style.opacity = '0';
+      } else {
+        // THINKING: no fresh placeable step — the portal says so, honestly
+        if (lastKey !== 'thinking') {
+          lastKey = 'thinking';
+          if (openViewer({ call: 'thinking', verb: '…', thought: act.thought })) {
+            if (!absorbed && cursorIn) await absorbCursor();
+          }
+          if (refs.cursor && (absorbed || !cursorIn)) refs.cursor.style.opacity = '0';
+        } else if (act.thought && isViewerOpen()) {
+          viewerHead('…', 'thinking', act.thought);
         }
       }
     }
