@@ -131,7 +131,7 @@ async function buildGrownContainer() {
   const list = sortSections(await loadManifest('/content/sections.json'));
   // numbering follows position, not the raw order field — so 04,07,12 still
   // print 04,05,06 down the page.
-  const hosts = await Promise.all(list.map((e, i) => fetchSection(e, e.order ?? i + 4)));
+  const hosts = await Promise.all(list.map((e, i) => fetchSection(e, i + 4)));
   for (const h of hosts) if (h) frag.appendChild(h);
   return frag;
 }
@@ -285,77 +285,47 @@ function callLabel(target, tool) {
   if (tool === 'fetch') return 'reading the web';
   return 'working';
 }
-// known never-frameable hosts (X-Frame-Options/CSP deny) — skip straight to the card
-const NO_FRAME = /(^|\.)(github\.com|google\.com|twitter\.com|x\.com|youtube\.com|reddit\.com)$/i;
 
 function viewerHead(verb, target, thought) {
-  if (refs.viewerVerb) refs.viewerVerb.textContent = `${verb} ${trimWords(target, 38)}`;
-  if (refs.viewerThought) refs.viewerThought.textContent = trimWords(thought || '', 60);
+  // verb line is "<verb> <short-target>" — the card's whole headline. The
+  // thought gets its own clamped block (it IS the personality of the card).
+  if (refs.viewerVerb) refs.viewerVerb.textContent = `${verb} ${trimWords(target, 26)}`;
+  if (refs.viewerThought) refs.viewerThought.textContent = trimWords(thought || '', 70);
 }
 
-function urlCard(u) {
-  // styled fallback when an iframe won't load: favicon + domain + url + "reading"
+// url → one favicon-and-domain row. No iframe: the compact card shows WHERE
+// it's reading, not the page itself (and external pages mostly refuse frames).
+function showUrl(u) {
   let host = u; try { host = new URL(u).host; } catch { /* keep raw */ }
-  const fav = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
-  return `<div class="vcard">
-    <img class="vfav" src="${escH(fav)}" alt="" width="32" height="32"
-         onerror="this.style.visibility='hidden'">
-    <div class="vdom">${escH(host)}</div>
-    <div class="vurl">${escH(trimWords(u, 90))}</div>
-    <div class="vtag">reading</div>
+  const fav = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
+  refs.viewerBody.innerHTML = `<div class="vrow">
+    <img class="vfav" src="${escH(fav)}" alt="" onerror="this.style.visibility='hidden'">
+    <span class="vdom">${escH(host)}</span>
   </div>`;
 }
 
-function showUrl(u) {
-  const body = refs.viewerBody;
-  let host = ''; try { host = new URL(u).host; } catch { /* unframeable below */ }
-  if (!host || NO_FRAME.test(host)) { body.innerHTML = urlCard(u); return; }
-  // try an iframe; if it errors or never loads, fall back to the card
-  body.innerHTML =
-    `<iframe class="vframe" sandbox="allow-scripts allow-same-origin"
-       referrerpolicy="no-referrer" src="${escH(u)}"></iframe>`;
-  const fr = body.querySelector('iframe');
-  let settled = false;
-  const fail = () => { if (settled) return; settled = true; body.innerHTML = urlCard(u); };
-  fr.addEventListener('error', fail);
-  fr.addEventListener('load', () => { settled = true; });    // it framed — keep it
-  setTimeout(fail, 3200);                                     // many denials are silent
-}
-
-// code → numbered monospace lines; .org headings (lines starting with *) tinted
-const codeHtml = (text, isOrg) => {
-  const lines = text.split('\n');
-  return `<pre class="vcode"><table>${lines.map((ln, i) => {
-    const head = isOrg && /^\*+\s/.test(ln);
-    return `<tr><td class="vln">${i + 1}</td><td class="vsrc${head ? ' vorg' : ''}">${escH(ln) || ' '}</td></tr>`;
-  }).join('')}</table></pre>`;
-};
-
+// file → a faint few-line excerpt (a glimpse of what it's reading, fading out
+// under the CSS mask — never a full document). Committed bytes from the mirror.
 async function showFile(path, verb) {
   const body = refs.viewerBody;
-  body.innerHTML = `<div class="vload">${escH(path)}</div>`;
+  body.innerHTML = `<pre class="vex">${escH(path)}</pre>`;
   let res = null;
   try { res = await fetch(RAW + path, { signal: AbortSignal.timeout(7000) }); }
-  catch { /* offline → 404 card below */ }
+  catch { /* offline → name-only below */ }
   if (!res || !res.ok) {
-    // not yet committed: be honest — it's a draft only Waldo can see right now
-    body.innerHTML = `<div class="vcard">
-      <div class="vdom">${escH(path)}</div>
-      <div class="vurl">${escH(verb)} ${escH(path.split('/').pop())} — first draft, not yet committed</div>
-      <div class="vtag">${escH(verb)}</div>
-    </div>`;
+    body.innerHTML = `<div class="vrow"><span class="vpulse"></span><span class="vdom">${escH(verb)} ${escH(path.split('/').pop())} — draft, not yet committed</span></div>`;
     return;
   }
-  body.innerHTML = codeHtml(await res.text(), /\.org$/.test(path));
+  const lines = (await res.text()).split('\n').filter((l) => l.trim()).slice(0, 7);
+  const isOrg = /\.org$/.test(path);
+  body.innerHTML = `<pre class="vex">${lines.map((l) =>
+    isOrg && /^\*+\s/.test(l) ? `<span class="vorg">${escH(l)}</span>` : escH(l)
+  ).join('\n')}</pre>`;
 }
 
 // a private/external call: NEVER the args or response — a labelled pulse only.
 function showCall(label) {
-  refs.viewerBody.innerHTML = `<div class="vcard vcall">
-    <div class="vpulse" aria-hidden="true"></div>
-    <div class="vdom">${escH(label)}</div>
-    <div class="vurl">off-page — nothing private is shown here</div>
-  </div>`;
+  refs.viewerBody.innerHTML = `<div class="vrow"><span class="vpulse"></span><span class="vdom">${escH(label)}</span></div>`;
 }
 
 function isViewerOpen() { return refs.viewer && refs.viewer.classList.contains('open'); }
