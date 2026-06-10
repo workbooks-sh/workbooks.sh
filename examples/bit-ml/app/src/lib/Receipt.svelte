@@ -1,8 +1,8 @@
 <script>
-  // §4.5 The receipt — a terminal-skinned block (DARK even in light mode)
-  // listing the pipeline trail: assigned → researched → drafted → edited,
-  // each row with a time + a commit sha (linking to the commit). The
-  // "agent-run" proof artifact, and a good colophon. Always terminal skin.
+  // §4.5 The receipt — a light Notion-style card (founder, 2026-06-10; was
+  // terminal-skinned). Lists the pipeline trail: assigned → researched →
+  // drafted → edited, each row with a time + a commit sha (linking to the
+  // commit). The "agent-run" proof artifact, and a good colophon.
   // Props: rows [{stage, time, sha, note}] · title.
   let {
     title = 'the receipt',
@@ -10,7 +10,7 @@
   } = $props();
 </script>
 
-<div class="receipt" data-theme="terminal">
+<div class="receipt">
   <div class="rhead mono">
     <span class="caret">▌</span> {title}
   </div>
@@ -30,8 +30,9 @@
 <style>
   .receipt {
     border-radius: var(--r); overflow: hidden;
-    background: var(--paper);   /* resolves to terminal #0d0e10 via data-theme */
+    background: var(--surface);   /* light Notion card — #fafafa, no stroke */
     color: var(--ink);
+    box-shadow: var(--shadow);    /* the one sanctioned Notion lift */
     padding: 16px 18px 18px;
     font-family: var(--mono);
   }
@@ -59,5 +60,5 @@
     .row { grid-template-columns: 80px 56px 1fr; }
     .sha { grid-column: 2 / 4; justify-self: start; }
   }
-  /* product chrome: the terminal block sits ON the page like a Linear card */
+  /* a light card sits ON the page with the soft Notion lift — no stroke */
 </style>

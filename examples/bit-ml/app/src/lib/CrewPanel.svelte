@@ -1,11 +1,16 @@
 <script>
-  // §4.8 Crew panel — the inspect panel redesigned for a newsroom. Opens
-  // from the masthead toggle on every page; ALWAYS terminal-skinned
-  // (dark, mono-dominant) regardless of page theme. Exactly the doc layout:
-  //   one row per agent: live dot (wire working / ink-3 idle), name, role,
-  //   doing-now, watch → · THE WIRE commit list · PIPELINE counts.
-  // Slide-in 150ms (§5: fast or absent). Can render as a docked overlay
-  // (toggleable) OR inline (a static open specimen) via `inline`.
+  // §4.8 Crew panel — the FUN ORG CHART (founder, 2026-06-10). Opens from the
+  // masthead ◉ crew toggle on every page as a slide-in right panel; ALSO renders
+  // inline on /design as the specimen. Light, Notion-style surface now (no more
+  // terminal skin): white card, soft lift shadow, OpenPeeps avatars.
+  //
+  //   desk sits at the TOP (it assigns) · three reports beneath ·
+  //   thin connector lines between the tiers · each member carries an avatar,
+  //   name, role, doing-now status line, a live badge, and a watch → link.
+  //   Below the chart: THE WIRE (recent commits, avatar per row) + PIPELINE
+  //   stat chips. Slide-in 150ms (§5: fast or absent).
+  import Avatar from './Avatar.svelte';
+
   let {
     open = false,
     inline = false,
@@ -17,132 +22,226 @@
     specimen = false,   // honest flag: the crew runtime (/_activity) isn't wired yet
     onclose,
   } = $props();
+
+  // org structure: desk leads (assignment), the rest are its reports.
+  const lead = $derived(agents.find((a) => a.role === 'assignment') ?? agents[0]);
+  const reports = $derived(agents.filter((a) => a !== lead));
+
+  // wire rows want an avatar — look the committer up in the crew
+  const seedOf = (who) => agents.find((a) => a.name === who)?.avatarSeed ?? who;
+
+  // pipeline string → [{label, n}] chips
+  const chips = $derived(
+    pipeline
+      .split('·')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => {
+        const m = s.match(/^(.*?)\s+(\d+)$/);
+        return m ? { label: m[1], n: m[2] } : { label: s, n: '' };
+      })
+  );
 </script>
 
 <aside
   class="crew"
   class:inline
   class:open={inline || open}
-  data-theme="terminal"
   aria-hidden={!(inline || open)}
 >
-  <div class="phead mono">
-    <span class="title">THE CREW</span>
-    {#if specimen}<span class="spectag" title="the crew runtime is a parallel build (wb-wc0.2) — this feed is static for now">specimen data</span>{/if}
-    <span class="time">{clock} UTC</span>
+  <div class="phead">
+    <span class="title mono">THE CREW</span>
+    {#if specimen}<span class="spectag mono" title="the crew runtime is a parallel build (wb-wc0.2) — this feed is static for now">specimen data</span>{/if}
+    <span class="time mono">{clock} UTC</span>
     {#if !inline}<button class="x" onclick={onclose} aria-label="close crew panel">×</button>{/if}
   </div>
-  <div class="rule mono">──────────────────────────────────────────</div>
 
-  <div class="agents">
-    {#each agents as a}
-      <div class="arow mono" class:dim={a.state === 'idle'} class:hit={filter && filter === a.name}>
-        <span class="dot" class:live={a.state !== 'idle'}>●</span>
-        <span class="name">{a.name}</span>
-        <span class="role">{a.role}</span>
-        <span class="doing">{a.doing}</span>
-        {#if a.state !== 'idle'}<button class="watch">watch →</button>{/if}
+  <!-- ── THE ORG CHART ─────────────────────────────────────────────── -->
+  {#if lead}
+    <div class="chart">
+      <div class="tier lead">
+        <div class="member" class:hit={filter === lead.name}>
+          <Avatar seed={lead.avatarSeed ?? lead.name} name={lead.name} size="lg" live={lead.state !== 'idle'} />
+          <span class="name">{lead.name}</span>
+          <span class="role mono">{lead.role}</span>
+          <span class="doing">{lead.doing}</span>
+        </div>
       </div>
-    {/each}
-  </div>
 
-  <div class="rule mono">──────────────────────────────────────────</div>
-  <div class="shead mono">THE WIRE <span class="sub">(live commits)</span></div>
+      <div class="connectors" aria-hidden="true">
+        <span class="drop"></span>
+        <span class="bus"></span>
+        {#each reports as _, i}<span class="riser" style="--i:{i}; --n:{reports.length}"></span>{/each}
+      </div>
+
+      <div class="tier reports">
+        {#each reports as a}
+          <div class="member" class:dim={a.state === 'idle'} class:hit={filter === a.name}>
+            <Avatar seed={a.avatarSeed ?? a.name} name={a.name} size="md" live={a.state !== 'idle'} />
+            <span class="name">{a.name}</span>
+            <span class="role mono">{a.role}</span>
+            <span class="status mono" class:live={a.state !== 'idle'}>
+              {a.state !== 'idle' ? '● live' : 'idle'}
+            </span>
+            <span class="doing">{a.doing}</span>
+            {#if a.state !== 'idle'}<button class="watch mono">watch →</button>{/if}
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- ── THE WIRE ──────────────────────────────────────────────────── -->
+  <div class="shead mono">THE WIRE <span class="sub">recent commits</span></div>
   <div class="commits">
     {#each wire as c}
-      <div class="crow mono">
-        <span class="ct">{c.time}</span>
+      <div class="crow">
+        <Avatar seed={seedOf(c.who)} name={c.who} size="sm" />
+        <span class="ct mono">{c.time}</span>
         <span class="cw">{c.who}</span>
         <span class="cm">{c.msg}</span>
       </div>
     {/each}
   </div>
 
-  <div class="rule mono">──────────────────────────────────────────</div>
-  <div class="pipe mono"><span class="plabel">PIPELINE</span> {pipeline}</div>
+  <!-- ── PIPELINE — Notion-ish stat chips ──────────────────────────── -->
+  <div class="shead mono">PIPELINE</div>
+  <div class="chips">
+    {#each chips as c}
+      <span class="chip">
+        <span class="cn">{c.n}</span>
+        <span class="cl mono">{c.label}</span>
+      </span>
+    {/each}
+  </div>
 </aside>
 
 <style>
   .crew {
-    /* terminal skin always — vars resolve via data-theme=terminal */
     background: var(--paper);
     color: var(--ink);
-    font-family: var(--mono);
-    font-size: 12px; line-height: 1.5;
+    font-family: var(--sans);
+    font-size: 13px; line-height: 1.5;
   }
 
-  /* docked overlay (toggle) */
+  /* docked overlay (toggle) — a floating Notion surface, soft lift, no stroke */
   .crew:not(.inline) {
     position: fixed; top: 0; right: 0; z-index: 80;
-    width: 360px; max-width: 88vw; height: 100vh;
-    padding: 18px 18px 24px;
-    border-left: 1px solid var(--rule);
+    width: 380px; max-width: 90vw; height: 100vh;
+    padding: 20px 22px 28px;
     overflow-y: auto;
     transform: translateX(100%);
     transition: transform .15s ease-out;   /* §4.8 slide-in 150ms */
-    box-shadow: -8px 0 40px -20px rgba(0,0,0,.5);
+    box-shadow: var(--shadow);
     border-radius: var(--r) 0 0 var(--r);
-    /* the faint top glow — Linear's dark-surface signature, barely there */
-    background-image: radial-gradient(120% 60% at 50% -10%, rgba(91,140,255,.07), transparent 60%);
   }
   .crew:not(.inline).open { transform: none; }
 
-  /* inline specimen */
+  /* inline specimen — a card on the page */
   .crew.inline {
-    width: 100%; padding: 18px 18px 20px;
+    width: 100%; padding: 24px 22px;
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
   }
 
   .phead {
     display: flex; align-items: baseline; gap: 12px;
-    font-size: 12px; letter-spacing: 0.06em;
+    margin-bottom: 28px;
   }
-  .title { color: var(--ink); font-weight: 500; }
+  .title { font-size: 11px; letter-spacing: 0.08em; color: var(--ink); font-weight: 500; }
   .spectag {
     font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--ink-3); border: 1px solid var(--rule);
-    border-radius: var(--r-s); padding: 2px 6px; align-self: center;
+    color: var(--ink-3); background: var(--surface);
+    border-radius: var(--r-s); padding: 3px 7px; align-self: center;
   }
-  .time { color: var(--wire); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .time { font-size: 11px; color: var(--wire); margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
   .x {
     background: none; border: 0; color: var(--ink-3);
-    font-size: 18px; line-height: 1; padding: 0 0 0 8px; cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 0 0 6px; cursor: pointer;
   }
   .x:hover { color: var(--ink); }
 
-  .rule { color: var(--rule); margin: 10px 0; overflow: hidden; white-space: nowrap; user-select: none; }
+  /* ── the chart ── */
+  .chart { margin-bottom: 30px; }
+  .tier { display: flex; justify-content: center; }
+  .tier.reports { gap: 6px; align-items: start; }
 
-  .agents { display: flex; flex-direction: column; gap: 7px; }
-  .arow {
-    display: grid;
-    grid-template-columns: 14px 56px 78px 1fr auto;
-    align-items: baseline; gap: 8px;
-    font-size: 12px;
+  .member {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 4px; padding: 10px 8px; border-radius: var(--r);
+    flex: 1 1 0; min-width: 0;
+    transition: background .14s ease;
   }
-  .arow.hit { background: color-mix(in srgb, var(--wire) 14%, transparent); margin: 0 -6px; padding: 2px 6px; }
-  .dot { color: var(--ink-3); }
-  .dot.live { color: var(--wire); animation: breathe 2.4s ease-in-out infinite; }
-  @keyframes breathe { 50% { opacity: .4; } }
-  .name { color: var(--ink); font-weight: 500; }
-  .role { color: var(--ink-2); }
-  .doing { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .arow.dim .doing { color: var(--ink-3); }
+  .member.hit { background: color-mix(in srgb, var(--wire) 8%, transparent); }
+  .tier.lead .member { flex: 0 0 auto; max-width: 200px; }
+
+  .name { font-size: 14px; font-weight: 600; color: var(--ink); margin-top: 4px; letter-spacing: -0.01em; }
+  .role {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-3);
+  }
+  .status { font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-3); }
+  .status.live { color: var(--wire); }
+  .doing {
+    font-size: 11.5px; color: var(--ink-2); line-height: 1.35;
+    max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tier.lead .doing { max-width: 22ch; }
+  .member.dim .doing { color: var(--ink-3); }
   .watch {
-    background: none; border: 0; padding: 0; cursor: pointer;
-    font: inherit; color: var(--wire); white-space: nowrap;
+    background: none; border: 0; padding: 2px 0 0; cursor: pointer;
+    font-size: 11px; color: var(--wire); white-space: nowrap;
   }
-  .watch:hover { text-decoration: underline; }
+  .watch:hover { text-decoration: underline; text-underline-offset: 2px; }
 
-  .shead { color: var(--ink-2); letter-spacing: 0.06em; margin-bottom: 8px; }
-  .shead .sub { color: var(--ink-3); }
-  .commits { display: flex; flex-direction: column; gap: 5px; }
-  .crow {
-    display: grid; grid-template-columns: 46px 52px 1fr; gap: 8px;
-    font-size: 12px;
+  /* thin connector lines (1px var(--rule)) drawn with borders/pseudo-elements */
+  .connectors {
+    position: relative; height: 22px;
+    display: flex; justify-content: center;
   }
-  .ct { color: var(--wire); font-variant-numeric: tabular-nums; }
-  .cw { color: var(--ink); }
+  .connectors .drop {
+    position: absolute; top: 0; left: 50%; width: 1px; height: 11px;
+    background: var(--rule);
+  }
+  .connectors .bus {
+    position: absolute; top: 11px; left: 16.6%; right: 16.6%; height: 1px;
+    background: var(--rule);
+  }
+  .connectors .riser {
+    position: absolute; top: 11px; height: 11px; width: 1px;
+    background: var(--rule);
+    /* evenly distribute risers across the bus, centered over each report */
+    left: calc(16.6% + (100% - 33.2%) * (var(--i) + 0.5) / var(--n));
+  }
+
+  /* ── the wire ── */
+  .shead {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--ink); margin: 0 0 12px;
+  }
+  .shead .sub { color: var(--ink-3); text-transform: none; letter-spacing: 0.01em; margin-left: 4px; }
+  .commits { display: flex; flex-direction: column; gap: 2px; margin-bottom: 30px; }
+  .crow {
+    display: grid; grid-template-columns: 28px 44px 44px 1fr; gap: 10px;
+    align-items: center; padding: 7px 8px; margin: 0 -8px; border-radius: var(--r-s);
+    font-size: 12.5px; transition: background .12s ease;
+  }
+  .crow:hover { background: var(--wash); }
+  .ct { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .cw { color: var(--ink); font-weight: 600; }
   .cm { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .pipe { color: var(--ink-2); font-size: 12px; }
-  .plabel { color: var(--ink); font-weight: 500; letter-spacing: 0.06em; }
+  /* ── pipeline chips ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    background: var(--surface); border-radius: var(--r-s);
+    padding: 8px 12px;
+  }
+  .cn { font-size: 16px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .cl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+
+  @media (max-width: 420px) {
+    .doing { max-width: 11ch; }
+  }
 </style>

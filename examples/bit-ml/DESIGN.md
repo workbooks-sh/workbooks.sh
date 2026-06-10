@@ -45,33 +45,46 @@ the wire lead and story headlines only. The stack's bite heads are tight
 grotesk (Switzer ~590, −2.2% tracking, 19/1.3); all chrome is product-grade
 Linear: frosted sticky masthead (blur + translucent paper), a ⌘K hint chip,
 pill toggles (1px border, full radius, bg-shift hover), radii ONLY on
-interactive/floating chrome (10–12px on panels, never on bites), and a
-barely-there radial glow atop dark terminal surfaces. The editorial stack
-itself stays flat and hairlined — paper is paper, product is product.
+interactive/floating chrome (10–12px on panels, never on bites), and the
+soft `--shadow` lift on floating Notion surfaces (the Notion dial, §3). The
+editorial stack itself stays flat and hairlined — paper is paper, product
+is product.
 
-## 3. Color — paper, ink, one wire
+## 3. Color — ONE theme: paper, ink, one wire
 
-Light mode is canonical (news is read, not dwelled in). Dark mode is the
-terminal — for the inspect panel and night reading, not a tinted clone.
+**One theme (founder, 2026-06-10).** Light only — white paper, black ink.
+The Notion-style editorial pivot: fun but modern, clean white and black,
+lots of whitespace. The [data-theme=terminal] page theme and its toggle were
+**deleted** — there is no dark mode, no night reading, no terminal skin
+anywhere. Surfaces that used to be terminal-skinned (the Receipt, the
+CrewPanel) are reinterpreted as light Notion surfaces.
 
 ```css
-:root {                          /* paper */
+:root {                          /* paper — the only theme */
   --paper:   #ffffff;           /* pure white */
   --ink:     #000000;           /* true black — contrast IS the palette */
   --ink-2:   #2e2e2e;           /* deks: still essentially black */
   --ink-3:   #757575;           /* meta resting state — the ONLY grey */
   --rule:    #ededed;           /* hairlines — barely there */
+  --wash:    #f5f5f5;           /* Notion hover wash on interactive rows */
+  --surface: #fafafa;           /* lightest gray a card may carry (#fafafa max) */
   --wire:    #0a52e0;           /* THE accent: wire blue. links, live, focus */
   --up:      #0a7d4f;  --down: #c4322e;   /* market semantics only */
-}
-[data-theme=terminal] {          /* the panel + dark mode: TRUE BLACK */
-  --paper: #000000; --ink: #ffffff; --ink-2: #d6d6d6; --ink-3: #8c8c8c;
-  --rule: #1c1c1c; --wire: #5b8cff;
+  /* the ONE Notion lift — soft shadow now sanctioned on floating surfaces */
+  --shadow:  0 1px 3px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.12);
 }
 ```
 
+- **The Notion dial (founder, 2026-06-10):** fun / clean / whitespace. Cards
+  are white or gray-25 (`--surface` #fafafa max), NO strokes (surface law
+  stands), and a soft **lift shadow is now sanctioned** on floating surfaces
+  (panels, the receipt, chips) — ONE consistent `--shadow` token, never a
+  freelanced shadow. Interactive rows take a `--wash` (#f5f5f5) hover.
+  Generous padding; `--r` stays 12px. Mono is reserved for genuine meta
+  (the meta system stands). The frosted sticky masthead + ⌘K + crew pill
+  read Notion-compatible and stay.
 - **Wire blue is the only voice of interactivity and liveness.** Links,
-  the live dot, focus rings, the inspect toggle. If something else is
+  the live badge, focus rings, the crew toggle. If something else is
   blue, it's wrong.
 - **Grayscale discipline (founder, 2026-06-10):** the base is WHITE and BLACK —
   true black ink on pure white, one grey for resting meta, generous white space (air IS
@@ -81,11 +94,12 @@ terminal — for the inspect panel and night reading, not a tinted clone.
   data. Nothing else.
 - No gradients anywhere except the presence system (the one inherited
   gradient: the live-agent rim, which signals "machine at work").
-- **Surface laws (founder, 2026-06-10):** backgrounds are #000 or #fff —
-  never a tinted gray. NO STROKES ON CARDS — a card separates by contrast
-  alone (black on white needs no outline); borders survive only on small
-  product chrome (pills, keycaps). ONE radius scale: --r 12px for floating
-  surfaces, --r-s 6px for chips — nothing freelances its roundness.
+- **Surface laws (founder, 2026-06-10):** backgrounds are #fff or the
+  gray-25 `--surface` (#fafafa) — never a darker tinted gray, never #000.
+  NO STROKES ON CARDS — a card separates by contrast + the soft `--shadow`
+  lift (the Notion sanction); borders survive only on small product chrome
+  (pills, keycaps). ONE radius scale: --r 12px for floating surfaces,
+  --r-s 6px for chips — nothing freelances its roundness.
 
 ## 4. The components
 
@@ -141,10 +155,11 @@ strip** (4.6) instead of a bite. Infinite-feel pagination, mono
 ### 4.5 Story page (the full bite)
 Same anatomy enlarged, then body at 68ch. Pull-quotes get a 2px wire
 rule left. Numbers in body inherit mono. At the foot, **the receipt**:
-a terminal-skinned block (dark even in light mode) listing the pipeline
-trail — assigned 13:40 → researched 13:51 (6 sources) → drafted 13:58 →
-edited 14:02 — each row linking to the commit. The receipt is the
-"agent-run" proof artifact, and it's also just a good colophon.
+a **light Notion card** (`--surface` #fafafa, no stroke, the soft `--shadow`
+lift) listing the pipeline trail — assigned 13:40 → researched 13:51 (6
+sources) → drafted 13:58 → edited 14:02 — each row linking to the commit.
+The receipt is the "agent-run" proof artifact, and it's also just a good
+colophon.
 
 ### 4.6 Market strip
 A mono single-line band between hairlines: `NVDA +2.4 ▲ · BTC 97,210 ▼ ·
@@ -155,34 +170,52 @@ no data, no strip (never placeholder numbers).
 Crew members are named like staff: `by wren (writer) · research: moss ·
 ed. hale`. Mono, ink-3, names link to the crew panel filtered to that
 agent. The transparency IS the brand: every story signs its machines.
+On **story pages** the byline MAY carry the writer's **avatar (sm)** inline
+(the OpenPeeps face — see "the crew are characters") to humanize it; the
+stack bites keep their bylines clean (no avatar in the stack).
 
-### 4.8 Crew panel (the inspect panel, redesigned for a newsroom)
-Opens from the masthead toggle (◉ crew) on every page — a right-side
-panel in **terminal skin** (dark, mono-dominant):
+### 4.8 Crew panel (the org chart)
+Opens from the masthead toggle (◉ crew) on every page — a slide-in right
+panel, now a **light Notion surface** (white card, soft `--shadow` lift, no
+stroke). It is a **fun ORG CHART**, not a terminal list. It also renders
+**inline on /design** as the specimen.
 
 ```
-THE CREW                                      14:02:33 UTC
-──────────────────────────────────────────────────────────
-● wren    writer     drafting: deepmind weather    watch →
-● moss    research   pulling: nature paper         watch →
-● hale    editor     idle — next pass in 4m
-● desk    assignment thinking
-──────────────────────────────────────────────────────────
-THE WIRE (live commits)
-14:01  wren   draft: deepmind-weather.html
-13:58  moss   research note: 6 sources attached
-13:51  desk   assigned: deepmind weather model
-──────────────────────────────────────────────────────────
-PIPELINE   assigned 2 · research 1 · writing 1 · edit 0
+            [avatar lg]
+              desk
+           assignment
+          ╱     |     ╲          ← thin connector lines (1px #e5e5e5)
+   [moss]    [wren]    [hale]
+  research   writer    editor
+   ● live    ● live     idle
+  pulling…  drafting…  next pass 4m
+  watch →   watch →
 ```
 
-One row per agent: live dot (wire blue working / ink-3 idle), name,
-role, doing-now (from its activity feed), **watch →**. Watching an
-agent = the lander's true-presence system scoped to that agent: its
-cursor with real anchors on the page it's editing, or the portal embed
-when it's off-page. Below: the merged commit wire and pipeline counts
-(the board's states, live). Multiple agents can be live at once — that's
-the showcase.
+**desk** sits at the top (it assigns); its three reports sit beneath, with
+1px connector lines (drawn with borders / pseudo-elements) between the tiers.
+Each member: an OpenPeeps **avatar** (md/lg, with a wire-blue live badge on
+its corner when working), name (sans 600), role (mono 10.5 uppercase ink-3),
+a doing-now status line (truncated), and a **watch →** link (stub). Watching
+an agent = the lander's true-presence system scoped to that agent: its cursor
+with real anchors on the page it's editing, or the portal embed when off-page.
+
+Below the chart: **THE WIRE** (recent commits, a light list with an avatar sm
+per row) and **PIPELINE** counts as Notion-ish stat chips (#fafafa rounded,
+no border). Multiple agents can be live at once — that's the showcase. The
+data comes from `feed.js`'s `crewFeed()` (its shape extended with
+`avatarSeed`); the honest **"specimen data"** tag stays until the runtime
+feed lands.
+
+### 4.8a The crew are characters (OpenPeeps)
+The crew get **faces**. Avatars are **OpenPeeps** (CC0) fetched via DiceBear —
+`https://api.dicebear.com/9.x/open-peeps/svg?seed=<name>` — deterministic per
+seed, so `desk`/`moss`/`wren`/`hale` always render the same face. Round-cropped
+on a `--wash` (#f5f5f5) circle; sizes sm 28 / md 44 / lg 64; `loading=lazy`,
+`alt = name`. The wire-blue live dot becomes a **badge on the avatar's corner**
+when an agent is working. Avatars humanize the bylines and the org chart.
+**Never bundled** (fetched, content-addressed by seed) and **never used for
+humans — only agents.**
 
 ### 4.9 Presence (inherited, re-skinned)
 The cursor, portal card, and type-in diffs port from the lander with the
@@ -214,6 +247,6 @@ a sharp colleague, not a hype account.
 - Same shell architecture as the lander (persistent shell, client
   routing, runtime CMS manifests — `content/stories.json` + partials).
 - The crew panel reads the same `/_activity` feed, extended with
-  per-agent identity (epic wb-wc0 item 2).
-- Light/terminal themes via `data-theme`; the crew panel is ALWAYS
-  terminal-skinned regardless of page theme.
+  per-agent identity + `avatarSeed` (epic wb-wc0 item 2).
+- **One theme — light only.** No `data-theme`, no toggle, no terminal skin.
+  Every surface (the receipt, the crew org chart) is a light Notion surface.
