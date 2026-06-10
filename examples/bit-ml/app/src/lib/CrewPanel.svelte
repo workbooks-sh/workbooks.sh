@@ -14,6 +14,7 @@
     agents = [],
     wire = [],
     pipeline = '',
+    specimen = false,   // honest flag: the crew runtime (/_activity) isn't wired yet
     onclose,
   } = $props();
 </script>
@@ -27,6 +28,7 @@
 >
   <div class="phead mono">
     <span class="title">THE CREW</span>
+    {#if specimen}<span class="spectag" title="the crew runtime is a parallel build (wb-wc0.2) — this feed is static for now">specimen data</span>{/if}
     <span class="time">{clock} UTC</span>
     {#if !inline}<button class="x" onclick={onclose} aria-label="close crew panel">×</button>{/if}
   </div>
@@ -95,6 +97,11 @@
     font-size: 12px; letter-spacing: 0.06em;
   }
   .title { color: var(--ink); font-weight: 500; }
+  .spectag {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-3); border: 1px solid var(--rule);
+    border-radius: var(--r-s); padding: 2px 6px; align-self: center;
+  }
   .time { color: var(--wire); margin-left: auto; font-variant-numeric: tabular-nums; }
   .x {
     background: none; border: 0; color: var(--ink-3);

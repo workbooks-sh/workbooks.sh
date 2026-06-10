@@ -1,0 +1,87 @@
+{
+  "_comment": "Runtime CMS manifest (DESIGN.md §7). Ordered rows; the frontend reads this, then fetches each story's .org file and renders it client-side with orgitorial. status: live = being written now (front-page type-in treatment); published = done. WireLead = newest published. Seed content — replace with agent-authored rows once the crew runtime ships (wb-wc0.2).",
+  "stories": [
+    {
+      "slug": "deepmind-weather",
+      "section": "AI",
+      "head": "DeepMind's new weather model beats the supercomputers it replaced",
+      "dek": "Fifteen-day forecasts from a diffusion model that runs on one TPU — the Nature paper, the caveats, and who loses a hardware contract.",
+      "sources": [
+        { "label": "Nature", "url": "https://www.nature.com/articles/s41586-024-08252-9" },
+        { "label": "GitHub", "url": "https://github.com/google-deepmind/graphcast" }
+      ],
+      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
+      "date": "2026-06-10",
+      "time": "14:02 UTC",
+      "read": "1m",
+      "status": "live",
+      "file": "content/stories/deepmind-weather.org",
+      "receipt": [
+        { "stage": "assigned", "time": "13:40", "note": "desk · weather model", "sha": "a1c4e9" },
+        { "stage": "researched", "time": "13:51", "note": "moss · 6 sources", "sha": "f72b08" },
+        { "stage": "drafted", "time": "13:58", "note": "wren · 612 words", "sha": "3d9a17" },
+        { "stage": "edited", "time": "14:02", "note": "hale · fact pass", "sha": "be05c2" }
+      ]
+    },
+    {
+      "slug": "nvidia-datacenter",
+      "section": "MARKETS",
+      "head": "Nvidia's data-center revenue laps the rest of the segment combined",
+      "dek": "The quarter in three lines: backlog, gross margin, and the one customer-concentration footnote analysts keep circling.",
+      "sources": [
+        { "label": "10-Q", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001045810&type=10-Q" },
+        { "label": "investor relations", "url": "https://investor.nvidia.com/financial-info/financial-reports/" }
+      ],
+      "byline": { "writer": "desk", "research": ["moss"], "editor": "hale" },
+      "date": "2026-06-09",
+      "time": "13:12 UTC",
+      "read": "1m",
+      "status": "published",
+      "file": "content/stories/nvidia-datacenter.org",
+      "receipt": [
+        { "stage": "assigned", "time": "11:20", "note": "desk · nvidia quarter", "sha": "77ab10" },
+        { "stage": "researched", "time": "12:05", "note": "moss · filing + transcript", "sha": "0c5d92" },
+        { "stage": "drafted", "time": "12:48", "note": "desk · 540 words", "sha": "e31f44" },
+        { "stage": "edited", "time": "13:12", "note": "hale · numbers pass", "sha": "9b2a76" }
+      ]
+    },
+    {
+      "slug": "tsmc-arizona",
+      "section": "CHIPS",
+      "head": "TSMC's Arizona fab clears its first leading-edge wafers",
+      "dek": "Two years late, but running — what the yield numbers say about whether onshoring the leading node actually pencils out.",
+      "sources": [
+        { "label": "TSMC", "url": "https://pr.tsmc.com/english/news" },
+        { "label": "Commerce", "url": "https://www.commerce.gov/news/press-releases" }
+      ],
+      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
+      "date": "2026-06-08",
+      "time": "13:40 UTC",
+      "read": "2m",
+      "status": "published",
+      "file": "content/stories/tsmc-arizona.org"
+    },
+    {
+      "slug": "eu-compute-threshold",
+      "section": "POLICY",
+      "head": "The EU's compute threshold for frontier models takes effect",
+      "dek": "What the 10^25 training-FLOP line actually triggers, who has to file, and the carve-out that open-weight labs lobbied for.",
+      "sources": [
+        { "label": "Official Journal", "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj" },
+        { "label": "AI Office", "url": "https://digital-strategy.ec.europa.eu/en/policies/ai-act" }
+      ],
+      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
+      "date": "2026-06-07",
+      "time": "11:58 UTC",
+      "read": "2m",
+      "status": "published",
+      "file": "content/stories/eu-compute-threshold.org",
+      "receipt": [
+        { "stage": "assigned", "time": "10:30", "note": "desk · EU AI Act", "sha": "44de01" },
+        { "stage": "researched", "time": "11:10", "note": "moss · OJ text", "sha": "8f7c23" },
+        { "stage": "drafted", "time": "11:42", "note": "wren · 498 words", "sha": "1a6b55" },
+        { "stage": "edited", "time": "11:58", "note": "hale · legal read", "sha": "cc90ef" }
+      ]
+    }
+  ]
+}

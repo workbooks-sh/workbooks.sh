@@ -13,6 +13,7 @@
     sources = [],
     byline,
     onagent,
+    href = null,   // /story/<slug> — the lead head links into the story
   } = $props();
 
   const sec = $derived(sectionOf(section));
@@ -26,7 +27,7 @@
     <span class="when">{dateline}</span>
   </div>
 
-  <h1 class="head serif">{head}</h1>
+  <h1 class="head serif">{#if href}<a class="headlink" {href}>{head}</a>{:else}{head}{/if}</h1>
 
   {#if dek}<p class="dek">{dek}</p>{/if}
 
@@ -60,6 +61,8 @@
     color: var(--ink);
     text-wrap: balance;
   }
+  .headlink { color: inherit; text-decoration: none; }
+  .headlink:hover { color: var(--wire); text-decoration: none; }
 
   .dek {
     margin: 14px 0 0;
