@@ -12,12 +12,15 @@
  * covers the common import/export forms so simple ESM packages bundle too. */
 
 function readStdin() {
+  // One reusable read buffer; chunks are right-sized COPIES (slice). A subarray
+  // of a fresh per-iteration buffer pins the whole 1MB backing ArrayBuffer per
+  // chunk — multi-MB stdin then retains hundreds of MB and stalls the GC.
   var chunks = [], total = 0, CH = 1 << 20;
+  var b = new Uint8Array(CH);
   for (;;) {
-    var b = new Uint8Array(CH);
     var n = Javy.IO.readSync(0, b);
     if (n <= 0) break;
-    chunks.push(b.subarray(0, n));
+    chunks.push(b.slice(0, n));
     total += n;
   }
   var out = new Uint8Array(total), o = 0;
