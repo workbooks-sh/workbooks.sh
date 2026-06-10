@@ -152,9 +152,17 @@ defmodule Workbooks.Agent do
   defp exec_one(%{name: "shell", args: a}, st) do
     # Preopen the agent's workdir so shell commands can read/write its files
     # (e.g. `cat out.txt`) — files stay inside the sandbox, no host escape.
-    case Shell.run(a["pipeline"], a["input"] || "", dirs: ["#{st.workdir}::#{st.workdir}"]) do
-      {:ok, o} -> {o, st, nil}
-      {:error, e} -> {"error: #{inspect(e)}", Map.put(st, :last, %{error: inspect(e)}), nil}
+    # A malformed call (missing/non-string pipeline) bounces back to the model
+    # as an error message — never a crash.
+    case a["pipeline"] do
+      p when is_binary(p) ->
+        case Shell.run(p, a["input"] || "", dirs: ["#{st.workdir}::#{st.workdir}"]) do
+          {:ok, o} -> {o, st, nil}
+          {:error, e} -> {"error: #{inspect(e)}", Map.put(st, :last, %{error: inspect(e)}), nil}
+        end
+
+      _ ->
+        {"shell error: required arg `pipeline` missing or not a string", Map.put(st, :last, %{error: "missing pipeline"}), nil}
     end
   end
 
