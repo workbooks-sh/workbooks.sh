@@ -85,7 +85,7 @@ defmodule Workbooks.Application do
     control =
       cond do
         Workbooks.Desktop.enabled?() ->
-          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, ip: Workbooks.Desktop.bind_ip(), port: Workbooks.Desktop.port(), thousand_island_options: [transport_options: [ipv6_v6only: false]]}, id: :control_web)]
+          [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, ip: Workbooks.Desktop.bind_ip(), port: Workbooks.Desktop.port(), thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]}, id: :control_web)]
 
         System.get_env("WB_WEB") == "1" ->
           [Supervisor.child_spec({Bandit, plug: Workbooks.Web, scheme: :http, port: port()}, id: :control_web)]
