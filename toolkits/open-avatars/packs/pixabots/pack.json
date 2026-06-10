@@ -1,0 +1,12 @@
+{
+  "name": "pixabots",
+  "title": "Pixabots",
+  "type": "gallery",
+  "kind": "raster",
+  "license": "See packs/pixabots/LICENSE.txt",
+  "credit": "Pixabots — 2000 pixel-art robot avatars (raster). See packs/pixabots/LICENSE.txt and SOURCE.md.",
+  "source": "packs/pixabots/SOURCE.md",
+  "path": "<id>.webp",
+  "base": "webp/",
+  "idsFile": "pixabots.ids.json"
+}

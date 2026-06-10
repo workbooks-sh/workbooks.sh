@@ -107,18 +107,32 @@ only job is to place the string.
 
 * The API
 
-- =avatar(pack, seed, opts) -> string= — a complete =<svg>= document.
-  - =pack= : a bundle object, or =null= to use a =register()='d default.
-  - =seed= : any string. Hashed to pick atoms. Same seed → identical svg.
-  - =opts= :
+The same call serves every pack TYPE — =avatar()= routes by =pack.type=
+(assembled / gallery / procedural; see =skills/packs=). The examples above use the
+assembled open-peeps pack; the contract below is the assembled one. Gallery packs
+take ={ base, size, title, background }= (and raster galleries return an =<img>=,
+not an =<svg>=); procedural packs pass =opts= straight to their generator and need
+their =generate= function attached to the pack object. The plug-in mechanics
+(inline a bundle, inject the string) are identical across all three.
+
+- =avatar(pack, seed, opts) -> string= — a complete =<svg>= (or =<img>= for raster
+  galleries).
+  - =pack= : a bundle object, or =null= to use a =register()='d default. For a
+    procedural pack: ={ type:"procedural", generate }= (attach the imported fn).
+  - =seed= : any string. Hashed (FNV-1a) for selection. Same seed → identical out.
+  - =opts= (assembled):
     - =crop= : ='circle'= (default) | ='bust'= | ='full'=
     - =categories= : =string[]= subset to draw (default is crop-appropriate)
     - =background= : a CSS color for a backplate (default: none/transparent)
     - =size= : px for the svg's =width/height= (default: scales to its box)
     - =title= : =<title>= text for a11y (default: the seed)
-- =pick(pack, seed) -> { <cat>: <name> }= — which atom each category resolves to.
+  - =opts= (gallery raster): =base= — URL/path prefix for the =<img src>= (where
+    you host the bitmaps); plus =size=, =title=.
+  - =opts= (procedural): passed straight to the pack's =generate(seed, opts)=
+    (e.g. =monochrome=, =variant=, =size= — pack-specific).
+- =pick(pack, seed)= — assembled: ={ <cat>: <name> }=; gallery: the chosen id.
   Useful for debugging or showing the composition.
-- =register(pack) -> void= — set a default bundle so you can call =avatar(null, …)=.
+- =register(pack) -> void= — set a default pack so you can call =avatar(null, …)=.
 
 * Done-when
 

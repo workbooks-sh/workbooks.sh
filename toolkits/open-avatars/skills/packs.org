@@ -7,11 +7,44 @@
 * When to use this
 
 Read this when your task is to *understand the pack format* or to *add a new
-avatar pack* (a new style — the toolkit is built to carry many). A pack is a
-self-contained style: a directory of monochrome SVG atoms + a calibration file +
-a generated bundle.
+avatar pack* (a new style — the toolkit is built to carry many). The toolkit is
+*type-dispatched*: a pack declares a =type= and the single =avatar()= routes to
+the right renderer. Pick the type that fits your art before you start.
 
-* Anatomy of a pack
+* The three pack types (and what =avatar()= does with each)
+
+A pack's =pack.json= declares ="type"=. =avatar(pack, seed, opts)= dispatches on it:
+
+| =type=        | The art is…                                     | =avatar()= returns           | Sub-kind         |
+|---------------+-------------------------------------------------+------------------------------+------------------|
+| =assembled=   | atoms composed by category + offsets            | one composed =<svg>=         | —                |
+| =gallery=     | a list of WHOLE, finished avatars               | one picked avatar            | =svg= / =raster= |
+| =procedural=  | a pure =generate(seed,opts)→svg= the pack ships | whatever =generate()= returns | —              |
+
+Determinism is identical across all three: selection is *FNV-1a over a SORTED id
+list* (gallery) or over a sorted category-name list (assembled); procedural packs
+own their algorithm but must be pure (same seed → same string, forever).
+
+Back-compat: a bundle with no =type= but a =categories= map is treated as
+=assembled=, so the original open-peeps bundle works untouched.
+
+Shipped packs:
+
+| Pack            | type / kind        | License | Source                              |
+|-----------------+--------------------+---------+-------------------------------------|
+| =open-peeps=    | assembled          | CC0     | openpeeps.com                       |
+| =transhumans=   | gallery · svg      | free-commercial | transhuman.club             |
+| =pixabots=      | gallery · raster   | own LICENSE | packs/pixabots/LICENSE.txt      |
+| =boring=        | procedural         | MIT     | boringdesigners/boring-avatars      |
+| =jdenticon=     | procedural         | MIT     | dmester/jdenticon                   |
+| =minidenticons= | procedural         | MIT     | laurentpayot/minidenticons          |
+| =pixitar=       | procedural         | MIT     | ptcodes/pixitar                     |
+
+(Full attribution: =LICENSES.md=.)
+
+* type: assembled — compose atoms (the open-peeps path)
+
+* Anatomy of an assembled pack
 
 #+begin_example
 packs/<name>/
@@ -81,7 +114,7 @@ root =<svg>= wrapper, keeping the inner =<g>…</g>=. An atom whose group is emp
 pick — the renderer emits *nothing* for it (no hollow group). The output is
 =pack.bundle.json= = ={ ...pack.json, atoms: { <cat>: { <name>: <inner> } } }=.
 
-* HOW TO ADD A NEW PACK
+* HOW TO ADD AN ASSEMBLED PACK
 
 1. *Drop atoms.* Create =packs/<name>/atoms/<cat>/*.svg=. Keep the categories
    you want (=body/ head/ face/=… or your own taxonomy — the renderer is generic
@@ -106,8 +139,100 @@ pick — the renderer emits *nothing* for it (no hollow group). The output is
    category drifts, the fix is its =offset= in =pack.json= — re-bundle, re-check.
    Add the pack's seeds to a specimen section if you want it in the proof page.
 
-* Done-when
+* Done-when (assembled)
 
 =pack.bundle.json= exists, a handful of seeds render with every category aligned
 to the reference, and "* None" picks render cleanly (no broken group). The
 renderer was *not* touched — all pack knowledge lives in =pack.json=.
+
+* HOW TO ADD A GALLERY PACK (whole, finished avatars)
+
+A gallery pack picks ONE complete avatar by seed. Two kinds:
+
+** kind: svg — whole inline SVG figures (e.g. transhumans)
+
+1. *Drop figures.* =packs/<name>/figures/*.svg= — one finished character per
+   file. They keep their *native art and color* (gallery packs are not
+   monochrome-by-law; that rule is only for assembled atom packs).
+2. *Write =pack.json=.*
+   #+begin_src json
+   { "name": "<name>", "type": "gallery", "kind": "svg",
+     "license": "…", "credit": "…", "dir": "figures",
+     "viewBox": [1080, 1080] }
+   #+end_src
+   =viewBox= is the figures' shared =[w,h]=. If a figure exports at a different
+   ratio the renderer centers it in a square =max(w,h)= viewBox — read one file's
+   =viewBox= to set this.
+3. *Bundle.* =node scripts/bundle-pack.mjs <name>= → =pack.bundle.json= =
+   ={ ...pack.json, items: { "<id>": "<inner svg>" } }= (id = the filename).
+4. *Verify.* =avatar(bundle, seed)= returns the chosen figure framed to a square;
+   =pick(bundle, seed)= returns the chosen id (FNV over the sorted id list).
+
+** kind: raster — a big set of bitmaps you DON'T inline (e.g. pixabots)
+
+For thousands of raster avatars, inlining is absurd (13 MB+). Instead the bundle
+records only the *id list* + a *path template*; =avatar()= returns an =<img>=.
+
+1. *Stage rasters.* =packs/<name>/<dir>/<id>.<ext>= (e.g. =webp/<id>.webp=) plus a
+   =manifest.json= with an ="ids"= array (or let the bundler list the dir).
+2. *Write =pack.json=.*
+   #+begin_src json
+   { "name": "<name>", "type": "gallery", "kind": "raster",
+     "license": "…", "credit": "…",
+     "path": "<id>.webp", "base": "webp/", "idsFile": "<name>.ids.json" }
+   #+end_src
+   - =path= — template; =<id>= is substituted with the chosen id.
+   - =base= — default prefix for the =src= (a consumer overrides with =opts.base=
+     to point at wherever THEY host the bitmaps).
+3. *Bundle.* =node scripts/bundle-pack.mjs <name>= emits the *tiny* =<name>.ids.json=
+   (={ ...pack.json, ids: [...] }=) — the rasters are NOT inlined.
+4. *Use.* =avatar(idsBundle, seed, { base: "https://cdn…/" })= →
+   =<img src="https://cdn…/<id>.webp" …>=. Default base = the bundle's =base=.
+
+* HOW TO ADD A PROCEDURAL PACK (a generator, no assets)
+
+A procedural pack ships a pure function; the core just calls it.
+
+1. *Write the generator.* =packs/<name>/generate.js=:
+   #+begin_src js
+   // <name> — <one line>. Ported from <repo> (<LICENSE>).
+   export function generate(seed, opts) { /* … */ return "<svg …>…</svg>"; }
+   export default { generate };
+   #+end_src
+   Rules: *pure* (no DOM/Node/fetch/Date/Math.random), *zero-dep*, deterministic
+   (same =seed= → byte-identical string). Hash the seed yourself (FNV-1a, or the
+   source library's own hash if you're porting one — keep it exact for parity).
+   Offer a =opts.monochrome= grayscale path where the algorithm allows it (the
+   user likes B&W), but keep the source's native color as the default.
+2. *Write =pack.json=.*
+   #+begin_src json
+   { "name": "<name>", "type": "procedural", "module": "generate.js",
+     "license": "MIT", "credit": "… (MIT)", "source": "<repo url>" }
+   #+end_src
+3. *Bundle* (optional bookkeeping). =node scripts/bundle-pack.mjs <name>= copies
+   =pack.json= → =pack.bundle.json= (procedural has nothing to compile).
+4. *Wire for =avatar()=.* The bundle JSON can't carry a function, so the consumer
+   attaches it: =avatar({ type:"procedural", generate }, seed, opts)=. In a
+   browser/specimen, load =generate.js= and build that pack object (see
+   =test/build-specimen.mjs=). A bad/missing/throwing =generate= degrades to a
+   1×1 svg — never throws.
+5. *Verify fidelity.* If you ported an upstream library, diff your output against
+   it (we verified jdenticon =d=-strings and minidenticons rects byte-identical
+   vs. the npm packages). Document any deviation honestly in the file header and
+   =LICENSES.md= (pixitar is a documented deviation — upstream is a
+   non-deterministic Ruby asset-compositor, reimagined as a deterministic grid).
+
+* Future packs (NOT built — source the assets/provider first)
+
+These are out of scope until someone sources their inputs; recorded so the next
+author knows the shape:
+
+- *avataaars* (Pablo Stanley, free-for-commercial) — an *assembled* pack; needs
+  its atoms cut per-category like open-peeps + a reference composition.
+- *vue-color-avatar* — *assembled*; same: source its layered parts as atoms.
+- *unavatar* / *dicebear-http* — a *new "network" provider type* (fetch a URL by
+  seed, e.g. =https://unavatar.io/<seed>= or a DiceBear HTTP endpoint). That
+  breaks the pure-string contract (=avatar()= would return an =<img>= pointing at
+  a remote service), so it needs a deliberate provider design, not a pack. Note
+  *DiceBear styles are licensed PER STYLE* — never bundle them under a blanket
+  license.

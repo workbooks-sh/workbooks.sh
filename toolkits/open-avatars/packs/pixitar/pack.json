@@ -1,0 +1,10 @@
+{
+  "name": "pixitar",
+  "title": "Pixitar",
+  "type": "procedural",
+  "module": "generate.js",
+  "license": "MIT",
+  "credit": "Inspired by pixitar by ptcodes — https://github.com/ptcodes/pixitar (MIT). Deterministic pixel-art port (see generate.js header for the faithful-vs-deviation note).",
+  "source": "https://github.com/ptcodes/pixitar",
+  "monochrome": true
+}

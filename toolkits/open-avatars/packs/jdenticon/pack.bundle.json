@@ -1,0 +1,1 @@
+{"name":"jdenticon","title":"Jdenticon","type":"procedural","module":"generate.js","license":"MIT","credit":"Jdenticon by Daniel Mester Pirttijärvi — https://github.com/dmester/jdenticon (MIT). SHA1-seeded geometric identicon; faithful port of the SVG path generator.","source":"https://github.com/dmester/jdenticon","monochrome":true}

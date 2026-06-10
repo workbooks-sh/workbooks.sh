@@ -155,4 +155,123 @@ function findSeedWithAll(b) {
   ok("null pack degrades, never throws", degraded.startsWith("<svg") && degraded.includes('viewBox="0 0 1 1"'));
 }
 
+// =====================================================================
+// GALLERY pack — transhumans (type: gallery, kind: svg)
+// =====================================================================
+{
+  const trans = JSON.parse(
+    readFileSync(join(__dirname, "..", "packs", "transhumans", "pack.bundle.json"), "utf8")
+  );
+  ok("transhumans is a gallery/svg pack", trans.type === "gallery" && trans.kind === "svg");
+
+  const a = avatar(trans, "desk");
+  const b = avatar(trans, "desk");
+  ok("gallery: same seed → byte-identical", a === b);
+  ok("gallery: different seed → different svg", a !== avatar(trans, "moss"));
+
+  ok("gallery: valid svg", a.startsWith("<svg") && a.trim().endsWith("</svg>"));
+  ok("gallery: declares xmlns", a.includes('xmlns="http://www.w3.org/2000/svg"'));
+  ok("gallery: square viewBox", a.includes('viewBox="0 0 1080 1080"'));
+  ok("gallery: has <title>", a.includes("<title>"));
+  ok("gallery: records chosen id", /data-id="[^"]+"/.test(a));
+
+  // pick() returns the chosen id, and it is one of the gallery ids.
+  const id = pick(trans, "desk");
+  ok("gallery pick() returns an id present in items", trans.items[id] != null);
+  ok("gallery pick() matches avatar()'s data-id", a.includes(`data-id="${cssAttr(id)}"`));
+
+  // pick is a deterministic FNV pick over the SORTED id list.
+  const ids = Object.keys(trans.items).sort();
+  const expect = ids[fnv1a("desk") % ids.length];
+  ok("gallery pick() = FNV over sorted ids", id === expect, `got ${id} want ${expect}`);
+
+  // background option draws a backplate rect.
+  const bg = avatar(trans, "desk", { background: "#eee" });
+  ok("gallery: background draws a rect backplate", bg.includes('fill="#eee"'));
+}
+
+// local FNV-1a mirror so the test can recompute the expected gallery pick.
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+// =====================================================================
+// GALLERY raster pack — pixabots (type: gallery, kind: raster)
+// =====================================================================
+{
+  const pix = JSON.parse(
+    readFileSync(join(__dirname, "..", "packs", "pixabots", "pixabots.ids.json"), "utf8")
+  );
+  ok("pixabots is a gallery/raster pack", pix.type === "gallery" && pix.kind === "raster");
+  ok("pixabots ships an id list, not inlined art", Array.isArray(pix.ids) && pix.ids.length > 0);
+
+  const r1 = avatar(pix, "desk", { base: "x/" });
+  const r2 = avatar(pix, "desk", { base: "x/" });
+  ok("raster: same seed → identical", r1 === r2);
+  ok("raster: returns an <img>", r1.startsWith("<img") && r1.includes("src="));
+  ok("raster: src = base + path template", /src="x\/[0-9a-f]{4}\.webp"/.test(r1));
+  ok("raster: different seed → different src", r1 !== avatar(pix, "moss", { base: "x/" }));
+
+  // opts.base overrides; default falls back to the pack's recorded base.
+  const def = avatar(pix, "desk");
+  ok("raster: default base from bundle", def.includes('src="webp/'));
+}
+
+// =====================================================================
+// PROCEDURAL packs — boring / jdenticon / minidenticons / pixitar
+// =====================================================================
+{
+  const procPacks = [
+    { name: "boring", monochrome: false },
+    { name: "jdenticon", monochrome: true },
+    { name: "minidenticons", monochrome: true },
+    { name: "pixitar", monochrome: true },
+  ];
+  for (const { name, monochrome } of procPacks) {
+    const mod = await import(join("..", "packs", name, "generate.js"));
+    const pack = { type: "procedural", name, generate: mod.generate };
+
+    const a = avatar(pack, "desk");
+    const b = avatar(pack, "desk");
+    ok(`${name}: same seed → byte-identical`, a === b);
+    ok(`${name}: different seed → different svg`, a !== avatar(pack, "moss"));
+    ok(`${name}: valid svg`, a.startsWith("<svg") && a.trim().endsWith("</svg>"));
+    ok(`${name}: declares xmlns`, a.includes('xmlns="http://www.w3.org/2000/svg"'));
+    ok(`${name}: has <title>`, a.includes("<title>"));
+
+    // generate() called directly is the same as via avatar() (pure pass-through).
+    ok(`${name}: avatar() == generate()`, a === mod.generate("desk", {}));
+
+    // monochrome opt where supported: changes output and removes saturated hue.
+    if (monochrome) {
+      const mono = avatar(pack, "desk", { monochrome: true });
+      ok(`${name}: monochrome opt changes output`, mono !== a);
+      ok(`${name}: monochrome is grayscale`, !/hsl\(\s*[1-9]/.test(mono) || mono.includes("hsl(0 0%"));
+    }
+  }
+
+  // boring variant switch (marble vs beam) is deterministic and distinct.
+  const boring = await import(join("..", "packs", "boring", "generate.js"));
+  const marble = boring.generate("desk", { variant: "marble" });
+  const beam = boring.generate("desk", { variant: "beam" });
+  ok("boring: marble viewBox 80", marble.includes('viewBox="0 0 80 80"'));
+  ok("boring: beam viewBox 36", beam.includes('viewBox="0 0 36 36"'));
+  ok("boring: marble ≠ beam", marble !== beam);
+  ok("boring: marble stable", marble === boring.generate("desk", { variant: "marble" }));
+}
+
+// ---------- procedural pack: bad generate degrades, never throws ----------
+{
+  const broken = { type: "procedural", name: "x" }; // no generate fn
+  const out = avatar(broken, "desk");
+  ok("procedural without generate() degrades", out.startsWith("<svg"));
+  const throws = { type: "procedural", generate: () => { throw new Error("boom"); } };
+  ok("procedural that throws degrades, never propagates", avatar(throws, "desk").startsWith("<svg"));
+}
+
 console.log(`open-avatars: ${pass} checks passed${process.exitCode ? " (with FAILURES)" : ""}`);
