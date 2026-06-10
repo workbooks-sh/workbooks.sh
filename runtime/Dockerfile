@@ -25,6 +25,7 @@ ENV LANG=C.UTF-8 WB_WEB=1 PORT=4000
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++6 openssl libncurses6 ca-certificates curl xz-utils \
+      git openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # wasmtime — runs the in-WASM commands (jq/grep) and components.
