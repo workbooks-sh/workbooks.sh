@@ -138,9 +138,10 @@ async function buildGrownContainer() {
 
 // initial mount: fetch the manifest, inject sections, wire reveal. Runs once
 // when #grown is in the DOM (called from Grown.svelte's $effect).
-let grownMounted = false;
 export async function mountGrown(host) {
-  if (!host || grownMounted) return; grownMounted = true;
+  // per-host idempotence (NOT a session flag): the host node is recreated on
+  // every route return, and each fresh host needs its content injected again.
+  if (!host || host.childElementCount > 0) return;
   const frag = await buildGrownContainer();
   host.append(...frag.children);
   // the "agent's desk" blog listing is the LAST section INSIDE #grown (not a
@@ -924,12 +925,23 @@ export function boot() {
   const markIntro = () => { try { localStorage.setItem('wb_intro', '1'); } catch { /* private mode */ } };
 
   if (reduced || seenIntro) {
-    document.querySelectorAll('.blk').forEach((b) => b.classList.add('on'));
-    refs.h1text.textContent = H1;
+    revealHome();
     if (matchMedia('(min-width: 961px)').matches) openPanel();
     else document.body.classList.add('panel-was-open');
   } else {
     build().then(markIntro);
   }
   watch();
+}
+
+// Reveal the homepage in its FINAL (post-intro) state. Home's nodes are
+// recreated on every route return — the intro only ever plays once, so every
+// remount must reveal instantly or the page comes back blank. Idempotent;
+// Home.svelte calls this on mount whenever the intro has already been seen.
+export function revealHome() {
+  const seen = reduced || (() => { try { return localStorage.getItem('wb_intro') === '1'; } catch { return true; } })();
+  if (!seen) return;                       // first visit: build() owns the reveal
+  document.querySelectorAll('.blk').forEach((b) => b.classList.add('on'));
+  if (refs.h1text && !refs.h1text.textContent) refs.h1text.textContent = H1;
+  if (refs.cursor && !following) refs.cursor.style.opacity = '0';
 }

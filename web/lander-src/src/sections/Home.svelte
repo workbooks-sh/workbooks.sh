@@ -5,12 +5,16 @@
   // the blog index, and a post. The intro build choreography targets these
   // nodes (#b-*, #grown) and runs once on first load of `/`; navigating back
   // here from a post does NOT replay it (the nodes are already built).
+  import { revealHome } from '../lib/stores.js';
   import Hero from './Hero.svelte';
   import Layers from './Layers.svelte';
   import Who from './Who.svelte';
   import Get from './Get.svelte';
   import Grown from './Grown.svelte';
   import Wmark from '../lib/Wmark.svelte';
+  // remount-safe: reveal instantly when the intro has already played (the
+  // $effect runs after children mount, so all #b-* refs are registered).
+  $effect(() => { revealHome(); });
 </script>
 
 <Hero />
