@@ -125,6 +125,11 @@ defmodule Workbooks.Keeper do
 
     schedule()
     put_status(%{running: false, next_run: System.system_time(:second) + div(interval_ms(), 1000)})
+
+    # REM: after waking work, maybe dream (time-gated, fire-and-forget — a
+    # failed or slow dream can never touch the run loop). wb-2ku.
+    Task.start(fn -> Workbooks.Dreams.maybe_dream(System.get_env("WB_TENANT", "local")) end)
+
     {:noreply, state}
   end
 

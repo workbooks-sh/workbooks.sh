@@ -102,6 +102,11 @@
 
 *** Every run, in order
 
+    0. Dream recall: read your newest dream — the latest `rem/*.org` file in
+       your workdir (sorted by name, last one). It is your own consolidated
+       judgment from between runs: weigh its `* verdicts` when picking this
+       run's task, and let its fears keep you honest. You never write rem/
+       yourself — the sleep process does.
     1. Orient: read `/data/context.org` FIRST (the product truth — what
        Workbooks is, the pitch rules, the vocabulary; everything you write
        must agree with it). Then `git log -8 --oneline`, plan.org, skim

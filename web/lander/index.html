@@ -318,7 +318,9 @@ body.panel-open .panel { transform: none; }
 .pcard.status .v { font: 400 11px/1 var(--mono); color: var(--faint); text-align: right; }
 .pcard.status .v.on { color: var(--live); }
 .pcard.status .state { display: flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); color: var(--ink); }
-.pcard.status .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); position: relative; }
+.pcard.status .pulse { width: 7px; height: 7px; border-radius: 50%; background: #b48cff; position: relative; animation: breathe 3.4s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .35; } }
+.panel.running .pulse { animation: none; }
 .panel.running .pulse { background: var(--live); }
 .panel.running .pulse::after {
   content: ""; position: absolute; inset: -4px; border-radius: 50%;
@@ -662,6 +664,7 @@ async function fetchFeed() {
    per run; humans get grouped. Extend by adding entries here. */
 const TYPES = {
   add:      { who: 'waldo', color: 'var(--live)' },
+  rem:      { who: 'waldo', color: '#b48cff' },
   blog:     { who: 'waldo', color: '#5aa7ff' },
   tweet:    { who: 'waldo', color: '#5aa7ff' },
   audit:    { who: 'waldo', color: 'var(--amber)' },
@@ -737,7 +740,8 @@ function renderStatus() {
     return;
   }
   panel.classList.toggle('running', !!a.running);
-  $('#stState').textContent = a.running ? 'waldo working' : 'waldo idle';
+  $('#stState').innerHTML = a.running ? 'waldo working'
+    : '<a href="/rem/" style="color:#b48cff;text-decoration:none">waldo dreaming →</a>';
   $('#stLast').textContent = a.last_run ? 'last run ' + rel(a.last_run) : '';
   $('#stNext').textContent = a.running ? 'in progress' :
     a.next_run ? 'in ' + fmtIn(a.next_run - Math.floor(Date.now() / 1000)) : '—';
