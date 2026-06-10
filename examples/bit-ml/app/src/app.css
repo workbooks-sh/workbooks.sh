@@ -124,3 +124,74 @@ button { font-family: inherit; cursor: pointer; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   orgitorial → bit.ml token bridge (skills/theming.org). Story bodies are
+   rendered client-side by the vendored orgitorial renderer as
+   <article class="org-doc">; we mount it inside .org-mount on the story page.
+   We remap orgitorial's --org-* vars onto bit.ml tokens so rendered stories
+   LOOK native. Scoped to .org-mount (beats orgitorial's own :root defaults
+   without !important) and follows the live [data-theme] via the bit.ml tokens.
+
+   DESIGN.md §4.5 story body: 17/1.65 Switzer, 68ch. The serif is RESERVED for
+   headlines (§2 Linear-forward dial) — story sub-heads (.org-h) ARE the serif's
+   home, so they alone keep --serif; everything else (body, mono meta) maps to
+   Switzer / Geist Mono. The big serif story HEADLINE is rendered natively by
+   Story.svelte (header:false strips orgitorial's own header).
+   ════════════════════════════════════════════════════════════════════ */
+.org-mount {
+  --org-paper:       var(--paper);
+  --org-ink:         var(--ink);
+  --org-ink-soft:    var(--ink-2);
+  --org-faint:       var(--ink-3);
+  --org-accent:      var(--wire);      /* links wear the one accent */
+  --org-accent-soft: color-mix(in srgb, var(--wire) 8%, transparent);
+  --org-rule:        var(--rule);
+  --org-rule-strong: color-mix(in srgb, var(--ink) 18%, var(--rule));
+  --org-panel:       color-mix(in srgb, var(--ink) 3%, var(--paper));
+  --org-panel-bar:   color-mix(in srgb, var(--ink) 6%, var(--paper));
+  --org-todo-bg:     var(--ink);
+  --org-todo-ink:    var(--paper);
+  --org-done-bg:     var(--paper);
+  --org-done-ink:    var(--ink);
+  --org-mark:        color-mix(in srgb, var(--wire) 12%, transparent);
+  --org-selection:   color-mix(in srgb, var(--wire) 16%, transparent);
+
+  /* three voices: body is Switzer (--org-serif drives .org-doc body text),
+     mono is Geist Mono. The bit.ml serif is reapplied to .org-h below. */
+  --org-serif: var(--sans);
+  --org-sans:  var(--sans);
+  --org-mono:  var(--mono);
+
+  --org-measure: 68ch;                 /* §4.5 */
+  --org-fs:      17px;                  /* §4.5 body 17 */
+  --org-lh:      1.65;                  /* §4.5 body line-height */
+  --org-radius:  var(--r-s);
+}
+
+/* the orgitorial article sits inline in our 720px column — kill its huge
+   outer padding + auto-centering (the page already provides the gutter) */
+.org-mount .org-doc {
+  max-width: var(--col);
+  margin: 0;
+  padding: 8px 0 0;
+  letter-spacing: -0.011em;            /* Switzer set tight, like body */
+}
+
+/* story sub-heads ARE the serif's home (DESIGN §2/§4.5) — reapply the bit.ml
+   serif to orgitorial headlines (it maps --org-serif to Switzer for the body) */
+.org-mount .org-h {
+  font-family: var(--serif);
+  letter-spacing: -0.012em;
+}
+.org-mount h2.org-h { font-weight: 600; }
+.org-mount h3.org-h, .org-mount h4.org-h { font-weight: 600; }
+/* h5 stays mono-uppercase per orgitorial — that's the meta voice, leave it */
+.org-mount h5.org-h { font-family: var(--mono); }
+
+/* pull-quotes: a 2px wire rule on the left (DESIGN §4.5) */
+.org-mount .org-quote {
+  border-left: 2px solid var(--wire);
+  padding-left: var(--org-s4, 1.5rem);
+  font-style: normal;
+}

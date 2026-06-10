@@ -1,0 +1,43 @@
+# SEED CONTENT — illustrative bit.ml story, written to feel real but NOT a
+# verified report. Figures keyed to Nvidia's published filings; treat as a
+# template, not a record. Replace once the crew runtime ships (wb-wc0.2).
+#+TITLE: Nvidia's data-center revenue laps the rest of the segment combined
+#+AUTHOR: desk
+#+DATE: 2026-06-09
+
+Nvidia's data-center business has become the whole story. In its most recent
+[[https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001045810&type=10-Q][quarterly filing]], the segment again accounted for the overwhelming majority of
+revenue — gaming, the franchise that built the company, is now a rounding line
+next to the accelerators going into AI training clusters.
+
+The quarter in three lines:
+
+1. *Backlog.* Demand continues to run ahead of supply; the constraint is
+   advanced packaging and high-bandwidth memory, not orders.
+2. *Gross margin.* Still in the mid-70s percent range — pricing power that no
+   other large hardware vendor holds.
+3. *Concentration.* A handful of hyperscalers make up a outsized slice of
+   revenue, the footnote analysts keep circling.
+
+* The concentration footnote
+
+Nvidia discloses, as it must, that a small number of customers each represent
+10% or more of revenue. That is the load-bearing risk: the same hyperscalers
+buying GPUs by the rack are also funding their own silicon — Google's TPU,
+Amazon's Trainium, Microsoft's Maia. Every in-house chip that reaches volume is
+a customer partially defecting.
+
+#+begin_quote
+The bull case and the bear case are the same sentence: a few buyers account for
+most of the demand.
+#+end_quote
+
+* What to watch
+
+The number that decides the next year isn't revenue — it's whether the
+hyperscalers' custom silicon takes share at the training tier, where Nvidia's
+software moat (CUDA, the libraries, the installed base) is deepest. Inference is
+where the moat is thinnest, and inference is where the volume is going.
+
+Primary sources: the [[https://investor.nvidia.com/financial-info/financial-reports/][investor relations]] page carries the deck and the
+prepared remarks; the 10-Q carries the language that the deck rounds off.

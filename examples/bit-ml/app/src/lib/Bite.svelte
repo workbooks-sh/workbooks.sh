@@ -22,6 +22,7 @@
     byline,
     status = 'unread',
     onagent,
+    href = null,   // /story/<slug> — when set, the head links into the story page
   } = $props();
 
   const sec = $derived(sectionOf(section));
@@ -54,7 +55,10 @@
     <span class="when">{time}{#if read} · {read} read{/if}</span>
   </div>
 
-  <h2 class="head">{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</h2>
+  <h2 class="head">
+    {#if href}<a class="headlink" {href}>{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</a>
+    {:else}{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}{/if}
+  </h2>
 
   {#if dek}<p class="dek">{dek}</p>{/if}
 
@@ -93,6 +97,10 @@
     color: var(--ink);
     text-wrap: balance;
   }
+  /* head links into the story but reads as a headline, not a blue link —
+     ink at rest, wire on hover (DESIGN §3: wire is the voice of interactivity) */
+  .headlink { color: inherit; text-decoration: none; }
+  .headlink:hover { color: var(--wire); text-decoration: none; }
 
   .dek {
     margin: 8px 0 0;

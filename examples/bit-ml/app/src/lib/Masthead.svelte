@@ -16,10 +16,10 @@
 </script>
 
 <header class="mast">
-  <a class="logo serif" href="#top">bit<span class="dot">.</span>ml</a>
+  <a class="logo serif" href="/">bit<span class="dot">.</span>ml</a>
 
   <nav class="nav mono" aria-label="sections">
-    {#each sections as s}<a class="navlink" href="#{s.toLowerCase()}">{s}</a>{/each}
+    {#each sections as s}<a class="navlink" href="/s/{s.toLowerCase()}">{s}</a>{/each}
   </nav>
 
   <div class="right mono">
