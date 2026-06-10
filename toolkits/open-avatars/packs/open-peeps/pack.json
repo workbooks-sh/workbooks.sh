@@ -1,0 +1,19 @@
+{
+  "name": "open-peeps",
+  "title": "Open Peeps (mono)",
+  "license": "CC0-1.0",
+  "credit": "Open Peeps by Pablo Stanley — https://openpeeps.com (public domain). Monochrome / black-and-white atoms.",
+  "canvas": [1136, 1533],
+  "categories": {
+    "body": { "dir": "atoms/body", "viewBox": [818, 733], "offset": [147, 639], "z": 0, "optional": false },
+    "head": { "dir": "atoms/head", "viewBox": [473, 567], "offset": [372, 180], "z": 1, "optional": false },
+    "face": { "dir": "atoms/face", "viewBox": [289, 293], "offset": [531, 366], "z": 2, "optional": false },
+    "facial-hair": { "dir": "atoms/facial-hair", "viewBox": [280, 230], "offset": [495, 518], "z": 3, "optional": true },
+    "accessories": { "dir": "atoms/accessories", "viewBox": [392, 138], "offset": [419, 421], "z": 4, "optional": true }
+  },
+  "crops": {
+    "circle": { "cx": 605, "cy": 470, "r": 355 },
+    "bust": { "viewBox": [0, 110, 1136, 900] },
+    "full": { "viewBox": [0, 0, 1136, 1533] }
+  }
+}
