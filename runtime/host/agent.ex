@@ -102,8 +102,9 @@ defmodule Workbooks.Agent do
 
   @doc """
   Run an agent to completion. `system` is the system prompt, `task` the user's
-  request. opts: :model, :vfs (an open VFS conn), :max_steps. Returns a run record
-  %{result, steps, events, log}.
+  request. opts: :model, :vfs (an open VFS conn), :max_steps, :agent (the crew
+  member's display name — tags every step + thought with its identity, wb-wc0.2).
+  Returns a run record %{result, steps, events, log}.
   """
   def run(system, task, opts \\ []) do
     vfs = opts[:vfs] || elem(VFS.open(":memory:"), 1)
@@ -111,6 +112,9 @@ defmodule Workbooks.Agent do
     st = %{
       vfs: vfs,
       model: opts[:model],
+      # The crew member's name (nil for the singleton). Stamped onto every step
+      # event so /_activity can group the live wire by agent (wb-wc0.2 §3).
+      agent: opts[:agent],
       tenant: opts[:tenant] || "dev",
       step: 0,
       max: opts[:max_steps] || 12,
@@ -158,6 +162,9 @@ defmodule Workbooks.Agent do
 
       ev = %{
         step: s.step,
+        # Per-agent identity (wb-wc0.2): nil for the singleton, the crew member's
+        # name otherwise. Carried into _steps.jsonl so the activity wire can group.
+        agent: s.agent,
         tool: call.name,
         args: call.args,
         output: String.slice(out, 0, 4000),

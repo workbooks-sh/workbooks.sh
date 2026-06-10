@@ -11,6 +11,22 @@ defmodule Workbooks.Keeper.Lifecycle do
   replacement; what the agent does INSIDE a state stays non-deterministic (the
   agent def's job). Org owns the spec; this module just interprets and steps it.
 
+  ## CONTEXT (singleton vs crew — wb-wc0.2)
+
+  Every entry point takes an optional `ctx` (a `%Ctx{}`): the lifecycle spec path
+  + the persistence/persistent_term NAMESPACE. This is the seam that lets ONE
+  module serve both the singleton keeper (the lander) and N crew workers, with
+  zero duplication:
+
+    * `ctx/0` builds the DEFAULT context from env (`WB_LIFECYCLE_DEF`, files
+      `lifecycle-pos` / `lifecycle-ran-<state>`, persistent_term key `:state`).
+      The zero-arg public API (`current/0`, `advance/1`, `status/0`, …) uses it,
+      so the singleton + every existing test keep working UNCHANGED.
+    * `Crew` builds a per-agent context — `ctx(def_path: "...", ns: "wren")` —
+      whose files are `lifecycle-pos-wren` / `lifecycle-ran-wren-<state>` and
+      whose persistent_term key is `{__MODULE__, :state, "wren"}`. So two agents
+      never share a cadence position.
+
   ## The spec (default `WB_LIFECYCLE_DEF`, e.g. /data/lifecycle.org)
 
   Headings are STATES; properties are the edges and gates (same conventions as
@@ -41,7 +57,27 @@ defmodule Workbooks.Keeper.Lifecycle do
   """
   require Logger
 
-  @pt_key {__MODULE__, :state}
+  # A lifecycle context: which spec file to read + the persistence namespace.
+  # `ns: nil` is the SINGLETON namespace (unsuffixed files, bare persistent_term
+  # key) — the exact legacy behavior. A crew worker passes a non-nil `ns`.
+  defmodule Ctx do
+    @moduledoc false
+    defstruct [:def_path, :ns]
+  end
+
+  # ── context ──────────────────────────────────────────────────────────────────
+
+  @doc """
+  Build a lifecycle context. With no opts it is the DEFAULT (env-driven, singleton
+  namespace) context — every zero-arg public function uses this, preserving the
+  singleton + tests verbatim. Crew passes `def_path:` + `ns:`.
+  """
+  def ctx(opts \\ []) do
+    %Ctx{
+      def_path: Keyword.get(opts, :def_path, System.get_env("WB_LIFECYCLE_DEF")),
+      ns: Keyword.get(opts, :ns, nil)
+    }
+  end
 
   # ── activation ───────────────────────────────────────────────────────────────
 
@@ -49,7 +85,7 @@ defmodule Workbooks.Keeper.Lifecycle do
   def def_path, do: System.get_env("WB_LIFECYCLE_DEF")
 
   @doc "True when a spec is set and parses into at least one state."
-  def active?, do: spec() != nil
+  def active?(ctx \\ ctx()), do: spec(ctx) != nil
 
   # ── current state ────────────────────────────────────────────────────────────
 
@@ -63,13 +99,13 @@ defmodule Workbooks.Keeper.Lifecycle do
   should treat the tick as a no-op and hold position. Also mirrors the public
   shape to `:persistent_term` so `Keeper.status/0` can surface it.
   """
-  def current do
-    case spec() do
+  def current(ctx \\ ctx()) do
+    case spec(ctx) do
       nil ->
         nil
 
       states ->
-        {name, hits} = position(states)
+        {name, hits} = position(ctx, states)
         s = states[name]
 
         view = %{
@@ -78,20 +114,20 @@ defmodule Workbooks.Keeper.Lifecycle do
           hits: hits,
           repeat: s.repeat,
           next_state: s.next,
-          gated: gated?(name, s),
+          gated: gated?(ctx, name, s),
           interval_ms: s.interval_ms
         }
 
-        :persistent_term.put(@pt_key, Map.take(view, [:state, :hits, :next_state, :kind]))
+        :persistent_term.put(pt_key(ctx), Map.take(view, [:state, :hits, :next_state, :kind]))
         view
     end
   end
 
   @doc "Public, persistent_term-readable position (for Keeper.status/0); nil when inactive."
-  def status do
-    case spec() do
+  def status(ctx \\ ctx()) do
+    case spec(ctx) do
       nil -> nil
-      _ -> :persistent_term.get(@pt_key, nil) || (current() && :persistent_term.get(@pt_key, nil))
+      _ -> :persistent_term.get(pt_key(ctx), nil) || (current(ctx) && :persistent_term.get(pt_key(ctx), nil))
     end
   end
 
@@ -112,13 +148,13 @@ defmodule Workbooks.Keeper.Lifecycle do
 
   Returns the NEW current view (same shape as `current/0`), or nil if inactive.
   """
-  def advance(outcome) do
-    case spec() do
+  def advance(outcome, ctx \\ ctx()) do
+    case spec(ctx) do
       nil ->
         nil
 
       states ->
-        {name, hits} = position(states)
+        {name, hits} = position(ctx, states)
         s = states[name]
 
         next =
@@ -134,8 +170,8 @@ defmodule Workbooks.Keeper.Lifecycle do
               {name, hits}
           end
 
-        write_position(next)
-        current()
+        write_position(ctx, next)
+        current(ctx)
     end
   end
 
@@ -172,8 +208,8 @@ defmodule Workbooks.Keeper.Lifecycle do
   end
 
   @doc "Record that `name` ran now (resets its min-interval gate). Keeper calls this."
-  def mark_ran(name) do
-    File.write(ran_path(name), Integer.to_string(System.system_time(:second)))
+  def mark_ran(name, ctx \\ ctx()) do
+    File.write(ran_path(ctx, name), Integer.to_string(System.system_time(:second)))
   rescue
     _ -> :ok
   end
@@ -182,8 +218,8 @@ defmodule Workbooks.Keeper.Lifecycle do
 
   # Parse + return the spec for this tick: %{name => state} | nil. Cheap to
   # re-read (one small file); kept dumb so a hot-edited spec is picked up.
-  defp spec do
-    with path when is_binary(path) <- def_path(),
+  defp spec(ctx) do
+    with path when is_binary(path) <- ctx.def_path,
          {:ok, org} <- File.read(path),
          states when is_map(states) <- parse(org) do
       states
@@ -196,36 +232,47 @@ defmodule Workbooks.Keeper.Lifecycle do
 
   # Current {state, hits}: persisted position, validated against the spec; an
   # unknown/absent state resets to the spec's start.
-  defp position(states) do
-    case read_position() do
+  defp position(ctx, states) do
+    case read_position(ctx) do
       {name, hits} when is_map_key(states, name) -> {name, hits}
-      _ -> {start_from_disk(states), 0}
+      _ -> {start_from_disk(ctx, states), 0}
     end
   end
 
-  defp start_from_disk(states) do
-    case def_path() && File.read(def_path()) do
+  defp start_from_disk(ctx, states) do
+    case ctx.def_path && File.read(ctx.def_path) do
       {:ok, org} -> start_state(org, states)
       _ -> first_key(states)
     end
   end
 
   # A state is gated when its :MIN-INTERVAL: hasn't elapsed since it last ran.
-  defp gated?(name, s) do
+  defp gated?(ctx, name, s) do
     case s.min_interval_ms do
       nil -> false
-      ms -> elapsed_ms(name) < ms
+      ms -> elapsed_ms(ctx, name) < ms
     end
   end
 
   # ── persistence (on the data volume, beside keeper-last-run) ──────────────────
+  # Filenames + the persistent_term key carry the namespace SUFFIX so crew agents
+  # never collide; ns == nil reproduces the exact legacy (singleton) paths/keys.
 
-  defp pos_path, do: Path.join(data_dir(), "lifecycle-pos")
-  defp ran_path(name), do: Path.join(data_dir(), "lifecycle-ran-#{name}")
+  defp pos_path(ctx), do: Path.join(data_dir(), "lifecycle-pos#{suffix(ctx)}")
+  defp ran_path(ctx, name), do: Path.join(data_dir(), "lifecycle-ran-#{ns_prefix(ctx)}#{name}")
   defp data_dir, do: System.get_env("WB_DATA") || File.cwd!()
 
-  defp read_position do
-    with {:ok, s} <- File.read(pos_path()),
+  defp suffix(%Ctx{ns: nil}), do: ""
+  defp suffix(%Ctx{ns: ns}), do: "-#{ns}"
+
+  defp ns_prefix(%Ctx{ns: nil}), do: ""
+  defp ns_prefix(%Ctx{ns: ns}), do: "#{ns}-"
+
+  defp pt_key(%Ctx{ns: nil}), do: {__MODULE__, :state}
+  defp pt_key(%Ctx{ns: ns}), do: {__MODULE__, :state, ns}
+
+  defp read_position(ctx) do
+    with {:ok, s} <- File.read(pos_path(ctx)),
          [name, hits] <- String.split(String.trim(s), " ", parts: 2),
          {n, _} <- Integer.parse(hits) do
       {name, n}
@@ -234,14 +281,14 @@ defmodule Workbooks.Keeper.Lifecycle do
     end
   end
 
-  defp write_position({name, hits}) do
-    File.write(pos_path(), "#{name} #{hits}")
+  defp write_position(ctx, {name, hits}) do
+    File.write(pos_path(ctx), "#{name} #{hits}")
   rescue
     _ -> :ok
   end
 
-  defp elapsed_ms(name) do
-    case File.read(ran_path(name)) do
+  defp elapsed_ms(ctx, name) do
+    case File.read(ran_path(ctx, name)) do
       {:ok, s} ->
         case Integer.parse(String.trim(s)) do
           {ts, _} -> (System.system_time(:second) - ts) * 1000
