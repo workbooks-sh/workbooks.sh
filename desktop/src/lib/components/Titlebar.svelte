@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Titlebar — the single, always-36px top chrome, styled as a
+   * Titlebar — the single, always-42px top chrome, styled as a
    * Chrome-browser tab strip.
    *
    * Layout (left → right):
@@ -544,8 +544,8 @@
     display: flex;
     align-items: stretch;
     gap: 0.4rem;
-    height: 36px;
-    flex: 0 0 36px;
+    height: 42px;
+    flex: 0 0 42px;
     padding: 0 0.5rem 0 78px;
     /* Blends with the sidebar — one chrome frame, no seam. */
     background: var(--color-chrome);
@@ -586,8 +586,11 @@
   .tabs {
     display: flex;
     flex-direction: row;
-    align-items: flex-end;
-    gap: 2px;
+    /* Centered pills — the old flush-bottom Chrome merge made sense
+     * when the canvas touched the bar; with the inset canvas the tabs
+     * float in the chrome instead. */
+    align-items: center;
+    gap: 3px;
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -601,11 +604,9 @@
     position: relative;
     display: flex;
     align-items: center;
-    height: 28px;
-    align-self: flex-end;
+    height: 31px;
     border: 1px solid var(--color-border);
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: 8px;
     background: transparent;
     color: var(--color-fg-muted);
     /* Chrome-style: every tab flexes to share the strip width, down to a
@@ -620,7 +621,7 @@
     background: var(--color-page);
     color: var(--color-fg);
     border-color: var(--color-border-strong);
-    margin-bottom: -1px;
+    box-shadow: 0 1px 2px rgba(15, 15, 15, 0.06);
     z-index: 1;
   }
   .tab-body {
@@ -675,7 +676,7 @@
     cursor: pointer;
     padding: 0 0.4rem;
     height: 100%;
-    border-radius: 0 8px 0 0;
+    border-radius: 0 8px 8px 0;
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.1s, background 0.1s, color 0.1s;
@@ -688,7 +689,8 @@
     color: var(--color-fg);
   }
 
-  /* "+" new-tab button, sits at the right end of the strip */
+  /* "+" new-tab button, sits at the right end of the strip — centered,
+   * same as the (now centered) tab pills. */
   .new-tab {
     display: inline-flex;
     align-items: center;
@@ -718,7 +720,7 @@
     border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong));
   }
   .tab-body.segment {
-    border-radius: 6px 6px 0 0;
+    border-radius: 6px;
     transition: background 0.1s;
   }
   .tab-body.segment.seg-focused {
