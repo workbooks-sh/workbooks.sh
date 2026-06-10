@@ -1,19 +1,31 @@
 <script>
+  // The persistent shell. nav, Cursor, Viewer, and Panel mount ONCE and never
+  // unmount — only #route's content swaps as the router changes. This is the
+  // whole point: one shell (the homepage's full panel + cursor + follow session)
+  // everywhere, so navigating to a blog post never drops the visitor out of the
+  // real UI onto a standalone page (where site.js's compact panel used to take
+  // over). See lib/router.svelte.js.
   import Cursor from './lib/Cursor.svelte';
   import Panel from './lib/Panel.svelte';
   import Viewer from './lib/Viewer.svelte';
   import Wmark from './lib/Wmark.svelte';
-  import Hero from './sections/Hero.svelte';
-  import Layers from './sections/Layers.svelte';
-  import Who from './sections/Who.svelte';
-  import Get from './sections/Get.svelte';
-  import Grown from './sections/Grown.svelte';
+  import Home from './sections/Home.svelte';
+  import BlogIndex from './sections/BlogIndex.svelte';
+  import BlogPost from './sections/BlogPost.svelte';
   import { boot } from './lib/stores.js';
+  import { route, startRouter } from './lib/router.svelte.js';
 
-  // boot runs once the whole page is in the DOM — the build choreography
-  // needs every #b-* node present and every ref registered.
+  startRouter();
+  const r = $derived(route());
+
+  // boot runs once the whole page is in the DOM — the build choreography needs
+  // every #b-* node present and every ref registered. The intro itself only
+  // plays on first load of `/` (guarded inside boot via wb_intro + the home
+  // route); the watch/follow loops run regardless of route.
   $effect(() => { boot(); });
 </script>
+
+<!-- ── PERSISTENT SHELL — mounted once, outside #route, never re-rendered ── -->
 
 <!-- agent cursor -->
 <Cursor />
@@ -23,31 +35,24 @@
 
 <!-- floating nav -->
 <nav class="nav blk" id="b-nav" aria-label="Primary">
-  <span class="glyph"><Wmark aria-label="Workbooks" role="img" /></span>
-  <span class="word">workbooks</span>
-  <a href="https://github.com/workbooks-sh/workbooks.sh">docs</a>
+  <a class="glyph" href="/" aria-label="Workbooks home"><Wmark aria-label="Workbooks" role="img" /></a>
+  <a class="word" href="/">workbooks</a>
+  <a href="/blog">blog</a>
   <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
   <a class="cta" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="navDl">download</a>
 </nav>
 
+<!-- ── CONTENT REGION — the only thing navigation swaps ── -->
 <div class="content">
-  <Hero />
-  <Layers />
-  <Who />
-  <Get />
-
-  <!-- the agent appends new sections here (sections/grown/*.svelte) -->
-  <Grown />
-
-  <footer class="foot">
-    <div class="inner">
-      <span class="glyph"><Wmark /></span>
-      <span>workbooks</span>
-      <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
-      <a href="https://github.com/workbooks-sh/living-lander">this site's source</a>
-      <span class="tail">served live by the workbooks runtime · kept by waldo</span>
-    </div>
-  </footer>
+  <main id="route">
+    {#if r.name === 'post'}
+      {#key r.slug}<BlogPost slug={r.slug} />{/key}
+    {:else if r.name === 'blog'}
+      <BlogIndex />
+    {:else}
+      <Home />
+    {/if}
+  </main>
 </div>
 
 <!-- fixed right panel: the live timeline -->

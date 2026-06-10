@@ -426,3 +426,9 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* sanitized call card — no data, ever; just a label + a soft pulse */
+.vcard.vcall { gap: 12px; }
+.vcall .vpulse { width: 12px; height: 12px; border-radius: 50%; background: var(--live);
+  box-shadow: 0 0 0 0 var(--live); animation: vcallpulse 1.6s ease-out infinite; }
+@keyframes vcallpulse { to { box-shadow: 0 0 0 12px rgba(63,224,129,0); opacity: .6; } }
