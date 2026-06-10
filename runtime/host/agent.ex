@@ -42,6 +42,15 @@ defmodule Workbooks.Agent do
       name: "publish",
       description: "Publish your changed content to the LIVE public site (host-brokered host File copy — no shell). Copies content/** and blog/** from your working dir to the public web root so it appears on the page. Call after writing content. No args.",
       parameters: %{type: "object", properties: %{}, required: []}
+    }},
+    %{type: "function", function: %{
+      name: "image",
+      description: "Generate an editorial image — a banner or illustration — for the page (host-brokered: you supply the INTENT, the host holds the key + network and writes the file). BUDGET: 2 per run — plan your banners, don't spray. Write under content/images/ (e.g. content/images/deepmind-banner.webp). NEVER put text/words/captions in the image (typography goes in HTML, not pixels). e.g. prompt=\"abstract DeepMind hero, deep blues + neural mesh\", path=\"content/images/deepmind-banner.webp\", aspect=\"16:9\".",
+      parameters: %{type: "object", properties: %{
+        prompt: %{type: "string", description: "what the image depicts (no text in the image)"},
+        path: %{type: "string", description: "workdir-relative output path under content/images/, e.g. content/images/x.webp"},
+        aspect: %{type: "string", description: "16:9 (default) | 1:1 | 3:1"}
+      }, required: ["prompt", "path"]}
     }}
   ]
 
@@ -100,6 +109,15 @@ defmodule Workbooks.Agent do
     tools(st) |> Enum.map(& &1.function.name)
   end
 
+  @doc false
+  # Test-only window onto a single tool execution (used by image_gen_test to
+  # exercise the `image` tool's budget + path guard + decode/write without driving
+  # the full LLM loop). `st0` is a partial run state; returns {output, new_state}.
+  def __exec_one_for_test__(call, st0) do
+    {out, st, _done} = exec_one(call, st0)
+    {out, st}
+  end
+
   @doc """
   Run an agent to completion. `system` is the system prompt, `task` the user's
   request. opts: :model, :vfs (an open VFS conn), :max_steps, :agent (the crew
@@ -124,6 +142,9 @@ defmodule Workbooks.Agent do
       # workdir (the shared substrate) instead of the in-memory VFS. It NO LONGER
       # grants any native execution — the `run` hatch was removed (wb-9ja).
       exec: opts[:exec] || false,
+      # Per-run image budget: the `image` tool is brokered + costs money/latency,
+      # so it's capped at 2 calls/run (counted here, threaded through exec_one).
+      images_used: 0,
       workdir: opts[:workdir] || System.tmp_dir!(),
       env: opts[:env] || [],
       # on_step.(event) fires as each tool step completes — for live streaming.
@@ -254,6 +275,55 @@ defmodule Workbooks.Agent do
 
   defp exec_one(%{name: "publish"}, st), do: {"publish not permitted (no exec capability)", st, nil}
 
+  # HOST-BROKERED image generation: the agent supplies a prompt + a workdir path;
+  # trusted host Elixir (Workbooks.ImageGen) calls OpenRouter's image lane with the
+  # host-held key and writes the decoded bytes via pure File ops. The agent never
+  # sees the key, the endpoint, or a subprocess. Path-traversal guarded exactly like
+  # publish (the written file must resolve strictly inside the workdir). Budget: 2
+  # image calls per run — counted in `images_used` and threaded through run state.
+  @image_budget 2
+  defp exec_one(%{name: "image"}, %{exec: true, images_used: used} = st)
+       when used >= @image_budget do
+    {"image budget exhausted (#{@image_budget}/run) — plan banners, don't spray", st, nil}
+  end
+
+  defp exec_one(%{name: "image", args: a}, %{exec: true} = st) do
+    prompt = to_string(a["prompt"] || "")
+    rel = to_string(a["path"] || "")
+    aspect = a["aspect"] || "16:9"
+    dest = in_workdir(st.workdir, rel)
+
+    cond do
+      prompt == "" ->
+        {"image error: required arg `prompt` is empty", st, nil}
+
+      rel == "" ->
+        {"image error: required arg `path` is empty", st, nil}
+
+      not image_contained?(st.workdir, dest) ->
+        {"image error: path escapes your working dir (#{rel}) — write under content/images/", st, nil}
+
+      true ->
+        # Count the call against the budget the moment it's attempted (a failed
+        # generation still spent the budgeted slot — keeps the cap honest).
+        st = %{st | images_used: st.images_used + 1}
+
+        case Workbooks.ImageGen.generate(prompt, aspect) do
+          {:ok, bin} ->
+            File.mkdir_p!(Path.dirname(dest))
+            File.write!(dest, bin)
+            {"ok #{rel} (#{byte_size(bin)} bytes)", st, nil}
+
+          {:error, reason} ->
+            {"image error: #{inspect(reason)}", Map.put(st, :last, %{error: inspect(reason)}), nil}
+        end
+    end
+  rescue
+    e -> {"image error: #{Exception.message(e)}", st, nil}
+  end
+
+  defp exec_one(%{name: "image"}, st), do: {"image not permitted (no exec capability)", st, nil}
+
   # Semantic recall over the agent's working org/code context — the files ARE the
   # memory (no separate store to drift). Stateless: always the current files.
   defp exec_one(%{name: "search", args: a}, st) do
@@ -319,6 +389,13 @@ defmodule Workbooks.Agent do
   # next agent. Relative paths join under the workdir.
   defp in_workdir(workdir, path) do
     if Path.type(path) == :absolute, do: path, else: Path.join(workdir, path || "")
+  end
+
+  # Path-traversal guard for image writes — the resolved dest must sit strictly
+  # inside the workdir (mirrors SitePublish.contained?). Blocks `..` escapes and
+  # absolute paths pointing outside the sandbox workdir.
+  defp image_contained?(workdir, dest) do
+    String.starts_with?(Path.expand(dest) <> "/", Path.expand(workdir) <> "/")
   end
 
   # Research fetch: GET a URL, strip HTML to readable text, truncate for the model.
