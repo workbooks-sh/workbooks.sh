@@ -164,8 +164,23 @@ defmodule Workbooks.Agent do
     # so it can't roam the container's fs/processes freely. run_net keeps network
     # (many native CLIs need it) but stays confined. NORTH STAR: no bash outside
     # WASM — every CLI/crate/npm becomes a WASM command and this tool is removed.
+    # Wall-clock bound per command (WB_RUN_TOOL_TIMEOUT_MS, default 120s): a
+    # hung CLI (wedged push, curl with no -m, interactive prompt) must surface
+    # as a tool error the model can react to — never stall the whole run.
+    task =
+      Task.async(fn ->
+        try do
+          Workbooks.Sandbox.run_net(["sh", "-c", a["cmd"] || ""], cd: st.workdir, env: st.env)
+        catch
+          kind, e -> {"run error: #{inspect({kind, e})}", 126}
+        end
+      end)
+
     {out, code} =
-      Workbooks.Sandbox.run_net(["sh", "-c", a["cmd"] || ""], cd: st.workdir, env: st.env)
+      case Task.yield(task, run_tool_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
+        {:ok, result} -> result
+        _ -> {"run timed out after #{div(run_tool_timeout_ms(), 1000)}s (command killed)", 124}
+      end
 
     # Capture the exit code — a non-zero is a bash call that broke; record it.
     meta = %{exit_code: code, error: if(code != 0, do: "nonzero exit #{code}", else: nil)}
@@ -175,6 +190,13 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "run"}, st), do: {"run not permitted (no exec capability)", st, nil}
+
+  defp run_tool_timeout_ms do
+    case System.get_env("WB_RUN_TOOL_TIMEOUT_MS") do
+      nil -> 120_000
+      s -> String.to_integer(s)
+    end
+  end
 
   # Semantic recall over the agent's working org/code context — the files ARE the
   # memory (no separate store to drift). Stateless: always the current files.
