@@ -41,7 +41,23 @@ defmodule Workbooks.AgentDef do
   # the next sibling heading (or end). Falls back to the whole body.
   defp system_prompt(org) do
     case Regex.split(~r/^\*+\s+System prompt\s*$/m, org, parts: 2) do
-      [_, rest] -> rest |> next_section() |> String.trim()
+      [_, rest] ->
+        rest |> next_section() |> String.trim()
+
+      _ ->
+        # No `** System prompt` heading: fall back to the body of the :agent:
+        # node (everything after its properties drawer) — an agent authored as
+        # a plain def shouldn't silently run prompt-less. (This bit bit.ml: the
+        # crew ran with EMPTY prompts and all imitated desk.)
+        agent_body(org)
+    end
+  end
+
+  # Everything after the first :agent: node's :END: drawer line, to the next
+  # top-level heading — used when there's no explicit `** System prompt`.
+  defp agent_body(org) do
+    case Regex.split(~r/^\s*:END:\s*$/m, org, parts: 2) do
+      [_, rest] -> rest |> String.trim()
       _ -> ""
     end
   end
