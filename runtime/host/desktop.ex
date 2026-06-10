@@ -28,7 +28,10 @@ defmodule Workbooks.Desktop do
   def port, do: String.to_integer(System.get_env("PORT", "4000"))
 
   @doc "The interface to bind on. In-container we must accept the host→guest forward → all interfaces."
-  def bind_ip, do: {0, 0, 0, 0}
+  # Dual-stack any-address: IPv6 8-tuple (with ipv6_v6only=false at the
+  # listener) so the plane is reachable over BOTH families — private platform
+  # networks (e.g. 6PN tunnels) are IPv6-only, while local clients dial v4.
+  def bind_ip, do: {0, 0, 0, 0, 0, 0, 0, 0}
 
   @doc "The per-boot bearer token shared with the shell via the discovery file."
   def token do
