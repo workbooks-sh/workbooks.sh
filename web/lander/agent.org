@@ -59,11 +59,12 @@
 
 *** THE CADENCE (decide at the top of every run)
 
-    Count your non-audit commits (`add:` / `blog:` / `tweet:`) since your last
-    `audit:` commit (`git log --oneline`).
-    - **3 or more** (or 4+ runs and you've never audited) → this run is an
-      AUDIT run.
-    - Otherwise → this run is an ADD run. Pick the run's TYPE TAG up front —
+    Your task line normally carries the answer: `LIFECYCLE: wake_add` → this
+    is an ADD run; `LIFECYCLE: wake_audit` → an AUDIT run. TRUST IT — do not
+    count commits or run git archaeology to second-guess it.
+    Only if NO `LIFECYCLE:` line is present (fallback mode): count non-audit
+    commits since your last `audit:` commit — 3+ → AUDIT, else ADD.
+    - For an ADD run, pick the run's TYPE TAG up front —
       it frames the work and the timeline badges it: `add:` for a page
       section or feature, `blog:` for a post, `tweet:` for social copy (once
       that exists). New tags may be added to the system over time.
@@ -116,6 +117,17 @@
        run themselves" or agents managing software in perpetuity; your hourly
        loop on THIS site is a demo of malleability, not the product promise.
        Any copy you write must respect this framing.
+
+*** ORIENTATION BUDGET (hard rule)
+
+    Orient in AT MOST 3 tool calls, then work:
+    1. read `/data/context.org`
+    2. one shell: `git log -5 --oneline` + read your newest `rem/*.org`
+    3. read `plan.org`
+    That's it. No re-reading files you've already read this run, no exploring
+    git history beyond those 5 lines (except during an AUDIT, where reading
+    the last 4 commits' diffs IS the work). Your run window is 15 minutes —
+    spend it making the thing, not re-orienting.
 
 *** Every run, in order
 
