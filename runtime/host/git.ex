@@ -193,13 +193,13 @@ defmodule Workbooks.Git do
     end
   end
 
-  @doc "Structured commit history `[%{sha, msg, ts}]` newest-first (ts = unix seconds)."
+  @doc "Structured commit history `[%{sha, ts, author, msg}]` newest-first (ts = unix seconds)."
   def log_entries(tenant) do
-    case git(repo_path(tenant), ["log", "--format=%h%x09%ct%x09%s"]) do
+    case git(repo_path(tenant), ["log", "--format=%h%x09%ct%x09%an%x09%s"]) do
       {out, 0} ->
         for line <- String.split(out, "\n", trim: true),
-            [sha, ts, msg] <- [String.split(line, "\t", parts: 3)] do
-          %{sha: sha, ts: String.to_integer(ts), msg: msg}
+            [sha, ts, author, msg] <- [String.split(line, "\t", parts: 4)] do
+          %{sha: sha, ts: String.to_integer(ts), author: author, msg: msg}
         end
 
       _ ->
