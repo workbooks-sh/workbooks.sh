@@ -22,8 +22,17 @@
       <span class="v" id="stLast"></span>
     </div>
     <div class="row"><span class="k">next check-in</span><span class="v on" id="stNext">—</span></div>
-    <button class="follow" id="followBtn" onclick={toggleFollow} hidden>follow along — it's working now</button>
   </div>
+
+  <!-- follow-along is a SETTING, not a call-to-action: its own card with a
+       switch, shown only when there's something to follow (engine-driven). -->
+  <button class="pcard followcard" id="followBtn" onclick={toggleFollow} hidden aria-pressed="false">
+    <span class="ftext">
+      <span class="ft">follow along</span>
+      <span class="fs" id="followSub">it's working right now</span>
+    </span>
+    <span class="fswitch" aria-hidden="true"><span class="fknob"></span></span>
+  </button>
 
   <div class="tl"><div id="tlList" bind:this={tlListEl}></div></div>
 </aside>

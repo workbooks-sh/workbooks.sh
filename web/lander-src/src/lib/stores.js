@@ -711,7 +711,9 @@ const setFollowBtn = (on) => {
   const b = document.querySelector('#followBtn');
   if (!b) return;
   b.classList.toggle('on', on);
-  b.textContent = on ? 'following ✓ — click to stop' : 'follow along — it\'s working now';
+  b.setAttribute('aria-pressed', String(on));
+  const sub = b.querySelector('#followSub');
+  if (sub) sub.textContent = on ? 'watching the cursor work' : "it's working right now";
 };
 // last resolved target — the cursor only MOVES when this changes, so repeated
 // same-target steps don't make it twitch around the page.
