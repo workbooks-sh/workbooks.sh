@@ -168,6 +168,55 @@ defmodule Workbooks.Git do
     end
   end
 
+  @doc """
+  HOST-BROKERED commit + push for an agent's working dir (wb-9ja). The keeper
+  agent (Waldo) used to `git add/commit/push` via the deleted native `run` hatch;
+  now it calls the agent `git` TOOL, and THIS host function runs git on its behalf.
+
+  This is HOST code operating its OWN repos (the tenant's data repo). It is not the
+  agent executing native code — the agent supplies only a commit message; the host
+  decides the exact command line (`add -A` → commit → push origin). `dir` is the
+  agent's workdir (= the tenant repo); `tenant` sets the commit identity. Pushes to
+  `origin` only when that remote exists (best-effort: a missing remote / network
+  failure is reported, never raised). Returns:
+    * `{:ok, info}`        — committed (sha) and, if pushable, pushed
+    * `{:nochange, dir}`   — nothing staged to commit
+    * `{:error, reason}`
+  """
+  def commit_and_push(dir, message, tenant) when is_binary(dir) do
+    id = identity(tenant)
+    # Hooks disabled so a global bd hook can't touch a non-beads repo (same as
+    # ensure_commit). add -A is safe: the auto-.gitignore (Workbooks.Private)
+    # excludes session/secret data, so a bulk add can't sweep in the signing key.
+    ensure_gitignore(dir)
+    git(dir, ["add", "-A"])
+
+    case git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message], env: commit_env(id)) do
+      {_, 0} ->
+        {sha, _} = git(dir, ["rev-parse", "--short", "HEAD"])
+        {:ok, String.trim(sha) <> maybe_push(dir)}
+
+      {_, _} ->
+        {:nochange, dir}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  # Push HEAD to origin when an origin remote is configured; otherwise the commit
+  # stands locally (the public mirror is wired separately via mirror/3 or the
+  # deploy operator). Never raises — a wedged/absent network is just reported.
+  defp maybe_push(dir) do
+    if has_remote?(dir, "origin") do
+      case git(dir, ["push", "origin", "HEAD"]) do
+        {_, 0} -> " (pushed)"
+        {out, _} -> " (push failed: #{String.slice(String.trim(out), 0, 120)})"
+      end
+    else
+      " (committed; no origin remote to push)"
+    end
+  end
+
   @doc "Author (`name <email>`) of the tenant repo's latest commit."
   def author(tenant) do
     {out, _} = git(repo_path(tenant), ["log", "-1", "--pretty=format:%an <%ae>"])

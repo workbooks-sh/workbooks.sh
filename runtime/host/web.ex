@@ -161,8 +161,9 @@ defmodule Workbooks.Web do
     opts =
       [tenant: conn.assigns.tenant, max_steps: params["max_steps"] || 40]
       |> then(&if params["model"], do: [{:model, params["model"]} | &1], else: &1)
-      # exec grants the real-CLI `run` tool (real bash — the INTERIM escape hatch
-      # for native CLIs, to be eliminated; see the no-native-exec epic). Honored
+      # exec is a TRUST grant: it gives the agent the HOST-BROKERED git/publish
+      # tools and routes its filesystem tools at the OS workdir. It does NOT grant
+      # any native execution — the `run` bash hatch was deleted (wb-9ja). Honored
       # ONLY for the trusted local case (single-tenant/desktop) or an explicit
       # WB_AGENT_EXEC=1 — never for arbitrary/multi-tenant callers.
       |> then(fn o ->

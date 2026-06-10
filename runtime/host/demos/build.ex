@@ -237,14 +237,15 @@ defmodule Workbooks.Demos.Build do
     end
   end
 
-  @doc "Build-isolation demo (wb-11ck.27): the sandbox runs compute but denies network."
+  @doc """
+  Build-isolation demo — RETIRED (wb-9ja). It demonstrated `Workbooks.Sandbox`
+  (the native bwrap/seatbelt isolator), which was DELETED: the build path no
+  longer runs ANY native compiler, so there is no native isolator to demo. The
+  real isolation now IS the wasm sandbox (wasmtime running `.wasm`), shown by
+  `demo_shell` / the language-lane demos. Returns a static note.
+  """
   def demo_sandbox do
-    {compute, 0} = Workbooks.Sandbox.run(["sh", "-c", "echo isolated-build"])
-
-    {net, _} =
-      Workbooks.Sandbox.run(["sh", "-c", "curl -s -m 3 http://example.com >/dev/null && echo REACHED || echo DENIED"])
-
-    %{backend: Workbooks.Sandbox.backend(), compute: String.trim(compute), network_denied: String.trim(net) == "DENIED"}
+    %{retired: true, note: "native build sandbox removed (wb-9ja) — compilation is in-wasm only"}
   end
 
   @doc "Pipe-shell demo (wb-11ck.20): a bash-style pipeline of in-WASM commands, no OS fork."

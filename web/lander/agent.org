@@ -171,21 +171,29 @@
 
 *** TOOLING (hard rule for THIS deployment)
 
-    The `shell` tool is unreliable here — it hangs. NEVER use it. Use `run`
-    for every shell need (it has git, cat, grep, sed, everything) and
-    vfs_read/vfs_write for files.
+    There is NO native shell here — the `run`/bash escape hatch was removed
+    (no-native-exec, wb-9ja). You CANNOT shell out. Your tools are:
+    - `vfs_read` / `vfs_write` — read/write files in your working dir.
+    - `shell` — the in-WASM shell (cat/echo/grep/jq/sort, pipes, redirection)
+      for TEXT MUNGING only. No git, no curl, no cp.
+    - `git` — host-brokered commit + push of your whole working dir. You supply
+      a message; the host runs git. This is how you commit AND publish to GitHub.
+    - `publish` — host-brokered copy of your content (content/**, blog/**) to the
+      live public site root. This is what makes a change appear on the page.
+    - `fetch` — HTTP GET a URL (use to confirm a change is live).
+    - `wb` — the wb CLI (e.g. `wb content check`).
+    Do NOT reach for git/curl/cp/sed as commands — use the tools above.
 
 *** ORIENTATION BUDGET (hard rule)
 
     Orient in AT MOST 4 tool calls, then work:
     1. read `/data/context.org`
-    2. one run: `git log -5 --oneline && ls rem | tail -1` then read that dream
+    2. read the latest `rem/*.org` dream (vfs_read; `shell` can list rem/ if needed)
     3. read `plan.org`
     4. read `sections.org` (and `design.org` before building any markup)
-    That's it. No re-reading files you've already read this run, no exploring
-    git history beyond those 5 lines (except during an AUDIT, where reading
-    the last 4 commits' diffs IS the work). Your run window is 15 minutes —
-    spend it making the thing, not re-orienting.
+    That's it. No re-reading files you've already read this run. Your run window
+    is 15 minutes — spend it making the thing, not re-orienting. (During an AUDIT,
+    reading the files your last 4 commits touched IS the work.)
 
 *** Every run, in order
 
@@ -196,10 +204,10 @@
        You never write rem/ yourself — the sleep process does.
     1. Orient: read `/data/context.org` FIRST (the product truth — what
        Workbooks is, the pitch rules, the vocabulary; everything you write
-       must agree with it). Then `git log -8 --oneline` and skim index.html.
-       To fact-check any product claim, read the open-source checkout at
-       `/data/context/source` (read-only — never edit/commit/push it;
-       `git -C /data/context/source pull --ff-only` to refresh).
+       must agree with it). Then skim index.html and your recent work via
+       plan.org's `* log`. To fact-check any product claim, read the
+       open-source checkout at `/data/context/source` (read-only via vfs_read —
+       never edit/commit/push it).
     2. Decide ADD or AUDIT per the cadence rule above, then apply the BOARD
        PROTOCOL (dream verdicts → board states → pick a task, mark it DOING).
     3. Plan first: add the one-line plan for this run to plan.org's `* log`
@@ -212,22 +220,20 @@
           last, each section has one <section class="grown"> + an <h2>). Fix
           everything it reports before deploying. A clean check is the gate.
        b. Publish to the live site root (this is what makes it appear — there
-          is no build): copy your changed content to the public web root:
-          `D=/data/build/public/wb-lander-live; mkdir -p $D/content/sections $D/blog;
-           cp -f content/sections.json content/blog.json $D/content/ 2>/dev/null;
-           cp -f content/sections/*.html $D/content/sections/ 2>/dev/null;
-           cp -f blog/*.html $D/blog/ 2>/dev/null; true`
-       c. Confirm it is LIVE: fetch http://localhost:4000/content/sections.json
+          is no build): call the `publish` tool. It copies your content
+          (content/**, blog/**) from your working dir to the public web root
+          for you — host-brokered, no shell, no cp.
+       c. Confirm it is LIVE: `fetch` http://localhost:4000/content/sections.json
           (your row is there) and, for a section, that the page shows it; for a
           blog post, fetch http://localhost:4000/blog/<slug>.html. If it is not
           served, you are not done — fix and repeat. NEVER mark a task done on
           a commit alone; done means it is visible on the live page.
-    7. Commit everything under your tag, update plan.org's Log with
-       one line on what happened.
-    8. Publish to GitHub — your repo mirrors to a public one and the timeline
-       links every sha to it: `git push origin main`. If the push fails, note
-       it in plan.org's Log and stop anyway (never retry-loop on the network).
-       Stop.
+    7. Update plan.org's Log with one line on what happened.
+    8. Commit + publish to GitHub in ONE step: call the `git` tool with your
+       commit message (under your tag). It commits your whole working dir AND
+       pushes — your repo mirrors to a public one and the timeline links every
+       sha to it. If the tool reports a push failure, note it in plan.org's Log
+       and stop anyway (never retry-loop on the network). Stop.
 
 *** SEED BACKLOG (create plan.org from this if it's missing)
 

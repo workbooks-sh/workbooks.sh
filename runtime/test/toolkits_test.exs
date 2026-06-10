@@ -341,16 +341,18 @@ defmodule Workbooks.ToolkitsTest do
       assert out =~ "skills/overview.org present"
       # git exec mode is posix; CLI_BIN=git is on PATH on this machine.
       assert out =~ "exec:"
-      # SECURITY REGRESSION (finding #14): pre blocks are NOT auto-executed; they
-      # are reported as skipped unless WB_TOOLKIT_EXEC=1.
-      assert out =~ "pre checks SKIPPED"
+      # NO NATIVE EXEC (wb-9ja): pre blocks are NEVER executed — native :role bash
+      # is removed entirely. verify reports them DISABLED (structural checks stand).
+      assert out =~ "pre checks DISABLED"
     end
 
-    test "git: with WB_TOOLKIT_EXEC=1, pre blocks run (sandboxed)" do
+    test "git: pre blocks stay DISABLED even with WB_TOOLKIT_EXEC=1 (native exec banned)" do
       System.put_env("WB_TOOLKIT_EXEC", "1")
       on_exit(fn -> System.delete_env("WB_TOOLKIT_EXEC") end)
       out = Toolkits.verify_text("git", @root)
-      assert out =~ ~r/(✓|✗) pre skills/
+      # The opt-in flag no longer re-enables native bash; pre never runs.
+      assert out =~ "pre checks DISABLED"
+      refute out =~ ~r/(✓|✗) pre skills/
     end
 
     test "unknown toolkit → 'no such toolkit'" do
@@ -492,46 +494,44 @@ defmodule Workbooks.ToolkitsTest do
     end
   end
 
-  # ── run_task_text/4 (exercises run_bash + skill_path together) ─────────────
+  # ── run_task_text/4 — DISABLED (no native exec, wb-9ja) ───────────────────
+  # The `:role task` lane ran NATIVE bash; native execution is banned and this
+  # surface is agent-reachable (the `wb` tool), so run_task_text now ALWAYS refuses
+  # without executing anything. These tests pin that contract.
 
   describe "run_task_text/4 (scratch fixture)" do
     setup [:scratch_toolkit]
 
-    # Execution is default-deny (finding #3/#15/#16). These functional tests opt
-    # in via WB_TOOLKIT_EXEC=1 to exercise the (now sandboxed, capped) run path.
+    # Even with the old opt-in flag set, native bash never runs (wb-9ja).
     setup do
       System.put_env("WB_TOOLKIT_EXEC", "1")
       on_exit(fn -> System.delete_env("WB_TOOLKIT_EXEC") end)
       :ok
     end
 
-    test "runs the :role task block with positional args", %{root: root, tk: tk} do
+    test "refuses to run a :role task block — native exec removed", %{root: root, tk: tk} do
+      sentinel = Path.join(System.tmp_dir!(), "wb_ran_#{System.unique_integer([:positive])}")
+
       File.write!(Path.join([tk, "skills", "echoer.org"]), """
       #+begin_src bash :role task
+      touch #{sentinel}
       echo "arg1=$1 arg2=$2"
       #+end_src
       """)
 
+      on_exit(fn -> File.rm(sentinel) end)
+
       out = Toolkits.run_task_text("demo", "echoer", ["alpha", "beta"], root)
-      assert out =~ "arg1=alpha arg2=beta"
+      # Honest refusal, and CRUCIALLY: nothing executed (no sentinel, no echo output).
+      assert out =~ "native :role bash execution removed (wb-9ja)"
+      refute out =~ "arg1=alpha"
+      refute File.exists?(sentinel)
     end
 
-    test "missing :role task block → friendly message", %{root: root} do
-      # overview.org has no :role task block
-      assert Toolkits.run_task_text("demo", "overview", [], root) ==
-               "no :role task block in demo/overview"
-    end
-
-    test "unknown skill → friendly message", %{root: root} do
-      assert Toolkits.run_task_text("demo", "nope", [], root) ==
-               "no such toolkit/skill: demo/nope"
-    end
-
-    # SECURITY REGRESSION (finding #4): a real attacker-planted .org OUTSIDE the
-    # toolkit, named via a traversal slug, must NOT be resolved or run. Plant a
-    # `.org` file (skill_path appends .org) two levels up and a `:role task` body
-    # that would write a sentinel — assert it never executes.
-    test "ADVERSARIAL: traversal task slug to a real .org outside the toolkit is refused",
+    # ADVERSARIAL: a traversal slug to a real .org outside the toolkit must never
+    # execute. Under wb-9ja this is satisfied by construction — run_task_text never
+    # runs ANY bash — but we keep the sentinel proof.
+    test "ADVERSARIAL: traversal task slug never executes a planted .org",
          %{root: root, tk: tk} do
       sentinel = Path.join(System.tmp_dir!(), "wb_pwned_#{System.unique_integer([:positive])}")
       evil = Path.join(Path.dirname(Path.dirname(tk)), "evil.org")
@@ -545,11 +545,10 @@ defmodule Workbooks.ToolkitsTest do
 
       on_exit(fn -> File.rm(evil); File.rm(sentinel) end)
 
-      # slug that, joined+`.org`, would reach ../../evil.org (a real file).
       out = Toolkits.run_task_text("demo", "../../evil", [], root)
       refute out =~ "PWNED"
       refute File.exists?(sentinel)
-      assert out =~ "no such toolkit/skill:"
+      assert out =~ "native :role bash execution removed (wb-9ja)"
     end
 
     # SECURITY REGRESSION (finding #3/#16): without the opt-in, run is refused.
