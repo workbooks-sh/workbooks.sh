@@ -126,7 +126,7 @@ defmodule Workbooks.Keeper do
     run_tick(path, Workbooks.Keeper.Lifecycle.current())
 
     schedule()
-    put_status(%{running: false, next_run: System.system_time(:second) + div(interval_ms(), 1000)})
+    put_status(%{running: false, next_run: System.system_time(:second) + div(tick_delay_ms(), 1000)})
     {:noreply, state}
   end
 
@@ -248,7 +248,24 @@ defmodule Workbooks.Keeper do
     end
   end
 
-  defp schedule, do: Process.send_after(self(), :tick, interval_ms())
+  # Continuous mode (WB_KEEPER_CONTINUOUS=1): the agent is effectively always
+  # live — each tick follows the last after only a short breather; the rem
+  # state (+ its spec gate) IS the rest between waking stretches. Unset →
+  # classic fixed interval.
+  defp schedule, do: Process.send_after(self(), :tick, tick_delay_ms())
+
+  defp tick_delay_ms do
+    if System.get_env("WB_KEEPER_CONTINUOUS") in ["1", "true"],
+      do: breather_ms(),
+      else: interval_ms()
+  end
+
+  defp breather_ms do
+    case System.get_env("WB_KEEPER_BREATHER_MS") do
+      nil -> 45_000
+      s -> String.to_integer(s)
+    end
+  end
 
   # Run via AgentDef.run/3 — same path as /api/run. The def's :MODEL: property is
   # honoured by AgentDef.run. The agent gets a shell (exec: true) and a workdir =

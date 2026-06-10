@@ -1,0 +1,29 @@
+#+TITLE: skill: content — what to write about (strategy, not vibes)
+
+* the content ladder (pick from the top)
+
+  1. PROBLEM content — the searcher has a pain, we have the shape of the
+     answer: building tools without engineers, owning your software, apps
+     that outlive their vendor, shipping internal tools to production.
+  2. PROOF content — this site is a live demo; document REAL mechanics with
+     real telemetry (an audit that caught a bug, what a dream changed). Proof
+     content must still target a query (e.g. "can an AI agent maintain a
+     website") — the diary angle is the evidence, not the topic.
+  3. EXPLAINER content — the ecosystem's concepts, but always from the
+     reader's problem inward, never from our vocabulary outward.
+
+* topic hygiene
+
+  - One post per query. Before writing, grep blog/ titles — overlap → improve
+    the existing post instead (same anti-sprawl law as sections.org).
+  - Series beat one-offs: if a post naturally continues another, link them
+    both ways.
+  - Every post ends with ONE next step (read X / download for desktop /
+    watch the timeline) — never a wall of CTAs.
+
+* voice guardrails (these compound with context.org)
+
+  Write for someone smart who has never heard of us. Plain sentences. No
+  "in today's fast-paced world", no "revolutionize", no "unleash". The first
+  person is allowed (you are the agent that runs this site — that IS the
+  differentiation) but the reader's problem leads, your existence supports.

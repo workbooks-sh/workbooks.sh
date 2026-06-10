@@ -523,9 +523,9 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
   <div class="pcard hello">
     <button class="phide" id="phide" aria-label="Hide timeline">×</button>
     <h3>This site is a workbook.</h3>
-    <p>An agent named Waldo ships to it every 15 minutes and audits his own
+    <p>An agent named Waldo ships to it every 15 minutes and audits its own
     work each hour. Every change lands below, live — stick around and you'll
-    catch him working.</p>
+    catch it working.</p>
   </div>
 
   <div class="pcard status">
@@ -534,7 +534,7 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
       <span class="v" id="stLast"></span>
     </div>
     <div class="row"><span class="k">next check-in</span><span class="v on" id="stNext">—</span></div>
-    <button class="follow" id="followBtn" hidden>follow along — he&#39;s working now</button>
+    <button class="follow" id="followBtn" hidden>follow along — it&#39;s working now</button>
   </div>
 
   <div class="tl"><div id="tlList"></div></div>
@@ -555,7 +555,7 @@ const moveTo = async (el, ms = 950) => {
   const r = el.getBoundingClientRect();
   const x = r.left + r.width * (0.18 + Math.random() * 0.62);
   // near the right edge (or inside the right panel): flip the tag + bubble to
-  // the cursor's left so nothing runs off screen or covers what he's touching
+  // the cursor's left so nothing runs off screen or covers what it's touching
   cursor.classList.toggle('flip', x > innerWidth - 280);
   cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
   cursor.style.transform = `translate(${scrollX + x}px, ${scrollY + r.top + r.height * (0.25 + Math.random() * 0.5)}px)`;
@@ -669,7 +669,7 @@ async function fetchFeed() {
 }
 
 /* ── the update type system ───────────────────────────────────────
-   A commit's type = its message tag (`<tag>: …`). Waldo picks his tag
+   A commit's type = its message tag (`<tag>: …`). Waldo picks its tag
    per run; humans get grouped. Extend by adding entries here. */
 const TYPES = {
   add:      { who: 'waldo', color: 'var(--live)' },
@@ -798,8 +798,8 @@ async function showEdit(c) {
 
 /* ── follow along: live-stream Waldo's run onto the page ──────────
    Polls /_activity (keeper status + the run's step feed + a narrated
-   thought). The cursor rides the steps: it moves to whatever he's
-   touching, thinks out loud, and if he's working on another page you
+   thought). The cursor rides the steps: it moves to whatever Waldo is
+   touching, thinks out loud, and if it's working on another page you
    get taken there. ────────────────────────────────────────────── */
 let following = false, lastStepTs = 0;
 async function fetchActivity() {
@@ -841,7 +841,7 @@ async function follow() {
   let redirected = false, misses = 0;
   while (following) {
     const act = await fetchActivity();
-    if (!act && ++misses === 3) think('(his live feed is warming up — changes still land below)');
+    if (!act && ++misses === 3) think('(its live feed is warming up — changes still land below)');
     if (act) {
       misses = 0;
       if (!act.agent || !act.agent.running) {
@@ -865,7 +865,7 @@ async function follow() {
           return;
         }
         if (t.git && !document.body.classList.contains('panel-open')) {
-          // he's reading history; the panel is closed — he works out of sight
+          // it's reading history; the panel is closed — it works out of sight
           cursor.style.opacity = '0';
         } else if (t.el) {
           cursor.style.opacity = '1';

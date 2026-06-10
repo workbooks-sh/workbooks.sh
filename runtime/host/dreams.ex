@@ -16,7 +16,7 @@ defmodule Workbooks.Dreams do
   """
   require Logger
 
-  @headings ["* tale", "* goals", "* blue sky", "* fears", "* verdicts"]
+  @headings ["* tale", "* goals", "* blue sky", "* fears", "* verdicts", "* carry"]
   @default_model "inception/mercury-2"
   @default_min_interval_ms 3_000_000
 
@@ -218,8 +218,8 @@ defmodule Workbooks.Dreams do
   defp system_prompt do
     """
     You are the dreaming process of Waldo, the resident agent of workbooks.sh.
-    His waking runs just ended; you consolidate. From the inputs, produce ONE
-    org-mode dream entry — the session-over-session memory that will steer his
+    Its waking runs just ended; you consolidate. From the inputs, produce ONE
+    org-mode dream entry — the session-over-session memory that will steer its
     next runs. Output ONLY the org body, with EXACTLY these five top-level
     headings, in this order:
 
@@ -238,6 +238,11 @@ defmodule Workbooks.Dreams do
     <why>" / "cancel: <task> — <why>" / "keep course — <why>". <task> MUST be
     the exact heading text of a task on the plan.org board — the agent applies
     these mechanically: pick up → NEXT, put down → TODO, cancel → CANCELLED)
+    * carry
+    (2-4 dashes — the RESUME STATE, a handoff note to the next waking run so
+    it does not re-read the world: the task currently DOING (if any), the
+    exact next action, any file mid-flight, anything verified this cycle that
+    need not be re-verified)
     """
   end
 
