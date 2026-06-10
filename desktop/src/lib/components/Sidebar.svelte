@@ -36,7 +36,8 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import Icon from "$lib/ui/Icon.svelte";
-  import { tintFor, tintWash } from "$lib/ui/tint";
+  import { tintFor, tintWash } from "$lib/ui/tint.svelte";
+  import TintArc from "$lib/ui/TintArc.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -622,7 +623,7 @@
             onPackageContext?.(pkg.id, e.clientX, e.clientY);
           }}
         >
-          <span class="row-icon app">
+          <span class="row-icon app" style="color: {tintFor(pkg.name)};">
             <Icon value={pkg.icon ?? ""} name={pkg.name} size={16} />
           </span>
           <span class="row-label">{pkg.name}</span>
@@ -653,7 +654,7 @@
           <span class="caret" class:open={expanded[pkg.id]}>
             <CaretRight size={11} weight="bold" aria-hidden="true" />
           </span>
-          <span class="row-icon"><FolderIcon size={17} /></span>
+          <span class="row-icon"><FolderIcon size={17} color={tintFor(pkg.name)} /></span>
           <span class="row-label">{pkg.name}</span>
         </button>
 
@@ -681,7 +682,7 @@
                   oncontextmenu={(e) => onWorkbookContext(book, e)}
                   title={book.path}
                 >
-                  <span class="row-icon book">
+                  <span class="row-icon book" style="color: {tintFor(book.title)};">
                     {#if identity}
                       <Icon value={identity} name={book.title} size={14} />
                     {:else}
@@ -712,50 +713,48 @@
     </button>
   {/if}
 
-  {#if bottomTabs.length > 0}
-    <div class="hairline" aria-hidden="true"></div>
+  <!-- Bottom toolbar — avatar (account menu) + icon-only utility nav. -->
+  <div class="bottom-bar">
+    <button
+      type="button"
+      class="avatar-btn"
+      bind:this={accountBtnEl}
+      title={accountLabel}
+      aria-label={accountLabel}
+      aria-haspopup="menu"
+      aria-expanded={accountMenuOpen}
+      onclick={handleAccountClick}
+      disabled={auth.status === "checking" || accountBusy}
+    >
+      {#if auth.status === "signed-in"}
+        {#if auth.user?.picture}
+          <img class="account-avatar lg2 account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
+        {:else}
+          <span class="account-avatar lg2">{accountInitial()}</span>
+        {/if}
+      {:else if auth.status === "sidecar-offline"}
+        <span class="account-anon lg2 offline">
+          <ArrowsClockwise size={14} weight="fill" class={accountBusy ? "spinning" : ""} />
+        </span>
+      {:else}
+        <span class="account-anon lg2"><UserIcon size={15} weight="fill" /></span>
+      {/if}
+    </button>
     {#each bottomTabs as tab (tab.id)}
       {@const TabIcon = tab.icon}
       <button
         type="button"
-        class="row"
+        class="bar-btn"
         class:active={active === tab.id}
+        title={tab.label}
+        aria-label={tab.label}
         aria-pressed={active === tab.id}
         onclick={() => (active = tab.id)}
       >
-        <span class="row-icon"><TabIcon size={16} weight="fill" aria-hidden="true" /></span>
-        <span class="row-label">{tab.label}</span>
+        <TabIcon size={17} weight="fill" aria-hidden="true" />
       </button>
     {/each}
-  {/if}
-
-  <!-- Account row -->
-  <button
-    type="button"
-    class="row account"
-    bind:this={accountBtnEl}
-    aria-haspopup="menu"
-    aria-expanded={accountMenuOpen}
-    onclick={handleAccountClick}
-    disabled={auth.status === "checking" || accountBusy}
-  >
-    <span class="row-icon">
-      {#if auth.status === "signed-in"}
-        {#if auth.user?.picture}
-          <img class="account-avatar account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
-        {:else}
-          <span class="account-avatar">{accountInitial()}</span>
-        {/if}
-      {:else if auth.status === "sidecar-offline"}
-        <span class="account-anon offline">
-          <ArrowsClockwise size={12} weight="fill" class={accountBusy ? "spinning" : ""} />
-        </span>
-      {:else}
-        <span class="account-anon"><UserIcon size={13} weight="fill" /></span>
-      {/if}
-    </span>
-    <span class="row-label">{accountLabel}</span>
-  </button>
+  </div>
 
   {#if accountMenuOpen}
     <div
@@ -859,6 +858,7 @@
 </nav>
 
 <ContextMenu bind:open={bmMenuOpen} x={bmMenuX} y={bmMenuY}>
+  {#if bmMenuTarget}<TintArc name={bmMenuTarget.title} />{/if}
   <button
     class="ctx-item"
     onclick={() => {
@@ -890,6 +890,7 @@
 </ContextMenu>
 
 <ContextMenu bind:open={wbMenuOpen} x={wbMenuX} y={wbMenuY}>
+  {#if wbMenuTarget}<TintArc name={wbMenuTarget.title} />{/if}
   <button
     class="ctx-item"
     onclick={() => {
@@ -1037,8 +1038,7 @@
     50% { opacity: 1; }
   }
 
-  /* ── Create CTA — flat secondary; the brand only speaks on hover,
-     as an animated gradient stroke sweeping the border. ───────────── */
+  /* ── Create — just a simple, quiet button. ─────────────────────── */
   .create-cta {
     display: flex;
     align-items: center;
@@ -1047,13 +1047,9 @@
     width: 100%;
     height: 34px;
     margin-bottom: 0.2rem;
-    border: 1px solid transparent;
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    /* Two-layer background: flat surface fill clipped to padding-box,
-       border-box layer carries the (normally invisible) stroke. */
-    background:
-      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-      linear-gradient(var(--color-border), var(--color-border)) border-box;
+    background: var(--color-surface);
     color: var(--color-fg-muted);
     font: inherit;
     font-size: 13px;
@@ -1061,35 +1057,18 @@
     letter-spacing: 0.01em;
     cursor: pointer;
     flex-shrink: 0;
-    transition: color 0.16s;
+    transition: color 0.14s, border-color 0.14s, background 0.14s;
   }
-  .create-cta:hover,
+  .create-cta:hover {
+    color: var(--color-fg);
+    border-color: var(--color-border-strong);
+  }
   .create-cta.engaged {
     color: var(--color-fg);
-    background:
-      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-      linear-gradient(
-          110deg,
-          var(--color-border),
-          var(--color-brand),
-          #7c3aed,
-          var(--color-brand),
-          var(--color-border)
-        )
-        border-box;
-    background-size: 100% 100%, 220% 100%;
-    animation: stroke-sweep 1.8s linear infinite;
+    border-color: color-mix(in srgb, var(--color-brand) 40%, var(--color-border));
   }
   .create-cta:active {
     transform: scale(0.99);
-  }
-  @keyframes stroke-sweep {
-    from { background-position: 0 0, 0% 0; }
-    to { background-position: 0 0, 220% 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .create-cta:hover,
-    .create-cta.engaged { animation: none; }
   }
 
   /* ── workspace header ─────────────────────────────────────────── */
@@ -1251,8 +1230,6 @@
     font-size: 12.5px;
     color: var(--color-fg-muted);
   }
-  .row.child .row-icon.book { color: var(--color-fg-subtle); }
-  .row.child:hover .row-icon.book { color: var(--color-brand); }
   .child-note {
     padding: 4px 8px 5px 26px;
     font-size: 11.5px;
@@ -1270,9 +1247,59 @@
     min-height: 0.4rem;
   }
 
-  /* ── account row + menu ───────────────────────────────────────── */
-  .row.account { margin-top: 0.15rem; }
-  .row.account:disabled { opacity: 0.6; cursor: default; }
+  /* ── bottom toolbar (avatar · settings · network) + account menu ── */
+  .bottom-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 2px 0;
+    flex-shrink: 0;
+  }
+  .avatar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.12s;
+  }
+  .avatar-btn:hover { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
+  .avatar-btn:disabled { opacity: 0.6; cursor: default; }
+  .bar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .bar-btn:hover {
+    background: color-mix(in srgb, var(--color-fg) 5%, transparent);
+    color: var(--color-fg);
+  }
+  .bar-btn.active {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    box-shadow:
+      0 1px 2px rgba(15, 15, 15, 0.07),
+      inset 0 0 0 1px var(--color-border);
+  }
+  .account-avatar.lg2,
+  .account-anon.lg2 {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
   .account-anon {
     display: inline-flex;
     align-items: center;
