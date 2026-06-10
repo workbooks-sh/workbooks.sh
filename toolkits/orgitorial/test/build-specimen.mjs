@@ -13,7 +13,7 @@ const css = read("dist/orgitorial.css");
 // inline (non-module) script: drop the ES `export` statements (SyntaxError in a
 // plain <script>); window.Orgitorial is still set, module.exports is guarded.
 const js = read("dist/orgitorial.js")
-  .replace(/\nexport \{ render, parseMeta \};\n/, "\n")
+  .replace(/\nexport \{[^}]*\};\n/, "\n")
   .replace(/\nexport default Orgitorial;\n/, "\n");
 
 const orgSafe = org.replace(/<\/script>/g, "<\\/script>");
@@ -77,6 +77,8 @@ ${js}
 (function () {
   var src = document.getElementById("org-source").textContent;
   document.body.insertAdjacentHTML("beforeend", window.Orgitorial.render(src));
+  // host-page opt-in: run live .org-app scripts + render mermaid from the CDN.
+  window.Orgitorial.activate(document);
   var html = document.documentElement;
   var btn = document.getElementById("themeBtn");
   function set(t) { html.setAttribute("data-org-theme", t); btn.textContent = t === "dark" ? "Light" : "Dark"; }

@@ -569,9 +569,96 @@ ol.org-list > li::marker { font-family: var(--org-mono); color: var(--org-faint)
   word-break: break-word;
 }
 
+/* ---------- living blocks: width system + app + mermaid ---------- */
+/*
+ * The founder's hard rules, encoded here:
+ *   - blocks NEVER inner-scroll: height is auto, no max-height, no overflow:scroll.
+ *   - a block may break OUT of the editorial measure: column (default) | wide | full.
+ * The breakout uses the classic centered-full-bleed margin trick so it works no
+ * matter how narrow --org-measure is set.
+ */
+
+.org-block { height: auto; }
+/* never trap a living block in a scroll box */
+.org-app,
+.org-mermaid { max-height: none; overflow: visible; }
+
+/* WIDE: spill past the measure, capped to the viewport with breathing room. */
+.org-block[data-width="wide"] {
+  width: min(92vw, calc(var(--org-measure) + 24rem));
+  margin-inline: calc(50% - min(46vw, calc(var(--org-measure) / 2 + 12rem)));
+}
+/* FULL: edge-to-edge full-bleed, pulled out of the centered column. */
+.org-block[data-width="full"] {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  max-width: 100vw;
+}
+
+/* live mini-app — NO chrome at all; the app owns its entire look. */
+.org-app {
+  margin: var(--org-s4) auto;
+}
+.org-block.org-app[data-width="full"],
+.org-block.org-app[data-width="wide"] { margin-block: var(--org-s5); }
+
+/* mermaid — centered, generous vertical room, no box. */
+.org-mermaid {
+  margin: var(--org-s5) auto;
+  text-align: center;
+}
+.org-mermaid-svg svg { max-width: 100%; height: auto; }
+/* pre is both the pre-activation source AND the fallback if the CDN is down */
+.org-mermaid > .org-mermaid-src {
+  display: inline-block;
+  text-align: left;
+  font-family: var(--org-mono);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--org-ink-soft);
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-radius: var(--org-radius);
+  padding: var(--org-s3);
+  white-space: pre;
+  margin: 0;
+}
+/* once rendered, the source collapses into a quiet <details> */
+.org-mermaid-fallback {
+  margin-top: var(--org-s2);
+  text-align: left;
+}
+.org-mermaid-fallback > summary {
+  cursor: pointer;
+  font-family: var(--org-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--org-faint);
+  list-style: none;
+}
+.org-mermaid-fallback > summary::-webkit-details-marker { display: none; }
+.org-mermaid-fallback > summary::before { content: "▸ "; color: var(--org-rule-strong); }
+.org-mermaid-fallback[open] > summary::before { content: "▾ "; }
+.org-mermaid-fallback > .org-mermaid-src {
+  display: block;
+  margin-top: var(--org-s1);
+  font-family: var(--org-mono);
+  font-size: 0.8rem;
+  color: var(--org-ink-soft);
+  background: var(--org-panel);
+  border: 1px solid var(--org-rule);
+  border-radius: var(--org-radius);
+  padding: var(--org-s2);
+  white-space: pre;
+  overflow-x: auto;
+}
+
 @media (max-width: 640px) {
   .org-doc { padding: var(--org-s5) var(--org-s3); --org-fs: 1.06rem; }
   .org-title { font-size: clamp(1.7rem, 6vw, 2.4rem); }
+  /* on phones, wide blocks just use the available column — no awkward breakout */
+  .org-block[data-width="wide"] { width: 100%; margin-inline: 0; }
 }
 
 </style>
@@ -691,6 +778,64 @@ one file does it,
 no build to doubt.
 #+end_verse
 
+* Living blocks: diagrams and mini-apps :living:
+
+An article can also be a workbook. Three block types turn a static post into a
+living document — and none of them inner-scroll or sit in a cramped iframe.
+
+A *Mermaid diagram* beats a paragraph when you're describing a flow. Write it as
+=#+begin_src mermaid=; the host page's =Orgitorial.activate(document)= call
+renders it (lazy-loading mermaid from a CDN only if a diagram is present):
+
+#+begin_src mermaid
+flowchart LR
+  A[".org file"] --> B["render()"]
+  B --> C["static HTML"]
+  C --> D["activate()"]
+  D --> E["mermaid + live apps"]
+#+end_src
+
+A *wide quote* can break out of the editorial column with =:width wide= — past
+the measure, but never the whole viewport:
+
+#+begin_quote :width wide
+The best interface for a document is the document itself — readable as plain
+text, alive when you open it in a browser, and the same one file either way.
+#+end_quote
+
+And a *full-bleed mini-app*: a self-contained =#+begin_src html :app= block with
+inline styles and an inline script that runs on =activate()=. Here's a 20-line
+compounding estimator, edge to edge:
+
+#+begin_src html :app :width full
+<div style="font-family:system-ui,sans-serif;max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem;text-align:center">
+  <label style="display:block;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:#888;margin-bottom:.6rem">
+    Monthly deposit
+    <input id="amt" type="range" min="50" max="2000" step="50" value="300"
+           style="display:block;width:100%;margin-top:.6rem;accent-color:#b3411f">
+  </label>
+  <div style="font-size:2.4rem;font-weight:700;line-height:1.1;margin:.4rem 0">
+    <span id="dep">$300</span>/mo →
+    <span id="total" style="color:#b3411f">$0</span>
+  </div>
+  <div style="font-size:.8rem;color:#888">after 30 years at 7% / yr, compounded monthly</div>
+  <script>
+    (function () {
+      var amt = document.getElementById("amt");
+      var fmt = function (n) { return "$" + Math.round(n).toLocaleString(); };
+      function recompute() {
+        var p = +amt.value, r = 0.07 / 12, n = 30 * 12;
+        var fv = p * ((Math.pow(1 + r, n) - 1) / r);
+        document.getElementById("dep").textContent = fmt(p);
+        document.getElementById("total").textContent = fmt(fv);
+      }
+      amt.addEventListener("input", recompute);
+      recompute();
+    })();
+  <\/script>
+</div>
+#+end_src
+
 * Drawers for metadata :advanced:
 
 Property drawers fold away the machinery so the prose stays clean. They render
@@ -744,6 +889,11 @@ section at the end, with backlinks.
  *   render(orgText, opts) -> string            // article HTML
  *   render(orgText, { meta: true }) -> { html, meta }
  *   parseMeta(orgText) -> { title, author, date, keywords:[] }
+ *   activate(rootEl, opts) -> Promise          // HOST-PAGE opt-in, browser only:
+ *     - lazy-loads mermaid from CDN ONLY if any .org-mermaid exists, renders each
+ *     - executes inline <script> in .org-app blocks (incl. type=module)
+ *     - idempotent (data-org-activated guards); keeps the renderer itself zero-dep.
+ *   opts.mermaidTheme (default "neutral"); opts.mermaidCdn to override the URL.
  *
  * opts:
  *   header   (bool, default true)  render an <header class="org-header"> from metadata
@@ -766,6 +916,9 @@ section at the end, with backlinks.
  *   li.org-item                list item
  *   li.org-check[data-checked] checkbox item ("true"|"false"|"partial")
  *   pre.org-src[data-lang]     #+begin_src  (header bar + code.language-<lang>)
+ *   div.org-app               #+begin_src html :app / #+begin_export html (live, inline HTML)
+ *   div.org-mermaid           #+begin_src mermaid  (raw text in pre.org-mermaid-src)
+ *   [data-width]              column|wide|full on any src/quote/app/mermaid block
  *   blockquote.org-quote       #+begin_quote
  *   pre.org-example            #+begin_example
  *   p.org-verse                #+begin_verse
@@ -1309,22 +1462,56 @@ function matchListItem(line) {
   return { indent: indent, ordered: ordered, checkbox: checkbox, text: text };
 }
 
+// Parse a `:width column|wide|full` header arg off a block's rest string.
+// Returns { width, attr, cls } — attr/cls are "" for the default (column).
+function parseWidth(rest) {
+  var m = /(?:^|\s):width\s+(column|wide|full)\b/i.exec(rest || "");
+  var width = m ? m[1].toLowerCase() : "column";
+  if (width === "column") return { width: "column", attr: "", cls: "" };
+  return { width: width, attr: ' data-width="' + width + '"', cls: " org-w-" + width };
+}
+
 function renderBlock(kind, rest, content) {
   if (kind === "src") {
     var lang = (rest.split(/\s+/)[0] || "").toLowerCase();
+    var w = parseWidth(rest);
+    // mermaid: emit raw text, render is host opt-in via activate()
+    if (lang === "mermaid") {
+      return (
+        '<div class="org-block org-mermaid' + w.cls + '"' + w.attr + '>' +
+        '<pre class="org-mermaid-src">' + content.map(esc).join("\n") + "</pre></div>"
+      );
+    }
+    // live app: `#+begin_src html :app` — inline first-party HTML, scripts run on activate()
+    if (lang === "html" && /(?:^|\s):app\b/i.test(rest)) {
+      return (
+        '<div class="org-block org-app' + w.cls + '"' + w.attr + '>' +
+        content.join("\n") + "</div>"
+      );
+    }
     var code = content.map(esc).join("\n");
     var langAttr = lang ? ' data-lang="' + attr(lang) + '"' : "";
     var langClass = lang ? " language-" + attr(lang) : "";
     return (
-      '<pre class="org-src"' + langAttr + '><code class="org-src-code' + langClass + '">' +
+      '<pre class="org-src org-block' + w.cls + '"' + langAttr + w.attr +
+      '><code class="org-src-code' + langClass + '">' +
       code +
       "</code></pre>"
+    );
+  }
+  // #+begin_export html — same trust model as :app (first-party live HTML)
+  if (kind === "export" && /^html\b/i.test(rest)) {
+    var we = parseWidth(rest);
+    return (
+      '<div class="org-block org-app' + we.cls + '"' + we.attr + '>' +
+      content.join("\n") + "</div>"
     );
   }
   if (kind === "example") {
     return '<pre class="org-example">' + content.map(esc).join("\n") + "</pre>";
   }
   if (kind === "quote") {
+    var wq = parseWidth(rest);
     var inner = content
       .join("\n")
       .split(/\n{2,}/)
@@ -1332,7 +1519,7 @@ function renderBlock(kind, rest, content) {
         return "<p>" + inline(p.replace(/\n/g, " ").trim()) + "</p>";
       })
       .join("");
-    return '<blockquote class="org-quote">' + inner + "</blockquote>";
+    return '<blockquote class="org-quote org-block' + wq.cls + '"' + wq.attr + ">" + inner + "</blockquote>";
   }
   if (kind === "verse") {
     return (
@@ -1349,9 +1536,99 @@ function renderBlock(kind, rest, content) {
   return '<pre class="org-raw" data-block="' + attr(kind) + '">' + content.map(esc).join("\n") + "</pre>";
 }
 
+// ---------- activate (host-page opt-in; browser only) ----------
+//
+// render() stays pure string→string and zero-dep. activate() is the optional,
+// browser-side step a HOST PAGE calls AFTER injecting the rendered HTML:
+//
+//   Orgitorial.activate(document);   // or any root element
+//
+// It (a) runs live .org-app blocks — re-creating their inline <script> nodes so
+// they actually execute (innerHTML scripts never run), including type=module
+// (a module may `import` wasm, e.g. candle-compiled models — nothing special is
+// done for it; it rides the standard module loader), and (b) lazy-loads mermaid
+// from a CDN ONLY when at least one .org-mermaid block is present, rendering each
+// and keeping the source as a <details> fallback. Idempotent per node.
+
+function reviveScripts(container) {
+  // Re-create every <script> under container so the browser executes it.
+  var scripts = container.querySelectorAll("script");
+  for (var i = 0; i < scripts.length; i++) {
+    var old = scripts[i];
+    var fresh = document.createElement("script");
+    for (var a = 0; a < old.attributes.length; a++) {
+      fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+    }
+    fresh.textContent = old.textContent;
+    old.parentNode.replaceChild(fresh, old);
+  }
+}
+
+function activate(rootEl, opts) {
+  opts = opts || {};
+  if (typeof document === "undefined") return Promise.resolve();
+  var root = rootEl || document;
+
+  // 1) live app blocks — execute their inline scripts exactly once.
+  var apps = root.querySelectorAll(".org-app:not([data-org-activated])");
+  for (var i = 0; i < apps.length; i++) {
+    apps[i].setAttribute("data-org-activated", "");
+    reviveScripts(apps[i]);
+  }
+
+  // 2) mermaid — only pay the CDN cost if a diagram exists.
+  var diagrams = root.querySelectorAll(".org-mermaid:not([data-org-activated])");
+  if (!diagrams.length) return Promise.resolve();
+
+  var theme = opts.mermaidTheme || "neutral";
+  var cdn = opts.mermaidCdn || "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+  return import(/* @vite-ignore */ cdn)
+    .then(function (mod) {
+      var mermaid = mod.default || mod;
+      mermaid.initialize({ startOnLoad: false, theme: theme, securityLevel: "strict" });
+      var jobs = [];
+      for (var j = 0; j < diagrams.length; j++) {
+        (function (el, k) {
+          el.setAttribute("data-org-activated", "");
+          var srcEl = el.querySelector(".org-mermaid-src");
+          var code = srcEl ? srcEl.textContent : el.textContent;
+          var id = "org-mmd-" + Date.now().toString(36) + "-" + k;
+          jobs.push(
+            mermaid
+              .render(id, code.trim())
+              .then(function (res) {
+                // keep the source as a collapsed <details> fallback
+                var details = document.createElement("details");
+                details.className = "org-mermaid-fallback";
+                var sum = document.createElement("summary");
+                sum.textContent = "diagram source";
+                var pre = document.createElement("pre");
+                pre.className = "org-mermaid-src";
+                pre.textContent = code.trim();
+                details.appendChild(sum);
+                details.appendChild(pre);
+                el.innerHTML =
+                  '<div class="org-mermaid-svg">' + res.svg + "</div>";
+                el.appendChild(details);
+              })
+              .catch(function () {
+                // leave the raw <pre> in place on failure — never blank.
+                el.removeAttribute("data-org-activated");
+              })
+          );
+        })(diagrams[j], j);
+      }
+      return Promise.all(jobs);
+    })
+    .catch(function () {
+      /* mermaid CDN unreachable: diagrams stay as readable source pre. */
+    });
+}
+
 // ---------- exports ----------
 
-var Orgitorial = { render: render, parseMeta: parseMeta, version: "0.1.0" };
+var Orgitorial = { render: render, parseMeta: parseMeta, activate: activate, version: "0.2.0" };
 
 // Browser global
 if (typeof window !== "undefined") {
@@ -1370,6 +1647,8 @@ if (typeof module !== "undefined" && module.exports) {
 (function () {
   var src = document.getElementById("org-source").textContent;
   document.body.insertAdjacentHTML("beforeend", window.Orgitorial.render(src));
+  // host-page opt-in: run live .org-app scripts + render mermaid from the CDN.
+  window.Orgitorial.activate(document);
   var html = document.documentElement;
   var btn = document.getElementById("themeBtn");
   function set(t) { html.setAttribute("data-org-theme", t); btn.textContent = t === "dark" ? "Light" : "Dark"; }

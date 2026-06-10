@@ -9,6 +9,11 @@
  *   render(orgText, opts) -> string            // article HTML
  *   render(orgText, { meta: true }) -> { html, meta }
  *   parseMeta(orgText) -> { title, author, date, keywords:[] }
+ *   activate(rootEl, opts) -> Promise          // HOST-PAGE opt-in, browser only:
+ *     - lazy-loads mermaid from CDN ONLY if any .org-mermaid exists, renders each
+ *     - executes inline <script> in .org-app blocks (incl. type=module)
+ *     - idempotent (data-org-activated guards); keeps the renderer itself zero-dep.
+ *   opts.mermaidTheme (default "neutral"); opts.mermaidCdn to override the URL.
  *
  * opts:
  *   header   (bool, default true)  render an <header class="org-header"> from metadata
@@ -31,6 +36,9 @@
  *   li.org-item                list item
  *   li.org-check[data-checked] checkbox item ("true"|"false"|"partial")
  *   pre.org-src[data-lang]     #+begin_src  (header bar + code.language-<lang>)
+ *   div.org-app               #+begin_src html :app / #+begin_export html (live, inline HTML)
+ *   div.org-mermaid           #+begin_src mermaid  (raw text in pre.org-mermaid-src)
+ *   [data-width]              column|wide|full on any src/quote/app/mermaid block
  *   blockquote.org-quote       #+begin_quote
  *   pre.org-example            #+begin_example
  *   p.org-verse                #+begin_verse
@@ -574,22 +582,56 @@ function matchListItem(line) {
   return { indent: indent, ordered: ordered, checkbox: checkbox, text: text };
 }
 
+// Parse a `:width column|wide|full` header arg off a block's rest string.
+// Returns { width, attr, cls } — attr/cls are "" for the default (column).
+function parseWidth(rest) {
+  var m = /(?:^|\s):width\s+(column|wide|full)\b/i.exec(rest || "");
+  var width = m ? m[1].toLowerCase() : "column";
+  if (width === "column") return { width: "column", attr: "", cls: "" };
+  return { width: width, attr: ' data-width="' + width + '"', cls: " org-w-" + width };
+}
+
 function renderBlock(kind, rest, content) {
   if (kind === "src") {
     var lang = (rest.split(/\s+/)[0] || "").toLowerCase();
+    var w = parseWidth(rest);
+    // mermaid: emit raw text, render is host opt-in via activate()
+    if (lang === "mermaid") {
+      return (
+        '<div class="org-block org-mermaid' + w.cls + '"' + w.attr + '>' +
+        '<pre class="org-mermaid-src">' + content.map(esc).join("\n") + "</pre></div>"
+      );
+    }
+    // live app: `#+begin_src html :app` — inline first-party HTML, scripts run on activate()
+    if (lang === "html" && /(?:^|\s):app\b/i.test(rest)) {
+      return (
+        '<div class="org-block org-app' + w.cls + '"' + w.attr + '>' +
+        content.join("\n") + "</div>"
+      );
+    }
     var code = content.map(esc).join("\n");
     var langAttr = lang ? ' data-lang="' + attr(lang) + '"' : "";
     var langClass = lang ? " language-" + attr(lang) : "";
     return (
-      '<pre class="org-src"' + langAttr + '><code class="org-src-code' + langClass + '">' +
+      '<pre class="org-src org-block' + w.cls + '"' + langAttr + w.attr +
+      '><code class="org-src-code' + langClass + '">' +
       code +
       "</code></pre>"
+    );
+  }
+  // #+begin_export html — same trust model as :app (first-party live HTML)
+  if (kind === "export" && /^html\b/i.test(rest)) {
+    var we = parseWidth(rest);
+    return (
+      '<div class="org-block org-app' + we.cls + '"' + we.attr + '>' +
+      content.join("\n") + "</div>"
     );
   }
   if (kind === "example") {
     return '<pre class="org-example">' + content.map(esc).join("\n") + "</pre>";
   }
   if (kind === "quote") {
+    var wq = parseWidth(rest);
     var inner = content
       .join("\n")
       .split(/\n{2,}/)
@@ -597,7 +639,7 @@ function renderBlock(kind, rest, content) {
         return "<p>" + inline(p.replace(/\n/g, " ").trim()) + "</p>";
       })
       .join("");
-    return '<blockquote class="org-quote">' + inner + "</blockquote>";
+    return '<blockquote class="org-quote org-block' + wq.cls + '"' + wq.attr + ">" + inner + "</blockquote>";
   }
   if (kind === "verse") {
     return (
@@ -614,9 +656,99 @@ function renderBlock(kind, rest, content) {
   return '<pre class="org-raw" data-block="' + attr(kind) + '">' + content.map(esc).join("\n") + "</pre>";
 }
 
+// ---------- activate (host-page opt-in; browser only) ----------
+//
+// render() stays pure string→string and zero-dep. activate() is the optional,
+// browser-side step a HOST PAGE calls AFTER injecting the rendered HTML:
+//
+//   Orgitorial.activate(document);   // or any root element
+//
+// It (a) runs live .org-app blocks — re-creating their inline <script> nodes so
+// they actually execute (innerHTML scripts never run), including type=module
+// (a module may `import` wasm, e.g. candle-compiled models — nothing special is
+// done for it; it rides the standard module loader), and (b) lazy-loads mermaid
+// from a CDN ONLY when at least one .org-mermaid block is present, rendering each
+// and keeping the source as a <details> fallback. Idempotent per node.
+
+function reviveScripts(container) {
+  // Re-create every <script> under container so the browser executes it.
+  var scripts = container.querySelectorAll("script");
+  for (var i = 0; i < scripts.length; i++) {
+    var old = scripts[i];
+    var fresh = document.createElement("script");
+    for (var a = 0; a < old.attributes.length; a++) {
+      fresh.setAttribute(old.attributes[a].name, old.attributes[a].value);
+    }
+    fresh.textContent = old.textContent;
+    old.parentNode.replaceChild(fresh, old);
+  }
+}
+
+function activate(rootEl, opts) {
+  opts = opts || {};
+  if (typeof document === "undefined") return Promise.resolve();
+  var root = rootEl || document;
+
+  // 1) live app blocks — execute their inline scripts exactly once.
+  var apps = root.querySelectorAll(".org-app:not([data-org-activated])");
+  for (var i = 0; i < apps.length; i++) {
+    apps[i].setAttribute("data-org-activated", "");
+    reviveScripts(apps[i]);
+  }
+
+  // 2) mermaid — only pay the CDN cost if a diagram exists.
+  var diagrams = root.querySelectorAll(".org-mermaid:not([data-org-activated])");
+  if (!diagrams.length) return Promise.resolve();
+
+  var theme = opts.mermaidTheme || "neutral";
+  var cdn = opts.mermaidCdn || "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+  return import(/* @vite-ignore */ cdn)
+    .then(function (mod) {
+      var mermaid = mod.default || mod;
+      mermaid.initialize({ startOnLoad: false, theme: theme, securityLevel: "strict" });
+      var jobs = [];
+      for (var j = 0; j < diagrams.length; j++) {
+        (function (el, k) {
+          el.setAttribute("data-org-activated", "");
+          var srcEl = el.querySelector(".org-mermaid-src");
+          var code = srcEl ? srcEl.textContent : el.textContent;
+          var id = "org-mmd-" + Date.now().toString(36) + "-" + k;
+          jobs.push(
+            mermaid
+              .render(id, code.trim())
+              .then(function (res) {
+                // keep the source as a collapsed <details> fallback
+                var details = document.createElement("details");
+                details.className = "org-mermaid-fallback";
+                var sum = document.createElement("summary");
+                sum.textContent = "diagram source";
+                var pre = document.createElement("pre");
+                pre.className = "org-mermaid-src";
+                pre.textContent = code.trim();
+                details.appendChild(sum);
+                details.appendChild(pre);
+                el.innerHTML =
+                  '<div class="org-mermaid-svg">' + res.svg + "</div>";
+                el.appendChild(details);
+              })
+              .catch(function () {
+                // leave the raw <pre> in place on failure — never blank.
+                el.removeAttribute("data-org-activated");
+              })
+          );
+        })(diagrams[j], j);
+      }
+      return Promise.all(jobs);
+    })
+    .catch(function () {
+      /* mermaid CDN unreachable: diagrams stay as readable source pre. */
+    });
+}
+
 // ---------- exports ----------
 
-var Orgitorial = { render: render, parseMeta: parseMeta, version: "0.1.0" };
+var Orgitorial = { render: render, parseMeta: parseMeta, activate: activate, version: "0.2.0" };
 
 // Browser global
 if (typeof window !== "undefined") {
@@ -627,5 +759,5 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = Orgitorial;
 }
 
-export { render, parseMeta };
+export { render, parseMeta, activate };
 export default Orgitorial;

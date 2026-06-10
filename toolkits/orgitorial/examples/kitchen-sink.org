@@ -105,6 +105,64 @@ one file does it,
 no build to doubt.
 #+end_verse
 
+* Living blocks: diagrams and mini-apps :living:
+
+An article can also be a workbook. Three block types turn a static post into a
+living document — and none of them inner-scroll or sit in a cramped iframe.
+
+A *Mermaid diagram* beats a paragraph when you're describing a flow. Write it as
+=#+begin_src mermaid=; the host page's =Orgitorial.activate(document)= call
+renders it (lazy-loading mermaid from a CDN only if a diagram is present):
+
+#+begin_src mermaid
+flowchart LR
+  A[".org file"] --> B["render()"]
+  B --> C["static HTML"]
+  C --> D["activate()"]
+  D --> E["mermaid + live apps"]
+#+end_src
+
+A *wide quote* can break out of the editorial column with =:width wide= — past
+the measure, but never the whole viewport:
+
+#+begin_quote :width wide
+The best interface for a document is the document itself — readable as plain
+text, alive when you open it in a browser, and the same one file either way.
+#+end_quote
+
+And a *full-bleed mini-app*: a self-contained =#+begin_src html :app= block with
+inline styles and an inline script that runs on =activate()=. Here's a 20-line
+compounding estimator, edge to edge:
+
+#+begin_src html :app :width full
+<div style="font-family:system-ui,sans-serif;max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem;text-align:center">
+  <label style="display:block;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:#888;margin-bottom:.6rem">
+    Monthly deposit
+    <input id="amt" type="range" min="50" max="2000" step="50" value="300"
+           style="display:block;width:100%;margin-top:.6rem;accent-color:#b3411f">
+  </label>
+  <div style="font-size:2.4rem;font-weight:700;line-height:1.1;margin:.4rem 0">
+    <span id="dep">$300</span>/mo →
+    <span id="total" style="color:#b3411f">$0</span>
+  </div>
+  <div style="font-size:.8rem;color:#888">after 30 years at 7% / yr, compounded monthly</div>
+  <script>
+    (function () {
+      var amt = document.getElementById("amt");
+      var fmt = function (n) { return "$" + Math.round(n).toLocaleString(); };
+      function recompute() {
+        var p = +amt.value, r = 0.07 / 12, n = 30 * 12;
+        var fv = p * ((Math.pow(1 + r, n) - 1) / r);
+        document.getElementById("dep").textContent = fmt(p);
+        document.getElementById("total").textContent = fmt(fv);
+      }
+      amt.addEventListener("input", recompute);
+      recompute();
+    })();
+  </script>
+</div>
+#+end_src
+
 * Drawers for metadata :advanced:
 
 Property drawers fold away the machinery so the prose stays clean. They render
