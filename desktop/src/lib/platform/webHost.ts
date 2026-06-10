@@ -199,6 +199,14 @@ function makeInvoke(): Invoke {
   let tabSeq = 0;
   const snap = () => ({ tabs, active: activeTabId });
 
+  // ?onboarding=fresh — preview the EMPTY first-run path: signed out,
+  // runtime stopped, no model key. Stateful so the flow can be walked
+  // (sign-in / wizard connect / key save flip the bits).
+  const freshOnboarding =
+    typeof location !== "undefined" &&
+    new URLSearchParams(location.search).get("onboarding") === "fresh";
+  const freshState = { signedIn: false, runtime: false, hasKey: false };
+
   // Stateful bookmark mock — backs the sidebar bookmark grid.
   let bookmarksMock: {
     id: string;
@@ -245,28 +253,43 @@ function makeInvoke(): Invoke {
 
     switch (cmd) {
       // ── identity / auth (http domain in a real web build) ──
-      case "identity_load": return IDENTITY;
+      case "identity_load": return freshOnboarding && !freshState.signedIn ? null : IDENTITY;
       case "identity_generate": return IDENTITY;
       case "identity_set_handle": return { ...IDENTITY, handle: a.handle };
       case "identity_set_workos": return { ...IDENTITY, workos_user_id: a.workos_user_id };
-      case "workos_load_session": return SESSION;
-      case "workos_sign_in": return SESSION;
+      case "workos_load_session":
+        return freshOnboarding && !freshState.signedIn ? null : SESSION;
+      case "workos_sign_in":
+        freshState.signedIn = true;
+        return SESSION;
       case "workos_clear_session": return null;
 
       // ── engine / daemon (local supervision — n/a on web) ──
-      case "daemon_status": case "daemon_up": case "daemon_down":
+      case "daemon_status":
+        return freshOnboarding && !freshState.runtime
+          ? { ...DAEMON, state: "stopped", url: null, pid: null }
+          : DAEMON;
+      case "daemon_up": case "daemon_down":
       case "daemon_restart": return DAEMON;
       case "sidecar_restart": return null;
       case "engine_detect": return { os: "macos", has_krunvm: true, has_homebrew: true, has_volume: true };
       case "engine_probe": return true;
-      case "engine_boot_local": case "engine_connect_cloud": return DAEMON;
+      case "engine_boot_local": case "engine_connect_cloud":
+        freshState.runtime = true;
+        return DAEMON;
       case "engine_disconnect_cloud": case "engine_install_backend": return null;
       case "runtime_url": return { url: DAEMON.url, token: "mock", state: "running" };
 
       // ── setup (don't auto-open the wizard) ──
-      case "setup_status": return { keychain_initialized: true, has_model_key: true, first_run_done: true };
+      case "setup_status":
+        return freshOnboarding
+          ? { keychain_initialized: true, has_model_key: freshState.hasKey, first_run_done: false }
+          : { keychain_initialized: true, has_model_key: true, first_run_done: true };
+      case "setup_save_model_key":
+        freshState.hasKey = true;
+        return { keychain_initialized: true, has_model_key: true, first_run_done: false };
       case "setup_initialize_keychain": case "setup_complete_first_run":
-      case "setup_save_model_key": return { keychain_initialized: true, has_model_key: true, first_run_done: true };
+        return { keychain_initialized: true, has_model_key: true, first_run_done: true };
 
       // ── workspaces handled via plugin:store above ──
 

@@ -370,7 +370,7 @@
     max-width: 440px;
     background: color-mix(in srgb, #14161b 88%, transparent);
     backdrop-filter: blur(8px);
-    border: 1px solid #262a32;
+    border: 0;
     border-radius: 14px;
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
     padding: 1.5rem 2rem 1.75rem;
