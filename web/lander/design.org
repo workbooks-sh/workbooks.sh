@@ -20,10 +20,10 @@ existing pattern, not a new one.
   stack and 02 · in the wild are human; yours continue 03, 04, …, in DOM
   order). Whoever adds or moves a section renumbers the kickers after it.
 
-  A section is ONE SOURCE FILE: `src/sections/grown/NN-slug.svelte`
-  (NN = page order; yours start at 04; faq is always 99-faq.svelte). The
-  page build compiles components — you never edit built output. The
-  component contains exactly one <section class="grown"> with
+  A section is ONE HTML PARTIAL: `content/sections/NN-slug.html` plus a row
+  in `content/sections.json` (NN = page order; yours start at 04; an faq row
+  carries `"pin":"last"`). The live page loads partials at runtime — no build,
+  no compiled output to edit. The partial is exactly one <section class="grown"> with
     1. <div class="kicker">0N · <two-word label></div>  (the sequence above)
     2. an <h2> (sentence case, ≤6 words, no period)
     3. prose <p>s — var(--dim), 15.5px, ≤65ch, 2-4 paragraphs MAX
