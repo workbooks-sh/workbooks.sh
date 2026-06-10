@@ -34,17 +34,17 @@ body {
   font-family: var(--sans); -webkit-font-smoothing: antialiased;
 }
 
-/* ── canvas: blueprint grid + vignette ───────────────────────── */
-.canvas {
-  position: fixed; inset: 0; z-index: 0;
-  background:
-    radial-gradient(1200px 700px at 42% 30%, rgba(255,255,255,.025), transparent 60%),
-    linear-gradient(var(--line-soft) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
-  background-size: auto, 56px 56px, 56px 56px;
-  opacity: 0; animation: canvas-in 1.4s .2s ease forwards;
+/* ── hero background: gradient ASCII shader (canvas). Everything
+   after the hero sits on a flat near-black. ─────────────────── */
+#ascii {
+  position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
+  opacity: 0; transition: opacity 1.6s ease;
 }
-@keyframes canvas-in { to { opacity: 1; } }
+#ascii.on { opacity: 1; }
+.hero::after {                       /* fade the field into the flat page */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28%;
+  background: linear-gradient(transparent, var(--bg)); pointer-events: none; z-index: 1;
+}
 
 /* ── materialization ─────────────────────────────────────────── */
 .blk { opacity: 0; }
@@ -56,13 +56,17 @@ body {
 }
 .blk.touch { box-shadow: 0 0 0 1px var(--live), 0 0 24px -6px var(--live); transition: box-shadow .2s; }
 
-/* ── shell: scrollable content + fixed right panel ───────────── */
-.content { position: relative; z-index: 10; margin-right: var(--panel-w); }
+/* ── shell: scrollable content + fixed right panel ──────────────
+   The panel does NOT exist visually until the build finishes: no
+   reserved space, slid off-screen. body.panel-open reveals it. */
+.content { position: relative; z-index: 10; margin-right: 0; transition: margin-right .6s cubic-bezier(.3,.8,.3,1); }
+body.panel-open .content { margin-right: var(--panel-w); }
 
 /* ── top floating nav (centered in the content column) ───────── */
 .nav {
-  position: fixed; top: 18px; left: calc((100vw - var(--panel-w)) / 2);
+  position: fixed; top: 18px; left: 50%;
   translate: -50% 0; z-index: 40;
+  transition: left .6s cubic-bezier(.3,.8,.3,1);
   display: flex; align-items: center; gap: 22px;
   padding: 9px 10px 9px 14px;
   background: color-mix(in srgb, var(--panel) 82%, transparent);
@@ -80,13 +84,16 @@ body {
   padding: 7px 13px; font: 500 12.5px/1 var(--mono); letter-spacing: -.01em;
 }
 .nav .cta:hover { background: #fff; color: #000; }
+body.panel-open .nav { left: calc((100vw - var(--panel-w)) / 2); }
 
 /* ── hero ────────────────────────────────────────────────────── */
 .hero {
+  position: relative; overflow: hidden;
   min-height: 100dvh; display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center;
   padding: 96px 32px 64px;
 }
+.hero > :not(#ascii) { position: relative; z-index: 2; }
 .hero .mark { width: 88px; height: 70px; color: var(--ink); margin-bottom: 32px; }
 .hero .mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 8px 30px rgba(0,0,0,.6)); }
 .hero h1 {
@@ -143,7 +150,19 @@ body {
 }
 #examples h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 12px; }
 #examples .xsub { color: var(--dim); font: 400 15px/1.6 var(--sans); max-width: 60ch; margin: 0 0 28px; }
-.xgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.xgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.poster.featured { grid-column: 1 / -1; aspect-ratio: 16 / 6.8; }
+.poster.featured .pimg {
+  position: absolute; inset: 0;
+  background: url(assets/wulu-banner.jpg) center / cover no-repeat;
+}
+.poster.featured .pscrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(195deg, transparent 35%, rgba(7,8,11,.88) 78%);
+}
+.poster.featured .pname { font-size: clamp(40px, 5vw, 60px); letter-spacing: .18em; }
+.poster.featured .ptag { max-width: 46ch; }
+@media (max-width: 700px) { .poster.featured { aspect-ratio: 16 / 10; } .xgrid { grid-template-columns: 1fr 1fr; } }
 .poster {
   position: relative; aspect-ratio: 2 / 2.7; border-radius: 12px; overflow: hidden;
   border: 1px solid var(--line); text-decoration: none; display: block;
@@ -191,33 +210,60 @@ body {
 #cursor.working .tag::after { content: " ·"; animation: workdots 1s steps(3) infinite; }
 @keyframes workdots { 33% { content: " ··"; } 66% { content: " ···"; } }
 
-/* ── right panel: the timeline ───────────────────────────────── */
+/* ── right panel: the timeline. Hidden until the build finishes
+   (body.panel-open), and hideable any time after that. ───────── */
 .panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w); z-index: 30;
-  display: flex; flex-direction: column;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border-left: 1px solid var(--line);
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  display: flex; flex-direction: column; gap: 10px; padding: 14px;
+  background: var(--bg); border-left: 1px solid var(--line);
   font-family: var(--mono);
+  transform: translateX(102%);
+  transition: transform .6s cubic-bezier(.3,.8,.3,1);
 }
-.panel .ribbon { padding: 18px 20px 0; }
-.panel .ribbon p { margin: 0; font: 400 12.5px/1.6 var(--sans); color: var(--dim); }
+body.panel-open .panel { transform: none; }
 
-.panel .status { padding: 16px 20px; border-bottom: 1px solid var(--line); display: grid; gap: 9px; }
-.panel .status .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.panel .status .k { font: 400 11px/1 var(--mono); color: var(--faint); }
-.panel .status .v { font: 400 11px/1 var(--mono); color: var(--faint); text-align: right; }
-.panel .status .v.on { color: var(--live); }
-.panel .status .state { display: flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); color: var(--ink); }
-.panel .status .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); position: relative; }
-.panel.running .status .pulse { background: var(--live); }
-.panel.running .status .pulse::after {
+.pcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+
+/* card 1 — the point, loud: green bg, black text */
+.pcard.hello { background: var(--live); border-color: var(--live); padding: 16px 18px; position: relative; }
+.pcard.hello h3 { margin: 0 0 6px; font: 600 15px/1.25 var(--sans); color: #04130a; letter-spacing: -.01em; }
+.pcard.hello p { margin: 0; font: 400 12px/1.5 var(--sans); color: rgba(4,19,10,.75); }
+.pcard.hello .phide {
+  position: absolute; top: 10px; right: 10px; appearance: none; border: 0;
+  background: rgba(4,19,10,.12); color: #04130a; width: 22px; height: 22px;
+  border-radius: 6px; font: 500 12px/1 var(--mono); cursor: pointer;
+}
+.pcard.hello .phide:hover { background: rgba(4,19,10,.22); }
+
+/* card 2 — live status */
+.pcard.status { padding: 13px 16px; display: grid; gap: 9px; }
+.pcard.status .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pcard.status .k { font: 400 11px/1 var(--mono); color: var(--faint); }
+.pcard.status .v { font: 400 11px/1 var(--mono); color: var(--faint); text-align: right; }
+.pcard.status .v.on { color: var(--live); }
+.pcard.status .state { display: flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); color: var(--ink); }
+.pcard.status .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); position: relative; }
+.panel.running .pulse { background: var(--live); }
+.panel.running .pulse::after {
   content: ""; position: absolute; inset: -4px; border-radius: 50%;
   border: 1px solid var(--live); animation: ring 1.6s ease-out infinite;
 }
 @keyframes ring { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
 
-.panel .tl { flex: 1; overflow-y: auto; padding: 18px 20px; scrollbar-width: thin; }
+/* reopen chip — only when the panel is hidden (after it has existed) */
+.peek {
+  position: fixed; right: 18px; bottom: 18px; z-index: 29;
+  display: none; align-items: center; gap: 8px;
+  appearance: none; border: 1px solid var(--line); cursor: pointer;
+  background: var(--panel); color: var(--dim);
+  font: 500 11.5px/1 var(--mono); padding: 10px 14px; border-radius: 999px;
+  box-shadow: 0 12px 32px -16px rgba(0,0,0,.8);
+}
+.peek:hover { color: var(--ink); border-color: var(--faint); }
+.peek .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+body.panel-was-open:not(.panel-open) .peek { display: flex; }
+
+.panel .tl { flex: 1; overflow-y: auto; padding: 16px 16px 8px; scrollbar-width: thin; }
 .node { position: relative; padding: 0 0 20px 20px; }
 .node::before {                                  /* rail */
   content: ""; position: absolute; left: 3px; top: 12px; bottom: -2px;
@@ -240,9 +286,10 @@ body {
 
 /* ── responsive: panel stacks under the page on small screens ── */
 @media (max-width: 960px) {
-  .content { margin-right: 0; }
-  .nav { left: 50%; }
-  .panel { position: static; width: 100%; height: auto; border-left: 0; border-top: 1px solid var(--line); }
+  body.panel-open .content { margin-right: 0; }
+  .nav { left: 50% !important; }
+  .panel { position: static; width: 100%; height: auto; border-left: 0; border-top: 1px solid var(--line); transform: none; display: none; }
+  body.panel-open .panel { display: flex; }
   .panel .tl { max-height: 50vh; }
 }
 @media (max-width: 640px) {
@@ -254,8 +301,6 @@ body {
 </style>
 </head>
 <body>
-
-<div class="canvas" aria-hidden="true"></div>
 
 <!-- agent cursor -->
 <div id="cursor" aria-hidden="true">
@@ -280,6 +325,7 @@ body {
 
 <div class="content">
   <main class="hero">
+    <canvas id="ascii" aria-hidden="true"></canvas>
     <span class="mark blk" id="b-mark" aria-hidden="true">
       <svg viewBox="0 0 258 206" fill="none">
         <path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/>
@@ -307,12 +353,14 @@ body {
 
   <!-- examples: human-curated. The agent never edits this section. -->
   <section id="examples">
-    <h2>Sites that run themselves</h2>
-    <p class="xsub">Each example is a real site with a real job, maintained by its own
-    agents on this same runtime. This page is the first. More are coming online.</p>
+    <h2>Workbooks in the wild</h2>
+    <p class="xsub">Software built in workbooks — real sites and tools with real
+    jobs, running on this same runtime. This page is one of them.</p>
     <div class="xgrid">
-      <a class="poster" href="#" aria-disabled="true">
+      <a class="poster featured" href="#" aria-disabled="true">
         <div class="pbg"></div>
+        <div class="pimg"></div>
+        <div class="pscrim"></div>
         <div class="pbody">
           <span class="pname">WULU</span>
           <span class="ptag">AI &amp; tech, curated like a cinema catalog. Creators
@@ -320,8 +368,9 @@ body {
         </div>
         <span class="pstatus">in production</span>
       </a>
-      <div class="poster ghost"><div class="pbody"><span class="ptag">next example</span></div></div>
-      <div class="poster ghost"><div class="pbody"><span class="ptag">next example</span></div></div>
+      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
+      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
+      <div class="poster ghost"><div class="pbody"><span class="ptag">next</span></div></div>
     </div>
   </section>
 
@@ -330,12 +379,14 @@ body {
 </div>
 
 <!-- fixed right panel: the live timeline -->
-<aside class="panel blk" id="timeline" aria-label="Agent timeline">
-  <div class="ribbon">
-    <p>An agent maintains this site — every change shows up here.</p>
+<aside class="panel" id="timeline" aria-label="Agent timeline">
+  <div class="pcard hello">
+    <button class="phide" id="phide" aria-label="Hide timeline">×</button>
+    <h3>This site is a workbook.</h3>
+    <p>An agent ships to it every hour, in public. You're looking at its desk.</p>
   </div>
 
-  <div class="status">
+  <div class="pcard status">
     <div class="row">
       <span class="state"><span class="pulse"></span><span id="stState">connecting…</span></span>
       <span class="v" id="stLast"></span>
@@ -345,6 +396,8 @@ body {
 
   <div class="tl"><div id="tlList"></div></div>
 </aside>
+
+<button class="peek" id="peek" aria-label="Show timeline"><span class="dot"></span>timeline</button>
 
 <script>
 (() => {
@@ -406,9 +459,17 @@ async function build() {
   await place('#b-sub');
   await place('#b-ctas');
   await place('#b-cards');
-  await place('#timeline', 500);
   await cursorExit();
+  openPanel();        // the timeline reveals itself only after the agent leaves
 }
+
+/* ── panel visibility ─────────────────────────────────────────── */
+const openPanel = () => { document.body.classList.add('panel-open', 'panel-was-open'); };
+const closePanel = () => { document.body.classList.remove('panel-open'); };
+document.addEventListener('click', e => {
+  if (e.target.closest('#phide')) closePanel();
+  if (e.target.closest('#peek')) openPanel();
+});
 
 /* ── live feed: /_changes = commits + agent status ────────────── */
 async function fetchFeed() {
@@ -529,9 +590,49 @@ async function watch() {
   }
 }
 
+/* ── hero ASCII shader: flowing char field on a green→blue gradient ─ */
+(() => {
+  const cv = $('#ascii'), ctx = cv.getContext('2d');
+  const RAMP = ' ..::--=+*#%@';
+  const CELL = 15;
+  let cols, rows, t = 0, running = false;
+  const resize = () => {
+    cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
+    cols = Math.ceil(cv.width / CELL); rows = Math.ceil(cv.height / CELL);
+    ctx.font = '12px ui-monospace, monospace';
+  };
+  const G = [63, 224, 129], B = [47, 111, 224];
+  const frame = () => {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const n = Math.sin(x * .19 + t) + Math.cos(y * .23 - t * .7) + Math.sin((x + y) * .11 + t * .5);
+        const v = (n + 3) / 6;                       // 0..1
+        const ch = RAMP[Math.floor(v * (RAMP.length - 1))];
+        if (ch === ' ') continue;
+        const m = Math.min(1, Math.max(0, x / cols * .6 + (1 - y / rows) * .4 + (v - .5) * .3));
+        const c = G.map((g, i) => Math.round(g * m + B[i] * (1 - m)));
+        ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(.04 + v * .14).toFixed(3)})`;
+        ctx.fillText(ch, x * CELL, y * CELL + 12);
+      }
+    }
+    t += .016;
+    if (running) setTimeout(() => requestAnimationFrame(frame), 50);
+  };
+  resize(); addEventListener('resize', resize);
+  if (reduced) { frame(); cv.classList.add('on'); return; }
+  new IntersectionObserver(([e]) => {
+    const vis = e.isIntersecting;
+    if (vis && !running) { running = true; frame(); }
+    if (!vis) running = false;
+  }).observe(cv.parentElement);
+  running = true; frame(); cv.classList.add('on');
+})();
+
 if (reduced) {
   document.querySelectorAll('.blk').forEach(b => b.classList.add('on'));
   $('#h1text').textContent = H1;
+  openPanel();
 } else {
   build();
 }

@@ -75,6 +75,11 @@
        audit. If there is truly nothing worth doing, log "no change" and stop.
     6. Write commit messages for the visitors reading the timeline, not for
        git: short, plain, present tense, what + why.
+    7. THE PITCH (brand rule, absolute): Workbooks is "software built in
+       workbooks" — malleable, flexible, yours. NEVER pitch it as "sites that
+       run themselves" or agents managing software in perpetuity; your hourly
+       loop on THIS site is a demo of malleability, not the product promise.
+       Any copy you write must respect this framing.
 
 *** Every run, in order
 
