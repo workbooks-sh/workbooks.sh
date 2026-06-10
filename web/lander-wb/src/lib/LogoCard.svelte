@@ -18,7 +18,7 @@
   strong{font-size:1.05rem;font-weight:700} .b{font-size:.9rem;opacity:.8;line-height:1.5}
   /* SATURATED color backgrounds; the W-mark is the subtle, lighter tone (a soft
      white wash over the fill). Text contrast chosen per color. */
-  .green{background:var(--green);color:#fff} .green .wm{fill:#fff;opacity:.2}
+  .green{background:var(--green);color:#06230f} .green .wm{fill:#fff;opacity:.34}
   .blue{background:var(--blue);color:#fff} .blue .wm{fill:#fff;opacity:.2}
   .rose{background:var(--rose);color:#fff} .rose .wm{fill:#fff;opacity:.2}
   .ink{background:var(--ink);color:var(--bg)} .ink .wm{fill:currentColor;opacity:.12}

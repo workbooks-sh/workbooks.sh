@@ -15,7 +15,7 @@
   onMount(applyTheme);
 
   const W = "M0 206V0.00231147H69.1194V76L126.393 0L168.946 0.00231147V76L223.295 0L257 0.00231147V183C257 195.703 246.703 206 234 206H116.27L112.626 140.5L41.5 206H0Z";
-  const trio = [["green", "#0a9d44", "go · live · positive"], ["blue", "#0080ff", "running · links · focus"], ["rose", "#ff0066", "alert · error · accent"]];
+  const trio = [["green", "#00ff44", "go · live · positive"], ["blue", "#0080ff", "running · links · focus"], ["rose", "#ff0066", "alert · error · accent"]];
   const neutrals = [["bg", "page"], ["bg2", "subtle fill"], ["card", "surface"], ["ink", "text"], ["ink2", "muted"], ["ink3", "faint"], ["hair", "hairline"]];
 </script>
 
@@ -116,6 +116,8 @@
       <Rule kind="dont">Don't use <em>accent stripes</em> (top borders, left rules) on cards.</Rule>
       <Rule kind="do">Pair every human <em>claim</em> with a machine <em>receipt</em> (real output).</Rule>
       <Rule kind="dont">Don't fabricate receipts, metrics, or praise — pre-launch, there are none.</Rule>
+      <Rule kind="do">On the bright <em>green</em>, set text in ink/black — it's high-luminance.</Rule>
+      <Rule kind="dont">Don't put <em>white</em> on green; white is for blue &amp; rose.</Rule>
       <Rule kind="do">Hairlines and <em>solid fills</em>; the trio is constant across themes.</Rule>
       <Rule kind="dont">No gradients-as-decoration, no drop-shadow chrome, no strokes.</Rule>
     </div>
