@@ -438,14 +438,16 @@ body.panel-open .viewer { right: calc(var(--panel-w) + 14px); }
   border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
 .vpage { width: 920px; height: 560px; border: 0; transform: scale(.227); transform-origin: 0 0;
   pointer-events: none; background: var(--bg); }
-.vcur { position: absolute; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--live); box-shadow: 0 0 0 2px color-mix(in srgb, var(--live) 30%, transparent);
-  animation: vroam 9s ease-in-out infinite; }
-@keyframes vroam {
-  0%   { left: 22%; top: 28%; } 22%  { left: 58%; top: 42%; }
-  45%  { left: 38%; top: 70%; } 68%  { left: 72%; top: 56%; }
-  100% { left: 22%; top: 28%; }
-}
+/* the embed activity dot — its left/top are TRUE coordinates set by the engine
+   (anchorEmbed: the rect of the element the current step touches inside the embed,
+   scaled by the iframe transform). It transitions smoothly between real positions;
+   it is HIDDEN (.show absent) whenever nothing in the embed resolves. No keyframe
+   roaming — a position with no feed datum behind it must not exist. */
+.vcur { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; background: var(--live); opacity: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--live) 30%, transparent);
+  transition: left .6s cubic-bezier(.3,.8,.3,1), top .6s cubic-bezier(.3,.8,.3,1), opacity .3s ease; }
+.vcur.show { opacity: 1; }
 .vjump { margin-top: 6px; font: 500 9.5px/1 var(--mono); color: var(--faint); }
 .viewer.haslink:hover .vjump { color: var(--live); }
 .vhead { display: flex; align-items: center; gap: 7px; }

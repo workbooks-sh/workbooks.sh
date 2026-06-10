@@ -193,6 +193,24 @@ const moveTo = async (el, ms = 950) => {
   await sleep(ms + 60);
 };
 const work = (on) => refs.cursor.classList.toggle('working', on);
+// behavior-driven placement on the MAIN page cursor: position it at `el` using
+// the semantic offset for `step` (reading scan / writing descent / tick). Unlike
+// moveTo (random scatter, used for the first fly-in), this is DETERMINISTIC from
+// the feed — the offset comes from readScanOffset(step). `ms` short → a live nudge
+// (same target, advancing), long → a travel (new target). Every position here is
+// step.tool + step.target + behaviorPolls; nothing ambient.
+const placeBehavior = async (el, step, ms = 600) => {
+  const cursor = refs.cursor;
+  let rect; try { rect = el.getBoundingClientRect(); } catch { return; }
+  if (!rect || (!rect.width && !rect.height)) return;
+  const { fx, fy } = readScanOffset(step, el, rect);
+  const x = rect.left + rect.width * (0.5 + fx);
+  const y = rect.top + rect.height * (0.5 + fy);
+  cursor.classList.toggle('flip', x > innerWidth - 280);
+  cursor.style.transitionDuration = reduced ? '0ms' : ms + 'ms';
+  cursor.style.transform = `translate(${scrollX + x}px, ${scrollY + y}px)`;
+  await sleep(reduced ? 0 : Math.min(ms + 40, 700));
+};
 const trimWords = (t, max = 90) =>
   !t || t.length <= max ? t : t.slice(0, max).replace(/\s+\S*$/, '') + ' …';
 const think = (text) => {
@@ -287,6 +305,69 @@ function callLabel(target, tool) {
   return 'working';
 }
 
+/* ── semantic motion: behavior = the actual tool ───────────────────────
+   Every motion below traces to a feed datum: the step's `tool` chooses the
+   behavior, the step's `target` (resolved to an element) is the anchor, and
+   `polls` (count of follow ticks the SAME target has persisted) advances it.
+   No global keyframes — the offset is recomputed each poll from these.
+
+   reading (vfs_read / fetch): eyes scanning a line — a slow horizontal sweep
+     left→right across the element's width, ~4s per pass, then wraps. fx ∈ [-.5,.5].
+   writing (vfs_write / publish): typing posture — descend the element's text
+     blocks (h2, then each <p>) one block per poll, anchoring fy to that block's
+     centre within the element (precise: where in the content it's writing).
+   shell/wb/git: a tight tool tick — a tiny settle jitter, no real travel.
+   anything else: centred, still. */
+const READ_TOOLS = new Set(['vfs_read', 'fetch', 'http']);
+const WRITE_TOOLS = new Set(['vfs_write', 'publish']);
+const TICK_TOOLS = new Set(['shell', 'wb', 'git', 'run']);
+// poll bookkeeping: how many follow ticks the current resolved target has lived.
+let behaviorKey = null, behaviorPolls = 0;
+// call once per poll BEFORE reading offsets, with the current target's stable key.
+// Resets the counter when the target changes; advances it when it persists (this
+// is what makes the cursor keep living on an unchanged-but-fresh step).
+function tickBehavior(key) {
+  if (key !== behaviorKey) { behaviorKey = key; behaviorPolls = 0; }
+  else behaviorPolls++;
+}
+// fractional offset within the anchored element for the current step+tool. `el`
+// + `rect` let the write behavior target real child text-blocks. fx/fy ∈ [-.5,.5].
+function readScanOffset(step, el, rect) {
+  const tool = step && step.tool;
+  if (READ_TOOLS.has(tool)) {
+    // horizontal scan: a 4s pass at our ~2.5s poll cadence advances ~0.62/poll of
+    // phase; ease it across the width so it reads like a gaze, not a metronome.
+    const phase = (behaviorPolls % 4) / 4 + 0.05;        // 0..1 across ~4 polls
+    return { fx: (phase - 0.5) * 0.74, fy: (Math.sin(behaviorPolls) * 0.04) };
+  }
+  if (WRITE_TOOLS.has(tool)) {
+    // typing descent: walk the element's text blocks (h2 then p's); one per poll.
+    const blocks = writeBlocks(el);
+    if (blocks.length && rect && rect.height) {
+      const b = blocks[Math.min(behaviorPolls, blocks.length - 1)];
+      let br; try { br = b.getBoundingClientRect(); } catch { br = null; }
+      if (br && br.height) {
+        // block centre as a fraction of the element box (its own coordinate space)
+        const fy = ((br.top + br.height / 2) - (rect.top + rect.height / 2)) / rect.height;
+        return { fx: -0.18, fy: Math.max(-0.5, Math.min(0.5, fy)) };  // left margin, like a caret
+      }
+    }
+    // no child blocks resolvable → small downward creep so it still advances
+    return { fx: -0.18, fy: Math.min(0.42, behaviorPolls * 0.12 - 0.2) };
+  }
+  if (TICK_TOOLS.has(tool)) {
+    // tool tick: a tiny pause-and-settle, no travel (work happens, cursor doesn't roam)
+    const j = behaviorPolls % 2 ? 0.03 : -0.03;
+    return { fx: j, fy: 0 };
+  }
+  return { fx: 0, fy: 0 };
+}
+// the text blocks a write descends through: heading then paragraphs, in order.
+// Deterministic from the element's children (WALDO partials are h2 + p's).
+const writeBlocks = (el) => {
+  try { return [...el.querySelectorAll('h2, p')]; } catch { return []; }
+};
+
 function viewerHead(verb, target, thought) {
   // verb line is "<verb> <short-target>" — the card's whole headline. The
   // thought gets its own clamped block (it IS the personality of the card).
@@ -324,16 +405,82 @@ async function showFile(path, verb) {
   ).join('\n')}</pre>`;
 }
 
-// another page of THIS site: a live scaled embed (the real page, ?embed=1 so
-// its shell chrome hides) with a roaming activity dot. The CARD is a link —
+// another page of THIS site: a live scaled embed (the real page, ?embed=1 so its
+// shell chrome hides) with an activity dot anchored to the REAL element the agent's
+// current step touches inside the embed (see anchorEmbed). The CARD is a link —
 // clicking jumps there; the page NEVER navigates on its own (no redirects).
 function showPage(page) {
   refs.viewer.classList.add('haslink');
   refs.viewer.dataset.jump = page;
+  embedPage = page;                 // the route the embed is showing (for stepTarget pathname)
+  embedReady = false;               // contentDocument not loaded yet — anchorEmbed guards
   refs.viewerBody.innerHTML = `<div class="vpagewrap">
     <iframe class="vpage" src="${escH(page)}?embed=1" loading="lazy" title="live view"></iframe>
     <span class="vcur" aria-hidden="true"></span>
   </div><div class="vjump">click to open ${escH(page)} →</div>`;
+}
+
+/* ── true embed anchoring: the dot IS a coordinate, not a keyframe ──────
+   The embed iframe is same-origin, so the parent can read its contentDocument.
+   Every poll while a page is embedded we resolve the agent's CURRENT step against
+   that document and, if it hits a real element, place `.vcur` at that element's
+   centre — scaled by the iframe's CSS transform (the embed is rendered at logical
+   size then `transform: scale(s)`, so a child rect read from contentDocument is in
+   logical px and must be multiplied by `s` to land in wrapper px). Nothing resolves
+   → hide the dot (the card header still narrates). Every datum here traces to the
+   live feed: the dot's position = stepTarget(currentStep, embedDoc).el.rect × scale. */
+let embedPage = null;     // route currently in the embed (set by showPage)
+let embedReady = false;   // becomes true once contentDocument + body exist
+// read the embed's CSS scale from the live transform matrix; fall back to the
+// .vpage constant (0.227) if the matrix can't be parsed (e.g. before layout).
+function embedScale(iframe) {
+  try {
+    const m = new DOMMatrixReadOnly(getComputedStyle(iframe).transform);
+    if (m.a && isFinite(m.a)) return m.a;     // uniform scale → matrix.a
+  } catch { /* fall through */ }
+  return 0.227;
+}
+// place the embed dot for the current step. Returns true if it anchored to a real
+// element (so callers know the embed is "alive"), false if nothing resolved.
+function anchorEmbed(step) {
+  const wrap = refs.viewerBody?.querySelector('.vpagewrap');
+  const iframe = wrap?.querySelector('.vpage');
+  const dot = wrap?.querySelector('.vcur');
+  if (!wrap || !iframe || !dot) return false;
+  let edoc = null;
+  try { edoc = iframe.contentDocument; } catch { edoc = null; }  // null until load
+  // the embed's SPA mounts async (CMS fetch): body may be empty for a few polls.
+  if (!edoc || !edoc.body || !edoc.body.firstChild) { embedReady = false; return false; }
+  embedReady = true;
+  // resolve THIS step against the embed's own document + route, not the host's.
+  const epath = (() => { try { return new URL(iframe.src).pathname; } catch { return embedPage || '/'; } })();
+  let t = {};
+  try { t = stepTarget(step, edoc, epath); } catch { t = {}; }
+  if (!t.el) { dot.classList.remove('show'); clearTouch(edoc); return false; }
+  let rect;
+  try { rect = t.el.getBoundingClientRect(); } catch { return false; }
+  if (!rect || (!rect.width && !rect.height)) { dot.classList.remove('show'); return false; }
+  const s = embedScale(iframe);
+  // element centre in the embed's logical coordinate space → wrapper px via scale.
+  const scan = readScanOffset(step, t.el, rect);   // semantic motion (reading drift)
+  const x = (rect.left + rect.width * (0.5 + scan.fx)) * s;
+  const y = (rect.top + rect.height * (0.5 + scan.fy)) * s;
+  dot.style.left = x + 'px';
+  dot.style.top = y + 'px';
+  dot.classList.add('show');
+  // brief highlight on the embed element itself — the embed loads our CSS so the
+  // `.touch` ring exists inside its document. Only (re)apply on target change.
+  if (anchorKey !== embedTargetKey(t.el)) {
+    anchorKey = embedTargetKey(t.el);
+    clearTouch(edoc);
+    try { t.el.classList.add('touch'); setTimeout(() => { try { t.el.classList.remove('touch'); } catch {} }, 1600); } catch {}
+  }
+  return true;
+}
+let anchorKey = null;
+const embedTargetKey = (el) => el.dataset?.grown || el.id || (el.tagName + ':' + (el.textContent || '').slice(0, 24));
+function clearTouch(edoc) {
+  try { edoc.querySelectorAll('.touch').forEach((n) => n.classList.remove('touch')); } catch {}
 }
 
 // a private/external call: NEVER the args or response — a labelled pulse only.
@@ -347,6 +494,7 @@ function closeViewer() {
   if (!win || !win.classList.contains('open')) return;
   win.classList.remove('open');
   viewerKey = null;
+  embedPage = null; embedReady = false; anchorKey = null;   // forget the embed state
   if (refs.viewerBody) refs.viewerBody.innerHTML = '';   // drop the iframe so it stops loading
 }
 // open (or re-point) the viewer for an off-page target. `t` is the resolved
@@ -365,7 +513,10 @@ function openViewer(t) {
   viewerKey = key;
   win.classList.add('open');
   viewerHead(t.verb, head, t.thought);
-  if (!t.pageEmbed) { refs.viewer.classList.remove('haslink'); delete refs.viewer.dataset.jump; }
+  if (!t.pageEmbed) {
+    refs.viewer.classList.remove('haslink'); delete refs.viewer.dataset.jump;
+    embedPage = null; embedReady = false; anchorKey = null;   // leaving embed mode
+  }
   if (t.pageEmbed) showPage(t.pageEmbed);
   else if (t.url) showUrl(t.url);
   else if (t.file) showFile(t.file, t.verb);
@@ -661,11 +812,18 @@ async function fetchActivity() {
 //   { page }          — another lander page: redirect (follow + not already there)
 //   { url } / { file }— off-page: the viewer window shows it
 //   {}                — nothing specific: HOLD position (never default to the headline)
-const stepTarget = (step) => {
+// `doc` is the DOM the element must live in. For the main page that's `document`;
+// when resolving a step FOR the portal's live embed it's `iframe.contentDocument`
+// — so {el} hits point inside the embed and we can anchor the embed dot to a REAL
+// node (no more fake roaming). `pathname` is the route that `doc` is showing (the
+// embed's route, not the host's) so the "am I already on this page" checks below
+// compare against the right page. Both default to the host document/route.
+const stepTarget = (step, doc = document, pathname = location.pathname) => {
   const t = (step && step.target) || '';
   const tool = step && step.tool;
   const verb = verbFor(tool);
-  // git history work → inspect the actual commit node in the panel
+  // git history work → inspect the actual commit node in the panel. The panel is
+  // host-only chrome (hidden in the embed) so always resolve it against `document`.
   if (/git\s+(log|show|diff)|^git\b/.test(t)) {
     const sha = /\b([0-9a-f]{7,40})\b/.exec(t);
     let node = null;
@@ -680,7 +838,7 @@ const stepTarget = (step) => {
   const grown = /content\/sections\/(\d{2}-[\w-]+)\.html/.exec(t);
   if (grown) {
     const hook = grown[1];
-    const el = document.querySelector(`[data-grown="${hook}"]`);
+    const el = doc.querySelector(`[data-grown="${hook}"]`);
     if (el) return { el };
     return { file: `content/sections/${hook}.html`, verb };
   }
@@ -694,11 +852,13 @@ const stepTarget = (step) => {
   if (file) {
     const f = file[1];
     if (f.startsWith('blog/')) {
-      // a blog page: follow it there in-shell; ON the page, the cursor works
-      // over the article itself; otherwise glimpse the file in the viewer.
+      // a blog page: follow it there in-shell; ON the page (host OR embed showing
+      // that route), the cursor works over the article itself; otherwise glimpse
+      // the file in the viewer. Route compare uses `pathname` (embed's when resolving
+      // for the embed) so the article resolves inside the embedded blog page too.
       const page = '/' + f.replace(/\.html$/, '');
-      if (location.pathname === page || location.pathname === '/' + f) {
-        const el = document.querySelector('.blogpost article');
+      if (pathname === page || pathname === '/' + f) {
+        const el = doc.querySelector('.blogpost article');
         if (el) return { el };
       }
       if (following && location.pathname !== page) return { page };
@@ -707,8 +867,8 @@ const stepTarget = (step) => {
     return { file: f, verb };
   }
   if (/index\.html/.test(t)) {
-    const sec = document.querySelectorAll('#grown section');
-    const el = sec[0] || document.querySelector('#grown');
+    const sec = doc.querySelectorAll('#grown section');
+    const el = sec[0] || doc.querySelector('#grown');
     return el ? { el } : {};
   }
   // a bare http(s) url (fetch tool / reading the web) → the viewer frames it
@@ -800,20 +960,34 @@ async function follow() {
       t.thought = act.thought;
       const key = fresh ? targetKey(t) : null;
 
-      if (t.page && key !== lastKey) {
-        // another lander page: NEVER redirect the visitor — show a live embed
-        // in the portal instead; clicking it is THEIR choice to jump.
-        lastKey = key;
-        if (openViewer({ pageEmbed: t.page, verb: 'working on', thought: t.thought })) {
-          if (!absorbed && cursorIn) await absorbCursor();
+      if (t.page) {
+        // another lander page: NEVER redirect the visitor — show a live embed in
+        // the portal. On target change (re)open it; the cursor is absorbed away.
+        if (key !== lastKey) {
+          lastKey = key;
+          if (openViewer({ pageEmbed: t.page, verb: 'working on', thought: t.thought })) {
+            if (!absorbed && cursorIn) await absorbCursor();
+          }
+          if (refs.cursor && (absorbed || !cursorIn)) refs.cursor.style.opacity = '0';
+        } else if (act.thought && isViewerOpen()) {
+          viewerHead('working on', t.page, act.thought);   // keep narrating live
         }
-        if (refs.cursor && (absorbed || !cursorIn)) refs.cursor.style.opacity = '0';
+        // EVERY poll: anchor the embed dot to the real element the CURRENT step
+        // touches inside the embed (its position IS stepTarget(last, embedDoc).el).
+        // tickBehavior advances the scan/descent even when the target is unchanged,
+        // so the dot visibly lives instead of freezing. anchorEmbed reads its own
+        // resolved target's key into the same behavior counter via the step+page.
+        tickBehavior('pg:' + t.page + ':' + (last.tool || '') + ':' + (last.target || ''));
+        anchorEmbed(last);     // guarded: false (dot hidden) until the embed loads
         await sleep(2500);
         continue;
       }
 
       if (fresh && t.el) {
-        // ON-PAGE: the cursor manifests at the element (only on target change)
+        // ON-PAGE: the cursor manifests at the element. tickBehavior tracks how
+        // long this exact target has persisted so the behavior (read scan / write
+        // descent) advances each poll — the cursor lives even on an unchanged step.
+        tickBehavior('on:' + key + ':' + (last.tool || ''));
         if (key !== lastKey) {
           lastKey = key;
           if (isViewerOpen()) { closeViewer(); await popCursor(t.el); }
@@ -825,8 +999,16 @@ async function follow() {
             await moveTo(t.el);
           }
           t.el.classList.add('touch');
-          setTimeout(() => t.el.classList.remove('touch'), 1600);
+          setTimeout(() => { try { t.el.classList.remove('touch'); } catch {} }, 1600);
+        } else {
+          // SAME target, still fresh: don't re-fly — advance the behavior in place.
+          // reading drifts across the line; writing descends the text blocks; a
+          // tool tick barely settles. Each is a deterministic offset from the feed.
+          await placeBehavior(t.el, last, 600);
         }
+        // writing posture: the working pulse runs while a write persists (the
+        // step.tool says so); cleared otherwise so reading doesn't look like typing.
+        work(WRITE_TOOLS.has(last.tool));
         if (act.thought && !absorbed) think(act.thought);
       } else if (fresh && (t.url || t.file || t.call)) {
         // OFF-PAGE: the portal owns it; the page cursor is absorbed away
