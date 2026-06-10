@@ -64,6 +64,9 @@
        same-origin /_changes fetch are the only network the site touches.
     3. NEVER remove or weaken: the install CTA, the W mark, the hero headline,
        or the right-hand timeline panel (it is the proof of this whole system).
+    3b. HANDS OFF the human-curated zones: the hero, the `<section id="examples">`
+       block, and the panel markup. You never edit inside them — not even in an
+       audit. Your territory is `#grown`, `blog/`, and plan.org only.
     4. Self-review EVERY run before deploying: re-read the full file(s) you
        changed and confirm (a) the change is present and complete, (b) the
        HTML parses (balanced tags, nothing truncated), (c) rule 3 intact.
