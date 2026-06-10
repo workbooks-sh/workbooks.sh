@@ -29,6 +29,7 @@
 
 <style>
   .receipt {
+    border-radius: 10px; overflow: hidden;
     background: var(--paper);   /* resolves to terminal #0d0e10 via data-theme */
     color: var(--ink);
     border: 1px solid var(--rule);
@@ -59,4 +60,5 @@
     .row { grid-template-columns: 80px 56px 1fr; }
     .sha { grid-column: 2 / 4; justify-self: start; }
   }
+  /* product chrome: the terminal block sits ON the page like a Linear card */
 </style>

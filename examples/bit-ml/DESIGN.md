@@ -40,6 +40,15 @@ meta 11/1 mono uppercase +0.06em tracking.
 **The rule that makes it sing:** serif and mono NEVER touch without a
 hairline or whitespace between them. The contrast is the brand.
 
+**The Linear-forward dial (founder, 2026-06-10):** the serif is RESERVED —
+the wire lead and story headlines only. The stack's bite heads are tight
+grotesk (Switzer ~590, −2.2% tracking, 19/1.3); all chrome is product-grade
+Linear: frosted sticky masthead (blur + translucent paper), a ⌘K hint chip,
+pill toggles (1px border, full radius, bg-shift hover), radii ONLY on
+interactive/floating chrome (10–12px on panels, never on bites), and a
+barely-there radial glow atop dark terminal surfaces. The editorial stack
+itself stays flat and hairlined — paper is paper, product is product.
+
 ## 3. Color — paper, ink, one wire
 
 Light mode is canonical (news is read, not dwelled in). Dark mode is the

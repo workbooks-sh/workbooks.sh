@@ -54,7 +54,7 @@
     <span class="when">{time}{#if read} · {read} read{/if}</span>
   </div>
 
-  <h2 class="head serif">{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</h2>
+  <h2 class="head">{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</h2>
 
   {#if dek}<p class="dek">{dek}</p>{/if}
 
@@ -84,10 +84,12 @@
   }
 
   .head {
+    /* Linear voice: the stack's heads are TIGHT GROTESK — serif is reserved
+       for the wire lead and story pages (the editorial soul, used sparingly). */
     margin: 0;
-    font-family: var(--serif);
-    font-size: 22px; line-height: 1.15; font-weight: 600;
-    letter-spacing: -0.012em;
+    font-family: var(--sans);
+    font-size: 19px; line-height: 1.3; font-weight: 590;
+    letter-spacing: -0.022em;
     color: var(--ink);
     text-wrap: balance;
   }

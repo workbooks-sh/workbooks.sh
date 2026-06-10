@@ -23,6 +23,7 @@
   </nav>
 
   <div class="right mono">
+    <span class="kbd" aria-hidden="true">⌘K</span>
     <span class="clock" aria-label="UTC clock">{clock} UTC</span>
     <button class="crew" class:on={crewOpen} onclick={oncrew} aria-pressed={crewOpen}>
       <span class="glyph">◉</span> crew
@@ -34,7 +35,11 @@
 <style>
   .mast {
     display: flex; align-items: center; gap: 24px;
-    padding: 18px 0 16px;
+    padding: 14px 0 13px;
+    position: sticky; top: 0; z-index: 30;
+    background: color-mix(in srgb, var(--paper) 78%, transparent);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
   }
   .logo {
     font-family: var(--serif); font-weight: 600; font-size: 22px;
@@ -43,6 +48,12 @@
   }
   .logo:hover { text-decoration: none; }
   .dot { color: var(--wire); }
+
+  .kbd {
+    font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 3px 7px;
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+  }
 
   .nav { display: flex; align-items: center; gap: 18px; margin-left: 4px; }
   .navlink {
@@ -57,13 +68,18 @@
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
   .crew {
+    /* a Linear pill: bordered, radiused, bg-shift on hover — product chrome */
     display: inline-flex; align-items: center; gap: 6px;
-    background: none; border: 0; padding: 0;
-    font-family: var(--mono); font-size: 11px;
+    border: 1px solid var(--rule); border-radius: 999px; padding: 5px 12px;
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+    font-family: var(--mono); font-size: 10.5px;
     text-transform: uppercase; letter-spacing: 0.07em;
-    color: var(--ink-3); cursor: pointer;
+    color: var(--ink-2); cursor: pointer;
+    transition: border-color .14s ease, background .14s ease, color .14s ease;
   }
-  .crew:hover, .crew.on { color: var(--wire); }
+  .crew:hover { border-color: color-mix(in srgb, var(--wire) 45%, var(--rule)); color: var(--ink); }
+  .crew.on { border-color: var(--wire); color: var(--wire);
+    background: color-mix(in srgb, var(--wire) 6%, transparent); }
   .crew .glyph { font-size: 12px; line-height: 1; }
   .crew.on .glyph { color: var(--wire); }
 
