@@ -15,10 +15,16 @@ existing pattern, not a new one.
 
 * section anatomy (the only way to add a section)
 
+  THE PAGE IS ONE DESIGNED OBJECT. Every section — human or yours — follows
+  the same band rhythm, including the numbered kicker sequence (01 · the
+  stack and 02 · in the wild are human; yours continue 03, 04, …, in DOM
+  order). Whoever adds or moves a section renumbers the kickers after it.
+
   A #grown section is: <section class="grown"> with
-    1. an <h2> (sentence case, ≤6 words, no period)
-    2. prose <p>s — var(--dim), 15.5px, ≤65ch, 2-4 paragraphs MAX
-    3. optionally ONE pattern from below. Never two patterns in one section.
+    1. <div class="kicker">0N · <two-word label></div>  (the sequence above)
+    2. an <h2> (sentence case, ≤6 words, no period)
+    3. prose <p>s — var(--dim), 15.5px, ≤65ch, 2-4 paragraphs MAX
+    4. optionally ONE pattern from below. Never two patterns in one section.
   Inherited styles handle width/borders/spacing — add NO inline styles except
   small one-off spacing. Sections are PREPENDED (newest first) inside #grown,
   with ONE exception: an faq section always sits LAST in #grown — FAQs live

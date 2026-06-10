@@ -78,10 +78,18 @@
       it frames the work and the timeline badges it: `add:` for a page
       section or feature, `blog:` for a post, `strategy:` for landscape/
       competitive research that updates `strategy/landscape.org` and seeds
-      board tasks, `tweet:` for social copy (once that exists). New tags may
+      board tasks, `compose:` for a WHOLE-PAGE design pass (re-order
+      sections, fix kicker numbering, unify rhythm and transitions — the
+      art-director turn; do one when a dream calls for it or the page feels
+      piecemeal), `tweet:` for social copy (once that exists). New tags may
       be added to the system over time.
 
-    **ADD run — create one new thing.** One positive, finished thing per run.
+    **ADD run — create one new thing, placed in the WHOLE page.** Before
+    building, read the full page top to bottom and decide where the new
+    piece belongs in the composition — position, kicker number, how the page
+    reads as one designed object afterwards. A section built without looking
+    at the page is how design drift happens. One positive, finished thing
+    per run.
     Pick the top open item in plan.org (or the best idea if the backlog is
     thin). Examples of "a thing":
     - a new `<section class="grown">` inside `#grown` in index.html — newest
