@@ -27,6 +27,9 @@ export function leadProps(row) {
     dek: row.dek,
     sources: (row.sources || []).map((s) => s.label),
     byline: bylineProps(row.byline),
+    // banner image: passed through to WireLead (§4.5 note 3)
+    banner: row.banner ?? null,
+    bannerAlt: row.bannerAlt ?? '',
   };
 }
 

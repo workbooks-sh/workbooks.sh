@@ -29,5 +29,5 @@
 {/if}
 
 <style>
-  .stack { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .stack { margin-top: 28px; display: flex; flex-direction: column; gap: 20px; }
 </style>

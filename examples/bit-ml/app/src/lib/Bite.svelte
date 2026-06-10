@@ -2,13 +2,14 @@
   // §4.3 Bite card — the atomic unit. Scannable in five seconds, honest in
   // thirty. No card background, no border-radius, no shadow: the stack IS
   // rules and rhythm. Anatomy top→bottom:
-  //   section tick+tag | timestamp+read-time (right)  ← mono row
-  //   headline (Newsreader, ≤2 lines, sentence case)
+  //   section badge (icon + tag tiny pill) | timestamp+read-time (right) ← mono row
+  //   headline (Switzer tight grotesk, ≤2 lines, sentence case)
   //   dek (Switzer, ≤2 sentences — the actual information)
   //   sources left · agent byline right                ← mono row
   //   hairline below
   // States: unread (full ink) · read (head→ink-2) ·
   //   live (wire-blue pulsing dot + head TYPES IN ~30cps — truthful motion).
+  // Badge: no banner on Bite (§4.5 founder note 3 — stack stays fast).
   import { sectionOf } from './sections.js';
   import Byline from './Byline.svelte';
 
@@ -48,7 +49,11 @@
 <article class="bite {status}">
   <div class="top mono">
     <span class="sec">
-      <span class="tag">{sec.tag}</span>
+      <!-- tiny badge: icon + tag, tinted wash bg, color text (§4.3) -->
+      <span
+        class="sec-badge"
+        style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
+      >{@html sec.icon}{sec.tag}</span>
       {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
     </span>
     <span class="when">{time}{#if read} · {read} read{/if}</span>
@@ -72,7 +77,7 @@
   .bite {
     background: var(--paper);
     border-radius: var(--r);
-    padding: 22px 24px 18px;
+    padding: 26px 28px 22px;
     box-shadow: var(--shadow);
     transition: transform .15s ease, box-shadow .15s ease;
   }
@@ -81,13 +86,10 @@
 
   .top {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; margin-bottom: 12px;
+    gap: 12px; margin-bottom: 14px;
   }
   .sec { display: inline-flex; align-items: center; gap: 8px; }
-  .tag {
-    background: var(--wash); border-radius: 999px; padding: 4px 10px;
-    letter-spacing: .06em;
-  }
+
   .when {
     font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em;
     text-transform: uppercase; white-space: nowrap;
@@ -109,7 +111,7 @@
   .headlink:hover { color: var(--wire); text-decoration: none; }
 
   .dek {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 16px; line-height: 1.5; color: var(--ink-2);
     letter-spacing: -0.008em;
     max-width: 56ch;
@@ -117,7 +119,7 @@
 
   .foot {
     display: flex; align-items: baseline; justify-content: space-between;
-    gap: 16px; margin-top: 14px; flex-wrap: wrap;
+    gap: 16px; margin-top: 18px; flex-wrap: wrap;
   }
   .sources {
     font-size: 11px; color: var(--ink-3); letter-spacing: 0.01em;

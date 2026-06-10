@@ -22,13 +22,13 @@
   --up:      #0a7d4f;
   --down:    #c4322e;           /* market semantics only */
 
-  /* section identity ticks (§3): tag color, not a tinted card */
-  /* section identity is TYPOGRAPHIC, not chromatic — grayscale discipline:
-     every section tick is ink; the tag text alone names the desk. */
-  --sec-ai:      var(--ink);
-  --sec-markets: var(--ink);
-  --sec-chips:   var(--ink);
-  --sec-policy:  var(--ink);
+  /* section badge accent colors (§4.2/§4.3): ONLY for the badge — not cards,
+     not tinted bands. Page stays monochrome everywhere else.
+     ai=wire-blue, markets=up-green, chips=amber, policy=plum */
+  --sec-ai:      #0a52e0;
+  --sec-markets: #0a7d4f;
+  --sec-chips:   #b8860b;
+  --sec-policy:  #7a4988;
 
   /* faces — three voices, strictly cast (§2) */
   --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
@@ -111,6 +111,20 @@ button { font-family: inherit; cursor: pointer; }
    not in a box. No card chrome (DESIGN law). */
 .well { position: relative; }
 
+/* ── section badge (§4.2/§4.3) ───────────────────────────────────────
+   Tiny pill: [icon 12px] [TAG], mono 9.5px, tinted wash bg (color ~10%),
+   color text, radius 999, padding 3px 8px. Badge accent = the ONLY place
+   section colors appear; everything else stays monochrome. */
+.sec-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  border-radius: 999px; padding: 3px 8px;
+  line-height: 1;
+  /* color + bg set via inline style per section (color-mix tint) */
+}
+.sec-badge svg { flex-shrink: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -161,6 +175,10 @@ button { font-family: inherit; cursor: pointer; }
   --org-fs:      17px;                  /* §4.5 body 17 */
   --org-lh:      1.65;                  /* §4.5 body line-height */
   --org-radius:  var(--r-s);
+
+  /* full-bleed story blocks (§4.11): overflow must be visible so wide/full
+     blocks can escape the 68ch column via negative margins */
+  overflow: visible;
 }
 
 /* the orgitorial article sits inline in our 720px column — kill its huge
@@ -170,6 +188,7 @@ button { font-family: inherit; cursor: pointer; }
   margin: 0;
   padding: 8px 0 0;
   letter-spacing: -0.011em;            /* Switzer set tight, like body */
+  overflow: visible;
 }
 
 /* story sub-heads ARE the serif's home (DESIGN §2/§4.5) — reapply the bit.ml
@@ -188,4 +207,20 @@ button { font-family: inherit; cursor: pointer; }
   border-left: 2px solid var(--wire);
   padding-left: var(--org-s4, 1.5rem);
   font-style: normal;
+}
+
+/* ── full-bleed story blocks (DESIGN.md §4.11) ────────────────────────
+   Elements with data-width=wide escape the 68ch column; data-width=full
+   go truly edge-to-edge. Both are centered. The .story container must NOT
+   clip (overflow: visible on .org-mount + .org-doc above). */
+.org-mount .org-block[data-width="wide"] {
+  width: min(92vw, calc(68ch + 24rem));
+  margin-inline: auto;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.org-mount .org-block[data-width="full"] {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
 }
