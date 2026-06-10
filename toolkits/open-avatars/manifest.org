@@ -1,0 +1,70 @@
+#+TITLE: open-avatars toolkit
+#+TOOLKIT: open-avatars
+#+VERSION: 0.1.0
+#+KIND: knowledge+assets
+#+STATUS: experimental
+#+TAGLINE: Deterministic, seed-based SVG avatars you plug into any site — a zero-dependency renderer (browser / Node / QuickJS-wasm) that composes "avatar packs" of monochrome SVG atoms into a stable avatar per seed. Same seed → same face, forever. First pack: Open Peeps (Pablo Stanley, CC0), black-and-white.
+#+FLOW: read this front door → pick the one skill your task needs (integrate to plug it in, packs to author or add a pack, authoring for seed/crop/theme semantics). cat a skill only when you reach its step. The renderer lives in dist/open-avatars.js; a working proof page is dist/specimen.html.
+
+* open-avatars — deterministic SVG avatars for any site            :toolkit:
+  :PROPERTIES:
+  :ID:        open-avatars
+  :KIND:      knowledge+assets
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :ASSETS:    dist/open-avatars.js, dist/specimen.html, packs/open-peeps/pack.json, packs/open-peeps/pack.bundle.json
+  :END:
+
+  A *knowledge + assets* toolkit: a tiny avatar engine you drop into any site.
+  Parts that ship together —
+
+  - =dist/open-avatars.js= — the renderer. One self-contained file, *zero
+    dependencies*. Pure string→string (=avatar(pack, seed, opts) -> svg=), so it
+    runs in a browser =<script>= (as =window.OpenAvatars=), as an ES module, in
+    Node at build time, and in the runtime's QuickJS wasm JS lane. No DOM, no
+    Node APIs, no =fetch=. Bad input degrades to a 1×1 canvas, never throws.
+  - =packs/<pack>/= — an *avatar pack*: a directory of monochrome SVG atoms
+    grouped by category (=body/ head/ face/ facial-hair/ accessories/=), a
+    =pack.json= that calibrates each category's position on a shared canvas, and
+    a generated =pack.bundle.json= (the atoms + calibration as one pure JSON
+    object the renderer consumes).
+  - =scripts/bundle-pack.mjs= — the build step. Reads a pack's atoms, strips the
+    Sketch export cruft down to the inner drawable, and emits =pack.bundle.json=.
+  - =skills/= — how to use it: plug-in recipes, the pack format + how to add new
+    packs, and the seed/crop/monochrome authoring semantics.
+
+  *Determinism is the whole point.* A seed string is hashed (FNV-1a) to pick one
+  atom per category; the same seed always yields byte-identical SVG — the
+  DiceBear contract. No randomness, no timestamps, no per-render state.
+
+  *Monochrome by law.* Open Peeps atoms ship black-on-white and the renderer
+  *never* recolors them. To theme, set =opts.background= (a backplate behind the
+  figure) or style the host =<svg>= from CSS — ink stays black, fills stay white.
+  See =skills/authoring=.
+
+  The first pack is *Open Peeps* (by Pablo Stanley, https://openpeeps.com, CC0 /
+  public domain): 132 atoms across 5 categories, calibrated to the official
+  composition (=packs/open-peeps/reference/bust.svg= is the witness for every
+  offset and the z-order).
+
+  Three crops frame the same figure:
+
+  | Crop     | Frames                          | Draws                       |
+  |----------+---------------------------------+-----------------------------|
+  | =circle= | head + face, disc-clipped       | everything *except* body    |
+  | =bust=   | head + shoulders                | all categories              |
+  | =full=   | the whole figure on the canvas  | all categories              |
+
+  Quick proof: open =dist/specimen.html= — one self-contained page (the renderer
+  + the Open Peeps bundle inlined) that renders a grid of ~24 seeded avatars at
+  circle crop, plus a live "type a seed → see the avatar" input and a crop
+  toggle. Rebuild it with =node test/build-specimen.mjs=. Tests:
+  =node test/avatar.test.mjs=.
+
+  Skill index (read on demand):
+
+  | Skill        | Use when                                                              |
+  |--------------+----------------------------------------------------------------------|
+  | =integrate=  | Plugging the renderer into a site (browser, Node build-time, wasm, framework) |
+  | =packs=      | The =pack.json= format + how to ADD A NEW PACK (new style)            |
+  | =authoring=  | Seed semantics, the three crops, the B&W/monochrome stance + theming |
