@@ -35,8 +35,43 @@ the site, the renderer doesn't change.
 <script>
   document.getElementById("post").innerHTML =
     Orgitorial.render("#+TITLE: Hello\n\nMy *first* org post.");
+  Orgitorial.activate(document);   // ← bring living blocks alive (see below)
 </script>
 #+end_src
+
+* The activate() step (living blocks)
+
+=render()= alone gives you a styled, static post. If the org uses *living
+blocks* — a =#+begin_src mermaid= diagram, a =#+begin_src html :app= mini-app,
+or =#+begin_export html= — the host page MUST call =Orgitorial.activate(document)=
+(or any root element) once, AFTER the rendered HTML is in the DOM:
+
+#+begin_src html
+<script type="module">
+  import { render, activate } from "./orgitorial.js";
+  document.getElementById("post").innerHTML = render(org);
+  activate(document);
+</script>
+#+end_src
+
+Why it's separate: =render()= is pure string→string and *zero-dependency* by
+law — it can't fetch a CDN or run scripts. =activate()= is the browser-only opt-in
+that does both. It is idempotent (safe to call again after appending more posts).
+
+- *Live app scripts.* Inline =<script>= injected via =innerHTML= never executes;
+  =activate()= re-creates each script node so it runs — including =type=module=.
+- *Mermaid CDN.* =activate()= lazy-loads mermaid *only if* a =.org-mermaid= block
+  exists — zero cost on diagram-free pages. Default source:
+  =https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs= (override with
+  =activate(root, { mermaidCdn, mermaidTheme })=). If the CDN is blocked, the
+  diagram degrades to its readable source =<pre>= — never a blank.
+- *Wasm / module payloads.* A module script in an =:app= block may =import= wasm
+  (e.g. a candle-compiled model) — it rides the standard module loader, nothing
+  special is wired. Keep those payloads lean; you're shipping them to a reader.
+
+If you prerender at build time (next section), you still ship =activate()= as a
+small client script for pages that have living blocks; diagram-free, app-free
+posts need no client JS at all.
 
 That is a complete, styled blog post. Fetch the org from a =.org= file instead
 of inlining it when you have real content:

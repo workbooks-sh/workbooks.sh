@@ -1,6 +1,6 @@
 #+TITLE: orgitorial toolkit
 #+TOOLKIT: orgitorial
-#+VERSION: 0.1.0
+#+VERSION: 0.2.0
 #+KIND: knowledge+assets
 #+STATUS: experimental
 #+TAGLINE: An org-mode blogging/CMS toolkit you plug into any site — a zero-dependency org→HTML renderer (browser / Node / QuickJS-wasm), a complete editorial CSS library themed by custom properties, and skills documenting the stable class contract. Plain HTML semantics, no framework.
@@ -45,6 +45,15 @@
   =[ ]/[X]= checkboxes, tables, =#+begin_src/quote/example/verse= blocks,
   =:PROPERTIES:= drawers, footnotes =[fn:1]=, horizontal rules, and inline
   =<timestamps>=. See =skills/authoring= for the full map.
+
+  An article can also be a *workbook*: three living-block types let a post carry
+  interactive content — a =#+begin_src mermaid= diagram, a =#+begin_src html
+  :app= (or =#+begin_export html=) mini-app, and a =:width column|wide|full=
+  modifier to break any block out of the editorial column (full-bleed, never
+  inner-scrolling). The renderer stays zero-dep — it only emits the markup; the
+  host page calls the new browser-only =Orgitorial.activate(document)= to run app
+  scripts and lazy-render mermaid from a CDN. See =skills/components= (contract)
+  and =skills/authoring= (when to reach for one).
 
   Intended consumers (the toolkit is built to be re-themed, not forked):
 

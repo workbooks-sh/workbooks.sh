@@ -1,6 +1,6 @@
 // orgitorial render tests — plain asserts, no deps.  run: node test/render.test.mjs
 import assert from "node:assert";
-import { render, parseMeta } from "../dist/orgitorial.js";
+import { render, parseMeta, activate } from "../dist/orgitorial.js";
 
 let pass = 0;
 function ok(name, cond, detail) {
@@ -69,12 +69,12 @@ has("table body", tbl, "<td>1</td><td>2</td>");
 
 // src block
 const src = "#+begin_src python\nprint(1)\n#+end_src";
-has("src pre", src, '<pre class="org-src" data-lang="python">');
+has("src pre", src, '<pre class="org-src org-block" data-lang="python">');
 has("src lang class", src, 'class="org-src-code language-python"');
 has("src escaped", "#+begin_src js\na < b\n#+end_src", "a &lt; b");
 
 // quote / example / verse
-has("quote", "#+begin_quote\nwise words\n#+end_quote", '<blockquote class="org-quote">');
+has("quote", "#+begin_quote\nwise words\n#+end_quote", '<blockquote class="org-quote org-block">');
 has("example", "#+begin_example\nraw\n#+end_example", '<pre class="org-example">raw</pre>');
 has("verse", "#+begin_verse\nl1\nl2\n#+end_verse", '<p class="org-verse">l1<br>l2</p>');
 
@@ -127,5 +127,49 @@ ok("no sentinel leak (kitchen sink)", !/[]/.test(
 ok("null input", typeof render(null) === "string");
 ok("number input", typeof render(42) === "string");
 ok("empty input", render("") === '<article class="org-doc"></article>');
+
+// ---------- living blocks: mermaid / :app / :width ----------
+
+// mermaid block -> .org-mermaid wrapper with raw text in pre.org-mermaid-src
+const mmd = "#+begin_src mermaid\nflowchart LR\n  A-->B\n#+end_src";
+has("mermaid wrapper", mmd, '<div class="org-block org-mermaid">');
+has("mermaid raw pre", mmd, '<pre class="org-mermaid-src">flowchart LR');
+ok("mermaid keeps arrows escaped", render(mmd).includes("A--&gt;B"));
+ok("mermaid not a src code block", !render(mmd).includes('class="org-src-code'));
+
+// app block -> .org-app with INLINE (un-escaped) first-party html + script
+const app = '#+begin_src html :app\n<b id="x">hi</b>\n<script>document.title="t"<\/script>\n#+end_src';
+has("app wrapper", app, '<div class="org-block org-app">');
+ok("app html inline (not escaped)", render(app).includes('<b id="x">hi</b>'));
+ok("app script preserved inline", render(app).includes("<script>"));
+
+// export html -> same app surface
+const exp = "#+begin_export html\n<button>go</button>\n#+end_export";
+has("export html -> app", exp, '<div class="org-block org-app">');
+ok("export html inline", render(exp).includes("<button>go</button>"));
+
+// :width on src / app / mermaid / quote -> data-width + org-w-* class
+has("width wide on src", "#+begin_src js :width wide\nx\n#+end_src", 'data-width="wide"');
+has("width wide class", "#+begin_src js :width wide\nx\n#+end_src", "org-w-wide");
+has("width full on app", "#+begin_src html :app :width full\n<i>z</i>\n#+end_src", 'data-width="full"');
+has("width wide on mermaid", "#+begin_src mermaid :width wide\nA-->B\n#+end_src", 'org-mermaid org-w-wide');
+has("width wide on quote", "#+begin_quote :width wide\nwords\n#+end_quote", 'org-quote org-block org-w-wide');
+ok("default width emits no data-width", !render("#+begin_src js\nx\n#+end_src").includes("data-width"));
+has("plain src still org-block", "#+begin_src js\nx\n#+end_src", '<pre class="org-src org-block" data-lang="js">');
+
+// app vs plain html src: ':app' is required to go live; plain html stays escaped code
+const plainHtml = "#+begin_src html\n<b>code</b>\n#+end_src";
+has("plain html src is escaped code", plainHtml, '<code class="org-src-code language-html">&lt;b&gt;code&lt;/b&gt;');
+ok("plain html src not live", !render(plainHtml).includes("org-app"));
+
+// activate(): exists, callable headless without DOM (no throw, returns thenable)
+ok("activate exported", typeof activate === "function");
+let actThrew = false;
+let actRet;
+try { actRet = activate(); } catch (e) { actThrew = true; }
+ok("activate no throw headless", !actThrew);
+ok("activate returns thenable", actRet && typeof actRet.then === "function");
+// host-page DOM execution of revived scripts is verified in the live specimen
+// (build-specimen.mjs calls Orgitorial.activate(document)); jsdom-free here.
 
 console.log(`\n${pass} assertions passed${process.exitCode ? " (with failures above)" : ""}`);

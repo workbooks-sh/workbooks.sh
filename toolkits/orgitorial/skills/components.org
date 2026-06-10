@@ -33,9 +33,12 @@ the CSS styles exactly these.
 | Timestamp        | =time.org-ts=                           | mono chip                             |
 | List (un/ordered)| =ul.org-list= / =ol.org-list=           | =li.org-item=                         |
 | Checkbox item    | =li.org-check[data-checked]=            | =true= / =false= / =partial=          |
-| Source block     | =pre.org-src[data-lang]=                | =code.org-src-code.language-<lang>=   |
+| Source block     | =pre.org-src.org-block[data-lang]=      | =code.org-src-code.language-<lang>=   |
+| Mermaid block    | =div.org-block.org-mermaid=             | raw text in =pre.org-mermaid-src=     |
+| Live mini-app    | =div.org-block.org-app=                 | inline HTML; scripts run on =activate()= |
+| Width modifier   | =[data-width=column\vert{}wide\vert{}full]= + =.org-w-*= | on any src/quote/app/mermaid block |
 | Example block    | =pre.org-example=                       | literal, no language bar              |
-| Quote            | =blockquote.org-quote=                   | accent rule + glyph                   |
+| Quote            | =blockquote.org-quote.org-block=        | accent rule + glyph; takes =:width=   |
 | Verse            | =p.org-verse=                           | line breaks preserved                 |
 | Table            | =table.org-table=                       | =thead/tbody=, =th/td=                 |
 | Drawer           | =details.org-drawer=                     | =summary.org-drawer-name=, =.org-prop=|
@@ -114,6 +117,78 @@ Renders collapsed; the disclosure triangle is CSS, the summary is mono.
 #+end_src
 
 Ref and definition cross-link both ways; =:target= highlights the landed note.
+
+* Living blocks: the three block types
+
+These turn a static article into a workbook. They share one rule the CSS
+enforces: a living block *never inner-scrolls* (=height: auto=, no =max-height=,
+no =overflow: scroll=) and may break out of the editorial measure.
+
+** Mermaid diagram — =#+begin_src mermaid=
+
+The renderer stays zero-dep: it emits the raw diagram text, it does *not* draw
+it. Drawing is a HOST-PAGE opt-in via =activate()= (below).
+
+#+begin_src html
+<div class="org-block org-mermaid">
+  <pre class="org-mermaid-src">flowchart LR
+  A --> B</pre>
+</div>
+#+end_src
+
+After =activate()=, the =<pre>= is replaced by =<div class="org-mermaid-svg">=
+(the rendered SVG) and the source is kept as a collapsed
+=details.org-mermaid-fallback=. If the CDN is unreachable, the readable =<pre>=
+stays — never a blank.
+
+** Live mini-app — =#+begin_src html :app= (or =#+begin_export html=)
+
+First-party authored HTML, emitted *inline and un-escaped* — same trust model as
+the existing ={@html}= note in =integrate=. No chrome: the app owns its look.
+
+#+begin_src html
+<div class="org-block org-app">
+  <button id="b">click</button>
+  <script>document.getElementById("b").onclick = …;</script>
+</div>
+#+end_src
+
+Inline =<script>= tags (incl. =type=module=) do *not* run from injected
+innerHTML — =activate()= re-creates each script node so it executes. A module
+script may =import= wasm (e.g. a candle-compiled model); nothing special is done
+for it, it rides the standard module loader.
+
+** Width — =:width column|wide|full= on any src/quote/app/mermaid block
+
+Adds =data-width="wide|full"= + =.org-w-wide|full=. Default =column= emits
+neither (stays in the measure).
+
+- =wide= → =width: min(92vw, measure + 24rem)=, centered breakout.
+- =full= → full-bleed =100vw= via the centered margin-inline calc.
+
+* The =activate()= contract
+
+=render()= is pure string→string and zero-dep. =activate(rootEl, opts)= is the
+*optional, browser-only* second step that brings living blocks to life. THE HOST
+PAGE MUST CALL =Orgitorial.activate(document)= (or a root element) AFTER injecting
+the rendered HTML — otherwise app scripts never run and mermaid never draws.
+
+#+begin_src html
+<div id="post"></div>
+<script type="module">
+  import { render, activate } from "./orgitorial.js";
+  document.getElementById("post").innerHTML = render(orgText);
+  activate(document);                  // ← brings .org-app + .org-mermaid alive
+</script>
+#+end_src
+
+- It is *idempotent* — guards each node with =data-org-activated=; safe to call
+  again after appending more posts.
+- It only fetches mermaid (from =opts.mermaidCdn=, default jsDelivr
+  =mermaid@11=) when at least one =.org-mermaid= exists — zero cost otherwise.
+- =opts.mermaidTheme= (default ="neutral"=) sets the mermaid theme.
+- Headless (no =document=) it returns a resolved promise and does nothing —
+  safe to import in Node/QuickJS where only =render= is used.
 
 * CSS variables each component reads
 

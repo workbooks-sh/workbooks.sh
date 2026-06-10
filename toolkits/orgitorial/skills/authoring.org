@@ -140,6 +140,74 @@ Violets are blue
 drop it when you write a real block.) Source blocks escape HTML and label the
 language; bring your own highlighter by targeting =.org-src-code.language-*=.
 
+* Living blocks: when an article should also be a workbook
+
+Every article *can* be a workbook. You have freedom to build custom components
+inline. Reach for one of these only when it earns its place — when a picture or
+30 seconds of interaction genuinely beats the paragraph:
+
+- *A diagram that beats a paragraph.* If you're describing a flow, a pipeline,
+  a state machine — draw it. =#+begin_src mermaid= renders a real diagram.
+- *A 30-second interactive that beats a chart.* A slider the reader drags, a
+  tiny estimator, a toggle that shows the difference — a =:app= block lets them
+  feel the point instead of reading it.
+
+Two hard rules from the start: keep mini-apps *condensed* (a self-contained
+widget, not a whole SPA), and *never let a block inner-scroll* — no cramped,
+scrolling iframe. A block can go *full width* instead of being crammed into the
+editorial column (=:width=, below).
+
+** Mermaid diagram
+
+#+begin_src org
+,#+begin_src mermaid          -> div.org-mermaid (rendered by the host's activate())
+flowchart LR
+  A[".org"] --> B["render()"] --> C["page"]
+,#+end_src
+#+end_src
+
+Write plain mermaid. The page renders it *only if* it calls
+=Orgitorial.activate(document)= (see =integrate=); the renderer itself just
+carries the text, so output stays zero-dependency.
+
+** Live mini-app (=:app=)
+
+A =#+begin_src html :app= block is your own HTML, inline and *live* — its
+=<script>= runs when the host calls =activate()=. This is first-party content
+(you authored it), same trust model as any HTML you write into the page.
+
+#+begin_src org
+,#+begin_src html :app :width full
+<div style="text-align:center">
+  <input id="n" type="range" min="0" max="100" value="20">
+  <output id="o">20</output>
+  <script>n.oninput = () => o.textContent = n.value;<\/script>
+</div>
+,#+end_src
+#+end_src
+
+Keep it self-contained: inline styles, an inline script, no external build. A
+module script *may* =import= wasm (e.g. a small candle-compiled model) — keep
+the payload lean. =#+begin_export html= is the same live surface for when you
+don't want a language tag.
+
+** Width: break out of the column
+
+Add =:width wide= or =:width full= to *any* block (src, quote, =:app=, mermaid):
+
+#+begin_src org
+,#+begin_quote :width wide        -> breaks past the measure, capped to the viewport
+A pull-quote that wants room.
+,#+end_quote
+
+,#+begin_src html :app :width full  -> edge-to-edge full-bleed
+…
+,#+end_src
+#+end_src
+
+Default is =column= (stays in the measure). Use =wide= for figures and
+pull-quotes, =full= for a hero-scale interactive.
+
 * Drawers, footnotes, rules
 
 #+begin_src org
@@ -159,8 +227,9 @@ Text with a note[fn:1].       -> sup.org-fnref linking to the definition
 
 Consciously excluded — these pass through as escaped =.org-raw=, never lost:
 
-- =#+begin_src= *execution / results* (=:results=, =#+RESULTS:=) — render-only,
-  no code runs.
+- =#+begin_src= babel *execution / results* (=:results=, =#+RESULTS:=) — no code
+  runs at render time. (A =:app= block is different: its HTML is live in the
+  browser via =activate()= — that's an authored mini-app, not babel evaluation.)
 - *LaTeX math* (=\(...\)=, =$...$=, =#+begin_math=) — passes through verbatim.
 - =#+INCLUDE:=, macros (=#+MACRO:= / ={{{...}}}=), babel noweb references.
 - *Radio targets*, internal =<<targets>>= / =[[*Headline]]= cross-links,
