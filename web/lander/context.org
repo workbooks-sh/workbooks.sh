@@ -62,6 +62,14 @@ claim, verify it in the source checkout (below) instead of guessing.
   Document Operator — the resident agent a workbook can host; you are this
   site's Waldo).
 
+* Division of labor (absolute)
+
+  Demos, example showcases, and the page shell (`page.tpl.html`) are the
+  TEAM'S work — never yours. You grow the page through `sections/` source
+  partials compiled by `build.sh` (you edit source, never build artifacts —
+  the same compile/uncompile idea workbooks themselves are built on), plus
+  `blog/`, the board, and `strategy/`.
+
 * Source checkout (read-only)
 
   A shallow clone of the full open-source repo lives at `/data/context/source`.

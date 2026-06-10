@@ -154,6 +154,7 @@ footer.foot .tail { margin-left: auto; }
 
 /* ── the three layers: dark cards, each lit by its color ─────── */
 .lgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.wgrid .lcard { min-height: 200px; }
 @media (max-width: 760px) { .lgrid { grid-template-columns: 1fr; } }
 .lcard {
   position: relative; overflow: hidden;
@@ -205,50 +206,6 @@ footer.foot .tail { margin-left: auto; }
 #grown h2 { font: 600 clamp(22px, 2.6vw, 32px)/1.15 var(--sans); letter-spacing: -.02em; margin: 0 0 14px; }
 #grown p { color: var(--dim); font: 400 15.5px/1.65 var(--sans); max-width: 64ch; }
 #grown a { color: var(--live); }
-
-/* ── examples: human-curated showcase (agent-untouchable) ────── */
-.xgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.poster.featured { grid-column: 1 / -1; aspect-ratio: 16 / 6.8; }
-.poster.featured .pimg {
-  position: absolute; inset: 0;
-  background: url(assets/wulu-banner.jpg) center / cover no-repeat;
-}
-.poster.featured .pscrim {
-  position: absolute; inset: 0;
-  background: linear-gradient(195deg, transparent 35%, rgba(7,8,11,.88) 78%);
-}
-.poster.featured .pname { font-size: clamp(40px, 5vw, 60px); letter-spacing: .18em; }
-.poster.featured .ptag { max-width: 46ch; }
-@media (max-width: 700px) { .poster.featured { aspect-ratio: 16 / 10; } .xgrid { grid-template-columns: 1fr 1fr; } }
-.poster {
-  position: relative; aspect-ratio: 2 / 2.7; border-radius: 12px; overflow: hidden;
-  border: 1px solid var(--line); text-decoration: none; display: block;
-  background: var(--panel);
-}
-.poster .pbg {
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(120% 90% at 80% 0%, rgba(63,224,129,.22), transparent 55%),
-    radial-gradient(100% 80% at 10% 100%, rgba(47,111,224,.25), transparent 60%),
-    linear-gradient(160deg, #1a1d24, #0d0e12 70%);
-}
-.poster .pbody {
-  position: absolute; inset: 0; padding: 18px;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
-}
-.poster .pname {
-  font: 600 clamp(28px, 3vw, 38px)/1 var(--sans); letter-spacing: .14em; color: var(--ink);
-}
-.poster .ptag { font: 400 11.5px/1.55 var(--sans); color: var(--dim); }
-.poster .pstatus {
-  position: absolute; top: 12px; left: 12px;
-  font: 500 9.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
-  color: var(--live); background: var(--live-dim);
-  padding: 4px 7px; border-radius: 4px;
-}
-.poster.ghost { border-style: dashed; background: transparent; }
-.poster.ghost .pbody { justify-content: center; align-items: center; }
-.poster.ghost .ptag { color: var(--faint); font-family: var(--mono); font-size: 10.5px; }
 
 /* ── the agent cursor ────────────────────────────────────────── */
 #cursor {
@@ -478,33 +435,54 @@ body.panel-was-open:not(.panel-open) .peek { display: flex; }
    </div>
   </section>
 
-  <!-- examples: human-curated. The agent never edits this section. -->
-  <section id="examples" class="band alt">
+
+  <!-- who it's for: human-curated. The agent never edits this section. -->
+  <section id="who" class="band alt">
    <div class="inner">
-    <div class="kicker reveal">02 · in the wild</div>
-    <h2 class="reveal">Workbooks in the wild</h2>
-    <p class="lede reveal">Software built in workbooks — real sites and tools with real
-    jobs, running on this same runtime. This page is one of them.</p>
-    <div class="xgrid">
-      <a class="poster featured reveal" href="#" aria-disabled="true">
-        <div class="pbg"></div>
-        <div class="pimg"></div>
-        <div class="pscrim"></div>
-        <div class="pbody">
-          <span class="pname">WULU</span>
-          <span class="ptag">AI &amp; tech, curated like a cinema catalog. Creators
-          showcased, never replaced — picked daily by an editorial room of agents.</span>
-        </div>
-        <span class="pstatus">in production</span>
-      </a>
-      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
-      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
-      <div class="poster ghost reveal"><div class="pbody"><span class="ptag">next</span></div></div>
+    <div class="kicker reveal">02 · built for</div>
+    <h2 class="reveal">From one person to the whole world</h2>
+    <p class="lede reveal">The same app, at every size. Nothing gets rewritten
+    on the way up.</p>
+    <div class="lgrid wgrid">
+      <div class="lcard c-green reveal">
+        <span class="lk">for yourself</span>
+        <p><b>The afternoon tool.</b> The tracker, the calculator, the little
+        dashboard you always meant to make — built by describing it, kept
+        because it's yours.</p>
+        <span class="wmark"><svg viewBox="0 0 258 206" fill="none"><path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/></svg></span>
+      </div>
+      <div class="lcard c-blue reveal">
+        <span class="lk">for your team</span>
+        <p><b>The shared tool.</b> Hand the same app to ten people, run it on
+        one runtime, change it Tuesday when the process changes.</p>
+        <span class="wmark"><svg viewBox="0 0 258 206" fill="none"><path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/></svg></span>
+      </div>
+      <div class="lcard c-amber reveal">
+        <span class="lk">for the world</span>
+        <p><b>The product.</b> What you built for yourself is already built to
+        serve everyone — same app, same runtime, public address.</p>
+        <span class="wmark"><svg viewBox="0 0 258 206" fill="none"><path d="M0 206V0.00231147H69.3883V76L126.885 0L169.603 0.00231147V76L224.164 0L258 0.00231147V206H116.723L113.064 140.5L41.6615 206H0Z" fill="currentColor"/></svg></span>
+      </div>
     </div>
    </div>
   </section>
 
-  <!-- the agent appends new sections here, one per hour -->
+  <!-- get it: human-curated. The agent never edits this section. -->
+  <section id="get" class="band">
+   <div class="inner">
+    <div class="kicker reveal">03 · get workbooks</div>
+    <h2 class="reveal">Start on your desktop</h2>
+    <p class="lede reveal">The desktop app runs the whole ecosystem on your
+    machine — no account, no cloud, works offline. Developers can build from
+    source or grab the CLI on GitHub.</p>
+    <div class="ctas reveal" style="justify-content:flex-start; margin-bottom:0">
+      <a class="btn primary" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="getDl">download for desktop</a>
+      <a class="btn ghost" href="https://github.com/workbooks-sh/workbooks.sh">github, for developers →</a>
+    </div>
+   </div>
+  </section>
+
+  <!-- the agent appends new sections here (sections/ partials, via build.sh) -->
   <div id="grown"></div>
 
   <footer class="foot">
@@ -646,7 +624,7 @@ async function build() {
     /Mac/.test(ua) ? R + 'Workbooks_0.1.0_aarch64.dmg' :
     /Win/.test(ua) ? R + 'Workbooks_0.1.0_x64-setup.exe' :
     /Linux/.test(ua) ? R + 'Workbooks_0.1.0_amd64.AppImage' : null;
-  if (asset) ['#navDl', '#heroDl'].forEach(s => { const a = $(s); if (a) a.href = asset; });
+  if (asset) ['#navDl', '#heroDl', '#getDl'].forEach(s => { const a = $(s); if (a) a.href = asset; });
 })();
 
 /* ── panel visibility ─────────────────────────────────────────── */

@@ -41,8 +41,13 @@ Audit: critique the recent adds against the plan and the page; correct drift.
 * rem
 :PROPERTIES:
 :KIND: rem
-:NEXT: wake_add
+:NEXT: wake_plan
 :MIN-INTERVAL: 10m
 :END:
 Dream: consolidate the cycle's telemetry into a rem/ entry. Time-gated so we
 dream at most once per ~audit cycle; then the loop returns to adding.
+* wake_plan
+:PROPERTIES:
+:KIND: wake
+:NEXT: wake_add
+:END:
