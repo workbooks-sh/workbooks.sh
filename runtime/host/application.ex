@@ -75,17 +75,20 @@ defmodule Workbooks.Application do
       end)
     end
 
-    # Re-register the persisted build-from-source commands (Lua/duk/zforth/…) from their cached,
-    # content-addressed artifacts — no rebuild, no fetch — so they survive a restart. Always runs
-    # (no-op when the manifest is empty); in a Task so it never blocks boot.
+    # Re-register the persisted build-from-source commands (Lua/duk/qjs/…) from their cached,
+    # content-addressed artifacts — no rebuild, no fetch — so they survive a restart. Then, when
+    # WB_CSOURCE=1, PROVISION the @csource catalog: build (in-sandbox) only the tools NOT already
+    # reloaded — a one-time first-boot cost (each persists + reloads thereafter). Sequential in ONE
+    # Task (reload first so the build skips what's cached); never blocks boot.
     Task.start(fn ->
-      case Workbooks.CommandRegistry.reload_persisted() do
-        0 ->
-          :ok
+      require Logger
+      reloaded = Workbooks.CommandRegistry.reload_persisted()
+      if reloaded > 0, do: Logger.info("command registry — #{reloaded} persisted command(s) reloaded")
 
-        n ->
-          require Logger
-          Logger.info("command registry — #{n} persisted command(s) reloaded from cache")
+      if System.get_env("WB_CSOURCE") == "1" do
+        results = Workbooks.Pallet.seed_csource()
+        ok = Enum.count(results, fn {_n, r} -> r == :ok end)
+        Logger.info("command pallet — #{ok}/#{map_size(results)} build-from-source tools provisioned")
       end
     end)
 

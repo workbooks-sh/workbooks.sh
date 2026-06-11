@@ -372,9 +372,15 @@ defmodule Workbooks.Pallet do
   end
 
   def seed_csource_one(%{name: n, url: u, sha: s, build_opts: opts}) do
-    case CommandRegistry.build_and_register_c_source(n, u, s, opts) do
-      {:ok, _addressed} -> :ok
-      other -> other
+    # Already registered (e.g. reloaded from the persisted cache at boot)? Skip the rebuild — makes
+    # seed_csource idempotent + cheap on every boot after the first.
+    if n in CommandRegistry.list() do
+      :ok
+    else
+      case CommandRegistry.build_and_register_c_source(n, u, s, opts) do
+        {:ok, _addressed} -> :ok
+        other -> other
+      end
     end
   end
 end
