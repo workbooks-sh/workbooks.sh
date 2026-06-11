@@ -18,11 +18,37 @@ defmodule Workbooks.Pallet do
 
   alias Workbooks.CommandRegistry
 
-  # Each entry: name · url · sha256 (pinned) · wasm_rel (path inside the .tar.gz) · preopen
-  # ("<subdir>::<guest>" or "." = package root → "/") · mode (:argv | :stdin1).
+  # Each entry: name · kind (:wasm single artifact | :archive .tar.gz) · url · sha256 (pinned) ·
+  # mode (:argv | :stdin1). :archive entries also carry wasm_rel (path inside the tarball) + preopen
+  # ("<subdir>::<guest>" or "." = package root → "/"). Single :wasm entries register via
+  # fetch_and_register_wasm; :archive via fetch_and_register_archive.
   @catalog [
+    # ── Language runtimes (single-file WASI .wasm) ──────────────────────────────
+    %{
+      name: "python",
+      kind: :wasm,
+      url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0%2B20231211-040d5a6/python-3.12.0.wasm",
+      sha: "e5dc5a398b07b54ea8fdb503bf68fb583d533f10ec3f930963e02b9505f7a763",
+      mode: :argv
+    },
+    %{
+      name: "ruby",
+      kind: :wasm,
+      url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/ruby/3.2.2%2B20230714-11be424/ruby-3.2.2-slim.wasm",
+      sha: "de598f394e398763d2b147e3e51a6eeadf048128598ac4a3f992a97204c192b0",
+      mode: :argv
+    },
+    %{
+      name: "wasm3",
+      kind: :wasm,
+      url: "https://github.com/wasm3/wasm3/releases/download/v0.5.0/wasm3-wasi.wasm",
+      sha: "8427e2f97a14e8c36708fa2c9864f73d1f499305449b5def2cc1b96bfc54a783",
+      mode: :argv
+    },
+    # ── Tools shipped as .tar.gz (wasm + companions) ────────────────────────────
     %{
       name: "coreutils",
+      kind: :archive,
       url: "https://github.com/uutils/coreutils/releases/download/0.9.0/coreutils-0.9.0-wasm32-wasip1.tar.gz",
       sha: "e5efa8a1c10bd0ac09eb780d46aff6d8a4ea0be07d41f4dd9a102b266c6eb69f",
       wasm_rel: "coreutils-0.9.0-wasm32-wasip1/coreutils.wasm",
@@ -31,6 +57,7 @@ defmodule Workbooks.Pallet do
     },
     %{
       name: "sqlite3",
+      kind: :archive,
       url: "https://cdn.wasmer.io/packages/_/sqlite/sqlite-0.2.2.tar.gz",
       sha: "93d4c1f1b3625c311b431076fe071fa1a111472520fbcffd934fafee5e7cc2ed",
       wasm_rel: "build/sqlite.wasm",
@@ -60,7 +87,14 @@ defmodule Workbooks.Pallet do
     end
   end
 
-  def seed_one(%{name: n, url: u, sha: s, wasm_rel: w, preopen: p, mode: m}) do
+  def seed_one(%{kind: :wasm, name: n, url: u, sha: s, mode: m}) do
+    case CommandRegistry.fetch_and_register_wasm(n, u, s, m) do
+      {:ok, _addressed, _sha} -> :ok
+      other -> other
+    end
+  end
+
+  def seed_one(%{kind: :archive, name: n, url: u, sha: s, wasm_rel: w, preopen: p, mode: m}) do
     case CommandRegistry.fetch_and_register_archive(n, u, s, w, p, m) do
       {:ok, _wasm, _sha} -> :ok
       other -> other

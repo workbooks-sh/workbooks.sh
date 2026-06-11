@@ -12,15 +12,30 @@ defmodule Workbooks.PalletTest do
 
     for e <- Pallet.catalog() do
       assert is_binary(e.name) and e.name != ""
+      assert e.kind in [:wasm, :archive]
       assert String.starts_with?(e.url, "https://")
       assert Regex.match?(~r/^[0-9a-f]{64}$/, e.sha), "#{e.name} sha must be 64-hex pinned"
-      assert is_binary(e.wasm_rel) and e.wasm_rel != ""
       assert e.mode in [:argv, :stdin1]
+      # archives carry the inner wasm path; single .wasm entries don't need one
+      if e.kind == :archive, do: assert(is_binary(e.wasm_rel) and e.wasm_rel != "")
     end
   end
 
   @tag :pallet
-  test "seed registers + RUNS coreutils and sqlite3 under wasmtime" do
+  test "seed registers + RUNS every pallet tool under wasmtime" do
+    # Language runtimes (single .wasm)
+    assert :ok = Pallet.seed_one("python")
+    assert {:ok, py} = CommandRegistry.run("python", "", ["-c", "print(2**10)"])
+    assert py =~ "1024"
+
+    assert :ok = Pallet.seed_one("ruby")
+    assert {:ok, rb} = CommandRegistry.run("ruby", "", ["-e", "puts 2**10"])
+    assert rb =~ "1024"
+
+    assert :ok = Pallet.seed_one("wasm3")
+    assert {:ok, w3} = CommandRegistry.run("wasm3", "", ["--version"])
+    assert w3 =~ "Wasm3"
+
     # coreutils — multicall: applet prepended to argv
     assert :ok = Pallet.seed_one("coreutils")
     assert {:ok, seq} = CommandRegistry.run("coreutils", "", ["seq", "5"])
