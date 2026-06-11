@@ -26,24 +26,25 @@ defmodule Workbooks.SitePublish do
   # Content the agent owns and that the live page loads at runtime. Each entry is
   # {relative-source-glob, dest-subdir}. The host fixes this set; the agent cannot
   # widen it (no path it writes can escape these globs into, say, src/).
-  @content_specs [
-    {"content/sections.json", "content"},
-    {"content/blog.json", "content"},
-    {"content/sections/*.html", "content/sections"},
-    {"blog/*.html", "blog"}
-  ]
+  # The whole content/ and blog/ trees are mirrored RECURSIVELY (structure
+  # preserved), not a hardcoded list of globs. The old per-glob list only knew
+  # the lander's shape (content/sections/*.html, blog/*.html) and copied ZERO
+  # files for bit.ml (content/stories/*.org + stories.json) — the crew's stories
+  # had no publish path. Mirroring the trees covers ANY tenant's content shape.
+  @publish_trees ["content", "blog"]
 
   @doc """
   Publish the agent's content from `workdir` to the live public site dir for
-  `tenant`. Pure host File ops (no shell). Returns `{:ok, copied_count}` or
-  `{:error, reason}`.
+  `tenant`. Mirrors content/** + blog/** recursively. Pure host File ops (no
+  shell). Returns `{:ok, copied_count}` or `{:error, reason}`.
   """
   def publish(workdir, tenant) when is_binary(workdir) do
     dest = site_dir(tenant)
+    abs_workdir = Path.expand(workdir)
 
     copied =
-      Enum.reduce(@content_specs, 0, fn {src_glob, dest_sub}, acc ->
-        acc + copy_glob(workdir, src_glob, Path.join(dest, dest_sub))
+      Enum.reduce(@publish_trees, 0, fn tree, acc ->
+        acc + mirror_tree(abs_workdir, tree, dest)
       end)
 
     {:ok, copied}
@@ -51,20 +52,26 @@ defmodule Workbooks.SitePublish do
     e -> {:error, Exception.message(e)}
   end
 
-  # Copy every file matching `src_glob` (relative to workdir) into `dest_dir`,
-  # creating the dir. Path-contained: only files that resolve strictly inside the
-  # workdir are copied (a manifest can't smuggle an absolute/`..` path out).
-  defp copy_glob(workdir, src_glob, dest_dir) do
-    abs_workdir = Path.expand(workdir)
+  # Mirror every regular file under workdir/<tree> into dest/<tree>/…, preserving
+  # the relative path. Path-contained: only files resolving strictly inside the
+  # workdir are copied (a symlink/`..` can't smuggle a path out of the workdir).
+  defp mirror_tree(abs_workdir, tree, dest) do
+    src_root = Path.join(abs_workdir, tree)
 
-    Path.wildcard(Path.join(abs_workdir, src_glob))
-    |> Enum.filter(&File.regular?/1)
-    |> Enum.filter(&contained?(abs_workdir, &1))
-    |> Enum.reduce(0, fn src, n ->
-      File.mkdir_p!(dest_dir)
-      File.cp!(src, Path.join(dest_dir, Path.basename(src)))
-      n + 1
-    end)
+    if File.dir?(src_root) do
+      Path.wildcard(Path.join(src_root, "**"))
+      |> Enum.filter(&File.regular?/1)
+      |> Enum.filter(&contained?(abs_workdir, &1))
+      |> Enum.reduce(0, fn src, n ->
+        rel = Path.relative_to(src, abs_workdir)
+        dst = Path.join(dest, rel)
+        File.mkdir_p!(Path.dirname(dst))
+        File.cp!(src, dst)
+        n + 1
+      end)
+    else
+      0
+    end
   end
 
   # The published static-site root this deployment serves (mirrors
