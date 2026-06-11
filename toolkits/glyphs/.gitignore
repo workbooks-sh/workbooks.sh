@@ -1,0 +1,5 @@
+# glyphs ships its resolver + CSS + curated packs + specimen as source
+# artifacts, not build output — override the repo-wide **/dist/ ignore for this
+# toolkit. (The curated JSON packs are committed; refresh with scripts/build-curated.mjs.)
+!dist/
+!dist/**
