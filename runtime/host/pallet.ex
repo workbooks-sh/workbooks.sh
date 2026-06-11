@@ -212,6 +212,32 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal gzip-compatible `gz` CLI on zlib's stream API (windowBits 15+16 = gzip wrapper, so the
+  # output interops with gzip/gunzip). stdin → compressed stdout; `-d` decompresses. The gz* FILE-API
+  # files (gzlib/gzread/gzwrite/gzclose, which use lseek) are excluded — not needed for streaming.
+  @gz_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "zlib.h"
+  int main(int argc, char** argv) {
+    int dec = (argc >= 2 && !strcmp(argv[1], "-d"));
+    size_t cap = 1 << 20, len = 0; unsigned char* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    z_stream s; memset(&s, 0, sizeof(s));
+    size_t ocap = len * 2 + 1024; unsigned char* out = malloc(ocap);
+    if (dec) {
+      inflateInit2(&s, 15 + 16); s.next_in = in; s.avail_in = len; s.next_out = out; s.avail_out = ocap; int ret;
+      do { if (s.avail_out == 0) { size_t u = s.next_out - out; ocap *= 2; out = realloc(out, ocap); s.next_out = out + u; s.avail_out = ocap - u; } ret = inflate(&s, Z_FINISH); } while (ret == Z_OK || ret == Z_BUF_ERROR);
+      fwrite(out, 1, s.next_out - out, stdout); inflateEnd(&s);
+    } else {
+      deflateInit2(&s, 6, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY); s.next_in = in; s.avail_in = len; s.next_out = out; s.avail_out = ocap;
+      deflate(&s, Z_FINISH); fwrite(out, 1, s.next_out - out, stdout); deflateEnd(&s);
+    }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -242,6 +268,16 @@ defmodule Workbooks.Pallet do
         src_globs: ["*.{c,h}"],
         exclude: ~w(qjs.c qjsc.c quickjs-libc.c api-test.c ctest.c fuzz.c run-test262.c unicode_gen.c),
         extra_sources: [{"qjs_main.c", @qjs_main}]
+      ]
+    },
+    %{
+      name: "gz",
+      url: "https://codeload.github.com/madler/zlib/tar.gz/refs/tags/v1.3.1",
+      sha: "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
+      build_opts: [
+        src_globs: ["*.{c,h}"],
+        exclude: ~w(gzlib.c gzread.c gzwrite.c gzclose.c),
+        extra_sources: [{"zmain.c", @gz_main}]
       ]
     }
   ]
