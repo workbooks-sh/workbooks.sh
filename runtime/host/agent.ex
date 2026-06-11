@@ -79,6 +79,11 @@ defmodule Workbooks.Agent do
       parameters: %{type: "object", properties: %{url: %{type: "string"}}, required: ["url"]}
     }},
     %{type: "function", function: %{
+      name: "web_search",
+      description: "Search the WEB by query — returns the top results as title · url · snippet. Keyless (DuckDuckGo/Brave/Bing, host-brokered). This is how you do real research: find what exists, who reported it, then `fetch` the primary sources. Use for SERP scans, finding sources, market/landscape research. e.g. query=\"anthropic fable launch\".",
+      parameters: %{type: "object", properties: %{query: %{type: "string"}}, required: ["query"]}
+    }},
+    %{type: "function", function: %{
       name: "vfs_write",
       description: "Write content to a path in your filesystem (persists across steps). Use for the deliverable, e.g. a brand-book HTML.",
       parameters: %{type: "object", properties: %{path: %{type: "string"}, content: %{type: "string"}}, required: ["path", "content"]}
@@ -339,6 +344,23 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "fetch", args: a}, st), do: {fetch_url(a["url"]), st, nil}
+
+  # web_search: host-brokered keyless SERP (the research capability the agents
+  # lost when the native `run`/curl hatch was removed — wb-9ja — which silently
+  # blocked all SERP work and made the lander mislabel itself "env-gated"). No
+  # keys, no native exec; the host queries the engine and returns parsed results.
+  defp exec_one(%{name: "web_search", args: a}, st) do
+    out =
+      case Workbooks.Browse.Search.query(a["query"] || "", limit: 8) do
+        [] -> "no results"
+        hits ->
+          Enum.map_join(hits, "\n", fn h ->
+            "• #{h.title}\n  #{h.url}#{if h[:snippet] && h.snippet != "", do: "\n  " <> String.slice(h.snippet, 0, 160), else: ""}"
+          end)
+      end
+
+    {out, st, nil}
+  end
 
   # Exec agents share an OS workdir (the substrate the toolkit CLIs + the next
   # agent read) — so their "filesystem" tools target that workdir, not the

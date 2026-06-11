@@ -194,7 +194,13 @@
       a message; the host runs git. This is how you commit AND publish to GitHub.
     - `publish` — host-brokered copy of your content (content/**, blog/**) to the
       live public site root. This is what makes a change appear on the page.
-    - `fetch` — HTTP GET a URL (use to confirm a change is live).
+    - `web_search` — search the WEB by query (keyless, host-brokered). Returns
+      top results (title · url · snippet). This is your RESEARCH tool: to write
+      a search-first blog post, `web_search` the topic + "alternative"/"vs" to
+      see the SERP and find the real competing pages, then `fetch` the primaries.
+      The blog work is NOT env-gated — you have search now. (The old
+      DataForSEO-via-curl path died with the native shell; this replaces it.)
+    - `fetch` — HTTP GET a URL (use to confirm a change is live, read a source).
     - `wb` — the wb CLI (e.g. `wb content check`).
     Do NOT reach for git/curl/cp/sed as commands — use the tools above.
 

@@ -23,13 +23,12 @@ only the recipes change, not your method.
   engine: `wb rt post` is host-side. SO: DataForSEO calls are made with
   the `fetch` tool ONLY if a GET endpoint exists — otherwise file the gap.
 
-  CURRENT TRUTH (2026-06-10): DataForSEO is POST-JSON; the fetch tool is
-  GET-only. Until the engine grants a brokered search tool, your SERP scan
-  is: fetch Google News RSS (GET, no key):
-    https://news.google.com/rss/search?q=<urlencoded query>&hl=en-US
-  Parse titles/links/dates from the XML with the shell tool (grep/sd).
-  It is weaker than a real SERP — say so in your research note when it
-  limited you.
+  CURRENT TRUTH: use the `web_search` tool — keyless, host-brokered SERP
+  (DuckDuckGo/Brave/Bing), returns title·url·snippet. Search the topic, the
+  "<topic> alternative", the "<X> vs <Y>" — read what the SERP rewards, pick
+  the PRIMARY sources, then `fetch` each to extract sourced facts. (DataForSEO
+  for keyword volumes is a separate, optional enrichment — not required to
+  research a story; web_search + fetch is the working path.)
 
 * limits & budgets
 

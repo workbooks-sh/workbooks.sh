@@ -17,7 +17,9 @@ your role def adds only your territory and hand-offs.
   - `vfs_read` / `vfs_write` — files in your workdir. Surgical writes.
   - `shell` — the in-WASM shell (echo/cat/grep/jq/sd pipelines). Real, fast.
   - `wb` — the engine CLI. `wb content check` validates manifests/partials.
-  - `fetch` — HTTP GET. Your only window to the web.
+  - `web_search` — keyless web search by query → top results (title·url·snippet).
+    Your SERP/research tool: search a topic, find the real primaries, then fetch.
+  - `fetch` — HTTP GET a URL (read a primary source you found via web_search).
   - `image` — host-brokered image generation. Budget: 2 images per run.
     Written to `content/images/<slug>-banner.webp`. See skills/design.org
     banner law for when a story earns one.
