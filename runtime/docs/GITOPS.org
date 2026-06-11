@@ -58,12 +58,39 @@
   (b) CI builds on push and the runtime pulls the built output. Pick one; until
   then app changes still ride the team build. Config/def/content are the 90%.
 
+* step 3 — the GOAL: in-sandbox build on pull (retire CI)
+
+  "Just send it" (Convex-style) for the WHOLE app: a push compiles + serves with
+  no CI round-trip. The runtime already has the lane (=compilers/js/qjs-run.wasm=
+  QuickJS + =compilers/svelte/sveltejob.js=) — but it hits the PERF WALL (wb-2ku.7):
+  QuickJS has no JIT, so it re-parses+interprets the multi-MB =svelte/compiler= on
+  EVERY build → ~17 CPU-min. The reconcile would just call it on pull; the wall is
+  the only blocker.
+
+  Fixes, leverage-ordered (the heavy ones need the PROVISIONED compilers env —
+  clang.wasm + harness + quickjs-ng — not a laptop):
+  1. PRECOMPILE svelte/compiler to QuickJS BYTECODE (qjsc) / a cached wasm command
+     so the parse cost is paid ONCE per svelte version, not per build. (wb-2ku.7
+     fix 1; needs provisioned env.)
+  2. WARM-INSTANCE (likely host-only, tractable WITHOUT re-provisioning): keep ONE
+     long-lived Wasmex instance with svelte/compiler already loaded and feed it
+     components, instead of spinning a fresh QuickJS (re-parsing the compiler) per
+     build. Amortizes the load over many compiles. Worth trying first — it's
+     Elixir orchestration (build.ex / JsDock), not toolchain work.
+  3. OUTPUT CACHE: content-address (component source → compiled JS); a push usually
+     changes 1–2 components, so only those recompile.
+  4. payload diet (ship only compiler/index + needed internals) + linearize the
+     ESM→CJS pass (also fix the named-export bug wb-w60c found en route).
+
+  Until one lands, step 2 (the CI bridge) carries app builds — by design.
+
 * status
 
   - [X] =Workbooks.Git.pull/1= — fetch + merge, data-safe, conflict-reporting
-  - [X] keeper reconcile hook (=WB_GITOPS=1=)
+  - [X] keeper reconcile hook (=WB_GITOPS=1=) + LIVE-proven (external GitHub push pulled live)
   - [X] no-clobber proof (=test/git_reconcile_test.exs=, 3 tests)
-  - [ ] move the lander def into the repo (=/data/agent.org= → repo path)
-  - [ ] dedicated reconcile controller + RCP =POST /reconcile=
-  - [ ] build seam decision (committed =dist= vs CI build-on-push)
+  - [X] move the lander def into the repo (=/data/wb-lander-live/agent.org=, WB_KEEPER_DEF repointed)
+  - [X] step 2 — =SitePublish.deploy_app/2= ships pulled =dist= live + CI =build-app.yml= bridge
+  - [ ] step 3 — in-sandbox build (above); start with the WARM-INSTANCE fix (host-only)
+  - [ ] dedicated reconcile controller + RCP =POST /reconcile= (anyone-triggers)
   - [ ] align monorepo source layout with the deploy layout (kill the flatten)
