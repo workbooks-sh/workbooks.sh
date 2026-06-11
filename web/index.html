@@ -21,14 +21,16 @@
 @font-face { font-family: "Braked"; src: url("fonts/BRAKED-Bold.woff") format("woff"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Braked"; src: url("fonts/BRAKED-Semibold.woff") format("woff"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Warlock"; src: url("fonts/UMWarlock.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Groothan"; src: url("fonts/GroothanMixed-Regular.woff2") format("woff2"), url("fonts/GroothanMixed-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Groothan"; src: url("fonts/GroothanMixed-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: "Muzzaro"; src: url("fonts/Muzzaro.woff2") format("woff2"), url("fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
 
   :root {
     --paper: #f7f6f1;
     --ink: #121316;
     --bloom: #13d943;  /* neon green — the one accent */
-    --display: "Warlock", "Braked", "Anton", sans-serif;
-    --accent: "Muzzaro", "Florens", "Handjet", serif;
+    --display: "Groothan", "Warlock", "Anton", sans-serif;
+    --accent: "Groothan", "Muzzaro", "Handjet", sans-serif;
     --mono: "JetBrains Mono", monospace;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -112,26 +114,28 @@
   .brandlock svg { width: 46px; height: auto; display: block; color: var(--ink); }
   .brandlock span {
     font-family: var(--display); font-size: 27px; letter-spacing: .05em;
-    text-transform: uppercase; color: var(--ink); line-height: 1;
+    color: var(--ink); line-height: 1;
   }
 
   .lockup { width: min(680px, 90vw); }
   .lockup .jl {
     display: block; font-family: var(--display); font-weight: 400;
     font-size: clamp(64px, 10.4vw, 138px); line-height: .96;
-    text-transform: uppercase; white-space: nowrap; color: var(--ink);
+    white-space: nowrap; color: var(--ink);
   }
   /* the counterpoint line: PIXELS against Anton's block — same ink,
      lowercase, the machine voice between two human shouts */
   /* the pixel voice, canonicalized: 900 so its strokes read the same ink
      density as Anton, a smidge of tracking, sized to Anton's cap height */
+  /* the counterpoint line, duo system: Groothan's bubble glyphs in white
+     with a thick ink outline, overlapping the grotesque lines around it */
   .lockup .jl:nth-child(2) {
     font-family: var(--accent); font-weight: 400; font-synthesis: none;
-    text-transform: uppercase; color: var(--ink);
+    text-transform: uppercase;
     letter-spacing: 0;
-    font-size: clamp(45px, 7.28vw, 97px); line-height: .96;
-    /* masked by the MATTE ENGINE below: a flowing pixel-blob field decides
-       where the ink is solid and where it breaks into scanlines */
+    font-size: clamp(46px, 7.4vw, 98px); line-height: .9;
+    color: #fff; -webkit-text-stroke: 6.5px var(--ink); paint-order: stroke fill;
+    position: relative; z-index: 2; margin: -.3em 0 -.26em;
   }
 
   .caption {
@@ -204,11 +208,11 @@
   .sky-kicker b { color: var(--bloom); }
   .sky-h {
     font-family: var(--display); font-size: clamp(32px, 3.7vw, 60px); line-height: .98;
-    text-transform: uppercase; color: var(--ink); white-space: nowrap;
+    color: var(--ink); white-space: nowrap;
   }
   .sky-h em {
     font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
-    font-size: .7em; letter-spacing: 0; text-transform: uppercase; color: var(--ink);
+    color: var(--ink);
   }
   .sky-points {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px;
@@ -235,9 +239,9 @@
   .s3-grid { display: grid; grid-template-columns: 340px 1fr; gap: 76px; max-width: 1480px; margin: 0 auto; align-items: start; }
   .s3-left h2 {
     font-family: var(--display); font-size: clamp(34px, 3.4vw, 52px); line-height: 1;
-    text-transform: uppercase; color: var(--paper); margin-bottom: 18px;
+    color: var(--paper); margin-bottom: 18px;
   }
-  .s3-left h2 em { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none; font-size: .7em; letter-spacing: 0; }
+  .s3-left h2 em { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none; }
   .s3-left .lede { font-size: 12.5px; line-height: 1.8; color: #9ba095; max-width: 42ch; margin-bottom: 30px; }
 
   .s3-sel { border-top: 1px solid rgba(247,246,241,.2); display: flex; flex-direction: column; }
@@ -302,7 +306,7 @@
   }
   .s3-scroll .thumb { position: absolute; left: 0; width: 2px; background: var(--ac); }
   .s3-stage .role { font: 700 10px var(--mono); letter-spacing: .3em; text-transform: uppercase; margin-bottom: 6px; }
-  .s3-stage h3 { font-family: var(--display); font-size: 38px; line-height: 1; text-transform: uppercase; color: var(--paper); }
+  .s3-stage h3 { font-family: var(--display); font-size: 38px; line-height: 1; color: var(--paper); }
   .s3-stage p { font-size: 12.5px; line-height: 1.8; margin-bottom: 12px; max-width: 58ch; color: #9ba095; }
   .s3-feats { list-style: none; padding: 0; margin: 6px 0 16px; display: flex; flex-direction: column; gap: 9px; }
   .s3-feats li { font: 400 12px var(--mono); line-height: 1.6; color: #9ba095; padding-left: 20px; position: relative; }
@@ -416,7 +420,7 @@
     <div class="sky-content">
       <div class="sky-head">
         <p class="sky-kicker">what is a workbook <b>■</b> 01</p>
-        <h2 class="sky-h">the atom of <em>a living internet.</em></h2>
+        <h2 class="sky-h">the ATOM of <em>a living internet.</em></h2>
       </div>
       <div class="sky-foot">
         <ul class="sky-points">
@@ -434,7 +438,7 @@
   <div class="s3-grid">
     <div class="s3-left">
       <p class="sky-kicker" style="text-align:left">the ecosystem <b>■</b> 02</p>
-      <h2>three pieces. <em>one organism.</em></h2>
+      <h2>three pieces. <em>one orgAnism.</em></h2>
       <p class="lede">The file carries everything, the engine keeps it running, the parts let it
         grow — each is simple alone, together they feed each other.</p>
       <nav class="s3-sel" id="s3Sel"></nav>
@@ -1460,15 +1464,8 @@ function fisheyeSetup() {
 })(0);
 
 document.fonts.ready.then(() => {
-  fluidSetup();
   fisheyeSetup();
-  addEventListener("resize", () => { fluidSetup(); fisheyeSetup(); });
-  let mf = 0;
-  (function matteLoop(ms) {
-    mf++;
-    if (fluidCv && mf % 2 === 0 && scrollY < innerHeight * 1.2) fluidPaint(ms / 1000);
-    requestAnimationFrame(matteLoop);
-  })(0);
+  addEventListener("resize", () => fisheyeSetup());
 });
 
 /* ── the spotlight: selectors left, stage right. Pastel DNA system. ── */

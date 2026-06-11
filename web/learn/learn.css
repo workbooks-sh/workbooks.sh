@@ -13,14 +13,16 @@
 @font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Bold.woff") format("woff"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Semibold.woff") format("woff"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Warlock"; src: url("../fonts/UMWarlock.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Groothan"; src: url("../fonts/GroothanMixed-Regular.woff2") format("woff2"), url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Groothan"; src: url("../fonts/GroothanMixed-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: "Muzzaro"; src: url("../fonts/Muzzaro.woff2") format("woff2"), url("../fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
 
 :root {
   --paper: #f7f6f1;
   --ink: #121316;
   --bloom: #13d943;
-  --display: "Warlock", "Braked", "Anton", sans-serif;
-    --accent: "Muzzaro", "Florens", "Handjet", serif;
+  --display: "Groothan", "Warlock", "Anton", sans-serif;
+    --accent: "Groothan", "Muzzaro", "Handjet", sans-serif;
   --mono: "JetBrains Mono", monospace;
   --dim: #565b54;
 }
@@ -99,12 +101,19 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 .lhero .lcol { display: flex; flex-direction: column; min-height: 100%; }
 .lhero .lcol h1 { margin: 22px 0 auto; }   /* auto bottom margin pins dek+meta to the base */
 .lhero h1 {
-  font-family: var(--display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(46px, 6.4vw, 92px); line-height: .96; max-width: 12ch;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(46px, 6.4vw, 92px); line-height: .84; max-width: 14ch;
+  display: flex; flex-direction: column; align-items: flex-start;
+}
+.lhero h1 .ln { display: block; }
+/* the bubble line — Groothan's UPPERCASE glyphs, white fill + ink outline,
+   overlapping the grotesque lines above and below (the duo lockup) */
+.lhero h1 .bub {
+  position: relative; z-index: 2; margin: -.26em 0 -.24em;
+  color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill;
 }
 .lhero h1 em, .lhero h1 i {
   font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
-  font-size: .7em; letter-spacing: 0;
 }
 .lhero .dek { margin-top: 30px; font-size: 13px; line-height: 1.9; color: var(--dim); max-width: 58ch; }
 .lhero .dek b { color: var(--ink); }
@@ -131,7 +140,7 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 .lhero .heroart .cap .face img { height: 26px; filter: invert(.92); }
 .lhero .heroart .cap span {
   font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 19px;
-  letter-spacing: .07em; text-transform: uppercase; color: var(--ink);
+  letter-spacing: .05em; color: var(--ink);
 }
 .lhero .meta { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
 .lhero .meta span {
@@ -145,7 +154,7 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
          max-width: 1180px; margin: 0 auto; padding: 24px 7vw 0; }
 .ltoc { position: sticky; top: 110px; align-self: start; padding-bottom: 40px; }
 .ltoc .t { font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 15px;
-           letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
+           letter-spacing: .08em; margin-bottom: 14px; }
 .ltoc a {
   display: block; font-size: 11px; line-height: 1.5; color: var(--dim); text-decoration: none;
   padding: 6px 0 6px 14px; border-left: 2px dotted rgba(18,19,22,.25);
@@ -156,12 +165,11 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 article { max-width: 680px; padding-bottom: 30px; }
 article section { padding: 34px 0 14px; }
 article h2 {
-  font-family: var(--display); font-weight: 400; text-transform: uppercase;
+  font-family: var(--display); font-weight: 400;
   font-size: clamp(26px, 2.6vw, 38px); line-height: 1.04; margin-bottom: 18px;
   scroll-margin-top: 110px;
 }
-article h2 em, article h2 i { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
-                font-size: .7em; letter-spacing: 0; }
+article h2 em, article h2 i { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none; }
 article h3 { font: 700 13px var(--mono); letter-spacing: .12em; text-transform: uppercase;
              margin: 26px 0 10px; color: var(--ink); }
 article p { font-size: 13px; line-height: 1.95; color: #3a3e38; margin-bottom: 14px; }
@@ -189,7 +197,7 @@ article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; f
 
 /* skippable-depth note — the ladder rung label */
 .skip { font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 14px;
-        letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+        letter-spacing: .06em; color: var(--dim);
         border: 1.5px dashed rgba(18,19,22,.3); border-radius: 7px;
         display: inline-block; padding: 5px 11px; margin-bottom: 14px; }
 .skip b { color: var(--ac); }

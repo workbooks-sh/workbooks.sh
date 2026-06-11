@@ -24,7 +24,8 @@ must be retuned per pair so BOTH FONTS HIT THE SAME CAP HEIGHT — measure with
 | 2 | Anton | **CS Golem** | ~1.0em | good fit, quirky rounded pixel; superseded by user's next picks |
 | 3 | **Inkognito** (mono) | **CS Florens Pixel** (pixel serif italic) | .96em | strong techno/editorial mix; Florens has built-in slant |
 | 4 | **Braked Bold** (condensed sans) | **Muzzaro** (condensed serif) | .67em | serif×sans editorial pair; superseded |
-| 5 | **UM Warlock** (condensed display sans) | **Muzzaro** (condensed serif) | .70em | CURRENT — duo treatment: scattered single serif letters (`<i>`) inside the sans headline, one-ish per line, plus serif `<em>` words in h2s |
+| 5 | **UM Warlock** (condensed display sans) | **Muzzaro** (condensed serif) | .70em | duo letters treatment; superseded |
+| 6 | **Groothan Mixed** (one file, two styles) | — (same font) | 1em (same font) | CURRENT — see "Groothan case rules" below |
 
 Notes:
 - Braked's Bold cut is registered at `font-weight: 400` on purpose — display
@@ -35,10 +36,21 @@ Notes:
   browser never fake-bolds a bitmap grid.
 - Body/mono stays JetBrains Mono; the dictionary defcards use EB Garamond.
 
-## The duo treatment
+## Groothan case rules (the current system)
 
-Headlines mix the two faces letter-wise, type-foundry "duo" style: most
-letters in `--display`, occasional single letters in `--accent` via `<i>`
-(`.lhero h1 i` / `article h2 i` share the `em` rule). Keep it sparse —
-roughly one serif letter per visual line. Hero lockup on the landing page is
-exempt (its own thing).
+Groothan Mixed packs the duo into ONE font: **UPPERCASE glyphs = bubble
+display, lowercase glyphs = clean grotesque caps**. So the style mix is pure
+CASE — no second family, no em-ratio. `text-transform: uppercase` was removed
+from every headline; the authored case IS the design:
+
+- Bubble appears in **headers/titles only** — never chips, kickers, TOC,
+  body. (Chips/TOC keep Groothan but lowercase → grotesque.)
+- **One-line title → exactly one bubble WORD** (`the DEFINITION`).
+- **Multi-line title → single bubble LETTERS only** (`c<em>A</em>n't`).
+- **Three-line lockup → the middle line is all-bubble**, white fill +
+  thick ink outline (`-webkit-text-stroke` ~5-6.5px, `paint-order: stroke
+  fill` — visible stroke is half the value), with condensed line-height and
+  negative margins so it overlaps the grotesque lines on both sides
+  (`.lhero h1 .bub`, and the landing hero's middle line).
+- The landing hero's ASCII/scanline matte engine is RETIRED in favor of this
+  bubble-outline system (matte functions remain in index.html, uninvoked).
