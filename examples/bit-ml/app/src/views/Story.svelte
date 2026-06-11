@@ -68,7 +68,7 @@
         class="sec-badge"
         style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
       >{@html sec.icon}{sec.tag}</span>
-      <span class="when">{story.time} · {story.read} read</span>
+      <span class="when">{#if story.time}{story.time} · {/if}{story.read} read</span>
     </div>
 
     <h1 class="head serif">{@html headHtml}</h1>

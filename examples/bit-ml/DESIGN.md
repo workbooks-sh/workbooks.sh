@@ -185,7 +185,7 @@ States: `unread` (full ink) · `read` (head drops to --ink-2) ·
 `LIVE` (being written now — wire-blue pulsing dot + the head renders
 with the type-in presence system; clicking opens the story mid-write).
 
-### 4.4 The front page (the WIDE broadsheet)
+### 4.4 The front page (the ZONED broadsheet)
 **Width dial (founder, 2026-06-10):** the front page is a WIDE editorial
 artifact, not a single 720px column. The page shell (`.sheet`) opens to
 `--page-max` (1280px); long-form views (story, section) and the chrome
@@ -194,33 +194,73 @@ artifact, not a single 720px column. The page shell (`.sheet`) opens to
 `--page-max 1280px` (the broadsheet wrapper), `--col 720px` (the measured
 column — story body + deks), `--measure 68ch` (long-form text).
 
-Real hierarchy through scale + space, not borders:
+**Zones, not a feed (front rebuild, 2026-06-10).** The front is NOT a uniform
+CMS grid of bites — it is a real newspaper front: a sequence of ZONES with
+intent, top→bottom, each in a different register, full `--page-max` width with
+generous air (`~80px`) between them. Hierarchy is **scale + whitespace**, never
+borders or cards (the surface law) — the ONE exception is the analysis band's
+subtle `--surface` ground (below). The recurring move: **colorful banner images
+on the clean monochrome page** — that contrast IS the look. Images are the only
+color besides wire-blue, the small section accents, brand marks, and market
+up/down. House image styles: `painterly` for the big features, `collage` for the
+section-cluster leads (encoded per-row as `imgStyle`).
 
-- **The WireLead is the feature.** At wide widths it's a broadsheet lead — a
-  BIG banner image dominating the left column (`1.35fr`) with the display
-  head/dek/foot to its right (`1fr`), generous `40px` gap. It stacks (banner
-  on top) below 860px. The banner is a 16:9 crop box (`aspect-ratio`,
-  `object-fit: cover` — the generated webp is ~square, so it crops cleanly and
-  looks intentional), `border-radius: var(--r)`, soft `--shadow` lift, no
-  border.
-- **Below: a 3-column editorial GRID** (`grid-auto-flow: row dense`, `28px`
-  gap, top margin `56px`). Bites that carry a banner become the **FEATURED**
-  variant — a banner thumbnail (3:2 crop box) above the body — and **span two
-  columns** so they dominate; text-only bites stay compact (one column). The
-  page reads with rhythm and importance, not uniformity. Whitespace + spread;
-  hierarchy is scale + air, never card strokes.
-- **Mobile** (≤680px): one clean measured column — the stack — no horizontal
-  scroll. Medium (≤980px): 2 columns, features span both.
+**The zones (top→bottom):**
 
-**Banner-on-Bite (founder note, 2026-06-10):** the prior "no banner on Bite"
-rule is RELAXED — but only for the FEATURED grid variant on the front page (a
-3:2 thumbnail). Bites in a section/story stack and the non-featured grid cells
-stay text-only and fast. The thumbnail is opt-in (`feature` + `banner` props);
-default Bite is unchanged.
+1. **THE LEAD** — the live/newest feature as a **dominant hero**: a big banner
+   (3:2 crop box, `object-fit: cover`, `--r` + soft `--shadow`) with the
+   Newsreader display head `clamp(34,5vw,56px)`, dek, byline below it
+   (`WireLead`, `stacked`). Beside it a **SECONDARY feature** (`FeatureCard`) at
+   medium size with its own banner + serif head `~28px`. An **asymmetric two-up**
+   (`1.55fr / 1fr`, a hairline gutter rule between — not equal halves), stacking
+   below 980px.
+2. **MARKET BAND** — the `MarketStrip` (mono tickers, up/down color) as a
+   full-width rule-bounded band right under the lead. Keeps the honest
+   `· specimen` note (§4.6: the front numbers are flagged fake, never passed off
+   as real data).
+3. **PER-SECTION CLUSTERS** — for EACH desk (ai → markets → chips → policy) a
+   `SectionCluster`: a **section header** (the section badge as a left-aligned
+   rule, accent color from `sections.js`) → ONE **imaged lead** (its feature
+   banner, medium, serif head `~25px`) → a tight **HEADLINE LIST**
+   (`HeadlineRow`) of that section's remaining stories — head + dek-snippet +
+   read/byline, **NO images**, hairline-separated, dense. This is the core
+   editorial texture: **one picture, many headlines.** Clusters lay in a
+   responsive grid (**2 across on wide**, 1 on narrow) so the page has rhythm,
+   not one endless column.
+4. **ANALYSIS strip** — the 2-3 longest-read stories in a DIFFERENT register: a
+   bordered-off band (the one sanctioned subtle `--surface` ground + `--r`),
+   labelled `ANALYSIS`, **byline-forward, serif heads, NO images** (`AnalysisCard`,
+   serif italic dek, column divider rules). Editorial furniture that signals
+   "this is commentary".
+5. **THE WIRE (latest)** — the most recent N stories as **timestamped
+   one-liners** (`WireRow`: mono, head only + a relative tick + section tag), a
+   dense scannable "latest" column (two columns on wide). A news-ticker register.
+6. **Footer** (the shell renders it).
+
+**Scale is the design:** hero head `clamp(34,5vw,56px)` · secondary/section-lead
+heads `24–28` · headline-list heads `17–19` tight grotesk · wire `~14` mono.
+Importance comes from scale + air, never strokes.
+
+**Mobile** (≤680px): collapses to one measured column in reading order — lead →
+its dek → section-by-section stacked clusters → analysis → wire. No horizontal
+scroll; images scale down. Medium (≤980px): the two-up stacks and clusters /
+analysis / wire fall to one column.
+
+**Banner-on-Bite (founder note, 2026-06-10):** the `Bite` FEATURED variant (a
+3:2 thumbnail, `feature` + `banner` props) still exists for section/grid reuse;
+the zoned front uses the dedicated lead / feature / cluster components instead,
+but bites in a section/story stack stay text-only and fast. Default Bite is
+unchanged.
+
+**Linking (front rebuild, 2026-06-10):** every story links to `/story/<slug>`.
+Only the original four (deepmind-weather, nvidia-datacenter, tsmc-arizona,
+eu-compute-threshold) carry org bodies; the other 20 are headline-only demo rows
+— clicking one resolves to `Story.svelte`'s graceful "not found" path (the row
+exists, the body doesn't), which is acceptable for the demo. Navigation never
+breaks.
 
 Section fronts = same stack filtered, in the reading band (sections stay
-measured; only the front page goes broadsheet-wide). No market strip on the
-real front (§4.6 forbids placeholder numbers).
+measured; only the front page goes zoned/broadsheet-wide).
 
 Section front header uses the **section badge** (§4.3, slightly larger
 variant: 11px, padding 4px 10px) as the sole section identity — color
