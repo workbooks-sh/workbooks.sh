@@ -27,13 +27,17 @@ defmodule Workbooks.Groundskeeper do
   @doc """
   Answer "where are we?" with real data, never vibes. `query` selects a view:
   summary | ready | issues | log. Unknown queries get the summary.
+
+  On the dev box bd is the ledger. On a deployed host (fly) there is no bd —
+  the answers degrade to the git checkout (cloned from WB_GK_REPO_URL on
+  demand) and its committed BOARD.org, which the dev box regenerates from bd.
   """
   def repo_state(query \\ "summary") do
     case query do
-      "ready" -> %{ready: bd(~w(ready))}
-      "issues" -> %{open: bd(~w(list --status open))}
+      "ready" -> %{ready: bd_or_board(~w(ready))}
+      "issues" -> %{open: bd_or_board(~w(list --status open))}
       "log" -> %{log: git(~w(log --oneline -15))}
-      _ -> %{log: git(~w(log --oneline -8)), status: git(~w(status -sb)), ready: bd(~w(ready))}
+      _ -> %{log: git(~w(log --oneline -8)), status: git(~w(status -sb)), ready: bd_or_board(~w(ready))}
     end
   end
 
@@ -55,10 +59,24 @@ defmodule Workbooks.Groundskeeper do
 
   # ── issues ──────────────────────────────────────────────────────────────────
 
-  @doc "File a bd issue from the conversation (founder lane). Returns bd's output."
+  @doc """
+  File an issue from the conversation (founder lane): bd on the dev box;
+  on a bd-less host the runtime's own backlog (the autopoet store) holds it
+  until a dev session sweeps it into bd.
+  """
   def file_issue(title, description \\ "") do
     args = ["create", title] ++ if(description == "", do: [], else: ["-d", description])
-    %{result: bd(args)}
+
+    case bd(args) do
+      "bd unavailable" <> _ ->
+        case Workbooks.Autopoet.file_issue(%{title: title, need: description, tenant: "groundskeeper", kind: :founder}) do
+          {:ok, id} -> %{result: "filed to runtime backlog as #{id} (will be swept into bd)"}
+          {:error, e} -> %{result: "could not file: #{inspect(e)}"}
+        end
+
+      out ->
+        %{result: out}
+    end
   end
 
   # ── the spawn lane ──────────────────────────────────────────────────────────
@@ -191,13 +209,62 @@ defmodule Workbooks.Groundskeeper do
     _ -> "bd unavailable on this host"
   end
 
+  # bd when present; otherwise the committed BOARD.org from the checkout —
+  # the dev box generates it FROM bd, so a deployed host still answers with
+  # real (if slightly stale) board state.
+  defp bd_or_board(args) do
+    case bd(args) do
+      "bd unavailable" <> _ ->
+        case repo_root() && File.read(Path.join(repo_root(), "examples/groundwork/BOARD.org")) do
+          {:ok, board} -> "from committed BOARD.org (bd lives on the dev box):\n" <> String.slice(board, 0, 4000)
+          _ -> "no board available on this host"
+        end
+
+      out ->
+        out
+    end
+  end
+
   defp git(args) do
-    case System.cmd("git", args, stderr_to_stdout: true) do
+    opts = [stderr_to_stdout: true] ++ if(root = repo_root(), do: [cd: root], else: [])
+
+    case System.cmd("git", args, opts) do
       {out, 0} -> String.trim(out)
       {out, _} -> "git error: #{String.trim(out)}"
     end
   rescue
     _ -> ""
+  end
+
+  # The workbooks checkout to answer repo questions from. Dev box: the cwd's
+  # repo. Deployed host: WB_GK_REPO (cloned shallow from WB_GK_REPO_URL on
+  # first use, pulled on later ones — best-effort, never blocks an answer).
+  defp repo_root do
+    case System.get_env("WB_GK_REPO") do
+      nil ->
+        case System.cmd("git", ~w(rev-parse --show-toplevel), stderr_to_stdout: true) do
+          {out, 0} -> String.trim(out)
+          _ -> nil
+        end
+
+      path ->
+        cond do
+          File.dir?(Path.join(path, ".git")) ->
+            Task.start(fn -> System.cmd("git", ~w(pull --ff-only), cd: path, stderr_to_stdout: true) end)
+            path
+
+          url = System.get_env("WB_GK_REPO_URL") ->
+            case System.cmd("git", ["clone", "--depth", "50", url, path], stderr_to_stdout: true) do
+              {_, 0} -> path
+              _ -> nil
+            end
+
+          true ->
+            nil
+        end
+    end
+  rescue
+    _ -> nil
   end
 
   defp slug(goal) do
