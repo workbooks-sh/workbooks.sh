@@ -361,13 +361,22 @@ defmodule Workbooks.CommandRegistry do
                   _ -> unpack
                 end
 
-              srcdir = if opts[:src_subdir], do: Path.join(top, opts[:src_subdir]), else: top
               builddir = Path.join(System.tmp_dir!(), "wbcbuild-#{got}")
               File.rm_rf!(builddir)
               File.mkdir_p!(builddir)
               exclude = opts[:exclude] || []
 
-              for f <- Path.wildcard(Path.join(srcdir, "*.{c,h}")) do
+              # Source selection: :src_globs (a list of {c,h} globs relative to the tarball top, for
+              # tools whose sources span multiple dirs e.g. zForth's src/zforth + src/linux) takes
+              # precedence; else :src_subdir (single dir); else the top dir. Files flatten into builddir.
+              globs =
+                cond do
+                  is_list(opts[:src_globs]) -> opts[:src_globs]
+                  opts[:src_subdir] -> [Path.join(opts[:src_subdir], "*.{c,h}")]
+                  true -> ["*.{c,h}"]
+                end
+
+              for g <- globs, f <- Path.wildcard(Path.join(top, g)), File.regular?(f) do
                 b = Path.basename(f)
                 unless b in exclude, do: File.cp!(f, Path.join(builddir, b))
               end
