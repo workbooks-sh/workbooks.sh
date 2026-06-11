@@ -6,6 +6,10 @@
  * Precedence stays: an explicit emoji / image / identity icon on the
  * item wins; a user tint override wins for folders (tinted solid
  * glyph); the material icon is the default everything else falls to.
+ *
+ * SYNC: the file/folder/def resolution here is mirrored agent-side by the
+ * `icons` toolkit (toolkits/icons/src/cli.js — for-file / for-folder /
+ * search). Change the resolution rules in one place → change the other.
  */
 import manifest from "material-icon-theme/dist/material-icons.json";
 

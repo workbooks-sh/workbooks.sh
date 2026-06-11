@@ -3,6 +3,12 @@
    * Legacy stored values (lucide:<Name>) → Material Icon Theme defs.
    * The phosphor glyph era is over for item icons — old values persisted
    * on disk resolve to their closest material icon instead.
+   *
+   * GRAMMAR SYNC — single source of truth, two homes: the value grammar
+   * this component resolves (and this legacy map) is ALSO exposed to
+   * agents by the `icons` toolkit (toolkits/icons/src/cli.js — `icons
+   * grammar`). Change the grammar or this map in one place → change the
+   * other; toolkits/icons/test/icons.test.mjs asserts the map stays in sync.
    */
   export const LEGACY_GLYPHS: Record<string, string> = {
     Kanban: "todo",

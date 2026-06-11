@@ -28,6 +28,7 @@ running **inside** the WASM runtime (one shell, WASM-only, host-brokered caps).
 |---|---|---|
 | **[open-avatars](open-avatars/)** | one DiceBear-like API, many art styles — `avatar(pack, seed)` routes by pack type (assembled / gallery / procedural). Same seed → byte-identical avatar forever. Ships open-peeps, transhumans, pixabots, boring, jdenticon, minidenticons, pixitar. | experimental |
 | **[glyphs](glyphs/)** | the unified SVG-mark resolver — `glyph('brand:google' \| 'icon:html5' \| 'avatar:open-peeps/wren' \| 'social:gh/user')`. Curated-local first, CDN fallback (svgl / simple-icons / lobehub / unavatar). Delegates avatars to open-avatars. | experimental |
+| **[icons](icons/)** | the universal icon library as a CLI — `icons search/for-file/for-folder/get/grammar` over the one value grammar (`mi:<def>` material · `lobe:<slug>` brand · emoji · `data:` · initials) the desktop's `Icon.svelte` renders. What an agent writes renders unchanged. | experimental |
 
 ## System knowledge & meta
 
