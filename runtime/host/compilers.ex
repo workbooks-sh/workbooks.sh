@@ -1523,6 +1523,21 @@ defmodule Workbooks.Compilers do
   `entry_rel` is POSIX-relative to `project_dir` (e.g. "index.js"). Returns {:ok, js} | {:error, _}.
   """
   def bundle_dir(project_dir, entry_rel, opts \\ [], root \\ default_root()) do
+    # ONE routing point for every bundle caller (wb-feto): esbuild FIRST
+    # (esbuild.wasm under wasmtime, JIT'd to native — the ~23-min QuickJS bundle
+    # drops to ~0.4s), falling back to the QuickJS bundler when esbuild can't
+    # resolve a node CORE module (`--platform=browser` makes builtins ERROR rather
+    # than externalize, so an fs/http bundle cleanly takes the slow-but-shimmed
+    # dock path). A pure-compute/frontend bundle takes the fast path; a missing
+    # esbuild.wasm (old image) also falls back. Output is self-contained JS either
+    # way (cjs), compatible with every caller (bundled_js_to_wasm, the dock detect).
+    case esbuild_bundle_dir(project_dir, entry_rel, [format: "cjs", extra: ["--platform=browser"]], root) do
+      {:ok, js} -> {:ok, js}
+      {:error, _} -> bundle_dir_quickjs(project_dir, entry_rel, opts, root)
+    end
+  end
+
+  defp bundle_dir_quickjs(project_dir, entry_rel, opts, root) do
     jd = Path.join(root, "js")
     qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
     bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
@@ -1618,10 +1633,65 @@ defmodule Workbooks.Compilers do
     jd = Path.join(root, "js")
     sd = Path.join(root, "svelte")
     qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
-    bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
-    sveltejob = Path.expand(Path.join(sd, "sveltejob.js"))
+    compilejob = Path.expand(Path.join(sd, "svelte_compile.js"))
+    esbuild_wasm = Path.expand(Path.join([root, "esbuild", "esbuild.wasm"]))
 
     unless File.regular?(qrun), do: wasmtime_build_js(jd)
+
+    # FAST PATH (wb-feto): split the COMPILE (QuickJS — svelte/compiler is JS, irreducible) from the
+    # BUNDLE (esbuild, native-fast). Falls back to the all-QuickJS sveltejob+bundlejob lane if the
+    # compile-only job or esbuild.wasm isn't present, or if the split path errors.
+    if File.regular?(qrun) and File.regular?(compilejob) and File.regular?(esbuild_wasm) do
+      case svelte_bundle_esbuild(project_dir, entry_rel, opts, root, qrun, compilejob) do
+        {:ok, js} -> {:ok, js}
+        _ -> svelte_bundle_dir_quickjs(project_dir, entry_rel, opts, root)
+      end
+    else
+      svelte_bundle_dir_quickjs(project_dir, entry_rel, opts, root)
+    end
+  end
+
+  # Compile .svelte → JS via the compile-only job (QuickJS), write the transformed file-map to a temp
+  # dir, then bundle with esbuild (treating .svelte as already-JS). The compiled output imports
+  # `svelte/internal`, resolved by esbuild from the node_modules carried in the map.
+  defp svelte_bundle_esbuild(project_dir, entry_rel, opts, root, qrun, compilejob) do
+    abs = Path.expand(project_dir)
+    files = collect_bundle_files(abs) |> Map.merge(collect_svelte_files(abs))
+
+    payload =
+      %{"files" => files}
+      |> maybe_put("svelteOptions", Keyword.get(opts, :svelte_options))
+      |> Jason.encode!()
+
+    with {:ok, json} <- run_bundler(payload, qrun, {File.read!(compilejob), "svelte_compile.js"}),
+         {:ok, %{"files" => transformed}} <- Jason.decode(json) do
+      tmp = Path.join(System.tmp_dir!(), "svelte-eb-#{:erlang.unique_integer([:positive])}")
+
+      try do
+        write_files(tmp, transformed)
+        esbuild_bundle_dir(tmp, entry_rel, [format: "cjs", extra: ["--loader:.svelte=js"]], root)
+      after
+        File.rm_rf(tmp)
+      end
+    else
+      _ -> {:error, :svelte_compile_failed}
+    end
+  end
+
+  defp write_files(dir, map) do
+    for {rel, content} <- map do
+      p = Path.join(dir, rel)
+      File.mkdir_p!(Path.dirname(p))
+      File.write!(p, content)
+    end
+  end
+
+  defp svelte_bundle_dir_quickjs(project_dir, entry_rel, opts, root) do
+    jd = Path.join(root, "js")
+    sd = Path.join(root, "svelte")
+    qrun = Path.expand(Path.join(jd, "qjs-run.wasm"))
+    bundlejob = Path.expand(Path.join(jd, "bundle/bundlejob.js"))
+    sveltejob = Path.expand(Path.join(sd, "sveltejob.js"))
 
     cond do
       not (File.regular?(qrun) and File.regular?(bundlejob) and File.regular?(sveltejob)) ->

@@ -41,6 +41,50 @@ defmodule Workbooks.EsbuildLaneTest do
     File.rm_rf!(dir)
   end
 
+  test "bundle_dir routes a pure-compute project through esbuild (fast path)" do
+    dir =
+      fixture(%{
+        "package.json" => ~S|{"name":"p"}|,
+        "src/u.js" => "export const add = (a, b) => a + b;\n",
+        "src/main.js" => "import { add } from './u.js';\nexport const t = add(1, 2);\n"
+      })
+
+    t0 = System.monotonic_time(:millisecond)
+    assert {:ok, js} = Workbooks.Compilers.bundle_dir(dir, "src/main.js", [], @root)
+    dt = System.monotonic_time(:millisecond) - t0
+    assert js =~ "add"
+    assert dt < 10_000, "bundle_dir should take the esbuild fast path; took #{dt}ms"
+    IO.puts("\n[bundle_dir→esbuild] #{dt}ms")
+    File.rm_rf!(dir)
+  end
+
+  @tag timeout: 1_800_000
+  test "svelte_bundle_dir splits compile (QuickJS) from bundle (esbuild), correct output" do
+    dir =
+      fixture(%{
+        "package.json" => ~S|{"name":"p","dependencies":{"svelte":"^4.2.0"}}|,
+        "Counter.svelte" => "<script>let n = 0;</script>\n<button on:click={() => n++}>count {n}</button>\n",
+        "src/main.js" => "import Counter from '../Counter.svelte';\nexport { Counter };\n"
+      })
+
+    # install svelte (npm lane) — fast (~3s). install_tree returns {:ok, installed}
+    # OR {:ok, installed, errors} when optional/transitive deps fail (e.g. @types/*);
+    # svelte itself still lands — that's what we check.
+    Workbooks.Npm.install_tree([%{name: "svelte", req: "^4.2.0", pin: nil}], dir)
+    assert File.dir?(Path.join(dir, "node_modules/svelte"))
+
+    t0 = System.monotonic_time(:millisecond)
+    res = Workbooks.Compilers.svelte_bundle_dir(dir, "src/main.js", [], @root)
+    dt = System.monotonic_time(:millisecond) - t0
+
+    assert {:ok, js} = res
+    refute js =~ "on:click", "raw svelte template syntax should be compiled away"
+    assert byte_size(js) > 500 and (js =~ "create_fragment" or js =~ "function"),
+           "looks like compiled+bundled svelte output"
+    IO.puts("\n[svelte split] compile(QuickJS)+bundle(esbuild) total = #{dt}ms")
+    File.rm_rf!(dir)
+  end
+
   test "transpiles JSX" do
     dir =
       fixture(%{
