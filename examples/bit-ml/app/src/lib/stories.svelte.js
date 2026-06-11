@@ -84,6 +84,55 @@ export function moreFrom(section, excludeSlug, n = 3) {
   return bySection(section).filter((s) => s.slug !== excludeSlug).slice(0, n);
 }
 
+// ── front-page zone selectors (DESIGN.md §4.4) ──────────────────────────────
+// The feature stories (those with a colorful banner), in manifest order. The
+// front-page LEAD is the first; the SECONDARY feature is the second.
+export function features() {
+  return (_manifest || []).filter((s) => s.feature && s.banner);
+}
+
+// The four desks, in editorial order, for the per-section clusters.
+export const SECTION_ORDER = ['ai', 'markets', 'chips', 'policy'];
+
+// A section CLUSTER: its imaged lead (the feature banner if any, else the first
+// story) + the remaining stories for the headline list. `exclude` drops slugs
+// already spent on the page (the front lead + secondary) so nothing repeats.
+export function sectionCluster(section, exclude = []) {
+  const ex = new Set(exclude);
+  const rows = bySection(section).filter((s) => !ex.has(s.slug));
+  if (!rows.length) return { lead: null, rest: [] };
+  // prefer a banner story as the cluster picture; else the first row
+  const lead = rows.find((s) => s.banner) || rows[0];
+  const rest = rows.filter((s) => s.slug !== lead.slug);
+  return { lead, rest };
+}
+
+// The ANALYSIS strip: the longest-read stories (commentary register), N of them,
+// excluding anything already spent as an imaged lead.
+export function analysisPicks(exclude = [], n = 3) {
+  const ex = new Set(exclude);
+  const mins = (r) => /(\d+)\s*m/.test(r) ? +RegExp.$1 : 0;   // "5m" → 5, "48s" → 0
+  return (_manifest || [])
+    .filter((s) => !ex.has(s.slug))
+    .map((s) => ({ s, m: mins(s.read || '') }))
+    .sort((a, b) => b.m - a.m)
+    .slice(0, n)
+    .map((x) => x.s);
+}
+
+// THE WIRE (latest): the most recent N stories as ticker rows. The manifest is
+// in published order (newest first); we synthesize a stable relative timestamp
+// per position so the latest column reads like a live wire (all rows share the
+// same demo date, so real timestamps aren't available — §4.6 honesty: this is
+// editorial furniture, not market data, so a relative tick is fine).
+const WIRE_TICKS = ['now', '2m', '6m', '14m', '23m', '38m', '52m', '1h', '1h', '2h', '2h', '3h'];
+export function wireLatest(n = 8) {
+  return (_manifest || []).slice(0, n).map((s, i) => ({
+    slug: s.slug, head: s.head, section: s.section,
+    when: WIRE_TICKS[Math.min(i, WIRE_TICKS.length - 1)],
+  }));
+}
+
 // Fetch + render a story body to HTML (cached). Returns a Promise<string>.
 // Orgitorial renders the article; we strip its own <header> (header:false) since
 // the bit.ml Story component renders the headline/dek/byline natively in the

@@ -28,7 +28,7 @@ export function biteProps(row) {
 export function leadProps(row) {
   return {
     section: row.section,
-    dateline: `${row.time} · ${row.date}`,
+    dateline: row.time ? `${row.time} · ${row.date}` : row.date,
     head: row.head,
     dek: row.dek,
     sources: (row.sources || []).map((s) => s.label),

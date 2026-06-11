@@ -19,6 +19,11 @@
     byline,
     onagent,
     href = null,   // /story/<slug> — the lead head links into the story
+    // stacked: banner ON TOP of the copy (a true dominant hero), used by the
+    // zoned front page where an OUTER two-up provides the asymmetry. Default
+    // (false) keeps the side-by-side broadsheet split for section fronts.
+    stacked = false,
+    hideRule = false,    // the zoned front draws its own zone separators
     banner = null,       // optional: path to banner image (already resolved)
     bannerAlt = '',
   } = $props();
@@ -29,7 +34,7 @@
   const dekHtml = $derived(brandify(dek));
 </script>
 
-<article class="lead" class:has-banner={!!banner}>
+<article class="lead" class:has-banner={!!banner} class:stacked>
   {#if banner}
     <!-- the dominant feature image: 16:9 crop box (the webp is ~square),
          radius + soft shadow; onerror hides the whole box (§4.5 note 3) -->
@@ -65,7 +70,7 @@
     </div>
   </div>
 </article>
-<hr class="hair" />
+{#if !hideRule}<hr class="hair" />{/if}
 
 <style>
   .lead { padding: 8px 0 40px; }
@@ -78,6 +83,21 @@
     gap: 40px;
     align-items: start;
   }
+
+  /* STACKED (the zoned front hero): banner ON TOP, copy below, full width — a
+     dominant lead; the OUTER two-up grid supplies the asymmetry vs the
+     secondary feature. The head scales UP (the biggest type on the page). */
+  .lead.stacked.has-banner {
+    display: block;
+    padding: 0 0 8px;
+  }
+  .lead.stacked .banner-box { aspect-ratio: 3 / 2; margin-bottom: 26px; }
+  .lead.stacked .dateline { margin-bottom: 16px; }
+  .lead.stacked .head {
+    font-size: clamp(34px, 5vw, 56px);
+    line-height: 1.02; letter-spacing: -0.022em;
+  }
+  .lead.stacked .dek { font-size: 19px; margin-top: 20px; max-width: 40ch; }
   .copy { min-width: 0; }   /* let text wrap instead of forcing column width */
 
   /* the dominant feature image — 16:9 crop box, radius + soft lift */
