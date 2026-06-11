@@ -291,6 +291,95 @@ defmodule Workbooks.CommandRegistry do
   end
 
   @doc """
+  Build a LOCAL source dir through the in-sandbox compiler lane (PackageManager.build_dir/2 —
+  clang.wasm / zig1.wasm / mrustc.wasm, NO native toolchain) and register the resulting wasm as a
+  command. `lang` ∈ "c"|"rust"|"zig"|"go". The Lane-B join: a real multi-file C tool (Lua, etc.)
+  becomes a live command. Returns {:ok, addressed_path} | {:error, reason}.
+  """
+  def register_built_dir(name, dir, lang \\ "c", mode \\ :argv) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not (is_binary(dir) and File.dir?(dir)) -> {:error, :no_dir}
+
+      true ->
+        case Workbooks.PackageManager.build_dir(dir, lang) do
+          {:ok, wasm, _} -> register_artifact(name, wasm, mode)
+          {:error, reason} -> {:error, {:build_failed, reason}}
+          other -> {:error, {:build_failed, other}}
+        end
+    end
+  end
+
+  @doc """
+  Fetch a C tool's SOURCE tarball (.tar.gz), sha-pin, unpack, assemble its source dir, build it
+  IN-SANDBOX (clang.wasm) and register the wasm as a command — the prebuilt-less Lane-B path for
+  upstream C tools with no shipped WASI binary. opts: `:src_subdir` (dir within the tarball's top
+  folder holding the .c/.h, e.g. "src"), `:exclude` (basenames to drop, e.g. a second `main`),
+  `:mode`. Building is slow but content-addressed (one-time). Returns {:ok, addressed} | {:error, _}.
+  """
+  def build_and_register_c_source(name, url, sha256, opts \\ []) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not (is_binary(url) and String.starts_with?(url, "https://")) -> {:error, :invalid_url}
+      true -> do_build_and_register_c_source(name, url, sha256, opts)
+    end
+  end
+
+  defp do_build_and_register_c_source(name, url, sha256, opts) do
+    tmp = Path.join(System.tmp_dir!(), "wbcsrc-#{:erlang.unique_integer([:positive])}.tgz")
+
+    case https_get_to_file(url, tmp) do
+      :ok ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        cond do
+          is_binary(sha256) and sha256 != "" and got != String.downcase(String.trim(sha256)) ->
+            File.rm(tmp)
+            {:error, {:sha_mismatch, [expected: String.downcase(String.trim(sha256)), got: got]}}
+
+          true ->
+            unpack = Path.join(System.tmp_dir!(), "wbcsrc-#{got}")
+            File.rm_rf!(unpack)
+            File.mkdir_p!(unpack)
+            {tout, tc} = System.cmd("tar", ["xzf", tmp, "-C", unpack], stderr_to_stdout: true)
+            File.rm(tmp)
+
+            if tc != 0 do
+              {:error, {:untar_failed, tout}}
+            else
+              top =
+                case File.ls(unpack) do
+                  {:ok, [d]} -> Path.join(unpack, d)
+                  _ -> unpack
+                end
+
+              srcdir = if opts[:src_subdir], do: Path.join(top, opts[:src_subdir]), else: top
+              builddir = Path.join(System.tmp_dir!(), "wbcbuild-#{got}")
+              File.rm_rf!(builddir)
+              File.mkdir_p!(builddir)
+              exclude = opts[:exclude] || []
+
+              for f <- Path.wildcard(Path.join(srcdir, "*.{c,h}")) do
+                b = Path.basename(f)
+                unless b in exclude, do: File.cp!(f, Path.join(builddir, b))
+              end
+
+              res = register_built_dir(name, builddir, "c", opts[:mode] || :argv)
+              File.rm_rf!(unpack)
+              File.rm_rf!(builddir)
+              res
+            end
+        end
+
+      {:error, reason} ->
+        File.rm(tmp)
+        {:error, {:fetch_failed, reason}}
+    end
+  end
+
+  @doc """
   The generic auto-wrap: build an arbitrary upstream Rust CLI crate to
   wasm32-wasip1 and register it as a command — any WASI-clean crate, zero per-CLI
   code. Returns {:ok, wasm_path} | {:error, reason}. (Other languages build via
