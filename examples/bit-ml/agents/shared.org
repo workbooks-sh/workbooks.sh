@@ -19,6 +19,11 @@ your role def adds only your territory and hand-offs.
   - `wb` — the engine CLI. `wb content check` validates manifests/partials.
   - `web_search` — keyless web search by query → top results (title·url·snippet).
     Your SERP/research tool: search a topic, find the real primaries, then fetch.
+    - `file_issue` — when you hit a WALL (a capability/tool you NEED that does
+      not exist, a rule that blocks you, something your sandbox can't do): FILE
+      IT, don't stall, fake, or mislabel it. The autopoet grows the capability.
+      (The lander spent 6h calling a missing search tool "env-gated" instead of
+      filing it — that is the exact failure this prevents.)
   - `fetch` — HTTP GET a URL (read a primary source you found via web_search).
   - `image` — host-brokered image generation. Budget: 2 images per run.
     Written to `content/images/<slug>-banner.webp`. See skills/design.org

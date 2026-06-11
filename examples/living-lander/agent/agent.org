@@ -200,6 +200,11 @@
       see the SERP and find the real competing pages, then `fetch` the primaries.
       The blog work is NOT env-gated — you have search now. (The old
       DataForSEO-via-curl path died with the native shell; this replaces it.)
+    - `file_issue` — when you hit a WALL (a capability/tool you NEED that does
+      not exist, a rule that blocks you, something your sandbox can't do): FILE
+      IT, don't stall, fake, or mislabel it. The autopoet grows the capability.
+      (The lander spent 6h calling a missing search tool "env-gated" instead of
+      filing it — that is the exact failure this prevents.)
     - `fetch` — HTTP GET a URL (use to confirm a change is live, read a source).
     - `wb` — the wb CLI (e.g. `wb content check`).
     Do NOT reach for git/curl/cp/sed as commands — use the tools above.
