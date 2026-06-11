@@ -29,6 +29,11 @@ raw ext4". vfkit's direct-kernel path is strictly simpler.
 | boot-vfkit.sh   | boot, find guest IP, prove HTTP + virtio-fs discovery; =--keep= to leave running |
 | boot-krunkit.sh | the recorded dead end |
 
+The rootfs-prep recipe was PROMOTED to =../engine-disk/lib.sh= (one source of
+truth) — build-disk.sh sources it; Linux CI (=engine-disk/build-ci.sh=, via
+=.github/workflows/engine-disk.yml=) runs the same functions and publishes
+=ghcr.io/workbooks-sh/engine-disk= for the desktop's vfkit lane (machine.rs).
+
 #+begin_src sh
 HOMEBREW_NO_AUTO_UPDATE=1 brew install skopeo umoci e2fsprogs vfkit
 ./build-disk.sh        # ~75 s first run (network), ~7 s warm (mke2fs only)

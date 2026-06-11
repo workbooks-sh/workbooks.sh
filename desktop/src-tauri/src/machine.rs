@@ -1,27 +1,53 @@
-//! Native local MACHINE — boots the ONE runtime OCI image in a local container
-//! engine, preferring docker → podman → krunvm (`WB_ENGINE` overrides).
+//! Native local MACHINE — boots the ONE runtime image locally, preferring
+//! vfkit → docker → podman → krunvm (`WB_ENGINE` overrides).
 //!
-//! Why that order (wb-ryw, 2026-06-10): the full runtime is I/O-heavy at boot
-//! (BEAM module loads, wasmtime NIFs, sqlite, a ~30MB embedding model). Docker
-//! and podman machines give the guest a real virtual DISK (block device +
-//! overlayfs) — the same image goes discovery + /health 200 in ~5s. krunvm's
-//! libkrun shares host folders via virtio-fs and impersonates sockets via TSI;
-//! under our app that floor measured 8-minutes-to-never, plus a day of TSI
-//! bugs (accept-serialization, startup_log deadlock, a 1.19 host-bind
-//! regression). krunvm stays as the no-daemon fallback path.
+//! vfkit (wb-hhf.2, spike at desktop/scripts/engine-spike/): direct-kernel
+//! boots a raw ext4 disk cut from the runtime OCI image — 0-2s cold boot, no
+//! daemon, no brew, fully bundleable. It only wins the election when its
+//! engine bundle (binary + kernel + initramfs + disk) is already present.
+//!
+//! Why docker → podman → krunvm after that (wb-ryw, 2026-06-10): the full
+//! runtime is I/O-heavy at boot (BEAM module loads, wasmtime NIFs, sqlite, a
+//! ~30MB embedding model). Docker and podman machines give the guest a real
+//! virtual DISK (block device + overlayfs) — the same image goes discovery +
+//! /health 200 in ~5s. krunvm's libkrun shares host folders via virtio-fs and
+//! impersonates sockets via TSI; under our app that floor measured
+//! 8-minutes-to-never, plus a day of TSI bugs (accept-serialization,
+//! startup_log deadlock, a 1.19 host-bind regression). krunvm stays as the
+//! no-daemon fallback path.
 //!
 //! All engines speak the SAME contract: host 4000 → guest 4000 (the guest
 //! writes the GUEST port into the bind-mounted /disco discovery file and
 //! cannot know a remapped host port), data dir → /data, disco dir → /disco.
+//! The vfkit guest only has a NAT ip, so a tiny in-process loopback proxy
+//! keeps 127.0.0.1:4000 true for the rest of the app.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 const VM: &str = "workbooks-runtime";
 const GUEST_PORT: u16 = 4000;
 const HOST_PORT: u16 = 4000;
 const DEFAULT_IMAGE: &str = "ghcr.io/workbooks-sh/runtime:latest";
+
+/// ghcr OCI artifact holding the vfkit boot assets (built by
+/// .github/workflows/engine-disk.yml after every runtime publish).
+const DEFAULT_ENGINE_DISK: &str = "ghcr.io/workbooks-sh/engine-disk:latest";
+/// No leading-zero octets — /var/db/dhcpd_leases strips them per octet; the
+/// matcher normalizes anyway, but a clean MAC keeps eyeball-debugging sane.
+const VFKIT_MAC: &str = "5a:94:ef:e4:1c:ee";
+/// Spike-proven cmdline: ext4 root on the first virtio-blk, our PID-1 wrapper.
+const VFKIT_CMDLINE: &str =
+    "console=hvc0 root=/dev/vda rw rootfstype=ext4 modules=ext4 init=/sbin/wb-init";
+/// Layer titles in the engine-disk artifact = file names in the bundle dir.
+const ASSET_KERNEL: &str = "kernel-image";
+const ASSET_INITRD: &str = "initramfs-wb";
+const ASSET_DISK: &str = "disk.img";
+const ASSET_DISK_ZST: &str = "disk.img.zst";
 
 /// The release `start` command blocks on a TTY under krunvm's no-TTY guest, so
 /// we boot the app with `eval` (no console) and park the node alive so the VM
@@ -37,6 +63,7 @@ fn image() -> String {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Engine {
+    Vfkit,
     Docker,
     Podman,
     Krunvm,
@@ -45,6 +72,7 @@ pub enum Engine {
 impl Engine {
     fn cli(self) -> &'static str {
         match self {
+            Engine::Vfkit => "vfkit",
             Engine::Docker => "docker",
             Engine::Podman => "podman",
             Engine::Krunvm => "krunvm",
@@ -62,17 +90,31 @@ fn podman_ready() -> bool {
     sh("podman", &["info", "--format", "{{.version.Version}}"]).is_ok()
 }
 
-/// Pick the boot engine: `WB_ENGINE=docker|podman|krunvm` overrides, else the
-/// first READY engine in preference order, else krunvm if merely installed
-/// (it has no daemon to be "ready").
+/// vfkit is "ready" only with a COMPLETE bundle on disk: the binary (bundled
+/// or PATH) plus every boot asset. A dev machine with a stray brew vfkit must
+/// not be yanked off its docker lane into a multi-hundred-MB asset download —
+/// `WB_ENGINE=vfkit` forces the lane and lets boot_vfkit fetch what's missing.
+fn vfkit_ready() -> bool {
+    vfkit_bin().is_some()
+        && [ASSET_KERNEL, ASSET_INITRD, ASSET_DISK]
+            .iter()
+            .all(|a| find_asset(a).is_some())
+}
+
+/// Pick the boot engine: `WB_ENGINE=vfkit|docker|podman|krunvm` overrides,
+/// else the first READY engine in preference order, else krunvm if merely
+/// installed (it has no daemon to be "ready").
 pub fn engine() -> Option<Engine> {
     match std::env::var("WB_ENGINE").ok().as_deref() {
+        Some("vfkit") => return Some(Engine::Vfkit),
         Some("docker") => return Some(Engine::Docker),
         Some("podman") => return Some(Engine::Podman),
         Some("krunvm") => return Some(Engine::Krunvm),
         _ => {}
     }
-    if docker_ready() {
+    if vfkit_ready() {
+        Some(Engine::Vfkit)
+    } else if docker_ready() {
         Some(Engine::Docker)
     } else if podman_ready() {
         Some(Engine::Podman)
@@ -111,6 +153,73 @@ fn pidfile() -> Option<std::path::PathBuf> {
     Some(support_dir()?.join("runtime.pid"))
 }
 
+fn vfkit_pidfile() -> Option<std::path::PathBuf> {
+    Some(support_dir()?.join("vfkit.pid"))
+}
+
+// ---- vfkit bundle resolution --------------------------------------------------
+
+/// Engine-bundle dirs, in preference order: explicit `WB_ENGINE_DIR` override,
+/// the .app's Contents/Resources/engine (signed bundled builds), the
+/// app-support engine dir (dev drops + the download target). Pure so tests
+/// can drive it without an .app or env mutation.
+fn bundle_candidates(
+    env_override: Option<&str>,
+    exe: Option<&Path>,
+    support: Option<&Path>,
+) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(d) = env_override {
+        dirs.push(PathBuf::from(d));
+    }
+    // exe lives at <name>.app/Contents/MacOS/<bin> → Contents/Resources/engine.
+    if let Some(contents) = exe.and_then(|e| e.parent()).and_then(|d| d.parent()) {
+        dirs.push(contents.join("Resources").join("engine"));
+    }
+    if let Some(s) = support {
+        dirs.push(s.join("engine"));
+    }
+    dirs
+}
+
+fn bundle_dirs() -> Vec<PathBuf> {
+    let exe = std::env::current_exe().ok();
+    let support = support_dir();
+    bundle_candidates(
+        std::env::var("WB_ENGINE_DIR").ok().as_deref(),
+        exe.as_deref(),
+        support.as_deref(),
+    )
+}
+
+/// The writable engine dir (download target + the disk's home — the Resources
+/// copy is sealed by the code signature, so a guest-writable disk.img must
+/// live here).
+fn engine_dir() -> Option<PathBuf> {
+    Some(support_dir()?.join("engine"))
+}
+
+fn find_in(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+    dirs.iter().map(|d| d.join(name)).find(|p| p.is_file())
+}
+
+fn find_asset(name: &str) -> Option<PathBuf> {
+    find_in(&bundle_dirs(), name)
+}
+
+/// The vfkit binary: bundled copy first, PATH fallback (dev: brew vfkit).
+fn vfkit_bin() -> Option<String> {
+    if let Some(p) = find_asset("vfkit") {
+        return Some(p.display().to_string());
+    }
+    command_exists("vfkit").then(|| "vfkit".into())
+}
+
+/// The engine-disk artifact reference — overridable via `WB_ENGINE_DISK`.
+fn engine_disk_ref() -> String {
+    std::env::var("WB_ENGINE_DISK").unwrap_or_else(|_| DEFAULT_ENGINE_DISK.into())
+}
+
 // ---- detection --------------------------------------------------------------
 
 /// What the wizard needs to know before it can offer a local boot: the host OS,
@@ -122,8 +231,10 @@ fn pidfile() -> Option<std::path::PathBuf> {
 pub struct BackendStatus {
     pub os: String,
     pub supported: bool,
-    /// The engine a boot would use right now ("docker"|"podman"|"krunvm").
+    /// The engine a boot would use right now ("vfkit"|"docker"|"podman"|"krunvm").
     pub engine: Option<String>,
+    /// Complete vfkit bundle present (binary + kernel + initramfs + disk).
+    pub vfkit: bool,
     pub docker: bool,
     pub podman: bool,
     pub krunvm: bool,
@@ -133,14 +244,16 @@ pub struct BackendStatus {
 
 pub fn detect() -> BackendStatus {
     let os = std::env::consts::OS.to_string();
+    let vfkit = vfkit_ready();
     let docker = docker_ready();
     let podman = podman_ready();
     let krunvm = command_exists("krunvm");
-    // A live container daemon supports local boot on ANY os; krunvm is the
-    // mac-only no-daemon path the wizard can install from scratch.
+    // A live container daemon supports local boot on ANY os; vfkit + krunvm
+    // are the mac-only no-daemon paths.
     let supported = docker || podman || os == "macos";
     BackendStatus {
         engine: engine().map(|e| e.cli().to_string()),
+        vfkit,
         docker,
         podman,
         krunvm,
@@ -392,6 +505,7 @@ fn spawn() -> Result<(), String> {
 /// at each step. The caller waits for discovery + /health.
 pub fn boot(app: &AppHandle) -> Result<(), String> {
     match engine() {
+        Some(Engine::Vfkit) => boot_vfkit(app),
         Some(Engine::Krunvm) | None => boot_krunvm(app),
         Some(eng) => boot_container(app, eng),
     }
@@ -413,8 +527,10 @@ fn boot_container(app: &AppHandle, eng: Engine) -> Result<(), String> {
 
     emit_setup(app, "Stopping any previous engine instance…");
     let _ = sh(cli, &["rm", "-f", VM]);
-    // A stale host-port squatter (e.g. an old krunvm zombie) blocks the bind.
-    let _ = sh("sh", &["-c", &format!("lsof -ti :{HOST_PORT} | xargs kill 2>/dev/null")]);
+    // A stale host-port squatter (an old krunvm zombie, our own vfkit proxy)
+    // blocks the bind.
+    stop_proxy();
+    kill_port_squatters();
 
     emit_setup(app, "Booting the engine…");
     let port_map = format!("{HOST_PORT}:{GUEST_PORT}");
@@ -460,9 +576,338 @@ fn boot_krunvm(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ---- vfkit lane ---------------------------------------------------------------
+
+struct VfkitAssets {
+    kernel: PathBuf,
+    initrd: PathBuf,
+    disk: PathBuf,
+}
+
+/// Locate or materialize the boot assets. kernel/initramfs are read-only and
+/// usable from any bundle dir; the disk must be WRITABLE, so it always ends
+/// up in the app-support engine dir — copied out of a sealed Resources bundle
+/// or downloaded (zstd) from the engine-disk artifact.
+fn ensure_bundle(app: &AppHandle) -> Result<VfkitAssets, String> {
+    let dl = engine_dir().ok_or("no engine dir")?;
+    std::fs::create_dir_all(&dl).map_err(|e| e.to_string())?;
+
+    let ro = |name: &str| -> Result<PathBuf, String> {
+        if let Some(p) = find_asset(name) {
+            return Ok(p);
+        }
+        let dest = dl.join(name);
+        emit_setup(app, &format!("Downloading engine {name}…"));
+        fetch_artifact_file(app, name, &dest)?;
+        Ok(dest)
+    };
+    let kernel = ro(ASSET_KERNEL)?;
+    let initrd = ro(ASSET_INITRD)?;
+
+    let disk = dl.join(ASSET_DISK);
+    if !disk.is_file() {
+        // A bundled (read-only) disk seeds the writable copy; else download.
+        if let Some(seed) = find_asset(ASSET_DISK).filter(|p| p != &disk) {
+            emit_setup(app, "Copying the bundled engine disk…");
+            std::fs::copy(&seed, &disk).map_err(|e| e.to_string())?;
+        } else {
+            let zst = dl.join(ASSET_DISK_ZST);
+            emit_setup(app, "Downloading the engine disk (first run is slow once)…");
+            fetch_artifact_file(app, ASSET_DISK_ZST, &zst)?;
+            emit_setup(app, "Unpacking the engine disk…");
+            unzstd(&zst, &disk)?;
+            let _ = std::fs::remove_file(&zst);
+        }
+    }
+    // Terminal pull event so the progress bar can complete/clear.
+    let _ = app.emit("engine-pull", serde_json::json!({ "done": 0, "total": null }));
+    Ok(VfkitAssets { kernel, initrd, disk })
+}
+
+/// Pull one named file (layer title) out of the ghcr engine-disk OCI artifact,
+/// streaming `engine-pull` progress. Anonymous pull — the artifact is public.
+fn fetch_artifact_file(app: &AppHandle, title: &str, dest: &Path) -> Result<(), String> {
+    let img = engine_disk_ref();
+    let rest = img
+        .strip_prefix("ghcr.io/")
+        .ok_or("engine-disk artifact must live on ghcr.io")?;
+    let (repo, tag) = rest.rsplit_once(':').unwrap_or((rest, "latest"));
+    // No total timeout — the disk is hundreds of MB on slow links.
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(None)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let tok: serde_json::Value = client
+        .get(format!("https://ghcr.io/token?scope=repository:{repo}:pull"))
+        .send()
+        .map_err(|e| format!("ghcr token: {e}"))?
+        .json()
+        .map_err(|e| e.to_string())?;
+    let tok = tok["token"].as_str().ok_or("no ghcr token")?;
+    let man: serde_json::Value = client
+        .get(format!("https://ghcr.io/v2/{repo}/manifests/{tag}"))
+        .bearer_auth(tok)
+        .header("Accept", "application/vnd.oci.image.manifest.v1+json")
+        .send()
+        .map_err(|e| format!("ghcr manifest: {e}"))?
+        .json()
+        .map_err(|e| e.to_string())?;
+    let layer = man["layers"]
+        .as_array()
+        .and_then(|ls| {
+            ls.iter()
+                .find(|l| l["annotations"]["org.opencontainers.image.title"] == title)
+        })
+        .ok_or(format!("no `{title}` layer in {img}"))?;
+    let digest = layer["digest"].as_str().ok_or("layer without digest")?;
+    let total = layer["size"].as_u64();
+
+    let mut resp = client
+        .get(format!("https://ghcr.io/v2/{repo}/blobs/{digest}"))
+        .bearer_auth(tok)
+        .send()
+        .map_err(|e| format!("ghcr blob: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("ghcr blob {digest}: HTTP {}", resp.status()));
+    }
+    let part = dest.with_extension("part");
+    let mut out = std::fs::File::create(&part).map_err(|e| e.to_string())?;
+    let mut buf = vec![0u8; 1 << 20];
+    let (mut done, mut last) = (0u64, 0u64);
+    loop {
+        let n = resp.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        done += n as u64;
+        if done - last >= (8 << 20) {
+            last = done;
+            let _ = app.emit("engine-pull", serde_json::json!({ "done": done, "total": total }));
+        }
+    }
+    std::fs::rename(&part, dest).map_err(|e| e.to_string())
+}
+
+fn unzstd(src: &Path, dst: &Path) -> Result<(), String> {
+    let f = std::fs::File::open(src).map_err(|e| e.to_string())?;
+    let mut dec = zstd::stream::read::Decoder::new(f).map_err(|e| e.to_string())?;
+    let part = dst.with_extension("part");
+    let mut out = std::fs::File::create(&part).map_err(|e| e.to_string())?;
+    std::io::copy(&mut dec, &mut out).map_err(|e| e.to_string())?;
+    std::fs::rename(&part, dst).map_err(|e| e.to_string())
+}
+
+/// vfkit boot: ensure the bundle, launch the VM with the spike's exact device
+/// set (virtio-blk root, NAT net, rng, the disco dir as the ONLY virtio-fs
+/// share, console to a log), resolve the guest IP from the macOS DHCP lease
+/// db, then keep the app's localhost contract via the loopback proxy. The
+/// guest's wb-init (baked into the disk) does the env + discovery writing.
+fn boot_vfkit(app: &AppHandle) -> Result<(), String> {
+    let bin = vfkit_bin().ok_or("vfkit binary not found (bundle dir or PATH)")?;
+    emit_setup(app, "Preparing the engine bundle…");
+    let assets = ensure_bundle(app)?;
+
+    emit_setup(app, "Stopping any previous engine instance…");
+    vfkit_down();
+
+    let disco = disco_dir().ok_or("no disco dir")?;
+    let logs = log_dir().ok_or("no log dir")?;
+    std::fs::create_dir_all(&disco).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&logs).map_err(|e| e.to_string())?;
+    // /data lives on the rootfs disk in phase 1 — see wb-hhf.2 for the
+    // second-disk plan that makes engine updates a disk.img swap.
+
+    emit_setup(app, "Booting the engine VM…");
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(logs.join("vfkit.log"))
+        .map_err(|e| e.to_string())?;
+    let console = logs.join("vfkit-console.log");
+    let child = Command::new(&bin)
+        .args([
+            "--cpus", "2",
+            "--memory", "2048",
+            "--kernel", &assets.kernel.display().to_string(),
+            "--initrd", &assets.initrd.display().to_string(),
+            "--kernel-cmdline", VFKIT_CMDLINE,
+            "--device", &format!("virtio-blk,path={}", assets.disk.display()),
+            "--device", &format!("virtio-net,nat,mac={VFKIT_MAC}"),
+            "--device", "virtio-rng",
+            "--device", &format!("virtio-fs,sharedDir={},mountTag=disco", disco.display()),
+            "--device", &format!("virtio-serial,logFilePath={}", console.display()),
+        ])
+        .stdin(Stdio::null())
+        .stdout(log.try_clone().map_err(|e| e.to_string())?)
+        .stderr(log)
+        .spawn()
+        .map_err(|e| format!("could not launch vfkit: {e}"))?;
+    let pid = child.id();
+    if let Some(p) = vfkit_pidfile() {
+        let _ = std::fs::write(p, pid.to_string());
+    }
+
+    emit_setup(app, "Waiting for the VM's network lease…");
+    let ip = wait_guest_ip(pid, 60)?;
+    emit_setup(app, &format!("Engine VM up at {ip} — proxying 127.0.0.1:{HOST_PORT}"));
+    spawn_proxy(&ip)
+}
+
+/// Poll /var/db/dhcpd_leases (macOS bootpd, world-readable) for our MAC; the
+/// lease lands within ~1s of VM launch. Errs early if vfkit itself died.
+fn wait_guest_ip(pid: u32, secs: u32) -> Result<String, String> {
+    for _ in 0..(secs * 2) {
+        if !pid_alive(pid) {
+            return Err("vfkit exited during boot — see logs/vfkit.log + vfkit-console.log".into());
+        }
+        if let Ok(leases) = std::fs::read_to_string("/var/db/dhcpd_leases") {
+            if let Some(ip) = lease_ip(&leases, VFKIT_MAC) {
+                return Ok(ip);
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    Err(format!("no DHCP lease for the engine VM after {secs}s"))
+}
+
+fn pid_alive(pid: u32) -> bool {
+    sh("kill", &["-0", &pid.to_string()]).is_ok()
+}
+
+/// Find the IP leased to `mac` in dhcpd_leases. Blocks look like
+/// `{\n\tname=…\n\tip_address=…\n\thw_address=1,<mac>\n…}` — field order is
+/// not guaranteed, and bootpd STRIPS LEADING ZEROS from each MAC octet, so
+/// both sides are normalized before comparing.
+fn lease_ip(leases: &str, mac: &str) -> Option<String> {
+    let want = normalize_mac(mac);
+    let (mut ip, mut hit) = (None::<String>, false);
+    for raw in leases.lines() {
+        let line = raw.trim();
+        if line.starts_with('{') {
+            ip = None;
+            hit = false;
+        } else if line.starts_with('}') {
+            if hit && ip.is_some() {
+                return ip;
+            }
+        } else if let Some(v) = line.strip_prefix("ip_address=") {
+            ip = Some(v.trim().to_string());
+        } else if let Some(v) = line.strip_prefix("hw_address=") {
+            // value carries a type prefix: "1,5a:94:ef:e4:1c:ee"
+            let hw = v.split_once(',').map_or(v, |(_, m)| m);
+            hit = normalize_mac(hw) == want;
+        }
+    }
+    if hit { ip } else { None }
+}
+
+/// Lowercase, strip leading zeros per octet ("0a" → "a", "00" → "0").
+fn normalize_mac(mac: &str) -> String {
+    mac.trim()
+        .to_ascii_lowercase()
+        .split(':')
+        .map(|o| {
+            let t = o.trim_start_matches('0');
+            if t.is_empty() { "0" } else { t }.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join(":")
+}
+
+// ---- loopback proxy -----------------------------------------------------------
+
+/// Stop handle for the live proxy accept-loop (one VM at a time).
+static PROXY: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+
+/// 127.0.0.1:4000 → guest:4000. The vfkit guest only has a NAT ip, but
+/// discovery defaults to 127.0.0.1 and the whole app trusts it — so the
+/// localhost contract is kept here instead of leaking guest IPs upward.
+/// Plain threads + io::copy: one VM, a handful of concurrent connections.
+fn spawn_proxy(guest_ip: &str) -> Result<(), String> {
+    stop_proxy();
+    let guest: std::net::SocketAddr = format!("{guest_ip}:{GUEST_PORT}")
+        .parse()
+        .map_err(|e| format!("bad guest address: {e}"))?;
+    // Loopback ONLY — never expose the engine on external interfaces.
+    let listener = std::net::TcpListener::bind(("127.0.0.1", HOST_PORT))
+        .map_err(|e| format!("proxy bind 127.0.0.1:{HOST_PORT}: {e}"))?;
+    let stop = Arc::new(AtomicBool::new(false));
+    *PROXY.lock().unwrap() = Some(stop.clone());
+    std::thread::spawn(move || {
+        for conn in listener.incoming() {
+            if stop.load(Ordering::Relaxed) {
+                break;
+            }
+            let Ok(client) = conn else { continue };
+            std::thread::spawn(move || proxy_conn(client, guest));
+        }
+    });
+    Ok(())
+}
+
+fn proxy_conn(client: std::net::TcpStream, guest: std::net::SocketAddr) {
+    let Ok(server) = std::net::TcpStream::connect_timeout(&guest, std::time::Duration::from_secs(3))
+    else {
+        return;
+    };
+    let (Ok(mut c_rd), Ok(mut s_rd)) = (client.try_clone(), server.try_clone()) else {
+        return;
+    };
+    let (mut c_wr, mut s_wr) = (client, server);
+    let up = std::thread::spawn(move || {
+        let _ = std::io::copy(&mut c_rd, &mut s_wr);
+        let _ = s_wr.shutdown(std::net::Shutdown::Write);
+    });
+    let _ = std::io::copy(&mut s_rd, &mut c_wr);
+    let _ = c_wr.shutdown(std::net::Shutdown::Write);
+    let _ = up.join();
+}
+
+/// Set the stop flag, then poke the listener so the blocking accept() returns
+/// and the loop drops it (freeing the port).
+fn stop_proxy() {
+    let flag = PROXY.lock().unwrap().take();
+    if let Some(flag) = flag {
+        flag.store(true, Ordering::Relaxed);
+        let _ = std::net::TcpStream::connect_timeout(
+            &std::net::SocketAddr::from(([127, 0, 0, 1], HOST_PORT)),
+            std::time::Duration::from_millis(200),
+        );
+    }
+}
+
+/// Kill the vfkit VM (pidfile pattern) + the loopback proxy. SIGTERM tears
+/// the VM down cleanly (spike-verified).
+fn vfkit_down() {
+    stop_proxy();
+    if let Some(p) = vfkit_pidfile() {
+        if let Some(pid) = std::fs::read_to_string(&p)
+            .ok()
+            .and_then(|s| s.trim().parse::<u32>().ok())
+        {
+            let _ = sh("kill", &[&pid.to_string()]);
+        }
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+/// Free the host port from stale squatters — but NEVER kill ourselves: the
+/// vfkit lane's loopback proxy (and its client sockets to guest:4000) live in
+/// THIS process, and a blanket `lsof | xargs kill` would shoot the app.
+fn kill_port_squatters() {
+    let me = std::process::id().to_string();
+    if let Ok(out) = sh("lsof", &["-ti", &format!(":{HOST_PORT}")]) {
+        for pid in out.split_whitespace().filter(|p| *p != me) {
+            let _ = sh("kill", &[pid]);
+        }
+    }
+}
+
 /// Tear down the local runtime on EVERY engine (cheap no-ops where absent):
-/// remove the named container, kill any spawned microVM, delete the VM
-/// definition, and free the host port. Image stores stay intact.
+/// remove the named container, kill any spawned microVM or vfkit VM, delete
+/// the VM definition, and free the host port. Image stores stay intact.
 pub fn down() -> Result<(), String> {
     for cli in ["docker", "podman"] {
         let _ = sh(cli, &["rm", "-f", VM]);
@@ -473,8 +918,9 @@ pub fn down() -> Result<(), String> {
     if let Some(p) = pidfile() {
         let _ = std::fs::remove_file(p);
     }
+    vfkit_down();
     let _ = sh("krunvm", &["delete", VM]);
-    let _ = sh("sh", &["-c", &format!("lsof -ti :{HOST_PORT} | xargs kill 2>/dev/null")]);
+    kill_port_squatters();
     Ok(())
 }
 
@@ -646,5 +1092,82 @@ mod tests {
     fn shquote_escapes_single_quotes() {
         assert_eq!(shquote("a'b"), "'a'\\''b'");
         assert_eq!(shquote("plain"), "'plain'");
+    }
+
+    const LEASES: &str = "{\n\tname=other\n\tip_address=192.168.64.7\n\thw_address=1,aa:bb:cc:dd:ee:ff\n\tlease=0x12345\n}\n{\n\tname=workbooks\n\thw_address=1,5a:94:ef:e4:1c:ee\n\tip_address=192.168.64.2\n\tlease=0x99999\n}\n";
+
+    #[test]
+    fn lease_ip_matches_regardless_of_field_order() {
+        // Second block lists hw_address BEFORE ip_address.
+        assert_eq!(
+            lease_ip(LEASES, "5a:94:ef:e4:1c:ee").as_deref(),
+            Some("192.168.64.2")
+        );
+        assert_eq!(
+            lease_ip(LEASES, "aa:bb:cc:dd:ee:ff").as_deref(),
+            Some("192.168.64.7")
+        );
+    }
+
+    #[test]
+    fn lease_ip_none_when_absent() {
+        assert_eq!(lease_ip(LEASES, "12:34:56:78:9a:bc"), None);
+        assert_eq!(lease_ip("", "5a:94:ef:e4:1c:ee"), None);
+    }
+
+    #[test]
+    fn lease_ip_normalizes_leading_zero_octets() {
+        // bootpd writes "a:1e:5:0:1c:ee" for MAC 0a:1e:05:00:1c:ee.
+        let leases = "{\n\tip_address=192.168.64.9\n\thw_address=1,a:1e:5:0:1c:ee\n}\n";
+        assert_eq!(
+            lease_ip(leases, "0a:1e:05:00:1c:ee").as_deref(),
+            Some("192.168.64.9")
+        );
+    }
+
+    #[test]
+    fn normalize_mac_strips_per_octet_zeros() {
+        assert_eq!(normalize_mac("0A:1E:05:00:1C:EE"), "a:1e:5:0:1c:ee");
+        assert_eq!(normalize_mac("5a:94:ef:e4:1c:ee"), "5a:94:ef:e4:1c:ee");
+    }
+
+    #[test]
+    fn bundle_candidates_orders_override_resources_support() {
+        let dirs = bundle_candidates(
+            Some("/custom/engine"),
+            Some(Path::new("/Applications/Workbooks.app/Contents/MacOS/workbooks-desktop")),
+            Some(Path::new("/Users/u/Library/Application Support/sh.workbooks")),
+        );
+        assert_eq!(
+            dirs,
+            vec![
+                PathBuf::from("/custom/engine"),
+                PathBuf::from("/Applications/Workbooks.app/Contents/Resources/engine"),
+                PathBuf::from("/Users/u/Library/Application Support/sh.workbooks/engine"),
+            ]
+        );
+    }
+
+    #[test]
+    fn bundle_candidates_tolerates_missing_parts() {
+        assert!(bundle_candidates(None, None, None).is_empty());
+        let dirs = bundle_candidates(None, None, Some(Path::new("/sup")));
+        assert_eq!(dirs, vec![PathBuf::from("/sup/engine")]);
+    }
+
+    #[test]
+    fn find_in_resolves_first_dir_with_the_file() {
+        let tmp = std::env::temp_dir().join(format!("wb-machine-test-{}", std::process::id()));
+        let (a, b) = (tmp.join("a"), tmp.join("b"));
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        std::fs::write(b.join(ASSET_KERNEL), b"k").unwrap();
+        let dirs = vec![a.clone(), b.clone()];
+        assert_eq!(find_in(&dirs, ASSET_KERNEL), Some(b.join(ASSET_KERNEL)));
+        assert_eq!(find_in(&dirs, ASSET_DISK), None);
+        // First dir wins once it has the file too.
+        std::fs::write(a.join(ASSET_KERNEL), b"k").unwrap();
+        assert_eq!(find_in(&dirs, ASSET_KERNEL), Some(a.join(ASSET_KERNEL)));
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

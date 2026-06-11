@@ -38,6 +38,8 @@ bs58 = "0.5"
 sha2 = "0.10"
 open = "5"
 tiny_http = "0.12"
+# Unpack the vfkit engine disk (disk.img.zst from the engine-disk artifact).
+zstd = "0.13"
 # The OQL kernel embedded — weave/tangle/validate workbooks LOCALLY, no Elixir,
 # no Docker. oql.wasm is a WASIp2 component; wasmtime + wasmtime-wasi host it.
 wasmtime = { version = "27", features = ["component-model"] }

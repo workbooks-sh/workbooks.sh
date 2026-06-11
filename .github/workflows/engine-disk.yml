@@ -1,0 +1,67 @@
+# Build the desktop vfkit engine's boot artifacts (wb-hhf.2) and publish them
+# as a ghcr OCI artifact — same registry as the runtime image, anonymously
+# pullable by the desktop app with the token dance it already uses for
+# manifest sizes (machine.rs).
+#
+# Chained via workflow_run so the disk is always cut from a runtime image that
+# FINISHED publishing — a paths-triggered sibling would race the image build.
+# Artifacts: disk.img.zst (OCI rootfs → ext4, ~per runtime release),
+# kernel-image + initramfs-wb (Alpine -virt, pinned in engine-disk/lib.sh).
+# arm64 only: the vfkit lane is Virtualization.framework on Apple Silicon.
+name: engine-disk
+
+on:
+  workflow_run:
+    workflows: [runtime-image]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: engine-disk
+  # QUEUE, don't cancel — same reasoning as runtime-image: each completed
+  # runtime publish should get a matching disk.
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/workbooks-sh/runtime
+  ARTIFACT: ghcr.io/workbooks-sh/engine-disk
+
+jobs:
+  build:
+    # workflow_run fires on failure too — only build on a successful publish.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04-arm # native arm64 — docker pull + mke2fs, no QEMU
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build from the SAME sha the runtime image was built from, so the
+          # disk's tag matches the image's tag.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: oras-project/setup-oras@v1
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build boot artifacts (rootfs → ext4 + kernel + initramfs)
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/engine-disk" IMAGE="${IMAGE}:latest" \
+            desktop/scripts/engine-disk/build-ci.sh
+
+      - name: Push OCI artifact (latest + sha)
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sha="$(git rev-parse --short HEAD)"
+          cd "$RUNNER_TEMP/engine-disk"
+          # Layer titles (org.opencontainers.image.title) are the contract the
+          # desktop downloader resolves files by — keep these names stable.
+          oras push "${ARTIFACT}:latest,${sha}" \
+            disk.img.zst kernel-image initramfs-wb
+          echo "=== published ${ARTIFACT}:latest (+ ${sha}) ==="
+          oras manifest fetch "${ARTIFACT}:latest" | head -50
