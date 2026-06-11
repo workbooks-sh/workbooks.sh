@@ -145,4 +145,70 @@ defmodule Workbooks.Pallet do
       other -> other
     end
   end
+
+  # ── Lane B — build-from-source catalog (:csource) ───────────────────────────
+  # Real C tools with no prebuilt WASI binary, built IN-SANDBOX (clang.wasm) via the general harvest
+  # flow. Each entry is DATA: a sha-pinned source tarball + build_opts (the proven recipe —
+  # :src_subdir/:src_globs/:exclude/:extra_sources/:cflags). Building is slow (seconds-to-minutes,
+  # content-addressed) so these are NOT auto-seeded at boot like the prebuilt @catalog — `seed_csource/0`
+  # builds them ONCE; after that they persist (registry.json) and reload at boot with no rebuild.
+  # Adding a harvested tool = append a verified recipe here. No per-tool engine code.
+
+  # A minimal `duk` CLI main (Duktape's bundled cmdline drags in linenoise + a dozen extras): eval
+  # `-e CODE` or stdin, print the result via the C API (no print()/console needed).
+  @duk_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include "duktape.h"
+  int main(int argc, char **argv) {
+    duk_context *ctx = duk_create_heap_default();
+    static char buf[1 << 20];
+    const char *code = NULL;
+    if (argc >= 3 && !strcmp(argv[1], "-e")) code = argv[2];
+    else { size_t n = fread(buf, 1, sizeof(buf) - 1, stdin); buf[n] = 0; code = buf; }
+    if (duk_peval_string(ctx, code) != 0) fprintf(stderr, "error: %s\n", duk_safe_to_string(ctx, -1));
+    else printf("%s\n", duk_safe_to_string(ctx, -1));
+    duk_destroy_heap(ctx);
+    return 0;
+  }
+  """
+
+  @csource [
+    %{
+      name: "lua",
+      url: "https://www.lua.org/ftp/lua-5.4.7.tar.gz",
+      sha: "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30",
+      build_opts: [src_subdir: "src", exclude: ["luac.c"]]
+    },
+    %{
+      name: "duk",
+      url: "https://duktape.org/duktape-2.7.0.tar.xz",
+      sha: "90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890",
+      build_opts: [src_globs: ["src/*.{c,h}"], extra_sources: [{"duk_main.c", @duk_main}]]
+    }
+  ]
+
+  @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."
+  def csource_catalog, do: @csource
+
+  @doc """
+  Build + register every :csource tool in-sandbox (SLOW — one clang.wasm build each; one-time, then
+  persisted + reloaded at boot). Returns `%{name => :ok | {:error, reason}}`. Call once to provision.
+  """
+  def seed_csource, do: Map.new(@csource, fn e -> {e.name, seed_csource_one(e)} end)
+
+  @doc "Build + register one :csource entry by name (or the entry map)."
+  def seed_csource_one(name) when is_binary(name) do
+    case Enum.find(@csource, &(&1.name == name)) do
+      nil -> {:error, :unknown_csource_entry}
+      e -> seed_csource_one(e)
+    end
+  end
+
+  def seed_csource_one(%{name: n, url: u, sha: s, build_opts: opts}) do
+    case CommandRegistry.build_and_register_c_source(n, u, s, opts) do
+      {:ok, _addressed} -> :ok
+      other -> other
+    end
+  end
 end

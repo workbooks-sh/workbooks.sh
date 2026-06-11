@@ -76,4 +76,24 @@ defmodule Workbooks.PalletTest do
 
     assert out =~ "50"
   end
+
+  test "csource catalog entries are well-formed + sha-pinned + carry build_opts" do
+    refute Pallet.csource_catalog() == []
+
+    for e <- Pallet.csource_catalog() do
+      assert is_binary(e.name) and e.name != ""
+      assert String.starts_with?(e.url, "https://")
+      assert Regex.match?(~r/^[0-9a-f]{64}$/, e.sha), "#{e.name} sha must be 64-hex pinned"
+      assert Keyword.keyword?(e.build_opts)
+    end
+  end
+
+  @tag :pallet
+  @tag timeout: 600_000
+  test "seed_csource_one builds + registers a C tool from source (duk)" do
+    assert :ok = Pallet.seed_csource_one("duk")
+    assert "duk" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("duk", "", ["-e", "6*7"])
+    assert String.trim(out) == "42"
+  end
 end
