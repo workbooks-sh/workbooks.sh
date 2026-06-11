@@ -113,6 +113,14 @@
   proprietary container. The trick isn't a new ingredient; it's that nobody had
   put the existing ones in the same file.</p>
 
+  <p class="wbdl">
+    <a class="dlbtn" href="hello-workbook.html" download="hello-workbook.html" id="dlWb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Download a workbook — open one up for real</a>
+    <span class="dlsub">hello-workbook.html · 11 KB · it explains itself the moment you open it —
+    real WebAssembly, data, and memory, straight from your downloads folder</span>
+  </p>
+
   <figure class="diag" aria-label="A workbook's layers">
     <div class="d-file">
       <span class="ftag">shop.html — one file, gzip-bound</span>
@@ -373,6 +381,21 @@
     <a href="../index.html">← back to the big picture</a>
   </div>
 </footer>
+
+<div class="dlhint" id="dlHint" role="status">
+  <span class="arr">↗</span>
+  <span><b>it just landed up here</b> — open <b>hello-workbook.html</b> from your
+  downloads and the file takes it from there.</span>
+</div>
+
+<script>
+document.getElementById("dlWb").addEventListener("click", () => {
+  const h = document.getElementById("dlHint");
+  h.classList.add("on");
+  clearTimeout(window.__dlh);
+  window.__dlh = setTimeout(() => h.classList.remove("on"), 9000);
+});
+</script>
 
 <script>
 window.LEARN = {
