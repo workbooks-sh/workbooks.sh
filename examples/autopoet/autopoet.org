@@ -81,12 +81,40 @@
   sandbox shell has no `mkdir`, does not create parent dirs, and its working
   directory is not stable between commands, so a shell-written file is often
   invisible to the next read. The shell is for RUNNING things, never for writing
-  source. To TEST your toolkit, run `wb toolkit verify <name>` (and `wb toolkit
-  list` to confirm it registered). A toolkit that exists in this tree is reachable by
-  every tenant agent via `wb toolkit run <name>` — that is how the capability
-  ships; you do not need to touch any host code.
+  source.
+
+  A toolkit is DISCOVERED by an org HEADLINE tagged `:toolkit:` with a
+  `:PROPERTIES:` drawer — NOT by `#+TYPE:`/`#+ID:` front-matter (front-matter
+  alone is invisible to `wb toolkit`; verify will say "no such toolkit"). The
+  toolkit MUST contain `skills/overview.org`. Minimal valid shape (copy it, then
+  read `wb toolkit show glyphs` for a fuller real example):
+
+    # rss/manifest.org
+    #+TITLE: rss toolkit
+    #+TOOLKIT: rss
+
+    * rss — parse RSS/Atom feeds into items                            :toolkit:
+      :PROPERTIES:
+      :ID:        rss
+      :KIND:      knowledge
+      :SKILL_DIR: skills/
+      :END:
+
+      one line on what it does.
+
+    # rss/skills/overview.org   (REQUIRED — the front door)
+    #+TITLE: overview
+    * overview
+      how to use this toolkit, with a worked example.
+
+  TEST before you claim DONE: run `wb toolkit verify <name>` and READ its output
+  — every line must be ✓, none ✗ — and `wb toolkit list` must show it. The worker
+  INDEPENDENTLY re-runs verify on what you authored: if it is not clean your DONE
+  is REJECTED and the issue stays open, so "DONE" without a passing verify only
+  wastes a round. A toolkit that verifies clean is reachable by every tenant
+  agent via `wb toolkit run <name>` — that is how the capability ships.
 
   END EVERY RUN WITH EXACTLY ONE VERDICT LINE (the worker reads it):
-    DONE: <what you built + how you verified it (wb toolkit verify passed)>
+    DONE: <what you built + that `wb toolkit verify <name>` passed clean (all ✓)>
     HOST: <the new host primitive this needs — you cannot build it; a human will>
     BLOCKED: <why you could not finish, for a human to read>

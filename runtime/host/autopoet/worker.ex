@@ -20,7 +20,9 @@ defmodule Workbooks.Autopoet.Worker do
     * `WB_AUTOPOET=1`           — activate (wired in application.ex)
     * `WB_AUTOPOET_DEF`         — path to the autopoet agent def (org)
     * `WB_AUTOPOET_WORKDIR`     — the workspace (default `<WB_DATA>/autopoet/workspace`);
-                                  its `toolkits/` subdir should be the WB_TOOLKITS_ROOT
+                                  the workspace itself IS the toolkits root — the
+                                  worker pins WB_TOOLKITS_ROOT to it at init so the
+                                  autopoet authors and verifies in the same tree
     * `WB_AUTOPOET_INTERVAL_MS` — poll cadence (default 180_000 = 3 min)
     * `WB_AUTOPOET_RUN_TIMEOUT_MS` — per-issue wall clock (default 900_000 = 15 min)
   """
@@ -57,7 +59,14 @@ defmodule Workbooks.Autopoet.Worker do
         {:ok, %{active: false}}
 
       path ->
-        File.mkdir_p!(Path.join(workdir(), "toolkits"))
+        # The workspace IS the toolkits root (the def's contract: "your working
+        # directory IS the toolkits tree"). Pin WB_TOOLKITS_ROOT to it so the
+        # autopoet's OWN `wb toolkit verify`/`list` resolve to exactly where it
+        # authors — otherwise it cannot verify its own work and falls back to
+        # claiming DONE on a shell smoke-test (the iter-9 false-DONE root cause).
+        # Safe because the autopoet runs on its own box (central topology).
+        File.mkdir_p!(workdir())
+        System.put_env("WB_TOOLKITS_ROOT", workdir())
         # A crash/restart during a run leaves its issue stuck :doing (no longer
         # :open, so it'd never be re-picked). Reclaim orphans on boot.
         reset_orphans()
@@ -102,6 +111,11 @@ defmodule Workbooks.Autopoet.Worker do
     Autopoet.set_status(issue.id, :doing, "autopoet picked it up")
     put_status(%{running: true, working: issue.id, last_run: System.system_time(:second)})
 
+    # Snapshot the toolkits present BEFORE the run, so the honesty gate verifies
+    # only what THIS run authored (a prior run's clean toolkit must not launder a
+    # new run's false DONE).
+    before = toolkit_names()
+
     # Run in a supervised, time-bounded Task so a slow/killed/crashing run can
     # neither block the worker forever nor orphan the issue: a timeout or an
     # exit becomes a BLOCKED verdict that resets the issue to :open for a retry.
@@ -128,7 +142,7 @@ defmodule Workbooks.Autopoet.Worker do
         kind, reason -> "BLOCKED: autopoet run #{kind} — #{inspect(reason)}"
       end
 
-    record_outcome(issue, result)
+    record_outcome(issue, result, before)
     put_status(%{running: false, working: nil})
   end
 
@@ -136,8 +150,16 @@ defmodule Workbooks.Autopoet.Worker do
   #   DONE: …    → implemented + tested + registered (issue closed)
   #   HOST: …    → needs a new host primitive (re-kind :host, human lane)
   #   anything   → not finished; leave OPEN with the note so a later tick retries
-  defp record_outcome(issue, result) do
-    {verdict, note} = classify(result)
+  #
+  # HONESTY GATE: a self-reported DONE is the agent grading its own homework —
+  # and it over-claims (it once returned "DONE … registration blocked by host
+  # gap" on a stub toolkit that fails verify). So the worker does NOT trust the
+  # word DONE: it INDEPENDENTLY runs `wb toolkit verify` on whatever toolkit this
+  # run newly authored. DONE is honored only if a fresh toolkit verifies clean;
+  # otherwise the issue stays OPEN with the verify output as evidence. Same trust
+  # boundary as the confinement guard — enforce host-side, don't trust the agent.
+  defp record_outcome(issue, result, before) do
+    {verdict, note} = classify(result) |> honesty_gate(before)
 
     case verdict do
       :done ->
@@ -152,6 +174,62 @@ defmodule Workbooks.Autopoet.Worker do
       :open ->
         Autopoet.set_status(issue.id, :open, "not finished this pass: #{note}")
         Logger.info("Autopoet: issue #{issue.id} left open — #{note}")
+    end
+  end
+
+  # Independent verification of a DONE. `before` is the toolkit set snapshotted
+  # before the run; the gate verifies only toolkits authored THIS run.
+  defp honesty_gate({:done, note}, before), do: decide(note, verify_new(before))
+  defp honesty_gate({verdict, note}, _before), do: {verdict, note}
+
+  @doc """
+  Reconcile a DONE note with the worker's independent verification result (pure,
+  so it is testable without the filesystem/OQL). DONE survives only on `{:ok,…}`;
+  a failed or absent verification downgrades it to OPEN with the evidence.
+  """
+  @spec decide(String.t(), {:ok, [String.t()]} | {:fail, String.t()} | :none) ::
+          {:done | :open, String.t()}
+  def decide(note, {:ok, names}),
+    do: {:done, note <> " ✔ worker-verified: #{Enum.join(names, ", ")}"}
+
+  def decide(_note, {:fail, report}),
+    do: {:open, "DONE claimed but the worker's `wb toolkit verify` FAILED — an unverified capability is not shipped:\n#{report}"}
+
+  def decide(_note, :none),
+    do: {:open, "DONE claimed but this run authored no verifiable toolkit (worker check). If you edited an existing artifact, say which and re-run; nothing was registered to verify."}
+
+  # Toolkits THIS run added (subdirs of the workspace that hold a manifest.org),
+  # each independently verified. Clean = verify output with no ✗ and not
+  # "no such toolkit". The workspace IS the toolkits root (the def's contract:
+  # "your working directory IS the toolkits tree"), so verify reads it directly.
+  defp verify_new(before) do
+    root = workdir()
+    fresh = toolkit_names() -- before
+
+    reports = Enum.map(fresh, fn n -> {n, Workbooks.Toolkits.verify_text(n, root)} end)
+    clean = for {n, r} <- reports, not String.contains?(r, "✗"), not String.contains?(r, "no such toolkit"), do: n
+
+    cond do
+      fresh == [] -> :none
+      clean != [] -> {:ok, clean}
+      true -> {:fail, Enum.map_join(reports, "\n\n", fn {n, r} -> "#{n}:\n#{r}" end)}
+    end
+  rescue
+    # verify needs the OQL/discovery services; if they are down, do not silently
+    # pass a DONE — surface it as unverified (stays open).
+    e -> {:fail, "worker verify errored: #{Exception.message(e)}"}
+  end
+
+  defp toolkit_names do
+    root = workdir()
+    case File.ls(root) do
+      {:ok, names} ->
+        names
+        |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.org"])))
+        |> Enum.sort()
+
+      _ ->
+        []
     end
   end
 
