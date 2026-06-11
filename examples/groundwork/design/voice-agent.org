@@ -1,6 +1,6 @@
 #+TITLE: the groundskeeper — a voice chief-of-staff for the repo
 #+DATE: <2026-06-10>
-#+STATUS: LIVE (2026-06-11) — agent_9201kttm5xv5fyn8vr1bnv3z9d5m provisioned; full loop proven (live session → webhook tool → bridge → bd wb-pdi2; post-call HMAC → transcript archived). Local stack: ~/.workbooks/groundskeeper.env + detached runtime/tunnel (logs in ~/.workbooks/). Quick-tunnel URL is EPHEMERAL: after a restart rerun groundskeeper-up.sh, then upsert_agent(<new url>) + PATCH the workspace webhook URL (id in env file notes).
+#+STATUS: LIVE ON FLY (2026-06-11) — permanent bridge https://wb-groundskeeper.fly.dev (app wb-groundskeeper, own box, volume wbdata, always-on). Agent agent_9201kttm5xv5fyn8vr1bnv3z9d5m + post-call webhook re-pointed there; live session + tool execution + repo_state-from-clone verified. No tunnel, no Mac dependency: the box shallow-clones the public repo (WB_GK_REPO) for repo answers, reads committed BOARD.org in place of bd, files issues to the runtime backlog (swept into bd by dev sessions). App at /gk/app behind WB_GK_APP_PASSWORD (one password on the phone; secrets are fly secrets). Mac stack retired; groundskeeper-up.sh remains the local-dev path. Iteration note: behavior changes still ride the CI image until wb-mest dissolves them into the config layer.
 #+NAME: groundskeeper (confirmed by the founder)
 
 * Status (2026-06-11)
