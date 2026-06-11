@@ -292,11 +292,24 @@ defmodule Workbooks.PackageManager do
   defp build_npm_dir(abs, lang, out) do
     with :ok <- ensure_node_modules(abs),
          {:ok, entry_rel} <- prepare_bundle_entry(abs, lang),
-         # Bundle dock-permissive: a bundle that requires fs/http/https pulls the host-brokered
-         # shims (Javy.VFS/Javy.Net); a pure-compute bundle never references them (wb-e1x.5).
-         {:ok, js} <- Workbooks.Compilers.bundle_dir(abs, entry_rel, dock: true) do
+         {:ok, js} <- npm_bundle(abs, entry_rel) do
       dock? = js =~ "Javy.VFS" or js =~ "Javy.Net"
       bundled_js_to_wasm(js, out, dock?)
+    end
+  end
+
+  # Bundle the npm project: esbuild FIRST (esbuild.wasm under wasmtime, JIT'd to
+  # native — the ~23-min QuickJS bundle drops to ~0.4s; the wb-feto win). Falls
+  # back to the QuickJS bundler when esbuild can't resolve a node CORE module:
+  # `--platform=browser` makes node builtins ERROR rather than externalize, so a
+  # bundle that needs fs/http (which only the QuickJS lane shims via Javy.VFS/Net,
+  # wb-e1x.5) cleanly takes the slow-but-shimmed path. The frontend case
+  # (React/Preact/Solid/Svelte-output/TS — pure compute, no node builtins) takes
+  # the fast path.
+  defp npm_bundle(abs, entry_rel) do
+    case Workbooks.Compilers.esbuild_bundle_dir(abs, entry_rel, format: "cjs", extra: ["--platform=browser"]) do
+      {:ok, js} -> {:ok, js}
+      {:error, _} -> Workbooks.Compilers.bundle_dir(abs, entry_rel, dock: true)
     end
   end
 
