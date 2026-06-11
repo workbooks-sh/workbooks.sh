@@ -85,6 +85,16 @@ defmodule Workbooks.Autopoet do
     end
   end
 
+  @doc "Reclassify an issue as :host (needs a new host primitive — the human lane)."
+  def rekind_host(id) do
+    path = Path.join(dir(), "#{id}.org")
+
+    with {:ok, body} <- File.read(path) do
+      File.write!(path, bump_field(body, "KIND", "host"))
+      :ok
+    end
+  end
+
   # ── rendering / parsing (org, so issues are diffable like every other surface) ──
 
   defp render(id, a) do

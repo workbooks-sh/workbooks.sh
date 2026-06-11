@@ -1,6 +1,22 @@
 #+TITLE: Autopoiesis — the autopoet and the self-editing runtime
 #+EPIC: wb-9ae
-#+STATUS: design + phase-1 build
+#+STATUS: WORKING — phases 1-3 + 5 shipped & proven; phase 4 optional
+
+* Status (2026-06-10)
+
+  The loop runs end to end. PROVEN: a filed issue ("no SEO toolkit") was picked
+  up by the autopoet worker, which read AUTHORING.org + example toolkits and
+  authored a real `seo` toolkit (manifest + two skills) that PASSES
+  =wb toolkit verify= — all confined to its workspace, no native code. Shipped:
+  the file_issue seam (P1), the autopoet def (P2), the supervised worker (P3),
+  and the proof (P5). P4 (the declarative tool registry) remains optional — the
+  autopoet already extends the system via toolkits, the native extension path.
+
+  LIVE ACTIVATION recipe (a box): set `WB_AUTOPOET=1`, `WB_AUTOPOET_DEF=<autopoet
+  def path>`, and point `WB_AUTOPOET_WORKDIR` (+ `WB_TOOLKITS_ROOT`) at a MUTABLE
+  toolkits tree seeded from the image (so authored toolkits are discoverable and
+  reach the tenant agents on that box). The worker idles when the backlog is
+  empty (no LLM cost) and works one issue per poll.
 
 * The idea
 

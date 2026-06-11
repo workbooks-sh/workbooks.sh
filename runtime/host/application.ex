@@ -18,7 +18,7 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ web() ++ keeper() ++ channels()
+      ] ++ web() ++ keeper() ++ autopoet() ++ channels()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
@@ -152,6 +152,16 @@ defmodule Workbooks.Application do
       System.get_env("WB_KEEPER_DEF") -> [Workbooks.Keeper]
       true -> []
     end
+  end
+
+  # Autopoet (wb-9ae): the self-improvement worker — a SYSTEM tenant (peer to the
+  # keeper, not owned by any tenant) that works the metacognitive backlog,
+  # authoring toolkits to fill capability gaps tenant agents file. Opt-in by
+  # WB_AUTOPOET=1 (needs WB_AUTOPOET_DEF). Idle when the backlog is empty.
+  defp autopoet do
+    if System.get_env("WB_AUTOPOET") == "1",
+      do: [Workbooks.Autopoet.Worker],
+      else: []
   end
 
   # Channels (wb messaging adapters, official-API tier): each inbound poller is
