@@ -224,8 +224,16 @@ defmodule Workbooks.PackageManager do
     abs = Path.expand(dir)
 
     case Path.wildcard(Path.join(abs, "**/*.c")) do
-      [] -> {:error, "no .c sources in #{abs}"}
-      [main | rest] -> compile_c_in_sandbox(main, rest, Path.join(@cache, "#{cache_key(["cdir", abs])}.wasm"))
+      [] ->
+        {:error, "no .c sources in #{abs}"}
+
+      [main | rest] ->
+        # collect the project's headers (relative paths preserved) so multi-file C resolves (wb-yi7q)
+        headers =
+          Path.wildcard(Path.join(abs, "**/*.h"))
+          |> Enum.map(fn h -> {h, Path.relative_to(h, abs)} end)
+
+        compile_c_in_sandbox(main, rest, Path.join(@cache, "#{cache_key(["cdir", abs])}.wasm"), headers)
     end
   end
 
@@ -572,10 +580,20 @@ defmodule Workbooks.PackageManager do
   # mmap parity: the shim is linked (extra_csrc) and mmap/munmap/msync are --wrap'd to it
   # (ld_args), so a CLI that mmap()s a file works the same as on the old zig-cc lane —
   # now with zero native execution.
-  defp compile_c_in_sandbox(main, rest, out) do
+  defp compile_c_in_sandbox(main, rest, out, headers \\ []) do
     File.mkdir_p!(@cache)
 
-    case Workbooks.Compilers.compile_c(main, extra_csrc: rest ++ [@mmap_shim], ld_args: @mmap_wraps) do
+    # Bring the project's headers into the guest (structure preserved) and -I every dir that holds
+    # one, so both `#include "x.h"` and `#include <x.h>` resolve for multi-file C tools (wb-yi7q).
+    inc_flags =
+      headers
+      |> Enum.map(fn {_host, rel} -> Path.dirname(rel) end)
+      |> Enum.uniq()
+      |> Enum.flat_map(fn d -> ["-I", if(d in [".", ""], do: "/work", else: "/work/#{d}")] end)
+
+    opts = [extra_csrc: rest ++ [@mmap_shim], aux_files: headers, argv: inc_flags, ld_args: @mmap_wraps]
+
+    case Workbooks.Compilers.compile_c(main, opts) do
       {:ok, wasm, _logs} ->
         File.cp!(wasm, out)
         File.rm(wasm)

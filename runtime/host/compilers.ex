@@ -218,6 +218,15 @@ defmodule Workbooks.Compilers do
             nm
           end)
 
+        # Companion files copied into /work but NOT compiled — project headers (so a relative
+        # `#include "util.h"` resolves against the source dir) and any data the build reads.
+        # Each is {host_path, guest_rel}; structure under /work is preserved (wb-yi7q).
+        for {host, rel} <- Keyword.get(opts, :aux_files, []) do
+          dst = Path.join(job, rel)
+          File.mkdir_p!(Path.dirname(dst))
+          File.cp!(Path.expand(host), dst)
+        end
+
         inc = includes |> Enum.with_index() |> Enum.map(fn {{h, _}, i} -> {h, "/inc#{i}"} end)
         inc_flags = Enum.flat_map(inc, fn {_, g} -> ["-I", g] end)
 
