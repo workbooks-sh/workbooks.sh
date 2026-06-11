@@ -173,6 +173,27 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `wren` CLI: eval `-e CODE` or stdin via the Wren embedding API (the bundled cli/ uses
+  # libuv for fs/net — not needed for a compute interpreter).
+  @wren_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include "wren.h"
+  static void writeFn(WrenVM* vm, const char* text) { (void)vm; fputs(text, stdout); }
+  static void errorFn(WrenVM* vm, WrenErrorType t, const char* m, int line, const char* msg) {
+    (void)vm; (void)t; fprintf(stderr, "[%s:%d] %s\n", m ? m : "?", line, msg);
+  }
+  int main(int argc, char** argv) {
+    WrenConfiguration c; wrenInitConfiguration(&c); c.writeFn = writeFn; c.errorFn = errorFn;
+    WrenVM* vm = wrenNewVM(&c);
+    static char buf[1 << 20]; const char* code;
+    if (argc >= 3 && !strcmp(argv[1], "-e")) code = argv[2];
+    else { size_t n = fread(buf, 1, sizeof(buf) - 1, stdin); buf[n] = 0; code = buf; }
+    wrenInterpret(vm, "main", code);
+    wrenFreeVM(vm); return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -185,6 +206,15 @@ defmodule Workbooks.Pallet do
       url: "https://duktape.org/duktape-2.7.0.tar.xz",
       sha: "90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890",
       build_opts: [src_globs: ["src/*.{c,h}"], extra_sources: [{"duk_main.c", @duk_main}]]
+    },
+    %{
+      name: "wren",
+      url: "https://codeload.github.com/wren-lang/wren/tar.gz/refs/tags/0.4.0",
+      sha: "23c0ddeb6c67a4ed9285bded49f7c91714922c2e7bb88f42428386bf1cf7b339",
+      build_opts: [
+        src_globs: ["src/include/*", "src/vm/*", "src/optional/*"],
+        extra_sources: [{"wren_main.c", @wren_main}]
+      ]
     }
   ]
 

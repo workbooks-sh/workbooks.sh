@@ -233,16 +233,20 @@ defmodule Workbooks.PackageManager do
         {:error, "no .c sources in #{abs}"}
 
       [main | rest] ->
-        # collect the project's headers (relative paths preserved) so multi-file C resolves (wb-yi7q)
-        headers =
-          Path.wildcard(Path.join(abs, "**/*.h"))
-          |> Enum.map(fn h -> {h, Path.relative_to(h, abs)} end)
+        # Forward EVERY non-.c companion (headers + generated includes .inc/.def + data) into the guest
+        # workdir, structure preserved, so any relative #include resolves — not just .h (wb-yi7q; .inc
+        # generalization for Wren-class tools that #include generated foo.wren.inc).
+        companions =
+          Path.wildcard(Path.join(abs, "**/*"))
+          |> Enum.filter(&File.regular?/1)
+          |> Enum.reject(fn f -> Path.extname(f) == ".c" end)
+          |> Enum.map(fn f -> {f, Path.relative_to(f, abs)} end)
 
         compile_c_in_sandbox(
           main,
           rest,
           Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " ")])}.wasm"),
-          headers,
+          companions,
           extra_argv
         )
     end
