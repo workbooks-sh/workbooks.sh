@@ -18,6 +18,20 @@
   reach the tenant agents on that box). The worker idles when the backlog is
   empty (no LLM cost) and works one issue per poll.
 
+  LESSONS from the first live run (on the wb-bitml crew box, 2026-06-10):
+  - *The thesis held organically.* Within minutes a crew agent (hale) filed, on
+    its own, a real bug it had hit silently for 4 runs ("vfs_write content is
+    invisible to shell/publish — amodei-policy & fable-backlash can't publish").
+    That is the whole point: sense-and-file instead of silent-spin. KEEP that
+    backlog — it is a real host bug to fix.
+  - *Topology confirmed: the autopoet wants its OWN box.* Co-tenanting the
+    authoring agent on an already-busy 4-agent crew box overloaded the runtime
+    ("Main child exited with signal" — repeated restarts). The central-autopoet
+    decision (its own process/box, not piggybacked on a tenant) is the right one.
+  - *Robustness fixed:* a restart mid-run left issues stuck `:doing` (un-pickable).
+    The worker now resets orphans on boot AND runs each issue in a time-bounded
+    supervised Task that catches exits/kills → BLOCKED → `:open` for retry.
+
 * The idea
 
   A system is /autopoietic/ when it maintains and re-produces itself. Our
