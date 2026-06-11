@@ -597,11 +597,20 @@ defmodule Workbooks.PackageManager do
     # runs under `-W exceptions=y` (PackageManager.run already passes it). Harmless for code that
     # never uses setjmp — the flags only affect setjmp-using functions; libsetjmp dead-strips if
     # unreferenced. This unblocks the interpreter C cluster (Lua/Forth/Duktape/MuJS/…).
+    sjlj = ["-mllvm", "-wasm-enable-sjlj", "-mllvm", "-wasm-use-legacy-eh=false"]
+
+    # wasi-libc "emulated" features many real C tools include (signal.h / process clocks / getpid):
+    # each header #errors unless its -D is set, and the symbols come from a sysroot stub lib. Enable
+    # them all by default — harmless when unused (headers no-op, libs dead-strip) — so real programs
+    # (Lua, interpreters, CLIs) compile without per-tool tweaking.
+    emu_defs = ["-D_WASI_EMULATED_SIGNAL", "-D_WASI_EMULATED_PROCESS_CLOCKS", "-D_WASI_EMULATED_GETPID"]
+    emu_libs = ["-lwasi-emulated-signal", "-lwasi-emulated-process-clocks", "-lwasi-emulated-getpid"]
+
     opts = [
       extra_csrc: rest ++ [@mmap_shim],
       aux_files: headers,
-      argv: inc_flags ++ ["-mllvm", "-wasm-enable-sjlj", "-mllvm", "-wasm-use-legacy-eh=false"],
-      link_libs: ["-lsetjmp"],
+      argv: inc_flags ++ sjlj ++ emu_defs,
+      link_libs: ["-lsetjmp"] ++ emu_libs,
       ld_args: @mmap_wraps
     ]
 
