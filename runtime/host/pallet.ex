@@ -262,6 +262,22 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `b2` CLI: BLAKE2b-512 of stdin → hex (Monocypher's modern crypto core).
+  @b2_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include "monocypher.h"
+  int main(void) {
+    size_t cap = 1 << 20, len = 0; unsigned char* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    unsigned char h[64];
+    crypto_blake2b(h, 64, in, len);
+    for (int i = 0; i < 64; i++) printf("%02x", h[i]);
+    printf("\n");
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -309,6 +325,12 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/lz4/lz4/tar.gz/refs/tags/v1.10.0",
       sha: "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b",
       build_opts: [src_globs: ["lib/*.{c,h}"], exclude: ["lz4file.c"], extra_sources: [{"lz4_main.c", @lz4_main}]]
+    },
+    %{
+      name: "b2",
+      url: "https://monocypher.org/download/monocypher-4.0.2.tar.gz",
+      sha: "38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c",
+      build_opts: [src_globs: ["src/monocypher.{c,h}"], extra_sources: [{"b2main.c", @b2_main}]]
     }
   ]
 
