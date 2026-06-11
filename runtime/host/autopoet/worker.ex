@@ -59,14 +59,7 @@ defmodule Workbooks.Autopoet.Worker do
         {:ok, %{active: false}}
 
       path ->
-        # The workspace IS the toolkits root (the def's contract: "your working
-        # directory IS the toolkits tree"). Pin WB_TOOLKITS_ROOT to it so the
-        # autopoet's OWN `wb toolkit verify`/`list` resolve to exactly where it
-        # authors — otherwise it cannot verify its own work and falls back to
-        # claiming DONE on a shell smoke-test (the iter-9 false-DONE root cause).
-        # Safe because the autopoet runs on its own box (central topology).
-        File.mkdir_p!(workdir())
-        System.put_env("WB_TOOLKITS_ROOT", workdir())
+        ensure_workspace()
         # A crash/restart during a run leaves its issue stuck :doing (no longer
         # :open, so it'd never be re-picked). Reclaim orphans on boot.
         reset_orphans()
@@ -77,23 +70,55 @@ defmodule Workbooks.Autopoet.Worker do
     end
   end
 
+  # The workspace IS the toolkits root (the def's contract: "your working
+  # directory IS the toolkits tree"). Pin WB_TOOLKITS_ROOT to it so the autopoet's
+  # OWN `wb toolkit verify`/`list` resolve to exactly where it authors — otherwise
+  # it cannot verify its own work and falls back to claiming DONE on a shell
+  # smoke-test (the iter-9 false-DONE root cause). Idempotent — safe to call from
+  # both the GenServer init and an on-demand `drain_one/0`.
+  defp ensure_workspace do
+    File.mkdir_p!(workdir())
+    System.put_env("WB_TOOLKITS_ROOT", workdir())
+  end
+
   defp reset_orphans do
     for i <- Autopoet.list(:doing) do
       Autopoet.set_status(i.id, :open, "reclaimed: worker restarted mid-run")
     end
   end
 
+  @doc """
+  Drain ONE issue on demand — the unit of autopoet work, callable WITHOUT the
+  GenServer (e.g. `wb autopoet tick` on a triggered job). The backlog is bursty
+  and small, so a triggered drain is the efficient shape — no always-on poller
+  idling on an empty backlog. Returns:
+    * `{:worked, id, verdict}` — ran an issue (verdict ∈ :done | :host | :open)
+    * `:empty`                 — no open :capability issue (no LLM call)
+    * `{:inactive, reason}`    — not configured (WB_AUTOPOET_DEF unset)
+  """
+  @spec drain_one() :: {:worked, String.t(), atom()} | :empty | {:inactive, String.t()}
+  def drain_one do
+    case def_path() do
+      nil ->
+        {:inactive, "WB_AUTOPOET_DEF unset"}
+
+      path ->
+        ensure_workspace()
+
+        case Autopoet.list(:open) |> Enum.filter(&(&1.kind == :capability)) |> top() do
+          nil -> :empty
+          issue -> {:worked, issue.id, work(issue, path)}
+        end
+    end
+  end
+
   @impl true
   def handle_info(:tick, %{active: false} = s), do: {:noreply, s}
 
-  def handle_info(:tick, %{def_path: path} = s) do
-    case Autopoet.list(:open) |> Enum.filter(&(&1.kind == :capability)) |> top() do
-      nil ->
-        # empty backlog — idle, no LLM call
-        put_status(%{running: false, working: nil, last_run: System.system_time(:second)})
-
-      issue ->
-        work(issue, path)
+  def handle_info(:tick, %{active: true} = s) do
+    case drain_one() do
+      :empty -> put_status(%{running: false, working: nil, last_run: System.system_time(:second)})
+      _ -> :ok
     end
 
     Process.send_after(self(), :tick, interval_ms())
@@ -142,8 +167,9 @@ defmodule Workbooks.Autopoet.Worker do
         kind, reason -> "BLOCKED: autopoet run #{kind} — #{inspect(reason)}"
       end
 
-    record_outcome(issue, result, before)
+    verdict = record_outcome(issue, result, before)
     put_status(%{running: false, working: nil})
+    verdict
   end
 
   # The autopoet ends its run with a verdict line we map onto the issue:
@@ -175,6 +201,8 @@ defmodule Workbooks.Autopoet.Worker do
         Autopoet.set_status(issue.id, :open, "not finished this pass: #{note}")
         Logger.info("Autopoet: issue #{issue.id} left open — #{note}")
     end
+
+    verdict
   end
 
   # Independent verification of a DONE. `before` is the toolkit set snapshotted
