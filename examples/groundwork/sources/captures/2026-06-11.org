@@ -1,0 +1,10 @@
+#+TITLE: captures — 2026-06-11
+
+* idea [2026-06-11 04:58]
+  The founder wants to sharpen the "workbook-as-container" pitch by grounding it in real competitor pricing (E2B, Daytona). The cost contrast needs to be concrete, not hand-wavy. Dispatched research gk-201.
+
+* note [2026-06-11 04:58]
+  Founder considers "workbook-as-container" the weakest pitch line. Needs concrete cost contrast with E2B and Daytona to shore it up — or to discover the claim doesn't hold and rethink it.
+
+* idea [2026-06-11 04:58]
+  Founder thinks "drift-is-testable" might be the headline of the whole pitch. Worth exploring as the core framing. (Parking for later.)

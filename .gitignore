@@ -78,3 +78,4 @@ secrets.env
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/workbooks-system
+examples/groundwork/runs/

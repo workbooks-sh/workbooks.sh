@@ -1,7 +1,45 @@
 #+TITLE: the groundskeeper — a voice chief-of-staff for the repo
 #+DATE: <2026-06-10>
-#+STATUS: DESIGN — epic filed, nothing built
-#+WORKING_NAME: groundskeeper (changeable; the referent is what matters)
+#+STATUS: BUILT (v0, self-tested) — voice hop blocked on key permission (wb-3ojf.6)
+#+NAME: groundskeeper (confirmed by the founder)
+
+* Status (2026-06-11)
+
+  Shipped and proven by rehearsal (no human, no ElevenLabs — see below):
+  - the /gk bridge on the control plane: =repo_state / capture / file_issue /
+    dispatch / tasks= + the post-call webhook (HMAC), own credential
+    (=WB_GK_SECRET=), fails closed. =runtime/host/groundskeeper*=, 9 tests.
+  - THE SPAWN LANE WORKS END TO END: voice agent hands a GOAL → the author
+    model (Mercury 2 via OpenRouter, =inception/mercury-2= — note
+    =mercury-coder= is delisted) writes an org TODO outline → validated →
+    persisted to =workflows/= (they STAY; a growing library) → run async on
+    the task ledger → completion queues as feedback the agent relays.
+    Real proof: =workflows/research-e2b-…-3.org= + ledger entry gk-201.
+  - the task ledger renders =TASKS.org= (generated, never hand-edited).
+  - =Rehearsal.run/2= — the self-demo: same persona (read from the def), same
+    five tools, every call through the REAL router. First transcript:
+    =rehearsals/2026-06-11-045937.org= — grounded repo answers, silent
+    captures, a real dispatch, honest tasks readback. Persona held.
+
+  BLOCKED on one user action: the ElevenLabs key lacks =convai_write=
+  (wb-3ojf.6). Everything below "go live" is ready to run once minted.
+
+* Go-live runbook (once the key has Agents permissions)
+
+  1. Expose the bridge: run the runtime where 11labs can reach it —
+     either the fly box (bridge ships with the runtime image via CI) or a
+     tunnel to a local =WB_WEB=1= runtime. Set =WB_GK_SECRET= (+
+     =WB_GK_POSTCALL_SECRET= after step 3).
+  2. Provision: =ELEVENLABS_API_KEY=<convai key> WB_GK_SECRET=… mix run
+     --no-start -e 'Workbooks.Groundskeeper.ElevenLabs.upsert_agent("https://<bridge-host>")'
+     → save the returned agent id as =WB_GK_AGENT_ID=.
+  3. In the 11labs dashboard: enable the post-call webhook →
+     =https://<bridge-host>/gk/postcall=, copy its signing secret into
+     =WB_GK_POSTCALL_SECRET=.
+  4. Talk to it from the ElevenLabs app / hosted call link on the phone.
+  5. Self-test anytime without a call:
+     =Workbooks.Groundskeeper.ElevenLabs.simulate(agent_id, "<founder scenario>")=
+     or the no-11labs path: =Workbooks.Groundskeeper.Rehearsal.run([…lines])=.
 
 * The referent
 

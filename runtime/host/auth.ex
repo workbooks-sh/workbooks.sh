@@ -31,6 +31,10 @@ defmodule Workbooks.Auth do
   def call(conn, _opts) do
     cond do
       conn.request_path in @public -> dev_fallback(conn)
+      # The groundskeeper bridge enforces its own credential (x-gk-secret /
+      # the ElevenLabs webhook HMAC) and fails closed when unconfigured —
+      # see Workbooks.Groundskeeper.Router.
+      String.starts_with?(conn.request_path, "/gk/") -> dev_fallback(conn)
       true ->
         case bearer(conn) do
           nil -> no_bearer(conn)

@@ -24,7 +24,7 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ web() ++ keeper() ++ autopoet() ++ channels()
+      ] ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
@@ -168,6 +168,16 @@ defmodule Workbooks.Application do
     if System.get_env("WB_AUTOPOET") == "1",
       do: [Workbooks.Autopoet.Worker],
       else: []
+  end
+
+  # Groundskeeper (wb-3ojf): the founder's voice-agent bridge task ledger —
+  # credential-gated like channels(): joins the tree only when WB_GK_SECRET is
+  # set (without it the /gk routes fail closed anyway).
+  defp groundskeeper do
+    case System.get_env("WB_GK_SECRET") do
+      s when s in [nil, ""] -> []
+      _ -> [Workbooks.Groundskeeper.Tasks]
+    end
   end
 
   # Channels (wb messaging adapters, official-API tier): each inbound poller is
