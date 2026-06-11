@@ -1,20 +1,18 @@
-//! Native local MACHINE — boots the ONE runtime OCI image inside a libkrun
-//! microVM via the `krunvm` CLI, with NO host Erlang and NO `wb` escript. This
-//! is route B of the install-wizard plan: on a fresh Mac the ONLY host
-//! dependency is the krunvm backend, so the wizard installs that and we drive
-//! the create → spawn → discovery dance directly from Rust.
+//! Native local MACHINE — boots the ONE runtime OCI image in a local container
+//! engine, preferring docker → podman → krunvm (`WB_ENGINE` overrides).
 //!
-//! Ported from `runtime/host/deploy/machine.ex` — keep the krunvm contract in
-//! sync with that module (the Elixir `wb deploy local` path is the same dance):
-//!   * a case-sensitive APFS volume named `krunvm` (one-time, no sudo)
-//!   * `krunvm create <image> --name N --port H:G --volume H:G`
-//!   * `krunvm start N -- <cmd>` runs the microVM in the FOREGROUND
+//! Why that order (wb-ryw, 2026-06-10): the full runtime is I/O-heavy at boot
+//! (BEAM module loads, wasmtime NIFs, sqlite, a ~30MB embedding model). Docker
+//! and podman machines give the guest a real virtual DISK (block device +
+//! overlayfs) — the same image goes discovery + /health 200 in ~5s. krunvm's
+//! libkrun shares host folders via virtio-fs and impersonates sockets via TSI;
+//! under our app that floor measured 8-minutes-to-never, plus a day of TSI
+//! bugs (accept-serialization, startup_log deadlock, a 1.19 host-bind
+//! regression). krunvm stays as the no-daemon fallback path.
 //!
-//! The runtime inside binds 0.0.0.0:4000 and writes the discovery file into the
-//! bind-mounted /disco dir; the host maps 4000→4000 so the discovered port is
-//! reachable on localhost. We pin the host port to the guest port (4000) because
-//! the guest writes the GUEST port into discovery and cannot know a remapped
-//! host port.
+//! All engines speak the SAME contract: host 4000 → guest 4000 (the guest
+//! writes the GUEST port into the bind-mounted /disco discovery file and
+//! cannot know a remapped host port), data dir → /data, disco dir → /disco.
 
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -33,6 +31,56 @@ const BOOT_EXPR: &str = "case Application.ensure_all_started(:workbooks) do {:ok
 /// The runtime image reference — overridable via `WB_IMAGE` for local pins.
 fn image() -> String {
     std::env::var("WB_IMAGE").unwrap_or_else(|_| DEFAULT_IMAGE.into())
+}
+
+// ---- engine selection ---------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Engine {
+    Docker,
+    Podman,
+    Krunvm,
+}
+
+impl Engine {
+    fn cli(self) -> &'static str {
+        match self {
+            Engine::Docker => "docker",
+            Engine::Podman => "podman",
+            Engine::Krunvm => "krunvm",
+        }
+    }
+}
+
+/// A container engine is "ready" only if its daemon/machine answers — a docker
+/// binary with Docker Desktop stopped must not win the election.
+fn docker_ready() -> bool {
+    sh("docker", &["info", "--format", "{{.ServerVersion}}"]).is_ok()
+}
+
+fn podman_ready() -> bool {
+    sh("podman", &["info", "--format", "{{.version.Version}}"]).is_ok()
+}
+
+/// Pick the boot engine: `WB_ENGINE=docker|podman|krunvm` overrides, else the
+/// first READY engine in preference order, else krunvm if merely installed
+/// (it has no daemon to be "ready").
+pub fn engine() -> Option<Engine> {
+    match std::env::var("WB_ENGINE").ok().as_deref() {
+        Some("docker") => return Some(Engine::Docker),
+        Some("podman") => return Some(Engine::Podman),
+        Some("krunvm") => return Some(Engine::Krunvm),
+        _ => {}
+    }
+    if docker_ready() {
+        Some(Engine::Docker)
+    } else if podman_ready() {
+        Some(Engine::Podman)
+    } else if command_exists("krunvm") {
+        Some(Engine::Krunvm)
+    } else {
+        None
+    }
 }
 
 // ---- host paths (mirror daemon::discovery_path + machine.ex defaults) -------
@@ -74,6 +122,10 @@ fn pidfile() -> Option<std::path::PathBuf> {
 pub struct BackendStatus {
     pub os: String,
     pub supported: bool,
+    /// The engine a boot would use right now ("docker"|"podman"|"krunvm").
+    pub engine: Option<String>,
+    pub docker: bool,
+    pub podman: bool,
     pub krunvm: bool,
     pub apfs_volume: bool,
     pub brew: bool,
@@ -81,16 +133,21 @@ pub struct BackendStatus {
 
 pub fn detect() -> BackendStatus {
     let os = std::env::consts::OS.to_string();
-    let supported = os == "macos";
-    if !supported {
-        return BackendStatus { os, supported, krunvm: false, apfs_volume: false, brew: false };
-    }
+    let docker = docker_ready();
+    let podman = podman_ready();
+    let krunvm = command_exists("krunvm");
+    // A live container daemon supports local boot on ANY os; krunvm is the
+    // mac-only no-daemon path the wizard can install from scratch.
+    let supported = docker || podman || os == "macos";
     BackendStatus {
+        engine: engine().map(|e| e.cli().to_string()),
+        docker,
+        podman,
+        krunvm,
+        apfs_volume: os == "macos" && apfs_volume_present(),
+        brew: command_exists("brew"),
         os,
         supported,
-        krunvm: command_exists("krunvm"),
-        apfs_volume: apfs_volume_present(),
-        brew: command_exists("brew"),
     }
 }
 
@@ -331,10 +388,61 @@ fn spawn() -> Result<(), String> {
     sh_ok("sh", &["-c", &script]).map(|_| ()).map_err(|e| format!("could not spawn krunvm: {e}"))
 }
 
-/// The full local boot: ensure the APFS volume, tear down any previous
-/// instance, (re)create the VM, spawn it. Emits `engine-setup` progress at
-/// each step. The caller waits for discovery.
+/// The full local boot, on the elected engine. Emits `engine-setup` progress
+/// at each step. The caller waits for discovery + /health.
 pub fn boot(app: &AppHandle) -> Result<(), String> {
+    match engine() {
+        Some(Engine::Krunvm) | None => boot_krunvm(app),
+        Some(eng) => boot_container(app, eng),
+    }
+}
+
+/// docker/podman boot: pull (streamed), replace any previous container, run
+/// detached with the standard port/volume/env contract. The image entrypoint
+/// is the release start — no eval dance needed under a real container engine.
+fn boot_container(app: &AppHandle, eng: Engine) -> Result<(), String> {
+    let cli = eng.cli();
+    let data = data_dir().ok_or("no data dir")?;
+    let disco = disco_dir().ok_or("no disco dir")?;
+    std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&disco).map_err(|e| e.to_string())?;
+
+    let img = image();
+    emit_setup(app, &format!("Pulling the engine image with {cli} (first run is slow once)…"));
+    stream(cli, &["pull", &img], app)?;
+
+    emit_setup(app, "Stopping any previous engine instance…");
+    let _ = sh(cli, &["rm", "-f", VM]);
+    // A stale host-port squatter (e.g. an old krunvm zombie) blocks the bind.
+    let _ = sh("sh", &["-c", &format!("lsof -ti :{HOST_PORT} | xargs kill 2>/dev/null")]);
+
+    emit_setup(app, "Booting the engine…");
+    let port_map = format!("{HOST_PORT}:{GUEST_PORT}");
+    let data_vol = format!("{}:/data", data.display());
+    let disco_vol = format!("{}:/disco", disco.display());
+    sh_ok(
+        cli,
+        &[
+            "run", "-d",
+            "--name", VM,
+            "--restart", "unless-stopped",
+            "-p", &port_map,
+            "-v", &data_vol,
+            "-v", &disco_vol,
+            "-e", "WB_DESKTOP=1",
+            "-e", "WB_DESKTOP_DIR=/disco",
+            "-e", "WB_DATA=/data",
+            "-e", "WB_EMBED=local",
+            &img,
+        ],
+    )
+    .map(|_| ())
+    .map_err(|e| format!("{cli} run failed: {e}"))
+}
+
+/// krunvm boot (fallback path): ensure the APFS volume, tear down any previous
+/// instance, (re)create the VM, spawn it detached.
+fn boot_krunvm(app: &AppHandle) -> Result<(), String> {
     emit_setup(app, "Preparing the krunvm volume…");
     ensure_apfs_volume()?;
     // A previous instance still holding the VM lock makes `krunvm start`
@@ -352,9 +460,13 @@ pub fn boot(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Kill the directly-spawned microVM (if any) and delete the VM definition.
-/// Leaves the APFS volume + image store intact so the next boot is fast.
+/// Tear down the local runtime on EVERY engine (cheap no-ops where absent):
+/// remove the named container, kill any spawned microVM, delete the VM
+/// definition, and free the host port. Image stores stay intact.
 pub fn down() -> Result<(), String> {
+    for cli in ["docker", "podman"] {
+        let _ = sh(cli, &["rm", "-f", VM]);
+    }
     if let Some(pid) = read_pidfile() {
         let _ = sh("kill", &[&pid.to_string()]);
     }
@@ -362,6 +474,7 @@ pub fn down() -> Result<(), String> {
         let _ = std::fs::remove_file(p);
     }
     let _ = sh("krunvm", &["delete", VM]);
+    let _ = sh("sh", &["-c", &format!("lsof -ti :{HOST_PORT} | xargs kill 2>/dev/null")]);
     Ok(())
 }
 
