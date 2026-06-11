@@ -1,0 +1,69 @@
+#+TITLE: GitOps for the runtime — push to update, tracked + data-safe
+#+EPIC: wb-642i (deploy spine) · wb-ziv (deploy ergonomics)
+
+* the idea
+
+  A running runtime tenant IS a git repo (see =host/git.ex= + GIT.org). Today the
+  loop is one-directional — the agent commits and the host PUSHES to GitHub
+  (=commit_and_push/3=). GitOps closes the loop: an authorized human (or CI) PUSHES
+  an update to the tenant's GitHub repo, and the live runtime PULLS it in and
+  applies it — *tracked, versioned, and without clobbering the agent's data*.
+
+  "Anyone with a connection can update the running system, and it's all versioned"
+  = a git push to the tenant's origin + the runtime reconciling it. The GitHub
+  account is the hub; access to the repo IS the authorization.
+
+* why it can't clobber (the whole point)
+
+  The manual deploy that prompted this OVERWROTE files (tar over ssh) — which is
+  exactly how you clobber an agent's in-flight work. =Workbooks.Git.pull/1= does a
+  =git merge= instead, which INTEGRATES:
+
+  - CODE paths and DATA paths are different files.
+  - A human edits CODE; the agent commits DATA.
+  - Different files ⇒ the merge replays cleanly ⇒ both survive.
+  - A genuine SAME-FILE divergence is REPORTED and rolled back (=merge --abort=),
+    left for a human — never silently overwritten.
+
+  Proven: =test/git_reconcile_test.exs= — upstream code push + local agent data
+  commit → pull integrates both, neither lost.
+
+* the code / data split (the convention that makes it safe)
+
+  | lane | examples | who writes | pushable by humans |
+  |------+----------+------------+--------------------|
+  | CODE | app =src/=, the agent def, =design.org=, =design-gate.org=, =skills/=, archetypes | the team / CI | YES — this is the GitOps surface |
+  | DATA | =content/=, =blog/=, the board (=plan.org=), =strategy/=, =rem/= (dreams), history | the agent | NO — the agent owns it; reconcile never touches it |
+
+  Keep them in DISJOINT paths and a code push can never collide with agent data.
+  (Open: the lander def lives at =/data/agent.org=, OUTSIDE the repo — move it INTO
+  the repo so it is GitOps-managed too.)
+
+* the reconcile trigger
+
+  - NOW: the keeper pulls at the TOP of each tick (opt-in =WB_GITOPS=1=), before the
+    agent runs — so a push lands live within one cycle. Best-effort; a failure is
+    logged, never blocks the run. See =keeper/worker.ex= =maybe_reconcile/1=.
+  - NEXT: a dedicated reconcile controller (poll origin every N s, or a webhook /
+    RCP =POST /reconcile= an authorized client hits right after pushing) so GitOps
+    works for tenants with no keeper, and crews don't each pull the same repo.
+
+* the build seam (the honest gap)
+
+  =pull= integrates the repo, but the served artifact may need a BUILD the runtime
+  can't do (the Svelte app needs =vite build=; there is no bun on the BEAM box).
+  So today GitOps is LIVE for the build-free surface — the agent def, =design.org=,
+  =skills/=, and =content/= (republished on merge). For the app =src/=, either
+  (a) commit the built =dist/= into the repo (pull = serve, no build), or
+  (b) CI builds on push and the runtime pulls the built output. Pick one; until
+  then app changes still ride the team build. Config/def/content are the 90%.
+
+* status
+
+  - [X] =Workbooks.Git.pull/1= — fetch + merge, data-safe, conflict-reporting
+  - [X] keeper reconcile hook (=WB_GITOPS=1=)
+  - [X] no-clobber proof (=test/git_reconcile_test.exs=, 3 tests)
+  - [ ] move the lander def into the repo (=/data/agent.org= → repo path)
+  - [ ] dedicated reconcile controller + RCP =POST /reconcile=
+  - [ ] build seam decision (committed =dist= vs CI build-on-push)
+  - [ ] align monorepo source layout with the deploy layout (kill the flatten)

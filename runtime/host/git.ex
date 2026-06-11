@@ -228,6 +228,90 @@ defmodule Workbooks.Git do
     end
   end
 
+  @doc """
+  GitOps INBOUND — fetch `origin` and integrate upstream changes into the running
+  tenant repo, LIVE. The inverse of `commit_and_push/3`: it lets an authorized
+  human (or CI) push an update to the tenant's GitHub repo and have the live
+  runtime pick it up, tracked + versioned, WITHOUT clobbering the agent's data.
+
+  Why it can't clobber: a `git merge` INTEGRATES rather than overwrites. The tenant
+  repo splits CODE paths (app `src/`, the agent def, `design.org`, `skills/`) from
+  DATA paths (`content/`, `blog/`, the board, `rem/`). A human edits code; the
+  agent commits data — different files, so the merge replays cleanly and both
+  survive. Only a genuine SAME-FILE divergence conflicts, and that is REPORTED and
+  rolled back (`merge --abort`), never silently overwritten — the opposite of the
+  manual tarball-over-ssh flatten that prompted this.
+
+  Runs at a safe point (e.g. the keeper tick BEFORE the agent runs): snapshots any
+  pending agent work first so the merge never trips on a dirty tree. Returns:
+    * `{:ok, :uptodate}`               — origin had nothing new
+    * `{:ok, {:applied, summary}}`     — merged N commits; `summary.files` changed
+    * `{:conflict, files}`             — same-file divergence, left for a human
+    * `{:skip, reason}`                — no origin remote
+    * `{:error, reason}`
+  """
+  def pull(tenant) do
+    dir = ensure_repo(tenant)
+
+    if has_remote?(dir, "origin") do
+      # never merge onto a dirty tree: snapshot pending agent work so a human's
+      # pushed code integrates without tripping on uncommitted data.
+      if dirty?(dir) do
+        git(dir, ["add", "-A"])
+        git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "wip: snapshot before reconcile"], env: commit_env(identity(tenant)))
+      end
+
+      {branch, _} = git(dir, ["symbolic-ref", "--short", "HEAD"])
+      branch = String.trim(branch)
+
+      case git(dir, ["fetch", "origin", "-q"]) do
+        {_, 0} -> reconcile(dir, branch, tenant)
+        {out, _} -> {:error, "fetch failed: #{String.slice(String.trim(out), 0, 160)}"}
+      end
+    else
+      {:skip, "no origin remote"}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  defp reconcile(dir, branch, tenant) do
+    if count(dir, "HEAD..origin/#{branch}") == 0 do
+      {:ok, :uptodate}
+    else
+      {names, _} = git(dir, ["diff", "--name-only", "HEAD", "origin/#{branch}"])
+      changed = String.split(names, "\n", trim: true)
+
+      case git(dir, ["-c", "core.hooksPath=/dev/null", "merge", "--no-edit", "origin/#{branch}"]) do
+        {_, 0} ->
+          # CODE is now live + versioned; republish DATA so the served site reflects
+          # the merged state (commit ⇒ live, same invariant as commit_and_push).
+          _ = Workbooks.SitePublish.publish(dir, tenant)
+          {:ok, {:applied, %{commits: count(dir, "ORIG_HEAD..HEAD"), files: changed}}}
+
+        {_, _} ->
+          {confl, _} = git(dir, ["diff", "--name-only", "--diff-filter=U"])
+          git(dir, ["merge", "--abort"])
+          {:conflict, String.split(confl, "\n", trim: true)}
+      end
+    end
+  end
+
+  # Commits ahead on `range` (e.g. "HEAD..origin/main"), as an integer.
+  defp count(dir, range) do
+    case git(dir, ["rev-list", "--count", range]) do
+      {n, 0} -> n |> String.trim() |> String.to_integer()
+      _ -> 0
+    end
+  end
+
+  defp dirty?(dir) do
+    case git(dir, ["status", "--porcelain"]) do
+      {out, 0} -> String.trim(out) != ""
+      _ -> false
+    end
+  end
+
   @doc "Author (`name <email>`) of the tenant repo's latest commit."
   def author(tenant) do
     {out, _} = git(repo_path(tenant), ["log", "-1", "--pretty=format:%an <%ae>"])

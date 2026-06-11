@@ -150,6 +150,12 @@ defmodule Workbooks.Keeper.Worker do
     write_last_run(cfg)
     put_status(cfg, %{running: true, last_run: System.system_time(:second)})
 
+    # GitOps reconcile (WB_GITOPS=1): BEFORE the agent runs, pull any human/CI code
+    # push from the tenant's git origin and integrate it live — so "push to GitHub"
+    # becomes "live within one tick", tracked + versioned, without clobbering the
+    # agent's data (the merge integrates code+data; see Workbooks.Git.pull/1).
+    maybe_reconcile(cfg)
+
     # When a lifecycle spec is active it decides what THIS tick is (wake vs rem,
     # and which wake state); otherwise we fall back to the env+prose path exactly
     # as before (zero regression when no lifecycle ctx). wb-2ku.3.
@@ -170,6 +176,29 @@ defmodule Workbooks.Keeper.Worker do
 
   # trap_exit is on: absorb EXITs from run tasks (normal or killed).
   def handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state}
+
+  # GitOps reconcile before the agent runs (opt-in WB_GITOPS=1). A human/CI push to
+  # the tenant's git origin lands live within one tick, integrated (never clobbered)
+  # with the agent's data. Best-effort: any failure is logged, never blocks the run.
+  defp maybe_reconcile(cfg) do
+    if System.get_env("WB_GITOPS") == "1" do
+      tenant = System.get_env("WB_TENANT", "local")
+
+      case Workbooks.Git.pull(tenant) do
+        {:ok, {:applied, %{commits: n, files: files}}} ->
+          Logger.info("Keeper#{label(cfg)}: GitOps — pulled #{n} upstream commit(s); #{length(files)} file(s): #{files |> Enum.take(6) |> Enum.join(", ")}")
+
+        {:conflict, files} ->
+          Logger.error("Keeper#{label(cfg)}: GitOps CONFLICT (#{Enum.join(files, ", ")}) — merge aborted, left for a human")
+
+        {:error, r} ->
+          Logger.error("Keeper#{label(cfg)}: GitOps pull error — #{r}")
+
+        _ ->
+          :ok
+      end
+    end
+  end
 
   # ── tick dispatch ─────────────────────────────────────────────────────────────
 
