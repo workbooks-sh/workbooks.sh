@@ -271,6 +271,11 @@ defmodule Workbooks.Compilers do
             # shim). They must precede the objects/libs so symbol wrapping applies.
             ld_extra = Keyword.get(opts, :ld_args, [])
 
+            # opts[:link_libs] are -l libs that must come AFTER the objects (an archive only
+            # pulls members satisfying PRECEDING undefined symbols), e.g. -lsetjmp providing
+            # __wasm_setjmp/__wasm_longjmp for -wasm-enable-sjlj output (wb-nwd7).
+            link_libs = Keyword.get(opts, :link_libs, [])
+
             # Stack: wasm-ld defaults to a 64 KiB stack, which overflows on modest
             # automatic buffers (a `char[65536]` blows it → __stack_pointer goes
             # out of bounds → faults even unrelated frames) and starves buffered
@@ -278,7 +283,7 @@ defmodule Workbooks.Compilers do
             # C command compiles to a robust binary. (wb-9ja)
             c2 =
               ["wasm-ld", "-m", "wasm32", "-z", "stack-size=8388608", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
-                ld_extra ++ crt ++ obj_paths ++
+                ld_extra ++ crt ++ obj_paths ++ link_libs ++
                 ["-lc", "#{@clang_lib_rt}/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
 
             log2 = CommandRegistry.run(cli, "", c2, preopens, ropts)

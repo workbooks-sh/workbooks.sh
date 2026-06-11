@@ -591,7 +591,19 @@ defmodule Workbooks.PackageManager do
       |> Enum.uniq()
       |> Enum.flat_map(fn d -> ["-I", if(d in [".", ""], do: "/work", else: "/work/#{d}")] end)
 
-    opts = [extra_csrc: rest ++ [@mmap_shim], aux_files: headers, argv: inc_flags, ld_args: @mmap_wraps]
+    # setjmp/longjmp support (wb-nwd7): lower setjmp via wasm exception-handling. CRUCIAL:
+    # -wasm-use-legacy-eh=false emits the MODERN exnref EH (wasmtime 45 supports only that, not the
+    # legacy `try` opcode); -lsetjmp links __wasm_setjmp/__wasm_longjmp from the sysroot; the output
+    # runs under `-W exceptions=y` (PackageManager.run already passes it). Harmless for code that
+    # never uses setjmp — the flags only affect setjmp-using functions; libsetjmp dead-strips if
+    # unreferenced. This unblocks the interpreter C cluster (Lua/Forth/Duktape/MuJS/…).
+    opts = [
+      extra_csrc: rest ++ [@mmap_shim],
+      aux_files: headers,
+      argv: inc_flags ++ ["-mllvm", "-wasm-enable-sjlj", "-mllvm", "-wasm-use-legacy-eh=false"],
+      link_libs: ["-lsetjmp"],
+      ld_args: @mmap_wraps
+    ]
 
     case Workbooks.Compilers.compile_c(main, opts) do
       {:ok, wasm, _logs} ->

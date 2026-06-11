@@ -26,4 +26,21 @@ int main(void){ printf("ok %d\n", square(7)); return 0; }
     assert out =~ "ok 49", "multi-file C should compile (square from util.c) + resolve util.h"
     File.rm_rf!(dir)
   end
+
+  test "build_dir compiles + runs setjmp/longjmp via modern wasm-EH (wb-nwd7)" do
+    dir = Path.join(System.tmp_dir!(), "csj-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    File.write!(Path.join(dir, "index.c"), ~S|#include <setjmp.h>
+#include <stdio.h>
+static jmp_buf b;
+int main(void){ if (setjmp(b)) { printf("caught\n"); return 0; } longjmp(b, 1); }
+|)
+
+    assert {:ok, wasm, _} = Workbooks.PackageManager.build_dir(dir, "c")
+    {out, status} = Workbooks.PackageManager.run(wasm, "", [], [], with_status: true)
+    assert status == 0
+    assert out =~ "caught", "longjmp should be caught by setjmp (interpreter-class C cluster)"
+    File.rm_rf!(dir)
+  end
 end
