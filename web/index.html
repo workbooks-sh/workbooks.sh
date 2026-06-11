@@ -1161,13 +1161,18 @@ function blobNoise(x, y, z) {
   }
   return layer(iz) + (layer(iz + 1) - layer(iz)) * sz;
 }
-const STRIPE_P = 4, STRIPE_GAP = 2, BLOB_C = 10;  /* css px, integers — 2px ink,
-                                                     2px gap: equal and dense */
+const STRIPE_P = 4, STRIPE_GAP = 2, BLOB_C = 5;   /* 5px cells — the mosaic must
+                                                     hug the strokes, not swallow them */
 
-/* fluid: an overlay canvas paints the paper-colored gaps OVER the ink */
+/* fluid: ONE canvas renders the whole word — the DOM text goes transparent
+   (it still does layout + justification), and the canvas draws:
+     1. a full field of shifting block-ASCII,
+     2. masked INTO the glyph shapes (destination-in with the same text),
+     3. solid ink re-drawn only where the matte covers.
+   Everything is canvas text with one font + baseline — registration is
+   perfect by construction. */
 const fluidEl = document.querySelector(".lockup .jl:nth-child(2)");
-let fluidCv = null, fluidCtx = null;
-let fluidCover = null; /* which blob cells the letterforms actually touch */
+let fluidCv = null, fluidCtx = null, FP = null;  /* FP: paint params */
 function fluidSetup() {
   if (!fluidEl) return;
   if (!fluidCv) {
@@ -1179,71 +1184,76 @@ function fluidSetup() {
   }
   const r = fluidEl.getBoundingClientRect();
   const d = Math.min(devicePixelRatio || 1, 2);
-  fluidCv.width = Math.ceil(r.width) * d; fluidCv.height = Math.ceil(r.height) * d;
-  fluidCv.style.width = Math.ceil(r.width) + "px";
-  fluidCv.style.height = Math.ceil(r.height) + "px";
-  fluidCv.style.left = "0"; fluidCv.style.top = "0";
-  fluidCtx.setTransform(d, 0, 0, d, 0, 0);
-
-  /* sample the glyphs: draw the same text offscreen, then mark which cells
-     carry ink — blocks may only ever replace LETTER, never empty paper */
-  const w = Math.ceil(r.width), h = Math.ceil(r.height);
-  const off = document.createElement("canvas");
-  off.width = w; off.height = h;
-  const oc = off.getContext("2d", { willReadFrequently: true });
+  const w = Math.ceil(r.width), rectH = Math.ceil(r.height);
   const cs = getComputedStyle(fluidEl);
-  oc.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  if (cs.letterSpacing !== "normal") oc.letterSpacing = cs.letterSpacing;
-  oc.textBaseline = "middle"; oc.textAlign = "left"; oc.fillStyle = "#000";
-  oc.fillText(fluidEl.textContent.toUpperCase(), 0, h * 0.54);
-  const img = oc.getImageData(0, 0, w, h).data;
-  const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
-  fluidCover = [];
-  for (let gy = 0; gy < rows; gy++) {
-    fluidCover[gy] = [];
-    for (let gx = 0; gx < cols; gx++) {
-      /* probe a few points in the cell — any ink counts */
-      let hit = false;
-      for (const [px, py] of [[0.5, 0.5], [0.2, 0.3], [0.8, 0.7]]) {
-        const x = Math.min(w - 1, Math.floor((gx + px) * BLOB_C));
-        const y = Math.min(h - 1, Math.floor((gy + py) * BLOB_C));
-        if (img[(y * w + x) * 4 + 3] > 40) { hit = true; break; }
-      }
-      fluidCover[gy][gx] = hit;
-    }
-  }
+  const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const probe = document.createElement("canvas").getContext("2d");
+  probe.font = font;
+  const met = probe.measureText("\u2588HXG");
+  const asc = met.fontBoundingBoxAscent, desc = met.fontBoundingBoxDescent;
+  const pad = Math.max(0, Math.ceil((asc + desc - rectH) / 2)) + 6;
+  const h = rectH + pad * 2;
+  FP = {
+    w, h, font,
+    ls: cs.letterSpacing !== "normal" ? cs.letterSpacing : "0px",
+    text: fluidEl.textContent.toUpperCase(),
+    baseline: pad + (rectH - (asc + desc)) / 2 + asc,
+  };
+  fluidCv.width = w * d; fluidCv.height = h * d;
+  fluidCv.style.width = w + "px"; fluidCv.style.height = h + "px";
+  fluidCv.style.left = "0"; fluidCv.style.top = -pad + "px";
+  fluidCtx.setTransform(d, 0, 0, d, 0, 0);
+  fluidEl.style.color = "transparent";  /* the canvas is the only visible render */
 }
-/* outside the matte the letterforms dissolve into BLOCK ASCII — the cell is
-   erased to paper, then refilled with a block glyph whose density rises the
-   closer the matte is. Inside the matte: untouched solid ink. */
-const BLOCKS = ["\u2591", "\u2592", "\u2593", "\u2588", "\u2580", "\u2584", "\u25A0"]; /* ░ ▒ ▓ █ ▀ ▄ ■ */
+const BLOCKS_FONT = `700 ${BLOB_C + 2}px 'JetBrains Mono', monospace`;
 function fluidPaint(t) {
-  const w = parseInt(fluidCv.style.width), h = parseInt(fluidCv.style.height);
-  fluidCtx.clearRect(0, 0, w, h);
+  if (!FP) return;
+  const { w, h, font, ls, text, baseline } = FP;
+  const cx = fluidCtx;
+  cx.clearRect(0, 0, w, h);
+
+  /* 1 · the block field, everywhere the matte does NOT cover */
+  cx.font = BLOCKS_FONT;
+  cx.textAlign = "center"; cx.textBaseline = "middle";
+  cx.fillStyle = "#121316";
   const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
-  fluidCtx.font = "700 " + (BLOB_C + 1) + "px 'JetBrains Mono', monospace";
-  fluidCtx.textAlign = "center"; fluidCtx.textBaseline = "middle";
+  const matte = [];
   for (let gy = 0; gy < rows; gy++) {
+    matte[gy] = [];
     for (let gx = 0; gx < cols; gx++) {
-      if (!fluidCover?.[gy]?.[gx]) continue;        /* no letter here — leave paper */
-      const v = blobNoise(gx * 0.11 + t * 0.32, gy * 0.21, t * 0.55);
-      if (v > 0.55) continue;                       /* matte: solid ink text */
-      const x = gx * BLOB_C, y0 = gy * BLOB_C;
-      /* erase the letterform here, then re-draw it as a block glyph */
-      fluidCtx.fillStyle = "#f7f6f1"; /* var(--paper) */
-      fluidCtx.fillRect(x, y0, BLOB_C, BLOB_C);
-      /* density: nearly-matte cells get the heavy blocks, far cells go light */
-      const d = Math.max(0, Math.min(1, (v - 0.20) / 0.35));
+      const v = blobNoise(gx * 0.055 + t * 0.32, gy * 0.105, t * 0.55);
+      const solid = v > 0.47;
+      matte[gy][gx] = solid;
+      if (solid) continue;
+      const dd = Math.max(0, Math.min(1, (v - 0.16) / 0.31));
       const pick = hash3(gx, gy, Math.floor(t * 2));
       let ch;
-      if (d > 0.85) ch = pick > 0.5 ? "\u2588" : "\u2593";
-      else if (d > 0.6) ch = pick > 0.5 ? "\u2593" : "\u2592";
-      else if (d > 0.35) ch = pick > 0.6 ? "\u2592" : (pick > 0.3 ? "\u2580" : "\u2584");
-      else ch = pick > 0.55 ? "\u2591" : (pick > 0.25 ? "\u25A0" : "\u2591");
-      fluidCtx.fillStyle = "#121316"; /* var(--ink) */
-      fluidCtx.fillText(ch, x + BLOB_C / 2, y0 + BLOB_C / 2 + 0.5);
+      if (dd > 0.72) ch = "\u2588";
+      else if (dd > 0.45) ch = pick > 0.4 ? "\u2593" : "\u2588";
+      else if (dd > 0.22) ch = pick > 0.55 ? "\u2592" : (pick > 0.25 ? "\u2580" : "\u2584");
+      else ch = pick > 0.7 ? "\u2591" : "\u2592";
+      cx.fillText(ch, gx * BLOB_C + BLOB_C / 2, gy * BLOB_C + BLOB_C / 2 + 0.5);
     }
   }
+
+  /* 2 · mask the field INTO the glyphs */
+  cx.globalCompositeOperation = "destination-in";
+  cx.font = font; cx.letterSpacing = ls;
+  cx.textAlign = "left"; cx.textBaseline = "alphabetic";
+  cx.fillText(text, 0, baseline);
+  cx.globalCompositeOperation = "source-over";
+
+  /* 3 · solid ink wherever the matte covers */
+  cx.save();
+  cx.beginPath();
+  for (let gy = 0; gy < rows; gy++)
+    for (let gx = 0; gx < cols; gx++)
+      if (matte[gy][gx]) cx.rect(gx * BLOB_C, gy * BLOB_C, BLOB_C, BLOB_C);
+  cx.clip();
+  cx.fillStyle = "#121316";
+  cx.fillText(text, 0, baseline);
+  cx.restore();
+  cx.letterSpacing = "0px";
 }
 
 /* static: one seeded frame, baked as a full-resolution mask */
