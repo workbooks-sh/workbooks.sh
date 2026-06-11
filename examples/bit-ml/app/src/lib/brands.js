@@ -86,7 +86,8 @@ function wrap(key, matchedText) {
   const mark = b.svg
     ? `<span class="brand-mark">${b.svg}</span>`
     : '';
-  return `<span class="brand">${mark}${esc(matchedText)}</span>`;
+  // mark sits AFTER the word (never before), tucked tight to it
+  return `<span class="brand">${esc(matchedText)}${mark}</span>`;
 }
 
 export function brandify(text) {
@@ -112,14 +113,19 @@ export function brandify(text) {
     if (!best) { out += esc(rest); break; }
 
     out += esc(rest.slice(0, best.index));
-    if (seen.has(best.key)) {
-      // already shown this block — plain text, no repeat mark
-      out += esc(best.matchedText);
+    const tail = rest.slice(best.index + best.length);
+    // POSITION RULE: a logo never opens or closes a headline — it must be within
+    // the words. "first" = nothing but whitespace precedes it in the whole text;
+    // "last" = nothing but whitespace/terminal punctuation follows it.
+    const atStart = out.trim() === '';
+    const atEnd = tail.replace(/[\s.,;:!?—–-]+$/, '').trim() === '';
+    if (seen.has(best.key) || atStart || atEnd) {
+      out += esc(best.matchedText);            // plain — no mark
     } else {
       seen.add(best.key);
       out += wrap(best.key, best.matchedText);
     }
-    rest = rest.slice(best.index + best.length);
+    rest = tail;
   }
   return out;
 }
