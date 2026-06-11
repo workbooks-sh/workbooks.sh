@@ -82,7 +82,7 @@
   }
 
   .caption {
-    margin-top: 30px; max-width: 58ch; font-size: 12.5px; line-height: 1.8;
+    margin-top: 30px; width: min(680px, 90vw); font-size: 12.5px; line-height: 1.8;
     color: #565b54; letter-spacing: .01em;
   }
   .caption b { color: var(--ink); font-weight: 700; }
@@ -283,6 +283,14 @@
   <a class="lnk" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
   <a class="dl" href="#download">Download</a>
 </nav>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="fisheye" filterUnits="userSpaceOnUse" x="-5%" y="-12%" width="110%" height="124%">
+    <feImage id="fisheyeMap" result="m" x="0" y="0"/>
+    <feDisplacementMap id="fisheyeDisp" in="SourceGraphic" in2="m"
+      xChannelSelector="R" yChannelSelector="G" scale="0"/>
+  </filter>
+</svg>
 
 <main class="hero">
   <div class="inner" id="inner">
@@ -646,6 +654,8 @@ requestAnimationFrame(frame);
    phase, and the composition rewrites — a new system resolves out of
    faint ASCII static and wires in; an old one dissolves back. Nothing
    operates it. It is the operator. */
+const NEXMARK = new Image();
+NEXMARK.src = "nexus-icon.svg";
 const tcv = document.getElementById("tree");
 const tctx = tcv.getContext("2d");
 let TW, TH, NEX, treeActive = false, sceneT0 = null;
@@ -661,14 +671,14 @@ const SLOT_POS = [
 /* the workbook's own anatomy — permanent, wired into the square:
    server side fans UP, client targets fan DOWN (it ships to all three) */
 const SPINE_UP = [
-  { label: "sandbox",  stripe: "#a8d4f0" },
-  { label: "database", stripe: "#a8d4f0" },
-  { label: "agents",   stripe: "#a8d4f0" },
+  { label: "isolated", stripe: "#aee5c2" },
+  { label: "stateful", stripe: "#aee5c2" },
+  { label: "agentic",  stripe: "#aee5c2" },
 ];
 const SPINE_DN = [
-  { label: "mobile",  stripe: "#13d943" },
-  { label: "desktop", stripe: "#13d943" },
-  { label: "web",     stripe: "#13d943" },
+  { label: "mobile",  stripe: "#a8d4f0" },
+  { label: "desktop", stripe: "#a8d4f0" },
+  { label: "web",     stripe: "#a8d4f0" },
 ];
 /* permanent organs + a rotating pool of systems that join and leave */
 const CORE = [
@@ -972,90 +982,150 @@ function treeFrame(ms) {
       drawNodeBox(n.x, n.y, n.def, Math.min(1, a), t);
     }
 
-    /* ── the spine: the workbook's FORMS, not its connections.
-       A different wiring language entirely: dead-straight DASHED stem →
-       bus → stubs (dimension-line, not network edge), no flow signals,
-       captioned as what a workbook IS (above) and BECOMES (below). ── */
+    /* ── the anatomy + the dock.
+       What a workbook IS exits from its upper sides (dashed — facets, not
+       connections). Below, the workbook sits DOCKED in a Nexus bay through
+       a visible port — and only from the dock does it BECOME the platforms. */
     const SQH = 124 / 2;
-    const CHIP_W = 110, CHIP_H = 34, FAN_X = 138, FAN_GAP = 78;
+    const CHIP_W = 110, CHIP_H = 34, FAN_X = 152, FAN_GAP = 84;
+    const dash = () => { tctx.setLineDash([3, 3]); tctx.lineWidth = 1.2; tctx.strokeStyle = S_INK; };
+    const undash = () => tctx.setLineDash([]);
     function chipIcon(kind, x, y) {
       tctx.strokeStyle = S_INK; tctx.lineWidth = 1.5; tctx.lineCap = "round";
       tctx.beginPath();
-      if (kind === "sandbox") {            /* a crate */
+      if (kind === "isolated") {            /* a crate — sandboxed */
         tctx.rect(x - 5, y - 4.5, 10, 9);
         tctx.moveTo(x - 5, y - 1); tctx.lineTo(x + 5, y - 1);
         tctx.moveTo(x, y - 1); tctx.lineTo(x, y + 4.5);
-      } else if (kind === "database") {    /* a cylinder */
+      } else if (kind === "stateful") {     /* a cylinder — carries its state */
         tctx.ellipse(x, y - 4, 5, 2, 0, 0, Math.PI * 2);
         tctx.moveTo(x - 5, y - 4); tctx.lineTo(x - 5, y + 3.4);
         tctx.moveTo(x + 5, y - 4); tctx.lineTo(x + 5, y + 3.4);
         tctx.moveTo(x + 5, y + 3.4); tctx.ellipse(x, y + 3.4, 5, 2, 0, 0, Math.PI);
-      } else if (kind === "agents") {      /* a spark */
+      } else if (kind === "agentic") {      /* a spark */
         tctx.moveTo(x, y - 5.5); tctx.lineTo(x, y + 5.5);
         tctx.moveTo(x - 5.5, y); tctx.lineTo(x + 5.5, y);
         tctx.moveTo(x - 3.4, y - 3.4); tctx.lineTo(x + 3.4, y + 3.4);
         tctx.moveTo(x + 3.4, y - 3.4); tctx.lineTo(x - 3.4, y + 3.4);
-      } else if (kind === "mobile") {      /* a phone */
+      } else if (kind === "mobile") {       /* a phone */
         tctx.rect(x - 3.4, y - 5.5, 6.8, 11);
         tctx.moveTo(x - 1.4, y + 3.4); tctx.lineTo(x + 1.4, y + 3.4);
-      } else if (kind === "desktop") {     /* a monitor */
+      } else if (kind === "desktop") {      /* a monitor */
         tctx.rect(x - 5.5, y - 5, 11, 7.4);
         tctx.moveTo(x - 2.4, y + 5.4); tctx.lineTo(x + 2.4, y + 5.4);
         tctx.moveTo(x, y + 2.4); tctx.lineTo(x, y + 5.4);
-      } else if (kind === "web") {         /* a globe */
+      } else if (kind === "web") {          /* a globe */
         tctx.arc(x, y, 5.4, 0, Math.PI * 2);
         tctx.moveTo(x - 5.4, y); tctx.lineTo(x + 5.4, y);
         tctx.moveTo(x, y - 5.4); tctx.ellipse(x, y, 2.6, 5.4, 0, -Math.PI / 2, Math.PI * 1.5);
       }
       tctx.stroke();
     }
-    function spineRow(arr, dir, caption) {  /* dir -1 = up (IS), +1 = down (BECOMES) */
-      const rowY = NEX.y + dir * (SQH + FAN_GAP);
-      const busY = NEX.y + dir * (SQH + FAN_GAP * 0.5);
-      /* the format wiring — dashed, hairline, axis-straight */
-      tctx.strokeStyle = S_INK; tctx.lineWidth = 1.2;
-      tctx.setLineDash([3, 3]);
-      tctx.beginPath();
-      tctx.moveTo(NEX.x, NEX.y + dir * SQH);
-      tctx.lineTo(NEX.x, busY);
-      tctx.moveTo(NEX.x - FAN_X, busY);
-      tctx.lineTo(NEX.x + FAN_X, busY);
-      for (let i = 0; i < arr.length; i++) {
-        const cx2 = NEX.x + (i - 1) * FAN_X;
-        tctx.moveTo(cx2, busY);
-        tctx.lineTo(cx2, rowY - dir * CHIP_H / 2);
-      }
-      tctx.stroke();
-      tctx.setLineDash([]);
-      /* connector seed on the square's edge — an open square, not a joint */
-      tctx.fillStyle = S_PAPER; tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6;
-      tctx.fillRect(NEX.x - 3.5, NEX.y + dir * SQH - 3.5, 7, 7);
-      tctx.strokeRect(NEX.x - 3.5, NEX.y + dir * SQH - 3.5, 7, 7);
-      /* the chips */
-      arr.forEach((sp, i) => {
-        const cx2 = NEX.x + (i - 1) * FAN_X, cy2 = rowY;
-        tctx.fillStyle = S_PAPER;
-        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
-        tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
-        tctx.strokeRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
-        tctx.fillStyle = sp.stripe;
-        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, 5, CHIP_H);
-        chipIcon(sp.label, cx2 - CHIP_W / 2 + 17, cy2);
-        tctx.font = "700 10.5px 'JetBrains Mono', monospace";
-        tctx.textAlign = "left"; tctx.textBaseline = "middle";
-        tctx.fillStyle = S_INK;
-        tctx.fillText(sp.label, cx2 - CHIP_W / 2 + 29, cy2 + 0.5);
-      });
-      /* the caption — above the IS row, below the BECOMES row */
+    function chip(cx2, cy2, sp) {
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+      tctx.strokeRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+      tctx.fillStyle = sp.stripe;
+      tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, 5, CHIP_H);
+      chipIcon(sp.label, cx2 - CHIP_W / 2 + 17, cy2);
+      tctx.font = "700 10.5px 'JetBrains Mono', monospace";
+      tctx.textAlign = "left"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_INK;
+      tctx.fillText(sp.label, cx2 - CHIP_W / 2 + 29, cy2 + 0.5);
+    }
+    function caption(text, y) {
       tctx.font = "700 9.5px 'JetBrains Mono', monospace";
       tctx.letterSpacing = "3px";
       tctx.textAlign = "center"; tctx.textBaseline = "middle";
       tctx.fillStyle = S_DIM;
-      tctx.fillText(caption, NEX.x, rowY + dir * (CHIP_H / 2 + 17));
+      tctx.fillText(text, NEX.x, y);
       tctx.letterSpacing = "0px";
     }
-    spineRow(SPINE_UP, -1, "A WORKBOOK IS");
-    spineRow(SPINE_DN, 1, "A WORKBOOK BECOMES");
+
+    /* IS — out of the upper sides */
+    const upY = NEX.y - SQH - FAN_GAP;
+    dash();
+    tctx.beginPath();
+    /* left facet exits the LEFT side */
+    tctx.moveTo(NEX.x - SQH, NEX.y - 24);
+    tctx.lineTo(NEX.x - FAN_X, NEX.y - 24);
+    tctx.lineTo(NEX.x - FAN_X, upY + CHIP_H / 2);
+    /* center facet exits the top */
+    tctx.moveTo(NEX.x, NEX.y - SQH);
+    tctx.lineTo(NEX.x, upY + CHIP_H / 2);
+    /* right facet exits the RIGHT side */
+    tctx.moveTo(NEX.x + SQH, NEX.y - 24);
+    tctx.lineTo(NEX.x + FAN_X, NEX.y - 24);
+    tctx.lineTo(NEX.x + FAN_X, upY + CHIP_H / 2);
+    tctx.stroke();
+    undash();
+    SPINE_DN.forEach((sp, i) => chip(NEX.x + (i - 1) * FAN_X, upY, sp));
+    caption("ONE WORKBOOK, ANY KIND OF APP", upY - CHIP_H / 2 - 17);
+
+    /* THE DOCK — a Nexus bay the workbook plugs into through a port */
+    const DOCK_W = 330, DOCK_H = 46;
+    const dockTop = NEX.y + SQH + 14, dockBot = dockTop + DOCK_H;
+    tctx.fillStyle = S_INK; /* hard offset shadow, house chrome */
+    tctx.fillRect(NEX.x - DOCK_W / 2 + 4, dockTop + 4, DOCK_W, DOCK_H);
+    tctx.fillStyle = S_PAPER;
+    tctx.fillRect(NEX.x - DOCK_W / 2, dockTop, DOCK_W, DOCK_H);
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+    tctx.strokeRect(NEX.x - DOCK_W / 2, dockTop, DOCK_W, DOCK_H);
+    /* the PORT: socket on the dock, pins bridging up to the workbook */
+    tctx.fillStyle = S_INK;
+    tctx.fillRect(NEX.x - 16, dockTop - 5, 32, 10);          /* socket */
+    tctx.fillRect(NEX.x - 10, NEX.y + SQH, 6, 14);           /* pin */
+    tctx.fillRect(NEX.x + 4,  NEX.y + SQH, 6, 14);           /* pin */
+    /* the bay wears the nexus mark + name */
+    if (NEXMARK.complete && NEXMARK.naturalWidth) {
+      tctx.save();
+      tctx.filter = "invert(0.92)";
+      tctx.drawImage(NEXMARK, NEX.x - DOCK_W / 2 + 14, dockTop + DOCK_H / 2 - 10, 20, 20);
+      tctx.restore();
+    }
+    tctx.font = "700 11px 'JetBrains Mono', monospace";
+    tctx.textAlign = "left"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_INK;
+    tctx.fillText("nexus", NEX.x - DOCK_W / 2 + 40, dockTop + DOCK_H / 2 + 0.5);
+    /* placement: ONE nexus — it lives local or cloud, your choice */
+    const pcy = dockTop + DOCK_H / 2;
+    let px2 = NEX.x + DOCK_W / 2 - 116;
+    tctx.strokeStyle = S_DIM; tctx.lineWidth = 1.3; tctx.lineCap = "round";
+    tctx.beginPath();                                  /* mini monitor */
+    tctx.rect(px2 - 4, pcy - 4, 8, 5.6);
+    tctx.moveTo(px2 - 1.6, pcy + 4); tctx.lineTo(px2 + 1.6, pcy + 4);
+    tctx.stroke();
+    tctx.font = "9px 'JetBrains Mono', monospace";
+    tctx.fillStyle = S_DIM; tctx.textAlign = "left"; tctx.textBaseline = "middle";
+    tctx.fillText("local", px2 + 8, pcy + 0.5);
+    tctx.fillText("or", px2 + 42, pcy + 0.5);
+    const cx2 = px2 + 64;
+    tctx.beginPath();                                  /* mini cloud */
+    tctx.arc(cx2 - 3, pcy + 1, 2.4, Math.PI * 0.5, Math.PI * 1.5);
+    tctx.arc(cx2 + 0.4, pcy - 1.6, 3, Math.PI * 0.8, Math.PI * 2.05);
+    tctx.arc(cx2 + 3.4, pcy + 1, 2.4, Math.PI * 1.5, Math.PI * 0.5);
+    tctx.closePath();
+    tctx.stroke();
+    tctx.fillText("cloud", cx2 + 8, pcy + 0.5);
+
+    /* BECOMES — only out of the DOCK */
+    const dnY = dockBot + FAN_GAP * 0.78;
+    const busY = dockBot + (dnY - dockBot) * 0.48;
+    dash();
+    tctx.beginPath();
+    tctx.moveTo(NEX.x, dockBot);
+    tctx.lineTo(NEX.x, busY);
+    tctx.moveTo(NEX.x - FAN_X, busY);
+    tctx.lineTo(NEX.x + FAN_X, busY);
+    for (let i = 0; i < SPINE_DN.length; i++) {
+      tctx.moveTo(NEX.x + (i - 1) * FAN_X, busY);
+      tctx.lineTo(NEX.x + (i - 1) * FAN_X, dnY - CHIP_H / 2);
+    }
+    tctx.stroke();
+    undash();
+    SPINE_UP.forEach((sp, i) => chip(NEX.x + (i - 1) * FAN_X, dnY, sp));
+    caption("DOCKED IN A NEXUS, IT IS", dnY + CHIP_H / 2 + 17);
 
     /* ── the nexus: a SQUARE — its own centered entity. The W mark above,
        "workbook" beneath, and a quiet .html: it is just a file. ── */
@@ -1282,9 +1352,48 @@ function staticBake(el, seed) {
   el.style.webkitMaskRepeat = "no-repeat"; el.style.maskRepeat = "no-repeat";
 }
 
+/* ── the fisheye: a convex bulge breathing under the whole lockup.
+   A radial displacement map (R: x-shift, G: y-shift, 128 = rest) makes the
+   center magnify; the feDisplacementMap scale oscillates slowly. ── */
+function fisheyeSetup() {
+  const lockup = document.querySelector(".lockup");
+  if (!lockup) return;
+  const r = lockup.getBoundingClientRect();
+  const w = Math.ceil(r.width), h = Math.ceil(r.height);
+  const RES = 4;                                  /* quarter-res map, scaled up */
+  const mw = Math.ceil(w / RES), mh = Math.ceil(h / RES);
+  const mc = document.createElement("canvas");
+  mc.width = mw; mc.height = mh;
+  const mx = mc.getContext("2d");
+  const img = mx.createImageData(mw, mh);
+  for (let y = 0; y < mh; y++) {
+    for (let x = 0; x < mw; x++) {
+      const nx = (x / mw) * 2 - 1, ny = (y / mh) * 2 - 1;
+      const rr = Math.min(1, Math.hypot(nx, ny) / 1.2);
+      const g = rr * (1 - rr) * 2;                /* peaks mid-radius — barrel */
+      const i = (y * mw + x) * 4;
+      img.data[i]     = 128 - nx * g * 110;       /* R: x displacement */
+      img.data[i + 1] = 128 - ny * g * 110;       /* G: y displacement */
+      img.data[i + 2] = 128;
+      img.data[i + 3] = 255;
+    }
+  }
+  mx.putImageData(img, 0, 0);
+  const fm = document.getElementById("fisheyeMap");
+  fm.setAttribute("href", mc.toDataURL());
+  fm.setAttribute("width", w); fm.setAttribute("height", h);
+  lockup.style.filter = "url(#fisheye)";
+}
+(function fisheyeBreathe(ms) {
+  const d = document.getElementById("fisheyeDisp");
+  if (d) d.setAttribute("scale", (5.5 + 3.5 * Math.sin(ms / 9000 * Math.PI * 2)).toFixed(2));
+  requestAnimationFrame(fisheyeBreathe);
+})(0);
+
 document.fonts.ready.then(() => {
   fluidSetup();
-  addEventListener("resize", fluidSetup);
+  fisheyeSetup();
+  addEventListener("resize", () => { fluidSetup(); fisheyeSetup(); });
   let mf = 0;
   (function matteLoop(ms) {
     mf++;
