@@ -58,10 +58,19 @@ defmodule Workbooks.Autopoet.Worker do
 
       path ->
         File.mkdir_p!(Path.join(workdir(), "toolkits"))
+        # A crash/restart during a run leaves its issue stuck :doing (no longer
+        # :open, so it'd never be re-picked). Reclaim orphans on boot.
+        reset_orphans()
         Logger.info("Autopoet: activated — def=#{path} workspace=#{workdir()} poll=#{interval_ms()}ms")
         Process.send_after(self(), :tick, 5_000)
         put_status(%{active: true, running: false, last_run: nil})
         {:ok, %{active: true, def_path: path}}
+    end
+  end
+
+  defp reset_orphans do
+    for i <- Autopoet.list(:doing) do
+      Autopoet.set_status(i.id, :open, "reclaimed: worker restarted mid-run")
     end
   end
 
@@ -93,13 +102,26 @@ defmodule Workbooks.Autopoet.Worker do
     Autopoet.set_status(issue.id, :doing, "autopoet picked it up")
     put_status(%{running: true, working: issue.id, last_run: System.system_time(:second)})
 
+    # Run in a supervised, time-bounded Task so a slow/killed/crashing run can
+    # neither block the worker forever nor orphan the issue: a timeout or an
+    # exit becomes a BLOCKED verdict that resets the issue to :open for a retry.
     result =
       try do
         org = File.read!(path)
-        run = Workbooks.AgentDef.run(org, task_for(issue), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
-        run[:result] || ""
+        task = Task.async(fn ->
+          run = Workbooks.AgentDef.run(org, task_for(issue), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
+          run[:result] || ""
+        end)
+
+        case Task.yield(task, run_timeout_ms()) || Task.shutdown(task, :brutal_kill) do
+          {:ok, res} -> res
+          nil -> "BLOCKED: run exceeded #{run_timeout_ms()}ms wall clock"
+          {:exit, reason} -> "BLOCKED: run exited — #{inspect(reason)}"
+        end
       rescue
         e -> "BLOCKED: autopoet run errored — #{Exception.message(e)}"
+      catch
+        kind, reason -> "BLOCKED: autopoet run #{kind} — #{inspect(reason)}"
       end
 
     record_outcome(issue, result)
@@ -182,6 +204,7 @@ defmodule Workbooks.Autopoet.Worker do
   end
 
   defp interval_ms, do: env_int("WB_AUTOPOET_INTERVAL_MS", @default_interval_ms)
+  defp run_timeout_ms, do: env_int("WB_AUTOPOET_RUN_TIMEOUT_MS", @default_run_timeout_ms)
 
   defp env_int(k, default) do
     case System.get_env(k) do
