@@ -139,7 +139,7 @@ defmodule Workbooks.Keeper.Worker do
           next_run: System.system_time(:second) + div(delay, 1000)
         })
 
-        {:ok, %{cfg: cfg, active: true, def_path: path}}
+        {:ok, %{cfg: cfg, active: true, def_path: path, no_work_streak: 0}}
     end
   end
 
@@ -153,11 +153,19 @@ defmodule Workbooks.Keeper.Worker do
     # When a lifecycle spec is active it decides what THIS tick is (wake vs rem,
     # and which wake state); otherwise we fall back to the env+prose path exactly
     # as before (zero regression when no lifecycle ctx). wb-2ku.3.
-    run_tick(cfg, path, lifecycle_current(cfg))
+    outcome = run_tick(cfg, path, lifecycle_current(cfg))
 
-    schedule(cfg)
-    put_status(cfg, %{running: false, next_run: System.system_time(:second) + div(tick_delay_ms(cfg), 1000)})
-    {:noreply, state}
+    # IDLE BACKOFF (efficiency): a continuous worker that just returned NO-WORK
+    # will almost certainly return NO-WORK again at the breather cadence (the
+    # board state did not change) — re-running every ~10s burns an LLM call per
+    # tick for nothing (the idle bit.ml crew). Count the NO-WORK streak and let
+    # tick_delay_ms back off; ANY real work (:done) resets it to the hot cadence.
+    streak = if outcome == :no_work, do: state.no_work_streak + 1, else: 0
+    delay = tick_delay_ms(cfg, streak)
+
+    Process.send_after(self(), :tick, delay)
+    put_status(cfg, %{running: false, next_run: System.system_time(:second) + div(delay, 1000)})
+    {:noreply, %{state | no_work_streak: streak}}
   end
 
   # trap_exit is on: absorb EXITs from run tasks (normal or killed).
@@ -172,10 +180,11 @@ defmodule Workbooks.Keeper.Worker do
   # time gate lives in Dreams). The agent def decides add-vs-audit from prose.
   defp run_tick(cfg, path, nil) do
     Logger.info("Keeper#{label(cfg)}: tick — running #{path}")
-    wake(cfg, path, nil)
+    outcome = wake(cfg, path, nil)
     # REM: after waking work, maybe dream (time-gated, fire-and-forget — a failed
     # or slow dream can never touch the run loop). wb-2ku.
     Task.start(fn -> Workbooks.Dreams.maybe_dream(System.get_env("WB_TENANT", "local")) end)
+    outcome
   end
 
   # A gated state (rem before its min-interval elapsed, say) → no-op tick that
@@ -289,12 +298,28 @@ defmodule Workbooks.Keeper.Worker do
   defp run_timeout_ms(%Cfg{run_timeout_ms: ms}) when is_integer(ms), do: ms
   defp run_timeout_ms(_), do: @default_run_timeout_ms
 
-  # Continuous mode: each tick follows the last after only a short breather; the
-  # rem state (+ its spec gate) IS the rest between waking stretches.
-  defp schedule(cfg), do: Process.send_after(self(), :tick, tick_delay_ms(cfg))
+  # NO-WORK idle backoff: with a streak of consecutive NO-WORK ticks, the next
+  # tick waits max(base_cadence, 1min · 2^(streak-1)), capped at 30min — so an
+  # idle worker quiets from ~10s polling to minutes between checks, while a single
+  # :done (streak resets to 0) snaps it back to the hot base cadence. Applied in
+  # BOTH modes: an interval worker idle for hours need not keep its hourly poll.
+  @no_work_base_ms 60_000
+  @no_work_cap_ms 1_800_000
 
-  defp tick_delay_ms(%Cfg{continuous: true} = cfg), do: cfg.breather_ms
-  defp tick_delay_ms(cfg), do: interval_ms(cfg)
+  defp tick_delay_ms(cfg, 0), do: base_delay_ms(cfg)
+
+  defp tick_delay_ms(cfg, streak) when streak > 0 do
+    # cap the exponent before shifting so a long streak can't build a huge bignum
+    backoff = min(@no_work_cap_ms, @no_work_base_ms * :erlang.bsl(1, min(streak - 1, 20)))
+    max(base_delay_ms(cfg), backoff)
+  end
+
+  defp base_delay_ms(%Cfg{continuous: true} = cfg), do: cfg.breather_ms
+  defp base_delay_ms(cfg), do: interval_ms(cfg)
+
+  @doc false
+  # test seam for the idle-backoff cadence (efficiency-critical — see tick_delay_ms/2)
+  def tick_delay_for_test(%Cfg{} = cfg, streak), do: tick_delay_ms(cfg, streak)
 
   # ── the run itself ───────────────────────────────────────────────────────────
 
