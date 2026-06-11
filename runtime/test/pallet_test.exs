@@ -12,13 +12,13 @@ defmodule Workbooks.PalletTest do
 
     for e <- Pallet.catalog() do
       assert is_binary(e.name) and e.name != ""
-      assert e.kind in [:wasm, :archive, :archive_many]
+      assert e.kind in [:wasm, :archive, :archive_many, :zip]
       assert String.starts_with?(e.url, "https://")
       assert Regex.match?(~r/^[0-9a-f]{64}$/, e.sha), "#{e.name} sha must be 64-hex pinned"
       assert e.mode in [:argv, :stdin1]
-      # archives carry the inner wasm path; multi-archives carry {name, rel} entries
+      # archives/zips carry the inner wasm path; multi-archives carry {name, rel} entries
       case e.kind do
-        :archive -> assert is_binary(e.wasm_rel) and e.wasm_rel != ""
+        k when k in [:archive, :zip] -> assert is_binary(e.wasm_rel) and e.wasm_rel != ""
         :archive_many -> assert is_list(e.entries) and e.entries != []
         :wasm -> :ok
       end
@@ -52,6 +52,11 @@ defmodule Workbooks.PalletTest do
              wasm-stats wasm-strip wasm2c wast2json wat-desugar spectest-interp) do
       assert t in CommandRegistry.list(), "#{t} should be registered"
     end
+
+    # prolog (trealla) — .zip unpacked via Erlang :zip; -g one-shot goal
+    assert :ok = Pallet.seed_one("prolog")
+    assert {:ok, p} = CommandRegistry.run("prolog", "", ["-g", "X is 6*7, write(X), nl, halt"])
+    assert p =~ "42"
 
     # coreutils — multicall: applet prepended to argv
     assert :ok = Pallet.seed_one("coreutils")

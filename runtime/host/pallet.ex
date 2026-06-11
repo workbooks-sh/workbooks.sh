@@ -85,6 +85,15 @@ defmodule Workbooks.Pallet do
         {"wat-desugar", "wabt-1.0.41/bin/wat-desugar"},
         {"spectest-interp", "wabt-1.0.41/bin/spectest-interp"}
       ]
+    },
+    # ── Tools shipped as .zip (unpacked via Erlang :zip — no native unzip) ───────
+    %{
+      name: "prolog",
+      kind: :zip,
+      url: "https://github.com/trealla-prolog/trealla/releases/download/v2.102.25/tpl-wasm-wasi.zip",
+      sha: "b31f4bd90336fbfd5b339fb245d4c1c418f8415059c1bfa75eb5fedd02be03d9",
+      wasm_rel: "tpl-wasm-wasi/tpl.wasm",
+      mode: :argv
     }
   ]
 
@@ -126,6 +135,13 @@ defmodule Workbooks.Pallet do
   def seed_one(%{kind: :archive_many, url: u, sha: s, entries: es, mode: m}) do
     case CommandRegistry.fetch_and_register_archive_many(u, s, es, m) do
       {:ok, _names} -> :ok
+      other -> other
+    end
+  end
+
+  def seed_one(%{kind: :zip, name: n, url: u, sha: s, wasm_rel: w, mode: m}) do
+    case CommandRegistry.fetch_and_register_zip(n, u, s, w, m) do
+      {:ok, _wasm, _sha} -> :ok
       other -> other
     end
   end

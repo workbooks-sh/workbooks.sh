@@ -611,6 +611,66 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Like `fetch_and_register_archive/6` but for a `.zip` — unpacked with Erlang's `:zip` (NO native
+  `unzip` binary, honoring the no-native-exec canon). Fetch → sha-pin → unzip into the content-
+  addressed store → register the inner `wasm_rel`. Returns {:ok, wasm_path, sha} | {:error, reason}.
+  """
+  def fetch_and_register_zip(name, url, sha256, wasm_rel, mode \\ :argv) do
+    cond do
+      not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not (is_binary(url) and String.starts_with?(url, "https://")) -> {:error, :invalid_url}
+      not is_binary(wasm_rel) -> {:error, :no_wasm_path}
+      true -> do_fetch_and_register_zip(name, url, sha256, wasm_rel, mode)
+    end
+  end
+
+  defp do_fetch_and_register_zip(name, url, sha256, wasm_rel, mode) do
+    tmp = Path.join(System.tmp_dir!(), "wbzip-#{:erlang.unique_integer([:positive])}.zip")
+
+    case https_get_to_file(url, tmp) do
+      :ok ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        cond do
+          is_binary(sha256) and sha256 != "" and got != String.downcase(String.trim(sha256)) ->
+            File.rm(tmp)
+            {:error, {:sha_mismatch, [expected: String.downcase(String.trim(sha256)), got: got]}}
+
+          true ->
+            dir = Path.join(Workbooks.PackageManager.commands_dir(), "#{got}.d")
+            File.rm_rf!(dir)
+            File.mkdir_p!(dir)
+
+            case :zip.unzip(String.to_charlist(tmp), [{:cwd, String.to_charlist(dir)}]) do
+              {:ok, _files} ->
+                File.rm(tmp)
+                wasm = Path.join(dir, wasm_rel)
+
+                cond do
+                  not File.regular?(wasm) ->
+                    {:error, {:wasm_not_in_archive, wasm_rel}}
+
+                  true ->
+                    case register(name, wasm, mode) do
+                      :ok -> {:ok, wasm, got}
+                      err -> err
+                    end
+                end
+
+              {:error, reason} ->
+                File.rm(tmp)
+                {:error, {:unzip_failed, reason}}
+            end
+        end
+
+      {:error, reason} ->
+        File.rm(tmp)
+        {:error, {:fetch_failed, reason}}
+    end
+  end
+
   # Pure Erlang/TLS HTTPS GET → file (no curl binary; no native subprocess). Mirrors
   # Workbooks.Npm.https_get / Workbooks.Compilers.http_get (wb-ova: "no curl binary").
   # Verified TLS via the OS trust store; only https URLs reach here (callers gate).
