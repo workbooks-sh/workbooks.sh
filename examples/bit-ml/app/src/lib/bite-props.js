@@ -4,6 +4,7 @@
 //   row.sources [{label,url}]                    →  ['label', …] (Bite shows labels)
 // The byline writer becomes { name, role:'writer' } so the Byline reads
 // "by <name> (writer)" per DESIGN.md §4.7.
+import { imageUrl } from './stories.svelte.js';
 
 export function biteProps(row) {
   return {
@@ -16,6 +17,11 @@ export function biteProps(row) {
     status: row.status === 'live' ? 'live' : 'unread',
     sources: (row.sources || []).map((s) => s.label),
     byline: bylineProps(row.byline),
+    // banner THUMBNAIL: passed through; the Bite renders it only when the view
+    // asks for the FEATURED variant (front-page grid §4.4). Resolved here so
+    // workbook mode gets the inlined data-URI (DRY — one image home).
+    banner: row.banner ? imageUrl(row.banner) : null,
+    bannerAlt: row.bannerAlt ?? '',
   };
 }
 
@@ -27,8 +33,9 @@ export function leadProps(row) {
     dek: row.dek,
     sources: (row.sources || []).map((s) => s.label),
     byline: bylineProps(row.byline),
-    // banner image: passed through to WireLead (§4.5 note 3)
-    banner: row.banner ?? null,
+    // banner image: passed through to WireLead (§4.5 note 3), resolved for
+    // workbook mode (inline data-URI) via imageUrl
+    banner: row.banner ? imageUrl(row.banner) : null,
     bannerAlt: row.bannerAlt ?? '',
   };
 }

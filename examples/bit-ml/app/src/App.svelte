@@ -72,22 +72,25 @@
 
 <!-- ── PERSISTENT SHELL — mounted once, outside #route ── -->
 <div class="sheet">
-  <Masthead oncrew={toggleCrew} {crewOpen} />
+  <!-- chrome stays in the reading band (720) so it aligns with measured views;
+       the front page (below) spreads to the full --page-max broadsheet width -->
+  <div class="band"><Masthead oncrew={toggleCrew} {crewOpen} /></div>
 
   <!-- ── CONTENT REGION — the only thing navigation swaps ── -->
   <main id="route">
     {#if r.name === 'story'}
-      {#key r.slug}<Story slug={r.slug} onagent={openCrew} />{/key}
+      {#key r.slug}<div class="band"><Story slug={r.slug} onagent={openCrew} /></div>{/key}
     {:else if r.name === 'section'}
-      {#key r.section}<Section section={r.section} onagent={openCrew} />{/key}
+      {#key r.section}<div class="band"><Section section={r.section} onagent={openCrew} /></div>{/key}
     {:else if r.name === 'design'}
-      <Design onagent={openCrew} />
+      <div class="band"><Design onagent={openCrew} /></div>
     {:else}
+      <!-- Front = the wide editorial grid; no band, uses the full shell width -->
       <Front onagent={openCrew} />
     {/if}
   </main>
 
-  <Footer oncrew={toggleCrew} />
+  <div class="band"><Footer oncrew={toggleCrew} /></div>
 </div>
 
 <!-- the docked crew panel — character grid + profile + commit console (§4.8) -->

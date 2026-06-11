@@ -99,7 +99,8 @@ CrewPanel) are reinterpreted as light Notion surfaces.
 - **Grayscale discipline (founder, 2026-06-10):** the base is WHITE and BLACK —
   true black ink on pure white, one grey for resting meta, generous white space (air IS
   the aesthetic). The only colors on a page: wire blue (interactivity/liveness),
-  up/down green/red inside market data, and section badge accents (§4.3). Nothing else.
+  up/down green/red inside market data, section badge accents (§4.3), the avatar
+  pack, inline brand marks (§4.12), and banner images (§4.5). Nothing else.
 - No gradients anywhere except the presence system (the one inherited
   gradient: the live-agent rim, which signals "machine at work").
 - **Surface laws (founder, 2026-06-10):** backgrounds are #fff or the
@@ -171,7 +172,10 @@ headline (Switzer tight grotesk, 2 lines max, sentence case) ·
 dek (Switzer, ≤2 sentences, the actual information) · footer row:
 sources left, **agent byline right** (mono — see 4.7). Hairline below.
 Bite cards are Notion cards: white bg, `border-radius: var(--r)`, soft `--shadow`
-lift, lift-on-hover. **No banner on Bite** — the stack stays fast.
+lift, lift-on-hover. **Default Bite has no banner** — the stack stays fast; the
+opt-in FEATURED variant (front-page grid only, §4.4) carries a 3:2 thumbnail.
+Brand marks render inline on the head + dek first mention (§inline brand logos);
+the live type-in head injects marks only once fully typed (truthful char-by-char).
 
 **Whitespace dial (founder, 2026-06-10):** generous, rhythmic.
 Card `padding: 26px 28px 22px`. Stack `gap: 20px`. Top margin `margin-bottom: 14px`.
@@ -181,11 +185,42 @@ States: `unread` (full ink) · `read` (head drops to --ink-2) ·
 `LIVE` (being written now — wire-blue pulsing dot + the head renders
 with the type-in presence system; clicking opens the story mid-write).
 
-### 4.4 The stack (front page)
-Single column, 720px, bites in published order with pinned lead.
-Section fronts = same stack filtered. Every 8th position: a **market
-strip** (4.6) instead of a bite. Infinite-feel pagination, mono
-"older →" link, no spinners (Linear rule: nothing loads visibly).
+### 4.4 The front page (the WIDE broadsheet)
+**Width dial (founder, 2026-06-10):** the front page is a WIDE editorial
+artifact, not a single 720px column. The page shell (`.sheet`) opens to
+`--page-max` (1280px); long-form views (story, section) and the chrome
+(masthead, footer) re-narrow themselves to the `--col` reading band via the
+`.band` helper. **Layout goes wide; reading measure stays sane.** Tokens:
+`--page-max 1280px` (the broadsheet wrapper), `--col 720px` (the measured
+column — story body + deks), `--measure 68ch` (long-form text).
+
+Real hierarchy through scale + space, not borders:
+
+- **The WireLead is the feature.** At wide widths it's a broadsheet lead — a
+  BIG banner image dominating the left column (`1.35fr`) with the display
+  head/dek/foot to its right (`1fr`), generous `40px` gap. It stacks (banner
+  on top) below 860px. The banner is a 16:9 crop box (`aspect-ratio`,
+  `object-fit: cover` — the generated webp is ~square, so it crops cleanly and
+  looks intentional), `border-radius: var(--r)`, soft `--shadow` lift, no
+  border.
+- **Below: a 3-column editorial GRID** (`grid-auto-flow: row dense`, `28px`
+  gap, top margin `56px`). Bites that carry a banner become the **FEATURED**
+  variant — a banner thumbnail (3:2 crop box) above the body — and **span two
+  columns** so they dominate; text-only bites stay compact (one column). The
+  page reads with rhythm and importance, not uniformity. Whitespace + spread;
+  hierarchy is scale + air, never card strokes.
+- **Mobile** (≤680px): one clean measured column — the stack — no horizontal
+  scroll. Medium (≤980px): 2 columns, features span both.
+
+**Banner-on-Bite (founder note, 2026-06-10):** the prior "no banner on Bite"
+rule is RELAXED — but only for the FEATURED grid variant on the front page (a
+3:2 thumbnail). Bites in a section/story stack and the non-featured grid cells
+stay text-only and fast. The thumbnail is opt-in (`feature` + `banner` props);
+default Bite is unchanged.
+
+Section fronts = same stack filtered, in the reading band (sections stay
+measured; only the front page goes broadsheet-wide). No market strip on the
+real front (§4.6 forbids placeholder numbers).
 
 Section front header uses the **section badge** (§4.3, slightly larger
 variant: 11px, padding 4px 10px) as the sole section identity — color
@@ -200,13 +235,20 @@ sources) → drafted 13:58 → edited 14:02 — each row linking to the commit.
 The receipt is the "agent-run" proof artifact, and it's also just a good
 colophon.
 
-**Banner images (founder note 3, 2026-06-10):** manifest rows may carry
-`"banner": "content/images/<file>"` (+ optional `"bannerAlt"`). Rendered
-on the story page as a full-column image above the org body:
-`border-radius: var(--r)`, no border, `object-fit: cover`.
-On WireLead: rendered below the dek, calm placement, same radius.
-On Bite cards: **no banner** — the stack stays fast.
-Missing/404 → renders nothing; `onerror` hides the element, no broken-image icon.
+**Banner images (founder note 3, 2026-06-10; revised):** manifest rows may
+carry `"banner": "content/images/<file>"` (+ optional `"bannerAlt"`).
+- **Story page:** a full-column **16:9 crop box** above the org body
+  (`aspect-ratio: 16/9`, `object-fit: cover` — the generated webp is ~square,
+  so it crops cleanly), `border-radius: var(--r)`, soft `--shadow`, no border.
+- **WireLead:** the dominant feature image (§4.4) — big, left-column,
+  16:9 crop box, same radius + shadow.
+- **Bite:** thumbnail (3:2 crop box) ONLY in the FEATURED front-page grid
+  variant (§4.4); section/story-stack bites stay text-only.
+- **Workbook mode:** banners are inlined as base64 `x-image` blocks by
+  `bundle-workbook.mjs`; `imageUrl()` (stories.svelte.js) resolves a path to
+  the inline data-URI (cached) so the single-file artifact is self-contained.
+  On a server it resolves to the `BASE`-prefixed file.
+- Missing/404 → renders nothing; `onerror` hides the crop box (no broken icon).
 
 **Whitespace dial (founder, 2026-06-10):** story `padding-top: 36px`,
 meta-top `margin-bottom: 22px`, dek `margin: 22px 0 0`,
@@ -326,6 +368,36 @@ DOM, `Story.svelte` calls `window.Orgitorial.activate(mountEl)` if the
 vendored orgitorial exposes it (guarded: `typeof window.Orgitorial?.activate === 'function'`).
 This is a forward-compatible no-op until the new vendor build lands. The
 guard lives in a `$effect` that re-runs whenever `pending` clears.
+
+### 4.12 Inline brand logos
+When a story names a company with a recognised mark, render the brand's
+**FULL-COLOR logo inline before the name** — in body, deks, AND headlines/
+headings (the founder wants logos in heads when a brand is named). This is the
+**SECOND sanctioned color exception** on the monochrome page (after wire blue,
+market up/down, and avatars). Nominative / editorial use only; never implies
+endorsement; never in the mono meta row.
+
+**Registry — `lib/brands.js`.** A curated `BRANDS = { key: { name, svg } }` of
+INLINED full-color SVG marks, sourced per `skills/icons.org` (svgl full-color
+first → lobehub `*-color` → simple-icons with the brand hex baked into `fill`).
+Each mark is normalized to a 24-viewBox, `width/height: 1em`. **Honesty law:**
+a brand with no clean mark gets `svg: null` and renders the **name alone** —
+never a broken or approximated logo. Shipped marks: Google, DeepMind, Nvidia,
+Amazon, Anthropic, OpenAI, Intel (TSMC / Micron / Bloomberg / ECMWF / EU are
+registered name-only — no clean mark sourced).
+
+**Render — `brandify(text)` + `BrandTag.svelte`.** `brandify` scans plain text
+for registered brand names (word-boundary, case-insensitive, **longest-match-
+first** so "OpenAI" wins over "Open"), HTML-escapes the text, and wraps each
+brand's **FIRST mention in that block** with
+`<span class="brand"><span class="brand-mark">{svg}</span>{name}</span>`. Later
+mentions in the same block render plain (logo once per block — `seen` set per
+call). The `.brand-mark` is **em-scaled**, so it grows with its heading. The
+`.brand`/`.brand-mark` CSS is GLOBAL (in `app.css`) because the marks inject via
+`{@html}` and component scoping can't reach them.
+
+**Applied in:** WireLead head + dek, Bite head (once fully typed) + dek, Story
+native serif head + dek. NOT the org body, NOT any mono meta row.
 
 ## 5. Motion
 Linear's law: **fast or absent.** 120–180ms ease-out for state changes;

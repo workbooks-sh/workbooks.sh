@@ -11,6 +11,7 @@
   //   live (wire-blue pulsing dot + head TYPES IN ~30cps — truthful motion).
   // Badge: no banner on Bite (§4.5 founder note 3 — stack stays fast).
   import { sectionOf } from './sections.js';
+  import { brandify } from './brands.js';
   import Byline from './Byline.svelte';
 
   let {
@@ -24,9 +25,15 @@
     status = 'unread',
     onagent,
     href = null,   // /story/<slug> — when set, the head links into the story page
+    // front-page grid (§4.4): the FEATURED variant carries a banner thumbnail
+    // so the grid reads with rhythm (some bites large, some compact).
+    feature = false,
+    banner = null,       // resolved src; only shown when feature is true
+    bannerAlt = '',
   } = $props();
 
   const sec = $derived(sectionOf(section));
+  const showBanner = $derived(feature && !!banner);
 
   // Type-in for the LIVE bite only (DESIGN §4.3/§5: the truthful-motion
   // exception, ~30cps). prefers-reduced-motion shows the full head at once.
@@ -44,31 +51,52 @@
     }, 1000 / 30); // ~30 characters per second
     return () => clearInterval(id);
   });
+
+  // Brand marks on first mention (§"inline brand logos"). The live head injects
+  // marks only once it's fully typed (mid-type stays plain text so the type-in
+  // stays truthful char-by-char); the dek always brandifies.
+  const headDone = $derived(typed.length >= head.length);
+  const headHtml = $derived(brandify(typed));
+  const dekHtml = $derived(brandify(dek));
 </script>
 
-<article class="bite {status}">
-  <div class="top mono">
-    <span class="sec">
-      <!-- tiny badge: icon + tag, tinted wash bg, color text (§4.3) -->
-      <span
-        class="sec-badge"
-        style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
-      >{@html sec.icon}{sec.tag}</span>
-      {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
-    </span>
-    <span class="when">{time}{#if read} · {read} read{/if}</span>
-  </div>
+<article class="bite {status}" class:feature>
+  {#if showBanner}
+    <a class="thumb-box" href={href ?? undefined} aria-hidden="true" tabindex="-1">
+      <img
+        class="thumb"
+        src={banner}
+        alt={bannerAlt}
+        loading="lazy"
+        onerror={(e) => { e.currentTarget.closest('.thumb-box').style.display = 'none'; }}
+      />
+    </a>
+  {/if}
 
-  <h2 class="head">
-    {#if href}<a class="headlink" {href}>{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}</a>
-    {:else}{typed}{#if status === 'live' && typed.length < head.length}<span class="caret"></span>{/if}{/if}
-  </h2>
+  <div class="body">
+    <div class="top mono">
+      <span class="sec">
+        <!-- tiny badge: icon + tag, tinted wash bg, color text (§4.3) -->
+        <span
+          class="sec-badge"
+          style="color:{sec.color};background:color-mix(in srgb,{sec.color} 10%,transparent)"
+        >{@html sec.icon}{sec.tag}</span>
+        {#if status === 'live'}<span class="live-dot" aria-label="live"></span><span class="live-word">live</span>{/if}
+      </span>
+      <span class="when">{time}{#if read} · {read} read{/if}</span>
+    </div>
 
-  {#if dek}<p class="dek">{dek}</p>{/if}
+    <h2 class="head">
+      {#if href}<a class="headlink" {href}>{#if headDone}{@html headHtml}{:else}{typed}<span class="caret"></span>{/if}</a>
+      {:else}{#if headDone}{@html headHtml}{:else}{typed}<span class="caret"></span>{/if}{/if}
+    </h2>
 
-  <div class="foot">
-    <span class="sources mono">{#if sources.length}sources: {sources.join(' · ')}{/if}</span>
-    {#if byline}<Byline {...byline} {onagent} />{/if}
+    {#if dek}<p class="dek">{@html dekHtml}</p>{/if}
+
+    <div class="foot">
+      <span class="sources mono">{#if sources.length}sources: {sources.join(' · ')}{/if}</span>
+      {#if byline}<Byline {...byline} {onagent} />{/if}
+    </div>
   </div>
 </article>
 
@@ -80,9 +108,29 @@
     padding: 26px 28px 22px;
     box-shadow: var(--shadow);
     transition: transform .15s ease, box-shadow .15s ease;
+    height: 100%;            /* fill the grid cell so a column reads evenly */
+    display: flex; flex-direction: column;
   }
   .bite:has(.headlink):hover { transform: translateY(-2px);
     box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 14px 36px -12px rgba(0,0,0,.16); }
+  .body { display: flex; flex-direction: column; flex: 1; }
+
+  /* FEATURED variant (front-page grid §4.4): a banner thumbnail above the body
+     so the bite carries visual weight. The padding gives way to a flush image
+     at the top of the card. 3:2 crop box, soft inner image. */
+  .feature { padding: 0; overflow: hidden; }
+  .feature .body { padding: 24px 26px 20px; }
+  .thumb-box {
+    display: block; width: 100%;
+    aspect-ratio: 3 / 2;
+    overflow: hidden; background: var(--surface);
+  }
+  .thumb {
+    display: block; width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    transition: transform .2s ease;
+  }
+  .feature:hover .thumb { transform: scale(1.02); }
 
   .top {
     display: flex; align-items: center; justify-content: space-between;

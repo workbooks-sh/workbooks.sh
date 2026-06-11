@@ -16,7 +16,8 @@
   import Byline from '../lib/Byline.svelte';
   import Receipt from '../lib/Receipt.svelte';
   import { sectionOf } from '../lib/sections.js';
-  import { manifest, storyBySlug, storyBody, moreFrom } from '../lib/stories.svelte.js';
+  import { brandify } from '../lib/brands.js';
+  import { manifest, storyBySlug, storyBody, moreFrom, imageUrl } from '../lib/stories.svelte.js';
   import { bylineProps, biteProps } from '../lib/bite-props.js';
 
   let { slug, onagent } = $props();
@@ -25,6 +26,11 @@
   const story = $derived(rows ? storyBySlug(slug) : null);
   const sec = $derived(story ? sectionOf(story.section) : null);
   const more = $derived(story ? moreFrom(story.section, story.slug, 3) : []);
+  // resolve the banner for workbook mode (inline data-URI) — DRY via imageUrl
+  const bannerSrc = $derived(story?.banner ? imageUrl(story.banner) : null);
+  // brand marks on the native serif head + dek (first mention each)
+  const headHtml = $derived(story ? brandify(story.head) : '');
+  const dekHtml = $derived(story?.dek ? brandify(story.dek) : '');
 
   // fetch + render the org body once the row is known (cached in the store)
   let body = $state('');
@@ -65,8 +71,8 @@
       <span class="when">{story.time} · {story.read} read</span>
     </div>
 
-    <h1 class="head serif">{story.head}</h1>
-    {#if story.dek}<p class="dek">{story.dek}</p>{/if}
+    <h1 class="head serif">{@html headHtml}</h1>
+    {#if story.dek}<p class="dek">{@html dekHtml}</p>{/if}
 
     <div class="byline-row">
       <span class="sources mono">{#if story.sources?.length}sources: {#each story.sources as s, i}<a href={s.url} target="_blank" rel="noopener">{s.label}</a>{#if i < story.sources.length - 1} · {/if}{/each}{/if}</span>
@@ -75,15 +81,18 @@
 
     <hr class="hair story-hr" />
 
-    {#if story.banner}
-      <!-- full-column banner above body (§4.5 note 3); onerror hides on 404 -->
-      <img
-        class="story-banner"
-        src={story.banner}
-        alt={story.bannerAlt ?? ''}
-        loading="lazy"
-        onerror={(e) => { e.currentTarget.style.display = 'none'; }}
-      />
+    {#if bannerSrc}
+      <!-- full-column banner above body (§4.5 note 3); onerror hides on 404.
+           16:9 crop box so the ~square generated webp crops cleanly. -->
+      <div class="story-banner-box">
+        <img
+          class="story-banner"
+          src={bannerSrc}
+          alt={story.bannerAlt ?? ''}
+          loading="lazy"
+          onerror={(e) => { e.currentTarget.closest('.story-banner-box').style.display = 'none'; }}
+        />
+      </div>
     {/if}
 
     <!-- the org body — orgitorial returns <article class="org-doc">…</article>;
@@ -149,9 +158,19 @@
 
   .story-hr { margin-top: 28px; }
 
-  .story-banner {
+  /* a set aspect-ratio box so the ~square generated webp crops to 16:9 cleanly
+     and looks intentional (DESIGN §4.5 note 3). Soft --shadow lift on the image
+     card (the one sanctioned image-card shadow). */
+  .story-banner-box {
     display: block; width: 100%; margin-top: 32px;
-    border-radius: var(--r); object-fit: cover;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--r); overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .story-banner {
+    display: block; width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
     /* no border per §4.5 note 3 */
   }
 

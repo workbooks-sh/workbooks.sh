@@ -16,6 +16,8 @@
       "read": "1m",
       "status": "live",
       "file": "content/stories/deepmind-weather.org",
+      "banner": "content/images/deepmind-weather-banner.webp",
+      "bannerAlt": "DeepMind weather model — global forecast field visualization",
       "receipt": [
         { "stage": "assigned", "time": "13:40", "note": "desk · weather model", "sha": "a1c4e9" },
         { "stage": "researched", "time": "13:51", "note": "moss · 6 sources", "sha": "f72b08" },
@@ -38,6 +40,8 @@
       "read": "1m",
       "status": "published",
       "file": "content/stories/nvidia-datacenter.org",
+      "banner": "content/images/nvidia-datacenter-banner.webp",
+      "bannerAlt": "Nvidia data-center — GPU racks in a hyperscale hall",
       "receipt": [
         { "stage": "assigned", "time": "11:20", "note": "desk · nvidia quarter", "sha": "77ab10" },
         { "stage": "researched", "time": "12:05", "note": "moss · filing + transcript", "sha": "0c5d92" },
@@ -60,8 +64,8 @@
       "read": "2m",
       "status": "published",
       "file": "content/stories/tsmc-arizona.org",
-      "banner": "content/images/tsmc-arizona-banner.svg",
-      "bannerAlt": "TSMC Arizona fab — wafer reticle specimen graphic"
+      "banner": "content/images/tsmc-arizona-banner.webp",
+      "bannerAlt": "TSMC Arizona fab — cleanroom and leading-edge wafer line"
     },
     {
       "slug": "eu-compute-threshold",
@@ -78,6 +82,8 @@
       "read": "2m",
       "status": "published",
       "file": "content/stories/eu-compute-threshold.org",
+      "banner": "content/images/eu-compute-threshold-banner.webp",
+      "bannerAlt": "EU compute threshold — the AI Act and frontier-model regulation",
       "receipt": [
         { "stage": "assigned", "time": "10:30", "note": "desk · EU AI Act", "sha": "44de01" },
         { "stage": "researched", "time": "11:10", "note": "moss · OJ text", "sha": "8f7c23" },

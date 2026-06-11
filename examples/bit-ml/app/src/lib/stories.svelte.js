@@ -14,8 +14,30 @@ function url(p) { return BASE.replace(/\/$/, '') + '/' + p.replace(/^\//, ''); }
 let _manifest = $state(null);          // null until loaded
 let _loading = false;
 const _bodies = new Map();             // slug → rendered HTML string (cache)
+const _imgs = new Map();               // path → resolved src (data-URI in workbook mode)
 
 export function manifest() { return _manifest; }
+
+// Resolve a banner/image path to a usable <img src>. In WORKBOOK MODE the
+// bundler inlines each image as <script type="x-image" data-path data-mime>{b64}>
+// (bundle-workbook.mjs) — we turn that into a data-URI so the single-file
+// artifact is fully self-contained (no fetch). On a normal server, just prefix
+// the BASE so the static file resolves. Missing → return the plain url; the
+// <img onerror> hides it (DESIGN §4.5 note 3). Cached per path.
+export function imageUrl(path) {
+  if (!path) return null;
+  if (_imgs.has(path)) return _imgs.get(path);
+  let resolved = url(path);
+  if (typeof document !== 'undefined') {
+    const inline = document.querySelector(`script[type="x-image"][data-path="${path}"]`);
+    if (inline) {
+      const mime = inline.getAttribute('data-mime') || 'image/png';
+      resolved = `data:${mime};base64,${inline.textContent.trim()}`;
+    }
+  }
+  _imgs.set(path, resolved);
+  return resolved;
+}
 
 // Kick the manifest fetch once. Idempotent. Components read manifest() reactively.
 export function loadManifest() {

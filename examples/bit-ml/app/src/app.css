@@ -35,7 +35,9 @@
   --sans:  'Switzer', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono:  'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --col: 720px;                 /* §4.4 single column */
+  --col: 720px;                 /* §4.4 the measured single column (story body, deks) */
+  --page-max: 1280px;           /* §4.4 the WIDE front-page wrapper (broadsheet) */
+  --measure: 68ch;              /* reading measure — long-form text stays sane while layout goes wide */
   color-scheme: light;
 }
 
@@ -82,11 +84,23 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 button { font-family: inherit; cursor: pointer; }
 
-/* the page shell — paper, the column, the rhythm. NOT a storybook. */
+/* the page shell — paper, the rhythm. NOT a storybook.
+   The shell is WIDE (broadsheet, --page-max) so the front page can spread into
+   a real editorial grid. Long-form views (story, section, the masthead/footer
+   chrome) re-narrow themselves to the reading column via `.band` — layout goes
+   wide, READING measure stays sane (DESIGN §4.4). */
 .sheet {
-  max-width: var(--col);
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: 0 32px 200px;
+}
+
+/* a centered reading-width band: the measured column inside the wide shell.
+   Masthead, Footer, Story, Section content sit in a .band so they keep the
+   720px measure while the front page uses the full width. */
+.band {
+  max-width: var(--col);
+  margin-inline: auto;
 }
 
 /* specimen scaffolding: every component is labelled like a type specimen —
@@ -224,3 +238,23 @@ button { font-family: inherit; cursor: pointer; }
   width: 100vw;
   margin-inline: calc(50% - 50vw);
 }
+
+/* ── inline brand logos (DESIGN.md §"inline brand logos") ──────────────────
+   The SECOND sanctioned color exception (after wire blue + market up/down +
+   avatars): a brand's FULL-COLOR mark on its FIRST mention in a block, before
+   the name. Em-scaled so it grows with whatever type it sits in — body, dek,
+   AND headlines. Nominative/editorial only; never in the mono meta row.
+   Injected via {@html} from brandify(), so these rules are GLOBAL (component
+   scoping can't reach @html content). */
+.brand {
+  display: inline-flex; align-items: baseline; gap: 0.18em;
+  white-space: nowrap;          /* keep the mark glued to the name */
+}
+.brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1em; height: 1em;
+  /* sit on the text baseline-ish — nudged down a hair for optical centering */
+  transform: translateY(0.12em);
+  flex: none;
+}
+.brand-mark svg { width: 1em; height: 1em; display: block; }
