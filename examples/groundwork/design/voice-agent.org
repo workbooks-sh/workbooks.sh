@@ -1,6 +1,6 @@
 #+TITLE: the groundskeeper — a voice chief-of-staff for the repo
 #+DATE: <2026-06-10>
-#+STATUS: BUILT (v0, self-tested) — voice hop blocked on key permission (wb-3ojf.6)
+#+STATUS: LIVE (2026-06-11) — agent_9201kttm5xv5fyn8vr1bnv3z9d5m provisioned; full loop proven (live session → webhook tool → bridge → bd wb-pdi2; post-call HMAC → transcript archived). Local stack: ~/.workbooks/groundskeeper.env + detached runtime/tunnel (logs in ~/.workbooks/). Quick-tunnel URL is EPHEMERAL: after a restart rerun groundskeeper-up.sh, then upsert_agent(<new url>) + PATCH the workspace webhook URL (id in env file notes).
 #+NAME: groundskeeper (confirmed by the founder)
 
 * Status (2026-06-11)

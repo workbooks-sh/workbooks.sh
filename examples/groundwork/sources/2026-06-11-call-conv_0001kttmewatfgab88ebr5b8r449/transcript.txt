@@ -1,0 +1,11 @@
+agent: Aye. The grounds are kept. What are we thinking about?
+
+user: File an issue titled: load benchmark for concurrent agents. Description: we claim thousands of agents per server with no proof; build a benchmark. Then tell me when it is filed.
+
+user: Goodbye.
+
+agent: 
+
+agent: 
+
+agent: Issue filed: load benchmark for concurrent agents.

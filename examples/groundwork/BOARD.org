@@ -1,8 +1,10 @@
 #+TITLE: BOARD — the repo, as bd sees it
-#+GENERATED: [2026-06-11 05:13 UTC] by Workbooks.Groundskeeper.Board — NEVER hand-edit (regenerated from bd; bd stays out of git)
+#+GENERATED: [2026-06-11 06:03 UTC] by Workbooks.Groundskeeper.Board — NEVER hand-edit (regenerated from bd; bd stays out of git)
 #+TODO: TODO DOING DEFERRED | DONE
 
-* P1 (46)
+* P1 (47)
+** TODO runtime: full mix test suite stalls at 0% CPU during first-run artifact provisioning (network fetch without timeout?)
+   :ID: wb-1ffa
 ** TODO groundskeeper: ElevenLabs API key lacks convai_write — mint/extend key with Agents permissions (USER ACTION)
    :ID: wb-3ojf.6
 ** TODO bit.ml eval gap: desk source-fabrication under open-ended scan (not fixture-fed)
@@ -96,21 +98,17 @@
 ** TODO Toolkits V3 — clean-room toolkit system :epic:
    :ID: wb-4bj
 
-* P2 (108)
-** TODO groundskeeper: ledger orphan handling — persist tasks (or mark DOING→BLOCKED on boot) so a restart can't leave TASKS.org stuck doing
-   :ID: wb-3ojf.7
+* P2 (106)
+** TODO load benchmark for concurrent agents
+   :ID: wb-f0kx
+** TODO load benchmark for concurrent agents
+   :ID: wb-pdi2
+** TODO groundskeeper v0: ElevenLabs agent def — persona prompt + 3 server tools + post-call webhook
+   :ID: wb-3ojf.2
 ** TODO Quality loop: lander + bit.ml + autopoet — zero bugs, validated efficient :epic:
    :ID: wb-vbi
 ** TODO groundskeeper v2: workbook-native mobile client
    :ID: wb-3ojf.5
-** TODO groundskeeper v1: dispatch_research — voice-filed research lane a deep-research agent works async
-   :ID: wb-3ojf.4
-** TODO groundskeeper v1: BOARD.org generation — bd -> committed org Kanban, the git-visible single source of truth
-   :ID: wb-3ojf.3
-** TODO groundskeeper v0: ElevenLabs agent def — persona prompt + 3 server tools + post-call webhook
-   :ID: wb-3ojf.2
-** TODO groundskeeper v0: bridge endpoints on runtime web plane — repo_state, capture, file_issue (HMAC-authed)
-   :ID: wb-3ojf.1
 ** TODO groundskeeper — voice chief-of-staff over the repo (design: examples/groundwork/design/voice-agent.org) :epic:
    :ID: wb-3ojf
 ** TODO groundwork: derive positioning artifacts from audited thesis
@@ -353,6 +351,14 @@
    :ID: wb-4bj.9
 
 * recently closed
+** DONE groundskeeper: ledger orphan handling — persist tasks (or mark DOING→BLOCKED on boot) so a restart can't leave TASKS.org stuck doing
+   :ID: wb-3ojf.7
+** DONE groundskeeper v1: BOARD.org generation — bd -> committed org Kanban, the git-visible single source of truth
+   :ID: wb-3ojf.3
+** DONE groundskeeper v1: dispatch_research — voice-filed research lane a deep-research agent works async
+   :ID: wb-3ojf.4
+** DONE groundskeeper v0: bridge endpoints on runtime web plane — repo_state, capture, file_issue (HMAC-authed)
+   :ID: wb-3ojf.1
 ** DONE SECURITY: exec-agent vfs_read/vfs_write unconfined (workdir escape)
    :ID: wb-ahz
 ** DONE bit.ml crew can't publish: vfs_write content invisible to shell/git/publish
@@ -375,11 +381,3 @@
    :ID: wb-2ku.10
 ** DONE Agent shell tool: WASM shell wedges on the lander box (every call → 150s timeout) — health-check and omit, or fix provisioning
    :ID: wb-91j
-** DONE Material Icon Theme as file/folder icon standard (emoji still overrides)
-   :ID: wb-5fl.15
-** DONE color system unification: tintFor everywhere, plain Create, bottom icon toolbar
-   :ID: wb-5fl.14
-** DONE sidebar polish: persistent dashed bookmarks container, folder drop-target move, folder ctx New workbook
-   :ID: wb-5fl.13
-** DONE bookmarks = explicit refs only: apps back to rows, grid only holds dragged-in pins, app-drag accepted
-   :ID: wb-5fl.11

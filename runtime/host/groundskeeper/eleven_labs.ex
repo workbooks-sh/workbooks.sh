@@ -112,7 +112,7 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
         "file_issue",
         "File a tracked issue in the project ledger when the founder commits to a piece of work or names a bug.",
         %{
-          title: %{type: "string"},
+          title: %{type: "string", description: "one-line issue title"},
           description: %{type: "string", description: "context: why, where, what done looks like"}
         },
         ["title"]
