@@ -238,6 +238,30 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `lz4` CLI on the LZ4 frame API (standard .lz4 format): stdin → compressed stdout, `-d`
+  # decompresses. Interoperates with the lz4 tool. (lz4's lib is a unity build — needs preserve_names.)
+  @lz4_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "lz4frame.h"
+  int main(int argc, char** argv) {
+    int dec = (argc >= 2 && !strcmp(argv[1], "-d"));
+    size_t cap = 1 << 20, len = 0; char* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    if (dec) {
+      LZ4F_dctx* d; LZ4F_createDecompressionContext(&d, LZ4F_VERSION);
+      size_t ocap = 1 << 20; char* out = malloc(ocap); size_t sp = 0;
+      while (sp < len) { size_t ds = ocap, ss = len - sp; LZ4F_decompress(d, out, &ds, in + sp, &ss, NULL); fwrite(out, 1, ds, stdout); sp += ss; if (ss == 0) break; }
+      LZ4F_freeDecompressionContext(d);
+    } else {
+      size_t b = LZ4F_compressFrameBound(len, NULL); char* out = malloc(b);
+      size_t n = LZ4F_compressFrame(out, b, in, len, NULL); fwrite(out, 1, n, stdout);
+    }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -279,6 +303,12 @@ defmodule Workbooks.Pallet do
         exclude: ~w(gzlib.c gzread.c gzwrite.c gzclose.c),
         extra_sources: [{"zmain.c", @gz_main}]
       ]
+    },
+    %{
+      name: "lz4",
+      url: "https://codeload.github.com/lz4/lz4/tar.gz/refs/tags/v1.10.0",
+      sha: "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b",
+      build_opts: [src_globs: ["lib/*.{c,h}"], exclude: ["lz4file.c"], extra_sources: [{"lz4_main.c", @lz4_main}]]
     }
   ]
 

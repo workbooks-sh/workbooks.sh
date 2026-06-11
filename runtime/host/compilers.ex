@@ -202,8 +202,13 @@ defmodule Workbooks.Compilers do
         id = Integer.to_string(:erlang.unique_integer([:positive]))
         job = Path.join(System.tmp_dir!(), "clangjob-#{id}")
         File.mkdir_p!(Path.join(job, "tmp"))
+        # :preserve_names keeps each source's ORIGINAL basename in /work (vs src.c / extra<i>.c) so
+        # unity-build tools — a .c that `#include`s another .c BY NAME (lz4hc.c includes lz4.c) —
+        # resolve (wb-4b61). Opt-in: the mrustc/zig callers keep the fixed-name behavior. The C-dir
+        # harvest turns it on. Assumes unique basenames (true for a flattened build dir).
+        preserve = Keyword.get(opts, :preserve_names, false)
         ext = Path.extname(source_path)
-        srcname = "src" <> if(ext == "", do: ".c", else: ext)
+        srcname = if preserve, do: Path.basename(source_path), else: "src" <> if(ext == "", do: ".c", else: ext)
         File.cp!(Path.expand(source_path), Path.join(job, srcname))
 
         # extra C sources compiled + linked alongside the main one (e.g. the zig wasi shim)
@@ -213,7 +218,7 @@ defmodule Workbooks.Compilers do
           extra_csrc
           |> Enum.with_index()
           |> Enum.map(fn {host, i} ->
-            nm = "extra#{i}.c"
+            nm = if preserve, do: Path.basename(host), else: "extra#{i}.c"
             File.cp!(Path.expand(host), Path.join(job, nm))
             nm
           end)

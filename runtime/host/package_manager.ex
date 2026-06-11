@@ -634,7 +634,9 @@ defmodule Workbooks.PackageManager do
       aux_files: headers,
       argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs ++ extra_argv,
       link_libs: ["-lsetjmp"] ++ emu_libs,
-      ld_args: @mmap_wraps
+      ld_args: @mmap_wraps,
+      # keep original source basenames so unity-build tools (a .c #include'ing a .c) resolve (wb-4b61)
+      preserve_names: true
     ]
 
     case Workbooks.Compilers.compile_c(main, opts) do
