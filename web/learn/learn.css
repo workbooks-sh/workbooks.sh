@@ -16,6 +16,20 @@ html { scroll-behavior: smooth; }
 body { background: var(--paper); color: var(--ink); font-family: var(--mono); overflow-x: hidden; }
 ::selection { background: var(--pc); }
 
+/* ── the house scrollbar — dotted track, solid 2px thumb, neutral ink ─────
+   Standard across the whole site (page-level); terminals keep their
+   piece-accent version of the same idea. */
+html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-track {
+  background-image: repeating-linear-gradient(180deg, rgba(86,91,84,.4) 0 4px, transparent 4px 9px);
+  background-size: 2px 100%; background-position: center; background-repeat: no-repeat;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #565b54; background-clip: padding-box;
+  border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
+}
+
 /* ── floating nav — same plate as the landing page, plus the Learn drop ── */
 .nav {
   position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 10;
@@ -94,12 +108,18 @@ body { background: var(--paper); color: var(--ink); font-family: var(--mono); ov
 .lhero .heroart .plate .dnaMini { display: flex; height: 12px; border-top: 2px solid var(--ink); }
 .lhero .heroart .plate .dnaMini i { display: block; height: 100%; }
 .lhero .heroart .cap {
-  position: absolute; left: -20px; top: -16px; width: 64px;
-  display: flex; flex-direction: column; border-radius: 14px; overflow: hidden;
+  position: absolute; left: -20px; top: -16px;
+  display: flex; align-items: center; gap: 11px; padding-right: 16px;
+  border-radius: 12px; overflow: hidden;
   border: 2px solid var(--ink); background: var(--pc);
 }
-.lhero .heroart .cap .face { height: 56px; display: flex; align-items: center; justify-content: center; }
-.lhero .heroart .cap .face img { height: 32px; filter: invert(.92); }
+.lhero .heroart .cap .face { width: 46px; height: 46px; display: flex; align-items: center;
+                             justify-content: center; background: rgba(18,19,22,.08); }
+.lhero .heroart .cap .face img { height: 26px; filter: invert(.92); }
+.lhero .heroart .cap span {
+  font-family: "Handjet", monospace; font-weight: 900; font-size: 19px;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--ink);
+}
 .lhero .meta { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
 .lhero .meta span {
   font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
