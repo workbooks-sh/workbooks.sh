@@ -108,8 +108,12 @@ defmodule Workbooks.Autopoet.Worker do
     result =
       try do
         org = File.read!(path)
+        body = case File.read(Path.join(Autopoet.dir(), "#{issue.id}.org")) do
+          {:ok, b} -> b
+          _ -> ""
+        end
         task = Task.async(fn ->
-          run = Workbooks.AgentDef.run(org, task_for(issue), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
+          run = Workbooks.AgentDef.run(org, task_for(issue, body), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
           run[:result] || ""
         end)
 
@@ -168,18 +172,29 @@ defmodule Workbooks.Autopoet.Worker do
     end
   end
 
-  defp task_for(issue) do
+  defp task_for(issue, body \\ "") do
     """
     IMPLEMENT THIS METACOGNITIVE ISSUE (filed by #{issue.tenant}):
 
     #{issue.title}
 
-    Read the full issue at `../issues/#{issue.id}.org` (need + tried/evidence).
+    THE FULL ISSUE (need + tried/evidence) — it is inlined here; do NOT try to
+    read it from `../issues/…` (that path is OUTSIDE your workspace and your file
+    tools are confined to the workspace, by design):
+
+    #{String.trim(body)}
+
     Your workspace is a toolkits tree. Fill this gap by authoring a TOOLKIT (or a
-    skill/def) here — follow the autopoiesis laws in your system prompt: edit the
-    declarative layer only, never native code; TEST before you register (`wb
-    toolkit verify <id>`); a gap that needs a NEW host primitive is not yours to
-    build — end with `HOST: <what primitive>`.
+    skill/def) here. AUTHOR FILES WITH THE `vfs_write` TOOL — it writes to your
+    workspace and creates parent dirs for you (so `vfs_write rss/manifest.org`
+    and `vfs_write rss/skills/parse.org` just work). Do NOT author files with the
+    `shell` tool (`cat > …`, `echo > …`, `mkdir`): the sandbox shell has no
+    `mkdir`, will not create parent dirs, and its cwd is not stable between
+    commands — shell redirection is for running commands, not writing files.
+    Follow the autopoiesis laws in your system prompt: edit the declarative layer
+    only, never native code; TEST before you register (`wb toolkit verify <id>`);
+    a gap that needs a NEW host primitive is not yours to build — end with
+    `HOST: <what primitive>`.
 
     End your run with ONE verdict line:
       DONE: <what you built + how you verified it>
