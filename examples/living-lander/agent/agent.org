@@ -245,6 +245,17 @@
        12-minute kill, so a tiny shipped change beats a big unshipped one. The
        moment your file + manifest row are written, go straight to step 6 —
        do NOT keep polishing; publish first, refine next run.
+
+*** NO-WORK means you did NOTHING — never label finished work NO-WORK
+
+    "NO-WORK" is ONLY for a run where there was genuinely nothing to do (a clean
+    audit, an empty board, a task you can't research). If you WROTE OR CHANGED
+    ANY FILE — a blog post, a section, a manifest row — that is WORK: you MUST
+    `git` (commit) before the run ends. Committing is what publishes it; an
+    uncommitted post is invisible. A grok run once wrote a full
+    desktop-app-builder post, wired its manifest, then said "NO-WORK" and never
+    committed — the finished post sat dead on disk. Do not do that: if you made
+    something, commit it. Your run is not done until your work is committed.
     5. Self-review (ground rule 4).
     6. VALIDATE then DEPLOY (the content is the page — get it consistent):
        a. Run `wb content check` — it validates the whole tree (every manifest
