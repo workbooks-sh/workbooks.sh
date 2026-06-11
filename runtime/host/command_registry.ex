@@ -229,13 +229,63 @@ defmodule Workbooks.CommandRegistry do
     case Workbooks.PackageManager.content_address(wasm_path) do
       {:ok, addressed, _sha} ->
         case register(name, addressed, mode) do
-          :ok -> {:ok, addressed}
-          {:error, reason} -> {:error, reason}
+          :ok ->
+            persist_manifest(name, addressed, mode)
+            {:ok, addressed}
+
+          {:error, reason} ->
+            {:error, reason}
         end
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # ── Persistence (boot survives restart) ─────────────────────────────────────
+  # Built/registered commands (Lua, duk, …) content-address into build/commands/ but the registry
+  # itself is in-memory (persistent_term) — gone on restart. A tiny manifest records (name → addressed
+  # path + mode) so `reload_persisted/0` re-registers them at boot WITHOUT rebuilding (the addressed
+  # wasm persists). Pallet (Lane A) artifacts re-seed via fetch; this is for the build-from-source set.
+  defp manifest_path, do: Path.join(Workbooks.PackageManager.commands_dir(), "registry.json")
+
+  defp persist_manifest(name, addressed, mode) do
+    m = read_manifest()
+    File.write(manifest_path(), Jason.encode!(Map.put(m, name, %{"path" => addressed, "mode" => to_string(mode)})))
+  rescue
+    _ -> :ok
+  end
+
+  defp read_manifest do
+    with {:ok, j} <- File.read(manifest_path()),
+         {:ok, m} when is_map(m) <- Jason.decode(j) do
+      m
+    else
+      _ -> %{}
+    end
+  end
+
+  @doc """
+  Re-register the persisted build-from-source commands at boot (Lua/duk/zforth/…) from their cached,
+  content-addressed artifacts — NO rebuild, NO fetch. Skips entries whose artifact is gone or whose
+  name is reserved/malformed. Returns the count re-registered. Idempotent.
+  """
+  def reload_persisted do
+    Enum.reduce(read_manifest(), 0, fn
+      {name, %{"path" => path, "mode" => mode}}, n ->
+        mode_atom = if mode == "stdin1", do: :stdin1, else: :argv
+
+        cond do
+          name in @reserved -> n
+          not Regex.match?(@name_re, name) -> n
+          not File.regular?(path) -> n
+          register(name, path, mode_atom) == :ok -> n + 1
+          true -> n
+        end
+
+      _, n ->
+        n
+    end)
   end
 
   # Inline languages an agent can self-author a command in. Rust takes crates.io

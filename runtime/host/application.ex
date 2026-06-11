@@ -75,6 +75,20 @@ defmodule Workbooks.Application do
       end)
     end
 
+    # Re-register the persisted build-from-source commands (Lua/duk/zforth/…) from their cached,
+    # content-addressed artifacts — no rebuild, no fetch — so they survive a restart. Always runs
+    # (no-op when the manifest is empty); in a Task so it never blocks boot.
+    Task.start(fn ->
+      case Workbooks.CommandRegistry.reload_persisted() do
+        0 ->
+          :ok
+
+        n ->
+          require Logger
+          Logger.info("command registry — #{n} persisted command(s) reloaded from cache")
+      end
+    end)
+
     trace("start: done")
     {:ok, sup}
   end

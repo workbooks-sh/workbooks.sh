@@ -45,4 +45,20 @@ int main(void){ printf("gated-on\n"); return 0; }
     assert out =~ "gated-on"
     File.rm_rf!(dir)
   end
+
+  test "a registered built command persists to the manifest + reload_persisted re-registers it from cache" do
+    dir = Path.join(System.tmp_dir!(), "cpersist-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, "index.c"), ~S|#include <stdio.h>
+int main(void){ printf("persisted\n"); return 0; }
+|)
+
+    assert {:ok, _} = CommandRegistry.register_built_dir("wbpersist", dir, "c")
+    # reload from the on-disk manifest (no rebuild) re-registers it — the boot-survival path
+    assert CommandRegistry.reload_persisted() >= 1
+    assert "wbpersist" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("wbpersist", "", [])
+    assert out =~ "persisted"
+    File.rm_rf!(dir)
+  end
 end
