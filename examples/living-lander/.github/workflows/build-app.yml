@@ -1,0 +1,49 @@
+# Step 2 of the GitOps deploy spine (wb-642i / runtime/docs/GITOPS.org): the CI
+# BRIDGE. The runtime can't run `vite build` (no bun on the BEAM box), so when a
+# human pushes app SOURCE, this Action builds the app and commits `dist/` back.
+# The running runtime then PULLS (src + dist) and ships dist live (SitePublish
+# .deploy_app on GitOps reconcile) — so "push source" ⇒ "live", no redeploy.
+#
+# This is the interim bridge. The goal (step 3) is the runtime building the app
+# IN-SANDBOX on pull, which retires this workflow entirely.
+name: build-app
+
+on:
+  push:
+    branches: [main]
+    # SOURCE only — a dist-only commit (below) does NOT match, so committing the
+    # build can't retrigger the build (belt: the commit also carries [skip ci]).
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'index.html'
+      - 'vite.config.js'
+      - 'svelte.config.js'
+
+permissions:
+  contents: write   # so GITHUB_TOKEN can commit the built dist back
+
+concurrency:
+  group: build-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: commit built dist
+        run: |
+          git config user.name "workbooks-ci"
+          git config user.email "ci@workbooks.sh"
+          git add -f dist
+          if git diff --cached --quiet; then
+            echo "dist unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "build: app dist [skip ci]"
+          git push

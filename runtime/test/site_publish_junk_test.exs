@@ -15,6 +15,30 @@ defmodule Workbooks.SitePublishJunkTest do
     :ok
   end
 
+  test "deploy_app ships dist/ to the served root, clears stale assets, no-ops without dist" do
+    workdir = Path.join(@data, "app")
+    dest = Path.join([@data, "build/public/apptest"])
+
+    # no dist yet → no-op
+    File.mkdir_p!(workdir)
+    assert {:ok, 0} = Workbooks.SitePublish.deploy_app(workdir, "apptest")
+
+    # a stale asset already served (from a prior build) — must be cleared
+    File.mkdir_p!(Path.join(dest, "assets"))
+    File.write!(Path.join(dest, "assets/old-DEADBEEF.js"), "stale")
+
+    # build output appears in the repo (CI committed it, or in-sandbox build)
+    File.mkdir_p!(Path.join(workdir, "dist/assets"))
+    File.write!(Path.join(workdir, "dist/index.html"), "<!doctype html><div id=app></div>")
+    File.write!(Path.join(workdir, "dist/assets/index-NEW123.js"), "console.log('new')")
+
+    assert {:ok, 2} = Workbooks.SitePublish.deploy_app(workdir, "apptest")
+    assert File.exists?(Path.join(dest, "index.html"))
+    assert File.exists?(Path.join(dest, "assets/index-NEW123.js"))
+    # the stale bundle is gone (renamed-bundle hygiene)
+    refute File.exists?(Path.join(dest, "assets/old-DEADBEEF.js"))
+  end
+
   test "publish copies real content but drops ._AppleDouble and .DS_Store" do
     workdir = Path.join(@data, "repo")
     stories = Path.join(workdir, "content/stories")

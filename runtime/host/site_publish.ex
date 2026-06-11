@@ -52,6 +52,48 @@ defmodule Workbooks.SitePublish do
     e -> {:error, Exception.message(e)}
   end
 
+  @doc """
+  Ship the BUILT app (the tenant repo's `dist/`) to the served site ROOT — the
+  "deploy the app" half of publish (content is the other half). A no-op when there
+  is no `dist/`: the app build runs in CI and commits `dist` back, OR — the goal —
+  the runtime builds it in-sandbox on pull. Clears stale `assets/` first so a
+  renamed bundle leaves nothing behind. Returns `{:ok, count}` (0 when no dist).
+
+  Called on GitOps reconcile (a pulled `dist` goes live) and invocable as
+  `wb deploy app` — so "commit a built dist" ⇒ "live", the same commit-⇒-live
+  invariant content already has.
+  """
+  def deploy_app(workdir, tenant) when is_binary(workdir) do
+    dist = Path.join(Path.expand(workdir), "dist")
+
+    if File.dir?(dist) do
+      dest = site_dir(tenant)
+      File.mkdir_p!(dest)
+      # the built app owns the site ROOT (index.html + assets); content/blog are
+      # layered separately by publish/2. Clear old assets so a renamed bundle
+      # can't leave stale files served.
+      File.rm_rf!(Path.join(dest, "assets"))
+
+      copied =
+        Path.wildcard(Path.join(dist, "**"))
+        |> Enum.filter(&File.regular?/1)
+        |> Enum.reject(&junk?/1)
+        |> Enum.reduce(0, fn src, n ->
+          rel = Path.relative_to(src, dist)
+          dst = Path.join(dest, rel)
+          File.mkdir_p!(Path.dirname(dst))
+          File.cp!(src, dst)
+          n + 1
+        end)
+
+      {:ok, copied}
+    else
+      {:ok, 0}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
   # Mirror every regular file under workdir/<tree> into dest/<tree>/…, preserving
   # the relative path. Path-contained: only files resolving strictly inside the
   # workdir are copied (a symlink/`..` can't smuggle a path out of the workdir).

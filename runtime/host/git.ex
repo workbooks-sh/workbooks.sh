@@ -284,9 +284,12 @@ defmodule Workbooks.Git do
 
       case git(dir, ["-c", "core.hooksPath=/dev/null", "merge", "--no-edit", "origin/#{branch}"]) do
         {_, 0} ->
-          # CODE is now live + versioned; republish DATA so the served site reflects
-          # the merged state (commit ⇒ live, same invariant as commit_and_push).
+          # CODE is now live + versioned. Republish DATA (content/blog) AND ship the
+          # built app (dist/ → site root) so the merged state is fully live — commit
+          # ⇒ live. deploy_app is a no-op until a built dist exists (CI bridge today,
+          # in-sandbox build tomorrow).
           _ = Workbooks.SitePublish.publish(dir, tenant)
+          _ = Workbooks.SitePublish.deploy_app(dir, tenant)
           {:ok, {:applied, %{commits: count(dir, "ORIG_HEAD..HEAD"), files: changed}}}
 
         {_, _} ->
