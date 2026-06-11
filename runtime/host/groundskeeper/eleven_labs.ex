@@ -27,13 +27,18 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
       name: "groundskeeper",
       conversation_config: %{
         agent: %{
-          first_message:
-            "Aye. The grounds are kept. What are we thinking about?",
+          # The app computes a contextual opener per call (time of day +
+          # fresh results) and passes it as a dynamic variable.
+          first_message: "{{greeting}}",
           prompt: %{
             prompt: persona!(),
             tools: tools(base_url)
           }
-        }
+        },
+        tts: %{voice_id: System.get_env("WB_GK_VOICE_ID", "U5UjeJMsOvyhYhXfZdvZ")},
+        # Fill-the-silence: when the founder goes quiet this long, the agent
+        # takes the turn (persona law 3 says how).
+        turn: %{turn_timeout: 10}
       }
     }
 

@@ -1,80 +1,97 @@
 <!doctype html>
-<!-- groundskeeper — voice-first, one orb, nothing else (wb-3ojf.5).
+<!-- groundskeeper — voice-first, one living orb (wb-3ojf.5).
      Served by the bridge at /gk/app, or wrapped by the native shell (which
-     seeds gk-bridge/gk-secret into localStorage at build time; this committed
-     file carries no credentials). Voice: @elevenlabs/client over a signed URL
-     minted host-side. -->
+     seeds gk-bridge/gk-secret at build time; this committed file carries no
+     credentials). Voice: @elevenlabs/client over a host-minted signed URL.
+     CONTEXT PASS: before each session the app gathers a briefing from the
+     bridge (fresh completions, open work, latest commits) and hands it to the
+     agent as dynamic variables — so it greets you and continues the thread
+     instead of rebooting the relationship every call. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>groundskeeper</title>
 <style>
-  :root { --green:#3fe081; --green-dim:#149157; --bg:#070b08; --text:#d7e4da; --mut:#5d7264; }
+  :root {
+    --paper:#faf6ee; --ink:#2b2620; --soft:#9a8f7f;
+    --coral:#ff6b57; --sun:#ffc145; --sky:#4cc9f0; --leaf:#3fc97c; --plum:#b388eb;
+  }
   * { box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent; }
   html,body { height:100%; }
   body {
-    background: radial-gradient(120% 90% at 50% 0%, #0c130e 0%, var(--bg) 60%);
-    color: var(--text);
-    font: 14px/1.5 ui-monospace, "Geist Mono", SFMono-Regular, Menlo, monospace;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.55 ui-rounded, -apple-system, "SF Pro Rounded", system-ui, sans-serif;
     display:flex; flex-direction:column; align-items:center;
-    padding: calc(env(safe-area-inset-top) + 18px) 24px calc(env(safe-area-inset-bottom) + 28px);
+    padding: calc(env(safe-area-inset-top) + 16px) 24px calc(env(safe-area-inset-bottom) + 16px);
     user-select:none; -webkit-user-select:none;
   }
-  #mark { font-size:12px; letter-spacing:.28em; color:var(--mut); }
-  #mark b { color:var(--green); font-weight:600; }
+  #mark { font-size:13px; font-weight:700; letter-spacing:.14em; color:var(--soft); }
 
-  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:34px; width:100%; }
+  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:30px; width:100%; }
 
-  #orb {
-    width:172px; height:172px; border-radius:50%;
-    border:1px solid rgba(63,224,129,.35);
-    background:
-      radial-gradient(circle at 38% 32%, rgba(63,224,129,.22), transparent 58%),
-      radial-gradient(circle at 50% 50%, rgba(20,145,87,.16), rgba(7,11,8,.9) 70%);
-    box-shadow: 0 0 36px rgba(63,224,129,.10), inset 0 0 28px rgba(63,224,129,.08);
-    transition: box-shadow .4s, border-color .4s, transform .2s;
+  /* the orb: a spinning multicolor gradient blurred inside a crisp circle —
+     a cheap, dependency-free "shader" that reads alive on any WKWebView */
+  #orb { width:190px; height:190px; border-radius:50%; overflow:hidden; position:relative;
+         box-shadow: 0 18px 44px rgba(43,38,32,.16), inset 0 0 0 6px var(--paper), inset 0 0 0 7px rgba(43,38,32,.08);
+         transition: transform .18s; }
+  #orb:active { transform: scale(.96); }
+  #orb .swirl {
+    position:absolute; inset:-30%;
+    background: conic-gradient(var(--coral), var(--sun), var(--leaf), var(--sky), var(--plum), var(--coral));
+    filter: blur(22px) saturate(1.15);
+    animation: spin 14s linear infinite;
   }
-  #orb:active { transform: scale(.97); }
-  body.connecting #orb { animation: pulse 1.1s ease-in-out infinite; }
-  body.listening  #orb { border-color: rgba(63,224,129,.8); box-shadow: 0 0 56px rgba(63,224,129,.28), inset 0 0 34px rgba(63,224,129,.14); animation: breathe 3.2s ease-in-out infinite; }
-  body.speaking   #orb { border-color: var(--green); box-shadow: 0 0 80px rgba(63,224,129,.45), inset 0 0 40px rgba(63,224,129,.22); animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes breathe { 50% { transform: scale(1.045); } }
-  @keyframes pulse   { 50% { transform: scale(1.03); opacity:.86; } }
+  #orb .core {
+    position:absolute; inset:26%; border-radius:50%;
+    background: radial-gradient(circle at 38% 32%, #fffdf7 0%, rgba(255,253,247,.65) 55%, rgba(255,253,247,.15) 100%);
+    filter: blur(2px);
+    transition: inset .5s;
+  }
+  @keyframes spin { to { transform: rotate(1turn); } }
 
-  #status { font-size:12px; letter-spacing:.18em; color:var(--mut); text-transform:lowercase; min-height:18px; }
-  body.listening #status, body.speaking #status { color: var(--green-dim); }
+  body.idle #orb .swirl { animation-duration: 26s; filter: blur(26px) saturate(.7) brightness(1.06); }
+  body.connecting #orb .swirl { animation-duration: 2.4s; }
+  body.listening #orb { animation: breathe 3s ease-in-out infinite; }
+  body.listening #orb .swirl { animation-duration: 9s; }
+  body.listening #orb .core { inset: 33%; }
+  body.speaking #orb { animation: bop 1.2s ease-in-out infinite; }
+  body.speaking #orb .swirl { animation-duration: 5s; filter: blur(18px) saturate(1.45); }
+  body.speaking #orb .core { inset: 20%; }
+  @keyframes breathe { 50% { transform: scale(1.04); } }
+  @keyframes bop { 30% { transform: scale(1.05); } 60% { transform: scale(.99); } }
+
+  #status { font-size:13px; font-weight:600; letter-spacing:.04em; color:var(--soft); min-height:20px; }
 
   #caption {
-    min-height:66px; max-width:34ch; text-align:center; color:var(--text);
-    font-size:15px; line-height:1.55; opacity:0; transition: opacity .5s;
+    min-height:72px; max-width:36ch; text-align:center; font-size:16px;
+    opacity:0; transform: translateY(4px); transition: opacity .45s, transform .45s;
   }
-  #caption.show { opacity:.92; }
+  #caption.show { opacity:1; transform:none; }
 
-  /* the single fallback surface: a centered field, shown only when locked /
-     unconfigured. no dialogs, no panels. */
-  #gate { display:none; flex-direction:column; gap:12px; width:min(78vw,300px); }
+  #gate { display:none; flex-direction:column; gap:10px; width:min(78vw,300px); }
   body.locked #gate { display:flex; }
   body.locked #orb, body.locked #status, body.locked #caption { display:none; }
   #gate input {
-    width:100%; padding:14px 16px; font:inherit; text-align:center; border-radius:12px;
-    background:rgba(255,255,255,.04); color:var(--text); border:1px solid rgba(63,224,129,.25); outline:none;
+    width:100%; padding:14px 16px; font:inherit; text-align:center; border-radius:14px;
+    background:#fff; color:var(--ink); border:2px solid #e8e0d2; outline:none;
   }
-  #gate input:focus { border-color: var(--green-dim); }
-  #gate .hint { font-size:11px; color:var(--mut); text-align:center; }
+  #gate input:focus { border-color: var(--sun); }
+  #gate .hint { font-size:12px; color:var(--soft); text-align:center; }
 </style>
 </head>
-<body>
-  <div id="mark"><b>●</b>&nbsp;GROUNDSKEEPER</div>
+<body class="idle">
+  <div id="mark">groundskeeper</div>
 
   <div id="stage">
     <div id="gate">
       <input id="password" type="password" placeholder="password" autocomplete="current-password" enterkeyhint="go">
-      <div class="hint">the gate is locked</div>
+      <div class="hint">locked — password opens 30 days</div>
     </div>
-    <div id="orb"></div>
+    <div id="orb"><div class="swirl"></div><div class="core"></div></div>
     <div id="status">tap to talk</div>
     <div id="caption"></div>
   </div>
@@ -83,12 +100,11 @@
   import { Conversation } from "https://esm.sh/@elevenlabs/client@latest";
 
   const $ = (id) => document.getElementById(id);
-  const body = document.body;
   let convo = null;
 
   const base = () => localStorage.getItem("gk-bridge") || "";
   const secret = () => localStorage.getItem("gk-secret") || "";
-  const setState = (s, label) => { body.className = s; $("status").textContent = label; };
+  const setState = (s, label) => { document.body.className = s; $("status").textContent = label; };
   const caption = (t) => { const c = $("caption"); c.textContent = t; c.classList.toggle("show", !!t); };
 
   const bridge = async (path, payload) => {
@@ -103,33 +119,61 @@
     return r.json();
   };
 
+  // The context pass: gather what changed since last talk, in parallel, fast.
+  // Failures degrade to an empty briefing — the call still starts.
+  async function gatherContext() {
+    const [t, r] = await Promise.allSettled([
+      bridge("/gk/tool/tasks"),
+      bridge("/gk/tool/repo_state", { query: "log" })
+    ]);
+    const tasks = t.status === "fulfilled" ? t.value : { tasks: [], feedback: [] };
+    const fresh = (tasks.feedback || [])
+      .map((f) => `"${(f.goal || f.task || "").slice(0, 80)}" came back ${f.status}: ${(f.summary || "").slice(0, 120)}`);
+    const open = (tasks.tasks || []).filter((x) => x.status === "doing" || x.status === "queued");
+    const log = r.status === "fulfilled" ? (r.value.log || "").split("\n").slice(0, 4).join("\n") : "";
+
+    const hour = new Date().getHours();
+    const hi = hour < 5 ? "up late?" : hour < 12 ? "morning." : hour < 18 ? "afternoon." : "evening.";
+    const greeting = fresh.length
+      ? `${hi} while you were gone — ${fresh[0].split(":")[0]}. want the details?`
+      : `${hi} what are we thinking about?`;
+
+    const briefing = [
+      fresh.length ? `FRESH RESULTS (relay naturally if relevant):\n${fresh.join("\n")}` : "",
+      open.length ? `STILL RUNNING: ${open.map((x) => x.goal.slice(0, 60)).join(" | ")}` : "",
+      log ? `LATEST COMMITS:\n${log}` : ""
+    ].filter(Boolean).join("\n\n") || "nothing new since last conversation.";
+
+    return { greeting, briefing };
+  }
+
   async function start() {
-    setState("connecting", "connecting");
+    setState("connecting", "waking up");
     try {
-      const { signed_url } = await bridge("/gk/tool/signed_url");
+      const [{ signed_url }, ctx] = await Promise.all([bridge("/gk/tool/signed_url"), gatherContext()]);
       convo = await Conversation.startSession({
         signedUrl: signed_url,
         connectionType: "websocket",
+        dynamicVariables: { greeting: ctx.greeting, briefing: ctx.briefing },
         onConnect: () => setState("listening", "listening"),
         onDisconnect: () => stop(true),
-        onModeChange: (m) => setState(m.mode === "speaking" ? "speaking" : "listening", m.mode),
+        onModeChange: (m) => setState(m.mode === "speaking" ? "speaking" : "listening", m.mode === "speaking" ? "…" : "listening"),
         onMessage: (m) => { if (m.source === "ai") caption(m.message); },
         onError: (e) => { caption("⚠ " + (e?.message || e)); stop(true); }
       });
     } catch (e) {
-      if (e.message !== "locked") { caption("⚠ " + e.message); setState("", "tap to talk"); }
+      if (e.message !== "locked") { caption("⚠ " + e.message); setState("idle", "tap to talk"); }
     }
   }
   async function stop(silent) {
     try { await convo?.endSession(); } catch {}
     convo = null;
     if (!silent) caption("");
-    setState("", "tap to talk");
+    setState("idle", "tap to talk");
   }
 
   $("orb").onclick = () => (convo ? stop() : start());
 
-  // PWA unlock: password → 30-day session cookie; secrets stay host-side.
   $("password").addEventListener("keydown", async (ev) => {
     if (ev.key !== "Enter") return;
     const r = await fetch(base() + "/gk/login", {
@@ -137,11 +181,10 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ password: $("password").value })
     });
-    if (r.ok) { $("password").value = ""; setState("", "tap to talk"); }
-    else $("password").value = "";
+    $("password").value = "";
+    if (r.ok) setState("idle", "tap to talk");
   });
 
-  // Probe auth once at open so the gate shows immediately when needed.
   bridge("/gk/tool/tasks").catch(() => {});
 </script>
 </body>
