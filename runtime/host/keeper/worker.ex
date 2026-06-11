@@ -315,6 +315,11 @@ defmodule Workbooks.Keeper.Worker do
       "MODE: #{mode}\n#{lifecycle_line}Perform one keeper run per your loop. Your working directory is this page's git repo.",
       exec: true,
       workdir: workdir,
+      # Thread the tenant through: without it the agent defaults to tenant "dev",
+      # so its commit→auto-publish wrote to build/public/DEV instead of the served
+      # build/public/<tenant> dir — the lander committed 4 posts that 404'd because
+      # they published to the wrong site root. Affects the crew identically.
+      tenant: tenant,
       agent: cfg.agent,
       max_steps: 60
     )
