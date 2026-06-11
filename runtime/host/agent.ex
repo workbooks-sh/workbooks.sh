@@ -389,10 +389,15 @@ defmodule Workbooks.Agent do
   # agent read) — so their "filesystem" tools target that workdir, not the
   # per-agent in-memory VFS. Non-exec agents use the sandboxed VFS.
   defp exec_one(%{name: "vfs_write", args: a}, %{exec: true} = st) do
-    path = in_workdir(st.workdir, a["path"])
-    File.mkdir_p!(Path.dirname(path))
-    File.write!(path, a["content"] || "")
-    {"wrote #{byte_size(a["content"] || "")} bytes to #{a["path"]}", st, nil}
+    case safe_path(st.workdir, a["path"]) do
+      {:ok, path} ->
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, a["content"] || "")
+        {"wrote #{byte_size(a["content"] || "")} bytes to #{a["path"]}", st, nil}
+
+      :escape ->
+        {"write blocked: path escapes your working dir (#{a["path"]}) — you can only write inside it", st, nil}
+    end
   rescue
     e -> {"write error: #{Exception.message(e)}", st, nil}
   end
@@ -403,10 +408,17 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "vfs_read", args: a}, %{exec: true} = st) do
-    out = case File.read(in_workdir(st.workdir, a["path"])) do
-      {:ok, c} -> c
-      {:error, r} -> "not found: #{a["path"]} (#{r})"
-    end
+    out =
+      case safe_path(st.workdir, a["path"]) do
+        {:ok, path} ->
+          case File.read(path) do
+            {:ok, c} -> c
+            {:error, r} -> "not found: #{a["path"]} (#{r})"
+          end
+
+        :escape ->
+          "read blocked: path escapes your working dir (#{a["path"]})"
+      end
 
     {out, st, nil}
   end
@@ -442,6 +454,21 @@ defmodule Workbooks.Agent do
   defp image_contained?(workdir, dest) do
     String.starts_with?(Path.expand(dest) <> "/", Path.expand(workdir) <> "/")
   end
+
+  # Resolve an agent path AND enforce containment: the file tools (vfs_read/
+  # vfs_write) must not escape the workdir. Without this an exec agent could
+  # read/write any host file (`/etc/passwd`, host `*.ex`, another tenant's repo,
+  # secrets) via an absolute path or `../` — the hole that made the autopoet's
+  # "confined to the config layer" claim false. `:escape` is returned for any
+  # path resolving outside the workdir.
+  defp safe_path(workdir, rel) do
+    abs = in_workdir(workdir, rel)
+    if image_contained?(workdir, abs), do: {:ok, abs}, else: :escape
+  end
+
+  @doc false
+  # test seam for the containment guard (security-critical — see safe_path/2)
+  def safe_path_for_test(workdir, rel), do: safe_path(workdir, rel)
 
   # Research fetch: GET a URL, strip HTML to readable text, truncate for the model.
   defp fetch_url(url) do
