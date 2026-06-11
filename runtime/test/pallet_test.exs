@@ -89,11 +89,32 @@ defmodule Workbooks.PalletTest do
   end
 
   @tag :pallet
-  @tag timeout: 600_000
-  test "seed_csource_one builds + registers a C tool from source (duk)" do
-    assert :ok = Pallet.seed_csource_one("duk")
-    assert "duk" in CommandRegistry.list()
-    assert {:ok, out} = CommandRegistry.run("duk", "", ["-e", "6*7"])
-    assert String.trim(out) == "42"
+  @tag timeout: 900_000
+  test "every @csource tool builds in-sandbox + runs (full-catalog regression)" do
+    # build + register each build-from-source tool — catches recipe rot (url/sha/source/lane changes)
+    for e <- Pallet.csource_catalog() do
+      assert :ok = Pallet.seed_csource_one(e.name), "#{e.name} should build + register from source"
+      assert e.name in CommandRegistry.list()
+    end
+
+    # a representative smoke per category
+    assert {:ok, lua} = CommandRegistry.run("lua", "", ["-e", "print(6*7)"])
+    assert lua =~ "42"
+    assert {:ok, qjs} = CommandRegistry.run("qjs", "", ["-e", "6*7"])
+    assert qjs =~ "42"
+    assert {:ok, wren} = CommandRegistry.run("wren", "", ["-e", "System.print(6*7)"])
+    assert wren =~ "42"
+    assert {:ok, md} = CommandRegistry.run("md", "# Hi", [])
+    assert md =~ "<h1>"
+    assert {:ok, b2} = CommandRegistry.run("b2", "abc", [])
+    assert b2 =~ "ba80a53f"
+
+    assert {:ok, gzc} = CommandRegistry.run("gz", "roundtrip-zlib", [])
+    assert {:ok, gzb} = CommandRegistry.run("gz", gzc, ["-d"])
+    assert gzb =~ "roundtrip-zlib"
+
+    assert {:ok, l4c} = CommandRegistry.run("lz4", "roundtrip-lz4", [])
+    assert {:ok, l4b} = CommandRegistry.run("lz4", l4c, ["-d"])
+    assert l4b =~ "roundtrip-lz4"
   end
 end
