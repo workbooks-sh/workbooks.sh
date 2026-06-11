@@ -122,8 +122,25 @@ defmodule Workbooks.Shell do
           [?> | r] -> {true, r}
           _ -> {false, rest}
         end
-        {file, rest3} = read_fname(rest2)
-        do_redirs(rest3, clean, infile, file, ap, nil)
+        # `2>` (or any `N>`) is an fd redirect — pop the digit we already buffered.
+        {clean, fd?} = case clean do
+          [d | t] when d in ?0..?9 -> {t, true}
+          _ -> {clean, false}
+        end
+        # `>&1` style (e.g. 2>&1) → discard the `&N` token, no file.
+        {file, rest3} =
+          case rest2 do
+            [?& | r] -> {tok, r2} = read_fname(r); {"&" <> tok, r2}
+            _ -> read_fname(rest2)
+          end
+        # DISCARD a redirect to the bit-bucket or an fd dup, and any fd-redirect
+        # to a path: the wasm shell has no /dev/null and no separate stderr, so
+        # `cmd 2>/dev/null` / `cmd 2>&1` are no-ops, NOT errors (this was the
+        # single biggest source of the lander's per-run thrash — wb-91j follow-up).
+        discard = fd? or file == "/dev/null" or String.starts_with?(file, "/dev/") or String.starts_with?(file, "&")
+        if discard,
+          do: do_redirs(rest3, clean, infile, outfile, append, nil),
+          else: do_redirs(rest3, clean, infile, file, ap, nil)
 
       is_nil(q) and c == ?< ->
         {file, rest2} = read_fname(rest)

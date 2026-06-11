@@ -194,7 +194,18 @@ defmodule Workbooks.Git do
     case git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message], env: commit_env(id)) do
       {_, 0} ->
         {sha, _} = git(dir, ["rev-parse", "--short", "HEAD"])
-        {:ok, String.trim(sha) <> maybe_push(dir)}
+        # COMMIT ⇒ PUBLISH, atomically (the lander shipped blogs that were
+        # committed but 404 because the run died before a separate publish step).
+        # Mirroring content/** + blog/** to the live site dir here means
+        # "committed" always implies "live" — a run can die any time after the
+        # commit and the page still reflects the repo.
+        pub =
+          case Workbooks.SitePublish.publish(dir, tenant) do
+            {:ok, n} when n > 0 -> " (published #{n})"
+            _ -> ""
+          end
+
+        {:ok, String.trim(sha) <> maybe_push(dir) <> pub}
 
       {_, _} ->
         {:nochange, dir}
