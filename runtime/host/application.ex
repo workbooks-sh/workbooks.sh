@@ -63,6 +63,18 @@ defmodule Workbooks.Application do
       )
     end)
 
+    # Lane-A command pallet (opt-in WB_PALLET=1): seed the prebuilt-WASI tools — python/ruby/sqlite3/
+    # coreutils/wabt/prolog/wasm3 — into the CommandRegistry in a TASK so the network fetches never
+    # block boot. Idempotent (re-register replaces); artifacts are content-addressed (cached after first).
+    if System.get_env("WB_PALLET") == "1" do
+      Task.start(fn ->
+        results = Workbooks.Pallet.seed()
+        ok = Enum.count(results, fn {_n, r} -> r == :ok end)
+        require Logger
+        Logger.info("command pallet seeded — #{ok}/#{map_size(results)} prebuilt-WASI tools live")
+      end)
+    end
+
     trace("start: done")
     {:ok, sup}
   end
