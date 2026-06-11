@@ -349,7 +349,8 @@ defmodule Workbooks.CommandRegistry do
             unpack = Path.join(System.tmp_dir!(), "wbcsrc-#{got}")
             File.rm_rf!(unpack)
             File.mkdir_p!(unpack)
-            {tout, tc} = System.cmd("tar", ["xzf", tmp, "-C", unpack], stderr_to_stdout: true)
+            # `xf` (no z/J) lets tar auto-detect the compression → handles .tar.gz / .tar.xz / .tar.bz2.
+            {tout, tc} = System.cmd("tar", ["xf", tmp, "-C", unpack], stderr_to_stdout: true)
             File.rm(tmp)
 
             if tc != 0 do
@@ -379,6 +380,12 @@ defmodule Workbooks.CommandRegistry do
               for g <- globs, f <- Path.wildcard(Path.join(top, g)), File.regular?(f) do
                 b = Path.basename(f)
                 unless b in exclude, do: File.cp!(f, Path.join(builddir, b))
+              end
+
+              # :extra_sources — inject custom {filename, content} files (e.g. a minimal CLI main for a
+              # library whose bundled CLI drags in too many extras, or a tool needing a small harness).
+              for {fname, content} <- opts[:extra_sources] || [] do
+                File.write!(Path.join(builddir, fname), content)
               end
 
               res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [])
