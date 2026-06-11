@@ -244,17 +244,30 @@ defmodule Workbooks.Compilers do
         # the driver can't batch+link under WASI). Collect the produced object guest-paths.
         srcs = [{srcname, "out.o"}] ++ Enum.map(extra_names, &{&1, Path.rootname(&1) <> ".o"})
 
+        # Compile the sources in PARALLEL — each clang invocation reads a DISTINCT source (read-only)
+        # and writes a DISTINCT object in the shared /work (outputs never collide), so concurrent
+        # wasmtime processes are safe. ~1.7x on a 33-file build (Lua 280s→166s; clang.wasm is CPU-bound
+        # so N instances compete rather than scale linearly). Capped so heavy instances don't OOM.
+        conc = max(1, min(System.schedulers_online() - 1, 6))
+
         logs1 =
-          for {sn, on} <- srcs do
-            CommandRegistry.run(
-              cli,
-              "",
-              ["clang", "--target=#{target}", "--sysroot=/usr", "-O2"] ++
-                inc_flags ++ extra ++ ["-c", "/work/#{sn}", "-o", "/work/#{on}"],
-              preopens,
-              ropts
-            )
-          end
+          srcs
+          |> Task.async_stream(
+            fn {sn, on} ->
+              CommandRegistry.run(
+                cli,
+                "",
+                ["clang", "--target=#{target}", "--sysroot=/usr", "-O2"] ++
+                  inc_flags ++ extra ++ ["-c", "/work/#{sn}", "-o", "/work/#{on}"],
+                preopens,
+                ropts
+              )
+            end,
+            max_concurrency: conc,
+            timeout: :infinity,
+            ordered: true
+          )
+          |> Enum.map(fn {:ok, log} -> log end)
 
         log1 = List.first(logs1)
         objs = Enum.map(srcs, fn {_, on} -> on end)
