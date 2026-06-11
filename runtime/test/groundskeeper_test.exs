@@ -181,6 +181,21 @@ defmodule GroundskeeperTest do
     assert content =~ "* DONE finished run"
   end
 
+  # ── the workbook app ────────────────────────────────────────────────────────
+
+  test "GET /app serves the workbook shell without any secret", %{home: home} do
+    File.mkdir_p!(Path.join(home, "app"))
+    File.write!(Path.join([home, "app", "groundskeeper.html"]), "<!doctype html><title>gk</title>")
+
+    c = conn(:get, "/app") |> Workbooks.Groundskeeper.Router.call(Workbooks.Groundskeeper.Router.init([]))
+    assert c.status == 200
+    assert c.resp_body =~ "gk"
+  end
+
+  test "signed_url tool is secret-gated like every other tool" do
+    assert call(:post, "/tool/signed_url", %{}).status == 403
+  end
+
   # ── the board ───────────────────────────────────────────────────────────────
 
   test "board sync renders BOARD.org from bd json (stubbed bd)", %{home: home} do

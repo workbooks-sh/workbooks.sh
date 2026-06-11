@@ -79,3 +79,7 @@ secrets.env
 .claude/skills/*
 !.claude/skills/workbooks-system
 examples/groundwork/runs/
+examples/groundwork/app/native/node_modules/
+examples/groundwork/app/native/ios/
+examples/groundwork/app/native/www/
+examples/groundwork/app/native/package-lock.json

@@ -1,0 +1,188 @@
+<!doctype html>
+<!-- groundskeeper — the founder's voice chief-of-staff, as a workbook (wb-3ojf.5).
+     One self-contained HTML file served by the runtime bridge (/gk/app).
+     Voice: ElevenLabs browser SDK over a signed URL the bridge mints server-side
+     (the agent stays private; the API key never leaves the host). The bridge
+     secret is entered once on-device and lives in localStorage — this file
+     carries no credentials. On iPhone: open in Safari → Share → Add to Home
+     Screen. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>groundskeeper</title>
+<style>
+  :root {
+    --green: #3fe081; --green-dim: #149157; --bg: #0a0f0c; --panel: #101712;
+    --line: #1d2a20; --text: #d7e4da; --mut: #6d8274;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; border-bottom: 1px solid var(--line);
+  }
+  header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--mut); }
+  header .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: .04em; }
+  header .state { margin-left: auto; color: var(--mut); font-size: 12px; }
+
+  main { flex: 1; overflow-y: auto; padding: 14px 16px; -webkit-overflow-scrolling: touch; }
+  .turn { margin-bottom: 12px; max-width: 92%; }
+  .turn .who { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); margin-bottom: 2px; }
+  .turn.agent .who { color: var(--green-dim); }
+  .turn p { white-space: pre-wrap; word-break: break-word; }
+  .turn.user { margin-left: auto; text-align: right; }
+  .sys { color: var(--mut); font-size: 12px; text-align: center; margin: 10px 0; }
+
+  #tasks { border-top: 1px solid var(--line); padding: 10px 16px; max-height: 28vh; overflow-y: auto; }
+  #tasks h2 { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
+  #tasks .t { display: flex; gap: 8px; font-size: 12px; padding: 3px 0; }
+  #tasks .t .st { min-width: 64px; color: var(--mut); }
+  #tasks .t .st.done { color: var(--green); }
+  #tasks .t .st.doing { color: #e0c33f; }
+  #tasks .t .st.blocked { color: #e05a3f; }
+
+  footer { padding: 12px 16px 18px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+  button {
+    flex: 1; padding: 14px; font: inherit; font-weight: 600; letter-spacing: .06em;
+    border-radius: 12px; border: 1px solid var(--green-dim);
+    background: transparent; color: var(--green); -webkit-tap-highlight-color: transparent;
+  }
+  button.primary { background: var(--green); color: #07130b; border-color: var(--green); }
+  button:disabled { opacity: .35; }
+
+  dialog {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px; width: min(92vw, 380px); margin: auto;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.7); }
+  dialog input {
+    width: 100%; margin: 10px 0 14px; padding: 12px; font: inherit;
+    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="dot"></div>
+  <h1>groundskeeper</h1>
+  <div class="state" id="state">idle</div>
+</header>
+
+<main id="feed">
+  <div class="sys">the grounds are kept — tap talk</div>
+</main>
+
+<section id="tasks">
+  <h2>dispatched work</h2>
+  <div id="tasklist"><div class="sys">—</div></div>
+</section>
+
+<footer>
+  <button id="talk" class="primary">talk</button>
+  <button id="setup" title="bridge secret">⚙</button>
+</footer>
+
+<dialog id="cfg">
+  <strong>bridge</strong>
+  <p style="color:var(--mut);font-size:12px;margin-top:6px">stored only on this device (localStorage). the page itself ships with no credentials. leave URL empty when opened from the bridge itself.</p>
+  <input id="bridgeUrl" type="url" placeholder="https://bridge-host (native shell only)" autocomplete="off">
+  <input id="secret" type="password" placeholder="x-gk-secret" autocomplete="off">
+  <button class="primary" id="saveCfg">save</button>
+</dialog>
+
+<script type="module">
+  import { Conversation } from "https://esm.sh/@elevenlabs/client@latest";
+
+  const $ = (id) => document.getElementById(id);
+  const feed = $("feed"), dot = $("dot"), state = $("state");
+  let convo = null;
+
+  const secret = () => localStorage.getItem("gk-secret") || "";
+  // Same-origin when served by the bridge (/gk/app); a native shell
+  // (capacitor://) has no usable origin, so the bridge URL is configured
+  // on-device alongside the secret.
+  const base = () => localStorage.getItem("gk-bridge") || "";
+  const bridge = (path, body) =>
+    fetch(base() + path, {
+      method: "POST",
+      headers: { "x-gk-secret": secret(), "content-type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then((r) => { if (!r.ok) throw new Error("bridge " + r.status); return r.json(); });
+
+  function say(role, text) {
+    if (!text) return;
+    const d = document.createElement("div");
+    d.className = "turn " + role;
+    d.innerHTML = `<div class="who">${role === "agent" ? "groundskeeper" : "you"}</div><p></p>`;
+    d.querySelector("p").textContent = text;
+    feed.appendChild(d);
+    feed.scrollTop = feed.scrollHeight;
+  }
+  function sys(text) {
+    const d = document.createElement("div");
+    d.className = "sys"; d.textContent = text;
+    feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
+  }
+
+  async function start() {
+    if (!secret()) { $("cfg").showModal(); return; }
+    $("talk").disabled = true; state.textContent = "connecting…";
+    try {
+      const { signed_url } = await bridge("/gk/tool/signed_url");
+      convo = await Conversation.startSession({
+        signedUrl: signed_url,
+        connectionType: "websocket",
+        onConnect: () => { dot.classList.add("live"); state.textContent = "listening"; $("talk").textContent = "end"; $("talk").disabled = false; },
+        onDisconnect: () => stopUi(),
+        onModeChange: (m) => { state.textContent = m.mode; },
+        onMessage: (m) => say(m.source === "ai" ? "agent" : "user", m.message),
+        onError: (e) => { sys("error: " + (e?.message || e)); stopUi(); }
+      });
+    } catch (e) {
+      sys("could not start: " + e.message);
+      stopUi();
+    }
+  }
+  function stopUi() {
+    dot.classList.remove("live"); state.textContent = "idle";
+    $("talk").textContent = "talk"; $("talk").disabled = false; convo = null;
+  }
+  async function stop() { try { await convo?.endSession(); } finally { stopUi(); } }
+
+  $("talk").onclick = () => (convo ? stop() : start());
+  $("setup").onclick = () => { $("secret").value = secret(); $("bridgeUrl").value = base(); $("cfg").showModal(); };
+  $("saveCfg").onclick = () => {
+    localStorage.setItem("gk-secret", $("secret").value.trim());
+    localStorage.setItem("gk-bridge", $("bridgeUrl").value.trim().replace(/\/$/, ""));
+    $("cfg").close(); refreshTasks();
+  };
+  // Native shell with nothing configured → open setup immediately.
+  if (location.protocol.startsWith("capacitor") && !base()) $("cfg").showModal();
+
+  async function refreshTasks() {
+    if (!secret()) return;
+    try {
+      const { tasks, feedback } = await bridge("/gk/tool/tasks");
+      (feedback || []).forEach((f) => sys(`◈ ${f.status}: ${f.goal || f.task} — ${f.summary}`));
+      $("tasklist").innerHTML = (tasks || []).length
+        ? tasks.map((t) =>
+            `<div class="t"><span class="st ${t.status}">${t.status}</span><span>${t.goal.slice(0, 90)}</span></div>`
+          ).join("")
+        : '<div class="sys">nothing dispatched</div>';
+    } catch { /* bridge unreachable; leave as-is */ }
+  }
+  setInterval(refreshTasks, 12000);
+  refreshTasks();
+</script>
+</body>
+</html>

@@ -13,8 +13,36 @@ defmodule Workbooks.Groundskeeper.Router do
   use Plug.Router
   alias Workbooks.Groundskeeper
 
+  plug(:cors)
   plug(:match)
   plug(:dispatch)
+
+  # The native workbook shell calls from capacitor://localhost — a cross-origin
+  # context with a custom header, so the browser preflights. Open CORS is safe
+  # here: every data route still requires the x-gk-secret (or the HMAC).
+  defp cors(conn, _opts) do
+    conn =
+      conn
+      |> Plug.Conn.put_resp_header("access-control-allow-origin", "*")
+      |> Plug.Conn.put_resp_header("access-control-allow-headers", "x-gk-secret, content-type")
+      |> Plug.Conn.put_resp_header("access-control-allow-methods", "GET, POST, OPTIONS")
+
+    if conn.method == "OPTIONS",
+      do: conn |> Plug.Conn.send_resp(204, "") |> Plug.Conn.halt(),
+      else: conn
+  end
+
+  # The workbook mobile app (wb-3ojf.5) — a single self-contained HTML file.
+  # Public shell: it ships no credentials (the bridge secret is entered
+  # on-device); every data/voice call it makes is secret-gated below.
+  get "/app" do
+    path = Path.join([Groundskeeper.home(), "app", "groundskeeper.html"])
+
+    case File.read(path) do
+      {:ok, html} -> conn |> Plug.Conn.put_resp_content_type("text/html") |> Plug.Conn.send_resp(200, html)
+      _ -> json(conn, 404, %{error: "app not installed in gk home"})
+    end
+  end
 
   post "/tool/:name" do
     {:ok, body, conn} = Plug.Conn.read_body(conn)
@@ -29,6 +57,14 @@ defmodule Workbooks.Groundskeeper.Router do
           "file_issue" -> Groundskeeper.file_issue(params["title"] || "untitled", params["description"] || "")
           "dispatch" -> Groundskeeper.dispatch(params["goal"] || "")
           "tasks" -> Groundskeeper.tasks()
+          # the workbook app's voice entry: a short-lived signed conversation
+          # URL minted host-side — the API key never reaches the client.
+          "signed_url" ->
+            case Workbooks.Groundskeeper.ElevenLabs.signed_url() do
+              {:ok, url} -> %{signed_url: url}
+              {:error, e} -> %{error: inspect(e)}
+            end
+
           _ -> %{error: "unknown tool #{name}"}
         end
 

@@ -51,6 +51,19 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
   def list_agents, do: request(:get, "/v1/convai/agents")
 
   @doc """
+  Mint a short-lived signed conversation URL for the (private) agent — what the
+  workbook app uses to start a browser voice session without ever seeing the
+  API key. Agent id from WB_GK_AGENT_ID.
+  """
+  def signed_url do
+    id = System.get_env("WB_GK_AGENT_ID") || raise "WB_GK_AGENT_ID not set"
+
+    with {:ok, %{"signed_url" => url}} <-
+           request(:get, "/v1/convai/conversation/get-signed-url?agent_id=#{id}"),
+         do: {:ok, url}
+  end
+
+  @doc """
   Run a server-side TEXT simulation of a conversation with the agent — the
   self-demo: a simulated founder talks; the agent (with its real prompt and
   tool configuration) responds and calls tools. Returns the simulated

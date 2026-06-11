@@ -1,0 +1,6 @@
+{
+  "appId": "sh.workbooks.groundskeeper",
+  "appName": "groundskeeper",
+  "webDir": "www",
+  "ios": { "contentInset": "always" }
+}
