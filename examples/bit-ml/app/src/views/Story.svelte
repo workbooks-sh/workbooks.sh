@@ -75,8 +75,8 @@
     {#if story.dek}<p class="dek">{@html dekHtml}</p>{/if}
 
     <div class="byline-row">
-      <span class="sources mono">{#if story.sources?.length}sources: {#each story.sources as s, i}<a href={s.url} target="_blank" rel="noopener">{s.label}</a>{#if i < story.sources.length - 1} · {/if}{/each}{/if}</span>
       {#if story.byline}<Byline {...bylineProps(story.byline)} {onagent} avatar />{/if}
+      <span class="sources mono">{#if story.sources?.length}sources: {#each story.sources as s, i}<a href={s.url} target="_blank" rel="noopener">{s.label}</a>{#if i < story.sources.length - 1} · {/if}{/each}{/if}</span>
     </div>
 
     <hr class="hair story-hr" />
@@ -150,8 +150,8 @@
   }
 
   .byline-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 16px; margin: 30px 0 0; flex-wrap: wrap;
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 6px; margin: 30px 0 0; text-align: left;
   }
   .sources { font-size: 11px; color: var(--ink-3); }
   .sources a { color: var(--ink-2); }
