@@ -110,7 +110,8 @@
      (This doc + `Workbooks.Autopoet`.) ← phase 1, here.
   2. *The autopoet character* — its def (system prompt + laws: edits the config
      layer only, toolkit-first, test-before-register, host-needs are gated
-     issues). `examples/autopoet/`.
+     issues). `runtime/priv/autopoet/autopoet.org` — embedded in the BEAM at
+     compile time (ships in every release), `WB_AUTOPOET_DEF` overrides.
   3. *The autopoet worker* — a system tenant the runtime supervises, polling
      the backlog on its own cadence. Depends on the multi-tenant keeper.
   4. *Declarative tool/capability registry* — lift the agent tool surface out

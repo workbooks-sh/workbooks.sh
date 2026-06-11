@@ -35,6 +35,16 @@ defmodule Workbooks.Autopoet.Worker do
   @default_run_timeout_ms 900_000
   @max_steps 80
 
+  # The autopoet is a SYSTEM def, not tenant data — it must be present on every
+  # runtime box so `WB_AUTOPOET=1` (or an on-demand `wb autopoet tick`) just works,
+  # with no manual file placement (the CI image ships only the release, not the
+  # repo's examples/). Embed the canonical def at COMPILE time so it is part of the
+  # BEAM and cannot be missing in prod; `WB_AUTOPOET_DEF` still overrides it (the
+  # def is editable config — a path lets the autopoet evolve its own def).
+  @autopoet_def_path Path.join(__DIR__, "../../priv/autopoet/autopoet.org") |> Path.expand()
+  @external_resource @autopoet_def_path
+  @embedded_def File.read!(@autopoet_def_path)
+
   def start_link(_opts \\ []), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
   @doc "Trigger one poll immediately (watched manual validation)."
@@ -53,21 +63,17 @@ defmodule Workbooks.Autopoet.Worker do
   def init(:ok) do
     Process.flag(:trap_exit, true)
 
-    case def_path() do
-      nil ->
-        Logger.info("Autopoet: no def (WB_AUTOPOET_DEF unset) — idle")
-        {:ok, %{active: false}}
-
-      path ->
-        ensure_workspace()
-        # A crash/restart during a run leaves its issue stuck :doing (no longer
-        # :open, so it'd never be re-picked). Reclaim orphans on boot.
-        reset_orphans()
-        Logger.info("Autopoet: activated — def=#{path} workspace=#{workdir()} poll=#{interval_ms()}ms")
-        Process.send_after(self(), :tick, 5_000)
-        put_status(%{active: true, running: false, last_run: nil})
-        {:ok, %{active: true, def_path: path}}
-    end
+    # The def always exists (embedded at compile time; WB_AUTOPOET_DEF overrides),
+    # so a started worker is always active — the GenServer itself is gated upstream
+    # by WB_AUTOPOET=1 in application.ex.
+    ensure_workspace()
+    # A crash/restart during a run leaves its issue stuck :doing (no longer :open,
+    # so it'd never be re-picked). Reclaim orphans on boot.
+    reset_orphans()
+    Logger.info("Autopoet: activated — def=#{def_source()} workspace=#{workdir()} poll=#{interval_ms()}ms")
+    Process.send_after(self(), :tick, 5_000)
+    put_status(%{active: true, running: false, last_run: nil})
+    {:ok, %{active: true}}
   end
 
   # The workspace IS the toolkits root (the def's contract: "your working
@@ -94,21 +100,18 @@ defmodule Workbooks.Autopoet.Worker do
   idling on an empty backlog. Returns:
     * `{:worked, id, verdict}` — ran an issue (verdict ∈ :done | :host | :open)
     * `:empty`                 — no open :capability issue (no LLM call)
-    * `{:inactive, reason}`    — not configured (WB_AUTOPOET_DEF unset)
+
+  The def is embedded (always present), so there is no "inactive" state — the
+  on-demand surface is always available; only the always-on GenServer is gated by
+  WB_AUTOPOET=1.
   """
-  @spec drain_one() :: {:worked, String.t(), atom()} | :empty | {:inactive, String.t()}
+  @spec drain_one() :: {:worked, String.t(), atom()} | :empty
   def drain_one do
-    case def_path() do
-      nil ->
-        {:inactive, "WB_AUTOPOET_DEF unset"}
+    ensure_workspace()
 
-      path ->
-        ensure_workspace()
-
-        case Autopoet.list(:open) |> Enum.filter(&(&1.kind == :capability)) |> top() do
-          nil -> :empty
-          issue -> {:worked, issue.id, work(issue, path)}
-        end
+    case Autopoet.list(:open) |> Enum.filter(&(&1.kind == :capability)) |> top() do
+      nil -> :empty
+      issue -> {:worked, issue.id, work(issue)}
     end
   end
 
@@ -131,7 +134,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   # ── the run ───────────────────────────────────────────────────────────────
 
-  defp work(issue, path) do
+  defp work(issue) do
     Logger.info("Autopoet: working issue #{issue.id} — #{issue.title}")
     Autopoet.set_status(issue.id, :doing, "autopoet picked it up")
     put_status(%{running: true, working: issue.id, last_run: System.system_time(:second)})
@@ -146,7 +149,7 @@ defmodule Workbooks.Autopoet.Worker do
     # exit becomes a BLOCKED verdict that resets the issue to :open for a retry.
     result =
       try do
-        org = File.read!(path)
+        org = def_org()
         body = case File.read(Path.join(Autopoet.dir(), "#{issue.id}.org")) do
           {:ok, b} -> b
           _ -> ""
@@ -317,7 +320,16 @@ defmodule Workbooks.Autopoet.Worker do
 
   # ── config ────────────────────────────────────────────────────────────────
 
-  defp def_path, do: System.get_env("WB_AUTOPOET_DEF")
+  # The autopoet def CONTENT: WB_AUTOPOET_DEF (a path) overrides the embedded
+  # default, so the autopoet can evolve its own def without a rebuild.
+  defp def_org do
+    case System.get_env("WB_AUTOPOET_DEF") do
+      p when is_binary(p) and p != "" -> File.read!(p)
+      _ -> @embedded_def
+    end
+  end
+
+  defp def_source, do: System.get_env("WB_AUTOPOET_DEF") || "embedded"
 
   defp workdir do
     System.get_env("WB_AUTOPOET_WORKDIR") ||

@@ -302,7 +302,6 @@ defmodule Workbooks.CLI do
     case Workbooks.Autopoet.Worker.drain_one() do
       {:worked, id, verdict} -> "autopoet: worked #{id} → #{verdict}"
       :empty -> "autopoet: backlog empty (no open :capability issue) — no run"
-      {:inactive, reason} -> "autopoet: inactive — #{reason}"
     end
   end
 

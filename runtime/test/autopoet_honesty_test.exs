@@ -69,23 +69,19 @@ defmodule Workbooks.AutopoetHonestyTest do
     refute cleanish?(bad), "hollow toolkit must NOT verify clean:\n#{bad}"
   end
 
-  test "drain_one/0 is a no-LLM no-op when inactive or the backlog is empty" do
-    # inactive: no def configured
+  test "drain_one/0 is a no-LLM no-op on an empty backlog (def is embedded, always present)" do
+    # the def is embedded at compile time, so even with WB_AUTOPOET_DEF unset the
+    # on-demand surface is available — an empty backlog returns :empty (no LLM).
     System.delete_env("WB_AUTOPOET_DEF")
-    assert {:inactive, _} = Worker.drain_one()
-
-    # active but empty backlog → :empty (never reaches an LLM call)
     data = "/tmp/wb-drain-empty"
     File.rm_rf!(data)
     File.mkdir_p!(Path.join(data, "autopoet/issues"))
     System.put_env("WB_DATA", data)
-    System.put_env("WB_AUTOPOET_DEF", Path.expand("../examples/autopoet/autopoet.org", __DIR__))
     System.put_env("WB_AUTOPOET_WORKDIR", Path.join(data, "ws"))
 
     assert :empty = Worker.drain_one()
     assert File.dir?(Path.join(data, "ws")), "drain_one should pin/create the workspace"
   after
-    System.delete_env("WB_AUTOPOET_DEF")
     System.delete_env("WB_AUTOPOET_WORKDIR")
     System.delete_env("WB_DATA")
   end
