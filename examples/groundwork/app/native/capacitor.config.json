@@ -2,5 +2,8 @@
   "appId": "sh.workbooks.groundskeeper",
   "appName": "groundskeeper",
   "webDir": "www",
-  "ios": { "contentInset": "always" }
+  "ios": {
+    "contentInset": "never"
+  },
+  "backgroundColor": "#faf6ee"
 }

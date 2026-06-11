@@ -35,7 +35,9 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
             tools: tools(base_url)
           }
         },
-        tts: %{voice_id: System.get_env("WB_GK_VOICE_ID", "U5UjeJMsOvyhYhXfZdvZ")},
+        # David — deep smooth Scottish. English agents require turbo/flash v2
+        # (v3 expressive is plan-gated, multilingual rejected).
+        tts: %{voice_id: System.get_env("WB_GK_VOICE_ID", "1N4VgTBW1ZGBv5IHWRAf"), model_id: "eleven_turbo_v2"},
         # Fill-the-silence: when the founder goes quiet this long, the agent
         # takes the turn (persona law 3 says how).
         turn: %{turn_timeout: 10}
