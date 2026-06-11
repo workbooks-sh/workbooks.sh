@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spotlight section — directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#f7f6f1; --ink:#121316; --bloom:#13d943;
+    --display:"Anton",sans-serif; --mono:"JetBrains Mono",monospace; --px:"Handjet",monospace;
+  }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--mono); }
+  .tag { font:700 12px var(--mono); letter-spacing:.12em; background:var(--ink); color:var(--paper);
+         padding:8px 14px; display:inline-block; margin:64px 0 30px 7vw; }
+  section { padding:0 7vw 60px; }
+  .kick { font:700 11px var(--mono); letter-spacing:.34em; text-transform:uppercase; margin-bottom:16px; }
+  .kick b { color:var(--bloom); }
+  .head { font-family:var(--display); text-transform:uppercase; color:var(--ink); }
+  .head em { font-family:var(--px); font-style:normal; font-weight:900; font-size:1.2em; letter-spacing:.04em; }
+  .role { font:700 10px var(--mono); letter-spacing:.3em; text-transform:uppercase; margin-bottom:8px; }
+  .why b { font-weight:700; }
+  .more {
+    display:inline-flex; gap:8px; margin-top:10px; background:var(--paper); color:var(--ink);
+    text-decoration:none; font:700 11.5px var(--mono); letter-spacing:.04em; text-transform:uppercase;
+    border:2px solid var(--ink); border-radius:9px; padding:9px 14px; box-shadow:3px 3px 0 var(--ink);
+  }
+
+  /* ── V1 · header above, tabs, full-width stage card ── */
+  .v1 .top { text-align:center; max-width:760px; margin:0 auto 36px; }
+  .v1 .top .head { font-size:clamp(36px,4vw,58px); margin-bottom:14px; }
+  .v1 .top .lede { font-size:12.5px; line-height:1.8; color:#3c423a; }
+  .v1 .tabs { display:flex; gap:14px; justify-content:center; margin-bottom:26px; }
+  .v1 .tab {
+    display:flex; align-items:center; gap:11px; padding:13px 22px; cursor:pointer;
+    border:2px solid var(--ink); border-radius:11px; background:#fff;
+    font:700 13px var(--mono); text-transform:uppercase; letter-spacing:.05em; color:var(--ink);
+    box-shadow:3px 3px 0 var(--ink);
+  }
+  .v1 .tab.active { color:#fff; }
+  .v1 .tab .mini { width:32px; height:32px; border-radius:8px; border:2px solid var(--ink);
+                   display:flex; align-items:center; justify-content:center; }
+  .v1 .tab .mini img { height:19px; }
+  .v1 .stage {
+    max-width:1100px; margin:0 auto; border:2px solid var(--ink); border-radius:16px;
+    box-shadow:8px 8px 0 var(--ink); padding:42px 48px; display:flex; gap:42px; align-items:center; min-height:300px;
+  }
+  .v1 .tile { width:150px; height:150px; flex:0 0 auto; border-radius:20px; border:2px solid var(--ink);
+              display:flex; align-items:center; justify-content:center; box-shadow:6px 6px 0 var(--ink); }
+  .v1 .tile img { height:90px; }
+  .v1 h3 { font-family:var(--display); font-size:36px; text-transform:uppercase; margin-bottom:12px; }
+  .v1 p { font-size:12.5px; line-height:1.75; margin-bottom:10px; max-width:62ch; }
+
+  /* ── V2 · inline, whitespace, zero chrome ── */
+  .v2 { max-width:1100px; margin:0 auto; }
+  .v2 .head { font-size:clamp(36px,4vw,58px); margin-bottom:12px; }
+  .v2 .lede { font-size:12.5px; line-height:1.8; color:#3c423a; max-width:60ch; margin-bottom:44px; }
+  .v2 .tabs { display:flex; gap:38px; border-bottom:2px solid var(--ink); margin-bottom:44px; }
+  .v2 .tab {
+    display:flex; align-items:center; gap:10px; padding:0 2px 14px; cursor:pointer; background:none; border:none;
+    font:700 14px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:#9aa093;
+    border-bottom:4px solid transparent; margin-bottom:-2px;
+  }
+  .v2 .tab img { height:20px; filter:grayscale(1) brightness(.55); }
+  .v2 .tab.active { color:var(--ink); }
+  .v2 .tab.active img { filter:none; }
+  .v2 .stage { display:flex; gap:56px; align-items:flex-start; }
+  .v2 .mark { flex:0 0 auto; width:200px; }
+  .v2 .mark .bigicon { width:170px; height:170px; border-radius:24px; display:flex; align-items:center; justify-content:center; }
+  .v2 .mark img { height:104px; }
+  .v2 h3 { font-family:var(--display); font-size:44px; text-transform:uppercase; margin-bottom:14px; }
+  .v2 p { font-size:12.5px; line-height:1.8; margin-bottom:12px; max-width:64ch; color:#2c3129; }
+  .v2 .why { border-left:4px solid; padding-left:14px; }
+  .v2 .more { box-shadow:none; border-width:2px; }
+
+  /* ── V3 · bookshelf accordion ── */
+  .v3 .top { max-width:1240px; margin:0 auto 30px; }
+  .v3 .top .head { font-size:clamp(34px,3.6vw,52px); }
+  .v3 .shelf { display:flex; gap:18px; max-width:1240px; margin:0 auto; height:430px; }
+  .v3 .panel {
+    border:2px solid var(--ink); border-radius:16px; overflow:hidden; cursor:pointer;
+    display:flex; flex-direction:column; flex:1; transition:flex .38s cubic-bezier(.7,0,.3,1);
+    box-shadow:5px 5px 0 var(--ink); position:relative;
+  }
+  .v3 .panel.active { flex:4.6; cursor:default; }
+  .v3 .spine {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:space-between; padding:22px 0; color:#fff;
+  }
+  .v3 .spine .mini { width:46px; height:46px; border-radius:10px; border:2px solid var(--ink);
+                     background:rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center; }
+  .v3 .spine .mini img { height:27px; }
+  .v3 .spine .vname { writing-mode:vertical-rl; transform:rotate(180deg);
+                      font:700 16px var(--mono); text-transform:uppercase; letter-spacing:.14em; }
+  .v3 .panel.active .spine { display:none; }
+  .v3 .body { display:none; padding:36px 40px; gap:36px; align-items:center; height:100%; }
+  .v3 .panel.active .body { display:flex; }
+  .v3 .tile { width:140px; height:140px; flex:0 0 auto; border-radius:18px; border:2px solid var(--ink);
+              display:flex; align-items:center; justify-content:center; box-shadow:5px 5px 0 var(--ink); }
+  .v3 .tile img { height:84px; }
+  .v3 h3 { font-family:var(--display); font-size:34px; text-transform:uppercase; margin-bottom:10px; }
+  .v3 p { font-size:12.2px; line-height:1.7; margin-bottom:9px; max-width:54ch; }
+
+  /* ── V4 · V2's editorial language, swung LEFT / RIGHT ── */
+  .v4 { max-width:1340px; margin:0 auto; display:grid; grid-template-columns:0.8fr 1.5fr; gap:64px; align-items:start; }
+  .v4 .head { font-size:clamp(34px,3.4vw,52px); margin-bottom:16px; }
+  .v4 .lede { font-size:12.5px; line-height:1.8; color:#3c423a; max-width:40ch; }
+  .v4 .tabs { display:flex; gap:34px; border-bottom:2px solid var(--ink); margin-bottom:38px; }
+  .v4 .tab {
+    display:flex; align-items:center; gap:10px; padding:0 2px 13px; cursor:pointer; background:none; border:none;
+    font:700 13.5px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:#9aa093;
+    border-bottom:4px solid transparent; margin-bottom:-2px;
+  }
+  .v4 .tab img { height:20px; filter:grayscale(1) brightness(.55); }
+  .v4 .tab.active { color:var(--ink); }
+  .v4 .tab.active img { filter:none; }
+  .v4 .stage { display:flex; gap:46px; align-items:flex-start; }
+  .v4 .bigicon { width:150px; height:150px; flex:0 0 auto; border-radius:22px; display:flex; align-items:center; justify-content:center; }
+  .v4 .bigicon img { height:92px; }
+  .v4 h3 { font-family:var(--display); font-size:40px; text-transform:uppercase; margin-bottom:12px; }
+  .v4 p { font-size:12.5px; line-height:1.8; margin-bottom:12px; max-width:56ch; color:#2c3129; }
+  .v4 .why { border-left:4px solid; padding-left:14px; }
+  .v4 .more { box-shadow:none; }
+</style>
+</head>
+<body>
+
+<div class="tag">V1 · HEADER ABOVE — TAB CHIPS — FULL-WIDTH STAGE</div>
+<section class="v1" id="v1">
+  <div class="top">
+    <p class="kick">the ecosystem <b>■</b> 02</p>
+    <h2 class="head">three pieces. <em>one organism.</em></h2>
+    <p class="lede">The file carries everything, the engine keeps it running, the parts let it grow — each is simple alone, together they feed each other.</p>
+  </div>
+  <div class="tabs"></div>
+  <div class="stage"></div>
+</section>
+
+<div class="tag">V2 · INLINE — WHITESPACE — UNDERLINE TABS, NO BOXES</div>
+<section class="v2" id="v2">
+  <p class="kick">the ecosystem <b>■</b> 02</p>
+  <h2 class="head">three pieces. <em>one organism.</em></h2>
+  <p class="lede">The file carries everything, the engine keeps it running, the parts let it grow — each is simple alone, together they feed each other.</p>
+  <div class="tabs"></div>
+  <div class="stage"></div>
+</section>
+
+<div class="tag">V3 · BOOKSHELF ACCORDION — SPINES EXPAND</div>
+<section class="v3" id="v3" style="padding-bottom:120px">
+  <div class="top">
+    <p class="kick">the ecosystem <b>■</b> 02</p>
+    <h2 class="head">three pieces. <em>one organism.</em></h2>
+  </div>
+  <div class="shelf"></div>
+</section>
+
+<div class="tag">V4 · V2'S LANGUAGE — INTRO LEFT, SPOTLIGHT RIGHT</div>
+<section style="padding-bottom:120px">
+  <div class="v4" id="v4">
+    <div>
+      <p class="kick">the ecosystem <b>■</b> 02</p>
+      <h2 class="head">three pieces. <em>one organism.</em></h2>
+      <p class="lede">The file carries everything, the engine keeps it running, the parts let it
+        grow — each is simple alone, together they feed each other.</p>
+    </div>
+    <div>
+      <div class="tabs"></div>
+      <div class="stage"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+const PIECES = [
+  { key:"workbooks", name:"Workbooks", role:"the unit", icon:"wb-file-icon.svg",
+    color:"#2b4bdf", pastel:"#b9c9f5",
+    body:"A workbook is one file that is a whole app — its code, data, and interface travel together, and it runs wherever it lands.",
+    why:"so software can be carried, shared, and changed as easily as a document.",
+    linkLabel:"What is a workbook →" },
+  { key:"nexus", name:"Nexus", role:"the engine", icon:"nexus-icon.svg",
+    color:"#7a3bf0", pastel:"#d6c4f7",
+    body:"The Nexus is the engine you own — it runs workbooks on your Mac, your server, or the cloud, and connects them to your data, your services, and each other.",
+    why:"so one system carries you from first prototype to production at full scale.",
+    linkLabel:"What is the Nexus →" },
+  { key:"toolkits", name:"Toolkits", role:"the parts", icon:"toolkit-icon.svg",
+    color:"#e8442e", pastel:"#f7c3b6",
+    body:"Toolkits are ready-made abilities a workbook can pick up — payments, search, charts, voices, anything — built by us, by the community, or by you.",
+    why:"so new powers snap in without rebuilding — and anything you make can become one.",
+    linkLabel:"What is a toolkit →" },
+];
+const stageHTML = (p) => `
+  <div class="tile" style="background:${p.color}"><img src="${p.icon}"></div>
+  <div>
+    <div class="role">${p.role}</div>
+    <h3>${p.name}</h3>
+    <p>${p.body}</p>
+    <p class="why"><b>Why it exists:</b> ${p.why}</p>
+    <a class="more" href="#">${p.linkLabel}</a>
+  </div>`;
+
+/* V1 */
+function v1Render(k) {
+  const tabs = document.querySelector("#v1 .tabs"), stage = document.querySelector("#v1 .stage");
+  tabs.innerHTML = "";
+  PIECES.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "tab" + (p.key === k ? " active" : "");
+    b.style.background = p.key === k ? p.color : "#fff";
+    b.innerHTML = `<span class="mini" style="background:${p.key === k ? "rgba(255,255,255,.25)" : p.color}"><img src="${p.icon}"></span>${p.name}`;
+    b.onclick = () => v1Render(p.key);
+    tabs.appendChild(b);
+  });
+  const p = PIECES.find(x => x.key === k);
+  stage.style.background = p.pastel;
+  stage.innerHTML = stageHTML(p);
+}
+v1Render("nexus");
+
+/* V2 */
+function v2Render(k) {
+  const tabs = document.querySelector("#v2 .tabs"), stage = document.querySelector("#v2 .stage");
+  tabs.innerHTML = "";
+  PIECES.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "tab" + (p.key === k ? " active" : "");
+    b.style.borderBottomColor = p.key === k ? p.color : "transparent";
+    b.innerHTML = `<img src="${p.icon}" style="background:${p.color};border-radius:5px;padding:3px;height:22px">${p.name}`;
+    b.onclick = () => v2Render(p.key);
+    tabs.appendChild(b);
+  });
+  const p = PIECES.find(x => x.key === k);
+  stage.innerHTML = `
+    <div class="mark"><div class="bigicon" style="background:${p.color}"><img src="${p.icon}"></div></div>
+    <div>
+      <div class="role" style="color:${p.color}">${p.role}</div>
+      <h3>${p.name}</h3>
+      <p>${p.body}</p>
+      <p class="why" style="border-color:${p.color}"><b>Why it exists:</b> ${p.why}</p>
+      <a class="more" href="#">${p.linkLabel}</a>
+    </div>`;
+}
+v2Render("nexus");
+
+/* V3 */
+function v3Render(k) {
+  const shelf = document.querySelector("#v3 .shelf");
+  shelf.innerHTML = "";
+  PIECES.forEach(p => {
+    const d = document.createElement("div");
+    const act = p.key === k;
+    d.className = "panel" + (act ? " active" : "");
+    d.style.background = act ? p.pastel : p.color;
+    d.innerHTML = `
+      <div class="spine">
+        <span class="mini"><img src="${p.icon}"></span>
+        <span class="vname">${p.name}</span>
+        <span class="mini" style="visibility:hidden"></span>
+      </div>
+      <div class="body">${stageHTML(p).replace('style="background:' + p.color + '"', 'style="background:' + p.color + '"')}</div>`;
+    if (!act) d.onclick = () => v3Render(p.key);
+    shelf.appendChild(d);
+  });
+}
+v3Render("nexus");
+
+/* V4 — V2 rearranged left/right */
+function v4Render(k) {
+  const tabs = document.querySelector("#v4 .tabs"), stage = document.querySelector("#v4 .stage");
+  tabs.innerHTML = "";
+  PIECES.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "tab" + (p.key === k ? " active" : "");
+    b.style.borderBottomColor = p.key === k ? p.color : "transparent";
+    b.innerHTML = `<img src="${p.icon}" style="background:${p.color};border-radius:5px;padding:3px;height:22px">${p.name}`;
+    b.onclick = () => v4Render(p.key);
+    tabs.appendChild(b);
+  });
+  const p = PIECES.find(x => x.key === k);
+  stage.innerHTML = `
+    <div class="bigicon" style="background:${p.color}"><img src="${p.icon}"></div>
+    <div>
+      <div class="role" style="color:${p.color}">${p.role}</div>
+      <h3>${p.name}</h3>
+      <p>${p.body}</p>
+      <p class="why" style="border-color:${p.color}"><b>Why it exists:</b> ${p.why}</p>
+      <a class="more" href="#">${p.linkLabel}</a>
+    </div>`;
+}
+v4Render("nexus");
+</script>
+</body>
+</html>

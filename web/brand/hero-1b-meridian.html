@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workbooks — hero I·b · meridian (radial swirl, full palette)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ── BRAND I·b · "meridian" ─ engineering paper, full crayon box ─────────
+     palette (founder swatches): vermilion / cobalt / cream / cornflower /
+     forest / mist. Graph paper goes CLASSIC BLUE; type goes forest;
+     one line burns vermilion. */
+  :root {
+    --paper: #fbfaf4;
+    --ink: #16181a;         /* the structure — near-black does the holding */
+    --bloom: #e0379b;       /* THE primary — vivid bloom magenta, solid, no gradient */
+    --cyan: #19b6e9;        /* event colors: they exist ONLY inside the pixel blooms */
+    --ink-soft: #61685f;
+    --display: "Archivo", sans-serif;
+    --mono: "IBM Plex Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper); color: var(--forest);
+    font-family: var(--mono); overflow: hidden;
+  }
+
+  #field { position: fixed; inset: 0; display: block; }
+
+  .hero {
+    position: relative; z-index: 2; height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 24px;
+  }
+  /* vellum disc — the calm eye of the swirl */
+  .hero::before {
+    content: ""; position: absolute; z-index: -1; width: min(900px, 96vw); aspect-ratio: 1.16;
+    background: radial-gradient(closest-side, var(--paper) 40%, rgba(250,247,236,.9) 58%, rgba(250,247,236,0) 78%);
+  }
+
+  .stamp { color: var(--bloom); width: 86px; margin-bottom: 40px; position: relative; }
+  .stamp svg { display: block; width: 100%; height: auto; }
+  .stamp .coords {
+    position: absolute; top: 100%; left: 50%; transform: translate(-50%, 10px);
+    font-size: 10px; letter-spacing: .24em; color: var(--ink-soft); white-space: nowrap;
+  }
+  .stamp .coords b { color: var(--cyan); font-weight: 500; }
+
+  /* ── the dynamic sans system: one variable family, three voices ──────────
+     Archivo's width axis does the editorial work the serif used to —
+     each line gets its own width/weight cut, then micro-tracking trues
+     the block flush. Engineered, not decorated. */
+  .lockup { width: min(740px, 92vw); margin-top: 8px; }
+  .lockup .jl {
+    display: block; font-family: var(--display);
+    font-variation-settings: "wdth" 125, "wght" 580;
+    font-size: clamp(54px, 9vw, 116px); line-height: 1.04;
+    text-transform: lowercase; white-space: nowrap; color: var(--ink);
+  }
+  /* the one vibrant moment: the primary, solid */
+  .lockup .jl:nth-child(2) { color: var(--bloom); }
+
+  .caption {
+    margin-top: 34px; max-width: 56ch; font-size: 13px; line-height: 1.75;
+    color: var(--ink-soft); letter-spacing: .01em;
+  }
+  .caption b { color: var(--ink); font-weight: 500; }
+
+  /* CTAs — the clean III-style pills */
+  .ctas { display: flex; gap: 14px; margin-top: 40px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+    font-family: var(--display); font-variation-settings: "wdth" 104, "wght" 560;
+    font-size: 13.5px; letter-spacing: .02em;
+    padding: 14px 24px; border-radius: 12px; transition: transform .18s ease, box-shadow .25s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn svg { height: 15px; width: auto; display: block; }
+  .btn .sep { width: 1px; align-self: stretch; opacity: .3; background: currentColor; }
+  .btn-dl { background: var(--ink); color: var(--paper); box-shadow: 0 14px 34px rgba(21,25,26,.26); }
+  .btn-dl:hover { box-shadow: 0 18px 44px rgba(21,25,26,.36); }
+  .btn-agent {
+    color: var(--ink); background: rgba(255,255,255,.55);
+    border: 1px solid rgba(21,25,26,.16);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .btn-agent:hover { border-color: rgba(21,25,26,.4); }
+
+  .skills { margin-top: 20px; font-size: 11.5px; letter-spacing: .04em; color: var(--ink-soft); }
+  .skills a { color: var(--bloom); text-decoration: none; border-bottom: 1px solid rgba(224,55,155,.4); }
+  .skills code { color: var(--ink); }
+</style>
+</head>
+<body>
+<canvas id="field" aria-hidden="true"></canvas>
+
+<main class="hero">
+  <div class="stamp" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+    <span class="coords">WORKBOOKS · FIELD <b>No.07</b></span>
+  </div>
+
+  <h1 class="lockup" aria-label="living breathing software">
+    <span class="jl">living</span>
+    <span class="jl">breathing</span>
+    <span class="jl">software</span>
+  </h1>
+
+  <p class="caption">
+    <b>Workbooks</b> is an ecosystem of software that tends itself — one open
+    file becomes a working app, an agent keeps it growing, and a runtime
+    carries it from your desk to anywhere. Plant it once; it keeps building.
+  </p>
+
+  <div class="ctas">
+    <a class="btn btn-dl" href="#download">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 12.79c-.027-2.747 2.243-4.067 2.345-4.13-1.277-1.868-3.265-2.124-3.972-2.152-1.69-.171-3.3.995-4.158.995-.857 0-2.182-.971-3.588-.945-1.846.027-3.55 1.073-4.5 2.726-1.92 3.328-.49 8.253 1.38 10.954.915 1.323 2.005 2.808 3.435 2.755 1.38-.055 1.9-.892 3.567-.892 1.667 0 2.136.892 3.594.864 1.485-.027 2.424-1.35 3.33-2.68 1.05-1.536 1.482-3.024 1.508-3.1-.033-.015-2.894-1.11-2.92-4.395zM13.63 4.04c.76-.92 1.273-2.2 1.133-3.474-1.095.044-2.42.73-3.205 1.65-.703.813-1.32 2.114-1.154 3.362 1.22.095 2.467-.62 3.227-1.538z"/></svg>
+      <span class="sep"></span>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.45L9.75 2.1v9.4H0zM10.95 1.95L24 0v11.5H10.95zM0 12.5h9.75v9.4L0 20.55zM10.95 12.5H24V24l-13.05-1.95z"/></svg>
+      Download the app
+    </a>
+    <a class="btn btn-agent" href="#agents">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></svg>
+      <span class="sep"></span>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"/></svg>
+      Build with Claude — or your agent
+    </a>
+  </div>
+  <p class="skills">teach any agent workbooks · <code>npx skills add workbooks-sh/workbooks.sh</code> → <a href="https://skills.sh">skills.sh</a></p>
+</main>
+
+<script>
+/* justified lockup — measure the inline text, true each line to the measure */
+function justifyLockup() {
+  document.querySelectorAll(".jl").forEach((el) => {
+    el.style.letterSpacing = "0px";
+    el.style.textAlign = "left";
+    const w = el.parentElement.clientWidth;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const tw = range.getBoundingClientRect().width;
+    const n = el.textContent.length - 1;
+    if (n < 1 || tw >= w) return;
+    el.style.letterSpacing = (w - tw) / n + "px";
+  });
+}
+document.fonts.ready.then(justifyLockup);
+addEventListener("resize", justifyLockup);
+
+/* ── the field, v2: ROTATIONAL warp stemming from the center ─────────────
+   Every grid vertex rotates about the page center by an angle that grows
+   with radius — zero twist in the calm eye, building smoothly to a full
+   organic swirl at the rim, identical in every direction. A whisper of
+   noise modulates the twist so the spiral feels grown, not machined. */
+const cv = document.getElementById("field");
+const ctx = cv.getContext("2d");
+let W, H, DPR, CX, CY, RMAX;
+
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  CX = W / 2; CY = H / 2;
+  RMAX = Math.hypot(CX, CY);
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resize();
+addEventListener("resize", resize);
+
+function smoothstep(a, b, x) {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+const TWIST = 1.55;     /* radians of swirl at the very rim — past ~90° the
+                           far grid sweeps across one side and unbalances it */
+const EYE = 0.22;       /* fraction of RMAX that stays perfectly straight */
+const CELL = 38, STEP = 12;
+
+function warp(x, y, t) {
+  const dx = x - CX, dy = y - CY;
+  const r = Math.hypot(dx, dy);
+  const rn = r / RMAX;
+  const ramp = Math.pow(smoothstep(EYE, 1.05, rn), 1.8);
+  if (ramp <= 0) return [x, y, 0];
+  /* modulation is RADIAL-ONLY so every side twists alike — rings of
+     tightening rotation breathing slowly outward from the eye */
+  const wob = 1 + 0.16 * Math.sin(rn * 7 - t * 0.8);
+  const phi = TWIST * ramp * wob * (0.92 + 0.08 * Math.sin(t * 0.35));
+  const cos = Math.cos(phi), sin = Math.sin(phi);
+  /* gentle radial breathing so the swirl inhales */
+  const rs = 1 + 0.018 * ramp * Math.sin(t * 0.8 + rn * 5);
+  return [CX + (dx * cos - dy * sin) * rs, CY + (dx * sin + dy * cos) * rs, ramp];
+}
+
+/* ── one field, two skins + color events ─────────────────────────────────
+   u runs 0 (top-left) → 1 (bottom-right). The ruled grid owns the wide
+   center band; BOTH corners dissolve into an ASCII shader that builds
+   slowly — lone ticks first, the full charset only deep in the corner.
+   The grid is ONE quiet color. Color happens as EVENTS: where the swirl's
+   energy peaks inside the ASCII zones, cells ignite into vivid pixel
+   tiles — concentrated blooms on a neutral field, never a wash. */
+function diag(x, y) { return (x / W + y / H) / 2; }
+const aTL = (u) => 1 - smoothstep(0.14, 0.44, u);
+const aBR = (u) => smoothstep(0.56, 0.86, u);
+const asciiW = (u) => Math.max(aTL(u), aBR(u));
+const lineW  = (u) => 1 - asciiW(u);
+
+/* line segments batched by quantized alpha — one stroke per bin */
+const BINS = 7;
+function strokeBinned(polylines) {
+  const bins = Array.from({ length: BINS + 1 }, () => new Path2D());
+  for (const pts of polylines) {
+    for (let i = 1; i < pts.length; i++) {
+      const mx = (pts[i - 1][0] + pts[i][0]) / 2, my = (pts[i - 1][1] + pts[i][1]) / 2;
+      const a = lineW(diag(mx, my));
+      if (a <= 0.02) continue;
+      const b = Math.round(a * BINS);
+      bins[b].moveTo(pts[i - 1][0], pts[i - 1][1]);
+      bins[b].lineTo(pts[i][0], pts[i][1]);
+    }
+  }
+  for (let b = 1; b <= BINS; b++) {
+    ctx.strokeStyle = `rgba(22,24,26,${(0.15 * b / BINS).toFixed(3)})`;
+    ctx.stroke(bins[b]);
+  }
+}
+
+/* charset builds with depth into a corner; the hottest cells stop being
+   type at all and become pixel tiles in the event palette */
+const RAMP = ["·", ":", "+", "×", "*", "#"];
+const EVENTS = ["#e0379b", "#19b6e9", "#2b4bdf", "#8fd935", "#f5a623"];
+function cellHash(gx, gy) {
+  let h = (gx * 374761393 + gy * 668265263) | 0;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+}
+
+function frame(ms) {
+  const t = ms / 1000 * 0.5;
+  ctx.clearRect(0, 0, W, H);
+  ctx.lineWidth = 1;
+
+  const x0 = CX % CELL - CELL, y0 = CY % CELL - CELL;
+  const PAD = Math.max(W, H) * 0.35;
+
+  /* 1 · the ruled band — one color, no gradient */
+  const polys = [];
+  for (let gx = x0 - PAD; gx <= W + PAD; gx += CELL) {
+    const pts = [];
+    for (let y = -PAD; y <= H + PAD; y += STEP) pts.push(warp(gx, y, t));
+    polys.push(pts);
+  }
+  for (let gy = y0 - PAD; gy <= H + PAD; gy += CELL) {
+    const pts = [];
+    for (let x = -PAD; x <= W + PAD; x += STEP) pts.push(warp(x, gy, t));
+    polys.push(pts);
+  }
+  strokeBinned(polys);
+
+  /* 2 · twin ASCII corners with pixel-bloom events */
+  ctx.font = "13px 'IBM Plex Mono', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let gx = x0 - PAD; gx <= W + PAD; gx += CELL) {
+    for (let gy = y0 - PAD; gy <= H + PAD; gy += CELL) {
+      const [px, py, ramp] = warp(gx, gy, t);
+      if (px < -10 || px > W + 10 || py < -10 || py > H + 10) continue;
+      const u = diag(px, py);
+      const aw = asciiW(u);
+      if (aw <= 0.03) continue;
+
+      /* depth into whichever corner we're in: 0 at the seam, 1 at the tip */
+      const depth = aTL(u) > aBR(u)
+        ? Math.min(1, (0.44 - u) / 0.44)
+        : Math.min(1, (u - 0.56) / 0.44);
+      const cap = Math.max(0, Math.round(depth * (RAMP.length - 1)));
+      const seed = cellHash(gx, gy);
+      const energy = Math.min(1, ramp * (0.5 + 0.5 * Math.sin(t * 1.2 + seed * 6.28)));
+
+      /* the EVENT: deep in a corner, peak energy, rare cells ignite.
+         a slow spatial wave gates them into CLUSTERS — blooms, not confetti */
+      const cluster = Math.sin(gx * 0.021 + t * 0.5) * Math.sin(gy * 0.017 - t * 0.4);
+      if (depth > 0.3 && cluster > 0.15 && energy > 0.32 && seed > 0.42) {
+        const sz = CELL * (0.30 + 0.26 * energy);
+        ctx.fillStyle = EVENTS[Math.floor(seed * 97) % EVENTS.length];
+        ctx.globalAlpha = Math.min(1, aw * cluster * 2.4) * (0.5 + 0.5 * energy);
+        ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+
+      const idx = Math.min(cap, Math.round(energy * cap));
+      ctx.fillStyle = `rgba(22,24,26,${(0.5 * aw * (0.45 + 0.55 * depth)).toFixed(3)})`;
+      ctx.fillText(RAMP[idx], px, py);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

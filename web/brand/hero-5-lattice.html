@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workbooks — hero V · lattice (breathing cells, identicon blooms)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ── BRAND V · "lattice" ─ hard type, breathing cells, flat color events ──
+     No gradients. No opacity fades. No blur. Everything that moves is
+     geometry: cells trade area, identicon pixels are born and die. */
+  :root {
+    --paper: #f7f6f1;
+    --ink: #121316;
+    --bloom: #13d943;  /* neon green — the one accent */
+    --display: "Anton", sans-serif;
+    --mono: "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--mono); overflow-x: hidden; }
+
+  #lattice { position: absolute; inset: 0; display: block; }
+  #s1 { position: relative; height: 100vh; overflow: hidden; }
+
+  /* ── floating nav — flat plate, hard offset shadow, no soft anything ───── */
+  .nav {
+    position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 10;
+    display: flex; align-items: center; gap: 26px;
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 10px;
+    padding: 10px 12px 10px 16px;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+  .nav .mark { width: 30px; color: var(--ink); display: flex; }
+  .nav .mark svg { width: 100%; height: auto; display: block; }
+  .nav a.lnk {
+    font-size: 12px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink); text-decoration: none;
+  }
+  .nav a.lnk:hover { color: var(--bloom); }
+  .nav .dl {
+    font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    text-decoration: none; color: var(--paper); background: var(--ink);
+    padding: 9px 16px; border-radius: 6px;
+  }
+  .nav .dl:hover { background: var(--bloom); }
+
+  /* ── hero ──────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative; z-index: 2; height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 24px;
+  }
+  .inner { display: flex; flex-direction: column; align-items: center; }
+
+  .brandlock { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
+  .brandlock svg { width: 46px; height: auto; display: block; color: var(--ink); }
+  .brandlock span {
+    font-family: var(--display); font-size: 27px; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--ink); line-height: 1;
+  }
+
+  .lockup { width: min(680px, 90vw); }
+  .lockup .jl {
+    display: block; font-family: var(--display); font-weight: 400;
+    font-size: clamp(64px, 10.4vw, 138px); line-height: .96;
+    text-transform: uppercase; white-space: nowrap; color: var(--ink);
+  }
+  /* the counterpoint line: PIXELS against Anton's block — same ink,
+     lowercase, the machine voice between two human shouts */
+  /* the pixel voice, canonicalized: 900 so its strokes read the same ink
+     density as Anton, a smidge of tracking, sized to Anton's cap height */
+  .lockup .jl:nth-child(2) {
+    font-family: "Handjet", monospace; font-weight: 900;
+    text-transform: uppercase; color: var(--ink);
+    letter-spacing: .04em;
+    font-size: clamp(76px, 12.4vw, 164px); line-height: .74;
+    /* masked by the MATTE ENGINE below: a flowing pixel-blob field decides
+       where the ink is solid and where it breaks into scanlines */
+  }
+
+  .caption {
+    margin-top: 30px; max-width: 58ch; font-size: 12.5px; line-height: 1.8;
+    color: #565b54; letter-spacing: .01em;
+  }
+  .caption b { color: var(--ink); font-weight: 700; }
+
+  /* CTAs — unchanged */
+  .ctas { display: flex; gap: 14px; margin-top: 38px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+    font-family: var(--mono); font-weight: 500; font-size: 13px; letter-spacing: .02em;
+    padding: 14px 24px; border-radius: 12px; transition: transform .18s ease, box-shadow .25s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn svg { height: 15px; width: auto; display: block; }
+  .btn-copy {
+    color: var(--ink); background: rgba(255,255,255,.55);
+    border: 1px solid rgba(18,19,22,.16); cursor: pointer;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .btn-copy:hover { border-color: rgba(18,19,22,.4); }
+  .btn-copy .cpy { height: 13px; opacity: .55; }
+  .btn-copy.copied .lbl { color: var(--bloom); }
+  .btn-dl { background: var(--ink); color: var(--paper); box-shadow: 0 14px 34px rgba(18,19,22,.26); }
+  .btn-dl:hover { box-shadow: 0 18px 44px rgba(18,19,22,.36); }
+  .btn-agent {
+    color: var(--ink); background: rgba(255,255,255,.55);
+    border: 1px solid rgba(18,19,22,.16);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .btn-agent:hover { border-color: rgba(18,19,22,.4); }
+
+  /* open-source badge row — flat two-cell shields in the house style */
+  .badges { display: flex; gap: 12px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: stretch; text-decoration: none;
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
+    border: 1.5px solid var(--ink); border-radius: 5px; overflow: hidden;
+  }
+  .badge .k { display: inline-flex; align-items: center; gap: 6px; background: var(--ink); color: var(--paper); padding: 5px 9px; }
+  .badge .k svg { height: 12px; width: auto; display: block; }
+  .badge .v { display: inline-flex; align-items: center; color: var(--ink); padding: 5px 9px; }
+  .badge:hover .v { background: var(--bloom) !important; }
+
+  /* ── section 2 · the grove ───────────────────────────────────────────────
+     Neon green world. Arrival is a RADIAL bloom from the bottom of the
+     screen (scroll-scrubbed veil). Inside: an ASCII tree of very small
+     glyphs grows bottom-up and blossoms; node-graph roots hang beneath it
+     on verlet physics. */
+  /* ── the seam: a DNA sequence line — flat color blocks of varying width
+     drifting past, occasionally mutating. Same pastels as the lattice. ── */
+  #dna { position: absolute; bottom: 0; left: 0; right: 0; height: 18px; z-index: 3; }
+  #dna canvas { display: block; }
+
+  #s2 { position: relative; height: 100vh; background: var(--paper); overflow: hidden; }
+  .sky-pin { position: relative; height: 100vh; overflow: hidden; }
+  #tree { position: absolute; inset: 0; display: block; }
+  .sky-content {
+    position: absolute; inset: 0; z-index: 3;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 11vh 7vw 5vh; text-align: center; pointer-events: none;
+  }
+  .sky-head { max-width: 820px; }
+  .sky-kicker {
+    font-size: 11px; font-weight: 700; letter-spacing: .34em; text-transform: uppercase;
+    color: var(--ink); margin-bottom: 18px;
+  }
+  .sky-kicker b { color: var(--bloom); }
+  .sky-h {
+    font-family: var(--display); font-size: clamp(32px, 3.7vw, 60px); line-height: .98;
+    text-transform: uppercase; color: var(--ink); white-space: nowrap;
+  }
+  .sky-h em {
+    font-family: "Handjet", monospace; font-style: normal; font-weight: 900;
+    font-size: 1.24em; letter-spacing: .04em; text-transform: uppercase; color: var(--ink);
+  }
+  .sky-points {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px;
+    max-width: 1060px; margin: 0; padding: 0;
+  }
+  .sky-points li {
+    list-style: none; font-size: 12px; line-height: 1.7; color: #3c423a;
+    text-align: left; padding-left: 20px; position: relative;
+  }
+  .sky-points li b { display: block; color: var(--ink); }
+  .sky-points li::before { content: "■"; position: absolute; left: 0; top: 3px; font-size: 9px; color: var(--bloom); }
+  .sky-more {
+    display: inline-block; margin-top: 22px; font-size: 12px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--ink); text-decoration: none;
+    border-bottom: 2px solid var(--bloom); padding-bottom: 3px; pointer-events: auto;
+  }
+  .sky-more:hover { color: var(--bloom); }
+
+  /* ── section 3 · the ecosystem — DARK. Pastel DNA-family color system:
+     each piece owns a pastel and a small spectrum; ink icons on pastel
+     tiles; soft borders; quiet buttons. ── */
+  #s3 { background: var(--ink); padding: 13vh 7vw 14vh; }
+  #s3 .sky-kicker { color: #8b9085; }
+  .s3-grid { display: grid; grid-template-columns: 340px 1fr; gap: 76px; max-width: 1480px; margin: 0 auto; align-items: start; }
+  .s3-left h2 {
+    font-family: var(--display); font-size: clamp(34px, 3.4vw, 52px); line-height: 1;
+    text-transform: uppercase; color: var(--paper); margin-bottom: 18px;
+  }
+  .s3-left h2 em { font-family: "Handjet", monospace; font-style: normal; font-weight: 900; font-size: 1.2em; letter-spacing: .04em; }
+  .s3-left .lede { font-size: 12.5px; line-height: 1.8; color: #9ba095; max-width: 42ch; margin-bottom: 30px; }
+
+  .s3-sel { border-top: 1px solid rgba(247,246,241,.2); display: flex; flex-direction: column; }
+  .s3-sel button {
+    display: flex; align-items: center; gap: 14px; padding: 17px 6px; cursor: pointer;
+    background: none; border: none; border-bottom: 1px solid rgba(247,246,241,.2); text-align: left;
+    font: 700 13.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #8b9085;
+  }
+  .s3-sel button { justify-content: flex-start; }
+  .s3-sel button .mini { width: 33px; height: 33px; border-radius: 8px; display: inline-flex;
+                         align-items: center; justify-content: center; flex: 0 0 auto; }
+  .s3-sel button .mini img { height: 19px; filter: invert(.92); }
+  .s3-sel button .go { margin-left: auto; visibility: hidden; font-size: 15px; }
+  .s3-sel button.active { color: var(--paper); }
+  .s3-sel button.active .go, .s3-sel button:hover .go { visibility: visible; }
+  .s3-sel button:hover { color: var(--paper); }
+
+  .s3-stage { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
+  .s3-headrow { display: flex; align-items: center; gap: 20px; margin-bottom: 22px; }
+  /* ONE capsule: the app icon with its language bar inset at the bottom */
+  .s3-stage .bigicon { width: 72px; flex: 0 0 auto; border-radius: 15px; overflow: hidden; display: flex; flex-direction: column; }
+  .s3-stage .bigicon .face { height: 62px; display: flex; align-items: center; justify-content: center; }
+  .s3-stage .bigicon .face img { height: 38px; filter: invert(.92); }
+  .s3-stage .bigicon .dnaMini { display: flex; height: 9px; }
+  .s3-stage .bigicon .dnaMini i { display: block; height: 100%; }
+  /* the terminal — no chrome, no frame: the section IS the screen.
+     It types each piece's story, scrolls, and restarts on switch. */
+  .s3-term {
+    font: 400 12.5px var(--mono); line-height: 2.05; color: #9ba095;
+    max-height: 480px; overflow-y: auto; padding-right: 10px;
+    scrollbar-width: thin; scrollbar-color: #3a3f3a transparent;
+  }
+  .s3-term .ln { white-space: pre-wrap; word-break: break-word; }
+  .s3-term .ps { color: var(--pc); font-weight: 700; }
+  .s3-term .cmd { color: var(--paper); font-weight: 700; }
+  .s3-term .ok { color: var(--bloom); }
+  .s3-term .dim { color: #6a7064; }
+  .s3-term .hi { color: var(--paper); }
+  .s3-term .q { color: var(--pc); }
+  .s3-term .caret { display: inline-block; width: 7px; height: 13px; background: var(--paper);
+                    vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .s3-stage .role { font: 700 10px var(--mono); letter-spacing: .3em; text-transform: uppercase; margin-bottom: 6px; }
+  .s3-stage h3 { font-family: var(--display); font-size: 38px; line-height: 1; text-transform: uppercase; color: var(--paper); }
+  .s3-stage p { font-size: 12.5px; line-height: 1.8; margin-bottom: 12px; max-width: 58ch; color: #9ba095; }
+  .s3-feats { list-style: none; padding: 0; margin: 6px 0 16px; display: flex; flex-direction: column; gap: 9px; }
+  .s3-feats li { font: 400 12px var(--mono); line-height: 1.6; color: #9ba095; padding-left: 20px; position: relative; }
+  .s3-feats li::before { content: "■"; position: absolute; left: 0; top: 2px; font-size: 9px; color: var(--pc); }
+  .s3-feats li b { color: var(--paper); font-weight: 700; }
+  .s3-stage .why { border-left: 3px solid; padding-left: 14px; color: #9ba095; }
+  .s3-stage .why b { color: var(--paper); }
+  .s3-stage .more {
+    display: inline-flex; gap: 8px; margin-top: 10px; align-self: flex-start;
+    color: var(--ink); text-decoration: none;
+    font: 700 11.5px var(--mono); letter-spacing: .04em; text-transform: uppercase;
+    border: none; border-radius: 8px; padding: 11px 16px;
+    transition: transform .15s ease;
+  }
+  .s3-stage .more:hover { transform: translateY(-2px); }
+</style>
+</head>
+<body>
+<section id="s1">
+<canvas id="lattice" aria-hidden="true"></canvas>
+
+<nav class="nav">
+  <span class="mark" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </span>
+  <a class="lnk" href="#how">How it works</a>
+  <a class="lnk" href="#examples">Examples</a>
+  <a class="lnk" href="https://skills.sh">skills.sh</a>
+  <a class="lnk" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="#download">Download</a>
+</nav>
+
+<main class="hero">
+  <div class="inner" id="inner">
+
+  <div class="brandlock" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+    <span>workbooks</span>
+  </div>
+
+  <h1 class="lockup" aria-label="living breathing software">
+    <span class="jl">living</span>
+    <span class="jl">breathing</span>
+    <span class="jl">software</span>
+  </h1>
+
+  <p class="caption">
+    <b>Workbooks</b> is a software ecosystem and systems architecture where
+    people and AI build together — and what they build runs anywhere, stays
+    connected, and keeps getting better.
+  </p>
+
+  <div class="ctas">
+    <a class="btn btn-dl" href="#download">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 12.79c-.027-2.747 2.243-4.067 2.345-4.13-1.277-1.868-3.265-2.124-3.972-2.152-1.69-.171-3.3.995-4.158.995-.857 0-2.182-.971-3.588-.945-1.846.027-3.55 1.073-4.5 2.726-1.92 3.328-.49 8.253 1.38 10.954.915 1.323 2.005 2.808 3.435 2.755 1.38-.055 1.9-.892 3.567-.892 1.667 0 2.136.892 3.594.864 1.485-.027 2.424-1.35 3.33-2.68 1.05-1.536 1.482-3.024 1.508-3.1-.033-.015-2.894-1.11-2.92-4.395zM13.63 4.04c.76-.92 1.273-2.2 1.133-3.474-1.095.044-2.42.73-3.205 1.65-.703.813-1.32 2.114-1.154 3.362 1.22.095 2.467-.62 3.227-1.538z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.45L9.75 2.1v9.4H0zM10.95 1.95L24 0v11.5H10.95zM0 12.5h9.75v9.4L0 20.55zM10.95 12.5H24V24l-13.05-1.95z"/></svg>
+      Download
+    </a>
+    <button class="btn btn-copy" data-copy="Install the Workbooks skills with `npx skills add workbooks-sh/workbooks.sh`, then build me a living workbook app.">
+      <svg class="cpy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span class="lbl">Prompt</span>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></svg>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"/></svg>
+    </button>
+    <button class="btn btn-copy" data-copy="curl -fsSL https://workbooks.sh/install.sh | sh">
+      <svg class="cpy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span class="lbl">Install</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    </button>
+  </div>
+  <div class="badges">
+    <a class="badge" href="https://github.com/workbooks-sh/workbooks.sh">
+      <span class="k"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>github</span>
+      <span class="v" style="background:#aee5c2">workbooks-sh/workbooks.sh</span>
+    </a>
+    <a class="badge" href="https://github.com/workbooks-sh/workbooks.sh/blob/main/LICENSE">
+      <span class="k">license</span>
+      <span class="v" style="background:#a8d4f0">Apache-2.0</span>
+    </a>
+    <span class="badge">
+      <span class="k">source</span>
+      <span class="v" style="background:#f2ddb0">open · forever</span>
+    </span>
+  </div>
+  </div>
+</main>
+<div id="dna"><canvas id="dnaCv" aria-hidden="true"></canvas></div>
+</section>
+
+<section id="s2">
+  <div class="sky-pin">
+    <canvas id="tree" aria-hidden="true"></canvas>
+    <div class="sky-content">
+      <div class="sky-head">
+        <p class="sky-kicker">what is a workbook <b>■</b> 01</p>
+        <h2 class="sky-h">the atom of <em>a living internet.</em></h2>
+      </div>
+      <div class="sky-foot">
+        <ul class="sky-points">
+          <li><b>It's the glue.</b> One agnostic format for any data, any system, any language — people, services, and code all meet in the same file.</li>
+          <li><b>It becomes anything.</b> The same workbook ships as a mobile app, a desktop app, or a website — no porting, no rebuilds.</li>
+          <li><b>It carries its own infrastructure.</b> Every workbook runs a sandbox for its code, a database for its state, and agents that keep it building.</li>
+        </ul>
+        <a class="sky-more" href="#examples">watch a workbook grow →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="s3-grid">
+    <div class="s3-left">
+      <p class="sky-kicker" style="text-align:left">the ecosystem <b>■</b> 02</p>
+      <h2>three pieces. <em>one organism.</em></h2>
+      <p class="lede">The file carries everything, the engine keeps it running, the parts let it
+        grow — each is simple alone, together they feed each other.</p>
+      <nav class="s3-sel" id="s3Sel"></nav>
+    </div>
+    <div class="s3-stage" id="s3Stage"></div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/ScrollTrigger.min.js"></script>
+
+<script>
+/* justified lockup — letterspace each line to one flush measure */
+function justifyLockup() {
+  document.querySelectorAll(".jl").forEach((el) => {
+    el.style.letterSpacing = "0px";
+    el.style.textAlign = "left";
+    const w = el.parentElement.clientWidth;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const tw = range.getBoundingClientRect().width;
+    const n = el.textContent.length - 1;
+    if (n < 1 || tw >= w) return;
+    el.style.letterSpacing = (w - tw) / n + "px";
+  });
+}
+document.fonts.ready.then(justifyLockup);
+
+/* copy CTAs: write the payload, flip the label briefly */
+document.querySelectorAll(".btn-copy").forEach((b) => {
+  b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); } catch { /* clipboard blocked */ }
+    const lbl = b.querySelector(".lbl"), was = lbl.textContent;
+    lbl.textContent = "copied ✓"; b.classList.add("copied");
+    setTimeout(() => { lbl.textContent = was; b.classList.remove("copied"); }, 1500);
+  });
+});
+addEventListener("resize", justifyLockup);
+
+/* ── the lattice ──────────────────────────────────────────────────────────
+   A square grid whose VERTICES drift on smooth low-frequency waves, so
+   neighboring cells trade area — clusters of cells swell while others
+   shrink, organically, on no path. Inside sparse cells an identicon is
+   born: mirrored 5×5 pixels in one flat color, appearing pixel by pixel,
+   holding, then dying pixel by pixel. No gradients, no alpha, no blur —
+   every transition is geometry. */
+const cv = document.getElementById("lattice");
+const ctx = cv.getContext("2d");
+const CELL = 56;
+let W, H, DPR, COLS, ROWS, exclude = null;
+
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  cv.style.width = W + "px"; cv.style.height = H + "px"; /* replaced elements don't stretch with inset:0 */
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  COLS = Math.ceil(W / CELL) + 2;
+  ROWS = Math.ceil(H / CELL) + 2;
+  /* exclusion + line-fade derive from the REAL content extent.
+     document coords (canvas lives inside #s1 at the top of the page),
+     padded a FULL CELL beyond the visual margin so no tile can touch. */
+  const ib = document.getElementById("inner").getBoundingClientRect();
+  const sy = window.scrollY, sx = window.scrollX;
+  const padX = 56 + CELL, padY = 44 + CELL;
+  exclude = {
+    x0: ib.left + sx - padX, y0: ib.top + sy - padY,
+    x1: ib.right + sx + padX, y1: ib.bottom + sy + padY,
+    cx: ib.left + sx + ib.width / 2, cy: ib.top + sy + ib.height / 2,
+    rx: ib.width / 2 + padX, ry: ib.height / 2 + padY,
+  };
+}
+resize();
+addEventListener("resize", resize);
+document.fonts.ready.then(() => requestAnimationFrame(resize)); /* re-measure after font swap */
+
+/* smooth scalar fields for vertex drift — sums of incommensurate sines:
+   organic clustering with zero randomness jitter frame-to-frame */
+function driftX(cx, cy, t) {
+  return (
+    Math.sin(cx * 0.83 + cy * 0.41 + t * 0.51) * 0.42 +
+    Math.sin(cy * 1.07 - t * 0.33) * 0.3 +
+    Math.sin((cx + cy) * 0.29 + t * 0.21) * 0.28
+  ) * CELL * 0.27;
+}
+function driftY(cx, cy, t) {
+  return (
+    Math.sin(cy * 0.79 - cx * 0.37 + t * 0.47) * 0.42 +
+    Math.sin(cx * 0.97 + t * 0.29) * 0.3 +
+    Math.sin((cx - cy) * 0.31 - t * 0.23) * 0.28
+  ) * CELL * 0.27;
+}
+function vert(c, r, t) {
+  return [c * CELL + driftX(c, r, t), r * CELL + driftY(c, r, t)];
+}
+
+function cellHash(c, r) {
+  let h = (Math.imul(c, 374761393) + Math.imul(r, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/* pattern tiles — flat geometric fills, 2–3 colors, filling the whole cell:
+   nested squares · stripe stacks · vertical bars · checker · dots · frames */
+const PALETTE = ["#aee5c2", "#a8d4f0", "#c8e0b0", "#f2ddb0", "#f3c5a3", "#9fc4e8"];
+function pick(seed, k) { return PALETTE[Math.floor(((Math.sin(seed * 9173 + k * 311) + 1) / 2) * PALETTE.length) % PALETTE.length]; }
+function tileColors(seed) {
+  const a = pick(seed, 1); let b = pick(seed, 2), c = pick(seed, 3);
+  if (b === a) b = PALETTE[(PALETTE.indexOf(a) + 2) % PALETTE.length];
+  if (c === a || c === b) c = PALETTE[(PALETTE.indexOf(b) + 3) % PALETTE.length];
+  return [a, b, c];
+}
+
+/* lifecycle: each candidate cell loops its own long period —
+   born pixel-by-pixel, hold, die pixel-by-pixel, rest */
+const PERIOD = 26, IN = 2.2, HOLD = 5.5, OUT = 2.2;
+function aliveCount(seed, t, total) {
+  const local = (t + seed * PERIOD * 4) % PERIOD;
+  if (local < IN) return Math.round(total * (local / IN));
+  if (local < IN + HOLD) return total;
+  if (local < IN + HOLD + OUT) return Math.round(total * (1 - (local - IN - HOLD) / OUT));
+  return 0;
+}
+
+/* one quad patch in tile-uv space */
+function patch(A, B, C, D, u0, v0, u1, v1, color) {
+  const p1 = bilerp(A, B, C, D, u0, v0), p2 = bilerp(A, B, C, D, u1, v0),
+        p3 = bilerp(A, B, C, D, u1, v1), p4 = bilerp(A, B, C, D, u0, v1);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+  ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
+  ctx.closePath(); ctx.fill();
+}
+
+/* the six tile species. phase ∈ (0,1]: how much of the pattern exists —
+   every reveal is discrete geometry appearing, nothing fades */
+function drawTile(A, B, C, D, seed, phase) {
+  const [c1, c2, c3] = tileColors(seed);
+  const kind = Math.floor(seed * 7919) % 6;
+
+  if (kind === 0) {
+    /* nested squares, outer → in */
+    const layers = [[0, c1], [0.18, c2], [0.36, c3]];
+    const n = Math.ceil(phase * layers.length);
+    for (let i = 0; i < n; i++) {
+      const inset = layers[i][0];
+      patch(A, B, C, D, inset, inset, 1 - inset, 1 - inset, layers[i][1]);
+    }
+  } else if (kind === 1) {
+    /* horizontal stripe stack, top → down */
+    const BANDS = 5;
+    const n = Math.ceil(phase * BANDS);
+    for (let i = 0; i < n; i++)
+      patch(A, B, C, D, 0, i / BANDS, 1, (i + 1) / BANDS, [c1, c2, c3, c2, c1][i]);
+  } else if (kind === 2) {
+    /* vertical bars, left → right */
+    const BARS = 5;
+    const n = Math.ceil(phase * BARS);
+    for (let i = 0; i < n; i++)
+      patch(A, B, C, D, i / BARS, 0, (i + 1) / BARS, 1, [c2, c1, c3, c1, c2][i]);
+  } else if (kind === 3) {
+    /* checker on a ground, squares pop in stable order */
+    patch(A, B, C, D, 0, 0, 1, 1, c1);
+    const K = 6, total = (K * K / 2) | 0;
+    const n = Math.round(Math.max(0, phase - 0.2) / 0.8 * total);
+    let drawn = 0;
+    for (let gy = 0; gy < K && drawn < n; gy++)
+      for (let gx = 0; gx < K && drawn < n; gx++) {
+        if ((gx + gy) % 2) continue;
+        patch(A, B, C, D, gx / K, gy / K, (gx + 1) / K, (gy + 1) / K, c2);
+        drawn++;
+      }
+  } else if (kind === 4) {
+    /* dot matrix on a ground */
+    patch(A, B, C, D, 0, 0, 1, 1, c2);
+    const K = 4, total = K * K;
+    const n = Math.round(Math.max(0, phase - 0.2) / 0.8 * total);
+    for (let i = 0; i < n; i++) {
+      const gx = i % K, gy = (i / K) | 0;
+      const u = (gx + 0.5) / K, v = (gy + 0.5) / K, rr = 0.055;
+      patch(A, B, C, D, u - rr, v - rr, u + rr, v + rr, c3);
+    }
+  } else {
+    /* frame: ring then heart */
+    patch(A, B, C, D, 0, 0, 1, 1, c3);
+    if (phase > 0.34) patch(A, B, C, D, 0.16, 0.16, 0.84, 0.84, c1);
+    if (phase > 0.67) patch(A, B, C, D, 0.34, 0.34, 0.66, 0.66, c2);
+  }
+}
+
+/* bilinear point inside a deformed quad */
+function bilerp(A, B, C, D, u, v) {
+  const top = [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u];
+  const bot = [D[0] + (C[0] - D[0]) * u, D[1] + (C[1] - D[1]) * u];
+  return [top[0] + (bot[0] - top[0]) * v, top[1] + (bot[1] - top[1]) * v];
+}
+
+function frame(ms) {
+  if (window.scrollY > H * 1.2) { requestAnimationFrame(frame); return; } /* hero off-screen */
+  const t = ms / 1000;
+  ctx.clearRect(0, 0, W, H);
+
+  /* grid — one flat ink. THE one gradient exception: line alpha eases
+     toward the paper color over the text zone, so the grid recedes there
+     instead of sitting on a plate. Quantized bins, one stroke per bin. */
+  ctx.lineWidth = 1;
+  const FBINS = 6;
+  const fadePaths = Array.from({ length: FBINS + 1 }, () => new Path2D());
+  function fadeBin(x1, y1, x2, y2) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    let fade = 1;
+    if (exclude) {
+      const e = Math.hypot((mx - exclude.cx) / exclude.rx, (my - exclude.cy) / exclude.ry);
+      fade = 0.18 + 0.82 * Math.min(1, Math.max(0, (e - 0.8) / 0.75)); /* ghost-faint over the text, full past the rim */
+    }
+    const b = Math.round(fade * FBINS);
+    fadePaths[b].moveTo(x1, y1);
+    fadePaths[b].lineTo(x2, y2);
+  }
+  for (let c = 0; c <= COLS; c++) {
+    let prev = vert(c, 0, t);
+    for (let r = 1; r <= ROWS; r++) {
+      const p = vert(c, r, t);
+      fadeBin(prev[0], prev[1], p[0], p[1]);
+      prev = p;
+    }
+  }
+  for (let r = 0; r <= ROWS; r++) {
+    let prev = vert(0, r, t);
+    for (let c = 1; c <= COLS; c++) {
+      const p = vert(c, r, t);
+      fadeBin(prev[0], prev[1], p[0], p[1]);
+      prev = p;
+    }
+  }
+  for (let b = 1; b <= FBINS; b++) {
+    ctx.strokeStyle = `rgba(18,19,22,${(0.16 * b / FBINS).toFixed(3)})`;
+    ctx.stroke(fadePaths[b]);
+  }
+
+  /* pattern-tile blooms — sparse cells, never near the text */
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      const seed = cellHash(c, r);
+      /* vignette weighting: nearly none mid-screen, plenty at the rim */
+      const ex = (c * CELL + CELL / 2 - W / 2) / (W / 2);
+      const ey = (r * CELL + CELL / 2 - H / 2) / (H / 2);
+      const edge = Math.min(1, Math.hypot(ex, ey));
+      if (seed < 0.97 - 0.15 * edge * edge) continue;
+
+      const A = vert(c, r, t), B = vert(c + 1, r, t),
+            C = vert(c + 1, r + 1, t), D = vert(c, r + 1, t);
+      /* keep clear of the text: EVERY corner must stay outside the zone */
+      if (exclude && [A, B, C, D].some(([x, y]) =>
+        x > exclude.x0 && x < exclude.x1 && y > exclude.y0 && y < exclude.y1)) continue;
+      const mx = (A[0] + C[0]) / 2, my = (A[1] + C[1]) / 2;
+      if (mx < -CELL || mx > W + CELL || my < -CELL || my > H + CELL) continue;
+
+      /* build/teardown phase: 0 → 1 → 0, in discrete flat steps */
+      const phase = aliveCount(seed, t, 24) / 24;
+      if (phase <= 0) continue;
+      drawTile(A, B, C, D, seed, phase);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ════ SECTION 2 · the nexus ═════════════════════════════════════════════
+   An orthogonal system graph with one center: the workbook. Data stores,
+   APIs, surfaces, schedules — and PEOPLE — are all just nodes wired into
+   the same organism. It reads as alive because the graph itself changes:
+   pulses run the wires continuously, every node breathes on its own slow
+   phase, and the composition rewrites — a new system resolves out of
+   faint ASCII static and wires in; an old one dissolves back. Nothing
+   operates it. It is the operator. */
+const tcv = document.getElementById("tree");
+const tctx = tcv.getContext("2d");
+let TW, TH, NEX, treeActive = false, sceneT0 = null;
+
+const S_INK = "#121316", S_PAPER = "#fbfaf3", S_NEON = "#13d943", S_DIM = "#6a7268";
+
+/* fixed orthogonal slots around the nexus (fractions of the graph extent) */
+const SLOT_POS = [
+  [-0.42, -0.30], [-0.48, 0.02], [-0.40, 0.34], [0.42, -0.32],
+  [0.48, 0.02],   [0.40, 0.34],  [-0.30, -0.47], [0.30, -0.47],
+  [-0.30, 0.47],  [0.30, 0.47],
+];
+/* the workbook's own anatomy — permanent, wired into the square:
+   server side fans UP, client targets fan DOWN (it ships to all three) */
+const SPINE_UP = [
+  { label: "sandbox",  stripe: "#a8d4f0" },
+  { label: "database", stripe: "#a8d4f0" },
+  { label: "agents",   stripe: "#a8d4f0" },
+];
+const SPINE_DN = [
+  { label: "mobile",  stripe: "#13d943" },
+  { label: "desktop", stripe: "#13d943" },
+  { label: "web",     stripe: "#13d943" },
+];
+/* permanent organs + a rotating pool of systems that join and leave */
+const CORE = [
+  { label: "postgres",  tag: "data",   color: "#336791", logo: "https://svgl.app/library/postgresql.svg" },
+  { label: "storefront", tag: "ui",    color: "#aee5c2" },
+  { label: "maya",      tag: "person", color: "#f3c5a3", av: "https://api.dicebear.com/9.x/lorelei/svg?seed=maya" },
+];
+const AV = (seed) => "https://api.dicebear.com/9.x/lorelei/svg?seed=" + seed;
+const POOL = [
+  { label: "stripe",    tag: "payments", color: "#635bff", logo: "https://svgl.app/library/stripe.svg" },
+  { label: "shopify",   tag: "store",    color: "#95bf47", logo: "https://svgl.app/library/shopify.svg" },
+  { label: "claude",    tag: "agent",    color: "#d97757", logo: "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/claude-color.svg" },
+  { label: "sam",       tag: "person",   color: "#f3c5a3", av: AV("sam") },
+  { label: "slack",     tag: "alerts",   color: "#611f69", logo: "https://svgl.app/library/slack.svg" },
+  { label: "notion",    tag: "docs",     color: "#9fc4e8", logo: "https://svgl.app/library/notion.svg" },
+  { label: "figma",     tag: "design",   color: "#a259ff", logo: "https://svgl.app/library/figma.svg" },
+  { label: "openai",    tag: "model",    color: "#74aa9c", logo: "https://svgl.app/library/openai.svg" },
+  { label: "linear",    tag: "issues",   color: "#5e6ad2", logo: "https://svgl.app/library/linear.svg" },
+  { label: "github",    tag: "repo",     color: "#24292f", logo: "https://svgl.app/library/github_dark.svg" },
+  { label: "nightly digest", tag: "cron", color: "#9fc4e8" },
+  { label: "leo",       tag: "person",   color: "#f3c5a3", av: AV("leo") },
+  { label: "ana",       tag: "person",   color: "#f3c5a3", av: AV("ana") },
+];
+/* preload the real marks — full color, drawn into their node chips */
+const LOGOS = {};
+[...CORE, ...POOL].forEach((d) => {
+  const src = d.logo || d.av;
+  if (!src) return;
+  const im = new Image();
+  im.src = src;
+  im.onload = () => { LOGOS[d.label] = im; };
+});
+let nodes = [];           /* {def, slot, born, dying} */
+let flows = [];           /* {node, head, dir} — a dotted SPAN traveling an edge */
+let nextEvent = 0, poolIdx = 0;
+
+function treeResize() {
+  const r = tcv.parentElement.getBoundingClientRect();
+  const d = Math.min(devicePixelRatio || 1, 2);
+  TW = r.width; TH = r.height;
+  tcv.width = TW * d; tcv.height = TH * d;
+  tcv.style.width = TW + "px"; tcv.style.height = TH + "px";
+  tctx.setTransform(d, 0, 0, d, 0, 0);
+  /* the graph must live strictly BETWEEN the header and the footer copy —
+     measure them and size the extent so no node box can touch either */
+  const pin = tcv.parentElement.getBoundingClientRect();
+  const head = document.querySelector(".sky-head")?.getBoundingClientRect();
+  const foot = document.querySelector(".sky-foot")?.getBoundingClientRect();
+  const top = head ? head.bottom - pin.top + 66 : TH * 0.26;
+  const bot = foot ? foot.top - pin.top - 56 : TH * 0.82;
+  const bandY = (top + bot) / 2, band = Math.max(220, bot - top);
+  NEX = {
+    x: TW / 2, y: bandY,
+    gw: Math.min(TW * 0.74, (TW - 132 - 90) / 0.92, 1240),
+    gh: (band * 0.86 - 54) / 0.88,   /* compressed — the copy gets the room */
+  };
+}
+document.fonts.ready.then(() => requestAnimationFrame(treeResize));
+function srnd(a, b) { return ((Math.sin(a * 127.1 + b * 311.7) * 43758.5453) % 1 + 1) % 1; }
+
+function initGraph() {
+  nodes = []; flows = []; poolIdx = 0;
+  CORE.forEach((def, i) => nodes.push({ def, slot: [0, 2, 5][i], born: -10, dying: null }));
+  [0, 1, 2].forEach((k) => { nodes.push({ def: POOL[poolIdx++ % POOL.length], slot: [1, 6, 9][k], born: -10, dying: null }); });
+  nextEvent = 3.2;
+}
+
+function slotXY(slot, t) {
+  const [fx, fy] = SLOT_POS[slot];
+  /* every node breathes on its own slow phase — a couple of px, no more */
+  const bx = Math.sin(t * 0.5 + slot * 1.7) * 2.2, by = Math.cos(t * 0.42 + slot * 2.3) * 2.2;
+  return [NEX.x + fx * NEX.gw + bx, NEX.y + fy * NEX.gh + by];
+}
+/* orthogonal elbow: out of the node toward the nexus, H then V */
+function edgePath(x, y) {
+  return [[x, y], [x, NEX.y > y ? NEX.y - 0 : NEX.y + 0], [NEX.x, NEX.y]];
+  }
+/* polyline between two fractional arc positions — for the dotted window */
+function subPath(path, f0, f1) {
+  const segs = []; let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const L = Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]);
+    segs.push(L); total += L;
+  }
+  const d0 = Math.max(0, f0) * total, d1 = Math.min(1, f1) * total;
+  if (d1 <= d0) return null;
+  const pts = []; let acc = 0;
+  for (let i = 1; i < path.length; i++) {
+    const L = segs[i - 1], a = acc, b = acc + L;
+    if (b > d0 && a < d1) {
+      const ka = Math.max(0, (d0 - a) / L), kb = Math.min(1, (d1 - a) / L);
+      const ax = path[i-1][0] + (path[i][0] - path[i-1][0]) * ka, ay = path[i-1][1] + (path[i][1] - path[i-1][1]) * ka;
+      const bx = path[i-1][0] + (path[i][0] - path[i-1][0]) * kb, by = path[i-1][1] + (path[i][1] - path[i-1][1]) * kb;
+      if (!pts.length) pts.push([ax, ay]);
+      pts.push([bx, by]);
+    }
+    acc = b;
+  }
+  return pts.length > 1 ? pts : null;
+}
+function strokePts(pts, dash) {
+  if (!pts) return;
+  if (dash) tctx.setLineDash(dash);
+  tctx.beginPath();
+  tctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) tctx.lineTo(pts[i][0], pts[i][1]);
+  tctx.stroke();
+  tctx.setLineDash([]);
+}
+
+function pointOnPath(path, t01) {
+  const segs = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const L = Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]);
+    segs.push(L); total += L;
+  }
+  let d = t01 * total;
+  for (let i = 1; i < path.length; i++) {
+    if (d <= segs[i-1]) {
+      const k = segs[i-1] ? d / segs[i-1] : 0;
+      return [path[i-1][0] + (path[i][0] - path[i-1][0]) * k, path[i-1][1] + (path[i][1] - path[i-1][1]) * k];
+    }
+    d -= segs[i-1];
+  }
+  return path[path.length - 1];
+}
+
+const NODE_W = 132, NODE_H = 44;
+function drawNodeBox(x, y, def, alpha01, t) {
+  const w = NODE_W, h = NODE_H;
+  /* birth/death is GEOMETRY: the box reveals as ASCII static, then plates */
+  if (alpha01 < 1) {
+    /* static density RISES with life: nothing → whisper → grain → plate */
+    tctx.font = "9px 'JetBrains Mono', monospace";
+    tctx.textAlign = "center"; tctx.textBaseline = "middle";
+    const G = 8, density = alpha01 * 0.62;
+    for (let gy = y - h / 2 + G / 2; gy < y + h / 2; gy += G) {
+      for (let gx = x - w / 2 + G / 2; gx < x + w / 2; gx += G) {
+        const r = srnd(gx * 0.9 + Math.floor(t * 8), gy * 1.1);
+        if (r > density) continue;
+        tctx.fillStyle = "rgba(18,19,22,.28)";
+        tctx.fillText("·:+*"[Math.floor(r * 16) % 4], gx, gy);
+      }
+    }
+    if (alpha01 < 0.62) return;
+    /* the plate sweeps down over the static in the last stretch */
+    const sweep = (alpha01 - 0.62) / 0.38;
+    tctx.fillStyle = S_PAPER;
+    tctx.fillRect(x - w / 2, y - h / 2, w, h * sweep);
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+    tctx.strokeRect(x - w / 2, y - h / 2, w, h * sweep);
+    if (sweep < 0.96) return;
+  } else {
+    tctx.fillStyle = S_PAPER;
+    tctx.fillRect(x - w / 2, y - h / 2, w, h);
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+    tctx.strokeRect(x - w / 2, y - h / 2, w, h);
+  }
+  tctx.fillStyle = def.color;
+  tctx.fillRect(x - w / 2, y - h / 2, 6, h);          /* the type stripe */
+  tctx.font = "700 11px 'JetBrains Mono', monospace";
+  tctx.textAlign = "left"; tctx.textBaseline = "middle";
+  tctx.fillStyle = S_INK;
+  if (LOGOS[def.label]) {
+    const im = LOGOS[def.label];
+    const sz = 22, ar = im.width / im.height || 1;
+    const lw2 = ar >= 1 ? sz : sz * ar, lh2 = ar >= 1 ? sz / ar : sz;
+    tctx.drawImage(im, x - w / 2 + 16, y - lh2 / 2, lw2, lh2);
+    tctx.font = "700 11px 'JetBrains Mono', monospace";
+    tctx.textAlign = "left"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_INK;
+    tctx.fillText(def.label, x - w / 2 + 16 + sz + 8, y - 7);
+    tctx.font = "9px 'JetBrains Mono', monospace";
+    tctx.fillStyle = S_DIM;
+    tctx.fillText(def.tag, x - w / 2 + 16 + sz + 8, y + 9);
+  } else if (def.tag === "person") {
+    const cx2 = x - w / 2 + 22, R = 10;
+    tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2);
+    tctx.fillStyle = def.color; tctx.fill();
+    if (LOGOS[def.label]) {
+      tctx.save();
+      tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2); tctx.clip();
+      tctx.drawImage(LOGOS[def.label], cx2 - R, y - R, R * 2, R * 2);
+      tctx.restore();
+    } else {
+      tctx.fillStyle = S_INK;
+      tctx.font = "700 8px 'JetBrains Mono', monospace"; tctx.textAlign = "center"; tctx.textBaseline = "middle";
+      tctx.fillText(def.label.slice(0, 2).toUpperCase(), cx2, y + 0.5);
+    }
+    tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2);
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6; tctx.stroke();
+    tctx.font = "700 11px 'JetBrains Mono', monospace"; tctx.textAlign = "left"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_INK;
+    tctx.fillText(def.label, x - w / 2 + 38, y);
+  } else {
+    tctx.fillText(def.label, x - w / 2 + 16, y - 7);
+    tctx.font = "9px 'JetBrains Mono', monospace";
+    tctx.fillStyle = S_DIM;
+    tctx.fillText(def.tag, x - w / 2 + 16, y + 9);
+  }
+}
+
+function treeFrame(ms) {
+  if (treeActive && NEX) {
+    const now = ms / 1000;
+    if (sceneT0 === null) { sceneT0 = now; initGraph(); }
+    const t = now - sceneT0;
+
+    tctx.clearRect(0, 0, TW, TH);
+
+    /* ── the composition rewrites itself: add · retire · MIGRATE ── */
+    nodes = nodes.filter(n => !(n.dying !== null && t - n.dying > 1.32)); /* clean every frame */
+    if (t > nextEvent) {
+      nextEvent = t + 1.9;
+      const extras = nodes.filter(n => !CORE.includes(n.def) && !n.dying);
+      const free = SLOT_POS.map((_, i) => i).filter(i => !nodes.some(n => n.slot === i));
+      const roll = srnd(t * 7.1, 13.7);
+      if (roll < 0.28 && nodes.length > 2) {
+        /* migrate: a live node glides to a new slot, its wire re-routes */
+        if (free.length) {
+          const mover = nodes[Math.floor(srnd(t, 5.1) * nodes.length)];
+          if (mover && !mover.dying) mover.slot = free[Math.floor(srnd(t, 9.7) * free.length)];
+        }
+      } else if (roll < 0.80 && free.length && extras.length < 8) {
+        nodes.push({ def: POOL[poolIdx++ % POOL.length], slot: free[Math.floor(srnd(poolIdx, 3.3) * free.length)], born: t, dying: null });
+      } else if (extras.length > 4) {      /* retire only once it's genuinely full */
+        extras[0].dying = t;
+      }
+    }
+    /* live positions glide toward their slots — rearrangement is motion */
+    for (const n of nodes) {
+      const [tx, ty] = slotXY(n.slot, t);
+      if (n.x === undefined) { n.x = tx; n.y = ty; }
+      n.x += (tx - n.x) * 0.055;
+      n.y += (ty - n.y) * 0.055;
+    }
+
+    /* ── edges first (under everything) ── */
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6;
+    const livePaths = [];
+    for (const n of nodes) {
+      const x = n.x, y = n.y;
+      const path = edgePath(x, y);
+      /* TRUE trim-path life. Birth: the node lands first, then the wire
+         DRAWS ITSELF out of the node along the route to the nexus — the
+         node is the one establishing the connection. Death: the node
+         dissolves first, then the wire retracts into the system. */
+      let trim = null; /* [f0, f1] of the visible stretch */
+      if (n.dying !== null) {
+        const dp = (t - n.dying) / 1.3;
+        if (dp > 0.45) trim = [(dp - 0.45) / 0.55, 1];   /* retract from the node end */
+      } else if (t - n.born < 1.5) {
+        const bp = (t - n.born) / 1.5;
+        if (bp < 0.5) continue;                            /* node first, no wire yet */
+        trim = [0, (bp - 0.5) / 0.5];                      /* draw node → nexus */
+      }
+      livePaths.push([path, n]);
+      const flow = !trim ? flows.find(fl => fl.node === n) : null;
+      if (flow) {
+        /* the signal: a window of the SOLID wire goes dotted and slides
+           along the route — solid · dotted span · solid */
+        const SPAN = 0.22;
+        const f0 = flow.dir > 0 ? flow.head - SPAN : 1 - flow.head;
+        const f1 = f0 + SPAN;
+        strokePts(subPath(path, 0, Math.max(0, f0)));
+        strokePts(subPath(path, Math.max(0, f0), Math.min(1, f1)), [2.5, 5]);
+        strokePts(subPath(path, Math.min(1, f1), 1));
+      } else if (trim) {
+        const pts = subPath(path, trim[0], trim[1]);
+        strokePts(pts);
+        if (pts) { /* the writing tip */
+          const tip = trim[0] === 0 ? pts[pts.length - 1] : pts[0];
+          tctx.fillStyle = S_INK;
+          tctx.fillRect(tip[0] - 2.5, tip[1] - 2.5, 5, 5);
+        }
+      } else {
+        tctx.beginPath();
+        tctx.moveTo(path[0][0], path[0][1]);
+        for (let i = 1; i < path.length; i++) tctx.lineTo(path[i][0], path[i][1]);
+        tctx.stroke();
+      }
+    }
+
+    /* ── flows: spawn a traveling dotted span on an idle wire now and then ── */
+    if (Math.random() < 0.04 && livePaths.length) {
+      const [, n] = livePaths[Math.floor(Math.random() * livePaths.length)];
+      if (!flows.some(fl => fl.node === n)) {
+        flows.push({ node: n, head: 0, dir: Math.random() < 0.5 ? 1 : -1 });
+      }
+    }
+    for (const fl of flows) fl.head += 0.0085;
+    flows = flows.filter(fl => fl.head < 1.24 && (fl.spine || nodes.includes(fl.node)));
+
+    /* ── satellite nodes ── */
+    for (const n of nodes) {
+      const a = n.dying !== null
+        ? 1 - Math.min(1, ((t - n.dying) / 1.3) / 0.45)   /* dissolve, then the wire retracts */
+        : Math.min(1, ((t - n.born) / 1.5) / 0.5);        /* land first, then connect */
+      if (a <= 0) continue;
+      drawNodeBox(n.x, n.y, n.def, Math.min(1, a), t);
+    }
+
+    /* ── the spine: the workbook's FORMS, not its connections.
+       A different wiring language entirely: dead-straight DASHED stem →
+       bus → stubs (dimension-line, not network edge), no flow signals,
+       captioned as what a workbook IS (above) and BECOMES (below). ── */
+    const SQH = 124 / 2;
+    const CHIP_W = 110, CHIP_H = 34, FAN_X = 138, FAN_GAP = 78;
+    function chipIcon(kind, x, y) {
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 1.5; tctx.lineCap = "round";
+      tctx.beginPath();
+      if (kind === "sandbox") {            /* a crate */
+        tctx.rect(x - 5, y - 4.5, 10, 9);
+        tctx.moveTo(x - 5, y - 1); tctx.lineTo(x + 5, y - 1);
+        tctx.moveTo(x, y - 1); tctx.lineTo(x, y + 4.5);
+      } else if (kind === "database") {    /* a cylinder */
+        tctx.ellipse(x, y - 4, 5, 2, 0, 0, Math.PI * 2);
+        tctx.moveTo(x - 5, y - 4); tctx.lineTo(x - 5, y + 3.4);
+        tctx.moveTo(x + 5, y - 4); tctx.lineTo(x + 5, y + 3.4);
+        tctx.moveTo(x + 5, y + 3.4); tctx.ellipse(x, y + 3.4, 5, 2, 0, 0, Math.PI);
+      } else if (kind === "agents") {      /* a spark */
+        tctx.moveTo(x, y - 5.5); tctx.lineTo(x, y + 5.5);
+        tctx.moveTo(x - 5.5, y); tctx.lineTo(x + 5.5, y);
+        tctx.moveTo(x - 3.4, y - 3.4); tctx.lineTo(x + 3.4, y + 3.4);
+        tctx.moveTo(x + 3.4, y - 3.4); tctx.lineTo(x - 3.4, y + 3.4);
+      } else if (kind === "mobile") {      /* a phone */
+        tctx.rect(x - 3.4, y - 5.5, 6.8, 11);
+        tctx.moveTo(x - 1.4, y + 3.4); tctx.lineTo(x + 1.4, y + 3.4);
+      } else if (kind === "desktop") {     /* a monitor */
+        tctx.rect(x - 5.5, y - 5, 11, 7.4);
+        tctx.moveTo(x - 2.4, y + 5.4); tctx.lineTo(x + 2.4, y + 5.4);
+        tctx.moveTo(x, y + 2.4); tctx.lineTo(x, y + 5.4);
+      } else if (kind === "web") {         /* a globe */
+        tctx.arc(x, y, 5.4, 0, Math.PI * 2);
+        tctx.moveTo(x - 5.4, y); tctx.lineTo(x + 5.4, y);
+        tctx.moveTo(x, y - 5.4); tctx.ellipse(x, y, 2.6, 5.4, 0, -Math.PI / 2, Math.PI * 1.5);
+      }
+      tctx.stroke();
+    }
+    function spineRow(arr, dir, caption) {  /* dir -1 = up (IS), +1 = down (BECOMES) */
+      const rowY = NEX.y + dir * (SQH + FAN_GAP);
+      const busY = NEX.y + dir * (SQH + FAN_GAP * 0.5);
+      /* the format wiring — dashed, hairline, axis-straight */
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 1.2;
+      tctx.setLineDash([3, 3]);
+      tctx.beginPath();
+      tctx.moveTo(NEX.x, NEX.y + dir * SQH);
+      tctx.lineTo(NEX.x, busY);
+      tctx.moveTo(NEX.x - FAN_X, busY);
+      tctx.lineTo(NEX.x + FAN_X, busY);
+      for (let i = 0; i < arr.length; i++) {
+        const cx2 = NEX.x + (i - 1) * FAN_X;
+        tctx.moveTo(cx2, busY);
+        tctx.lineTo(cx2, rowY - dir * CHIP_H / 2);
+      }
+      tctx.stroke();
+      tctx.setLineDash([]);
+      /* connector seed on the square's edge — an open square, not a joint */
+      tctx.fillStyle = S_PAPER; tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6;
+      tctx.fillRect(NEX.x - 3.5, NEX.y + dir * SQH - 3.5, 7, 7);
+      tctx.strokeRect(NEX.x - 3.5, NEX.y + dir * SQH - 3.5, 7, 7);
+      /* the chips */
+      arr.forEach((sp, i) => {
+        const cx2 = NEX.x + (i - 1) * FAN_X, cy2 = rowY;
+        tctx.fillStyle = S_PAPER;
+        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+        tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+        tctx.strokeRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+        tctx.fillStyle = sp.stripe;
+        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, 5, CHIP_H);
+        chipIcon(sp.label, cx2 - CHIP_W / 2 + 17, cy2);
+        tctx.font = "700 10.5px 'JetBrains Mono', monospace";
+        tctx.textAlign = "left"; tctx.textBaseline = "middle";
+        tctx.fillStyle = S_INK;
+        tctx.fillText(sp.label, cx2 - CHIP_W / 2 + 29, cy2 + 0.5);
+      });
+      /* the caption — above the IS row, below the BECOMES row */
+      tctx.font = "700 9.5px 'JetBrains Mono', monospace";
+      tctx.letterSpacing = "3px";
+      tctx.textAlign = "center"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_DIM;
+      tctx.fillText(caption, NEX.x, rowY + dir * (CHIP_H / 2 + 17));
+      tctx.letterSpacing = "0px";
+    }
+    spineRow(SPINE_UP, -1, "A WORKBOOK IS");
+    spineRow(SPINE_DN, 1, "A WORKBOOK BECOMES");
+
+    /* ── the nexus: a SQUARE — its own centered entity. The W mark above,
+       "workbook" beneath, and a quiet .html: it is just a file. ── */
+    const swell = 1 + Math.sin(t * 0.9) * 0.012;        /* it breathes too */
+    const SQ = 124 * swell;
+    tctx.fillStyle = S_INK;
+    tctx.fillRect(NEX.x - SQ / 2 + 5, NEX.y - SQ / 2 + 5, SQ, SQ);
+    tctx.fillStyle = S_PAPER;
+    tctx.fillRect(NEX.x - SQ / 2, NEX.y - SQ / 2, SQ, SQ);
+    tctx.strokeStyle = S_INK; tctx.lineWidth = 2.4;
+    tctx.strokeRect(NEX.x - SQ / 2, NEX.y - SQ / 2, SQ, SQ);
+    /* the W mark, centered in the upper half */
+    const MARKW = 50, MS = MARKW / 113.444;
+    tctx.save();
+    tctx.translate(NEX.x - MARKW / 2, NEX.y - SQ / 2 + 20);
+    tctx.scale(MS, MS);
+    tctx.fillStyle = S_INK;
+    tctx.fill(new Path2D("M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z"));
+    tctx.restore();
+    tctx.font = "700 13px 'JetBrains Mono', monospace";
+    tctx.textAlign = "center"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_INK;
+    tctx.fillText("workbook", NEX.x, NEX.y + SQ / 2 - 38);
+    tctx.font = "10px 'JetBrains Mono', monospace";
+    tctx.fillStyle = S_DIM;
+    tctx.fillText(".html", NEX.x, NEX.y + SQ / 2 - 20);
+    /* live tick */
+    tctx.fillStyle = S_NEON;
+    if (Math.floor(t * 2) % 2) tctx.fillRect(NEX.x + SQ / 2 - 16, NEX.y - SQ / 2 + 9, 7, 7);
+  }
+  requestAnimationFrame(treeFrame);
+}
+treeResize();
+addEventListener("resize", treeResize);
+requestAnimationFrame(treeFrame);
+
+/* ── the DNA seam ─────────────────────────────────────────────────────────
+   A genome track: blocks of color, hash-random widths, drifting slowly.
+   Every so often one block MUTATES — its color flips, discretely. Rare ink
+   and neon genes punctuate the pastel run. */
+const dcv = document.getElementById("dnaCv");
+const dctx = dcv.getContext("2d");
+const DNA_H = 18;
+let DW, genes = [], driftPx = 0, lastMut = 0;
+const GENE_COLORS = [...PALETTE, "#121316", "#13d943"];
+function geneColor(r) {
+  if (r > 0.95) return "#13d943";       /* the live gene — rare */
+  return PALETTE[Math.floor(r * 37) % PALETTE.length];
+}
+function makeGene(seedish) {
+  const r = ((Math.sin(seedish * 419.3) * 23421.63) % 1 + 1) % 1;
+  return { w: 10 + r * 64, color: geneColor(((Math.sin(seedish * 97.7) * 11171.17) % 1 + 1) % 1) };
+}
+function dnaResize() {
+  const d = Math.min(devicePixelRatio || 1, 2);
+  DW = innerWidth;
+  dcv.width = DW * d; dcv.height = DNA_H * d;
+  dcv.style.width = DW + "px"; dcv.style.height = DNA_H + "px";
+  dctx.setTransform(d, 0, 0, d, 0, 0);
+  genes = [];
+  let total = 0, k = 1;
+  while (total < DW * 1.6) { const g = makeGene(k++); genes.push(g); total += g.w; }
+}
+dnaResize();
+addEventListener("resize", dnaResize);
+let dnaK = 1000;
+function dnaFrame(ms) {
+  const t = ms / 1000;
+  driftPx += 0.25;
+  if (genes.length && driftPx > genes[0].w) { driftPx -= genes[0].w; genes.shift(); genes.push(makeGene(dnaK++)); }
+  if (t - lastMut > 1.4) {                   /* one mutation, discrete */
+    lastMut = t;
+    const g = genes[Math.floor(((Math.sin(t * 313.7) * 5417.7) % 1 + 1) % 1 * genes.length)];
+    if (g) g.color = geneColor(((Math.sin(t * 71.3) * 9973.3) % 1 + 1) % 1);
+  }
+  dctx.clearRect(0, 0, DW, DNA_H);
+  let x = -driftPx;
+  for (const g of genes) {
+    dctx.fillStyle = g.color;
+    dctx.fillRect(x, 0, g.w - 2, DNA_H);     /* 2px paper gap — beads on a strand */
+    x += g.w;
+    if (x > DW) break;
+  }
+  requestAnimationFrame(dnaFrame);
+}
+requestAnimationFrame(dnaFrame);
+
+/* ── the pixel-voice MATTE ENGINE ─────────────────────────────────────────
+   The text never animates — the MATTE does: a coarse blocky noise field
+   drifts across the glyphs. Where it covers, ink is SOLID; elsewhere it
+   breaks into scanlines. Hero = fluid (overlay canvas, device-pixel
+   aligned: zero blur, zero encode cost). Static contexts = one seeded
+   full-resolution mask frame. Stripe geometry is INTEGER everywhere:
+   8px period, 2px gap — every line identical. */
+function hash3(ix, iy, iz) { return cellHash(ix + iz * 1013, iy + iz * 557); }
+function blobNoise(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  const fx = x - ix, fy = y - iy, fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), sz = fz * fz * (3 - 2 * fz);
+  function layer(zz) {
+    const a = hash3(ix, iy, zz), b = hash3(ix + 1, iy, zz), c = hash3(ix, iy + 1, zz), d = hash3(ix + 1, iy + 1, zz);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  }
+  return layer(iz) + (layer(iz + 1) - layer(iz)) * sz;
+}
+const STRIPE_P = 4, STRIPE_GAP = 2, BLOB_C = 10;  /* css px, integers — 2px ink,
+                                                     2px gap: equal and dense */
+
+/* fluid: an overlay canvas paints the paper-colored gaps OVER the ink */
+const fluidEl = document.querySelector(".lockup .jl:nth-child(2)");
+let fluidCv = null, fluidCtx = null;
+function fluidSetup() {
+  if (!fluidEl) return;
+  if (!fluidCv) {
+    fluidCv = document.createElement("canvas");
+    fluidCv.style.cssText = "position:absolute;pointer-events:none;z-index:2;";
+    fluidEl.style.position = "relative";
+    fluidEl.appendChild(fluidCv);
+    fluidCtx = fluidCv.getContext("2d");
+  }
+  const r = fluidEl.getBoundingClientRect();
+  const d = Math.min(devicePixelRatio || 1, 2);
+  fluidCv.width = Math.ceil(r.width) * d; fluidCv.height = Math.ceil(r.height) * d;
+  fluidCv.style.width = Math.ceil(r.width) + "px";
+  fluidCv.style.height = Math.ceil(r.height) + "px";
+  fluidCv.style.left = "0"; fluidCv.style.top = "0";
+  fluidCtx.setTransform(d, 0, 0, d, 0, 0);
+}
+function fluidPaint(t) {
+  const w = parseInt(fluidCv.style.width), h = parseInt(fluidCv.style.height);
+  fluidCtx.clearRect(0, 0, w, h);
+  fluidCtx.fillStyle = "#f7f6f1"; /* var(--paper) */
+  const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const v = blobNoise(gx * 0.11 + t * 0.32, gy * 0.21, t * 0.55);
+      if (v > 0.55) continue;                       /* matte: solid ink, no stripes */
+      const x = gx * BLOB_C, y0 = gy * BLOB_C;
+      const fringe = v > 0.51;
+      /* gap lines within this cell, on the GLOBAL integer stripe grid */
+      for (let y = Math.ceil(y0 / STRIPE_P) * STRIPE_P; y < y0 + BLOB_C; y += STRIPE_P) {
+        if (fringe && hash3(gx, gy, Math.floor(y / STRIPE_P)) > 0.5) continue; /* ragged pixel boundary */
+        fluidCtx.fillRect(x, y + STRIPE_P - STRIPE_GAP, BLOB_C, STRIPE_GAP);
+      }
+    }
+  }
+}
+
+/* static: one seeded frame, baked as a full-resolution mask */
+function staticBake(el, seed) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (!r.width) return;
+  const d = Math.min(devicePixelRatio || 1, 2);
+  const cv = document.createElement("canvas");
+  cv.width = Math.ceil(r.width * d); cv.height = Math.ceil(r.height * d);
+  const cx = cv.getContext("2d");
+  cx.scale(d, d);
+  cx.fillStyle = "#fff";
+  const w = r.width, h = r.height;
+  for (let y = 0; y < h; y += STRIPE_P) cx.fillRect(0, y, w, STRIPE_P - STRIPE_GAP);
+  const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const v = blobNoise(gx * 0.11 + seed * 37, gy * 0.21 + seed * 11, seed);
+      if (v > 0.53) cx.fillRect(gx * BLOB_C, gy * BLOB_C, BLOB_C, BLOB_C);
+    }
+  }
+  const url = "url(" + cv.toDataURL() + ")";
+  el.style.webkitMaskImage = url; el.style.maskImage = url;
+  el.style.webkitMaskSize = "100% 100%"; el.style.maskSize = "100% 100%";
+  el.style.webkitMaskRepeat = "no-repeat"; el.style.maskRepeat = "no-repeat";
+}
+
+document.fonts.ready.then(() => {
+  fluidSetup();
+  addEventListener("resize", fluidSetup);
+  let mf = 0;
+  (function matteLoop(ms) {
+    mf++;
+    if (fluidCv && mf % 2 === 0 && scrollY < innerHeight * 1.2) fluidPaint(ms / 1000);
+    requestAnimationFrame(matteLoop);
+  })(0);
+});
+
+/* ── the spotlight: selectors left, stage right. Pastel DNA system. ── */
+const PIECES = [
+  { key: "workbooks", name: "Workbooks", role: "the unit", icon: "wb-file-icon.svg",
+    pastel: "#a8d4f0",
+    mix: [["#aee5c2", .34], ["#f2ddb0", .26], ["#f3c5a3", .22], ["#9fc4e8", .18]],
+    body: "A workbook is one file that is a whole app — its code, data, and interface travel together, and it runs wherever it lands.",
+    body2: "Open it on your laptop and it's something you can read and change; serve it from the Nexus and it's a product people use. Same file, no export step — the document is the deployment.",
+    feats: ["<b>HTML at heart</b> — opens in any browser, readable by any agent.", "<b>History on board</b> — every version travels inside the file.", "<b>Yours outright</b> — no lock-in, no account required to open it."],
+    why: "so software can be carried, shared, and changed as easily as a document.",
+    story: [
+      ["cmd", "wb new shop.html"],
+      ["ok", "created shop.html — one file, a whole app"],
+      ["dim", "  code, data, and interface live inside it"],
+      ["cmd", "wb dev shop.html"],
+      ["ok", "serving http://localhost:4000  (live reload)"],
+      ["q",  "› ask: \"track inventory and orders for my store\""],
+      ["out", "building… <span class=hi>table</span> · <span class=hi>orders board</span> · <span class=hi>quick-add</span>"],
+      ["ok", "shipped v0.2 — still one file"],
+      ["cmd", "ls -la"],
+      ["out", "-rw-r--r--  1 you  staff  412K  shop.html"],
+      ["dim", "  that's it. that's the app."],
+      ["cmd", "open shop.html"],
+      ["dim", "  mail it, git it, hand it to a teammate —"],
+      ["dim", "  wherever it lands, it runs."]],
+    link: "#what-is-a-workbook", linkLabel: "What is a workbook →" },
+  { key: "nexus", name: "Nexus", role: "the engine", icon: "nexus-icon.svg",
+    pastel: "#aee5c2",
+    mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
+    body: "The Nexus is the engine you own — it runs workbooks on your Mac, your server, or the cloud, and connects them to your data, your services, and each other.",
+    body2: "One command starts it, and the same engine carries the whole journey: the prototype you build for yourself becomes the product your team runs — no microservices, no serverless maze.",
+    feats: ["<b>One command</b> — up and serving in seconds, anywhere.", "<b>Dev is prod</b> — the same engine from first sketch to full scale.", "<b>Truly portable</b> — Mac, Linux, a VPS, or the cloud. You choose."],
+    why: "so one system carries you from first prototype to production at full scale.",
+    story: [
+      ["cmd", "wb deploy init"],
+      ["q",  "? where should this nexus live?"],
+      ["out", "    this mac        <span class=dim>— for you</span>"],
+      ["out", "  <span class=hi>› a vps</span>          <span class=dim>— for your team</span>"],
+      ["out", "    fly.io          <span class=dim>— for the world</span>"],
+      ["ok", "nexus up — one engine, owned by you"],
+      ["cmd", "wb deploy apply shop.html"],
+      ["out", "shipping shop.html → nexus…"],
+      ["ok", "live at https://shop.yourteam.com"],
+      ["dim", "  the prototype you built is the product they use —"],
+      ["dim", "  same file, same engine, dev = prod."],
+      ["cmd", "wb deploy status"],
+      ["out", "shop.html     <span class=ok>healthy</span>   v0.2   2 visitors"],
+      ["dim", "  no microservices. no serverless maze. one system."]],
+    link: "#what-is-the-nexus", linkLabel: "What is the Nexus →" },
+  { key: "toolkits", name: "Toolkits", role: "the parts", icon: "toolkit-icon.svg",
+    pastel: "#f3c5a3",
+    mix: [["#f2ddb0", .34], ["#a8d4f0", .26], ["#aee5c2", .22], ["#9fc4e8", .18]],
+    body: "Toolkits are ready-made abilities a workbook can pick up — payments, search, charts, voices, anything — built by us, by the community, or by you.",
+    body2: "Each one snaps in with a single line and brings everything it needs along. And it flows both ways: anything you build inside a workbook can be packaged as a toolkit and handed to the next one.",
+    feats: ["<b>One line to add</b> — a toolkit carries its own UI, storage, and permissions.", "<b>Composable</b> — toolkits stack and talk to each other.", "<b>Two-way street</b> — package anything you've built and share it."],
+    why: "so new powers snap in without rebuilding — and anything you make can become one.",
+    story: [
+      ["cmd", "wb toolkit add payments"],
+      ["out", "snapping in… <span class=hi>ui</span> · <span class=hi>storage</span> · <span class=hi>permissions</span>"],
+      ["ok", "shop.html can now take payments"],
+      ["dim", "  one line. no rebuild. it just knows how."],
+      ["cmd", "wb toolkit add charts voice-notes"],
+      ["ok", "2 toolkits snapped in — they stack and talk"],
+      ["cmd", "wb toolkit make my-inventory-kit"],
+      ["out", "packaging from your workbook…"],
+      ["ok", "my-inventory-kit ready — it flows both ways"],
+      ["cmd", "wb toolkit publish my-inventory-kit"],
+      ["ok", "published — anyone's workbook can pick it up"],
+      ["dim", "  what you build feeds the ecosystem,"],
+      ["dim", "  and the ecosystem feeds you back."]],
+    link: "#what-is-a-toolkit", linkLabel: "What is a toolkit →" },
+];
+const s3Sel = document.getElementById("s3Sel");
+const s3Stage = document.getElementById("s3Stage");
+/* the shared languages of the ecosystem — every piece is made of the same
+   hues, in different proportions, like the language bar on a repo */
+function dnaMiniHTML(mix, seed) {
+  const segs = [];
+  let k = seed;
+  mix.forEach(([color, frac]) => {
+    const n = frac > 0.3 ? 3 : frac > 0.12 ? 2 : 1;
+    for (let j = 0; j < n; j++) segs.push([color, frac / n]);
+  });
+  for (let i = segs.length - 1; i > 0; i--) {
+    k++;
+    const j = Math.floor(((Math.sin(k * 127.1) * 43758.5453) % 1 + 1) % 1 * (i + 1));
+    [segs[i], segs[j]] = [segs[j], segs[i]];
+  }
+  return segs.map(([c, w]) => `<i style="width:${(w * 100).toFixed(1)}%;background:${c}"></i>`).join("");
+}
+function spotRender(activeKey) {
+  s3Sel.innerHTML = "";
+  PIECES.forEach((p) => {
+    const b = document.createElement("button");
+    b.className = p.key === activeKey ? "active" : "";
+    b.innerHTML = `<span class="mini" style="background:${p.pastel}"><img src="${p.icon}" alt=""></span> ${p.name} <span class="go" style="color:${p.pastel}">→</span>`;
+    b.onclick = () => spotRender(p.key);
+    s3Sel.appendChild(b);
+  });
+  const p = PIECES.find(x => x.key === activeKey);
+  s3Stage.style.setProperty("--pc", p.pastel);
+  s3Stage.innerHTML = `
+    <div>
+      <div class="s3-headrow">
+        <div class="bigicon">
+          <div class="face" style="background:${p.pastel}"><img src="${p.icon}" alt=""></div>
+          <div class="dnaMini">${dnaMiniHTML(p.mix, PIECES.indexOf(p) * 97 + 13)}</div>
+        </div>
+        <div>
+          <div class="role" style="color:${p.pastel}">${p.role}</div>
+          <h3>${p.name}</h3>
+        </div>
+      </div>
+      <p>${p.body}</p>
+      <p>${p.body2}</p>
+      <ul class="s3-feats">${p.feats.map(ft => `<li>${ft}</li>`).join("")}</ul>
+      <p class="why" style="border-color:${p.pastel}"><b>Why it exists:</b> ${p.why}</p>
+      <a class="more" href="${p.link}" style="background:${p.pastel}">${p.linkLabel}</a>
+    </div>
+    <aside class="s3-term" id="s3Term"></aside>`;
+  playStory(p);
+}
+/* the storyteller: types commands char by char, prints output line by
+   line, keeps the tail in view. Switching pieces cancels and restarts. */
+let storyToken = 0;
+async function playStory(p) {
+  const my = ++storyToken;
+  const term = document.getElementById("s3Term");
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const line = (html, cls) => {
+    const d = document.createElement("div");
+    d.className = "ln" + (cls ? " " + cls : "");
+    d.innerHTML = html;
+    term.appendChild(d);
+    term.scrollTop = term.scrollHeight;
+    return d;
+  };
+  for (const [kind, text] of p.story) {
+    if (my !== storyToken) return;
+    if (kind === "cmd") {
+      await sleep(420);
+      const d = line(`<span class="ps">$ </span><span class="cmd"></span><span class="caret"></span>`);
+      const span = d.querySelector(".cmd");
+      for (const ch of text) {
+        if (my !== storyToken) return;
+        span.textContent += ch;
+        term.scrollTop = term.scrollHeight;
+        await sleep(26);
+      }
+      d.querySelector(".caret").remove();
+      await sleep(300);
+    } else {
+      await sleep(kind === "dim" ? 200 : 300);
+      line(text, kind === "out" ? "" : kind);
+    }
+  }
+  if (my === storyToken) line(`<span class="ps">$ </span><span class="caret"></span>`);
+}
+
+spotRender("workbooks");
+
+gsap.registerPlugin(ScrollTrigger);
+ScrollTrigger.create({
+  trigger: "#s2",
+  start: "top bottom",
+  end: "bottom top",
+  onToggle: (st) => {
+    treeActive = st.isActive;
+    if (!st.isActive) sceneT0 = null; /* replay the build on return */
+  },
+});
+</script>
+</body>
+</html>
