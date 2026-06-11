@@ -78,3 +78,4 @@ take c/manifest.org
 take wasm-tools/build.sh
 
 echo "stage-tools: done — $(du -sh "$DST" | cut -f1) total" >&2
+take esbuild/esbuild.wasm      # AOT bundler (wasip1) — the fast lane, replaces QuickJS bundlejob for JS/TS/JSX (wb-feto)

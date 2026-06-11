@@ -1,0 +1,16 @@
+#+TITLE: esbuild lane — AOT bundler/transformer (wasip1)
+#+TOOLKIT: esbuild
+
+* esbuild — the fast in-sandbox bundle/transform engine                 :compiler:
+  :PROPERTIES:
+  :ID:       esbuild
+  :BIN:      esbuild.wasm
+  :END:
+
+  esbuild (Go) compiled to wasip1, run under wasmtime (which JITs it to native).
+  Replaces the QuickJS-interpreted bundlejob.js for JS/TS/JSX: a multi-file bundle
+  that took ~23min interpreting in QuickJS runs in ~160ms here. Handles JSX/TSX,
+  TS, minify, bundle, tree-shake. The keystone for the frontend lanes (React /
+  Preact / Solid / vanilla / TS) and the universal bundler under the component
+  compilers (svelte/vue still compile .svelte/.vue in QuickJS, then esbuild bundles).
+  Build: GOOS=wasip1 GOARCH=wasm go build github.com/evanw/esbuild/cmd/esbuild.

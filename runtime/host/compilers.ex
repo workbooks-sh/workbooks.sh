@@ -1543,6 +1543,65 @@ defmodule Workbooks.Compilers do
   end
 
   @doc """
+  esbuild lane (wb-feto) — bundle/transform a project dir with esbuild compiled to
+  `wasip1`, run under `wasmtime` (which JITs it to NATIVE). A multi-file JS/TS/JSX
+  bundle that takes ~23 min interpreting in QuickJS (`bundle_dir/4`) runs in
+  ~160 ms here: the host's wasm-JIT executing the real compiler, no JS-interp
+  layer. Handles JSX/TSX, TS, minify, tree-shake. Unlike the QuickJS lanes, esbuild
+  reads the project files DIRECTLY from the mapped dir (no JSON file-map on stdin):
+  the project is mapped as the wasm root `/`, the bundle is written to `/out.js`.
+
+  `entry_rel` is POSIX-relative to `project_dir` ("src/main.js"). opts:
+  `:format` ("esm"|"cjs"|"iife", default "esm") · `:jsx` ("automatic"|"transform")
+  · `:minify` (bool) · `:extra` (raw esbuild flag list). Returns {:ok, js} | {:error, _}.
+  """
+  def esbuild_bundle_dir(project_dir, entry_rel, opts \\ [], root \\ default_root()) do
+    wasm = Path.expand(Path.join([root, "esbuild", "esbuild.wasm"]))
+    abs = Path.expand(project_dir)
+    out_rel = "__wb_esbuild_out.js"
+    out_abs = Path.join(abs, out_rel)
+
+    if not File.regular?(wasm) do
+      {:error, {:esbuild_missing, wasm}}
+    else
+      File.rm(out_abs)
+
+      args =
+        ["run"] ++
+          Workbooks.PackageManager.wasmtime_cache_args() ++
+          ["--dir", "#{abs}::/", wasm, "/" <> entry_rel, "--bundle",
+           "--format=" <> Keyword.get(opts, :format, "esm"),
+           "--outfile=/" <> out_rel] ++
+          esbuild_opts(opts)
+
+      try do
+        case System.cmd("wasmtime", args, stderr_to_stdout: true) do
+          {_, 0} ->
+            case File.read(out_abs) do
+              {:ok, js} -> File.rm(out_abs); {:ok, js}
+              _ -> {:error, :esbuild_no_output}
+            end
+
+          {out, _} ->
+            {:error, String.slice(String.trim(out), 0, 400)}
+        end
+      after
+        File.rm(out_abs)
+      end
+    end
+  end
+
+  defp esbuild_opts(opts) do
+    jsx = case Keyword.get(opts, :jsx) do
+      nil -> []
+      v -> ["--jsx=#{v}"]
+    end
+
+    min = if Keyword.get(opts, :minify, false), do: ["--minify"], else: []
+    jsx ++ min ++ Keyword.get(opts, :extra, [])
+  end
+
+  @doc """
   Svelte sibling of `bundle_dir/4` (wb-2ku.5): compile a project dir's `.svelte` components AND
   bundle them into a single self-contained CommonJS JS string, ENTIRELY in the sandbox. Runs the
   Svelte compiler (`svelte/compiler`, required from the project's hoisted node_modules) inside
