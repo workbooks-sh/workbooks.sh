@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#5da8e8; --deep:#2b4bdf;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is a workbook? — Workbooks</title>
+<meta name="description" content="A workbook is a single HTML file that carries a whole piece of software — interface, code, data, and history — and opens anywhere a browser does.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="mark" href="../index.html" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </a>
+  <div class="drop">
+    <a href="#" onclick="return false">Learn</a>
+    <div class="panel">
+      <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span> Workbooks <small>the unit</small></a>
+      <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span> Nexus <small>the engine</small></a>
+      <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span> Toolkits <small>the parts</small></a>
+    </div>
+  </div>
+  <a class="lnk ghost" href="../index.html#examples">Examples</a>
+  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="../index.html#download">Download</a>
+</nav>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 01 — <b>what is a workbook?</b></div>
+    <h1>Try <em>emailing</em> someone your&nbsp;app</h1>
+    <p class="dek">A workbook is <b>one file that is a whole piece of software</b>.
+  This page takes you from "it's an HTML file" to "an agent can live inside it" —
+  start at the top, bail whenever you have what you need.</p>
+    <div class="meta">
+    <span class="on">the unit</span><span>10 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img src="img/workbook-hero.jpg" alt="Two figures on a vast alien plain, one handing the other a single glowing file — 1970s sci-fi paperback style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../wb-file-icon.svg" alt=""></div></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">On this page</div>
+  <a href="#problem">The file we lost</a>
+  <a href="#definition">The definition</a>
+  <a href="#anatomy">Open one up</a>
+  <a href="#spectrum">Document or app?</a>
+  <a href="#not-a-zip">Not a zip, not an image</a>
+  <a href="#org-layer">The writable layer</a>
+  <a href="#agent">An agent can live here</a>
+  <a href="#limits">Where a file falls short</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>Software became something you <em>can't hand</em> to anyone</h2>
+  <p>Seriously — try it. Not a link to your app, the app itself. What would you
+  even attach? A modern application is a git repository, a
+  <code>node_modules</code> folder with forty thousand files in it, a Dockerfile,
+  six environment variables, a database living in somebody's datacenter in
+  Virginia, and a deploy pipeline held together with YAML. There is no
+  <b>thing</b>. Nothing you can copy, carry, send, or keep. The software exists
+  only as a process — a relationship between a dozen services that all have to
+  be standing at once.</p>
+  <p>Here's what makes that strange: computing already produced the perfect
+  handable artifact, decades ago, and it's the most successful file format in
+  history. An HTML file opens on any device made in the last twenty-five years.
+  Any browser, any operating system, no installer, no app store, no account. It
+  has carried the entire web, for generations of hardware, without breaking.
+  We just never asked it to do more than hold a page.</p>
+  <p>A workbook asks it to do more.</p>
+</section>
+
+<section id="definition">
+  <h2>The definition</h2>
+  <div class="defcard">
+    <div class="lbl">workbook · noun</div>
+    <p>A <b>workbook</b> is a single HTML file that carries a whole piece of
+    software — the interface, the code, the data, and the history of how it got
+    that way — and opens anywhere a browser does.</p>
+  </div>
+  <p>The name is literal. A paper workbook is a textbook, your worked answers,
+  and your notes in the margins — one binding, no loose pages. A workbook is
+  that for software: the program, its data, and the record of its own making,
+  travelling as one object.</p>
+  <p>That's the whole idea. Everything below is unpacking it.</p>
+</section>
+
+<section id="anatomy">
+  <h2>Open one up</h2>
+  <p>A workbook doesn't hide what it is. Crack one open and every layer inside
+  is a standard you've heard of — that's deliberate. No invented format, no
+  proprietary container. The trick isn't a new ingredient; it's that nobody had
+  put the existing ones in the same file.</p>
+
+  <div class="viz">
+    <div class="vt">[ diagram — a workbook, exploded ]</div>
+    <div class="vd">the file fanned into its five layers: html/css/js · webassembly ·
+    sqlite · gzip binding · org layer — each labeled with what it contributes</div>
+  </div>
+
+  <h3>HTML, CSS, JavaScript — the part you know</h3>
+  <p>The face of the file is an ordinary web page, which means it renders the
+  same interface on every screen on earth. And CSS matters more than it gets
+  credit for: it has quietly become the objective language of design — not just
+  for apps, but for everything code touches now. We use code to make videos,
+  write books, build brands, tell stories. All of it needs design, and CSS is
+  how design gets said precisely.</p>
+
+  <h3>WebAssembly — the part you didn't expect</h3>
+  <p>You've probably never written WebAssembly, and that's normal — almost
+  nobody writes it. You write C, Rust, Go, Python, and it <b>compiles</b> to
+  WebAssembly. What it does for a workbook is make the file genuinely polyglot:
+  real, assembly-level computation in nearly any language, running inside the
+  page. And because WebAssembly was born in the browser — one of the most
+  isolated, battle-tested environments ever shipped — all that computation is
+  sandboxed by birthright. Keep that word, <b>sandboxed</b>; it comes back.</p>
+
+  <h3>SQLite — a real database, in the file</h3>
+  <p>SQLite is the most deployed database engine in the world, and the whole
+  thing fits in a single binary. A workbook carries one. That gives every
+  workbook a standard, queryable database — and something subtler: a
+  <b>virtual file system</b>. Folders and files an agent or a program can read
+  and write, living entirely inside the workbook. Images, video, documents,
+  memory — all of it travels with the file.</p>
+
+  <h3>gzip — the binding</h3>
+  <p>A workbook is natively compressed, the way the web already compresses
+  everything in transit. But it's compressed with its structure still legible —
+  the file knows where its own parts are, so a tool (or an engine) can route to
+  one layer without unpacking the world.</p>
+
+  <h3>The org layer — the part you write</h3>
+  <p>Threaded through the file is a plain-text layer of notes, tasks, and
+  configuration that both people and agents read and write. It's the workbook's
+  memory and intent — and it's interesting enough to get
+  <a href="#org-layer">its own section below</a>.</p>
+</section>
+
+<section id="spectrum">
+  <h2>So is it a document <em>or an app?</em></h2>
+  <p>Yes.</p>
+  <p>That's not a dodge — dissolving that line is the point. The same format
+  carries:</p>
+  <ul>
+    <li><b>A report</b> whose charts are live queries against the data riding in the file.</li>
+    <li><b>A brand book</b> that carries the fonts, palettes, and assets it describes.</li>
+    <li><b>A store dashboard</b> — inventory and orders in the SQLite, interface up front.</li>
+    <li><b>A game</b>, compute in WebAssembly, save-files in the database.</li>
+    <li><b>An agent's workspace</b> — its files, its memory, its tools, in one sendable object.</li>
+  </ul>
+  <p>Today those live in five different systems — a doc tool, a design tool, a
+  SaaS dashboard, an app store, an agent platform — each with its own accounts,
+  exports, and silos. The workbook's bet is that they're all the same shape:
+  <b>interface + code + data</b>, and one honest file can hold that shape.</p>
+  <div class="viz">
+    <div class="vt">[ strip — one format, five workbooks ]</div>
+    <div class="vd">a row of workbook file icons, each opened a crack to show a different
+    face: report · brand book · dashboard · game · agent workspace</div>
+  </div>
+</section>
+
+<section id="not-a-zip">
+  <h2>"Isn't this just <em>a zip file?</em>"</h2>
+  <p>Fair question — it's compressed and it has things inside. But a zip is
+  storage. It's inert: unpack it or nothing happens, and the archive couldn't
+  care less what it holds. A workbook is <b>runnable</b> — double-click it and
+  it opens, renders, computes. The structure inside isn't cargo, it's anatomy.</p>
+
+  <h3>"Okay — so it's a container image"</h3>
+  <p>Closer, and this comparison is worth slowing down for. A container image
+  also packages software with everything it needs. But an image is a build
+  artifact for a Linux kernel: it needs a daemon installed, it behaves
+  differently across operating systems, and if you've ever burned an afternoon
+  getting Docker Desktop to reproduce a sandbox that worked fine on your
+  coworker's machine, you know the tax. It's a format for infrastructure
+  people, full stop. And you can't <b>open</b> one — there's nothing to see.</p>
+  <p>Here's the move that makes workbooks interesting: <b>a workbook plays both
+  roles</b>. Opened in a browser, it's a document — readable, viewable,
+  shareable. Docked into an engine, it behaves like a container image: its
+  WebAssembly is the executable surface, its SQLite is the disk, and the engine
+  isolates and runs it exactly the way a kernel runs an image. Same file, no
+  conversion step.</p>
+  <div class="note">
+    <p><b>One artifact, two readings</b> — a document to a human, a container
+    to an engine. Most of what's novel about workbooks falls out of this one
+    property.</p>
+  </div>
+  <p>The engine half of that story is the Nexus, and it gets
+  <a href="nexus.html">its own page</a>.</p>
+</section>
+
+<section id="org-layer">
+  <h2>The writable layer</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — skip to <a href="#agent">agents</a> if you don't care how the sausage is authored</span></p>
+  <p>Every system that humans and AI build in together needs a layer both can
+  write. The obvious candidate is Markdown, and Markdown is great at what it was
+  built for — it's a blogging language. Prose goes in, prose comes out. But try
+  to run a system on it: you can't validate Markdown, can't write a test suite
+  for it, can't reliably parse a plan out of it. When an agent drifts — writes
+  one file too many, contradicts itself across notes — Markdown has no way to
+  even notice. The formats that <b>can</b> be validated, YAML and JSON, fail in
+  the opposite direction: machines parse them fine, but nobody can think in
+  them. There's no room for a paragraph of intent.</p>
+  <p>Workbooks use <b>org</b> — a plain-text format from the Emacs world with
+  twenty years of history, sitting in the lineage of literate programming:
+  the old idea that code should live inside the explanation of why it exists.
+  Org reads like Markdown — headings, prose, lists — but underneath it's a
+  parseable tree that natively understands <b>tasks, states, dates,
+  dependencies, and runnable blocks of code</b>. You can validate it. You can
+  test it. You can parse a project plan out of it without an AI in the loop.</p>
+  <p>And here's the practical kicker: those twenty years of documentation are
+  in every model's training data. Agents don't have to be taught org — they
+  arrived knowing it.</p>
+  <p>In a workbook, the org layer is where intent lives: the spec, the notes,
+  the task states, the project's memory of itself. It's the layer that makes a
+  workbook <b>authored</b> rather than just generated.</p>
+</section>
+
+<section id="agent">
+  <h2>An agent can <em>live in here</em></h2>
+  <p><span class="skip">depth rung · the advanced bit</span></p>
+  <p>Strip an agent's needs to the floor and the list is short: a file system
+  to work in, processes to run, and a memory of what it's doing. That's the
+  whole computer, as far as an agent is concerned.</p>
+  <p>Look back at the anatomy. A workbook has a file system (the SQLite virtual
+  file system), processes (WebAssembly, any language), and memory with actual
+  chronology (the org layer). Which means an agent doesn't need your operating
+  system — your real files, your keychain, your environment variables. It can
+  work entirely inside the file: read its data, run its code, write its notes,
+  every bit of it sandboxed.</p>
+  <p>It's worth saying how unusual that is. The industry answer to "where do
+  agents work?" is to rent isolation — a fresh micro virtual machine per agent,
+  metered by the second, in someone's cloud. What's being recreated in each of
+  those rented boxes is: a file system, some processes, a place for memory.
+  The workbook carries that environment <b>in the artifact itself</b> — the
+  workspace and the work product are the same object, and you can email it.</p>
+  <div class="viz">
+    <div class="vt">[ diagram — the agent's room ]</div>
+    <div class="vd">cutaway of a workbook as a room an agent works in: vfs shelves ·
+    wasm workbench · org notebook — with the OS visible outside the wall, untouched</div>
+  </div>
+</section>
+
+<section id="limits">
+  <h2>Where a file alone <em>falls short</em></h2>
+  <p>Honesty section. A workbook on its own is still a file, and files have a
+  hard limit: <b>nothing happens while it's closed</b>. It can't run a schedule
+  overnight, can't keep an agent working after you walk away, can't serve
+  itself to a thousand people, can't sync state between the copy on your laptop
+  and the copy you sent.</p>
+  <p>That's not a flaw to apologize for — it's a boundary to know. The file is
+  the artifact; for the living part you dock it into an engine you own. That
+  engine is <a href="nexus.html">the Nexus</a>, and it's what makes a workbook
+  isolated, stateful, and agentic — without giving up the part where it's still
+  just a file you can hand to anyone.</p>
+</section>
+
+<div class="termblock">
+  <div class="tb-head"><span class="sw"><img src="../wb-file-icon.svg" alt=""></span><span>a workbook, start to handoff</span></div>
+  <div class="tb-wrap">
+    <div class="lterm"></div>
+    <div class="lscroll"><div class="thumb"></div></div>
+  </div>
+</div>
+
+<section id="faq" class="faq">
+  <h2>Questions people <em>actually ask</em></h2>
+  <details>
+    <summary>Do I need Workbooks installed to open one?</summary>
+    <p>No — and this is the most important answer on the page. A workbook opens
+    in any browser, for anyone, forever. The ecosystem (the app, the CLI, the
+    Nexus) is for <b>building and running</b> workbooks, never a gate on
+    viewing one. If receiving a workbook required installing something, the
+    whole hand-it-to-anyone argument would be theater.</p>
+  </details>
+  <details>
+    <summary>How big can a workbook get?</summary>
+    <p>Further than you'd guess. SQLite is comfortable holding gigabytes, and
+    gzip keeps the wire size honest — but the practical ceiling is whatever a
+    browser tab is happy to open, so workbooks in the tens-of-megabytes range
+    stay pleasant to share. Heavier data usually belongs behind an engine,
+    with the workbook querying it rather than carrying it.</p>
+  </details>
+  <details>
+    <summary>If the data rides in the file, what about private data?</summary>
+    <p>Default rule: sharing a workbook shares its contents — treat the file
+    like the document it is. For the gated case, workbooks support sealed
+    sections: the shell of the file stays public and readable while protected
+    data is encrypted, releasing only through an engine that checks who's
+    asking. What never happens is the theatrical version — a login screen
+    drawn over data that's actually sitting in the file.</p>
+  </details>
+  <details>
+    <summary>Can two people use one workbook at the same time?</summary>
+    <p>Through a Nexus, yes — the engine holds the live state and serves both
+    of you, the same way it serves a workbook as a product to a thousand
+    users. The file is the artifact you carry and keep; multiplayer is one of
+    the things docking adds.</p>
+  </details>
+  <details>
+    <summary>What do I write one with?</summary>
+    <p>Anything that writes text — that's the point of building on standards.
+    In practice you'll mostly write the org layer and let the toolchain tangle
+    it into the file, or have an agent do the assembling. The CLI scaffolds,
+    builds, signs, and verifies; <a href="toolkit.html">toolkits</a> are how a
+    workbook picks up ready-made abilities without you writing them.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>Keep going</h2>
+  <p>You know what the unit is. Next: the engine that brings it to life, and
+  the parts it builds with.</p>
+  <div class="cards">
+    <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>What is the Nexus<small>the engine you own</small></div><span class="go">→</span></a>
+    <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>What is a toolkit<small>the parts</small></div><span class="go">→</span></a>
+    <a href="../index.html#download"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>Get Workbooks<small>desktop app + CLI, one installer</small></div><span class="go">→</span></a>
+    <a href="https://github.com/workbooks-sh/workbooks.sh"><span class="sw" style="background:#9fc4e8"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>Read the source<small>open source, FSL — github</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../index.html">← back to the big picture</a>
+  </div>
+</footer>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .34], ["#f2ddb0", .26], ["#f3c5a3", .22], ["#9fc4e8", .18]],
+  story: [
+    ["cmd", "workbook init shop"],
+    ["ok", "scaffolded shop/ — spec · src · data"],
+    ["cmd", "workbook dev"],
+    ["ok", "http://localhost:5173 · live reload"],
+    ["q",  "› \"track inventory and orders for my store\""],
+    ["out", "agent: <span class=hi>inventory table</span> · <span class=hi>orders board</span> · <span class=hi>quick-add</span>"],
+    ["cmd", "workbook build"],
+    ["out", "tangling… code · data · ui → one file"],
+    ["ok", "dist/shop.html  (412 KB, self-contained)"],
+    ["cmd", "wbx sign shop.html"],
+    ["ok", "signed — provenance travels with the file"],
+    ["cmd", "wbx verify shop.html"],
+    ["ok", "signature good · history intact · runs anywhere"],
+    ["dim", "  mail it, git it, hand it to a teammate —"],
+    ["dim", "  the document is the deployment."]],
+};
+</script>
+<script src="learn.js"></script>
+</body>
+</html>

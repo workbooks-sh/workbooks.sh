@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#57c97e; --deep:#7a3bf0;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is the Nexus? — Workbooks</title>
+<meta name="description" content="The Nexus is the engine you own that runs workbooks — on your laptop or your cloud — and is what makes them isolated, stateful, and agentic.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="mark" href="../index.html" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </a>
+  <div class="drop">
+    <a href="#" onclick="return false">Learn</a>
+    <div class="panel">
+      <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span> Workbooks <small>the unit</small></a>
+      <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span> Nexus <small>the engine</small></a>
+      <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span> Toolkits <small>the parts</small></a>
+    </div>
+  </div>
+  <a class="lnk ghost" href="../index.html#examples">Examples</a>
+  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="../index.html#download">Download</a>
+</nav>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02 — <b>what is the nexus?</b></div>
+    <h1>The engine <em>you own</em></h1>
+    <p class="dek">The <b>Nexus</b> runs workbooks — on your laptop, your server, or your
+  cloud account — and docking is what turns a file into living software:
+  <b>isolated, stateful, agentic</b>. This page explains why you'd want to own
+  the engine, and how one machine carries you from first prototype to production.</p>
+    <div class="meta">
+    <span class="on">the engine</span><span>12 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img src="img/nexus-hero.jpg" alt="A homestead with one colossal engine standing on its land, cables running to the lit windows — 1970s sci-fi paperback style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../nexus-icon.svg" alt=""></div></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">On this page</div>
+  <a href="#problem">Whose computer is it?</a>
+  <a href="#definition">The definition</a>
+  <a href="#docking">What docking means</a>
+  <a href="#beam">The boring miracle</a>
+  <a href="#isolation">Isolation, twice</a>
+  <a href="#why-not">Why not serverless?</a>
+  <a href="#security">The security model</a>
+  <a href="#dev-prod">Dev is prod</a>
+  <a href="#limits">What it isn't</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>Where does your software live when <em>you're not looking?</em></h2>
+  <p>Almost everything you "own" digitally runs on a computer that isn't yours.
+  Your notes, your photos, the app your business depends on — they live in
+  someone's datacenter, and what you actually own is a login. That trade has
+  real upsides, and for plenty of things it's fine. But notice what it does to
+  software <b>you build</b>: your own creation lives somewhere you can't see,
+  priced per request, on terms that change under you.</p>
+  <p>The agent era sharpened this from a philosophical itch into a bill. Agents
+  need a computer to live on — a real one, with files and processes and time.
+  The industry's answer has been to rent that computer in slices: a fresh
+  micro virtual machine per agent, metered by the second. It's genuinely good
+  technology, and at prototype scale it feels free. Then you scale, and the
+  meter is the business model. People have resorted to parking Mac minis in
+  closets just to give an agent somewhere permanent to exist — which tells you
+  the demand is real, even when the answer is silly.</p>
+  <p>The missing piece isn't a cheaper rental. It's an engine you own.</p>
+</section>
+
+<section id="definition">
+  <h2>The definition</h2>
+  <div class="defcard">
+    <div class="lbl">nexus · noun</div>
+    <p>The <b>Nexus</b> is the engine that runs workbooks. You run it — on a
+    laptop, a server, or your own cloud account — and docking a workbook into
+    it is what makes the file <b>isolated</b>, <b>stateful</b>, and
+    <b>agentic</b>.</p>
+  </div>
+  <p>"Nexus" because that's its job: the point where your workbooks, your data,
+  your services, and your agents connect — and the one piece of the system
+  that's a place rather than a file. A workbook is the thing you hand to
+  anyone. The Nexus is the thing you plug it into.</p>
+</section>
+
+<section id="docking">
+  <h2>What docking <em>actually means</em></h2>
+  <p>On its own, a workbook is an artifact — complete, portable, and inert
+  while it's closed (<a href="workbook.html#limits">the workbook page</a> ends
+  on exactly this boundary). Dock it into a Nexus and three things switch on:</p>
+  <ul>
+    <li><b>Isolated</b> — the workbook runs in its own sealed compartment.
+    It can't reach the host machine, your keychain, or any other workbook;
+    it gets exactly the capabilities you grant it and nothing else.</li>
+    <li><b>Stateful</b> — its database becomes live, persistent, and synced.
+    The workbook keeps running while it's closed: schedules fire overnight,
+    state survives restarts, the copy you serve stays current.</li>
+    <li><b>Agentic</b> — agents attached to the workbook get somewhere
+    permanent to live and work: long-running, on schedules, with their files
+    and memory in the workbook they're tending.</li>
+  </ul>
+  <p>Same file before and after — nothing was converted, exported, or deployed
+  in the traditional sense. The landing page draws this as a diagram: one
+  workbook, docked, fanning out into any kind of app. This page is that
+  picture in prose.</p>
+  <div class="viz">
+    <div class="vt">[ diagram — the dock ]</div>
+    <div class="vd">a workbook file sliding into the nexus port; three lights coming on:
+    isolated · stateful · agentic — with "local" and "cloud" as two positions of the same dock</div>
+  </div>
+</section>
+
+<section id="beam">
+  <h2>Built on a <em>boring miracle</em></h2>
+  <p>Here's the part most platforms bury in a footnote, told up front, because
+  it's the best reason to trust the design. The Nexus is built on the BEAM —
+  the virtual machine behind Erlang and Elixir — which is not new, not trendy,
+  and not experimental. It was engineered by Ericsson to run telephone
+  exchanges: millions of simultaneous calls, where every call had to be
+  isolated from every other call, and the system was allowed to fail for
+  roughly nothing. The famous figure is nine nines of uptime —
+  99.9999999% — about 31 milliseconds of downtime per year.</p>
+  <p>The design that achieves that is almost insultingly simple: everything is
+  a tiny isolated process. A call is a process. A web request is a process. If
+  one crashes, it takes nothing down with it — a supervisor notices and
+  replaces it, mid-flight, while the rest of the exchange hums along. Forty
+  years later, that same VM quietly carries a noticeable share of the world's
+  messaging traffic.</p>
+  <p>The Nexus inherits the whole posture for free: every docked workbook,
+  every agent, every request is one of those processes. A workbook crashing is
+  a non-event — its process dies, its supervisor restarts it, no other tenant
+  notices. This is also why one modest machine goes so far: the BEAM was built
+  to hold <b>millions</b> of concurrent processes, so "thousands of workbooks
+  and agents on one server" isn't a stretch goal — it's the VM's resting heart
+  rate.</p>
+</section>
+
+<section id="isolation">
+  <h2>Isolation, <em>twice</em></h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the mechanism behind the "isolated" light</span></p>
+  <p>BEAM processes isolate workbooks from <b>each other</b>. But a workbook
+  also carries arbitrary code — its WebAssembly could have been written by
+  anyone. That code runs inside a second wall: a WebAssembly sandbox
+  (industry-standard, the same engine class browsers trust), where the code
+  gets memory it can't escape and only the capabilities explicitly handed in.
+  No ambient file system, no ambient network — grants, not inheritance.</p>
+  <p>So the nesting goes: machine → engine → process → sandbox. Code in a
+  workbook would have to break out of two unrelated containment systems just
+  to reach its neighbor, let alone your machine.</p>
+  <p>And one detail that says a lot about the philosophy: <b>even the compilers
+  live inside the sandbox</b>. When the Nexus builds code — C, Rust, Zig, Go,
+  JavaScript — the compiler itself has been compiled to WebAssembly and runs
+  under the same containment as everything else. Build steps are a classic
+  attack surface (an "install" script is just untrusted code you run with your
+  own hands), and the Nexus simply refuses to have that surface: nothing
+  untrusted ever executes natively on the host. Not even the toolchain.</p>
+</section>
+
+<section id="why-not">
+  <h2>"Why not serverless? Why not <em>rent the VMs?</em>"</h2>
+  <p>Because of what agents and living software actually are.</p>
+  <p>Serverless functions are built for ephemeral work — a request comes in,
+  a function spins up, answers, and evaporates. Nothing about an agent is
+  ephemeral. An agent is a long-running thing with memory, files, schedules,
+  and a chronology — the precise opposite of the serverless shape. You can
+  duct-tape persistence onto function calls, and people do, but you're
+  fighting the model, and the per-invocation meter is still running while
+  you fight it. The pricing follows the shape: scale a serverless prototype
+  into a real product and the bill scales with every single call.</p>
+  <p>Rented microVM sandboxes fix the shape problem — a real computer, properly
+  isolated — but keep the meter. You're paying for isolation as a service,
+  by the second, forever. Lovely for a demo; a trap to build a company on.</p>
+  <p>The Nexus's answer: <b>isolation is software, not a subscription</b>. The
+  BEAM and the WebAssembly sandbox do what the rented VM was doing, on a
+  machine you own — and the economics invert. One small server runs thousands
+  of isolated workbooks and agents concurrently. When you outgrow it, you
+  don't multiply line items; you grow the machine. That's how companies that
+  operate at serious scale actually manage cost, and there's no reason a
+  two-person team shouldn't get the same curve.</p>
+</section>
+
+<section id="security">
+  <h2>The security model, <em>plainly</em></h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — unless you have a security review in your future</span></p>
+  <p>Start with why agent setups are scary. An agent running with operating
+  system access is an open box: your keychain, your environment variables,
+  your API keys, your files — anything a vulnerability or a bad instruction
+  can reach, it can reach. And "bad instruction" is the part people
+  underestimate: prompt injection means anyone whose text reaches your agent —
+  a web page it reads, an email it summarizes — is partially steering it. Give
+  that agent your data and an internet connection, and you've built an
+  exfiltration machine and put a stranger near the wheel.</p>
+  <p>The Nexus's frame: <b>never trust the workload; structure the world so it
+  doesn't have to be trusted.</b></p>
+  <ul>
+    <li><b>Capabilities are granted, not inherited.</b> A workbook starts with
+    nothing — no network, no host files, no secrets. Each power is a specific,
+    revocable grant, so the question "what could this thing do at worst?" has
+    a short written answer.</li>
+    <li><b>Secrets stay in the engine.</b> Keys live with the Nexus; workbooks
+    ask the engine to act, and the engine decides. Code in the sandbox never
+    holds credentials, so there's nothing to leak.</li>
+    <li><b>The blast radius is one process.</b> Compromised or just broken,
+    a workbook can trash exactly itself. The supervisor restarts it; its
+    neighbors never know.</li>
+  </ul>
+  <p>None of this requires you to do security engineering. It's what docking
+  <b>is</b> — the same answer at two people and at ten thousand, which is
+  exactly what a security review wants to hear.</p>
+</section>
+
+<section id="dev-prod">
+  <h2>Dev is prod — <em>one engine, every stage</em></h2>
+  <p>The classic software journey crosses three worlds: the thing on your
+  laptop, the staging copy, and production — each with different
+  infrastructure, different configs, different failure modes. Most "works on
+  my machine" misery is those worlds disagreeing.</p>
+  <p>There is exactly one Nexus. The engine on your laptop and the engine in
+  your cloud are the same engine — same image, same behavior — and a
+  deployment is described by one declarative file. Where it runs is a value in
+  that file: flip <code>local</code> to <code>cloud</code> and the prototype
+  you built for yourself <b>is</b> the product your team runs. No translation
+  layer, no re-platforming cliff, no "now make it real" rewrite.</p>
+  <p>Ownership compounds here too: multi-tenancy is built in, with
+  organization-level isolation enforced by the engine. A team — or a whole
+  company, or your customers — share one Nexus the way tenants share a
+  building, each behind their own door.</p>
+</section>
+
+<section id="limits">
+  <h2>What the Nexus <em>isn't</em></h2>
+  <p>Honesty section.</p>
+  <p><b>It isn't serverless-with-extra-steps.</b> It's a server — that's the
+  point. You own a thing that runs; "nothing to operate" was the pitch that
+  ends with the meter. What ownership costs you is knowing the thing exists;
+  what it buys you is everything above.</p>
+  <p><b>It isn't a number-cruncher.</b> The BEAM's genius is coordination —
+  millions of small isolated things, none allowed to hurt the others — not
+  raw math. Heavy computation belongs in the WebAssembly lane, in a language
+  built for it. The Nexus is deliberately split-brained like that: the engine
+  coordinates, the sandbox computes. Knowing which half does which is most of
+  understanding the design.</p>
+  <p><b>It isn't required.</b> Worth repeating from the workbook page: workbooks open
+  in any browser, no engine in sight. The Nexus is for the living part —
+  running, persisting, serving, agents. Viewing is free, forever, by design.</p>
+</section>
+
+<div class="termblock">
+  <div class="tb-head"><span class="sw"><img src="../nexus-icon.svg" alt=""></span><span>owning an engine, start to status</span></div>
+  <div class="tb-wrap">
+    <div class="lterm"></div>
+    <div class="lscroll"><div class="thumb"></div></div>
+  </div>
+</div>
+
+<section id="faq" class="faq">
+  <h2>Questions people <em>actually ask</em></h2>
+  <details>
+    <summary>Do I need a Nexus to open a workbook?</summary>
+    <p>No. Files open in any browser. You need a Nexus when you want a
+    workbook to <b>live</b> — keep state, run schedules, host agents, serve
+    other people.</p>
+  </details>
+  <details>
+    <summary>What does it cost to run one?</summary>
+    <p>Whatever the machine costs — that's the whole model. A laptop runs it
+    for free; a small VPS runs a serious multi-tenant install. Because the
+    BEAM holds enormous concurrency on modest hardware, the curve is "grow
+    the machine when you outgrow it," not "pay per call from day one."</p>
+  </details>
+  <details>
+    <summary>Local versus cloud — what's actually different?</summary>
+    <p>Position, not kind. Same engine image either way; the deployment file
+    says where it runs. Local gives you a private, cloud-identical engine on
+    your own hardware; cloud gives the same engine an address other people
+    can reach. Moving between them is editing one value, in both
+    directions.</p>
+  </details>
+  <details>
+    <summary>Can my team share one?</summary>
+    <p>Yes — multi-tenancy with organization-level isolation is built into the
+    engine, not bolted on. Tenants share the machine and never each other's
+    data, which is also how one Nexus can serve your product to your
+    customers.</p>
+  </details>
+  <details>
+    <summary>I already have a database. Do I have to abandon it?</summary>
+    <p>No. Workbooks carry SQLite for the travels-with-the-file case, and the
+    engine speaks to external databases when you bring one. The file's data
+    layer is a default, not a wall.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>Keep going</h2>
+  <p>Unit, engine — one piece left: the parts the ecosystem builds with, and
+  the part of the system that's honestly still a frontier.</p>
+  <div class="cards">
+    <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>What is a toolkit<small>the parts</small></div><span class="go">→</span></a>
+    <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>the unit</small></div><span class="go">→</span></a>
+    <a href="../index.html#download"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Run your own<small>one installer, engine included</small></div><span class="go">→</span></a>
+    <a href="https://github.com/workbooks-sh/workbooks.sh"><span class="sw" style="background:#9fc4e8"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Read the source<small>open source, FSL — github</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../index.html">← back to the big picture</a>
+  </div>
+</footer>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
+  story: [
+    ["cmd", "wbx deploy init"],
+    ["q",  "? engine place — where does this run?"],
+    ["out", "  <span class=hi>› local</span>     a microVM on this mac — cloud-identical"],
+    ["out", "    cloud     fly.io, under your own account"],
+    ["q",  "? database"],
+    ["out", "  <span class=hi>› sqlite</span>    zero-config, travels with the deploy"],
+    ["out", "    postgres  bring your own DSN"],
+    ["ok", "wrote deployment.org (local) — declarative, reproducible"],
+    ["dim", "  engine place · tenancy · storage · database · auth —"],
+    ["dim", "  one org file describes the whole deployment."],
+    ["cmd", "wbx deploy validate"],
+    ["ok", "valid — local · single-tenant · storage=local-fs · db=sqlite"],
+    ["cmd", "wbx deploy apply"],
+    ["out", "pulling engine… booting microVM…"],
+    ["ok", "runtime up — http://127.0.0.1:4000"],
+    ["cmd", "wbx deploy status"],
+    ["out", "local runtime: microVM up — http://127.0.0.1:4000 <span class=dim>(pid 210)</span>"],
+    ["dim", "  cloud later? flip ENGINE_PLACE to fly — same file,"],
+    ["dim", "  same engine, dev → prod."]],
+};
+</script>
+<script src="learn.js"></script>
+</body>
+</html>
