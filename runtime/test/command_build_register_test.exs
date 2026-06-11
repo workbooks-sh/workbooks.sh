@@ -27,4 +27,22 @@ int main(int argc, char **argv){ int n = argc > 1 ? atoi(argv[1]) : 0; printf("%
     assert String.trim(out) == "42"
     File.rm_rf!(dir)
   end
+
+  test "register_built_dir threads :cflags — a define-gated main builds only with the -D" do
+    dir = Path.join(System.tmp_dir!(), "cflags-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    # main() exists only under -DENABLE_MAIN (the pattern single-file interpreters use, e.g. s7's
+    # -DWITH_MAIN). Without the flag there's no entry point; with it, it builds + runs.
+    File.write!(Path.join(dir, "index.c"), ~S|#include <stdio.h>
+#ifdef ENABLE_MAIN
+int main(void){ printf("gated-on\n"); return 0; }
+#endif
+|)
+
+    assert {:ok, _} = CommandRegistry.register_built_dir("wbgated", dir, "c", :argv, ["-DENABLE_MAIN"])
+    assert {:ok, out} = CommandRegistry.run("wbgated", "", [])
+    assert out =~ "gated-on"
+    File.rm_rf!(dir)
+  end
 end

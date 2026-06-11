@@ -220,9 +220,14 @@ defmodule Workbooks.PackageManager do
   # clang.wasm + wasm-ld (Workbooks.Compilers.compile_c) — zero native execution, so
   # untrusted C source never touches a native toolchain (wb-fm0.1). All *.c under the
   # dir are compiled together (first is the main TU, the rest passed as extra sources).
-  def build_dir(dir, "c") do
-    abs = Path.expand(dir)
+  def build_dir(dir, "c"), do: build_c_dir(Path.expand(dir), [])
 
+  @doc """
+  Build a C project dir in-sandbox with optional extra clang flags (`extra_argv`, e.g. `-DWITH_MAIN`
+  to enable a single-file interpreter's CLI, or `-I`/`-D` a tool needs). build_dir(dir,"c") is this
+  with no extra flags; the registration lane passes a tool's :cflags here.
+  """
+  def build_c_dir(abs, extra_argv) when is_list(extra_argv) do
     case Path.wildcard(Path.join(abs, "**/*.c")) do
       [] ->
         {:error, "no .c sources in #{abs}"}
@@ -233,7 +238,13 @@ defmodule Workbooks.PackageManager do
           Path.wildcard(Path.join(abs, "**/*.h"))
           |> Enum.map(fn h -> {h, Path.relative_to(h, abs)} end)
 
-        compile_c_in_sandbox(main, rest, Path.join(@cache, "#{cache_key(["cdir", abs])}.wasm"), headers)
+        compile_c_in_sandbox(
+          main,
+          rest,
+          Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " ")])}.wasm"),
+          headers,
+          extra_argv
+        )
     end
   end
 
@@ -584,7 +595,7 @@ defmodule Workbooks.PackageManager do
   # mmap parity: the shim is linked (extra_csrc) and mmap/munmap/msync are --wrap'd to it
   # (ld_args), so a CLI that mmap()s a file works the same as on the old zig-cc lane —
   # now with zero native execution.
-  defp compile_c_in_sandbox(main, rest, out, headers \\ []) do
+  defp compile_c_in_sandbox(main, rest, out, headers \\ [], extra_argv \\ []) do
     File.mkdir_p!(@cache)
 
     # Bring the project's headers into the guest (structure preserved) and -I every dir that holds
@@ -617,7 +628,7 @@ defmodule Workbooks.PackageManager do
     opts = [
       extra_csrc: rest ++ [@mmap_shim, @posix_stub],
       aux_files: headers,
-      argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs,
+      argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs ++ extra_argv,
       link_libs: ["-lsetjmp"] ++ emu_libs,
       ld_args: @mmap_wraps
     ]
