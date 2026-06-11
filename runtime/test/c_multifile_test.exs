@@ -43,4 +43,21 @@ int main(void){ if (setjmp(b)) { printf("caught\n"); return 0; } longjmp(b, 1); 
     assert out =~ "caught", "longjmp should be caught by setjmp (interpreter-class C cluster)"
     File.rm_rf!(dir)
   end
+
+  test "build_dir links host-escape stubs so system()/popen() fail safely (wb-nsdc)" do
+    dir = Path.join(System.tmp_dir!(), "cstub-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    File.write!(Path.join(dir, "index.c"), ~S|#include <stdlib.h>
+#include <stdio.h>
+int main(void){ printf("system=%d\n", system("echo hi")); return 0; }
+|)
+
+    assert {:ok, wasm, _} = Workbooks.PackageManager.build_dir(dir, "c")
+    {out, status} = Workbooks.PackageManager.run(wasm, "", [], [], with_status: true)
+    assert status == 0
+    # the sandbox has no shell: system() links (stubbed) + returns failure, not a link error
+    assert out =~ "system=-1"
+    File.rm_rf!(dir)
+  end
 end

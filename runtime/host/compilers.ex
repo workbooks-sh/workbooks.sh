@@ -297,7 +297,21 @@ defmodule Workbooks.Compilers do
               {:error, {:link_failed, log2}}
             end
           else
-            {:error, {:compile_failed, log1}}
+            # Report the sources whose object is MISSING (the real failure), not just the first
+            # source's log — multi-file builds were hiding which file actually broke (wb-nsdc).
+            failing =
+              Enum.zip(srcs, logs1)
+              |> Enum.reject(fn {{_sn, on}, _log} -> File.regular?(Path.join(job, on)) end)
+              |> Enum.map(fn {{sn, _on}, log} ->
+                txt = case log do
+                  {:ok, t} -> t
+                  other -> inspect(other)
+                end
+
+                "[#{sn}] " <> String.slice(to_string(txt), 0, 600)
+              end)
+
+            {:error, {:compile_failed, Enum.join(failing, "\n--- next failing source ---\n")}}
           end
 
         File.rm_rf(job)

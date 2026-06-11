@@ -570,6 +570,10 @@ defmodule Workbooks.PackageManager do
   @mmap_shim Path.expand(Path.join([__DIR__, "..", "build", "shims", "mmap_shim.c"]))
   @mmap_wraps ["--wrap=mmap", "--wrap=munmap", "--wrap=msync"]
 
+  # Stubs for host-escape libc fns wasi-libc declares but omits (system/popen/pclose/tmpnam), linked
+  # into every C build so real CLIs (Lua's os/io libs, etc.) link and the escape fails safely (wb-nsdc).
+  @posix_stub Path.expand(Path.join([__DIR__, "..", "build", "shims", "posix_stub.c"]))
+
   # C = compile + link to a runnable wasm32-wasip1 command ENTIRELY in the sandbox
   # via clang.wasm + wasm-ld (Workbooks.Compilers.compile_c) — zero native execution
   # (wb-fm0.1). The old native `zig cc`/`wasm-ld` path is gone: untrusted C source is
@@ -606,10 +610,14 @@ defmodule Workbooks.PackageManager do
     emu_defs = ["-D_WASI_EMULATED_SIGNAL", "-D_WASI_EMULATED_PROCESS_CLOCKS", "-D_WASI_EMULATED_GETPID"]
     emu_libs = ["-lwasi-emulated-signal", "-lwasi-emulated-process-clocks", "-lwasi-emulated-getpid"]
 
+    # L_tmpnam: wasi-libc omits it; -D it so call sites using the macro (Lua os.tmpname) compile —
+    # the actual tmpnam() is stubbed (posix_stub.c) to fail safely.
+    compat_defs = ["-DL_tmpnam=260"]
+
     opts = [
-      extra_csrc: rest ++ [@mmap_shim],
+      extra_csrc: rest ++ [@mmap_shim, @posix_stub],
       aux_files: headers,
-      argv: inc_flags ++ sjlj ++ emu_defs,
+      argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs,
       link_libs: ["-lsetjmp"] ++ emu_libs,
       ld_args: @mmap_wraps
     ]
