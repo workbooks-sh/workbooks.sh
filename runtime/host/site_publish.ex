@@ -55,12 +55,23 @@ defmodule Workbooks.SitePublish do
   # Mirror every regular file under workdir/<tree> into dest/<tree>/…, preserving
   # the relative path. Path-contained: only files resolving strictly inside the
   # workdir are copied (a symlink/`..` can't smuggle a path out of the workdir).
+  # OS metadata cruft that must never be published: AppleDouble resource forks
+  # (`._*`, created when a macOS dev's files cross to a non-HFS volume and which
+  # get committed by accident — 22 were polluting bit.ml's served tree) and the
+  # usual `.DS_Store`/`Thumbs.db`. They never affect rendering but are junk a
+  # crawler would fetch.
+  defp junk?(path) do
+    base = Path.basename(path)
+    String.starts_with?(base, "._") or base in [".DS_Store", "Thumbs.db"]
+  end
+
   defp mirror_tree(abs_workdir, tree, dest) do
     src_root = Path.join(abs_workdir, tree)
 
     if File.dir?(src_root) do
       Path.wildcard(Path.join(src_root, "**"))
       |> Enum.filter(&File.regular?/1)
+      |> Enum.reject(&junk?/1)
       |> Enum.filter(&contained?(abs_workdir, &1))
       |> Enum.reduce(0, fn src, n ->
         rel = Path.relative_to(src, abs_workdir)
