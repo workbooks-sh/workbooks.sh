@@ -3,7 +3,7 @@
 * agent :agent:
   :PROPERTIES:
   :ID:       agent
-  :MODEL:    minimax/minimax-m3
+  :MODEL:    x-ai/grok-4.20
   :TOOLKITS: git
   :END:
 
