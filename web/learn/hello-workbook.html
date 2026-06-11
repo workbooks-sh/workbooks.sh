@@ -74,36 +74,38 @@
   </section>
 
   <section data-n="02 · webassembly" style="--c:var(--peach)">
-    <h2>There's real computation in here</h2>
-    <p>A workbook isn't just a page — it can carry <b>compiled programs</b>.
-    A tiny WebAssembly module (assembly-level code, the kind C and Rust
-    compile to) is embedded in this file as 41 bytes, and your browser is
-    running it <b>natively, right now</b>:</p>
-    <div class="demo">
-      <input type="number" id="a" value="34"> +
-      <input type="number" id="b" value="35"> =
-      <span class="out" id="sum">…</span>
-      <span class="ok" id="wasmStatus"></span>
-    </div>
-    <p>That sum isn't JavaScript — it's <code>add(a, b)</code> inside a
-    sandboxed WebAssembly instance. Real workbooks carry whole programs this
-    way: databases, game engines, compilers.</p>
+    <h2>There's a compiled engine in here</h2>
+    <p><b>This is not a video.</b> Every pixel below is computed on your
+    machine, every frame, from scratch — by a compiled WebAssembly program
+    (assembly-level code, the kind C and Rust compile to) embedded in this
+    file as <b>349 bytes</b>. It is diving into the Mandelbrot set, an
+    infinitely deep mathematical object. <b>Click anywhere to steer the
+    dive.</b></p>
+    <canvas id="fract" style="width:100%;border:1.5px solid var(--ink);border-radius:10px;display:block;cursor:crosshair;background:var(--paper)"></canvas>
+    <p style="margin:8px 0 10px"><span class="ok" id="fstat">warming up…</span></p>
+    <p>Watch the counter — <b>tens of millions of arithmetic operations per
+    frame</b>, from a program smaller than this paragraph. Workbooks carry
+    whole databases, game engines, and compilers exactly the same way; this
+    one is just small enough to read.</p>
   </section>
 
   <section data-n="03 · data" style="--c:var(--mint)">
-    <h2>There's data in here — and it remembers</h2>
+    <h2>There's data in here — shipped in the file</h2>
     <p>Workbooks carry their data with them. This one shipped with a reading
-    list inside the file (<b><span id="rows">…</span> rows</b>, look for
-    <code>id="dataset"</code> in the source), and the notebox below
-    <b>persists</b> — close this tab, reopen the file, your note is still
-    here:</p>
+    list <b>inside the file itself</b> (<b><span id="rows">…</span> rows</b> —
+    look for <code>id="dataset"</code> in the source). Full workbooks take
+    this much further: a real <b>SQLite database riding in the file</b> —
+    queryable tables, images, whole file systems.</p>
     <div class="demo" style="flex-direction:column; align-items:stretch">
       <textarea id="note" placeholder="write yourself a note, close the tab, come back…"></textarea>
       <span style="font-size:11px;color:var(--dim)" id="noteStatus">nothing saved yet</span>
     </div>
-    <p>Full workbooks do this with a real <b>SQLite database riding in the
-    file</b> — queryable tables, images, whole file systems. This little demo
-    uses your browser's storage for the same effect.</p>
+    <p>And an honesty note, because it matters: that notebox will survive
+    closing the tab — but it's <b>your browser remembering, not this
+    file</b>. A downloaded static file can't rewrite itself on your disk.
+    Making the data layer truly live — written back, synced, durable — is
+    exactly what docking into a Nexus is for. Files carry; engines
+    remember.</p>
   </section>
 
   <section data-n="04 · the org layer" style="--c:var(--sand)">
@@ -114,8 +116,8 @@
     <pre class="org"><span class="h">* hello-workbook</span>  the file that explains itself
 <span class="h">** tasks</span>
 <span class="kw">DONE</span> say hello without a server
-<span class="kw">DONE</span> run real webassembly from inside the file
-<span class="kw">DONE</span> remember the reader's note across closes
+<span class="kw">DONE</span> dive a 349-byte fractal engine from inside the file
+<span class="kw">DONE</span> tell the truth about what a static file can't do
 <span class="kw">TODO</span> dock into a Nexus and come alive
 <span class="h">** note</span>
 agents read this layer the way you just did.</pre>
@@ -153,17 +155,70 @@ agents read this layer the way you just did.</pre>
 document.getElementById("size").textContent =
   (new Blob([document.documentElement.outerHTML]).size / 1024).toFixed(1) + " KB";
 
-/* 02 — a real WebAssembly module, embedded as bytes: (func add (a i32) (b i32) i32) */
-const WASM = Uint8Array.from(atob("AGFzbQEAAAABBwFgAn9/AX8DAgEABwcBA2FkZAAACgkBBwAgACABags="),
-                             c => c.charCodeAt(0));
+/* 02 — the engine: a 349-byte WebAssembly fractal renderer (hand-written WAT,
+   assembled with wasm-tools). Exports: mem + mandel(w,h,cx,cy,scale,maxIter)
+   -> total iterations. JS only colors the result and runs the camera. */
+const WASM = Uint8Array.from(atob(
+"AGFzbQEAAAABCwFgBn9/fHx8fwF+AwIBAAUDAQAgBxACA21lbQIABm1hbmRlbAAACqoCAacCBQJ/BnwCfwJ8AX4gALdEAAAAAAAA4D+iIRAgAbdEAAAAAAAA4D+iIRFBACEHAkADQCAHIAFODQEgAyAHtyARoSAEoqAhCUEAIQYCQANAIAYgAE4NASACIAa3IBChIASioCEIRAAAAAAAAAAAIQpEAAAAAAAAAAAhC0QAAAAAAAAAACEMRAAAAAAAAAAAIQ1BACEOAkADQCAOIAVODQEgDCANoEQAAAAAAADwQGQNASAKIAuiRAAAAAAAAABAoiAJoCELIAwgDaEgCKAhCiAKIAqiIQwgCyALoiENIA5BAWohDgwACwsgEiAOrHwhEiAHIABsIAZqQQN0IQ8gDyAOsjgCACAPIAwgDaC2OAIEIAZBAWohBgwACwsgB0EBaiEHDAALCyASCw=="),
+  c => c.charCodeAt(0));
+const cvs = document.getElementById("fract");
+const FW = 384, FH = 232;
+cvs.width = FW; cvs.height = FH;
+const fctx = cvs.getContext("2d");
+const img = new ImageData(FW, FH);
+/* brand palette, cyclic */
+const stops = [[247,246,241],[168,212,240],[43,75,223],[18,19,22],[174,229,194],[247,246,241]];
+const LUT = new Uint8ClampedArray(2048 * 3);
+for (let i = 0; i < 2048; i++) {
+  const t = i / 2048 * (stops.length - 1), k = Math.min(stops.length - 2, t | 0), f = t - k;
+  for (let c = 0; c < 3; c++) LUT[i*3+c] = stops[k][c] + (stops[k+1][c] - stops[k][c]) * f;
+}
+const HOME = { cx: -0.743643887037151, cy: 0.131825904205330, scale: 3.1 / FW };
+let cx = HOME.cx, cy = HOME.cy, scale = HOME.scale;
+let fps = 0, lastT = performance.now();
 WebAssembly.instantiate(WASM).then(({ instance }) => {
-  const a = document.getElementById("a"), b = document.getElementById("b");
-  const sum = document.getElementById("sum");
-  const run = () => sum.textContent = instance.exports.add(+a.value | 0, +b.value | 0);
-  a.oninput = b.oninput = run; run();
-  document.getElementById("wasmStatus").textContent = "← computed in wasm";
+  const mandel = instance.exports.mandel;
+  const mem = new Float32Array(instance.exports.mem.buffer);
+  const fstat = document.getElementById("fstat");
+  cvs.addEventListener("click", (e) => {
+    const r = cvs.getBoundingClientRect();
+    cx += ((e.clientX - r.left) / r.width * FW - FW/2) * scale;
+    cy += ((e.clientY - r.top) / r.height * FH - FH/2) * scale;
+  });
+  let iterCap = 1100; /* adaptive: governed each frame to hold ~30fps */
+  (function frame() {
+    const maxIter = Math.min(iterCap, 90 + (90 * Math.log10(HOME.scale / scale) | 0)) | 0;
+    const t0 = performance.now();
+    const total = Number(mandel(FW, FH, cx, cy, scale, maxIter));
+    const dt = Math.max(.1, performance.now() - t0);
+    const d = img.data;
+    for (let p = 0; p < FW * FH; p++) {
+      const it = mem[p*2], zn2 = mem[p*2+1];
+      let r2, g2, b2;
+      if (it >= maxIter) { r2 = 18; g2 = 19; b2 = 22; }
+      else {
+        const mu = it + 1 - Math.log2(Math.log(zn2) / 2);
+        const idx = (((mu * 25) | 0) % 2048 + 2048) % 2048;
+        r2 = LUT[idx*3]; g2 = LUT[idx*3+1]; b2 = LUT[idx*3+2];
+      }
+      d[p*4] = r2; d[p*4+1] = g2; d[p*4+2] = b2; d[p*4+3] = 255;
+    }
+    fctx.putImageData(img, 0, 0);
+    const now = performance.now();
+    fps = fps * .9 + (1000 / Math.max(1, now - lastT)) * .1; lastT = now;
+    fstat.textContent =
+      (total / 1e6).toFixed(1) + "M operations this frame · " +
+      (total / 1e6 / (dt / 1000)).toFixed(0) + "M ops/sec · zoom ×" +
+      (HOME.scale / scale).toExponential(1).replace("e+", "·10^") + " · " +
+      Math.round(fps) + " fps — all inside this file";
+    if (dt > 40 && iterCap > 140) iterCap *= 0.85;
+    else if (dt < 22 && iterCap < 1100) iterCap *= 1.12;
+    scale *= 0.982;
+    if (scale < 4e-13) { cx = HOME.cx; cy = HOME.cy; scale = HOME.scale; iterCap = 1100; }
+    requestAnimationFrame(frame);
+  })();
 }).catch(() => {
-  document.getElementById("sum").textContent = "(this browser blocked wasm)";
+  document.getElementById("fstat").textContent = "(this browser blocked WebAssembly)";
 });
 
 /* 03 — data in the file + persistence */
@@ -173,9 +228,9 @@ const note = document.getElementById("note"), status = document.getElementById("
 const KEY = "hello-workbook-note";
 try {
   const saved = localStorage.getItem(KEY);
-  if (saved) { note.value = saved; status.textContent = "restored from your last visit ✓"; }
+  if (saved) { note.value = saved; status.textContent = "restored — by your browser, not the file"; }
   note.oninput = () => { localStorage.setItem(KEY, note.value);
-                         status.textContent = "saved — survives closing the tab ✓"; };
+                         status.textContent = "saved by your browser (not written into the file)"; };
 } catch { status.textContent = "(storage unavailable in this browser mode)"; }
 </script>
 </body>
