@@ -63,6 +63,28 @@ defmodule Workbooks.Pallet do
       wasm_rel: "build/sqlite.wasm",
       preopen: ".",
       mode: :argv
+    },
+    # ── Multi-tool archive (one tarball → many commands, one download) ──────────
+    %{
+      name: "wabt",
+      kind: :archive_many,
+      url: "https://github.com/WebAssembly/wabt/releases/download/1.0.41/wabt-1.0.41-wasi.tar.gz",
+      sha: "b1f09bde4a7f407d8d2b43b6076004dedf64780cbfcf7cce19207a11ade06f9c",
+      mode: :argv,
+      entries: [
+        {"wat2wasm", "wabt-1.0.41/bin/wat2wasm"},
+        {"wasm2wat", "wabt-1.0.41/bin/wasm2wat"},
+        {"wasm-validate", "wabt-1.0.41/bin/wasm-validate"},
+        {"wasm-decompile", "wabt-1.0.41/bin/wasm-decompile"},
+        {"wasm-interp", "wabt-1.0.41/bin/wasm-interp"},
+        {"wasm-objdump", "wabt-1.0.41/bin/wasm-objdump"},
+        {"wasm-stats", "wabt-1.0.41/bin/wasm-stats"},
+        {"wasm-strip", "wabt-1.0.41/bin/wasm-strip"},
+        {"wasm2c", "wabt-1.0.41/bin/wasm2c"},
+        {"wast2json", "wabt-1.0.41/bin/wast2json"},
+        {"wat-desugar", "wabt-1.0.41/bin/wat-desugar"},
+        {"spectest-interp", "wabt-1.0.41/bin/spectest-interp"}
+      ]
     }
   ]
 
@@ -97,6 +119,13 @@ defmodule Workbooks.Pallet do
   def seed_one(%{kind: :archive, name: n, url: u, sha: s, wasm_rel: w, preopen: p, mode: m}) do
     case CommandRegistry.fetch_and_register_archive(n, u, s, w, p, m) do
       {:ok, _wasm, _sha} -> :ok
+      other -> other
+    end
+  end
+
+  def seed_one(%{kind: :archive_many, url: u, sha: s, entries: es, mode: m}) do
+    case CommandRegistry.fetch_and_register_archive_many(u, s, es, m) do
+      {:ok, _names} -> :ok
       other -> other
     end
   end

@@ -546,6 +546,71 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Fetch a prebuilt .tar.gz that bundles MANY wasm command modules (e.g. WABT's wat2wasm/wasm2wat/…),
+  verify sha256, unpack ONCE into the content-addressed store, and register each `{command_name,
+  rel_path}` entry. One download for the whole cluster (vs N for N single-archive calls). The tools
+  are self-contained wasm — registered with NO default preopen, so callers pass their own `--dir` for
+  file-mode tools. Returns {:ok, registered_names} | {:error, reason}. Same name/url guards as the
+  single-archive path; every entry name must be non-reserved and charset-clean.
+  """
+  def fetch_and_register_archive_many(url, sha256, entries, mode \\ :argv) when is_list(entries) do
+    names = Enum.map(entries, fn {n, _} -> n end)
+
+    cond do
+      not (is_binary(url) and String.starts_with?(url, "https://")) -> {:error, :invalid_url}
+      names == [] -> {:error, :no_entries}
+      Enum.any?(names, &(&1 in @reserved)) -> {:error, :reserved_name}
+      not Enum.all?(names, &(is_binary(&1) and Regex.match?(@name_re, &1))) -> {:error, :invalid_name}
+      not Enum.all?(entries, fn {_, rel} -> is_binary(rel) end) -> {:error, :no_wasm_path}
+      true -> do_fetch_and_register_archive_many(url, sha256, entries, mode)
+    end
+  end
+
+  defp do_fetch_and_register_archive_many(url, sha256, entries, mode) do
+    tmp = Path.join(System.tmp_dir!(), "wbarcm-#{:erlang.unique_integer([:positive])}.tgz")
+
+    case https_get_to_file(url, tmp) do
+      :ok ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        cond do
+          is_binary(sha256) and sha256 != "" and got != String.downcase(String.trim(sha256)) ->
+            File.rm(tmp)
+            {:error, {:sha_mismatch, [expected: String.downcase(String.trim(sha256)), got: got]}}
+
+          true ->
+            dir = Path.join(Workbooks.PackageManager.commands_dir(), "#{got}.d")
+            File.rm_rf!(dir)
+            File.mkdir_p!(dir)
+            {tout, tcode} = System.cmd("tar", ["xzf", tmp, "-C", dir], stderr_to_stdout: true)
+            File.rm(tmp)
+
+            if tcode != 0 do
+              {:error, {:untar_failed, tout}}
+            else
+              results =
+                Enum.map(entries, fn {name, rel} ->
+                  wasm = Path.join(dir, rel)
+
+                  if File.regular?(wasm),
+                    do: {name, register(name, wasm, mode)},
+                    else: {name, {:error, {:not_in_archive, rel}}}
+                end)
+
+              case Enum.filter(results, fn {_, r} -> r != :ok end) do
+                [] -> {:ok, Enum.map(results, &elem(&1, 0))}
+                bad -> {:error, {:register_failed, bad}}
+              end
+            end
+        end
+
+      {:error, reason} ->
+        File.rm(tmp)
+        {:error, {:fetch_failed, reason}}
+    end
+  end
+
   # Pure Erlang/TLS HTTPS GET → file (no curl binary; no native subprocess). Mirrors
   # Workbooks.Npm.https_get / Workbooks.Compilers.http_get (wb-ova: "no curl binary").
   # Verified TLS via the OS trust store; only https URLs reach here (callers gate).
