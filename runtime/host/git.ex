@@ -273,8 +273,26 @@ defmodule Workbooks.Git do
     out
   end
 
+  @doc """
+  Set `safe.directory=*` in the global git config once at boot, so EVERY git
+  invocation (including the direct ones in dreams.ex / library.ex that bypass the
+  helper) trusts the /data volume regardless of its uid ownership. Idempotent.
+  """
+  def trust_all_dirs do
+    System.cmd("git", ["config", "--global", "--replace-all", "safe.directory", "*"], stderr_to_stdout: true)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  # Every git op trusts its working dir: on a deployed box the /data volume is
+  # owned by the image's build uid (e.g. 501) while the runtime runs as root, so
+  # git's dubious-ownership guard otherwise REFUSES every command — silently
+  # blocking commit/publish (the bit.ml crew wrote stories to disk for days that
+  # never shipped because `git` errored on ownership). `safe.directory=*` is safe
+  # here: a single-tenant container, no untrusted sibling repos.
   defp git(dir, args, opts \\ []),
-    do: System.cmd("git", args, [cd: dir, stderr_to_stdout: true] ++ opts)
+    do: System.cmd("git", ["-c", "safe.directory=*", "-c", "safe.directory=#{dir}"] ++ args, [cd: dir, stderr_to_stdout: true] ++ opts)
 
   # --- Radicle federation (GIT.org phase 3) ---------------------------------
   #

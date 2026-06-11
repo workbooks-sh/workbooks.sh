@@ -7,6 +7,12 @@ defmodule Workbooks.Application do
     trace("begin")
     Workbooks.Auth.Guardian.install_config()
     trace("guardian ok")
+    # Trust every git working dir process-wide: the /data volume is owned by the
+    # image's build uid while we run as root, so git's dubious-ownership guard
+    # would otherwise block EVERY git op (commit/publish/dream-recall) — the bug
+    # that left the bit.ml crew's stories written-but-unpublished for days.
+    Workbooks.Git.trust_all_dirs()
+    trace("git trust ok")
 
     children =
       [
