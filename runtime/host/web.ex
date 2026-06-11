@@ -644,6 +644,50 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{rollup: rollup, runs: runs}))
   end
 
+  # ── Channels (messaging adapters, official-API tier) ────────────────────────
+  # Runtime capability, not an agent tool: creds stay runtime-side (env), the
+  # control plane just lists/sends/approves. See Workbooks.Channels.
+
+  get "/api/channels" do
+    json = Jason.encode!(%{channels: Workbooks.Channels.list()})
+    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
+  end
+
+  # {"channel": "telegram", "peer": "<chat id>", "text": "...", "parse_mode": "Markdown"?}
+  post "/api/channels/send" do
+    {:ok, body, conn} = read_body(conn)
+    p = Jason.decode!(body)
+    opts = if pm = p["parse_mode"], do: [parse_mode: pm], else: []
+
+    case Workbooks.Channels.send(p["channel"] || "", p["peer"], p["text"] || "", opts) do
+      {:ok, sent} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, sent: sent}))
+
+      {:error, :unknown_channel} ->
+        Workbooks.Web.Error.render(conn, :bad_request, "unknown channel: #{p["channel"]}")
+
+      {:error, :not_configured} ->
+        Workbooks.Web.Error.render(conn, :unavailable, "channel not configured: #{p["channel"]}")
+
+      {:error, reason} ->
+        Workbooks.Web.Error.render(conn, :unavailable, "send failed: #{inspect(reason)}")
+    end
+  end
+
+  # DM-policy pairing: {"channel": "telegram", "code": "ABC123"} → allowlist the peer.
+  post "/api/channels/approve" do
+    {:ok, body, conn} = read_body(conn)
+    p = Jason.decode!(body)
+
+    case Workbooks.Channels.approve(p["channel"] || "", p["code"] || "") do
+      {:ok, peer} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, peer: peer}))
+
+      :not_found ->
+        Workbooks.Web.Error.render(conn, :not_found, "no pending pairing code: #{p["code"]}")
+    end
+  end
+
   # Browse — the runtime's web capability, reachable over HTTP so any consumer
   # (brandnana harvest, an agent, an external caller) can fetch/crawl/search
   # through the configured provider (free native browser by default).

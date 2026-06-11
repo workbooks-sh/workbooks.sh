@@ -52,6 +52,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb channels …` — messaging channels over RCP (list / send / approve
+      # against the connected runtime's control plane; creds stay runtime-side).
+      ["channels" | rest] ->
+        {out, failed?} = Workbooks.CLI.Runtime.channels(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       # `wb dev …` — the development service: inspect the demo env + drive the
       # local verify loop (info / up / test). HOST-side, no app boot.
       ["dev" | rest] ->

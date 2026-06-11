@@ -18,7 +18,7 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ web() ++ keeper()
+      ] ++ web() ++ keeper() ++ channels()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
@@ -152,6 +152,13 @@ defmodule Workbooks.Application do
       System.get_env("WB_KEEPER_DEF") -> [Workbooks.Keeper]
       true -> []
     end
+  end
+
+  # Channels (wb messaging adapters, official-API tier): each inbound poller is
+  # opt-in by CREDENTIAL — the Telegram long-poller joins the tree only when
+  # TELEGRAM_BOT_TOKEN is set (same pattern as keeper(): unset → excluded).
+  defp channels do
+    if Workbooks.Channels.Telegram.configured?(), do: [Workbooks.Channels.Telegram], else: []
   end
 
   defp port, do: String.to_integer(System.get_env("PORT", "4000"))

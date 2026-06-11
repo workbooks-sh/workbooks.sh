@@ -54,6 +54,30 @@ defmodule Workbooks.CLI.Runtime do
   def toolkit(["sign", id], req), do: do_request(:post, "/rcp/toolkit/sign?id=#{enc(id)}", "", req)
   def toolkit(_, _), do: {toolkit_usage(), true}
 
+  @doc """
+  `wb channels …` over RCP — messaging channels live runtime-side (creds + the
+  pollers run in the engine); the CLI just drives the control-plane routes.
+  """
+  def channels(args, req \\ &http_request/4)
+  def channels(["list"], req), do: do_request(:get, "/api/channels", nil, req)
+
+  def channels(["send", channel, peer | text], req) when text != [],
+    do: do_request(:post, "/api/channels/send", Jason.encode!(%{channel: channel, peer: peer, text: Enum.join(text, " ")}), req)
+
+  def channels(["approve", channel, code], req),
+    do: do_request(:post, "/api/channels/approve", Jason.encode!(%{channel: channel, code: code}), req)
+
+  def channels(_, _), do: {channels_usage(), true}
+
+  defp channels_usage do
+    """
+    wb channels list | send <channel> <peer> <text…> | approve <channel> <code>
+
+    Runs against the connected runtime (creds + inbound pollers live there).
+    Target: WB_RUNTIME_URL (+ WB_TOKEN) or the local discovery file.
+    """
+  end
+
   defp enc(s), do: URI.encode_www_form(to_string(s))
 
   defp toolkit_usage do
