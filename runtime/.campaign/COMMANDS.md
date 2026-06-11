@@ -32,6 +32,7 @@ Provision once with `Pallet.seed_csource/0` (slow — one clang build each). 7 c
 | `gz` | gzip-compatible compression | `run("gz", data, [])` / `run("gz", comp, ["-d"])` |
 | `lz4` | LZ4 frame compression | `run("lz4", data, [])` / `run("lz4", comp, ["-d"])` |
 | `b2` | BLAKE2b-512 hash → hex | `run("b2", data, [])` |
+| `md` | CommonMark markdown → HTML | `run("md", "# Hi", [])` |
 
 ## Built-ins (always present)
 `jq` (JSON), `grep` (regex line match), `upper` (demo), `wbox` (in-wasm shell coreutils). Plus the

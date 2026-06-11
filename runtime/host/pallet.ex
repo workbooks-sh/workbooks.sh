@@ -278,6 +278,20 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `md` CLI: CommonMark markdown on stdin → HTML on stdout (md4c).
+  @md_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include "md4c-html.h"
+  static void out(const MD_CHAR* t, MD_SIZE n, void* ud) { (void)ud; fwrite(t, 1, n, stdout); }
+  int main(void) {
+    size_t cap = 1 << 20, len = 0; char* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    md_html(in, (MD_SIZE)len, out, NULL, 0, 0);
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -331,6 +345,12 @@ defmodule Workbooks.Pallet do
       url: "https://monocypher.org/download/monocypher-4.0.2.tar.gz",
       sha: "38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c",
       build_opts: [src_globs: ["src/monocypher.{c,h}"], extra_sources: [{"b2main.c", @b2_main}]]
+    },
+    %{
+      name: "md",
+      url: "https://codeload.github.com/mity/md4c/tar.gz/refs/tags/release-0.5.2",
+      sha: "55d0111d48fb11883aaee91465e642b8b640775a4d6993c2d0e7a8092758ef21",
+      build_opts: [src_globs: ["src/*.{c,h}"], extra_sources: [{"md_main.c", @md_main}]]
     }
   ]
 
