@@ -194,6 +194,24 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `qjs` CLI: eval `-e CODE` or stdin via the QuickJS embedding API (skips qjs.c, which
+  # needs a qjsc-generated repl.c, and quickjs-libc.c's std/os modules — pure-compute eval).
+  @qjs_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include "quickjs.h"
+  int main(int argc, char** argv) {
+    JSRuntime* rt = JS_NewRuntime(); JSContext* ctx = JS_NewContext(rt);
+    static char buf[1 << 20]; const char* code;
+    if (argc >= 3 && !strcmp(argv[1], "-e")) code = argv[2];
+    else { size_t n = fread(buf, 1, sizeof(buf) - 1, stdin); buf[n] = 0; code = buf; }
+    JSValue v = JS_Eval(ctx, code, strlen(code), "<eval>", JS_EVAL_TYPE_GLOBAL);
+    if (JS_IsException(v)) { JSValue e = JS_GetException(ctx); const char* s = JS_ToCString(ctx, e); fprintf(stderr, "error: %s\n", s ? s : "?"); }
+    else { const char* s = JS_ToCString(ctx, v); printf("%s\n", s ? s : "undefined"); }
+    JS_FreeContext(ctx); JS_FreeRuntime(rt); return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -214,6 +232,16 @@ defmodule Workbooks.Pallet do
       build_opts: [
         src_globs: ["src/include/*", "src/vm/*", "src/optional/*"],
         extra_sources: [{"wren_main.c", @wren_main}]
+      ]
+    },
+    %{
+      name: "qjs",
+      url: "https://codeload.github.com/quickjs-ng/quickjs/tar.gz/refs/tags/v0.10.0",
+      sha: "c54007e6ce9893b0074d53feac47c64a362900df20493110800c9e1f5c43427b",
+      build_opts: [
+        src_globs: ["*.{c,h}"],
+        exclude: ~w(qjs.c qjsc.c quickjs-libc.c api-test.c ctest.c fuzz.c run-test262.c unicode_gen.c),
+        extra_sources: [{"qjs_main.c", @qjs_main}]
       ]
     }
   ]
