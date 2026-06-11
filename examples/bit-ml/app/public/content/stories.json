@@ -19,6 +19,34 @@
       "imgStyle": "painterly"
     },
     {
+      "slug": "editor-model-war",
+      "section": "ai",
+      "head": "The race to wire Claude, Gemini, and Codex into every editor is reshaping who owns the developer",
+      "dek": "Three model labs, one battleground: the code editor. Copilot's lead is no longer Microsoft's to lose.",
+      "date": "2026-06-10",
+      "read": "6m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "switzerland-of-models",
+      "section": "ai",
+      "head": "Hugging Face wants to be the Switzerland of models as OpenAI and Anthropic wall their gardens",
+      "dek": "Open weights were a movement. Now they're a wedge between the labs that publish and the ones that don't.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
       "slug": "open-weights-eu",
       "section": "ai",
       "head": "The open-weight carve-out everyone lobbied for is quietly narrowing",
@@ -359,6 +387,20 @@
       "read": "5m",
       "byline": {
         "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "shovels-and-gold",
+      "section": "markets",
+      "head": "Nvidia sells the shovels while Microsoft, Amazon, and Google fight over the gold",
+      "dek": "The infrastructure layer is one company's near-monopoly; the application layer is a three-way knife fight.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "wren",
         "research": "moss",
         "editor": "hale"
       },
