@@ -210,23 +210,31 @@
   .s3-stage .bigicon .face img { height: 38px; filter: invert(.92); }
   .s3-stage .bigicon .dnaMini { display: flex; height: 9px; }
   .s3-stage .bigicon .dnaMini i { display: block; height: 100%; }
-  /* the terminal — no chrome, no frame: the section IS the screen.
-     It types each piece's story, scrolls, and restarts on switch. */
+  /* the terminal — softly contained: one shade above the section, no border.
+     The scrollbar is a brand moment: a faint dotted stroke that turns SOLID
+     where the thumb is. Success lines use the piece's vibrant accent. */
+  .s3-termwrap { position: relative; background: #1b1d20; border-radius: 12px; padding: 22px 30px 22px 24px; }
   .s3-term {
     font: 400 12.5px var(--mono); line-height: 2.05; color: #9ba095;
-    max-height: 480px; overflow-y: auto; padding-right: 10px;
-    scrollbar-width: thin; scrollbar-color: #3a3f3a transparent;
+    max-height: 460px; overflow-y: auto; padding-right: 12px;
+    scrollbar-width: none;
   }
+  .s3-term::-webkit-scrollbar { display: none; }
   .s3-term .ln { white-space: pre-wrap; word-break: break-word; }
   .s3-term .ps { color: var(--pc); font-weight: 700; }
   .s3-term .cmd { color: var(--paper); font-weight: 700; }
-  .s3-term .ok { color: var(--bloom); }
+  .s3-term .ok { color: var(--ac); }
   .s3-term .dim { color: #6a7064; }
   .s3-term .hi { color: var(--paper); }
   .s3-term .q { color: var(--pc); }
   .s3-term .caret { display: inline-block; width: 7px; height: 13px; background: var(--paper);
                     vertical-align: -2px; animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
+  .s3-scroll {
+    position: absolute; top: 22px; bottom: 22px; right: 12px; width: 2px;
+    background-image: repeating-linear-gradient(180deg, rgba(247,246,241,.22) 0 4px, transparent 4px 9px);
+  }
+  .s3-scroll .thumb { position: absolute; left: 0; width: 2px; background: var(--ac); }
   .s3-stage .role { font: 700 10px var(--mono); letter-spacing: .3em; text-transform: uppercase; margin-bottom: 6px; }
   .s3-stage h3 { font-family: var(--display); font-size: 38px; line-height: 1; text-transform: uppercase; color: var(--paper); }
   .s3-stage p { font-size: 12.5px; line-height: 1.8; margin-bottom: 12px; max-width: 58ch; color: #9ba095; }
@@ -1223,7 +1231,7 @@ document.fonts.ready.then(() => {
 /* ── the spotlight: selectors left, stage right. Pastel DNA system. ── */
 const PIECES = [
   { key: "workbooks", name: "Workbooks", role: "the unit", icon: "wb-file-icon.svg",
-    pastel: "#a8d4f0",
+    pastel: "#a8d4f0", accent: "#5da8e8",
     mix: [["#aee5c2", .34], ["#f2ddb0", .26], ["#f3c5a3", .22], ["#9fc4e8", .18]],
     body: "A workbook is one file that is a whole app — its code, data, and interface travel together, and it runs wherever it lands.",
     body2: "Open it on your laptop and it's something you can read and change; serve it from the Nexus and it's a product people use. Same file, no export step — the document is the deployment.",
@@ -1246,7 +1254,7 @@ const PIECES = [
       ["dim", "  wherever it lands, it runs."]],
     link: "#what-is-a-workbook", linkLabel: "What is a workbook →" },
   { key: "nexus", name: "Nexus", role: "the engine", icon: "nexus-icon.svg",
-    pastel: "#aee5c2",
+    pastel: "#aee5c2", accent: "#57c97e",
     mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
     body: "The Nexus is the engine you own — it runs workbooks on your Mac, your server, or the cloud, and connects them to your data, your services, and each other.",
     body2: "One command starts it, and the same engine carries the whole journey: the prototype you build for yourself becomes the product your team runs — no microservices, no serverless maze.",
@@ -1269,7 +1277,7 @@ const PIECES = [
       ["dim", "  no microservices. no serverless maze. one system."]],
     link: "#what-is-the-nexus", linkLabel: "What is the Nexus →" },
   { key: "toolkits", name: "Toolkits", role: "the parts", icon: "toolkit-icon.svg",
-    pastel: "#f3c5a3",
+    pastel: "#f3c5a3", accent: "#ee9455",
     mix: [["#f2ddb0", .34], ["#a8d4f0", .26], ["#aee5c2", .22], ["#9fc4e8", .18]],
     body: "Toolkits are ready-made abilities a workbook can pick up — payments, search, charts, voices, anything — built by us, by the community, or by you.",
     body2: "Each one snaps in with a single line and brings everything it needs along. And it flows both ways: anything you build inside a workbook can be packaged as a toolkit and handed to the next one.",
@@ -1320,6 +1328,7 @@ function spotRender(activeKey) {
   });
   const p = PIECES.find(x => x.key === activeKey);
   s3Stage.style.setProperty("--pc", p.pastel);
+  s3Stage.style.setProperty("--ac", p.accent);
   s3Stage.innerHTML = `
     <div>
       <div class="s3-headrow">
@@ -1338,7 +1347,10 @@ function spotRender(activeKey) {
       <p class="why" style="border-color:${p.pastel}"><b>Why it exists:</b> ${p.why}</p>
       <a class="more" href="${p.link}" style="background:${p.pastel}">${p.linkLabel}</a>
     </div>
-    <aside class="s3-term" id="s3Term"></aside>`;
+    <aside class="s3-termwrap">
+      <div class="s3-term" id="s3Term"></div>
+      <div class="s3-scroll" id="s3Scroll"><div class="thumb" id="s3Thumb"></div></div>
+    </aside>`;
   playStory(p);
 }
 /* the storyteller: types commands char by char, prints output line by
@@ -1348,14 +1360,28 @@ async function playStory(p) {
   const my = ++storyToken;
   const term = document.getElementById("s3Term");
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const thumb = document.getElementById("s3Thumb");
+  const syncBar = () => {
+    const track = document.getElementById("s3Scroll");
+    if (!track) return;
+    const h = track.clientHeight;
+    const frac = Math.min(1, term.clientHeight / term.scrollHeight);
+    const top = term.scrollHeight > term.clientHeight
+      ? (term.scrollTop / (term.scrollHeight - term.clientHeight)) * (h * (1 - frac)) : 0;
+    thumb.style.height = Math.max(18, h * frac) + "px";
+    thumb.style.top = top + "px";
+  };
+  term.addEventListener("scroll", syncBar);
   const line = (html, cls) => {
     const d = document.createElement("div");
     d.className = "ln" + (cls ? " " + cls : "");
     d.innerHTML = html;
     term.appendChild(d);
     term.scrollTop = term.scrollHeight;
+    syncBar();
     return d;
   };
+  syncBar();
   for (const [kind, text] of p.story) {
     if (my !== storyToken) return;
     if (kind === "cmd") {
