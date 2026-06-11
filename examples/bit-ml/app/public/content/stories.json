@@ -1,95 +1,368 @@
 {
-  "_comment": "Runtime CMS manifest (DESIGN.md §7). Ordered rows; the frontend reads this, then fetches each story's .org file and renders it client-side with orgitorial. status: live = being written now (front-page type-in treatment); published = done. WireLead = newest published. Seed content — replace with agent-authored rows once the crew runtime ships (wb-wc0.2).",
   "stories": [
     {
       "slug": "deepmind-weather",
-      "section": "AI",
-      "head": "DeepMind's new weather model beats the supercomputers it replaced",
-      "dek": "Fifteen-day forecasts from a diffusion model that runs on one TPU — the Nature paper, the caveats, and who loses a hardware contract.",
-      "sources": [
-        { "label": "Nature", "url": "https://www.nature.com/articles/s41586-024-08252-9" },
-        { "label": "GitHub", "url": "https://github.com/google-deepmind/graphcast" }
-      ],
-      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
+      "section": "ai",
+      "head": "A weather model that runs on one chip just out-forecast the supercomputers",
+      "dek": "Ten-day global forecasts in eight minutes on a single TPU \u2014 and the procurement budgets that should be nervous.",
       "date": "2026-06-10",
-      "time": "14:02 UTC",
-      "read": "1m",
+      "read": "48s",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
       "status": "live",
-      "file": "content/stories/deepmind-weather.org",
+      "feature": true,
       "banner": "content/images/deepmind-weather-banner.webp",
-      "bannerAlt": "DeepMind weather model — global forecast field visualization",
-      "receipt": [
-        { "stage": "assigned", "time": "13:40", "note": "desk · weather model", "sha": "a1c4e9" },
-        { "stage": "researched", "time": "13:51", "note": "moss · 6 sources", "sha": "f72b08" },
-        { "stage": "drafted", "time": "13:58", "note": "wren · 612 words", "sha": "3d9a17" },
-        { "stage": "edited", "time": "14:02", "note": "hale · fact pass", "sha": "be05c2" }
-      ]
+      "bannerAlt": "A weather model that runs on one chip just out-forecast the supercomputers",
+      "imgStyle": "painterly"
+    },
+    {
+      "slug": "open-weights-eu",
+      "section": "ai",
+      "head": "The open-weight carve-out everyone lobbied for is quietly narrowing",
+      "dek": "Brussels' implementing act redraws the line between a 'released' model and a 'deployed' one.",
+      "date": "2026-06-10",
+      "read": "3m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "agents-enterprise",
+      "section": "ai",
+      "head": "Enterprises wanted autonomous agents. They got very expensive interns",
+      "dek": "The gap between a demo that books a flight and a system you'd trust with the company card.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "small-models-win",
+      "section": "ai",
+      "head": "The frontier moved down: why the interesting models got small",
+      "dek": "A 7B that fits on a laptop is doing what a 70B did a year ago, and the economics flipped with it.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published",
+      "banner": "content/images/small-models-win-banner.webp",
+      "bannerAlt": "The frontier moved down: why the interesting models got small",
+      "imgStyle": "collage"
+    },
+    {
+      "slug": "synthetic-data-wall",
+      "section": "ai",
+      "head": "The synthetic-data flywheel is hitting a quality wall",
+      "dek": "Models trained on model output are starting to taste like a photocopy of a photocopy.",
+      "date": "2026-06-10",
+      "read": "6m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "voice-clone-fraud",
+      "section": "ai",
+      "head": "Voice-clone fraud is now a board-level line item",
+      "dek": "Three CFOs, one fake CEO, and the four-second sample that fooled all of them.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
     },
     {
       "slug": "nvidia-datacenter",
-      "section": "MARKETS",
-      "head": "Nvidia's data-center revenue laps the rest of the segment combined",
-      "dek": "The quarter in three lines: backlog, gross margin, and the one customer-concentration footnote analysts keep circling.",
-      "sources": [
-        { "label": "10-Q", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001045810&type=10-Q" },
-        { "label": "investor relations", "url": "https://investor.nvidia.com/financial-info/financial-reports/" }
-      ],
-      "byline": { "writer": "desk", "research": ["moss"], "editor": "hale" },
-      "date": "2026-06-09",
-      "time": "13:12 UTC",
-      "read": "1m",
+      "section": "markets",
+      "head": "Nvidia's data-center revenue lapped the rest of the company twice over",
+      "dek": "The quarter in three lines: backlog, gross margin, and the concentration footnote analysts keep circling.",
+      "date": "2026-06-10",
+      "read": "3m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
       "status": "published",
-      "file": "content/stories/nvidia-datacenter.org",
+      "feature": true,
       "banner": "content/images/nvidia-datacenter-banner.webp",
-      "bannerAlt": "Nvidia data-center — GPU racks in a hyperscale hall",
-      "receipt": [
-        { "stage": "assigned", "time": "11:20", "note": "desk · nvidia quarter", "sha": "77ab10" },
-        { "stage": "researched", "time": "12:05", "note": "moss · filing + transcript", "sha": "0c5d92" },
-        { "stage": "drafted", "time": "12:48", "note": "desk · 540 words", "sha": "e31f44" },
-        { "stage": "edited", "time": "13:12", "note": "hale · numbers pass", "sha": "9b2a76" }
-      ]
+      "bannerAlt": "Nvidia's data-center revenue lapped the rest of the company twice over",
+      "imgStyle": "collage"
+    },
+    {
+      "slug": "openai-ipo",
+      "section": "markets",
+      "head": "OpenAI files confidentially. The foundation-model IPO race is on",
+      "dek": "What a confidential S-1 does and doesn't tell you, and why Anthropic's timing matters.",
+      "date": "2026-06-10",
+      "read": "3m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "ai-capex-bubble",
+      "section": "markets",
+      "head": "The hyperscaler capex chart that has everyone arguing about a bubble",
+      "dek": "$400B of planned buildout, and the depreciation schedule nobody wants to model.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "power-the-bottleneck",
+      "section": "markets",
+      "head": "The bottleneck stopped being chips. Now it's power",
+      "dek": "A gigawatt of compute is easy to order and very hard to plug in.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published",
+      "banner": "content/images/power-the-bottleneck-banner.webp",
+      "bannerAlt": "The bottleneck stopped being chips. Now it's power",
+      "imgStyle": "painterly"
+    },
+    {
+      "slug": "chip-export-arb",
+      "section": "markets",
+      "head": "The grey market in export-restricted accelerators has a price",
+      "dek": "What an H-class card costs in three cities, and what that spread says about enforcement.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "ai-startup-down-round",
+      "section": "markets",
+      "head": "The down-round nobody's naming and everyone's pricing in",
+      "dek": "Late-stage AI marks are quietly being rewritten in the secondaries.",
+      "date": "2026-06-10",
+      "read": "3m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
     },
     {
       "slug": "tsmc-arizona",
-      "section": "CHIPS",
-      "head": "TSMC's Arizona fab clears its first leading-edge wafers",
-      "dek": "Two years late, but running — what the yield numbers say about whether onshoring the leading node actually pencils out.",
-      "sources": [
-        { "label": "TSMC", "url": "https://pr.tsmc.com/english/news" },
-        { "label": "Commerce", "url": "https://www.commerce.gov/news/press-releases" }
-      ],
-      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
-      "date": "2026-06-08",
-      "time": "13:40 UTC",
-      "read": "2m",
+      "section": "chips",
+      "head": "TSMC's Arizona fab cleared its first leading-edge wafers",
+      "dek": "Two years late, but running \u2014 what the yield numbers say about onshoring the leading node.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "wren",
+        "research": "moss",
+        "editor": "hale"
+      },
       "status": "published",
-      "file": "content/stories/tsmc-arizona.org",
+      "feature": true,
       "banner": "content/images/tsmc-arizona-banner.webp",
-      "bannerAlt": "TSMC Arizona fab — cleanroom and leading-edge wafer line"
+      "bannerAlt": "TSMC's Arizona fab cleared its first leading-edge wafers",
+      "imgStyle": "collage"
+    },
+    {
+      "slug": "micron-hbm",
+      "section": "chips",
+      "head": "The memory shortage is an HBM shortage wearing a trenchcoat",
+      "dek": "Why high-bandwidth memory, not logic, is the part of the AI stack that's actually sold out.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "glass-substrate",
+      "section": "chips",
+      "head": "Glass substrates: the unglamorous fix for the chip that got too big",
+      "dek": "Packaging is where the next two years of performance quietly hides.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published",
+      "banner": "content/images/glass-substrate-banner.webp",
+      "bannerAlt": "Glass substrates: the unglamorous fix for the chip that got too big",
+      "imgStyle": "painterly"
+    },
+    {
+      "slug": "intel-foundry",
+      "section": "chips",
+      "head": "Intel's foundry bet reaches the part where customers have to show up",
+      "dek": "The technology roadmap is the easy half. The order book is the test.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "china-mature-node",
+      "section": "chips",
+      "head": "China cornered the boring chips. That turns out to matter",
+      "dek": "Mature-node oversupply is reshaping who can build a car, a missile, or a fridge.",
+      "date": "2026-06-10",
+      "read": "6m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "euv-high-na",
+      "section": "chips",
+      "head": "The $400M lithography machine and the math that justifies it",
+      "dek": "High-NA EUV is shipping. The cost-per-wafer argument is closer than the marketing suggests.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
     },
     {
       "slug": "eu-compute-threshold",
-      "section": "POLICY",
-      "head": "The EU's compute threshold for frontier models takes effect",
-      "dek": "What the 10^25 training-FLOP line actually triggers, who has to file, and the carve-out that open-weight labs lobbied for.",
-      "sources": [
-        { "label": "Official Journal", "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj" },
-        { "label": "AI Office", "url": "https://digital-strategy.ec.europa.eu/en/policies/ai-act" }
-      ],
-      "byline": { "writer": "wren", "research": ["moss"], "editor": "hale" },
-      "date": "2026-06-07",
-      "time": "11:58 UTC",
-      "read": "2m",
+      "section": "policy",
+      "head": "The EU's compute threshold for 'frontier' is about to bite",
+      "dek": "What the training-FLOP line actually triggers, and the carve-out open-weight labs lobbied for.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
       "status": "published",
-      "file": "content/stories/eu-compute-threshold.org",
+      "feature": true,
       "banner": "content/images/eu-compute-threshold-banner.webp",
-      "bannerAlt": "EU compute threshold — the AI Act and frontier-model regulation",
-      "receipt": [
-        { "stage": "assigned", "time": "10:30", "note": "desk · EU AI Act", "sha": "44de01" },
-        { "stage": "researched", "time": "11:10", "note": "moss · OJ text", "sha": "8f7c23" },
-        { "stage": "drafted", "time": "11:42", "note": "wren · 498 words", "sha": "1a6b55" },
-        { "stage": "edited", "time": "11:58", "note": "hale · legal read", "sha": "cc90ef" }
-      ]
+      "bannerAlt": "The EU's compute threshold for 'frontier' is about to bite",
+      "imgStyle": "collage"
+    },
+    {
+      "slug": "seattle-data-centers",
+      "section": "policy",
+      "head": "Seattle's data-center moratorium, backed by the people who build them",
+      "dek": "A one-year pause, an unlikely coalition, and the power-and-water fight coming to every metro.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "ai-liability",
+      "section": "policy",
+      "head": "Who pays when the agent is wrong? The liability question gets real",
+      "dek": "A first ruling treats an AI summary as the platform's own speech, not a link.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "chip-act-clawback",
+      "section": "policy",
+      "head": "The CHIPS money came with strings. Now the clawbacks start",
+      "dek": "Missed milestones, a tightening labor market, and the first state to ask for its incentives back.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published",
+      "banner": "content/images/chip-act-clawback-banner.webp",
+      "bannerAlt": "The CHIPS money came with strings. Now the clawbacks start",
+      "imgStyle": "painterly"
+    },
+    {
+      "slug": "model-disclosure",
+      "section": "policy",
+      "head": "Mandatory model disclosure is coming. Nobody agrees what to disclose",
+      "dek": "Weights, data, evals, incidents \u2014 the four fights inside one word.",
+      "date": "2026-06-10",
+      "read": "4m",
+      "byline": {
+        "writer": "moss",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
+    },
+    {
+      "slug": "sovereign-ai",
+      "section": "policy",
+      "head": "Every government wants a sovereign model. Most want someone else to run it",
+      "dek": "The gap between a press release about national AI and a working cluster.",
+      "date": "2026-06-10",
+      "read": "5m",
+      "byline": {
+        "writer": "hale",
+        "research": "moss",
+        "editor": "hale"
+      },
+      "status": "published"
     }
   ]
 }
