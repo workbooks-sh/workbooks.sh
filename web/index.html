@@ -1109,9 +1109,9 @@ function treeFrame(ms) {
     tctx.stroke();
     tctx.fillText("cloud", cx2 + 8, pcy + 0.5);
 
-    /* BECOMES — only out of the DOCK */
-    const dnY = dockBot + FAN_GAP * 0.78;
-    const busY = dockBot + (dnY - dockBot) * 0.48;
+    /* the facets the nexus grants — label rides the EDGE, elk-style */
+    const dnY = dockBot + FAN_GAP * 0.92;
+    const busY = dockBot + (dnY - dockBot) * 0.52;
     dash();
     tctx.beginPath();
     tctx.moveTo(NEX.x, dockBot);
@@ -1125,7 +1125,17 @@ function treeFrame(ms) {
     tctx.stroke();
     undash();
     SPINE_UP.forEach((sp, i) => chip(NEX.x + (i - 1) * FAN_X, dnY, sp));
-    caption("DOCKED IN A NEXUS, IT IS", dnY + CHIP_H / 2 + 17);
+    /* the edge label — knocked out of the line so no glyph is crossed */
+    const elY = (dockBot + busY) / 2 + 1;
+    tctx.font = "700 9.5px 'JetBrains Mono', monospace";
+    tctx.letterSpacing = "3px";
+    const elW = tctx.measureText("MAKES IT").width;
+    tctx.fillStyle = S_PAPER;
+    tctx.fillRect(NEX.x - elW / 2 - 8, elY - 9, elW + 16, 18);
+    tctx.textAlign = "center"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_DIM;
+    tctx.fillText("MAKES IT", NEX.x, elY);
+    tctx.letterSpacing = "0px";
 
     /* ── the nexus: a SQUARE — its own centered entity. The W mark above,
        "workbook" beneath, and a quiet .html: it is just a file. ── */
