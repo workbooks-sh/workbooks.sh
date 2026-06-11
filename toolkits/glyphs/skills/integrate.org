@@ -1,0 +1,146 @@
+#+TITLE: glyphs — integrate
+#+TOOLKIT: glyphs
+#+SKILL: integrate
+#+TAGS: integrate embed browser node wasm framework configure
+#+STATUS: experimental
+
+* When to use this
+
+Read this when your task is to *plug glyphs into a site* — a static page, a
+server-rendered template, a single HTML file, a component framework, or the
+runtime's wasm JS lane. The shape is always: load the resolver + the packs, call
+=configure()= once, then =glyph()= / =glyphAsync()= and inject the string.
+
+(For the ref grammar + opts, see =skills/resolve=. To add curated marks, see
+=skills/curate=.)
+
+* The artifacts
+
+- =dist/glyphs.js= — the resolver. Zero dependencies. Exposes its API three ways:
+  - ES module: =import { glyph, glyphAsync, configure } from "./glyphs.js"=
+  - browser global: load via =<script>=, then =window.Glyphs.glyph(...)=
+  - CommonJS: =const { glyph } = require("./glyphs.js")=
+- =dist/glyphs.css= — sizing + the mono filter. Link it so =.glyph= aligns to the
+  baseline at =1em= and =mono= desaturates.
+- =packs/*.json= — the curated maps + svgl index (pure JSON).
+- =packs/open-avatars/= — the open-avatars renderer + open-peeps bundle (for
+  =avatar:=).
+
+* configure() — the one wiring step
+
+The core is *pure*: it holds no fs and imports no JSON. Inject the packs once:
+
+#+begin_src js
+import { configure, glyph } from "./glyphs.js";
+import { avatar } from "./packs/open-avatars/open-avatars.js";
+import brands from "./packs/curated-brands.json"   with { type: "json" };
+import icons from "./packs/curated-icons.json"     with { type: "json" };
+import svglIndex from "./packs/svgl-index.json"     with { type: "json" };
+import openPeeps from "./packs/open-avatars/open-peeps.bundle.json" with { type: "json" };
+
+configure({
+  brands, icons, svglIndex,
+  avatarPacks: { "open-peeps": openPeeps },  // add more packs here
+  avatarFn: avatar,                          // open-avatars' avatar()
+});
+
+document.querySelector("#logo").innerHTML = glyph("brand:google", { size: 28 });
+#+end_src
+
+Pass only what you need — omit =avatarPacks=/=avatarFn= if you never use
+=avatar:=; omit =svglIndex= if you only want curated brands. Each key defaults to
+empty, and a kind with no backing config simply misses → =null=.
+
+* Browser, no bundler (inline the packs)
+
+#+begin_src html
+<link rel="stylesheet" href="glyphs.css">
+<span id="logo"></span>
+<script src="packs/open-avatars/open-avatars.js"></script>   <!-- window.OpenAvatars -->
+<script src="glyphs.js"></script>                            <!-- window.Glyphs -->
+<script type="application/json" id="brands">/* curated-brands.json */</script>
+<script type="application/json" id="icons">/* curated-icons.json */</script>
+<script type="application/json" id="svgl">/* svgl-index.json */</script>
+<script type="application/json" id="peeps">/* open-peeps.bundle.json */</script>
+<script>
+  var J = id => JSON.parse(document.getElementById(id).textContent);
+  Glyphs.configure({
+    brands: J("brands"), icons: J("icons"), svglIndex: J("svgl"),
+    avatarPacks: { "open-peeps": J("peeps") }, avatarFn: OpenAvatars.avatar,
+  });
+  document.getElementById("logo").innerHTML = Glyphs.glyph("brand:google", { size: 28 });
+  // long tail needs the network:
+  Glyphs.glyphAsync("brand:stripe", { size: 28 }).then(s => {
+    if (s) document.getElementById("logo").insertAdjacentHTML("beforeend", s);
+  });
+</script>
+#+end_src
+
+Fetch the JSON instead of inlining it where the packs live as files. =dist/specimen.html=
+is a complete worked example (built by =node test/build-specimen.mjs=).
+
+* Inline-in-headline (the bit.ml use)
+
+Marks default to =1em=, so a logo drops straight into running text and scales
+with the font:
+
+#+begin_src js
+el.innerHTML =
+  Glyphs.glyph("brand:x") + " ships a model that beats " +
+  Glyphs.glyph("brand:openai") + " and " + Glyphs.glyph("brand:google") + ".";
+#+end_src
+
+The =.glyph= class aligns each mark to the baseline. Size the headline; the marks
+follow.
+
+* Framework (Svelte / React / anything)
+
+glyphs ships *no component* on purpose. Render the *string* and inject it. Call
+=configure()= once at app start.
+
+#+begin_src svelte
+<script>
+  import { glyph } from "glyphs";
+  export let ref;            // assumes configure() ran at startup
+  $: svg = glyph(ref, { size: "1.25em" });
+</script>
+{#if svg}<span>{@html svg}</span>{/if}
+#+end_src
+
+For the long tail, resolve in an async block and store the result; render nothing
+until it arrives (a miss stays =null=).
+
+* Node build-time prerender
+
+Render once at build time and ship static SVG — useful when the deploy target
+has no =fetch=. Node 18+ has =fetch=, so =glyphAsync()= reaches the CDN here:
+
+#+begin_src js
+import { writeFileSync } from "node:fs";
+import { configure, glyphAsync } from "./dist/glyphs.js";
+// … configure() with the packs …
+writeFileSync("public/marks/stripe.svg", (await glyphAsync("brand:stripe")) || "");
+#+end_src
+
+* The wasm / node fetch caveat
+
+The CDN path uses the global =fetch=. In the runtime's QuickJS wasm lane (and
+some Node contexts) =fetch= is *absent*. There:
+
+- =glyph()= (curated-only, =avatar:=, =social:=) is *fully functional* — pure
+  string transforms, no network.
+- =glyphAsync()= returns the *curated hit* or =null= for the long tail (it never
+  throws). It does NOT reach the CDN.
+
+So in a no-fetch target, either rely on the curated set (=curate= more marks) or
+*prerender the long tail at build time* (in Node, where =fetch= exists) and ship
+the SVGs. =social:= is a plain =<img>= the *browser* loads, so it works in any
+HTML output regardless of a server-side =fetch=.
+
+* Done-when
+
+=configure()= ran once, =glyph()= renders curated marks with no =await=, the long
+tail resolves through =glyphAsync()= (or is prerendered for a no-fetch target),
+and you injected the *string* with no recoloring beyond =opts.color/mono= and no
+framework-specific mark component. A miss renders nothing — you wrote no
+broken-image fallback.
