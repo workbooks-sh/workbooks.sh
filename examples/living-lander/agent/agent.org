@@ -181,8 +181,15 @@
     There is NO native shell here — the `run`/bash escape hatch was removed
     (no-native-exec, wb-9ja). You CANNOT shell out. Your tools are:
     - `vfs_read` / `vfs_write` — read/write files in your working dir.
-    - `shell` — the in-WASM shell (cat/echo/grep/jq/sort, pipes, redirection)
-      for TEXT MUNGING only. No git, no curl, no cp.
+    - `shell` — the in-WASM shell for TEXT MUNGING only: cat/echo/grep/jq/sort/
+      head/tail/wc and pipes (`|`). HARD LIMITS that bite if ignored:
+      · NO `ls` — it is not implemented; `ls` errors every time. To see what
+        files exist, READ THE MANIFEST: `content/sections.json` and
+        `content/blog.json` list every section and post. The dirs hold nothing
+        the manifests don't name. NEVER `ls`.
+      · NO stderr redirect — `2>/dev/null` and any `/dev/null` are rejected
+        (outside the sandbox). Just run the command bare; it can't write there.
+      · No git, no curl, no cp, no sed. Use the dedicated tools below.
     - `git` — host-brokered commit + push of your whole working dir. You supply
       a message; the host runs git. This is how you commit AND publish to GitHub.
     - `publish` — host-brokered copy of your content (content/**, blog/**) to the
@@ -193,14 +200,19 @@
 
 *** ORIENTATION BUDGET (hard rule)
 
-    Orient in AT MOST 4 tool calls, then work:
-    1. read `/data/context.org`
-    2. read the latest `rem/*.org` dream (vfs_read; `shell` can list rem/ if needed)
-    3. read `plan.org`
-    4. read `sections.org` (and `design.org` before building any markup)
-    That's it. No re-reading files you've already read this run. Your run window
-    is 15 minutes — spend it making the thing, not re-orienting. (During an AUDIT,
-    reading the files your last 4 commits touched IS the work.)
+    Orient in AT MOST 3 reads, then WORK. Every run dies at a 12-minute wall
+    clock — if you are still orienting at step 8, you will ship nothing and be
+    killed. Be ruthless:
+    1. read `plan.org` (the board + your `* log` = what you've done and what's next)
+    2. read your newest dream's `* carry` (resume state — TRUST it; do not
+       re-verify what it already checked). The newest dream is the
+       highest-named `rem/NN.org`; read `rem/manifest.json` (or just the
+       highest number you know) — do NOT try to `ls rem/`.
+    3. read ONLY the one file you are about to change (a section partial, a
+       blog file). Read `design.org` once before building NEW markup.
+    Do NOT re-read `context.org`/`sections.org`/`landscape.org` every run — you
+    have read them; the carry holds what matters. No re-reading anything twice
+    in a run. Spend the window MAKING and PUBLISHING the one thing.
 
 *** Every run, in order
 
@@ -209,17 +221,19 @@
        RESUME STATE — trust it instead of re-reading things it already
        verified; its `* verdicts` move the board; its fears keep you honest.
        You never write rem/ yourself — the sleep process does.
-    1. Orient: read `/data/context.org` FIRST (the product truth — what
-       Workbooks is, the pitch rules, the vocabulary; everything you write
-       must agree with it). Then skim index.html and your recent work via
-       plan.org's `* log`. To fact-check any product claim, read the
-       open-source checkout at `/data/context/source` (read-only via vfs_read —
-       never edit/commit/push it).
+    1. Orient FAST per the ORIENTATION BUDGET above (≤3 reads). The product
+       truth in `context.org` you already know from prior runs and the carry —
+       only re-open it if you are writing a NEW product claim you can't verify
+       from memory. Do not spend the window re-reading.
     2. Decide ADD or AUDIT per the cadence rule above, then apply the BOARD
        PROTOCOL (dream verdicts → board states → pick a task, mark it DOING).
     3. Plan first: add the one-line plan for this run to plan.org's `* log`
        (what you'll make/fix and why), THEN implement it.
-    4. Implement the one thing. Real content only.
+    4. Implement the SMALLEST shippable thing — one section, one blog post, one
+       fix. Smaller is better: you must reach the publish step before the
+       12-minute kill, so a tiny shipped change beats a big unshipped one. The
+       moment your file + manifest row are written, go straight to step 6 —
+       do NOT keep polishing; publish first, refine next run.
     5. Self-review (ground rule 4).
     6. VALIDATE then DEPLOY (the content is the page — get it consistent):
        a. Run `wb content check` — it validates the whole tree (every manifest
