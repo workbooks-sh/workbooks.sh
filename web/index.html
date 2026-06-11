@@ -11,11 +11,24 @@
   /* ── BRAND V · "lattice" ─ hard type, breathing cells, flat color events ──
      No gradients. No opacity fades. No blur. Everything that moves is
      geometry: cells trade area, identicon pixels are born and die. */
+/* ── headline font slots — switch pairs by editing --display / --accent in :root.
+   All trialed faces stay registered below; pairs log: fonts/README.md ── */
+@font-face { font-family: "Inkognito"; src: url("fonts/Inkognito.woff2") format("woff2"), url("fonts/Inkognito.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Florens"; src: url("fonts/CSFlorensPixel-Regular.woff2") format("woff2"), url("fonts/CSFlorensPixel-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Golem"; src: url("fonts/CSGolem-Regular.woff2") format("woff2"), url("fonts/CSGolem-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+/* Braked: the Bold cut is registered at weight 400 on purpose — every display
+   spot says 400, and the display face should land heavy like Anton did. */
+@font-face { font-family: "Braked"; src: url("fonts/BRAKED-Bold.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Braked"; src: url("fonts/BRAKED-Semibold.woff") format("woff"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Warlock"; src: url("fonts/UMWarlock.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Muzzaro"; src: url("fonts/Muzzaro.woff2") format("woff2"), url("fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
+
   :root {
     --paper: #f7f6f1;
     --ink: #121316;
     --bloom: #13d943;  /* neon green — the one accent */
-    --display: "Anton", sans-serif;
+    --display: "Warlock", "Braked", "Anton", sans-serif;
+    --accent: "Muzzaro", "Florens", "Handjet", serif;
     --mono: "JetBrains Mono", monospace;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -113,10 +126,10 @@
   /* the pixel voice, canonicalized: 900 so its strokes read the same ink
      density as Anton, a smidge of tracking, sized to Anton's cap height */
   .lockup .jl:nth-child(2) {
-    font-family: "Handjet", monospace; font-weight: 900;
+    font-family: var(--accent); font-weight: 400; font-synthesis: none;
     text-transform: uppercase; color: var(--ink);
-    letter-spacing: .04em;
-    font-size: clamp(76px, 12.4vw, 164px); line-height: .74;
+    letter-spacing: 0;
+    font-size: clamp(45px, 7.28vw, 97px); line-height: .96;
     /* masked by the MATTE ENGINE below: a flowing pixel-blob field decides
        where the ink is solid and where it breaks into scanlines */
   }
@@ -194,8 +207,8 @@
     text-transform: uppercase; color: var(--ink); white-space: nowrap;
   }
   .sky-h em {
-    font-family: "Handjet", monospace; font-style: normal; font-weight: 900;
-    font-size: 1.24em; letter-spacing: .04em; text-transform: uppercase; color: var(--ink);
+    font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
+    font-size: .7em; letter-spacing: 0; text-transform: uppercase; color: var(--ink);
   }
   .sky-points {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px;
@@ -224,7 +237,7 @@
     font-family: var(--display); font-size: clamp(34px, 3.4vw, 52px); line-height: 1;
     text-transform: uppercase; color: var(--paper); margin-bottom: 18px;
   }
-  .s3-left h2 em { font-family: "Handjet", monospace; font-style: normal; font-weight: 900; font-size: 1.2em; letter-spacing: .04em; }
+  .s3-left h2 em { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none; font-size: .7em; letter-spacing: 0; }
   .s3-left .lede { font-size: 12.5px; line-height: 1.8; color: #9ba095; max-width: 42ch; margin-bottom: 30px; }
 
   .s3-sel { border-top: 1px solid rgba(247,246,241,.2); display: flex; flex-direction: column; }

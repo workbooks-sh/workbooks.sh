@@ -1,0 +1,44 @@
+# Headline font pairs — trial log
+
+The site's headline system is two slots, defined once in `:root` of
+`web/index.html` and `web/learn/learn.css`:
+
+- `--display` — the primary headline voice (shouting caps)
+- `--accent` — the counterpoint inside headlines (`<em>` spans, capsule
+  labels, kickers, TOC titles, FAQ `+`)
+
+**Switching pairs = editing those two vars** (all trialed faces stay
+registered as `@font-face`). One catch: the accent's `font-size` em-multiples
+must be retuned per pair so BOTH FONTS HIT THE SAME CAP HEIGHT — measure with
+`ctx.measureText("HE").actualBoundingBoxAscent` at 100px and set
+`em = displayCaps / accentCaps`. Spots to retune: `article h2 em` +
+`.lhero h1 em` (learn.css), `.lockup .jl:nth-child(2)` + `.sky-h em` +
+`.s3-left h2 em` (index.html).
+
+## Pairs tried (2026-06-11)
+
+| # | display | accent | cap ratio (em) | verdict |
+|---|---------|--------|----------------|---------|
+| 0 | Anton (Google) | Handjet 900 (Google) | 1.16–1.24em | the original; pixel voice felt wrong → replaced |
+| 1 | Anton | **IT Pixwix** | — | REJECTED — way too wide, "EMAILING" overflowed columns |
+| 2 | Anton | **CS Golem** | ~1.0em | good fit, quirky rounded pixel; superseded by user's next picks |
+| 3 | **Inkognito** (mono) | **CS Florens Pixel** (pixel serif italic) | .96em | strong techno/editorial mix; Florens has built-in slant |
+| 4 | **Braked Bold** (condensed sans) | **Muzzaro** (condensed serif) | .67em | serif×sans editorial pair; superseded |
+| 5 | **UM Warlock** (condensed display sans) | **Muzzaro** (condensed serif) | .70em | CURRENT — duo treatment: scattered single serif letters (`<i>`) inside the sans headline, one-ish per line, plus serif `<em>` words in h2s |
+
+Notes:
+- Braked's Bold cut is registered at `font-weight: 400` on purpose — display
+  spots all say 400 and the face should land heavy like Anton did.
+  (Semibold registered at 600 if a lighter display is wanted.)
+- Muzzaro caps fill the full em (100/100px) — hence the small .67 ratio.
+- Florens/Golem/Pixwix are pixel faces: keep `font-synthesis: none` so the
+  browser never fake-bolds a bitmap grid.
+- Body/mono stays JetBrains Mono; the dictionary defcards use EB Garamond.
+
+## The duo treatment
+
+Headlines mix the two faces letter-wise, type-foundry "duo" style: most
+letters in `--display`, occasional single letters in `--accent` via `<i>`
+(`.lhero h1 i` / `article h2 i` share the `em` rule). Keep it sparse —
+roughly one serif letter per visual line. Hero lockup on the landing page is
+exempt (its own thing).

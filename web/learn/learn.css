@@ -3,11 +3,24 @@
    Handjet machine voice, JetBrains Mono body. Each page tints itself with
    its piece's colors via --pc (pastel) / --ac (vibrant) / --deep (card hue)
    set on <html>. Visuals are dashed PLACEHOLDERS this pass. */
+/* ── headline font slots — switch pairs by editing --display / --accent in :root.
+   All trialed faces stay registered below; pairs log: fonts/README.md ── */
+@font-face { font-family: "Inkognito"; src: url("../fonts/Inkognito.woff2") format("woff2"), url("../fonts/Inkognito.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Florens"; src: url("../fonts/CSFlorensPixel-Regular.woff2") format("woff2"), url("../fonts/CSFlorensPixel-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Golem"; src: url("../fonts/CSGolem-Regular.woff2") format("woff2"), url("../fonts/CSGolem-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+/* Braked: the Bold cut is registered at weight 400 on purpose — every display
+   spot says 400, and the display face should land heavy like Anton did. */
+@font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Bold.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Semibold.woff") format("woff"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Warlock"; src: url("../fonts/UMWarlock.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Muzzaro"; src: url("../fonts/Muzzaro.woff2") format("woff2"), url("../fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
+
 :root {
   --paper: #f7f6f1;
   --ink: #121316;
   --bloom: #13d943;
-  --display: "Anton", sans-serif;
+  --display: "Warlock", "Braked", "Anton", sans-serif;
+    --accent: "Muzzaro", "Florens", "Handjet", serif;
   --mono: "JetBrains Mono", monospace;
   --dim: #565b54;
 }
@@ -89,9 +102,9 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
   font-family: var(--display); font-weight: 400; text-transform: uppercase;
   font-size: clamp(46px, 6.4vw, 92px); line-height: .96; max-width: 12ch;
 }
-.lhero h1 em {
-  font-family: "Handjet", monospace; font-style: normal; font-weight: 900;
-  font-size: 1.18em; letter-spacing: .04em; line-height: .8;
+.lhero h1 em, .lhero h1 i {
+  font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
+  font-size: .7em; letter-spacing: 0;
 }
 .lhero .dek { margin-top: 30px; font-size: 13px; line-height: 1.9; color: var(--dim); max-width: 58ch; }
 .lhero .dek b { color: var(--ink); }
@@ -117,7 +130,7 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
                              justify-content: center; background: rgba(18,19,22,.08); }
 .lhero .heroart .cap .face img { height: 26px; filter: invert(.92); }
 .lhero .heroart .cap span {
-  font-family: "Handjet", monospace; font-weight: 900; font-size: 19px;
+  font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 19px;
   letter-spacing: .07em; text-transform: uppercase; color: var(--ink);
 }
 .lhero .meta { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
@@ -131,7 +144,7 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 .lwrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 64px;
          max-width: 1180px; margin: 0 auto; padding: 24px 7vw 0; }
 .ltoc { position: sticky; top: 110px; align-self: start; padding-bottom: 40px; }
-.ltoc .t { font-family: "Handjet", monospace; font-weight: 900; font-size: 15px;
+.ltoc .t { font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 15px;
            letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
 .ltoc a {
   display: block; font-size: 11px; line-height: 1.5; color: var(--dim); text-decoration: none;
@@ -147,8 +160,8 @@ article h2 {
   font-size: clamp(26px, 2.6vw, 38px); line-height: 1.04; margin-bottom: 18px;
   scroll-margin-top: 110px;
 }
-article h2 em { font-family: "Handjet", monospace; font-style: normal; font-weight: 900;
-                font-size: 1.16em; letter-spacing: .03em; }
+article h2 em, article h2 i { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
+                font-size: .7em; letter-spacing: 0; }
 article h3 { font: 700 13px var(--mono); letter-spacing: .12em; text-transform: uppercase;
              margin: 26px 0 10px; color: var(--ink); }
 article p { font-size: 13px; line-height: 1.95; color: #3a3e38; margin-bottom: 14px; }
@@ -160,16 +173,22 @@ article ul { list-style: none; padding: 0; margin: 4px 0 16px; display: flex; fl
 article ul li { font-size: 12.5px; line-height: 1.8; color: #3a3e38; padding-left: 20px; position: relative; }
 article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; font-size: 9px; color: var(--ac); }
 
-/* the one-line definition — the page's single biggest typographic moment */
-.defcard { background: var(--ink); color: var(--paper); border-radius: 16px;
-           padding: 30px 32px; margin: 10px 0 18px; }
-.defcard .lbl { font-family: "Handjet", monospace; font-weight: 900; font-size: 15px;
-                letter-spacing: .14em; text-transform: uppercase; color: var(--pc); margin-bottom: 12px; }
-.defcard p { font-size: 16px; line-height: 1.75; color: var(--paper); margin: 0; }
-.defcard p b { color: var(--pc); }
+/* the definition — a classic dictionary entry: serif voice on white, the one
+   place the page deliberately changes typeface */
+.defcard { background: #fff; border: 2px solid var(--ink); border-radius: 14px;
+           box-shadow: 7px 7px 0 var(--ink); padding: 30px 36px; margin: 12px 0 24px;
+           font-family: "EB Garamond", Georgia, serif; color: var(--ink); }
+.defcard .head { display: flex; align-items: baseline; gap: 13px; flex-wrap: wrap; }
+.defcard .hw { font-size: 37px; font-weight: 600; letter-spacing: .005em; line-height: 1; }
+.defcard .pr { font-size: 16.5px; color: #6a6f68; }
+.defcard .pos { font-style: italic; font-size: 16.5px; color: #6a6f68; }
+.defcard .rule { height: 3px; background: var(--pc); width: 64px; margin: 15px 0 14px; border-radius: 2px; }
+.defcard p { font-family: inherit; font-size: 18px; line-height: 1.66; color: #26282b; margin: 0; }
+.defcard p b { color: var(--ink); font-weight: 600; }
+.defcard .num { font-weight: 700; margin-right: 4px; }
 
 /* skippable-depth note — the ladder rung label */
-.skip { font-family: "Handjet", monospace; font-weight: 900; font-size: 14px;
+.skip { font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 14px;
         letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
         border: 1.5px dashed rgba(18,19,22,.3); border-radius: 7px;
         display: inline-block; padding: 5px 11px; margin-bottom: 14px; }
@@ -179,7 +198,7 @@ article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; f
 .viz { border: 2px dashed rgba(18,19,22,.3); border-radius: 14px;
        background: color-mix(in srgb, var(--pc) 16%, var(--paper));
        padding: 44px 30px; margin: 22px 0; text-align: center; }
-.viz .vt { font-family: "Handjet", monospace; font-weight: 900; font-size: 17px;
+.viz .vt { font-family: var(--accent); font-weight: 400; font-synthesis: none; font-size: 17px;
            letter-spacing: .1em; text-transform: uppercase; }
 .viz .vd { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.7; }
 
@@ -232,7 +251,7 @@ article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; f
   font: 700 13px var(--mono); padding: 17px 4px; color: var(--ink);
 }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::before { content: "+"; font-family: "Handjet", monospace; font-weight: 900;
+.faq summary::before { content: "+"; font-family: var(--accent); font-weight: 400; font-synthesis: none;
                        font-size: 19px; color: var(--ac); flex: 0 0 auto; }
 .faq details[open] summary::before { content: "–"; }
 .faq details p { padding: 0 4px 18px 33px; margin: 0; }
@@ -272,4 +291,83 @@ article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; f
   .lnext .cards { grid-template-columns: 1fr; }
   .nav { gap: 16px; }
   .nav a.lnk.ghost { display: none; }
+}
+
+/* ── architectural diagrams — the empties, filled. White plate, ink lines,
+   mono labels, pastel fills; pure HTML/CSS, no runtime. ─────────────────── */
+.diag { border: 2px solid var(--ink); border-radius: 14px; background: #fff;
+        padding: 30px 28px 20px; margin: 24px 0; }
+.diag .dcap { margin-top: 22px; text-align: center; font: 700 10px var(--mono);
+              letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+.diag .dcap b { color: var(--ac); font-weight: 700; }
+.diag .lbl { font: 700 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.diag .sub { font: 400 10.5px/1.6 var(--mono); color: var(--dim); }
+
+/* the dashed file shell (a workbook drawn as its outline) */
+.d-file { border: 2px dashed rgba(18,19,22,.45); border-radius: 12px;
+          padding: 20px 16px 12px; position: relative; }
+.d-file > .ftag { position: absolute; top: -9px; left: 16px; background: #fff;
+                  padding: 0 8px; font: 700 11px var(--mono); letter-spacing: .05em; }
+.d-row { display: flex; align-items: center; gap: 16px; padding: 10px 6px; }
+.d-row + .d-row { border-top: 1px dotted rgba(18,19,22,.3); }
+.d-chip { flex: 0 0 128px; text-align: center; border: 1.5px solid var(--ink);
+          border-radius: 7px; padding: 8px 6px; font: 700 10px var(--mono);
+          letter-spacing: .04em; text-transform: uppercase; color: var(--ink); }
+.d-row .sub { flex: 1; }
+
+/* the strip of five faces */
+.d-strip { display: flex; gap: 12px; flex-wrap: wrap; }
+.d-card { flex: 1 1 96px; border: 1.5px solid var(--ink); border-radius: 10px;
+          overflow: hidden; text-align: center; background: #fff; }
+.d-card .face { height: 54px; display: flex; align-items: center; justify-content: center;
+                gap: 5px; font: 700 17px var(--mono); color: var(--ink); }
+.d-card .face i { display: block; border-radius: 2px; }
+.d-card .lbl { display: block; border-top: 1.5px solid var(--ink); padding: 7px 4px 6px;
+               font-size: 9px; letter-spacing: .08em; }
+
+/* the cutaway room */
+.d-os { border: 2px dashed rgba(18,19,22,.45); border-radius: 12px;
+        padding: 26px 18px 16px; position: relative; }
+.d-os > .ftag { position: absolute; top: -9px; left: 16px; background: #fff;
+                padding: 0 8px; font: 700 11px var(--mono); letter-spacing: .05em; color: var(--dim); }
+.d-room { border: 2px solid var(--ink); border-radius: 10px; padding: 16px 14px 14px; position: relative; }
+.d-room > .ftag { position: absolute; top: -9px; left: 14px; background: #fff;
+                  padding: 0 8px; font: 700 11px var(--mono); letter-spacing: .05em; }
+.d-cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+.d-cell { border: 1.5px solid var(--ink); border-radius: 8px; padding: 11px 10px; }
+.d-cell .sub { display: block; margin-top: 3px; color: #41463f; }
+
+/* the dock */
+.d-dock { display: flex; flex-direction: column; align-items: center; }
+.d-filechip { border: 2px solid var(--ink); border-radius: 10px; padding: 10px 24px;
+              font: 700 11.5px var(--mono); letter-spacing: .05em; background: #fff;
+              box-shadow: 4px 4px 0 var(--ink); }
+.d-stem { width: 2px; height: 20px;
+          background-image: repeating-linear-gradient(180deg, var(--ink) 0 4px, transparent 4px 8px); }
+.d-engine { display: flex; align-items: center; gap: 22px; background: var(--ink);
+            color: var(--paper); border-radius: 12px; padding: 13px 24px; }
+.d-engine .lbl { color: var(--paper); }
+.d-engine .place { font: 400 10px var(--mono); color: var(--pc); letter-spacing: .06em; }
+.d-lights { display: flex; gap: 16px; }
+.d-light { display: flex; flex-direction: column; align-items: center; }
+.d-light .chip { border: 1.5px solid var(--ink); border-radius: 7px; padding: 7px 13px;
+                 font: 700 10px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+
+/* the hex stack */
+.d-levels { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin-left: 8px; }
+.d-level { display: flex; align-items: center; gap: 20px; }
+.d-level .hexo { width: 62px; height: 54px; flex: 0 0 auto; display: flex;
+                 align-items: center; justify-content: center;
+                 clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+                 background: var(--ink); }
+.d-level .hexi { width: 56px; height: 48px; display: flex; align-items: center; justify-content: center;
+                 clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+                 font: 700 9px var(--mono); letter-spacing: .04em; }
+.d-level + .d-level { margin-top: -2px; }
+.d-levelstem { width: 2px; height: 18px; margin-left: 30px;
+               background-image: repeating-linear-gradient(180deg, var(--ink) 0 4px, transparent 4px 8px); }
+
+@media (max-width: 700px) {
+  .d-cells { grid-template-columns: 1fr; }
+  .d-chip { flex-basis: 104px; }
 }

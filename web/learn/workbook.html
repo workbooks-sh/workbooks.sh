@@ -7,7 +7,7 @@
 <meta name="description" content="A workbook is a single HTML file that carries a whole piece of software — interface, code, data, and history — and opens anywhere a browser does.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="learn.css">
 </head>
 <body>
@@ -35,7 +35,7 @@
   <div class="row">
     <div class="lcol">
       <div class="kicker">learn / 01 — <b>what is a workbook?</b></div>
-    <h1>Try <em>emailing</em> someone your&nbsp;app</h1>
+    <h1>Tr<i>y</i> emailing s<i>o</i>meone your <i>a</i>pp</h1>
     <p class="dek">A workbook is <b>one file that is a whole piece of software</b>.
   This page takes you from "it's an HTML file" to "an agent can live inside it" —
   start at the top, bail whenever you have what you need.</p>
@@ -92,10 +92,12 @@
 <section id="definition">
   <h2>The definition</h2>
   <div class="defcard">
-    <div class="lbl">workbook · noun</div>
-    <p>A <b>workbook</b> is a single HTML file that carries a whole piece of
-    software — the interface, the code, the data, and the history of how it got
-    that way — and opens anywhere a browser does.</p>
+    <div class="head"><span class="hw">work·book</span> <span class="pr">/ˈwɜrk·bʊk/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a single HTML file that carries a whole
+    piece of software — the <b>interface</b>, the <b>code</b>, the
+    <b>data</b>, and the history of how it got that way — and opens anywhere
+    a browser does.</p>
   </div>
   <p>The name is literal. A paper workbook is a textbook, your worked answers,
   and your notes in the margins — one binding, no loose pages. A workbook is
@@ -111,11 +113,16 @@
   proprietary container. The trick isn't a new ingredient; it's that nobody had
   put the existing ones in the same file.</p>
 
-  <div class="viz">
-    <div class="vt">[ diagram — a workbook, exploded ]</div>
-    <div class="vd">the file fanned into its five layers: html/css/js · webassembly ·
-    sqlite · gzip binding · org layer — each labeled with what it contributes</div>
-  </div>
+  <figure class="diag" aria-label="A workbook's layers">
+    <div class="d-file">
+      <span class="ftag">shop.html — one file, gzip-bound</span>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">html · css · js</span><span class="sub">the interface — renders the same on every screen on earth</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#9fc4e8">webassembly</span><span class="sub">real computation in any language, sandboxed by birthright</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">sqlite</span><span class="sub">a queryable database and a virtual file system, riding in the file</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">org layer</span><span class="sub">intent, tasks, and memory — the part you and agents write</span></div>
+    </div>
+    <figcaption class="dcap">a workbook, exploded — <b>four standards, one binding</b></figcaption>
+  </figure>
 
   <h3>HTML, CSS, JavaScript — the part you know</h3>
   <p>The face of the file is an ordinary web page, which means it renders the
@@ -171,11 +178,16 @@
   SaaS dashboard, an app store, an agent platform — each with its own accounts,
   exports, and silos. The workbook's bet is that they're all the same shape:
   <b>interface + code + data</b>, and one honest file can hold that shape.</p>
-  <div class="viz">
-    <div class="vt">[ strip — one format, five workbooks ]</div>
-    <div class="vd">a row of workbook file icons, each opened a crack to show a different
-    face: report · brand book · dashboard · game · agent workspace</div>
-  </div>
+  <figure class="diag" aria-label="One format, five very different workbooks">
+    <div class="d-strip">
+      <div class="d-card"><div class="face" style="background:#a8d4f0"><i style="width:7px;height:13px;background:var(--ink)"></i><i style="width:7px;height:22px;background:var(--ink)"></i><i style="width:7px;height:9px;background:var(--ink)"></i></div><span class="lbl">report</span></div>
+      <div class="d-card"><div class="face" style="background:#f2ddb0"><i style="width:12px;height:12px;background:#2b4bdf;border-radius:50%"></i><i style="width:12px;height:12px;background:#e8442e;border-radius:50%"></i><i style="width:12px;height:12px;background:#13d943;border-radius:50%"></i></div><span class="lbl">brand book</span></div>
+      <div class="d-card"><div class="face" style="background:#aee5c2">▦</div><span class="lbl">dashboard</span></div>
+      <div class="d-card"><div class="face" style="background:#f3c5a3">▲▲</div><span class="lbl">game</span></div>
+      <div class="d-card"><div class="face" style="background:#9fc4e8">❯_</div><span class="lbl">agent workspace</span></div>
+    </div>
+    <figcaption class="dcap">same anatomy, five faces — <b>interface + code + data</b></figcaption>
+  </figure>
 </section>
 
 <section id="not-a-zip">
@@ -253,11 +265,20 @@
   those rented boxes is: a file system, some processes, a place for memory.
   The workbook carries that environment <b>in the artifact itself</b> — the
   workspace and the work product are the same object, and you can email it.</p>
-  <div class="viz">
-    <div class="vt">[ diagram — the agent's room ]</div>
-    <div class="vd">cutaway of a workbook as a room an agent works in: vfs shelves ·
-    wasm workbench · org notebook — with the OS visible outside the wall, untouched</div>
-  </div>
+  <figure class="diag" aria-label="An agent working entirely inside the file">
+    <div class="d-os">
+      <span class="ftag">your computer — files, keys, os: untouched</span>
+      <div class="d-room">
+        <span class="ftag">the workbook — agent at work ●</span>
+        <div class="d-cells">
+          <div class="d-cell" style="background:#aee5c2"><span class="lbl">files</span><span class="sub">sqlite virtual file system</span></div>
+          <div class="d-cell" style="background:#a8d4f0"><span class="lbl">processes</span><span class="sub">webassembly, any language</span></div>
+          <div class="d-cell" style="background:#f2ddb0"><span class="lbl">memory</span><span class="sub">the org layer, with chronology</span></div>
+        </div>
+      </div>
+    </div>
+    <figcaption class="dcap">everything an agent needs from a computer — <b>at file scale</b></figcaption>
+  </figure>
 </section>
 
 <section id="limits">
