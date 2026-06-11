@@ -32,9 +32,32 @@ defmodule Workbooks.Groundskeeper.Router do
       else: conn
   end
 
+  # The app login (wb-3ojf.5): one password on the phone → a signed session
+  # cookie; every real secret stays host-side. Token = expiry.hmac(WB_GK_SECRET),
+  # so no session store is needed. Gated on WB_GK_APP_PASSWORD (unset → 503).
+  post "/login" do
+    {:ok, body, conn} = Plug.Conn.read_body(conn)
+
+    with pw when pw not in [nil, ""] <- System.get_env("WB_GK_APP_PASSWORD"),
+         %{"password" => presented} <- Jason.decode(body) |> elem(1),
+         true <- Plug.Crypto.secure_compare(presented || "", pw) do
+      conn
+      |> Plug.Conn.put_resp_cookie("gk_session", session_token(),
+        max_age: 30 * 24 * 3600,
+        http_only: true,
+        secure: true,
+        same_site: "Lax"
+      )
+      |> json(200, %{ok: true})
+    else
+      nil -> json(conn, 503, %{error: "app password not configured"})
+      _ -> json(conn, 403, %{error: "wrong password"})
+    end
+  end
+
   # The workbook mobile app (wb-3ojf.5) — a single self-contained HTML file.
-  # Public shell: it ships no credentials (the bridge secret is entered
-  # on-device); every data/voice call it makes is secret-gated below.
+  # Public shell: it ships no credentials (auth is the login above, or the
+  # on-device secret); every data/voice call it makes is gated below.
   get "/app" do
     path = Path.join([Groundskeeper.home(), "app", "groundskeeper.html"])
 
@@ -115,6 +138,9 @@ defmodule Workbooks.Groundskeeper.Router do
     json(conn, 404, %{error: "not found"})
   end
 
+  # Two credentials open the tool surface: the shared secret header (the
+  # ElevenLabs webhooks) or a valid session cookie (the workbook app, after
+  # /login). Fails closed when WB_GK_SECRET is unset.
   defp check_secret(conn) do
     case System.get_env("WB_GK_SECRET") do
       s when s in [nil, ""] ->
@@ -123,9 +149,32 @@ defmodule Workbooks.Groundskeeper.Router do
       secret ->
         presented = conn |> Plug.Conn.get_req_header("x-gk-secret") |> List.first() || ""
 
-        if Plug.Crypto.secure_compare(presented, secret),
-          do: :ok,
-          else: {:error, 403, "forbidden"}
+        cond do
+          Plug.Crypto.secure_compare(presented, secret) -> :ok
+          valid_session?(conn) -> :ok
+          true -> {:error, 403, "forbidden"}
+        end
+    end
+  end
+
+  defp session_token do
+    expiry = System.system_time(:second) + 30 * 24 * 3600
+    "#{expiry}.#{session_sig(expiry)}"
+  end
+
+  defp session_sig(expiry) do
+    :crypto.mac(:hmac, :sha256, System.get_env("WB_GK_SECRET") || "", "gk-session:#{expiry}")
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp valid_session?(conn) do
+    with %{"gk_session" => token} <- Plug.Conn.fetch_cookies(conn).req_cookies,
+         [ts, sig] <- String.split(token, ".", parts: 2),
+         {expiry, ""} <- Integer.parse(ts),
+         true <- expiry > System.system_time(:second) do
+      Plug.Crypto.secure_compare(sig, session_sig(expiry))
+    else
+      _ -> false
     end
   end
 

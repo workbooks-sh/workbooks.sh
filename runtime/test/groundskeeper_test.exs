@@ -181,6 +181,42 @@ defmodule GroundskeeperTest do
     assert content =~ "* DONE finished run"
   end
 
+  # ── the app password gate ───────────────────────────────────────────────────
+
+  test "login with the right password sets a session cookie that opens the tools" do
+    System.put_env("WB_GK_APP_PASSWORD", "open-sesame")
+    on_exit(fn -> System.delete_env("WB_GK_APP_PASSWORD") end)
+
+    login = call(:post, "/login", %{password: "open-sesame"})
+    assert login.status == 200
+    %{"gk_session" => %{value: token}} = login.resp_cookies
+
+    c =
+      conn(:post, "/tool/tasks", "{}")
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("cookie", "gk_session=#{token}")
+      |> Workbooks.Groundskeeper.Router.call(Workbooks.Groundskeeper.Router.init([]))
+
+    assert c.status == 200
+  end
+
+  test "wrong password is 403; unconfigured password is 503; forged cookie fails" do
+    assert call(:post, "/login", %{password: "x"}).status == 503
+
+    System.put_env("WB_GK_APP_PASSWORD", "open-sesame")
+    on_exit(fn -> System.delete_env("WB_GK_APP_PASSWORD") end)
+    assert call(:post, "/login", %{password: "nope"}).status == 403
+
+    forged = "#{System.system_time(:second) + 1000}.deadbeef"
+
+    c =
+      conn(:post, "/tool/tasks", "{}")
+      |> put_req_header("cookie", "gk_session=#{forged}")
+      |> Workbooks.Groundskeeper.Router.call(Workbooks.Groundskeeper.Router.init([]))
+
+    assert c.status == 403
+  end
+
   # ── the workbook app ────────────────────────────────────────────────────────
 
   test "GET /app serves the workbook shell without any secret", %{home: home} do

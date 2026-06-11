@@ -92,11 +92,18 @@
   <button id="setup" title="bridge secret">⚙</button>
 </footer>
 
+<dialog id="login">
+  <strong>the gate is locked</strong>
+  <p style="color:var(--mut);font-size:12px;margin-top:6px">password opens a 30-day session. every real secret stays on the host.</p>
+  <input id="password" type="password" placeholder="password" autocomplete="current-password">
+  <button class="primary" id="doLogin">unlock</button>
+</dialog>
+
 <dialog id="cfg">
-  <strong>bridge</strong>
-  <p style="color:var(--mut);font-size:12px;margin-top:6px">stored only on this device (localStorage). the page itself ships with no credentials. leave URL empty when opened from the bridge itself.</p>
+  <strong>bridge (advanced)</strong>
+  <p style="color:var(--mut);font-size:12px;margin-top:6px">only needed in a native shell or to use the raw secret instead of the password. stored in localStorage.</p>
   <input id="bridgeUrl" type="url" placeholder="https://bridge-host (native shell only)" autocomplete="off">
-  <input id="secret" type="password" placeholder="x-gk-secret" autocomplete="off">
+  <input id="secret" type="password" placeholder="x-gk-secret (optional)" autocomplete="off">
   <button class="primary" id="saveCfg">save</button>
 </dialog>
 
@@ -112,12 +119,33 @@
   // (capacitor://) has no usable origin, so the bridge URL is configured
   // on-device alongside the secret.
   const base = () => localStorage.getItem("gk-bridge") || "";
+  // Auth is the session cookie set by /gk/login (password flow); the raw
+  // secret header is the fallback for native shells. 403 → show the gate.
   const bridge = (path, body) =>
     fetch(base() + path, {
       method: "POST",
-      headers: { "x-gk-secret": secret(), "content-type": "application/json" },
+      credentials: "same-origin",
+      headers: Object.assign(
+        { "content-type": "application/json" },
+        secret() ? { "x-gk-secret": secret() } : {}
+      ),
       body: JSON.stringify(body || {})
-    }).then((r) => { if (!r.ok) throw new Error("bridge " + r.status); return r.json(); });
+    }).then((r) => {
+      if (r.status === 403) { if (!$("login").open) $("login").showModal(); throw new Error("locked"); }
+      if (!r.ok) throw new Error("bridge " + r.status);
+      return r.json();
+    });
+
+  $("doLogin").onclick = async () => {
+    const r = await fetch(base() + "/gk/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: $("password").value })
+    });
+    if (r.ok) { $("login").close(); sys("gate unlocked"); refreshTasks(); }
+    else $("password").value = "";
+  };
 
   function say(role, text) {
     if (!text) return;
@@ -135,7 +163,6 @@
   }
 
   async function start() {
-    if (!secret()) { $("cfg").showModal(); return; }
     $("talk").disabled = true; state.textContent = "connecting…";
     try {
       const { signed_url } = await bridge("/gk/tool/signed_url");
@@ -170,7 +197,6 @@
   if (location.protocol.startsWith("capacitor") && !base()) $("cfg").showModal();
 
   async function refreshTasks() {
-    if (!secret()) return;
     try {
       const { tasks, feedback } = await bridge("/gk/tool/tasks");
       (feedback || []).forEach((f) => sys(`◈ ${f.status}: ${f.goal || f.task} — ${f.summary}`));
