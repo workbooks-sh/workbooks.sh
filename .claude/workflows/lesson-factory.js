@@ -68,6 +68,7 @@ Write ${REPO}/web/learn/${l.slug}.html:
 Write ${REPO}/web/learn/audio/scripts/${l.slug}.json:
 - Read ${REPO}/web/learn/audio/README.md first — its rules are HARD (no double-quote chars in text, only the proven tag set, 10-16 tags, ellipses beats, every list enumerated First…Second…, never read a table aloud).
 - Same structure as scripts/autopoet.json: slug, title "${l.title} — under ${l.parent}", tracks matching the page sections (intro…outro), intro says "Lesson ${l.nn.replace('·', ' point ')}" and names the parent; outro hands back to the parent lesson.
+- EYES-CLOSED RULE (README rule 6, hard): every track opens by speaking its section's headline naturally; every mermaid diagram, org sample, and table in that section gets a spoken walkthrough woven into the narration (describe the graph as a story, read the sample aloud, give the table's verdict) — never "as shown above/below". A driver must fully follow the argument.
 
 VERIFY before finishing: the JSON parses (python3 json.load); zero '\"' inside script text values; zero internal .html hrefs in the page; mermaid loader present if any pre.mermaid; all includes present. Return one line per file written plus the section count.`,
     { label: `write:${l.slug}`, phase: 'Write' }

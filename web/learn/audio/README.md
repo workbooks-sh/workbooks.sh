@@ -53,6 +53,21 @@ bottom-bar → full-screen sheet.
    `eleven_v3`, stability `0.0` (creative — maximum tag response).
    A future switch to another voice is one constant + a regen pass.
 
+6. **The episode must stand alone with eyes closed.** A listener driving
+   hears EVERYTHING the reader sees:
+   - **Headlines are spoken.** Every section's track opens by orienting the
+     listener naturally — "Next: the ready set." / "Now the honest part." —
+     never diving into prose mid-thought.
+   - **Every visual gets audio alt text.** A mermaid diagram, an org
+     sample, a comparison table — each is DESCRIBED as a small narrative
+     woven into the track: walk the dependency graph aloud ("picture four
+     tasks: copy is already done off to the side; hero art is lit up,
+     ready; build waits on it; deploy waits on build"), read the org
+     sample as speech, summarize the table's verdict in a sentence.
+   - **Never reference the page spatially.** No "as shown above", "the
+     diagram below", "this table". The spoken version IS the artifact.
+   Check: could someone reconstruct the page's argument from audio alone?
+
 ## Music — tunes, not atmospheres
 
 Cue prompts say *1970s library music, warm electric piano, melodic, gentle
