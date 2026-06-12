@@ -162,7 +162,7 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 .ltoc a:hover { color: var(--ink); }
 .ltoc a.on { color: var(--ink); font-weight: 700; border-left: 2px solid var(--ac); }
 
-article { max-width: 680px; padding-bottom: 30px; }
+article { max-width: 680px; padding-bottom: 30px; min-width: 0; }
 article section { padding: 34px 0 14px; }
 article h2 {
   font-family: var(--display); font-weight: 400;
@@ -410,7 +410,7 @@ article ul li::before { content: "■"; position: absolute; left: 0; top: 4px; f
   background-image: repeating-linear-gradient(90deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }
 .nav .drop .panel a .sw b, .lnext .cards a .sw b { font: 700 13px var(--mono); color: var(--ink); }
 .lhero .heroart .cap .face b { font: 700 22px var(--mono); color: var(--ink); }
-pre.orgsample { background: #fff; border: 2px solid var(--ink); border-radius: 12px;
+pre.orgsample { background: #fff; border: 2px solid var(--ink); border-radius: 12px; max-width: 100%;
   padding: 18px 20px; margin: 16px 0; font: 400 12px/1.9 var(--mono); color: var(--ink);
   overflow-x: auto; white-space: pre; }
 pre.orgsample i { color: var(--dim); font-style: normal; }

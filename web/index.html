@@ -401,16 +401,9 @@ const WB_FLAGS = { desktopDownload: false };</script>
     </div>
   </div>
   <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
-  <a class="dl" href="../index.html#download">Download</a>
+  <a class="dl" href="index.html#download">Download</a>
 </nav>
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="fisheye" filterUnits="userSpaceOnUse" x="-5%" y="-12%" width="110%" height="124%">
-    <feImage id="fisheyeMap" result="m" x="0" y="0"/>
-    <feDisplacementMap id="fisheyeDisp" in="SourceGraphic" in2="m"
-      xChannelSelector="R" yChannelSelector="G" scale="0"/>
-  </filter>
-</svg>
 
 <main class="hero">
   <div class="inner" id="inner">
@@ -1482,48 +1475,7 @@ function staticBake(el, seed) {
   el.style.webkitMaskRepeat = "no-repeat"; el.style.maskRepeat = "no-repeat";
 }
 
-/* ── the fisheye: a convex bulge breathing under the whole lockup.
-   A radial displacement map (R: x-shift, G: y-shift, 128 = rest) makes the
-   center magnify; the feDisplacementMap scale oscillates slowly. ── */
-function fisheyeSetup() {
-  const lockup = document.querySelector(".lockup");
-  if (!lockup) return;
-  const r = lockup.getBoundingClientRect();
-  const w = Math.ceil(r.width), h = Math.ceil(r.height);
-  const RES = 4;                                  /* quarter-res map, scaled up */
-  const mw = Math.ceil(w / RES), mh = Math.ceil(h / RES);
-  const mc = document.createElement("canvas");
-  mc.width = mw; mc.height = mh;
-  const mx = mc.getContext("2d");
-  const img = mx.createImageData(mw, mh);
-  for (let y = 0; y < mh; y++) {
-    for (let x = 0; x < mw; x++) {
-      const nx = (x / mw) * 2 - 1, ny = (y / mh) * 2 - 1;
-      const rr = Math.min(1, Math.hypot(nx, ny) / 1.2);
-      const g = rr * (1 - rr) * 2;                /* peaks mid-radius — barrel */
-      const i = (y * mw + x) * 4;
-      img.data[i]     = 128 - nx * g * 110;       /* R: x displacement */
-      img.data[i + 1] = 128 - ny * g * 110;       /* G: y displacement */
-      img.data[i + 2] = 128;
-      img.data[i + 3] = 255;
-    }
-  }
-  mx.putImageData(img, 0, 0);
-  const fm = document.getElementById("fisheyeMap");
-  fm.setAttribute("href", mc.toDataURL());
-  fm.setAttribute("width", w); fm.setAttribute("height", h);
-  lockup.style.filter = "url(#fisheye)";
-}
-(function fisheyeBreathe(ms) {
-  const d = document.getElementById("fisheyeDisp");
-  if (d) d.setAttribute("scale", (5.5 + 3.5 * Math.sin(ms / 9000 * Math.PI * 2)).toFixed(2));
-  requestAnimationFrame(fisheyeBreathe);
-})(0);
 
-document.fonts.ready.then(() => {
-  fisheyeSetup();
-  addEventListener("resize", () => fisheyeSetup());
-});
 
 /* ── the spotlight: selectors left, stage right. Pastel DNA system. ── */
 const PIECES = [
