@@ -68,6 +68,18 @@ defmodule Workbooks.NetGuardTest do
     end
   end
 
+  @tag :netdeps
+  test "RED-TEAM: a public URL that REDIRECTS to an internal target never reaches it (each hop re-validated)" do
+    # autoredirect is off; NetGuard follows 3xx MANUALLY and re-checks allowed?/allow-list on EVERY hop, so a
+    # public host redirecting to cloud metadata can't smuggle the guest there. httpbin issues the 302; we
+    # assert the internal target is NEVER reached (denied), regardless of whether httpbin itself is reachable.
+    redirect =
+      "http://httpbin.org/redirect-to?url=" <> URI.encode_www_form("http://169.254.169.254/latest/")
+
+    refute match?({:ok, _}, NetGuard.get(redirect)),
+           "redirect-to-internal must not reach the internal target"
+  end
+
   test "get/1 denies internal destinations before opening a socket (offline)" do
     # No :httpc call is made for a denied URL — proven by this passing with no network.
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/latest/meta-data/")

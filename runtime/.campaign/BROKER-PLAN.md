@@ -1255,3 +1255,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (down from 504 in ~15s); normal Bandit chunked streaming still green (monitor/demonitor transparent). So the
   one open cosmetic item is closed — a trapped/no-response guest now yields a fast, meaningful 502, the
   request is bounded, and the server stays up. The DoS + red-team picture is fully green and clean.
+- 2026-06-12 (iter 92): **RED-TEAM coverage audit + redirect-to-internal e2e added.** Audited the red-team
+  test coverage vs the keystone's vector list. FOUND: the obfuscation vectors (decimal/hex/octal/short-form
+  IPs, userinfo@ smuggle, IPv4-mapped IPv6, 0=0.0.0.0, expanded ::1) are ALL explicitly tested
+  (net_guard_test RED-TEAM); DNS-rebinding (resolve-then-pin), DNS-exfil (IP-only scoping), rate/conn/byte DoS
+  all tested. The one vector lacking an explicit E2E was REDIRECT-TO-INTERNAL — added a test: a public URL
+  (httpbin) issuing a 302 to cloud-metadata is followed MANUALLY (autoredirect off) with allowed?/allow-list
+  re-checked on EVERY hop, so the internal target is never reached (asserted not-{:ok}, robust to httpbin
+  availability). 14 net_guard tests green. NEXT (user-steered): go DEEP on adversarial audits — systematically
+  probe every broker for the subtler vectors not yet covered (response-header injection from a serving guest,
+  host_http_get response-size cap, multi-instance rate amplification, TLS verify-downgrade, public-port abuse,
+  exec/storage/queue adversarial surface).
