@@ -887,3 +887,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   fan-out cap). Holistic DoS-cadence sweep: 32 broker tests green. NO code change — extending the rate floor
   to fast brokers would be a mistake; the design is correct as-is.
   NEXT (iter 56): the inbound seam (wb-py4k, focused-session), or more auditing.
+- 2026-06-12 (iter 56): **SECURITY AUDIT pass — verdict SOUND (no new gaps).** Audited parallel_broker
+  (well-protected: fan-out cap @max_inputs 1024 + each task is a full ExecBroker.exec, so the exec cadence
+  incl the iter-54 rate floor applies per task + concurrency cap + timeout + revocation), storage SQL
+  (PARAMETERIZED throughout ?1/?2 + bind, tenant=?1-scoped → injection-safe + isolated), cross-tenant
+  isolation (TESTED storage+queue), exec no-injection (TESTED — structural argv). All clean + test-guarded.
+  Wrote the canonical "Security audit" section in BROKER-CAPABILITIES.md (gaps found+fixed + verified-clean).
+  The audit pass (iters 53-56) found the real gaps (latent rate, batch amplification, inbound race) and
+  confirmed the rest is sound. NEXT (iter 57): the inbound seam (wb-py4k, focused-session NIF).

@@ -60,3 +60,28 @@ All broker unit/hermetic suites green together (34 tests): `net_guard`, `exec_br
 `parallel_broker`, `serve_broker`. Guest e2e proofs (`@tag :build`, real Rust/C guests) for exec, storage,
 parallel, and serve. Dock additions regression-free (`js_dock_test` green). Networking deny-side has its own
 red-team suite; its egress reachability is the only env-gated remainder.
+
+## Security audit (iters 53–56) — verdict: SOUND
+
+The brokered-capability surface was systematically audited. Gaps found are fixed; the rest is verified clean
+and test-guarded.
+
+**Gaps found + fixed:**
+- iter48 — inbound serve concurrency race (ETS req/resp channel under concurrent dispatch) → per-serve_id atomic lock.
+- iter53 — host_http_get_many had no batch-size cap (request amplification) → @max_http_batch 64.
+- iter54 — the rate quota was BUILT BUT LATENT (docks never passed :rate) → RateLimiter.default_quota() floor wired into all 5 volume-DoS brokers (net/exec/tcp/udp/tls).
+
+**Verified clean (test-guarded):**
+- DoS cadence per surface — RATE floor (volume: network/exec, 2000/s per tenant) + RESOURCE caps (growth:
+  queue depth 1000, storage 1MB value / 10k keys) + no-read (secret) + fan-out cap (parallel @max_inputs 1024).
+  Rate floor deliberately NOT on the fast growth-DoS brokers (would harm legit µs-ops; caps are the right control).
+- SSRF + resolve-then-PIN on ALL FIVE egress paths (host_http_get, wasi-http, wasi-sockets, TcpBroker, UdpBroker, TlsBroker).
+- Red-team obfuscation (IP-literals/IPv6/decimal/hex/octal/userinfo@/v4-mapped/redirect/rebinding/exfil) proven HOLISTICALLY against a live guest.
+- Tenant isolation — per-tenant namespacing + SQL `tenant=?1` scoping; tested for storage + queue.
+- No-injection — exec argv is structural (`"; rm -rf /"` is a literal arg); tested.
+- Parameterized SQL throughout (?1/?2 + bind) — no injection.
+- Revocation — broadly wired (every main broker), mid-flight.
+
+**Remaining frontier:** the inbound STANDARD-component seam (wb-py4k) — a focused-session NIF (sync bindgen!
+proxy + resource-lowering). The hand-written serve_broker covers the inbound capability today (DoS-hardened +
+concurrency-correct).
