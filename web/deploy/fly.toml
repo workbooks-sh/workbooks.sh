@@ -1,0 +1,50 @@
+# workbooks.sh origin — the site's root data source: our runtime image serving
+# the public content plane from /data/build/public/wb-site. Cloudflare fronts
+# this as proxy/CDN (web/_worker.js on the Pages project). Epic wb-gnzy.
+#
+# Two planes, two services:
+#   * public 80/443  → PublicWeb (:4001, anonymous GET)
+#   * control :4000  → Workbooks.Web (authed; WB_PUBLIC_BEARER locks it)
+# auto_stop OFF: this is an origin, not a demo.
+app = "wb-site"
+primary_region = "sjc"
+
+[build]
+  image = "ghcr.io/workbooks-sh/runtime:latest"
+
+[mounts]
+  source = "wbdata"
+  destination = "/data"
+
+[env]
+  WB_DATA = "/data"
+  WB_PUBLIC = "1"
+  WB_PUBLIC_APP = "wb-site"
+  PUBLIC_PORT = "4001"
+  WB_TENANT = "wb-site"
+
+[[services]]
+  internal_port = 4001
+  protocol = "tcp"
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+[[services]]
+  internal_port = 4000
+  protocol = "tcp"
+  [[services.ports]]
+    port = 4000
+    handlers = ["tls", "http"]
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

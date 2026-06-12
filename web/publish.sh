@@ -27,3 +27,9 @@ PY
 export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-6d4b74aeb10f455fbf88141901e7595d}"
 wrangler pages deploy "$STAGE" --project-name=workbooks-shell --branch=main --commit-dirty=true
 rm -rf "$STAGE"
+
+# Refresh the fly origin (root data source) from GitHub main — push first.
+if command -v fly >/dev/null 2>&1 && fly status --app wb-site >/dev/null 2>&1; then
+  echo "refreshing origin wb-site from GitHub main…"
+  fly ssh console -a wb-site -C "sh -c 'set -e; rm -rf /tmp/r; git clone -q --depth 1 https://github.com/workbooks-sh/workbooks.sh /tmp/r; rm -rf /data/build/public/wb-site; mkdir -p /data/build/public/wb-site; cp -r /tmp/r/web/. /data/build/public/wb-site/; rm -rf /data/build/public/wb-site/brand /data/build/public/wb-site/og/build.py /data/build/public/wb-site/publish.sh /data/build/public/wb-site/deploy /data/build/public/wb-site/_worker.js; cp /tmp/r/desktop/scripts/install.sh /data/build/public/wb-site/install.sh; echo origin-refreshed'" 2>&1 | tail -1
+fi
