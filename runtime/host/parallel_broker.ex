@@ -37,6 +37,50 @@ defmodule Workbooks.ParallelBroker do
     end
   end
 
+  @doc """
+  Parse the wasm wire request for host_parallel_map (length-prefixed LE, binary-safe):
+
+      [name_len][name][argc][(arg_len)(arg)]*[ninputs][(input_len)(input)]*
+
+  Returns `{:ok, name, argv, inputs}` | `:error`.
+  """
+  def parse_map_request(bin) when is_binary(bin) do
+    with <<nlen::little-32, name::binary-size(nlen), argc::little-32, r1::binary>> <- bin,
+         {:ok, argv, r2} <- lp_list(r1, argc, []),
+         <<nin::little-32, r3::binary>> <- r2,
+         {:ok, inputs, _} <- lp_list(r3, nin, []) do
+      {:ok, name, argv, inputs}
+    else
+      _ -> :error
+    end
+  end
+
+  def parse_map_request(_), do: :error
+
+  @doc """
+  Encode `[{:ok, out} | {:error, _}]` results back for the guest:
+
+      [nresults][ (len:i32, -1 = error)(result_bytes) ]*
+
+  -1 length marks a failed task (no body follows). Order matches the inputs.
+  """
+  def encode_results(results) when is_list(results) do
+    body =
+      Enum.map_join(results, "", fn
+        {:ok, out} -> <<byte_size(out)::little-signed-32, out::binary>>
+        {:error, _} -> <<-1::little-signed-32>>
+      end)
+
+    <<length(results)::little-signed-32, body::binary>>
+  end
+
+  defp lp_list(rest, 0, acc), do: {:ok, Enum.reverse(acc), rest}
+
+  defp lp_list(<<len::little-32, item::binary-size(len), rest::binary>>, n, acc) when n > 0,
+    do: lp_list(rest, n - 1, [item | acc])
+
+  defp lp_list(_, _, _), do: :error
+
   defp run(name, inputs, argv, max_conc, timeout) do
     inputs
     |> Task.async_stream(

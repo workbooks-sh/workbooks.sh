@@ -414,3 +414,21 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   exec (done+e2e), durable storage (done+e2e, both docks), data-parallelism (core+dispatch proven).
   NEXT (iter 17): wire host_parallel_map Dock import (N-in / N-out length-prefixed ABI) + a guest e2e; then
   the app-host platform stone. (Networking functional reclamation still gated on wb-0beq + internet env.)
+- 2026-06-12 (iter 17): **STONE 4 FULLY e2e-PROVEN (green) — guest-driven brokered data-parallelism.**
+  Added the host_parallel_map ABI: parse_map_request ([name][argv][N inputs], LE length-prefixed) +
+  encode_results ([n][(len,-1=err)(body)]*), both hermetically tested. Wired host_parallel_map into rust_dock
+  (commands-cap gated). GUEST e2e (rust_dock_test, @tag :build): a Rust guest builds the map request, calls
+  host_parallel_map; the host fans coreutils `cat` over [alpha,beta,gamma] CONCURRENTLY across fresh
+  sandboxes, returns the encoded N results; the guest parses them -> "n=3 results=alpha,beta,gamma". 6 unit +
+  1 guest e2e green. Stone 4 DONE + e2e-validated.
+  CAMPAIGN SCORECARD — FOUR brokered capabilities, the host-does-privileged-op / guest-stays-sandboxed
+  pattern with full security cadence (default-deny, quotas, audit, adversarial tests) + offline e2e proofs:
+    1. NETWORKING — deny-side comprehensively secured + red-team proven (SSRF floor both paths, obfuscation,
+       redirect, allow-list, audit); functional reachability + the standard-tool seam env/refactor-gated
+       (wb-0beq async engine refactor + wb-k2im internet env). The 323 reclamation waits on that gate.
+    2. EXEC (Stone 2) — done + guest e2e-proven (broker exec to the 32 sandboxed cmds; no injection).
+    3. DURABLE STORAGE (Stone 3) — done + guest e2e-proven (persistent tenant-isolated KV, both docks).
+    4. DATA-PARALLELISM (Stone 4) — done + guest e2e-proven (fan a cmd over N inputs concurrently).
+  NEXT (iter 18): the app-host / INBOUND server-flip stone (host-as-listener -> guest handler) — likely
+  larger and may meet the same component-async gate as outbound (wb-0beq); scope it first. js_dock
+  host_parallel_map parity is a quick mechanical follow.

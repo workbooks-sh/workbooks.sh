@@ -57,6 +57,27 @@ defmodule Workbooks.RustDock do
            else
              _ -> -1
            end
+         end},
+      # host_parallel_map(req_ptr,req_len, out_ptr,out_cap) -> i32 : run a command over N inputs CONCURRENTLY
+      # (brokered data-parallelism). Writes [n][(len,-1=err)(body)]* into out; -1 if out_cap too small.
+      "host_parallel_map" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, req_ptr, req_len, out_ptr, out_cap ->
+           req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
+
+           with {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv) do
+             enc = Workbooks.ParallelBroker.encode_results(results)
+
+             if byte_size(enc) <= out_cap do
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, enc)
+               byte_size(enc)
+             else
+               -1
+             end
+           else
+             _ -> -1
+           end
          end}
     }
   end

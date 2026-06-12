@@ -20,6 +20,28 @@ defmodule Workbooks.ParallelBrokerTest do
     assert Enum.all?(results, &match?({:error, _}, &1))
   end
 
+  test "parse_map_request round-trips name+argv+inputs; malformed -> :error" do
+    req = build_map_req("coreutils", ["cat"], ["a", "bb", "ccc"])
+    assert {:ok, "coreutils", ["cat"], ["a", "bb", "ccc"]} = ParallelBroker.parse_map_request(req)
+    assert {:ok, "x", [], []} = ParallelBroker.parse_map_request(build_map_req("x", [], []))
+    assert :error = ParallelBroker.parse_map_request(<<>>)
+    assert :error = ParallelBroker.parse_map_request(<<5::little-32, "ab">>)
+  end
+
+  test "encode_results -> [n][(len, -1=err)(body)]* (binary, order-preserving)" do
+    enc = ParallelBroker.encode_results([{:ok, "a"}, {:error, :x}, {:ok, "bb"}])
+
+    assert <<3::little-signed-32, 1::little-signed-32, "a", -1::little-signed-32,
+             2::little-signed-32, "bb">> == enc
+  end
+
+  defp build_map_req(name, argv, inputs) do
+    lp = fn items -> Enum.map_join(items, "", fn i -> <<byte_size(i)::little-32, i::binary>> end) end
+
+    <<byte_size(name)::little-32, name::binary, length(argv)::little-32, lp.(argv)::binary,
+      length(inputs)::little-32, lp.(inputs)::binary>>
+  end
+
   @tag :pallet
   @tag timeout: 120_000
   test "DATA-PARALLEL DISPATCH: runs a command over N inputs concurrently in fresh sandboxes" do

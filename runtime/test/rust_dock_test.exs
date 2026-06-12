@@ -132,4 +132,39 @@ fn main(){
     assert {:ok, o3} = RustDock.run(w, profile: :minimal, tenant: tb)
     assert String.trim(o3) == "stored r=0"
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "host_parallel_map — guest fans a command over N inputs CONCURRENTLY (Stone 4)" do
+    assert "host_parallel_map" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+    assert :ok = Workbooks.Pallet.seed_one("coreutils")
+
+    w =
+      build!(~S|
+extern "C" { fn host_parallel_map(rp:i32,rl:i32,op:i32,oc:i32) -> i32; }
+fn le(n:u32, b:&mut Vec<u8>){ b.extend_from_slice(&n.to_le_bytes()); }
+fn rd(b:&[u8],p:usize)->i32{ i32::from_le_bytes([b[p],b[p+1],b[p+2],b[p+3]]) }
+fn main(){
+  // [name_len][name][argc][(arg_len)(arg)]*[ninputs][(input_len)(input)]*
+  let name=b"coreutils"; let args:[&[u8];1]=[b"cat"]; let inputs:[&[u8];3]=[b"alpha",b"beta",b"gamma"];
+  let mut req:Vec<u8>=Vec::new();
+  le(name.len() as u32,&mut req); req.extend_from_slice(name);
+  le(args.len() as u32,&mut req); for a in args.iter(){ le(a.len() as u32,&mut req); req.extend_from_slice(a); }
+  le(inputs.len() as u32,&mut req); for i in inputs.iter(){ le(i.len() as u32,&mut req); req.extend_from_slice(i); }
+  let mut out=[0u8;512];
+  let total=unsafe{ host_parallel_map(req.as_ptr() as i32, req.len() as i32, out.as_mut_ptr() as i32, 512) };
+  if total<4 { println!("err total={}", total); return; }
+  let mut p=0usize; let n=rd(&out,p); p+=4;
+  let mut parts:Vec<String>=Vec::new();
+  for _ in 0..n {
+    let len=rd(&out,p); p+=4;
+    if len<0 { parts.push(String::from("ERR")); }
+    else { parts.push(std::str::from_utf8(&out[p..p+len as usize]).unwrap_or("?").to_string()); p+=len as usize; }
+  }
+  println!("n={} results={}", n, parts.join(","));
+}|)
+
+    assert {:ok, out} = RustDock.run(w, profile: :minimal)
+    assert String.trim(out) == "n=3 results=alpha,beta,gamma"
+  end
 end
