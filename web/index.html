@@ -7,7 +7,7 @@
 <link rel="preload" href="fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -100,7 +100,14 @@ const WB_FLAGS = { desktopDownload: false };</script>
     font-size: 12px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
     color: var(--ink); text-decoration: none;
   }
-  .nav .drop > a::after { content: " ▾"; font-size: 9px; }
+  .nav .drop > a::after {
+    content: ""; display: inline-block; width: 7px; height: 7px;
+    border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor;
+    transform: rotate(45deg); margin-left: 9px; vertical-align: 2px;
+  }
+  .nav a.gh { display: inline-flex; align-items: center; color: var(--ink); }
+  .nav a.gh svg { width: 19px; height: 19px; display: block; }
+  .nav a.gh:hover { color: var(--bloom); }
   .nav .drop > a:hover { color: var(--bloom); }
   .nav .drop .panel {
     position: absolute; top: calc(100% + 14px); left: 50%; transform: translateX(-50%);
@@ -139,11 +146,11 @@ const WB_FLAGS = { desktopDownload: false };</script>
     color: var(--ink); line-height: 1;
   }
 
-  .lockup { width: min(680px, 90vw); }
+  .lockup { width: min(900px, 92vw); }
   .lockup .jl {
     display: block; font-family: var(--display); font-weight: 400;
-    font-size: clamp(64px, 10.4vw, 138px); line-height: .96;
-    white-space: nowrap; color: var(--ink);
+    font-size: clamp(64px, 11vw, 150px); line-height: .94;
+    white-space: nowrap; color: var(--ink); text-align: center;
   }
   /* the counterpoint line: PIXELS against Anton's block — same ink,
      lowercase, the machine voice between two human shouts */
@@ -155,8 +162,9 @@ const WB_FLAGS = { desktopDownload: false };</script>
     font-family: var(--accent); font-weight: 400; font-synthesis: none;
     text-transform: uppercase;
     letter-spacing: 0;
-    font-size: clamp(56px, 9.2vw, 122px); line-height: .9;
-    color: #fff; -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill;
+    font-size: clamp(48px, 8.6vw, 116px); line-height: .9; text-align: center;
+    color: #fff; -webkit-text-stroke: 1px var(--ink);
+    text-shadow: 5.0px 0.0px 0 var(--ink), 4.6px 1.9px 0 var(--ink), 3.5px 3.5px 0 var(--ink), 1.9px 4.6px 0 var(--ink), 0.0px 5.0px 0 var(--ink), -1.9px 4.6px 0 var(--ink), -3.5px 3.5px 0 var(--ink), -4.6px 1.9px 0 var(--ink), -5.0px 0.0px 0 var(--ink), -4.6px -1.9px 0 var(--ink), -3.5px -3.5px 0 var(--ink), -1.9px -4.6px 0 var(--ink), -0.0px -5.0px 0 var(--ink), 1.9px -4.6px 0 var(--ink), 3.5px -3.5px 0 var(--ink), 4.6px -1.9px 0 var(--ink);
     position: relative; z-index: 2; margin: -.42em 0 -.38em;
   }
 
@@ -369,11 +377,11 @@ const WB_FLAGS = { desktopDownload: false };</script>
     .s3-termwrap { border-left: none; border-top: 1px solid rgba(247,246,241,.07); }
     .ctas { gap: 10px; }
     .btn { padding: 12px 16px; }
-    .lockup { width: 94vw; }
-    .lockup .jl { font-size: clamp(44px, 15vw, 64px); line-height: 1.04; }
+    .lockup { width: 84vw; }
+    .lockup .jl { font-size: clamp(42px, 13.5vw, 56px); line-height: 1; }
     .lockup .jl:nth-child(2) {
-      font-size: clamp(38px, 13vw, 56px); line-height: 1;
-      margin: -.3em 0 -.26em; -webkit-text-stroke: 4px var(--ink);
+      font-size: clamp(33px, 10.6vw, 46px); line-height: 1;
+      margin: -.3em 0 -.26em; text-shadow: 3.0px 0.0px 0 var(--ink), 2.8px 1.1px 0 var(--ink), 2.1px 2.1px 0 var(--ink), 1.1px 2.8px 0 var(--ink), 0.0px 3.0px 0 var(--ink), -1.1px 2.8px 0 var(--ink), -2.1px 2.1px 0 var(--ink), -2.8px 1.1px 0 var(--ink), -3.0px 0.0px 0 var(--ink), -2.8px -1.1px 0 var(--ink), -2.1px -2.1px 0 var(--ink), -1.1px -2.8px 0 var(--ink), -0.0px -3.0px 0 var(--ink), 1.1px -2.8px 0 var(--ink), 2.1px -2.1px 0 var(--ink), 2.8px -1.1px 0 var(--ink);
     }
   }
 </style>
@@ -400,7 +408,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
       <a href="learn/autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span> Autopoet <small>the gardener</small></a>
     </div>
   </div>
-  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="lnk gh" href="https://github.com/workbooks-sh/workbooks.sh" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a>
   <a class="dl" href="index.html#download">Download</a>
 </nav>
 
@@ -501,21 +509,6 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/ScrollTrigger.min.js"></script>
 
 <script>
-/* justified lockup — letterspace each line to one flush measure */
-function justifyLockup() {
-  document.querySelectorAll(".jl").forEach((el) => {
-    el.style.letterSpacing = "0px";
-    el.style.textAlign = "left";
-    const w = el.parentElement.clientWidth;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    const tw = range.getBoundingClientRect().width;
-    const n = el.textContent.length - 1;
-    if (n < 1 || tw >= w) return;
-    el.style.letterSpacing = (w - tw) / n + "px";
-  });
-}
-document.fonts.ready.then(justifyLockup);
 
 /* copy CTAs: write the payload, flip the label briefly */
 document.querySelectorAll(".btn-copy").forEach((b) => {
@@ -526,7 +519,6 @@ document.querySelectorAll(".btn-copy").forEach((b) => {
     setTimeout(() => { lbl.textContent = was; b.classList.remove("copied"); }, 1500);
   });
 });
-addEventListener("resize", justifyLockup);
 
 /* ── the lattice ──────────────────────────────────────────────────────────
    A square grid whose VERTICES drift on smooth low-frequency waves, so

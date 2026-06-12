@@ -67,7 +67,14 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
 }
 .nav .dl:hover { background: var(--bloom); }
 .nav .drop { position: relative; }
-.nav .drop > a::after { content: " ▾"; font-size: 9px; }
+.nav .drop > a::after {
+  content: ""; display: inline-block; width: 7px; height: 7px;
+  border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor;
+  transform: rotate(45deg); margin-left: 9px; vertical-align: 2px;
+}
+.nav a.gh { display: inline-flex; align-items: center; color: var(--ink); }
+.nav a.gh svg { width: 19px; height: 19px; display: block; }
+.nav a.gh:hover { color: var(--bloom); }
 .nav .drop .panel {
   position: absolute; top: calc(100% + 14px); left: 50%; transform: translateX(-50%);
   display: none; flex-direction: column; min-width: 240px;
@@ -110,7 +117,8 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
    overlapping the grotesque lines above and below (the duo lockup) */
 .lhero h1 .bub {
   position: relative; z-index: 2; margin: -.26em 0 -.24em;
-  color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill;
+  color: #fff; -webkit-text-stroke: 1px var(--ink);
+  text-shadow: 4.0px 0.0px 0 var(--ink), 3.7px 1.5px 0 var(--ink), 2.8px 2.8px 0 var(--ink), 1.5px 3.7px 0 var(--ink), 0.0px 4.0px 0 var(--ink), -1.5px 3.7px 0 var(--ink), -2.8px 2.8px 0 var(--ink), -3.7px 1.5px 0 var(--ink), -4.0px 0.0px 0 var(--ink), -3.7px -1.5px 0 var(--ink), -2.8px -2.8px 0 var(--ink), -1.5px -3.7px 0 var(--ink), -0.0px -4.0px 0 var(--ink), 1.5px -3.7px 0 var(--ink), 2.8px -2.8px 0 var(--ink), 3.7px -1.5px 0 var(--ink);
 }
 .lhero h1 em, .lhero h1 i {
   font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
@@ -420,7 +428,7 @@ pre.orgsample i { color: var(--dim); font-style: normal; }
   .nav { gap: 14px; padding: 8px 10px 8px 12px; top: 12px; max-width: 94vw; }
   .lhero { padding-top: 120px; }
   .lhero h1 { font-size: clamp(40px, 11.5vw, 54px); line-height: 1; }
-  .lhero h1 .bub { margin: -.2em 0 -.18em; -webkit-text-stroke: 4px var(--ink); }
+  .lhero h1 .bub { margin: -.2em 0 -.18em; text-shadow: 3.0px 0.0px 0 var(--ink), 2.8px 1.1px 0 var(--ink), 2.1px 2.1px 0 var(--ink), 1.1px 2.8px 0 var(--ink), 0.0px 3.0px 0 var(--ink), -1.1px 2.8px 0 var(--ink), -2.1px 2.1px 0 var(--ink), -2.8px 1.1px 0 var(--ink), -3.0px 0.0px 0 var(--ink), -2.8px -1.1px 0 var(--ink), -2.1px -2.1px 0 var(--ink), -1.1px -2.8px 0 var(--ink), -0.0px -3.0px 0 var(--ink), 1.1px -2.8px 0 var(--ink), 2.1px -2.1px 0 var(--ink), 2.8px -1.1px 0 var(--ink); }
   .d-row { flex-wrap: wrap; row-gap: 6px; }
   .cmp-wrap, .faq, article section { min-width: 0; }
   .cmp { display: block; overflow-x: auto; }
