@@ -25,7 +25,14 @@ defmodule Workbooks.NetGuard do
   def get(url, opts \\ []) when is_binary(url) do
     timeout = Keyword.get(opts, :timeout, 10_000)
     allow = Keyword.get(opts, :allow, nil)
-    do_get(url, timeout, allow, 5)
+    principal = Keyword.get(opts, :principal)
+
+    if principal && Workbooks.Revocation.revoked?(principal) do
+      Logger.warning("wb-broker: DENY egress #{inspect(url)} — principal revoked")
+      {:error, :revoked}
+    else
+      do_get(url, timeout, allow, 5)
+    end
   end
 
   defp do_get(_url, _timeout, _allow, hops) when hops < 0, do: {:error, :too_many_redirects}

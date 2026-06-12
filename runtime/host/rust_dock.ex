@@ -25,9 +25,9 @@ defmodule Workbooks.RustDock do
 
     env =
       ambient()
-      |> maybe(Policy.allow_http?(profile), &egress/0)
+      |> maybe(Policy.allow_http?(profile), fn -> egress(tenant) end)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
-      |> maybe("exec" in caps, &exec_caps/0)
+      |> maybe("exec" in caps, fn -> exec_caps(tenant) end)
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
 
     %{"env" => env}
@@ -40,7 +40,7 @@ defmodule Workbooks.RustDock do
   # (Workbooks.ExecBroker.parse_request) and the host runs the named REGISTERED wasm command in its own
   # sandboxed instance (no dirs passed → no host-file escalation; the catalog tools have no net). The
   # ExecBroker enforces default-deny / registered-only / depth / output-cap / structural-argv.
-  defp exec_caps do
+  defp exec_caps(principal) do
     %{
       # host_exec(req_ptr,req_len, out_ptr,out_cap) -> i32 : run a sandboxed wasm command, write its
       # output into the out buffer, return bytes written (truncated to out_cap; -1 on deny/error).
@@ -50,7 +50,7 @@ defmodule Workbooks.RustDock do
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
 
            with {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
-                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true) do
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: principal) do
              n = min(byte_size(out), out_cap)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
@@ -66,7 +66,7 @@ defmodule Workbooks.RustDock do
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
 
            with {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
-                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv) do
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: principal) do
              enc = Workbooks.ParallelBroker.encode_results(results)
 
              if byte_size(enc) <= out_cap do
@@ -175,7 +175,7 @@ defmodule Workbooks.RustDock do
 
   # Egress — ONLY merged when Policy.allow_http? (net/browse profile). Untrusted Rust on a
   # minimal/non-net profile never gets this import → no host-mediated network.
-  defp egress do
+  defp egress(principal) do
     %{
       # host_http_get(url_ptr,url_len, out_ptr,out_cap) -> i32 : host reads URL from wasm mem,
       # BEAM HTTP GET (the IO wasm cant do), writes body into out buffer, returns body len
@@ -186,7 +186,7 @@ defmodule Workbooks.RustDock do
            url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
 
            # wb-broker SSRF floor: deny internal/sensitive destinations BEFORE the socket opens.
-           case Workbooks.NetGuard.get(url) do
+           case Workbooks.NetGuard.get(url, principal: principal) do
              {:ok, body} ->
                n = min(byte_size(body), out_cap)
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
@@ -216,7 +216,7 @@ defmodule Workbooks.RustDock do
              |> Task.async_stream(
                fn url ->
                  # wb-broker SSRF floor applies per-URL in the concurrent batch too.
-                 case Workbooks.NetGuard.get(url) do
+                 case Workbooks.NetGuard.get(url, principal: principal) do
                    {:ok, body} -> body
                    {:error, _} -> :error
                  end

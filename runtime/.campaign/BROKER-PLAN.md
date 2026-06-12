@@ -544,3 +544,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   principal to host_http_get/host_exec); DoS body-cap + net reachability (wb-k2im, server/internet); the 323
   standard-tool reclamation (wb-0beq wasi-seam async refactor). NEXT (iter 26): thread the principal to net+
   exec for full revocation coverage, OR begin wb-0beq scoping (a separate async engine for wasi-http guests).
+- 2026-06-12 (iter 26): **REVOCATION now covers ALL BROKERS (green) — the cadence item is COMPLETE.**
+  Threaded the dock TENANT as the revocation principal through host_http_get (NetGuard.get principal:),
+  host_exec (ExecBroker.exec principal:), and host_parallel_map (ParallelBroker.map principal:) in BOTH docks
+  (rust_dock egress/exec_caps now take the principal; js_dock passes tenant). Each broker consults
+  Revocation.revoked?(principal) FIRST, so revoking a tenant denies its ENTIRE brokered surface — net + exec
+  + parallel + kv + serve — immediately, mid-flight, no teardown. Tests: net + exec revocation hermetic (26
+  broker tests green); dock import-map regression-free (least-privilege test still green with the threading).
+  CADENCE COMPLETE: default-deny + scoped allow-list + quotas + audit + FULL mid-flight revocation +
+  adversarial red-team. The only networking remainders are env/refactor-gated: DoS body-cap + reachability
+  (wb-k2im, needs a server/internet); the 323 standard-tool reclamation (wb-0beq, wasi-seam async refactor).
+  NEXT (iter 27): rate/conn quotas (the last listed cadence item — a per-principal request counter, testable
+  via the revocation-style ETS), OR begin wb-0beq scoping (separate async engine for wasi-http guests).

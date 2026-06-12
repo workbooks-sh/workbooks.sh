@@ -77,7 +77,7 @@ defmodule Workbooks.JsDock do
              url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
 
              # wb-broker SSRF floor on the host-mediated path (same as rust_dock).
-             case Workbooks.NetGuard.get(url) do
+             case Workbooks.NetGuard.get(url, principal: tenant) do
                {:ok, body} ->
                  n = min(byte_size(body), out_cap)
                  :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
@@ -98,7 +98,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_exec,
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len),
                 {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
-                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true) do
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: tenant) do
              n = min(byte_size(out), out_cap)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
@@ -113,7 +113,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_exec,
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
                 {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
-                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv) do
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: tenant) do
              enc = Workbooks.ParallelBroker.encode_results(results)
 
              if byte_size(enc) <= oc do

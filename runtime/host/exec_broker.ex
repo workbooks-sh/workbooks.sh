@@ -34,8 +34,13 @@ defmodule Workbooks.ExecBroker do
     commands = Keyword.get(opts, :commands, :all)
     max_output = Keyword.get(opts, :max_output, @default_max_output)
     depth = Keyword.get(opts, :depth, 0)
+    principal = Keyword.get(opts, :principal)
 
     cond do
+      principal && Workbooks.Revocation.revoked?(principal) ->
+        deny(name, "principal revoked")
+        {:error, :revoked}
+
       not allow ->
         deny(name, "not granted (no commands cap)")
         {:error, :denied}

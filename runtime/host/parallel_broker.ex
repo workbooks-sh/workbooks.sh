@@ -29,11 +29,13 @@ defmodule Workbooks.ParallelBroker do
     max_inputs = Keyword.get(opts, :max_inputs, @max_inputs)
     max_conc = Keyword.get(opts, :max_concurrency, @max_concurrency)
     timeout = Keyword.get(opts, :timeout, 30_000)
+    principal = Keyword.get(opts, :principal)
 
     cond do
+      principal && Workbooks.Revocation.revoked?(principal) -> {:error, :revoked}
       not allow -> {:error, :denied}
       length(inputs) > max_inputs -> {:error, :too_many_inputs}
-      true -> {:ok, run(name, inputs, argv, max_conc, timeout)}
+      true -> {:ok, run(name, inputs, argv, max_conc, timeout, principal)}
     end
   end
 
@@ -81,10 +83,10 @@ defmodule Workbooks.ParallelBroker do
 
   defp lp_list(_, _, _), do: :error
 
-  defp run(name, inputs, argv, max_conc, timeout) do
+  defp run(name, inputs, argv, max_conc, timeout, principal) do
     inputs
     |> Task.async_stream(
-      fn input -> ExecBroker.exec(name, argv, input, allow: true) end,
+      fn input -> ExecBroker.exec(name, argv, input, allow: true, principal: principal) end,
       max_concurrency: max_conc,
       timeout: timeout,
       on_timeout: :kill_task,

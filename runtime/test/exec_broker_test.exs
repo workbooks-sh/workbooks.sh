@@ -26,6 +26,13 @@ defmodule Workbooks.ExecBrokerTest do
              ExecBroker.exec("coreutils", ["seq", "1"], "", allow: true, depth: 99)
   end
 
+  test "REVOCATION: a revoked principal is denied exec (before running anything)" do
+    p = "revp-#{System.unique_integer([:positive])}"
+    assert :ok = Workbooks.Revocation.revoke(p)
+    assert {:error, :revoked} = ExecBroker.exec("coreutils", ["seq", "1"], "", allow: true, principal: p)
+    assert :ok = Workbooks.Revocation.unrevoke(p)
+  end
+
   test "every denial is audit-logged" do
     log = capture_log(fn -> ExecBroker.exec("rm", [], "", allow: true) end)
     assert log =~ "DENY exec" and log =~ "unknown"

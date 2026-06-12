@@ -103,4 +103,12 @@ defmodule Workbooks.NetGuardTest do
     listed = capture_log(fn -> NetGuard.get("http://8.8.8.8/", allow: ["example.com"]) end)
     assert listed =~ "DENY egress" and listed =~ "allow-list"
   end
+
+  test "REVOCATION: a revoked principal is denied egress before any socket opens" do
+    p = "revp-#{System.unique_integer([:positive])}"
+    assert :ok = Workbooks.Revocation.revoke(p)
+    # 8.8.8.8 would pass the SSRF floor + the allow-list — but the revoked principal short-circuits first
+    assert {:error, :revoked} = NetGuard.get("http://8.8.8.8/", principal: p, allow: ["8.8.8.8"])
+    assert :ok = Workbooks.Revocation.unrevoke(p)
+  end
 end
