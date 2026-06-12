@@ -999,3 +999,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   test-driven call. The guest never touches the socket; its outbound stays SSRF-filtered. The inbound seam
   is now end-to-end deployable: a standard wasi:http app runs, fully sandboxed + brokered, behind a real
   HTTP server.
+- 2026-06-12 (iter 67): **APP-HOST CONCURRENCY — a pool of wasi:http instances serves concurrent requests.**
+  The iter-66 app-host used a SINGLE persistent instance — each Components instance serializes its own
+  requests (GenServer.call), so one pid = a single-threaded server. Added a `:pids` POOL to ComponentPlug
+  (Enum.random spreads each request across N instances -> N-way concurrency; instances are reused, so the
+  assumption is well-behaved stateless handlers — strict per-request isolation would be a future variant that
+  instantiates fresh from a pre-compiled component). E2E: a pool of 4 instances behind Bandit, 20 CONCURRENT
+  real HTTP requests -> ALL 200 with the correct response. The app-host now handles concurrent load —
+  production-capable, not single-threaded.

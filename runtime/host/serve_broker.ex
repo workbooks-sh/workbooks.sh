@@ -225,7 +225,16 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
 
   @impl true
   def call(conn, opts) do
-    pid = Keyword.fetch!(opts, :pid)
+    # CONCURRENCY: each Components instance serializes its own requests (a GenServer.call), so a single pid
+    # is a single-threaded server. A `:pids` POOL spreads requests across N instances for N-way concurrency.
+    # (Instances are reused across requests; well-behaved stateless handlers are the assumption — for strict
+    # per-request isolation, a future variant would instantiate fresh from a pre-compiled component.)
+    pid =
+      case Keyword.get(opts, :pids) do
+        [_ | _] = pids -> Enum.random(pids)
+        _ -> Keyword.fetch!(opts, :pid)
+      end
+
     max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
 
     # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
