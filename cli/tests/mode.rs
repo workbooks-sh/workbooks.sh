@@ -181,3 +181,34 @@ fn wbx_env_aliases_win_over_wb() {
         v["error"]["message"]
     );
 }
+
+#[test]
+fn help_json_emits_the_verb_tree() {
+    let out = wbx().args(["help", "--json"]).output().unwrap();
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["ok"], true);
+    let subs = v["data"]["subcommands"].as_array().unwrap();
+    let names: Vec<&str> = subs.iter().filter_map(|s| s["name"].as_str()).collect();
+    for must in ["init", "dev", "toolkit", "deploy", "doctor"] {
+        assert!(names.contains(&must), "tree missing {must}");
+    }
+    // group verbs expose their sub-verbs
+    let toolkit = subs.iter().find(|s| s["name"] == "toolkit").unwrap();
+    assert!(!toolkit["subcommands"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn author_verbs_accept_stdin_dash() {
+    use std::io::Write;
+    let mut child = wbx()
+        .args(["lint", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.as_mut().unwrap().write_all(b"* hello\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "[]");
+}

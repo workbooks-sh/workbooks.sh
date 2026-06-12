@@ -189,7 +189,38 @@ enum WorkbookVerb {
     Deploy { id: String, file: String },
 }
 
+/// The verb tree as data — agents introspect the surface instead of
+/// scraping help prose. `wbx help --json` (either order) and the agent-mode
+/// landing both emit this.
+fn verb_tree(cmd: &clap::Command) -> serde_json::Value {
+    serde_json::json!({
+        "name": cmd.get_name(),
+        "about": cmd.get_about().map(|a| a.to_string()),
+        "args": cmd.get_arguments()
+            .filter(|a| !matches!(a.get_id().as_str(), "help" | "version"))
+            .map(|a| serde_json::json!({
+                "name": a.get_id().as_str(),
+                "required": a.is_required_set(),
+                "long": a.get_long(),
+            }))
+            .collect::<Vec<_>>(),
+        "subcommands": cmd.get_subcommands().map(verb_tree).collect::<Vec<_>>(),
+    })
+}
+
 fn main() {
+    // pre-clap intercept: `wbx help --json` / `wbx --json help` → the tree
+    {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let has = |w: &str| args.iter().any(|a| a == w);
+        if has("help") && has("--json") && args.len() == 2 {
+            use clap::CommandFactory;
+            let tree = verb_tree(&Cli::command());
+            println!("{}", serde_json::json!({ "ok": true, "verb": "help", "data": tree }));
+            return;
+        }
+    }
+
     let cli = Cli::parse();
     let m = mode::detect(cli.json, cli.agent);
     let verb = mode::verb_path();
@@ -208,6 +239,14 @@ fn main() {
 
 fn landing(io: &dyn io::Io, human: bool) -> Result<String> {
     let mut out = commands::doctor(io, human)?;
+    if !human {
+        // agents get the verb tree alongside health — one call orients them
+        use clap::CommandFactory;
+        if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&out) {
+            v["verbs"] = verb_tree(&Cli::command());
+            out = v.to_string();
+        }
+    }
     if human {
         out.push_str(
             "\n\nstart here   wbx init <name> · wbx dev · wbx bundle\n\

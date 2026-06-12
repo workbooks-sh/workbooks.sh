@@ -11,6 +11,12 @@ use crate::io::Io;
 use anyhow::Result;
 
 fn read_org(io: &dyn Io, file: &str) -> Result<String> {
+    if file == "-" {
+        use std::io::Read;
+        let mut s = String::new();
+        std::io::stdin().read_to_string(&mut s)?;
+        return Ok(s);
+    }
     Ok(String::from_utf8(io.read(file)?)?)
 }
 
