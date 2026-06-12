@@ -2238,6 +2238,7 @@ name = "wasmex"
 version = "0.14.0"
 dependencies = [
  "bytes",
+ "http-body",
  "http-body-util",
  "hyper",
  "rand 0.9.2",

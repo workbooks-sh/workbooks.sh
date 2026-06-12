@@ -1131,3 +1131,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasi:http/sockets ALREADY stream (guest reads chunks, host passes through); the gap is the INBOUND serve NIF
   (buffers) + host_http_get. Genuinely multi-fire (NIF->Plug->guest->e2e) like the inbound seam — the 16MiB
   cap is the DoS floor until then.
+- 2026-06-12 (iter 81): **★ STREAMING NIF WRITTEN + COMPILING (wb-t3sq foundation).** Per the inbound-seam
+  lesson (the genuine attempt converges), wrote component_serve_http_stream instead of deferring again. Same
+  as serve_http up to handle.call + into_parts, then STREAMS the response body frame-by-frame to the caller
+  pid: {ref, :stream_start, status, headers} / {ref, :stream_data, binary}* / {ref, :stream_done} (via
+  TOKIO_RUNTIME.block_on(resp_body.frame()) + env.send per chunk). Only 1 compile error (the http-body dep for
+  Body::frame — declared, exactly like the inbound seam's missing deps). Elixir stub added (Native.
+  component_serve_http_stream, auto-discovered). Runtime healthy: 5 broker_audit + the existing serve_http e2e
+  green, NO regression (additive). The hard part — streaming the response body across the NIF boundary as
+  tagged messages — is DONE + compiling. NEXT (iter 82): Instance.serve_http_stream helper + a streaming
+  ComponentPlug (spawn the NIF call, receive {ref,:stream_*}, forward via send_chunked) + a multi-chunk
+  streaming guest + e2e.

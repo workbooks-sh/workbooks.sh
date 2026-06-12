@@ -367,6 +367,141 @@ pub fn serve_http<'a>(
     Ok((parts.status.as_u16(), out_headers, out_bin.release(env)))
 }
 
+// wb-broker STREAMING inbound serve (wb-t3sq): same as serve_http, but instead of buffering the response
+// body it streams it FRAME-BY-FRAME to `caller` as messages tagged with `ref_term`:
+//   {ref, :stream_start, status, headers} ; {ref, :stream_data, <binary>}* ; {ref, :stream_done}
+// The Plug spawns this (so it isn't blocked in the NIF) and forwards each chunk via send_chunked. Enables
+// large downloads / Server-Sent-Events / big responses without the host buffering the whole body.
+#[rustler::nif(name = "component_serve_http_stream", schedule = "DirtyCpu")]
+pub fn serve_http_stream(
+    env: rustler::Env,
+    component_store_resource: ResourceArc<ComponentStoreResource>,
+    instance_resource: ResourceArc<ComponentInstanceResource>,
+    method: String,
+    uri: String,
+    headers: Vec<(String, String)>,
+    body: rustler::Binary,
+    caller: rustler::LocalPid,
+    ref_term: rustler::Term,
+) -> NifResult<rustler::Atom> {
+    use bytes::Bytes;
+    use http_body::Body;
+    use http_body_util::{BodyExt, Full};
+    use rustler::OwnedBinary;
+    use wasmtime_wasi_http::bindings::http::types::Scheme;
+    use wasmtime_wasi_http::WasiHttpView;
+
+    let store: &mut Store<ComponentStoreData> =
+        &mut (component_store_resource.inner.lock().unwrap());
+    let instance = &mut instance_resource.inner.lock().unwrap();
+
+    let mut builder = hyper::Request::builder()
+        .method(method.as_str())
+        .uri(uri.as_str());
+    for (k, v) in &headers {
+        builder = builder.header(k.as_str(), v.as_str());
+    }
+    let req_body = Full::new(Bytes::copy_from_slice(body.as_slice()))
+        .map_err(|e: std::convert::Infallible| match e {})
+        .boxed();
+    let hyper_req = builder
+        .body(req_body)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    let req = store
+        .data_mut()
+        .new_incoming_request(Scheme::Http, hyper_req)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    let (tx, mut rx) = tokio::sync::oneshot::channel();
+    let out = store
+        .data_mut()
+        .new_response_outparam(tx)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    let mut iface = None;
+    for name in [
+        "wasi:http/incoming-handler@0.2.6",
+        "wasi:http/incoming-handler@0.2.3",
+        "wasi:http/incoming-handler@0.2.0",
+        "wasi:http/incoming-handler",
+    ] {
+        if let Some((_, idx)) = instance.get_export(&mut *store, None, name) {
+            iface = Some(idx);
+            break;
+        }
+    }
+    let iface =
+        iface.ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
+    let handle_idx = instance
+        .get_export(&mut *store, Some(&iface), "handle")
+        .map(|(_, idx)| idx)
+        .ok_or_else(|| Error::Term(Box::new("no #handle export".to_string())))?;
+    let handle = instance
+        .get_func(&mut *store, handle_idx)
+        .ok_or_else(|| Error::Term(Box::new("handle is not a func".to_string())))?;
+
+    let req_any = req
+        .try_into_resource_any(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    let out_any = out
+        .try_into_resource_any(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    handle
+        .call(
+            &mut *store,
+            &[Val::Resource(req_any), Val::Resource(out_any)],
+            &mut [],
+        )
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    handle
+        .post_return(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    let resp = rx
+        .try_recv()
+        .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
+        .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
+    let (parts, mut resp_body) = resp.into_parts();
+
+    let out_headers = parts
+        .headers
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str().to_string(),
+                String::from_utf8_lossy(v.as_bytes()).to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let start = rustler::Atom::from_str(env, "stream_start").unwrap();
+    let data = rustler::Atom::from_str(env, "stream_data").unwrap();
+    let done = rustler::Atom::from_str(env, "stream_done").unwrap();
+
+    let _ = env.send(
+        &caller,
+        (ref_term, start, parts.status.as_u16(), out_headers).encode(env),
+    );
+
+    // stream the body frame by frame (the guest produces frames via blocking_write_and_flush)
+    loop {
+        match TOKIO_RUNTIME.block_on(async { resp_body.frame().await }) {
+            Some(Ok(frame)) => {
+                if let Ok(bytes) = frame.into_data() {
+                    let mut bin = OwnedBinary::new(bytes.len()).unwrap();
+                    bin.as_mut_slice().copy_from_slice(&bytes);
+                    let _ = env.send(&caller, (ref_term, data, bin.release(env)).encode(env));
+                }
+            }
+            _ => break,
+        }
+    }
+
+    let _ = env.send(&caller, (ref_term, done).encode(env));
+    Ok(rustler::Atom::from_str(env, "ok").unwrap())
+}
+
 fn component_execute_function(
     thread_env: &mut OwnedEnv,
     component_store_resource: ResourceArc<ComponentStoreResource>,

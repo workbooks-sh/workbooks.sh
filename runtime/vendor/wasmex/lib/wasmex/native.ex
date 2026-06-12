@@ -101,6 +101,11 @@ defmodule Wasmex.Native do
   # {status, headers, body}. The inbound standard-component seam.
   def component_serve_http(_store, _instance, _method, _uri, _headers, _body), do: error()
 
+  # wb-broker (wb-t3sq): like component_serve_http but STREAMS the response body to `caller` as
+  # {ref, :stream_start, status, headers} / {ref, :stream_data, bin}* / {ref, :stream_done}.
+  def component_serve_http_stream(_store, _instance, _method, _uri, _headers, _body, _caller, _ref),
+    do: error()
+
   def component_receive_callback_result(_component_resource, _token, _success, _result),
     do: error()
 
