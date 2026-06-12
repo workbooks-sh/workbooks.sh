@@ -15,6 +15,84 @@ use wasmtime_wasi::WasiCtx;
 use wasmtime_wasi::WasiView;
 use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
 
+// wb-broker SSRF defense — the egress capability cadence. Permit ONLY public, externally-routable
+// destinations; deny anything that could reach the host's own services or internal network. Used by
+// socket_addr_check (raw wasi-sockets) and (next increment) the wasi-http send_request override.
+pub(crate) fn wb_addr_allowed(addr: std::net::SocketAddr) -> bool {
+    wb_ip_allowed(addr.ip())
+}
+
+pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    // Normalize IPv4-mapped IPv6 (::ffff:a.b.c.d) → V4 so e.g. ::ffff:127.0.0.1 / ::ffff:169.254.169.254
+    // can't smuggle an internal target past the V4 checks.
+    let ip = match ip {
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => IpAddr::V4(v4),
+            None => IpAddr::V6(v6),
+        },
+        v4 => v4,
+    };
+    match ip {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            !(v4.is_loopback()            // 127.0.0.0/8
+                || v4.is_private()        // 10/8, 172.16/12, 192.168/16
+                || v4.is_link_local()     // 169.254.0.0/16 (incl. cloud metadata 169.254.169.254)
+                || v4.is_unspecified()    // 0.0.0.0
+                || v4.is_broadcast()      // 255.255.255.255
+                || v4.is_documentation()  // 192.0.2/24, 198.51.100/24, 203.0.113/24
+                || v4.is_multicast()      // 224.0.0.0/4
+                || o[0] == 0              // 0.0.0.0/8
+                || (o[0] == 100 && (o[1] & 0xc0) == 64)) // CGNAT 100.64.0.0/10
+        }
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            !(v6.is_loopback()                  // ::1
+                || v6.is_unspecified()          // ::
+                || v6.is_multicast()            // ff00::/8
+                || (s[0] & 0xffc0) == 0xfe80    // link-local fe80::/10
+                || (s[0] & 0xfe00) == 0xfc00)   // unique-local fc00::/7
+        }
+    }
+}
+
+#[cfg(test)]
+mod wb_ssrf_tests {
+    use super::wb_ip_allowed;
+    use std::net::IpAddr;
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+    #[test]
+    fn denies_all_internal_and_sensitive() {
+        for s in [
+            "127.0.0.1", "127.1.2.3", "169.254.169.254", "169.254.0.1", "10.0.0.1", "10.255.255.255",
+            "172.16.0.1", "172.31.255.255", "192.168.1.1", "100.64.0.1", "100.127.255.255",
+            "0.0.0.0", "0.1.2.3", "255.255.255.255", "224.0.0.1", "192.0.2.1",
+            "::1", "::", "::ffff:127.0.0.1", "::ffff:169.254.169.254", "::ffff:10.0.0.1",
+            "fe80::1", "fc00::1", "fd12:3456:789a::1", "ff02::1",
+        ] {
+            assert!(!wb_ip_allowed(ip(s)), "SSRF: must DENY {}", s);
+        }
+    }
+    #[test]
+    fn allows_public_routable() {
+        for s in [
+            "8.8.8.8", "1.1.1.1", "93.184.216.34", "140.82.112.3",
+            "2606:4700:4700::1111", "2001:4860:4860::8888", "2620:fe::fe",
+        ] {
+            assert!(wb_ip_allowed(ip(s)), "must ALLOW public {}", s);
+        }
+    }
+    #[test]
+    fn ipv4_mapped_internal_is_denied() {
+        // the classic bypass: smuggle a loopback/metadata target as an IPv4-mapped IPv6 literal
+        assert!(!wb_ip_allowed(ip("::ffff:127.0.0.1")));
+        assert!(!wb_ip_allowed(ip("::ffff:169.254.169.254")));
+    }
+}
+
 #[derive(Debug, NifStruct)]
 #[module = "Wasmex.Wasi.PreopenOptions"]
 pub struct ExWasiPreopenOptions {
@@ -258,9 +336,18 @@ pub fn component_store_new_wasi(
     }
 
     if options.allow_http {
+        // wb-broker: net is brokered, but inherit_network() alone = full host stack (SSRF: a guest
+        // could reach 169.254.169.254 / localhost / RFC1918). socket_addr_check fires at connect-time on
+        // the RESOLVED address (which also closes DNS-rebinding for the raw-socket path), and we deny any
+        // internal/sensitive destination. NOTE: this guards the raw wasi-sockets path only; wasi-http
+        // connects via tokio directly (bypasses this) and is filtered in send_request below.
         wasi_ctx_builder
             .inherit_network()
-            .allow_ip_name_lookup(true);
+            .allow_ip_name_lookup(true)
+            .socket_addr_check(|addr, _use| {
+                let ok = wb_addr_allowed(addr);
+                Box::pin(async move { ok })
+            });
     }
 
     let engine = unwrap_engine(engine_resource)?;

@@ -112,3 +112,21 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 2): write the store.rs socket_addr_check patch + the SSRF filter fn + thread net_allow through
   WasiP2Options/Instance/Policy; cargo-rebuild the NIF; mix compile. Then iter 3: the adversarial red-team
   test (guest tries metadata/localhost/RFC1918 → assert blocked; allowed host → assert reachable).
+- 2026-06-12 (iter 2): **RAW-SOCKET SSRF FILTER LANDED + UNIT-VALIDATED (green).** store.rs: added
+  `socket_addr_check` on the net builder + `wb_ip_allowed()` SSRF filter (denies loopback/RFC1918/link-
+  local[incl metadata 169.254.169.254]/CGNAT-100.64/ULA-fc00/link-local-fe80/multicast/broadcast/
+  unspecified + IPv4-mapped-IPv6 normalization; allows public). 3 cargo tests GREEN over 34 adversarial
+  address forms (incl ::ffff:127.0.0.1 bypass). NIF compiles (mix compile exit 0). socket_addr_check fires
+  at connect-time on the RESOLVED addr → closes DNS-rebinding FOR THE RAW-SOCKET PATH.
+  CLOSED: raw wasi-sockets egress SSRF.
+  STILL OPEN (networking is NOT secure yet — do not claim done):
+    (a) **wasi-http BYPASS** — wasmtime-wasi-http connects via tokio TcpStream::connect directly
+        (types.rs:377), NOT through socket_addr_check. A wasi-http guest could still reach internal IPs.
+        NEXT = override `WasiHttpView::send_request` (store.rs:113 impl) to wb_ip_allowed-check every
+        resolved IP of the request authority before default_send_request; resolve-pin to close rebinding
+        (needs a `hyper` dep at wasmtime-wasi-http's version + care w/ TLS SNI).
+    (b) e2e integration proof — a REAL guest's connect actually blocked (unit test proves the fn; the
+        wiring-to-a-live-guest is unproven). Need a wasi-sockets/wasi-http test guest.
+    (c) scoped per-instance allow-list (today = deny-internal/allow-all-public; not yet {host,port} scoped).
+    (d) quotas, audit log, mid-flight revocation.
+  NEXT (iter 3): the wasi-http send_request override (the bigger half of the SSRF close).
