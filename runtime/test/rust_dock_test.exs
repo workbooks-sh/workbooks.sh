@@ -63,6 +63,21 @@ fn main(){
     end
   end
 
+  test "least-privilege: dedicated exec/kv caps gate the brokers (compute profile is denied them)" do
+    min = RustDock.imports(profile: :minimal)["env"] |> Map.keys()
+    assert "host_exec" in min
+    assert "host_kv_put" in min
+    assert "host_parallel_map" in min
+
+    # compute has only the `vfs` cap — NO exec, NO durable kv: a profile can grant compute/storage without
+    # granting the ability to spawn commands.
+    compute = RustDock.imports(profile: :compute)["env"] |> Map.keys()
+    refute "host_exec" in compute
+    refute "host_kv_put" in compute
+    refute "host_kv_get" in compute
+    refute "host_parallel_map" in compute
+  end
+
   @tag :build
   @tag timeout: 300_000
   test "host_exec — guest brokers exec to a SANDBOXED coreutils (seq) end-to-end (Stone 2)" do

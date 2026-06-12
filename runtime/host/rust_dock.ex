@@ -27,8 +27,8 @@ defmodule Workbooks.RustDock do
       ambient()
       |> maybe(Policy.allow_http?(profile), &egress/0)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
-      |> maybe("commands" in caps, &exec_caps/0)
-      |> maybe("vfs" in caps, fn -> kv_caps(tenant) end)
+      |> maybe("exec" in caps, &exec_caps/0)
+      |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
 
     %{"env" => env}
   end

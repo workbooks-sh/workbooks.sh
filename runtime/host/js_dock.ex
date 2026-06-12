@@ -66,8 +66,8 @@ defmodule Workbooks.JsDock do
   # the wasm never opens a socket); VFS is the Instance's sandboxed KV store (no host FS reach).
   defp env(profile, vfs, tenant) do
     allow_http = Policy.allow_http?(profile)
-    allow_exec = "commands" in Policy.caps(profile)
-    allow_kv = "vfs" in Policy.caps(profile)
+    allow_exec = "exec" in Policy.caps(profile)
+    allow_kv = "kv" in Policy.caps(profile)
 
     %{
       "host_http_get" =>

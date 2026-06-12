@@ -12,10 +12,10 @@ serving is via `ServeBroker`.
 |---|---|---|---|---|
 | `host_http_get` | `(url_ptr,url_len, out_ptr,out_cap)` → body len / -1 | `net`/`browse` | `NetGuard` | SSRF floor + redirect re-check + allow-list + audit |
 | `host_http_get_many` | newline URLs in → `[count][len,body]*` | `net`/`browse` | `NetGuard` | concurrent egress |
-| `host_exec` | `(req_ptr,req_len, out_ptr,out_cap)` → out len / -1 | `commands` | `ExecBroker` | runs a REGISTERED wasm cmd, sandboxed; req = `parse_request` LE format; no injection (structural argv) |
-| `host_parallel_map` | `(req,out)` → `[n][(len,-1=err)(body)]*` | `commands` | `ParallelBroker` | fan a cmd over N inputs CONCURRENTLY (BEAM); fan-out + concurrency caps |
-| `host_kv_put` | `(key_ptr,key_len, val_ptr,val_len)` → 0 / -1 | `vfs` | `StorageBroker` | DURABLE, per-TENANT (tenant from Dock, not guest); size + key-count quotas |
-| `host_kv_get` | `(key_ptr,key_len, out_ptr,out_cap)` → val len / -1 | `vfs` | `StorageBroker` | tenant-isolated read |
+| `host_exec` | `(req_ptr,req_len, out_ptr,out_cap)` → out len / -1 | `exec` | `ExecBroker` | runs a REGISTERED wasm cmd, sandboxed; req = `parse_request` LE format; no injection (structural argv) |
+| `host_parallel_map` | `(req,out)` → `[n][(len,-1=err)(body)]*` | `exec` | `ParallelBroker` | fan a cmd over N inputs CONCURRENTLY (BEAM); fan-out + concurrency caps |
+| `host_kv_put` | `(key_ptr,key_len, val_ptr,val_len)` → 0 / -1 | `kv` | `StorageBroker` | DURABLE, per-TENANT (tenant from Dock, not guest); size + key-count quotas |
+| `host_kv_get` | `(key_ptr,key_len, out_ptr,out_cap)` → val len / -1 | `kv` | `StorageBroker` | tenant-isolated read |
 | `host_request_get` | `(out_ptr,out_cap)` → req len | (serve instance) | `ServeBroker` | inbound: fetch the current request bytes |
 | `host_response_set` | `(ptr,len)` → 0 | (serve instance) | `ServeBroker` | inbound: return the response bytes (size-capped) |
 | ambient: `host_now`, `host_log`; vfs: `host_vfs_read/write` | | always / `vfs` | — | clock/log; ephemeral per-instance KV |

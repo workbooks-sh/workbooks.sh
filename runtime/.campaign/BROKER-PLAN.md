@@ -496,3 +496,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   caps so a profile can grant network/storage WITHOUT granting exec, etc. (add a no-exec profile to prove
   it); OR a composition DEMO (a serve guest that execs a cmd + caches in KV per request — proving the
   platform composes into real apps). Networking 323-reclamation stays gated on wb-0beq.
+- 2026-06-12 (iter 22): **LEAST-PRIVILEGE cap hardening (green) — manageability ↑.** Split the coarse caps:
+  added DEDICATED `exec` (gates host_exec + host_parallel_map) and `kv` (gates durable host_kv), distinct
+  from the broad `commands`/`vfs`. The 3 standard profiles gained `exec`+`kv` (every current capability
+  preserved); added a restrictive `compute` profile (caps: vfs only — pure compute + ephemeral vfs, NO exec,
+  NO durable kv, NO net). Shifted the gates in BOTH docks (rust_dock maybe "exec"/"kv"; js_dock allow_exec/
+  allow_kv). A profile can now grant durable STORAGE or NETWORK without also granting the ability to SPAWN
+  COMMANDS. Hermetic test: minimal has host_exec/host_kv/host_parallel_map; compute is DENIED all three. 20
+  broker unit tests regression-free. Updated BROKER-CAPABILITIES.md cap-gate column.
+  NEXT (iter 23): a COMPOSITION demo (a serve guest that, per request, execs a cmd + caches the result in KV
+  — proving the brokers compose into a real sandboxed app), OR the DoS body-cap (net path streaming). The
+  net-egress 323-reclamation stays gated on wb-0beq.
