@@ -364,3 +364,24 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   `commands` cap); a JS-guest e2e (rust e2e proves the mechanism; js_dock is wired identically).
   NEXT (iter 14): per the loop directive — re-evaluate runtime/.campaign/resolved.json's FORK-EXEC subset
   now reachable via host_exec (flip reachable ones), then pull the next stone (brokered durable storage).
+
+## STONE 3 — brokered durable storage + the honest 323-reclamation finding
+- 2026-06-12 (iter 14a — RECLAMATION re-run, HONEST result): re-ran the feasibility pass vs the two brokers.
+  **No items flipped — the reclamation is GATED, not unlocked** (a false "live" is worse than an accurate
+  "impossible"). reclaim-analysis.md records it: ~64 net + ~37 fork-exec "runtime-only" candidates, BUT they
+  are STANDARD tools using wasi-sockets / POSIX fork-exec — they reach the broker only via the WASI-SEAM
+  generalization (wb-0beq, env/refactor-gated), NOT via the hand-written-guest brokers; and fork-exec tools
+  can't even compile to wasi (no process model). The brokers' real win is enabling NEW hand-written guests
+  (host_exec composes the 32 live cmds; host_http_get gives them SSRF-safe egress) — proven — not auto-
+  reclaiming standard tools. Reclamation revisits after wb-0beq in an internet env.
+- 2026-06-12 (iter 14b — Stone 3 CORE built + validated, green): Workbooks.StorageBroker — host-brokered
+  PERSISTENT k/v (sqlite-backed; the in-instance VFS is ephemeral, this survives across runs). Security
+  cadence: TENANT ISOLATION (every row scoped by tenant — a guest can't read/overwrite another tenant's
+  keys; tested adversarially), QUOTAS (per-value size + per-tenant key-count, DoS defense), binary-safe
+  BLOBs. put/get/delete/keys. 6 ExUnit tests green: round-trip+binary, tenant-isolation, DURABLE (persists
+  across close+reopen), size-quota, key-count-quota, empty-key reject. Conn-passing style (like VFS) -> the
+  Dock holds one app-supervised conn.
+  NEXT (iter 15): wire host_kv_put/get Dock imports — design the TENANT identity for a dock guest (per-app/
+  per-instance) + the persistent-conn lifecycle (app-supervised, durable DB path under the data dir), then a
+  guest e2e (a Rust guest puts+gets a key, value persists). Then the next stone (threading-fallback or
+  app-host platform).
