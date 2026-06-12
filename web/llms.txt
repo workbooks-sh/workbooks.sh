@@ -19,6 +19,7 @@ coding agent, install the skills: `npx skills add workbooks-sh/workbooks.sh`.
 - [Org](https://workbooks.sh/learn/org.html): the written layer people and agents share
 - [Agents](https://workbooks.sh/learn/agents.html): long-running crew — a model on a schedule with files, tools, memory
 - [The Autopoet](https://workbooks.sh/learn/autopoet.html): the gardener — tends the declarative layer, never the engine
+- [wbx](https://workbooks.sh/learn/wbx.html): the command line — one compiled tool, same binary on laptop, CI, and inside the engine
 
 ## Try
 - [hello-workbook.html](https://workbooks.sh/learn/hello-workbook.html): a real workbook that explains itself — live WebAssembly inside

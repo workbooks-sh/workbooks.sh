@@ -65,6 +65,7 @@
     item('learn/org.html', ['#f2ddb0', '<b>✳</b>'], 'Org', 'the grammar') +
     item('learn/agents.html', ['#9fc4e8', '<b>✦</b>'], 'Agents', 'the crew') +
     item('learn/autopoet.html', ['#aee5c2', '<b>❀</b>'], 'Autopoet', 'the gardener') +
+    item('learn/wbx.html', ['#d9dbd3', '<b>&gt;_</b>'], 'wbx', 'the command') +
     '</div></div>' +
     '<a class="lnk gh" href="https://github.com/workbooks-sh/workbooks.sh" aria-label="GitHub">' + GH + '</a>' +
     (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index.html#download">Download</a>' : '');
