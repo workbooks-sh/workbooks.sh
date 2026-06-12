@@ -317,6 +317,22 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `qr` CLI: stdin text → an ASCII QR code (nayuki qrcodegen, ## = dark module).
+  @qr_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include "qrcodegen.h"
+  int main(void) {
+    static char buf[8192]; size_t n = fread(buf, 1, sizeof(buf) - 1, stdin); buf[n] = 0;
+    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) buf[--n] = 0;
+    uint8_t qr[qrcodegen_BUFFER_LEN_MAX], tmp[qrcodegen_BUFFER_LEN_MAX];
+    if (!qrcodegen_encodeText(buf, tmp, qr, qrcodegen_Ecc_MEDIUM, qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true)) { fprintf(stderr, "qr: encode failed\n"); return 1; }
+    int s = qrcodegen_getSize(qr);
+    for (int y = -1; y <= s; y++) { for (int x = -1; x <= s; x++) { int d = (x >= 0 && x < s && y >= 0 && y < s) && qrcodegen_getModule(qr, x, y); fputs(d ? "##" : "  ", stdout); } putchar('\n'); }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -385,6 +401,16 @@ defmodule Workbooks.Pallet do
         src_globs: ["lib/*.h", "lib/common/*.{c,h}", "lib/compress/*.{c,h}", "lib/decompress/*.{c,h}"],
         extra_sources: [{"zmain.c", @zstd_main}],
         cflags: ["-DZSTD_DISABLE_ASM=1"]
+      ]
+    },
+    %{
+      name: "qr",
+      url: "https://codeload.github.com/nayuki/QR-Code-generator/tar.gz/refs/tags/v1.8.0",
+      sha: "2ec0a4d33d6f521c942eeaf473d42d5fe139abcfa57d2beffe10c5cf7d34ae60",
+      build_opts: [
+        src_globs: ["c/*.{c,h}"],
+        exclude: ~w(qrcodegen-demo.c qrcodegen-test.c),
+        extra_sources: [{"qrmain.c", @qr_main}]
       ]
     }
   ]
