@@ -1311,3 +1311,8 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   :message_too_large; tight rate -> :rate_limited on publish + poll. host_publish/host_poll callers get the
   default-quota rate automatically. Severity-order remaining: HIGH wb-an2v (tenant-isolation "default"
   collapse) next, then the wb-8w8x medium/low batch.
+- 2026-06-12 (iter 95 cont): **FIXED wb-8w8x item: forensics-ring target truncation (MEDIUM memory-DoS).**
+  BrokerAudit.record now truncates the GUEST-CONTROLLED target to @max_target_bytes (512) before storing it in
+  the host-lifetime ring AND before emitting it via :telemetry — so 128 ring entries × a multi-MB guest URL
+  can't exhaust host memory. Test: a 100KB target -> stored <= 512 bytes. 6 broker_audit tests green. (Rest of
+  the wb-8w8x batch + wb-an2v tenant-isolation continue next, severity order.)

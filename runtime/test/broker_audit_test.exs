@@ -77,4 +77,13 @@ defmodule Workbooks.BrokerAuditTest do
 
     :telemetry.detach("test-#{inspect(ref)}")
   end
+
+  test "wb-8w8x: a huge guest-controlled target is TRUNCATED in the forensics ring (memory floor)" do
+    BrokerAudit.reset()
+    huge = "http://10.0.0.1/" <> String.duplicate("A", 100_000)
+    BrokerAudit.record(:net, :deny, :ssrf, huge)
+
+    [{:net, :ssrf, target, _ts} | _] = BrokerAudit.recent(1)
+    assert byte_size(target) <= 512
+  end
 end

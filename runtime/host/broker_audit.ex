@@ -12,6 +12,9 @@ defmodule Workbooks.BrokerAudit do
   @table :wb_broker_audit
   @ring :wb_broker_audit_ring
   @ring_max 128
+  # wb-8w8x: the `target` is GUEST-CONTROLLED (the attempted URL/host:port). Stored verbatim in the host-
+  # lifetime ring it's a memory-exhaustion vector (128 entries × a multi-MB guest string). Truncate it.
+  @max_target_bytes 512
 
   @doc """
   Count one broker outcome and, on a denial, append it to the forensics ring. `broker` e.g.
@@ -24,6 +27,8 @@ defmodule Workbooks.BrokerAudit do
     if reason do
       :ets.update_counter(table(), {broker, outcome, reason}, 1, {{broker, outcome, reason}, 0})
     end
+
+    target = truncate_target(target)
 
     if outcome == :deny do
       key = System.unique_integer([:monotonic, :positive])
@@ -50,6 +55,11 @@ defmodule Workbooks.BrokerAudit do
     |> Enum.take(n)
     |> Enum.map(fn {_, ev} -> ev end)
   end
+
+  defp truncate_target(t) when is_binary(t) and byte_size(t) > @max_target_bytes,
+    do: binary_part(t, 0, @max_target_bytes)
+
+  defp truncate_target(t), do: t
 
   defp prune_ring do
     case :ets.info(ring(), :size) do
