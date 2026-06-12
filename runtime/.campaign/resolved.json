@@ -1,0 +1,143 @@
+{
+"resolved": {
+"MuJS": {
+"verdict": "live",
+"lane": "B",
+"recipe": "mujs 1.3.5 C source, minimal eval main",
+"smoke": "print(6*7)=42",
+"extent": "ES5 interpreter; eval stdin JS, print() bound"
+},
+"SQL": {
+"verdict": "live",
+"lane": "A",
+"recipe": "sqlite3 (already cataloged)",
+"smoke": "SELECT 6*7=42",
+"extent": "full SQL via sqlite3 shell"
+},
+"sql.js": {
+"verdict": "live",
+"lane": "A",
+"recipe": "capability via sqlite3",
+"smoke": "sqlite3 SELECT",
+"extent": "SQLite-in-wasm capability live via sqlite3; sql.js's own JS API is browser-host-bound but the capability is in-sandbox"
+},
+"wa-sqlite": {
+"verdict": "live",
+"lane": "A",
+"recipe": "capability via sqlite3 + --dir",
+"smoke": "sqlite3 + file",
+"extent": "SQLite + file persistence in-sandbox via sqlite3 --dir; OPFS/IndexedDB VFS is browser-only but persistence capability exists"
+},
+"PHP": {
+"verdict": "live",
+"lane": "A",
+"recipe": "php-cgi-8.2.6.wasm (vmware WLR), file mode",
+"smoke": "php -f /w/t.php (echo 6*7) => 42",
+"extent": "Full Zend PHP 8.2 via php-cgi SAPI; run scripts with -f + a --dir mount (not -r/stdin). CGI mode."
+},
+"C++": {
+"verdict": "deferred",
+"lane": "B",
+"recipe": "clang.wasm handles C; needs libc++/libc++abi wired into the lane",
+"smoke": "none yet",
+"extent": "REACHABLE not impossible \u2014 the clang lane is C-only today; C++ needs libc++ in the sysroot + a cpp dispatch. Keep wire-up; revisit."
+},
+"mruby": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt wasm32-wasi mruby exists (no release assets anywhere; only emscripten/browser config in-tree; Wasmer null; WLR is CRuby not mruby). And the C source cannot build in a codegen-free clang sandbox: it requires b",
+"extent": "off-the-table (verified)"
+},
+"NumPy": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "NumPy is a CPython C-extension, not a standalone WASI program. The only real wasm build is Pyodide's emscripten target (needs a JS/browser host, out of scope for plain wasm32-wasi under wasmtime). No pure-Python wheel ex",
+"extent": "off-the-table (verified)"
+},
+"Typst": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32-wasi build exists or is feasible. Verified Typst v0.14.2 releases ship native-only targets; the wasmer typst/typst package is empty (lastVersion=null). The project's only wasm path is the browser build (w",
+"extent": "off-the-table (verified)"
+},
+"Shell (Bash)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two compounding blockers. (1) Build: bash source needs host-run codegen (mkbuiltins, mksyntax, mksignames each compiled+executed to emit .c/.h) and a ./configure-generated config.h with no config.h.generic fallback \u2014 can",
+"extent": "off-the-table (verified)"
+},
+"Haxe": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Haxe compiler is written in OCaml (verified via gh languages: OCaml 4.95MB, only 77KB C glue), not C/Rust/pure-Python, and no wasm32-wasi prebuilt exists. Producing a WASI module would require the full OCaml+opam toolcha",
+"extent": "off-the-table (verified)"
+},
+"Elm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Elm's compiler is a native Haskell/GHC binary \u2014 verified the only elm/compiler 0.19.1 release assets are native linux/mac/windows binaries (no .wasm), and no wasm32-wasi Elm build exists in VMware WLR or anywhere else. N",
+"extent": "off-the-table (verified)"
+},
+"MoonBit": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "MoonBit's toolchain is distributed only as a wasm_of_ocaml build: a .js+.wasm pair (moonc.js + code-*.wasm) that hard-requires a JS host \u2014 Node >=24 / V8 with wasm-gc and the jsoo JS runtime (moonc.js references globalTh",
+"extent": "off-the-table (verified)"
+},
+"Forth": {
+"verdict": "live",
+"lane": "B",
+"recipe": "zForth commit 41db72d, ctx-API + embedded core.zf",
+"smoke": "'2 3 + . 9 sq .' => 5 81",
+"extent": "Full Forth primitives + core.zf vocab; SJLJ via lane"
+},
+"Scheme": {
+"verdict": "deferred",
+"lane": "B",
+"blocker": "S7 builds but uses unguarded POSIX (popen, getrusage ru_maxrss); needs feature-disable. Reachable.",
+"extent": "pending"
+}
+},
+"preliminary": {
+"cbindgen": {
+"verdict": "uncertain",
+"lane": "C",
+"source_url": "https://crates.io/api/v1/crates/cbindgen/0.29.4/download",
+"recipe": "Lane C (Rust crate via mrustc ~1.74 + clang). Crate: cbindgen 0.29.4 (download verified at https://crates.io/api/v1/crates/cbindgen/0.29.4/download; releases page has NO wasm asset \u2014 only native ELF c",
+"smoke": "echo 'pub extern \"C\" fn add(a:i32,b:i32)->i32{a+b}' > /tmp/lib.rs; wasmtime run --dir /tmp cbindgen.wasm -- /tmp  # expe",
+"blocker": "No prebuilt wasm32-wasi asset exists (all cbindgen releases are native ELF; not on VMware WLR or wapm). Only path is mrustc, but the dep graph (syn full + serde_derive + clap derive + proc-macro2/quot",
+"confidence": "medium",
+"verified": false
+},
+"Graphviz (dot)": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/12.2.1/graphviz-12.2.1.tar.gz",
+"recipe": "Lane A is NOT viable: the widely-cited @hpcc-js/wasm Graphviz is emscripten/browser-targeted \u2014 its GitHub releases (wasm-graphviz-v1.22.0) ship EMPTY assets (npm-only) and the package is a .js+.wasm p",
+"smoke": "After a successful static-plugin wasm32-wasi build to dot.wasm: `printf 'digraph{a->b}' | wasmtime run dot.wasm -- -Tsvg",
+"blocker": "No plain wasm32-wasi prebuilt exists (hpcc-js is emscripten/JS-host-only, empty GitHub assets). Source builds but is configure-dependent (no pre-generated config.h) and uses a dlopen/ltdl plugin archi",
+"confidence": "high",
+"verified": false
+},
+"tar": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/rxi/microtar (raw: https://raw.githubusercontent.com/rxi/microtar/master/src/microtar.c + microtar.h)",
+"recipe": "Lane B (C source -> wasm via in-sandbox clang). microtar is a single-file, dependency-free tar implementation: just microtar.c + microtar.h, including only <stdio.h> <stdlib.h> <stddef.h> <string.h>. ",
+"smoke": "Verified locally with native clang (identical source/behavior to the wasm build):\n  clang -O2 microtar.c tar_main.c -o t",
+"blocker": "",
+"confidence": "high",
+"verified": false
+},
+"sed": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://ftp.gnu.org/gnu/sed/sed-4.9.tar.gz",
+"recipe": "Lane B (closest viable, but gated). GNU sed 4.9 source VERIFIED at https://ftp.gnu.org/gnu/sed/sed-4.9.tar.gz (HTTP 200). Core is small + WASI-friendly (pure stdin->stdout, only fs/stdio syscalls, no ",
+"smoke": "After a successful build to sed.wasm: printf 'hello world\\n' | wasmtime sed.wasm 's/world/wasm/'  => expected stdout: \"h",
+"blocker": "No verifiable clean lane: (A) no plain wasm32-wasi sed binary exists anywhere I could confirm \u2014 uutils coreutils.wasm has no sed applet, wasmer registry empty, no busybox-wasi release; (B) GNU sed 4.9",
+"confidence": "medium",
+"verified": false
+}
+}
+}

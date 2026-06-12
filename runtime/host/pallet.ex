@@ -417,6 +417,37 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # zForth (Forth): tiny C interpreter (ctx-based API) + its forth bootstrap (core.zf, embedded at
+  # compile time so the command is self-contained — core.zf defines `.`/emit/`:`/`;` etc.). setjmp →
+  # rides the lane's SJLJ path.
+  @zforth_core File.read!(Path.join(__DIR__, "../priv/zforth/core_zf.h"))
+  @zforth_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <stdarg.h>
+  #include "zforth.h"
+  #include "core_zf.h"
+  zf_input_state zf_host_sys(zf_ctx *ctx, zf_syscall_id id, const char *last_word) {
+    (void)last_word;
+    switch ((int)id) {
+      case ZF_SYSCALL_EMIT: putchar((int)zf_pop(ctx)); break;
+      case ZF_SYSCALL_PRINT: printf(ZF_CELL_FMT " ", zf_pop(ctx)); break;
+      case ZF_SYSCALL_TELL: { zf_cell len = zf_pop(ctx); zf_cell addr = zf_pop(ctx); const char* p = (const char*)zf_dump(ctx, NULL) + (int)addr; fwrite(p, 1, (size_t)len, stdout); break; }
+      default: break;
+    }
+    return ZF_INPUT_INTERPRET;
+  }
+  void zf_host_trace(zf_ctx *ctx, const char *fmt, va_list va) { (void)ctx; vfprintf(stderr, fmt, va); }
+  zf_cell zf_host_parse_num(zf_ctx *ctx, const char *buf) { char *e; zf_cell v = strtol(buf, &e, 0); if (*e) zf_abort(ctx, ZF_ABORT_NOT_A_WORD); return v; }
+  int main(void) {
+    static zf_ctx ctx;
+    zf_init(&ctx, 0); zf_bootstrap(&ctx);
+    zf_eval(&ctx, CORE_ZF);
+    static char l[4096]; while (fgets(l, sizeof(l), stdin)) zf_eval(&ctx, l);
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -529,6 +560,15 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/ccxvii/mujs/tar.gz/refs/tags/1.3.5",
       sha: "78a311ae4224400774cb09ef5baa2633c26971513f8b931d3224a0eb85b13e0b",
       build_opts: [src_globs: ["*.{c,h}"], exclude: ~w(main.c one.c), extra_sources: [{"mujs_main.c", @mujs_main}]]
+    },
+    %{
+      name: "zforth",
+      url: "https://codeload.github.com/zevv/zForth/tar.gz/41db72d165c1539d57f3f79970fc57ea881a79dc",
+      sha: "34c578ec2aa979786387e5f244fa933b6b040f9a6f18888ed2cc4273ef06df8d",
+      build_opts: [
+        src_globs: ["src/zforth/zforth.{c,h}", "src/linux/zfconf.h"],
+        extra_sources: [{"zfmain.c", @zforth_main}, {"core_zf.h", @zforth_core}]
+      ]
     }
   ]
 
