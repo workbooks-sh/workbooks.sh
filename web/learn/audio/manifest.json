@@ -4,7 +4,7 @@
    "slug": "workbook",
    "title": "Workbooks — the unit",
    "src": "audio/episodes/workbook.mp3",
-   "dur": 531,
+   "dur": 529,
    "chapters": [
     {
      "id": "intro",
@@ -14,52 +14,52 @@
     {
      "id": "problem",
      "title": "Software you can't hand to anyone",
-     "t": 29
+     "t": 31
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 88
+     "t": 90
     },
     {
      "id": "anatomy",
      "title": "Open one up",
-     "t": 126
+     "t": 128
     },
     {
      "id": "spectrum",
      "title": "Document or app? Yes.",
-     "t": 182
+     "t": 184
     },
     {
      "id": "not-a-zip",
      "title": "Isn't this just a zip file?",
-     "t": 233
+     "t": 235
     },
     {
      "id": "org-layer",
      "title": "The writable layer",
-     "t": 304
+     "t": 301
     },
     {
      "id": "agent",
      "title": "An agent can live in here",
-     "t": 366
+     "t": 364
     },
     {
      "id": "limits",
      "title": "Where a file alone falls short",
-     "t": 429
+     "t": 426
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 462
+     "t": 459
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 514
+     "t": 511
     }
    ]
   },
@@ -67,7 +67,7 @@
    "slug": "nexus",
    "title": "Nexus — the engine",
    "src": "audio/episodes/nexus.mp3",
-   "dur": 644,
+   "dur": 650,
    "chapters": [
     {
      "id": "intro",
@@ -82,27 +82,27 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 112
+     "t": 111
     },
     {
      "id": "docking",
      "title": "What docking actually means",
-     "t": 146
+     "t": 145
     },
     {
      "id": "beam",
      "title": "Built on a boring miracle",
-     "t": 205
+     "t": 204
     },
     {
      "id": "isolation",
      "title": "Isolation, twice",
-     "t": 275
+     "t": 274
     },
     {
      "id": "why-not",
      "title": "Why not serverless? Why not rent?",
-     "t": 340
+     "t": 339
     },
     {
      "id": "security",
@@ -112,22 +112,22 @@
     {
      "id": "dev-prod",
      "title": "Dev is prod",
-     "t": 484
+     "t": 490
     },
     {
      "id": "limits",
      "title": "What the Nexus isn't",
-     "t": 530
+     "t": 536
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 577
+     "t": 583
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 626
+     "t": 633
     }
    ]
   },
@@ -135,7 +135,7 @@
    "slug": "toolkit",
    "title": "Toolkits — the parts",
    "src": "audio/episodes/toolkit.mp3",
-   "dur": 581,
+   "dur": 582,
    "chapters": [
     {
      "id": "intro",
@@ -170,27 +170,27 @@
     {
      "id": "wasm",
      "title": "Why WebAssembly?",
-     "t": 316
+     "t": 317
     },
     {
      "id": "compose",
      "title": "Toolkits compose",
-     "t": 394
+     "t": 395
     },
     {
      "id": "frontier",
      "title": "The honest frontier",
-     "t": 453
+     "t": 455
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 508
+     "t": 509
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 566
+     "t": 567
     }
    ]
   },
@@ -198,7 +198,7 @@
    "slug": "org",
    "title": "Org — the grammar",
    "src": "audio/episodes/org.mp3",
-   "dur": 424,
+   "dur": 423,
    "chapters": [
     {
      "id": "intro",
@@ -233,22 +233,22 @@
     {
      "id": "where",
      "title": "Where it shows up",
-     "t": 264
+     "t": 263
     },
     {
      "id": "limits",
      "title": "Where it bites",
-     "t": 311
+     "t": 309
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 348
+     "t": 346
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 407
+     "t": 406
     }
    ]
   },
@@ -256,7 +256,7 @@
    "slug": "agents",
    "title": "Agents — the crew",
    "src": "audio/episodes/agents.mp3",
-   "dur": 341,
+   "dur": 354,
    "chapters": [
     {
      "id": "intro",
@@ -291,7 +291,7 @@
     {
      "id": "boundaries",
      "title": "Crew, not autopilot",
-     "t": 230
+     "t": 229
     },
     {
      "id": "faq",
@@ -309,7 +309,7 @@
    "slug": "autopoet",
    "title": "Autopoet — the gardener",
    "src": "audio/episodes/autopoet.mp3",
-   "dur": 366,
+   "dur": 369,
    "chapters": [
     {
      "id": "intro",
@@ -329,32 +329,32 @@
     {
      "id": "safe",
      "title": "Why this is safe to want",
-     "t": 106
+     "t": 108
     },
     {
      "id": "does",
      "title": "What it actually does",
-     "t": 156
+     "t": 159
     },
     {
      "id": "homogeneity",
      "title": "You can't learn from noise",
-     "t": 214
+     "t": 219
     },
     {
      "id": "honest",
      "title": "The youngest idea here",
-     "t": 248
+     "t": 251
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 293
+     "t": 296
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 349
+     "t": 352
     }
    ]
   },
@@ -362,7 +362,7 @@
    "slug": "wbx",
    "title": "wbx — the command",
    "src": "audio/episodes/wbx.mp3",
-   "dur": 597,
+   "dur": 599,
    "chapters": [
     {
      "id": "intro",
@@ -417,12 +417,12 @@
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 518
+     "t": 520
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 577
+     "t": 578
     }
    ]
   }

@@ -5,7 +5,7 @@
   {
    "id": "intro",
    "title": "One file that is whole software",
-   "text": "Welcome to the first lesson — the workbook. Here's the whole idea in one sentence… a workbook is one file that is a whole piece of software. [curious] By the end of this, you'll go from \"okay, it's an HTML file\"… all the way to \"an agent can live inside it.\" And you can bail whenever you have what you need. That's the deal with all of these lessons."
+   "text": "Welcome to the first lesson — the workbook. Here's the whole idea in one sentence… a workbook is one file that is a whole piece of software. [curious] By the end of this, you'll go from okay, it's an HTML file… all the way to an agent can live inside it. And you can bail whenever you have what you need. That's the deal with all of these lessons."
   },
   {
    "id": "problem",
@@ -30,7 +30,7 @@
   {
    "id": "not-a-zip",
    "title": "Isn't this just a zip file?",
-   "text": "[curious] \"Isn't this just a zip file?\" Fair question — it's compressed, it has things inside. But a zip is storage. It's inert. Unpack it, or nothing happens. A workbook is runnable — double-click it, and it opens, renders, computes. \"Okay… so it's a container image.\" Closer — and worth slowing down for. An image also packages software with everything it needs. But it's a build artifact for a Linux kernel. It needs a daemon… it behaves differently across operating systems… and you can't open one. There's nothing to see. [excited] Here's the move that makes workbooks interesting. A workbook plays both roles. Opened in a browser — it's a document. Docked into an engine — it behaves exactly like a container image. The WebAssembly is the executable surface… the SQLite is the disk. Same file. No conversion step. One artifact, two readings. A document to a human… a container to an engine."
+   "text": "[curious] Isn't this just a zip file? Fair question — it's compressed, it has things inside. But a zip is storage. It's inert. Unpack it, or nothing happens. A workbook is runnable — double-click it, and it opens, renders, computes. Okay… so it's a container image. Closer — and worth slowing down for. An image also packages software with everything it needs. But it's a build artifact for a Linux kernel. It needs a daemon… it behaves differently across operating systems… and you can't open one. There's nothing to see. [excited] Here's the move that makes workbooks interesting. A workbook plays both roles. Opened in a browser — it's a document. Docked into an engine — it behaves exactly like a container image. The WebAssembly is the executable surface… the SQLite is the disk. Same file. No conversion step. One artifact, two readings. A document to a human… a container to an engine."
   },
   {
    "id": "org-layer",

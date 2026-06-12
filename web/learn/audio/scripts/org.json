@@ -30,7 +30,7 @@
   {
    "id": "why-not",
    "title": "Why not just Markdown?",
-   "text": "[curious] \"Why not just Markdown?\" Use Markdown! It's wonderful — for writing. The trouble starts when you ask it to run a system. There are no states… no dates… no dependencies. Just headings… [chuckles] and vibes. When an agent drifts — writes one file too many, contradicts itself across notes — Markdown has no way to even notice. You can't write a test suite for Markdown. You can, for org. Parse the tree… check the states… validate the dates… diff the intent. And that's the whole argument, in one line. Markdown is for telling humans things. [excited] Org is for telling humans and systems the same thing… at once."
+   "text": "[curious] Why not just Markdown? Use Markdown! It's wonderful — for writing. The trouble starts when you ask it to run a system. There are no states… no dates… no dependencies. Just headings… [chuckles] and vibes. When an agent drifts — writes one file too many, contradicts itself across notes — Markdown has no way to even notice. You can't write a test suite for Markdown. You can, for org. Parse the tree… check the states… validate the dates… diff the intent. And that's the whole argument, in one line. Markdown is for telling humans things. [excited] Org is for telling humans and systems the same thing… at once."
   },
   {
    "id": "where",

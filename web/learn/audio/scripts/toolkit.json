@@ -30,7 +30,7 @@
   {
    "id": "versus",
    "title": "Isn't this just an MCP server?",
-   "text": "[curious] \"Isn't this just an MCP server?\" Or a plugin… or an npm package? Each of those solves one of the three layers, and leaves you to source the other two. An npm package gives you code that runs — on your machine, at your risk… with a readme, maybe. An MCP server gives you code behind a protocol — but a schema isn't guidance. A platform plugin runs in the host's sandbox — and it's locked to that host. A toolkit covers all three. The code runs… the wasm sandbox bounds it… and the manual is the surface. On any Nexus, in any workbook. None of those other things are bad ideas. Toolkits happily wrap existing CLIs rather than compete with them. [excited] The claim isn't \"better protocol.\" It's that code, sandbox, and manual were never supposed to be three separate supply chains."
+   "text": "[curious] Isn't this just an MCP server? Or a plugin… or an npm package? Each of those solves one of the three layers, and leaves you to source the other two. An npm package gives you code that runs — on your machine, at your risk… with a readme, maybe. An MCP server gives you code behind a protocol — but a schema isn't guidance. A platform plugin runs in the host's sandbox — and it's locked to that host. A toolkit covers all three. The code runs… the wasm sandbox bounds it… and the manual is the surface. On any Nexus, in any workbook. None of those other things are bad ideas. Toolkits happily wrap existing CLIs rather than compete with them. [excited] The claim isn't better protocol. It's that code, sandbox, and manual were never supposed to be three separate supply chains."
   },
   {
    "id": "wasm",

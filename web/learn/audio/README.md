@@ -36,14 +36,20 @@ bottom-bar → full-screen sheet.
    Do NOT invent mood tags (`[warm]`, `[thoughtful]`, `[serious]` were all
    read as words at least once). Mood comes from the prose itself.
 
-3. **Pauses are ellipses.** `…` is a real beat in v3. Use it for thought
+3. **NO double quotes in narration text.** v3 treats a quote-led sentence
+   as stage direction and silently skips it — fourteen segments lost their
+   opening rhetorical questions this way ("Isn't this just a zip file?"
+   was never spoken). Write the words without quote marks; delivery tags
+   and sentence shape carry the "voicing a question" feel.
+
+4. **Pauses are ellipses.** `…` is a real beat in v3. Use it for thought
    rhythm; use `—` for mid-sentence pivots. No SSML.
 
-4. **Tags need earning.** ~10–15 per episode, each at a moment the text
+5. **Tags need earning.** ~10–15 per episode, each at a moment the text
    actually supports ([chuckles] after a genuinely wry line). A tag against
    the grain of the sentence does nothing.
 
-5. **Voice + settings** (generate.mjs): voice `q0IMILNRPxOgtBTS4taI`,
+6. **Voice + settings** (generate.mjs): voice `q0IMILNRPxOgtBTS4taI`,
    `eleven_v3`, stability `0.0` (creative — maximum tag response).
    A future switch to another voice is one constant + a regen pass.
 

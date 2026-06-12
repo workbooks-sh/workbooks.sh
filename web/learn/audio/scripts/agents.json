@@ -30,12 +30,12 @@
   {
    "id": "chronology",
    "title": "The missing sense is time",
-   "text": "[curious] Ask today's agents the questions that actually matter on real work. When did this happen? Why did we decide that… then? What was I doing before this? And they shrug. [chuckles] Context windows hold text — not chronology. Here… chronology is ambient. The org layer's tasks carry states and dates natively. The workbook carries its own history. Telemetry is part of the substrate. An agent that can answer \"what was I doing, and why\"… is the difference between a goldfish and a colleague. And it falls out of the grammar — not out of a bigger model."
+   "text": "[curious] Ask today's agents the questions that actually matter on real work. When did this happen? Why did we decide that… then? What was I doing before this? And they shrug. [chuckles] Context windows hold text — not chronology. Here… chronology is ambient. The org layer's tasks carry states and dates natively. The workbook carries its own history. Telemetry is part of the substrate. An agent that can answer what was I doing, and why… is the difference between a goldfish and a colleague. And it falls out of the grammar — not out of a bigger model."
   },
   {
    "id": "boundaries",
    "title": "Crew, not autopilot",
-   "text": "Honesty section — and a values one. The pitch is never \"software that runs itself.\" It's people and AI… building together. Agents here are crew. They carry work between your sessions, file what they found… and stop at the edges you set. Direction stays human. And the edges are real — not vibes. An agent's blast radius is its sandbox. Its capabilities are explicit grants. And what it changes is written in a layer you can read… diff… and revert. Trust is earned in increments — and the architecture is built so the increments are safe to give."
+   "text": "Honesty section — and a values one. The pitch is never software that runs itself. It's people and AI… building together. Agents here are crew. They carry work between your sessions, file what they found… and stop at the edges you set. Direction stays human. And the edges are real — not vibes. An agent's blast radius is its sandbox. Its capabilities are explicit grants. And what it changes is written in a layer you can read… diff… and revert. Trust is earned in increments — and the architecture is built so the increments are safe to give."
   },
   {
    "id": "faq",

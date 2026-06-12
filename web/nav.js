@@ -75,12 +75,7 @@
 
   // notebooks — runnable org documents; searchable from the Learn dropdown
   var NOTEBOOKS = [
-    { id: "loops",       title: "the agent loop",          cat: "agents",        sw: "#9fc4e8" },
-    { id: "context",     title: "the context repository",  cat: "agents",        sw: "#9fc4e8" },
-    { id: "workflows",   title: "workflows from org",      cat: "orchestration", sw: "#f2ddb0" },
-    { id: "tangle",      title: "tangling source blocks",  cat: "grammar",       sw: "#f2ddb0" },
-    { id: "telemetry",   title: "telemetry, ambient",      cat: "observability", sw: "#aee5c2" },
-    { id: "validations", title: "validating the layer",    cat: "quality",       sw: "#f3c5a3" },
+    { href: "learn/nb-kernel.html", title: "the kernel, live in your tab", cat: "grammar", sw: "#f2ddb0" },
   ];
 
   function item(href, sw, name, small) {
@@ -100,13 +95,14 @@
     '</div>';
 
   var nbRows = NOTEBOOKS.map(function (n) {
-    return '<a href="' + root + 'learn/notebook.html?nb=' + n.id + '" data-nb="' + (n.title + " " + n.cat).toLowerCase() + '">' +
+    return '<a href="' + root + n.href + '" data-nb="' + (n.title + " " + n.cat).toLowerCase() + '">' +
       '<span class="cat" style="--swc:' + n.sw + '; background:' + n.sw + '">' + n.cat + '</span> ' + n.title + '</a>';
   }).join("");
   var notebooksCol =
     '<div class="col"><div class="colhead">notebooks <small>runnable examples</small></div>' +
     '<div class="nbsearch"><input type="search" placeholder="search notebooks…" aria-label="Search notebooks"></div>' +
     '<div class="nblist">' + nbRows + '<div class="nbempty" style="display:none">no notebooks match</div></div>' +
+    '<div class="colhead" style="padding-top:10px"><small>the shelf grows — one at a time, each its own design</small></div>' +
     '</div>';
 
   // Docs — stubbed category panel; everything points at the repo until the
