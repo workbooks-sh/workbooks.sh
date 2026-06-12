@@ -316,10 +316,10 @@
 "flatc": {
 "verdict": "live-likely",
 "lane": "B",
-"recipe": "flatbuffers src/*.cpp via C++ lane; builds but <cstring> libc++ search-path (wb-3b3u) blocks; once fixed: exclude flathash.cpp, -I/work/include",
-"confidence": "high",
+"recipe": "C++ lane builds it (cstring fixed); needs the full CMake source set (grpc/src/compiler + cross-deps like python::Keywords) + -fno-exceptions. Per-tool build-graph slog, NOT a lane gap.",
+"confidence": "medium",
 "verified": false,
-"note": "C++ lane compiles it; blocked only on wb-3b3u libc++ <cstring>"
+"note": "C++ lane proven; flatc full build deferred"
 },
 "JerryScript": {
 "verdict": "live-likely",
