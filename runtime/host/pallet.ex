@@ -623,6 +623,41 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # expat (XML parser). Provide a wasi expat_config.h (getentropy) overriding the macOS one; compile only
+  # the getentropy random backend; xmltok_impl/ns are :include_only (xmltok.c #includes them). `expat`
+  # counts elements in stdin XML (proves well-formed parse).
+  @expat_config ~S"""
+  #ifndef EXPAT_CONFIG_H
+  #define EXPAT_CONFIG_H
+  #define XML_DTD 1
+  #define XML_GE 1
+  #define XML_NS 1
+  #define XML_CONTEXT_BYTES 1024
+  #define HAVE_GETENTROPY 1
+  #define HAVE_STDINT_H 1
+  #define HAVE_STDLIB_H 1
+  #define HAVE_STRING_H 1
+  #define HAVE_MEMORY_H 1
+  #define BYTEORDER 1234
+  #define PACKAGE_VERSION "2.8.1"
+  #endif
+  """
+  @expat_main ~S"""
+  #include <stdio.h>
+  #include "expat.h"
+  static int elems = 0;
+  static void start(void *u, const char *name, const char **atts) { (void)u; (void)name; (void)atts; elems++; }
+  int main(void) {
+    XML_Parser p = XML_ParserCreate(NULL);
+    XML_SetStartElementHandler(p, start);
+    static char buf[1 << 16]; size_t n = fread(buf, 1, sizeof buf, stdin);
+    if (XML_Parse(p, buf, (int)n, 1) == XML_STATUS_ERROR) { printf("error\n"); return 1; }
+    printf("%d\n", elems);
+    XML_ParserFree(p);
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -750,6 +785,18 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "expat",
+      url: "https://github.com/libexpat/libexpat/releases/download/R_2_8_1/expat-2.8.1.tar.gz",
+      sha: "a52eb72108be160e190b5cafa5bba8663f1313f2013e26060d1c18e26e31067b",
+      build_opts: [
+        src_globs: ["lib/*.{c,h}"],
+        include_only: ["xmltok_impl.c", "xmltok_ns.c"],
+        exclude: ~w(random_arc4random_buf.c random_arc4random.c random_dev_urandom.c random_getrandom.c random_rand_s.c),
+        cflags: ["-DHAVE_EXPAT_CONFIG_H", "-I/work", "-I/work/lib"],
+        extra_sources: [{"expat_config.h", @expat_config}, {"xpmain.c", @expat_main}]
+      ]
     },
     %{
       name: "mbedtls",

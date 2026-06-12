@@ -600,6 +600,109 @@
 "recipe": "mbedtls 3.6.6 library/*.c + minimal crypto config (MBEDTLS_CONFIG_FILE) + SHA-256 main",
 "smoke": "sha256('abc')=ba7816bf...",
 "extent": "mbedTLS crypto builds (SHA/AES/...); TLS protocol unusable in-sandbox (no net); mbedtls cmd = SHA-256 hex"
+},
+"LuaRocks": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec plus network-as-purpose",
+"extent": "off-the-table (verified)"
+},
+"vlang vpm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: vpm's entire fetch mechanism spawns the external git/hg binary via os.execute_opt() (cmd/tools/vpm/vcs.v clone(); install.v also runs `git -C status`/`rev-list`). No internal HTTP client \u2014 ",
+"extent": "off-the-table (verified)"
+},
+"wasm-pack": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec orchestration: spawns cargo/rustc + wasm-bindgen CLI, downloads toolchain binaries over network, and runs headless browsers for tests \u2014 none available under wasm32-wasi/wasmtime. No standalo",
+"extent": "off-the-table (verified)"
+},
+"GNU ld / gold": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "gold = explicit native pthread multithreading (hard blocker). ld = GNU autotools configure-generated BFD/target config (no pregenerated amalgam) + hosted-POSIX/mmap/dlopen assumptions wasi-libc cannot",
+"extent": "off-the-table (verified)"
+},
+"GNU Make": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: Make's purpose is forking/execing recipe subprocesses (vfork/exec/waitpid + pipe jobserver in job.c); wasip1 has no process spawning. Without a custom recipe-dispatch shim onto in-sandbox w",
+"extent": "off-the-table (verified)"
+},
+"Ninja": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: Ninja exists solely to spawn parallel build subprocesses (posix_spawn/fork+exec, ppoll on pipes). No native exec in sandbox; no subprocess-to-wasm-command bridge. Graph eval is pure but doe",
+"extent": "off-the-table (verified)"
+},
+"OCaml / js_of_ocaml": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "wasm_of_ocaml requires WasmGC + funcref + i31 + exception-handling proposals not supported by standalone wasmtime (browser/Node-only); WasiCaml's exception machinery depends on JS host EH and explicit",
+"extent": "off-the-table (verified)"
+},
+"PostgreSQL": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only wasm slice (PGlite) is an emscripten/JS-paired build, not plain wasm32-wasi; the experimental WASI build is incomplete, blocked on longjmp error-handling with no native WASM equivalent. Plus fork",
+"extent": "off-the-table (verified)"
+},
+"Redis": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose: Redis IS a networked server (RESP over TCP sockets, remote clients, pub/sub broker) \u2014 server sockets + ae event loop + fork()-for-persistence have no plain wasm32-wasi/wasmtime equiva",
+"extent": "off-the-table (verified)"
+},
+"Valkey": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-purpose daemon: requires sockets/event-loop (raison d'\u00eatre), fork() for BGSAVE+COW persistence, and background threads \u2014 none available under plain wasm32-wasi/wasmtime; no embeddable library ",
+"extent": "off-the-table (verified)"
+},
+"Memcached": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "none",
+"extent": "off-the-table (verified)"
+},
+"BadgerDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Durable path needs mmap; ristretto z/mmap_wasip1.go returns syscall.ENOSYS and Badger's table/vlog open has no non-mmap fallback (only ephemeral WithInMemory mode survives). dir_other.go also disables",
+"extent": "off-the-table (verified)"
+},
+"BoltDB / bbolt": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Storage engine is fundamentally mmap+flock based (syscall.Mmap MAP_SHARED in bolt_unix.go); wasip1 has neither mmap nor flock and bbolt ships no wasip1/wasm platform file, so GOOS=wasip1 build fails. ",
+"extent": "off-the-table (verified)"
+},
+"ripgrep (rg)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Rust edition 2024 + MSRV 1.85.0 (verified in master Cargo.toml) exceed mrustc ~1.74; plus serde_derive proc-macros, regex/aho-corasick build-script codegen, and crossbeam native-thread parallelism. No",
+"extent": "off-the-table (verified)"
+},
+"bash": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: bash requires fork/exec/posix_spawn/pipes/job-control to run external commands and pipelines; plain wasm32-wasi preview1 has no process model. The only working wasm bash builds depend on WA",
+"extent": "off-the-table (verified)"
+},
+"fd": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "edition 2024 + MSRV 1.77.2 + clap derive proc-macro exceed mrustc ~1.74; no prebuilt wasm.",
+"extent": "off-the-table (verified)"
+},
+"expat": {
+"verdict": "live",
+"lane": "B",
+"recipe": "expat 2.8.1 lib/*.c + wasi config + xmltok_impl/ns :include_only + element-count main",
+"smoke": "<a><b/><c/></a> => 3",
+"extent": "XML parsing (SAX); expat cmd counts elements / checks well-formed"
 }
 },
 "preliminary": {
@@ -1094,6 +1197,34 @@
 "lane": "D",
 "recipe": "Lane D JS on QuickJS. Bundle ESM compiler to one qjs script, pure JS acorn, shim fs and process, emit wasm to ",
 "confidence": "medium",
+"verified": false
+},
+"Perl interpreter (perl)": {
+"verdict": "uncertain",
+"lane": "A",
+"recipe": "zeroperl (github.com/6over3/zeroperl) builds Perl5 (default 5.42.0, configurable via PERL_VERSION) as a self-c",
+"confidence": "medium",
+"verified": false
+},
+"WAMR (WebAssembly Micro Runtime)": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B self-contained C/C++. Build ONLY the classic or fast interpreter (pure portable C, zero codegen): defin",
+"confidence": "medium",
+"verified": false
+},
+"Berkeley DB": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C, same shape as the already-live sqlite3 but heavier). BDB is a mature ANSI/POSIX C li",
+"confidence": "medium",
+"verified": false
+},
+"ag (The Silver Searcher)": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (self-contained C) is the only candidate path, but requires a heavy fork, not a clean compile. Steps if",
+"confidence": "high",
 "verified": false
 }
 }
