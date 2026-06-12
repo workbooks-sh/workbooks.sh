@@ -919,10 +919,14 @@ defmodule Workbooks.CommandRegistry do
   # of the caller's dirs so it always finds its resources. The spec may also carry
   # default run opts (:run_opts, e.g. a compiler's higher fuel/timeout).
   defp run_builtin({:wasm, path, mode, opts}, input, argv, dirs, ropts) do
+    # opts[:argv] is a FROZEN argv prefix (e.g. a python-tool's ["-c", script]); opts[:dirs] are
+    # default preopens (e.g. a runtime's stdlib, or a frozen site-packages dir). Both merge ahead of
+    # the caller's. This makes a "base interpreter + frozen script + mounted package" a first-class
+    # command (Lane D: pure-Python tools riding CPython) with no new spec kind.
     run_builtin(
       {:wasm, path, mode},
       input,
-      argv,
+      Map.get(opts, :argv, []) ++ argv,
       Map.get(opts, :dirs, []) ++ dirs,
       Keyword.merge(Map.get(opts, :run_opts, []), ropts)
     )

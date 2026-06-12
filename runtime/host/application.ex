@@ -96,6 +96,12 @@ defmodule Workbooks.Application do
         ok = Enum.count(results, fn {_n, r} -> r == :ok end)
         Logger.info("command pallet — #{ok}/#{map_size(results)} Rust (Lane C) tools provisioned")
       end
+
+      if System.get_env("WB_PYTOOLS") == "1" do
+        results = Workbooks.Pallet.seed_python_tools()
+        ok = Enum.count(results, fn {_n, r} -> r == :ok end)
+        Logger.info("command pallet — #{ok}/#{map_size(results)} Python (Lane D) tools registered")
+      end
     end)
 
     trace("start: done")

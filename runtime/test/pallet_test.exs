@@ -154,4 +154,26 @@ defmodule Workbooks.PalletTest do
     assert {:ok, out} = CommandRegistry.run("wfreq", "the cat the dog the", [])
     assert out =~ "3\tthe"
   end
+
+  test "python-tools catalog entries are well-formed (Lane D)" do
+    refute Pallet.python_tools_catalog() == []
+
+    for t <- Pallet.python_tools_catalog() do
+      assert is_binary(t.name) and t.name != ""
+      assert is_binary(t.script) and t.script =~ "import"
+    end
+  end
+
+  @tag :pallet
+  @tag timeout: 300_000
+  test "Lane D — a pure-Python tool (yaml/PyYAML) rides CPython in-sandbox as a command" do
+    # proves Lane D: CPython.wasm + a FROZEN -c script + the vendored priv/pytools site-packages
+    # (mounted /pkgs) registered as a first-class `yaml` command — third-party pure-Python, no native exec
+    assert :ok = Pallet.seed_python_tool_one("yaml")
+    assert "yaml" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("yaml", "name: workbooks\nlanes: [A, B, C]\ncount: 3", [])
+    assert out =~ ~s("count": 3)
+    assert out =~ ~s("lanes": ["A", "B", "C"])
+    assert out =~ ~s("name": "workbooks")
+  end
 end

@@ -526,6 +526,15 @@ defmodule Workbooks.Pallet do
     %{name: "wfreq", source: @wfreq_src, mode: :argv}
   ]
 
+  # Lane D — pure-Python tools riding the CPython.wasm interpreter (Lane A) with a FROZEN site-packages
+  # dir (vendored under priv/pytools, mounted at /pkgs) + a frozen `-c` script. Zero native exec; just
+  # the interpreter + .py files. Each tool = data (name + script); the package universe is shared.
+  @yaml_script "import sys; sys.path.insert(0, '/pkgs'); import yaml, json; print(json.dumps(yaml.safe_load(sys.stdin.read()), sort_keys=True))"
+
+  @python_tools [
+    %{name: "yaml", script: @yaml_script}
+  ]
+
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."
   def csource_catalog, do: @csource
 
@@ -582,6 +591,38 @@ defmodule Workbooks.Pallet do
         {:ok, _} -> :ok
         other -> other
       end
+    end
+  end
+
+  @doc "The pure-Python tools catalog (Lane D — name + frozen `-c` script; ride CPython + priv/pytools)."
+  def python_tools_catalog, do: @python_tools
+
+  @doc """
+  Register every :python tool as a first-class command (CPython.wasm + frozen script + the vendored
+  priv/pytools site-packages mounted at /pkgs). No build/fetch beyond CPython itself — fast.
+  """
+  def seed_python_tools, do: Map.new(@python_tools, fn t -> {t.name, seed_python_tool_one(t)} end)
+
+  @doc "Register one :python tool by name (or the entry map)."
+  def seed_python_tool_one(name) when is_binary(name) do
+    case Enum.find(@python_tools, &(&1.name == name)) do
+      nil -> {:error, :unknown_python_tool}
+      t -> seed_python_tool_one(t)
+    end
+  end
+
+  def seed_python_tool_one(%{name: n, script: script}) do
+    # ensure the CPython interpreter (Lane A) is registered, then wrap it: frozen ["-c", script] +
+    # the vendored pure-Python packages mounted read-only at /pkgs.
+    if "python" not in CommandRegistry.list(), do: seed_one("python")
+
+    case CommandRegistry.current("python") do
+      {:wasm, py_path, _mode} ->
+        pkgs = Application.app_dir(:workbooks, "priv/pytools")
+        CommandRegistry.register(n, py_path, :argv, %{dirs: ["#{pkgs}::/pkgs"], argv: ["-c", script]})
+
+      _ ->
+        {:error, :python_not_registered}
     end
   end
 end
