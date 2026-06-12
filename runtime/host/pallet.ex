@@ -40,6 +40,15 @@ defmodule Workbooks.Pallet do
       mode: :argv
     },
     %{
+      # libjpeg-turbo CLI tools (prebuilt WASI, vmware WLR). cjpeg/djpeg: PPM<->JPEG on stdin/stdout.
+      name: "jpeg",
+      kind: :archive_many,
+      url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/libs/libjpeg/2.1.5.1%2B20230623-2993864/jpeg-bin-2.1.5.1-wasi-sdk-20.0.tar.gz",
+      sha: "9809568fb042cd6d8961fec1a23b86a66ec0f421f69f3182a0986030769c372d",
+      mode: :argv,
+      entries: [{"cjpeg", "bin/cjpeg"}, {"djpeg", "bin/djpeg"}, {"jpegtran", "bin/jpegtran"}]
+    },
+    %{
       name: "ruby",
       kind: :wasm,
       url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/ruby/3.2.2%2B20230714-11be424/ruby-3.2.2-slim.wasm",
@@ -448,6 +457,26 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # `tar`: list/extract a tar archive (microtar, single-file). `tar t|x <file.tar>` with a --dir mount.
+  @tar_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "microtar.h"
+  int main(int argc, char** argv) {
+    if (argc < 3) { fprintf(stderr, "usage: tar t|x <file.tar>\n"); return 1; }
+    char mode = argv[1][0];
+    mtar_t tar; mtar_header_t h;
+    if (mtar_open(&tar, argv[2], "r") != MTAR_ESUCCESS) { fprintf(stderr, "tar: open fail\n"); return 1; }
+    while (mtar_read_header(&tar, &h) == MTAR_ESUCCESS) {
+      if (mode == 't') printf("%s\n", h.name);
+      else if (mode == 'x') { char* b = malloc(h.size); mtar_read_data(&tar, b, h.size); FILE* f = fopen(h.name, "wb"); if (f) { fwrite(b, 1, h.size, f); fclose(f); } free(b); }
+      mtar_next(&tar);
+    }
+    mtar_close(&tar); return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -569,6 +598,12 @@ defmodule Workbooks.Pallet do
         src_globs: ["src/zforth/zforth.{c,h}", "src/linux/zfconf.h"],
         extra_sources: [{"zfmain.c", @zforth_main}, {"core_zf.h", @zforth_core}]
       ]
+    },
+    %{
+      name: "tar",
+      url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
+      sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
+      build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
     }
   ]
 
