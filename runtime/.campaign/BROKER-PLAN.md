@@ -923,3 +923,7 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   jco --world-name needs the fully-qualified world + the full dep tree resolvable (proxy depends on wasi:io/
   clocks/etc.) — a WIT-resolution detail. NEXT: nail the guest (jco qualified world OR a wrapper WIT) + the
   serve_http e2e.
+- 2026-06-12 (iter 59 cont.): guest blocker pinned — jco proxy-world resolves but the addEventListener('fetch')
+  JS does NOT map to wasi:http/incoming-handler#handle in componentize-js 0.19.3. NEXT (iter 60): build the
+  guest via the correct componentize-js handler-export format OR a cargo-component Rust guest (well-defined
+  Guest trait), then the Components.serve_http e2e. NIF + Elixir plumbing are done + committed.
