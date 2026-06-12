@@ -1,0 +1,45 @@
+#+TITLE: sandbox commands toolkit
+#+TOOLKIT: sandbox
+#+VERSION: 0.1.0
+#+STATUS: stable
+#+TAGLINE: The in-sandbox command set — scripting languages, JS engines, compression, hashing, docs, encoding — all real CLIs compiled to WASI and run under wasmtime, no native execution.
+
+* sandbox — in-sandbox WASI commands                              :toolkit:
+  :PROPERTIES:
+  :ID:        sandbox
+  :KIND:      commands
+  :STATUS:    stable
+  :SKILL_DIR: skills/
+  :END:
+
+  Real upstream CLIs/runtimes compiled to =wasm32-wasi= and run under wasmtime in the sandbox via the
+  =run-command= Dock import (host: =Workbooks.CommandRegistry.run/3-5=). ZERO native execution — each
+  command IS a sandboxed wasm module, stdin → stdout, argv passed through. Two catalogs in
+  =Workbooks.Pallet= provide them: prebuilt-WASI artifacts (=@catalog=, seeded at boot with
+  =WB_PALLET=1=) and build-from-source (=@csource=, built in-sandbox via =clang.wasm=, provisioned with
+  =WB_CSOURCE=1=, then persisted + reloaded — no rebuild on later boots).
+
+  Unlike git/ffmpeg/etc., this toolkit is not ONE wrapped CLI — it is the INDEX of the command set the
+  agent can reach. Invoke any of them by name; pass file access with a WASI =--dir= preopen.
+
+  | Command(s)                  | Category      | What                                            |
+  |-----------------------------+---------------+-------------------------------------------------|
+  | =python= =ruby=             | languages     | full interpreters + huge stdlibs                |
+  | =lua= =wren=                | languages     | small embeddable scripting                      |
+  | =qjs= =duk=                 | JS engines    | qjs = full ES2023; duk = ES5/ES2015             |
+  | =gz= =lz4= =zstd= =br=      | compression   | gzip / lz4 / zstandard / brotli (each + =-d=)   |
+  | =b2= =b3=                   | crypto hash   | BLAKE2b-512 / BLAKE3-256 → hex                  |
+  | =sqlite3=                   | database      | SQL on stdin → stdout                           |
+  | =jq=                        | JSON          | filter / transform                              |
+  | =md=                        | documents     | CommonMark markdown → HTML                      |
+  | =qr=                        | encoding      | text → ASCII QR code                            |
+  | =coreutils=                 | unix utils    | ~100 applets (=coreutils <applet> …=)           |
+  | =wat2wasm= =wasm2wat= …     | wasm tooling  | WABT (12 tools)                                 |
+  | =prolog= =wasm3=            | misc          | Trealla Prolog / Wasm3 interpreter              |
+
+  Skill index (read on demand):
+
+  | Skill      | Use when                                                     |
+  |------------+--------------------------------------------------------------|
+  | =overview= | First contact — what's here + the invocation convention      |
+  | =commands= | Per-command usage, args, stdin/stdout, + how to add a tool    |

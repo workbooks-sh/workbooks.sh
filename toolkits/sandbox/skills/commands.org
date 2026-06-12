@@ -1,0 +1,69 @@
+#+TITLE: sandbox — command reference
+#+SKILL: commands
+#+TOOLKIT: sandbox
+
+* How to read this
+
+  Each entry is =command= — what it does — how to call it (stdin / argv). All run
+  under wasmtime (WASI), stdin → stdout. File-mode commands need a =--dir= preopen.
+
+* Languages
+
+  - =python= — CPython 3.12, full stdlib. =run("python", "", ["-c", "print(2**10)"])= →
+    =1024=. Scripts: mount a dir (=--dir=) and pass the path. C-extensions don't load
+    (pure-Python only); net/subprocess are sandbox-stubbed.
+  - =ruby= — Ruby 3.2. =run("ruby", "", ["-e", "puts 2**10"])=.
+  - =lua= — Lua 5.4. =run("lua", "", ["-e", "print(6*7)"])=.
+  - =wren= — Wren (class-based). =run("wren", "", ["-e", "System.print(6*7)"])=.
+
+* JavaScript engines
+
+  - =qjs= — QuickJS-ng, full ES2023. =run("qjs", "", ["-e", "6*7"])= → =42= (prints the
+    expression's value).
+  - =duk= — Duktape, ES5/ES2015. Same =-e= shape. Lighter, older language level.
+
+* Compression (each: stdin → compressed stdout; =-d= decompresses)
+
+  - =gz=  — gzip (interops with gzip/gunzip). =run("gz", data, [])= / =run("gz", c, ["-d"])=.
+  - =lz4= — LZ4 frame (interops with the lz4 tool).
+  - =zstd= — Zstandard (=.zst=). Best general ratio/speed.
+  - =br=  — brotli. Best for text/web payloads.
+
+* Hashing (stdin → hex digest)
+
+  - =b2= — BLAKE2b-512. =run("b2", data, [])=.
+  - =b3= — BLAKE3-256 (fastest modern hash). =run("b3", data, [])=.
+  (For SHA-256/MD5/etc. use =coreutils sha256sum= / =md5sum=, or python's =hashlib=.)
+
+* Data / docs / encoding
+
+  - =sqlite3= — SQL on stdin. =run("sqlite3", "SELECT 6*7;", [])=. Persistent DB needs =--dir=.
+  - =jq= — JSON. Built-in: filter on stdin's first line, JSON after (legacy =:stdin1= mode).
+  - =md= — CommonMark markdown → HTML. =run("md", "# Hi", [])= → =<h1>Hi</h1>=.
+  - =qr= — text → ASCII QR. =run("qr", "https://…", [])= (=##= = dark module).
+
+* Unix utilities
+
+  - =coreutils= — uutils multicall, ~100 applets. Prepend the applet to argv:
+    =run("coreutils", stdin, ["wc", "-l"])=, =run("coreutils", "", ["seq", "5"])=,
+    =["sha256sum"]=, =["sort"]=, =["base64"]=, =["cut", "-f1"]=, … FS applets need =--dir=.
+
+* WebAssembly tooling (WABT)
+
+  - =wat2wasm= =wasm2wat= =wasm-validate= =wasm-objdump= =wasm-strip= =wasm-decompile=
+    =wasm-interp= =wasm-stats= =wasm2c= =wast2json= =wat-desugar= =spectest-interp=.
+    File I/O via =--dir=. =run("wat2wasm", "", ["--version"])=.
+
+* Misc
+
+  - =prolog= — Trealla. One-shot goal: =run("prolog", "", ["-g", "X is 6*7, write(X), nl, halt"])=.
+  - =wasm3= — a wasm interpreter (run a nested guest module).
+
+* Adding a tool (for the maintainer)
+
+  Edit =Workbooks.Pallet=. A prebuilt WASI =.wasm= → append to =@catalog= (=:wasm= /
+  =:archive= / =:archive_many= / =:zip=). A buildable C source → append to =@csource=
+  with =build_opts= (=:src_subdir= | =:src_globs= | =:exclude= | =:extra_sources= [inject a
+  minimal main] | =:cflags=). The in-sandbox C lane handles multi-file, headers, generated
+  =.inc=, setjmp/longjmp, wasi-libc emulated features, host-escape stubs, unity builds, AND
+  structured multi-dir trees — so most real C libraries build with a few lines of data.

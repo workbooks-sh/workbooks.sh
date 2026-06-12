@@ -1,0 +1,39 @@
+#+TITLE: sandbox — overview
+#+SKILL: overview
+#+TOOLKIT: sandbox
+
+* What this is
+
+  A set of real CLIs and language runtimes that run **inside the sandbox** as
+  =wasm32-wasi= modules under wasmtime — no native execution. You invoke them by
+  name; each reads stdin and writes stdout, with argv passed through.
+
+* The invocation convention
+
+  Every command is stdin → stdout. Concretely (host side, =Workbooks.CommandRegistry=):
+
+  - =run(name, stdin, argv)= — run with stdin + argv.
+  - =run(name, stdin, argv, dirs)= — same, plus WASI =--dir= preopens (host paths) for
+    commands that read/write FILES (a guest path resolves against a preopen).
+
+  From an agent's perspective it is the =run-command= capability: give the command
+  name, the stdin bytes, and the argument list.
+
+* When to reach for it
+
+  - You need a real interpreter (=python=, =ruby=, =lua=, =qjs=) for logic the host
+    can't express, or to lean on a huge stdlib (json/csv/hashlib/re/… via python).
+  - You need a specific binary format/algorithm the host lacks: compression
+    (=gz=/=lz4=/=zstd=/=br=), modern hashing (=b2=/=b3=), QR (=qr=), markdown→HTML (=md=),
+    SQL (=sqlite3=), JSON queries (=jq=), or the ~100 unix utilities (=coreutils=).
+  - You need wasm tooling (=wat2wasm=, =wasm-validate=, … the WABT set).
+
+  Prefer a single command over re-implementing in the host. Prefer =python=/=ruby=
+  for anything their stdlib already covers; reach for a dedicated command when it's
+  faster or NOT in a stdlib (e.g. =zstd=, =br=, =b3=, =qr= are not in python's stdlib).
+
+* Provisioning
+
+  Prebuilt tools seed at boot with =WB_PALLET=1=. Build-from-source tools (=lua=,
+  =qjs=, =gz=, …) provision with =WB_CSOURCE=1= (a one-time in-sandbox build, then
+  persisted + reloaded). See the =commands= skill for the per-command details.
