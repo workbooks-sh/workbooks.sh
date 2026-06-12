@@ -1055,3 +1055,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   unaffected). The SSRF classifier is now FUZZ-VALIDATED — across the swept IPv4/IPv6 space, no internal or
   non-routable address is ever allowed. Validation lesson realized: the red-team suite proves the vectors we
   listed; the fuzz found the one we didn't.
+- 2026-06-12 (iter 73): **WASI-SOCKETS CONNECTION-RATE QUOTA — wb-um2g COMPLETE (every egress path now
+  metered).** The wasi-http path got its egress meter in iter71; the wasi-SOCKETS path (socket_addr_check is
+  a closure with no &mut store) was still unmetered. Added wb_conn_rate_ok (a sliding-window meter over an
+  Arc<Mutex<(count, window)>> the closure carries) + wired it into socket_addr_check: 50k connect attempts /
+  10s per instance, counting DENIED attempts too (so a flood of SSRF-blocked connects is also capped) = the
+  keystone's "conn quota" for the raw-socket path. 11 cargo unit tests green (incl conn_rate_quota) + the
+  wasi-sockets e2e green. So the untrusted STANDARD-tool path is now FULLY METERED on BOTH protocols:
+  wasi-http (rate via send_request) + wasi-sockets (conn rate via socket_addr_check). wb-um2g CLOSED. The
+  keystone's rate/conn quotas now cover EVERY egress path: host_* brokers + both wasi standard paths.

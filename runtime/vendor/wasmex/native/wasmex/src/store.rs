@@ -71,6 +71,29 @@ pub(crate) fn wb_addr_allowed(addr: std::net::SocketAddr) -> bool {
 // and every entry is an IP literal (an IP-scoped guest), the guest never needs DNS — so we disable name
 // lookup entirely, closing DNS-exfil (a malicious guest can't leak data by resolving attacker subdomains).
 // Unscoped or hostname-scoped guests keep DNS (they need to resolve names to fetch).
+// Sliding-window connection-rate meter for the raw-socket path. The socket_addr_check closure has no &mut
+// store, so it carries its own shared meter (Arc<Mutex<(count, window_start)>>). Returns whether this
+// connect attempt is within `max` per `window` (and counts it). `now` is injected for unit-testability.
+pub(crate) fn wb_conn_rate_ok(
+    meter: &std::sync::Mutex<(u32, Option<std::time::Instant>)>,
+    now: std::time::Instant,
+    window: std::time::Duration,
+    max: u32,
+) -> bool {
+    let mut m = meter.lock().unwrap();
+    match m.1 {
+        Some(start) if now.duration_since(start) < window => {
+            m.0 += 1;
+            m.0 <= max
+        }
+        _ => {
+            m.1 = Some(now);
+            m.0 = 1;
+            true
+        }
+    }
+}
+
 pub(crate) fn wb_dns_needed(net_allow: &Option<Vec<String>>) -> bool {
     match net_allow {
         Some(list) if !list.is_empty() => list.iter().any(|e| {
@@ -277,6 +300,22 @@ mod wb_ssrf_tests {
         assert!(sd.egress_allowed(t1, win, 2), "new window resets");
         assert!(sd.egress_allowed(t1, win, 2));
         assert!(!sd.egress_allowed(t1, win, 2));
+    }
+
+    #[test]
+    fn conn_rate_quota_meters_the_socket_path() {
+        use std::sync::Mutex;
+        use std::time::{Duration, Instant};
+        let meter = Mutex::new((0u32, None::<Instant>));
+        let t0 = Instant::now();
+        let win = Duration::from_secs(10);
+        // max = 2 per window: first two connects pass, the third is over quota (counts denied attempts too)
+        assert!(super::wb_conn_rate_ok(&meter, t0, win, 2));
+        assert!(super::wb_conn_rate_ok(&meter, t0, win, 2));
+        assert!(!super::wb_conn_rate_ok(&meter, t0, win, 2), "3rd connect in-window exceeds the quota");
+        // a fresh window resets the count
+        let t1 = t0 + Duration::from_secs(11);
+        assert!(super::wb_conn_rate_ok(&meter, t1, win, 2), "new window resets");
     }
 
     // Independent oracle: RANGE-based classification of internal/non-routable IPs (wb_ip_allowed uses masks +
@@ -736,12 +775,22 @@ pub fn component_store_new_wasi(
         // must match one (default-deny scope on top of the SSRF floor). Hostname entries don't apply here
         // (the socket layer has only the resolved IP, no hostname) — those scope the wasi-http path instead.
         let net_allow_for_sockets = options.net_allow.clone();
+        // per-instance connection-RATE meter for the raw-socket path (the conn quota): bound a runaway /
+        // red-team standard tool to a max number of connect attempts per window. Counts DENIED attempts too,
+        // so a flood of SSRF-blocked connects is also capped.
+        let conn_meter = std::sync::Arc::new(std::sync::Mutex::new((0u32, None::<std::time::Instant>)));
         wasi_ctx_builder
             .inherit_network()
             // DNS-exfil: an IP-only-scoped guest gets NO name lookup (it can't leak via DNS queries).
             .allow_ip_name_lookup(wb_dns_needed(&options.net_allow))
             .socket_addr_check(move |addr, _use| {
-                let ok = wb_addr_allowed(addr) && wb_addr_in_scope(addr, &net_allow_for_sockets);
+                let ok = wb_conn_rate_ok(
+                    &conn_meter,
+                    std::time::Instant::now(),
+                    std::time::Duration::from_secs(10),
+                    50_000,
+                ) && wb_addr_allowed(addr)
+                    && wb_addr_in_scope(addr, &net_allow_for_sockets);
                 Box::pin(async move { ok })
             });
     }
