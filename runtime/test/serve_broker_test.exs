@@ -139,6 +139,29 @@ __attribute__((export_name("handle"))) int handle(void) {
 
   @tag :build
   @tag timeout: 300_000
+  test "per-serve_id serialization — concurrent requests to one guest never cross-talk" do
+    serve_id = "sc#{System.unique_integer([:positive])}"
+    pid = serving_guest(echo_bytes(), serve_id)
+
+    # fire many concurrent dispatches with DISTINCT payloads; each MUST get its own echo (no ETS channel race)
+    results =
+      1..40
+      |> Task.async_stream(
+        fn i ->
+          {:ok, resp} = ServeBroker.dispatch(serve_id, pid, "r#{i}")
+          {i, resp}
+        end,
+        max_concurrency: 20,
+        timeout: 60_000
+      )
+      |> Enum.map(fn {:ok, r} -> r end)
+
+    assert length(results) == 40
+    assert Enum.all?(results, fn {i, resp} -> resp == "echo:r#{i}" end)
+  end
+
+  @tag :build
+  @tag timeout: 300_000
   test "host-as-listener — REAL HTTP request served by the guest, who sets status+headers and sees req headers" do
     serve_id = "h#{System.unique_integer([:positive])}"
     pid = serving_guest(rich_bytes(), serve_id)

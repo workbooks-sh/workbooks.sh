@@ -105,12 +105,34 @@ defmodule Workbooks.ServeBroker do
     do: Workbooks.RateLimiter.check(serve_id, max, window) == {:error, :rate_limited}
 
   defp do_dispatch(serve_id, pid, request, timeout) do
-    put({serve_id, :req}, request)
-    delete({serve_id, :resp})
+    # The {serve_id,:req}/{serve_id,:resp} channel + the single persistent guest mean concurrent requests to
+    # ONE serve_id MUST run one-at-a-time — otherwise request A's call could read request B's just-written
+    # bytes. Serialize the whole put->call->lookup per serve_id (the guest is single-threaded anyway).
+    with_lock(serve_id, fn ->
+      put({serve_id, :req}, request)
+      delete({serve_id, :resp})
 
-    case Wasmex.call_function(pid, "handle", [], timeout) do
-      {:ok, _} -> {:ok, lookup({serve_id, :resp}) || ""}
-      {:error, reason} -> {:error, reason}
+      case Wasmex.call_function(pid, "handle", [], timeout) do
+        {:ok, _} -> {:ok, lookup({serve_id, :resp}) || ""}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  # Atomic per-serve_id critical section via ETS insert_new (test-and-set). try/after releases the lock even
+  # if the guest call raises; the 1ms backoff is bounded in practice by the inbound rate limit.
+  defp with_lock(serve_id, fun) do
+    key = {serve_id, :lock}
+
+    if :ets.insert_new(table(), {key, true}) do
+      try do
+        fun.()
+      after
+        :ets.delete(table(), key)
+      end
+    else
+      Process.sleep(1)
+      with_lock(serve_id, fun)
     end
   end
 

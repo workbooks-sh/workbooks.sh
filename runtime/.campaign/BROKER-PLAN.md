@@ -804,3 +804,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   429 on rate-limit. 8 serve_broker tests green (incl the new rate test). (c) Filed wb-5hfo — per-serve_id
   concurrency (the ETS channel races under concurrent inbound; needs a per-serve_id serializer).
   NEXT (iter 48): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.
+- 2026-06-12 (iter 48): **per-serve_id SERIALIZATION (wb-5hfo FIXED) — inbound concurrency race closed.**
+  The serve_broker's {serve_id,:req}/{serve_id,:resp} ETS channel + single persistent guest raced under
+  concurrent inbound (request A's call could read request B's just-written bytes). Fixed: do_dispatch wraps
+  put->call->lookup in an atomic per-serve_id ETS lock (insert_new test-and-set; try/after releases even if
+  the guest raises; 1ms backoff bounded by the inbound rate limit). CONCURRENCY REGRESSION: 40 concurrent
+  dispatches to one serve_id, each gets its OWN echo — no cross-talk. 9 serve_broker tests green. The inbound
+  capability is now DoS-hardened (iter47) + concurrency-correct (iter48). wb-5hfo CLOSED.
+  NEXT (iter 49): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.
