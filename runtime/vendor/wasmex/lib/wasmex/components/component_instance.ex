@@ -72,6 +72,33 @@ defmodule Wasmex.Components.Instance do
     )
   end
 
+  @doc """
+  Like `serve_http/5` but STREAMS the response body to `caller` (wb-t3sq). Sends, tagged with `ref`:
+  `{ref, :stream_start, status, headers}`, then `{ref, :stream_data, binary}` per body frame, then
+  `{ref, :stream_done}`. Lets a hosted app emit large downloads / Server-Sent-Events without the host
+  buffering the whole body. The caller (or a Plug that spawned this) forwards each chunk as it arrives.
+  """
+  def serve_http_stream(
+        %__MODULE__{store_resource: store_resource, instance_resource: instance_resource},
+        method,
+        uri,
+        headers,
+        body,
+        caller,
+        ref
+      ) do
+    Wasmex.Native.component_serve_http_stream(
+      store_resource,
+      instance_resource,
+      method,
+      uri,
+      headers,
+      body,
+      caller,
+      ref
+    )
+  end
+
   defp parse_function_path(path) when is_binary(path), do: [path]
   defp parse_function_path(path) when is_atom(path), do: [Atom.to_string(path)]
 

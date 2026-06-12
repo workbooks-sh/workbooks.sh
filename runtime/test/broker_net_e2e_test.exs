@@ -560,4 +560,53 @@ defmodule Workbooks.BrokerNetE2ETest do
     :ok = Workbooks.Revocation.unrevoke(sid)
     assert req.() == 200
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "STREAMING serve NIF (wb-t3sq) — response body arrives as start / data* / done messages" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+    {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, inst} = Wasmex.Components.Instance.new(store, component, %{})
+
+    ref = make_ref()
+
+    :ok =
+      Wasmex.Components.Instance.serve_http_stream(
+        inst,
+        "GET",
+        "/",
+        [{"host", "localhost"}],
+        "",
+        self(),
+        ref
+      )
+
+    # the DirtyCpu NIF ran synchronously, queuing the stream messages to our mailbox
+    assert_receive {^ref, :stream_start, 200, headers}, 5_000
+    assert is_list(headers)
+    body = collect_stream(ref, "")
+    assert body =~ "hello from brokered guest"
+  end
+
+  defp collect_stream(ref, acc) do
+    receive do
+      {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk)
+      {^ref, :stream_done} -> acc
+    after
+      5_000 -> flunk("stream did not complete")
+    end
+  end
 end

@@ -1142,3 +1142,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   tagged messages — is DONE + compiling. NEXT (iter 82): Instance.serve_http_stream helper + a streaming
   ComponentPlug (spawn the NIF call, receive {ref,:stream_*}, forward via send_chunked) + a multi-chunk
   streaming guest + e2e.
+- 2026-06-12 (iter 82): **★ STREAMING PROVEN at the NIF level (wb-t3sq).** Added Instance.serve_http_stream(
+  inst, method, uri, headers, body, caller, ref) -> Native.component_serve_http_stream. E2E green: serve_http_
+  stream -> the guest response arrives as {ref, :stream_start, 200, headers} -> {ref, :stream_data, chunk}* ->
+  {ref, :stream_done}, and the reassembled body =~ "hello from brokered guest". So the streaming MECHANISM
+  works end-to-end: the guest's response is streamed frame-by-frame to the caller pid, correctly tagged +
+  reassembled (the DirtyCpu NIF runs synchronously, queuing the messages). Two fires de-risked streaming:
+  iter81 (NIF compiling) + iter82 (NIF proven e2e). REMAINING: a streaming ComponentPlug (spawn the NIF in a
+  task so the Plug isn't blocked, forward each {ref,:stream_data} via send_chunked/chunk) + a MULTI-chunk
+  streaming guest (N flushes -> N frames, proving TRUE chunked delivery vs the current 1 frame) + the full
+  HTTP-through-Bandit e2e.
