@@ -212,3 +212,60 @@ fn author_verbs_accept_stdin_dash() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "[]");
 }
+
+#[test]
+fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
+    let dir = std::env::temp_dir().join(format!("wbx-import-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let skill = dir.join("my-skill");
+    std::fs::create_dir_all(skill.join("references")).unwrap();
+    std::fs::create_dir_all(skill.join("scripts")).unwrap();
+    std::fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: demo-skill\ndescription: does demo things\n---\n# Demo\n\nUse `demo` like [this](https://x.dev).\n\n```bash\necho hi\n```\n",
+    ).unwrap();
+    std::fs::write(skill.join("references/extra.md"), "# Extra\n\nMore notes.\n").unwrap();
+    std::fs::write(skill.join("scripts/run.sh"), "#!/bin/sh\necho hi\n").unwrap();
+
+    let out_dir = dir.join("out");
+    let out = wbx()
+        .args(["toolkit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+        .output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+
+    let manifest = std::fs::read_to_string(out_dir.join("manifest.org")).unwrap();
+    assert!(manifest.contains("#+TOOLKIT: demo-skill"), "id from frontmatter");
+    assert!(manifest.contains("#+TAGLINE: does demo things"));
+    assert!(manifest.contains("TODO dependency audit"), "stage-2 handoff present");
+    assert!(manifest.contains("scripts/run.sh"), "carried script listed");
+    assert!(out_dir.join("scripts/run.sh").is_file());
+
+    let skill_org = std::fs::read_to_string(out_dir.join("skills/demo-skill.org")).unwrap();
+    assert!(skill_org.contains("* Demo"), "md heading became org");
+    assert!(skill_org.contains("#+begin_src bash"), "fence became src block");
+    assert!(skill_org.contains("[[https://x.dev][this]]"), "link converted");
+    assert!(out_dir.join("skills/reference-extra.org").is_file());
+
+    let again = wbx()
+        .args(["toolkit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+        .output().unwrap();
+    assert!(!again.status.success());
+}
+
+#[test]
+fn toolkit_import_markdown_and_unknown_kind() {
+    let dir = std::env::temp_dir().join(format!("wbx-import-md-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let md = dir.join("notes.md");
+    std::fs::write(&md, "# Notes\n\nA doc worth keeping.\n").unwrap();
+    let out_dir = dir.join("nt");
+    let out = wbx()
+        .args(["toolkit", "import", md.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+        .output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(out_dir.join("skills/notes.org").is_file());
+    let bad = wbx().args(["toolkit", "import", md.to_str().unwrap(), "--as", "vsix"]).output().unwrap();
+    assert!(!bad.status.success());
+    assert_ne!(bad.status.code(), Some(101), "no panic");
+}

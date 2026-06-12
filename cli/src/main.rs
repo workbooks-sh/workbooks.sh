@@ -8,6 +8,7 @@
 mod commands; // engine-backed verbs
 mod deploy;
 mod dev;
+mod import;
 mod io;
 mod kernel;
 mod local;
@@ -155,6 +156,15 @@ enum ToolkitVerb {
     Build { id: String, which: Option<String> },
     /// Ship a toolkit directory onto the engine (the deploy-the-toolkit verb)
     Push { id: String, dir: String },
+    /// Package an existing construct (Claude skill, markdown, folder) as a toolkit
+    Import {
+        /// SKILL.md / .md file / directory
+        source: String,
+        /// Override detection: claude-skill | markdown | folder
+        #[arg(long = "as")] as_kind: Option<String>,
+        /// Output directory (default: ./<id>-toolkit)
+        #[arg(long)] out: Option<String>,
+    },
     /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
     Run { id: String, task: String, #[arg(trailing_var_arg = true)] args: Vec<String> },
 }
@@ -314,6 +324,7 @@ fn run(cli: Cli, human: bool) -> Result<String> {
             ToolkitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
             ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
             ToolkitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
+            ToolkitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref())?,
             ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },
         // runtime ops
