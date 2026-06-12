@@ -1,0 +1,202 @@
+[
+ {
+  "name": "HarfBuzz",
+  "lane": "B",
+  "source_url": "https://github.com/harfbuzz/harfbuzz",
+  "recipe": "HarfBuzz is a self-contained C++ OpenType shaping library: pure CPU, no syscalls, no GPU, no threads, no network. Strong Lane B fit on our C++/libc++ lane. Lane A (prebuilt plain wasm32-wasi) is NOT clean: the maintained harfbuzzjs .wasm (github.com/harfbuzz/harfbuzzjs release v1.2.1, harfbuzz.wasm = 384887 bytes, 302->200 confirmed) is emscripten-built (--no-entry, MODULARIZE, EXPORTED_RUNTIME_METHODS=@em.runtime, -lexports.js) so it imports the emscripten `env` runtime rather than WASI \u2014 a JS-host pair, disqualified per Lane A rules. Build from source instead: HarfBuzz amalgamates into a single TU (src/harfbuzz.cc includes all .cc) so no meson/configure needed and no yacc/bison/codegen. Compile harfbuzz.cc with -DHB_NO_MT (single-thread, drops pthread imports), -DHB_TINY or minimal feature defines, libc++; inject a tiny main(): hb_blob_create_from_file()/hb_blob_create() over an embedded .ttf, hb_face_create, hb_font_create, hb_buffer_add_utf8 on a test string, hb_shape(font, buf, NULL, 0), then read hb_buffer_get_glyph_infos/positions and print glyph IDs + advances. All file I/O can be avoided by embedding font bytes in a const array, keeping it pure-function. Capability is genuinely new (text shaping) \u2014 not covered by our existing sqlite3/pcre2/python/etc fleet.",
+  "smoke": "Build src/harfbuzz.cc (single-TU amalgam) with -DHB_NO_MT to wasm32-wasi + tiny main that embeds a small .ttf as a byte array, runs hb_shape() on the string \"AVA fi\" (tests kerning + ligature), and prints each glyph's codepoint and x_advance. PASS = non-empty glyph run with sane positive advances and the \"fi\" mapping to a ligature glyph (or 2 glyphs if font lacks it); exit 0, zero WASI imports beyond clock/args, no env/emscripten imports.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "FreeType",
+  "lane": "B",
+  "source_url": "https://gitlab.freedesktop.org/freetype/freetype/-/archive/VER-2-13-3/freetype-VER-2-13-3.tar.gz",
+  "recipe": "Lane B (self-contained C, our C lane). FreeType 2.13.3 is plain portable C \u2014 verified source tarball (200, 4MB) has NO yacc/bison/lex (.y/.l absent), and config headers ship PRE-GENERATED (include/freetype/config/ftmodule.h lists all modules; ftoption.h present), so no GNU make / configure / autogen needed. docs/INSTALL.ANY gives the exact no-make amalgam recipe: compile the umbrella .c files with clang.wasm targeting wasm32-wasi, -DFT2_BUILD_LIBRARY -Iinclude. File set (each is a single object that #includes its parts):\n  base: src/base/ftsystem.c ftinit.c ftdebug.c ftbase.c ftbbox.c ftglyph.c ftbitmap.c ftmm.c ftstroke.c ftsynth.c\n  drivers: src/sfnt/sfnt.c src/truetype/truetype.c src/cff/cff.c src/type1/type1.c src/cid/type1cid.c src/autofit/autofit.c\n  rasterizers: src/smooth/smooth.c src/raster/raster.c src/sdf/sdf.c\n  support: src/psaux/psaux.c src/pshinter/pshinter.c src/psnames/psnames.c src/gzip/ftgzip.c\nftsystem.c is the ANSI-stdio variant (ft_fopen/ft_fread/ft_fseek -> fopen/fread/fseek) which WASI's libc provides directly \u2014 no unix syscalls, no mmap-required path. Drop optional HarfBuzz/zlib/png/brotli deps (default build needs none; uses bundled gzip). Inject a tiny main.c: FT_Init_FreeType, FT_New_Face(argv font), FT_Set_Pixel_Sizes, FT_Load_Char('A', FT_LOAD_RENDER), dump bitmap rows/width/pitch + a pixel-density count to stdout. Link with our libc to one freetype.wasm CLI. No JS/emscripten/GPU anywhere.",
+  "smoke": "echo a small TTF into the sandbox (or fetch DejaVuSans.ttf), run `freetype font.ttf A 48` -> prints glyph bitmap dims (e.g. width=27 rows=34 pitch=27) and an ASCII art / nonzero-pixel count; assert exit 0 and stable dims across runs (deterministic). Also FT_Library_Version prints 2.13.3.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "libsodium",
+  "lane": "B",
+  "source_url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz",
+  "recipe": "Lane B (self-contained C, static lib). Pure C, no TLS/socket/threads. Use the stable RELEASE TARBALL (not git) \u2014 it ships a PREGENERATED autotools configure, so no autoconf/bison/yacc needed. Upstream already ships an official `dist-build/wasm32-wasi.sh` proving the target. Build into our C lane (clang.wasm, --target=wasm32-wasi, -O3 -DED25519_NONDETERMINISTIC=1), configure with `--host=wasm32-wasi --disable-pie --disable-ssp --disable-shared --without-pthreads`. Output is a static `libsodium.a` (no executable), so inject a tiny `main.c` that calls `sodium_init()` then exercises one primitive (e.g. crypto_box keypair + secretbox roundtrip) and link against libsodium.a to produce the runnable `.wasm`. Entropy: libsodium has a native `__wasi__` randombytes backend that calls WASI `random_get` \u2014 wasmtime's WASI provides it, so the getrandom hookup the upstream note flags is satisfied with zero patching (no custom randombytes_implementation needed). If autotools-in-sandbox is friction, the source tree is flat enough to compile src/libsodium/**/*.c directly with the bundled config (configure mainly sets HAVE_* macros; can substitute a known wasm32-wasi config.h). NOT a capability we already ship (sqlite/pcre2/python/etc. give no NaCl crypto primitives).",
+  "smoke": "In-sandbox: build libsodium.a from the stable tarball via the C lane, then compile+link a 15-line main.c: `sodium_init(); unsigned char pk[32],sk[32]; crypto_box_keypair(pk,sk); unsigned char nonce[24],c[64]; randombytes_buf(nonce,24); crypto_secretbox_easy(c,(unsigned char*)\"hi\",2,nonce,sk); puts(\"ok\");` Run the resulting .wasm under wasmtime; expect exit 0 and stdout \"ok\". Validates sodium_init, WASI entropy (randombytes_buf -> random_get), and a real AEAD primitive end-to-end.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "mbedTLS",
+  "lane": "B",
+  "source_url": "https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.6",
+  "recipe": "Lane B (self-contained C). Use the 3.6 LTS branch (tag mbedtls-3.6.6), NOT 4.x \u2014 4.x splits crypto into the tf-psa-crypto git submodule (pointer file at repo root), which fragments the build; 3.6 keeps all 109 crypto/TLS .c files in library/ plus pure-C 3rdparty/{everest,p256-m}. No yacc/bison/configure/amalgam-gen. Config headers ship PREGENERATED: include/mbedtls/mbedtls_config.h, version.h, build_info.h are committed static files (no perl/python generation needed for the library; framework/ and scripts/ are test-only submodule tooling we ignore). Build steps: (1) fetch tarball for mbedtls-3.6.6 (curl -L codeload.github.com/Mbed-TLS/mbedtls/tar.gz/refs/tags/mbedtls-3.6.6). (2) Compile library/*.c + 3rdparty/everest/library/*.c + 3rdparty/p256-m/p256-m/*.c with -I include -I library -I 3rdparty/everest/include -I 3rdparty/p256-m to one static archive. (3) Disable platform deps unfit for pure wasi via a custom config (set CFLAG -DMBEDTLS_USER_CONFIG_FILE or edit mbedtls_config.h): turn OFF MBEDTLS_NET_C (net_sockets.c uses BSD sockets), MBEDTLS_TIMING_C (gettimeofday), and define MBEDTLS_NO_PLATFORM_ENTROPY (entropy_poll.c wants /dev/urandom or getrandom). TLS itself needs none of these \u2014 it uses pluggable BIO send/recv callbacks and a pluggable RNG, exactly the embedded-portability design the note describes. (4) Inject a tiny main.c that exercises the crypto core (no network) so it links to a standalone .wasm. Entropy: feed a fixed seed via mbedtls_ctr_drbg with a custom f_entropy callback for a deterministic smoke; production wasi can wire getentropy through a host import later.",
+  "smoke": "main.c: compute SHA-256 of \"abc\" via mbedtls_sha256() and assert the digest hex == ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad; then AES-128-ECB encrypt the FIPS-197 test vector (key 000102...0f, plaintext 00112233...ff) and assert ciphertext == 69c4e0d86a7b0430d8cdb78070b4c55a; print \"MBEDTLS OK\" and exit 0. Run: wasmtime mbedtls_smoke.wasm. No network, no filesystem, no entropy source required \u2014 pure deterministic crypto, ideal for wasi sandbox.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "wolfSSL",
+  "lane": "B",
+  "source_url": "https://github.com/wolfSSL/wolfssl",
+  "recipe": "Lane B (self-contained C, no yacc/bison). Skip autoconf entirely: compile sources directly with -DWOLFSSL_USER_SETTINGS and a hand-authored wolfssl/options.h / user_settings.h (wolfSSL's documented config-header path). Build set = wolfcrypt/src/*.c (~102 files: aes, sha*, rsa, ecc, random, etc.) + src/*.c (ssl.c, internal.c, tls.c, tls13.c, keys.c) against the wasi-sysroot/libc++ lane (C lane suffices; no C++ needed). Entropy: define CUSTOM_RAND_GENERATE_SEED to a host-wired wc_GenerateSeed that pulls from WASI random_get / host entropy cap \u2014 OR set WOLFSSL_GETRANDOM so it calls getrandom() (wasi-libc provides random_get). Net IO is fully abstracted: register wolfSSL_SSLSetIORecv/SSLSetIOSend callbacks bound to host net brokering (or for a self-test, feed an in-memory transcript / loopback BIO). Inject a tiny main() that runs a self-test. Crypto + handshake math is pure CPU \u2014 no native-only deps. Mirrors the mbedTLS-on-WASI pattern. Caveat: large file set and you must author user_settings.h by hand (enable HAVE_TLS13, ECC, AES-GCM, SHA2/3; disable filesystem with NO_FILESYSTEM, threading with SINGLE_THREADED, NO_WRITEV).",
+  "smoke": "Compile wolfcrypt test only (no TLS/net) to prove crypto runs hermetically in-sandbox: build wolfcrypt/src/*.c + wolfcrypt/test/test.c with -DWOLFSSL_USER_SETTINGS -DSINGLE_THREADED -DNO_FILESYSTEM -DCUSTOM_RAND_GENERATE_SEED=wb_seed (wb_seed fills from WASI random_get), target wasm32-wasi, then `wasmtime wolfcrypt_test.wasm` \u2014 expect all algo self-tests (AES, SHA256, RSA, ECC, HMAC) to PASS with no syscall errors. This isolates the compute/entropy path from net brokering. TLS handshake-over-host-net is a second, larger milestone.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "medium"
+ },
+ {
+  "name": "rustls",
+  "lane": "none",
+  "source_url": "https://github.com/rustls/rustls",
+  "recipe": "No viable in-sandbox lane. rustls is a Rust LIBRARY crate (not a CLI/.wasm artifact), so there is nothing to prebuild for Lane A \u2014 you would have to compile it from source through our only Rust path, mrustc (~1.74). That fails on three independent counts: (1) rustls 0.24-dev declares rust-version = \"1.85\", edition 2021, and its dep chain (webpki, rustls-pki-types, zerocopy, subtle, zeroize) leans on proc-macro derives \u2014 proc-macros + modern MSRV are explicitly impossible for mrustc. (2) The default crypto provider `ring` is NOT pure-Rust: its Cargo.toml has build = \"build/main.rs\", a cc build-dependency, and links = \"ring_core_0_17_...\", i.e. it compiles C plus per-arch perlasm/.S assembly via a native build script \u2014 exactly the native cc exec we forbid. The aws-lc-rs alternative is worse (vendored BoringSSL C + cmake + bindgen). (3) Even a \"pure-Rust\" provider (rustls-rustcrypto) pulls the proc-macro-heavy RustCrypto stack targeting stable Rust, still un-buildable by mrustc. TLS is not a capability we already cover (sqlite/pcre2/python/qjs/etc. give none of it). To get TLS in-sandbox the real path is to expose it as a HOST/Dock-brokered capability (BEAM :ssl over a Dock import) rather than compiling rustls to wasm32-wasi.",
+  "smoke": "N/A \u2014 cannot build. If forced: `mrustc` on the rustls workspace dies immediately on edition-2021/MSRV-1.85 + proc-macro derives (zerocopy/zeroize), and `ring`'s build/main.rs would shell out to `cc` to compile crypto/*.c + perlasm .S (native exec, blocked). There is no rustls .wasm to `wasmtime run` (it's a library, no main).",
+  "verdict": "impossible",
+  "blocker": "Default ring/aws-lc-rs crypto providers require native C+perlasm compiled via a cc build script (build/main.rs, links=ring_core, cc build-dep) \u2014 forbidden native exec; and rustls+deps need MSRV 1.85 / edition 2021 + proc-macro derives, beyond mrustc ~1.74 (proc-macros impossible). Library, not a CLI/.wasm, so no prebuilt Lane-A artifact. TLS belongs in the host/Dock layer, not compiled in-sandbox.",
+  "confidence": "high"
+ },
+ {
+  "name": "Pyodide",
+  "lane": "none",
+  "source_url": "https://github.com/pyodide/pyodide/releases/latest",
+  "recipe": "No recipe \u2014 not runnable under wasmtime as shipped, and Python is already a LIVE in-sandbox capability. Pyodide is CPython+scipy compiled with EMSCRIPTEN (target wasm32-emscripten), not wasm32-wasi. Its .wasm (python.wasm/pyodide.asm.wasm) is inseparable from the Emscripten JS runtime (pyodide.js): it imports a JS host for syscalls, FS (MEMFS/IDBFS), dynamic linking of the package .so/.whl files, and stdlib bootstrap. Bare wasmtime has no JS host and cannot satisfy those env/wasi_snapshot imports \u2014 it will fail at instantiation on missing 'env' module imports. Release assets confirm the shape: pyodide-314.0.0.tar.bz2 / pyodide-core / static-libraries / xbuildenv \u2014 all Emscripten browser/node bundles, zero wasm32-wasi artifact. The base Python capability is ALREADY covered by our live CPython-on-wasi lane; Pyodide's only delta is the numpy/scipy stack, which is exactly what's welded to Emscripten+JS and would require porting each C-extension wheel to wasi (out of scope here).",
+  "smoke": "N/A \u2014 would fail before any code runs. `wasmtime run pyodide.asm.wasm` errors at module instantiation: unknown import `env.__*` / `wasi`-incompatible Emscripten imports (no JS host to provide MEMFS, dynamic-link, syscall shims). No tiny-main injection helps; the wasm is not WASI-linked.",
+  "verdict": "impossible",
+  "blocker": "Emscripten-targeted (wasm32-emscripten), not wasm32-wasi: the .wasm requires a JS/browser host (pyodide.js Emscripten runtime, JS FS + syscall + dynamic-link shims) that wasmtime does not provide. No standalone WASI build exists. Base Python is already live in-sandbox; the scipy stack is the welded-to-JS part.",
+  "confidence": "high"
+ },
+ {
+  "name": "RE2",
+  "lane": "B",
+  "source_url": "https://github.com/google/re2",
+  "recipe": "Lane B (C++/libc++). Prebuilt npm `re2-wasm@1.0.2` is NOT plain wasm32-wasi \u2014 its build/wasm/re2.wasm imports emscripten+embind (`emscripten::val`, `memory_view<*>`, `emscripten_resize_heap`); JS-host coupled, so Lane A is out. Build from source: fetch google/re2 (~20 .cc in re2/ + rune.cc/strutil.cc in util/; generated perl_groups.cc + unicode_*.cc are pre-committed so no perl/python codegen at build) and its hard dep abseil-cpp. RE2 needs ~15 abseil targets per BUILD.bazel: base, container (flat_hash_map/set, inlined_vector, fixed_array), hash, strings + str_format, synchronization (absl::Mutex), flags, log (absl_check/absl_log), types (optional/span). Compile RE2 + the needed absl TUs with our clang.wasm/libc++ to wasm32-wasi (no CMake/Bazel \u2014 drive clang directly per TU, archive to a static lib). Inject a tiny main: read pattern+input from argv/stdin, RE2::FullMatch / PartialMatch, print match/groups. RE2's value over our live PCRE2 is the linear-time, no-backtracking (ReDoS-safe) automata guarantee \u2014 a distinct capability, not redundant.",
+  "smoke": "printf 'foo123bar\\n' | re2 '([a-z]+)(\\d+)' -> prints captures foo / 123. Also feed a pathological ReDoS pattern like '(a+)+$' against 'aaaaaaaaaaaaaaaaaaaaX' and confirm it returns immediately (linear time) where a backtracker would hang. Exit 0 on match, 1 on no-match.",
+  "verdict": "uncertain",
+  "blocker": "No blocker on capability (pure-CPU automata regex, no JIT/syscalls/threads-as-purpose/GPU/net \u2014 ideal wasm). Uncertainty is build effort: requires building the large abseil-cpp transitive dep (~15 targets incl. absl/synchronization Mutex which assumes futex/thread primitives, plus absl/flags + absl/log) alongside ~23 RE2 TUs by driving clang per-TU (no Bazel/CMake in-sandbox). That's a multi-TU porting project, not a one-shot wire-up; absl/synchronization on single-threaded wasi may need a no-op/stub thread shim. Needs a real build pass to confirm libc++ + absl compile clean to wasm32-wasi.",
+  "confidence": "medium"
+ },
+ {
+  "name": "Oniguruma",
+  "lane": "B",
+  "source_url": "https://github.com/kkos/oniguruma",
+  "recipe": "Lane B (self-contained C). Vendor src/*.c from kkos/oniguruma: core regparse.c regcomp.c regexec.c regenc.c regsyntax.c regerror.c regext.c regtrav.c regversion.c onig_init.c st.c + all encoding tables (utf8.c utf16_*.c utf32_*.c ascii.c unicode.c unicode_*_data.c euc_jp.c sjis.c iso8859_*.c koi8*.c gb18030.c big5.c euc_kr.c euc_tw.c cp1251.c). Parser regparse.c is HAND-WRITTEN \u2014 no yacc/bison. All unicode_*/encoding tables are PREGENERATED and committed (the .gperf/.py/.sh scripts only regenerate them; never run). configure/autotools NOT needed: hand-write a minimal src/config.h (#define HAVE_STDINT_H 1, HAVE_STRING_H 1, HAVE_UNISTD_H 1, SIZEOF_INT/LONG/etc, USE_CRNL... \u2014 config.h.cmake.in is trivial feature-detect) instead of generating it. Compile to wasm32-wasi via our clang C lane, libc-only, no syscalls in the match path (operates on caller byte buffers). Inject a tiny main.c: read pattern+subject from argv/stdin, onig_new() + onig_search(), print match offsets/captures. NOT the vscode-oniguruma onig.wasm (that's Emscripten + JS glue, not plain wasi). Distinct from live pcre2: Oniguruma adds Ruby/Onig regex syntax + multi-byte CJK encodings (EUC-JP/SJIS/GB18030) + TextMate-grammar matching that pcre2 does not cover.",
+  "smoke": "echo, with main wired: onig matches Ruby-syntax pattern '\\d+(?<word>\\w+)' against subject 'abc123def' under ONIG_ENCODING_UTF8 \u2192 prints match region [3,9) + named capture 'word'=def; second run with ONIG_ENCODING_EUC_JP over a multibyte subject returns a hit, proving multi-encoding path. Exit 0, no WASI fd/clock syscalls invoked.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "Polars",
+  "lane": "none",
+  "source_url": "https://github.com/pola-rs/polars",
+  "recipe": "Already a LIVE capability in this ecosystem: the workbooks runtime ships Polars as `wb.polars` in its default ~8MB wasm bundle (see workbooks-authoring skill). That bundle is a wasm-bindgen build (`wasm32-unknown-unknown` + inlined JS glue, `<script id=\"bindgen-src\">`) that runs in a JS host inside the workbook HTML. It is NOT a standalone wasm32-wasi module loadable by bare wasmtime via our command lane. For DataFrame/columnar compute under the wasmtime CLI lane today, the covered substitute is sqlite3 (already live: GROUP BY/joins/aggregations) plus jq for JSON shaping. To get Polars itself on the bare wasi command lane: blocked \u2014 see blocker. No new in-sandbox command needed; route DataFrame work to sqlite3, or use Polars inside the workbook JS-host runtime where it already exists.",
+  "smoke": "N/A for bare wasi lane (no standalone module). Capability check in the JS-host context: `wb.polars.readCSV(\"a,b\\n1,2\\n3,4\").select([\"a\"]).sum()` -> 4. Equivalent on the LIVE wasi command lane: `printf 'a,b\\n1,2\\n3,4\\n' | sqlite3 -csv ':memory:' '.import /dev/stdin t' 'select sum(a) from t'` -> 4.",
+  "verdict": "impossible",
+  "blocker": "No standalone wasm32-wasi build exists: every Polars wasm artifact (nodejs-polars-wasm, the workbooks runtime bundle) is a wasm-bindgen wasm32-unknown-unknown module that REQUIRES a JS host (inlined bindgen JS glue) \u2014 not loadable by bare wasmtime. Source build is also out of reach for our lanes: Polars is a large multi-crate workspace with heavy proc-macros and depends on rayon (native data-parallel threads) and tokio, so Lane C (mrustc ~1.74) is impossible. It IS already live as `wb.polars` inside the JS-host workbook runtime, and the equivalent DataFrame/aggregation workload is covered on the wasi command lane by the already-live sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "Apache Arrow",
+  "lane": "D",
+  "source_url": "https://registry.npmjs.org/apache-arrow",
+  "recipe": "Lane D (JS on our QuickJS/esbuild lane). The `apache-arrow` npm pkg (v21.1.0) is PURE JS: deps are tslib, flatbuffers, json-bignum, @swc/helpers \u2014 all pure JS, zero native bindings (tarball has no .node/.wasm files). It ships prebuilt bundles incl. Arrow.es2015.min.js (pre-transpiled, no build step). Arrow is just columnar memory layout + pure-function compute (build Table/RecordBatch from typed arrays, slice/filter/iterate, read/write the Arrow IPC binary format) \u2014 no kernel/JIT/GPU/network. Bundle Arrow.es2015.min.js (or esbuild the ESM entry) and run under QuickJS in the wasm sandbox. NOTE: rust lane (apache/arrow-rs, tag 59.0.0) is NOT viable \u2014 large crate, proc-macros, mrustc-impossible. C++ lane impossible \u2014 full CMake build + many 3rd-party deps. JS is the only realistic in-sandbox path.",
+  "smoke": "In QuickJS: load Arrow.es2015.min.js, then `const { tableFromArrays } = Arrow; const t = tableFromArrays({ id: Int32Array.from([1,2,3]), x: Float64Array.from([1.5,2.5,3.5]) }); print(t.numRows, t.getChild('x').get(2));` -> expect `3 3.5`. Then round-trip IPC: `tableToIPC(t)` -> Uint8Array, `tableFromIPC(bytes)` -> reconstructed table with numRows===3. No host imports beyond stdout needed.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "medium"
+ },
+ {
+  "name": "Fortran",
+  "lane": "none",
+  "source_url": "https://github.com/lfortran/lfortran/releases/latest",
+  "recipe": "No viable in-sandbox lane. Lane A: LFortran (the only Fortran compiler with a WASM story) ships ONLY a source tarball (lfortran-0.63.0.tar.gz) in its GitHub releases \u2014 zero wasm assets (grep -ic wasm = 0). Its \"WASM backend\" EMITS wasm and its in-browser demo is an Emscripten/JS-host lfortran.js pair (excluded: browser/JS host), NOT a plain wasm32-wasi lfortran.wasm runnable under wasmtime. Lane B: LFortran, LLVM flang, and gfortran are all LLVM-class compilers (100k+ LOC, CMake + full LLVM backend dependency, parser/ASR infra) \u2014 not a tiny-main C/C++ inject; cannot self-build in our C/C++ lane. Lane C/D: not a Rust crate, not Python/JS. To wire Fortran we would need either a prebuilt wasm32-wasi lfortran.wasm (does not exist upstream) or to cross-compile lfortran itself to wasm32-wasi from source (LLVM-dependency build, out of scope for the inject-main lanes).",
+  "smoke": "If a wasm32-wasi lfortran.wasm existed: write hello.f90 (program hello; print *, \"ok\"; end program), run `wasmtime lfortran.wasm -- hello.f90 -o hello.wasm` then `wasmtime hello.wasm` and assert stdout contains \"ok\". Cannot execute today \u2014 no such .wasm artifact.",
+  "verdict": "uncertain",
+  "blocker": "No prebuilt wasm32-wasi Fortran compiler exists (LFortran releases = source tarball only, in-browser build is JS-host/Emscripten excluded); the only paths are building an LLVM-class C++ compiler in-sandbox (impractical for our inject-main C/C++ lane) or cross-compiling lfortran to wasm32-wasi from source (out of scope). Not impossible in principle (pure AOT, no JIT/threads/GPU/net needed) but no ready artifact to wire.",
+  "confidence": "high"
+ },
+ {
+  "name": "Austral",
+  "lane": "none",
+  "source_url": "https://github.com/austral/austral",
+  "recipe": "No viable lane. The Austral compiler is written in OCaml (GitHub language=OCaml, austral.opam + dune-project + Makefile; README requires OCaml 4.13+, opam, dune, and a C compiler). Lane A: no prebuilt wasm32-wasi austral.wasm published anywhere (only native CI artifacts via build-and-test.yml). Lane B: the COMPILER is OCaml, not self-contained C/C++ \u2014 it cannot go through our clang/libc++ lane; OCaml\u2192wasm needs the full OCaml toolchain (opam/dune/findlib + OCaml runtime), which we do NOT have in-sandbox. Lane C: not Rust. Lane D: not Python/JS. The emitted C output DOES compile through our live C lane, but that is moot \u2014 we cannot run the austral compiler to produce that C in the first place without OCaml. Bootstrapping the compiler in-sandbox is impossible without an OCaml-in-wasm toolchain we don't have.",
+  "smoke": "N/A \u2014 cannot even build the compiler. Were OCaml available, the smoke would be: `austral compile examples/hello-world/Hello.aum --entrypoint=Hello:main --output=hello.c && clang hello.c austral-runtime.c -o hello && ./hello` expecting \"Hello, world!\" on stdout. Blocked at step 0: no austral binary obtainable in-sandbox.",
+  "verdict": "impossible",
+  "blocker": "Austral compiler is OCaml (dune/opam, OCaml 4.13+). We have no OCaml-in-wasm toolchain, so the compiler cannot be built or bootstrapped in-sandbox; no prebuilt austral.wasm exists. The emitted-C-through-our-C-lane path is unreachable because running the compiler to emit that C requires OCaml first.",
+  "confidence": "high"
+ },
+ {
+  "name": "Coq/Rocq",
+  "lane": "none",
+  "source_url": "https://github.com/rocq-prover/rocq/blob/master/INSTALL.md",
+  "recipe": "No viable lane. Coq/Rocq is a large OCaml codebase (kernel + Gallina + tactics) whose only runtime is OCaml. Our four lanes don't reach it: (A) no prebuilt plain wasm32-wasi .wasm exists \u2014 Coq has no wasm32-wasi target; OCaml's wasm_of_ocaml emits a Wasm-GC module plus mandatory JS glue that runs only under a browser/Node JS host (the js-pair lane A forbids), not a standalone wasmtime CLI module. (B) not self-contained C/C++ \u2014 it's OCaml; bootstrapping the OCaml compiler+runtime is out of scope and itself needs a host. (C) not a Rust crate (mrustc lane n/a). (D) not pure-Python and not a QuickJS/esbuild-able npm tool \u2014 jsCoq/coq-in-the-browser is a js_of_ocaml app bundle bound to a DOM/Node JS host, not a pure-JS module loadable on our QuickJS/esbuild lane. Coq is also NOT a capability already covered by our live tools (sqlite/pcre2/python/ruby/php/lua/qjs/compressors/jq/coreutils).",
+  "smoke": "N/A \u2014 nothing to smoke-test. There is no wasm32-wasi Coq/rocq binary to invoke under `wasmtime coqc --version` or `wasmtime rocq --version`; the only working jitless build (jsCoq, js_of_ocaml) requires a browser/Node JS host, which is excluded.",
+  "verdict": "impossible",
+  "blocker": "Coq/Rocq runs only on the OCaml runtime. The sole jitless build (jsCoq, via js_of_ocaml / wasm_of_ocaml) is a JS-host-bound app bundle needing a browser or Node DOM/JS environment \u2014 that's the JS-pair / browser-host case the lanes explicitly exclude. No plain wasm32-wasi standalone module exists, and it is not C/C++, not Rust, not pure-Python, and not a QuickJS-loadable npm tool. Belongs to the JS-host lane outside this in-sandbox wasmtime surface.",
+  "confidence": "high"
+ },
+ {
+  "name": "pip",
+  "lane": "none",
+  "source_url": "https://pypi.org/pypi/pip/json",
+  "recipe": "pip is pure Python and WOULD import under our existing CPython.wasm (Lane D), but pip's purpose is network-as-purpose: resolve + download + install packages from PyPI over HTTPS. Standalone wasm32-wasi under wasmtime has no socket/TLS stack, so `pip install X` cannot reach PyPI \u2014 the httpie-class disqualifier already recorded in this repo's wave3 results. The two routes that make pip functional both violate constraints: (1) Pyodide + micropip uses an in-BROWSER JS fetch host (browser/JS host barred); (2) reimplementing the index/download over a host fetch broker is network-as-purpose brokering (barred). CRITICALLY, pip's only USEFUL in-sandbox outcome \u2014 making a pure-Python package available to CPython.wasm \u2014 is ALREADY COVERED by the existing Lane D pattern: vendor the py3-none-any wheel under runtime priv/pytools and mount it at /pkgs (per .campaign/COMMANDS.md `yaml`/`tmpl` tools), no installer, no network needed. So pip adds nothing runnable in-sandbox: offline package provisioning is solved by vendoring; online install is impossible without sockets. No new tool to land.",
+  "smoke": "No offline smoke exercises pip's purpose. `pip --version` / `pip --help` would print (pure-Python imports resolve under CPython.wasm), but proves nothing \u2014 pip's job is install, and `pip install requests` (or any pkg) requires a TCP+TLS socket to pypi.org / files.pythonhosted.org, which wasm32-wasi/wasmtime cannot open. Even `pip download` hits the network. There is no network-free invocation that demonstrates the tool working.",
+  "verdict": "impossible",
+  "blocker": "pip's core function is network egress to PyPI (HTTPS index + wheel download); standalone wasm32-wasi under wasmtime has no socket/TLS layer. The only working routes need a browser/JS fetch host (Pyodide+micropip) or a host network broker \u2014 both explicitly barred. Offline package provisioning is already handled by the existing Lane D vendor-and-mount (/pkgs) pattern, so pip is both impossible-as-installer and redundant-as-capability.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hatch",
+  "lane": "D",
+  "source_url": "https://pypi.org/pypi/hatchling/json",
+  "recipe": "Scope to the build-backend half (hatchling) \u2014 the pure-function packager \u2014 not the full `hatch` CLI. We already have CPython live in-sandbox; hatchling is pure Python with only pure-Python deps (packaging, pathspec, pluggy, trove-classifiers, tomli on <3.11). pip-resolve hatchling-1.30.1-py3-none-any.whl + 4 dep wheels into CPython's site-packages (lane D, no C-ext). Drive via PEP 517: `python -m hatchling build` (or build_sdist/build_wheel hooks) against a project dir containing pyproject.toml + sources. Output sdist/wheel to a sandbox path. Do NOT attempt the full `hatch` CLI: its deps (uv, virtualenv, keyring, pexpect, httpx2, shellingham, userpath, distro) require subprocess spawning, network, OS keyring, and PTY \u2014 none available in-sandbox.",
+  "smoke": "In-sandbox: write /tmp/proj/pyproject.toml ([build-system] requires=[\"hatchling\"], build-backend=\"hatchling.build\"; [project] name=\"x\" version=\"0.1.0\") + /tmp/proj/x/__init__.py. Then `cd /tmp/proj && python -m build --wheel --no-isolation` (or call hatchling.build:build_wheel directly). Expect dist/x-0.1.0-py3-none-any.whl produced; unzip -l it shows x/__init__.py + METADATA. Pure file-in/file-out, no net.",
+  "verdict": "live-likely",
+  "blocker": "Only the hatchling build-backend is live-likely (pure Python, pure-Python deps, runs on our in-sandbox CPython). The full `hatch` CLI is impossible in-sandbox: deps uv/virtualenv/pexpect/keyring/httpx2/userpath need subprocess spawn, network, PTY, and OS keyring.",
+  "confidence": "high"
+ },
+ {
+  "name": "easy_install",
+  "lane": "D",
+  "source_url": "https://setuptools.pypa.io/en/latest/deprecated/easy_install.html",
+  "recipe": "Capability already covered \u2014 no port needed. easy_install is a pure-Python console script bundled with setuptools that rides CPython; it has no C extension of its own. We ALREADY have python live in-sandbox. Its sole function \u2014 fetching/installing pure-Python (and egg) packages over brokered network \u2014 is the same capability pip provides, and easy_install is officially deprecated with \"Do not use it. Instead use pip.\" (setuptools docs). So: (1) do NOT bring up a separate easy_install command; (2) expose pure-Python package install via the existing python.wasm lane (python -m pip install <pkg> --no-build-isolation for pure-Python wheels) over the Dock-brokered network. If a literal `easy_install` shim is ever wanted for compatibility, it is just `python -m easy_install` once setuptools (pure-Python) is on the python sys.path \u2014 zero new compiler work, no native exec. Network must come from the host net broker (Dock import), not a real socket.",
+  "smoke": "In-sandbox: `python -c \"import setuptools; print(setuptools.__version__)\"` proves the pure-Python host exists. Then `python -m pip install --no-deps --no-build-isolation six` (a canonical pure-Python wheel) over the brokered net, followed by `python -c \"import six; print(six.__version__)\"` \u2014 installs and imports a pure-Python package with no native exec, GPU, or browser. (easy_install equivalent: `python -m easy_install six` once setuptools is importable.)",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "Composer",
+  "lane": "A",
+  "source_url": "https://getcomposer.org/composer-stable.phar",
+  "recipe": "Composer is a pure-PHP phar; no separate wasm to build. Our live `php` IS the WLR plain wasm32-wasi `php-cgi-8.2.6.wasm` (already in runtime/host/pallet.ex, sha-pinned, runs under wasmtime). composer.phar (3.5MB, HTTP 200 at getcomposer.org/composer-stable.phar) is just a PHP script, so it executes via the existing PHP lane: fetch the phar into a preopen dir, then `run(\"php\",\"\",[\"-f\",\"/w/composer.phar\",\"--\",\"--version\"],[\"host::/w\"])`. NO new compiler/runtime work \u2014 it rides the live PHP command. Two unproven frictions: (1) WLR ships php-CGI SAPI, not CLI; the only non-wasmedge CLI php asset doesn't exist in the release (assets are php-cgi-8.2.6.wasm, php-cgi-slim, and a wasmedge-only php-8.2.6.wasm we can't use on wasmtime). Composer assumes CLI SAPI (argv, STDIN/STDOUT, exit codes, no CGI header preamble); php-cgi -f argv pass-through is plausible (pallet.ex notes file-mode argv) but the phar+argv path is unverified. (2) Composer's PURPOSE is network: install/update/require resolve and download from repo.packagist.org over HTTPS (verified live, HTTP 200), which the sandbox does not broker by default (no JS/browser host, no native net). Only offline subcommands (--version, validate, init, dump-autoload over an existing vendor/) run purely in-sandbox.",
+  "smoke": "Fetch composer.phar into a preopened workdir and run `run(\"php\",\"\",[\"-f\",\"/w/composer.phar\",\"--\",\"--version\"],[\"host::/w\"])` under wasmtime; expect \"Composer version 3.x\" on stdout (strip any CGI header lines php-cgi may prepend). Then `composer init -n` + `composer validate` on a hand-written composer.json to prove offline parse/validate. install/update will fail without an HTTPS broker to repo.packagist.org.",
+  "verdict": "uncertain",
+  "blocker": "Two open risks: (1) live php is CGI-SAPI (php-cgi), not CLI \u2014 phar+argv execution unproven (only CLI php asset is wasmedge, unusable on wasmtime); (2) Composer's defining function (install/update/require) is network-as-purpose, needs brokered HTTPS to repo.packagist.org which the sandbox lacks by default. Offline subcommands likely run; the real product does not without a network broker.",
+  "confidence": "medium"
+ },
+ {
+  "name": "Buildout",
+  "lane": "D",
+  "source_url": "https://pypi.org/pypi/zc.buildout/json",
+  "recipe": "zc.buildout 5.2.0 ships as a pure-Python wheel (zc_buildout-5.2.0-py3-none-any.whl, requires_python>=3.9) \u2014 verified live on PyPI (curl 200). It imports cleanly on our existing in-sandbox CPython lane (no C extensions in buildout itself). BUT buildout is not a compute library; it is a project *bootstrapper*. Its declared runtime deps are pip, setuptools<82, wheel, packaging \u2014 and its function is to (1) read buildout.cfg, (2) resolve+download distributions from PyPI over the network, and (3) run \"recipes\" that frequently shell out (configure/make, zope daemons via zdaemon, deployment scripts). Both pillars of its purpose violate the sandbox: network is the purpose (fetch eggs from PyPI), and recipe execution is subprocess-spawning native exec. Pyodide/micropip face the identical wall and do not support buildout. Note: this overlaps an already-LIVE capability \u2014 we have python in-sandbox; you can `import zc.buildout` but cannot run a real `bin/buildout` install because there is no PyPI network path and no subprocess for recipes inside wasm32-wasi/wasmtime.",
+  "smoke": "python in-sandbox: `python -c \"import zc.buildout; print(zc.buildout.__file__)\"` would succeed (pure-Python import). But the real test \u2014 `buildout -c buildout.cfg` (or `python -m zc.buildout.buildout install`) against any nontrivial config \u2014 fails: it calls into pip/installer to open sockets to pypi.org (no network in sandbox) and, for recipes like zc.recipe.egg / build recipes, invokes setuptools build \u2192 subprocess to a compiler. wasmtime wasi has neither sockets-to-PyPI nor fork/exec, so the install step errors at the first download/spawn.",
+  "verdict": "impossible",
+  "blocker": "Network-as-purpose (fetches distributions from PyPI) + subprocess/native-exec for recipe execution (configure/make, zdaemon, setuptools builds). The pure-Python module imports fine on our CPython lane, but a real buildout run requires PyPI network access and fork/exec \u2014 neither exists in wasm32-wasi under wasmtime. It's a package-installer/process-orchestrator, not a self-contained compute artifact.",
+  "confidence": "high"
+ },
+ {
+  "name": "LLVM",
+  "lane": "A",
+  "source_url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
+  "recipe": "ALREADY LIVE in-sandbox \u2014 capability already covered. Our clang lane (runtime/compilers/clang/build.sh) fetches YoWASP's LLVM (@yowasp/clang, whitequark's PLAIN wasm32-wasi port, NOT emscripten/JS), sha256-verifies the npm tarball, and extracts llvm.core.wasm \u2014 the clang+lld multitool carrying the full LLVM core (IR parser, optimizer/pass pipeline, ALL backends incl. wasm32-wasi, plus lld). It runs directly on wasmtime in-sandbox with the bundled sysroot (libc/libc++/headers/builtins) mounted at /usr. This is the production C lane backend and finishes Zig (zig1.wasm \u2192 C \u2192 clang.wasm) and Rust (mrustc.wasm C output \u2192 clang.wasm). Invoke modes of LLVM exposed via the multitool: clang -S -emit-llvm (emit LLVM IR), opt-equivalent passes via clang -O flags, clang -Xclang -disable-llvm-verifier (already used in Rust lane per BUILD-STATE.org), and lld for linking. No native exec, no browser/JS host, no GPU. NOTE: the standalone `opt`/`llc` binaries are not separately broken out \u2014 the multitool drives them through clang/lld frontends, which covers IR-emit + optimize + codegen + link. If a discrete opt/llc CLI is ever needed, add a `take` for those tools from the same YoWASP package (or @yowasp/* sibling) in stage-tools.sh.",
+  "smoke": "Provision via runtime/compilers/clang/build.sh (fetches+verifies @yowasp/clang, yields llvm.core.wasm path). Then under wasmtime: `wasmtime run --dir=<sysroot>::/usr llvm.core.wasm -- clang --version` prints LLVM/clang version. IR-emit proof: write tiny `int main(){return 42;}`, run `clang -S -emit-llvm -o out.ll in.c` \u2192 out.ll contains `define i32 @main()` and `ret i32 42`. Full lane proof already exists: rust e2e.sh prints 'RUST IN WASM SANDBOX: 55' (mrustc C \u2192 clang.wasm \u2192 wasm), proving LLVM codegen+lld link work in-sandbox.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ }
+]

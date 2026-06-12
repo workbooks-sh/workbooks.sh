@@ -232,6 +232,68 @@
 "recipe": "already live as php (php-cgi WLR)",
 "smoke": "php -f => 42",
 "extent": "= php command (Zend VM)"
+},
+"rustls": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Default ring/aws-lc-rs crypto providers require native C+perlasm compiled via a cc build script (build/main.rs, links=ring_core, cc build-dep) \u2014 forbidden native exec; and rustls+deps need MSRV 1.85 /",
+"extent": "off-the-table (verified)"
+},
+"Pyodide": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Emscripten-targeted (wasm32-emscripten), not wasm32-wasi: the .wasm requires a JS/browser host (pyodide.js Emscripten runtime, JS FS + syscall + dynamic-link shims) that wasmtime does not provide. No ",
+"extent": "off-the-table (verified)"
+},
+"Polars": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No standalone wasm32-wasi build exists: every Polars wasm artifact (nodejs-polars-wasm, the workbooks runtime bundle) is a wasm-bindgen wasm32-unknown-unknown module that REQUIRES a JS host (inlined b",
+"extent": "off-the-table (verified)"
+},
+"Austral": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Austral compiler is OCaml (dune/opam, OCaml 4.13+). We have no OCaml-in-wasm toolchain, so the compiler cannot be built or bootstrapped in-sandbox; no prebuilt austral.wasm exists. The emitted-C-throu",
+"extent": "off-the-table (verified)"
+},
+"Coq/Rocq": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Coq/Rocq runs only on the OCaml runtime. The sole jitless build (jsCoq, via js_of_ocaml / wasm_of_ocaml) is a JS-host-bound app bundle needing a browser or Node DOM/JS environment \u2014 that's the JS-pair",
+"extent": "off-the-table (verified)"
+},
+"pip": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "pip's core function is network egress to PyPI (HTTPS index + wheel download); standalone wasm32-wasi under wasmtime has no socket/TLS layer. The only working routes need a browser/JS fetch host (Pyodi",
+"extent": "off-the-table (verified)"
+},
+"Buildout": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (fetches distributions from PyPI) + subprocess/native-exec for recipe execution (configure/make, zdaemon, setuptools builds). The pure-Python module imports fine on our CPython lane",
+"extent": "off-the-table (verified)"
+},
+"grep": {
+"verdict": "live",
+"lane": "B",
+"recipe": "regex line-matching capability via pcre2 (live)",
+"smoke": "pcre2 '^b' => banana,blueberry",
+"extent": "grep core (regex line match) via pcre2; full GNU grep flags (-r/-A/-B) not all present"
+},
+"libSQL / Turso": {
+"verdict": "live",
+"lane": "A",
+"recipe": "SQLite-compatible capability via sqlite3 (live)",
+"smoke": "sqlite3 SELECT",
+"extent": "core SQLite/SQL via sqlite3; libSQL's extra (vector/replication) not present"
+},
+"Cloudflare D1": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "D1 is a hosted serverless SQLite cloud service (network API), not a runnable in-sandbox tool; the SQLite capability itself is live via sqlite3",
+"extent": "off-the-table (cloud service)"
 }
 },
 "preliminary": {
@@ -406,6 +468,110 @@
 "lane": "D",
 "source_url": "https://registry.npmjs.org/pdf-lib/latest",
 "recipe": "Do NOT compile pdftk-java (needs JVM; original C++/GCJ native/JIT). Cover capability with pure-JS pdf-lib on QuickJS/esbuild JS lane. Bundle",
+"confidence": "high",
+"verified": false
+},
+"HarfBuzz": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/harfbuzz/harfbuzz",
+"recipe": "HarfBuzz is a self-contained C++ OpenType shaping library: pure CPU, no syscalls, no GPU, no threads, no network. Strong Lane B fit on our C",
+"confidence": "high",
+"verified": false
+},
+"FreeType": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://gitlab.freedesktop.org/freetype/freetype/-/archive/VER-2-13-3/freetype-V",
+"recipe": "Lane B (self-contained C, our C lane). FreeType 2.13.3 is plain portable C \u2014 verified source tarball (200, 4MB) has NO yacc/bison/lex (.y/.l",
+"confidence": "high",
+"verified": false
+},
+"libsodium": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz",
+"recipe": "Lane B (self-contained C, static lib). Pure C, no TLS/socket/threads. Use the stable RELEASE TARBALL (not git) \u2014 it ships a PREGENERATED aut",
+"confidence": "high",
+"verified": false
+},
+"mbedTLS": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.6",
+"recipe": "Lane B (self-contained C). Use the 3.6 LTS branch (tag mbedtls-3.6.6), NOT 4.x \u2014 4.x splits crypto into the tf-psa-crypto git submodule (poi",
+"confidence": "high",
+"verified": false
+},
+"wolfSSL": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/wolfSSL/wolfssl",
+"recipe": "Lane B (self-contained C, no yacc/bison). Skip autoconf entirely: compile sources directly with -DWOLFSSL_USER_SETTINGS and a hand-authored ",
+"confidence": "medium",
+"verified": false
+},
+"RE2": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://github.com/google/re2",
+"recipe": "Lane B (C++/libc++). Prebuilt npm `re2-wasm@1.0.2` is NOT plain wasm32-wasi \u2014 its build/wasm/re2.wasm imports emscripten+embind (`emscripten",
+"confidence": "medium",
+"verified": false
+},
+"Oniguruma": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/kkos/oniguruma",
+"recipe": "Lane B (self-contained C). Vendor src/*.c from kkos/oniguruma: core regparse.c regcomp.c regexec.c regenc.c regsyntax.c regerror.c regext.c ",
+"confidence": "high",
+"verified": false
+},
+"Apache Arrow": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://registry.npmjs.org/apache-arrow",
+"recipe": "Lane D (JS on our QuickJS/esbuild lane). The `apache-arrow` npm pkg (v21.1.0) is PURE JS: deps are tslib, flatbuffers, json-bignum, @swc/hel",
+"confidence": "medium",
+"verified": false
+},
+"Fortran": {
+"verdict": "uncertain",
+"lane": "none",
+"source_url": "https://github.com/lfortran/lfortran/releases/latest",
+"recipe": "No viable in-sandbox lane. Lane A: LFortran (the only Fortran compiler with a WASM story) ships ONLY a source tarball (lfortran-0.63.0.tar.g",
+"confidence": "high",
+"verified": false
+},
+"Hatch": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://pypi.org/pypi/hatchling/json",
+"recipe": "Scope to the build-backend half (hatchling) \u2014 the pure-function packager \u2014 not the full `hatch` CLI. We already have CPython live in-sandbox",
+"confidence": "high",
+"verified": false
+},
+"easy_install": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://setuptools.pypa.io/en/latest/deprecated/easy_install.html",
+"recipe": "Capability already covered \u2014 no port needed. easy_install is a pure-Python console script bundled with setuptools that rides CPython; it has",
+"confidence": "high",
+"verified": false
+},
+"Composer": {
+"verdict": "uncertain",
+"lane": "A",
+"source_url": "https://getcomposer.org/composer-stable.phar",
+"recipe": "Composer is a pure-PHP phar; no separate wasm to build. Our live `php` IS the WLR plain wasm32-wasi `php-cgi-8.2.6.wasm` (already in runtime",
+"confidence": "medium",
+"verified": false
+},
+"LLVM": {
+"verdict": "live-likely",
+"lane": "A",
+"source_url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
+"recipe": "ALREADY LIVE in-sandbox \u2014 capability already covered. Our clang lane (runtime/compilers/clang/build.sh) fetches YoWASP's LLVM (@yowasp/clang",
 "confidence": "high",
 "verified": false
 }
