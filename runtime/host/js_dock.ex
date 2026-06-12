@@ -70,6 +70,7 @@ defmodule Workbooks.JsDock do
     allow_kv = "kv" in Policy.caps(profile)
     allow_secrets = "secrets" in Policy.caps(profile)
     allow_tcp = "tcp" in Policy.caps(profile)
+    allow_udp = "udp" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -177,6 +178,21 @@ defmodule Workbooks.JsDock do
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
                 {:ok, resp} <- Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
+             n = min(byte_size(resp), oc)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end},
+      # Brokered UDP send/recv-one (resolve-then-pin, SSRF-safe). Mirrors rust_dock.
+      "host_udp" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, hp, hl, port, dp, dl, op, oc ->
+           with true <- allow_udp,
+                host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
+                dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl),
+                {:ok, resp} <- Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
              n = min(byte_size(resp), oc)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n

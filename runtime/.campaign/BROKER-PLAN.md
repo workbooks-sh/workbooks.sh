@@ -774,3 +774,9 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   PLATFORM now NINE brokered capabilities: net(http+sockets) / exec / storage / parallel / serve / secrets /
   queue / raw-TCP / UDP — all guest-e2e-proven, both docks (UDP js_dock parity pending). NEXT (iter 45):
   js_dock host_udp parity; OR a 10th capability.
+- 2026-06-12 (iter 45): **js_dock host_udp PARITY (UDP on both docks) + COMPREHENSIVE robustness sweep (green).**
+  js_dock host_udp mirrors rust_dock (allow_udp gate) — UDP now on both docks. Ran a full coherence sweep
+  after 44 iterations of changes: 49 broker UNIT tests (udp/tcp/net_guard/exec/storage/queue/secret/
+  rate_limiter) + 8 cargo SSRF/scope/dns-needed tests = 57 tests, 0 failures. The whole platform's unit layer
+  is coherent + green. PLATFORM: 9 brokered capabilities, BOTH docks, every cadence primitive + red-team
+  vector covered. NEXT (iter 46): a 10th capability, or per-tool reclamation.
