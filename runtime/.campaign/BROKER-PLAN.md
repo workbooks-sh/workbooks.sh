@@ -853,3 +853,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   parallel/tcp/udp/tls) is present on :network and ALL gated off :compute (only host_log/host_now ambient) —
   a least-privilege regression guard against un-gating or a missing dock wiring.
   NEXT (iter 53): the inbound seam (wb-py4k, additive-sync), or more.
+- 2026-06-12 (iter 53): **host_http_get_many DoS-amplification cap + inbound-seam crux pinned.** (a) Verified
+  host_http_get_many routes EVERY URL through NetGuard.get (full SSRF floor + resolve-then-pin + revocation) —
+  no SSRF bypass in the batch path. (b) FIXED a DoS-amplification gap: the batch had NO size cap — a guest
+  could fan ONE import call into an unbounded outbound burst (bounded only by 16-concurrency, not total).
+  Added @max_http_batch 64 (Enum.take + audit log on truncation) — the amplification floor. Clean compile,
+  coherence guard green. (c) wb-py4k crux: the real difficulty is RESOURCE-LOWERING (a sync bindgen! proxy
+  with version-specific with-mappings + WIT-source discovery) — confirmed a FOCUSED-SESSION task needing
+  iterative compile cycles, not a blind loop-fire. Plan complete in the bd; no engine async_support needed.
+  NEXT (iter 54): more hardening, or the inbound seam in a focused sitting.

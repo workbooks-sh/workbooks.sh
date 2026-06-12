@@ -9,6 +9,11 @@ defmodule Workbooks.RustDock do
   """
 
   alias Workbooks.Policy
+  require Logger
+
+  # DoS-amplification floor: cap how many URLs one host_http_get_many call may fan out to, so a guest can't
+  # turn a single import call into an unbounded burst of outbound requests.
+  @max_http_batch 64
 
   @doc """
   env.* imports for a Rust core module. opts: :profile (caps gate, default :minimal).
@@ -343,9 +348,18 @@ defmodule Workbooks.RustDock do
            _ = Application.ensure_all_started(:inets)
            _ = Application.ensure_all_started(:ssl)
 
-           urls =
+           all_urls =
              Wasmex.Memory.read_string(ctx.caller, ctx.memory, urls_ptr, urls_len)
              |> String.split("\n", trim: true)
+
+           # DoS-amplification floor: a guest can't fan one call out to an unbounded request burst
+           urls = Enum.take(all_urls, @max_http_batch)
+
+           if length(all_urls) > @max_http_batch do
+             Logger.warning(
+               "wb-broker: host_http_get_many batch capped at #{@max_http_batch} (got #{length(all_urls)})"
+             )
+           end
 
            results =
              urls
