@@ -1026,3 +1026,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   hand-written serve_broker. So the standard-component app-host is DoS-floored on BOTH directions — outbound
   SSRF-brokered, inbound rate+size-capped. App-host hardening arc: deployable(66) -> concurrent(67) ->
   isolated(68) -> inbound-DoS-floored(69).
+- 2026-06-12 (iter 70): **APP-HOST MID-FLIGHT REVOCATION — the inbound cadence is now COMPLETE.** The
+  ComponentPlug had size (413) + rate (429) floors but no revocation — a hosted app couldn't be killed without
+  killing the server. Added an opt-in `:serve_id`; once revoked, every subsequent request -> 503 (the server
+  keeps running, only the hosted app is gated). E2E: serving (200) -> revoke -> 503 -> unrevoke -> 200. So the
+  app-host inbound cadence now MATCHES the outbound brokers + the hand-written serve_broker: request-size cap
+  (413) + per-client rate floor (429) + mid-flight revocation (503). The standard-component app-host now has
+  the FULL security cadence on BOTH directions: outbound SSRF-brokered + scopable (net_allow) + revocable;
+  inbound size-capped + rate-floored + revocable. App-host arc: deployable(66) -> concurrent(67) ->
+  isolated(68) -> rate-floored(69) -> revocable(70) = PRODUCTION-COMPLETE.

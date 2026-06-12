@@ -463,4 +463,46 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert s1 == 200
     assert s2 == 429
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "APP-HOST mid-flight revocation — a revoked hosted app is refused (503), server keeps running" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{bytes: bytes, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    sid = "apphost-#{System.unique_integer([:positive])}"
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.ComponentPlug, pid: pid, serve_id: sid},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+    url = ~c"http://127.0.0.1:#{port}/"
+    req = fn -> :httpc.request(:get, {url, []}, [], body_format: :binary) |> elem(1) |> elem(0) |> elem(1) end
+
+    # serving normally -> revoke (mid-flight) -> refused -> unrevoke -> serving again
+    assert req.() == 200
+    :ok = Workbooks.Revocation.revoke(sid)
+    assert req.() == 503
+    :ok = Workbooks.Revocation.unrevoke(sid)
+    assert req.() == 200
+  end
 end

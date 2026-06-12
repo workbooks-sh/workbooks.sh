@@ -228,6 +228,11 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
     max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
 
     cond do
+      # MID-FLIGHT REVOCATION (opt-in `:serve_id`) — a hosted app can be killed without killing the server;
+      # once its serve_id is revoked, every subsequent request is refused (503).
+      revoked?(Keyword.get(opts, :serve_id)) ->
+        send_resp(conn, 503, "service revoked")
+
       # INBOUND DoS floor (opt-in `:rate` = {max, window_ms}) — PER-CLIENT (by remote IP) so a flood from one
       # client can't starve others or exhaust the host with unbounded request handling / instantiation.
       rate_limited?(conn, Keyword.get(opts, :rate)) ->
@@ -251,6 +256,9 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
         end
     end
   end
+
+  defp revoked?(nil), do: false
+  defp revoked?(serve_id), do: Workbooks.Revocation.revoked?(serve_id)
 
   defp rate_limited?(_conn, nil), do: false
 
