@@ -62,16 +62,6 @@
           "sublessons": []
         },
         {
-          "slug": "autopoet",
-          "title": "Autopoet",
-          "sub": "the gardener",
-          "color": "#aee5c2",
-          "icon": "icons/autopoet.svg",
-          "audio": true,
-          "status": "live",
-          "sublessons": []
-        },
-        {
           "slug": "wbx",
           "title": "wbx",
           "sub": "the command",
@@ -89,7 +79,17 @@
           "icon": "icons/workflows.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "autopoet",
+              "title": "Autopoet",
+              "sub": "the gardener",
+              "color": "#f2ddb0",
+              "icon": "icons/autopoet.svg",
+              "audio": true,
+              "status": "live"
+            }
+          ]
         },
         {
           "slug": "vfs",

@@ -49,6 +49,9 @@
     '.nav .drop .panel .colhead { font: 700 9px var(--mono, monospace); letter-spacing: .22em;',
     '  text-transform: uppercase; color: var(--dim, #565b54); padding: 8px 10px 6px; display: flex; align-items: baseline; gap: 8px; }',
     '.nav .drop .panel .colhead small { font-weight: 400; letter-spacing: .02em; text-transform: none; font-size: 9px; }',
+    '.nav .drop .panel .subrow { margin-left: 18px; border-left: 2px dotted rgba(18,19,22,.25); }',
+    '.nav .drop .panel .subrow a { padding-top: 6px; padding-bottom: 6px; font-size: 10.5px; }',
+    '.nav .drop .panel .subrow a .sw { width: 18px; height: 18px; } .nav .drop .panel .subrow a .sw img { height: 11px; }',
     '.nav .drop .panel .nbsearch { margin: 2px 8px 6px; }',
     '.nav .drop .panel .nbsearch input { width: 100%; box-sizing: border-box; border: 2px solid var(--ink, #121316);',
     '  border-radius: 7px; background: #fff; padding: 7px 9px; font: 500 11px var(--mono, monospace);',
@@ -145,7 +148,12 @@
       cat.tiers.forEach(function (tier, i) {
         if (i > 0) html += '<div class="sep" aria-hidden="true"></div>';
         html += '<div class="colhead">' + (i === 0 ? "lessons" : "") + ' <small>' + tier.title + "</small></div>";
-        tier.lessons.filter(function (l) { return l.status === "live"; }).forEach(function (l) { html += lessonRow(l); });
+        tier.lessons.filter(function (l) { return l.status === "live"; }).forEach(function (l) {
+          html += lessonRow(l);
+          (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) {
+            html += '<div class="subrow">' + lessonRow(x) + "</div>";
+          });
+        });
       });
       host.innerHTML = html;
     })

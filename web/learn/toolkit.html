@@ -6,9 +6,7 @@
 <title>What is a toolkit? — Workbooks</title>
 <meta name="description" content="A toolkit is a capability you install into the Workbooks ecosystem — a real program compiled to WebAssembly, wrapped in a readable manual that teaches people and agents how to use it.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -29,6 +27,18 @@
 <link rel="stylesheet" href="learn.css">
 </head>
 <body>
+<!--
+
+    three layers, since you're the type to look:
+
+      manual   ← you are, at this exact moment, reading one
+      muscle   ← the part that compiles to wasm
+      floor    ← the sandbox it can't fall through
+
+    the manual IS the interface. documentation that can't drift from
+    the tool, because the documentation is how the tool is reached.
+
+-->
 
 <div id="site-nav"></div>
 <script src="../nav.js?v=3"></script>

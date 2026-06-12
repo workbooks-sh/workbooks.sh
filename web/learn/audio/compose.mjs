@@ -33,7 +33,7 @@ const scripts = readdirSync(join(HERE, "scripts"))
   .map((f) => JSON.parse(readFileSync(join(HERE, "scripts", f), "utf8")))
   .filter((s) => !only.length || only.includes(s.slug));
 
-const ORDER = ["workbook", "nexus", "toolkit", "org", "agents", "autopoet", "wbx"];
+const ORDER = ["workbook", "nexus", "toolkit", "org", "agents", "autopoet", "wbx", "workflows", "vfs"];
 scripts.sort((a, b) => ORDER.indexOf(a.slug) - ORDER.indexOf(b.slug));
 
 // ── the shape ────────────────────────────────────────────────────────────────
@@ -55,6 +55,8 @@ const TURNS = {
   agents: ["definition", "boundaries", "faq"],
   autopoet: ["definition", "does", "faq"],
   wbx: ["definition", "first", "faq"],
+  workflows: ["definition", "compile", "faq"],
+  vfs: ["definition", "workspace", "faq"],
 };
 
 const fdur = (f) =>

@@ -7,9 +7,7 @@
 <meta name="description" content="The virtual file system is the workbook's own disk: real files and directories, SQLite-backed, riding inside the artifact — the workspace an agent works in is the file you can send.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="img/vfs-hero.jpg" as="image" fetchpriority="high">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Workbooks">
@@ -19,6 +17,18 @@
 <link rel="stylesheet" href="learn.css">
 </head>
 <body>
+<!--
+
+    $ ls /this-page
+    .                    a directory listing for a page about disks
+    ..                   (the page is not actually a workbook — yet)
+    hero.jpg             1970s. an atrium that is a book.
+    lesson.org           the spec is at the bottom of this source
+    you-are-here         0 bytes, like all the best files
+
+    SELECT path FROM files WHERE curiosity = 'rewarded';
+
+-->
 
 <div id="site-nav"></div>
 <script src="../nav.js?v=3"></script>
@@ -33,7 +43,7 @@
       code and your agents work in is <b>the same file you can send</b> — and nothing
       they do can touch the computer it's sitting on.</p>
       <div class="meta">
-        <span class="on">the disk</span><span>5 min read</span>
+        <span class="on">the disk</span><span>10 min read</span>
       </div>
     </div>
     <figure class="heroart">
@@ -52,9 +62,12 @@
   <a href="#problem">Where does an agent keep files?</a>
   <a href="#definition">The definition</a>
   <a href="#anatomy">A disk you can query</a>
+  <a href="#inside">What's actually inside</a>
   <a href="#readings">Two readings, again</a>
   <a href="#workspace">The workspace is the artifact</a>
+  <a href="#day">A day in the life</a>
   <a href="#safety">Why this is the safe shape</a>
+  <a href="#versus">Four places to keep bytes</a>
   <a href="#honest">Where the disk ends</a>
   <a href="#faq">FAQ</a>
   <a href="#next">Keep going</a>
@@ -76,6 +89,10 @@
   that disk is mundane — paths, directories, read, write, list. Nothing
   about that requires an operating system underneath. It just requires
   somewhere structured for bytes to live.</p>
+  <p>So the missing piece isn't a bigger disk or a cheaper rental. It's a
+  disk that belongs to the <b>project</b> — one that travels when the
+  project travels, and stops existing for you the moment you delete the
+  file. That's what this lesson is about.</p>
 </section>
 
 <section id="definition">
@@ -107,11 +124,75 @@
     </div>
     <figcaption class="dcap">"find every file the agent touched this week" is <b>one query</b>, not a crawl</figcaption>
   </figure>
+  <p>Here's the same picture as the engine sees it. Code and agents come at
+  the store through paths; questions come at it through SQL; both land on
+  the same bytes, and the bytes are riding in the html:</p>
+  <pre class="mermaid">
+flowchart LR
+  code["code + agents — speak in paths<br/>open · read · write · list"]
+  q["questions — speak in SQL<br/>SELECT path FROM files WHERE …"]
+  subgraph store["one SQLite store — gzip-bound into the html"]
+    direction TB
+    f1["/notes/june.org"]
+    f2["/data/orders.csv"]
+    f3["/reports/week-24.org"]
+  end
+  code -- "a program's verbs" --> store
+  q -- "a question's verbs" --> store
+  style store fill:#fbfaf6,stroke:#121316
+  style f1 fill:#a8d4f0,stroke:#121316
+  style f2 fill:#a8d4f0,stroke:#121316
+  style f3 fill:#a8d4f0,stroke:#121316
+  style code fill:#ffffff,stroke:#121316
+  style q fill:#ffffff,stroke:#121316
+  </pre>
   <p>Most file systems make you choose: easy paths or real queries. Because
   this one is a database wearing a directory tree, questions that are
   painful on a normal disk — everything modified since the last deploy,
   every file over a megabyte, every note tagged urgent — are single
-  statements.</p>
+  statements. The claim deserves to be concrete, so here are three of them,
+  against a real workbook's disk:</p>
+  <pre class="orgsample">-- everything modified since the last deploy
+SELECT path FROM files WHERE mtime > '2026-06-09';
+   <i>→ /notes/june.org · /reports/week-24.org · … 6 rows</i>
+
+-- where the megabytes actually live
+SELECT dir, sum(size) FROM files GROUP BY dir ORDER BY 2 DESC;
+   <i>→ /assets 11.2 MB · /data 3.4 MB · /notes 0.2 MB</i>
+
+-- every file the agent touched this week
+SELECT path FROM files WHERE writer = 'agent'
+  AND mtime > date('now', '-7 days');
+   <i>→ 14 rows — its notes, two drafts, one finished report</i></pre>
+  <p>Try asking your operating system the second question. There's a
+  progress bar involved. Here it's an index lookup, because a listing was
+  never a crawl in the first place — it was always a query, the way it
+  should have been all along.</p>
+</section>
+
+<section id="inside">
+  <h2>what's actually INSIDE</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the store's shape, for the curious</span></p>
+  <p>No mystery meat. The store holds three kinds of thing, and none of
+  them is exotic. <b>Paths</b> — the namespace, a table of names that makes
+  <code>/notes/june.org</code> mean something. <b>Blobs</b> — the bytes
+  themselves, one per file, sitting in the same store. And <b>metadata</b> —
+  sizes, times, kinds, who wrote what — as columns, not as a cache your
+  tools rebuild by crawling.</p>
+  <p>Directories deserve a sentence of their own. On a normal disk, the
+  question <em>what belongs to this project?</em> is answered by folklore —
+  a naming convention, a <code>.gitignore</code>, a README that says don't
+  touch <code>/vendor</code>. Here a directory is a fact in a table, the
+  project boundary is the store's edge, and "what's in this tree, who wrote
+  it, and when" are answers you <code>SELECT</code>, not answers you
+  reconstruct.</p>
+  <p>And the door swings both ways. Unbundle a workbook and the VFS unpacks
+  to ordinary files in ordinary directories on your real disk — open them
+  in anything, commit them anywhere, walk away entirely if you choose. The
+  store is also plain SQLite, readable by the most widely deployed database
+  tooling on earth. The format holds your files; it doesn't hold them
+  hostage. That's the same no-invented-formats promise the whole
+  <a href="workbook">anatomy</a> makes, kept one layer down.</p>
 </section>
 
 <section id="readings">
@@ -128,6 +209,30 @@
   restarts, schedules write into it overnight, and the copy you serve to a
   thousand people reads from it. Same paths, same queries, same code; the
   only thing that changed is that the disk now has a heartbeat.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant T as a browser tab
+  participant F as the .html file
+  participant N as a nexus
+  rect rgb(251,250,246)
+  Note over T,F: reading one — opened
+  F->>T: VFS loads into memory
+  T->>T: code reads + writes — for real
+  T--xF: tab closes — file byte-identical
+  end
+  rect rgb(232,243,250)
+  Note over F,N: reading two — docked
+  F->>N: engine takes the VFS live
+  N->>N: writes persist · a schedule writes overnight
+  N->>T: served copies read from the live disk
+  end
+  </pre>
+  <p>Read the diagram's two halves as one promise with two tenses. In the
+  top half the disk is a <em>reading</em> — fully real while you're there,
+  gone without a trace when you leave. In the bottom half it's a
+  <em>residence</em>. Nothing about the file changed between the halves;
+  what changed is whether something with a power supply has agreed to keep
+  its state.</p>
 </section>
 
 <section id="workspace">
@@ -141,6 +246,39 @@
   data, and the entire working state of the crew that built it. No
   "let me zip up my folder", no "it works on my sandbox". The thing you
   collaborate on and the thing you ship stopped being different things.</p>
+  <p>This is also what makes handoffs between humans and
+  <a href="agents">agents</a> boring, in the good way. There's no
+  export-from-the-sandbox step where context dies; the agent's scratch
+  files, half-finished drafts, and decision notes are sitting in
+  <code>/notes</code> next to the deliverable in <code>/reports</code>,
+  and whoever opens the file next — colleague or crew — starts from the
+  real state, not a summary of it.</p>
+</section>
+
+<section id="day">
+  <h2>a day in the LIFE</h2>
+  <p>Abstractions should earn their keep, so here's one ordinary day in the
+  life of one workbook's disk.</p>
+  <p><b>06:00.</b> A schedule fires on the <a href="nexus">engine</a>. An
+  agent runs its <a href="workflows">workflow</a>, pulls the week's orders
+  out of <code>/data</code>, and writes the finished report to
+  <code>/reports/week-24.org</code> — a path that didn't exist at 05:59.
+  Its working notes land in <code>/notes</code>, timestamped, beside last
+  week's.</p>
+  <p><b>09:00.</b> You open the served workbook with your coffee. The
+  dashboard's chart isn't an email attachment someone generated — it's a
+  live query against the path the agent wrote three hours ago. Nothing was
+  uploaded, deployed, or synced, because the disk the agent wrote and the
+  disk the dashboard reads were never two disks.</p>
+  <p><b>11:00.</b> Your accountant asks for the numbers. She does not want
+  a login. You unbundle one file out of the VFS and email her an ordinary
+  CSV — the disk travels with the file, and any single file travels out of
+  the disk.</p>
+  <p><b>23:00.</b> Nothing happens, on your laptop, because your laptop was
+  never involved. It could have been closed in a bag all day. Every byte in
+  this story lived in the workbook's own disk — written by the crew, read
+  by the served copies, versioned with the project. That's the whole
+  pitch, wearing a Tuesday.</p>
 </section>
 
 <section id="safety">
@@ -152,9 +290,69 @@
   <a href="nexus">security model's</a> grants-not-inheritance rule starts
   here: the default disk is the one riding in the artifact, and everything
   beyond it is a specific, revocable permission.</p>
-  <p>This is also why the blast radius stays boring. A confused agent can
-  trash exactly one VFS — which is versioned, diffable, and restorable,
-  because it's inside a file that git has been tracking all along.</p>
+  <pre class="mermaid">
+flowchart TD
+  agent["an agent — even a confused one"]
+  subgraph wb["the workbook — where writes can land"]
+    vfs["the VFS<br/>versioned · diffable · restorable"]
+  end
+  subgraph host["your computer — no path resolves here"]
+    docs["~/Documents"]
+    keys["keychain · ~/.env"]
+    os["the OS disk"]
+  end
+  agent -- "every write" --> vfs
+  vfs -. "a specific, revocable grant — the only door" .-> host
+  style vfs fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style wb fill:#fbfaf6,stroke:#121316
+  style host fill:#fbfaf6,stroke:#121316
+  style docs fill:#d9dbd3,stroke:#121316
+  style keys fill:#d9dbd3,stroke:#121316
+  style os fill:#d9dbd3,stroke:#121316
+  style agent fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Now add the part people underestimate: <b>prompt injection</b>. The
+  <a href="nexus">Nexus lesson</a> puts it plainly — anyone whose text
+  reaches your agent is partially steering it. A web page it reads, an
+  email it summarizes, a comment in a file. Give a steerable agent your
+  operating system and you've built an exfiltration machine with a stranger
+  near the wheel. Give it a VFS and the same hostile instruction hits a
+  wall made of construction, not policy: the worst text can do is trash one
+  project-sized disk.</p>
+  <p>And even that worst case is boring, because the disk lives inside a
+  file that git has been tracking all along. A bad Thursday looks like
+  this:</p>
+  <pre class="mermaid">
+flowchart LR
+  c1["tue<br/>v1 ships"] --> c2["wed<br/>agent writes /reports"] --> c3["thu<br/>bad write trashes /data"] --> c4["thu + 30s<br/>git revert — disk restored"]
+  style c1 fill:#d9dbd3,stroke:#121316
+  style c2 fill:#d9dbd3,stroke:#121316
+  style c3 fill:#f3c5a3,stroke:#121316
+  style c4 fill:#13d943,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Versioned, diffable, restorable — not because anyone wired up a backup
+  system for agent workspaces, but because the workspace is bytes in a file
+  and files already have the best undo humanity ever shipped.</p>
+</section>
+
+<section id="versus">
+  <h2>four places to keep BYTES</h2>
+  <p>It's worth lining the disk up against its alternatives honestly.
+  Project bytes live in one of four places today:</p>
+  <table class="cmp">
+    <tr><th></th><th>travels with the project?</th><th>queryable?</th><th>sandboxed from host?</th><th>versioned with the work?</th><th>costs a meter?</th></tr>
+    <tr><td>your OS disk</td><td class="n">no — it's the machine</td><td class="n">no — crawl it</td><td class="n">it <em>is</em> the host</td><td>only what you commit</td><td class="y">no</td></tr>
+    <tr><td>a cloud bucket (S3)</td><td class="n">no — the project points at it</td><td class="n">listings, not content</td><td>from yours — creds reach it</td><td class="n">separately, if configured</td><td class="n">storage + egress, forever</td></tr>
+    <tr><td>a rented sandbox volume</td><td class="n">no — evaporates with the VM</td><td class="n">no</td><td class="y">yes</td><td class="n">no</td><td class="n">by the second</td></tr>
+    <tr><td><b>the VFS</b></td><td class="y">it <em>is</em> the project file</td><td class="y">yes — it's SQLite</td><td class="y">by construction</td><td class="y">git tracks the file</td><td class="y">no — bytes in a file</td></tr>
+  </table>
+  <p>The honest read of that table: the other three still exist for
+  reasons, and you'll meet them at your system's boundaries. The OS disk is
+  where workbooks sit; a bucket is the right home for a terabyte of video;
+  rented isolation is fine for a one-off job. But notice which column each
+  one wins and which four it forfeits. The VFS is the only row that doesn't
+  trade away the project's coherence to get its one virtue — because its
+  virtue <em>is</em> the project's coherence.</p>
 </section>
 
 <section id="honest">
@@ -162,11 +360,16 @@
   <p>Honesty section. The VFS is a project-scale disk, not a media vault —
   SQLite holds gigabytes comfortably, but a workbook stays pleasant to
   share in the tens of megabytes, so heavy assets belong behind an engine
-  with the workbook querying them. And in a browser, persistence is the
-  file's: changes live in memory until you save or dock — the open tab is
-  a reading room, not a writing desk. For durability, schedules, and
-  serving, the engine is the answer, the way it always is for the living
-  part.</p>
+  with the workbook querying them. Put the catalog in the file and the
+  warehouse behind the <a href="nexus">Nexus</a>; the table above already
+  told you a bucket wins exactly one column, and raw tonnage is it.</p>
+  <p>And in a browser, persistence is the file's: changes live in memory
+  until you save or dock — the open tab is a reading room, not a writing
+  desk. That's a designed property, not a gap — it's what makes opening a
+  workbook from a stranger safe, and what keeps the artifact honest — but
+  it means the browser alone is not where durable state accumulates. For
+  durability, schedules, and serving, the engine is the answer, the way it
+  always is for the living part.</p>
 </section>
 
 <section id="faq" class="faq">
@@ -183,6 +386,23 @@
     <p>Always. Unbundle the workbook and the tree unpacks to ordinary
     files; or query the live VFS on an engine and export what you need.
     The disk travels with the file — it's never trapped in it.</p>
+  </details>
+  <details>
+    <summary>What happens to the VFS when I email the file?</summary>
+    <p>It goes along — the disk is bytes in the html, so sending the file
+    sends the disk, exactly as it stood when you sent it. The recipient
+    opens the same paths, runs the same queries, no setup. Their copy and
+    yours are now two readings; if you want them to converge again, that's
+    what docking into a shared <a href="nexus">engine</a> is for.</p>
+  </details>
+  <details>
+    <summary>Can code inside the workbook list MY computer's files?</summary>
+    <p>No — and not because a setting says no. There is no path that
+    resolves outside the artifact: every open, read, and list bottoms out
+    in the store riding in the file, so "escape to the host disk" isn't a
+    permission to deny, it's a sentence with no referent. Reaching beyond
+    the file takes a specific, revocable grant — and that's the security
+    model working, not failing.</p>
   </details>
   <details>
     <summary>What about two people writing at once?</summary>
@@ -254,5 +474,6 @@ window.LEARN = {
 </script>
 <script src="learn.js"></script>
 <script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
 </body>
 </html>

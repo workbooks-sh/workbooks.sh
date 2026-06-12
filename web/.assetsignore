@@ -1,0 +1,11 @@
+# Production tree hygiene — pipeline internals never ship to the edge.
+# (People WILL view source. Let them find lessons, not build artifacts.)
+learn/audio/raw
+learn/audio/align
+learn/audio/cues
+learn/audio/scripts
+learn/audio/*.mjs
+learn/audio/README.md
+learn/icons/*.mjs
+brand
+_worker.js.bak
