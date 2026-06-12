@@ -33,6 +33,7 @@ defmodule Workbooks.RustDock do
       |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
       |> maybe("tcp" in caps, fn -> tcp_caps(tenant) end)
       |> maybe("udp" in caps, fn -> udp_caps(tenant) end)
+      |> maybe("tls" in caps, fn -> tls_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -98,6 +99,30 @@ defmodule Workbooks.RustDock do
            dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
 
            case Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
+             {:ok, resp} ->
+               n = min(byte_size(resp), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
+               n
+
+             {:error, _} ->
+               -1
+           end
+         end}
+    }
+  end
+
+  # Brokered TLS request/response — merged on the "tls" cap. The host does the TLS handshake (cert-verified,
+  # resolve-then-pinned), so a crypto-less guest gets a secure channel (HTTPS, TLS line protocols).
+  defp tls_caps(tenant) do
+    %{
+      # host_tls(host_ptr,host_len, port, req_ptr,req_len, out_ptr,out_cap) -> i32 : reply len (-1 denied)
+      "host_tls" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, hp, hl, port, rp, rl, op, oc ->
+           host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
+           req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl)
+
+           case Workbooks.TlsBroker.request(host, port, req, principal: tenant) do
              {:ok, resp} ->
                n = min(byte_size(resp), oc)
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))

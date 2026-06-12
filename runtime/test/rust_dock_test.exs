@@ -281,4 +281,27 @@ fn main(){
     assert {:ok, out} = RustDock.run(w, profile: :minimal)
     assert String.trim(out) == "n_gt0=true txid_ok=true ancount_gt0=true"
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "host_tls — guest does an HTTPS request over the brokered, cert-verified TLS channel" do
+    assert "host_tls" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+
+    w =
+      build!(~S|
+extern "C" { fn host_tls(hp:i32,hl:i32,port:i32,rp:i32,rl:i32,op:i32,oc:i32) -> i32; }
+fn main(){
+  let host=b"example.com";
+  let req=b"GET / HTTP/1.0\r\nHost: example.com\r\n\r\n";
+  let mut out=[0u8;1024];
+  let n=unsafe{ host_tls(host.as_ptr() as i32,host.len() as i32, 443, req.as_ptr() as i32,req.len() as i32, out.as_mut_ptr() as i32, 1024) };
+  let s=if n>0 { std::str::from_utf8(&out[..n as usize]).unwrap_or("") } else { "" };
+  println!("n_gt0={} has_http={}", n>0, s.contains("HTTP/"));
+}|)
+
+    # the guest sent plaintext; the host did the TLS handshake (cert-verified, pinned) + returned the decrypted reply
+    assert {:ok, out} = RustDock.run(w, profile: :minimal)
+    assert String.trim(out) == "n_gt0=true has_http=true"
+  end
 end

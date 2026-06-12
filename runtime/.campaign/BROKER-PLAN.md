@@ -823,3 +823,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   metadata, link-local, RFC1918 x3, CGNAT, IPv6 loopback, IPv6 ULA, userinfo@ — 10 forms), all BLOCKED on the
   real wasi path. Proves the obfuscation/SSRF defense holistically (beyond the hermetic unit tests).
   NEXT (iter 50): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.
+- 2026-06-12 (iter 50): **10th capability — brokered TLS (host_tls) (green).** Workbooks.TlsBroker: the host
+  does the TLS handshake (verify_peer against the system trust store, SNI=hostname, resolve-then-PINNED IP —
+  a rebind to internal fails the handshake) so a CRYPTO-LESS guest gets a secure channel (HTTPS / TLS line
+  protocols) without shipping a TLS stack. Same cadence (SSRF + pin + revocation + rate + size-cap). Wired
+  host_tls into rust_dock (dedicated "tls" cap; compute denied). 3 unit tests (SSRF-deny / revoke+rate / REAL
+  HTTPS-over-TLS to example.com:443, cert-validated) + 1 GUEST e2e: a Rust guest sends plaintext via host_tls
+  -> the host's TLS handshake -> decrypted HTTPS reply ("n_gt0=true has_http=true"). PLATFORM now TEN brokered
+  capabilities: net(http+sockets) / exec / storage / parallel / serve / secrets / queue / raw-TCP / UDP / TLS.
+  NEXT (iter 51): js_dock host_tls parity; OR the inbound seam (wb-py4k).
