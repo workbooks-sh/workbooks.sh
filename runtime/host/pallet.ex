@@ -559,6 +559,39 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # FreeType (font engine). Built from its umbrella TUs (:compile_only — each #includes its parts) with
+  # a trimmed ftmodule.h (only the modules we compile) so ftinit doesn't reference uncompiled drivers.
+  @freetype_ftmodule ~S"""
+  FT_USE_MODULE( FT_Module_Class, autofit_module_class )
+  FT_USE_MODULE( FT_Driver_ClassRec, tt_driver_class )
+  FT_USE_MODULE( FT_Driver_ClassRec, t1_driver_class )
+  FT_USE_MODULE( FT_Driver_ClassRec, cff_driver_class )
+  FT_USE_MODULE( FT_Driver_ClassRec, t1cid_driver_class )
+  FT_USE_MODULE( FT_Module_Class, psaux_module_class )
+  FT_USE_MODULE( FT_Module_Class, psnames_module_class )
+  FT_USE_MODULE( FT_Module_Class, pshinter_module_class )
+  FT_USE_MODULE( FT_Module_Class, sfnt_module_class )
+  FT_USE_MODULE( FT_Renderer_Class, ft_smooth_renderer_class )
+  FT_USE_MODULE( FT_Renderer_Class, ft_raster1_renderer_class )
+  FT_USE_MODULE( FT_Renderer_Class, ft_sdf_renderer_class )
+  FT_USE_MODULE( FT_Renderer_Class, ft_bitmap_sdf_renderer_class )
+  """
+  @freetype_main ~S"""
+  #include <stdio.h>
+  #include <ft2build.h>
+  #include FT_FREETYPE_H
+  int main(void) {
+    FT_Library lib;
+    if (FT_Init_FreeType(&lib)) { puts("init-fail"); return 1; }
+    FT_Int maj, min, pat; FT_Library_Version(lib, &maj, &min, &pat);
+    printf("freetype %d.%d.%d\n", maj, min, pat);
+    FT_Done_FreeType(lib); return 0;
+  }
+  """
+  @freetype_umbrellas ~w(ftsystem.c ftinit.c ftdebug.c ftbase.c ftbbox.c ftglyph.c ftbitmap.c ftmm.c
+                         ftstroke.c ftsynth.c sfnt.c truetype.c cff.c type1.c type1cid.c autofit.c
+                         smooth.c raster.c sdf.c psaux.c pshinter.c psnames.c ftgzip.c ftmain.c)
+
   @csource [
     %{
       name: "lua",
@@ -686,6 +719,17 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "freetype",
+      url: "https://gitlab.freedesktop.org/freetype/freetype/-/archive/VER-2-13-3/freetype-VER-2-13-3.tar.gz",
+      sha: "bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103",
+      build_opts: [
+        src_globs: ["src/**/*.{c,h}", "include/**/*.h"],
+        compile_only: @freetype_umbrellas,
+        cflags: ["-DFT2_BUILD_LIBRARY", "-I/work/include"],
+        extra_sources: [{"include/freetype/config/ftmodule.h", @freetype_ftmodule}, {"ftmain.c", @freetype_main}]
+      ]
     },
     %{
       name: "wuffs",

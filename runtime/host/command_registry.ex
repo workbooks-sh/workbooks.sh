@@ -346,18 +346,18 @@ defmodule Workbooks.CommandRegistry do
   command. `lang` ∈ "c"|"rust"|"zig"|"go". The Lane-B join: a real multi-file C tool (Lua, etc.)
   becomes a live command. Returns {:ok, addressed_path} | {:error, reason}.
   """
-  def register_built_dir(name, dir, lang \\ "c", mode \\ :argv, cflags \\ [], include_only \\ []) do
+  def register_built_dir(name, dir, lang \\ "c", mode \\ :argv, cflags \\ [], include_only \\ [], compile_only \\ []) do
     cond do
       not (is_binary(name) and name != "" and Regex.match?(@name_re, name)) -> {:error, :invalid_name}
       name in @reserved -> {:error, :reserved_name}
       not (is_binary(dir) and File.dir?(dir)) -> {:error, :no_dir}
 
       true ->
-        # cflags (e.g. -DWITH_MAIN) + :include_only (amalgamation .c the driver #includes) only apply to
-        # the C lane.
+        # cflags + :include_only / :compile_only (amalgamation .c the driver #includes) only apply to the
+        # C lane.
         built =
-          if lang == "c" and (cflags != [] or include_only != []),
-            do: Workbooks.PackageManager.build_c_dir(Path.expand(dir), cflags, include_only),
+          if lang == "c" and (cflags != [] or include_only != [] or compile_only != []),
+            do: Workbooks.PackageManager.build_c_dir(Path.expand(dir), cflags, include_only, compile_only),
             else: Workbooks.PackageManager.build_dir(dir, lang)
 
         case built do
@@ -446,7 +446,7 @@ defmodule Workbooks.CommandRegistry do
                 File.write!(dst, content)
               end
 
-              res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [], opts[:include_only] || [])
+              res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [], opts[:include_only] || [], opts[:compile_only] || [])
               File.rm_rf!(unpack)
               File.rm_rf!(builddir)
               res

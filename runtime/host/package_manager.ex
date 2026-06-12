@@ -227,14 +227,24 @@ defmodule Workbooks.PackageManager do
   to enable a single-file interpreter's CLI, or `-I`/`-D` a tool needs). build_dir(dir,"c") is this
   with no extra flags; the registration lane passes a tool's :cflags here.
   """
-  def build_c_dir(abs, extra_argv, include_only \\ []) when is_list(extra_argv) do
+  def build_c_dir(abs, extra_argv, include_only \\ [], compile_only \\ []) when is_list(extra_argv) do
     src_exts = ~w(.c .cpp .cc .cxx)
     all_src = Path.wildcard(Path.join(abs, "**/*.{c,cpp,cc,cxx}"))
 
     # :include_only — .c/.cpp that a DRIVER #includes (amalgamation/single-file libs: wuffs-v0.4.c, the
     # FreeType umbrella's parts, stb). They must be PRESENT (+ their dir -I'd) but NOT compiled standalone
     # (else duplicate symbols / no IMPLEMENTATION) — wb-wun5. So they join the companions, not the sources.
-    {incl, sources} = Enum.split_with(all_src, fn f -> Path.basename(f) in include_only end)
+    # :compile_only — the inverse: compile ONLY these basenames (the umbrella TUs), everything else is
+    # include_only. Cleaner for amalgam projects with FEW umbrellas + MANY parts (FreeType, HarfBuzz).
+    {incl, sources} =
+      cond do
+        compile_only != [] ->
+          {comp, rest} = Enum.split_with(all_src, fn f -> Path.basename(f) in compile_only end)
+          {rest, comp}
+
+        true ->
+          Enum.split_with(all_src, fn f -> Path.basename(f) in include_only end)
+      end
 
     case sources do
       [] ->
@@ -253,7 +263,7 @@ defmodule Workbooks.PackageManager do
         compile_c_in_sandbox(
           main,
           rest,
-          Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " "), Enum.join(include_only, ",")])}.wasm"),
+          Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " "), Enum.join(include_only, ","), Enum.join(compile_only, ",")])}.wasm"),
           companions,
           extra_argv,
           abs

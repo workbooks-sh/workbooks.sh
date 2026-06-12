@@ -429,6 +429,73 @@
 "lane": "none",
 "blocker": "Full Node.js v18+ program: dynamic require() of config + template-engine plugins (nunjucks/liquid), recursive fs globbing, chokidar file-watch, Node stdlib + module resolution. QuickJS (the only in-sa",
 "extent": "off-the-table (verified)"
+},
+"FreeType": {
+"verdict": "live",
+"lane": "B",
+"recipe": "freetype 2.13.3 umbrella TUs via :compile_only + trimmed ftmodule.h",
+"smoke": "FT_Init + version => freetype 2.13.3",
+"extent": "FreeType font engine builds (tt/cff/type1/sfnt/autofit/smooth/sdf); freetype cmd prints version, ready for FT_New_Face glyph rendering"
+},
+"Bison": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "bison fork/exec's GNU m4 as a separate process at runtime to expand skeleton (.m4) files; wasm32-wasi/wasmtime has no fork/exec/subprocess support, so the unmodified tool cannot run in-sandbox.",
+"extent": "off-the-table (verified)"
+},
+"thrift": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Compiler requires flex + bison codegen at build time (thriftl.ll / thrifty.yy \u2192 lexer/parser .cc); no pregenerated parser is checked into the repo and we don't provision flex.wasm/bison.wasm. Without ",
+"extent": "off-the-table (verified)"
+},
+"wasmi": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Build infeasible: requires Rust 1.86 + edition 2024; mrustc caps at ~1.74/edition-2021 (cannot parse edition 2024). Large multi-crate workspace + a c_api proc-macro compound it. No prebuilt wasm32-was",
+"extent": "off-the-table (verified)"
+},
+"yq": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Written in Go \u2014 no lane covers Go (TinyGo/Go-wasip1 not in our toolchain; mrustc is Rust-only, B is C/C++-only). No upstream wasm32-wasi asset exists (release assets are native-arch only). Adjacent jq",
+"extent": "off-the-table (verified)"
+},
+"Common Lisp": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "SBCL = runtime native-code JIT (no jitless wasm). ECL = only WASM target is emscripten (JS-glue imports invoke_iii + setjmp emulation), documented to fail under wasmtime/wasmedge; ECL's WASI port expl",
+"extent": "off-the-table (verified)"
+},
+"Pascal (Free Pascal / FPC)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "FPC is a native self-hosting compiler; wasm32 is only an emit target, not a build for the compiler itself. No prebuilt fpc.wasm; bootstrapping requires a native FPC binary (native exec), which is unav",
+"extent": "off-the-table (verified)"
+},
+"Roc": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Roc has no prebuilt standalone wasm32-wasi binary. Its wasm path is browser/JS-paired, and standalone wasm needs a platform host (Rust/Zig/C) linked into each app. Building/running Roc requires the fu",
+"extent": "off-the-table (verified)"
+},
+"Gleam": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Gleam compiler's only wasm form is a wasm-bindgen wasm32-unknown-unknown browser blob requiring a JS glue host (not standalone wasm32-wasi under wasmtime); compiling from Rust source via mrustc is imp",
+"extent": "off-the-table (verified)"
+},
+"Cython": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two-stage CPython dependency: Cython needs CPython to RUN (it's pure-Python codegen) and its output links the CPython C-API (Python.h, libpython). No standalone wasm32-wasi artifact; viable only insid",
+"extent": "off-the-table (verified)"
+},
+"Koka": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Koka compiler is a Haskell/GHC program; no GHC->wasm32-wasi lane exists (not Lane A/B/C/D). The C/JS backends only help after the (off-sandbox) Haskell compiler has already emitted code, so Koka itsel",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -834,6 +901,76 @@
 "lane": "D",
 "recipe": "Lane D (JS-on-qjs via the runtime's npm/esbuild bundle lane). Scope: the @enhance/ssr render core ONLY (pure custom-elem",
 "confidence": "high",
+"verified": false
+},
+"Glimmer.js": {
+"verdict": "live-likely",
+"lane": "D",
+"recipe": "npm pack @glimmer/compiler@0.94.11 + its pure-JS deps (@glimmer/syntax, @glimmer/util, @glimmer/wire-format, @glimmer/in",
+"confidence": "high",
+"verified": false
+},
+"Flex": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (self-contained C). Use the release tarball flex-2.6.4.tar.gz, which ships PREGENERATED scan.c (built by the bund",
+"confidence": "medium",
+"verified": false
+},
+"Tcl interpreter": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C, our clang+libc wasi-sdk lane \u2014 same path as the already-LIVE ruby/php/lua). Fetch the Tcl core",
+"confidence": "medium",
+"verified": false
+},
+"htmlq": {
+"verdict": "uncertain",
+"lane": "C",
+"recipe": "Lane C (bare Rust via mrustc ~1.74). htmlq 0.5.0 deps: kuchikiki 0.8, html5ever 0.26, clap 4.5 (derive), lazy_static, ur",
+"confidence": "medium",
+"verified": false
+},
+"Eigen": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B :include_only. Eigen is a header-only C++ template library (verified: Eigen/Dense is just #includes of Core/LU/Ch",
+"confidence": "high",
+"verified": false
+},
+"Perl": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "No blessed prebuilt perl.wasm exists. Use the zeroperl project (perl5 compiled to wasm32-wasi via the clang lane with AS",
+"confidence": "medium",
+"verified": false
+},
+"COBOL": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "GnuCOBOL is the only portable COBOL impl (mainframe IBM Enterprise COBOL with EBCDIC/CICS/DB2/JCL is a separate dialect,",
+"confidence": "medium",
+"verified": false
+},
+"Nim": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Nim transpiles to portable C, then our existing clang.wasm + wasi-libc lane takes over. Author runs `nim c --compileOnly",
+"confidence": "high",
+"verified": false
+},
+"V (vlang)": {
+"verdict": "impossible",
+"lane": "none",
+"recipe": "No viable lane. V is a codegen toolchain, not a droppable library. The pragmatic \"V to C to clang.wasm\" path requires ru",
+"confidence": "medium",
+"verified": false
+},
+"Odin": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Odin is an LLVM-based compiler with a first-class `wasi_wasm32` build target (TargetMetrics target_wasi_wasm32 = {Target",
+"confidence": "medium",
 "verified": false
 }
 }
