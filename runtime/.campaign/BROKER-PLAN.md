@@ -507,3 +507,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 23): a COMPOSITION demo (a serve guest that, per request, execs a cmd + caches the result in KV
   — proving the brokers compose into a real sandboxed app), OR the DoS body-cap (net path streaming). The
   net-egress 323-reclamation stays gated on wb-0beq.
+- 2026-06-12 (iter 23): **COMPOSITION DEMO (green) — the brokers compose into a real sandboxed app.** Built
+  a CACHING HTTP SERVER as one sandboxed C-reactor guest granted BOTH the serve channel AND the kv broker
+  (instantiated with Map.merge(RustDock.imports(:minimal, tenant), ServeBroker.imports(serve_id))). Per
+  request it reads the request (serve), looks up a KV key (durable storage), and caches on miss. e2e over a
+  REAL Bandit listener: GET /first -> "MISS:GET /first" (computed + cached via host_kv_put); GET /second ->
+  "HIT:GET /first" (the first request, returned from durable KV). Proves serve + durable-storage COMPOSE into
+  a stateful sandboxed app — built entirely from brokered capabilities, fully isolated. Green.
+  ===== The platform now stands: FIVE brokered capabilities, least-privilege caps, documented (BROKER-
+  CAPABILITIES.md), coherence-verified (34 unit tests together), and COMPOSED (a real caching web server). =====
+  NEXT (iter 24): more composition (serve + EXEC — a guest that runs a cmd per request) OR the net DoS body-
+  cap (streaming). Net-egress 323-reclamation remains gated on wb-0beq (wasi-seam async refactor + internet).

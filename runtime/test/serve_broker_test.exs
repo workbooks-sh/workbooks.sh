@@ -1,6 +1,6 @@
 defmodule Workbooks.ServeBrokerTest do
   use ExUnit.Case, async: false
-  alias Workbooks.{Compilers, ServeBroker}
+  alias Workbooks.{Compilers, RustDock, ServeBroker}
 
   # --- hermetic marshaling (no guest) ---
 
@@ -60,6 +60,34 @@ __attribute__((export_name("handle"))) int handle(void) {
     pid
   end
 
+  # COMPOSITION demo guest: a caching HTTP server. Per request it reads the request (serve), looks up a KV
+  # key (durable storage), and on miss caches the request — composing the serve + kv brokers in ONE sandboxed
+  # guest. Wraps responses as "200\n\n<body>" so the Plug's decoder applies status 200.
+  defp caching_server_bytes,
+    do:
+      compile_reactor(~S|
+__attribute__((import_module("env"),import_name("host_request_get"))) extern int host_request_get(int,int);
+__attribute__((import_module("env"),import_name("host_response_set"))) extern int host_response_set(int,int);
+__attribute__((import_module("env"),import_name("host_kv_put"))) extern int host_kv_put(int,int,int,int);
+__attribute__((import_module("env"),import_name("host_kv_get"))) extern int host_kv_get(int,int,int,int);
+static unsigned char req[256]; static unsigned char keyb[8]; static unsigned char val[256]; static unsigned char resp[320];
+__attribute__((export_name("handle"))) int handle(void) {
+  int n = host_request_get((int)(long)req, 256); if(n<0)n=0; if(n>256)n=256;
+  const char* k="lastreq"; for(int i=0;i<7;i++) keyb[i]=k[i];
+  int g = host_kv_get((int)(long)keyb, 7, (int)(long)val, 256);
+  resp[0]='2';resp[1]='0';resp[2]='0';resp[3]='\n';resp[4]='\n'; int p=5;
+  if (g>0) {
+    resp[p++]='H';resp[p++]='I';resp[p++]='T';resp[p++]=':';
+    for(int i=0;i<g;i++) resp[p++]=val[i];
+  } else {
+    resp[p++]='M';resp[p++]='I';resp[p++]='S';resp[p++]='S';resp[p++]=':';
+    for(int i=0;i<n;i++) resp[p++]=req[i];
+    host_kv_put((int)(long)keyb, 7, (int)(long)req, n);
+  }
+  host_response_set((int)(long)resp, p);
+  return 0;
+}|)
+
   @tag :build
   @tag timeout: 300_000
   test "serve-flip core — host dispatches to a persistent guest handler, re-entered per request" do
@@ -101,5 +129,49 @@ __attribute__((export_name("handle"))) int handle(void) {
     # the guest received the marshaled request (incl the forwarded x-foo header) and echoed it
     assert body =~ "echo:GET /rich"
     assert body =~ "x-foo: bar"
+  end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "COMPOSITION — a sandboxed serving guest caches in KV per request (serve + durable storage compose)" do
+    serve_id = "c#{System.unique_integer([:positive])}"
+    tenant = "demo-#{System.unique_integer([:positive])}"
+
+    # one guest, granted BOTH the serve channel and the dock's kv broker — the brokers compose
+    dock_env = RustDock.imports(profile: :minimal, tenant: tenant)["env"]
+    env = Map.merge(dock_env, ServeBroker.imports(serve_id))
+    {:ok, pid} = Wasmex.start_link(%{bytes: caching_server_bytes(), imports: %{"env" => env}})
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.Plug, serve_id: serve_id, pid: pid},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+
+    get = fn path ->
+      {:ok, {{_, s, _}, _, b}} =
+        :httpc.request(:get, {~c"http://127.0.0.1:#{port}#{path}", []}, [], body_format: :binary)
+
+      {s, to_string(b)}
+    end
+
+    # first request: cache MISS -> the guest computes + caches it via the kv broker
+    {s1, b1} = get.("/first")
+    assert s1 == 200
+    assert b1 =~ "MISS:GET /first"
+
+    # second request: cache HIT -> the guest returns the FIRST request, which persisted via durable KV.
+    # Proves serve + storage compose into a real stateful sandboxed app.
+    {s2, b2} = get.("/second")
+    assert s2 == 200
+    assert b2 =~ "HIT:GET /first"
   end
 end
