@@ -167,17 +167,24 @@
     align-items: center;
     gap: 6px;
     padding: 8px 4px 6px;
-    border: 0;
+    border: 1px solid transparent;
     background: transparent;
-    border-radius: 10px;
+    border-radius: 14px;
     color: var(--color-fg);
     font: inherit;
     cursor: pointer;
-    transition: background 0.12s;
+    transition:
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+      background 0.15s,
+      border-color 0.15s;
   }
-  .tile:hover { background: var(--color-surface-soft); }
+  .tile:hover {
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    border-color: var(--color-border-strong);
+    transform: translateY(-3px);
+  }
   .tile:focus-visible {
-    outline: 2px solid var(--color-fg);
+    outline: 2px solid var(--color-ring);
     outline-offset: 1px;
   }
   .icon :global(.mi) {
@@ -223,7 +230,7 @@
     text-align: center;
   }
   .empty.muted { color: var(--color-fg-muted); }
-  .empty.err { color: #ef4444; }
+  .empty.err { color: var(--color-err); }
   .empty.centered {
     min-height: 100%;
     justify-content: center;
@@ -267,11 +274,11 @@
     color: var(--color-page);
     border: 0;
     border-radius: 8px;
-    font: inherit;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: opacity 0.12s;
+    transition: filter 0.15s;
   }
-  .cta:hover { opacity: 0.88; }
+  .cta:hover { filter: brightness(1.08); }
 </style>

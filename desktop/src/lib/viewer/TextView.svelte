@@ -55,8 +55,8 @@
   }
   .warn {
     padding: 0.5rem 1rem;
-    background: color-mix(in srgb, #f59e0b 12%, transparent);
-    color: #b45309;
+    background: color-mix(in srgb, var(--color-warn) 12%, transparent);
+    color: var(--color-warn);
     font-size: 12px;
     border-bottom: 1px solid var(--color-border);
   }
@@ -65,7 +65,7 @@
     overflow: auto;
     margin: 0;
     padding: 1rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-mono), ui-monospace, Menlo, Consolas, monospace;
     font-size: 13px;
     line-height: 1.55;
     white-space: pre-wrap;
@@ -77,7 +77,7 @@
     font-size: 0.85rem;
   }
   .status.err {
-    color: #ef4444;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--color-err); /* app-wide error literal — no error token in the canon */
+    font-family: var(--font-mono), ui-monospace, monospace;
   }
 </style>

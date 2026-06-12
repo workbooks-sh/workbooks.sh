@@ -127,7 +127,7 @@
             },
             ".cm-scroller": {
               fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                "var(--font-mono), ui-monospace, Menlo, Consolas, monospace",
               overflowX: "auto",
             },
             ".cm-content": {
@@ -194,8 +194,8 @@
     color: var(--color-fg-muted);
   }
   .status.err {
-    color: #ef4444;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--color-err); /* app-wide error literal — no error token in the canon */
+    font-family: var(--font-mono), ui-monospace, monospace;
     white-space: pre-wrap;
   }
 </style>

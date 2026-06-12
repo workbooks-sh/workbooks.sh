@@ -180,16 +180,17 @@
   }
   .new-row input {
     flex: 1 1 auto;
-    background: var(--color-surface-soft);
+    background: var(--color-page);
     border: 1px solid var(--color-border);
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 0.4rem 0.6rem;
-    font-size: 0.85rem;
+    font-size: 13px;
     color: var(--color-fg);
-    font-family: inherit;
+    font-family: var(--font-mono);
     outline: 0;
+    transition: border-color 0.15s;
   }
-  .new-row input:focus { border-color: var(--color-border-strong); }
+  .new-row input:focus { border-color: var(--color-ring); }
 
   .list {
     display: flex;
@@ -202,11 +203,12 @@
     gap: 0.4rem;
     background: var(--color-surface-soft);
     border: 1px solid var(--color-border);
-    border-radius: 9px;
+    border-radius: 10px;
     padding: 0.45rem 0.5rem;
+    transition: border-color 0.15s, background 0.15s;
   }
   .theme.active {
-    border-color: var(--color-border-strong);
+    border-color: var(--color-ring);
     background: var(--color-surface);
   }
   .theme-body {
@@ -259,6 +261,7 @@
     white-space: nowrap;
   }
   .chip {
+    font-family: var(--font-mono);
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -267,10 +270,10 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     color: var(--color-fg-muted);
-    font-weight: 600;
+    font-weight: 500;
   }
   .theme-body :global(.active-tick) {
-    color: var(--color-fg);
+    color: var(--color-brand);
     flex-shrink: 0;
   }
 
@@ -289,8 +292,8 @@
   }
   .icon-btn:hover { background: var(--color-page); color: var(--color-fg); }
   .icon-btn.danger:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
+    background: color-mix(in srgb, var(--color-err) 12%, transparent);
+    color: var(--color-err);
   }
 
   .btn {
@@ -299,29 +302,31 @@
     gap: 0.3rem;
     height: 28px;
     padding: 0 0.7rem;
-    border-radius: 7px;
-    font-size: 0.78rem;
+    border-radius: 8px;
+    font-size: 12px;
     font-weight: 500;
-    font-family: inherit;
+    font-family: var(--font-mono);
     cursor: pointer;
     border: 1px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s, filter 0.15s;
   }
   .btn:disabled { opacity: 0.5; cursor: default; }
   .btn.primary {
     background: var(--color-fg);
     color: var(--color-page);
   }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
   .btn.ghost {
     background: transparent;
     color: var(--color-fg-muted);
     border-color: var(--color-border);
   }
   .btn.ghost:hover {
-    background: var(--color-page);
     color: var(--color-fg);
+    border-color: var(--color-border-strong);
   }
   .error {
-    color: #ef4444;
+    color: var(--color-err);
     font-size: 0.78rem;
   }
 </style>

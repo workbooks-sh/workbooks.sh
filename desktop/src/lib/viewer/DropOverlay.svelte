@@ -137,8 +137,8 @@
     bottom: 6px;
     width: calc(50% - 9px);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--color-brand) 14%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--color-brand) 55%, transparent);
+    background: var(--color-brand-soft);
+    border: 1.5px dashed var(--color-brand);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -152,8 +152,8 @@
     top: 6px;
     bottom: 6px;
     border-radius: 10px;
-    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-brand) 55%, transparent);
-    background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+    border: 1.5px dashed color-mix(in srgb, var(--color-brand) 65%, transparent);
+    background: color-mix(in srgb, var(--color-brand-soft) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -164,9 +164,11 @@
     padding: 5px 12px;
     border-radius: 999px;
     background: var(--color-brand);
-    color: white;
+    /* ink-on-green is law — never white-on-green */
+    color: var(--color-brand-ink);
+    font-family: var(--font-mono);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     box-shadow: 0 2px 10px color-mix(in srgb, var(--color-brand) 40%, transparent);
   }
   @keyframes drop-in {

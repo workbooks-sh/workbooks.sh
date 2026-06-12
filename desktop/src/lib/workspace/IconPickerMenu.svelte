@@ -345,7 +345,7 @@
     cursor: pointer;
     padding: 0;
     overflow: hidden;
-    transition: border-color 0.12s, transform 0.08s;
+    transition: border-color 0.15s, transform 0.08s;
   }
   .trigger:hover { border-color: var(--color-border-strong); }
   .trigger:active { transform: scale(0.97); }
@@ -371,7 +371,7 @@
     width: 240px;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-pop);
     padding: 0.35rem;
     color: var(--color-fg);
@@ -414,11 +414,11 @@
     justify-content: center;
     aspect-ratio: 1;
     border: 0;
-    border-radius: 7px;
+    border-radius: 8px;
     background: transparent;
     cursor: pointer;
     padding: 0;
-    transition: background 0.1s;
+    transition: background 0.15s;
   }
   .cell:hover { background: var(--color-surface-soft); }
   .cell img {
@@ -451,18 +451,19 @@
     gap: 5px;
     padding: 5px 9px;
     border: 1px solid var(--color-border);
-    border-radius: 7px;
+    border-radius: 8px;
     background: transparent;
     color: var(--color-fg-muted);
-    font: inherit;
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
   }
   .foot-btn:hover { color: var(--color-fg); border-color: var(--color-border-strong); }
 
   .err {
     margin-left: auto;
     font-size: 0.72rem;
-    color: #ef4444;
+    color: var(--color-err);
   }
 </style>

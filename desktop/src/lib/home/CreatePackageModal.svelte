@@ -150,7 +150,7 @@
     max-width: 380px;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: 12px;
+    border-radius: 14px;
     box-shadow: var(--shadow-pop);
     padding: 1.75rem 1.75rem 1.5rem;
     display: flex;
@@ -179,7 +179,8 @@
     background: var(--color-surface-soft);
     padding: 1px 5px;
     border-radius: 4px;
-    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
     word-break: break-all;
   }
   form {
@@ -217,14 +218,15 @@
     font-family: inherit;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: opacity 0.12s;
+    transition: filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.primary {
     background: var(--color-fg);
     color: var(--color-page);
+    font-family: var(--font-mono);
   }
-  .btn.primary:not(:disabled):hover { opacity: 0.88; }
+  .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
   .btn.ghost {
     background: transparent;
     border-color: var(--color-border);
@@ -233,7 +235,7 @@
   .btn.ghost:not(:disabled):hover { background: var(--color-surface-soft); }
   .error {
     margin-top: 0.6rem;
-    color: #ef4444;
+    color: var(--color-err);
     font-size: 0.78rem;
     word-break: break-word;
   }

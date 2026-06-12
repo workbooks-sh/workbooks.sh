@@ -554,7 +554,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: color-mix(in srgb, var(--color-page) 55%, transparent);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     z-index: 1200;
@@ -581,16 +581,16 @@
     align-items: center;
     gap: 0.65rem;
     padding: 0.55rem 0.6rem 0.55rem 0.95rem;
-    background: var(--color-surface);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--color-border-strong);
-    border-radius: 12px;
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 12px 32px rgba(0, 0, 0, 0.18);
-    transition: border-color 0.12s;
+    border-radius: 14px;
+    box-shadow: var(--shadow-pop);
+    transition: border-color 0.15s;
   }
   .bar:focus-within {
-    border-color: var(--color-fg-muted);
+    border-color: var(--color-ring);
   }
   .bar.busy {
     opacity: 0.85;
@@ -640,9 +640,9 @@
     border: 0;
     background: transparent;
     color: var(--color-fg-muted);
-    border-radius: 7px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background 0.1s, color 0.1s, opacity 0.1s;
+    transition: background 0.15s, color 0.15s, opacity 0.15s, filter 0.15s;
   }
   .trailing-btn:hover:not(:disabled) {
     background: var(--color-surface-soft);
@@ -657,7 +657,7 @@
     color: var(--color-page);
   }
   .trailing-btn.primary:hover:not(:disabled) {
-    opacity: 0.9;
+    filter: brightness(1.08);
   }
   .trailing-btn.primary:disabled {
     background: var(--color-surface-soft);
@@ -685,9 +685,11 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
   }
   .kbd-hint kbd {
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
     font-size: 0.65rem;
     padding: 0.05rem 0.3rem;
     border: 1px solid var(--color-border);
@@ -700,13 +702,15 @@
    * second-card visual treatment underneath the input bar. */
   .result {
     padding: 0.75rem 0.85rem;
-    background: var(--color-surface);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--color-border);
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 0.88rem;
     line-height: 1.55;
     color: var(--color-fg);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-pop);
     display: flex;
     align-items: flex-start;
     gap: 0.45rem;
@@ -728,12 +732,12 @@
   .wizard-shell {
     display: flex;
     flex-direction: column;
-    background: var(--color-surface);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--color-border-strong);
-    border-radius: 12px;
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 12px 32px rgba(0, 0, 0, 0.18);
+    border-radius: 14px;
+    box-shadow: var(--shadow-pop);
     overflow: hidden;
   }
   .wizard-shell.busy { opacity: 0.92; }
@@ -744,11 +748,13 @@
     gap: 0.42rem;
     padding: 0.42rem 0.85rem;
     border-bottom: 1px solid var(--color-border);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.015em;
-    color: var(--color-fg-muted);
-    background: var(--color-surface-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-surface-soft) 70%, transparent);
   }
   .wizard-head-label {
     line-height: 1.3;
@@ -794,10 +800,10 @@
     gap: 0.45rem;
     font-size: 0.85rem;
   }
-  .wizard-done-row { color: #10b981; }
+  .wizard-done-row { color: var(--color-ok); }
   .wizard-err-row {
-    color: #ef4444;
-    background: color-mix(in srgb, #ef4444 6%, var(--color-surface));
+    color: var(--color-err);
+    background: color-mix(in srgb, var(--color-err) 6%, var(--color-surface));
     font-size: 0.82rem;
   }
 
@@ -826,25 +832,25 @@
     height: 30px;
     padding: 0 0.85rem;
     border: 0;
-    border-radius: 7px;
+    border-radius: 8px;
     background: var(--color-fg);
     color: var(--color-page);
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    transition: opacity 0.1s;
+    transition: filter 0.15s, background 0.15s, color 0.15s;
   }
-  .continue-btn:hover:not(:disabled) { opacity: 0.9; }
+  .continue-btn:hover:not(:disabled) { filter: brightness(1.08); }
   .continue-btn:disabled {
     background: var(--color-surface-soft);
     color: var(--color-fg-subtle);
     cursor: default;
   }
   .result.err {
-    color: #ef4444;
-    background: color-mix(in srgb, #ef4444 8%, var(--color-surface));
-    border-color: color-mix(in srgb, #ef4444 30%, var(--color-border));
+    color: var(--color-err);
+    background: color-mix(in srgb, var(--color-err) 8%, var(--color-surface));
+    border-color: color-mix(in srgb, var(--color-err) 30%, var(--color-border));
     font-size: 0.82rem;
   }
 

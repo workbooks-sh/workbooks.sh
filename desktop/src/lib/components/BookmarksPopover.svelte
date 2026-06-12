@@ -183,9 +183,11 @@
     z-index: 500;
     width: 360px;
     max-width: calc(100vw - 16px);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
     box-shadow: var(--shadow-pop);
     overflow: hidden;
     display: flex;
@@ -200,7 +202,14 @@
     border-bottom: 1px solid var(--color-border);
     color: var(--color-fg);
   }
-  .title { font-size: 0.85rem; font-weight: 600; }
+  .title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-brand);
+  }
   .spacer { flex: 1 1 auto; }
   .add-current {
     display: inline-flex;
@@ -208,16 +217,17 @@
     gap: 0.25rem;
     height: 22px;
     padding: 0 0.55rem;
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--color-fg);
     color: var(--color-page);
     border: 0;
-    font: inherit;
-    font-size: 0.74rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
+    transition: filter 0.15s;
   }
-  .add-current:hover { opacity: 0.88; }
+  .add-current:hover { filter: brightness(1.08); }
 
   .list {
     flex: 1 1 auto;
@@ -241,7 +251,8 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.2rem 0.35rem;
-    border-radius: 6px;
+    border-radius: 8px;
+    transition: background 0.15s;
   }
   .row:hover { background: var(--color-surface-soft); }
   .row-body {
@@ -268,8 +279,8 @@
     white-space: nowrap;
   }
   .row-leaf {
-    font-family: ui-monospace, SFMono-Regular, monospace;
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--color-fg-muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -282,7 +293,7 @@
     min-width: 32px;
     height: 20px;
     padding: 0 5px;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     background: var(--color-surface-soft);
     border: 1px solid var(--color-border);
@@ -306,12 +317,13 @@
     border: 0;
     background: transparent;
     color: var(--color-fg-muted);
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
+    transition: color 0.15s, background 0.15s;
   }
   .icon-btn:hover { background: var(--color-surface); color: var(--color-fg); }
   .icon-btn.danger:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
+    background: color-mix(in srgb, var(--color-err) 12%, transparent);
+    color: var(--color-err);
   }
 </style>

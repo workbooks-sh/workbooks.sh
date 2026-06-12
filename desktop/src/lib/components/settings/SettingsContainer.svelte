@@ -131,17 +131,18 @@
     border: 0;
     border-bottom: 2px solid transparent;
     padding: 0.5rem 0.85rem;
-    font: inherit;
-    font-size: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.02em;
     color: var(--color-fg-muted);
     cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
+    transition: color 0.15s, border-color 0.15s;
     margin-bottom: -1px;
   }
   .tab:hover { color: var(--color-fg); }
   .tab.active {
     color: var(--color-fg);
-    border-bottom-color: var(--color-fg);
+    border-bottom-color: var(--color-brand);
     font-weight: 500;
   }
   .body {

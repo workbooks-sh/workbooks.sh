@@ -113,7 +113,7 @@
     overflow: hidden;
     border-radius: 0;
     box-shadow: inset 0 0 0 1px transparent;
-    transition: box-shadow 0.12s;
+    transition: box-shadow 0.15s;
   }
   .pane.focused {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 35%, transparent);
@@ -124,12 +124,12 @@
     background: var(--color-border);
     background-clip: content-box;
     padding: 0 2px;
-    transition: background-color 0.12s;
+    transition: background-color 0.15s;
     touch-action: none;
   }
   .divider:hover,
   .divider.dragging {
-    background-color: var(--color-brand);
+    background-color: var(--color-ring);
     background-clip: content-box;
   }
   .empty {

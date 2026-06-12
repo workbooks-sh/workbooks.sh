@@ -1052,7 +1052,7 @@
     50% { opacity: 1; }
   }
 
-  /* ── Create — just a simple, quiet button. ─────────────────────── */
+  /* ── Create — THE primary CTA: live green, ink text, mono voice. ── */
   .create-cta {
     display: flex;
     align-items: center;
@@ -1061,33 +1061,27 @@
     width: 100%;
     height: 34px;
     margin-bottom: 0.2rem;
-    border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    border: 1px solid transparent;
     border-radius: 10px;
-    background: var(--color-surface);
-    color: var(--color-fg-muted);
-    font: inherit;
+    background: var(--color-fg);
+    color: var(--color-page);
+    font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 500;
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
     cursor: pointer;
     flex-shrink: 0;
-    /* Faint depth: hairline of light along the top, a breath of
-       darkness pooling at the bottom — no drop shadow. */
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
-      inset 0 -2px 3px -1px rgba(15, 15, 15, 0.08);
-    transition: color 0.14s, border-color 0.14s;
+    transition:
+      filter 0.15s,
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .create-cta:hover,
   .create-cta.engaged {
-    color: var(--color-fg);
-    border-color: var(--color-border);
+    filter: brightness(1.08);
+    transform: translateY(-1px);
   }
   .create-cta:active {
     transform: scale(0.99);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, white 20%, transparent),
-      inset 0 2px 3px -1px rgba(15, 15, 15, 0.08);
   }
 
   /* ── workspace header ─────────────────────────────────────────── */
@@ -1105,7 +1099,7 @@
     font: inherit;
     color: var(--color-fg);
     text-align: left;
-    transition: background 0.12s;
+    transition: background 0.15s;
   }
   .ws-header:hover { background: var(--color-surface-soft); }
   .ws-header :global(.ws-caret) {
@@ -1158,7 +1152,7 @@
     text-align: left;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.12s, color 0.12s;
+    transition: background 0.15s, color 0.15s;
   }
   .row:hover {
     background: color-mix(in srgb, var(--color-fg) 5%, transparent);
@@ -1179,7 +1173,7 @@
     justify-content: center;
     width: 18px;
     flex-shrink: 0;
-    /* Slate-blue lean instead of raw fg — kills the "white icon on
+    /* Brand-green lean instead of raw fg — kills the "white icon on
      * gray" unfinished look without going full rainbow. */
     color: color-mix(in srgb, var(--color-brand) 26%, var(--color-fg-muted));
   }
@@ -1295,7 +1289,7 @@
     background: transparent;
     cursor: pointer;
     padding: 0;
-    transition: background 0.12s;
+    transition: background 0.15s;
   }
   .avatar-btn:hover { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
   .avatar-btn:disabled { opacity: 0.6; cursor: default; }
@@ -1310,7 +1304,7 @@
     background: transparent;
     color: var(--color-fg-muted);
     cursor: pointer;
-    transition: background 0.12s, color 0.12s;
+    transition: background 0.15s, color 0.15s;
   }
   .bar-btn:hover {
     background: color-mix(in srgb, var(--color-fg) 5%, transparent);
@@ -1342,8 +1336,8 @@
   }
   .account-anon.offline {
     border-style: solid;
-    border-color: rgba(220, 130, 30, 0.45);
-    color: rgb(190, 110, 25);
+    border-color: color-mix(in srgb, var(--color-warn) 45%, transparent);
+    color: var(--color-warn);
   }
   .account-avatar {
     display: inline-flex;
@@ -1449,20 +1443,22 @@
     border-radius: 50%;
     background: var(--color-fg-muted);
   }
-  .status-dot.dot-ok      { background: rgb(34, 160, 105); }
-  .status-dot.dot-pending { background: rgb(220, 165, 30); animation: pulse 1200ms ease-in-out infinite; }
-  .status-dot.dot-warn    { background: rgb(220, 130, 30); }
-  .status-dot.dot-err     { background: rgb(220, 60, 60); }
+  .status-dot.dot-ok      { background: var(--color-ok); }
+  .status-dot.dot-pending { background: var(--color-warn); animation: pulse 1200ms ease-in-out infinite; }
+  .status-dot.dot-warn    { background: var(--color-warn); }
+  .status-dot.dot-err     { background: var(--color-err); } /* no error token in canon */
   .status-dot.dot-idle    { background: var(--color-fg-muted); opacity: 0.45; }
   .status-label {
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--color-fg-muted);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-weight: 600;
+    letter-spacing: 0.08em;
+    font-weight: 500;
   }
   .status-val {
-    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
     color: var(--color-fg);
     font-weight: 500;
     max-width: 130px;

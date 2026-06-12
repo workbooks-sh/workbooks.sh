@@ -395,7 +395,7 @@
     gap: 0.4rem;
     font-size: 12px;
     color: var(--color-fg-muted);
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -412,7 +412,7 @@
   .mode-group {
     display: inline-flex;
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
   }
   /* Icon-only tri-state for view mode. No text labels — title attr
@@ -428,7 +428,7 @@
     color: var(--color-fg-muted);
     cursor: pointer;
     border-right: 1px solid var(--color-border);
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.15s, color 0.15s;
   }
   .mode-btn:last-child { border-right: 0; }
   .mode-btn:hover {
@@ -462,15 +462,16 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 0.5rem 0.85rem;
-    background: rgba(245, 158, 11, 0.12);
-    border-bottom: 1px solid rgba(245, 158, 11, 0.4);
+    background: color-mix(in srgb, var(--color-warn) 12%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-warn) 40%, transparent);
     color: var(--color-fg);
     font-size: 12.5px;
     flex-shrink: 0;
   }
   .banner.err {
-    background: rgba(239, 68, 68, 0.12);
-    border-bottom-color: rgba(239, 68, 68, 0.4);
+    /* var(--color-err) = app-wide error literal — no error token in the canon */
+    background: color-mix(in srgb, var(--color-err) 12%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--color-err) 40%, transparent);
   }
   .banner-actions {
     display: inline-flex;
@@ -481,10 +482,11 @@
     background: var(--color-fg);
     color: var(--color-page);
     border: 0;
-    border-radius: 5px;
+    border-radius: 8px;
     font-size: 11.5px;
     font-family: inherit;
     cursor: pointer;
+    transition: background 0.15s, color 0.15s;
   }
   .banner-btn.ghost {
     background: transparent;
@@ -497,8 +499,8 @@
     color: var(--color-fg-muted);
   }
   .status.err {
-    color: #ef4444;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--color-err); /* app-wide error literal — no error token in the canon */
+    font-family: var(--font-mono), ui-monospace, monospace;
     white-space: pre-wrap;
   }
   .layout {
@@ -525,7 +527,7 @@
   }
   .portability-toggle {
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: 8px;
     width: 26px;
     height: 24px;
     background: transparent;

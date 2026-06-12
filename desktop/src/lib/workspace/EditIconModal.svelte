@@ -106,22 +106,23 @@
     gap: 0.3rem;
     height: 30px;
     padding: 0 0.85rem;
-    border-radius: 7px;
+    border-radius: 8px;
     font-size: 0.82rem;
     font-weight: 500;
-    font-family: inherit;
+    font-family: var(--font-mono);
     cursor: pointer;
-    border: 0;
+    border: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
   }
   .btn.ghost {
     background: transparent;
     color: var(--color-fg-muted);
-    border: 1px solid var(--color-border);
+    border-color: var(--color-border);
   }
-  .btn.ghost:hover { background: var(--color-surface-soft); color: var(--color-fg); }
+  .btn.ghost:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
   .err {
     margin-top: 0.5rem;
     font-size: 0.76rem;
-    color: #ef4444;
+    color: var(--color-err);
   }
 </style>

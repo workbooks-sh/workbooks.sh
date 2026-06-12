@@ -60,7 +60,7 @@
     --input-font-color: var(--color-fg);
     --input-placeholder-color: var(--color-fg-subtle);
     --num-columns: 8;
-    --outline-color: var(--color-fg-muted);
+    --outline-color: var(--color-ring);
     width: 100%;
     max-width: 100%;
     border-radius: 8px;

@@ -83,10 +83,8 @@
     min-width: 180px;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
-    box-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.08),
-      0 8px 24px rgba(0, 0, 0, 0.12);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
     padding: 4px;
     font-size: 12.5px;
     color: var(--color-fg);
@@ -104,8 +102,9 @@
     color: var(--color-fg);
     text-align: left;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 8px;
     font: inherit;
+    transition: background 0.15s, color 0.15s;
   }
   :global(.ctx-item:hover:not(:disabled)) {
     background: var(--color-surface-soft);

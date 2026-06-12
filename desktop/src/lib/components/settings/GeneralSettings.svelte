@@ -341,7 +341,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--color-fg-muted);
     letter-spacing: 0.02em;
   }
@@ -351,9 +352,12 @@
     border-radius: 999px;
     background: var(--color-fg-subtle);
   }
-  .status-ok .dot { background: rgb(52, 195, 143); }
-  .status-warn .dot { background: rgb(232, 167, 56); }
-  .status-err .dot { background: rgb(220, 92, 92); }
+  .status-ok .dot {
+    background: var(--color-ok);
+    box-shadow: 0 0 6px var(--color-ring);
+  }
+  .status-warn .dot { background: var(--color-warn); }
+  .status-err .dot { background: var(--color-err); }
 
   /* ── identity card ─────────────────────────────────────────── */
   .identity {
@@ -423,6 +427,7 @@
     gap: 0.5rem;
   }
   .net-label {
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     color: var(--color-fg-subtle);
     text-transform: uppercase;
@@ -433,7 +438,7 @@
     color: var(--color-fg);
   }
   .mono {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
   }
 
   /* ── signed-out state ──────────────────────────────────────── */
@@ -457,7 +462,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    border-radius: 6px;
+    border-radius: 8px;
     font: inherit;
     font-size: 0.82rem;
     font-weight: 500;
@@ -466,14 +471,14 @@
     background: transparent;
     color: var(--color-fg-muted);
     border: 1px solid transparent;
-    transition: color 0.1s, background 0.1s, border-color 0.1s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s, filter 0.15s;
   }
   .ghost:hover:not(:disabled) {
     color: var(--color-fg);
     background: var(--color-surface-soft);
   }
   .ghost.danger:hover:not(:disabled) {
-    color: rgb(220, 92, 92);
+    color: var(--color-err);
   }
   .ghost:disabled,
   .primary:disabled {
@@ -483,13 +488,15 @@
   .primary {
     background: var(--color-fg);
     color: var(--color-page);
-    border-color: var(--color-fg);
+    border-color: transparent;
     padding: 0.5rem 0.9rem;
-    font-weight: 600;
-    font-size: 0.83rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: -0.01em;
   }
   .primary:hover:not(:disabled) {
-    opacity: 0.9;
+    filter: brightness(1.08);
   }
 
   /* ── engine footer ─────────────────────────────────────────── */
@@ -526,20 +533,22 @@
   }
   .logs-head h2 {
     margin: 0;
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-fg-subtle);
+    letter-spacing: 0.12em;
+    color: var(--color-brand);
   }
   .logs-count {
-    font-size: 0.74rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--color-fg-subtle);
     font-variant-numeric: tabular-nums;
   }
   .logs-err {
     margin: 0;
-    color: rgb(220, 92, 92);
+    color: var(--color-err);
     font-size: 0.78rem;
   }
   .logs-empty {
@@ -553,8 +562,8 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
   .log-list li {
     display: grid;
@@ -588,14 +597,14 @@
   /* ── misc ─────────────────────────────────────────────────── */
   .muted { color: var(--color-fg-muted); font-size: 0.85rem; }
   .center { text-align: center; }
-  .err { color: rgb(220, 92, 92); }
+  .err { color: var(--color-err); }
   .action-err {
     margin: 0;
-    color: rgb(220, 92, 92);
+    color: var(--color-err);
     font-size: 0.78rem;
     padding: 0.4rem 0.6rem;
-    background: color-mix(in oklab, rgb(220, 92, 92) 8%, transparent);
-    border: 1px solid color-mix(in oklab, rgb(220, 92, 92) 22%, transparent);
-    border-radius: 6px;
+    background: color-mix(in oklab, var(--color-err) 8%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-err) 22%, transparent);
+    border-radius: 8px;
   }
 </style>

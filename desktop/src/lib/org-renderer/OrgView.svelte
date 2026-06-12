@@ -90,7 +90,7 @@
     padding: 1rem 0;
   }
   .status-line.err {
-    color: #ef4444;
+    color: var(--color-err);
     opacity: 0.85;
     font-family: ui-monospace, SFMono-Regular, monospace;
     font-size: 0.85rem;

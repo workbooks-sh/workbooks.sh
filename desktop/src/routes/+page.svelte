@@ -26,7 +26,7 @@
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
   import KeychainOnboarding from "$lib/setup/KeychainOnboarding.svelte";
   import EngineOnboarding from "$lib/setup/EngineOnboarding.svelte";
-  import FirstRunOnboarding from "$lib/setup/FirstRunOnboarding.svelte";
+  import OnboardingFlow from "$lib/onboarding/OnboardingFlow.svelte";
   import { setupStatus } from "$lib/bridge/setup.svelte";
   import { engineStatus } from "$lib/bridge/engine.svelte";
   import WorkspaceSwitcher from "$lib/workspace/WorkspaceSwitcher.svelte";
@@ -502,7 +502,10 @@
 {:else if showOnboarding}
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
 {:else if !firstRunDone}
-  <FirstRunOnboarding oncomplete={() => (firstRunDone = true)} />
+  <!-- Personalization onboarding (wb-aakl.20) — choices, never a gate.
+       The old runtime/key gate (FirstRunOnboarding) is retired: the CLI
+       owns setup before the browser is ever opened. -->
+  <OnboardingFlow oncomplete={() => (firstRunDone = true)} />
 {:else}
   <div class="app">
     <div

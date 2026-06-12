@@ -4,7 +4,14 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Workbooks Desktop</title>
+    <title>Workbooks</title>
+    <!-- Brand type — fetched per wavelet canon (never bundled); system
+         fallbacks keep the app fully usable offline. -->
+    <link rel="preconnect" href="https://fonts.bunny.net" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.bunny.net/css?family=geist:400,500,600,700|jetbrains-mono:400,500,700&display=swap"
+    />
     <script>
       /* Web-host bootstrap: when there's no Tauri IPC (i.e. a plain browser),
          stand in for window.__TAURI_INTERNALS__ so the frontend runs as a web

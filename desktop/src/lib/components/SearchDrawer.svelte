@@ -216,8 +216,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--color-surface);
-    border-right: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-right: 1px solid var(--color-border-strong);
   }
 
   .search-row {
@@ -235,8 +237,8 @@
     border: 0;
     outline: 0;
     color: var(--color-fg);
-    font-family: inherit;
-    font-size: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 13px;
     min-width: 0;
   }
   .search-row input::placeholder { color: var(--color-fg-subtle); }
@@ -252,6 +254,7 @@
     color: var(--color-fg-muted);
     cursor: pointer;
     flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
   }
   .clear:hover { background: var(--color-surface-soft); color: var(--color-fg); }
 
@@ -274,7 +277,7 @@
     gap: 0.45rem;
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 0.4rem 0.55rem;
     color: var(--color-fg);
     font-family: inherit;
@@ -282,6 +285,7 @@
     cursor: pointer;
     text-align: left;
     min-width: 0;
+    transition: background 0.15s;
   }
   .result.active { background: var(--color-surface-soft); }
   .result:hover { background: var(--color-surface-soft); }
@@ -291,13 +295,13 @@
   }
   .result .path {
     color: var(--color-fg-muted);
-    font-size: 0.72rem;
+    font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     direction: rtl;
     text-align: left;
     flex: 1 1 auto;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
   }
 </style>

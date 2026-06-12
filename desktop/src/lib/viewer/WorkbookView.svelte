@@ -195,8 +195,8 @@
     font-size: 0.95rem;
   }
   .status.err {
-    color: #ef4444;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--color-err); /* app-wide error literal — no error token in the canon */
+    font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 0.85rem;
     white-space: pre-wrap;
     padding: 2rem;

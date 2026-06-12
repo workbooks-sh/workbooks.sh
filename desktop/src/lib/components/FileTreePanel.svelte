@@ -735,7 +735,7 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #10b981;
+    background: var(--color-ok);
     flex-shrink: 0;
   }
   .pkg-body { padding-left: 0; }
@@ -745,7 +745,7 @@
     color: var(--color-fg-subtle);
     margin: 0;
   }
-  .empty.xs.error { color: #ef4444; }
+  .empty.xs.error { color: var(--color-err); }
 
   /* Inline segmented source/compiled toggle on the ws row. The
    * container height must accommodate the 24px `.seg` children; a
@@ -899,15 +899,16 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--color-accent, #10b981);
+    background: var(--color-accent);
     opacity: 0.7;
   }
   .tag {
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--color-fg-subtle);
     border: 1px solid var(--color-border);
-    border-radius: 3px;
-    padding: 0 4px;
+    border-radius: 999px;
+    padding: 0 5px;
   }
   .empty {
     margin: 0;
@@ -922,10 +923,10 @@
   }
   .empty.error {
     color: var(--color-fg-muted);
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
   }
   .empty code {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--color-fg-muted);
   }

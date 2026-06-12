@@ -111,12 +111,13 @@
   input {
     background: var(--color-surface-soft);
     border: 1px solid var(--color-border);
-    border-radius: 7px;
+    border-radius: 8px;
     padding: 0.5rem 0.65rem;
     font-size: 0.88rem;
     font-family: inherit;
     color: var(--color-fg);
     outline: 0;
+    transition: border-color 0.15s;
   }
   input:focus { border-color: var(--color-border-strong); }
   .row { display: flex; gap: 0.4rem; justify-content: flex-end; }
@@ -126,30 +127,38 @@
     gap: 0.3rem;
     height: 30px;
     padding: 0 0.85rem;
-    border-radius: 7px;
+    border-radius: 8px;
     font-size: 0.82rem;
     font-weight: 500;
-    font-family: inherit;
+    font-family: var(--font-mono);
     cursor: pointer;
-    border: 0;
-    transition: opacity 0.1s, background 0.1s;
+    border: 1px solid transparent;
+    transition:
+      color 0.15s,
+      background 0.15s,
+      border-color 0.15s,
+      filter 0.15s,
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .btn:disabled { opacity: 0.5; cursor: default; }
   .btn.primary { background: var(--color-fg); color: var(--color-page); }
-  .btn.primary:hover:not(:disabled) { opacity: 0.88; }
+  .btn.primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
   .btn.ghost {
     background: transparent;
     color: var(--color-fg-muted);
-    border: 1px solid var(--color-border);
+    border-color: var(--color-border);
   }
   .btn.ghost:hover:not(:disabled) {
-    background: var(--color-surface-soft);
+    border-color: var(--color-border-strong);
     color: var(--color-fg);
   }
   .err {
     margin-top: 0.5rem;
     font-size: 0.76rem;
-    color: #ef4444;
+    color: var(--color-err);
     word-break: break-word;
   }
 </style>

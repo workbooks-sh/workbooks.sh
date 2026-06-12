@@ -633,7 +633,7 @@
     font: inherit;
     font-size: 0.78rem;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
   .palette-chip:hover:not(:disabled) {
     background: var(--color-surface);
@@ -645,7 +645,7 @@
     opacity: 0.55;
   }
   .palette-chip kbd {
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
     font-size: 0.68rem;
     padding: 0.1rem 0.35rem;
     border: 1px solid var(--color-border);
@@ -685,7 +685,11 @@
     gap: 0.5rem;
   }
   .foot-left { flex: 1 1 auto; min-width: 0; }
-  .hint { font-size: 0.72rem; color: var(--color-fg-subtle); }
+  .hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-fg-subtle);
+  }
   .muted { color: var(--color-fg-muted); }
 
   .btn {
@@ -701,15 +705,15 @@
     font-family: inherit;
     cursor: pointer;
     border: 0;
-    transition: opacity 0.12s;
+    transition: opacity 0.15s, filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.35; cursor: default; }
   .btn.primary { background: var(--color-fg); color: var(--color-page); }
-  .btn.primary:not(:disabled):hover { opacity: 0.88; }
+  .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
 
   .err {
     margin-top: 0.6rem;
-    color: #ef4444;
+    color: var(--color-err);
     font-size: 0.8rem;
     text-align: center;
   }
@@ -830,7 +834,7 @@
     .voice-shell { animation: none; }
   }
   .voice-shell.errored {
-    border: 1.5px solid color-mix(in srgb, #ef4444 50%, var(--color-border-strong));
+    border: 1.5px solid color-mix(in srgb, var(--color-err) 50%, var(--color-border-strong));
     background: var(--color-surface);
     animation: none;
   }
@@ -845,19 +849,19 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #34d399;
-    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+    background: var(--color-brand);
+    box-shadow: 0 0 0 0 var(--color-ring);
     animation: voice-dot-pulse 1.6s ease-out infinite;
   }
   .voice-dot.muted {
-    background: #fbbf24;
+    background: var(--color-warn);
     box-shadow: none;
     animation: none;
   }
   @keyframes voice-dot-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
-    70%  { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    0%   { box-shadow: 0 0 0 0 var(--color-ring); }
+    70%  { box-shadow: 0 0 0 5px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
   }
   .voice-status {
     flex: 1 1 auto;
@@ -889,11 +893,11 @@
   }
   .voice-btn:disabled { opacity: 0.35; cursor: default; }
   .voice-btn.end {
-    background: color-mix(in srgb, #ef4444 14%, var(--color-surface));
-    color: #ef4444;
+    background: color-mix(in srgb, var(--color-err) 14%, var(--color-surface));
+    color: var(--color-err);
   }
   .voice-btn.end:hover {
-    background: color-mix(in srgb, #ef4444 22%, var(--color-surface));
+    background: color-mix(in srgb, var(--color-err) 22%, var(--color-surface));
   }
 
   .voice-transcript {
@@ -997,7 +1001,7 @@
     top: 0.4rem;
     right: 0.55rem;
     font-size: 0.78rem;
-    color: #10b981;
+    color: var(--color-ok);
     font-weight: 700;
   }
 
@@ -1007,9 +1011,9 @@
     gap: 0.4rem;
     padding: 0.4rem 0.55rem;
     font-size: 0.82rem;
-    color: #ef4444;
-    background: color-mix(in srgb, #ef4444 8%, transparent);
-    border: 1px solid color-mix(in srgb, #ef4444 30%, var(--color-border));
+    color: var(--color-err);
+    background: color-mix(in srgb, var(--color-err) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-err) 30%, var(--color-border));
     border-radius: 7px;
   }
 
@@ -1037,14 +1041,14 @@
     border-color: var(--color-fg-muted);
   }
   .tool-block.running {
-    border-color: color-mix(in srgb, #f59e0b 50%, var(--color-border-strong));
+    border-color: color-mix(in srgb, var(--color-warn) 50%, var(--color-border-strong));
   }
   .tool-block.done {
-    border-color: color-mix(in srgb, #10b981 35%, var(--color-border-strong));
+    border-color: color-mix(in srgb, var(--color-ok) 35%, var(--color-border-strong));
   }
   .tool-block.errored {
-    border-color: color-mix(in srgb, #ef4444 50%, var(--color-border-strong));
-    background: color-mix(in srgb, #ef4444 5%, var(--color-surface-soft));
+    border-color: color-mix(in srgb, var(--color-err) 50%, var(--color-border-strong));
+    background: color-mix(in srgb, var(--color-err) 5%, var(--color-surface-soft));
   }
   .tool-head {
     display: inline-flex;
@@ -1056,8 +1060,8 @@
     color: var(--color-fg-muted);
     font-weight: 600;
   }
-  .tool-block.done .tool-head { color: #10b981; }
-  .tool-block.errored .tool-head { color: #ef4444; }
+  .tool-block.done .tool-head { color: var(--color-ok); }
+  .tool-block.errored .tool-head { color: var(--color-err); }
   .tool-name { color: inherit; }
   :global(.tool-head .spin) {
     animation: tool-spin 1s linear infinite;
@@ -1066,7 +1070,7 @@
     to { transform: rotate(360deg); }
   }
   .tool-cmd {
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--color-fg);
     background: transparent;
@@ -1080,7 +1084,7 @@
     background: var(--color-page);
     border: 1px solid var(--color-border);
     border-radius: 6px;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono);
     font-size: 0.74rem;
     color: var(--color-fg-muted);
     white-space: pre-wrap;

@@ -125,6 +125,7 @@
     color: var(--color-fg);
     outline: 0;
     text-align: center;
+    transition: border-color 0.15s;
   }
   input:focus { border-color: var(--color-border-strong); }
   .btn {
@@ -133,23 +134,28 @@
     justify-content: center;
     gap: 0.4rem;
     height: 38px;
-    border-radius: 9px;
+    border-radius: 10px;
     font-size: 0.88rem;
     font-weight: 500;
-    font-family: inherit;
+    font-family: var(--font-mono);
     cursor: pointer;
     border: 0;
-    transition: opacity 0.12s;
+    transition:
+      filter 0.15s,
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.primary {
     background: var(--color-fg);
     color: var(--color-page);
   }
-  .btn.primary:not(:disabled):hover { opacity: 0.88; }
+  .btn.primary:not(:disabled):hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
   .error {
     margin-top: 0.6rem;
-    color: #ef4444;
+    color: var(--color-err);
     font-size: 0.78rem;
     word-break: break-word;
   }

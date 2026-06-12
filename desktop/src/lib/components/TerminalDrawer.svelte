@@ -77,15 +77,26 @@
    *  the open/close cycle. */
   function themeFromCss() {
     const styles = getComputedStyle(document.documentElement);
-    const bg = styles.getPropertyValue("--color-page").trim() || "#0a0a0a";
-    const fg = styles.getPropertyValue("--color-fg").trim() || "#e6e6e6";
-    return { background: bg, foreground: fg, cursor: fg };
+    const v = (name: string, fallback: string) =>
+      styles.getPropertyValue(name).trim() || fallback;
+    // Fallback literals = canon dark ramp (app.css); cursor/selection
+    // are the live-green accent.
+    const bg = v("--color-page", "#06100d");
+    return {
+      background: bg,
+      foreground: v("--color-fg", "#eef3ef"),
+      cursor: v("--color-brand", "#3fe081"),
+      cursorAccent: bg,
+      selectionBackground: v("--color-brand-soft", "rgba(63, 224, 129, 0.25)"),
+    };
   }
 
   function newXterm(): { xterm: Xterm; fit: FitAddon } {
     const xterm = new Xterm({
       cursorBlink: true,
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+      // xterm measures glyphs itself — needs a concrete family list,
+      // not var(--font-mono). Keep in sync with app.css.
+      fontFamily: '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       fontSize: 12,
       theme: themeFromCss(),
       scrollback: 5000,
@@ -261,8 +272,8 @@
   });
 
   function statusColor(s: SessionMeta): string {
-    if (s.state === "running") return "var(--color-emerald, #10b981)";
-    if (s.state === "failed") return "#ef4444";
+    if (s.state === "running") return "var(--color-ok)";
+    if (s.state === "failed") return "var(--color-err)"; // app-wide error literal — no error token
     return "var(--color-fg-subtle)";
   }
 
@@ -432,7 +443,7 @@
     height: 4px;
     cursor: ns-resize;
     background: transparent;
-    transition: background 0.1s;
+    transition: background 0.15s;
     /* Slight margin into the drawer so the cursor change is generous
      * — the actual hit area extends 2px beyond the visible bar via
      * the negative margin trick. */
@@ -443,7 +454,7 @@
   }
   .resize-handle:hover,
   .drawer.dragging .resize-handle {
-    background: var(--color-border-strong, var(--color-border));
+    background: var(--color-ring);
   }
   .drawer-head {
     flex-shrink: 0;
@@ -471,8 +482,8 @@
     font-weight: 600;
   }
   .state-tag.failed {
-    color: #ef4444;
-    border-color: color-mix(in srgb, #ef4444 35%, var(--color-border));
+    color: var(--color-err); /* app-wide error literal — no error token in the canon */
+    border-color: color-mix(in srgb, var(--color-err) 35%, var(--color-border));
   }
   .spacer { flex: 1 1 auto; }
   .head-btn {
@@ -486,7 +497,7 @@
     border: 0;
     color: var(--color-fg-muted);
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.15s, color 0.15s;
   }
   .head-btn:hover {
     background: var(--color-surface-soft);
@@ -543,11 +554,11 @@
     gap: 0.2rem;
     border-radius: 6px;
     border-left: 2px solid transparent;
-    transition: background 0.1s, border-color 0.1s;
+    transition: background 0.15s, border-color 0.15s;
   }
   .tab.active {
     background: var(--color-page);
-    border-left-color: var(--color-fg);
+    border-left-color: var(--color-brand);
   }
   .tab-pick {
     flex: 1 1 auto;
@@ -593,7 +604,7 @@
     color: var(--color-fg-subtle);
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.1s, color 0.1s, background 0.1s;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
   }
   .tab:hover .tab-close,
   .tab.active .tab-close {
@@ -612,13 +623,13 @@
     gap: 0.3rem;
     height: 26px;
     background: transparent;
-    border: 1px dashed var(--color-border-strong, var(--color-border));
-    border-radius: 6px;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 8px;
     color: var(--color-fg-muted);
     font: inherit;
     font-size: 0.72rem;
     cursor: pointer;
-    transition: color 0.1s, background 0.1s, border-color 0.1s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
   }
   .new-shell:hover {
     color: var(--color-fg);

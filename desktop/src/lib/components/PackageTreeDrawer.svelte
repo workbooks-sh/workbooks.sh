@@ -96,11 +96,12 @@
     background: var(--color-surface);
   }
   .label {
-    font-size: 11.5px;
+    font-family: var(--font-mono);
+    font-size: 11px;
     font-weight: 500;
     color: var(--color-fg-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -109,7 +110,7 @@
     display: flex;
     gap: 0;
     border: 1px solid var(--color-border);
-    border-radius: 5px;
+    border-radius: 8px;
     overflow: hidden;
     background: var(--color-surface-soft);
   }

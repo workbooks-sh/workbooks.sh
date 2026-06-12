@@ -448,7 +448,7 @@
     aria-label={engine.title}
     onclick={() => wizard.open()}
   >
-    <span class="engine-dot"></span>
+    <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
   </button>
 
   <button
@@ -561,13 +561,13 @@
     align-self: center;
     height: 26px;
     width: 28px;
-    border-radius: 6px;
+    border-radius: 8px;
     background: transparent;
     border: 0;
     color: var(--color-fg-muted);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.15s, color 0.15s;
   }
   .menu-btn:hover,
   .menu-btn[aria-expanded="true"] {
@@ -578,6 +578,7 @@
   .ctx-shortcut {
     margin-left: auto;
     color: var(--color-fg-subtle);
+    font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
@@ -614,7 +615,7 @@
     flex: 1 1 0;
     min-width: 44px;
     max-width: 240px;
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.15s, color 0.15s;
   }
   .tab:hover { background: var(--color-page); color: var(--color-fg); }
   .tab.active {
@@ -679,7 +680,7 @@
     border-radius: 0 8px 8px 0;
     flex-shrink: 0;
     opacity: 0;
-    transition: opacity 0.1s, background 0.1s, color 0.1s;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
   }
   .tab:hover .close,
   .tab.active .close { opacity: 0.7; }
@@ -698,14 +699,14 @@
     align-self: center;
     height: 26px;
     width: 28px;
-    border-radius: 6px;
+    border-radius: 8px;
     background: transparent;
     border: 0;
     color: var(--color-fg-muted);
     cursor: pointer;
     flex-shrink: 0;
     margin-left: 2px;
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.15s, color 0.15s;
   }
   .new-tab:hover { background: var(--color-page); color: var(--color-fg); }
 
@@ -721,7 +722,7 @@
   }
   .tab-body.segment {
     border-radius: 6px;
-    transition: background 0.1s;
+    transition: background 0.15s;
   }
   .tab-body.segment.seg-focused {
     color: var(--color-fg);
@@ -785,7 +786,7 @@
     height: 24px;
     width: 24px;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 8px;
     background: transparent;
     flex-shrink: 0;
     cursor: pointer;
@@ -821,20 +822,21 @@
     height: 24px;
     padding: 0 0.7rem;
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--color-page);
     color: var(--color-fg-muted);
     font-size: 12px;
-    font-family: inherit;
+    font-family: var(--font-mono);
     font-weight: 500;
     cursor: pointer;
     flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
   .agent-btn:hover { color: var(--color-fg); }
   .agent-btn.active {
     background: var(--color-fg);
     color: var(--color-page);
-    border-color: var(--color-fg);
+    border-color: var(--color-brand);
   }
 
   /* Live-session indicator on the agent button: small pulsing dot.
@@ -845,18 +847,18 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #34d399; /* emerald */
-    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+    background: var(--color-ok);
+    box-shadow: 0 0 0 0 var(--color-ring);
     animation: live-dot-pulse 1.6s ease-out infinite;
   }
   .live-dot.muted {
-    background: #fbbf24; /* amber when muted */
+    background: var(--color-warn);
     animation: none;
   }
   @keyframes live-dot-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
-    70%  { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    0%   { box-shadow: 0 0 0 0 var(--color-ring); }
+    70%  { box-shadow: 0 0 0 6px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
   }
   @media (prefers-reduced-motion: reduce) {
     .live-dot { animation: none; }
