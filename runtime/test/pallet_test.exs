@@ -179,7 +179,7 @@ defmodule Workbooks.PalletTest do
   @tag timeout: 600_000
   test "Lane D — a JS npm tool (glimmer compiler) bundles on Javy + runs" do
     # proves the JS-npm-bundle lane: resolve+fetch+esbuild-bundle @glimmer/compiler → Javy wasm command
-    assert :ok = Pallet.seed_js_tool_one("glimmer")
+    assert {:ok, _} = Pallet.seed_js_tool_one("glimmer")
     assert "glimmer" in CommandRegistry.list()
     assert {:ok, out} = CommandRegistry.run("glimmer", "<div>{{name}}</div>", [])
     assert out =~ "block"
