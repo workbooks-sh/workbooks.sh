@@ -34,6 +34,7 @@ Provision once with `Pallet.seed_csource/0` (slow — one clang build each). 7 c
 | `zstd` | Zstandard compression | `run("zstd", data, [])` / `run("zstd", comp, ["-d"])` |
 | `qr` | text → ASCII QR code | `run("qr", "https://…", [])` |
 | `b2` | BLAKE2b-512 hash → hex | `run("b2", data, [])` |
+| `b3` | BLAKE3-256 hash → hex | `run("b3", data, [])` |
 | `md` | CommonMark markdown → HTML | `run("md", "# Hi", [])` |
 
 ## Built-ins (always present)

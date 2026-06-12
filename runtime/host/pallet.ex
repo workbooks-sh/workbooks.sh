@@ -333,6 +333,23 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `b3` CLI: BLAKE3-256 of stdin → hex (the modern fast crypto hash).
+  @b3_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include "blake3.h"
+  int main(void) {
+    blake3_hasher h; blake3_hasher_init(&h);
+    static unsigned char buf[65536]; size_t r;
+    while ((r = fread(buf, 1, sizeof(buf), stdin)) > 0) blake3_hasher_update(&h, buf, r);
+    unsigned char out[BLAKE3_OUT_LEN];
+    blake3_hasher_finalize(&h, out, BLAKE3_OUT_LEN);
+    for (int i = 0; i < BLAKE3_OUT_LEN; i++) printf("%02x", out[i]);
+    printf("\n");
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -411,6 +428,17 @@ defmodule Workbooks.Pallet do
         src_globs: ["c/*.{c,h}"],
         exclude: ~w(qrcodegen-demo.c qrcodegen-test.c),
         extra_sources: [{"qrmain.c", @qr_main}]
+      ]
+    },
+    %{
+      name: "b3",
+      url: "https://codeload.github.com/BLAKE3-team/BLAKE3/tar.gz/refs/tags/1.5.4",
+      sha: "ddd24f26a31d23373e63d9be2e723263ac46c8b6d49902ab08024b573fd2a416",
+      build_opts: [
+        src_globs: ["c/*.{c,h}"],
+        exclude: ~w(blake3_avx2.c blake3_avx512.c blake3_neon.c blake3_sse2.c blake3_sse41.c example.c main.c),
+        cflags: ~w(-DBLAKE3_NO_SSE2 -DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512 -DBLAKE3_USE_NEON=0),
+        extra_sources: [{"b3main.c", @b3_main}]
       ]
     }
   ]
