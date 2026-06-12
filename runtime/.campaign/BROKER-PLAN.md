@@ -812,3 +812,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   dispatches to one serve_id, each gets its OWN echo — no cross-talk. 9 serve_broker tests green. The inbound
   capability is now DoS-hardened (iter47) + concurrency-correct (iter48). wb-5hfo CLOSED.
   NEXT (iter 49): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.
+- 2026-06-12 (iter 49): **HOLISTIC red-team e2e (green) + inbound-seam depth + js_dock harness gap filed.**
+  (a) Deepened wb-py4k: the wasi-http serve example is ASYNC (instantiate_async + call_handle.await + a FRESH
+  per-request store) vs wasmex's SYNC single-instance model — serve is a PARALLEL NIF path (ProxyPre +
+  per-request instances + in_tokio-wrapping), a focused-session piece (a loop-fire attempt risks a reverted/
+  broken NIF build that blocks all runtime work). (b) Filed wb-q2mo: js_dock host_tcp/host_udp are wired imports
+  but NOT JS-callable — the Javy harness only bridges Net.get; tcp/udp need harness bindings + a harness.o
+  rebuild (manual compilers-package op). rust_dock versions are fully e2e-proven + callable. (c) WIN: a
+  HOLISTIC red-team e2e — ONE real wasi:http guest blocked from EVERY obfuscated internal target (loopback,
+  metadata, link-local, RFC1918 x3, CGNAT, IPv6 loopback, IPv6 ULA, userinfo@ — 10 forms), all BLOCKED on the
+  real wasi path. Proves the obfuscation/SSRF defense holistically (beyond the hermetic unit tests).
+  NEXT (iter 50): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.

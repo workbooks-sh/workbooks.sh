@@ -34,6 +34,46 @@ defmodule Workbooks.BrokerNetE2ETest do
   end
 
   @tag :build
+  @tag timeout: 300_000
+  test "RED-TEAM holistic — a real wasi:http guest is blocked from EVERY obfuscated internal target" do
+    out = Path.join(System.tmp_dir!(), "redteam_#{System.unique_integer([:positive])}.component.wasm")
+
+    {_, 0} =
+      System.cmd(
+        "node",
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/net_probe.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
+        stderr_to_stdout: true
+      )
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{path: out, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    on_exit(fn -> File.rm(out) end)
+    probe = fn url -> elem(Wasmex.Components.call_function(pid, "probe", [url], 12_000), 1) end
+
+    # every flavor of internal/obfuscated destination the red-team mandate names must come back BLOCKED
+    # (either SSRF-denied at connect, or unresolvable -> denied). One real guest, the real wasi-http path.
+    targets = [
+      "http://127.0.0.1/",          # loopback
+      "http://169.254.169.254/",    # cloud metadata
+      "http://169.254.0.1/",        # link-local
+      "http://10.0.0.1/",           # RFC1918
+      "http://172.16.0.1/",         # RFC1918
+      "http://192.168.1.1/",        # RFC1918
+      "http://100.64.0.1/",         # CGNAT
+      "http://[::1]/",              # IPv6 loopback
+      "http://[fd00::1]/",          # IPv6 ULA
+      "http://user:pass@127.0.0.1/" # userinfo@ trick
+    ]
+
+    for url <- targets do
+      assert probe.(url) =~ "BLOCKED", "red-team bypass: expected #{url} to be BLOCKED"
+    end
+  end
+
+  @tag :build
   @tag :netdeps
   test "RECLAMATION — a standard wasi:http fetch tool retrieves real web content through the broker (SSRF-safe)" do
     out = Path.join(System.tmp_dir!(), "fetch_#{System.unique_integer([:positive])}.component.wasm")
