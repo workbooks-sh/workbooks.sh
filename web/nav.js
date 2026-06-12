@@ -53,6 +53,8 @@
     '  background: var(--swc, #ddd); border-radius: 5px; padding: 3px 6px; flex: 0 0 auto; }',
     '.nav .drop .panel .nbempty { font: 400 10.5px var(--mono, monospace); color: var(--dim, #565b54); padding: 8px 10px; }',
     '.nav .drop .panel .subbody { max-height: 340px; overflow-y: auto; }',
+    '.nav .drop .panel a.soon { opacity: .45; cursor: default; }',
+    '.nav .drop .panel a.soon:hover { background: none; }',
     '.nav .drop .panel a.viewall { justify-content: center; font-size: 10.5px; color: var(--dim, #565b54); }',
     '.nav .drop .panel a.viewall:hover { color: var(--ink, #121316); }',
     '.nav a.gh { display: inline-flex; align-items: center; color: var(--ink, #121316); }',
@@ -142,13 +144,15 @@
 
       function subRow(x) {
         var icon = x.icon.indexOf("../") === 0 ? root + x.icon.slice(3) : root + "learn/" + x.icon;
-        return '<a href="' + root + 'learn/' + x.slug + '">' +
-          '<span class="sw" style="background:' + x.color + '"><img src="' + icon + '" alt=""></span> ' +
-          x.title + "</a>";
+        var chip = '<span class="sw" style="background:' + x.color + '"><img src="' + icon + '" alt=""></span> ';
+        if (x.status === "planned") {
+          return '<a class="soon" aria-disabled="true">' + chip + x.title + ' <small>soon</small></a>';
+        }
+        return '<a href="' + root + 'learn/' + x.slug + '">' + chip + x.title + "</a>";
       }
       function showSubs(slug) {
         var l = bylSlug[slug];
-        var subs = (l.sublessons || []).filter(function (x) { return x.status === "live"; });
+        var subs = (l.sublessons || []).filter(function (x) { return x.status !== "hidden"; });
         head.innerHTML = "deep dives <small>in " + l.title.toLowerCase() + "</small>";
         body.innerHTML = subs.length
           ? subs.map(subRow).join("")

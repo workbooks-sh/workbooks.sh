@@ -13,7 +13,52 @@
           "icon": "../wb-file-icon.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "bundling-and-unbundling",
+              "title": "bundling and unbundling",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What a .wbundle actually is — a plain zip of workbook.html + workbook.org + vfs.sqlite + manifest.json — and the exact round trip: bundle, ship, unbundle, restore, with nothing proprietary in the container."
+            },
+            {
+              "slug": "nesting",
+              "title": "nesting",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Workbooks inside workbooks: the org tree makes every workbook a graftable subtree, nested workflows compile into one DAG of sub-worlds with typed imports/exports, and an upgrade gate keeps combining and removing safe."
+            },
+            {
+              "slug": "signing-and-verifying",
+              "title": "signing and verifying",
+              "sub": "implementation",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Make provenance travel with the bytes: sign a workbook with a self-certifying did:key (Ed25519 over canonical JSON, embedded in the file) and verify both the signature and that the artifact hasn't been touched since."
+            },
+            {
+              "slug": "spec-marker",
+              "title": "the spec marker",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How a workbook identifies and describes itself from the inside — the inline org spec and embedded source markers that make the format filename-independent and self-explaining."
+            }
+          ]
         },
         {
           "slug": "nexus",
@@ -23,7 +68,74 @@
           "icon": "../nexus-icon.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "the-dock",
+              "title": "the dock",
+              "sub": "concept",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader understands the Dock as a typed capability membrane: the host hands a workbook only the functions its grants permit, so a component asking for an ungranted power fails to even instantiate."
+            },
+            {
+              "slug": "grants-not-inheritance",
+              "title": "what a workbook may do",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader can read and reason about a Policy profile: the four standard profiles, how each maps to a memory ceiling, a wall-clock CPU trap, and a capability list — and why a minimal profile literally has no network stack."
+            },
+            {
+              "slug": "life-of-an-instance",
+              "title": "the life of an instance",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader can trace a docked workbook through its whole state machine — created → active → suspended → frozen → archived — and sees why 'freeze' is just 'stop the process, keep the SQLite file', no VM snapshot needed."
+            },
+            {
+              "slug": "alive-while-closed",
+              "title": "alive while closed",
+              "sub": "concept",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader learns how a workbook keeps working with nobody watching: keeper workers ticking agent defs on intervals, singleton vs crew scheduling, lifecycle specs that decide what each tick is, and schedules declared in the org source."
+            },
+            {
+              "slug": "two-planes",
+              "title": "the two planes",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader understands why one Nexus runs two separate HTTP surfaces — an authed control plane and an anonymous GET-only content plane — and how a single BEAM node serves many custom domains via an ETS-backed SNI registry, no reverse proxy."
+            },
+            {
+              "slug": "one-file-two-places",
+              "title": "one file, two places",
+              "sub": "setup",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The reader stands up a Nexus both ways — a cloud-identical krunvm microVM on their laptop and a Fly deploy — and understands deployment.org as inert declarative config where moving to the cloud is editing one property."
+            }
+          ]
         },
         {
           "slug": "toolkit",
@@ -33,7 +145,74 @@
           "icon": "../toolkit-icon.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "the-import-ramp",
+              "title": "the import ramp",
+              "sub": "implementation",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Anything → toolkit: how wbx toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted."
+            },
+            {
+              "slug": "the-wasm-audit",
+              "title": "the wasm audit",
+              "sub": "mechanics",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Ready, convertible, or blocked: how the static dependency audit classifies every carried script against the wasm lanes, writes findings INTO the toolkit's own manifest, and emits a checkbox fix-up plan an agent can work through to done — with --fix closing the loop as push → build → verify."
+            },
+            {
+              "slug": "the-compiler-lanes",
+              "title": "the compiler lanes",
+              "sub": "concept",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The crux bet of the toolkit layer: C, Rust, Zig, Go, and JS compilers that are themselves compiled to WebAssembly, so untrusted source is built entirely inside the sandbox — c4, mrustc-to-C, zig1's C backend, yaegi interpretation, and QuickJS embedding, each a different trick to dodge native execution."
+            },
+            {
+              "slug": "the-promotion-ladder",
+              "title": "the promotion ladder",
+              "sub": "implementation",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Session → workspace → registry: an agent writes a source file, build-inline registers it as a command in one step, and promote materializes it as a real source-owned toolkit — org owns the spec, wasm owns the artifact, and self-authoring never widens granted capabilities."
+            },
+            {
+              "slug": "signing-and-trust",
+              "title": "signing and trust",
+              "sub": "mechanics",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What the signature actually binds: an Ed25519 did:key signature over the canonical manifest body ties the declared contract (EXEC/CAPS/BUILD_SRC) to an author identity, the build gate refuses any unsigned or tampered third-party toolkit, and the sandbox bounds damage regardless — two layers, distinct jobs."
+            },
+            {
+              "slug": "proving-a-toolkit",
+              "title": "proving a toolkit",
+              "sub": "implementation",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Verify and eval as the toolkit's quality gates: structural checks (manifest, skills, exec, caps, provenance), then bundled evals/*.org cases where an agent is run against a :TASK: with the toolkit's own manual injected and a judge model scores the result and tool trace against a :RUBRIC:."
+            }
+          ]
         }
       ]
     },
@@ -49,7 +228,63 @@
           "icon": "icons/org.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "reading-org",
+              "title": "reading org",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Learn the whole grammar in one sitting — headlines, tags, TODO states, drawers, timestamps, source blocks — by drilling each construct against the kernel's actual parse output, with side-by-side markdown comparisons showing exactly what structure markdown throws away."
+            },
+            {
+              "slug": "tangling",
+              "title": "tangling",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Literate programming, weaponized: how source blocks plus six header args (:deps :uses :in :out :persist :dir) compile a document into a WIT-world-shaped build plan — components, capability imports, and a DAG of :out→:in edges."
+            },
+            {
+              "slug": "properties-drawers",
+              "title": "properties drawers",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How :PROPERTIES: drawers turn a headline into a typed record — the key-value mechanism behind toolkit manifests, agent identities, and the spec block inside every learn page."
+            },
+            {
+              "slug": "timestamps-and-repeaters",
+              "title": "timestamps and repeaters",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The full date grammar — active <…> vs inactive […], SCHEDULED vs DEADLINE, +1d/.+/++ repeaters, and the :SCHEDULE: cron escape hatch — and how a timestamp on a headline becomes a workflow that actually runs every morning."
+            },
+            {
+              "slug": "the-kernel",
+              "title": "the kernel",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the wb CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website."
+            }
+          ]
         },
         {
           "slug": "agents",
@@ -59,7 +294,96 @@
           "icon": "icons/agents.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "the-loop",
+              "title": "the loop",
+              "sub": "mechanics",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What a single agent run actually is — the model→tools→append cycle, why every tool call is wall-clock bounded, and how a run leaves a fully readable trace."
+            },
+            {
+              "slug": "authoring-an-agent",
+              "title": "authoring an agent",
+              "sub": "implementation",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Write a complete agent definition in plain org — the :agent: node, the system-prompt heading, declared toolkits — and understand exactly how the runtime parses and runs it."
+            },
+            {
+              "slug": "context-repo",
+              "title": "the context repo",
+              "sub": "concept",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "An agent's memory is a workbook — a git repo of plain files it reads, writes, and commits — not a vector store bolted on the side; the board, the canon, and the logs all live in one place anyone can diff."
+            },
+            {
+              "slug": "spawning",
+              "title": "spawning",
+              "sub": "mechanics",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How a run comes to exist and stays alive — supervised sessions you start with one call, then poll or stream while the agent works for minutes, surviving the caller that launched it."
+            },
+            {
+              "slug": "orchestration",
+              "title": "orchestration",
+              "sub": "mechanics",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How standing agents keep a cadence — the keeper's tick, a lifecycle state machine declared in org, and a crew of workers sharing one board with claims as protocol, not locks."
+            },
+            {
+              "slug": "human-in-the-loop",
+              "title": "human in the loop",
+              "sub": "implementation",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Insert a real human checkpoint into a live run — a review canvas the agent opens, a commit the human makes, and a FIFO the agent polls mid-loop to pick the verdict up."
+            },
+            {
+              "slug": "runtime-configuration",
+              "title": "configuring at runtime",
+              "sub": "setup",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Every knob that shapes an agent without touching engine code — the env contract, org manifests, model and toolkit props, intervals, and the exec trust grant."
+            },
+            {
+              "slug": "dreaming",
+              "title": "dreaming",
+              "sub": "concept",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What an agent does between runs — a sleep phase that digests telemetry, commits, and the backlog into a dream journal whose verdicts mechanically steer the next waking run."
+            }
+          ]
         },
         {
           "slug": "wbx",
@@ -69,7 +393,63 @@
           "icon": "icons/wbx.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "mode-model",
+              "title": "the mode model",
+              "sub": "concept",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How one binary serves two audiences — TTY detection, the --agent/--json switches, the {ok, verb, data, error} envelope, and the stable exit-code map an agent can branch on without parsing prose."
+            },
+            {
+              "slug": "org-pipelines",
+              "title": "org on stdin",
+              "sub": "implementation",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Build real pipelines with the kernel verbs — query, tangle, and lint accept '-' for stdin, emit JSON, and compose with --json and jq so generated org never touches a temp file."
+            },
+            {
+              "slug": "doctor-and-friends",
+              "title": "doctor, status, completions",
+              "sub": "setup",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Wire wbx into your shell and let it check itself — doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-wbx where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update."
+            },
+            {
+              "slug": "deploy-kit",
+              "title": "declare, then converge",
+              "sub": "setup",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Stand up an engine with the deploy-kit — scaffold deployment.org with init, validate, apply, and watch one verb set converge a local container or a cloud provider, with secrets declared by name and never written into the artifact."
+            },
+            {
+              "slug": "capability-seam",
+              "title": "the capability seam",
+              "sub": "mechanics",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Why the same crate compiles to your laptop and into the engine's sandbox — one Io trait (http/read/write/spawn) as the only place the two targets differ, native std/reqwest on one side, Dock-brokered host imports on the other, plus engine discovery via runtime.json."
+            }
+          ]
         },
         {
           "slug": "workflows",
@@ -89,6 +469,72 @@
               "audio": true,
               "status": "live",
               "added": "2026-06-12"
+            },
+            {
+              "slug": "validations",
+              "title": "validations",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "DONE is a claim until a check proves it — the three-rung ladder of plan validation (dangling inputs, missing langs), task acceptance (:done-when: and :check blocks run fail-closed in the WASM shell), and build conformance, which together turn drift from a shrug into a named diagnostic."
+            },
+            {
+              "slug": "schedules",
+              "title": "schedules",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The full grammar of time in a plan — active vs inactive timestamps, +1w/.+/++ repeaters, the :SCHEDULE: cron property — and the keeper, the engine that actually fires them: workers, crews, lifecycle specs, and the breather between ticks."
+            },
+            {
+              "slug": "boards-as-renderings",
+              "title": "boards as renderings",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Why there is no board model anywhere in the runtime — a board is the kernel's render() over the plan file plus a write path back into it, and any surface (kanban, status page, an agent's ready list) is the same one-file two-way binding."
+            },
+            {
+              "slug": "waves",
+              "title": "waves",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How a compiled world executes — topological waves where every step whose predecessors are done runs in parallel, producers' stdout piped into consumers' stdin along the edges, and agent-lang components fanning out sub-agents inside the same DAG."
+            },
+            {
+              "slug": "plan-to-world",
+              "title": "plan to world",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What tangle_plan actually computes — edges inferred by matching :out to :in, exports as the outputs nobody consumed, imports from :uses, nested workflows as sub-worlds — and why the result is shaped like a WIT world on purpose."
+            },
+            {
+              "slug": "upgrade-gate",
+              "title": "the upgrade gate",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How a live plan changes safely — the Motoko/Candid-style subtyping rules (exports may grow but never shrink, imports may shrink but never grow, an output type may never change) that let the kernel refuse a breaking redeploy before it runs."
             }
           ]
         },
@@ -100,7 +546,74 @@
           "icon": "icons/vfs.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "sql-over-the-disk",
+              "title": "sql over the disk",
+              "sub": "implementation",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How to actually query the disk: the vfs table's real schema, the Policy-gated vfs-query Dock import your component calls, error-as-JSON safety so a bad query can never crash the engine, and one SQL statement run across a whole library of workbooks."
+            },
+            {
+              "slug": "volumes",
+              "title": "volumes",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The disk isn't one undifferentiated tree — it's three named regions (workspace, memory, tmp) with different lifetimes, and knowing which one a byte lives in tells you whether it persists, travels, or evaporates."
+            },
+            {
+              "slug": "docked-disk",
+              "title": "the docked disk",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "What 'the disk gets a heartbeat' actually means: the instance lifecycle state machine, freeze/resume as a file copy instead of a VM snapshot, WAL-mode streaming to off-box replicas, and clone-per-tenant so a thousand users each get their own copy of one template disk."
+            },
+            {
+              "slug": "what-ships-what-stays",
+              "title": "what ships, what stays",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Sharing exposes the work, never the session that produced it — one boundary module decides what leaves on every egress path (bundle, git, library), so agent memory, scratch files, and telemetry stay home unless the owner explicitly opts in."
+            },
+            {
+              "slug": "sealed-sections",
+              "title": "sealed sections",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "How part of a shipped disk can be ciphertext to everyone and plaintext to the right person: AES-256-GCM envelopes whose content keys never ride in the bundle — they're escrowed at the runtime, released only after a posture check, and optionally wrapped to a recipient's DID so there's no plaintext-key honeypot anywhere."
+            },
+            {
+              "slug": "foreign-tables",
+              "title": "foreign tables",
+              "sub": "implementation",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Make FROM reach past the file: register a data-source plugin and a query against its entity routes to a live API instead of the local store — or run the sync daemon and keep a resident, queryable, agent-airgapped mirror of the outside world inside the disk."
+            }
+          ]
         }
       ]
     }
