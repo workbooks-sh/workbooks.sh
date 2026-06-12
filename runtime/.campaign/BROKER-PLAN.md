@@ -193,3 +193,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   a non-listed host with a net_allow set is BLOCKED. That single harness validates the WHOLE stack e2e and
   unblocks validating quotas/audit/rebinding as they're added. NEXT (iter 6) = build that harness. Only once
   it's green do quotas/audit/revocation get added (each then runtime-proven via the harness).
+- 2026-06-12 (iter 5 — e2e harness scouted + guest laid down): FEASIBLE PATH CONFIRMED. componentize-js is
+  in node_modules; wasmex runs components via Wasmex.Components.call_function(pid,name,params); host/
+  instance.ex is a working component-instantiation pattern to copy. Wrote the guest fixture test/broker_e2e/
+  net_probe.js (a `probe(url)` that fetch()es and returns "OK <status>" or "BLOCKED <msg>"). CONCRETE NEXT
+  (iter 6, execute): (1) componentize net_probe.js -> a wasi:http component (StarlingMonkey fetch routes via
+  wasi:http/outgoing-handler -> our send_request override); resolve the WIT world iteratively by running the
+  tool (export `probe: func(url: string) -> string`, import wasi:http). (2) instantiate it via wasmex
+  Components with %WasiP2Options{allow_http: true} (copy host/instance.ex). (3) ASSERT e2e: probe("http://
+  169.254.169.254/") -> "BLOCKED", probe("http://127.0.0.1/") -> "BLOCKED"; then with net_allow set, probe
+  a non-listed host -> "BLOCKED", an allow-listed public host -> reachable. THAT closes wb-q962 and proves
+  the whole stack (SSRF + allow-list + wiring) at runtime — after which quotas/audit/revocation get added,
+  each runtime-proven via this same harness.
