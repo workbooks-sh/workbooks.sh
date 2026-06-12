@@ -83,4 +83,17 @@ defmodule Workbooks.StorageBrokerTest do
     assert :ok = Workbooks.Revocation.unrevoke(t)
     assert {:ok, "v"} = StorageBroker.get(conn, t, "k")
   end
+
+  test "wb-8w8x: KEY-size cap rejects an oversized key", %{conn: conn} do
+    big_key = String.duplicate("k", 2_000)
+    assert {:error, :key_too_large} = StorageBroker.put(conn, "t", big_key, "v")
+    assert :ok = StorageBroker.put(conn, "t", "small", "v")
+  end
+
+  test "wb-8w8x: per-tenant BYTE quota (not just entry count)", %{conn: conn} do
+    blob = String.duplicate("a", 100)
+    assert :ok = StorageBroker.put(conn, "t", "k1", blob, max_tenant_bytes: 150)
+    # k2 would push the tenant total over 150 bytes -> rejected even though the entry count is tiny
+    assert {:error, :quota_exceeded} = StorageBroker.put(conn, "t", "k2", blob, max_tenant_bytes: 150)
+  end
 end

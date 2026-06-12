@@ -1322,3 +1322,7 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   fresh bucket per window auto-resets the count; the previous bucket is opportunistically pruned (table doesn't
   grow per-window); reset/1 match_deletes all the principal's buckets. Bonus: also fixes the max=0 edge (now
   denies the 1st call). 30 rate-consumer tests green (net_guard/queue/tcp/udp).
+- 2026-06-12 (iter 96 cont): **FIXED wb-8w8x items: storage KEY cap + per-tenant BYTE quota (MEDIUM).** Key
+  size was unbounded (multi-MB keys) and the quota counted ENTRIES not bytes (10k × 1MB = 10GB/tenant).
+  StorageBroker.put now caps byte_size(key) (@max_key_bytes 1024 -> :key_too_large) and enforces a per-tenant
+  TOTAL-BYTE quota (@max_tenant_bytes 64MiB via a SUM(LENGTH(value)) query). 9 storage tests green.

@@ -15,6 +15,10 @@ defmodule Workbooks.StorageBroker do
 
   @max_value 1024 * 1024
   @max_keys 10_000
+  # wb-8w8x: the KEY was unbounded (a guest could store a multi-MB key) and the quota counted ENTRIES, not
+  # bytes (10k keys × 1MB = 10GB per tenant). Cap key size + a per-tenant TOTAL-BYTE quota.
+  @max_key_bytes 1024
+  @max_tenant_bytes 64 * 1024 * 1024
 
   @doc "Open (and migrate) the durable store at `path`. `:memory:` for tests that don't need persistence."
   def open(path) do
@@ -39,6 +43,8 @@ defmodule Workbooks.StorageBroker do
       when is_binary(tenant) and is_binary(key) and is_binary(value) do
     max_value = Keyword.get(opts, :max_value, @max_value)
     max_keys = Keyword.get(opts, :max_keys, @max_keys)
+    max_key = Keyword.get(opts, :max_key_bytes, @max_key_bytes)
+    max_tenant = Keyword.get(opts, :max_tenant_bytes, @max_tenant_bytes)
 
     cond do
       Workbooks.Revocation.revoked?(tenant) ->
@@ -48,11 +54,20 @@ defmodule Workbooks.StorageBroker do
       key == "" or tenant == "" ->
         {:error, :invalid_key}
 
+      byte_size(key) > max_key ->
+        Workbooks.BrokerAudit.record(:storage, :deny, :key_too_large)
+        {:error, :key_too_large}
+
       byte_size(value) > max_value ->
         Workbooks.BrokerAudit.record(:storage, :deny, :value_too_large)
         {:error, :value_too_large}
 
       not exists?(conn, tenant, key) and count(conn, tenant) >= max_keys ->
+        Workbooks.BrokerAudit.record(:storage, :deny, :quota_exceeded)
+        {:error, :quota_exceeded}
+
+      # per-tenant TOTAL-BYTE quota (conservative: counts the new value fully even on overwrite)
+      byte_total(conn, tenant) + byte_size(value) > max_tenant ->
         Workbooks.BrokerAudit.record(:storage, :deny, :quota_exceeded)
         {:error, :quota_exceeded}
 
@@ -128,6 +143,17 @@ defmodule Workbooks.StorageBroker do
 
   defp count(conn, tenant) do
     {:ok, stmt} = Sqlite3.prepare(conn, "SELECT COUNT(*) FROM wb_kv WHERE tenant = ?1")
+    :ok = Sqlite3.bind(stmt, [tenant])
+    {:row, [n]} = Sqlite3.step(conn, stmt)
+    Sqlite3.release(conn, stmt)
+    n
+  end
+
+  # total value-bytes stored for `tenant` (for the per-tenant byte quota)
+  defp byte_total(conn, tenant) do
+    {:ok, stmt} =
+      Sqlite3.prepare(conn, "SELECT COALESCE(SUM(LENGTH(value)), 0) FROM wb_kv WHERE tenant = ?1")
+
     :ok = Sqlite3.bind(stmt, [tenant])
     {:row, [n]} = Sqlite3.step(conn, stmt)
     Sqlite3.release(conn, stmt)
