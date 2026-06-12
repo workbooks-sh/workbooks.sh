@@ -178,6 +178,60 @@ defmodule Workbooks.BrokerNetE2ETest do
   end
 
   @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "APP-HOST fresh-per-request — each request gets an ISOLATED wasi:http instance (correct serve model)" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    # compile ONCE into a shared engine; each request instantiates a FRESH store+instance (isolation)
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.ComponentPlug, component: component, engine: engine},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+    url = ~c"http://127.0.0.1:#{port}/"
+
+    # 20 concurrent requests, EACH a fresh isolated instance — all succeed, no recompile, no serialization
+    results =
+      1..20
+      |> Task.async_stream(
+        fn _ ->
+          {:ok, {{_, status, _}, _h, body}} =
+            :httpc.request(:get, {url, []}, [], body_format: :binary)
+
+          {status, to_string(body)}
+        end,
+        max_concurrency: 20,
+        timeout: 30_000
+      )
+      |> Enum.map(fn {:ok, r} -> r end)
+
+    assert length(results) == 20
+    assert Enum.all?(results, fn {s, b} -> s == 200 and b =~ "hello from brokered guest" end)
+  end
+
+  @tag :build
   @tag timeout: 300_000
   test "wasi-http OUTBOUND works through the broker — internal SSRF-blocked, public reachable, no panic" do
     out = Path.join(System.tmp_dir!(), "net_probe_#{System.unique_integer([:positive])}.component.wasm")

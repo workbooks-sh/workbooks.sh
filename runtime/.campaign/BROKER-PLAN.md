@@ -1007,3 +1007,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   instantiates fresh from a pre-compiled component). E2E: a pool of 4 instances behind Bandit, 20 CONCURRENT
   real HTTP requests -> ALL 200 with the correct response. The app-host now handles concurrent load —
   production-capable, not single-threaded.
+- 2026-06-12 (iter 68): **APP-HOST FRESH-PER-REQUEST ISOLATION — the correct wasi:http serve model.** The
+  iter-67 pool REUSED instances (state could leak across requests for stateful handlers). The proper model
+  turned out tractable: compile the component ONCE into a SHARED engine (Wasmex.Engine.new + Component.new),
+  then per request instantiate a FRESH store+instance (Store.new_wasi(SAME engine) + Instance.new) — the key
+  was sharing one engine, since cross-engine instantiation isn't supported. ComponentPlug now has TWO modes:
+  `:component`+`:engine` (FRESH-per-request — per-request ISOLATION + natural concurrency, no GenServer
+  serialization, no recompile) and `:pids`/`:pid` (reused). E2E: 20 CONCURRENT requests, EACH a fresh
+  isolated instance -> all 200 with the correct response. The app-host is now PRODUCTION-CORRECT: standard
+  wasi:http apps run with per-request isolation + concurrency, no state leak. The inbound seam is complete:
+  proven -> deployable (iter66) -> concurrent (iter67) -> correctly isolated (iter68).

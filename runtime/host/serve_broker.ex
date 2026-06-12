@@ -225,22 +225,12 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
 
   @impl true
   def call(conn, opts) do
-    # CONCURRENCY: each Components instance serializes its own requests (a GenServer.call), so a single pid
-    # is a single-threaded server. A `:pids` POOL spreads requests across N instances for N-way concurrency.
-    # (Instances are reused across requests; well-behaved stateless handlers are the assumption — for strict
-    # per-request isolation, a future variant would instantiate fresh from a pre-compiled component.)
-    pid =
-      case Keyword.get(opts, :pids) do
-        [_ | _] = pids -> Enum.random(pids)
-        _ -> Keyword.fetch!(opts, :pid)
-      end
-
     max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
 
     # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
     case read_body(conn, length: max_req) do
       {:ok, body, conn} ->
-        case Wasmex.Components.serve_http(pid, conn.method, conn.request_path, conn.req_headers, body) do
+        case dispatch(opts, conn, body) do
           {status, headers, resp_body} when is_integer(status) ->
             conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
             send_resp(conn, status, resp_body)
@@ -251,6 +241,36 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
 
       {:more, _partial, conn} ->
         send_resp(conn, 413, "request too large")
+    end
+  end
+
+  # Two modes:
+  #  * `:component` (+ `:engine`) — FRESH-PER-REQUEST: instantiate a fresh store+instance from the
+  #    pre-compiled component for each request. Correct wasi:http serve model — per-request ISOLATION (no
+  #    state leak) + natural concurrency (each request its own instance, no GenServer serialization).
+  #  * `:pids` / `:pid` — REUSED instances (a pool or single). Cheaper, fine for stateless handlers.
+  defp dispatch(opts, conn, body) do
+    case Keyword.get(opts, :component) do
+      nil ->
+        pid =
+          case Keyword.get(opts, :pids) do
+            [_ | _] = pids -> Enum.random(pids)
+            _ -> Keyword.fetch!(opts, :pid)
+          end
+
+        Wasmex.Components.serve_http(pid, conn.method, conn.request_path, conn.req_headers, body)
+
+      component ->
+        engine = Keyword.fetch!(opts, :engine)
+        wasi = Keyword.get(opts, :wasi_options, %Wasmex.Wasi.WasiP2Options{allow_http: true})
+
+        try do
+          {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+          {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+          Wasmex.Components.Instance.serve_http(instance, conn.method, conn.request_path, conn.req_headers, body)
+        rescue
+          e -> {:error, Exception.message(e)}
+        end
     end
   end
 end
