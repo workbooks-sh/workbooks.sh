@@ -54,6 +54,11 @@
     '.nav .drop .panel .nbempty { font: 400 10.5px var(--mono, monospace); color: var(--dim, #565b54); padding: 8px 10px; }',
     '.nav .drop .panel .subbody { max-height: 340px; overflow-y: auto; }',
     '.nav .drop .panel a.soon { opacity: .45; cursor: default; }',
+    '.nav .drop .panel [data-lessons] a { position: relative; }',
+    '.nav .drop .panel [data-lessons] a.on { background: rgba(18,19,22,.07);',
+    '  margin-right: -24px; padding-right: 34px; border-radius: 7px 0 0 7px; }',
+    '.nav .drop .panel [data-lessons] a.on::after { content: "→"; position: absolute; right: 12px; top: 50%;',
+    '  transform: translateY(-50%); font-weight: 700; color: var(--bloom-d, #149157); }',
     '.nav .drop .panel a.soon:hover { background: none; }',
     '.nav .drop .panel a.viewall { justify-content: center; font-size: 10.5px; color: var(--dim, #565b54); }',
     '.nav .drop .panel a.viewall:hover { color: var(--ink, #121316); }',
@@ -172,10 +177,22 @@
           '<div class="nbempty">deep dives appear here as the shelf grows</div>';
       }
       showRecent();
+      function clearPin() {
+        host.querySelectorAll("a.on").forEach(function (x) { x.classList.remove("on"); });
+      }
       host.querySelectorAll("a[data-slug]").forEach(function (a) {
-        a.addEventListener("mouseenter", function () { showSubs(a.dataset.slug); });
+        a.addEventListener("mouseenter", function () {
+          clearPin();
+          a.classList.add("on");
+          showSubs(a.dataset.slug);
+        });
       });
-      nav.querySelector("[data-lessons]").addEventListener("mouseleave", showRecent);
+      // the selection survives the trip across to the deep-dives panel;
+      // it resets only when the cursor leaves the dropdown entirely
+      host.closest(".panel").addEventListener("mouseleave", function () {
+        clearPin();
+        showRecent();
+      });
     })
     .catch(function () {});
 
