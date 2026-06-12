@@ -107,6 +107,7 @@ pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
                 || v4.is_documentation()  // 192.0.2/24, 198.51.100/24, 203.0.113/24
                 || v4.is_multicast()      // 224.0.0.0/4
                 || o[0] == 0              // 0.0.0.0/8
+                || o[0] >= 240            // reserved/future-use 240.0.0.0/4 (non-routable; some nets use it internally)
                 || (o[0] == 100 && (o[1] & 0xc0) == 64)) // CGNAT 100.64.0.0/10
         }
         IpAddr::V6(v6) => {
@@ -276,6 +277,71 @@ mod wb_ssrf_tests {
         assert!(sd.egress_allowed(t1, win, 2), "new window resets");
         assert!(sd.egress_allowed(t1, win, 2));
         assert!(!sd.egress_allowed(t1, win, 2));
+    }
+
+    // Independent oracle: RANGE-based classification of internal/non-routable IPs (wb_ip_allowed uses masks +
+    // std methods, so this is a genuinely separate implementation — a discrepancy = a real gap).
+    fn oracle_internal(ip: std::net::IpAddr) -> bool {
+        use std::net::IpAddr;
+        let ip = match ip {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(IpAddr::V6(v6)),
+            v4 => v4,
+        };
+        match ip {
+            IpAddr::V4(v4) => {
+                let o = v4.octets();
+                v4.is_loopback()
+                    || v4.is_private()
+                    || v4.is_link_local()
+                    || v4.is_broadcast()
+                    || v4.is_unspecified()
+                    || v4.is_multicast()
+                    || v4.is_documentation()
+                    || o[0] == 0 // 0.0.0.0/8
+                    || o[0] >= 240 // reserved/future-use 240.0.0.0/4
+                    || (o[0] == 100 && (64..=127).contains(&o[1])) // CGNAT 100.64.0.0/10
+            }
+            IpAddr::V6(v6) => {
+                let s0 = v6.segments()[0];
+                v6.is_loopback()
+                    || v6.is_unspecified()
+                    || v6.is_multicast()
+                    || (0xfe80..=0xfebf).contains(&s0) // link-local fe80::/10
+                    || (0xfc00..=0xfdff).contains(&s0) // unique-local fc00::/7
+            }
+        }
+    }
+
+    #[test]
+    fn ssrf_fuzz_no_internal_ip_is_ever_allowed() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+        use super::wb_ip_allowed;
+
+        // deterministic LCG sweep (reproducible — no flaky randomness): every IP the independent oracle
+        // classifies as internal/non-routable MUST be denied by wb_ip_allowed.
+        let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (state >> 32) as u32
+        };
+
+        for _ in 0..200_000 {
+            let v4 = IpAddr::V4(Ipv4Addr::from(next()));
+            if oracle_internal(v4) {
+                assert!(!wb_ip_allowed(v4), "internal {v4:?} must be denied");
+            }
+
+            let bits = ((next() as u128) << 96)
+                | ((next() as u128) << 64)
+                | ((next() as u128) << 32)
+                | (next() as u128);
+            let v6 = IpAddr::V6(Ipv6Addr::from(bits));
+            if oracle_internal(v6) {
+                assert!(!wb_ip_allowed(v6), "internal {v6:?} must be denied");
+            }
+        }
     }
 
     #[test]

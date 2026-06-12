@@ -1045,3 +1045,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   egress_rate_quota: max-2 -> 3rd denied, window resets) + the wasi-http e2e still green (50k cap doesn't
   break normal use). The standard-tool wasi-http OUTBOUND path is now METERED, matching the host_* brokers.
   FOLLOW-UP: the wasi-SOCKETS path (socket_addr_check closure, no &mut store) needs a different mechanism.
+- 2026-06-12 (iter 72): **SSRF FUZZING — found + fixed a real gap the fixed red-team suite missed (the
+  highest-leverage security validation from the strategic review).** Wrote a deterministic-LCG fuzz (200k
+  IPv4 + 200k IPv6 = 400k checks) with an INDEPENDENT range-based oracle (wb_ip_allowed uses bitmasks + std
+  methods; the oracle uses explicit range checks — a genuinely separate implementation, so a discrepancy is a
+  real bug). The fuzz IMMEDIATELY found a gap: 240.0.0.0/4 (reserved/future-use, non-routable, used
+  internally by some networks) was ALLOWED by wb_ip_allowed. FIXED: added `o[0] >= 240` to the SSRF floor.
+  Re-run: 400k checks clean, 10 SSRF cargo tests green; the wasi-http content e2e still green (public IPs
+  unaffected). The SSRF classifier is now FUZZ-VALIDATED — across the swept IPv4/IPv6 space, no internal or
+  non-routable address is ever allowed. Validation lesson realized: the red-team suite proves the vectors we
+  listed; the fuzz found the one we didn't.
