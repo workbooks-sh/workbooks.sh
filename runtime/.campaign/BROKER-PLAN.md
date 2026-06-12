@@ -1173,3 +1173,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   polling the handle future and the body stream together). Reverted the multi-frame probe; the working small-
   body streaming (iter83) stands. wb-t3sq updated with the async requirement; larger bodies use buffered
   serve_http (16 MiB cap) until async lands. HONEST: streaming is delivered for the common case, not unbounded.
+- 2026-06-12 (iter 85): **FEASIBILITY RE-RUN CONCLUSION + a real DoS finding.** (1) Re-ran the feasibility
+  pass (resolved.json: 32 live / 61 reachable / 262 impossible / 1 deferred). The 61 "reachable" all have
+  their NETWORK blocker REMOVED by the broker work (lane=none -> need a per-tool wasm build to go LIVE =
+  per-tool grind, not new capability). The 262 "impossible" are BUILD/toolchain-blocked (native OCaml/Haskell
+  compilers, wasm-bindgen JS-host modules, no wasm32-wasi build) — networking CANNOT reclaim them. So
+  networking's reclamation is COMPLETE; the next frontiers are NON-networking (more compiler-in-wasm build
+  lanes, a JS-host WASM-engine lane, or deep caps threads/GPU). (2) DoS FINDING (wb-95o6, P1): the synchronous
+  serve model — BOTH buffered serve_http AND streaming serve_http_stream — DEADLOCKS on a response body over
+  the wasi-http output buffer (handle.call blocks the guest on write-backpressure; the host reads only AFTER
+  handle.call returns, so it never returns). Confirmed iter84 (256KB -> 300s timeout). The Elixir-level
+  timeouts stop the request hanging forever, but the blocked DirtyCpu NIF thread LEAKS (flood = dirty-
+  scheduler exhaustion). The 16MiB cap is ineffective (after the deadlock). FIX: async serve (proper; also
+  unlocks unbounded streaming) or epoch-interruption deadline (safety) — both cross-cutting, scoped in wb-95o6.
