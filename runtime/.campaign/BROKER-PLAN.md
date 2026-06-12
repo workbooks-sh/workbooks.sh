@@ -895,3 +895,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   Wrote the canonical "Security audit" section in BROKER-CAPABILITIES.md (gaps found+fixed + verified-clean).
   The audit pass (iters 53-56) found the real gaps (latent rate, batch amplification, inbound race) and
   confirmed the rest is sound. NEXT (iter 57): the inbound seam (wb-py4k, focused-session NIF).
+- 2026-06-12 (iter 57): **inbound-seam COMPLETE RECIPE captured + wasi-path-rate residual filed.** Confirmed
+  the exact wasmtime-wasi-http 39 signatures (new_incoming_request<B>(scheme, hyper::Request<B>) ->
+  Resource<HostIncomingRequest>; new_response_outparam(oneshot::Sender<Result<Response,ErrorCode>>)). The NIF
+  is ~100+ LOC across unfamiliar APIs (BoxBody body plumbing, resource->Val conversion, async body collect) —
+  MORE than one loop-fire's compile-iteration budget converges, and a half-written NIF breaks the whole crate
+  build (forces revert). Wrote the full 7-step recipe + imports + risk-list into wb-py4k so a DEDICATED fire
+  executes it directly. Filed wb-um2g: the standard wasi path lacks a per-tenant rate quota (host_* brokers have
+  it; the wasi path is SSRF-safe but unmetered — naturally bounded by network latency / sandbox limits; LOWER
+  priority). NEXT (iter 58): DEDICATE the fire to writing the serve NIF + iterating compiles (recipe ready,
+  additive, revert-safe).
