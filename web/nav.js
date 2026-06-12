@@ -138,6 +138,21 @@
   var mount = document.getElementById("site-nav");
   if (mount) mount.replaceWith(nav);
 
+  fetch(root + "learn/lessons.json")
+    .then(function (r) { return r.json(); })
+    .then(function (cat) {
+      var host = nav.querySelector("[data-lessons]");
+      if (!host) return;
+      var html = "";
+      cat.tiers.forEach(function (tier, i) {
+        if (i > 0) html += '<div class="sep" aria-hidden="true"></div>';
+        html += '<div class="colhead">' + (i === 0 ? "lessons" : "") + ' <small>' + tier.title + "</small></div>";
+        tier.lessons.filter(function (l) { return l.status === "live"; }).forEach(function (l) { html += lessonRow(l); });
+      });
+      host.innerHTML = html;
+    })
+    .catch(function () {});
+
   nav.querySelectorAll(".drop > a").forEach(function (drop) {
     drop.addEventListener("click", function (e) {
       e.preventDefault();

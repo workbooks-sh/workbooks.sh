@@ -1,0 +1,26 @@
+{
+  "comment": "THE lesson catalog — single source of truth for nav, Lesson Center, audio, OG (epic wb-lplk). Tier 1 = the concepts; tier 2 = the constructs/primitives. status: live | planned. Sub-lessons nest under their parent and inherit its color.",
+  "tiers": [
+    {
+      "id": "concepts",
+      "title": "the concepts",
+      "lessons": [
+        { "slug": "workbook", "title": "Workbooks", "sub": "the unit",     "color": "#a8d4f0", "icon": "../wb-file-icon.svg",  "audio": true, "status": "live", "sublessons": [] },
+        { "slug": "nexus",    "title": "Nexus",     "sub": "the engine",   "color": "#aee5c2", "icon": "../nexus-icon.svg",    "audio": true, "status": "live", "sublessons": [] },
+        { "slug": "toolkit",  "title": "Toolkits",  "sub": "the parts",    "color": "#f3c5a3", "icon": "../toolkit-icon.svg",  "audio": true, "status": "live", "sublessons": [] }
+      ]
+    },
+    {
+      "id": "constructs",
+      "title": "the constructs",
+      "lessons": [
+        { "slug": "org",       "title": "Org",       "sub": "the grammar",  "color": "#f2ddb0", "icon": "icons/org.svg",       "audio": true, "status": "live",    "sublessons": [] },
+        { "slug": "agents",    "title": "Agents",    "sub": "the crew",     "color": "#9fc4e8", "icon": "icons/agents.svg",    "audio": true, "status": "live",    "sublessons": [] },
+        { "slug": "autopoet",  "title": "Autopoet",  "sub": "the gardener", "color": "#aee5c2", "icon": "icons/autopoet.svg",  "audio": true, "status": "live",    "sublessons": [] },
+        { "slug": "wbx",       "title": "wbx",       "sub": "the command",  "color": "#d9dbd3", "icon": "icons/wbx.svg",       "audio": true, "status": "live",    "sublessons": [] },
+        { "slug": "workflows", "title": "Workflows", "sub": "the plans",    "color": "#f2ddb0", "icon": "icons/workflows.svg", "audio": false, "status": "planned", "sublessons": [] },
+        { "slug": "vfs",       "title": "VFS",       "sub": "the disk",     "color": "#a8d4f0", "icon": "icons/vfs.svg",       "audio": false, "status": "planned", "sublessons": [] }
+      ]
+    }
+  ]
+}
