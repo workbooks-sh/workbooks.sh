@@ -667,6 +667,43 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # Oniguruma (regex engine — Ruby/PHP's). Provide a wasm32 config.h (regenc.h includes it
+  # unconditionally); the unicode *_data.c are #included by unicode.c (:include_only). `onig` = grep.
+  @onig_config ~S"""
+  #define HAVE_STDARG_H 1
+  #define HAVE_STDLIB_H 1
+  #define HAVE_STRING_H 1
+  #define HAVE_STRINGS_H 1
+  #define HAVE_INTTYPES_H 1
+  #define HAVE_STDINT_H 1
+  #define SIZEOF_INT 4
+  #define SIZEOF_LONG 4
+  #define SIZEOF_LONG_LONG 8
+  #define SIZEOF_VOIDP 4
+  #define HAVE_PROTOTYPES 1
+  #define HAVE_STDARG_PROTOTYPES 1
+  """
+  @onig_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include "oniguruma.h"
+  int main(int argc, char** argv) {
+    if (argc < 2) { fprintf(stderr, "usage: onig <pattern>\n"); return 1; }
+    OnigErrorInfo einfo; regex_t* reg;
+    UChar* pat = (UChar*)argv[1];
+    if (onig_new(&reg, pat, pat + strlen(argv[1]), ONIG_OPTION_DEFAULT, ONIG_ENCODING_UTF8, ONIG_SYNTAX_DEFAULT, &einfo) != ONIG_NORMAL) { fprintf(stderr, "bad pattern\n"); return 1; }
+    OnigRegion* region = onig_region_new();
+    char line[8192];
+    while (fgets(line, sizeof(line), stdin)) {
+      size_t len = strlen(line); if (len && line[len - 1] == '\n') line[--len] = 0;
+      UChar* s = (UChar*)line;
+      if (onig_search(reg, s, s + len, s, s + len, region, ONIG_OPTION_NONE) >= 0) printf("%s\n", line);
+    }
+    onig_region_free(region, 1); onig_free(reg); onig_end();
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -794,6 +831,18 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "onig",
+      url: "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz",
+      sha: "2a5cfc5ae259e4e97f86b68dfffc152cdaffe94e2060b770cb827238d769fc05",
+      build_opts: [
+        src_globs: ["src/*.{c,h}"],
+        exclude: ~w(mktable.c),
+        include_only: ~w(unicode_egcb_data.c unicode_fold_data.c unicode_property_data_posix.c unicode_property_data.c unicode_wb_data.c),
+        cflags: ["-I/work/src"],
+        extra_sources: [{"src/config.h", @onig_config}, {"onigmain.c", @onig_main}]
+      ]
     },
     %{
       name: "expat",

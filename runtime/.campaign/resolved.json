@@ -860,6 +860,13 @@
 "lane": "none",
 "blocker": "Network-as-purpose + WASIX-only. WinterJS is a Service-Worker HTTP server whose reason to exist is serving fetch events over the network (`--net` mandatory). It targets Wasmer's WA",
 "extent": "off-the-table (verified)"
+},
+"Oniguruma": {
+"verdict": "live",
+"lane": "B",
+"recipe": "oniguruma 6.9.10 src/*.c + wasm32 config.h + unicode *_data.c :include_only + grep main",
+"smoke": "'^b' => banana,blueberry",
+"extent": "full Oniguruma regex (Ruby/PHP's engine); onig cmd = grep"
 }
 },
 "preliminary": {
@@ -1067,14 +1074,6 @@
 "source_url": "https://github.com/google/re2",
 "recipe": "Lane B (C++/libc++). Prebuilt npm `re2-wasm@1.0.2` is NOT plain wasm32-wasi \u2014 its build/wasm/re2.wasm imports emscripten+embind (`emscripten",
 "confidence": "medium",
-"verified": false
-},
-"Oniguruma": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/kkos/oniguruma",
-"recipe": "Lane B (self-contained C). Vendor src/*.c from kkos/oniguruma: core regparse.c regcomp.c regexec.c regenc.c regsyntax.c regerror.c regext.c ",
-"confidence": "high",
 "verified": false
 },
 "Apache Arrow": {
