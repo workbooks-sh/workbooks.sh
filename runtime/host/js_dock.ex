@@ -41,7 +41,7 @@ defmodule Workbooks.JsDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdin: si, stdout: so},
-               imports: %{"env" => env(profile, vfs, Workbooks.Tenant.resolve(opts))}
+               imports: %{"env" => env(profile, vfs, Workbooks.Tenant.resolve(opts), Keyword.get(opts, :net_allow, nil))}
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)
@@ -64,7 +64,7 @@ defmodule Workbooks.JsDock do
   # All three host fns are ALWAYS bound (the harness imports them unconditionally); each enforces
   # its own cap and returns -1 when denied → JS sees null/false. Egress is host-brokered (:httpc,
   # the wasm never opens a socket); VFS is the Instance's sandboxed KV store (no host FS reach).
-  defp env(profile, vfs, tenant) do
+  defp env(profile, vfs, tenant, net_allow) do
     allow_http = Policy.allow_http?(profile)
     allow_exec = "exec" in Policy.caps(profile)
     allow_kv = "kv" in Policy.caps(profile)
@@ -81,7 +81,7 @@ defmodule Workbooks.JsDock do
              url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
 
              # wb-broker SSRF floor on the host-mediated path (same as rust_dock).
-             case Workbooks.NetGuard.get(url, principal: tenant) do
+             case Workbooks.NetGuard.get(url, principal: tenant, allow: net_allow) do
                {:ok, body} ->
                  n = min(byte_size(body), max(out_cap, 0))
                  :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
@@ -178,7 +178,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_tcp,
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
-                {:ok, resp} <- Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
+                {:ok, resp} <- Workbooks.TcpBroker.request(host, port, req, principal: tenant, allow: net_allow) do
              n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
@@ -193,7 +193,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_udp,
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl),
-                {:ok, resp} <- Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
+                {:ok, resp} <- Workbooks.UdpBroker.request(host, port, dgram, principal: tenant, allow: net_allow) do
              n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
@@ -208,7 +208,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_tls,
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
-                {:ok, resp} <- Workbooks.TlsBroker.request(host, port, req, principal: tenant) do
+                {:ok, resp} <- Workbooks.TlsBroker.request(host, port, req, principal: tenant, allow: net_allow) do
              n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n

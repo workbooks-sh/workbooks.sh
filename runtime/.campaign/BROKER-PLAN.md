@@ -1409,3 +1409,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasi-http OUTBOUND + RED-TEAM holistic + content tests all still green. ALL audit findings with a clear fix
   are now CLOSED (CRITICAL + 2 HIGH + every MEDIUM/LOW). Remaining: the dock allow-list scope-threading
   (follow-on wiring) + wb-ltum (minimal-caps design decision, owner's call).
+- 2026-06-12 (iter 104): **DOCK ALLOW-LIST SCOPE-THREADING — the per-instance net allow-list is now ENFORCED
+  end-to-end (closes the wb-8w8x follow-on).** The socket-broker :allow param (iter99) + NetGuard :allow were
+  ENFORCEABLE but the docks never passed a scope (called brokers with principal: only). Added a :net_allow
+  opt threaded through BOTH docks: rust_dock imports/1 + run/2 and js_dock env/run pass `allow: net_allow` to
+  every net broker (NetGuard.get x2, Tcp/Udp/TlsBroker.request). nil = no scoping (no regression). PROVEN
+  end-to-end: the SAME network guest run with net_allow ["only-this-host.invalid"] is CONFINED — host_http_get
+  to example.com returns denied (bytes_gt0=false) BEFORE any socket; without net_allow it fetches normally.
+  Also fixed a residual "default" tenant in RustDock.run (missed in iter100) -> now nil -> unique ephemeral.
+  20 dock/tenant tests green. So a caller can now confine a guest's destinations to a granted {host,port} list
+  across HTTP + raw TCP/UDP/TLS, enforced by the host. The audit's last follow-on item is closed; only wb-ltum
+  (minimal-caps DESIGN decision, owner's call) remains.

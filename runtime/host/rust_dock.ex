@@ -27,18 +27,21 @@ defmodule Workbooks.RustDock do
     caps = Policy.caps(profile)
     vfs = Keyword.get(opts, :vfs)
     tenant = Workbooks.Tenant.resolve(opts)
+    # per-instance egress SCOPE (wb-8w8x): a granted {host,port} allow-list confining ALL net brokers. nil =
+    # no extra scoping (the SSRF floor still applies). The caller passes it to confine a guest's destinations.
+    net_allow = Keyword.get(opts, :net_allow, nil)
 
     env =
       ambient()
-      |> maybe(Policy.allow_http?(profile), fn -> egress(tenant) end)
+      |> maybe(Policy.allow_http?(profile), fn -> egress(tenant, net_allow) end)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
       |> maybe("exec" in caps, fn -> exec_caps(tenant) end)
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
       |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
       |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
-      |> maybe("tcp" in caps, fn -> tcp_caps(tenant) end)
-      |> maybe("udp" in caps, fn -> udp_caps(tenant) end)
-      |> maybe("tls" in caps, fn -> tls_caps(tenant) end)
+      |> maybe("tcp" in caps, fn -> tcp_caps(tenant, net_allow) end)
+      |> maybe("udp" in caps, fn -> udp_caps(tenant, net_allow) end)
+      |> maybe("tls" in caps, fn -> tls_caps(tenant, net_allow) end)
 
     %{"env" => env}
   end
@@ -94,7 +97,7 @@ defmodule Workbooks.RustDock do
 
   # UDP send/recv — merged on the "udp" cap. The host opens the socket (resolve-then-pinned, SSRF-safe),
   # sends the datagram, returns the first reply. For DNS/NTP/STUN/etc.
-  defp udp_caps(tenant) do
+  defp udp_caps(tenant, net_allow) do
     %{
       # host_udp(host_ptr,host_len, port, dgram_ptr,dgram_len, out_ptr,out_cap) -> i32 : reply len (-1 denied)
       "host_udp" =>
@@ -103,7 +106,7 @@ defmodule Workbooks.RustDock do
            host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
            dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
 
-           case Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
+           case Workbooks.UdpBroker.request(host, port, dgram, principal: tenant, allow: net_allow) do
              {:ok, resp} ->
                n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
@@ -118,7 +121,7 @@ defmodule Workbooks.RustDock do
 
   # Brokered TLS request/response — merged on the "tls" cap. The host does the TLS handshake (cert-verified,
   # resolve-then-pinned), so a crypto-less guest gets a secure channel (HTTPS, TLS line protocols).
-  defp tls_caps(tenant) do
+  defp tls_caps(tenant, net_allow) do
     %{
       # host_tls(host_ptr,host_len, port, req_ptr,req_len, out_ptr,out_cap) -> i32 : reply len (-1 denied)
       "host_tls" =>
@@ -127,7 +130,7 @@ defmodule Workbooks.RustDock do
            host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl)
 
-           case Workbooks.TlsBroker.request(host, port, req, principal: tenant) do
+           case Workbooks.TlsBroker.request(host, port, req, principal: tenant, allow: net_allow) do
              {:ok, resp} ->
                n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
@@ -142,7 +145,7 @@ defmodule Workbooks.RustDock do
 
   # Raw-TCP request/response — merged on the "tcp" cap. The host opens the (resolve-then-pinned, SSRF-safe)
   # connection; the guest never touches a socket. Tenant = revocation/rate principal.
-  defp tcp_caps(tenant) do
+  defp tcp_caps(tenant, net_allow) do
     %{
       # host_tcp(host_ptr,host_len, port, req_ptr,req_len, out_ptr,out_cap) -> i32 : response len (-1 denied).
       "host_tcp" =>
@@ -151,7 +154,7 @@ defmodule Workbooks.RustDock do
            host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl)
 
-           case Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
+           case Workbooks.TcpBroker.request(host, port, req, principal: tenant, allow: net_allow) do
              {:ok, resp} ->
                n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
@@ -278,7 +281,13 @@ defmodule Workbooks.RustDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdout: so},
-               imports: imports(profile: profile, vfs: vfs, tenant: Keyword.get(opts, :tenant, "default"))
+               imports:
+                 imports(
+                   profile: profile,
+                   vfs: vfs,
+                   tenant: Keyword.get(opts, :tenant),
+                   net_allow: Keyword.get(opts, :net_allow)
+                 )
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)
@@ -316,7 +325,7 @@ defmodule Workbooks.RustDock do
 
   # Egress — ONLY merged when Policy.allow_http? (net/browse profile). Untrusted Rust on a
   # minimal/non-net profile never gets this import → no host-mediated network.
-  defp egress(principal) do
+  defp egress(principal, net_allow) do
     %{
       # host_http_get(url_ptr,url_len, out_ptr,out_cap) -> i32 : host reads URL from wasm mem,
       # BEAM HTTP GET (the IO wasm cant do), writes body into out buffer, returns body len
@@ -327,7 +336,7 @@ defmodule Workbooks.RustDock do
            url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
 
            # wb-broker SSRF floor: deny internal/sensitive destinations BEFORE the socket opens.
-           case Workbooks.NetGuard.get(url, principal: principal) do
+           case Workbooks.NetGuard.get(url, principal: principal, allow: net_allow) do
              {:ok, body} ->
                n = min(byte_size(body), max(out_cap, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
@@ -366,7 +375,7 @@ defmodule Workbooks.RustDock do
              |> Task.async_stream(
                fn url ->
                  # wb-broker SSRF floor applies per-URL in the concurrent batch too.
-                 case Workbooks.NetGuard.get(url, principal: principal) do
+                 case Workbooks.NetGuard.get(url, principal: principal, allow: net_allow) do
                    {:ok, body} -> body
                    {:error, _} -> :error
                  end

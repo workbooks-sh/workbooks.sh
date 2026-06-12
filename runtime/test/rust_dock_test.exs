@@ -61,6 +61,12 @@ fn main(){
       {:ok, out} -> assert String.trim(out) == "bytes_gt0=true has_example=true"
       {:error, reason} -> IO.puts("\n[skip] http (network-less CI?): #{inspect(reason) |> String.slice(0, 80)}")
     end
+
+    # wb-8w8x: the SAME guest run with a :net_allow that does NOT include example.com must be CONFINED — the
+    # dock threads the scope into NetGuard, which denies the off-list host BEFORE any socket (hermetic-safe:
+    # denied without network). Proves the per-instance allow-list is enforced END-TO-END from the dock.
+    assert {:ok, confined} = RustDock.run(w, profile: :network, net_allow: ["only-this-host.invalid"])
+    assert String.trim(confined) == "bytes_gt0=false has_example=false"
   end
 
   test "least-privilege: dedicated exec/kv caps gate the brokers (compute profile is denied them)" do
