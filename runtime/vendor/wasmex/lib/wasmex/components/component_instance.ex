@@ -50,6 +50,33 @@ defmodule Wasmex.Components.Instance do
     )
   end
 
+  @doc """
+  Drive a guest that exports `wasi:http/incoming-handler` with a synthesized request — the inbound
+  standard-component seam (wb-py4k). Returns `{status, headers, body}` (body as a binary).
+  """
+  def serve_http(
+        %__MODULE__{store_resource: store_resource, instance_resource: instance_resource},
+        method,
+        uri,
+        headers,
+        body
+      ) do
+    case Wasmex.Native.component_serve_http(
+           store_resource,
+           instance_resource,
+           method,
+           uri,
+           headers,
+           body
+         ) do
+      {status, hdrs, body_bytes} when is_integer(status) and is_list(body_bytes) ->
+        {status, hdrs, :erlang.list_to_binary(body_bytes)}
+
+      other ->
+        other
+    end
+  end
+
   defp parse_function_path(path) when is_binary(path), do: [path]
   defp parse_function_path(path) when is_atom(path), do: [Atom.to_string(path)]
 

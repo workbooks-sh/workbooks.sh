@@ -915,3 +915,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   The hard part — driving a STANDARD wasi:http server component from wasmex's SYNC engine — is DONE.
   REMAINING (iter 59): a Wasmex.Components.serve_http helper (GenServer handle_call -> the NIF) + a cargo-
   component wasi:http server guest (exports wasi:http/incoming-handler) + the e2e. Down to Elixir plumbing.
+- 2026-06-12 (iter 59): **inbound-seam Elixir plumbing wired (compiling) — guest WIT-resolution in progress.**
+  Added Wasmex.Components.serve_http(pid, method, uri, headers, body) -> GenServer handle_call ->
+  Wasmex.Components.Instance.serve_http -> Native.component_serve_http (the iter-58 NIF), returning
+  {status, headers, body} (body list->binary). Compiles, 3 tests green, no regression. GUEST: located the
+  wasi:http proxy world (deps/http/proxy.wit, wasi:http@0.2.6, in the wasmtime-wasi-http crate's wit/), but
+  jco --world-name needs the fully-qualified world + the full dep tree resolvable (proxy depends on wasi:io/
+  clocks/etc.) — a WIT-resolution detail. NEXT: nail the guest (jco qualified world OR a wrapper WIT) + the
+  serve_http e2e.

@@ -253,6 +253,14 @@ defmodule Wasmex.Components do
     GenServer.call(pid, {:call_function, name_or_path, params}, timeout)
   end
 
+  @doc """
+  Drive a guest exporting `wasi:http/incoming-handler` with a synthesized request (the inbound
+  standard-component seam). Returns `{status, headers, body}`.
+  """
+  def serve_http(pid, method, uri, headers \\ [], body \\ "", timeout \\ 15_000) do
+    GenServer.call(pid, {:serve_http, method, uri, headers, body}, timeout)
+  end
+
   @impl true
   def init(%{store: store, component: component, imports: imports} = state) do
     case Wasmex.Components.Instance.new(store, component, imports) do
@@ -272,6 +280,17 @@ defmodule Wasmex.Components do
       ) do
     :ok = Wasmex.Components.Instance.call_function(instance, name, params, from)
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_call(
+        {:serve_http, method, uri, headers, body},
+        _from,
+        %{instance: instance} = state
+      ) do
+    # the serve NIF is synchronous (returns {status, headers, body}); reply directly
+    result = Wasmex.Components.Instance.serve_http(instance, method, uri, headers, body)
+    {:reply, result, state}
   end
 
   @impl true
