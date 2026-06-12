@@ -5,8 +5,10 @@ defmodule Workbooks.RateLimiter do
   `window_ms`. The principal is the dock tenant (same identity used for revocation), so a runaway guest is
   throttled without affecting others.
 
-  Lazy public ETS; the read-then-bump is approximate under heavy concurrency — fine for a floor (the point
-  is to cap a runaway, not meter precisely). Uses monotonic time so it's immune to wall-clock jumps.
+  Lazy public ETS. wb-8w8x: the count is bumped ATOMICALLY via a time-bucketed `:ets.update_counter`, so
+  concurrent broker calls on one principal can't lose updates and undercount (the old read-then-bump did).
+  The bucket key `{principal, div(now, window)}` rolls each window — a fresh bucket auto-resets the count with
+  no race. Uses monotonic time so it's immune to wall-clock jumps.
   """
   @table :wb_ratelimit
 
@@ -19,26 +21,22 @@ defmodule Workbooks.RateLimiter do
   def default_quota, do: @default_quota
 
   @doc "Count a request for `principal`. :ok if within budget, {:error, :rate_limited} once over `max`/window."
-  def check(principal, max, window_ms) do
-    now = System.monotonic_time(:millisecond)
+  def check(principal, max, window_ms) when window_ms > 0 do
+    bucket = div(System.monotonic_time(:millisecond), window_ms)
+    key = {principal, bucket}
+    # ATOMIC increment (no read-then-bump race); a fresh bucket per window auto-resets the count.
+    count = :ets.update_counter(table(), key, {2, 1}, {key, 0})
+    # opportunistically drop the previous window's bucket so the table doesn't grow one entry per window
+    :ets.delete(table(), {principal, bucket - 1})
 
-    case :ets.lookup(table(), principal) do
-      [{_, count, start}] when now - start < window_ms ->
-        if count >= max do
-          {:error, :rate_limited}
-        else
-          :ets.insert(table(), {principal, count + 1, start})
-          :ok
-        end
-
-      _ ->
-        # no record, or the prior window has elapsed → start a fresh window
-        :ets.insert(table(), {principal, 1, now})
-        :ok
-    end
+    if count > max, do: {:error, :rate_limited}, else: :ok
   end
 
-  def reset(principal), do: :ets.delete(table(), principal) && :ok
+  def reset(principal) do
+    # the key is {principal, bucket}, so delete every bucket for this principal
+    :ets.match_delete(table(), {{principal, :_}, :_})
+    :ok
+  end
 
   defp table do
     case :ets.whereis(@table) do

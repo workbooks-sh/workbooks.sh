@@ -13,9 +13,10 @@ defmodule Workbooks.TcpBrokerTest do
   test "DEFAULT RATE FLOOR is enforced — a broker call with NO explicit :rate still throttles (DoS floor)" do
     {max, window} = Workbooks.RateLimiter.default_quota()
     p = "defrate-#{System.unique_integer([:positive])}"
-    # ensure the table exists, then pre-fill this tenant's counter to the default ceiling
+    # ensure the table exists, then pre-fill this tenant's CURRENT-window bucket to the ceiling
     Workbooks.RateLimiter.check(p, max, window)
-    :ets.insert(:wb_ratelimit, {p, max, System.monotonic_time(:millisecond)})
+    bucket = div(System.monotonic_time(:millisecond), window)
+    :ets.insert(:wb_ratelimit, {{p, bucket}, max})
 
     # NO :rate passed -> the broker falls back to the default floor -> rate-limited before the SSRF/connect
     assert {:error, :rate_limited} = TcpBroker.request("1.1.1.1", 80, "x", principal: p)

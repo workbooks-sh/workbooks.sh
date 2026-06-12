@@ -1316,3 +1316,9 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the host-lifetime ring AND before emitting it via :telemetry — so 128 ring entries × a multi-MB guest URL
   can't exhaust host memory. Test: a 100KB target -> stored <= 512 bytes. 6 broker_audit tests green. (Rest of
   the wb-8w8x batch + wb-an2v tenant-isolation continue next, severity order.)
+- 2026-06-12 (iter 96): **Audit remediation continues (wb-8w8x batch).** FIXED RateLimiter atomicity (LOW):
+  replaced the non-atomic lookup+insert read-then-bump with a time-bucketed :ets.update_counter
+  (key={principal, div(now, window)}). Concurrent broker fan-out can no longer lose updates/undercount; a
+  fresh bucket per window auto-resets the count; the previous bucket is opportunistically pruned (table doesn't
+  grow per-window); reset/1 match_deletes all the principal's buckets. Bonus: also fixes the max=0 edge (now
+  denies the 1st call). 30 rate-consumer tests green (net_guard/queue/tcp/udp).
