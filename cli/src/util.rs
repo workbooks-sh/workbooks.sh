@@ -78,3 +78,11 @@ pub fn app_dir() -> PathBuf {
         [&home, ".local", "share", "sh.workbooks"].iter().collect()
     }
 }
+
+/// Env lookup with the canonical prefix first: `WBX_<key>`, falling back to
+/// the legacy `WB_<key>`. Docs say WBX_*; both work.
+pub fn env_var(key: &str) -> Option<String> {
+    std::env::var(format!("WBX_{key}"))
+        .or_else(|_| std::env::var(format!("WB_{key}")))
+        .ok()
+}

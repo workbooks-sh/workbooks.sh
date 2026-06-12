@@ -11,7 +11,7 @@ use base64::Engine as _;
 
 /// Local/trusted runtimes scope to tenant "local"; override with WB_TENANT.
 fn tenant() -> String {
-    std::env::var("WB_TENANT").unwrap_or_else(|_| "local".into())
+    crate::util::env_var("TENANT").unwrap_or_else(|| "local".into())
 }
 
 // ── build / run (need the in-sandbox compiler toolchain → the engine) ──
@@ -214,7 +214,7 @@ pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
     let this = std::env::current_exe().ok().map(|p| p.display().to_string());
 
     // engine: discovery → well-known probe, classified not thrown
-    let engine_url = std::env::var("WB_ENGINE_URL").ok();
+    let engine_url = crate::util::env_var("ENGINE_URL");
     let (engine, engine_detail) = match rcp::call(io, "GET", "/.well-known/workbooks-runtime", None) {
         Ok(body) => ("reachable", body.chars().take(120).collect::<String>()),
         Err(e) => {

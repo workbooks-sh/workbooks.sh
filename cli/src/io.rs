@@ -58,7 +58,7 @@ mod native {
     /// Mirror of `Workbooks.Desktop.discovery_path/0`: WB_DESKTOP_DIR override,
     /// else the per-OS app-data `sh.workbooks/disco/runtime.json`.
     fn discovery_path() -> PathBuf {
-        if let Ok(d) = std::env::var("WB_DESKTOP_DIR") {
+        if let Some(d) = crate::util::env_var("DESKTOP_DIR") {
             return PathBuf::from(d).join("runtime.json");
         }
         crate::util::app_dir().join("disco").join("runtime.json")
@@ -110,9 +110,9 @@ mod native {
         fn http(&self, req: HttpReq) -> Result<String> {
             // Remote engine override: WB_ENGINE_URL (+ optional WB_ENGINE_TOKEN)
             // — the discovery file only knows about LOCAL engines.
-            if let Ok(base) = std::env::var("WB_ENGINE_URL") {
+            if let Some(base) = crate::util::env_var("ENGINE_URL") {
                 let url = format!("{}{}", base.trim_end_matches('/'), req.path);
-                let token = std::env::var("WB_ENGINE_TOKEN").ok();
+                let token = crate::util::env_var("ENGINE_TOKEN");
                 return request(req.method, &url, req.body.map(str::as_bytes), token.as_deref());
             }
             let d = discovery()?;

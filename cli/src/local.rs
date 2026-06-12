@@ -429,7 +429,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
                 "self-hosted" => {
                     let slug = std::path::Path::new(wb).file_stem().unwrap_or_default().to_string_lossy().to_string();
                     let base = project.trim_end_matches('/');
-                    let bearer = std::env::var("WB_PUBLISH_TOKEN").ok();
+                    let bearer = crate::util::env_var("PUBLISH_TOKEN");
                     io.http_url("PUT", &format!("{base}/w/{slug}"), Some(&html), bearer.as_deref())?;
                     format!("{base}/w/{slug}")
                 }
@@ -551,4 +551,84 @@ pub fn init(name: &str, template: &str) -> Result<String> {
 
 next: cd {name} && wbx dev"
     ))
+}
+
+// ─────────────────────────── ops ───────────────────────────
+
+/// `wbx open <file>` — the default browser, cross-platform.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn open(file: &str) -> Result<String> {
+    let p = std::path::Path::new(file);
+    if !p.exists() {
+        bail!("not found: {file}");
+    }
+    let target = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let status = if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(&target).status()
+    } else if cfg!(windows) {
+        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&target).status()
+    } else {
+        std::process::Command::new("xdg-open").arg(&target).status()
+    }
+    .context("launch opener")?;
+    if !status.success() {
+        bail!("opener exited with {status}");
+    }
+    Ok(format!("opened {}", target.display()))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn open(_file: &str) -> Result<String> {
+    bail!("`wbx open` needs the native binary")
+}
+
+/// `wbx upgrade` — replace this binary with the latest release.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn upgrade() -> Result<String> {
+    let exe = std::env::current_exe().context("locate current binary")?;
+    if exe.components().any(|c| c.as_os_str() == "node_modules") {
+        return Ok("installed via npm — upgrade with: npm update -g @work.books/cli".into());
+    }
+    let repo = crate::util::env_var("CLI_REPO").unwrap_or_else(|| "workbooks-sh/workbooks.sh".into());
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("wbx-upgrade")
+        .build()?;
+    let body = client
+        .get(format!("https://api.github.com/repos/{repo}/releases?per_page=30"))
+        .send()
+        .context("query releases")?
+        .text()?;
+    let rels: serde_json::Value = serde_json::from_str(&body).context("parse releases")?;
+    let tag = rels
+        .as_array()
+        .and_then(|a| {
+            a.iter()
+                .filter_map(|r| r["tag_name"].as_str())
+                .find(|t| t.starts_with("wbx-v"))
+        })
+        .context("no wbx-v* release found")?
+        .to_string();
+    let latest = tag.trim_start_matches("wbx-v");
+    if latest == env!("CARGO_PKG_VERSION") {
+        return Ok(format!("already current: wbx {latest}"));
+    }
+    let os = if cfg!(target_os = "macos") { "darwin" } else if cfg!(windows) { "windows" } else { "linux" };
+    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
+    let ext = if cfg!(windows) { ".exe" } else { "" };
+    let url = format!("https://github.com/{repo}/releases/download/{tag}/wbx-{os}-{arch}{ext}");
+    let bytes = client.get(&url).send().context("download")?.error_for_status()?.bytes()?;
+    let tmp = exe.with_extension("new");
+    std::fs::write(&tmp, &bytes).with_context(|| format!("write {}", tmp.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    }
+    std::fs::rename(&tmp, &exe).context("swap binary into place")?;
+    Ok(format!("upgraded: wbx {} → {latest}", env!("CARGO_PKG_VERSION")))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn upgrade() -> Result<String> {
+    bail!("`wbx upgrade` needs the native binary")
 }

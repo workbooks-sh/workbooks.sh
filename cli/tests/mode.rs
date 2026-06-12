@@ -151,3 +151,33 @@ fn agent_mode_deploy_init_never_prompts() {
     assert!(s.contains("local"), "agent default is local: {s}");
     assert!(dir.join("deployment.org").is_file());
 }
+
+#[test]
+fn status_is_the_landing_and_open_maps_not_found() {
+    let out = wbx().arg("status").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(v["version"].is_string());
+    // open on a missing file → exit 4 (not-found contract)
+    let out = wbx().args(["open", "/definitely/not/here.html"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(4));
+}
+
+#[test]
+fn wbx_env_aliases_win_over_wb() {
+    // WBX_ENGINE_URL preferred: point it at a dead port and watch the
+    // engine-unreachable class (3), proving the alias was read
+    let out = wbx()
+        .args(["--json", "rt", "status"])
+        .env("WBX_ENGINE_URL", "http://127.0.0.1:1")
+        .env("WB_ENGINE_URL", "http://127.0.0.1:2")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "dead engine maps to exit 3");
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("127.0.0.1:1"),
+        "WBX_ var must take precedence: {}",
+        v["error"]["message"]
+    );
+}

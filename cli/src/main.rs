@@ -40,6 +40,12 @@ enum Cmd {
     Dev { #[arg(default_value = ".")] src: String, #[arg(long)] port: Option<u16> },
     /// Environment + engine health report (always exits 0; agents get JSON via --json)
     Doctor,
+    /// Where am I — version, engine, workspace (same as bare `wbx`)
+    Status,
+    /// Open a workbook (or any file) in the default browser
+    Open { file: String },
+    /// Replace this binary with the latest release (npm installs: use npm)
+    Upgrade,
     /// Shell completions to stdout (bash | zsh | fish | elvish | powershell)
     Completions { shell: clap_complete::Shell },
     // ── source inspection (local, kernel) ──
@@ -200,22 +206,26 @@ fn main() {
     }
 }
 
+fn landing(io: &dyn io::Io, human: bool) -> Result<String> {
+    let mut out = commands::doctor(io, human)?;
+    if human {
+        out.push_str(
+            "\n\nstart here   wbx init <name> · wbx dev · wbx bundle\n\
+             the engine   wbx deploy local · wbx deploy status\n\
+             the parts    wbx toolkit list · wbx workbook list\n\
+             everything   wbx help",
+        );
+    }
+    Ok(out)
+}
+
 fn run(cli: Cli, human: bool) -> Result<String> {
     let io = io::platform();
     let io = io.as_ref();
 
     // bare `wbx` — the where-am-I landing, not a usage dump
     let Some(cmd) = cli.cmd else {
-        let mut out = commands::doctor(io, human)?;
-        if human {
-            out.push_str(
-                "\n\nstart here   wbx init <name> · wbx dev · wbx bundle\n\
-                 the engine   wbx deploy local · wbx deploy status\n\
-                 the parts    wbx toolkit list · wbx workbook list\n\
-                 everything   wbx help",
-            );
-        }
-        return Ok(out);
+        return landing(io, human);
     };
 
     let out = match cmd {
@@ -223,6 +233,9 @@ fn run(cli: Cli, human: bool) -> Result<String> {
         Cmd::Init { name, template } => local::init(&name, &template)?,
         Cmd::Dev { src, port } => dev::dev(&src, port)?,
         Cmd::Doctor => commands::doctor(io, human)?,
+        Cmd::Status => landing(io, human)?,
+        Cmd::Open { file } => local::open(&file)?,
+        Cmd::Upgrade => local::upgrade()?,
         Cmd::Completions { shell } => {
             use clap::CommandFactory;
             let mut buf = Vec::new();
