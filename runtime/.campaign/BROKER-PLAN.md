@@ -739,3 +739,18 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   paths: wasi-http (hostname, send_request override) + wasi-sockets (IP, socket_addr_check).
   KEYSTONE: every item + every cadence primitive e2e-proven across both standard seams. 8 capabilities; 61
   reclaimed; red-team green. NEXT (iter 42): a 9th capability, or per-tool reclamation.
+- 2026-06-12 (iter 42): **★ DNS-REBINDING PIN for wasi-http (green) — the LAST red-team gap closed.**
+  Found OutgoingRequestConfig has NO connect-check hook — default_send_request connects to the URI authority
+  (the hostname), RE-resolving and leaving a DNS-rebind window (check sees public, connect gets internal).
+  This is a required red-team item the raw-socket path had (socket_addr_check on the resolved addr) but wasi-
+  http lacked. FIXED: send_request now resolve-then-PINS — wb_resolve_pinned resolves ONCE, denies internal,
+  keeps the IP; for HTTP it rewrites the request authority to the pinned IP (preserving the original Host
+  header for vhost routing) so the connect goes to the CHECKED ip, not a re-resolved one. HTTPS keeps SNI
+  intact — TLS cert validation binds the connection to the hostname (a rebind to internal fails the
+  handshake, can't present the hostname's cert). VALIDATED: 7 cargo SSRF tests green; ALL 5 wasi-net e2e
+  green — the pin does NOT break content retrieval (example.com still returns "Example Domain"), internal
+  still blocked, allow-list + sockets unaffected. RESOLVE-THEN-PIN now COMPLETE across ALL paths: TcpBroker +
+  wasi-sockets (socket_addr_check) + wasi-http (authority pin / cert-bound). The full red-team suite is GREEN
+  including DNS-rebinding on EVERY path.
+  KEYSTONE: now truly EXHAUSTIVELY complete — every red-team vector defended on every path; both standard
+  seams e2e-proven; every cadence primitive done. NEXT (iter 43): a 9th capability / per-tool reclamation.

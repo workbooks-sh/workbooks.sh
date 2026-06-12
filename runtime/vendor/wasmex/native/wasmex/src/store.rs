@@ -45,6 +45,24 @@ pub(crate) fn wb_addr_in_scope(addr: std::net::SocketAddr, net_allow: &Option<Ve
     }
 }
 
+// Resolve `host` ONCE and return a single allowed (public) IP to PIN the wasi-http connection to — closing
+// the DNS-rebinding window (the host re-resolving between our check and the actual connect). None if it
+// doesn't resolve or ANY resolved address is internal/non-routable.
+pub(crate) fn wb_resolve_pinned(host: &str, port: u16) -> Option<std::net::IpAddr> {
+    use std::net::ToSocketAddrs;
+    match (host, port).to_socket_addrs() {
+        Ok(addrs) => {
+            let addrs: Vec<_> = addrs.collect();
+            if !addrs.is_empty() && addrs.iter().all(|a| wb_ip_allowed(a.ip())) {
+                Some(addrs[0].ip())
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
+    }
+}
+
 pub(crate) fn wb_addr_allowed(addr: std::net::SocketAddr) -> bool {
     wb_ip_allowed(addr.ip())
 }
@@ -357,16 +375,19 @@ impl WasiHttpView for ComponentStoreData {
                 ))));
             }
         };
-        let port = uri.port_u16().unwrap_or(match uri.scheme_str() {
-            Some("https") => 443,
-            _ => 80,
-        });
-        if !wb_host_allowed(&host, port) {
-            return Err(HttpError::from(ErrorCode::InternalError(Some(
-                "wb-broker: destination denied by egress policy (internal/non-routable address)"
-                    .to_string(),
-            ))));
-        }
+        let is_https = uri.scheme_str() == Some("https");
+        let port = uri.port_u16().unwrap_or(if is_https { 443 } else { 80 });
+
+        // Resolve ONCE + SSRF floor: deny if unresolvable or any resolved IP is internal; keep the pinned IP.
+        let pinned = match wb_resolve_pinned(&host, port) {
+            Some(ip) => ip,
+            None => {
+                return Err(HttpError::from(ErrorCode::InternalError(Some(
+                    "wb-broker: destination denied by egress policy (internal/non-routable address)"
+                        .to_string(),
+                ))))
+            }
+        };
         // Scoped allow-list (on top of the SSRF floor): if this instance was granted a non-empty list,
         // the destination host must match it. No list (None/empty) = no extra scoping.
         if let Some(list) = &self.net_allow {
@@ -374,6 +395,29 @@ impl WasiHttpView for ComponentStoreData {
                 return Err(HttpError::from(ErrorCode::InternalError(Some(
                     "wb-broker: destination not in the instance egress allow-list".to_string(),
                 ))));
+            }
+        }
+
+        // DNS-REBINDING PIN: connect to the IP we just checked, not the hostname (which default_send_request
+        // would RE-resolve, leaving a rebind window). For http, rewrite the authority to the pinned IP and
+        // keep the original Host header for vhost routing. For https we leave the SNI hostname intact —
+        // TLS cert validation already binds the connection to the hostname, so a rebind to an internal IP
+        // fails the handshake (it can't present the hostname's cert).
+        let mut request = request;
+        if !is_https {
+            if let Ok(hv) = hyper::header::HeaderValue::from_str(&host) {
+                request.headers_mut().insert(hyper::header::HOST, hv);
+            }
+            let auth_str = match pinned {
+                std::net::IpAddr::V6(v6) => format!("[{}]:{}", v6, port),
+                v4 => format!("{}:{}", v4, port),
+            };
+            if let Ok(authority) = auth_str.parse::<hyper::http::uri::Authority>() {
+                let mut parts = request.uri().clone().into_parts();
+                parts.authority = Some(authority);
+                if let Ok(new_uri) = hyper::Uri::from_parts(parts) {
+                    *request.uri_mut() = new_uri;
+                }
             }
         }
         Ok(default_send_request(request, config))
