@@ -2,9 +2,27 @@
 // site's root data source). Pages' own static copy is the FALLBACK: if the
 // origin errors or is unreachable, serve the last-published static tree.
 // x-wb-origin header says which plane answered. Epic wb-gnzy.
+const ASSET_RE = /\.(css|js|mjs|json|svg|png|jpe?g|gif|webp|ico|woff2?|wasm|mp3|org|txt|xml)$/i;
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+
+    // Static assets NEVER detour through the origin: serve straight from the
+    // Pages copy with real edge caching. The fly origin is the CMS surface
+    // for PAGES; making a 2KB icon pay a cross-continent round trip per view
+    // was the whole reason lessons loaded in seconds instead of millis.
+    if (ASSET_RE.test(url.pathname)) {
+      const r = await env.ASSETS.fetch(req);
+      const h = new Headers(r.headers);
+      h.set("x-wb-origin", "edge-asset");
+      // versioned URLs are immutable; the rest revalidate hourly
+      h.set("cache-control", url.search.includes("v=")
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=3600, stale-while-revalidate=86400");
+      return new Response(r.body, { status: r.status, headers: h });
+    }
+
     try {
       const res = await fetch("https://wb-site.fly.dev" + url.pathname + url.search, {
         method: req.method,

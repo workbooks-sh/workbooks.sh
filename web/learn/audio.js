@@ -245,7 +245,9 @@
       dock.querySelector(".ttl").textContent = e.title;
       bar.querySelector(".ttl").textContent = e.title;
       sheet.querySelector(".now .ttl").textContent = e.title;
-      sheet.querySelector(".art img").src = "img/" + e.slug + "-hero.jpg";
+      var art = sheet.querySelector(".art img");
+      if (sheet.classList.contains("open")) art.src = "img/" + e.slug + "-hero.jpg";
+      else art.dataset.src = "img/" + e.slug + "-hero.jpg";
       dock.querySelector(".spd").textContent = rate + "×";
       sheet.querySelectorAll(".spds .spd").forEach(function (b) { b.classList.toggle("on", parseFloat(b.textContent) === rate); });
       document.querySelectorAll(".apls .row").forEach(function (r) { r.classList.toggle("on", +r.dataset.i === cur); });
@@ -300,8 +302,14 @@
     dock.querySelector(".spd").addEventListener("click", function () { setRate(rates[(rates.indexOf(rate) + 1) % rates.length]); });
     dock.querySelector(".lst").addEventListener("click", function (e) { e.stopPropagation(); dock.querySelector(".appop").classList.toggle("open"); });
     document.addEventListener("click", function (e) { if (!dock.contains(e.target)) dock.querySelector(".appop").classList.remove("open"); });
-    bar.querySelector(".exp").addEventListener("click", function () { sheet.classList.add("open"); document.body.style.overflow = "hidden"; });
-    bar.querySelector(".mid").addEventListener("click", function () { sheet.classList.add("open"); document.body.style.overflow = "hidden"; });
+    function openSheet() {
+      sheet.classList.add("open");
+      document.body.style.overflow = "hidden";
+      var art = sheet.querySelector(".art img");
+      if (art.dataset.src && art.src.indexOf(art.dataset.src) < 0) art.src = art.dataset.src;
+    }
+    bar.querySelector(".exp").addEventListener("click", openSheet);
+    bar.querySelector(".mid").addEventListener("click", openSheet);
     sheet.querySelector(".cls").addEventListener("click", function () { sheet.classList.remove("open"); document.body.style.overflow = ""; });
     [dock, sheet].forEach(function (n) {
       n.querySelector('input[type=range]').addEventListener("input", function () {
