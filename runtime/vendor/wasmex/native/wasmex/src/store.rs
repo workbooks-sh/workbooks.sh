@@ -83,6 +83,33 @@ pub(crate) fn wb_host_allowed(host: &str, port: u16) -> bool {
     }
 }
 
+/// Per-instance egress allow-list match for the wasi-http path (where we have the hostname).
+/// Entry forms (case-insensitive): "host" (any port), "host:port" (exact port), "*.suffix" (host or any
+/// subdomain), "*.suffix:port". This SCOPES egress on top of the always-on SSRF deny-internal floor;
+/// an empty/None list (caller's choice) means "no extra scoping" (allow any public dest after SSRF).
+pub(crate) fn wb_host_in_allowlist(host: &str, port: u16, allow: &[String]) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    allow.iter().any(|raw| {
+        let e = raw.trim().to_ascii_lowercase();
+        let (pat, eport): (&str, Option<u16>) = match e.rsplit_once(':') {
+            Some((h, p)) => match p.parse::<u16>() {
+                Ok(pn) => (h, Some(pn)),
+                Err(_) => (e.as_str(), None),
+            },
+            None => (e.as_str(), None),
+        };
+        if let Some(ep) = eport {
+            if ep != port {
+                return false;
+            }
+        }
+        match pat.strip_prefix("*.") {
+            Some(suffix) => host == suffix || host.ends_with(&format!(".{}", suffix)),
+            None => host == pat,
+        }
+    })
+}
+
 #[cfg(test)]
 mod wb_ssrf_tests {
     use super::wb_ip_allowed;
@@ -135,6 +162,30 @@ mod wb_ssrf_tests {
         assert!(wb_host_allowed("8.8.8.8", 80), "allow public literal");
         assert!(wb_host_allowed("1.1.1.1", 443), "allow public literal");
     }
+
+    #[test]
+    fn allowlist_matching() {
+        use super::wb_host_in_allowlist as m;
+        let allow = vec![
+            "example.com".to_string(),
+            "*.api.github.com".to_string(),
+            "secure.test:443".to_string(),
+        ];
+        // matches
+        assert!(m("example.com", 80, &allow), "exact host any port");
+        assert!(m("EXAMPLE.COM", 443, &allow), "case-insensitive");
+        assert!(m("example.com.", 80, &allow), "trailing-dot FQDN normalized");
+        assert!(m("v3.api.github.com", 443, &allow), "wildcard subdomain");
+        assert!(m("api.github.com", 80, &allow), "wildcard base matches");
+        assert!(m("secure.test", 443, &allow), "exact host + port");
+        // non-matches
+        assert!(!m("secure.test", 80, &allow), "wrong port denied");
+        assert!(!m("evil.com", 80, &allow), "unlisted host denied");
+        assert!(!m("notexample.com", 80, &allow), "suffix-confusion denied");
+        assert!(!m("github.com", 80, &allow), "*.api.github.com != github.com");
+        assert!(!m("x.example.com", 80, &allow), "exact entry != subdomain");
+        assert!(!m("anything.com", 80, &[]), "empty list matches nothing");
+    }
 }
 
 #[derive(Debug, NifStruct)]
@@ -170,6 +221,10 @@ pub struct ExWasiP2Options {
     inherit_stdout: bool,
     inherit_stderr: bool,
     allow_http: bool,
+    // wb-broker: optional per-instance egress allow-list (host / host:port / *.suffix). None or empty =
+    // no extra scoping (any public dest, after the SSRF deny-internal floor). Decodes from the Elixir
+    // WasiP2Options :net_allow field (nil -> None).
+    net_allow: Option<Vec<String>>,
 }
 
 #[derive(NifStruct)]
@@ -230,6 +285,8 @@ pub struct ComponentStoreData {
     pub(crate) http: Option<WasiHttpCtx>,
     pub(crate) limits: StoreLimits,
     pub(crate) table: ResourceTable,
+    // wb-broker: per-instance egress allow-list, read by the WasiHttpView::send_request SSRF/scope check.
+    pub(crate) net_allow: Option<Vec<String>>,
 }
 
 impl WasiHttpView for ComponentStoreData {
@@ -269,6 +326,16 @@ impl WasiHttpView for ComponentStoreData {
                 std::io::ErrorKind::PermissionDenied,
                 "wb-broker: destination denied by egress policy (internal/non-routable address)",
             )));
+        }
+        // Scoped allow-list (on top of the SSRF floor): if this instance was granted a non-empty list,
+        // the destination host must match it. No list (None/empty) = no extra scoping.
+        if let Some(list) = &self.net_allow {
+            if !list.is_empty() && !wb_host_in_allowlist(&host, port, list) {
+                return Err(HttpError::trap(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "wb-broker: destination not in the instance egress allow-list",
+                )));
+            }
         }
         Ok(default_send_request(request, config))
     }
@@ -376,6 +443,7 @@ pub fn component_store_new(
             ctx: None,
             limits,
             table: wasmtime_wasi::ResourceTable::new(),
+            net_allow: None,
         },
     );
     store.limiter(|state| &mut state.limits);
@@ -446,6 +514,7 @@ pub fn component_store_new_wasi(
             limits,
             http: http_option,
             table: wasmtime_wasi::ResourceTable::new(),
+            net_allow: options.net_allow.clone(),
         },
     );
     store.limiter(|state| &mut state.limits);

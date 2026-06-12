@@ -44,6 +44,9 @@ defmodule Wasmex.Wasi.WasiP2Options do
             inherit_stdout: true,
             inherit_stderr: true,
             allow_http: false,
+            # wb-broker: optional per-instance egress allow-list (host / host:port / *.suffix). nil =
+            # no extra scoping (any public destination, after the always-on SSRF deny-internal floor).
+            net_allow: nil,
             args: [],
             env: %{}
 
@@ -53,6 +56,7 @@ defmodule Wasmex.Wasi.WasiP2Options do
           inherit_stdin: boolean(),
           inherit_stdout: boolean(),
           inherit_stderr: boolean(),
-          allow_http: boolean()
+          allow_http: boolean(),
+          net_allow: [String.t()] | nil
         }
 end

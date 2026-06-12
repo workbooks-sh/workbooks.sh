@@ -159,3 +159,23 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 5): SCOPED ALLOW-LIST — today egress = deny-internal/ALLOW-ALL-PUBLIC (a net guest can reach
   ANY external host = exfiltration surface). Make it per-instance {host/ip,port} allow-list, default-deny,
   threaded Policy.ex → WasiP2Options → store.rs options → the socket_addr_check + send_request closures.
+- 2026-06-12 (iter 5): **SCOPED ALLOW-LIST mechanism BUILT + VALIDATED (green).** Added wb_host_in_allowlist
+  (exact / host:port / *.suffix / *.suffix:port, case-insensitive, trailing-dot-normalized) + 12-assertion
+  unit test. Threaded `net_allow: Option<Vec<String>>` end-to-end: Elixir WasiP2Options defstruct (nil
+  default) → ExWasiP2Options NifStruct → ComponentStoreData → enforced in send_request (AFTER the SSRF
+  floor: if Some(non-empty) list, host must match). mix compile exit 0; 6 cargo tests green; **RUNTIME
+  DECODE proven** (created a component store with net_allow=["api.github.com","*.example.com:443"] →
+  DECODE-OK, so the NifStruct↔defstruct alignment is correct — the runtime-only break mode is closed).
+  Backward-compatible: nil/empty = allow-public (after SSRF), so existing net/browse guests are unaffected.
+  STATE OF SECURITY NOW: SSRF deny-internal floor LIVE on both egress paths (unit-validated); scoped
+  allow-list MECHANISM ready on the wasi-http path.
+  STILL OPEN (precise):
+    - The allow-list is BUILT but not yet POPULATED by Policy — net_allow is nil for all current profiles,
+      so no instance is scoped yet (the capability exists; activation = Policy/Instance sets net_allow for a
+      scoped profile/tool, naturally coupled to Phase-4's first scoped brokered tool).
+    - allow-list applies to wasi-http (has hostname); raw-sockets (socket_addr_check, IP-only) still
+      deny-internal/allow-public — IP/CIDR allow-list for raw sockets is a follow-up.
+    - DNS-rebinding pin for http hostnames; rate/byte/conn quotas; audit log; mid-flight revocation; the
+      live-guest e2e (wb-q962).
+  NEXT (iter 6): audit log (every egress decision {instance,dest,verdict} — observability/"manageable") +
+  rate/conn quotas (DoS floor). Then Policy population + the Phase-4 first brokered tool (→ the live e2e).
