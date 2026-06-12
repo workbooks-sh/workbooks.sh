@@ -111,6 +111,18 @@ defmodule Workbooks.BrokerNetE2ETest do
     # socket_addr_check SSRF-blocks internal targets on the raw-socket path
     assert probe.("127.0.0.1:22") =~ "ERR"
     assert probe.("169.254.169.254:80") =~ "ERR"
+
+    # SCOPED allow-list on the raw-socket path (IP-based): a guest scoped to ["1.1.1.1"] may reach it but
+    # NOT another public host (8.8.8.8, which passes the SSRF floor) — default-deny per-instance scope.
+    {:ok, scoped} =
+      Wasmex.Components.start_link(%{
+        path: wasm,
+        wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true, net_allow: ["1.1.1.1"]}
+      })
+
+    sp = fn t -> elem(Wasmex.Components.call_function(scoped, "probe", [t], 12_000), 1) end
+    assert sp.("1.1.1.1:80") =~ "OK"
+    assert sp.("8.8.8.8:80") =~ "ERR"
   end
 
   @tag :build

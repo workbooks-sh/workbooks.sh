@@ -729,3 +729,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   plus the unit/adversarially-tested obfuscation defense, resolve-then-pin, rate/conn/body quotas, audit,
   revocation. NEXT (iter 41): extend the allow-list to the wasi-SOCKETS path (IP/CIDR via socket_addr_check —
   it has the resolved IP, no hostname); OR a 9th capability.
+- 2026-06-12 (iter 41): **SCOPED ALLOW-LIST extended to the wasi-SOCKETS path (IP-based) — complete for BOTH
+  standard paths (green).** Added wb_addr_in_scope: socket_addr_check now also enforces net_allow's IP
+  entries on the raw-socket path (exact IP / IP:port; hostname entries don't match an IP, so a hostname-only
+  scope denies raw sockets — a sane least-privilege default). Rust unit test (7 cargo SSRF tests green) +
+  E2E: a real wasi:sockets guest scoped to net_allow=["1.1.1.1"] reaches 1.1.1.1 ("OK n=256") but is BLOCKED
+  from 8.8.8.8 ("ERR Permission denied" — passes SSRF, fails the scope). So the keystone cadence item
+  "per-instance scoped {host,port} allow-list (default deny)" is now COMPLETE + e2e-proven for BOTH standard
+  paths: wasi-http (hostname, send_request override) + wasi-sockets (IP, socket_addr_check).
+  KEYSTONE: every item + every cadence primitive e2e-proven across both standard seams. 8 capabilities; 61
+  reclaimed; red-team green. NEXT (iter 42): a 9th capability, or per-tool reclamation.

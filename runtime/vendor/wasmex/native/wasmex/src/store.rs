@@ -23,6 +23,28 @@ use wasmtime_wasi_http::types::{
 // wb-broker SSRF defense — the egress capability cadence. Permit ONLY public, externally-routable
 // destinations; deny anything that could reach the host's own services or internal network. Used by
 // socket_addr_check (raw wasi-sockets) and (next increment) the wasi-http send_request override.
+// Per-instance IP scope for the raw-socket path. `net_allow` None/empty = no scoping (any public, after the
+// SSRF floor). With entries, the connecting IP must match an IP entry ("1.1.1.1" or "1.1.1.1:port" or an
+// IPv6 literal). Hostname entries (for wasi-http) don't match an IP, so a hostname-only scope denies raw
+// sockets entirely — a sane least-privilege default.
+pub(crate) fn wb_addr_in_scope(addr: std::net::SocketAddr, net_allow: &Option<Vec<String>>) -> bool {
+    match net_allow {
+        Some(list) if !list.is_empty() => {
+            let ip = addr.ip().to_string();
+            list.iter().any(|e| {
+                if e == &ip {
+                    return true;
+                }
+                match e.rsplit_once(':') {
+                    Some((h, p)) if p.parse::<u16>().is_ok() => h == ip,
+                    _ => false,
+                }
+            })
+        }
+        _ => true,
+    }
+}
+
 pub(crate) fn wb_addr_allowed(addr: std::net::SocketAddr) -> bool {
     wb_ip_allowed(addr.ip())
 }
@@ -162,6 +184,24 @@ mod wb_ssrf_tests {
         use super::wb_host_allowed;
         assert!(wb_host_allowed("8.8.8.8", 80), "allow public literal");
         assert!(wb_host_allowed("1.1.1.1", 443), "allow public literal");
+    }
+
+    #[test]
+    fn addr_in_scope_ip_allowlist() {
+        use super::wb_addr_in_scope as s;
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        let a = |o: [u8; 4], port: u16| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(o[0], o[1], o[2], o[3])), port);
+
+        // no scope (None/empty) -> allow any (after the SSRF floor)
+        assert!(s(a([8, 8, 8, 8], 80), &None));
+        assert!(s(a([8, 8, 8, 8], 80), &Some(vec![])));
+        // exact IP entry matches; entry with :port matches
+        assert!(s(a([1, 1, 1, 1], 80), &Some(vec!["1.1.1.1".into()])));
+        assert!(s(a([1, 1, 1, 1], 443), &Some(vec!["1.1.1.1:443".into()])));
+        // a different public IP is NOT in the scope -> denied
+        assert!(!s(a([8, 8, 8, 8], 80), &Some(vec!["1.1.1.1".into()])));
+        // hostname-only scope has no IP match -> raw sockets denied (least-privilege default)
+        assert!(!s(a([1, 1, 1, 1], 80), &Some(vec!["example.com".into()])));
     }
 
     #[test]
@@ -484,11 +524,15 @@ pub fn component_store_new_wasi(
         // the RESOLVED address (which also closes DNS-rebinding for the raw-socket path), and we deny any
         // internal/sensitive destination. NOTE: this guards the raw wasi-sockets path only; wasi-http
         // connects via tokio directly (bypasses this) and is filtered in send_request below.
+        // Per-instance IP scoping for the raw-socket path: if net_allow has IP entries, the connecting IP
+        // must match one (default-deny scope on top of the SSRF floor). Hostname entries don't apply here
+        // (the socket layer has only the resolved IP, no hostname) — those scope the wasi-http path instead.
+        let net_allow_for_sockets = options.net_allow.clone();
         wasi_ctx_builder
             .inherit_network()
             .allow_ip_name_lookup(true)
-            .socket_addr_check(|addr, _use| {
-                let ok = wb_addr_allowed(addr);
+            .socket_addr_check(move |addr, _use| {
+                let ok = wb_addr_allowed(addr) && wb_addr_in_scope(addr, &net_allow_for_sockets);
                 Box::pin(async move { ok })
             });
     }
