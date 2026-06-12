@@ -85,14 +85,24 @@ defmodule Workbooks.ServeBroker do
     {status, headers, body}
   end
 
-  @doc "Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}."
-  def dispatch(serve_id, pid, request, timeout \\ 10_000) when is_binary(request) do
-    if Workbooks.Revocation.revoked?(serve_id) do
-      {:error, :revoked}
-    else
-      do_dispatch(serve_id, pid, request, timeout)
+  @doc """
+  Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}.
+  opts: `:timeout` (ms), `:rate` `{max, window_ms}` (per-serve_id inbound flood floor — checked BEFORE the
+  guest runs, so a flood is rejected without spending guest CPU). Mirrors the outbound brokers' cadence.
+  """
+  def dispatch(serve_id, pid, request, opts \\ []) when is_binary(request) do
+    rate = Keyword.get(opts, :rate)
+    timeout = Keyword.get(opts, :timeout, 10_000)
+
+    cond do
+      Workbooks.Revocation.revoked?(serve_id) -> {:error, :revoked}
+      rate && rate_denied?(serve_id, rate) -> {:error, :rate_limited}
+      true -> do_dispatch(serve_id, pid, request, timeout)
     end
   end
+
+  defp rate_denied?(serve_id, {max, window}),
+    do: Workbooks.RateLimiter.check(serve_id, max, window) == {:error, :rate_limited}
 
   defp do_dispatch(serve_id, pid, request, timeout) do
     put({serve_id, :req}, request)
@@ -149,17 +159,30 @@ defmodule Workbooks.ServeBroker.Plug do
   def call(conn, opts) do
     serve_id = Keyword.fetch!(opts, :serve_id)
     pid = Keyword.fetch!(opts, :pid)
-    {:ok, body, conn} = read_body(conn)
-    req = ServeBroker.encode_http_request(conn.method, conn.request_path, conn.req_headers, body)
+    max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
+    rate = Keyword.get(opts, :rate)
 
-    case ServeBroker.dispatch(serve_id, pid, req) do
-      {:ok, resp} ->
-        {status, headers, out} = ServeBroker.decode_http_response(resp)
-        conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
-        send_resp(conn, status, out)
+    # DoS floor (huge-body): cap the host-side read; a request larger than max_req is rejected cleanly (413)
+    # instead of crashing the read_body match or buffering unbounded host memory.
+    case read_body(conn, length: max_req) do
+      {:ok, body, conn} ->
+        req = ServeBroker.encode_http_request(conn.method, conn.request_path, conn.req_headers, body)
 
-      {:error, _} ->
-        send_resp(conn, 502, "guest handler error")
+        case ServeBroker.dispatch(serve_id, pid, req, rate: rate) do
+          {:ok, resp} ->
+            {status, headers, out} = ServeBroker.decode_http_response(resp)
+            conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+            send_resp(conn, status, out)
+
+          {:error, :rate_limited} ->
+            send_resp(conn, 429, "rate limited")
+
+          {:error, _} ->
+            send_resp(conn, 502, "guest handler error")
+        end
+
+      {:more, _partial, conn} ->
+        send_resp(conn, 413, "request too large")
     end
   end
 end

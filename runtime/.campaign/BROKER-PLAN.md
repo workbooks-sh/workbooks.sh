@@ -794,3 +794,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   denied). RESOLVE-THEN-PIN now COMPLETE across ALL FIVE paths: TcpBroker + UdpBroker + wasi-sockets +
   wasi-http + host_http_get — DNS-rebinding closed EVERYWHERE.
   NEXT (iter 47): the inbound standard seam (wb-py4k, NIF), or a 10th capability.
+- 2026-06-12 (iter 47): **INBOUND seam hardened (DoS cadence) + standard-seam frontier de-risked.** (a)
+  Confirmed the wasi-http serve API for wb-py4k: ProxyPre/ProxyIndices + new_incoming_request +
+  new_response_outparam + async call_handle (updated the bd with the full host pattern) — a focused-session
+  NIF piece (instantiation/linker machinery isn't in component_instance.rs), too big/risky for a loop fire.
+  (b) Hardened the CURRENT inbound capability (serve_broker, hand-written) with the DoS cadence it lacked: an
+  inbound RATE limit (per-serve_id, checked BEFORE the guest runs -> a flood costs no guest CPU) + a REQUEST
+  SIZE cap (read_body length -> clean 413 instead of a read_body-match crash / unbounded host buffering) +
+  429 on rate-limit. 8 serve_broker tests green (incl the new rate test). (c) Filed wb-5hfo — per-serve_id
+  concurrency (the ETS channel races under concurrent inbound; needs a per-serve_id serializer).
+  NEXT (iter 48): the inbound standard seam (wb-py4k, focused NIF), or a 10th capability.

@@ -25,6 +25,13 @@ defmodule Workbooks.ServeBrokerTest do
     assert :ok = Workbooks.Revocation.unrevoke(sid)
   end
 
+  test "INBOUND RATE LIMIT — a flooded serve_id is rejected before the guest runs (DoS floor)" do
+    sid = "serv-rl-#{System.unique_integer([:positive])}"
+    # exhaust the per-serve_id budget, then the next dispatch is rate-limited BEFORE do_dispatch (pid nil)
+    assert :ok = Workbooks.RateLimiter.check(sid, 1, 60_000)
+    assert {:error, :rate_limited} = ServeBroker.dispatch(sid, nil, "req", rate: {1, 60_000})
+  end
+
   # --- guests ---
 
   defp compile_reactor(body_c) do
