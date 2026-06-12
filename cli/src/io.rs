@@ -68,7 +68,7 @@ mod native {
         let path = discovery_path();
         let raw = std::fs::read_to_string(&path).with_context(|| {
             format!(
-                "no runtime discovery at {} — is the runtime running? (try `wb deploy local`)",
+                "no runtime discovery at {} — is the runtime running? (try `wbx deploy local`)",
                 path.display()
             )
         })?;

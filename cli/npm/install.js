@@ -1,5 +1,5 @@
-// postinstall: download the native `wb` binary that matches this platform from
-// the GitHub Release tagged `wb-v<version>`, into ./bin/. One small launcher
+// postinstall: download the native `wbx` binary that matches this platform from
+// the GitHub Release tagged `wbx-v<version>`, into ./bin/. One small launcher
 // package per registry; the heavy binary comes from the Release (also the curl
 // path). Set WB_CLI_SKIP_DOWNLOAD=1 to skip (e.g. in CI/sandboxes).
 const fs = require("fs");
@@ -13,9 +13,9 @@ function assetName() {
   const os = process.platform; // darwin | linux | win32
   const arch = process.arch; // arm64 | x64
   const a = arch === "arm64" ? "arm64" : arch === "x64" ? "x64" : arch;
-  if (os === "darwin") return `wb-darwin-${a}`;
-  if (os === "linux") return `wb-linux-${a}`;
-  if (os === "win32") return `wb-windows-${a}.exe`;
+  if (os === "darwin") return `wbx-darwin-${a}`;
+  if (os === "linux") return `wbx-linux-${a}`;
+  if (os === "win32") return `wbx-windows-${a}.exe`;
   throw new Error(`unsupported platform: ${os}/${arch}`);
 }
 
@@ -23,9 +23,9 @@ function assetName() {
 // Returns the shadowing path string, or null if no shadow.
 function findShadow(installedBin) {
   const resolved = path.resolve(installedBin);
-  // Collect every directory on PATH and look for a wb / wb.exe match.
+  // Collect every directory on PATH and look for a wbx / wbx.exe match.
   const sep = process.platform === "win32" ? ";" : ":";
-  const exeName = process.platform === "win32" ? "wb.exe" : "wb";
+  const exeName = process.platform === "win32" ? "wbx.exe" : "wbx";
   const dirs = (process.env.PATH || "").split(sep).filter(Boolean);
   for (const dir of dirs) {
     const candidate = path.join(dir, exeName);
@@ -69,10 +69,10 @@ async function main() {
     return;
   }
   const asset = assetName();
-  const url = `https://github.com/${REPO}/releases/download/wb-v${version}/${asset}`;
+  const url = `https://github.com/${REPO}/releases/download/wbx-v${version}/${asset}`;
   const binDir = path.join(__dirname, "bin");
   fs.mkdirSync(binDir, { recursive: true });
-  const out = path.join(binDir, process.platform === "win32" ? "wb.exe" : "wb");
+  const out = path.join(binDir, process.platform === "win32" ? "wbx.exe" : "wbx");
   console.log(`[wb] downloading ${asset} (v${version})…`);
   await download(url, out);
   if (process.platform !== "win32") fs.chmodSync(out, 0o755);
@@ -97,7 +97,7 @@ async function main() {
 
 main().catch((e) => {
   // FIX 2 — LOUD failure banner so users aren't left with a silent broken install.
-  const binOut = path.join(__dirname, "bin", process.platform === "win32" ? "wb.exe" : "wb");
+  const binOut = path.join(__dirname, "bin", process.platform === "win32" ? "wbx.exe" : "wbx");
   const alreadyPresent = (() => { try { return fs.statSync(binOut).isFile(); } catch (_) { return false; } })();
 
   process.stderr.write(

@@ -4,7 +4,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const bin = path.join(__dirname, process.platform === "win32" ? "wb.exe" : "wb");
+const bin = path.join(__dirname, process.platform === "win32" ? "wbx.exe" : "wbx");
 
 function fatal(reason) {
   process.stderr.write(

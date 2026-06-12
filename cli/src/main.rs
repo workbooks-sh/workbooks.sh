@@ -17,7 +17,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "wb", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
+#[command(name = "wbx", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,

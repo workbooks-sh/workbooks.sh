@@ -1,7 +1,7 @@
 //! Engine-backed verbs. Each is a thin RCP call into a running runtime — the
 //! runtime owns the compilers, wasmtime, and the tenant library, so the CLI
 //! never reimplements them. If no runtime is reachable, `io.http` returns a
-//! clear "no runtime — try `wb deploy local`" error (see io.rs).
+//! clear "no runtime — try `wbx deploy local`" error (see io.rs).
 
 use crate::io::Io;
 use crate::rcp;
@@ -56,7 +56,7 @@ pub fn store(io: &dyn Io, slug: &str, list: bool, build: bool) -> Result<String>
     if list {
         rcp::call(io, "GET", "/rcp/store", None)
     } else if slug.is_empty() {
-        bail!("usage: wb store <slug> [--build] | wb store --list")
+        bail!("usage: wbx store <slug> [--build] | wb store --list")
     } else {
         let b = if build { "&build=1" } else { "" };
         rcp::call(io, "POST", &format!("/rcp/store?slug={}{b}", urlenc(slug)), None)
@@ -157,7 +157,7 @@ pub fn toolkit_verify(io: &dyn Io, id: &str) -> Result<String> {
 pub fn toolkit_sign(io: &dyn Io, id: &str) -> Result<String> {
     rcp::call(io, "POST", &format!("/rcp/toolkit/sign?id={}", urlenc(id)), None)
 }
-/// `wb toolkit push <id> <dir>` — ship a toolkit DIRECTORY onto the engine
+/// `wbx toolkit push <id> <dir>` — ship a toolkit DIRECTORY onto the engine
 /// (zip over RCP; the engine unpacks it under its toolkits root). This is the
 /// deploy-the-toolkit verb: write a toolkit, push it, the runtime has it.
 pub fn toolkit_push(io: &dyn Io, id: &str, dir: &str) -> Result<String> {
@@ -200,6 +200,6 @@ pub fn rt(io: &dyn Io, args: &[String]) -> Result<String> {
         Some("status") => rcp::call(io, "GET", "/.well-known/workbooks-runtime", None),
         Some("get") => rcp::call(io, "GET", args.get(1).map(String::as_str).unwrap_or("/"), None),
         Some("post") => rcp::call(io, "POST", args.get(1).map(String::as_str).unwrap_or("/"), args.get(2).map(String::as_str)),
-        _ => bail!("usage: wb rt status | get <path> | post <path> [body]"),
+        _ => bail!("usage: wbx rt status | get <path> | post <path> [body]"),
     }
 }

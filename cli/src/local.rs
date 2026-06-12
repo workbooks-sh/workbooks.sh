@@ -343,12 +343,12 @@ const PUBLISH_TEMPLATE: &str = "\
 # PUBLISH_TARGET:  cloudflare-pages | gh-pages | self-hosted
 # PUBLISH_PROJECT: CF Pages project name, GitHub repo (org/name), or runtime URL
 # PUBLISH_DOMAIN:  optional custom domain (for the printed URL)
-# `wb publish apply <workbook.html|.wbundle>` ships the ASSEMBLED workbook —
+# `wbx publish apply <workbook.html|.wbundle>` ships the ASSEMBLED workbook —
 # run `wb bundle` first. Publish is distribution only.
 ";
 
 fn publish_cfg(io: &dyn Io) -> Result<std::collections::BTreeMap<String, String>> {
-    let raw = io.read(PUBLISH_FILE).with_context(|| format!("no {PUBLISH_FILE} — run `wb publish init`"))?;
+    let raw = io.read(PUBLISH_FILE).with_context(|| format!("no {PUBLISH_FILE} — run `wbx publish init`"))?;
     Ok(util::org_keywords(&String::from_utf8(raw)?))
 }
 
@@ -388,7 +388,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
                 bail!("{PUBLISH_FILE} already exists");
             }
             io.write(PUBLISH_FILE, PUBLISH_TEMPLATE.as_bytes())?;
-            Ok(format!("wrote {PUBLISH_FILE} — edit it, then `wb publish apply <workbook>`"))
+            Ok(format!("wrote {PUBLISH_FILE} — edit it, then `wbx publish apply <workbook>`"))
         }
         "validate" => {
             let (target, project) = publish_validate(io)?;
@@ -419,7 +419,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
                     };
                     io.spawn("git", &["-C", &s, "init", "-q", "-b", "gh-pages"])?;
                     io.spawn("git", &["-C", &s, "add", "-A"])?;
-                    io.spawn("git", &["-C", &s, "-c", "user.name=wb", "-c", "user.email=wb@workbooks.sh", "commit", "-q", "-m", "wb publish"])?;
+                    io.spawn("git", &["-C", &s, "-c", "user.name=wb", "-c", "user.email=wb@workbooks.sh", "commit", "-q", "-m", "wbx publish"])?;
                     io.spawn("git", &["-C", &s, "push", "-f", &remote, "gh-pages"])?;
                     cfg.get("PUBLISH_DOMAIN").map(|d| format!("https://{d}")).unwrap_or_else(|| {
                         let (org, repo) = project.split_once('/').unwrap_or(("", &project));
@@ -438,7 +438,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
             let _ = std::fs::remove_dir_all(&stage);
             Ok(format!("published {wb} → {url}"))
         }
-        v => bail!("usage: wb publish init|validate|apply <workbook> — got {v}"),
+        v => bail!("usage: wbxx publish init|validate|apply <workbook> — got {v}"),
     }
 }
 
@@ -459,15 +459,15 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
     let mut vars = vars_load(io);
     match args.first().map(String::as_str) {
         Some("set") => {
-            let key = args.get(1).context("usage: wb var set <key> <value> [--secret]")?;
-            let val = args.get(2).context("usage: wb var set <key> <value> [--secret]")?;
+            let key = args.get(1).context("usage: wbx var set <key> <value> [--secret]")?;
+            let val = args.get(2).context("usage: wbx var set <key> <value> [--secret]")?;
             let secret = args.iter().any(|a| a == "--secret");
             vars.insert(key.clone(), serde_json::json!({"value": val, "secret": secret}));
             io.write(&vars_path(), serde_json::to_string_pretty(&vars)?.as_bytes())?;
             Ok(format!("set {key}{}", if secret { " (secret)" } else { "" }))
         }
         Some("get") => {
-            let key = args.get(1).context("usage: wb var get <key>")?;
+            let key = args.get(1).context("usage: wbx var get <key>")?;
             match vars.get(key) {
                 Some(v) if v["secret"].as_bool().unwrap_or(false) => Ok("(secret — use {{secret:KEY}} refs)".into()),
                 Some(v) => Ok(v["value"].as_str().unwrap_or_default().to_string()),
@@ -491,7 +491,7 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
                 .join("\n"))
         }
         Some("ref") => {
-            let mut tpl = args.get(1).context("usage: wb var ref <template>")?.clone();
+            let mut tpl = args.get(1).context("usage: wbx var ref <template>")?.clone();
             for (k, v) in &vars {
                 let val = v["value"].as_str().unwrap_or_default();
                 tpl = tpl.replace(&format!("{{{{var:{k}}}}}"), val);
@@ -499,6 +499,6 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
             }
             Ok(tpl)
         }
-        _ => bail!("usage: wb var set|get|list|ref"),
+        _ => bail!("usage: wbx var set|get|list|ref"),
     }
 }

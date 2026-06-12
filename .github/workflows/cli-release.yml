@@ -1,13 +1,13 @@
 name: cli-release
 
-# Build + ship the canonical `wb` CLI (cli/). One Rust source → native binaries
+# Build + ship the canonical `wbx` CLI (cli/). One Rust source → native binaries
 # (per platform) + a wasm32-wasip1 module. Distributed three ways from one run:
 #   - GitHub Release assets        (the curl path: workbooks.sh/cli.sh)
 #   - npmjs  @work.books/cli        (public; NPM_TOKEN)
 #   - GitHub Packages @workbooks-sh/cli  (shows as "cli" in the repo's Packages)
 on:
   push:
-    tags: ["wb-v*"]
+    tags: ["wbx-v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -29,7 +29,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "v=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "v=${GITHUB_REF_NAME#wb-v}" >> "$GITHUB_OUTPUT"
+            echo "v=${GITHUB_REF_NAME#wbx-v}" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -37,12 +37,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-14, target: aarch64-apple-darwin, asset: wb-darwin-arm64 }
+          - { os: macos-14, target: aarch64-apple-darwin, asset: wbx-darwin-arm64 }
           # Intel mac is CROSS-compiled from the arm64 runner — macos-13 (Intel)
           # runners are being retired and can queue indefinitely.
-          - { os: macos-14, target: x86_64-apple-darwin, asset: wb-darwin-x64 }
-          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, asset: wb-linux-x64 }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, asset: wb-linux-arm64 }
+          - { os: macos-14, target: x86_64-apple-darwin, asset: wbx-darwin-x64 }
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, asset: wbx-linux-x64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, asset: wbx-linux-arm64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }} --manifest-path cli/Cargo.toml
-      - run: cp cli/target/${{ matrix.target }}/release/wb ${{ matrix.asset }}
+      - run: cp cli/target/${{ matrix.target }}/release/wbx ${{ matrix.asset }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
@@ -84,8 +84,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.version.outputs.v }}
         run: |
-          gh release create "wb-v$V" dist/* --title "wb v$V" --notes "Workbooks CLI v$V" \
-            || gh release upload "wb-v$V" dist/* --clobber
+          gh release create "wbx-v$V" dist/* --title "wbx v$V" --notes "Workbooks CLI v$V" \
+            || gh release upload "wbx-v$V" dist/* --clobber
 
   npm:
     needs: [version, release]
