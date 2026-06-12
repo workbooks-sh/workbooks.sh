@@ -347,3 +347,20 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   that itself execs is depth-counted (today depth is per-call only); (c) a dedicated `exec` cap (default-off)
   for finer control than the broad `commands` cap. NEXT (iter 13): build the minimal guest e2e (JS via JsDock
   is the lighter path — add a host_exec JS-harness wrapper + a guest that exec's coreutils -> assert output).
+- 2026-06-12 (iter 13): **STONE 2 FULLY e2e-PROVEN (green) — guest-driven exec dispatch works end-to-end.**
+  Added a real GUEST e2e (test/rust_dock_test.exs, @tag :build): a Rust guest compiled with
+  `extern { fn host_exec }`, builds the length-prefixed request in-guest, calls host_exec; the host parses
+  it, runs coreutils in ITS OWN sandbox, and returns the output to the guest — guest verifies seq 5 ==
+  "1\n2\n3\n4\n5" (9 bytes; CommandRegistry maybe_trim drops the trailing newline), ok=true. The COMPLETE
+  path proven: guest -> host_exec import -> parse_request -> ExecBroker.exec -> CommandRegistry sandbox ->
+  output -> guest. Caught+fixed my own wrong expected (10 vs 9). Compiles+runs in ~10s.
+  STONE 2 STATUS = DONE + e2e-validated: ExecBroker core (default-deny/no-OS-exec/allow-list/depth/audit/
+  no-injection — tested), parse_request ABI (tested), host_exec wired into rust_dock + js_dock (commands-cap
+  gated, escalation-confined), and now the guest-driven e2e (proven). UNLIKE networking, Stone 2 is FULLY
+  validated offline — a guest can safely broker exec to the 32 sandboxed wasm commands. This unlocks the
+  FORK-EXEC class (build tools / shells / orchestrators) for wasm-available commands.
+  MINOR REMAINING (non-blocking refinements): nesting-depth threading (currently defense for a non-reachable
+  scenario — catalog tools have no host_exec so they can't re-exec); a dedicated `exec` cap (vs the broad
+  `commands` cap); a JS-guest e2e (rust e2e proves the mechanism; js_dock is wired identically).
+  NEXT (iter 14): per the loop directive — re-evaluate runtime/.campaign/resolved.json's FORK-EXEC subset
+  now reachable via host_exec (flip reachable ones), then pull the next stone (brokered durable storage).

@@ -62,4 +62,36 @@ fn main(){
       {:error, reason} -> IO.puts("\n[skip] http (network-less CI?): #{inspect(reason) |> String.slice(0, 80)}")
     end
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "host_exec — guest brokers exec to a SANDBOXED coreutils (seq) end-to-end (Stone 2)" do
+    # gated on the commands cap (present on :minimal); the guest builds the length-prefixed request,
+    # calls host_exec, the host runs coreutils in its own sandbox, the output comes back.
+    assert "host_exec" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+    assert :ok = Workbooks.Pallet.seed_one("coreutils")
+
+    w =
+      build!(~S|
+extern "C" { fn host_exec(rp:i32,rl:i32,op:i32,oc:i32) -> i32; }
+fn le(n:u32, b:&mut Vec<u8>){ b.extend_from_slice(&n.to_le_bytes()); }
+fn main(){
+  // [name_len][name][argc][(arg_len)(arg)]*[stdin_len][stdin]
+  let name:&[u8]=b"coreutils";
+  let args:[&[u8];2]=[b"seq", b"5"];
+  let mut req:Vec<u8>=Vec::new();
+  le(name.len() as u32,&mut req); req.extend_from_slice(name);
+  le(args.len() as u32,&mut req);
+  for a in args.iter(){ le(a.len() as u32,&mut req); req.extend_from_slice(a); }
+  le(0u32,&mut req); // empty stdin
+  let mut out=[0u8;256];
+  let n=unsafe{ host_exec(req.as_ptr() as i32, req.len() as i32, out.as_mut_ptr() as i32, 256) };
+  let expected:&[u8]=b"1\n2\n3\n4\n5"; // CommandRegistry maybe_trim strips the trailing newline (9 bytes)
+  let ok = n==9 && &out[..(if n>0 {n as usize} else {0})]==expected;
+  println!("n={} ok={}", n, ok);
+}|)
+
+    assert {:ok, out} = RustDock.run(w, profile: :minimal)
+    assert String.trim(out) == "n=9 ok=true"
+  end
 end
