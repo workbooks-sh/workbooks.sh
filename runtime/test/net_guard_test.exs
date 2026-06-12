@@ -80,6 +80,20 @@ defmodule Workbooks.NetGuardTest do
            "redirect-to-internal must not reach the internal target"
   end
 
+  @tag :netdeps
+  test "RED-TEAM: https egress is cert-VERIFIED (MITM defense) and IP-pinned (DNS-rebinding defense)" do
+    # a valid public https host works — the pin + SNI + verify_peer don't break normal TLS
+    assert {:ok, _body} = NetGuard.get("https://example.com/")
+
+    # an INVALID cert is REJECTED by verify_peer. :httpc's DEFAULT (verify_none) would ACCEPT these — that was
+    # the MITM hole. expired + self-signed both fail the chain/validity check against the system trust store.
+    assert {:error, _} = NetGuard.get("https://expired.badssl.com/")
+    assert {:error, _} = NetGuard.get("https://self-signed.badssl.com/")
+
+    # and https to an internal target is still SSRF-blocked before any socket opens
+    assert {:error, :denied} = NetGuard.get("https://169.254.169.254/")
+  end
+
   test "get/1 denies internal destinations before opening a socket (offline)" do
     # No :httpc call is made for a denied URL — proven by this passing with no network.
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/latest/meta-data/")

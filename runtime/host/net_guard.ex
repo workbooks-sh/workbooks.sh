@@ -72,17 +72,18 @@ defmodule Workbooks.NetGuard do
         _ = Application.ensure_all_started(:inets)
         _ = Application.ensure_all_started(:ssl)
 
-        # resolve-then-PIN: connect to the IP we just checked, not the hostname (which :httpc would RE-resolve,
-        # leaving a DNS-rebind window). For http, swap the URL host for the pinned IP and keep the original
-        # Host header for vhost routing. https keeps its SNI hostname — cert validation binds the connection.
-        {req_url, req_headers} = pin_for_http(url)
+        # resolve-then-PIN (http AND https): connect to the IP we just checked, not the hostname (which :httpc
+        # would RE-resolve, leaving a DNS-rebind window). For https we also pass ssl opts that ENFORCE cert
+        # validation (verify_peer) bound to the original HOSTNAME via SNI — without them :httpc https defaults
+        # to verify_none (MITM) and re-resolves the host (rebinding). (wb-j3n8 audit: critical egress-ssrf gap.)
+        {req_url, req_headers, extra_opts} = pin_for_http(url)
 
         # autoredirect: false — :httpc would otherwise auto-FOLLOW a 3xx, bypassing the guard if a public
         # URL redirects to an internal one. We follow manually so EVERY hop is re-checked (and bounded).
         case :httpc.request(
                :get,
                {req_url, req_headers},
-               [{:timeout, timeout}, {:autoredirect, false}],
+               [{:timeout, timeout}, {:autoredirect, false}] ++ extra_opts,
                body_format: :binary
              ) do
           {:ok, {{_, status, _}, hdrs, body}} when status in 300..399 ->
@@ -100,20 +101,42 @@ defmodule Workbooks.NetGuard do
     end
   end
 
-  # Resolve-then-pin for the host_http_get path. http: return the IP-rewritten URL + a Host header carrying
-  # the original hostname. https / unresolvable: unchanged (cert validation binds https; allowed? already
-  # vetted the host so resolve rarely fails here).
+  # Resolve-then-pin for the host_http_get path (http AND https). Swap the URL host for the validated, pinned
+  # IP (so :httpc can't RE-resolve the hostname — closes DNS-rebinding) and keep a Host header for vhost
+  # routing. For https we ALSO return ssl options that (a) ENFORCE cert validation (verify_peer against the
+  # system trust store) and (b) bind SNI + the hostname-match to the original HOSTNAME, so the cert is
+  # validated for the hostname even though the socket connects to the pinned IP. Returns {url, headers, extra}
+  # where `extra` is the http_options to append (the {:ssl, _} block for https, [] for http).
   defp pin_for_http(url) do
     uri = URI.parse(url)
 
-    with "http" <- uri.scheme,
+    with scheme when scheme in ["http", "https"] <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
          {:ok, ip} <- resolve_allowed_ip(host) do
-      host_hdr = if uri.port in [nil, 80], do: host, else: "#{host}:#{uri.port}"
+      default_port = if scheme == "https", do: 443, else: 80
+      host_hdr = if uri.port in [nil, default_port], do: host, else: "#{host}:#{uri.port}"
       pinned = URI.to_string(%{uri | host: :inet.ntoa(ip) |> to_string()})
-      {String.to_charlist(pinned), [{~c"host", String.to_charlist(host_hdr)}]}
+
+      extra =
+        if scheme == "https" do
+          [
+            {:ssl,
+             [
+               verify: :verify_peer,
+               cacerts: :public_key.cacerts_get(),
+               server_name_indication: String.to_charlist(host),
+               customize_hostname_check: [
+                 match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+               ]
+             ]}
+          ]
+        else
+          []
+        end
+
+      {String.to_charlist(pinned), [{~c"host", String.to_charlist(host_hdr)}], extra}
     else
-      _ -> {String.to_charlist(url), []}
+      _ -> {String.to_charlist(url), [], []}
     end
   end
 

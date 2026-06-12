@@ -1285,3 +1285,21 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   developed in a NEW module (non-conflicting with the running adversarial audit's view of the broker files).
   POST-AUDIT: integrate CappedHttp into NetGuard.do_get (replace the sync :httpc; Location-based redirect
   re-validation) to close wb-j3n8, alongside any other confirmed egress findings from the audit.
+- 2026-06-12 (iter 95): **ADVERSARIAL AUDIT COMPLETE (62 agents, 2.76M tokens) — 50 raised, 18 CONFIRMED after
+  skeptic refutation. CRITICAL FIXED.** The audit found a CRITICAL my earlier work MISSED:
+  * CRITICAL egress-ssrf: host_http_get HTTPS was NEITHER IP-pinned NOR cert-verified — pin_for_http only
+    pinned http (https re-resolved -> DNS-rebinding to metadata/internal) and :httpc https defaults to
+    verify_none (MITM). The code COMMENT even falsely claimed "https keeps SNI; cert validation binds". FIXED
+    THIS ITER: pin_for_http now pins http AND https + returns ssl opts (verify_peer + cacerts + SNI=hostname +
+    pkix_verify_hostname_match_fun) so the cert is validated for the HOSTNAME while connecting to the pinned
+    IP. Red-team test green: example.com -> ok; expired/self-signed.badssl.com -> REJECTED (:selfsigned_peer);
+    https internal -> SSRF-denied.
+  CONFIRMED REMAINING (filed): HIGH wb-an2v tenant-isolation collapse (JsDock/RustDock run under hardcoded
+  "default" tenant -> cross-tenant KV+secrets); HIGH wb-uh5w queue no byte/tenant/rate caps (memory DoS).
+  MEDIUM/LOW batch wb-8w8x: wasi:http https not pinned (store.rs); NAT64/IPv4-in-IPv6 classifier gap; inbound
+  streaming-serve no cumulative body cap; TLS/TCP/UDP brokers lack a per-instance allow-list (SSRF floor only);
+  KV key-size unbounded + entry-count quota; default :minimal over-grants caps; forensics-ring target stored
+  unbounded; exec stdout buffered-before-cap; exec out_cap negative-traps; UDP reply from any source; non-atomic
+  RateLimiter. FULLY COVERED (no confirmed gap): IPv4-mapped obfuscation, redirect-to-internal, raw-socket
+  pinning, command/argv injection, HTTP allow-list path. NEXT: fix in severity order (wb-an2v, wb-uh5w, then
+  wb-8w8x items), each with a red-team test.
