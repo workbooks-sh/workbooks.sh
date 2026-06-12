@@ -1198,3 +1198,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   buffered seam all green (no regression). Also added epoch_interruption engine config (OFF by default) as the
   foundation for bounding a COMPUTE-spinning guest (a separate DoS that epoch CAN trap). REMAINING: apply the
   same concurrent-drain to the BUFFERED serve_http (still deadlocks on bodies over the wasi-http buffer).
+- 2026-06-12 (iter 87): **★ wb-95o6 FULLY FIXED (both serve paths) — CLOSED.** Applied the concurrent-drain to
+  the BUFFERED serve_http too: handle() on a spawn_blocking thread + drain the response body concurrently into
+  a buffer, KEEPING the drain going past the 16MiB cap (discarding) so an over-cap body can't block the guest
+  either, then error after the stream closes. PROVEN: a 256KB body via the buffered serve_http (deadlocked
+  identically before) now returns in ~1s. FULL broker_net_e2e suite GREEN — 18 tests incl the 2000-serve soak
+  (still memory-stable with spawn_blocking-per-serve — the threads complete and return to the pool, no leak),
+  both 256KB large-body tests, and every serve path. So the leaked-dirty-scheduler DoS is closed: handle()
+  ALWAYS completes because the host ALWAYS drains. The 16MiB cap is now correctly enforced (cap the buffer,
+  keep reading). NOTE: a separate COMPUTE-DoS remains (a guest that spins in handle() before setting the
+  response — the host's block_on(rx) waits) — the epoch_interruption infra (iter86) is the foundation to bound
+  it (epoch CAN trap a spinning wasm guest); wiring it next.

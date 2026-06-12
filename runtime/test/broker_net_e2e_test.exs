@@ -650,6 +650,39 @@ defmodule Workbooks.BrokerNetE2ETest do
 
   @tag :build
   @tag :netdeps
+  @tag timeout: 120_000
+  test "BUFFERED serve_http large body (wb-95o6) — a 256KB response returns, NO deadlock" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+    {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, inst} = Wasmex.Components.Instance.new(store, component, %{})
+
+    # the buffered path used to deadlock identically on a body over the wasi-http buffer; run under a Task so a
+    # regression is a fast failure, not a hung suite.
+    task =
+      Task.async(fn ->
+        Wasmex.Components.Instance.serve_http(inst, "GET", "/stream", [{"host", "localhost"}], "")
+      end)
+
+    {status, _headers, body} = Task.await(task, 60_000)
+
+    assert status == 200
+    assert byte_size(body) == 256_000
+  end
+
+  @tag :build
+  @tag :netdeps
   @tag timeout: 300_000
   test "APP-HOST streaming — chunked transfer through Bandit to a real client (wb-t3sq)" do
     proj = "test/broker_e2e/wasi_http_handler"

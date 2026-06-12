@@ -251,7 +251,8 @@ pub fn serve_http<'a>(
     body: rustler::Binary,
 ) -> NifResult<(u16, Vec<(String, String)>, rustler::Binary<'a>)> {
     use bytes::Bytes;
-    use http_body_util::{BodyExt, Full, Limited};
+    use http_body::Body;
+    use http_body_util::{BodyExt, Full};
     use rustler::OwnedBinary;
     use wasmtime_wasi_http::bindings::http::types::Scheme;
     use wasmtime_wasi_http::WasiHttpView;
@@ -260,93 +261,120 @@ pub fn serve_http<'a>(
     // hosted app can't exhaust host memory by returning an unbounded body.
     const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 
-    let store: &mut Store<ComponentStoreData> =
-        &mut (component_store_resource.inner.lock().unwrap());
-    let instance = &mut instance_resource.inner.lock().unwrap();
+    // SETUP under the store/instance locks; released at the end of the block so the handler thread can take
+    // the store (see serve_http_stream for the full concurrent-drain rationale).
+    let (handle, req_any, out_any, rx) = {
+        let mut store_guard = component_store_resource.inner.lock().unwrap();
+        let store: &mut Store<ComponentStoreData> = &mut store_guard;
+        let mut instance_guard = instance_resource.inner.lock().unwrap();
+        let instance = &mut *instance_guard;
 
-    // 1. build the hyper request (boxed body; Full's Infallible error widens to hyper::Error via match)
-    let mut builder = hyper::Request::builder()
-        .method(method.as_str())
-        .uri(uri.as_str());
-    for (k, v) in &headers {
-        builder = builder.header(k.as_str(), v.as_str());
-    }
-    let req_body = Full::new(Bytes::copy_from_slice(body.as_slice()))
-        .map_err(|e: std::convert::Infallible| match e {})
-        .boxed();
-    let hyper_req = builder
-        .body(req_body)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
-
-    // 2-3. incoming-request + response-outparam resources (sync WasiHttpView methods)
-    let req = store
-        .data_mut()
-        .new_incoming_request(Scheme::Http, hyper_req)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
-    let (tx, mut rx) = tokio::sync::oneshot::channel();
-    let out = store
-        .data_mut()
-        .new_response_outparam(tx)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
-
-    // 4. resolve wasi:http/incoming-handler#handle
-    // component interface exports are versioned (e.g. "...@0.2.6") — try the known versions then the bare name
-    let mut iface = None;
-    for name in [
-        "wasi:http/incoming-handler@0.2.6",
-        "wasi:http/incoming-handler@0.2.3",
-        "wasi:http/incoming-handler@0.2.0",
-        "wasi:http/incoming-handler",
-    ] {
-        if let Some((_, idx)) = instance.get_export(&mut *store, None, name) {
-            iface = Some(idx);
-            break;
+        let mut builder = hyper::Request::builder()
+            .method(method.as_str())
+            .uri(uri.as_str());
+        for (k, v) in &headers {
+            builder = builder.header(k.as_str(), v.as_str());
         }
-    }
-    let iface =
-        iface.ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
-    let handle_idx = instance
-        .get_export(&mut *store, Some(&iface), "handle")
-        .map(|(_, idx)| idx)
-        .ok_or_else(|| Error::Term(Box::new("no #handle export".to_string())))?;
-    let handle = instance
-        .get_func(&mut *store, handle_idx)
-        .ok_or_else(|| Error::Term(Box::new("handle is not a func".to_string())))?;
+        let req_body = Full::new(Bytes::copy_from_slice(body.as_slice()))
+            .map_err(|e: std::convert::Infallible| match e {})
+            .boxed();
+        let hyper_req = builder
+            .body(req_body)
+            .map_err(|e| Error::Term(Box::new(e.to_string())))?;
 
-    // 5. resources -> component Vals
-    let req_any = req
-        .try_into_resource_any(&mut *store)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
-    let out_any = out
-        .try_into_resource_any(&mut *store)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+        let req = store
+            .data_mut()
+            .new_incoming_request(Scheme::Http, hyper_req)
+            .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let out = store
+            .data_mut()
+            .new_response_outparam(tx)
+            .map_err(|e| Error::Term(Box::new(e.to_string())))?;
 
-    // 6. SYNC call (no async_support needed)
-    handle
-        .call(
+        let mut iface = None;
+        for name in [
+            "wasi:http/incoming-handler@0.2.6",
+            "wasi:http/incoming-handler@0.2.3",
+            "wasi:http/incoming-handler@0.2.0",
+            "wasi:http/incoming-handler",
+        ] {
+            if let Some((_, idx)) = instance.get_export(&mut *store, None, name) {
+                iface = Some(idx);
+                break;
+            }
+        }
+        let iface = iface
+            .ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
+        let handle_idx = instance
+            .get_export(&mut *store, Some(&iface), "handle")
+            .map(|(_, idx)| idx)
+            .ok_or_else(|| Error::Term(Box::new("no #handle export".to_string())))?;
+        let handle = instance
+            .get_func(&mut *store, handle_idx)
+            .ok_or_else(|| Error::Term(Box::new("handle is not a func".to_string())))?;
+
+        let req_any = req
+            .try_into_resource_any(&mut *store)
+            .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+        let out_any = out
+            .try_into_resource_any(&mut *store)
+            .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+        (handle, req_any, out_any, rx)
+    };
+
+    // wb-95o6 FIX: run handle() on a blocking thread while THIS thread drains the response body, so a body
+    // larger than the wasi-http buffer can't deadlock the guest on write-backpressure (the old call-then-read
+    // bug). The drain reads the decoupled body channel (no store lock) so it never contends with the handler.
+    let store_arc = component_store_resource.clone();
+    let handle_task = TOKIO_RUNTIME.spawn_blocking(move || {
+        let mut g = store_arc.inner.lock().unwrap();
+        let store: &mut Store<ComponentStoreData> = &mut g;
+        match handle.call(
             &mut *store,
             &[Val::Resource(req_any), Val::Resource(out_any)],
             &mut [],
-        )
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
-    handle
-        .post_return(&mut *store)
-        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+        ) {
+            Ok(()) => {
+                let _ = handle.post_return(&mut *store);
+                Ok(())
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    });
 
-    // 7. collect the response the guest set on the outparam
-    let resp = rx
-        .try_recv()
+    let resp = TOKIO_RUNTIME
+        .block_on(rx)
         .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
         .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
-    let (parts, resp_body) = resp.into_parts();
-    let collected = TOKIO_RUNTIME
-        .block_on(async { Limited::new(resp_body, MAX_RESPONSE_BYTES).collect().await })
-        .map_err(|_| {
-            Error::Term(Box::new(
-                "wb-broker: response body exceeds cap or stream errored".to_string(),
-            ))
-        })?;
-    let body_bytes = collected.to_bytes();
+    let (parts, mut resp_body) = resp.into_parts();
+
+    // drain into a buffer capped at MAX_RESPONSE_BYTES, but KEEP draining past the cap (discarding) so the
+    // guest never blocks on a full channel (no leak); error only once the stream closes if it exceeded the cap.
+    let mut buf: Vec<u8> = Vec::new();
+    let mut over = false;
+    loop {
+        match TOKIO_RUNTIME.block_on(async { resp_body.frame().await }) {
+            Some(Ok(frame)) => {
+                if let Ok(bytes) = frame.into_data() {
+                    if buf.len() + bytes.len() <= MAX_RESPONSE_BYTES {
+                        buf.extend_from_slice(&bytes);
+                    } else {
+                        over = true;
+                    }
+                }
+            }
+            _ => break,
+        }
+    }
+    let _ = TOKIO_RUNTIME.block_on(handle_task);
+    if over {
+        return Err(Error::Term(Box::new(
+            "wb-broker: response body exceeds cap".to_string(),
+        )));
+    }
+    let body_bytes = Bytes::from(buf);
 
     // hand the body back as a binary (no intermediate byte-list) so real HTTP payloads stay efficient
     let mut out_bin = OwnedBinary::new(body_bytes.len())
