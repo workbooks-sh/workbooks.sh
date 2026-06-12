@@ -284,3 +284,28 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 10): finish the host-path cadence that IS offline-validatable — DoS body-size cap (stream +
   abort) + per-instance conn/rate counter; then DNS-rebinding pin; then revocation. In parallel, file a bd
   to investigate wasi-http-outbound connect (the 323-reclamation gate).
+- 2026-06-12 (iter 10): **GATE DIAGNOSED + remaining-work honestly mapped; strategic PIVOT decided.**
+  Root-caused the wasi-http-outbound panic (wb-0beq): wasmex calls components SYNC (function.call,
+  component_instance.rs:331) inside a tokio task (spawn, :202); a wasi-http outbound does in_tokio->block_on
+  -> "runtime from within a runtime". Fix = async_support(true)+call_async, but that's ENGINE-WIDE (the 32
+  modules + oql + Dock guests share the engine + call sync) -> a focused, regression-heavy refactor (or a
+  separate async engine) + needs internet to confirm -> NOT a loop increment. This is the GATE for the 323
+  (standard tools use wasi-sockets/http, not host_http_get).
+  HONEST ASSESSMENT of the networking keystone:
+    * DENY-SIDE SECURITY = COMPLETE + TESTED across both egress paths: SSRF floor (wasi NIF e2e-proven +
+      host NetGuard unit-proven), red-team obfuscation (decimal/hex/octal/short IP, userinfo@, v4-mapped —
+      12-case suite green), redirect-to-internal (per-hop re-check), scoped allow-list (mechanism both paths,
+      e2e-deny-proven wasi + unit host), audit log (host). ~30 tests green; main green every commit.
+    * EVERY REMAINING ITEM IS GENUINELY GATED on resources this dev-env/loop-format can't provide:
+      - allow-REACHABILITY e2e + DoS-body-cap + DNS-rebinding-pin -> need a SERVER/INTERNET env (wb-k2im);
+        DoS-cap also has a real design tension (:httpc streaming vs redirect-follow vs host_http_get ABI).
+      - wasi-http OUTBOUND working (-> the 323 reclamation) -> the async engine refactor (wb-0beq).
+  STRATEGIC PIVOT (per the loop directive "if blocked file a bd + move on; pull the NEXT STONE"): the
+  networking deny-side is working+secure+manageable for the host_http_get path; the value-unlock (323) +
+  remaining red-team polish are env/refactor-gated. So the productive frontier moves to the NEXT STONE that
+  IS offline-validatable: **Stone 2 — exec -> CommandRegistry dispatch** (a guest's exec(cmd) brokered to the
+  32 in-sandbox wasm commands, Policy-gated, adversarially tested for command-injection/ungranted-command/
+  arg-smuggling). This advances real capability (build tools, shells) without the networking blockers.
+  NEXT (iter 11, fresh context): begin Stone 2 — design the host_exec Dock import (name+argv+stdin ->
+  CommandRegistry.run, deny ungranted commands), wire it, and adversarially test it offline. Networking
+  resumes when an internet env / a focused async-refactor session is available (wb-0beq, wb-k2im, wb-q962).
