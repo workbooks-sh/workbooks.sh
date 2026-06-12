@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#4a90d9;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents — hired for the long run — Workbooks</title>
+<meta name="description" content="Agents in the Workbooks ecosystem are long-running workers: a model on a schedule with files, tools, and memory — living on a Nexus, working inside workbooks, hired for outcomes rather than messages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="mark" href="../index.html" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </a>
+  <div class="drop">
+    <a href="#" onclick="return false">Learn</a>
+    <div class="panel">
+      <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span> Workbooks <small>the unit</small></a>
+      <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span> Nexus <small>the engine</small></a>
+      <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span> Toolkits <small>the parts</small></a>
+      <div class="sep" aria-hidden="true"></div>
+      <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span> Org <small>the grammar</small></a>
+      <a href="agents.html"><span class="sw" style="background:#9fc4e8"><b>✦</b></span> Agents <small>the crew</small></a>
+      <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span> Autopoet <small>the gardener</small></a>
+    </div>
+  </div>
+  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="../index.html#download">Download</a>
+</nav>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05 — <b>the crew</b></div>
+    <h1><span class="ln">hired</span><span class="ln bub">FOR THE</span><span class="ln">long run</span></h1>
+    <p class="dek">An <b>agent</b> here is not a chat window — it's a long-running worker: a model on a <b>schedule</b>, with files, tools, and memory, living on an engine you own. This page is how the construct works, and where its edges are.</p>
+    <div class="meta">
+    <span class="on">the crew</span><span>9 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img src="img/agents-hero.jpg" alt="A small robot with a satchel and pocket watch walking a long path toward a workshop — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>✦</b></div><span>agents</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Not a chatbot</a>
+  <a href="#definition">The definition</a>
+  <a href="#needs">What an agent needs</a>
+  <a href="#onetool">One tool, many toolkits</a>
+  <a href="#chronology">The missing sense</a>
+  <a href="#boundaries">Crew, not autopilot</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>not a CHATBOT</h2>
+  <p>Strip the hype and an agent is a simple construct: a model, in a loop,
+  with tools. The strange part is how the industry runs them — like
+  serverless functions, summoned for a message and evaporated after — and
+  then wonders why they forget everything, repeat work, and can't be trusted
+  with anything longer than a conversation.</p>
+  <p>But nothing about an agent is ephemeral. The whole point is memory,
+  files, schedules, follow-through — <b>time</b>. People feel this so
+  strongly they've taken to parking Mac minis in closets just to give an
+  agent somewhere permanent to exist. The instinct is right; the hardware is
+  silly. An agent isn't a function call. It's a long-running thing.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">a·gent</span> <span class="pr">/ˈeɪ·dʒənt/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a long-running worker in the ecosystem: a
+    model on a <b>schedule</b>, with <b>files</b>, <b>tools</b>, and
+    <b>memory</b>, and a place to live — hired for outcomes, not
+    messages.</p>
+  </div>
+  <p>The mental model shift is from <i>conversation</i> to <i>tenure</i>.
+  You don't summon an agent; you give it a workspace and a beat, and it
+  carries work between your sessions.</p>
+</section>
+
+<section id="needs">
+  <h2>what an agent actually NEEDS</h2>
+  <p>Four things — the same four a human colleague needs from a computer:</p>
+  <ul>
+    <li><b>Files</b> — a workspace it owns. Here that's
+    <a href="workbook.html#agent">inside a workbook</a>: the virtual file
+    system riding in the artifact it's tending.</li>
+    <li><b>Processes</b> — real programs to run, in the workbook's
+    WebAssembly lane, sandboxed by construction.</li>
+    <li><b>Memory</b> — not a vector database bolted on the side, but the
+    workbook's <a href="org.html">org layer</a>: notes, decisions, and task
+    states it reads and writes like you do.</li>
+    <li><b>Time</b> — schedules, persistence, the ability to exist while
+    you're away. That's what <a href="nexus.html#docking">docking</a> is for:
+    the Nexus is where agents live.</li>
+  </ul>
+  <p>Notice what's not on the list: your operating system. An agent here
+  never touches it (<a href="nexus.html#security">the security model</a>
+  explains why that's structural, not polite).</p>
+</section>
+
+<section id="onetool">
+  <h2>one tool, many TOOLKITS</h2>
+  <p>Agents in this ecosystem get exactly <b>one</b> tool: a shell. Every
+  capability beyond it comes from <a href="toolkit.html">toolkits</a> — real
+  programs on the path, each carrying the manual that teaches its use. No
+  bespoke integration per tool, no N×M plugin matrix, no protocol zoo. An
+  agent that can read a manual and run a command can use anything the
+  ecosystem has — the same way you can.</p>
+</section>
+
+<section id="chronology">
+  <h2>the missing sense is t<em>I</em>me</h2>
+  <p>Ask today's agents the questions that matter on real work — <i>when did
+  this happen? why did we decide that then? what was I doing before this?</i>
+  — and they shrug. Context windows hold text, not chronology.</p>
+  <p>Here, chronology is ambient. The org layer's tasks carry states and
+  dates natively; the workbook carries its own history; telemetry is part of
+  the substrate. An agent that can answer "what was I doing and why" is the
+  difference between a goldfish and a colleague — and it falls out of the
+  grammar, not out of a bigger model.</p>
+</section>
+
+<section id="boundaries">
+  <h2>crew, not AUTOPILOT</h2>
+  <p>Honesty section, and a values one. The pitch is never "software that
+  runs itself" — it's <b>people and AI building together</b>. Agents here
+  are crew: they carry work between your sessions, file what they found,
+  and stop at the edges you set. Direction stays human.</p>
+  <p>And the edges are real, not vibes: an agent's blast radius is its
+  sandbox, its capabilities are explicit grants, and what it changes is
+  written in a layer you can read, diff, and revert. Trust is earned in
+  increments — the architecture is built so the increments are safe to
+  give.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Which models do agents use?</summary>
+    <p>Any — the construct is model-agnostic. An agent definition names its
+    model the way it names its toolkits; swap either without touching the
+    rest.</p>
+  </details>
+  <details>
+    <summary>Can an agent modify the system itself?</summary>
+    <p>Only the declarative layer — toolkits, skills, definitions — never
+    the engine. That boundary, and the standing process that works inside
+    it, is <a href="autopoet.html">the Autopoet's whole story</a>.</p>
+  </details>
+  <details>
+    <summary>How do I see what an agent did while I was away?</summary>
+    <p>Read its org layer — the task states and notes it kept are the
+    timesheet. Chronology being native is exactly what makes "catch me up"
+    a real operation instead of an apology.</p>
+  </details>
+  <details>
+    <summary>What does it cost to run one?</summary>
+    <p>Your engine, your meter: agents live on a Nexus you own, so the
+    marginal cost is model calls — not a per-second rental for the computer
+    they exist on.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>The crew writes in the grammar, lives on the engine, and one standing
+  member tends the whole garden.</p>
+  <div class="cards">
+    <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span>
+      <div>The Autopoet<small>the gardener in the machine</small></div><span class="go">→</span></a>
+    <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+      <div>Org<small>the layer everyone writes</small></div><span class="go">→</span></a>
+    <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>What is the Nexus<small>where agents live</small></div><span class="go">→</span></a>
+    <a href="../index.html#download"><span class="sw" style="background:#9fc4e8"><b>✦</b></span>
+      <div>Get Workbooks<small>and meet the crew</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../index.html">← back to the big picture</a>
+  </div>
+</footer>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .34], ["#aee5c2", .26], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+</body>
+</html>

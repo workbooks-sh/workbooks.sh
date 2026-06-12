@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#d9a93e;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Org — the written layer — Workbooks</title>
+<meta name="description" content="Org is the Workbooks ecosystem's written layer: plain text holding prose, tasks, dates, and runnable code in one parseable tree — readable by people, writable by agents, testable by machines.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="mark" href="../index.html" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </a>
+  <div class="drop">
+    <a href="#" onclick="return false">Learn</a>
+    <div class="panel">
+      <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span> Workbooks <small>the unit</small></a>
+      <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span> Nexus <small>the engine</small></a>
+      <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span> Toolkits <small>the parts</small></a>
+      <div class="sep" aria-hidden="true"></div>
+      <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span> Org <small>the grammar</small></a>
+      <a href="agents.html"><span class="sw" style="background:#9fc4e8"><b>✦</b></span> Agents <small>the crew</small></a>
+      <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span> Autopoet <small>the gardener</small></a>
+    </div>
+  </div>
+  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="../index.html#download">Download</a>
+</nav>
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 04 — <b>the written layer</b></div>
+    <h1><span class="ln">the layer</span><span class="ln bub">EVERYONE</span><span class="ln">writes</span></h1>
+    <p class="dek"><b>Org</b> is the grammar of the ecosystem — plain text that holds <b>prose, tasks, dates, and runnable code</b> in one parseable tree. People write it, agents write it, machines can test it. This page explains why that one trick holds the rest together.</p>
+    <div class="meta">
+    <span class="on">the grammar</span><span>8 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img src="img/org-hero.jpg" alt="A colossal card-catalog archive shaped like an open book, a tiny figure and a small robot filing slips together — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>✳</b></div><span>org</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The missing layer</a>
+  <a href="#definition">The definition</a>
+  <a href="#history">Born twenty years early</a>
+  <a href="#holds">What one file can hold</a>
+  <a href="#why-not">Why not Markdown?</a>
+  <a href="#where">Where it shows up</a>
+  <a href="#limits">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the missing LAYER</h2>
+  <p>Every serious project has a second product nobody ships: the intent. Why
+  this exists, what's done, what's next, what we decided and when. Today that
+  layer is scattered — a README that's half true, tickets in one silo, the
+  spec in another, and the agent's context in none of them.</p>
+  <p>The formats on offer force a bad trade. Markdown is lovely to read and
+  means nothing to a machine — it's a blogging language. You can't validate
+  it, can't write a test suite for it, can't reliably parse a plan out of it.
+  YAML and JSON parse perfectly and can't hold a paragraph of reasoning.
+  Prose or structure: pick one. The ecosystem refuses to pick.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">org</span> <span class="pr">/ɔːrg/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the ecosystem's written layer: plain text
+    that holds <b>prose, tasks, dates, and runnable code</b> in one parseable
+    tree — readable by people, writable by agents, testable by machines.</p>
+  </div>
+  <p>The name comes from org-mode, the format it grew from. In Workbooks,
+  org is simply <b>the grammar everything is authored in</b> — the same way
+  the web settled on HTML for what things look like, the ecosystem settles on
+  org for what things mean.</p>
+</section>
+
+<section id="history">
+  <h2>born twenty years EARLY</h2>
+  <p>Org-mode appeared in the Emacs world around 2003, as a way to keep
+  notes, to-dos, and schedules in plain text. It sits in the lineage of
+  literate programming — Donald Knuth's old, stubborn idea that code should
+  live inside the explanation of why it exists, not the other way around.
+  Over two decades it quietly grew the exact feature set agent systems are
+  now reinventing badly: task states, timestamps, dependencies, and
+  <b>tangling</b> — source code written inside the document, extractable to
+  real files.</p>
+  <p>And here's the accident of history that makes it perfect now: those
+  twenty years of documentation are in <b>every model's training data</b>.
+  Agents don't have to be taught org. They arrived knowing it.</p>
+</section>
+
+<section id="holds">
+  <h2>what one file can HOLD</h2>
+  <figure class="diag" aria-label="What an org file holds">
+    <div class="d-file">
+      <span class="ftag">project.org — one parseable tree</span>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">headlines</span><span class="sub">a real hierarchy — sections machines can navigate</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">prose</span><span class="sub">the reasoning, in full sentences, where it belongs</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">tasks + dates</span><span class="sub">TODO → DONE states, schedules, deadlines — native, not convention</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">code blocks</span><span class="sub">runnable source in any language, tangled out to real files</span></div>
+    </div>
+    <figcaption class="dcap">prose AND structure — <b>the trade nobody else refuses</b></figcaption>
+  </figure>
+  <p>A taste of what that looks like in practice — this is a real deployment,
+  described entirely in org:</p>
+  <pre class="orgsample">* deployment
+** ENGINE_PLACE: local          <i># flip to "fly" → same engine, in the cloud</i>
+** DATABASE: sqlite
+** TODO rotate signing key      <i>SCHEDULED: &lt;2026-06-20&gt;</i>
+** notes
+   single-tenant for now; revisit when the team joins.</pre>
+  <p>Configuration, a scheduled task, and a paragraph of reasoning — one
+  file, and every line of it is parseable.</p>
+</section>
+
+<section id="why-not">
+  <h2>"why not just MARKDOWN?"</h2>
+  <p>Use Markdown! It's wonderful — for writing. The trouble starts when you
+  ask it to run a system. There are no states, no dates, no dependencies —
+  just headings and vibes. When an agent drifts (writes one file too many,
+  contradicts itself across notes), Markdown has no way to even notice.
+  <b>You can't write a test suite for Markdown.</b> You can for org: parse
+  the tree, check the states, validate the dates, diff the intent.</p>
+  <p>That's the whole argument in one line: Markdown is for telling humans
+  things. Org is for telling humans <b>and systems</b> the same thing at
+  once.</p>
+</section>
+
+<section id="where">
+  <h2>where it shows UP</h2>
+  <ul>
+    <li><b>Inside every workbook</b> — the writable layer where intent,
+    tasks, and memory live (<a href="workbook.html#org-layer">part one</a>).</li>
+    <li><b>Toolkit manuals</b> — the readable surface that doubles as the
+    tool's interface (<a href="toolkit.html#manual">the manual is the API</a>).</li>
+    <li><b>Deployments</b> — one declarative org file describes the whole
+    engine setup (<a href="nexus.html#dev-prod">dev is prod</a>).</li>
+    <li><b>Workflows</b> — plans whose tasks, states, and dependencies render
+    straight to boards and timelines, executed by agents.</li>
+    <li><b>Agent definitions</b> — who an agent is, written in the same
+    grammar it works in.</li>
+  </ul>
+  <p>One grammar everywhere is the quiet superpower: every piece of the
+  ecosystem can read every other piece, and so can you.</p>
+</section>
+
+<section id="limits">
+  <h2>where it b<em>I</em>tes</h2>
+  <p>Honesty section. Plain text drifts — agents writing freely will
+  eventually write too much, or twice, or contradictorily. Org doesn't
+  prevent that; no format does. What it does is make drift <b>detectable</b>:
+  because the layer is parseable, a checker (or another agent) can walk the
+  tree and find the contradiction. And org is not a database — heavy
+  structured data belongs in the workbook's SQLite, not in headlines. Use
+  each layer for what it's for.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Do I have to learn Emacs?</summary>
+    <p>No. Org the format left Emacs the editor behind long ago — any text
+    editor works, and in this ecosystem most org is written by tools and
+    agents anyway. Your job is mostly to read it, which takes about four
+    minutes to learn.</p>
+  </details>
+  <details>
+    <summary>Will I be writing org by hand all day?</summary>
+    <p>Rarely. You'll write prose and intentions; the toolchain and agents
+    keep the structure. Think of it like git — you don't hand-edit the
+    object store either.</p>
+  </details>
+  <details>
+    <summary>Should my README be org now?</summary>
+    <p>Keep READMEs in Markdown — that's its home turf. Org earns its keep
+    where <b>systems</b> need to read what you wrote: specs, plans, configs,
+    manuals, memory.</p>
+  </details>
+  <details>
+    <summary>Is this a proprietary Workbooks format?</summary>
+    <p>The opposite — it's a twenty-year-old open convention with parsers in
+    every language and deep model familiarity. Workbooks adopts it precisely
+    because it belongs to nobody.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>The grammar is what makes the rest composable — the crew that writes in
+  it, and the gardener that tends it.</p>
+  <div class="cards">
+    <a href="agents.html"><span class="sw" style="background:#9fc4e8"><b>✦</b></span>
+      <div>Agents<small>the crew — hired for the long run</small></div><span class="go">→</span></a>
+    <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span>
+      <div>The Autopoet<small>the gardener in the machine</small></div><span class="go">→</span></a>
+    <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>where the org layer lives</small></div><span class="go">→</span></a>
+    <a href="../index.html#download"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+      <div>Get Workbooks<small>and read some org in the wild</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../index.html">← back to the big picture</a>
+  </div>
+</footer>
+
+<script>
+window.LEARN = {
+  mix: [["#f3c5a3", .34], ["#aee5c2", .26], ["#a8d4f0", .22], ["#9fc4e8", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+</body>
+</html>

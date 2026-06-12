@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Autopoet — the gardener in the machine — Workbooks</title>
+<meta name="description" content="The Autopoet is the Workbooks ecosystem's self-improvement mechanism: a standing process that tends the declarative layer — toolkits, skills, agent definitions — and never the engine itself.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Handjet:wght@400..900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="mark" href="../index.html" aria-label="Workbooks">
+    <svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/>
+    </svg>
+  </a>
+  <div class="drop">
+    <a href="#" onclick="return false">Learn</a>
+    <div class="panel">
+      <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span> Workbooks <small>the unit</small></a>
+      <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span> Nexus <small>the engine</small></a>
+      <a href="toolkit.html"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span> Toolkits <small>the parts</small></a>
+      <div class="sep" aria-hidden="true"></div>
+      <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span> Org <small>the grammar</small></a>
+      <a href="agents.html"><span class="sw" style="background:#9fc4e8"><b>✦</b></span> Agents <small>the crew</small></a>
+      <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span> Autopoet <small>the gardener</small></a>
+    </div>
+  </div>
+  <a class="lnk ghost" href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+  <a class="dl" href="../index.html#download">Download</a>
+</nav>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 06 — <b>living software</b></div>
+    <h1><span class="ln">the gardener</span><span class="ln bub">IN THE</span><span class="ln">machine</span></h1>
+    <p class="dek">The <b>Autopoet</b> is the ecosystem's standing gardener: it reads how the system is doing and tends the <b>declarative layer</b> — toolkits, skills, definitions — never the engine. This page is why that's safe to want, and honestly, how young it is.</p>
+    <div class="meta">
+    <span class="on">the gardener</span><span>8 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img src="img/autopoet-hero.jpg" alt="A small gardener robot watering machine-flowers beside a greenhouse of seedling machines — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>❀</b></div><span>autopoet</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Software rots by default</a>
+  <a href="#definition">The definition</a>
+  <a href="#safe">Why it's safe to want</a>
+  <a href="#does">What it actually does</a>
+  <a href="#homogeneity">You can't learn from noise</a>
+  <a href="#honest">The youngest idea</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>software rots by DEFAULT</h2>
+  <p>Entropy is undefeated. Dependencies drift, docs quietly stop being
+  true, the workaround becomes load-bearing, and the person who understood
+  the cron job leaves. Every fix requires a human to reopen the project,
+  reload the context, and spend an afternoon — so most fixes never happen,
+  and shipped software starts dying the day it ships.</p>
+  <p>The real promise of agents was never that they type faster than you.
+  It's that <b>improvement can become a standing process</b> instead of a
+  heroic act. That standing process needs a name, a safe lane, and a leash —
+  which is exactly what this page is about.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">au·to·po·et</span> <span class="pr">/ˌɔː·toʊ·ˈpoʊ·ət/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the ecosystem's gardener: a standing
+    process that reads how the system is doing and tends its
+    <b>declarative layer</b> — toolkits, skills, agent definitions — and
+    <b>never the engine itself</b>.</p>
+  </div>
+  <p>The name is from <i>autopoiesis</i> — "self-making," the biologists'
+  word for systems that maintain themselves. Not a product feature; a role
+  the architecture makes safe to fill.</p>
+</section>
+
+<section id="safe">
+  <h2>why this is SAFE to want</h2>
+  <p>"Software that edits itself" sounds like the beginning of an incident
+  report. The reason it isn't here comes down to one boundary the whole
+  ecosystem is built around:</p>
+  <figure class="diag" aria-label="The host/loaded boundary">
+    <div class="d-os">
+      <span class="ftag">host — the engines · deploy-fixed · never self-edited</span>
+      <div class="d-room">
+        <span class="ftag">loaded — what the autopoet tends</span>
+        <div class="d-cells">
+          <div class="d-cell" style="background:#f3c5a3"><span class="lbl">toolkits</span><span class="sub">capabilities, sandboxed</span></div>
+          <div class="d-cell" style="background:#f2ddb0"><span class="lbl">skills + manuals</span><span class="sub">the written know-how</span></div>
+          <div class="d-cell" style="background:#9fc4e8"><span class="lbl">agent definitions</span><span class="sub">who the crew is</span></div>
+        </div>
+      </div>
+    </div>
+    <figcaption class="dcap">edits the garden — <b>never the ground</b></figcaption>
+  </figure>
+  <p>Everything inside that inner box is declarative: written in
+  <a href="org.html">the grammar</a>, parseable, versioned, testable, and
+  run <a href="nexus.html#isolation">inside the sandbox</a>. Which means
+  every change the autopoet makes is the safest kind of change software can
+  receive: a reviewable diff to configuration, not a mutation to a running
+  engine.</p>
+</section>
+
+<section id="does">
+  <h2>what it actually dOes</h2>
+  <p>A loop, humble on purpose:</p>
+  <ul>
+    <li><b>Listen</b> — telemetry from the engine, and issues filed by the
+    working crew. Agents are encouraged to file <i>metacognitive</i> tickets:
+    "my toolkit lacks a verb for X," "this manual misled me here."</li>
+    <li><b>Tend</b> — implement the fix in the declarative layer: extend a
+    toolkit, correct a manual, tune an agent definition.</li>
+    <li><b>Verify</b> — build, test, sandbox-run; the same gates any change
+    passes.</li>
+    <li><b>Swap</b> — loaded artifacts hot-swap; nothing reboots, nothing is
+    redeployed.</li>
+  </ul>
+  <p>The first resident is real: this project's own landing-site crew files
+  issues about its tools, and the autopoet lands the fixes — workbooks in
+  the wild, tending their own toolbox.</p>
+</section>
+
+<section id="homogeneity">
+  <h2>you can't learn from NOISE</h2>
+  <p>Why does this need the rest of the ecosystem? Because improvement needs
+  signal. When every project speaks its own stack — different formats,
+  different logs, different plugin zoos — the data describing "how it's
+  going" is noise, and nothing systematic can learn from it. One grammar in,
+  one telemetry shape out: now patterns are visible, and the gardener can
+  actually see which plants are thirsty. The tooling was never the
+  interesting part. <b>Consistent improvement is.</b></p>
+</section>
+
+<section id="honest">
+  <h2>the youngest IDEA here</h2>
+  <p>Full honesty: the autopoet is the most frontier construct on these
+  pages — younger than toolkits, younger than everything. Today it is an
+  agent-and-process loop editing the declarative layer behind gates. The
+  long bet — models that read live runtime data and propose changes the way
+  a forecaster reads weather — is research, not product, and we'd rather
+  tell you that than imply otherwise.</p>
+  <p>One thing it will never be, at any maturity: a pitch about software
+  that runs itself. The ecosystem's whole shape is <b>people and AI building
+  together</b>. The autopoet is just the part that keeps what you built
+  getting better between your sessions.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can it break production?</summary>
+    <p>Its lane is the declarative layer: parseable, versioned, sandbox-run,
+    gated by the same checks as any change — and revertible like any diff.
+    The engine itself is out of reach by construction, not by policy.</p>
+  </details>
+  <details>
+    <summary>Can I turn it off?</summary>
+    <p>Yes — it's a standing process on your engine, not a property of the
+    system. Stop it and you simply have software that improves only when
+    someone shows up. Like everything else you've ever run.</p>
+  </details>
+  <details>
+    <summary>Does it ever write engine code?</summary>
+    <p>Never. The host/loaded boundary is the design's spine: engines are
+    deploy-fixed; the autopoet works entirely in what they load.</p>
+  </details>
+  <details>
+    <summary>Is this just AGI marketing?</summary>
+    <p>No — and the mundanity is the point. Telemetry in, reviewable diffs
+    to config files out. The most magical thing about it is how unmagical
+    every individual step is.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>That's the full tour — the pieces, the grammar, the crew, the gardener.
+  The rest is what you grow.</p>
+  <div class="cards">
+    <a href="workbook.html"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>Start over: the workbook<small>the unit it all tends</small></div><span class="go">→</span></a>
+    <a href="agents.html"><span class="sw" style="background:#9fc4e8"><b>✦</b></span>
+      <div>Agents<small>the crew that files the issues</small></div><span class="go">→</span></a>
+    <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+      <div>Org<small>the layer it edits</small></div><span class="go">→</span></a>
+    <a href="../index.html#download"><span class="sw" style="background:#aee5c2"><b>❀</b></span>
+      <div>Get Workbooks<small>plant something</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../index.html">← back to the big picture</a>
+  </div>
+</footer>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .30], ["#a8d4f0", .26], ["#f2ddb0", .24], ["#f3c5a3", .20]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+</body>
+</html>
