@@ -3,8 +3,8 @@
   {
    "slug": "workbook",
    "title": "Workbooks — the unit",
-   "src": "audio/episodes/workbook.mp3?v=529",
-   "dur": 529,
+   "src": "audio/episodes/workbook.mp3?v=616",
+   "dur": 616,
    "chapters": [
     {
      "id": "intro",
@@ -14,52 +14,52 @@
     {
      "id": "problem",
      "title": "Software you can't hand to anyone",
-     "t": 31
+     "t": 34
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 90
+     "t": 93
     },
     {
      "id": "anatomy",
      "title": "Open one up",
-     "t": 128
+     "t": 132
     },
     {
      "id": "spectrum",
      "title": "Document or app? Yes.",
-     "t": 184
+     "t": 210
     },
     {
      "id": "not-a-zip",
      "title": "Isn't this just a zip file?",
-     "t": 235
+     "t": 275
     },
     {
      "id": "org-layer",
      "title": "The writable layer",
-     "t": 301
+     "t": 342
     },
     {
      "id": "agent",
      "title": "An agent can live in here",
-     "t": 364
+     "t": 403
     },
     {
      "id": "limits",
      "title": "Where a file alone falls short",
-     "t": 426
+     "t": 476
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 459
+     "t": 546
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 511
+     "t": 598
     }
    ]
   },
@@ -197,8 +197,8 @@
   {
    "slug": "nexus",
    "title": "Nexus — the engine",
-   "src": "audio/episodes/nexus.mp3?v=650",
-   "dur": 650,
+   "src": "audio/episodes/nexus.mp3?v=703",
+   "dur": 703,
    "chapters": [
     {
      "id": "intro",
@@ -213,60 +213,60 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 111
+     "t": 106
     },
     {
      "id": "docking",
      "title": "What docking actually means",
-     "t": 145
+     "t": 142
     },
     {
      "id": "beam",
      "title": "Built on a boring miracle",
-     "t": 204
+     "t": 213
     },
     {
      "id": "isolation",
      "title": "Isolation, twice",
-     "t": 274
+     "t": 286
     },
     {
      "id": "why-not",
      "title": "Why not serverless? Why not rent?",
-     "t": 339
+     "t": 355
     },
     {
      "id": "security",
      "title": "The security model, plainly",
-     "t": 415
+     "t": 424
     },
     {
      "id": "dev-prod",
      "title": "Dev is prod",
-     "t": 490
+     "t": 499
     },
     {
      "id": "limits",
      "title": "What the Nexus isn't",
-     "t": 536
+     "t": 586
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 583
+     "t": 630
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 633
+     "t": 685
     }
    ]
   },
   {
    "slug": "toolkit",
    "title": "Toolkits — the parts",
-   "src": "audio/episodes/toolkit.mp3?v=582",
-   "dur": 582,
+   "src": "audio/episodes/toolkit.mp3?v=643",
+   "dur": 643,
    "chapters": [
     {
      "id": "intro",
@@ -276,60 +276,60 @@
     {
      "id": "problem",
      "title": "A million lock files",
-     "t": 29
+     "t": 31
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 93
+     "t": 95
     },
     {
      "id": "anatomy",
      "title": "Three layers",
-     "t": 127
+     "t": 133
     },
     {
      "id": "manual",
      "title": "The manual is the interface",
-     "t": 197
+     "t": 208
     },
     {
      "id": "versus",
      "title": "Isn't this just an MCP server?",
-     "t": 255
+     "t": 270
     },
     {
      "id": "wasm",
      "title": "Why WebAssembly?",
-     "t": 317
+     "t": 342
     },
     {
      "id": "compose",
      "title": "Toolkits compose",
-     "t": 395
+     "t": 425
     },
     {
      "id": "frontier",
      "title": "The honest frontier",
-     "t": 455
+     "t": 486
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 509
+     "t": 569
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 567
+     "t": 628
     }
    ]
   },
   {
    "slug": "org",
    "title": "Org — the grammar",
-   "src": "audio/episodes/org.mp3?v=423",
-   "dur": 423,
+   "src": "audio/episodes/org.mp3?v=454",
+   "dur": 454,
    "chapters": [
     {
      "id": "intro",
@@ -344,50 +344,50 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 79
+     "t": 83
     },
     {
      "id": "history",
      "title": "Born twenty years early",
-     "t": 110
+     "t": 114
     },
     {
      "id": "holds",
      "title": "What one file can hold",
-     "t": 161
+     "t": 166
     },
     {
      "id": "why-not",
      "title": "Why not just Markdown?",
-     "t": 218
+     "t": 253
     },
     {
      "id": "where",
      "title": "Where it shows up",
-     "t": 263
+     "t": 297
     },
     {
      "id": "limits",
      "title": "Where it bites",
-     "t": 309
+     "t": 343
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 346
+     "t": 380
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 406
+     "t": 437
     }
    ]
   },
   {
    "slug": "agents",
    "title": "Agents — the workers",
-   "src": "audio/episodes/agents.mp3?v=338",
-   "dur": 338,
+   "src": "audio/episodes/agents.mp3?v=351",
+   "dur": 351,
    "chapters": [
     {
      "id": "intro",
@@ -402,45 +402,45 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 81
+     "t": 79
     },
     {
      "id": "needs",
      "title": "What an agent actually needs",
-     "t": 106
+     "t": 104
     },
     {
      "id": "onetool",
      "title": "One tool, many toolkits",
-     "t": 158
+     "t": 156
     },
     {
      "id": "chronology",
      "title": "The missing sense is time",
-     "t": 188
+     "t": 190
     },
     {
      "id": "boundaries",
      "title": "Agents, not autopilot",
-     "t": 229
+     "t": 234
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 270
+     "t": 277
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 320
+     "t": 333
     }
    ]
   },
   {
    "slug": "autopoet",
    "title": "Autopoet — the gardener",
-   "src": "audio/episodes/autopoet.mp3?v=524",
-   "dur": 524,
+   "src": "audio/episodes/autopoet.mp3?v=504",
+   "dur": 504,
    "chapters": [
     {
      "id": "intro",
@@ -450,50 +450,50 @@
     {
      "id": "problem",
      "title": "Software rots by default",
-     "t": 48
+     "t": 47
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 107
+     "t": 105
     },
     {
      "id": "safe",
      "title": "Why this is safe to want",
-     "t": 139
+     "t": 137
     },
     {
      "id": "does",
      "title": "What it actually does",
-     "t": 203
+     "t": 225
     },
     {
      "id": "homogeneity",
      "title": "You can't learn from noise",
-     "t": 358
+     "t": 317
     },
     {
      "id": "honest",
      "title": "The youngest idea here",
-     "t": 388
+     "t": 356
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 438
+     "t": 405
     },
     {
      "id": "outro",
      "title": "Back up to the parents",
-     "t": 494
+     "t": 461
     }
    ]
   },
   {
    "slug": "wbx",
    "title": "wbx — the command",
-   "src": "audio/episodes/wbx.mp3?v=588",
-   "dur": 588,
+   "src": "audio/episodes/wbx.mp3?v=663",
+   "dur": 663,
    "chapters": [
     {
      "id": "intro",
@@ -508,60 +508,60 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 64
+     "t": 69
     },
     {
      "id": "install",
      "title": "Install it",
-     "t": 102
+     "t": 107
     },
     {
      "id": "families",
      "title": "The verb families",
-     "t": 144
+     "t": 149
     },
     {
      "id": "modes",
      "title": "Two audiences, one binary",
-     "t": 210
+     "t": 215
     },
     {
      "id": "first",
      "title": "Your first workbook, two minutes",
-     "t": 280
+     "t": 292
     },
     {
      "id": "import",
      "title": "Import anything",
-     "t": 344
+     "t": 360
     },
     {
      "id": "agents",
      "title": "Wire in an agent",
-     "t": 416
+     "t": 449
     },
     {
      "id": "everywhere",
      "title": "Same binary everywhere",
-     "t": 469
+     "t": 502
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 517
+     "t": 592
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 567
+     "t": 643
     }
    ]
   },
   {
    "slug": "workflows",
    "title": "Workflows — the plans",
-   "src": "audio/episodes/workflows.mp3?v=737",
-   "dur": 737,
+   "src": "audio/episodes/workflows.mp3?v=828",
+   "dur": 828,
    "chapters": [
     {
      "id": "intro",
@@ -581,65 +581,65 @@
     {
      "id": "anatomy",
      "title": "What a plan can say",
-     "t": 152
+     "t": 163
     },
     {
      "id": "ready",
      "title": "The ready set",
-     "t": 217
+     "t": 227
     },
     {
      "id": "rounds",
      "title": "Watching a board clear",
-     "t": 272
+     "t": 303
     },
     {
      "id": "boards",
      "title": "Boards are renderings",
-     "t": 335
+     "t": 386
     },
     {
      "id": "schedules",
      "title": "Time is native",
-     "t": 379
+     "t": 430
     },
     {
      "id": "nesting",
      "title": "Plans hold plans",
-     "t": 433
+     "t": 484
     },
     {
      "id": "compile",
      "title": "The compile story",
-     "t": 477
+     "t": 546
     },
     {
      "id": "versus",
      "title": "What it replaces",
-     "t": 527
+     "t": 619
     },
     {
      "id": "honest",
      "title": "Where it bites",
-     "t": 574
+     "t": 666
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 647
+     "t": 738
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 711
+     "t": 802
     }
    ]
   },
   {
    "slug": "vfs",
    "title": "VFS — the disk",
-   "src": "audio/episodes/vfs.mp3?v=790",
-   "dur": 790,
+   "src": "audio/episodes/vfs.mp3?v=774",
+   "dur": 774,
    "chapters": [
     {
      "id": "intro",
@@ -689,22 +689,22 @@
     {
      "id": "versus",
      "title": "Four places to keep bytes",
-     "t": 558
+     "t": 555
     },
     {
      "id": "honest",
      "title": "Where the disk ends",
-     "t": 618
+     "t": 616
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 671
+     "t": 668
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 750
+     "t": 747
     }
    ]
   }
