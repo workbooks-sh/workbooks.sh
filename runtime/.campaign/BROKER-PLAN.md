@@ -641,3 +641,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   unblocked by the same fix — socket_addr_check is wired — but no easy wasi-sockets guest to verify yet).
   NEXT (iter 33): produce a wasi-SOCKETS guest (cargo-component or C wasi:sockets) to verify raw-TCP outbound
   is unblocked + SSRF-filtered (would reclaim the db-client/netcat subset); OR continue new capabilities.
+- 2026-06-12 (iter 33): wasi-sockets STANDARD-tool verify BLOCKED (componentize-js node:net traps
+  'unreachable' — StarlingMonkey has no raw sockets; no wasi:sockets guest-build lane; filed bd). DELIVERED
+  instead the **8th capability: brokered RAW-TCP (TcpBroker) + resolve-then-pin (green).** The host opens the
+  TCP connection — RESOLVE-THEN-PIN: resolves the name ONCE, refuses internal, connects to the PINNED IP
+  (not the hostname), closing the DNS-rebinding window the TLS-bearing http path couldn't. Sends request,
+  reads reply (size-capped), closes. SSRF + per-principal revocation + rate + timeout. NetGuard.
+  resolve_allowed_ip added. REAL public-TCP e2e: a raw TCP request to 1.1.1.1:80 (HTTP/1.0) -> got an HTTP
+  response, brokered+pinned+SSRF-safe; internal denied (audit-logged). 4 tests green. Covers line protocols
+  (HTTP/1, Redis RESP, …) for hand-written guests. Also lands the keystone "resolve-then-pin" cadence item.
+  PLATFORM now EIGHT brokered capabilities. NEXT (iter 34): wire host_tcp Dock import + guest e2e; OR more.

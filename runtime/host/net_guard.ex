@@ -131,6 +131,20 @@ defmodule Workbooks.NetGuard do
 
   def allowed?(_), do: false
 
+  @doc """
+  Resolve `host` and return ONE allowed (public) IP to PIN a connection to — so the caller connects to this
+  resolved IP, not the hostname, closing the DNS-rebinding window (resolve-then-pin). Returns `{:ok, ip}`
+  (an :inet address tuple) | `:error` (unresolvable, or any resolved address is internal/non-routable).
+  """
+  def resolve_allowed_ip(host) when is_binary(host) do
+    case resolve(host) do
+      {:ok, [_ | _] = ips} -> if Enum.all?(ips, &ip_allowed?/1), do: {:ok, hd(ips)}, else: :error
+      _ -> :error
+    end
+  end
+
+  def resolve_allowed_ip(_), do: :error
+
   # Resolve a host (IP literal or DNS name) to a list of inet address tuples. Tries literal first, then
   # A and AAAA. Deny (empty/error) if nothing resolves.
   defp resolve(host) do
