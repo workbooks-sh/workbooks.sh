@@ -251,10 +251,14 @@ pub fn serve_http<'a>(
     body: rustler::Binary,
 ) -> NifResult<(u16, Vec<(String, String)>, rustler::Binary<'a>)> {
     use bytes::Bytes;
-    use http_body_util::{BodyExt, Full};
+    use http_body_util::{BodyExt, Full, Limited};
     use rustler::OwnedBinary;
     use wasmtime_wasi_http::bindings::http::types::Scheme;
     use wasmtime_wasi_http::WasiHttpView;
+
+    // DoS floor (huge bodies): cap the response body the host will buffer from the guest — a malicious
+    // hosted app can't exhaust host memory by returning an unbounded body.
+    const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 
     let store: &mut Store<ComponentStoreData> =
         &mut (component_store_resource.inner.lock().unwrap());
@@ -336,8 +340,12 @@ pub fn serve_http<'a>(
         .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
     let (parts, resp_body) = resp.into_parts();
     let collected = TOKIO_RUNTIME
-        .block_on(async { resp_body.collect().await })
-        .map_err(|e| Error::Term(Box::new(format!("body collect: {e}"))))?;
+        .block_on(async { Limited::new(resp_body, MAX_RESPONSE_BYTES).collect().await })
+        .map_err(|_| {
+            Error::Term(Box::new(
+                "wb-broker: response body exceeds cap or stream errored".to_string(),
+            ))
+        })?;
     let body_bytes = collected.to_bytes();
 
     // hand the body back as a binary (no intermediate byte-list) so real HTTP payloads stay efficient

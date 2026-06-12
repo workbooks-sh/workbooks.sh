@@ -1064,3 +1064,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasi-sockets e2e green. So the untrusted STANDARD-tool path is now FULLY METERED on BOTH protocols:
   wasi-http (rate via send_request) + wasi-sockets (conn rate via socket_addr_check). wb-um2g CLOSED. The
   keystone's rate/conn quotas now cover EVERY egress path: host_* brokers + both wasi standard paths.
+- 2026-06-12 (iter 74): **SERVE-NIF RESPONSE-BODY CAP — closed the inbound huge-body DoS.** The serve NIF
+  collected the guest's response body FULLY with no size cap — a malicious hosted app could exhaust host
+  memory by returning an unbounded body (the REQUEST body is capped by the Plug's read_body, but the response
+  wasn't). Wrapped the response in http_body_util::Limited(16 MiB) before collect: a guest returning > 16 MiB
+  errors (the host buffers at most 16 MiB) -> the handle_call rescue returns {:error} -> 502. 0 rust errors;
+  the inbound e2e green (the cap doesn't break normal small responses); the overflow path is guaranteed by
+  Limited (a standard library). So the keystone's "huge bodies / byte quotas" now covers the inbound app-host
+  RESPONSE too (request was already capped). FOLLOW-UP: full streaming (chunked, not buffered) for large
+  LEGIT downloads/SSE — the bigger capability item; this cap is the DoS floor until then.
