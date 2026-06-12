@@ -1,7 +1,7 @@
 /* feature flags — keep in sync with index.html */
 const WB_FLAGS = { desktopDownload: false };
 if (!WB_FLAGS.desktopDownload) {
-  document.querySelectorAll(".nav .dl").forEach(a => a.textContent = "Install");
+  document.querySelectorAll(".nav .dl").forEach(el => el.remove());
 }
 
 /* ── LEARN CHASSIS JS — shared by the three concept pages ──────────────────

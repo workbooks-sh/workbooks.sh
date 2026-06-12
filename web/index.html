@@ -1717,7 +1717,7 @@ spotRender("workbooks");
 /* desktop build not published yet — pull its affordances, keep the copy CTAs */
 if (!WB_FLAGS.desktopDownload) {
   document.querySelectorAll(".btn-dl").forEach(el => el.remove());
-  document.querySelectorAll(".nav .dl").forEach(a => a.textContent = "Install");
+  document.querySelectorAll(".nav .dl").forEach(el => el.remove());
 }
 
 gsap.registerPlugin(ScrollTrigger);
