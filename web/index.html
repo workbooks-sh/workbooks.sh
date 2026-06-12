@@ -24,6 +24,8 @@
 <meta name="twitter:description" content="A software ecosystem where people and AI build together — and what they build runs anywhere, stays connected, and keeps getting better.">
 <meta name="twitter:image" content="https://workbooks.sh/og.jpg">
 <meta name="twitter:image:src" content="https://workbooks.sh/og.jpg">
+<script>/* feature flags — flip when ready */
+const WB_FLAGS = { desktopDownload: false };</script>
 <style>
   /* ── BRAND V · "lattice" ─ hard type, breathing cells, flat color events ──
      No gradients. No opacity fades. No blur. Everything that moves is
@@ -432,7 +434,7 @@
     connected, and keeps getting better.
   </p>
 
-  <div class="ctas">
+  <div class="ctas" id="download">
     <a class="btn btn-dl soon" aria-disabled="true">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 12.79c-.027-2.747 2.243-4.067 2.345-4.13-1.277-1.868-3.265-2.124-3.972-2.152-1.69-.171-3.3.995-4.158.995-.857 0-2.182-.971-3.588-.945-1.846.027-3.55 1.073-4.5 2.726-1.92 3.328-.49 8.253 1.38 10.954.915 1.323 2.005 2.808 3.435 2.755 1.38-.055 1.9-.892 3.567-.892 1.667 0 2.136.892 3.594.864 1.485-.027 2.424-1.35 3.33-2.68 1.05-1.536 1.482-3.024 1.508-3.1-.033-.015-2.894-1.11-2.92-4.395zM13.63 4.04c.76-.92 1.273-2.2 1.133-3.474-1.095.044-2.42.73-3.205 1.65-.703.813-1.32 2.114-1.154 3.362 1.22.095 2.467-.62 3.227-1.538z"/></svg>
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.45L9.75 2.1v9.4H0zM10.95 1.95L24 0v11.5H10.95zM0 12.5h9.75v9.4L0 20.55zM10.95 12.5H24V24l-13.05-1.95z"/></svg>
@@ -1711,6 +1713,12 @@ async function playStory(p) {
 }
 
 spotRender("workbooks");
+
+/* desktop build not published yet — pull its affordances, keep the copy CTAs */
+if (!WB_FLAGS.desktopDownload) {
+  document.querySelectorAll(".btn-dl").forEach(el => el.remove());
+  document.querySelectorAll(".nav .dl").forEach(a => a.textContent = "Install");
+}
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.create({

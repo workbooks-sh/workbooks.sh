@@ -1,3 +1,9 @@
+/* feature flags — keep in sync with index.html */
+const WB_FLAGS = { desktopDownload: false };
+if (!WB_FLAGS.desktopDownload) {
+  document.querySelectorAll(".nav .dl").forEach(a => a.textContent = "Install");
+}
+
 /* ── LEARN CHASSIS JS — shared by the three concept pages ──────────────────
    Each page declares `window.LEARN = { mix, story }` before this script:
      mix   — the piece's DNA proportions [[color, frac], ...]
