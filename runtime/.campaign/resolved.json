@@ -758,6 +758,108 @@
 "lane": "none",
 "blocker": "swiftc is a native (non-wasm) LLVM toolchain; building Swift -> wasm32-wasi requires native exec, which is forbidden in-sandbox. No prebuilt standalone Swift .wasm program exists t",
 "extent": "off-the-table (verified)"
+},
+"Haskell": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt standalone Haskell .wasm interpreter/REPL exists. The only path to wasm is GHC's AOT cross-compiler (per-program output), and GHC is a huge native Haskell-bootstrapped ",
+"extent": "off-the-table (verified)"
+},
+"Dart": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "dart2wasm output depends on the WasmGC proposal (host GC) and a JS host loader (.mjs), not plain wasm32-wasi; standalone WASI/component-model support is an open, unimplemented SDK ",
+"extent": "off-the-table (verified)"
+},
+"R": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only port is emscripten/browser webR (JS+wasm pair, not standalone wasm32-wasi); R core needs a Fortran/LAPACK toolchain (no Fortran lane) plus autoconf + emscripten patches \u2014 not ",
+"extent": "off-the-table (verified)"
+},
+"D": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No D tool ships as a prebuilt plain wasm32-wasi .wasm (no Lane A). D-to-wasm requires the LDC/LLVM-D compiler toolchain + wasi-libc + druntime port, which is not in the sandbox and",
+"extent": "off-the-table (verified)"
+},
+"Ada": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Ada needs AOT compilation via patched GNAT-LLVM (heavy LLVM codegen toolchain, not amalgam/crate/pip). No prebuilt wasm32-wasi .wasm exists. AdaWebPack targets the browser (Web API",
+"extent": "off-the-table (verified)"
+},
+"Lean": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32 wasi build exists. Emscripten only port needs JS runtime and C plus plus exceptions which WASI lacks, and Lean is self hosting.",
+"extent": "off-the-table (verified)"
+},
+"Cyclone": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "32-bit-ABI-locked, self-hosting (bootstrap chicken-and-egg), abandoned-2006 autoconf toolchain that does not build on 64-bit hosts let alone wasm32 without a major port; not a self",
+"extent": "off-the-table (verified)"
+},
+"Dafny": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Dafny is .NET/C# (JIT/Blazor-emscripten only, no wasm32-wasi); its required Z3 prover ships only as emscripten+JS-bindings wasm (disallowed JS-pair, not plain WASI) and is normally",
+"extent": "off-the-table (verified)"
+},
+"F*": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "F*'s core purpose (program verification) discharges SMT proof obligations by fork-exec'ing Z3 as a child subprocess over a pipe \u2014 process spawn is impossible in-sandbox. Plus no OC",
+"extent": "off-the-table (verified)"
+},
+"RedwoodJS": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: the api side is a long-lived Fastify/Apollo GraphQL HTTP server. Plus hard Node-runtime dependence (libuv, native addons, fork-exec build tooling) and Prisma's ",
+"extent": "off-the-table (verified)"
+},
+"Blitz.js": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose plus Node-server runtime; needs long-lived Node HTTP server for Next.js SSR and Prisma native DB engine; no standalone wasm32-wasi artifact and value is not pure",
+"extent": "off-the-table (verified)"
+},
+"Fresh": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Deno native runtime; network server core, JIT, threads. Out of lane.",
+"extent": "off-the-table (verified)"
+},
+"Analog": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Framework's purpose is a Node-hosted Vite dev-server + Nitro HTTP server (network-as-purpose, long-lived listener) plus a Vite/Rollup/esbuild plugin toolchain that requires the ful",
+"extent": "off-the-table (verified)"
+},
+"Rspack": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native threading as the core architecture (rayon + parallel module graph) requires wasm32-wasip1-threads, plus napi-rs/emnapi N-API bindings and a JS/Web-Worker host (Atomics.wait,",
+"extent": "off-the-table (verified)"
+},
+"Rolldown": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only wasm artifact is a NAPI-RS binding requiring wasm32-wasip1-threads (native threads/shared memory) + @napi-rs/wasm-runtime JS glue + Node-like host; not a standalone wasm32-was",
+"extent": "off-the-table (verified)"
+},
+"SpiderMonkey": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt standalone runnable JS-shell .wasm exists \u2014 the wasm32-wasi prebuilt is a link-only static library; the only runnable form (StarlingMonkey/js-compute) requires WASI 0.2",
+"extent": "off-the-table (verified)"
+},
+"WinterJS": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose + WASIX-only. WinterJS is a Service-Worker HTTP server whose reason to exist is serving fetch events over the network (`--net` mandatory). It targets Wasmer's WA",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1357,6 +1459,27 @@
 "lane": "A",
 "recipe": "Haskell-the-compiler (GHC) is NOT shippable in-sandbox \u2014 GHC is a huge native cross-compiler with no",
 "confidence": "high",
+"verified": false
+},
+"Idris": {
+"verdict": "uncertain",
+"lane": "none",
+"recipe": "No clean lane. Idris2 is a SELF-HOSTED compiler: building it requires an existing Idris2 binary or a",
+"confidence": "medium",
+"verified": false
+},
+"ATS": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "No prebuilt wasm exists (no Lane A; confirmed via search \u2014 only Rust/C wasi targets surface, nothing",
+"confidence": "medium",
+"verified": false
+},
+"Hermes": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "C++ engine, no JIT (interpreter), no threads (-DLLVM_ENABLE_THREADS=0), no network/fork-exec \u2014 runs ",
+"confidence": "medium",
 "verified": false
 }
 }
