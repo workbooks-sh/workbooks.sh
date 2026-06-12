@@ -531,8 +531,13 @@ defmodule Workbooks.Pallet do
   # the interpreter + .py files. Each tool = data (name + script); the package universe is shared.
   @yaml_script "import sys; sys.path.insert(0, '/pkgs'); import yaml, json; print(json.dumps(yaml.safe_load(sys.stdin.read()), sort_keys=True))"
 
+  # `tmpl`: Jinja2 templating (Jinja2 + its dep MarkupSafe, both vendored — proves Lane D handles
+  # MULTI-package deps). stdin = JSON {"template": "...", "data": {...}} → the rendered text.
+  @tmpl_script "import sys, json; sys.path.insert(0, '/pkgs'); from jinja2 import Template; req = json.loads(sys.stdin.read()); sys.stdout.write(Template(req['template']).render(**req.get('data', {})))"
+
   @python_tools [
-    %{name: "yaml", script: @yaml_script}
+    %{name: "yaml", script: @yaml_script},
+    %{name: "tmpl", script: @tmpl_script}
   ]
 
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."

@@ -34,6 +34,7 @@
   | =md=                        | documents     | CommonMark markdown → HTML                      |
   | =qr=                        | encoding      | text → ASCII QR code                            |
   | =yaml=                      | config        | YAML → JSON (PyYAML on CPython, Lane D)         |
+  | =tmpl=                      | templating    | Jinja2 render (multi-package Python, Lane D)    |
   | =wfreq=                     | text          | word frequency (Rust via mrustc→clang, Lane C)  |
   | =coreutils=                 | unix utils    | ~100 applets (=coreutils <applet> …=)           |
   | =wat2wasm= =wasm2wat= …     | wasm tooling  | WABT (12 tools)                                 |

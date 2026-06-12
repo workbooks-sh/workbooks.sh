@@ -58,6 +58,8 @@
 
   - =yaml= — YAML → JSON (PyYAML on CPython, Lane D). =run("yaml", "a: 1\nb: [x, y]", [])= →
     ={"a": 1, "b": ["x", "y"]}=. Distinct: YAML is in no stdlib we have.
+  - =tmpl= — Jinja2 templating (Jinja2 + MarkupSafe on CPython, Lane D multi-package). stdin =
+    JSON ={"template","data"}= → rendered text. =run("tmpl", json, [])=.
   - =wfreq= — word frequency, desc by count (a Rust tool built via mrustc→clang, Lane C).
     =run("wfreq", "the cat the dog the", [])= → =3⇥the / 1⇥cat / 1⇥dog=.
 

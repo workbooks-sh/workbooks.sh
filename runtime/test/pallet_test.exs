@@ -176,4 +176,15 @@ defmodule Workbooks.PalletTest do
     assert out =~ ~s("lanes": ["A", "B", "C"])
     assert out =~ ~s("name": "workbooks")
   end
+
+  @tag :pallet
+  @tag timeout: 300_000
+  test "Lane D — a multi-package Python tool (tmpl/Jinja2+MarkupSafe) renders on CPython" do
+    # proves Lane D handles a package WITH dependencies (Jinja2 → MarkupSafe), both vendored pure-Python
+    assert :ok = Pallet.seed_python_tool_one("tmpl")
+    assert "tmpl" in CommandRegistry.list()
+    req = ~s({"template": "Hi {{ n }}! {% for x in xs %}{{ x }}{% endfor %}", "data": {"n": "WB", "xs": [1, 2, 3]}})
+    assert {:ok, out} = CommandRegistry.run("tmpl", req, [])
+    assert String.trim(out) == "Hi WB! 123"
+  end
 end
