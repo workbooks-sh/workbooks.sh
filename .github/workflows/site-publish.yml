@@ -1,0 +1,28 @@
+# workbooks.sh GitOps spine — push to main touching web/** refreshes the fly
+# origin (wb-site), which serves the site through the Cloudflare proxy.
+# The Pages static FALLBACK is updated separately via `bash web/publish.sh`
+# (local, wrangler OAuth). Epic wb-gnzy.
+name: site-publish
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "desktop/scripts/install.sh"]
+  workflow_dispatch:
+concurrency:
+  group: site-publish
+  cancel-in-progress: true
+jobs:
+  refresh-origin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Refresh origin from main
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SITE_TOKEN }}
+        run: |
+          flyctl ssh console -a wb-site -C "sh -c 'set -e; rm -rf /tmp/r; git clone -q --depth 1 https://github.com/workbooks-sh/workbooks.sh /tmp/r; rm -rf /data/build/public/wb-site; mkdir -p /data/build/public/wb-site; cp -r /tmp/r/web/. /data/build/public/wb-site/; rm -rf /data/build/public/wb-site/brand /data/build/public/wb-site/og/build.py /data/build/public/wb-site/publish.sh /data/build/public/wb-site/deploy /data/build/public/wb-site/_worker.js; cp /tmp/r/desktop/scripts/install.sh /data/build/public/wb-site/install.sh; echo origin-refreshed'"
+      - name: Verify
+        run: |
+          sleep 3
+          code=$(curl -s -o /dev/null -w "%{http_code}" https://wb-site.fly.dev/)
+          echo "origin / -> $code"; [ "$code" = "200" ]

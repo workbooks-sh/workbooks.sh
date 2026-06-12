@@ -22,6 +22,56 @@ document.querySelectorAll("[data-dna]").forEach((el, i) => {
   el.innerHTML = dnaSegs(LEARN.mix, i * 97 + 13);
 });
 
+/* ── the page renders from its own record ──────────────────────────────────
+   Every learn page carries an org spec (script#workbook-spec) — its CMS
+   record. The chrome derives from it at runtime: hero lockup + kicker + chip
+   from the spec's properties, the TOC from the actual sections, the read
+   time from the actual words. Edit the record, the page follows. */
+(function () {
+  var el = document.getElementById("workbook-spec");
+  if (!el) return;
+  var org = el.textContent;
+  var props = {};
+  org.replace(/:([A-Z0-9]+):[ \t]+(\S[^\n]*)/g, function (_, k, v) { props[k] = v.trim(); });
+
+  /* hero from the record */
+  var kick = document.querySelector(".lhero .kicker");
+  if (kick && props.NN && props.KICKER)
+    kick.innerHTML = "learn / " + props.NN + " — <b>" + props.KICKER + "</b>";
+  var h1 = document.querySelector(".lhero h1");
+  if (h1 && props.TITLE1 && props.TITLE2 && props.TITLE3)
+    h1.innerHTML =
+      '<span class="ln">' + props.TITLE1 + '</span>' +
+      '<span class="ln bub">' + props.TITLE2 + '</span>' +
+      '<span class="ln">' + props.TITLE3 + '</span>';
+  var chip = document.querySelector(".lhero .meta .on");
+  if (chip && props.CHIP) chip.textContent = props.CHIP;
+
+  /* read time from the actual article */
+  var article = document.querySelector("article");
+  var mins = document.querySelector(".lhero .meta span:not(.on)");
+  if (article && mins) {
+    var words = article.textContent.trim().split(/\s+/).length;
+    mins.textContent = Math.max(1, Math.round(words / 210)) + " min read";
+  }
+
+  /* TOC from the sections that actually exist */
+  var toc = document.querySelector(".ltoc");
+  if (toc && article) {
+    var links = [];
+    article.querySelectorAll("section[id]").forEach(function (sec) {
+      var h = sec.querySelector("h2");
+      if (h) {
+        var label = h.textContent.replace(/\s+/g, " ").trim().toLowerCase();
+        if (label.length > 30) label = label.slice(0, 29).replace(/\s+\S*$/, "") + "…";
+        links.push('<a href="#' + sec.id + '">' + label + "</a>");
+      }
+    });
+    if (links.length)
+      toc.innerHTML = '<div class="t">on this page</div>\n' + links.join("\n");
+  }
+})();
+
 /* TOC scrollspy */
 const tocLinks = [...document.querySelectorAll(".ltoc a")];
 const sections = tocLinks.map(a => document.querySelector(a.getAttribute("href")));
