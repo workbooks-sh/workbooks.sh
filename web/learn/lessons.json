@@ -49,7 +49,17 @@
           "icon": "icons/org.svg",
           "audio": true,
           "status": "live",
-          "sublessons": []
+          "sublessons": [
+            {
+              "slug": "nb-kernel",
+              "title": "The kernel, live in your tab",
+              "sub": "runnable",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "live"
+            }
+          ]
         },
         {
           "slug": "agents",

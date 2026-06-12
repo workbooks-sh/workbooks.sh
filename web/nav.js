@@ -49,14 +49,6 @@
     '.nav .drop .panel .colhead { font: 700 9px var(--mono, monospace); letter-spacing: .22em;',
     '  text-transform: uppercase; color: var(--dim, #565b54); padding: 8px 10px 6px; display: flex; align-items: baseline; gap: 8px; }',
     '.nav .drop .panel .colhead small { font-weight: 400; letter-spacing: .02em; text-transform: none; font-size: 9px; }',
-    '.nav .drop .panel .subrow { margin-left: 18px; border-left: 2px dotted rgba(18,19,22,.25); }',
-    '.nav .drop .panel .subrow a { padding-top: 6px; padding-bottom: 6px; font-size: 10.5px; }',
-    '.nav .drop .panel .subrow a .sw { width: 18px; height: 18px; } .nav .drop .panel .subrow a .sw img { height: 11px; }',
-    '.nav .drop .panel .nbsearch { margin: 2px 8px 6px; }',
-    '.nav .drop .panel .nbsearch input { width: 100%; box-sizing: border-box; border: 2px solid var(--ink, #121316);',
-    '  border-radius: 7px; background: #fff; padding: 7px 9px; font: 500 11px var(--mono, monospace);',
-    '  color: var(--ink, #121316); outline: none; }',
-    '.nav .drop .panel .nbsearch input:focus { border-color: var(--bloom, #13d943); }',
     '.nav .drop .panel a .cat { font: 700 8.5px var(--mono, monospace); letter-spacing: .08em; color: var(--ink, #121316);',
     '  background: var(--swc, #ddd); border-radius: 5px; padding: 3px 6px; flex: 0 0 auto; }',
     '.nav .drop .panel .nbempty { font: 400 10.5px var(--mono, monospace); color: var(--dim, #565b54); padding: 8px 10px; }',
@@ -76,10 +68,6 @@
   var WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor"/></svg>';
   var GH = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>';
 
-  // notebooks — runnable org documents; searchable from the Learn dropdown
-  var NOTEBOOKS = [
-    { href: "learn/nb-kernel.html", title: "the kernel, live in your tab", cat: "grammar", sw: "#f2ddb0" },
-  ];
 
   function item(href, sw, name, small) {
     return '<a href="' + root + href + '"><span class="sw" style="background:' + sw[0] + '">' + sw[1] + '</span> ' + name + ' <small>' + small + '</small></a>';
@@ -87,6 +75,8 @@
 
   // lessons come from THE catalog (learn/lessons.json) — the CMS seed.
   var lessonsCol = '<div class="col" data-lessons><div class="colhead">lessons <small>loading…</small></div></div>';
+  // hovering a lesson on the left fills this panel with its deep dives
+  var subPanel = '<div class="col" data-subpanel><div class="colhead">deep dives <small>hover a lesson</small></div><div class="subbody"></div></div>';
 
   function lessonRow(l) {
     var icon = l.icon.indexOf("../") === 0 ? root + l.icon.slice(3) : root + "learn/" + l.icon;
@@ -95,16 +85,6 @@
       l.title + ' <small>' + l.sub + '</small></a>';
   }
 
-  var nbRows = NOTEBOOKS.map(function (n) {
-    return '<a href="' + root + n.href + '" data-nb="' + (n.title + " " + n.cat).toLowerCase() + '">' +
-      '<span class="cat" style="--swc:' + n.sw + '; background:' + n.sw + '">' + n.cat + '</span> ' + n.title + '</a>';
-  }).join("");
-  var notebooksCol =
-    '<div class="col"><div class="colhead">notebooks <small>runnable examples</small></div>' +
-    '<div class="nbsearch"><input type="search" placeholder="search notebooks…" aria-label="Search notebooks"></div>' +
-    '<div class="nblist">' + nbRows + '<div class="nbempty" style="display:none">no notebooks match</div></div>' +
-    '<div class="colhead" style="padding-top:10px"><small>the shelf grows — one at a time, each its own design</small></div>' +
-    '</div>';
 
   // Docs — stubbed category panel; everything points at the repo until the
   // documentation CMS lands (the categories are the future information
@@ -125,7 +105,7 @@
 
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
-    '<div class="drop"><a href="#">Learn</a><div class="panel">' + lessonsCol + '<div class="vsep" aria-hidden="true"></div>' + notebooksCol + '</div></div>' +
+    '<div class="drop"><a href="#">Learn</a><div class="panel">' + lessonsCol + '<div class="vsep" aria-hidden="true"></div>' + subPanel + '</div></div>' +
     '<div class="drop"><a href="#">Docs</a><div class="panel">' + docsCol + '</div></div>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
     (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '');
@@ -149,13 +129,41 @@
         if (i > 0) html += '<div class="sep" aria-hidden="true"></div>';
         html += '<div class="colhead">' + (i === 0 ? "lessons" : "") + ' <small>' + tier.title + "</small></div>";
         tier.lessons.filter(function (l) { return l.status === "live"; }).forEach(function (l) {
-          html += lessonRow(l);
-          (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) {
-            html += '<div class="subrow">' + lessonRow(x) + "</div>";
-          });
+          html += lessonRow(l).replace("<a ", '<a data-slug="' + l.slug + '" ');
         });
       });
       host.innerHTML = html;
+
+      var bylSlug = {};
+      cat.tiers.forEach(function (t) { t.lessons.forEach(function (l) { bylSlug[l.slug] = l; }); });
+      var body = nav.querySelector("[data-subpanel] .subbody");
+      var head = nav.querySelector("[data-subpanel] .colhead");
+
+      function showSubs(slug) {
+        var l = bylSlug[slug];
+        var subs = (l.sublessons || []).filter(function (x) { return x.status === "live"; });
+        head.innerHTML = "deep dives <small>in " + l.title.toLowerCase() + "</small>";
+        body.innerHTML = subs.length
+          ? subs.map(lessonRow).join("")
+          : '<div class="nbempty">nothing deeper here yet — the shelf grows</div>';
+      }
+      function showAll() {
+        head.innerHTML = 'deep dives <small>hover a lesson</small>';
+        var html = "";
+        cat.tiers.forEach(function (t) {
+          t.lessons.forEach(function (l) {
+            (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) {
+              html += lessonRow(x).replace("<small>", "<small>" + l.title.toLowerCase() + " · ");
+            });
+          });
+        });
+        body.innerHTML = html || '<div class="nbempty">deep dives appear here as the shelf grows</div>';
+      }
+      showAll();
+      host.querySelectorAll("a[data-slug]").forEach(function (a) {
+        a.addEventListener("mouseenter", function () { showSubs(a.dataset.slug); });
+      });
+      nav.querySelector("[data-lessons]").addEventListener("mouseleave", showAll);
     })
     .catch(function () {});
 
@@ -168,20 +176,4 @@
     });
   });
 
-  // notebook search — filter as you type
-  var search = nav.querySelector(".nbsearch input");
-  if (search) {
-    search.addEventListener("input", function () {
-      var q = search.value.trim().toLowerCase();
-      var any = false;
-      nav.querySelectorAll(".nblist a").forEach(function (a) {
-        var hit = !q || a.dataset.nb.indexOf(q) >= 0;
-        a.style.display = hit ? "" : "none";
-        any = any || hit;
-      });
-      nav.querySelector(".nbempty").style.display = any ? "none" : "";
-    });
-    // keep the dropdown open while typing
-    search.addEventListener("click", function (e) { e.stopPropagation(); });
-  }
 })();
