@@ -440,7 +440,9 @@ defmodule Workbooks.CommandRegistry do
               # :extra_sources — inject custom {filename, content} files (e.g. a minimal CLI main for a
               # library whose bundled CLI drags in too many extras, or a tool needing a small harness).
               for {fname, content} <- opts[:extra_sources] || [] do
-                File.write!(Path.join(builddir, fname), content)
+                dst = Path.join(builddir, fname)
+                File.mkdir_p!(Path.dirname(dst))
+                File.write!(dst, content)
               end
 
               res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [])

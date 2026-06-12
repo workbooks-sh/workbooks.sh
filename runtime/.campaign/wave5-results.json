@@ -1,0 +1,202 @@
+[
+ {
+  "name": "LLVM",
+  "lane": "A",
+  "source_url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
+  "recipe": "ALREADY LIVE \u2014 no new work. LLVM is in-sandbox today via the existing `clang` compiler lane: runtime/compilers/clang/build.sh fetches @yowasp/clang (whitequark/YoWASP), sha-verifies, and extracts `llvm.core.wasm` \u2014 a single LLVM multitool built FOR wasm32-wasi that runs on wasmtime. It dispatches by argv[0] to clang/clang++/lld AND the llvm-* tools (opt, llc, llvm-as, llvm-dis, etc.), which ARE LLVM's IR/optimizer/backends. The +llvm-resources.tar sysroot mounts at the clang resource dir. URL verified HTTP/2 200, sha pinned (6230ea1...), tgz already present locally (27MB). YoWASP is the canonical wasm32-wasi LLVM build; this is Lane A prebuilt plain wasm32-wasi (NOT emscripten/js-pair). To expose opt/llc as standalone CommandRegistry verbs, register additional argv[0] aliases against the same llvm.core.wasm \u2014 pure CPU, no native exec/JIT/GPU/network.",
+  "smoke": "Run llvm.core.wasm under wasmtime with argv[0]=clang to compile `int main(){return 41+1;}` to a.wasm against the mounted sysroot, then run a.wasm \u2192 exit 42. For the optimizer/backend specifically: emit LLVM IR (clang -S -emit-llvm hello.c -o hello.ll), then invoke the same binary as `opt -O2 hello.ll -o hello.bc` and `llc` \u2014 non-zero-free exit + valid .bc proves IR+optimizer+backend run in-sandbox. (Per CLAUDE.md: do NOT run a full local compile in this scout; the clang lane is already proven by the Rust lane using clang.wasm.)",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "Cranelift",
+  "lane": "none",
+  "source_url": "https://cranelift.dev",
+  "recipe": "N/A \u2014 Cranelift is a native code generator (JIT backend for wasmtime/rustc). As a Rust library it compiles to wasm32-wasi, but its purpose is to EMIT host-architecture (x86-64/aarch64) machine code. The only useful consumption of that output is executing it natively = JIT/native code execution, which is forbidden in our wasmtime sandbox (no native exec). It cannot run its emitted code in-sandbox, so it delivers no usable standalone capability as a .wasm CLI. No prebuilt plain wasm32-wasi CLI exists (it ships as crates, not an executable). Lane C (mrustc) is also out: cranelift-codegen is large and uses build-script codegen + heavy macros, beyond mrustc ~1.74.",
+  "smoke": "No valid smoke: any meaningful test (compile a function -> run emitted machine code) requires native execution of emitted bytes, which the sandbox prohibits. A library-only \"isa::lookup + emit bytes\" smoke produces non-executable host machine code with no consumer in-sandbox.",
+  "verdict": "impossible",
+  "blocker": "Purpose is JIT/native code generation \u2014 emits host machine code that can only be used by executing it natively, which is banned in the wasmtime sandbox (no native exec). No prebuilt wasm32-wasi CLI; not a runnable standalone artifact.",
+  "confidence": "high"
+ },
+ {
+  "name": "wasm-bindgen",
+  "lane": "none",
+  "source_url": "https://github.com/wasm-bindgen/wasm-bindgen/releases/tag/0.2.123",
+  "recipe": "No viable lane. Lane A: releases ship only native triples (aarch64/x86_64-apple-darwin, *-linux-gnu/musl, windows-msvc) \u2014 NO plain wasm32-wasi/wasip1 .wasm artifact. Lane B: not C/C++. Lane C: it is a Rust crate (wasm-bindgen-cli) but Cargo.toml declares rust-version=1.86 and edition 2021, and depends on proc-macro-heavy / modern crates (clap v4 derive, serde_derive, walrus 0.26, wasmparser 0.245) plus network/server crates (ureq, native-tls, rouille). mrustc tops out ~1.74 and cannot do proc-macros at this scale \u2014 building it is impossible. Lane D: not Python/JS. The note's claim (\"pure transform, compiles to wasip1\") describes runtime behavior, not buildability in our toolchain; we have no prebuilt wasm and cannot compile the source.",
+  "smoke": "If a wasm32-wasi build existed: run `wasm-bindgen --version`; then `wasm-bindgen path/to/mod.wasm --out-dir out --target web` on a tiny #[wasm_bindgen]-compiled input.wasm, and assert out/mod_bg.wasm + out/mod.js (JS glue) are emitted. None of this is runnable today \u2014 no artifact, unbuildable source.",
+  "verdict": "impossible",
+  "blocker": "No prebuilt plain wasm32-wasi artifact (only native triples), and the Rust source requires Rust 1.86 + heavy proc-macros (clap/serde derive, walrus, wasmparser) \u2014 far beyond mrustc ~1.74, so Lane C build is impossible. Not C/C++/Python/JS for other lanes.",
+  "confidence": "high"
+ },
+ {
+  "name": "jco",
+  "lane": "none",
+  "source_url": "https://github.com/bytecodealliance/jco",
+  "recipe": "jco ships only as the npm package @bytecodealliance/jco (v1.23.0, bin src/jco.js) \u2014 there is NO prebuilt plain wasm32-wasi binary (Lane A fails; repo language is Rust but the product is a JS CLI). It is not a self-contained C/C++ amalgam (B) nor a bare Rust crate (C). It nominally lands in Lane D (npm/JS), but its core deps make in-sandbox execution intractable: @bytecodealliance/componentize-js bundles StarlingMonkey (a full SpiderMonkey JS engine compiled to wasm, ~tens of MB) \u2014 running that inside our QuickJS JS lane is engine-in-engine; and binaryen is a large emscripten C++ artifact, not our plain wasm32-wasi lane. Crucially, jco is a BUILD-TIME developer toolchain whose job is to PRODUCE wasm components and to TRANSPILE components into JS + browser/Node host shims (@bytecodealliance/preview2-shim / preview3-shim) \u2014 i.e. its outputs target the JS browser/Node host the scope explicitly excludes. We already run wasm components directly on wasmtime; jco makes the toolchain, it is not a runtime data/compute capability the sandbox consumes. No recipe that fits the lanes.",
+  "smoke": "N/A \u2014 would-be smoke (`jco transpile add.wasm -o out/`) requires StarlingMonkey/binaryen JS-engine deps and emits browser/Node-host JS shims, which our wasmtime-only, no-JS-host sandbox cannot execute.",
+  "verdict": "impossible",
+  "blocker": "jco is a JS/npm build-time toolchain (componentize-js bundles a full StarlingMonkey/SpiderMonkey wasm JS engine + binaryen emscripten C++), not a standalone wasm32-wasi command; its purpose and output target a browser/Node JS host (preview2/3-shim), which the sandbox scope excludes. No plain wasm32-wasi binary exists, and it is a toolchain to BUILD components we already run on wasmtime \u2014 not a runtime capability.",
+  "confidence": "high"
+ },
+ {
+  "name": "DuckDB",
+  "lane": "none",
+  "source_url": "https://github.com/duckdb/duckdb-wasm",
+  "recipe": "No viable lane. (A) The only shipped wasm artifact is duckdb-wasm \u2014 an Emscripten build distributed via npm (@duckdb/duckdb-wasm), requiring JS glue, Web Workers, and a browser/Node host; not a plain wasm32-wasi module (GitHub release assets are empty). (B) DuckDB core is a large C++17 codebase (~92% C++, hundreds of KLOC) needing CMake + Python 3 orchestration and a Postgres-derived bison-generated SQL parser (libpg_query) \u2014 not a self-contained amalgam our C/C++ libc++ lane can build. (C/D) N/A (C++, not Rust/Python/JS). Capability note: the SQL-analytics-query capability is ALREADY covered by our live sqlite3; DuckDB adds OLAP vectorization perf but no missing capability.",
+  "smoke": "If a wasi build existed: echo \"SELECT sum(x) FROM range(1000000) t(x);\" | duckdb :memory: \u2014 expect 499999500000. Capability-equivalent today: sqlite3 :memory: 'SELECT sum(value) FROM generate_series(0,999999);'",
+  "verdict": "impossible",
+  "blocker": "Only wasm artifact is an Emscripten/JS-host build (npm duckdb-wasm, needs browser/Node + Web Workers), not plain wasm32-wasi. Core is a huge CMake+Python+bison C++17 build, not a self-contained amalgam. SQL-analytics capability already covered by live sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "SurrealDB",
+  "lane": "none",
+  "source_url": "https://registry.npmjs.org/@surrealdb/wasm/-/wasm-3.0.3.tgz",
+  "recipe": "No viable lane. (A) Only official wasm is @surrealdb/wasm (surrealdb_bg.wasm) built via `wasm-pack --target deno --features kv-indxdb,kv-mem` \u2014 a wasm-bindgen JS-host module: all imports are __wbg_*/__wbindgen_* (fetch, crypto, IndexedDB cursors), ZERO wasi_snapshot_preview1. Needs a JS runtime + browser IndexedDB host; not plain wasm32-wasi under wasmtime. (B) N/A \u2014 Rust, not C/C++. (C) surrealdb crate = 292 dep-lines, proc-macro derives (reblessive), pervasive tokio async + async-trait, surrealdb-core mega-crate; mrustc ~1.74 cannot build. (D) No pure-Python pkg; JS pkg is the wasm-bindgen wrapper, not QuickJS-runnable.",
+  "smoke": "N/A \u2014 cannot load. If a plain wasi build existed: `wasmtime run surrealdb.wasm -- start --bind 0.0.0.0:0 memory` then `wasmtime run surrealdb.wasm -- sql --endpoint memory -e 'CREATE person SET name=\"x\"; SELECT * FROM person;'` and assert the created record returns. Not achievable: the shipped wasm imports fetch/crypto/IndexedDB JS glue, which wasmtime does not provide.",
+  "verdict": "impossible",
+  "blocker": "Official wasm is wasm-bindgen/JS-host (browser+IndexedDB), not wasm32-wasi \u2014 imports __wbg_*/fetch/crypto, no wasi_snapshot_preview1. Self-build via mrustc impossible (292 deps, proc-macros, full tokio async). Embedded-relational-DB capability already covered live by sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "Supabase",
+  "lane": "none",
+  "source_url": "https://registry.npmjs.org/@electric-sql/pglite/latest",
+  "recipe": "No viable recipe. Supabase is a multi-service networked stack (managed PostgreSQL server + GoTrue auth + PostgREST + Realtime/Phoenix + Storage + Kong gateway), not a single wasm32-wasi binary. Its entire purpose is a networked database/API server (network-as-purpose), which is out of scope for an in-sandbox standalone wasm. The only in-sandbox-Postgres candidate is pglite (Postgres compiled to wasm), but pglite v0.5.2 is EMSCRIPTEN-based (devDep @types/emscripten, scripts/bundle-wasm.ts, browser field shimming fs/crypto/stream) and requires a JS host \u2014 it is NOT plain wasm32-wasi under wasmtime, disqualifying Lane A. Lane B/C/D N/A: porting Postgres C from scratch needs flex/bison + a configure-generated build (parser, pg_config), far beyond self-contained C. We already have sqlite3 LIVE, which covers the in-sandbox relational-DB capability; the Supabase-specific server/auth/REST/realtime layers cannot run in-sandbox.",
+  "smoke": "N/A \u2014 nothing to smoke-test. (If one wanted the DB capability: it is already covered by the live sqlite3 command, e.g. `echo 'CREATE TABLE t(x); INSERT INTO t VALUES(1); SELECT * FROM t;' | sqlite3`.)",
+  "verdict": "impossible",
+  "blocker": "Supabase is a networked multi-service server stack (network-as-purpose); no standalone wasm32-wasi build exists. Its only in-sandbox-Postgres proxy, pglite, is emscripten + JS-host (not plain wasm32-wasi). The relational-DB capability is already covered live by sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "Neon",
+  "lane": "none",
+  "source_url": "https://github.com/electric-sql/pglite",
+  "recipe": "No viable in-sandbox recipe. Neon proper is a proprietary cloud (branching plus storage-compute separation behind a control plane); the neondatabase serverless driver is pure HTTP-WS to Neon cloud, which is network-as-purpose. The only Postgres-in-WASM substitute, pglite, is an Emscripten build running Postgres single-user-mode via an IO pathway that requires a JavaScript host (its README says Emscripten cannot fork and depends on JS glue) - an emscripten JS-pair artifact excluded from Lane A, with no plain wasm32-wasi wasmtime build existing. Lane B (Postgres from C) is infeasible because Postgres needs configure plus bison-flex and a forking full-POSIX multi-process model, not a single-process WASI target.",
+  "smoke": "Already covered by LIVE sqlite3 for in-sandbox relational SQL; no wasm32-wasi Postgres artifact exists to smoke. Would-be test: create a table, insert a row, select count.",
+  "verdict": "impossible",
+  "blocker": "Neon is a network-bound proprietary cloud (network-as-purpose). The pglite substitute is an Emscripten JavaScript-host build, not plain wasm32-wasi under wasmtime. Full Postgres from C needs configure plus bison-flex and a forking multi-process POSIX model. In-sandbox relational SQL is already covered by LIVE sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "absurd-sql",
+  "lane": "none",
+  "source_url": "https://github.com/jlongster/absurd-sql",
+  "recipe": "N/A \u2014 not portable to wasm32-wasi/wasmtime. absurd-sql is a JS library (repo language: JavaScript) built on sql.js/emscripten, not plain wasm32-wasi. Its sole value-add is a SQLite VFS backed by IndexedDB (browser-only storage API) made synchronous via a SharedArrayBuffer + Atomics.wait worker handshake (requires a JS browser/worker host). Standalone wasmtime has neither IndexedDB nor cross-worker SAB blocking, so the entire library collapses to nothing. The underlying SQLite engine is already LIVE (sqlite3 in our fleet); absurd-sql adds only the browser persistence layer we cannot use.",
+  "smoke": "N/A \u2014 capability (SQLite-in-wasm) already covered by LIVE sqlite3. Smoke for that: `echo 'CREATE TABLE t(x);INSERT INTO t VALUES(1);SELECT count(*) FROM t;' | sqlite3` \u2192 1.",
+  "verdict": "impossible",
+  "blocker": "Core purpose is an IndexedDB block-storage VFS plus a SharedArrayBuffer/Atomics.wait worker trick \u2014 both are browser/JS-host-only APIs absent from standalone wasm32-wasi under wasmtime. Emscripten/sql.js based, not plain wasm32-wasi. The plain SQLite engine it wraps is already LIVE (sqlite3), so the only delta absurd-sql offers is exactly the browser-bound persistence we cannot run.",
+  "confidence": "high"
+ },
+ {
+  "name": "ffmpeg",
+  "lane": "B",
+  "source_url": "https://github.com/SebastiaanYN/FFmpeg-WASI",
+  "recipe": "No plain prebuilt .wasm release exists. Lane A fails because ffmpegwasm/ffmpeg.wasm is emscripten/JS-paired and both WASI repos show no releases, source+script only. Take Lane B: cross-compile FFmpeg C source to wasm32-wasi via our C/clang lane. FFmpeg configure is a hand-written POSIX shell script, NOT autoconf/yacc/bison, so it fits self-contained-C. Follow SebastiaanYN/FFmpeg-WASI: configure with threading and network disabled via --disable-pthreads --disable-network --disable-asm --target-os=none --arch=wasm32, enable only needed demux/mux/decode/encode, link wasi-libc. yanghaku/ffmpeg-wasm32-wasi confirms the same toolchain yields ffmpeg.wasm, ffprobe.wasm and static libs. Build thread-free so it runs under PLAIN wasmtime with no experimental-wasi-threads. Output is a CLI ffmpeg.wasm taking -i in then out, with --dir for file I/O.",
+  "smoke": "wasmtime --dir . ffmpeg.wasm -- -i in.mp4 -ss 1 -vframes 1 out.png extracts one thumbnail frame; pure file-in file-out CPU transcode, no device/GPU/network.",
+  "verdict": "live-likely",
+  "blocker": "No standalone prebuilt plain-wasi .wasm to drop in, so Lane A is unavailable and a from-source C build is required. Build is large/slow but mechanically proven twice (SebastiaanYN and yanghaku) on wasm32-wasi with threads and network disabled, runnable on plain wasmtime. yanghaku prebuilt needs experimental-wasi-threads so avoid it; SebastiaanYN thread-disabled config is clean. Recording/streaming/HW-accel are out of scope with no device/GPU/net; file transcode is pure CPU and wires.",
+  "confidence": "medium"
+ },
+ {
+  "name": "ImageMagick",
+  "lane": "none",
+  "source_url": "https://github.com/dlemstra/magick-wasm",
+  "recipe": "No viable lane. Lane A fails: the only official WASM build (@imagemagick/magick-wasm v0.0.40, from dlemstra/Magick.Native) is an EMSCRIPTEN module, not plain wasm32-wasi. Confirmed in src/image-magick.ts + native-instance.ts: uses instantiateWasm(imports: WebAssembly.Imports, successCallback), wasmBinary, and a JS-provided env import object (emscripten malloc/syscall/callback shims). It is explicitly designed for browser/Node/Deno JS hosts, not standalone wasmtime. Lane B fails: upstream ImageMagick is a large autoconf/configure C project (not a self-contained amalgam) with optional delegate libs; porting to bare wasm32-wasi is a major effort, no prebuilt wasi artifact exists. Lanes C/D N/A (not Rust/Python/JS-pure-compute).",
+  "smoke": "N/A \u2014 cannot run. If a plain wasi .wasm existed: wasmtime run magick.wasm convert in.png -resize 50% out.png and verify out.png dimensions halved. Not achievable with the emscripten artifact under bare wasmtime (no JS env imports).",
+  "verdict": "impossible",
+  "blocker": "Only official WASM build is an Emscripten/JS-host-paired module (WebAssembly.Imports env + wasmBinary glue, browser/Node/Deno targeted), not a standalone wasm32-wasi binary; no plain-wasi prebuilt exists and ImageMagick's autoconf C source is not a self-contained amalgam compilable on our bare C/wasi lane. Partial raster overlap with already-live jpeg, but general convert/compose not covered.",
+  "confidence": "high"
+ },
+ {
+  "name": "pandoc",
+  "lane": "A",
+  "source_url": "https://haskell-wasm.github.io/pandoc-wasm/pandoc.wasm",
+  "recipe": "Lane A \u2014 fetch the prebuilt standalone wasm32-wasi module from the official haskell-wasm/pandoc-wasm GitHub Pages deploy (built by CI with the GHC 9.12 wasm backend, wasm-opt -Oz'd). curl -fsSL https://haskell-wasm.github.io/pandoc-wasm/pandoc.wasm -o pandoc.wasm (52.9 MB, magic \\0asm v1, content-type application/wasm). README states it is \"fully wasm32-wasi compliant and doesn't make use of any JSFFI feature in the ghc wasm backend\" \u2014 no browser/JS host needed. Register as a CommandRegistry entry; map argv straight through (pandoc behaves as the normal CLI). Mount the work dir via wasmtime --dir (CI uses `wasmtime run --dir $PWD::/`). Caveats baked into this build: no Lua filters (needs setjmp/longjmp via wasm EH, unsupported by wasmtime), no HTTP client (wasip1 has no sockets), and PDF output is unavailable (needs external LaTeX engine \u2014 out of scope). All Markdown/HTML/DOCX/RST/LaTeX-source/etc. AST conversions work \u2014 pure document transform, no JIT.",
+  "smoke": "printf '# Title\\n\\nHello **world**.\\n' > in.md; then under wasmtime: `wasmtime run --dir .::/ -- pandoc.wasm in.md -f markdown -t rst -o out.rst` (or -t html for stdout). Expect out.rst to contain an RST-underlined \"Title\" heading and \"**world**\" rendered as RST bold. CI does exactly this: `wasmtime run --dir $PWD::/ -- dist/pandoc.wasm pandoc/README.md -o pandoc/README.rst`.",
+  "verdict": "live-likely",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "qpdf",
+  "lane": "B",
+  "source_url": "https://github.com/qpdf/qpdf/releases/download/v12.3.2/qpdf-12.3.2.tar.gz",
+  "recipe": "Lane B (self-contained C++17 -> wasm32-wasi via our C++/libc++ lane). Fetch release tarball qpdf-12.3.2.tar.gz (CONFIRMED 200; latest release v12.3.2). Build libqpdf + qpdf CLI from libqpdf/*.cc + qpdf/qpdf.cc. Deps: zlib + libjpeg only \u2014 both already cross-compiled/live (jpeg is LIVE; zlib via our gz lane sources). Crypto: bundled native AES/RC4/SHA2 (AES_PDF_native.cc, no OpenSSL required when QPDF_CRYPTO=native). Codegen note: generate_auto_job (Python) emits auto_job_*.hh/.cc headers from job.yml, but the RELEASE TARBALL ships these pre-generated (maintainer-only step, analogous to pregenerated bison) \u2014 so the tarball is self-contained, no Python/yacc at build time. Compile C++17 to wasm32-wasi (CMake or direct clang++ over the .cc set, skip the dev/test/fuzz/appimage dirs). Wire as file-in/file-out: stdin/argv -> WASI preopened dir, qpdf reads input.pdf writes output.pdf. The existing Emscripten builds (jsscheller/neslinesli93/le0pard qpdf-wasm) PROVE the codebase is wasm-portable; we just retarget to plain wasi-sdk instead of emcc (no JS glue, no browser). NOT Lane A \u2014 every prebuilt .wasm found is Emscripten/browser-paired (excluded).",
+  "smoke": "printf to a preopened dir, then: qpdf --check input.pdf  (validates structure, exit 0) ; or transform: qpdf --linearize --object-streams=generate in.pdf out.pdf  then qpdf --show-npages out.pdf prints page count. Minimal: qpdf --version prints \"qpdf version 12.3.2\". Generate a 1-page PDF inline, run qpdf --qdf --no-original-object-ids in.pdf out.pdf, assert out.pdf nonzero and starts with %PDF.",
+  "verdict": "live-likely",
+  "blocker": "None hard. Soft: confirm zlib is cross-compiled standalone (we have gz/zstd lanes but verify zlib lib object availability); confirm release tarball includes pre-generated auto_job_*.hh (expected \u2014 it's a dist tarball, not bare git). C++17 + libc++ exceptions/RTTI must be enabled in our wasm32-wasi C++ lane (qpdf uses exceptions heavily).",
+  "confidence": "medium"
+ },
+ {
+  "name": "mutool (MuPDF)",
+  "lane": "B",
+  "source_url": "https://cgit.ghostscript.com/mupdf.git/",
+  "recipe": "Lane A is OUT: the only prebuilt WASM (npm `mupdf@1.27.0`, dist/mupdf-wasm.wasm, 9.99MB) is emscripten-built \u2014 imports module `a` (minified emscripten env), uses emscripten_asm_const_int/_ptr, emscripten_resize_heap, emscripten_date_now, __emscripten_stdout_seek, and ships mandatory JS glue (mupdf-wasm.js). No wasi_snapshot_preview1 import. That violates the 'NOT emscripten/js-pair, must be plain wasm32-wasi' rule, so it is unusable as standalone-under-wasmtime. No plain wasm32-wasi mutool.wasm exists (gh code search total 0; no wapm/community wasi build). Realistic path = Lane B: build MuPDF from source (cgit.ghostscript.com/mupdf.git) against wasi-sdk via our C lane. MuPDF builds with a plain hand-written Makefile (NO autotools/configure, NO yacc/bison \u2014 fonts/cmaps/CJK tables ship as pre-generated C) and vendors all thirdparty in-tree (freetype, harfbuzz, mujs, jbig2dec, openjpeg, lcms2, zlib, gumbo). Target the `mutool` tool only; stub the X11/GL viewer. Compile flags: -DTOFU disabled or trim CJK fonts to cut size, define FZ_ENABLE_JS via mujs (pure C, fine). Heavy but self-contained \u2014 no codegen tools needed. Wire as a CommandRegistry entry exposing `mutool draw/convert/extract/info` over stdin/stdout with fs reads for the input PDF.",
+  "smoke": "echo a small PDF to the sandbox fs, then run `mutool info in.pdf` (expects page count + metadata to stdout) and `mutool draw -o out.png -r 72 in.pdf 1` (rasterize page 1 to PNG, pure compute, no GPU). Also `mutool convert -o out.txt in.pdf` for text extraction. All are deterministic CPU-only, no network/JIT.",
+  "verdict": "live-likely",
+  "blocker": "Large vendored C codebase (~freetype+harfbuzz+mujs+openjpeg+jbig2dec): non-trivial wasi-sdk build effort and a multi-MB .wasm unless CJK fonts are trimmed. No prebuilt wasi artifact exists, so it is build-from-source only. Not a hard blocker (no JIT/threads/GPU/network-as-purpose \u2014 rendering/extraction is pure compute), but meaningfully heavier than a one-shot.",
+  "confidence": "medium"
+ },
+ {
+  "name": "tesseract",
+  "lane": "B",
+  "source_url": "https://github.com/tesseract-ocr/tesseract",
+  "recipe": "Lane B (C++/libc++), multi-lib port \u2014 NOT a clean wire-up. Tesseract is C++17, mandatorily depends on Leptonica, which itself needs zlib+libpng+libtiff+libjpeg. No amalgam: CMake + git submodules. Path: cross-compile the dependency stack to wasm32-wasi with our libc++/clang lane bottom-up \u2014 zlib -> libpng/libjpeg/libtiff -> leptonica -> tesseract \u2014 disabling all OS/threads/SIMD-intrinsic paths or guarding them, building a static CLI front-end (tesseract input.png stdout). Existing WASM builds (tesseract.js-core, robertknight/tesseract-wasm, Danlock/tesseract-wasm) are ALL Emscripten (JS-glue ABI) and do NOT qualify \u2014 they cannot be reused as plain WASI. Also must stage tessdata trained-model files (eng.traineddata, multi-MB) into the WASI preopened FS at a known TESSDATA_PREFIX path. OCR itself is pure CPU LSTM inference (no GPU/JIT/net) so wasmtime-runnable in principle; the cost is the dependency tree, not the runtime.",
+  "smoke": "wasmtime run --dir=. tesseract.wasm -- sample.png stdout --tessdata-dir ./tessdata -l eng  # OCR a PNG of known text, assert recognized string appears on stdout",
+  "verdict": "uncertain",
+  "blocker": "No prebuilt plain wasm32-wasi artifact exists \u2014 all WASM builds are Emscripten (JS-glue), disqualifying Lane A. Lane B is possible but heavy: not self-contained \u2014 requires porting a 5-library C/C++ tree (leptonica + zlib/png/tiff/jpeg) plus tesseract C++17, then staging multi-MB tessdata model files into the WASI FS. Achievable on our C++/libc++ lane but far beyond a clean wire-up; needs real porting effort to confirm.",
+  "confidence": "high"
+ },
+ {
+  "name": "sox",
+  "lane": "B",
+  "source_url": "https://downloads.sourceforge.net/project/sox/sox/14.4.2/sox-14.4.2.tar.gz",
+  "recipe": "Use the SoX 14.4.2 release tarball (curl -fsIL confirmed: HTTP 200, 1134299 bytes; ships a pre-generated `configure` so no autoconf/automake needed). It's portable C with NO yacc/bison/flex (verified src/Makefile.am has no .y/.l/lex/yacc rules). All audio-device backends (alsa, coreaudio, pulseaudio, sunaudio, waveaudio) and all dynamic-plugin paths (libltdl/ladspa) are OPTIONAL `--with` features that auto-disable when their headers are absent (configure.ac: SOX_FMT_LIB under \"Audio devices\", SOX_WITH_LIB libltdl) \u2014 so a wasi static build drops them cleanly. Build path: run `configure` ONCE on the host (it's /bin/sh, can't run in-sandbox) to emit a wasi-flavored config.h + Makefile with --disable-shared, no external codec libs, devices off; then compile the ~50 core .c files (formats.c, effects*.c, dft_filter.c, biquad*.c, the built-in WAV/AIFF/AU/RAW/.dat/SPHERE format handlers, sox.c CLI) with our clang.wasm C lane to a single static sox.wasm. Codecs mp3/vorbis/flac stay OUT of v1 (optional libs); built-in PCM formats cover the smoke. NOTE: the two existing wasm ports (IPS-LMU/wasmsox, rameshvarun/sox-emscripten) are emscripten/browser-targeted (emrun test.html, JS glue) \u2014 disqualified for Lane A prebuilt-plain-wasi, but they confirm the C compiles to wasm.",
+  "smoke": "Generate a 1s 440Hz mono WAV and resample it file-to-file under wasmtime: `wasmtime --dir=. sox.wasm -n in.wav synth 1 sine 440` then `wasmtime --dir=. sox.wasm in.wav out.wav rate 8000` \u2014 assert out.wav exists, is a valid 8kHz RIFF/WAVE (check header `RIFF`...`WAVEfmt`, sample-rate field = 8000), and `sox.wasm --i out.wav` reports Sample Rate: 8000. Pure compute over sample buffers, no audio device touched.",
+  "verdict": "live-likely",
+  "blocker": "Autotools `configure` is a /bin/sh script and cannot run in-sandbox, so config.h/Makefile must be generated host-side once (standard for autotools ports). Not a runtime/exec blocker \u2014 no JIT, no threads, no GPU, no network, no browser/JS host required for file-to-file DSP.",
+  "confidence": "medium"
+ },
+ {
+  "name": "ONNX Runtime",
+  "lane": "none",
+  "source_url": "https://onnxruntime.ai/docs/build/web.html",
+  "recipe": "No viable lane. (A) The maintained onnxruntime-web .wasm (ort-wasm-simd-threaded.wasm) is EMSCRIPTEN-compiled (emsdk/emcc), not plain wasm32-wasi: it ships a mandatory paired .mjs JS glue file, uses WebWorker for multithreading, and routes accel through JSEP (WebGPU/WebNN browser host APIs). Emscripten output depends on its JS runtime/import object, not a clean WASI command module \u2014 disqualified by Lane A's \"NOT emscripten/js-pair\" exclusion. (B) Building ORT from source as wasm32-wasi means compiling the full native C++ engine (Eigen, abseil, protobuf, onnx) via CMake \u2014 millions of LOC, third-party submodules, far past self-contained C/C++. (C) No bare Rust crate; the `ort` crate is FFI bindings to the native libonnxruntime, not a pure-Rust impl. (D) Not pure-Python; the `onnxruntime` pip wheel is a native C-extension. Capability (small-model ONNX inference) is partially adjacent to nothing currently live; we have no tensor/NN inference runtime.",
+  "smoke": "N/A \u2014 no buildable artifact. If a real plain-WASI .wasm existed, smoke would be: wasmtime run ort.wasm with a tiny add.onnx model + 1x4 float input, expect elementwise-sum output tensor on stdout. No such non-emscripten artifact is published.",
+  "verdict": "impossible",
+  "blocker": "Only prebuilt WASM is emscripten/JS-pair (mandatory .mjs glue + browser JSEP/WebWorker host APIs), not plain wasm32-wasi. From-source is a millions-LOC C++ tree (Eigen/protobuf/abseil/onnx via CMake+emsdk) \u2014 not self-contained C/C++; no bare-Rust or pure-Python lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "TensorFlow Lite (LiteRT)",
+  "lane": "none",
+  "source_url": "https://github.com/google-ai-edge/LiteRT",
+  "recipe": "No viable lane. (A) Only shipped WASM is @tensorflow/tfjs-tflite (npm 0.0.1-alpha.10) \u2014 Emscripten-compiled, fetched via tflite_web_api JS glue, requires TF.js + browser/Node host (verified: tarball ships tf-tflite.*.js loaders, no standalone wasm32-wasi module). Disqualified as emscripten/js-pair. (B) TFLite C++ core builds only via Bazel (partial CMake target still pulls XNNPACK, ruy, Eigen, Abseil, FlatBuffers codegen, gemmlowp, farmhash) \u2014 huge multi-repo dep graph with schema code-gen, not an amalgam, not configure-pregenerated. Out of scope for self-contained C/C++ lane (Bazel disqualifier). (C) N/A (C++). (D) tflite-runtime / ai-edge-litert pip wheels are native .so C-extensions, not pure Python. Disqualified.",
+  "smoke": "If a plain wasm32-wasi build existed: wasmtime tflite.wasm --invoke run model.tflite input.bin, expect output tensor bytes matching a known reference (e.g. mobilenet classifying a fixed image to the expected top-1 label). Not achievable today.",
+  "verdict": "impossible",
+  "blocker": "Only WASM artifact is Emscripten + JS-host bound (tfjs-tflite / browser tflite_web_api) \u2014 disqualified. From-source path is Bazel + XNNPACK/Eigen/Abseil/FlatBuffers-codegen giant, not reachable via the self-contained C/C++ lane. Python wheels are native C-extensions. No plain wasm32-wasi build exists in any lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "llama.cpp / ggml",
+  "lane": "B",
+  "source_url": "https://github.com/ggml-org/llama.cpp",
+  "recipe": "Lane A dead: latest release (b9601) ships NO wasm/wasi asset (all native macos/ubuntu/win + xcframework; gh api confirmed). All public wasm builds are Emscripten/JS-paired (wllama) \u2014 not plain wasm32-wasi. Lane B (self-contained C++/libc++, which we have): clone ggml-org/llama.cpp. CPU-only build \u2014 core sources are plain SIMD C/C++ with NO codegen step (CMake only SELECTS files; no yacc/bison/configure-unless-pregenerated). Compile the minimal CPU set against our libc++ + WASI sysroot: ggml/src/ggml.c, ggml-cpu/*.c(pp), ggml-quants.c, ggml-alloc.c, ggml-backend*.cpp, ggml-threading.cpp, gguf.cpp + src/llama*.cpp + common/. Disable every accel backend: -DGGML_NATIVE=OFF -DGGML_BLAS=OFF -DGGML_CUDA=OFF -DGGML_METAL=OFF -DGGML_VULKAN=OFF -DGGML_OPENMP=OFF. Force single thread: ggml-cpu.c already has `#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__) n_threads=1` and ggml_graph_plan tolerates threadpool==NULL \u2014 so no pthreads needed (define equivalent for WASI or pass -DGGML_DEFAULT_N_THREADS path / n_threads=1 at call site). Build a static llama-cli-equivalent or llama-simple as the wasm32-wasi command; GGUF model loads via WASI fs (preopen the model dir). 4GB wasm mem ceiling is a non-issue per our compiler notes; pick a small quantized GGUF (e.g. a tiny Q4_0 model) for smoke. Capability (local quantized LLM inference / ggml tensor lib) is NEW \u2014 not covered by sqlite/python/jq/etc. fleet.",
+  "smoke": "Preopen a dir holding a tiny quantized GGUF (e.g. a ~Q4 small model). Run: `llama-cli -m /models/tiny.gguf -p \"The capital of France is\" -n 8 --threads 1 --no-warmup` under wasmtime. Expect deterministic greedy decode producing \"Paris\" (or coherent continuation) on stdout, exit 0, no pthread/host-import errors. Minimal variant: `llama-simple` with a fixed prompt token loop to avoid CLI arg surface.",
+  "verdict": "live-likely",
+  "blocker": "None fatal. Risks (not blockers): large C++ TU set increases compile time/memory (do NOT run full compile here per instructions); single-thread inference is SLOW so smoke must use a tiny model + short -n; must ensure no accel backend gets auto-enabled (explicit -DGGML_*=OFF). pthreads avoidable via the existing Emscripten single-thread code path.",
+  "confidence": "medium"
+ },
+ {
+  "name": "whisper.cpp",
+  "lane": "B",
+  "source_url": "https://github.com/ggml-org/whisper.cpp",
+  "recipe": "Lane B (self-contained C/C++, our libc++ lane). Same ggml CPU lineage as llama.cpp. Compile the CPU backend only: ggml/src/ggml.c, ggml-alloc.c, ggml-quants.c, ggml-backend*.cpp, ggml-threading.cpp, ggml/src/ggml-cpu/* (ggml-cpu.c/.cpp, ops.cpp, vec.cpp, unary/binary-ops.cpp, traits.cpp, quants.c + arch/wasm/quants.c), src/whisper.cpp, include/whisper.h. Target wasm32-wasi with -msimd128 -DGGML_USE_CPU -DNDEBUG; define CMAKE_SYSTEM_PROCESSOR=wasm so the arch/wasm/quants.c SIMD path is selected (CMakeLists line 566). Force single-thread: pass whisper_full_params.n_threads=1 (ggml_barrier short-circuits at n_threads==1, ggml-cpu.c:568; threadpool spawn is skipped, no real pthread_create needed). Drop all GPU backends (cuda/metal/vulkan/blas dirs) and the coreml/openvino src subdirs. SKIP the cli example's miniaudio/SDL/ffmpeg audio decoders entirely \u2014 call the whisper.h C API directly: whisper_init_from_file_with_params + whisper_full(ctx, params, pcmf32, n_samples) feeding raw 16kHz mono float32 PCM, then whisper_full_get_segment_text. No yacc/bison/configure/amalgam-gen. Model = a ggml/gguf bin (e.g. ggml-tiny.en.bin) provided as input bytes; no network (core has zero curl/http/socket).",
+  "smoke": "Build a tiny WASI host harness linking whisper.h. Feed ggml-tiny.en.bin (~75MB) + the repo's samples/jfk PCM converted to 16kHz mono f32 (precompute to a raw .f32 to avoid the miniaudio decoder). Call whisper_init_from_file_with_params then whisper_full with n_threads=1; assert whisper_full_get_segment_text(ctx,0) contains \"And so my fellow Americans\" / \"ask not\". Exit 0 = STT pipeline runs in-sandbox.",
+  "verdict": "live-likely",
+  "blocker": "No prebuilt wasm32-wasi (Lane A dead: only Win/cuBLAS/xcframework/jar release assets). Two build wrinkles, both handled: (1) threading \u2014 force n_threads=1 so no pthread spawn (barrier short-circuits); WASI SDK supplies single-thread pthread stubs. (2) audio decode \u2014 cli example pulls vendored miniaudio.h (mp3/flac/ogg/wav) which is avoidable: feed raw PCM float32 straight into the whisper_full C API and skip examples/common-whisper.cpp entirely. SIMD needs -msimd128 + the arch/wasm/quants.c path. Same proven ggml CPU backend as llama.cpp; pure CPU compute, no GPU/network.",
+  "confidence": "medium"
+ }
+]

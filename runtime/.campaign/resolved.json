@@ -294,6 +294,86 @@
 "lane": "none",
 "blocker": "D1 is a hosted serverless SQLite cloud service (network API), not a runnable in-sandbox tool; the SQLite capability itself is live via sqlite3",
 "extent": "off-the-table (cloud service)"
+},
+"libsodium": {
+"verdict": "live",
+"lane": "B",
+"recipe": "libsodium 1.0.20 src/libsodium/**/*.c + injected version.h + generichash main",
+"smoke": "keypair+secretbox roundtrip => ok; sodium cmd = BLAKE2b hex",
+"extent": "full NaCl crypto (box/secretbox/sign/generichash/pwhash); sodium cmd hashes stdin"
+},
+"LLVM": {
+"verdict": "live",
+"lane": "A",
+"recipe": "already in-sandbox via the clang lane (YoWASP llvm.core.wasm: clang/clang++/lld/opt/llc)",
+"smoke": "clang compiles + runs (Rust lane proves it)",
+"extent": "LLVM multitool live as the C/C++/Rust compile lane"
+},
+"Cranelift": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Purpose is JIT/native code generation \u2014 emits host machine code that can only be used by executing it natively, which is banned in the wasmtime sandbox (no native exec). No prebuilt wasm32-wasi CLI; n",
+"extent": "off-the-table (verified)"
+},
+"wasm-bindgen": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi artifact (only native triples), and the Rust source requires Rust 1.86 + heavy proc-macros (clap/serde derive, walrus, wasmparser) \u2014 far beyond mrustc ~1.74, so Lane C bu",
+"extent": "off-the-table (verified)"
+},
+"jco": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "jco is a JS/npm build-time toolchain (componentize-js bundles a full StarlingMonkey/SpiderMonkey wasm JS engine + binaryen emscripten C++), not a standalone wasm32-wasi command; its purpose and output",
+"extent": "off-the-table (verified)"
+},
+"DuckDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only wasm artifact is an Emscripten/JS-host build (npm duckdb-wasm, needs browser/Node + Web Workers), not plain wasm32-wasi. Core is a huge CMake+Python+bison C++17 build, not a self-contained amalga",
+"extent": "off-the-table (verified)"
+},
+"SurrealDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Official wasm is wasm-bindgen/JS-host (browser+IndexedDB), not wasm32-wasi \u2014 imports __wbg_*/fetch/crypto, no wasi_snapshot_preview1. Self-build via mrustc impossible (292 deps, proc-macros, full toki",
+"extent": "off-the-table (verified)"
+},
+"Supabase": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Supabase is a networked multi-service server stack (network-as-purpose); no standalone wasm32-wasi build exists. Its only in-sandbox-Postgres proxy, pglite, is emscripten + JS-host (not plain wasm32-w",
+"extent": "off-the-table (verified)"
+},
+"Neon": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Neon is a network-bound proprietary cloud (network-as-purpose). The pglite substitute is an Emscripten JavaScript-host build, not plain wasm32-wasi under wasmtime. Full Postgres from C needs configure",
+"extent": "off-the-table (verified)"
+},
+"absurd-sql": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core purpose is an IndexedDB block-storage VFS plus a SharedArrayBuffer/Atomics.wait worker trick \u2014 both are browser/JS-host-only APIs absent from standalone wasm32-wasi under wasmtime. Emscripten/sql",
+"extent": "off-the-table (verified)"
+},
+"ImageMagick": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only official WASM build is an Emscripten/JS-host-paired module (WebAssembly.Imports env + wasmBinary glue, browser/Node/Deno targeted), not a standalone wasm32-wasi binary; no plain-wasi prebuilt exi",
+"extent": "off-the-table (verified)"
+},
+"ONNX Runtime": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only prebuilt WASM is emscripten/JS-pair (mandatory .mjs glue + browser JSEP/WebWorker host APIs), not plain wasm32-wasi. From-source is a millions-LOC C++ tree (Eigen/protobuf/abseil/onnx via CMake+e",
+"extent": "off-the-table (verified)"
+},
+"TensorFlow Lite (LiteRT)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only WASM artifact is Emscripten + JS-host bound (tfjs-tflite / browser tflite_web_api) \u2014 disqualified. From-source path is Bazel + XNNPACK/Eigen/Abseil/FlatBuffers-codegen giant, not reachable via th",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -573,6 +653,62 @@
 "source_url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
 "recipe": "ALREADY LIVE in-sandbox \u2014 capability already covered. Our clang lane (runtime/compilers/clang/build.sh) fetches YoWASP's LLVM (@yowasp/clang",
 "confidence": "high",
+"verified": false
+},
+"ffmpeg": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "No plain prebuilt .wasm release exists. Lane A fails because ffmpegwasm/ffmpeg.wasm is emscripten/JS-paired and both WASI repos sh",
+"confidence": "medium",
+"verified": false
+},
+"pandoc": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "Lane A \u2014 fetch the prebuilt standalone wasm32-wasi module from the official haskell-wasm/pandoc-wasm GitHub Pages deploy (built by",
+"confidence": "high",
+"verified": false
+},
+"qpdf": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C++17 -> wasm32-wasi via our C++/libc++ lane). Fetch release tarball qpdf-12.3.2.tar.gz (CONFIRMED 200; lat",
+"confidence": "medium",
+"verified": false
+},
+"mutool (MuPDF)": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane A is OUT: the only prebuilt WASM (npm `mupdf@1.27.0`, dist/mupdf-wasm.wasm, 9.99MB) is emscripten-built \u2014 imports module `a` ",
+"confidence": "medium",
+"verified": false
+},
+"tesseract": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (C++/libc++), multi-lib port \u2014 NOT a clean wire-up. Tesseract is C++17, mandatorily depends on Leptonica, which itself need",
+"confidence": "high",
+"verified": false
+},
+"sox": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Use the SoX 14.4.2 release tarball (curl -fsIL confirmed: HTTP 200, 1134299 bytes; ships a pre-generated `configure` so no autocon",
+"confidence": "medium",
+"verified": false
+},
+"llama.cpp / ggml": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane A dead: latest release (b9601) ships NO wasm/wasi asset (all native macos/ubuntu/win + xcframework; gh api confirmed). All pu",
+"confidence": "medium",
+"verified": false
+},
+"whisper.cpp": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C/C++, our libc++ lane). Same ggml CPU lineage as llama.cpp. Compile the CPU backend only: ggml/src/ggml.c,",
+"confidence": "medium",
 "verified": false
 }
 }

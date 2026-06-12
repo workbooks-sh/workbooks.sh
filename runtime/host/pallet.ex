@@ -504,6 +504,42 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # libsodium (NaCl crypto). version.h is configure-generated (not shipped) — inject it at its nested
+  # path. `sodium` = BLAKE2b (crypto_generichash) of stdin → hex (proves the whole lib links + runs).
+  @sodium_version ~S"""
+  #ifndef sodium_version_H
+  #define sodium_version_H
+  #include "export.h"
+  #define SODIUM_VERSION_STRING "1.0.20"
+  #define SODIUM_LIBRARY_VERSION_MAJOR 26
+  #define SODIUM_LIBRARY_VERSION_MINOR 2
+  #ifdef __cplusplus
+  extern "C" {
+  #endif
+  SODIUM_EXPORT const char *sodium_version_string(void);
+  SODIUM_EXPORT int sodium_library_version_major(void);
+  SODIUM_EXPORT int sodium_library_version_minor(void);
+  SODIUM_EXPORT int sodium_library_minimal(void);
+  #ifdef __cplusplus
+  }
+  #endif
+  #endif
+  """
+  @sodium_main ~S"""
+  #include <stdio.h>
+  #include <sodium.h>
+  int main(void) {
+    if (sodium_init() < 0) return 1;
+    static unsigned char buf[65536];
+    crypto_generichash_state st; crypto_generichash_init(&st, NULL, 0, 32);
+    size_t n; while ((n = fread(buf, 1, sizeof buf, stdin)) > 0) crypto_generichash_update(&st, buf, n);
+    unsigned char h[32]; crypto_generichash_final(&st, h, 32);
+    for (int i = 0; i < 32; i++) printf("%02x", h[i]);
+    printf("\n");
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -631,6 +667,16 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "sodium",
+      url: "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz",
+      sha: "b6b1d2a8802cd8bfa611638c0e9ce31d14ef324e16062c39a76854091cba6d7f",
+      build_opts: [
+        src_globs: ["src/libsodium/**/*.{c,h}"],
+        cflags: ["-I/work/src/libsodium/include", "-I/work/src/libsodium/include/sodium"],
+        extra_sources: [{"src/libsodium/include/sodium/version.h", @sodium_version}, {"sodium_main.c", @sodium_main}]
+      ]
     },
     %{
       name: "pcre2",
