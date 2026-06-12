@@ -87,15 +87,29 @@
 "Forth": {
 "verdict": "live",
 "lane": "B",
-"recipe": "zForth commit 41db72d, ctx-API + embedded core.zf",
+"recipe": "zForth (commit 41db72d) ctx-API + embedded core.zf bootstrap",
 "smoke": "'2 3 + . 9 sq .' => 5 81",
-"extent": "Full Forth primitives + core.zf vocab; SJLJ via lane"
+"extent": "Full Forth: primitives + core.zf vocab (:/;/./emit/dup/...); setjmp via lane SJLJ"
 },
 "Scheme": {
 "verdict": "deferred",
 "lane": "B",
-"blocker": "S7 builds but uses unguarded POSIX (popen, getrusage ru_maxrss); needs feature-disable. Reachable.",
+"blocker": "S7 builds but uses many POSIX features unguarded on wasi (popen, getrusage ru_maxrss/ru_inblock); needs feature-disable patching. Reachable, not impossible. Try chibi/tinyscheme alt.",
 "extent": "pending"
+},
+"tar": {
+"verdict": "live",
+"lane": "B",
+"recipe": "microtar (commit 27076e1) + t/x main",
+"smoke": "tar t test.tar => a,b",
+"extent": "list (t) + extract (x) ustar archives via --dir mount"
+},
+"jpegoptim / mozjpeg": {
+"verdict": "live",
+"lane": "A",
+"recipe": "libjpeg-turbo WLR CLIs (cjpeg/djpeg/jpegtran)",
+"smoke": "cjpeg PPM->JPEG, SOI ff d8",
+"extent": "JPEG encode/decode/transform via cjpeg/djpeg/jpegtran (stdin/stdout)"
 }
 },
 "preliminary": {
@@ -116,16 +130,6 @@
 "recipe": "Lane A is NOT viable: the widely-cited @hpcc-js/wasm Graphviz is emscripten/browser-targeted \u2014 its GitHub releases (wasm-graphviz-v1.22.0) ship EMPTY assets (npm-only) and the package is a .js+.wasm p",
 "smoke": "After a successful static-plugin wasm32-wasi build to dot.wasm: `printf 'digraph{a->b}' | wasmtime run dot.wasm -- -Tsvg",
 "blocker": "No plain wasm32-wasi prebuilt exists (hpcc-js is emscripten/JS-host-only, empty GitHub assets). Source builds but is configure-dependent (no pre-generated config.h) and uses a dlopen/ltdl plugin archi",
-"confidence": "high",
-"verified": false
-},
-"tar": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/rxi/microtar (raw: https://raw.githubusercontent.com/rxi/microtar/master/src/microtar.c + microtar.h)",
-"recipe": "Lane B (C source -> wasm via in-sandbox clang). microtar is a single-file, dependency-free tar implementation: just microtar.c + microtar.h, including only <stdio.h> <stdlib.h> <stddef.h> <string.h>. ",
-"smoke": "Verified locally with native clang (identical source/behavior to the wasm build):\n  clang -O2 microtar.c tar_main.c -o t",
-"blocker": "",
 "confidence": "high",
 "verified": false
 },
