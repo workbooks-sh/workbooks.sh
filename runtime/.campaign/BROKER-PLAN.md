@@ -1333,3 +1333,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   DNS-roundtrip test (1.1.1.1:53) green -> the connect+verify path works end-to-end. THIS FIRE total: 3
   wb-8w8x items fixed (RateLimiter atomicity, storage key/byte caps, UDP source). Remaining batch + wb-an2v
   (tenant isolation, needs command-lane tenant threading) next.
+- 2026-06-12 (iter 97): **FIXED wb-8w8x: NAT64/6to4/Teredo IPv4-in-IPv6 classifier gap (MEDIUM SSRF).** The
+  IPv6 branch of wb_ip_allowed (store.rs) only denied native-IPv6 internal ranges + ::ffff: v4-mapped — it
+  did NOT re-classify an IPv4 EMBEDDED in a global-looking IPv6 (NAT64 64:ff9b::/96 + 64:ff9b:1::/48, 6to4
+  2002::/16, Teredo 2001::/32), so an internal IPv4 (169.254.169.254 metadata, 127.0.0.1, 10.x) could be
+  smuggled as an allowed IPv6 literal that a NAT64/6to4 gateway routes to the internal target. FIX: extracted
+  wb_v4_internal (shared V4 deny set) + wb_embedded_v4s (pulls every embedded-IPv4 candidate from the
+  prefixes), and the V6 branch now denies if ANY embedded v4 is internal. Refactored the V4 branch onto the
+  shared helper (the 400k fuzz exercises it -> no regression). 12 cargo SSRF tests green incl new
+  ssrf_nat64_6to4_teredo (7 internal smuggles denied, 1 public NAT64 still allowed); wasi e2e green. NEXT
+  remaining wb-8w8x: wasi:http https pin (custom connector, substantial Rust); inbound streaming-serve body
+  cap; TLS/TCP/UDP allow-list; default-profile over-grant; exec stdout/out_cap. Plus HIGH wb-an2v tenant.

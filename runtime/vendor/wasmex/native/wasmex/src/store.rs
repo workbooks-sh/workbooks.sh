@@ -108,6 +108,55 @@ pub(crate) fn wb_dns_needed(net_allow: &Option<Vec<String>>) -> bool {
     }
 }
 
+// True if an IPv4 is internal / non-routable (the V4 deny set). Shared by the V4 branch AND the IPv6
+// NAT64/6to4/Teredo embedded-IPv4 re-classification below.
+pub(crate) fn wb_v4_internal(v4: &std::net::Ipv4Addr) -> bool {
+    let o = v4.octets();
+    v4.is_loopback()
+        || v4.is_private()
+        || v4.is_link_local()
+        || v4.is_unspecified()
+        || v4.is_broadcast()
+        || v4.is_documentation()
+        || v4.is_multicast()
+        || o[0] == 0
+        || o[0] >= 240
+        || (o[0] == 100 && (o[1] & 0xc0) == 64)
+}
+
+// wb-8w8x: NAT64/6to4/Teredo embed an IPv4 inside a global-LOOKING IPv6 literal that routes (via a gateway)
+// to that IPv4. Extract every embedded-IPv4 candidate so an INTERNAL IPv4 can't be smuggled as IPv6.
+pub(crate) fn wb_embedded_v4s(s: &[u16; 8]) -> Vec<std::net::Ipv4Addr> {
+    use std::net::Ipv4Addr;
+    let b = |hi: u16, lo: u16| {
+        Ipv4Addr::new((hi >> 8) as u8, (hi & 0xff) as u8, (lo >> 8) as u8, (lo & 0xff) as u8)
+    };
+    let mut out = Vec::new();
+    // NAT64 well-known 64:ff9b::/96 — IPv4 in the last 32 bits
+    if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0 && s[3] == 0 && s[4] == 0 && s[5] == 0 {
+        out.push(b(s[6], s[7]));
+    }
+    // NAT64 local-use 64:ff9b:1::/48 — RFC6052 embedding skips the u-byte (bits 64..71)
+    if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0x0001 {
+        out.push(Ipv4Addr::new(
+            (s[3] >> 8) as u8,
+            (s[3] & 0xff) as u8,
+            (s[4] & 0xff) as u8,
+            (s[5] >> 8) as u8,
+        ));
+    }
+    // 6to4 2002::/16 — IPv4 in bits 16..48
+    if s[0] == 0x2002 {
+        out.push(b(s[1], s[2]));
+    }
+    // Teredo 2001:0000::/32 — server IPv4 (bits 32..64) + client IPv4 (last 32 bits, one's-complemented)
+    if s[0] == 0x2001 && s[1] == 0x0000 {
+        out.push(b(s[2], s[3]));
+        out.push(b(!s[6], !s[7]));
+    }
+    out
+}
+
 pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
     use std::net::IpAddr;
     // Normalize IPv4-mapped IPv6 (::ffff:a.b.c.d) → V4 so e.g. ::ffff:127.0.0.1 / ::ffff:169.254.169.254
@@ -120,21 +169,14 @@ pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
         v4 => v4,
     };
     match ip {
-        IpAddr::V4(v4) => {
-            let o = v4.octets();
-            !(v4.is_loopback()            // 127.0.0.0/8
-                || v4.is_private()        // 10/8, 172.16/12, 192.168/16
-                || v4.is_link_local()     // 169.254.0.0/16 (incl. cloud metadata 169.254.169.254)
-                || v4.is_unspecified()    // 0.0.0.0
-                || v4.is_broadcast()      // 255.255.255.255
-                || v4.is_documentation()  // 192.0.2/24, 198.51.100/24, 203.0.113/24
-                || v4.is_multicast()      // 224.0.0.0/4
-                || o[0] == 0              // 0.0.0.0/8
-                || o[0] >= 240            // reserved/future-use 240.0.0.0/4 (non-routable; some nets use it internally)
-                || (o[0] == 100 && (o[1] & 0xc0) == 64)) // CGNAT 100.64.0.0/10
-        }
+        IpAddr::V4(v4) => !wb_v4_internal(&v4),
         IpAddr::V6(v6) => {
             let s = v6.segments();
+            // wb-8w8x: NAT64/6to4/Teredo can embed an INTERNAL IPv4 in a global-looking IPv6 — re-classify
+            // every embedded-IPv4 candidate and deny if any is internal.
+            if wb_embedded_v4s(&s).iter().any(wb_v4_internal) {
+                return false;
+            }
             !(v6.is_loopback()                  // ::1
                 || v6.is_unspecified()          // ::
                 || v6.is_multicast()            // ff00::/8
@@ -381,6 +423,28 @@ mod wb_ssrf_tests {
                 assert!(!wb_ip_allowed(v6), "internal {v6:?} must be denied");
             }
         }
+    }
+
+    #[test]
+    fn ssrf_nat64_6to4_teredo_embedded_internal_v4_denied() {
+        use super::wb_ip_allowed;
+        use std::net::IpAddr;
+        // every literal embeds an INTERNAL IPv4 (169.254.169.254 metadata, 127.0.0.1, 10.0.0.1) in a
+        // global-LOOKING IPv6 prefix — all MUST be denied (NAT64 well-known/local, 6to4, Teredo).
+        for s in [
+            "64:ff9b::a9fe:a9fe",         // NAT64 well-known -> 169.254.169.254 (metadata)
+            "64:ff9b::7f00:1",            // NAT64 well-known -> 127.0.0.1
+            "64:ff9b::a00:1",             // NAT64 well-known -> 10.0.0.1
+            "64:ff9b:1:a9fe:0:a9fe::",    // NAT64 local-use 64:ff9b:1::/48 -> 169.254.169.254
+            "2002:a9fe:a9fe::",           // 6to4 -> 169.254.169.254
+            "2002:7f00:1::",              // 6to4 -> 127.0.0.1
+            "2001:0:0:0:0:0:5601:5601",   // Teredo client (one's-complement of a9fe:a9fe) -> 169.254.169.254
+        ] {
+            let ip: IpAddr = s.parse().unwrap();
+            assert!(!wb_ip_allowed(ip), "NAT64/6to4/Teredo internal smuggle not denied: {s}");
+        }
+        // a NAT64 prefix wrapping a PUBLIC IPv4 (8.8.8.8) is still allowed (no over-blocking)
+        assert!(wb_ip_allowed("64:ff9b::808:808".parse().unwrap()), "NAT64 public should pass");
     }
 
     #[test]
