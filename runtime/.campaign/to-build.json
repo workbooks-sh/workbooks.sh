@@ -20,16 +20,6 @@
   "confidence": "high"
  },
  {
-  "name": "pdftk",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
-  "build_opts": "JS bundle on QuickJS/esbuild lane. npm pkg: pdf-lib@1.17.1. deps (all pure-JS, no C-ext): @pdf-lib/standard-fonts, @pdf-lib/upng, pako, tslib. esbuild bundle entry wrapping pdf-lib API (merge/split/stamp/rotate/fill-form/decrypt) -> single .js, run on qjs. No native, no codegen, no configure.",
-  "smoke": "qjs bundle.js: load 2 input PDFs via PDFDocument.load, mergeDocuments, save() -> assert output bytes start with %PDF and page count == sum of inputs; also rotate page 0 by 90 and re-save without error.",
-  "blocker": "pdftk itself is impossible (pdftk-java = JVM; original = C++/GCJ native, no plain wasm32-wasi). Capability is delivered instead via pdf-lib on the JS lane \u2014 covers merge/split/stamp/rotate/form-fill. Note: lacks pdftk's full uncompress/repair/burst PDF-internals parity, but covers the common verbs.",
-  "confidence": "high"
- },
- {
   "name": "hatchling",
   "decisive": "live-buildable",
   "lane": "D",

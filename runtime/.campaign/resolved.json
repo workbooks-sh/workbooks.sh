@@ -2088,6 +2088,13 @@
 "lane": "none",
 "blocker": "bundles but fails at runtime under Javy/QuickJS with 'SyntaxError: invalid redefinition of lexical identifier' (esbuild bundle / QuickJS lexical-scope conflict); experimental JS->wasm AOT compiler, not cleanly runnable in-lane",
 "extent": "off-the-table (Javy runtime error)"
+},
+"pdftk": {
+"verdict": "live",
+"lane": "D",
+"recipe": "pdf-lib npm bundled on Javy/QuickJS (async resolves \u2014 Javy pumps the promise queue)",
+"smoke": "create PDF => pdf bytes: 828",
+"extent": "PDF generation/manipulation (pdf-lib: create/merge/split/stamp/forms); pdf cmd text->PDF"
 }
 },
 "preliminary": {
@@ -2128,14 +2135,6 @@
 "lane": "D",
 "source_url": "https://pypi.org/pypi/csvkit/2.2.0/json",
 "recipe": "Lane D (pure-Python pip pkg, Pyodide/CPython-on-wasm host). VERIFIED via PyPI JSON API: csvkit-2.2.0 ships csvkit-2.2.0-py3-none-any.whl. En",
-"confidence": "high",
-"verified": false
-},
-"pdftk": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://registry.npmjs.org/pdf-lib/latest",
-"recipe": "Do NOT compile pdftk-java (needs JVM; original C++/GCJ native/JIT). Cover capability with pure-JS pdf-lib on QuickJS/esbuild JS lane. Bundle",
 "confidence": "high",
 "verified": false
 },

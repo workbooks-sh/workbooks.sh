@@ -1139,11 +1139,17 @@ defmodule Workbooks.Pallet do
                 @js_read_stdin <>
                 "const html=enhance();const out=html`<p>${input}</p>`;Javy.IO.writeSync(1,new TextEncoder().encode(out));"
 
+  # `pdf`: stdin text → a one-page PDF (pdf-lib; async, and Javy DOES pump the promise queue). Binary out.
+  @pdf_js "import { PDFDocument, StandardFonts } from 'pdf-lib';" <>
+            @js_read_stdin <>
+            "(async()=>{const doc=await PDFDocument.create();const font=await doc.embedFont(StandardFonts.Helvetica);const page=doc.addPage();page.drawText(input||'hello',{x:50,y:700,size:24,font});const bytes=await doc.save();Javy.IO.writeSync(1,bytes);})().catch(e=>Javy.IO.writeSync(1,new TextEncoder().encode('err:'+e)));"
+
   @js_tools [
     %{name: "glimmer", deps: ["@glimmer/compiler"], src: @glimmer_js},
     %{name: "arrow", deps: ["apache-arrow"], src: @arrow_js},
     %{name: "protobuf", deps: ["protobufjs"], src: @protobuf_js},
-    %{name: "enhance", deps: ["@enhance/ssr"], src: @enhance_js}
+    %{name: "enhance", deps: ["@enhance/ssr"], src: @enhance_js},
+    %{name: "pdf", deps: ["pdf-lib"], src: @pdf_js}
   ]
 
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."
