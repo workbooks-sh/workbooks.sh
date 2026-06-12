@@ -29,4 +29,18 @@ defmodule Workbooks.BrokerAuditTest do
     assert BrokerAudit.count({:net, :deny, :allowlist}) >= 1
     assert BrokerAudit.total_denials() >= 2
   end
+
+  test "exec + serve denials are also audited (observability across capability brokers)" do
+    BrokerAudit.reset()
+    # exec without the commands grant -> denied (recorded via the central deny/2 helper)
+    assert {:error, :denied} = Workbooks.ExecBroker.exec("jq", [], "", allow: false)
+    # a revoked inbound serve dispatch -> denied (recorded)
+    sid = "audit-#{System.unique_integer([:positive])}"
+    :ok = Workbooks.Revocation.revoke(sid)
+    assert {:error, :revoked} = Workbooks.ServeBroker.dispatch(sid, nil, "req")
+    :ok = Workbooks.Revocation.unrevoke(sid)
+
+    assert BrokerAudit.count({:exec, :deny}) >= 1
+    assert BrokerAudit.count({:serve, :deny, :revoked}) >= 1
+  end
 end

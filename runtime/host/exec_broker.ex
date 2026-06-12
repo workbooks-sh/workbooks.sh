@@ -106,6 +106,7 @@ defmodule Workbooks.ExecBroker do
     do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
 
   defp deny(name, why) do
+    Workbooks.BrokerAudit.record(:exec, :deny)
     Logger.warning("wb-broker: DENY exec #{inspect(name)} — #{why}")
   end
 end

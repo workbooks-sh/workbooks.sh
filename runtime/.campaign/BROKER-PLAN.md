@@ -1084,3 +1084,10 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   counts per broker+reason; NetGuard SSRF + allow-list denials audited). The keystone's "manageable" criterion
   is now met: every wired broker denial is observable + queryable. FOLLOW-UP: wire exec/storage/queue/serve
   (mechanical) + a recent-events forensics ring + :telemetry emission for external monitors.
+- 2026-06-12 (iter 76): **BROKER OBSERVABILITY extended to exec + serve (6 brokers now audited).** Wired
+  BrokerAudit.record into ExecBroker (the central deny/2 helper -> {:exec, :deny}) and ServeBroker.dispatch
+  (revoked / rate_limited -> {:serve, :deny, reason}). 13 tests green (exec deny recorded via the helper; a
+  revoked inbound serve dispatch recorded). The metered/queryable observability now covers net/tcp/udp/tls
+  (egress, iter75) + exec + serve = the 6 main brokers; every denial is queryable via BrokerAudit.stats/
+  count/total_denials. FOLLOW-UP: storage/queue capacity denials (value_too_large/quota_exceeded/queue_full),
+  a recent-events forensics ring (with targets), and :telemetry emission for external monitors.

@@ -95,9 +95,16 @@ defmodule Workbooks.ServeBroker do
     timeout = Keyword.get(opts, :timeout, 10_000)
 
     cond do
-      Workbooks.Revocation.revoked?(serve_id) -> {:error, :revoked}
-      rate && rate_denied?(serve_id, rate) -> {:error, :rate_limited}
-      true -> do_dispatch(serve_id, pid, request, timeout)
+      Workbooks.Revocation.revoked?(serve_id) ->
+        Workbooks.BrokerAudit.record(:serve, :deny, :revoked)
+        {:error, :revoked}
+
+      rate && rate_denied?(serve_id, rate) ->
+        Workbooks.BrokerAudit.record(:serve, :deny, :rate_limited)
+        {:error, :rate_limited}
+
+      true ->
+        do_dispatch(serve_id, pid, request, timeout)
     end
   end
 
