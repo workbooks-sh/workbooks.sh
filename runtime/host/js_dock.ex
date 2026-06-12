@@ -73,16 +73,15 @@ defmodule Workbooks.JsDock do
          fn ctx, url_ptr, url_len, out_ptr, out_cap ->
            if allow_http do
              url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
-             _ = Application.ensure_all_started(:inets)
-             _ = Application.ensure_all_started(:ssl)
 
-             case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, 10_000}], body_format: :binary) do
-               {:ok, {{_, _status, _}, _hdrs, body}} ->
+             # wb-broker SSRF floor on the host-mediated path (same as rust_dock).
+             case Workbooks.NetGuard.get(url) do
+               {:ok, body} ->
                  n = min(byte_size(body), out_cap)
                  :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
                  n
 
-               _ ->
+               {:error, _} ->
                  -1
              end
            else

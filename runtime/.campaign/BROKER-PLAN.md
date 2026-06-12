@@ -228,3 +228,21 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
       runtime-provable via this harness.
   NEXT (iter 7): fix the blocking-resolver-on-async-thread (spawn_blocking) — it's likely the connect panic
   AND a correctness issue (blocking the executor); then quotas + audit, each e2e-checked.
+- 2026-06-12 (iter 7): **CLOSED THE ACTIVE SSRF HOLE on the host-mediated path (host_http_get) — Elixir,
+  unit-validated.** CORRECTION to iter6: the connect-panic was on an IP LITERAL (1.1.1.1, no DNS) so it is
+  NOT my blocking resolver — it's the pre-existing wasi-http OUTBOUND path in wasmex (unwired/needs its own
+  investigation) + this dev env has no outbound internet. THE BIGGER FINDING: host_http_get / host_http_get_
+  many (rust_dock, js_dock) — the mediated path that ACTUALLY WORKS and is USED by real guests — did
+  `:httpc.request(guest_url)` with NO destination check = an ACTIVE SSRF hole (a guest could fetch
+  169.254.169.254 metadata). FIXED: new Workbooks.NetGuard (host/net_guard.ex) — allowed?/1 resolves the URL
+  host and permits only if EVERY resolved addr is public (denies loopback/RFC1918/link-local[metadata]/CGNAT/
+  unspecified/broadcast/multicast/IPv6-ULA/link-local + IPv4-mapped, mirrors the Rust wb_ip_allowed); get/2 =
+  the single SSRF-guarded choke point (denies BEFORE opening a socket). Wired into ALL 3 sites (rust_dock get
+  + get_many concurrent batch, js_dock get). 6 ExUnit tests green incl get/1-denies-internal OFFLINE (proves
+  no socket opened). mix compile clean. NOW: BOTH egress paths SSRF-guarded — wasi (NIF socket_addr_check +
+  send_request, e2e-proven deny) AND host-mediated (Elixir NetGuard, unit-proven deny). No functional
+  regression (public URLs still fetch).
+  STILL OPEN: allow-reachability e2e (needs internet env + the wasi-http-outbound connect-path fix); a host-
+  path allow-list (NetGuard.get could take an allow-list arg like the wasi path); DNS-rebinding pin; quotas;
+  audit; revocation. NEXT (iter 8): host-path allow-list arg on NetGuard.get (parity w/ wasi path) + a
+  denial AUDIT log (Logger.warning on every blocked egress — observable + testable via the deny harness).

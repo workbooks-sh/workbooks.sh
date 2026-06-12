@@ -100,16 +100,15 @@ defmodule Workbooks.RustDock do
         {:fn, [:i32, :i32, :i32, :i32], [:i32],
          fn ctx, url_ptr, url_len, out_ptr, out_cap ->
            url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, url_ptr, url_len)
-           _ = Application.ensure_all_started(:inets)
-           _ = Application.ensure_all_started(:ssl)
 
-           case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, 10_000}], body_format: :binary) do
-             {:ok, {{_, _status, _}, _hdrs, body}} ->
+           # wb-broker SSRF floor: deny internal/sensitive destinations BEFORE the socket opens.
+           case Workbooks.NetGuard.get(url) do
+             {:ok, body} ->
                n = min(byte_size(body), out_cap)
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
                n
 
-             _ ->
+             {:error, _} ->
                -1
            end
          end},
@@ -132,9 +131,10 @@ defmodule Workbooks.RustDock do
              urls
              |> Task.async_stream(
                fn url ->
-                 case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, 10_000}], body_format: :binary) do
-                   {:ok, {{_, _, _}, _, body}} -> body
-                   _ -> :error
+                 # wb-broker SSRF floor applies per-URL in the concurrent batch too.
+                 case Workbooks.NetGuard.get(url) do
+                   {:ok, body} -> body
+                   {:error, _} -> :error
                  end
                end,
                max_concurrency: 16,
