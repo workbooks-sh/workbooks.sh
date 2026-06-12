@@ -170,3 +170,42 @@ P2 — daily ergonomics:
 P3 — reach:
 - windows release matrix (install.js already expects the asset name)
 - stdin pipelines across author/trust verbs
+
+## Import: anything → toolkit (`wbx toolkit import`)
+
+The ecosystem's intake ramp (relates epic wb-rhs): take any existing
+agent-capability construct and package it as a toolkit — automatically where
+parsing suffices, and where it doesn't, emit the fix-up plan as org TODOs so
+an agent (or human) finishes the conversion with instructions in hand.
+Philosophy follows the prime DX directive: parse what's parseable, do the
+work, and leave a manual — never a shrug.
+
+### Source taxonomy (detect by shape, override with --as)
+
+| kind            | shape detected                                   | maps to                          |
+|-----------------|--------------------------------------------------|----------------------------------|
+| claude-skill    | SKILL.md (+ references/, scripts/) or skills.sh ref | manifest + skill tree (md→org) |
+| markdown        | a single .md file                                | one-skill toolkit (md→org)       |
+| folder          | directory of scripts/docs                        | skills from docs, bins from scripts |
+| mcp-server      | mcp manifest / package exposing tools            | skill per tool; server runs as the bin |
+| cursor-rules    | .cursor/rules / .cursorrules                     | skill tree (guidance-only toolkit) |
+| agents-md       | AGENTS.md / CLAUDE.md                            | guidance-only toolkit            |
+| openapi-actions | OpenAPI spec (GPT actions style)                 | skill per operation; HTTP via engine |
+| npm-cli         | package.json with bin                            | manual + wasm-lane build plan    |
+| pip-cli         | pyproject/setup with console_scripts             | manual + wasm-lane build plan    |
+
+### Pipeline (three honest stages)
+
+1. **Parse + scaffold** — detect the kind, translate docs to org (mechanical
+   md→org), write `manifest.org` + `skills/` + carried assets. Always
+   succeeds for parseable sources; the toolkit may start guidance-only.
+2. **Dependency audit (auto-CHECK)** — scan scripts/manifests for
+   interpreters, binaries, npm/pip deps, network/fs expectations. Classify
+   each against the wasm lanes: `ready` (js/c/zig/rust/go lanes cover it) ·
+   `convertible` (known recipe, needs a build) · `blocked` (native-only,
+   needs redesign). Emit the report in the manifest; `--json` for agents.
+3. **Fix-up plan (the agent manual)** — everything not `ready` becomes org
+   TODOs inside the scaffold, each with concrete instructions (which lane,
+   which recipe, what to rewrite). `wbx toolkit verify <id>` is the done
+   test; auto-CONVERT (engine-backed builds via the compiler lanes) applies
+   where the engine is reachable.
