@@ -16,46 +16,46 @@ search · telemetry/ledger · mirror · publish
 - **Success:** pretty JSON on stdout.
 - **Failure:** a missing file raises (the command reads the file directly).
 
-## Pack / unpack — `wb bundle`, `wb unpack`
+## Pack / unpack — `wb bundle`, `wbx unpack`
 
 - **Need:** turn a single Org source into a portable bundle, or take one apart.
 - **Action:** `wb bundle src.org out` writes a bundle of `{source.org,
-  manifest.json}` (the manifest is the tangle plan). `wb unpack bundle dest`
+  manifest.json}` (the manifest is the tangle plan). `wbx unpack bundle dest`
   disassembles a parent workbook into a flat tree under `dest`.
 - **Success:** `bundled N parts → out` / `unpacked N files → dest`.
 
-## Build / compose — `wb build`, `wb pack`
+## Build / compose — `wbx build`, `wb pack`
 
 - **Need:** compile a workspace's components to WASM, or compose its members.
-- **Action:** `wb build <workspace>` compiles components → WASM and reports what
+- **Action:** `wbx build <workspace>` compiles components → WASM and reports what
   built vs. couldn't (JSON). `wb pack <workspace> <out> [--build]` composes the
   members into ONE workbook; `--build` produces the *runnable* projection
   (components compiled to WASM, source dropped).
 - **Success:** `packed <slug> → out (N bytes)`.
 - **Failure:** a string error from the library layer (e.g. unknown workspace).
 
-## Sign / verify — `wb sign`, `wb verify`
+## Sign / verify — `wbx sign`, `wbx verify`
 
 - **Need:** stamp a published HTML artifact with verifiable provenance, or check
   one you received.
-- **Action:** `wb sign file.html [--out f]` embeds a did:key manifest (the
-  tenant's identity, a `c2pa.action.published` action). `wb verify file.html`
+- **Action:** `wbx sign file.html [--out f]` embeds a did:key manifest (the
+  tenant's identity, a `c2pa.action.published` action). `wbx verify file.html`
   checks signature + asset integrity.
 - **Success (verify):** `valid=true signature=… asset_integrity=… issuer=did:…`.
 
-## Library — `wb library`, `wb checkout`, `wb checkin`
+## Library — `wbx library`, `wb checkout`, `wb checkin`
 
 - **Need:** see the identity's access graph and move members in/out of a working dir.
-- **Action:** `wb library` lists workspaces + members. `wb library query <sql>`
+- **Action:** `wbx library` lists workspaces + members. `wbx library query <sql>`
   runs a cross-workbook query over members' virtual filesystems. `wb checkout
   <member> <workdir>` borrows a member out; `wb checkin <member> <workdir>` packs
   + signs it back.
 - **Success:** a member listing, query JSON, or a checkout/checkin record.
 
-## Durable storage — `wb store`, `wb stored`, `wb fetch`
+## Durable storage — `wbx store`, `wb stored`, `wb fetch`
 
 - **Need:** archive a workspace on the configured backend (local volume / S3 / R2).
-- **Action:** `wb store <slug> [--build]`, `wb stored` (list keys), `wb fetch
+- **Action:** `wbx store <slug> [--build]`, `wb stored` (list keys), `wb fetch
   <key> <out>`.
 - **Success:** `stored <slug> → <key> (backend: …)` / `fetched <key> → out`.
 
@@ -86,17 +86,17 @@ search · telemetry/ledger · mirror · publish
 - **Failure:** `skipped: <reason>` or `error: …`; `radicle: not available` when
   Radicle isn't installed.
 
-## Publish — `wb publish`
+## Publish — `wbx publish`
 
 Render a workbook (.org) → self-contained HTML → a live URL. Declarative, mirrors
 deploy-kit. Non-interactive; `--json` switches to machine output (exit 0/non-zero).
 
-- **`wb publish init`** — scaffold `./publish.org`. Fails if it exists (use
+- **`wbx publish init`** — scaffold `./publish.org`. Fails if it exists (use
   `--force`).
-- **`wb publish validate [config]`** — coherence-check the config, no render/deploy.
-- **`wb publish apply [<file.org>] [config]`** — render + ship → prints the live
+- **`wbx publish validate [config]`** — coherence-check the config, no render/deploy.
+- **`wbx publish apply [<file.org>] [config]`** — render + ship → prints the live
   URL. Workbook defaults to `./workbook.org`, config to `./publish.org`.
-- **`wb publish site [<dir>]`** — render a multi-page site from `site.org` →
+- **`wbx publish site [<dir>]`** — render a multi-page site from `site.org` →
   deploy.
 
 A `publish.org` describes: `PUBLISH_TARGET` (`cloudflare-pages` | `gh-pages` |

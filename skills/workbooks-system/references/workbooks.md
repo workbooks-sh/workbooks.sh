@@ -47,7 +47,7 @@ workbooks (and your tooling around them) so nothing breaks under it.
 
 ## The authoring loop (CLI)
 
-The `wb`/workbook tooling drives the loop; the canonical verbs:
+The `wbx`/workbook tooling drives the loop; the canonical verbs:
 
 ```
 workbook init        # scaffold a new workbook project
@@ -66,7 +66,7 @@ contract.
 Deploying a workbook to a live engine stores it under an id and serves it on
 the public plane:
 
-- `wb workbook deploy <id> <artifact>` (control plane `PUT /w/<id>`,
+- `wbx workbook deploy <id> <artifact>` (control plane `PUT /w/<id>`,
   bearer-authed). A complete-HTML artifact is served verbatim; org sources
   are rendered by the runtime.
 - **Every deploy is one git commit** in the tenant's repo — the public,

@@ -13,11 +13,11 @@ as commands on PATH; knowledge arrives as org skill files it reads
 progressively:
 
 ```
-wb toolkit list                # what's installed
-wb toolkit search <query>      # find a capability
-wb toolkit show <id>           # the toolkit's overview skill
-wb toolkit show <id> <skill>   # a specific recipe, loaded only when needed
-wb toolkit run <id> <task> -- <args>
+wbx toolkit list                # what's installed
+wbx toolkit search <query>      # find a capability
+wbx toolkit show <id>           # the toolkit's overview skill
+wbx toolkit show <id> <skill>   # a specific recipe, loaded only when needed
+wbx toolkit run <id> <task> -- <args>
 ```
 
 Never design a capability as a bespoke "tool registry" entry or a special
@@ -65,7 +65,7 @@ Exec shapes (what a command can be): `command` (a WASM CLI), `component`
 (a renderer/kernel-shape module), `federation` (a remote capability). Use
 `command` unless you specifically need another shape.
 
-Verify before shipping: `wb toolkit verify <id>` — and treat an unbuilt or
+Verify before shipping: `wbx toolkit verify <id>` — and treat an unbuilt or
 unverifiable command as not shipped.
 
 ## Writing skills for agents (the methodology)

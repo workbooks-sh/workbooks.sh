@@ -24,30 +24,30 @@ container, not a different stack.
 ## The verbs
 
 ```
-wb deploy init       # scaffold a deployment config
-wb deploy validate   # check it before touching anything
-wb deploy apply      # create/update the deployment
-wb deploy update     # roll a new image/config
-wb deploy verify     # prove the engine is actually serving
-wb deploy status     # what's running where
-wb deploy logs       # engine logs
-wb deploy down       # tear down
+wbx deploy init       # scaffold a deployment config
+wbx deploy validate   # check it before touching anything
+wbx deploy apply      # create/update the deployment
+wbx deploy update     # roll a new image/config
+wbx deploy verify     # prove the engine is actually serving
+wbx deploy status     # what's running where
+wbx deploy logs       # engine logs
+wbx deploy down       # tear down
 ```
 
 Local target runs the image in a container (krunvm/podman/docker behind one
 seam); cloud targets deploy the same image to your provider. Prod-parity
-testing is `wb deploy local` — same bytes that ship.
+testing is `wbx deploy local` — same bytes that ship.
 
 ## Talking to a deployed engine from the CLI
 
 Engine-targeted commands resolve the engine from the environment:
 
 ```
-WB_ENGINE_URL=<control plane url>  WB_ENGINE_TOKEN=<bearer>  wb workbook list
+WB_ENGINE_URL=<control plane url>  WB_ENGINE_TOKEN=<bearer>  wbx workbook list
 ```
 
-Operate content with `wb workbook deploy/list/show`, capabilities with
-`wb toolkit …`, configuration with `wb var …`. Prefer these over shelling
+Operate content with `wbx workbook deploy/list/show`, capabilities with
+`wbx toolkit …`, configuration with `wbx var …`. Prefer these over shelling
 into machines: CLI operations go through the authed control plane, are
 logged as commits on the tenant's git rail, and work identically against
 local and cloud engines. SSH into a box is for diagnosing the box, not for

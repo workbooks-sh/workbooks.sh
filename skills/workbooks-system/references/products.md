@@ -11,7 +11,7 @@ or whole:
 - **The runtime** — the Elixir/BEAM engine: serves workbooks, hosts agents,
   executes all compute as WebAssembly on wasmtime. Ships as one OCI image
   (built by CI); Deploy Kit runs it anywhere → `deploykit.md`.
-- **The `wb` CLI** — one binary for the whole surface: authoring, bundling,
+- **The `wbx` CLI** — one binary for the whole surface: authoring, bundling,
   deploying, toolkit ops, engine ops → `cli/index.md`.
 - **Compiler lanes** — in-sandbox toolchains (C, Zig, Rust, JS/TS/npm) that
   turn source into the WASM the platform runs → `toolkit.md`.
