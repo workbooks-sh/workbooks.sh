@@ -470,3 +470,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   brokered platform spanning egress, process-spawning, persistent state, concurrency, AND inbound serving.
   NEXT (iter 20): richer HTTP marshaling (forward headers + guest-set status/headers) for the serve-flip;
   and/or consolidate (a capability/ABI reference doc). Networking's 323 reclamation stays gated on wb-0beq.
+- 2026-06-12 (iter 20): **serve-flip enriched to a FULL HTTP handler (green).** encode_http_request now
+  forwards request headers (METHOD PATH\n Header: v\n ... \n\n body); decode_http_response parses a guest-set
+  STATUS + headers (STATUS\n Header: v\n\n body; plain bytes -> 200 fallback). The Plug forwards req headers
+  in and applies the guest's status+headers out. Hermetic marshaling tests + RICH HTTP e2e: a real HTTP GET
+  /rich (with x-foo: bar) -> the guest SET status 201 + header x-guest:hi and SAW the forwarded x-foo header
+  (echoed in the body). 4 tests green (2 hermetic + 2 build e2e). The serve-flip guest is now a real HTTP
+  handler (reads method/path/headers/body; sets status/headers/body) — production-shaped, fully sandboxed.
+  STONE 5 = COMPLETE (core + real-HTTP + full request/response marshaling, all e2e-proven).
+  PLATFORM STATUS: five brokered capabilities, all e2e-proven (except net-egress reachability, env-gated):
+  net egress (deny-side red-team proven), exec, durable storage, data-parallelism, inbound HTTP serving.
+  NEXT (iter 21): CONSOLIDATE — a capability/ABI reference doc (the host_* import surface across both docks +
+  ServeBroker) + a single green run of all broker unit suites; OR harden a deferred cadence item (dedicated
+  exec/kv caps for least-privilege, or the DoS body-cap). Networking 323-reclamation stays gated on wb-0beq.

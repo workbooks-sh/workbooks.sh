@@ -42,11 +42,47 @@ defmodule Workbooks.ServeBroker do
   end
 
   @doc """
-  Marshal an HTTP request into the bytes the guest handler sees: a request line + a blank line + body
-  (HTTP-ish; v1 omits header forwarding). Binary-safe in the body.
+  Marshal an HTTP request into the bytes the guest handler sees, HTTP-message-shaped:
+
+      METHOD PATH\\n  Header: value\\n  ...\\n  \\n  <body>
+
+  request line, forwarded headers, a blank line, then the (binary-safe) body.
   """
-  def encode_http_request(method, path, body) when is_binary(body) do
-    method <> " " <> path <> "\n\n" <> body
+  def encode_http_request(method, path, headers, body) when is_list(headers) and is_binary(body) do
+    hdr = Enum.map_join(headers, "", fn {k, v} -> "#{k}: #{v}\n" end)
+    method <> " " <> path <> "\n" <> hdr <> "\n" <> body
+  end
+
+  @doc """
+  Decode the guest's response bytes (same shape: `STATUS\\nHeader: v\\n\\n<body>`) into
+  `{status, [{header, value}], body}`. A guest that returns plain bytes (no `\\n\\n`) is treated as a
+  200 with that body — so a minimal handler still works.
+  """
+  def decode_http_response(bytes) when is_binary(bytes) do
+    case :binary.split(bytes, "\n\n") do
+      [head, body] -> parse_head(head, body)
+      [body] -> {200, [], body}
+    end
+  end
+
+  defp parse_head(head, body) do
+    [status_line | hlines] = String.split(head, "\n")
+
+    status =
+      case Integer.parse(String.trim(status_line)) do
+        {n, _} when n in 100..599 -> n
+        _ -> 200
+      end
+
+    headers =
+      Enum.flat_map(hlines, fn line ->
+        case String.split(line, ":", parts: 2) do
+          [k, v] -> [{String.downcase(String.trim(k)), String.trim(v)}]
+          _ -> []
+        end
+      end)
+
+    {status, headers, body}
   end
 
   @doc "Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}."
@@ -106,11 +142,16 @@ defmodule Workbooks.ServeBroker.Plug do
     serve_id = Keyword.fetch!(opts, :serve_id)
     pid = Keyword.fetch!(opts, :pid)
     {:ok, body, conn} = read_body(conn)
-    req = ServeBroker.encode_http_request(conn.method, conn.request_path, body)
+    req = ServeBroker.encode_http_request(conn.method, conn.request_path, conn.req_headers, body)
 
     case ServeBroker.dispatch(serve_id, pid, req) do
-      {:ok, resp} -> send_resp(conn, 200, resp)
-      {:error, _} -> send_resp(conn, 502, "guest handler error")
+      {:ok, resp} ->
+        {status, headers, out} = ServeBroker.decode_http_response(resp)
+        conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+        send_resp(conn, status, out)
+
+      {:error, _} ->
+        send_resp(conn, 502, "guest handler error")
     end
   end
 end
