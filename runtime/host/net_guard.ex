@@ -16,17 +16,44 @@ defmodule Workbooks.NetGuard do
   SSRF-guarded HTTP GET — the single choke point for the host-mediated egress path. Denies internal
   destinations BEFORE any socket is opened. Returns `{:ok, body}` | `{:error, :denied | :request_failed}`.
   """
-  def get(url, timeout \\ 10_000) when is_binary(url) do
+  def get(url, timeout \\ 10_000) when is_binary(url), do: do_get(url, timeout, 5)
+
+  defp do_get(_url, _timeout, hops) when hops < 0, do: {:error, :too_many_redirects}
+
+  defp do_get(url, timeout, hops) do
     if allowed?(url) do
       _ = Application.ensure_all_started(:inets)
       _ = Application.ensure_all_started(:ssl)
 
-      case :httpc.request(:get, {String.to_charlist(url), []}, [{:timeout, timeout}], body_format: :binary) do
-        {:ok, {{_, _status, _}, _hdrs, body}} -> {:ok, body}
-        _ -> {:error, :request_failed}
+      # autoredirect: false — :httpc would otherwise auto-FOLLOW a 3xx, bypassing the guard if a public
+      # URL redirects to an internal one. We follow manually so EVERY hop is re-SSRF-checked (and bounded).
+      case :httpc.request(
+             :get,
+             {String.to_charlist(url), []},
+             [{:timeout, timeout}, {:autoredirect, false}],
+             body_format: :binary
+           ) do
+        {:ok, {{_, status, _}, hdrs, body}} when status in 300..399 ->
+          case redirect_target(url, hdrs) do
+            nil -> {:ok, body}
+            next -> do_get(next, timeout, hops - 1)
+          end
+
+        {:ok, {{_, _status, _}, _hdrs, body}} ->
+          {:ok, body}
+
+        _ ->
+          {:error, :request_failed}
       end
     else
       {:error, :denied}
+    end
+  end
+
+  defp redirect_target(base, hdrs) do
+    case List.keyfind(hdrs, ~c"location", 0) do
+      {_, loc} -> base |> URI.parse() |> URI.merge(to_string(loc)) |> URI.to_string()
+      _ -> nil
     end
   end
 

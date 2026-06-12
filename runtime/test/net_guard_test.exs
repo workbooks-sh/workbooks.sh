@@ -48,6 +48,25 @@ defmodule Workbooks.NetGuardTest do
     refute NetGuard.allowed?(nil)
   end
 
+  test "RED-TEAM: denies obfuscated/smuggled internal targets (decimal/hex/octal/short IP, userinfo@, v4-mapped)" do
+    for url <- [
+          "http://2130706433/",                  # decimal int = 127.0.0.1
+          "http://0x7f000001/",                   # hex = 127.0.0.1
+          "http://0177.0.0.1/",                   # octal octet = 127.0.0.1
+          "http://127.1/",                        # short form = 127.0.0.1
+          "http://017700000001/",                 # full octal = 127.0.0.1
+          "http://trusted.example.com@127.0.0.1/",        # userinfo smuggle -> loopback
+          "http://google.com@169.254.169.254/latest/",    # userinfo -> cloud metadata
+          "http://169.254.169.254.nip.io.@127.0.0.1/",    # userinfo with internal host
+          "http://[::ffff:127.0.0.1]/",           # IPv4-mapped IPv6 loopback
+          "http://[::ffff:a9fe:a9fe]/",           # IPv4-mapped IPv6 metadata (169.254.169.254)
+          "http://0/",                            # 0 = 0.0.0.0
+          "http://[0:0:0:0:0:0:0:1]/"             # expanded ::1
+        ] do
+      refute NetGuard.allowed?(url), "RED-TEAM bypass not blocked: #{url}"
+    end
+  end
+
   test "get/1 denies internal destinations before opening a socket (offline)" do
     # No :httpc call is made for a denied URL — proven by this passing with no network.
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/latest/meta-data/")

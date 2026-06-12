@@ -246,3 +246,20 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   path allow-list (NetGuard.get could take an allow-list arg like the wasi path); DNS-rebinding pin; quotas;
   audit; revocation. NEXT (iter 8): host-path allow-list arg on NetGuard.get (parity w/ wasi path) + a
   denial AUDIT log (Logger.warning on every blocked egress — observable + testable via the deny harness).
+- 2026-06-12 (iter 8): **RED-TEAM adversarial hardening of the host path (green) + redirect bypass fixed.**
+  PROBED the bypass vectors empirically: Erlang :inet.parse_address CANONICALIZES decimal (2130706433),
+  hex (0x7f000001), octal (0177.0.0.1), full-octal (017700000001), short (127.1) IP forms all -> {127,0,0,1}
+  — AND its parse agrees with what :httpc/getaddrinfo resolve, so there's NO parser-mismatch bypass; userinfo@
+  is caught by URI.parse (host extracted past the @). Added a 12-case RED-TEAM ExUnit test asserting all these
+  obfuscated internal targets are DENIED — GREEN. FIXED a real hole: :httpc auto-FOLLOWS 3xx by default (a
+  public URL redirecting to internal would bypass the guard) -> NetGuard.get now sets autoredirect:false and
+  follows redirects MANUALLY, re-SSRF-checking EVERY hop (bounded to 5), staying functional. 7 NetGuard tests
+  green, mix compile clean.
+  RED-TEAM STATUS (host path): IP-literals ✓, IPv6 ✓, decimal/hex/octal/short IP ✓, IPv4-mapped ✓, userinfo@ ✓,
+  redirect-to-internal ✓ (per-hop check). STILL OPEN: DNS-rebinding (NetGuard resolves in allowed?, :httpc
+  re-resolves on connect — a window; pin needs connect-to-IP-with-Host which :httpc doesn't expose easily);
+  DoS (no body-size cap — :httpc reads full body; no per-instance conn/rate quota); DNS-exfil (resolving the
+  host leaks the subdomain — mitigate by allow-list-first). Wasi-path: same obfuscation forms are denied
+  by-construction (deny on resolve-fail or internal-IP) but not yet explicitly red-team-tested.
+  NEXT (iter 9): body-size cap + conn/rate quota on NetGuard.get (DoS floor, testable); then allow-list arg
+  (host-path parity) + denial audit (Logger + CaptureLog test); then explicit wasi-path red-team coverage.
