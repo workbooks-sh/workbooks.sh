@@ -969,3 +969,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   + REQUEST-METHOD passthrough + response collection — every serve-NIF path. 1 test green. The inbound seam is
   now thoroughly validated. NEXT: body-as-Binary perf (large bodies cross as a list today) OR a serving-guest
   outbound-SSRF composition test; both nice-to-have on a fully-complete keystone.
+- 2026-06-12 (iter 64): **inbound seam body made PRODUCTION-EFFICIENT (Binary in/out).** The serve NIF
+  crossed request/response bodies as byte LISTS (Elixir bin_to_list -> Vec<u8> -> list_to_binary) — O(n)
+  memory + slow for real HTTP payloads (uploads, API bodies). Changed component_serve_http to take
+  `body: rustler::Binary` + return `rustler::Binary` (OwnedBinary.release(env)) — bodies now cross as BINARIES
+  both ways with no intermediate list; Instance.serve_http simplified (no conversions). 0 rust errors; the
+  inbound e2e stays green (no regression); a 50KB random binary request body crosses cleanly with status 200.
+  The inbound seam now handles real HTTP payloads efficiently. NEXT: optional serving-guest outbound-SSRF
+  composition test (the SSRF mechanism is global + already proven); otherwise the keystone is comprehensively
+  done in every dimension.

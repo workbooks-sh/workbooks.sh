@@ -241,16 +241,18 @@ pub fn call_exported_function(
 // The host synthesizes the request, calls handle (SYNC — the engine is sync), and collects the response the
 // guest writes to the response-outparam. Lets STANDARD wasi:http server components run as sandboxed guests.
 #[rustler::nif(name = "component_serve_http", schedule = "DirtyCpu")]
-pub fn serve_http(
+pub fn serve_http<'a>(
+    env: rustler::Env<'a>,
     component_store_resource: ResourceArc<ComponentStoreResource>,
     instance_resource: ResourceArc<ComponentInstanceResource>,
     method: String,
     uri: String,
     headers: Vec<(String, String)>,
-    body: Vec<u8>,
-) -> NifResult<(u16, Vec<(String, String)>, Vec<u8>)> {
+    body: rustler::Binary,
+) -> NifResult<(u16, Vec<(String, String)>, rustler::Binary<'a>)> {
     use bytes::Bytes;
     use http_body_util::{BodyExt, Full};
+    use rustler::OwnedBinary;
     use wasmtime_wasi_http::bindings::http::types::Scheme;
     use wasmtime_wasi_http::WasiHttpView;
 
@@ -265,7 +267,7 @@ pub fn serve_http(
     for (k, v) in &headers {
         builder = builder.header(k.as_str(), v.as_str());
     }
-    let req_body = Full::new(Bytes::from(body))
+    let req_body = Full::new(Bytes::copy_from_slice(body.as_slice()))
         .map_err(|e: std::convert::Infallible| match e {})
         .boxed();
     let hyper_req = builder
@@ -336,7 +338,12 @@ pub fn serve_http(
     let collected = TOKIO_RUNTIME
         .block_on(async { resp_body.collect().await })
         .map_err(|e| Error::Term(Box::new(format!("body collect: {e}"))))?;
-    let body_bytes = collected.to_bytes().to_vec();
+    let body_bytes = collected.to_bytes();
+
+    // hand the body back as a binary (no intermediate byte-list) so real HTTP payloads stay efficient
+    let mut out_bin = OwnedBinary::new(body_bytes.len())
+        .ok_or_else(|| Error::Term(Box::new("response body alloc failed".to_string())))?;
+    out_bin.as_mut_slice().copy_from_slice(&body_bytes);
 
     let out_headers = parts
         .headers
@@ -349,7 +356,7 @@ pub fn serve_http(
         })
         .collect::<Vec<_>>();
 
-    Ok((parts.status.as_u16(), out_headers, body_bytes))
+    Ok((parts.status.as_u16(), out_headers, out_bin.release(env)))
 }
 
 fn component_execute_function(
