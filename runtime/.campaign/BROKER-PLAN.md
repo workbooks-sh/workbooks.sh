@@ -150,3 +150,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
     (4) rate/byte/conn quotas, audit log, mid-flight revocation.
   NEXT (iter 4): build a wasi-http (or wasi-sockets) TEST GUEST + prove at runtime it CANNOT reach metadata/
   localhost/RFC1918 (asserts the override actually fires), and CAN reach an allowed public host.
+- 2026-06-12 (iter 4): **resolver-path tests added (5 cargo tests green).** wb_host_allowed now unit-proven:
+  denies 127.0.0.1/169.254.169.254/10.0.0.1/::1/localhost(resolved); allows 8.8.8.8/1.1.1.1. HONEST STATUS
+  of the e2e: NO current guest uses wasi-http (all use the already-mediated host_http_get), so the live-
+  guest-blocked proof is COUPLED to Phase 4 (the first real brokered tool) — filed bd for it; until it
+  exists, networking is "filter implemented + unit-validated + wired via wasmtime's documented hooks
+  (socket_addr_check per-connect, WasiHttpView::send_request per-request)", NOT "e2e-proven". Not overclaiming.
+  NEXT (iter 5): SCOPED ALLOW-LIST — today egress = deny-internal/ALLOW-ALL-PUBLIC (a net guest can reach
+  ANY external host = exfiltration surface). Make it per-instance {host/ip,port} allow-list, default-deny,
+  threaded Policy.ex → WasiP2Options → store.rs options → the socket_addr_check + send_request closures.

@@ -117,6 +117,24 @@ mod wb_ssrf_tests {
         assert!(!wb_ip_allowed(ip("::ffff:127.0.0.1")));
         assert!(!wb_ip_allowed(ip("::ffff:169.254.169.254")));
     }
+
+    // wb_host_allowed: the wasi-http override's resolve-then-check path. Hermetic — IP literals need no
+    // DNS; "localhost" resolves via /etc/hosts to loopback on every system.
+    #[test]
+    fn host_allowed_denies_internal_and_localhost() {
+        use super::wb_host_allowed;
+        assert!(!wb_host_allowed("127.0.0.1", 80), "deny loopback literal");
+        assert!(!wb_host_allowed("169.254.169.254", 80), "deny cloud metadata");
+        assert!(!wb_host_allowed("10.0.0.1", 443), "deny RFC1918");
+        assert!(!wb_host_allowed("::1", 80), "deny IPv6 loopback literal (brackets stripped upstream)");
+        assert!(!wb_host_allowed("localhost", 80), "deny localhost (resolves to loopback)");
+    }
+    #[test]
+    fn host_allowed_permits_public_literal() {
+        use super::wb_host_allowed;
+        assert!(wb_host_allowed("8.8.8.8", 80), "allow public literal");
+        assert!(wb_host_allowed("1.1.1.1", 443), "allow public literal");
+    }
 }
 
 #[derive(Debug, NifStruct)]
