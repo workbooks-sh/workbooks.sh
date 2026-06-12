@@ -179,3 +179,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
       live-guest e2e (wb-q962).
   NEXT (iter 6): audit log (every egress decision {instance,dest,verdict} — observability/"manageable") +
   rate/conn quotas (DoS floor). Then Policy population + the Phase-4 first brokered tool (→ the live e2e).
+- 2026-06-12 (iter 5 — STRATEGIC NOTE / priority correction): The security MECHANISMS (SSRF filter on both
+  egress paths, scoped allow-list) are built + their LOGIC is exhaustively unit-validated, and the
+  enforcement is wired via wasmtime's DOCUMENTED hooks (socket_addr_check per-connect; WasiHttpView::
+  send_request per-request) — correct-by-construction. BUT every remaining enforcement feature (allow-list
+  actually blocking, quotas, audit firing, rebinding-pin) can ONLY be RUNTIME-validated with a live guest —
+  the SAME gap as wb-q962. Adding more enforcement code I can't yet runtime-prove violates the rigor bar
+  ("no untested claims"). THEREFORE the critical path is now wb-q962 (the e2e harness), NOT more mechanism:
+  stand up ONE wasi-http guest (componentize-js is in node_modules → componentize a JS `fetch()` into a
+  wasi:http component; OR find a prebuilt wasi-http test component), run it through the patched runtime via
+  the wasmex Components API with allow_http, and PROVE: (a) fetch to 169.254.169.254 / 127.0.0.1 is BLOCKED
+  at runtime (send_request override fires), (b) fetch to an allow-listed public host SUCCEEDS, (c) fetch to
+  a non-listed host with a net_allow set is BLOCKED. That single harness validates the WHOLE stack e2e and
+  unblocks validating quotas/audit/rebinding as they're added. NEXT (iter 6) = build that harness. Only once
+  it's green do quotas/audit/revocation get added (each then runtime-proven via the harness).
