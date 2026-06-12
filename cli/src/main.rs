@@ -28,7 +28,7 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
@@ -188,7 +188,14 @@ fn main() {
     let m = mode::detect(cli.json, cli.agent);
     let verb = mode::verb_path();
     match run(cli, m == mode::Mode::Human) {
-        Ok(out) => mode::render_ok(m, &verb, &out),
+        Ok(out) => {
+            mode::render_ok(m, &verb, &out);
+            if m == mode::Mode::Human {
+                if let Some(h) = mode::next_hint(&verb) {
+                    eprintln!("→ next: {h}");
+                }
+            }
+        }
         Err(e) => std::process::exit(mode::render_err(m, &verb, &e)),
     }
 }
@@ -197,7 +204,21 @@ fn run(cli: Cli, human: bool) -> Result<String> {
     let io = io::platform();
     let io = io.as_ref();
 
-    let out = match cli.cmd {
+    // bare `wbx` — the where-am-I landing, not a usage dump
+    let Some(cmd) = cli.cmd else {
+        let mut out = commands::doctor(io, human)?;
+        if human {
+            out.push_str(
+                "\n\nstart here   wbx init <name> · wbx dev · wbx bundle\n\
+                 the engine   wbx deploy local · wbx deploy status\n\
+                 the parts    wbx toolkit list · wbx workbook list\n\
+                 everything   wbx help",
+            );
+        }
+        return Ok(out);
+    };
+
+    let out = match cmd {
         // start here
         Cmd::Init { name, template } => local::init(&name, &template)?,
         Cmd::Dev { src, port } => dev::dev(&src, port)?,
@@ -265,7 +286,7 @@ fn run(cli: Cli, human: bool) -> Result<String> {
         Cmd::Mirror { target } => commands::mirror(io, &target)?,
         Cmd::Federate => commands::federate(io)?,
         // engine
-        Cmd::Deploy { verb } => deploy::run(io, verb)?,
+        Cmd::Deploy { verb } => deploy::run(io, verb, human)?,
         Cmd::Rt { args } => commands::rt(io, &args)?,
         // config
         Cmd::Var { args } => local::var(io, &args)?,

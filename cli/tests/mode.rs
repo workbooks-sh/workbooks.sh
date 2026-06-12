@@ -123,3 +123,31 @@ fn completions_emit_for_zsh_and_bash() {
         assert!(s.len() > 500, "{shell} script non-trivial");
     }
 }
+
+#[test]
+fn bare_wbx_is_a_landing_not_a_usage_error() {
+    let out = wbx().env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    assert!(out.status.success(), "bare wbx must not be an error");
+    // piped → agent mode → doctor JSON body
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("agent landing is structured");
+    assert!(v["version"].is_string());
+}
+
+#[test]
+fn agent_mode_deploy_init_never_prompts() {
+    let dir = std::env::temp_dir().join(format!("wbx-pick-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // piped stdin closed + no preset: agent default must be instant 'local',
+    // never a hang on a picker
+    let out = wbx()
+        .current_dir(&dir)
+        .args(["deploy", "init"])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("local"), "agent default is local: {s}");
+    assert!(dir.join("deployment.org").is_file());
+}

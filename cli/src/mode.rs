@@ -150,3 +150,42 @@ mod tests {
         assert_eq!(c("something else entirely"), 1);
     }
 }
+
+/// Hand-rolled picker for HUMAN mode only — callers must gate on mode; agent
+/// mode never reaches this. Prints the menu to stderr, reads one line.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn pick(question: &str, options: &[(&str, &str)], default: usize) -> std::io::Result<usize> {
+    use std::io::Write;
+    let err = std::io::stderr();
+    let mut e = err.lock();
+    writeln!(e, "? {question}")?;
+    for (i, (name, desc)) in options.iter().enumerate() {
+        let mark = if i == default { "›" } else { " " };
+        writeln!(e, "  {mark} {}) {name:<10} {desc}", i + 1)?;
+    }
+    write!(e, "  [{}] ", default + 1)?;
+    e.flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    let n: usize = line.trim().parse().unwrap_or(default + 1);
+    Ok(n.saturating_sub(1).min(options.len() - 1))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn pick(_q: &str, _o: &[(&str, &str)], default: usize) -> std::io::Result<usize> {
+    Ok(default)
+}
+
+/// Next-verb guidance, HUMAN mode only — the CLI teaches its own grammar.
+pub fn next_hint(verb: &str) -> Option<&'static str> {
+    Some(match verb {
+        "build" => "wbx bundle  (assemble everything into one artifact)",
+        "bundle" => "wbx sign <artifact>  (embed provenance)",
+        "sign" => "wbx verify <artifact>  ·  wbx workbook deploy <id> <artifact>",
+        "deploy init" => "wbx deploy apply  (converge to what you declared)",
+        "deploy apply" => "wbx deploy status  ·  wbx deploy logs",
+        "toolkit build" => "wbx toolkit push <id>  (ship it onto the engine)",
+        "workbook deploy" => "wbx workbook list  (see it living)",
+        _ => return None,
+    })
+}

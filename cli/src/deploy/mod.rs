@@ -32,8 +32,8 @@ use std::path::PathBuf;
 pub enum DeployVerb {
     /// Scaffold ./deployment.org (local | cloud)
     Init {
-        #[arg(default_value = "local")]
-        preset: String,
+        /// local | cloud — omit on a TTY to pick interactively
+        preset: Option<String>,
     },
     /// Coherence check on deployment.org (incl. declared secrets)
     Validate,
@@ -79,9 +79,9 @@ const DEFAULT_IMAGE: &str = "ghcr.io/workbooks-sh/runtime:latest";
 const RECIPE_SPINE: &str = include_str!("../../deploy-kit/providers/_recipe.sh");
 const RECIPE_FLY: &str = include_str!("../../deploy-kit/providers/fly/bootstrap.sh");
 
-pub fn run(io: &dyn Io, verb: DeployVerb) -> Result<String> {
+pub fn run(io: &dyn Io, verb: DeployVerb, human: bool) -> Result<String> {
     match verb {
-        DeployVerb::Init { preset } => init(io, &preset),
+        DeployVerb::Init { preset } => init(io, preset.as_deref(), human),
         DeployVerb::Validate => {
             let cfg = validate(io)?;
             let missing = missing_secrets(io, &cfg);
@@ -100,7 +100,7 @@ pub fn run(io: &dyn Io, verb: DeployVerb) -> Result<String> {
         DeployVerb::Down => lifecycle(io, "down"),
         DeployVerb::Local => {
             if io.read(FILE).is_err() {
-                init(io, "local")?;
+                init(io, Some("local"), false)?;
             }
             apply(io)
         }
@@ -158,7 +158,22 @@ fn validate(io: &dyn Io) -> Result<Config> {
     Ok(cfg)
 }
 
-fn init(io: &dyn Io, preset: &str) -> Result<String> {
+fn init(io: &dyn Io, preset: Option<&str>, human: bool) -> Result<String> {
+    let preset = match preset {
+        Some(p) => p.to_string(),
+        // human on a TTY gets a picker; agents get the safe default
+        None if human => {
+            let i = crate::mode::pick(
+                "engine place — where does this run?",
+                &[("local", "a container on this machine — cloud-identical"),
+                  ("cloud", "fly.io, under your own account")],
+                0,
+            )?;
+            ["local", "cloud"][i].to_string()
+        }
+        None => "local".to_string(),
+    };
+    let preset = preset.as_str();
     let body = match preset {
         "cloud" | "fly" => TEMPLATE_FLY,
         _ => TEMPLATE_LOCAL,
