@@ -32,6 +32,14 @@ defmodule Workbooks.Pallet do
       mode: :argv
     },
     %{
+      # PHP (Zend) as the php-cgi SAPI. File-mode: run a script via `run("php", "", ["-f","/w/x.php"], ["host::/w"])`.
+      name: "php",
+      kind: :wasm,
+      url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/php/8.2.6%2B20230714-11be424/php-cgi-8.2.6.wasm",
+      sha: "edb29de7cd80597292670499846db56929af1166459c4a776ef606aef357c93b",
+      mode: :argv
+    },
+    %{
       name: "ruby",
       kind: :wasm,
       url: "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/ruby/3.2.2%2B20230714-11be424/ruby-3.2.2-slim.wasm",
