@@ -1,0 +1,202 @@
+[
+ {
+  "name": "Chapel",
+  "lane": "none",
+  "source_url": "https://chapel-lang.org",
+  "recipe": "No viable recipe. Chapel's `chpl` compiler is C++ that emits C source, then fork-execs a native backend C compiler (gcc/clang) to link a native executable \u2014 a native-codegen + fork-exec toolchain, not a self-contained translatable library. Its runtime requires a tasking layer (qthreads, built on native threads / makecontext user-context switching) for the task/data parallelism that is the language's whole purpose, plus a comm layer (GASNet/ofi/RDMA/MPI for multi-locale). wasm32-wasi (WASI preview1, single-threaded) provides none of this. A single-locale serial wasm build would require an upstream port that strips parallelism (Chapel's reason to exist) AND eliminates the fork-exec backend \u2014 does not exist today; that is full-compile/new-port work, out of scope.",
+  "smoke": "N/A \u2014 cannot reach a runnable .wasm. Hypothetical smoke (`echo 'writeln(\"hi\");' | chpl /dev/stdin -o hi && ./hi`) is impossible because chpl fork-execs a native C compiler, which the sandbox forbids.",
+  "verdict": "impossible",
+  "blocker": "Compiler fork-execs a native backend C compiler (native codegen, not in-sandbox); runtime requires native-thread tasking (qthreads) + GASNet/RDMA/MPI comm \u2014 all unavailable under single-threaded wasm32-wasi/wasmtime. No prebuilt wasm exists; parallelism (the entire value) cannot survive a serial wasm port.",
+  "confidence": "high"
+ },
+ {
+  "name": "Futhark",
+  "lane": "none",
+  "source_url": "https://futhark.readthedocs.io/en/latest/man/futhark-wasm.html",
+  "recipe": "No viable recipe. (1) The Futhark compiler is a large native Haskell/GHC program distributed only as native binary tarballs / source \u2014 there is NO prebuilt wasm32-wasi build of the compiler (Lane A fails). (2) It is Haskell, not C/C++/Rust/Python/JS \u2014 none of Lanes B/C/D apply; we have no Haskell/GHC toolchain in-sandbox and LLVM-live does not provide GHC. Building it would be a forbidden full-compile. (3) Its core value (GPU codegen via CUDA/OpenCL/ISPC) cannot exist in-sandbox: no GPU/driver access. (4) The only WASM-flavored backend, futhark-wasm / futhark-wasm-multicore, emits C then runs it through Emscripten (emcc) to produce a .js glue file for browser/Node invocation \u2014 that is the browser/JS path, and wasm-multicore additionally needs native threads. Neither targets standalone wasm32-wasi under wasmtime.",
+  "smoke": "N/A \u2014 cannot run. There is no wasm32-wasi artifact to exec under wasmtime. (Hypothetically: `wasmtime futhark.wasm c prog.fut` \u2014 but no such .wasm exists; compiler ships native-only.)",
+  "verdict": "impossible",
+  "blocker": "Compiler is native Haskell/GHC with no wasm32-wasi build (no Haskell lane; full-compile forbidden). Core value is GPU codegen (no GPU/driver in-sandbox). futhark-wasm backend targets Emscripten+JS browser/Node, not standalone WASI; wasm-multicore also needs native threads.",
+  "confidence": "high"
+ },
+ {
+  "name": "Turbopack",
+  "lane": "none",
+  "source_url": "https://nextjs.org/docs/app/api-reference/turbopack",
+  "recipe": "None. Turbopack is not a standalone CLI: it's a Rust bundler embedded in Next.js, distributed only as a platform-specific NAPI native node addon (with an in-Next.js WASM fallback binding that still runs inside the Node host, not freestanding under wasmtime). Built on the turbo-tasks (turbo-tasks-memory/fs) incremental framework whose work-stealing scheduler depends on native multi-threading, plus a native filesystem watcher (notify). No wasm32-wasi standalone target exists. Lane C (mrustc) is also out: edition2024, massive crate graph, heavy proc-macros.",
+  "smoke": "N/A \u2014 nothing to build. If hypothetically attempted: `turbopack-cli` does not exist as a wasm32-wasi artifact; the published WASM is a NAPI binding loaded by Next.js inside Node, so `wasmtime run` of any standalone Turbopack .wasm is not a thing.",
+  "verdict": "impossible",
+  "blocker": "Requires native multi-threaded work-stealing (turbo-tasks scheduler), a native filesystem watcher, and Node-host/Next.js embedding via NAPI; distributed only as a native node addon, no freestanding wasm32-wasi CLI. Native threads + fs-watch + browser/Node embedding are all hard wasmtime-standalone disqualifiers. Also edition2024 + heavy proc-macros block mrustc.",
+  "confidence": "high"
+ },
+ {
+  "name": "conda",
+  "lane": "none",
+  "source_url": "https://docs.conda.io/projects/conda/en/stable/",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "conda's entire value is network-as-purpose: it downloads prebuilt native binaries (C/C++/Fortran libs, toolchains, native Python ext modules) from remote channels (conda-forge/anaconda.org) for a TARGET platform (linux-64, osx-arm64, etc.), then fork-execs post-link/activation scripts and the installed native binaries. The CLI is pure Python and could in principle run under CPython.wasm, but (1) there is no wasm32-wasi conda platform/channel so every installable artifact is native code for a non-wasm target, (2) downloading packages over the network is the purpose not incidental, and (3) install requires fork-exec of scripts and binaries. Network-as-purpose + fork-exec + native-binary-install all violate sandbox constraints. Not lane A/B/C/D.",
+  "confidence": "high"
+ },
+ {
+  "name": "Mamba",
+  "lane": "none",
+  "source_url": "https://github.com/mamba-org/mamba",
+  "recipe": "N/A \u2014 out of scope. Mamba is a C++ conda reimplementation whose entire reason for existing is to resolve and download packages from remote channels over the network. Core deps: libsolv (SAT solver), libcurl (HTTP/HTTPS transport), OpenSSL (TLS), libarchive (tarball extraction). It advertises parallel multi-threaded downloading as its headline feature. Even if the C++ compiled cleanly via the C/C++ lane, the tool does nothing useful without (a) live network fetches to conda channels and (b) native threads for its parallel downloader \u2014 both forbidden in-sandbox. Like conda, it is an installer/network client, not a self-contained compute library.",
+  "smoke": "None possible. Any meaningful invocation (`micromamba create -n env python`, `micromamba install`, `micromamba repoquery`) requires hitting remote channel repodata over HTTPS. With no network there is no repodata to solve against, so the solver has nothing to operate on. No offline standalone smoke exists that exercises Mamba's purpose.",
+  "verdict": "impossible",
+  "blocker": "network-as-purpose (parallel HTTPS downloads from conda channels via libcurl/OpenSSL is the tool's entire function) + native-threads (multi-threaded parallel downloader is its headline feature). Both forbidden in-sandbox.",
+  "confidence": "high"
+ },
+ {
+  "name": "pixi",
+  "lane": "none",
+  "source_url": "https://pixi.sh",
+  "recipe": "",
+  "smoke": "N/A \u2014 even if the rattler/Rust core cross-compiled to wasm32-wasi (it won't: large async-tokio + proc-macros + edition2021/2024, out of mrustc reach), there is no useful standalone behavior. `pixi install` is definitionally: HTTP(S) fetch of conda-forge/PyPI repodata + packages, SAT-solve, then unpack PREBUILT NATIVE (ELF/Mach-O) binaries onto a filesystem and link/run them. None of that executes meaningfully in an isolated wasm32-wasi sandbox.",
+  "verdict": "impossible",
+  "blocker": "Network-as-purpose AND native-payload manager. pixi's reason for existing is to fetch remote prebuilt native conda/PyPI packages over the network, solve deps, and install/exec native binaries \u2014 same dead end as conda/mamba. Wasm32-wasi sandbox has no network-as-purpose, can't fork-exec the native payloads it installs, and the binaries it manages are x86_64/aarch64 ELF/Mach-O, not wasm. Additionally the rattler/tokio Rust stack is far beyond mrustc ~1.74 (heavy async, proc-macros, recent editions) so Lane C compilation also fails. No prebuilt WASI .wasm exists (Lane A).",
+  "confidence": "high"
+ },
+ {
+  "name": "Cargo",
+  "lane": "none",
+  "source_url": "https://doc.rust-lang.org/cargo",
+  "recipe": "N/A \u2014 cannot be built as a standalone wasm32-wasi command.",
+  "smoke": "N/A \u2014 no viable in-sandbox build.",
+  "verdict": "impossible",
+  "blocker": "Cargo is a build ORCHESTRATOR, not a self-contained tool \u2014 both of its core jobs are on the impossible list. (1) Network-as-purpose: its reason to exist is fetching crates from the crates.io registry over HTTPS (git/sparse index + tarball download). (2) Fork-exec: it spawns rustc, build.rs build-scripts, and linkers as subprocesses to compile a dependency graph, then collects their artifacts. WASI has no process spawning (no fork/exec/Command) and no general network as a purpose. Strip both and nothing of Cargo remains \u2014 there is no useful \"Cargo minus network minus subprocesses.\" Note the compile-Rust capability is already covered IN-LANE separately (mrustc.wasm -> clang.wasm pipeline is LIVE per repo memory; LLVM also LIVE), so the actual Rust-build need is met by a different mechanism that does not require Cargo's orchestration model.",
+  "confidence": "high"
+ },
+ {
+  "name": "Cabal",
+  "lane": "none",
+  "source_url": "https://ghc.gitlab.haskell.org/ghc/doc/users_guide/wasm.html",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "Cabal (cabal-install) is a build orchestrator whose core purpose is fork-exec: it spawns GHC, ghc-pkg, hsc2hs, linkers, and ./configure scripts as subprocesses to drive a build. WASI under wasmtime has no process spawning, so cabal cannot perform its function in-sandbox. The GHC wasm backend's own model confirms this: cabal runs on the HOST and PRODUCES target wasm modules (via wasm32-wasi-ghc cross-compiler + --with-compiler flags); cabal itself is not run as a wasm module driving builds. Additionally, no prebuilt cabal-install .wasm ships (Lane A fails) \u2014 only the wasm32-wasi-cabal wrapper, which is a host-side shell script. Cabal is native Haskell compiled by GHC's experimental wasm backend in theory, but fork-exec-as-purpose makes a standalone in-sandbox cabal impossible regardless.",
+  "confidence": "high"
+ },
+ {
+  "name": "vcpkg",
+  "lane": "none",
+  "source_url": "https://learn.microsoft.com/en-us/vcpkg/get_started/overview",
+  "recipe": "N/A \u2014 cannot run in-sandbox. vcpkg is itself a build orchestrator written in C++/CMake whose sole purpose is fork-exec: it runs each port's CMake recipe, downloads source over the network (git/curl), and invokes native compilers/linkers/cmake/msbuild/pkg-config per port, then spawns build subprocesses and probes the host toolchain. Even building vcpkg-the-binary to wasm32-wasi would yield a tool that does nothing useful, since every install action requires process spawning, network fetches, and a host build environment that WASI/wasmtime do not provide (no fork-exec, no real toolchain discovery, network-as-purpose). This is the canonical \"Orchestrator\" anti-pattern called out in the brief: portfiles assume native toolchains, MSBuild, and system probing. The clang.wasm lane we have does not help \u2014 vcpkg expects to drive a full native CMake+compiler+linker pipeline with subprocess control, not a single in-process compiler.",
+  "smoke": "No valid smoke. Any `vcpkg install <port>` immediately fork-execs cmake + git/curl + a native compiler driver, all of which are unavailable under wasmtime WASI. Nothing meaningful runs without subprocess spawning and network.",
+  "verdict": "impossible",
+  "blocker": "fork-exec is the entire product: vcpkg spawns cmake/git/curl/native compilers/linkers per port and probes the host toolchain. Also network-as-purpose (downloads source) and no host build environment under WASI. Not a self-contained computation \u2014 it is an orchestrator of external native processes.",
+  "confidence": "high"
+ },
+ {
+  "name": "Spack",
+  "lane": "none",
+  "source_url": "https://spack.io",
+  "recipe": "N/A \u2014 not portable as a meaningful in-sandbox tool. Spack is pure Python (would load on CPython.wasm, already LIVE), but it is a build-from-source HPC package manager whose entire job is to fork-exec native compilers (gcc/clang/gfortran/mpicc), configure/make/cmake, detect and target real microarchitectures, and write native install trees. None of that survives in wasm32-wasi: no fork-exec of subprocesses, no native toolchain to drive, no real arch detection. Decoupled from native build orchestration the tool does nothing.",
+  "smoke": "No coherent smoke exists: `spack install zlib` would immediately fail attempting to fork-exec a C compiler / configure under WASI (no subprocess, no native gcc). Even `spack spec` arch concretization targets host microarchitectures that don't exist in-sandbox.",
+  "verdict": "impossible",
+  "blocker": "fork-exec of native compilers and build tools (configure/make/cmake/mpicc) is Spack's core purpose; WASI has no subprocess spawning and there is no native toolchain to orchestrate. Native-build-orchestration-as-purpose.",
+  "confidence": "high"
+ },
+ {
+  "name": "Swift Package Manager",
+  "lane": "none",
+  "source_url": "https://www.swift.org/package-manager",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "SwiftPM is a build-orchestration DRIVER, not a self-contained tool \u2014 its entire purpose is fork-exec + network, both of which are sandbox-forbidden as purpose. It (1) fork-execs the native Swift compiler (swiftc/driver), the linker (ld64/lld), and clang for C targets; (2) drives llbuild as a subprocess build engine; (3) fetches dependencies over the network from Git remotes (network-as-purpose). It also depends on the full native toolchain (Foundation, libdispatch, swift-driver, swift-llbuild, swift-syntax) \u2014 none of which exist as wasm32-wasi. CONFUSION TRAP: SwiftWasm lets the Swift compiler EMIT wasm32-wasi binaries (your program compiled TO wasm), and 'swift run' can delegate execution to WasmKit/wasmtime \u2014 but that is the OUTPUT artifact running, not SwiftPM itself running as a .wasm. SwiftPM-as-a-wasm-module under wasmtime does not exist and cannot, because a build tool with no fork-exec and no network has no function. Not lane A (no prebuilt SwiftPM wasm; the WASI SDKs ship the cross-compilation target, host tools stay native), not B/C/D (it's a giant Swift codebase, not C/Rust-crate/Python/JS). Native-toolchain-orchestrator \u2192 impossible.",
+  "confidence": "high"
+ },
+ {
+  "name": "CRAN (install.packages)",
+  "lane": "none",
+  "source_url": "https://docs.r-wasm.org/webr/latest/",
+  "recipe": "No viable recipe. R has no wasm32-wasi standalone build. The only wasm R is WebR, which is compiled with Emscripten (JS glue, browser/Node host) per its own docs \u2014 Emscripten output does not run under bare wasmtime. install.packages against CRAN source requires R's native build toolchain (CC/Fortran/configure + fork-exec of compilers), and even WebR's install.packages only fetches precompiled wasm binaries from repo.r-wasm.org over the network within an Emscripten/browser runtime. Both the runtime (browser/Emscripten dependency) and the installer's core purpose (fork-exec native compilers + network-as-purpose) violate sandbox constraints. Not buildable via Lane A (no WASI .wasm exists), B/C/D (R is a multi-hundred-kLOC C+Fortran interpreter with configure and fork-exec; impossible to self-contain).",
+  "smoke": "N/A \u2014 nothing to smoke-test; no standalone wasm32-wasi R artifact can be produced. (Hypothetically: `wasmtime R.wasm -e 'install.packages(\"jsonlite\")'` \u2014 but no such R.wasm exists and install.packages would fork-exec a compiler + hit the network.)",
+  "verdict": "impossible",
+  "blocker": "R's only wasm port is WebR (Emscripten/browser-Node, not wasm32-wasi standalone \u2014 won't run under wasmtime). install.packages fundamentally requires fork-exec of native compilers and network fetch as its purpose; even WebR's variant is browser/Emscripten-bound and network-dependent. Fails fork-exec, network, and browser constraints simultaneously.",
+  "confidence": "high"
+ },
+ {
+  "name": "renv",
+  "lane": "none",
+  "source_url": "https://rstudio.github.io/renv/",
+  "recipe": "N/A. renv is not a standalone executable \u2014 it is an R package (pure R source code) that only runs inside an R interpreter. It is not a .wasm artifact (Lane A), not C/C++ source (Lane B), not a Rust crate (Lane C), and not Python/JS (Lane D). The only conceivable host is WebR (R-on-wasm), but R itself is NOT in the LIVE set, so renv has no interpreter to run on in-sandbox. Even granting an R host, renv's central operation `restore()` delegates to `install.packages()`, which fetches CRAN source tarballs and invokes native R CMD INSTALL \u2192 C/C++/Fortran compilation per package. That cross-compilation-as-purpose is exactly the in-sandbox native-build problem and is out of scope.",
+  "smoke": "N/A \u2014 cannot construct a standalone in-sandbox smoke. renv has no entrypoint without an R interpreter (not LIVE), and its functional value (restore/install) requires fork-exec of R CMD INSTALL + native toolchain per CRAN package.",
+  "verdict": "impossible",
+  "blocker": "No R interpreter in-sandbox (R/WebR not in LIVE set), and renv's purpose (restore\u2192install.packages) requires native C/C++/Fortran compilation + process spawning of R CMD INSTALL per CRAN package. Not a standalone wasm; not any of lanes A-D.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hackage",
+  "lane": "none",
+  "source_url": "https://hackage.haskell.org",
+  "recipe": "No viable recipe. Hackage is just an HTTP package index (JSON/HTML/tarball API) \u2014 trivially queryable like npm, but \"network-as-purpose\" is explicitly excluded by the brief, so the registry-fetch angle does not qualify. The substantive use of Hackage is building/installing Haskell packages via Cabal+GHC, which cannot run in-sandbox: GHC's only wasm support is a CROSS-compiler (wasm32-wasi-ghc runs NATIVELY on the host and EMITS wasm; per GHC User's Guide ch.15 you must invoke the host-native wasm32-wasi-ghc/ghc-pkg/hsc2hs). There is no GHC/Cabal that is itself a wasm32-wasi .wasm runnable under wasmtime. Building Haskell needs native fork-exec of a multi-stage toolchain (ghc -> native code-gen -> system linker), configure scripts, and native ghc-pkg/cabal-install \u2014 all native exec, none available in the sandbox. Lane A (prebuilt wasm) fails: GHC ships the wasm cross-backend but not a wasm-native GHC binary. Lanes B/C/D irrelevant (it's a Haskell toolchain, not C/Rust/Python/JS).",
+  "smoke": "N/A \u2014 no buildable artifact. If one wanted only the registry side: curl-equivalent GET https://hackage.haskell.org/package/aeson/preferred (JSON) returns version metadata \u2014 but that is pure network access, explicitly excluded, not a sandboxed compute artifact.",
+  "verdict": "impossible",
+  "blocker": "GHC has only a wasm CROSS-compiler (host-native wasm32-wasi-ghc emits wasm); there is no GHC/Cabal that runs as wasm32-wasi under wasmtime. Using Hackage = Cabal/GHC building Haskell to native via fork-exec of a multi-stage native toolchain (code-gen + system linker + configure + ghc-pkg). All native exec, unavailable in-sandbox. The registry itself is pure network access, which the brief excludes as network-as-purpose.",
+  "confidence": "high"
+ },
+ {
+  "name": "rustc",
+  "lane": "none",
+  "source_url": "https://doc.rust-lang.org/rustc/platform-support/wasm32-wasip1.html",
+  "recipe": "N/A \u2014 rustc cannot run as standalone wasm32-wasi in-sandbox. (A) No prebuilt: rustc is never distributed as a wasm32-wasi .wasm binary; rustup ships native host binaries (x86_64/aarch64). The wasm32-wasi *target* lets rustc EMIT wasm, but rustc-the-program stays native. (B) Architecturally impossible to sandbox: rustc fork-execs LLVM's wasm-ld linker driver as a subprocess to link every artifact (no in-process linking path), spawns native threads for parallel codegen/rayon, and the std build + cargo orchestration assume process spawn \u2014 all of which violate the no-fork-exec / no-native-threads sandbox constraints. This is the documented holy-grail-but-hard case. The project already addresses bare-Rust compilation via Lane C (mrustc~1.74 \u2192 clang.wasm, no_std/libstd), which exists precisely BECAUSE upstream rustc is unsandboxable. LLVM itself is already LIVE in-sandbox.",
+  "smoke": "N/A \u2014 no in-sandbox path to smoke-test. Negative check: `rustup target list | grep installed` shows the host is always a native triple; there is no `rustc.wasm`. Linking a hello-world with `--target wasm32-wasip1` invokes `wasm-ld` as a subprocess (observable via strace/-Clink-self-contained), which the sandbox forbids.",
+  "verdict": "impossible",
+  "blocker": "fork-exec (rustc spawns LLVM wasm-ld linker as a subprocess per link) + native-threads (parallel codegen/rayon); no prebuilt wasm32-wasi rustc exists, only a native rustc that targets wasm. Bare-Rust crate compilation is instead served by existing Lane C (mrustc\u2192clang.wasm).",
+  "confidence": "high"
+ },
+ {
+  "name": "swiftc",
+  "lane": "none",
+  "source_url": "https://www.swift.org",
+  "recipe": "N/A \u2014 cannot run swiftc as a wasm32-wasi module under wasmtime. swiftc is a multi-million-line C++/LLVM compiler driver. SwiftWasm / Swift 6.1+ wasm support is the inverse direction: native swiftc (running on the host) emits wasm32-unknown-wasi binaries (`swiftc -target wasm32-unknown-wasi hello.swift -o hello.wasm`). No prebuilt swiftc.wasm exists; the swiftwasm-pad playground confirms compilation happens on a native AWS Lambda backend, only the editor frontend is wasm.",
+  "smoke": "N/A \u2014 no swiftc.wasm artifact to run. The closest LIVE proof (`swiftc -target wasm32-unknown-wasi hello.swift`) runs swiftc NATIVELY, not in-sandbox.",
+  "verdict": "impossible",
+  "blocker": "swiftc is a huge C++/LLVM compiler+driver. Two hard wasip1 blockers: (1) the driver fork-execs sub-processes (separate frontend + clang/lld linker invocations) \u2014 no fork-exec under WASI; (2) the LLVM backend relies on native codegen/JIT machinery and an enormous unported C++ toolchain (no configure/codegen lane viable). Self-hosting swiftc to wasm32-wasi is an unsolved, massive undertaking; no community has produced one. SwiftWasm is the opposite direction (Swift compiled TO wasm as a target). Out of Lanes A-D entirely.",
+  "confidence": "high"
+ },
+ {
+  "name": "GHC \u2014 Glasgow Haskell Compiler",
+  "lane": "none",
+  "source_url": "https://ghc.gitlab.haskell.org/ghc/doc/users_guide/wasm.html",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "GHC's wasm32-wasi support is a CROSS-COMPILER backend (compiles Haskell TO wasm); GHC itself runs natively on {x86_64,aarch64}-{linux,darwin} hosts and is NOT distributed as a wasm32-wasi binary. No prebuilt ghc.wasm exists \u2014 Lane A fails. Running GHC in-sandbox would require self-hosting the entire GHC compiler + GHC RTS (NCG, native codegen, GC) as wasm, which no upstream artifact provides. Additionally, GHC's interpreter/Template-Haskell path (GHCi, the 'external interpreter') depends on a nodejs dyld script for RTS-linker + iserv process bootstrapping \u2014 i.e. a separate JS runtime + process/fork-exec model, disqualifying under no-fork-exec/no-JS-runtime rules. GHC is a large GHC-Haskell program; Lanes B/C/D (C/C++, mrustc Rust, pip/QuickJS) are all inapplicable to a Haskell self-host. Standalone GHC under wasmtime is impossible today.",
+  "confidence": "high"
+ },
+ {
+  "name": "Raku (Rakudo/MoarVM)",
+  "lane": "none",
+  "source_url": "https://github.com/MoarVM/MoarVM",
+  "recipe": "No viable recipe. MoarVM is C but Rakudo's compiler is self-hosted in Raku/NQP: building it requires a running MoarVM+NQP to compile the CORE setting (bootstrap chicken-and-egg, plus a host perl5 + git fetching multi-repo deps). Even setting bootstrap aside, the VM hard-depends on native pthreads (the scheduler, async/Supply, hyper/race concurrency are built into the runtime, not optional), dlopen-based dynamic module/extop/NativeCall loading, and an optional JIT. Native threads and dlopen are unavailable under single-threaded wasm32-wasi on wasmtime \u2014 no Lane A/B/C/D path.",
+  "smoke": "N/A \u2014 cannot produce a wasm32-wasi build. Hypothetical check would be `wasmtime run rakudo.wasm -e 'say 1+1'` printing 2, but no .wasm can be produced.",
+  "verdict": "impossible",
+  "blocker": "Native pthreads (concurrency baked into the VM scheduler) + dlopen dynamic loading (modules/extops/NativeCall) + self-hosted Raku/NQP bootstrap requiring a running MoarVM. None survive single-threaded wasm32-wasi/wasmtime; no prebuilt WASI .wasm and no WASM backend exist.",
+  "confidence": "high"
+ },
+ {
+  "name": "MySQL",
+  "lane": "none",
+  "source_url": "https://www.mysql.com",
+  "recipe": "None. MySQL is a large multithreaded C++ network database server with no wasm32-wasi build. Lane A (prebuilt): none exists. Lane B (self-contained C/C++): infeasible \u2014 InnoDB/storage engines depend on pthreads (native threads), POSIX signals, mmap, fork-exec for tooling, and a CMake configure step that probes the host OS; networking (listening sockets) is the server's reason-for-being, not incidental. Lane C/D: N/A (C++). The in-sandbox relational-DB need is already covered by sqlite3 (LIVE), an in-process embedded engine that fits the model; MySQL's client/server, threaded, socket-as-purpose architecture does not.",
+  "smoke": "N/A \u2014 cannot build. If a hypothetical wasm existed: `mysqld --initialize-insecure --datadir=/tmp/d && mysql -e 'CREATE TABLE t(x INT); INSERT INTO t VALUES(1); SELECT * FROM t;'`. But mysqld is a network daemon (listens on a socket / forks), so it violates network-as-purpose + native-threads regardless.",
+  "verdict": "impossible",
+  "blocker": "Native pthreads (InnoDB threadpool), POSIX signals, fork-exec, and listening-socket networking as the server's core purpose; no wasm32-wasi build exists and the architecture is fundamentally a network daemon. Embedded relational need already served by LIVE sqlite3.",
+  "confidence": "high"
+ },
+ {
+  "name": "MariaDB",
+  "lane": "none",
+  "source_url": "https://mariadb.org",
+  "recipe": "N/A \u2014 no in-sandbox path. MariaDB is a threaded C++ network database server (MySQL fork). No upstream wasm32-wasi target exists. Building it would require porting a huge C++ codebase whose core design is network-as-purpose (serves clients over TCP/Unix sockets), uses native pthreads (thread-per-connection), POSIX signals, and fork-exec for some subsystems \u2014 none of which fit standalone wasmtime under WASIp1. For in-sandbox SQL, sqlite3 is already LIVE and is the correct answer.",
+  "smoke": "N/A \u2014 cannot produce a runnable artifact. A DB server's smoke test is \"accept a client connection and run a query over a socket,\" which is exactly the network-as-purpose case excluded by the sandbox.",
+  "verdict": "impossible",
+  "blocker": "network-as-purpose (DB server over TCP/Unix sockets is the entire point) + native pthreads thread-per-connection model + POSIX signals; plus a massive C++ port with zero upstream wasm32-wasi target. sqlite3 already covers in-sandbox SQL.",
+  "confidence": "high"
+ }
+]

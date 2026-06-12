@@ -1344,6 +1344,126 @@
 "recipe": "prebuilt agda-opt.wasm (GHC 9.10 wasm backend, agda-web/agda-wasm-dist zip, 31MB)",
 "smoke": "agda --version => Agda version 2.8.0",
 "extent": "dependently-typed lang/proof assistant runs; --version live, batch typecheck needs prim datadir mount (follow-up)"
+},
+"Chapel": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Compiler fork-execs a native backend C compiler (native codegen, not in-sandbox); runtime requires native-thread tasking (qthreads) + GASNet/RDMA/MPI comm \u2014 all unavailab",
+"extent": "off-the-table (verified)"
+},
+"Futhark": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Compiler is native Haskell/GHC with no wasm32-wasi build (no Haskell lane; full-compile forbidden). Core value is GPU codegen (no GPU/driver in-sandbox). futhark-wasm bac",
+"extent": "off-the-table (verified)"
+},
+"Turbopack": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Requires native multi-threaded work-stealing (turbo-tasks scheduler), a native filesystem watcher, and Node-host/Next.js embedding via NAPI; distributed only as a native ",
+"extent": "off-the-table (verified)"
+},
+"conda": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "conda's entire value is network-as-purpose: it downloads prebuilt native binaries (C/C++/Fortran libs, toolchains, native Python ext modules) from remote channels (conda-",
+"extent": "off-the-table (verified)"
+},
+"Mamba": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose (parallel HTTPS downloads from conda channels via libcurl/OpenSSL is the tool's entire function) + native-threads (multi-threaded parallel downloader i",
+"extent": "off-the-table (verified)"
+},
+"pixi": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose AND native-payload manager. pixi's reason for existing is to fetch remote prebuilt native conda/PyPI packages over the network, solve deps, and install",
+"extent": "off-the-table (verified)"
+},
+"Cargo": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Cargo is a build ORCHESTRATOR, not a self-contained tool \u2014 both of its core jobs are on the impossible list. (1) Network-as-purpose: its reason to exist is fetching crate",
+"extent": "off-the-table (verified)"
+},
+"Cabal": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Cabal (cabal-install) is a build orchestrator whose core purpose is fork-exec: it spawns GHC, ghc-pkg, hsc2hs, linkers, and ./configure scripts as subprocesses to drive a",
+"extent": "off-the-table (verified)"
+},
+"vcpkg": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec is the entire product: vcpkg spawns cmake/git/curl/native compilers/linkers per port and probes the host toolchain. Also network-as-purpose (downloads source) a",
+"extent": "off-the-table (verified)"
+},
+"Spack": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec of native compilers and build tools (configure/make/cmake/mpicc) is Spack's core purpose; WASI has no subprocess spawning and there is no native toolchain to or",
+"extent": "off-the-table (verified)"
+},
+"Swift Package Manager": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "SwiftPM is a build-orchestration DRIVER, not a self-contained tool \u2014 its entire purpose is fork-exec + network, both of which are sandbox-forbidden as purpose. It (1) for",
+"extent": "off-the-table (verified)"
+},
+"CRAN (install.packages)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "R's only wasm port is WebR (Emscripten/browser-Node, not wasm32-wasi standalone \u2014 won't run under wasmtime). install.packages fundamentally requires fork-exec of native c",
+"extent": "off-the-table (verified)"
+},
+"renv": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No R interpreter in-sandbox (R/WebR not in LIVE set), and renv's purpose (restore\u2192install.packages) requires native C/C++/Fortran compilation + process spawning of R CMD ",
+"extent": "off-the-table (verified)"
+},
+"Hackage": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GHC has only a wasm CROSS-compiler (host-native wasm32-wasi-ghc emits wasm); there is no GHC/Cabal that runs as wasm32-wasi under wasmtime. Using Hackage = Cabal/GHC buil",
+"extent": "off-the-table (verified)"
+},
+"rustc": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec (rustc spawns LLVM wasm-ld linker as a subprocess per link) + native-threads (parallel codegen/rayon); no prebuilt wasm32-wasi rustc exists, only a native rustc",
+"extent": "off-the-table (verified)"
+},
+"swiftc": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "swiftc is a huge C++/LLVM compiler+driver. Two hard wasip1 blockers: (1) the driver fork-execs sub-processes (separate frontend + clang/lld linker invocations) \u2014 no fork-",
+"extent": "off-the-table (verified)"
+},
+"GHC \u2014 Glasgow Haskell Compiler": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GHC's wasm32-wasi support is a CROSS-COMPILER backend (compiles Haskell TO wasm); GHC itself runs natively on {x86_64,aarch64}-{linux,darwin} hosts and is NOT distributed",
+"extent": "off-the-table (verified)"
+},
+"Raku (Rakudo/MoarVM)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native pthreads (concurrency baked into the VM scheduler) + dlopen dynamic loading (modules/extops/NativeCall) + self-hosted Raku/NQP bootstrap requiring a running MoarVM",
+"extent": "off-the-table (verified)"
+},
+"MySQL": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native pthreads (InnoDB threadpool), POSIX signals, fork-exec, and listening-socket networking as the server's core purpose; no wasm32-wasi build exists and the architect",
+"extent": "off-the-table (verified)"
+},
+"MariaDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose (DB server over TCP/Unix sockets is the entire point) + native pthreads thread-per-connection model + POSIX signals; plus a massive C++ port with zero ",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1922,6 +2042,13 @@
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B (self-contained C), but heavy multi-tarball with a configure cascade. Deps needed a",
+"confidence": "medium",
+"verified": false
+},
+"libxml2": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "buildable w/ config-subst (xmlversion.h filled) but needs dup/posix-decl shim; expat covers core XML",
 "confidence": "medium",
 "verified": false
 }
