@@ -1266,3 +1266,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   probe every broker for the subtler vectors not yet covered (response-header injection from a serving guest,
   host_http_get response-size cap, multi-instance rate amplification, TLS verify-downgrade, public-port abuse,
   exec/storage/queue adversarial surface).
+- 2026-06-12 (iter 93): **Multi-agent ADVERSARIAL AUDIT launched (user-approved) + wb-j3n8 fix design.** Per
+  the user's steer to cover every vulnerability "in depth and in full", launched a workflow: 11 red-team
+  auditors (one per broker surface — egress-ssrf, wasi-egress, inbound-serve, exec, storage, queue, tls,
+  tcp-udp, audit-obs, revocation-rate, policy-caps-secrets), each finding -> an independent SKEPTIC tries to
+  refute it -> synthesis ranks the CONFIRMED findings. Running in background (don't double-launch). While it
+  runs (holding off broker-file edits so the auditors see a consistent tree), researched the wb-j3n8 fix: the
+  :httpc async-streaming format (stream_start carries headers but NO status), so the response-size cap will
+  use Location-header redirect detection (SSRF-safe) + a streamed accumulate-to-max_bytes read. NEXT: when the
+  audit lands, fix the confirmed findings in severity order (starting with wb-j3n8).
