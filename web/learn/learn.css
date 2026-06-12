@@ -68,7 +68,8 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
    overlapping the grotesque lines above and below (the duo lockup) */
 .lhero h1 .bub {
   position: relative; z-index: 2; margin: -.26em 0 -.24em;
-  color: #fff; -webkit-text-stroke: 1px var(--ink);
+  /* the bubble word wears its page's category color (each page sets --pc) */
+  color: var(--pc, #fff); -webkit-text-stroke: 1px var(--ink);
   text-shadow: 2.5px 0.0px 0 var(--ink), 2.3px 1.0px 0 var(--ink), 1.8px 1.8px 0 var(--ink), 1.0px 2.3px 0 var(--ink), 0.0px 2.5px 0 var(--ink), -1.0px 2.3px 0 var(--ink), -1.8px 1.8px 0 var(--ink), -2.3px 1.0px 0 var(--ink), -2.5px 0.0px 0 var(--ink), -2.3px -1.0px 0 var(--ink), -1.8px -1.8px 0 var(--ink), -1.0px -2.3px 0 var(--ink), -0.0px -2.5px 0 var(--ink), 1.0px -2.3px 0 var(--ink), 1.8px -1.8px 0 var(--ink), 2.3px -1.0px 0 var(--ink);
 }
 .lhero h1 em, .lhero h1 i {
