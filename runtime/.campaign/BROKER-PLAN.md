@@ -1303,3 +1303,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   RateLimiter. FULLY COVERED (no confirmed gap): IPv4-mapped obfuscation, redirect-to-internal, raw-socket
   pinning, command/argv injection, HTTP allow-list path. NEXT: fix in severity order (wb-an2v, wb-uh5w, then
   wb-8w8x items), each with a red-team test.
+- 2026-06-12 (iter 95 cont): **FIXED wb-uh5w (HIGH queue DoS) — CLOSED.** QueueBroker now enforces the full
+  DoS cadence: per-message BYTE cap (@max_msg_bytes 256KiB — a giant message can't pin host memory), per-tenant
+  TOTAL-message cap (@max_tenant_msgs 50k across all the tenant's topics, counted under the Agent lock — bounds
+  the distinct-topic explosion that slipped past the per-topic depth cap), and per-tenant RATE limit on BOTH
+  publish AND poll (the only broker that lacked it). 7 queue tests green incl new: 300KB message ->
+  :message_too_large; tight rate -> :rate_limited on publish + poll. host_publish/host_poll callers get the
+  default-quota rate automatically. Severity-order remaining: HIGH wb-an2v (tenant-isolation "default"
+  collapse) next, then the wb-8w8x medium/low batch.

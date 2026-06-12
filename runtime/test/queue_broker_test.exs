@@ -48,4 +48,22 @@ defmodule Workbooks.QueueBrokerTest do
     assert :ok = Workbooks.Revocation.unrevoke(t)
     assert {:ok, "x"} = QueueBroker.poll(t, "j")
   end
+
+  test "wb-uh5w: per-message BYTE cap rejects a giant message (memory-DoS floor)" do
+    t = "q-#{System.unique_integer([:positive])}"
+    big = String.duplicate("A", 300 * 1024)
+    assert {:error, :message_too_large} = QueueBroker.publish(t, "topic", big)
+    assert :ok = QueueBroker.publish(t, "topic", "small")
+  end
+
+  test "wb-uh5w: per-tenant RATE limit on publish AND poll" do
+    t = "q-#{System.unique_integer([:positive])}"
+    assert :ok = QueueBroker.publish(t, "topic", "m1", rate: {1, 60_000})
+    assert {:error, :rate_limited} = QueueBroker.publish(t, "topic", "m2", rate: {1, 60_000})
+
+    # poll is rate-limited too: the 1st poll is within budget (empty topic), the 2nd is over
+    t2 = "q-#{System.unique_integer([:positive])}"
+    assert :empty = QueueBroker.poll(t2, "topic", rate: {1, 60_000})
+    assert {:error, :rate_limited} = QueueBroker.poll(t2, "topic", rate: {1, 60_000})
+  end
 end
