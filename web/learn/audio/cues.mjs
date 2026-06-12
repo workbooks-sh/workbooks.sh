@@ -26,6 +26,8 @@ const TEMPER = {
   agents: "patient gentle pulse, quietly determined",
   autopoet: "organic and tender, growing warmth",
   wbx: "precise and crisp, quietly confident",
+  bundles: "tidy packing-room temperament, light and satisfying, things clicking into place",
+  nesting: "branching garden temperament, gentle recursive motifs, patient growth",
 };
 
 // section plans — durations are honored by the API, so placement math is exact.

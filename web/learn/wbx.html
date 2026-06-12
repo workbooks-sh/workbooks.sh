@@ -207,14 +207,15 @@ next: wbx dev field-notes</i></pre>
   living page on the right — is the whole authoring experience.</p>
   <p><b>3 — make it one file.</b> When it's worth keeping, tangle everything
   into a single self-contained artifact and put your name on it:</p>
-  <pre class="orgsample">wbx bundle field-notes      <i># org + data + wasm → field-notes.html</i>
-wbx sign field-notes.html   <i># did:key provenance, embedded</i></pre>
-  <p>That HTML file opens in any browser, mails like an attachment, and
-  carries its own provenance. No server was involved at any point — the
-  engine only enters the story when you want the workbook to <em>keep
-  living</em> after you close the laptop, and that's
-  <code>wbx deploy local</code> + <code>wbx workbook deploy</code>, shown in
-  the session below.</p>
+  <pre class="orgsample">wbx bundle field-notes      <i># packs workbook.html + source + data → field-notes.wbundle</i>
+wbx sign field-notes.html   <i># did:key provenance, embedded in the artifact</i></pre>
+  <p>The carton ships anywhere; the <code>workbook.html</code> inside opens
+  in any browser, mails like an attachment, and carries its own provenance
+  (<a href="bundles">the bundles deep dive</a> opens one up byte by byte).
+  No server was involved at any point — the engine only enters the story
+  when you want the workbook to <em>keep living</em> after you close the
+  laptop, and that's <code>wbx deploy local</code> +
+  <code>wbx workbook deploy</code>, shown in the session below.</p>
 </section>
 
 <section id="import">
@@ -408,8 +409,8 @@ window.LEARN = {
     ["cmd", "wbx dev field-notes"],
     ["out", "http://127.0.0.1:4321 — watching… (edit, save, it follows)"],
     ["cmd", "wbx bundle field-notes"],
-    ["out", "tangling… org + data + wasm → one artifact"],
-    ["ok", "field-notes.html — self-contained"],
+    ["out", "packing… workbook.html + source + data → one carton"],
+    ["ok", "field-notes.wbundle — shippable, source riding inside"],
     ["cmd", "wbx sign field-notes.html"],
     ["ok", "signed — did:key provenance embedded"],
     ["cmd", "wbx deploy local"],

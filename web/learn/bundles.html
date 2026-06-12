@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bundles — the carton around the app — Workbooks</title>
+<meta name="description" content="A .wbundle is a plain zip: workbook.html, workbook.org, vfs.sqlite, and a one-object manifest. This sub-lesson opens one with unzip, walks the bundle/unbundle and ship/restore round trips, and shows what does — and doesn't — leave home when you share.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/bundles-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="bundles — the carton around the app">
+<meta property="og:description" content="A .wbundle is a plain zip — the app, its source, its disk, and a label. Nothing proprietary; unzip opens it. The round trip, the manifest, and the privacy strip, in detail.">
+<meta property="og:url" content="https://workbooks.sh/learn/bundles">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    $ unzip -l this-page.wbundle
+    Archive:  this-page.wbundle
+      workbook.html      the page you are reading
+      workbook.org       the spec — scroll to the bottom of this source
+      vfs.sqlite         (not present — a lesson travels light)
+      manifest.json      {"format":"wbundle/1"} — that is the whole trick
+
+    no magic numbers were invented in the making of this format.
+    it was zip all along. it is always zip all along.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 01·1 — <b>under workbook · bundles</b></div>
+      <h1><span class="ln">the carton</span><span class="ln bub">AROUND</span><span class="ln">the app</span></h1>
+      <p class="dek">You bundled a <a href="workbook">workbook</a> and got a second file
+      with a strange extension. Relax: a <b>.wbundle is a plain zip</b> — the app, its
+      source, its disk, and a one-object label. This page opens one with tools you
+      already have, walks the round trips, and shows exactly what leaves home when
+      you share — and what stays.</p>
+      <div class="meta">
+        <span class="on">the carton</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/bundles-hero.jpg" alt="A small courier standing on a bright launch platform before one monumental shipping carton, its four flaps open to reveal tidy luminous compartments — a glowing screen, a paper scroll, a stack of disk platters, and a tiny stamped label — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../wb-file-icon.svg" alt=""></div><span>bundles</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The second file</a>
+  <a href="#definition">The definition</a>
+  <a href="#inside">Open one — no Workbooks software</a>
+  <a href="#roundtrip">bundle ⇄ unbundle</a>
+  <a href="#manifest">The smallest manifest in software</a>
+  <a href="#ship-restore">The same verbs at engine scale</a>
+  <a href="#everywhere">One carton, every door</a>
+  <a href="#safety">The way back in</a>
+  <a href="#sealed">When part of the carton is ciphertext</a>
+  <a href="#limits">Where the carton ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the second FILE</h2>
+  <p>The <a href="workbook">parent lesson</a> made a one-file promise: the
+  workbook is the app, the source, and the disk, in a single artifact. Then
+  you ran <code>wbx bundle</code> and a <em>second</em> file appeared, wearing
+  an extension you've never seen. Every instinct you've trained on twenty
+  years of software says: here it comes. The custom container. The moat.</p>
+  <p>Those instincts are earned. The history of "our format" is mostly a
+  history of files that stopped opening when a vendor stopped caring:</p>
+  <table class="cmp">
+    <tr><th>the file</th><th>what it really was</th><th>opens without the vendor?</th></tr>
+    <tr><td>.doc (pre-2007)</td><td>a proprietary binary dump</td><td class="n">reverse-engineered, painfully</td></tr>
+    <tr><td>.psd</td><td>a proprietary layered blob</td><td class="n">partially, with heroics</td></tr>
+    <tr><td>.sketch</td><td>a zip — schema undocumented for years</td><td>eventually</td></tr>
+    <tr><td><b>.wbundle</b></td><td><b>a zip — entries you already know</b></td><td class="y">today, with <code>unzip</code></td></tr>
+  </table>
+  <p>So the question this page answers first, before any mechanics: did the
+  one-file promise just sprout format lock-in? And the second question,
+  the one that actually matters when you hit send: when I hand this to
+  someone, what <em>exactly</em> did I hand them — does my agent's memory
+  go along for the ride?</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">w·bun·dle</span> <span class="pr">/ˈdʌb·əl·juː ˌbʌn·dəl/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a <b>plain zip</b> holding a workbook's
+    runnable <b>workbook.html</b>, its <b>workbook.org</b> source, its
+    <b>vfs.sqlite</b> disk, and a one-object <b>manifest.json</b> whose
+    format tag is <code>wbundle/1</code>.</p>
+  </div>
+  <p>That defcard is not a summary of the spec. It <em>is</em> the spec.
+  The runtime packs bundles with the zip library that ships in Erlang's
+  standard library; the <a href="wbx">CLI</a> packs them with a stock Rust
+  zip crate using ordinary deflate. Two implementations, one deliberately
+  boring container — the design's own words: because it's a plain zip,
+  any tool can open it. Not a moat. A carton. The 1989 kind.</p>
+</section>
+
+<section id="inside">
+  <h2>open one — with NO workbooks software</h2>
+  <p>Proof beats reassurance. Bundle a project, then crack the result open
+  with the <code>unzip</code> that has shipped on every Unix since before
+  some of your dependencies were born:</p>
+  <pre class="orgsample">$ wbx bundle shop/
+bundled shop/shop.org → shop.wbundle (412403 bytes, with vfs.sqlite)
+
+$ unzip -l shop.wbundle
+Archive:  shop.wbundle
+  workbook.html        <i>the app — open it in a browser right now</i>
+  workbook.org         <i>the source — prose, tasks, code</i>
+  vfs.sqlite           <i>the disk — sqlite3 can query it directly</i>
+  manifest.json        <i>the label</i></pre>
+  <p>Four entries, all standards older than most companies:</p>
+  <figure class="diag" aria-label="the exploded carton">
+    <div class="d-file">
+      <span class="ftag">shop.wbundle — a zip, exploded</span>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">workbook.html</span><span class="sub">the <b>runnable artifact</b> — the workbook itself, rendered and self-contained</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">workbook.org</span><span class="sub">the <b><a href="org">source</a></b> — travels with the artifact, so recipients can <b>re-author, not just run</b></span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">vfs.sqlite</span><span class="sub">the <b><a href="vfs">disk</a></b> — included only when the project has one; plain SQLite</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">manifest.json</span><span class="sub">the <b>label</b> — one small object whose main job is to say <i>I am wbundle/1</i></span></div>
+    </div>
+    <figcaption class="dcap">the bundle is not the app — it's the <b>shipping carton</b> around the app</figcaption>
+  </figure>
+  <p>And the disk really is just the disk. The entire <a href="vfs">VFS</a>
+  schema is one table — <code>vfs(volume, path, content, mtime)</code> —
+  so this works, today, with no Workbooks software installed:</p>
+  <pre class="orgsample">$ sqlite3 vfs.sqlite "SELECT volume, path FROM vfs"
+   <i>→ workspace · /data/orders.csv</i>
+   <i>→ workspace · /reports/week-24.org</i></pre>
+  <p>That's the no-moat moment. Every layer of the carton is inspectable
+  with tooling you had before you ever heard of this project — and that's
+  not an accident you're exploiting, it's the design promise of the whole
+  <a href="workbook">anatomy</a>, kept at the shipping layer too.</p>
+</section>
+
+<section id="roundtrip">
+  <h2>bundle ⇄ UNBUNDLE</h2>
+  <p>The local round trip is two <a href="wbx">CLI</a> verbs, and both run
+  entirely on your machine — no engine, no account, no network. First,
+  how <code>wbx bundle</code> decides what to pack. You can hand it a
+  <code>.org</code> file directly; or a directory, in which case it looks
+  for <code>workbook.org</code> inside; or a directory with exactly one
+  <code>.org</code> file, which it takes as the obvious choice. Two or more
+  candidates and it refuses with <i>name one workbook.org or pass it
+  explicitly</i> — guessing is not a feature in a packaging tool.</p>
+  <p>Then the gate. The bundle verb will not assemble a workbook whose
+  source doesn't lint clean:</p>
+  <pre class="orgsample">$ wbx bundle shop/
+error: source has diagnostics — fix them first (wb lint)</pre>
+  <p>That's a deliberate stance: a <code>.wbundle</code> is a thing you hand
+  to other people, so the assembler refuses to carton up known-broken
+  source. Fix the diagnostics, run again, and the pipeline is short:</p>
+  <pre class="mermaid">
+flowchart LR
+  src["workbook.org<br/>+ vfs.sqlite if present"] --> lint{"lint gate<br/>diagnostics?"}
+  lint -- "yes — refuse" --> stop["fix them first"]
+  lint -- "clean" --> render["render<br/>org → workbook.html"]
+  render --> pack["pack — plain zip<br/>+ manifest.json"]
+  pack --> wb["shop.wbundle"]
+  wb --> un["wbx unbundle"]
+  un --> dir["shop/ — the project back,<br/>ready to re-author"]
+  style src fill:#f2ddb0,stroke:#121316
+  style lint fill:#ffffff,stroke:#121316
+  style stop fill:#f3c5a3,stroke:#121316
+  style render fill:#ffffff,stroke:#121316
+  style pack fill:#ffffff,stroke:#121316
+  style wb fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style un fill:#ffffff,stroke:#121316
+  style dir fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>Defaults are unsurprising on purpose: output is named after the org
+  file's stem — <code>&lt;stem&gt;.wbundle</code>, written where you ran
+  the command; <code>wbx unbundle</code> extracts
+  into a directory named after the file's stem unless you say otherwise.
+  The exact strings, because exactness is this page's whole register:</p>
+  <pre class="orgsample">$ wbx bundle shop/
+bundled shop/shop.org → shop.wbundle (412403 bytes, with vfs.sqlite)
+
+$ wbx unbundle shop.wbundle
+unbundled shop.wbundle → shop/ (4 files)</pre>
+  <p>And the trip is lossless where it counts: the source rides inside, so
+  <code>bundle → unbundle</code> gives the recipient the <em>project</em>
+  back — org file, disk, rendered app — not a flattened export. That's the
+  difference between sending someone a printout and sending them the
+  document.</p>
+</section>
+
+<section id="manifest">
+  <h2>the smallest MANIFEST in software</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the label, field by field</span></p>
+  <p>Here is a real manifest, verbatim, as the CLI writes it:</p>
+  <pre class="orgsample">{"id":"shop","format":"wbundle/1","volumes":[],"signed":false,
+ "private_included":false,"created":1781136000}</pre>
+  <p>Six fields. No registry lookups, no nested config tree, no version
+  matrix. Each one:</p>
+  <table class="cmp">
+    <tr><th>field</th><th>type</th><th>who reads it</th></tr>
+    <tr><td><code>id</code></td><td>string</td><td>anything naming the workbook — restore, the library, you</td></tr>
+    <tr><td><code>format</code></td><td>string — always <code>wbundle/1</code></td><td>every unpacker — the one tag both lanes emit</td></tr>
+    <tr><td><code>volumes</code></td><td>array of strings</td><td>restore — which <a href="vfs">disk volumes</a> are aboard</td></tr>
+    <tr><td><code>signed</code></td><td>bool</td><td>verification — whether provenance travels with the bytes</td></tr>
+    <tr><td><code>private_included</code></td><td>bool</td><td>the recipient — was the privacy strip skipped on purpose?</td></tr>
+    <tr><td><code>created</code></td><td>unix seconds</td><td>humans and archives</td></tr>
+  </table>
+  <p>Pack the same workbook on an engine instead and the delta is small and
+  legible: <code>"volumes":["workspace"]</code> says which volume of the
+  disk made the trip. And there is exactly one field that ever appears
+  conditionally — <code>key_refs</code>, present only when entries are
+  <a href="#sealed">sealed</a>:</p>
+  <pre class="orgsample">"key_refs":{"vfs.sqlite":{"key_id":"shop:dmZzLnNxbGl0ZQ","algo":"aes-256-gcm"}}</pre>
+  <p>Read that carefully: it's a <em>reference</em>, never a key. The
+  manifest tells you which door is locked and which keyring holds the key —
+  the key itself never rides in the carton. Which is why a bundle, sealed
+  entries and all, is safe to mirror to any storage you don't fully trust.</p>
+</section>
+
+<section id="ship-restore">
+  <h2>the same verbs at ENGINE scale</h2>
+  <p>Everything so far ran on your laptop. The <a href="nexus">engine</a>
+  speaks the same container through two verbs of its own: <b>ship</b> packs
+  a live workbook into a bundle blob, and <b>restore</b> is its exact
+  inverse — manifest, html, and disk bytes back out, ready to reopen. The
+  round trip is exercised end-to-end in the engine's own demo: ship,
+  restore, reopen the VFS, same bytes.</p>
+  <p>But ship adds the step that answers this page's opening worry. Before
+  anything leaves the engine, the disk copy that's about to travel gets
+  stripped — and the strip is not a policy document, it's one SQL
+  statement run against the egress copy:</p>
+  <pre class="orgsample">DELETE FROM vfs WHERE volume NOT IN ('workspace');
+VACUUM;</pre>
+  <p>The <a href="vfs">VFS</a> has three named volumes, and only one of
+  them is public:</p>
+  <figure class="diag" aria-label="which volumes ship">
+    <div class="d-file">
+      <span class="ftag">the three volumes — what travels, what stays</span>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">workspace</span><span class="sub">the working tree — the work itself. <b>ships</b></span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">memory</span><span class="sub">the agent's long-term memory. <b>stays home</b></span></div>
+      <div class="d-row"><span class="d-chip" style="background:#d9dbd3">tmp</span><span class="sub">scratch space. <b>stays home</b></span></div>
+    </div>
+    <figcaption class="dcap">sharing exposes the <b>work</b> — never the session that produced it</figcaption>
+  </figure>
+  <p>That rule — the work, never the session — is stated once in the
+  engine's source and enforced as a delete, not promised in a README. Your
+  <a href="agents">agent's</a> accumulated memory, its half-thoughts in
+  scratch space: none of it is in the carton unless you explicitly pass
+  <code>include_private</code>, and the manifest's
+  <code>private_included</code> flag tells the recipient you did.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant O as owner's engine
+  participant B as the .wbundle
+  participant R as recipient
+  O->>O: copy the disk · DELETE non-workspace volumes · VACUUM
+  O->>B: ship — pack html + stripped vfs + manifest
+  Note over B: a plain zip — safe to mail, mirror, archive
+  B->>R: restore — manifest, workbook.html, vfs.sqlite back out
+  R->>R: reopen the disk — the work, intact
+  </pre>
+  <p>One honest nuance: the two lanes pack slightly different entry sets.
+  The CLI bundle carries four entries including <code>workbook.org</code>;
+  the engine's ship carries three — html, disk, manifest — because it ships
+  an assembled workbook, whose source already rides inside the html. Same
+  container, same tag, same restore; the org entry is the CLI lane's extra
+  courtesy to re-authors. And there's a sharing/archiving distinction worth
+  knowing: the engine's library pack supports two purposes — <b>share</b>,
+  which strips, and <b>archive</b>, which keeps everything, because an
+  archive is <em>your</em> complete snapshot, for you. It even honors the
+  repo's own <code>.gitignore</code> when packing, so what git wouldn't
+  track, the carton doesn't carry.</p>
+</section>
+
+<section id="everywhere">
+  <h2>one carton, EVERY door</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — where the same zip shows up</span></p>
+  <p>Here's the part that makes the boring container a design decision
+  rather than a missed opportunity: the platform reuses this exact zip shape
+  for every flow where a workbook crosses a boundary. Not five formats for
+  five features — one carton, five doors:</p>
+  <pre class="mermaid">
+flowchart TD
+  wb([".wbundle — one container"])
+  co["checkout / checkin<br/>working tree ⇄ engine, over RCP"]
+  st["store / fetch<br/>cold archive — workbooks/{slug}.wbundle"]
+  pub["publish<br/>pulls workbook.html out by name"]
+  tk["toolkit install<br/>a built toolkit is wasm in the same zip"]
+  fr["fractal pack<br/>a whole workspace — bundles inside a bundle"]
+  wb --- co
+  wb --- st
+  wb --- pub
+  wb --- tk
+  wb --- fr
+  style wb fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style co fill:#fbfaf6,stroke:#121316
+  style st fill:#fbfaf6,stroke:#121316
+  style pub fill:#fbfaf6,stroke:#121316
+  style tk fill:#f3c5a3,stroke:#121316
+  style fr fill:#f2ddb0,stroke:#121316
+  </pre>
+  <p>In order. <b>Checkout and checkin</b>: when you pull a workbook's
+  working tree down from an engine or push edits back, the payload crossing
+  the wire is this zip, base64-wrapped in JSON — the engine packs, the CLI
+  unpacks, and vice versa. <b>Store and fetch</b>: archiving a workbook is
+  literally writing the blob to storage under
+  <code>workbooks/&lt;slug&gt;.wbundle</code>; fetching restores it. The
+  design doc says it plainly — archiving is just writing the blob to cold
+  storage. <b>Publish</b> accepts a <code>.wbundle</code> and pulls
+  <code>workbook.html</code> out of it by name — and refuses raw org source
+  with <i>publish ships ASSEMBLED workbooks — run wb bundle first</i>.
+  <b><a href="toolkit">Toolkit</a> install</b>: a built toolkit — compiled
+  wasm and all — ships in the same container; the engine's own tests put it
+  in writing: it's still just a .wbundle. And <b>the fractal pack</b>: a
+  whole workspace — its index plus every member workbook — packs into one
+  parent bundle. Containers hold containers; the carton nests.</p>
+  <p>The payoff of one shape everywhere: every tool that learns to open the
+  carton learns every door at once — including the tools that don't exist
+  yet, and the ones that aren't ours.</p>
+</section>
+
+<section id="safety">
+  <h2>the way BACK in</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — what the unpacker refuses</span></p>
+  <p>Plain zips have one classic ambush: an archive whose entry is named
+  <code>../../etc/cron.d/x</code>, hoping the extractor will cheerfully
+  write outside its target directory. The unbundler checks every entry name
+  and rejects anything rooted at <code>/</code> or containing a
+  <code>..</code> component, with the refusal spelled out:</p>
+  <pre class="orgsample">refusing unsafe entry path in bundle: ../../etc/cron.d/x</pre>
+  <p>The server side has the same guard on toolkit install — extraction
+  paths are expanded and checked against the destination prefix before a
+  single byte is written. Hand either lane something that isn't a zip at
+  all and the answer is equally blunt: <i>not a workbook bundle (zip)</i>.
+  Fail closed, say why, write nothing.</p>
+  <p>Sizes are bounded where bundles cross the network: checkin bodies cap
+  at 100 MB, toolkit installs at 50 MB. Local <code>wbx bundle</code> has
+  no ceiling in code — the caps live at the engine's doors, where untrusted
+  bytes arrive. Notice the symmetry with <a href="#ship-restore">the
+  previous section</a>: the privacy strip guards the way <em>out</em>, the
+  path guard the way <em>in</em>. A container format is only as honest as
+  both directions of its boundary.</p>
+</section>
+
+<section id="sealed">
+  <h2>when part of the carton is CIPHERTEXT</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the gated case</span></p>
+  <p>Sometimes a bundle should travel freely while part of its contents
+  stays gated — a paid dataset inside a free demo, say. Ship accepts a list
+  of gated entries, and each one is sealed as real AES-256-GCM ciphertext
+  with a layout you can audit byte by byte:</p>
+  <figure class="diag" aria-label="the sealed-entry envelope">
+    <div class="d-file">
+      <span class="ftag">a sealed entry — the wbseal1 envelope</span>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">wbseal1</span><span class="sub">7-byte magic — <b>this entry is sealed</b></span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">iv</span><span class="sub">12 bytes — the nonce</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">tag</span><span class="sub">16 bytes — the GCM authentication tag</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#d9dbd3">ciphertext</span><span class="sub">the entry — unreadable without the key</span></div>
+    </div>
+    <figcaption class="dcap">a real gate — <b>a key the client lacks</b>, not a login screen drawn over data</figcaption>
+  </figure>
+  <p>The keys never ride along. Each sealed entry gets its own fresh 256-bit
+  key — per entry, so revoking one doesn't unlock the rest — and the keys
+  are escrowed at the runtime. The manifest carries only the
+  <code>key_refs</code> you met <a href="#manifest">above</a>: which entry,
+  which key id, which algorithm. To open a sealed entry, the client asks
+  the engine to release the key — a single endpoint,
+  <code>POST /rcp/key/:key_id</code> — and the engine runs the same access
+  enforcement as any gated call, failing closed with the same error
+  envelope as any unauthorized request.</p>
+  <p>And GCM gives the gate a clean failure mode: a wrong key, a tampered
+  ciphertext, and a mismatched context all fail the authentication tag
+  <em>indistinguishably</em>. There is no partial decrypt, no oracle to
+  probe — the entry opens correctly or not at all. Bundles without
+  <code>key_refs</code> unpack as plain zips, exactly as before; the sealed
+  case is the exception, and the round trip — seal, release, open — is
+  covered by the engine's test suite, not just this paragraph.</p>
+</section>
+
+<section id="limits">
+  <h2>where the carton ENDS</h2>
+  <p>Honesty section. Five edges worth knowing before you lean on them.</p>
+  <p><b>A bundle is a snapshot, not a replica.</b> Nothing inside it syncs.
+  Send someone a <code>.wbundle</code> and you've sent them the project as
+  it stood; if you want two copies to converge again, that's the
+  <a href="nexus">engine's</a> job, not the carton's.</p>
+  <p><b>Bundle is not build.</b> <code>wbx bundle</code> is local assembly —
+  lint, render, zip. Compiling components is a different, engine-backed
+  verb. The lint gate will tell you the difference the moment your source
+  needs more than assembly.</p>
+  <p><b>The two lanes differ by one entry.</b> CLI bundles carry the org
+  source as a separate file; engine ships don't, because an assembled
+  workbook already embeds its source. If your tooling reaches for a
+  top-level <code>workbook.org</code>, know which lane produced the bundle
+  in your hand.</p>
+  <p><b>Sharing shares contents.</b> Anyone can unzip what you send —
+  that's the feature. The privacy strip protects the volumes that never
+  left; <a href="#sealed">sealed entries</a> protect what shipped as
+  ciphertext; everything else in the carton is readable by design. Don't
+  put a secret in the workspace and hope the extension protects it.</p>
+  <p><b>The .html is still the artifact people open.</b> The parent lesson's
+  terminal story ends at a self-contained <code>shop.html</code> — and
+  that's right: the html is the runnable thing, the page you double-click.
+  The <code>.wbundle</code> is the shipping carton <em>around</em> it —
+  html plus source plus disk plus label — and it exists for
+  <b>round-tripping authorship</b>, not for viewing. Hand a reader the
+  html; hand a collaborator the carton. As for the two packers — Erlang's
+  on the engine, Rust's in the CLI — the guarantee is the same container
+  either way: same entries, same manifest, same tag. Byte-identical
+  archives are not the claim; interchangeability is.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can I just rename it to .zip?</summary>
+    <p>Yes. It is one. The extension is a courtesy to humans and file
+    managers; the format is identified by the <code>wbundle/1</code> tag in
+    the manifest, not by the name. <code>unzip</code> never cared what you
+    called it.</p>
+  </details>
+  <details>
+    <summary>Why not just ship the bare .html?</summary>
+    <p>You can — that's exactly what publish does: it pulls
+    <code>workbook.html</code> out of the carton and serves it. The bundle
+    earns its keep when the recipient is a collaborator, not a viewer: it
+    adds the org source for re-authoring and the disk as a separate,
+    directly queryable file.</p>
+  </details>
+  <details>
+    <summary>Does my agent's memory ship when I share?</summary>
+    <p>Not from the engine, by default. Ship strips every volume except
+    <code>workspace</code> before packing — the agent's <code>memory</code>
+    volume and <code>tmp</code> scratch are deleted from the egress copy by
+    a literal SQL statement. If you override with
+    <code>include_private</code>, the manifest's
+    <code>private_included</code> flag says so, on the record.</p>
+  </details>
+  <details>
+    <summary>Will this open in 2056?</summary>
+    <p>The carton is zip — in continuous use since 1989. Inside: html,
+    SQLite — the most deployed database on earth — and UTF-8 text. Pick the
+    one you think dies first. The format's survival doesn't depend on this
+    project existing, which is the strongest durability claim a format can
+    make.</p>
+  </details>
+  <details>
+    <summary>Is a .wbundle compressed twice?</summary>
+    <p>No — it's deflate per entry, like every zip you've ever made. The
+    html inside carries its own bound assets, so the carton's compression
+    is doing ordinary work on ordinary bytes, not wrapping compression in
+    compression for sport.</p>
+  </details>
+  <details>
+    <summary>What if the zip is corrupt or hostile?</summary>
+    <p>Garbage is refused up front — <i>not a workbook bundle (zip)</i> —
+    and entry paths that try to climb out of the extraction directory are
+    rejected by name, on both the CLI and the engine. Fail closed, write
+    nothing.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>The carton makes the most sense next to the thing it carries and the
+  doors it passes through.</p>
+  <div class="cards">
+    <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>the unit this carton ships</small></div><span class="go">→</span></a>
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>the disk riding inside — and its volumes</small></div><span class="go">→</span></a>
+    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
+      <div>wbx, the CLI<small>where bundle and unbundle live</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>ship, restore, and every engine door</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workbook · bundles
+  :PROPERTIES:
+  :SLUG:   bundles
+  :KIND:   learn
+  :NN:     01.1
+  :KICKER: under workbook · bundles
+  :TITLE1: the carton
+  :TITLE2: AROUND
+  :TITLE3: the app
+  :CHIP:   the carton
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/bundles-hero.jpg
+  :END:
+** og
+- a .wbundle is a plain zip — unzip opens it today
+- html + org + sqlite + a one-object manifest
+- only the workspace ships — never the session
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .38], ["#aee5c2", .24], ["#f2ddb0", .20], ["#f3c5a3", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

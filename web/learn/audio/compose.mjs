@@ -33,7 +33,7 @@ const scripts = readdirSync(join(HERE, "scripts"))
   .map((f) => JSON.parse(readFileSync(join(HERE, "scripts", f), "utf8")))
   .filter((s) => !only.length || only.includes(s.slug));
 
-const ORDER = ["workbook", "nexus", "toolkit", "org", "agents", "autopoet", "wbx", "workflows", "vfs"];
+const ORDER = ["workbook", "bundles", "nesting", "nexus", "toolkit", "org", "agents", "autopoet", "wbx", "workflows", "vfs"];
 scripts.sort((a, b) => ORDER.indexOf(a.slug) - ORDER.indexOf(b.slug));
 
 // ── the shape ────────────────────────────────────────────────────────────────
@@ -49,6 +49,8 @@ const DUCK = "threshold=0.02:ratio=3.5:attack=150:release=1100"; // polite, not 
 // musical turns per lesson — a few real moments, NOT every section
 const TURNS = {
   workbook: ["definition", "org-layer", "faq"],
+  bundles: ["definition", "ship", "faq"],
+  nesting: ["definition", "gate", "faq"],
   nexus: ["definition", "why-not", "faq"],
   toolkit: ["definition", "wasm", "faq"],
   org: ["definition", "why-not", "faq"],

@@ -1,0 +1,66 @@
+{
+ "slug": "nesting",
+ "title": "nesting — under workbook",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Workbooks inside workbooks",
+   "text": "Lesson one point two — nesting. A deep dive, under the workbook lesson… lesson one, the unit. That lesson made a simple claim: one workbook is one file. The app, its disk, its plans — all of it. [curious] Which leaves exactly the question a person with ten workbooks actually has. Do these things compose? Or is the endgame a folder of beautiful silos… each one whole, and none of them able to join? This lesson is the answer, and it has three beats. Combining is a paste. The paste compiles. And the prune — the un-combining — is gated… so taking systems apart finally tells you who breaks."
+  },
+  {
+   "id": "problem",
+   "title": "Combining systems is a migration",
+   "text": "First — combining systems is a migration. Composition is the thing software is worst at. Two working projects… one obvious move — put them together — and the industry's answers are all surgery. Git submodules. A package registry, and a version matrix. Or the full monorepo migration, with its weeks of build-system archaeology. [sighs] And un-combining is worse. Ask anyone who has tried to extract a service from a codebase it grew into. Nothing comes out clean… because nothing was ever a unit in the first place."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. Nesting is the property that a workbook is a tree… whose every subtree is itself a complete, compilable workbook. So combining systems is grafting a subtree in. Splitting them is pruning one out. And the prune is gated. The unit underneath is the subtree, and the kernel defines it in one line — a headline, plus everything deeper, until the level pops back. Where the subtree ends… is where the unit ends. Everything else in this lesson is consequences."
+  },
+  {
+   "id": "graft",
+   "title": "The paste that compiles",
+   "text": "Next — the paste that compiles. An experiment, run for real against the kernel. Picture two files. On one side, pipeline dot org — a workflow called Pipeline, top level, a file of its own. On the other, company dot org — someone's notes, a prose section… and under that prose, the same Pipeline, demoted two levels and pasted in. A dotted arrow links the two — demote, paste. Now compile both files… and the two arrows land on the same box. One world. Byte-identical either way. [excited] Same components. Same edges. Same exports. Not similar — the same. The reason is small and structural. Every comparison in the compiler is relative. A child is anything deeper than its parent… deeper than — never depth three. No absolute level appears anywhere in the compile. So every workbook is graft-ready by construction. Nobody designed an import mechanism. The grammar's levels being relative… is the import mechanism. Notice what the move is made of. No graft verb in the command line. No manifest to update. No registry round-trip. Grafting is a text edit — cut the subtree, fix the levels, paste, re-compile. An agent can do it with the one tool agents actually have… and you review it as a diff."
+  },
+  {
+   "id": "sub-worlds",
+   "title": "One tree, one DAG",
+   "text": "Next — one tree, one DAG. The graft would be a parlor trick if the paste were only storage… but the nested tree compiles, nested. The worked example. One headline — Pipeline, tagged workflow — with three children. Ingest, a component producing raw bytes. Transform — a whole sub-world, Clean then Score inside. And Publish, a component consuming the raw bytes. The compiler is literally recursive. A component child becomes a leaf… a workflow child triggers the same function on the subtree, then skips past it. The plan holds a full world at every depth — components, edges, exports… and room for sub-worlds of its own. The compiled graph is boxes inside boxes. The Pipeline box holds Ingest, Publish… and the whole Transform box. An arrow carries raw bytes from Ingest to Publish. Inside Transform, an arrow carries cleaned data from Clean to Score. And one dotted arrow reaches from Ingest into Clean, labeled declared, not piped yet — remember it. Each level can carry its own clock, so a monthly parent holds an hourly child. [curious] The org tree and the execution graph are the same object at different zoom levels — an outline a person edits… a typed plan an engine runs, on the same five-hundred-and-fifty-line pure Rust kernel built into the command line."
+  },
+  {
+   "id": "surface",
+   "title": "What a world shows outside",
+   "text": "Next — what a world shows outside. Every world in that plan — at every depth — gets a computed signature. Three rules, short enough to state exactly. First… edges. One component's declared output name matches another's declared input. Second… imports. The union of every component's declared capabilities — names like vfs query, or net email — the same capabilities toolkits fulfill. Third… exports. The outputs nobody inside the world consumed. That last rule is the elegant one. Consumption is encapsulation. Trace it through the pipeline, component by component. Ingest produces the raw bytes… Publish eats them — so they vanish from the surface. Clean produces the cleaned data… Score eats it — internal again. But Score's output, the score itself… nobody consumes it. So the verdict of the whole trace is one line. The Transform sub-world exports the score… and the parent Pipeline exports nothing at all. If imports, exports, and typed names sound familiar — they should. The plan is deliberately shaped like a WebAssembly WIT world. And the kernel takes its own medicine… it ships as a WIT-typed component, exporting tangle-plan and check-upgrade, with no host imports at all."
+  },
+  {
+   "id": "gate",
+   "title": "Grow free, shrink gated",
+   "text": "Now — grow free, shrink gated. Pasting in is half of composition. The other half — the half nobody ships — is taking things apart without silently breaking whoever depended on the part you removed. That is the upgrade gate. It diffs the old plan's signatures against the new. Four rules. First — exports may grow, never shrink… removing one is an error. Second — a new import is a warning. Flagged, not forbidden. Third — a component's output type may not change. And fourth — a workflow may not disappear. Watch it fire. A world starts emailing and changes its output from string to json… three diagnostics. Export removed — breaking. New capability required — a warning. Output type changed — breaking. Each named… each scoped. Now the nesting payoff. Prune the Transform subtree out of the Pipeline, gate old against new — two errors. The export of the score… removed. Breaking — scoped to Pipeline. The workflow itself… removed. Breaking — scoped to Transform. Run the gate the other direction — flat to nested — and the answer is empty. Nothing. [excited] Growing the tree is always safe. Pruning is gated. That asymmetry is the whole lesson in one diff — the gate hands you the exact list of promises you're about to break… before anything deploys."
+  },
+  {
+   "id": "run",
+   "title": "How the nest executes",
+   "text": "Next — how the nest executes. A nested plan runs as a nested run — the engine's recursion mirrors the compiler's. Follow one through. The engine calls the Pipeline world with its input. Wave one — Ingest runs. Wave two — Publish runs, Ingest's output piped onto its input. Then the recursion. The engine steps into Transform, the sub-world — handing it, for now, the run's original input… more on that in the seams. Wave one — Clean. Wave two — Score, cleaned data piped between them. The sub-record climbs back up, exporting the score… and the engine receives one nested run record — each level reporting its workflow, schedule, exports, and tasks… with its sub-workflows' records inside. A wave runs everything whose producers are done — up to eight steps in parallel. Two details make the recursion more than bookkeeping. First — an agent-language component is just another step. Its source block is the system prompt, and the engine runs it as a bounded agent… six steps, then done. A sub-world can fan out sub-agents inside the same graph. No second orchestrator. Second — properties survive the recursion. Persistence markers are collected by walking the worlds all the way down… and a build compiles every component, however deep the graft put it."
+  },
+  {
+   "id": "flat-forest",
+   "title": "The nesting that isn't",
+   "text": "Now — the nesting that isn't. [curious] People mean a second thing by workbooks inside workbooks. Not trees in a file… runtimes — a sandboxed program calling another program. Here, the design does the opposite — on purpose. Declarative nesting recurses without bound — a tree is just a tree. Runtime nesting never truly recurses at all. Play one call through. A running guest asks the host to exec a command — and the arguments are a structural list, not a string… a shell-injection payload arrives as a literal argument, not an incantation. The host walks its ladder — revoked… rate-limited… capability granted… depth within bounds… allow-listed… registered. Only then does it run the target — no wasm-in-wasm, no operating system shell, ever — a registered wasm command in its own fresh, isolated instance. A sibling… not a child. Output is capped at eight megabytes… every denial audit-logged. However deep the call chain reads, the real shape is a flat forest of peer sandboxes — the host between every pair. Capabilities flow down by explicit grant, never by inheritance. And depth is capped at eight — for one named failure mode… a guest exec-ing guests, that exec guests. The recursion bomb. Ask the broker for depth ninety-nine — an error comes back before any sandbox spins up. [chuckles] The tree recurses. The sandbox never does."
+  },
+  {
+   "id": "honest",
+   "title": "Where the seams are",
+   "text": "[exhales] Honesty section — where the seams are. Boundaries, not apologies… four seams, each a fact about today's code. First… sub-worlds get the original input. The recursion hands a sub-world the same input the parent run started with — not a sibling's piped output. Cross-boundary wiring is declared in the grammar… but the sub-world's own validation still flags that input as dangling, and the executor doesn't pipe across the boundary yet. That dotted arrow — declared, not piped — is a contract waiting for its plumbing. Second… the gate is a kernel export, not yet a tollbooth. It ships in the kernel, has a runtime wrapper, and runs in the demos — but no deploy path calls it yet. Making every push stop at the kernel's refusal is wiring the runtime still owes. Nothing here claims your redeploys are gated today. Third… renames read as removals. The gate keys workflows by title — so renaming one is remove plus add. Breaking. Titles are identity… treat them that way. And fourth… one producer per name. Within a world, each output name maps to a single producer — if two components claim the same output, the last writer wins. Name your outputs like you name your exports. Because that's what they are."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Questions people actually ask — quick fire. [curious] Is there a depth limit on nesting workbooks? No — the compile is unbounded recursion over a tree, and a tree is just text. The famous limit of eight caps runtime exec chains in the sandbox broker… not headline depth in your file. How do I split a workbook back out? The graft, reversed. Cut the subtree… promote its levels… save it as its own file. Both halves compile — every subtree was already a complete workbook. Then run the gate on the half you took it from — it names exactly which exports disappeared. Do sub-workflows see the parent's data? Declared, yes. Piped… not yet. The contract is in the file ahead of the plumbing… the order this ecosystem prefers. Is a nested workbook still one file? Yes — deeper headlines, same file. Nothing here adds a second artifact. And — why is a new import only a warning, when removals are errors? Because the two failures have different owners. A removed export breaks consumers no matter who approves it. A new capability is an ask — granted at dock time, per instance, by the engine and whoever runs it. [chuckles] The gate's job is to make the ask visible… flagging, not forbidding."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the workbook",
+   "text": "So that's nesting. Every subtree a complete workbook… combining as a paste that compiles… splitting as a prune the gate names the cost of. Grow free — shrink gated. And one boundary worth keeping: the file nests without limit, and the sandbox never nests at all. [curious] The way back up is short. This was a deep dive under lesson one — what is a workbook — the unit all of this composes. If the tree grammar itself felt new, the org lesson holds it… and the workflows lesson runs the single-level plan this one stacked. Start with the workbook. Everything here is that one idea… folded into itself."
+  }
+ ]
+}

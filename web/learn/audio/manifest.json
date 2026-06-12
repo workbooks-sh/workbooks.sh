@@ -64,6 +64,137 @@
    ]
   },
   {
+   "slug": "bundles",
+   "title": "bundles — under workbook",
+   "src": "audio/episodes/bundles.mp3?v=879",
+   "dur": 879,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The second file",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "It is a zip",
+     "t": 86
+    },
+    {
+     "id": "inside",
+     "title": "Open one with no Workbooks software",
+     "t": 155
+    },
+    {
+     "id": "roundtrip",
+     "title": "Bundle and unbundle",
+     "t": 241
+    },
+    {
+     "id": "manifest",
+     "title": "The smallest manifest in software",
+     "t": 329
+    },
+    {
+     "id": "ship",
+     "title": "The same verbs at engine scale",
+     "t": 418
+    },
+    {
+     "id": "everywhere",
+     "title": "One carton, every door",
+     "t": 513
+    },
+    {
+     "id": "safety",
+     "title": "The way back in, and the sealed case",
+     "t": 596
+    },
+    {
+     "id": "limits",
+     "title": "Where the carton ends",
+     "t": 681
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 772
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 833
+    }
+   ]
+  },
+  {
+   "slug": "nesting",
+   "title": "nesting — under workbook",
+   "src": "audio/episodes/nesting.mp3?v=937",
+   "dur": 937,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Workbooks inside workbooks",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Combining systems is a migration",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 91
+    },
+    {
+     "id": "graft",
+     "title": "The paste that compiles",
+     "t": 127
+    },
+    {
+     "id": "sub-worlds",
+     "title": "One tree, one DAG",
+     "t": 221
+    },
+    {
+     "id": "surface",
+     "title": "What a world shows outside",
+     "t": 317
+    },
+    {
+     "id": "gate",
+     "title": "Grow free, shrink gated",
+     "t": 408
+    },
+    {
+     "id": "run",
+     "title": "How the nest executes",
+     "t": 509
+    },
+    {
+     "id": "flat-forest",
+     "title": "The nesting that isn't",
+     "t": 608
+    },
+    {
+     "id": "honest",
+     "title": "Where the seams are",
+     "t": 720
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 812
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the workbook",
+     "t": 894
+    }
+   ]
+  },
+  {
    "slug": "nexus",
    "title": "Nexus — the engine",
    "src": "audio/episodes/nexus.mp3?v=650",
