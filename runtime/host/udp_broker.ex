@@ -16,7 +16,7 @@ defmodule Workbooks.UdpBroker do
   def request(host, port, datagram, opts \\ [])
       when is_binary(host) and is_integer(port) and is_binary(datagram) do
     principal = Keyword.get(opts, :principal)
-    rate = Keyword.get(opts, :rate)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
     max = Keyword.get(opts, :max_response, @default_max_response)
     timeout = Keyword.get(opts, :timeout, 5_000)
 

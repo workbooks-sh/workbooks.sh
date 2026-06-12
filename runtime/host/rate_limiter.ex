@@ -10,6 +10,14 @@ defmodule Workbooks.RateLimiter do
   """
   @table :wb_ratelimit
 
+  # Per-tenant DoS FLOOR applied by every broker that doesn't get an explicit :rate. Generous on purpose —
+  # the point is to stop a runaway guest (a tight loop spamming a broker does thousands/sec), NOT to meter
+  # legitimate throughput. 2000 broker calls/sec per tenant. Override per-call with an explicit :rate.
+  @default_quota {120_000, 60_000}
+
+  @doc "The default per-tenant broker rate floor `{max, window_ms}` — used when no explicit :rate is given."
+  def default_quota, do: @default_quota
+
   @doc "Count a request for `principal`. :ok if within budget, {:error, :rate_limited} once over `max`/window."
   def check(principal, max, window_ms) do
     now = System.monotonic_time(:millisecond)

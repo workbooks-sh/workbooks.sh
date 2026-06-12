@@ -26,7 +26,7 @@ defmodule Workbooks.NetGuard do
     timeout = Keyword.get(opts, :timeout, 10_000)
     allow = Keyword.get(opts, :allow, nil)
     principal = Keyword.get(opts, :principal)
-    rate = Keyword.get(opts, :rate)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->

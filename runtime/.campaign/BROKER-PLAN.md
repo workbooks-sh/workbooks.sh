@@ -862,3 +862,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   with version-specific with-mappings + WIT-source discovery) — confirmed a FOCUSED-SESSION task needing
   iterative compile cycles, not a blind loop-fire. Plan complete in the bd; no engine async_support needed.
   NEXT (iter 54): more hardening, or the inbound seam in a focused sitting.
+- 2026-06-12 (iter 54): **RATE QUOTA WIRED (was LATENT) — keystone "rate quotas" cadence now ENFORCED.**
+  AUDIT finding: the brokers SUPPORTED :rate but the docks NEVER passed it (grep rate: -> 0) and there was no
+  default — so per-tenant rate limiting was BUILT BUT LATENT (a guest could loop ANY broker call unbounded).
+  Revocation, by contrast, IS broadly wired (verified: exec/parallel/net/tcp/udp/tls all pass principal; the
+  earlier "only 3" was a grep artifact — they use principal:principal not principal:tenant). FIX: added
+  RateLimiter.default_quota() = {120_000, 60_000} (2000 broker calls/sec per tenant — a generous DoS FLOOR,
+  not a precise meter) + defaulted :rate to it in all 5 hot brokers (net_guard/exec/tcp/udp/tls). Now every
+  broker call with a principal (they all pass one) is rate-limited by default; an explicit :rate still
+  overrides. 36 broker tests green + a new enforcement test (a call with NO explicit rate, pre-filled to the
+  ceiling, IS rate-limited). FOLLOW-UP: queue/secret/storage brokers take tenant-as-first-arg, not a :rate
+  opt — assess whether they need a flood floor too. NEXT (iter 55): wire rate on queue/secret/storage; OR the
+  inbound seam.

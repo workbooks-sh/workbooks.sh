@@ -17,7 +17,7 @@ defmodule Workbooks.TlsBroker do
   def request(host, port, data, opts \\ [])
       when is_binary(host) and is_integer(port) and is_binary(data) do
     principal = Keyword.get(opts, :principal)
-    rate = Keyword.get(opts, :rate)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
     max = Keyword.get(opts, :max_response, @default_max_response)
     timeout = Keyword.get(opts, :timeout, 10_000)
 

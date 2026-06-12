@@ -10,6 +10,17 @@ defmodule Workbooks.TcpBrokerTest do
     assert :error = NetGuard.resolve_allowed_ip("[::1]")
   end
 
+  test "DEFAULT RATE FLOOR is enforced — a broker call with NO explicit :rate still throttles (DoS floor)" do
+    {max, window} = Workbooks.RateLimiter.default_quota()
+    p = "defrate-#{System.unique_integer([:positive])}"
+    # ensure the table exists, then pre-fill this tenant's counter to the default ceiling
+    Workbooks.RateLimiter.check(p, max, window)
+    :ets.insert(:wb_ratelimit, {p, max, System.monotonic_time(:millisecond)})
+
+    # NO :rate passed -> the broker falls back to the default floor -> rate-limited before the SSRF/connect
+    assert {:error, :rate_limited} = TcpBroker.request("1.1.1.1", 80, "x", principal: p)
+  end
+
   test "SSRF — internal TCP destinations are denied before any connect (hermetic)" do
     assert {:error, :denied} = TcpBroker.request("127.0.0.1", 22, "x")
     assert {:error, :denied} = TcpBroker.request("169.254.169.254", 80, "x")

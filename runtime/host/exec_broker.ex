@@ -35,7 +35,7 @@ defmodule Workbooks.ExecBroker do
     max_output = Keyword.get(opts, :max_output, @default_max_output)
     depth = Keyword.get(opts, :depth, 0)
     principal = Keyword.get(opts, :principal)
-    rate = Keyword.get(opts, :rate)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
