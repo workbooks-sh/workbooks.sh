@@ -345,7 +345,7 @@ fn collect_scripts(dir: &Path) -> Result<Vec<PathBuf>> {
 
 // ── entry ───────────────────────────────────────────────────────────────────
 
-pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>) -> Result<String> {
+pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>, human: bool) -> Result<String> {
     let src = Path::new(source);
     let kind = detect(src, as_kind)?;
     let t = match kind {
@@ -356,5 +356,13 @@ pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>) -> Result<
     let out_dir = out
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(format!("{}-toolkit", t.id)));
-    write_scaffold(&out_dir, kind, src, &t)
+    let msg = write_scaffold(&out_dir, kind, src, &t)?;
+    // stage 2 runs automatically — the tool does the work, the artifact
+    // carries its own audit; agents re-run with `wbx toolkit audit`
+    let audit_line = match crate::audit::audit(&out_dir.to_string_lossy(), human) {
+        Ok(report) if human => format!("\n\n{report}"),
+        Ok(_) => String::new(),
+        Err(e) => format!("\n\naudit skipped: {e:#}"),
+    };
+    Ok(format!("{msg}{audit_line}"))
 }

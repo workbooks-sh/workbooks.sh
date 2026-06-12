@@ -5,6 +5,7 @@
 //!   - ENGINE   : thin RCP calls into a running runtime (it owns compilers,
 //!                wasmtime, the tenant library).
 
+mod audit;
 mod commands; // engine-backed verbs
 mod deploy;
 mod dev;
@@ -167,6 +168,8 @@ enum ToolkitVerb {
     },
     /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
     Run { id: String, task: String, #[arg(trailing_var_arg = true)] args: Vec<String> },
+    /// Re-run the wasm-compatibility audit on an imported toolkit dir
+    Audit { #[arg(default_value = ".")] dir: String },
 }
 
 #[derive(Subcommand)]
@@ -324,7 +327,8 @@ fn run(cli: Cli, human: bool) -> Result<String> {
             ToolkitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
             ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
             ToolkitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
-            ToolkitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref())?,
+            ToolkitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref(), human)?,
+            ToolkitVerb::Audit { dir } => audit::audit(&dir, human)?,
             ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },
         // runtime ops

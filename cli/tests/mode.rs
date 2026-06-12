@@ -236,7 +236,8 @@ fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
     let manifest = std::fs::read_to_string(out_dir.join("manifest.org")).unwrap();
     assert!(manifest.contains("#+TOOLKIT: demo-skill"), "id from frontmatter");
     assert!(manifest.contains("#+TAGLINE: does demo things"));
-    assert!(manifest.contains("TODO dependency audit"), "stage-2 handoff present");
+    assert!(manifest.contains("** dependency audit (static, auto)"), "import auto-runs stage 2");
+    assert!(manifest.contains("TODO fix-up plan"), "stage-3 handoff present");
     assert!(manifest.contains("scripts/run.sh"), "carried script listed");
     assert!(out_dir.join("scripts/run.sh").is_file());
 
@@ -268,4 +269,54 @@ fn toolkit_import_markdown_and_unknown_kind() {
     let bad = wbx().args(["toolkit", "import", md.to_str().unwrap(), "--as", "vsix"]).output().unwrap();
     assert!(!bad.status.success());
     assert_ne!(bad.status.code(), Some(101), "no panic");
+}
+
+#[test]
+fn toolkit_audit_classifies_against_the_lanes() {
+    let dir = std::env::temp_dir().join(format!("wbx-audit-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("scripts")).unwrap();
+    std::fs::write(
+        dir.join("manifest.org"),
+        "#+TOOLKIT: demo\n\n* demo\n\n** TODO dependency audit\n   stage 2 pending\n",
+    ).unwrap();
+    // posix shell + network binary → convertible (Dock-brokered net)
+    std::fs::write(dir.join("scripts/fetch.sh"), "#!/bin/bash\ncurl -s https://x.dev | head\n").unwrap();
+    // node + bare npm require → convertible (npm bundle lane)
+    std::fs::write(dir.join("scripts/tool.js"), "#!/usr/bin/env node\nconst axios = require('axios');\n").unwrap();
+    // python → blocked (no lane)
+    std::fs::write(dir.join("scripts/calc.py"), "#!/usr/bin/env python3\nimport numpy\n").unwrap();
+
+    let out = wbx()
+        .args(["--json", "toolkit", "audit", dir.to_str().unwrap()])
+        .output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let v: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("envelope parses");
+    assert_eq!(v["ok"], true);
+    assert_eq!(v["verb"], "toolkit audit");
+    let scripts = v["data"]["scripts"].as_array().unwrap();
+    assert_eq!(scripts.len(), 3);
+    let class_of = |f: &str| {
+        scripts.iter().find(|s| s["file"] == f).unwrap()["class"].as_str().unwrap().to_string()
+    };
+    assert_eq!(class_of("calc.py"), "blocked", "python has no lane");
+    assert_eq!(class_of("fetch.sh"), "convertible", "curl needs Dock-brokered net");
+    assert_eq!(class_of("tool.js"), "convertible", "bare npm dep needs bundling");
+    assert_eq!(v["data"]["summary"]["blocked"], 1);
+
+    // findings landed in the manifest, stage-1 TODO replaced, stage-3 handoff left
+    let m = std::fs::read_to_string(dir.join("manifest.org")).unwrap();
+    assert!(m.contains("** dependency audit (static, auto)"));
+    assert!(!m.contains("** TODO dependency audit"));
+    assert!(m.contains("npm =axios="), "npm dep surfaced");
+    assert!(m.contains("pip =numpy="), "pip dep surfaced");
+    assert!(m.contains("TODO make calc.py sandbox-ready"));
+    assert!(m.contains("** TODO fix-up plan"));
+
+    // human mode: summary line, exit 0
+    let h = wbx().args(["toolkit", "audit", dir.to_str().unwrap()]).output().unwrap();
+    assert!(h.status.success());
+    let txt = String::from_utf8_lossy(&h.stdout);
+    assert!(txt.contains("ready") && txt.contains("blocked"), "summary present: {txt}");
 }
