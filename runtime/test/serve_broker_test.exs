@@ -17,6 +17,14 @@ defmodule Workbooks.ServeBrokerTest do
     assert {404, [], ""} = ServeBroker.decode_http_response("404\n\n")
   end
 
+  test "MID-FLIGHT REVOCATION — a revoked serve_id is denied dispatch before the guest is touched" do
+    sid = "revs-#{System.unique_integer([:positive])}"
+    assert :ok = Workbooks.Revocation.revoke(sid)
+    # pid is nil on purpose: dispatch must short-circuit on revocation BEFORE calling the guest
+    assert {:error, :revoked} = ServeBroker.dispatch(sid, nil, "req")
+    assert :ok = Workbooks.Revocation.unrevoke(sid)
+  end
+
   # --- guests ---
 
   defp compile_reactor(body_c) do

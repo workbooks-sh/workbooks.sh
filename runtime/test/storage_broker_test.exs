@@ -69,4 +69,18 @@ defmodule Workbooks.StorageBrokerTest do
     assert {:error, :invalid_key} = StorageBroker.put(conn, "t", "", "v")
     assert {:error, :invalid_key} = StorageBroker.put(conn, "", "k", "v")
   end
+
+  test "MID-FLIGHT REVOCATION — a revoked tenant is denied immediately, restored on unrevoke", %{conn: conn} do
+    t = "revt-#{System.unique_integer([:positive])}"
+    assert :ok = StorageBroker.put(conn, t, "k", "v")
+    assert {:ok, "v"} = StorageBroker.get(conn, t, "k")
+
+    assert :ok = Workbooks.Revocation.revoke(t)
+    assert {:error, :revoked} = StorageBroker.put(conn, t, "k", "v2")
+    assert {:error, :revoked} = StorageBroker.get(conn, t, "k")
+
+    # access restored on unrevoke; the original value is intact (revocation gates access, not data)
+    assert :ok = Workbooks.Revocation.unrevoke(t)
+    assert {:ok, "v"} = StorageBroker.get(conn, t, "k")
+  end
 end

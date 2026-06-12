@@ -87,6 +87,14 @@ defmodule Workbooks.ServeBroker do
 
   @doc "Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}."
   def dispatch(serve_id, pid, request, timeout \\ 10_000) when is_binary(request) do
+    if Workbooks.Revocation.revoked?(serve_id) do
+      {:error, :revoked}
+    else
+      do_dispatch(serve_id, pid, request, timeout)
+    end
+  end
+
+  defp do_dispatch(serve_id, pid, request, timeout) do
     put({serve_id, :req}, request)
     delete({serve_id, :resp})
 

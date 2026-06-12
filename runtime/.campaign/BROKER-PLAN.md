@@ -531,3 +531,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   STANDARD tools (wb-0beq wasi-seam async refactor + internet env) — a focused-session task, not a loop step.
   NEXT (iter 25): the net DoS body-cap (streaming, the last unaddressed red-team item), OR begin the wb-0beq
   scoping (separate async engine for wasi-http components) if pursuing the 323 reclamation.
+- 2026-06-12 (iter 25): **MID-FLIGHT REVOCATION (green) — a keystone cadence item, manageable + tested.**
+  Workbooks.Revocation (lazy public-ETS registry: revoke/unrevoke/revoked?). StorageBroker.put/get and
+  ServeBroker.dispatch now consult it on every privileged op, so revoking a principal (kv tenant / serve_id)
+  denies its brokered access IMMEDIATELY — even while the guest is running, no teardown needed. Tests: kv
+  revoke -> put+get denied -> unrevoke -> restored (data intact, revocation gates ACCESS not data); serve
+  revoke -> dispatch denied BEFORE touching the guest (pid=nil never called). 14 tests green.
+  The DoS body-cap (huge bodies) stays in wb-k2im — it needs a SERVER to test (:httpc streaming vs the
+  redirect-follow; offline-unverifiable), same env-gating as net reachability; not false-claimed as done.
+  CADENCE now: default-deny + scoped allow-list + quotas + audit + MID-FLIGHT REVOCATION + adversarial tests.
+  REMAINING (all needs identity-threading or an env): net/exec revocation (thread the dock tenant as the
+  principal to host_http_get/host_exec); DoS body-cap + net reachability (wb-k2im, server/internet); the 323
+  standard-tool reclamation (wb-0beq wasi-seam async refactor). NEXT (iter 26): thread the principal to net+
+  exec for full revocation coverage, OR begin wb-0beq scoping (a separate async engine for wasi-http guests).

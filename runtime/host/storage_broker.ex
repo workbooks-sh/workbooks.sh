@@ -41,6 +41,7 @@ defmodule Workbooks.StorageBroker do
     max_keys = Keyword.get(opts, :max_keys, @max_keys)
 
     cond do
+      Workbooks.Revocation.revoked?(tenant) -> {:error, :revoked}
       key == "" or tenant == "" -> {:error, :invalid_key}
       byte_size(value) > max_value -> {:error, :value_too_large}
       not exists?(conn, tenant, key) and count(conn, tenant) >= max_keys -> {:error, :quota_exceeded}
@@ -50,6 +51,14 @@ defmodule Workbooks.StorageBroker do
 
   @doc "Fetch the value for (`tenant`, `key`). {:ok, value} | {:error, :not_found}."
   def get(conn, tenant, key) when is_binary(tenant) and is_binary(key) do
+    if Workbooks.Revocation.revoked?(tenant) do
+      {:error, :revoked}
+    else
+      do_get(conn, tenant, key)
+    end
+  end
+
+  defp do_get(conn, tenant, key) do
     {:ok, stmt} = Sqlite3.prepare(conn, "SELECT value FROM wb_kv WHERE tenant = ?1 AND key = ?2")
     :ok = Sqlite3.bind(stmt, [tenant, key])
 

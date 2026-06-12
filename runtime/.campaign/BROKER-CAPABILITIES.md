@@ -2,7 +2,7 @@
 
 The pattern: a wasm guest stays sandboxed; the **host performs the privileged op** behind a mediated,
 Policy-gated `env.*` import (the Dock membrane). Five capabilities, each with the same cadence —
-**default-deny, scoped, quota'd, audit-logged, adversarially tested, offline-e2e-proven** (where the dev env
+**default-deny, scoped, quota'd, audit-logged, mid-flight-revocable, adversarially tested, offline-e2e-proven** (where the dev env
 allows). Guests reach these via `RustDock`/`JsDock` (env imports gated by the profile's caps); inbound
 serving is via `ServeBroker`.
 
