@@ -165,6 +165,26 @@ defmodule Workbooks.PalletTest do
     assert String.trim(out) == "banana\nblueberry"
   end
 
+  test "js-tools catalog entries are well-formed (Lane D / JS)" do
+    refute Pallet.js_tools_catalog() == []
+
+    for t <- Pallet.js_tools_catalog() do
+      assert is_binary(t.name) and t.name != ""
+      assert is_binary(t.src) and t.src =~ "Javy.IO"
+      assert is_list(t.deps) and t.deps != []
+    end
+  end
+
+  @tag :pallet
+  @tag timeout: 600_000
+  test "Lane D — a JS npm tool (glimmer compiler) bundles on Javy + runs" do
+    # proves the JS-npm-bundle lane: resolve+fetch+esbuild-bundle @glimmer/compiler → Javy wasm command
+    assert :ok = Pallet.seed_js_tool_one("glimmer")
+    assert "glimmer" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("glimmer", "<div>{{name}}</div>", [])
+    assert out =~ "block"
+  end
+
   test "python-tools catalog entries are well-formed (Lane D)" do
     refute Pallet.python_tools_catalog() == []
 

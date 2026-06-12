@@ -20,16 +20,6 @@
   "confidence": "high"
  },
  {
-  "name": "JerryScript",
-  "decisive": "live-buildable",
-  "lane": "B",
-  "url": "https://github.com/jerryscript-project/jerryscript",
-  "build_opts": "deps: [github jerryscript-project/jerryscript master]. src_globs: jerry-core/**/*.c, jerry-port/common/*.c, jerry-math/*.c. exclude: jerry-core/debugger/*.c, jerry-core/api/jerry-debugger*.c (debugger off). include_dirs: jerry-core/include, jerry-core, jerry-core/api, jerry-core/ecma/base, jerry-core/ecma/builtin-objects, jerry-core/ecma/builtin-objects/typedarray, jerry-core/ecma/operations, jerry-core/jcontext, jerry-core/jmem, jerry-core/jrt, jerry-core/lit, jerry-core/parser/js, jerry-core/parser/regexp, jerry-core/vm, jerry-port/include, jerry-math/include. cflags: --target=wasm32-wasi -O2 -DJERRY_GLOBAL_HEAP_SIZE='(512)' -DJERRY_PARSER=1 -DJERRY_DEBUGGER=0 -DJERRY_VALGRIND=0 -DJERRY_SYSTEM_ALLOCATOR=0. config: rename jerry-core/config.h -> jerryscript-config.h (the @JERRY_BUILD_CFG@ line is a comment; every JERRY_* define self-defaults via #ifndef, so NO configure run needed). extra_sources main: jerry-main/main-unix.c OR a 4-line driver calling jerry_init()/jerry_eval()/jerry_cleanup() reading stdin. No bison/flex (parser is hand-written), no codegen run (lit-*.inc.h unicode/magic-string/error tables are COMMITTED in jerry-core/lit + ecma/base), no CMake configure run.",
-  "smoke": "echo \"var s=0;for(var i=1;i<=100;i++)s+=i;print(s);\" | jerryscript.wasm  -> 5050 (use jerry-main snapshot/print or jerry_eval driver)",
-  "blocker": "none \u2014 but note overlap with already-live qjs (QuickJS). JerryScript still has distinct buildable value: ES2015+ IoT-targeted engine, self-contained jerry-math (no host libm), far smaller footprint, snapshot exec. Not redundant in capability though it shares the JS-engine slot.",
-  "confidence": "high"
- },
- {
   "name": "csvkit",
   "decisive": "live-buildable",
   "lane": "D",
@@ -47,16 +37,6 @@
   "build_opts": "JS bundle on QuickJS/esbuild lane. npm pkg: pdf-lib@1.17.1. deps (all pure-JS, no C-ext): @pdf-lib/standard-fonts, @pdf-lib/upng, pako, tslib. esbuild bundle entry wrapping pdf-lib API (merge/split/stamp/rotate/fill-form/decrypt) -> single .js, run on qjs. No native, no codegen, no configure.",
   "smoke": "qjs bundle.js: load 2 input PDFs via PDFDocument.load, mergeDocuments, save() -> assert output bytes start with %PDF and page count == sum of inputs; also rotate page 0 by 90 and re-save without error.",
   "blocker": "pdftk itself is impossible (pdftk-java = JVM; original = C++/GCJ native, no plain wasm32-wasi). Capability is delivered instead via pdf-lib on the JS lane \u2014 covers merge/split/stamp/rotate/form-fill. Note: lacks pdftk's full uncompress/repair/burst PDF-internals parity, but covers the common verbs.",
-  "confidence": "high"
- },
- {
-  "name": "apache-arrow",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/apache-arrow/-/apache-arrow-21.1.0.tgz",
-  "build_opts": "npm:apache-arrow@21.1.0; pure-JS, no native; runtime deps tslib+flatbuffers+json-bignum+@swc/helpers all pure-JS; bundle ESM via esbuild lane, run on QuickJS-ng; exclude CLI deps command-line-args/command-line-usage (tooling-only)",
-  "smoke": "import { tableFromArrays, tableToIPC, tableFromIPC } from 'apache-arrow'; const t = tableFromArrays({ id: Int32Array.from([1,2,3]), v: Float64Array.from([1.5,2.5,3.5]) }); const buf = tableToIPC(t); const t2 = tableFromIPC(buf); console.log(t2.numRows===3 && t2.getChild('id').get(1)===2);",
-  "blocker": "",
   "confidence": "high"
  },
  {
@@ -100,16 +80,6 @@
   "confidence": "high"
  },
  {
-  "name": "glimmer-compiler",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/@glimmer/compiler/-/compiler-0.94.11.tgz",
-  "build_opts": "JS bundle on QuickJS via the live npm lane (wb-spy). entry=@glimmer/compiler@0.94.11; deps (all pure-JS ESM, no C-ext): @glimmer/syntax@0.95.0, @glimmer/util@0.94.8, @glimmer/wire-format@0.94.8, @glimmer/interfaces@0.94.6, @handlebars/parser@~2.2.0, simple-html-tokenizer@^0.5.11. npm resolve+fetch+bundlejob.js \u2192 single ESM bundle, run on quickjs-ng. No native, no node builtins required for precompile().",
-  "smoke": "import { precompile } from bundle; precompile('<div>{{name}}</div>') returns a wire-format JSON template string (non-empty). Verify it parses and emits opcodes.",
-  "blocker": "none \u2014 full dep closure verified pure-JS ESM (npm pack of compiler + syntax + util + wire-format + interfaces; syntax pulls only @handlebars/parser + simple-html-tokenizer, both pure-JS). prod dist is plain ESM (49KB), import-only deps. No configure/codegen/native.",
-  "confidence": "high"
- },
- {
   "name": "porffor",
   "decisive": "live-buildable",
   "lane": "D",
@@ -128,15 +98,5 @@
   "smoke": "echo files into a tmp dir; run: git init /tmp/r && git add . && git commit -m x && git log --oneline (local object/refs ops only \u2014 no network clone/fetch).",
   "blocker": "Network transports (clone/fetch/push over http/ssh) are unreachable in-sandbox: no sockets/TLS \u2014 those subcommands compile out (GIT_HTTPS=0/GIT_SSH=0). Threads disabled (GIT_THREADS=0). Must pick exactly ONE sha1/sha256 backend (builtin) and exclude the rest, and exclude all win32/ + openssl/mbedtls/commoncrypto hash sources or you get duplicate symbols / missing headers. The bundled CLI (src/cli) is secondary \u2014 build the library first, then a thin main; if CLI source-list proves fiddly, the libgit2 library itself is the live-buildable artifact.",
   "confidence": "medium"
- },
- {
-  "name": "BoringSSL",
-  "decisive": "live-buildable",
-  "lane": "B",
-  "url": "https://github.com/google/boringssl (verified: gen/sources.json + gen/crypto/err_data.cc + all perlasm outputs committed; include/openssl/opensslconf.h is a static committed stub, no .in templates)",
-  "build_opts": "deps: [boringssl tarball]. lang: C++17 (clang + libc++). define: OPENSSL_NO_ASM, OPENSSL_NO_THREADS_CORRUPT_MEMORY_AND_LEAK_SECRETS_IF_THREADED off (single-thread default ok), NDEBUG. include_dirs: include/, crypto/, third_party/fiat/, gen/. src_globs (compile_only, from gen/sources.json crypto.srcs + ssl.srcs + bcm.srcs, all 'pure' entries i.e. NOT prefixed gen/ AND extra_source gen/crypto/err_data.cc): crypto/**/*.cc, ssl/**/*.cc, crypto/fipsmodule/bcm.cc (monolithic, #includes the *.cc.inc), gen/crypto/err_data.cc. exclude: gen/bcm/*.S, gen/crypto/*.S, gen/bcm/*.asm, third_party/fiat/asm/*.S (all asm -> OPENSSL_NO_ASM), **/*_test.cc, crypto/test/**, tool/**, pki/** (optional), fuzz/**, decrepit/** (optional), rust/**. NO -DBORINGSSL_FIPS (avoids sys/mman.h/mprotect in bcm.cc). cflags: -DOPENSSL_NO_ASM -std=c++17 -fno-exceptions. entropy: falls through target.h __wasm32__ -> OPENSSL_RAND_GETENTROPY (WASI random_get). No configure, no codegen run, no flex/bison/protoc.",
-  "smoke": "Build libcrypto+libssl, link tiny C driver: RAND_bytes(buf,32) then SHA256 of a string and assert digest matches known vector; optionally EVP_aes_256_gcm encrypt/decrypt round-trip. Run under wasmtime; getentropy backed by WASI random_get.",
-  "blocker": "None blocking. Notes: must define OPENSSL_NO_ASM (skip all gen/bcm,gen/crypto .S/.asm); must build non-FIPS (BORINGSSL_FIPS guards the only sys/mman.h+mprotect use in bcm.cc); single-threaded wasi-libc fine (locks are no-ops). All codegen (perlasm .S, err_data.cc) and config (opensslconf.h) are COMMITTED in gen/ + include/ \u2014 confirmed no pregenerate/configure/codegen step needed. Distinct value vs live mbedtls/libsodium: full OpenSSL-compatible libcrypto+libssl TLS/X.509 API surface.",
-  "confidence": "high"
  }
 ]

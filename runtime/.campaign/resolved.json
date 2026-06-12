@@ -2036,6 +2036,32 @@
 "recipe": "prebuilt openssl.wasm (voltbuilder/openssl-wasm v1.1.1o, WASI-only, 1.96MB)",
 "smoke": "openssl version => OpenSSL 1.1.1o",
 "extent": "full OpenSSL CLI: dgst/enc/genrsa/rsa/x509/rand/base64/... crypto toolkit"
+},
+"Glimmer.js": {
+"verdict": "live",
+"lane": "D",
+"recipe": "@glimmer/compiler npm bundled on Javy/QuickJS (esbuild in-sandbox)",
+"smoke": "precompile('<div>{{name}}</div>') => wire-format JSON",
+"extent": "Glimmer/Ember template precompiler; glimmer cmd stdin->wire-format"
+},
+"Apache Arrow": {
+"verdict": "live",
+"lane": "D",
+"recipe": "apache-arrow npm bundled on Javy/QuickJS",
+"smoke": "tableFromArrays({a:[1,2,3],b:[4,5,6]}) => rows=3 ipc=432",
+"extent": "Apache Arrow columnar tables + IPC; arrow cmd JSON->table"
+},
+"BoringSSL": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "redundant \u2014 crypto/TLS capability already live via openssl + mbedtls + libsodium; a 2nd big C++ crypto build adds no distinct capability (off the table per redundancy)",
+"extent": "off-the-table (redundant)"
+},
+"JerryScript": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "redundant \u2014 JS-engine capability already live via qjs + duk + mujs; JerryScript adds no distinct capability (off the table per redundancy)",
+"extent": "off-the-table (redundant)"
 }
 },
 "preliminary": {
@@ -2079,14 +2105,6 @@
 "verified": false,
 "note": "C++ lane proven; flatc full build deferred"
 },
-"JerryScript": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/jerryscript-project/jerryscript",
-"recipe": "Lane B portable C with CMake build core math port and desktop entry with clang for wasm wasi link to one wasm hand written parser no bison t",
-"confidence": "high",
-"verified": false
-},
 "csvkit": {
 "verdict": "live-likely",
 "lane": "D",
@@ -2101,14 +2119,6 @@
 "source_url": "https://registry.npmjs.org/pdf-lib/latest",
 "recipe": "Do NOT compile pdftk-java (needs JVM; original C++/GCJ native/JIT). Cover capability with pure-JS pdf-lib on QuickJS/esbuild JS lane. Bundle",
 "confidence": "high",
-"verified": false
-},
-"Apache Arrow": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://registry.npmjs.org/apache-arrow",
-"recipe": "Lane D (JS on our QuickJS/esbuild lane). The `apache-arrow` npm pkg (v21.1.0) is PURE JS: deps are tslib, flatbuffers, json-bignum, @swc/hel",
-"confidence": "medium",
 "verified": false
 },
 "Hatch": {
@@ -2159,13 +2169,6 @@
 "verdict": "live-likely",
 "lane": "D",
 "recipe": "Lane D (JS-on-qjs via the runtime's npm/esbuild bundle lane). Scope: the @enhance/ssr render core ONLY (pure custom-elem",
-"confidence": "high",
-"verified": false
-},
-"Glimmer.js": {
-"verdict": "live-likely",
-"lane": "D",
-"recipe": "npm pack @glimmer/compiler@0.94.11 + its pure-JS deps (@glimmer/syntax, @glimmer/util, @glimmer/wire-format, @glimmer/in",
 "confidence": "high",
 "verified": false
 },
@@ -2229,13 +2232,6 @@
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B in principle (pure-C CPU text-layout, no GPU/syscall/fork-exec/network), but NOT self-contain",
-"confidence": "medium",
-"verified": false
-},
-"BoringSSL": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C/C++). Vendor the BoringSSL tree (crypto/ + ssl/ + include/), which ships PR",
 "confidence": "medium",
 "verified": false
 },

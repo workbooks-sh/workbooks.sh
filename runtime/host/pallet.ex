@@ -1115,6 +1115,25 @@ defmodule Workbooks.Pallet do
     %{name: "tmpl", script: @tmpl_script}
   ]
 
+  # Lane D (JS) — a pure-JS npm package bundled (esbuild, in-sandbox) + run on Javy/QuickJS. The npm tree
+  # is resolved+fetched+bundled by the live npm lane (wb-spy); zero native addons. stdin via Javy.IO.
+  @js_read_stdin "const CH=65536;const cs=[];let n;const b=new Uint8Array(CH);while((n=Javy.IO.readSync(0,b))>0){cs.push(b.slice(0,n));}let t=0;for(const c of cs)t+=c.length;const all=new Uint8Array(t);let o=0;for(const c of cs){all.set(c,o);o+=c.length;}const input=new TextDecoder().decode(all).trim();"
+
+  # `glimmer`: Glimmer/Ember template → wire-format JSON (precompile, a pure function).
+  @glimmer_js "import { precompile } from '@glimmer/compiler';" <>
+                @js_read_stdin <>
+                "const out=precompile(input);Javy.IO.writeSync(1,new TextEncoder().encode(typeof out==='string'?out:JSON.stringify(out)));"
+
+  # `arrow`: Apache Arrow — JSON {col:[…]} on stdin → an Arrow table; prints rows + IPC byte length.
+  @arrow_js "import { tableFromArrays, tableToIPC } from 'apache-arrow';" <>
+              @js_read_stdin <>
+              "const obj=JSON.parse(input);const table=tableFromArrays(obj);const ipc=tableToIPC(table);Javy.IO.writeSync(1,new TextEncoder().encode('rows='+table.numRows+' ipc='+ipc.length));"
+
+  @js_tools [
+    %{name: "glimmer", deps: ["@glimmer/compiler"], src: @glimmer_js},
+    %{name: "arrow", deps: ["apache-arrow"], src: @arrow_js}
+  ]
+
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."
   def csource_catalog, do: @csource
 
@@ -1178,6 +1197,24 @@ defmodule Workbooks.Pallet do
 
   @doc "The pure-Python tools catalog (Lane D — name + frozen `-c` script; ride CPython + priv/pytools)."
   def python_tools_catalog, do: @python_tools
+
+  @doc "The Lane-D JS-tool catalog (npm package bundled on Javy/QuickJS)."
+  def js_tools_catalog, do: @js_tools
+
+  @doc "Build + register every :js tool (npm resolve+bundle each; cached after first fetch)."
+  def seed_js_tools, do: Map.new(@js_tools, fn t -> {t.name, seed_js_tool_one(t)} end)
+
+  @doc "Register one :js tool by name (or the entry map)."
+  def seed_js_tool_one(name) when is_binary(name) do
+    case Enum.find(@js_tools, &(&1.name == name)) do
+      nil -> {:error, :unknown_js_tool}
+      t -> seed_js_tool_one(t)
+    end
+  end
+
+  def seed_js_tool_one(%{name: n, src: s, deps: d}) do
+    Workbooks.CommandRegistry.build_and_register_inline(n, "js", s, d, :argv)
+  end
 
   @doc """
   Register every :python tool as a first-class command (CPython.wasm + frozen script + the vendored
