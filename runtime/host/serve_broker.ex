@@ -227,21 +227,36 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
   def call(conn, opts) do
     max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
 
-    # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
-    case read_body(conn, length: max_req) do
-      {:ok, body, conn} ->
-        case dispatch(opts, conn, body) do
-          {status, headers, resp_body} when is_integer(status) ->
-            conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
-            send_resp(conn, status, resp_body)
+    cond do
+      # INBOUND DoS floor (opt-in `:rate` = {max, window_ms}) — PER-CLIENT (by remote IP) so a flood from one
+      # client can't starve others or exhaust the host with unbounded request handling / instantiation.
+      rate_limited?(conn, Keyword.get(opts, :rate)) ->
+        send_resp(conn, 429, "rate limited")
 
-          {:error, _} ->
-            send_resp(conn, 502, "wasi:http component error")
+      true ->
+        # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
+        case read_body(conn, length: max_req) do
+          {:ok, body, conn} ->
+            case dispatch(opts, conn, body) do
+              {status, headers, resp_body} when is_integer(status) ->
+                conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+                send_resp(conn, status, resp_body)
+
+              {:error, _} ->
+                send_resp(conn, 502, "wasi:http component error")
+            end
+
+          {:more, _partial, conn} ->
+            send_resp(conn, 413, "request too large")
         end
-
-      {:more, _partial, conn} ->
-        send_resp(conn, 413, "request too large")
     end
+  end
+
+  defp rate_limited?(_conn, nil), do: false
+
+  defp rate_limited?(conn, {max, window}) do
+    key = "apphost:" <> (conn.remote_ip |> :inet.ntoa() |> to_string())
+    Workbooks.RateLimiter.check(key, max, window) == {:error, :rate_limited}
   end
 
   # Two modes:

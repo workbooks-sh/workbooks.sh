@@ -1017,3 +1017,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   isolated instance -> all 200 with the correct response. The app-host is now PRODUCTION-CORRECT: standard
   wasi:http apps run with per-request isolation + concurrency, no state leak. The inbound seam is complete:
   proven -> deployable (iter66) -> concurrent (iter67) -> correctly isolated (iter68).
+- 2026-06-12 (iter 69): **APP-HOST INBOUND RATE FLOOR (per-client) — inbound DoS cadence completed.** The
+  ComponentPlug had a request-SIZE cap (413) but NO inbound RATE floor — a flood (esp. in fresh-per-request
+  mode) = unbounded instantiation/handling = DoS. Added an opt-in `:rate` {max, window_ms} keyed PER-CLIENT
+  (conn.remote_ip via RateLimiter) so a flood from one client can't starve others or exhaust the host. E2E:
+  rate {1, 60_000} -> 1st request 200, 2nd from the same client 429. The app-host inbound now has the full
+  DoS cadence: request-size cap (413) + per-client rate floor (429), mirroring the outbound brokers and the
+  hand-written serve_broker. So the standard-component app-host is DoS-floored on BOTH directions — outbound
+  SSRF-brokered, inbound rate+size-capped. App-host hardening arc: deployable(66) -> concurrent(67) ->
+  isolated(68) -> inbound-DoS-floored(69).

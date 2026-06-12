@@ -422,4 +422,45 @@ defmodule Workbooks.BrokerNetE2ETest do
     # a DIFFERENT public host (would pass the SSRF floor) is NOT on the list -> blocked by the scope
     assert probe.("http://1.1.1.1/") =~ "BLOCKED"
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "APP-HOST inbound rate floor — a flooding client is 429'd (per-client DoS quota)" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{bytes: bytes, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    # a per-client budget of 1 request / window
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.ComponentPlug, pid: pid, rate: {1, 60_000}},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+    url = ~c"http://127.0.0.1:#{port}/"
+
+    # 1st request is within budget; the 2nd from the same client exceeds it -> 429
+    {:ok, {{_, s1, _}, _, _}} = :httpc.request(:get, {url, []}, [], body_format: :binary)
+    {:ok, {{_, s2, _}, _, _}} = :httpc.request(:get, {url, []}, [], body_format: :binary)
+
+    assert s1 == 200
+    assert s2 == 429
+  end
 end
