@@ -2062,6 +2062,32 @@
 "lane": "none",
 "blocker": "redundant \u2014 JS-engine capability already live via qjs + duk + mujs; JerryScript adds no distinct capability (off the table per redundancy)",
 "extent": "off-the-table (redundant)"
+},
+"protoc": {
+"verdict": "live",
+"lane": "D",
+"recipe": "protobufjs npm bundled on Javy/QuickJS",
+"smoke": "parse 2-message .proto => M,N",
+"extent": "protobuf .proto parsing (protoc substitute); protobuf cmd stdin proto->type names"
+},
+"Enhance (@enhance/ssr render core)": {
+"verdict": "live",
+"lane": "D",
+"recipe": "@enhance/ssr npm bundled on Javy/QuickJS",
+"smoke": "enhance('hello') => <html>..<p>hello</p>..",
+"extent": "server-side render (parse5 SSR); enhance cmd stdin->rendered HTML"
+},
+"Marko": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "redundant \u2014 template->JS compilation live via glimmer; @marko/compiler pulls @babel/core (huge dep tree) making the bundle build prohibitively slow for no distinct capability",
+"extent": "off-the-table (redundant + slow)"
+},
+"porffor": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "bundles but fails at runtime under Javy/QuickJS with 'SyntaxError: invalid redefinition of lexical identifier' (esbuild bundle / QuickJS lexical-scope conflict); experimental JS->wasm AOT compiler, not cleanly runnable in-lane",
+"extent": "off-the-table (Javy runtime error)"
 }
 },
 "preliminary": {
@@ -2086,14 +2112,6 @@
 "lane": "D",
 "source_url": "https://registry.npmjs.org/microbundle/0.15.1",
 "recipe": "JS npm lane (NOT a .wasm). microbundle 0.15.1 is pure JS; bin = dist/cli.js, main = dist/microbundle.js. Pinned deps are all pure-JS npm: rollup ^2.35.1 (CRITIC",
-"confidence": "high",
-"verified": false
-},
-"protoc": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://registry.npmjs.org/protobufjs-cli/latest",
-"recipe": "protoc itself is C++ with no plain wasm32-wasi build (Lanes A/B/C dead \u2014 see blocker). Use the pure-JS equivalent instead: npm `protobufjs-cli@2.5.4` ships `pbj",
 "confidence": "high",
 "verified": false
 },
@@ -2155,20 +2173,6 @@
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B (self-contained C++ via our clang/libc++ lane). No prebuilt plain wasm32-wasi .wasm exists (existing \"leveldb was",
-"confidence": "high",
-"verified": false
-},
-"Marko": {
-"verdict": "live-likely",
-"lane": "D",
-"recipe": "npm-resolve+bundle @marko/compiler@5.39.63 (pure JS, Babel-based: @babel/core/parser/traverse/generator \u2014 no node-gyp/.n",
-"confidence": "medium",
-"verified": false
-},
-"Enhance (@enhance/ssr render core)": {
-"verdict": "live-likely",
-"lane": "D",
-"recipe": "Lane D (JS-on-qjs via the runtime's npm/esbuild bundle lane). Scope: the @enhance/ssr render core ONLY (pure custom-elem",
 "confidence": "high",
 "verified": false
 },

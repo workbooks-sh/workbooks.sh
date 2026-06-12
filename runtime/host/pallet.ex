@@ -1129,9 +1129,21 @@ defmodule Workbooks.Pallet do
               @js_read_stdin <>
               "const obj=JSON.parse(input);const table=tableFromArrays(obj);const ipc=tableToIPC(table);Javy.IO.writeSync(1,new TextEncoder().encode('rows='+table.numRows+' ipc='+ipc.length));"
 
+  # `protobuf`: parse a .proto schema (stdin) → comma-list of message type names (protobufjs, pure-JS).
+  @protobuf_js "import protobuf from 'protobufjs';" <>
+                 @js_read_stdin <>
+                 "const root=protobuf.parse(input).root;const types=[];root.nestedArray.forEach(t=>types.push(t.name));Javy.IO.writeSync(1,new TextEncoder().encode(types.join(',')));"
+
+  # `enhance`: server-side render — stdin text wrapped in a <p> via @enhance/ssr (parse5-based SSR).
+  @enhance_js "import enhance from '@enhance/ssr';" <>
+                @js_read_stdin <>
+                "const html=enhance();const out=html`<p>${input}</p>`;Javy.IO.writeSync(1,new TextEncoder().encode(out));"
+
   @js_tools [
     %{name: "glimmer", deps: ["@glimmer/compiler"], src: @glimmer_js},
-    %{name: "arrow", deps: ["apache-arrow"], src: @arrow_js}
+    %{name: "arrow", deps: ["apache-arrow"], src: @arrow_js},
+    %{name: "protobuf", deps: ["protobufjs"], src: @protobuf_js},
+    %{name: "enhance", deps: ["@enhance/ssr"], src: @enhance_js}
   ]
 
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."

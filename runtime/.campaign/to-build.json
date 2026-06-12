@@ -1,15 +1,5 @@
 [
  {
-  "name": "protobufjs-cli (protoc substitute)",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/protobufjs-cli/-/protobufjs-cli-2.5.4.tgz",
-  "build_opts": "npm lane: resolve+fetch+bundle `protobufjs-cli@2.5.4` (+ peer `protobufjs@^8.6.3`); deps all pure-JS (chalk, escodegen, espree, estraverse, glob, jsdoc, minimist, tmp) \u2014 NO gypfile/postinstall/node-gyp/native addons (verified registry manifest). Entry: bin pbjs (proto->JSON/static-JS/descriptor) and pbts (.d.ts). Run resulting bundle on QuickJS with JsDock Node fs/path shims (already live). bundlejob.js / compilers/js lane, no per-tool host work.",
-  "smoke": "echo 'syntax=\"proto3\"; message M { int32 id = 1; string name = 2; }' > a.proto; pbjs -t json a.proto  ->  expect JSON with nested.M.fields.id.type=int32, .name.type=string. Also pbjs -t static-module a.proto emits a JS encoder/decoder module.",
-  "blocker": "protoc itself (C++) has NO plain wasm32-wasi build (emscripten/js-pair only) and needs a bootstrap-protoc codegen step + abseil + CMake configure -> lanes A/B/C dead. protobufjs-cli is the pure-JS equivalent reached via lane D. Residual risk: pbts path pulls heavy `jsdoc`; if jsdoc trips a Node API the fs shim lacks, pbts (.d.ts gen) may degrade while core pbjs (.proto->JSON/JS) still works \u2014 not a build blocker, only a feature-surface caveat.",
-  "confidence": "medium"
- },
- {
   "name": "flatc",
   "decisive": "live-buildable",
   "lane": "B",
@@ -57,36 +47,6 @@
   "build_opts": "target=libsox (the library; skip the sox.c CLI driver which needs termios/glob/signals). src=src/ with an EXPLICIT literal list (no configure, no codegen). compile_only (core, all unconditional): adpcms.c aiff.c cvsd.c g711.c g721.c g723_24.c g723_40.c g72x.c vox.c raw.c formats.c formats_i.c skelform.c xmalloc.c getopt.c util.c libsox.c libsox_i.c sox-fmt.c; effects: bend.c biquad.c biquads.c chorus.c compand.c compandt.c contrast.c dcshift.c delay.c dft_filter.c dither.c divide.c downsample.c earwax.c echo.c echos.c effects.c effects_i.c effects_i_dsp.c fade.c fft4g.c fir.c firfit.c flanger.c gain.c hilbert.c input.c ladspa.c loudness.c mcompand.c noiseprof.c noisered.c output.c overdrive.c pad.c phaser.c rate.c remix.c repeat.c reverb.c reverse.c silence.c sinc.c skeleff.c speed.c splice.c stat.c stats.c stretch.c swap.c synth.c tempo.c tremolo.c trim.c upsample.c vad.c vol.c; formats: raw-fmt.c s1-fmt.c s2-fmt.c s3-fmt.c s4-fmt.c u1-fmt.c u2-fmt.c u3-fmt.c u4-fmt.c al-fmt.c la-fmt.c ul-fmt.c lu-fmt.c 8svx.c aiff-fmt.c aifc-fmt.c au.c avr.c cdr.c cvsd-fmt.c dvms-fmt.c dat.c hcom.c htk.c maud.c prc.c sf.c smp.c sounder.c soundtool.c sphere.c tx16w.c voc.c vox-fmt.c ima-fmt.c adpcm.c ima_rw.c wav.c wve.c xa.c nulfile.c f4-fmt.c f8-fmt.c gsrt.c. EXCLUDE: sox.c, example*.c, sox_sample_test.c, *coreaudio.c, alsa.c, ao.c, pulseaudio*, sndio.c, sunaudio.c, oss*, waveaudio*, flac.c, sndfile.c, mp3.c, opus*, vorbis*, wavpack.c, amr*.c, spectrogram.c (needs PNG), win32-*. deps (in-tree, built-in, no external libs): libgsm/*.c (for gsm format) + lpc10/*.c (for lpc10 format) \u2014 both plain-C amalgams already vendored in the tarball; add their .c globs as :compile_only too, with -Ilibgsm -Ilpc10 and define EXTERNAL_GSM/EXTERNAL_LPC10 UNSET. config: hand-write src/soxconfig.h (all #undef except HAVE_STDINT_H/STRING_H/STRINGS_H/UNISTD_H/FCNTL_H/INTTYPES_H/SYS_TYPES_H/SYS_STAT_H/VSNPRINTF/STRCASECMP/STRDUP/STDC_HEADERS=1 and PACKAGE_VERSION=\"14.4.2\"); leave HAVE_LIBLTDL/HAVE_POPEN/all codec HAVE_* undefined so only built-in formats/effects register. sox.h ships pre-generated (version 14.4.2 baked, SOX_LIB_VERSION_CODE present) \u2014 do not regenerate. cflags: -I src -I src/libgsm -I src/lpc10 -DNDEBUG -DHAVE_CONFIG_H -Wno-incompatible-function-pointer-types -Wno-format -fno-strict-aliasing. extra_sources_main=none (library target; expose lsx/sox_* entrypoints, drive via a tiny wasm shim calling sox_init/sox_open_read/sox_open_write/effects chain).",
   "smoke": "curl -fsIL the 14.4.2 tarball -> HTTP 200, 1134299 bytes (verified). Extracted; libsox source list is an EXPLICIT literal enumeration in src/Makefile.am (no glob/codegen needed). Wrote a hand-made src/soxconfig.h (all-#undef template, only POSIX HAVE_*_H + STDC set) and ran clang -fsyntax-only on representative core sources targeting host clang: wav.c, effects.c, formats.c, reverb.c all parse CLEAN (warnings only). au.c throws one incompatible-function-pointer-types diagnostic from the uint64_t-vs-long seek typedef \u2014 cosmetic, cleared by -Wno-incompatible-function-pointer-types (SoX ships these suppressed). No configure run, no flex/bison/m4/autoheader needed; sox.h + soxconfig.h.in confirm config is pure preprocessor substitution. No unconditional fork/exec/popen/system anywhere in libsox (grep clean); all process/dlopen paths gated behind HAVE_LIBLTDL/HAVE_POPEN which stay undefined.",
   "blocker": "None structural. Two minor, lane-handled items: (1) the sox CLI driver (sox.c) is NOT buildable (termios/glob/signal/realtime-audio) \u2014 build the LIBRARY (libsox) + a thin wasm shim instead, which is the right artifact anyway; (2) the LP64-vs-ILP32 seek function-pointer typedef mismatch needs -Wno-incompatible-function-pointer-types. Neither needs per-tool host work.",
-  "confidence": "high"
- },
- {
-  "name": "@marko/compiler",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/@marko/compiler/-/compiler-5.39.63.tgz",
-  "build_opts": "JS bundle on QuickJS via npm-resolve+bundle. Entry: @marko/compiler (dist/index.js). Full pure-JS import graph; resolver follows actual require() calls (not just package.json deps) so it pulls @babel/core@7.x + @babel/parser/generator/traverse/types + htmljs-parser, he, jsesc, kleur, raptor-util/regexp, complain, resolve-from, self-closing-tags, source-map-support. All verified pure JS: gypfile=null, no install scripts, no node-gyp, no native addons on any node in the graph. API: compiler.compileSync(src, filename, config) -> {code}. No emscripten, no native binary.",
-  "smoke": "const {compileSync}=require('@marko/compiler'); const out=compileSync('<div>${input.name}</div>','test.marko',{output:'source'}); expect typeof out.code==='string' && out.code.length>0",
-  "blocker": "None fundamental. Risk is QuickJS fidelity for a Babel-scale bundle (large graph; @babel/core uses some dynamic plugin resolution + does fs reads for browserslist/config that must be stubbed/disabled via output:'source' + explicit babelConfig to avoid filesystem lookups). Not a host-per-tool task \u2014 handled by the generic JS-bundle lane's shims, same as other Babel-family bundles.",
-  "confidence": "medium"
- },
- {
-  "name": "@enhance/ssr",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/@enhance/ssr",
-  "build_opts": "JS bundle lane (esbuild --bundle --format=esm/iife --platform=browser) on QuickJS. entry: index.mjs. npm deps: @enhance/ssr@4.0.3, @begin/parse5@0.0.4 (bundles parse5@7, --no-builtins), nanoid@^4 (resolve random-browser.js via browser export condition to avoid node:crypto). No node fs/net needed for the render core. QuickJS crypto.getRandomValues shim covers nanoid; or pin esbuild conditions=browser.",
-  "smoke": "import enhance from bundle; render an HTML string containing a registered custom element template with slots; assert expanded/composed HTML output (slot fill + attribute pass-through) matches expected \u2014 pure string-in/string-out, no DOM, no network.",
-  "blocker": "none \u2014 pure-JS ESM; only nanoid touches randomness (resolved via browser crypto.getRandomValues shim / esbuild browser condition). parse5 explicitly opts out of node builtins.",
-  "confidence": "high"
- },
- {
-  "name": "porffor",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://registry.npmjs.org/porffor/-/porffor-0.61.13.tgz",
-  "build_opts": "lane=D (JS-on-QuickJS bundle, NOT wasm32-wasi). entry=compiler/index.js (the compile API; do NOT use runtime/index.js \u2014 that's the Node CLI/REPL). pure-ESM, type=module. runtime deps: acorn (https://registry.npmjs.org/acorn/-/, pure JS, dist/acorn.mjs, zero deps, no gyp/install). node-repl-polyfill is REPL-only \u2014 exclude. Bundle: porffor compiler/*.js + builtins_precompiled.js (1.9M, SHIPPED in tarball, the precompiled stdlib \u2014 no codegen needed) + acorn into one qjs script. Shims: (1) parse.js L20 does import((globalThis.document?'https://esm.sh/':'')+parser) \u2014 no document in qjs \u2192 resolves bare 'acorn'; pre-bundle acorn so the dynamic import hits the bundled module. (2) fs/child_process/execSync are conditionally imported behind `typeof process?.version !== 'undefined'` and used ONLY for debug/disassemble/2c output \u2014 shim process={version:undefined, stdout:{write:print}} so the fs/execSync branches stay undefined and the pure compile path runs. API: default(source) -> {wasm: Uint8Array, exports, ...}; emit wasm bytes (assemble.js, pure-JS LEB128 via encoding.js, no Buffer/fs).",
-  "smoke": "In qjs: load bundle, call porffor('export default () => 40 + 2') and assert the returned object has a non-empty wasm Uint8Array starting with the WASM magic (0x00 0x61 0x73 0x6d); optionally instantiate that wasm with our wasmtime/wasm host and call the export to get 42.",
-  "blocker": "none for the compile-to-wasm-bytes path. Caveats (not blockers): set process.version=undefined so the node fs/child_process branches stay dormant \u2014 the -c (C output via 2c.js) and disassemble/debug paths assume Node and are out of scope; only the wasm-bytes path is in-scope. acorn dynamic import must be pre-resolved in the bundle.",
   "confidence": "high"
  },
  {
