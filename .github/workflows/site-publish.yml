@@ -15,12 +15,14 @@ jobs:
   refresh-origin:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Refresh origin from main
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SITE_TOKEN }}
         run: |
-          flyctl ssh console -a wb-site -C "sh -c 'set -e; rm -rf /tmp/r; git clone -q --depth 1 https://github.com/workbooks-sh/workbooks.sh /tmp/r; rm -rf /data/build/public/wb-site; mkdir -p /data/build/public/wb-site; cp -r /tmp/r/web/. /data/build/public/wb-site/; rm -rf /data/build/public/wb-site/brand /data/build/public/wb-site/og/build.py /data/build/public/wb-site/publish.sh /data/build/public/wb-site/deploy /data/build/public/wb-site/_worker.js; cp /tmp/r/desktop/scripts/install.sh /data/build/public/wb-site/install.sh; echo origin-refreshed'"
+          B64=$(base64 -w0 web/deploy/origin-refresh.sh)
+          flyctl ssh console -a wb-site -C "sh -c 'echo $B64 | base64 -d | sh'"
       - name: Verify
         run: |
           sleep 3
