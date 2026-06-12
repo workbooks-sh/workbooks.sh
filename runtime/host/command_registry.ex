@@ -384,6 +384,42 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  # Fetch + sha-verify + extract a tarball, returning its top dir — for :deps (multi-tarball C builds
+  # like libpng+zlib, where the main source needs a second library's sources compiled alongside it).
+  defp fetch_and_unpack(url, sha) do
+    tmp = Path.join(System.tmp_dir!(), "wbdep-#{:erlang.unique_integer([:positive])}.tgz")
+
+    case https_get_to_file(url, tmp) do
+      :ok ->
+        got = :crypto.hash(:sha256, File.read!(tmp)) |> Base.encode16(case: :lower)
+
+        if is_binary(sha) and sha != "" and got != String.downcase(String.trim(sha)) do
+          File.rm(tmp)
+          {:error, {:dep_sha_mismatch, [expected: sha, got: got]}}
+        else
+          unpack = Path.join(System.tmp_dir!(), "wbdep-#{got}")
+          File.rm_rf!(unpack)
+          File.mkdir_p!(unpack)
+          {_o, tc} = System.cmd("tar", ["xf", tmp, "-C", unpack], stderr_to_stdout: true)
+          File.rm(tmp)
+
+          cond do
+            tc != 0 ->
+              {:error, :dep_untar_failed}
+
+            true ->
+              case File.ls(unpack) do
+                {:ok, [d]} -> {:ok, Path.join(unpack, d)}
+                _ -> {:ok, unpack}
+              end
+          end
+        end
+
+      e ->
+        e
+    end
+  end
+
   defp do_build_and_register_c_source(name, url, sha256, opts) do
     tmp = Path.join(System.tmp_dir!(), "wbcsrc-#{:erlang.unique_integer([:positive])}.tgz")
 
@@ -438,18 +474,46 @@ defmodule Workbooks.CommandRegistry do
                 end
               end
 
-              # :extra_sources — inject custom {filename, content} files (e.g. a minimal CLI main for a
-              # library whose bundled CLI drags in too many extras, or a tool needing a small harness).
-              for {fname, content} <- opts[:extra_sources] || [] do
-                dst = Path.join(builddir, fname)
-                File.mkdir_p!(Path.dirname(dst))
-                File.write!(dst, content)
-              end
+              # :deps — fetch + extract additional library tarballs into builddir/<subdir> so the whole
+              # multi-library build compiles as one unit (wb-fali; e.g. libpng needs zlib's sources).
+              # Each dep: %{url:, sha:, subdir:, globs:}. build_c_dir then globs them in as ordinary sources.
+              deps_ok =
+                Enum.reduce_while(opts[:deps] || [], :ok, fn dep, _acc ->
+                  case fetch_and_unpack(dep[:url], dep[:sha]) do
+                    {:ok, dtop} ->
+                      for g <- dep[:globs] || ["*.{c,h}"], f <- Path.wildcard(Path.join(dtop, g)), File.regular?(f), Path.basename(f) not in exclude do
+                        dst = Path.join([builddir, dep[:subdir] || "", Path.relative_to(f, dtop)])
+                        File.mkdir_p!(Path.dirname(dst))
+                        File.cp!(f, dst)
+                      end
 
-              res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [], opts[:include_only] || [], opts[:compile_only] || [])
-              File.rm_rf!(unpack)
-              File.rm_rf!(builddir)
-              res
+                      {:cont, :ok}
+
+                    {:error, r} ->
+                      {:halt, {:error, {:dep_failed, dep[:url], r}}}
+                  end
+                end)
+
+              case deps_ok do
+                {:error, _} = e ->
+                  File.rm_rf!(unpack)
+                  File.rm_rf!(builddir)
+                  e
+
+                :ok ->
+                  # :extra_sources — inject custom {filename, content} files (e.g. a minimal CLI main for a
+                  # library whose bundled CLI drags in too many extras, or a tool needing a small harness).
+                  for {fname, content} <- opts[:extra_sources] || [] do
+                    dst = Path.join(builddir, fname)
+                    File.mkdir_p!(Path.dirname(dst))
+                    File.write!(dst, content)
+                  end
+
+                  res = register_built_dir(name, builddir, "c", opts[:mode] || :argv, opts[:cflags] || [], opts[:include_only] || [], opts[:compile_only] || [])
+                  File.rm_rf!(unpack)
+                  File.rm_rf!(builddir)
+                  res
+              end
             end
         end
 

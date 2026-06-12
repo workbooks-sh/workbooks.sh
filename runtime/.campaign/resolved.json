@@ -981,6 +981,127 @@
 "lane": "none",
 "blocker": "No plain wasm32-wasi BEAM exists. (A) No prebuilt: mainline Erlang/OTP has no wasm32-wasi port; AtomVM's only WASM target is Emscripten (browser/Node.js js-pair), which i",
 "extent": "off-the-table (verified)"
+},
+"wazero": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Go source only \u2014 no prebuilt wasm32-wasi artifact published (releases ship Go source + native CLI binaries). Building it needs a Go->wasm (GOOS=wasip1) toolchain, which i",
+"extent": "off-the-table (verified)"
+},
+"R (R interpreter)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "R core depends on Fortran (BLAS/LAPACK + base Fortran routines); no Fortran compiler exists in the sandbox (only C/C++/Rust). The only wasm build (webR) is Emscripten/JS-",
+"extent": "off-the-table (verified)"
+},
+"RocksDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "RocksDB is architecturally a multi-threaded background-compaction LSM engine: flush runs on a HIGH thread pool and compaction on a LOW thread pool (max_background_jobs), ",
+"extent": "off-the-table (verified)"
+},
+"LMDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "LMDB's whole design = mmap() of a single data file (data IS the memory map; MDB_WRITEMAP writes through it) + file locks on a lockfile for MVCC reader/writer coordination",
+"extent": "off-the-table (verified)"
+},
+"etcd": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (gRPC server + multi-node Raft consensus over real TCP) is the entire value; additionally no Go->wasm32-wasi lane exists (only yaegi interpreter, insuf",
+"extent": "off-the-table (verified)"
+},
+"InfluxDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose: InfluxDB is a server daemon whose reason to exist is listening on a TCP socket (HTTP + Arrow Flight/gRPC). Compounded by native-threads (tokio reactor",
+"extent": "off-the-table (verified)"
+},
+"Dgraph": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: Dgraph's entire reason for existing is the distributed Alpha/Zero cluster that exposes gRPC + GraphQL/DQL servers over the network. Alpha uses Raft pe",
+"extent": "off-the-table (verified)"
+},
+"Firebird": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Embedded engine relies on POSIX fcntl file locking and shared-memory IPC, unavailable in wasm32-wasi; plus ICU data dep and configure+GPRE codegen build. SQLite already L",
+"extent": "off-the-table (verified)"
+},
+"KeyDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native pthreads are the product's whole point (wasip1 has no threads); compounded by network-server-as-purpose (BSD sockets/epoll) and fork() for persistence. Threads+for",
+"extent": "off-the-table (verified)"
+},
+"MonetDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hard-depends on capabilities wasip1 lacks: fork-exec (monetdbd daemon + mserver5 process model), mmap MAP_SHARED writeback (column storage / BAT memory mapping), native p",
+"extent": "off-the-table (verified)"
+},
+"Qdrant": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "edition=2024 + MSRV 1.94 + proc-macros + 15-crate workspace defeats mrustc ~1.74 (lane C, the only candidate). Core also requires native threads (rayon/tokio), mmap, SIMD",
+"extent": "off-the-table (verified)"
+},
+"Chroma": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native-threads-as-purpose (tokio multithreaded runtime + morsel-driven parallel engine, the explicit point of the Rust rewrite) and network/object-store-as-purpose (gRPC/",
+"extent": "off-the-table (verified)"
+},
+"LanceDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "tokio async runtime and object_store networking and native SIMD kernels on a proc-macro heavy Rust workspace; mrustc cannot build it, no prebuilt wasm exists, upstream no",
+"extent": "off-the-table (verified)"
+},
+"Apache Iceberg": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "iceberg-rust requires proc-macros (derive_builder/typed-builder/typetag/serde_derive/serde_repr/strum) + tokio async runtime + arrow/parquet \u2014 impossible under mrustc~1.7",
+"extent": "off-the-table (verified)"
+},
+"Delta Lake": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only real implementation is delta-rs (large async Tokio rt-multi-thread + arrow/parquet + object_store + proc-macros, non-edition-2018) \u2014 uncompilable by mrustc (Lane C i",
+"extent": "off-the-table (verified)"
+},
+"curl": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose: curl exists to move bytes over TCP/TLS, and wasm32-wasi/wasmtime (wasip1) has no raw sockets. All real curl-wasm ports rely on a browser WebSocket pro",
+"extent": "off-the-table (verified)"
+},
+"wget": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose: wget's sole function is HTTP(S)/FTP fetch; wasm32-wasi/wasip1 has no sockets, so connections are impossible without host-brokered net imports (network",
+"extent": "off-the-table (verified)"
+},
+"rsync": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose (SSH/socket transport to remote rsyncd is the entire value) + fork/exec multi-process architecture (generator/sender/receiver) + select()/poll over soc",
+"extent": "off-the-table (verified)"
+},
+"gpg (GnuPG)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GnuPG is multi-process by architecture: the gpg CLI fork/execs gpg-agent, dirmngr, gpgsm and a pinentry helper, and delegates all secret-key operations to gpg-agent over ",
+"extent": "off-the-table (verified)"
+},
+"libpng": {
+"verdict": "live",
+"lane": "B",
+"recipe": "libpng 1.6.43 + zlib 1.3.1 via :deps multi-tarball lane (excl gzFile); vendored pnglibconf.h",
+"smoke": "libpng 1.6.43 zlib 1.3.1",
+"extent": "PNG image lib + zlib build in-sandbox; png cmd prints versions, ready for PNG decode/encode"
 }
 },
 "preliminary": {
@@ -1599,6 +1720,13 @@
 "verdict": "uncertain",
 "lane": "none",
 "recipe": "Helm is Go. Its core work (helm template: render Go-template charts to YAML using engine.Render / re",
+"confidence": "high",
+"verified": false
+},
+"GHC RTS (Haskell)": {
+"verdict": "live-likely",
+"lane": "none",
+"recipe": "The GHC RTS itself is not a standalone wasm artifact you fetch or build via the C/C++/Rust",
 "confidence": "high",
 "verified": false
 }

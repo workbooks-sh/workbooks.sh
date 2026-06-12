@@ -704,7 +704,36 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # libpng — built WITH zlib via the :deps multi-tarball lane (zlib's sources compiled alongside, minus its
+  # gzFile API which needs lseek). pnglibconf.h is configure-generated → vendored from scripts/*.prebuilt.
+  @libpng_config File.read!(Path.join(__DIR__, "../priv/libpng/pnglibconf.h"))
+  @png_main ~S"""
+  #include <stdio.h>
+  #include "png.h"
+  #include "zlib.h"
+  int main(void) { printf("libpng %s zlib %s\n", PNG_LIBPNG_VER_STRING, zlibVersion()); return 0; }
+  """
+
   @csource [
+    %{
+      name: "png",
+      url: "https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.43.tar.gz",
+      sha: "fecc95b46cf05e8e3fc8a414750e0ba5aad00d89e9fdf175e94ff041caf1a03a",
+      build_opts: [
+        src_globs: ["*.{c,h}"],
+        exclude: ~w(pngtest.c example.c gzlib.c gzread.c gzwrite.c gzclose.c),
+        deps: [
+          %{
+            url: "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz",
+            sha: "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+            subdir: "zlib",
+            globs: ["*.{c,h}"]
+          }
+        ],
+        cflags: ["-I/work/zlib", "-I/work"],
+        extra_sources: [{"pnglibconf.h", @libpng_config}, {"pngmain.c", @png_main}]
+      ]
+    },
     %{
       name: "lua",
       url: "https://www.lua.org/ftp/lua-5.4.7.tar.gz",
