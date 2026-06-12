@@ -177,6 +177,61 @@
 "lane": "none",
 "blocker": "The sole maintained wasm port is Emscripten-targeted and JS-host-coupled by design: cmake/port/Emscripten.cmake sets SWIPL_ARCH=wasm-emscripten with Emscripten-only -fwasm-exceptions/-sSUPPORT_LONGJMP=wasm and an Emscrip",
 "extent": "off-the-table (verified)"
+},
+"Wuffs": {
+"verdict": "deferred",
+"lane": "B",
+"blocker": "single-file amalgamation (driver #includes the .c); lane compiles every .c (no :include_only). 3.3MB, can't vendor. Reachable; needs lane :include_only (filed).",
+"extent": "pending lane support"
+},
+"LLD": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Not self-contained: wasm-ld is built from llvm-project and links a large LLVM library set plus codegen backends. Its build hard-requires LLVM's CMake configure and TableGen \u2014 a native host-side codege",
+"extent": "off-the-table (verified)"
+},
+"OCaml": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Self-hosting bootstrap: the runtime VM (ocamlrun) is portable C but is useless without OCaml-compiled stdlib + compiler bytecode, which require a full ./configure + GNU Make multi-stage bootstrap buil",
+"extent": "off-the-table (verified)"
+},
+"PGlite": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only prebuilt artifact is an Emscripten MAIN_MODULE=2 dynamic-link wasm requiring the Emscripten JS glue host (FS/PROXYFS/addFunction/callMain), emscripten_*/GOT.mem/invoke_* longjmp-trampoline import",
+"extent": "off-the-table (verified)"
+},
+"GraphQL/SQLite OPFS (wa-sqlite OPFS)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "OPFS VFS is a browser-only persistence backend (FileSystemAccess + WebLocks, implemented in JS glue) with no wasmtime/WASI equivalent; prebuilt wasm is emscripten/JS-pair (not plain wasm32-wasi) and t",
+"extent": "off-the-table (verified)"
+},
+"httpie": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "httpie is network-as-purpose: its only function is HTTP/TLS egress via requests/urllib3 sockets. Standalone wasm32-wasi under wasmtime has no socket/TLS support, and both upstream-suggested routes (Py",
+"extent": "off-the-table (verified)"
+},
+"Candle": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Candle's only wasm form is wasm32-unknown-unknown + wasm-bindgen browser/JS pairs (needs JS host + web-sys: Window/Request/Performance), NOT wasm32-wasi. No prebuilt wasi .wasm is shipped. Building fr",
+"extent": "off-the-table (verified)"
+},
+"tract": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "mrustc lane infeasible: edition 2024 + proc-macro deps (syn/quote/prost protobuf codegen/derive-new/pastey) + inventory link-time registration, across a large multi-crate workspace. mrustc ceiling is ",
+"extent": "off-the-table (verified)"
+},
+"Zend Engine (PHP)": {
+"verdict": "live",
+"lane": "A",
+"recipe": "already live as php (php-cgi WLR)",
+"smoke": "php -f => 42",
+"extent": "= php command (Zend VM)"
 }
 },
 "preliminary": {
@@ -208,14 +263,6 @@
 "smoke": "After a successful build to sed.wasm: printf 'hello world\\n' | wasmtime sed.wasm 's/world/wasm/'  => expected stdout: \"h",
 "blocker": "No verifiable clean lane: (A) no plain wasm32-wasi sed binary exists anywhere I could confirm \u2014 uutils coreutils.wasm has no sed applet, wasmer registry empty, no busybox-wasi release; (B) GNU sed 4.9",
 "confidence": "medium",
-"verified": false
-},
-"Wuffs": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://raw.githubusercontent.com/google/wuffs/v0.4.0-alpha.9/release/c/wuffs-v0",
-"recipe": "Wuffs-the-library ships as a PRE-TRANSPILED single-file C header library (stb-style) at release/c/wuffs-vMAJOR.MINOR.c \u2014 NO transpiler, codegen, configure, or m",
-"confidence": "high",
 "verified": false
 },
 "J": {
@@ -269,24 +316,96 @@
 "flatc": {
 "verdict": "live-likely",
 "lane": "B",
-"source_url": "https://github.com/google/flatbuffers/tree/v25.12.19-2026-02-06-03fffb2/src",
-"recipe": "flatc is self-contained C++11, fixed explicit source list (NO codegen, NO autotools, NO generated headers missing \u2014 reflection_generated.h ships checked-in), pu",
+"source_url": "https://github.com/google/flatbuffers",
+"recipe": "Lane B (self-contained C++17, our clang.wasm C++ lane to wasm32-wasi). Clone google/flatbuffers (tag v25.12.19). Compile the flatc source se",
 "confidence": "high",
 "verified": false
 },
 "JerryScript": {
 "verdict": "live-likely",
 "lane": "B",
-"source_url": "https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.",
-"recipe": "Lane B (self-contained C, CMake cross-build with wasi-sdk). No prebuilt plain-wasi .wasm exists (vmware-labs WLR has none; project releases are source zips only",
+"source_url": "https://github.com/jerryscript-project/jerryscript",
+"recipe": "Lane B portable C with CMake build core math port and desktop entry with clang for wasm wasi link to one wasm hand written parser no bison t",
 "confidence": "high",
 "verified": false
 },
-"Zend Engine (PHP)": {
+"libSQL / Turso": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://github.com/tursodatabase/libsql",
+"recipe": "Lane B (self-contained C), but gated on a codegen step. libSQL's SQLite-fork C lives in libsql-sqlite3/ (language=C, JIT-free, portable, ide",
+"confidence": "high",
+"verified": false
+},
+"Cloudflare D1 (SQLite)": {
 "verdict": "live-likely",
-"lane": "A",
-"source_url": "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/p",
-"recipe": "Prebuilt PLAIN wasm32-wasi PHP CGI binary from VMware Labs WebAssembly Language Runtimes. Two confirmed-live variants at tag php/8.2.6+20230714-11be424: php-cgi",
+"lane": "B",
+"source_url": "https://sqlite.org/2024/sqlite-amalgamation-3470200.zip",
+"recipe": "D1 the managed Workers service is closed/network-as-purpose (impossible to replicate as-is), but its substance is SQLite, which has a first-",
+"confidence": "high",
+"verified": false
+},
+"grep": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://ftp.gnu.org/gnu/grep/grep-3.11.tar.gz",
+"recipe": "Lane B (self-contained C), but with a gnulib caveat. GNU grep 3.11 tarball (verified HTTP 200, 2.82 MB) ships a pre-generated `configure` an",
+"confidence": "medium",
+"verified": false
+},
+"awk (gawk)": {
+"verdict": "uncertain",
+"lane": "none",
+"source_url": "https://ftp.gnu.org/gnu/gawk/gawk-5.4.0.tar.xz",
+"recipe": "No clean lane for GNU gawk specifically. Lane A: no prebuilt plain wasm32-wasi gawk .wasm exists \u2014 wasm-forge/gawk releases, gawk-wasm repos",
+"confidence": "high",
+"verified": false
+},
+"busybox": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://busybox.net/downloads/busybox-1.36.1.tar.bz2",
+"recipe": "Lane B (C), but gated. Source tarball live (curl -fsIL 200, 2.5MB) and self-contained C (no external deps for the NOFORK subset). BLOCKER: b",
+"confidence": "medium",
+"verified": false
+},
+"findutils": {
+"verdict": "uncertain",
+"lane": "none",
+"source_url": "https://github.com/uutils/findutils",
+"recipe": "No viable clean lane. (A) No verified plain wasm32-wasi module: wapm/wasmer entries (wasmer.io/syrusakbary/findutils) redirect and are wasme",
+"confidence": "medium",
+"verified": false
+},
+"7-Zip (7z/p7zip)": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/ip7z/7zip",
+"recipe": "Build the standalone console binary 7zz from the official ip7z/7zip source under CPP/7zip/Bundles/Alone2/ using wasi-sdk clang instead of gc",
+"confidence": "medium",
+"verified": false
+},
+"xmlstarlet": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://downloads.sourceforge.net/project/xmlstar/xmlstarlet/1.6.1/xmlstarlet-1.",
+"recipe": "Lane B (self-contained C over libxml2/libxslt). 1) Build deps to wasm32-wasi first: libxml2 (known wasm builds), then libxslt + libexslt (pu",
+"confidence": "medium",
+"verified": false
+},
+"csvkit": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://pypi.org/pypi/csvkit/2.2.0/json",
+"recipe": "Lane D (pure-Python pip pkg, Pyodide/CPython-on-wasm host). VERIFIED via PyPI JSON API: csvkit-2.2.0 ships csvkit-2.2.0-py3-none-any.whl. En",
+"confidence": "high",
+"verified": false
+},
+"pdftk": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://registry.npmjs.org/pdf-lib/latest",
+"recipe": "Do NOT compile pdftk-java (needs JVM; original C++/GCJ native/JIT). Cover capability with pure-JS pdf-lib on QuickJS/esbuild JS lane. Bundle",
 "confidence": "high",
 "verified": false
 }
