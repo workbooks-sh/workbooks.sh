@@ -41,7 +41,7 @@ defmodule Workbooks.JsDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdin: si, stdout: so},
-               imports: %{"env" => env(profile, vfs, Keyword.get(opts, :tenant, "default"))}
+               imports: %{"env" => env(profile, vfs, Workbooks.Tenant.resolve(opts))}
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)

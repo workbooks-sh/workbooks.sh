@@ -990,8 +990,16 @@ defmodule Workbooks.PackageManager do
       # net-using command needs opts[:profile] = :network.
       dock_artifact?(wasm_path) ->
         # JsDock.run returns {:ok, stdout} | {:error, _}; unwrap to match the CLI run shape
-        # (bare stdout binary on success).
-        case Workbooks.JsDock.run(wasm_path, input, profile: Keyword.get(opts, :profile, :minimal)) do
+        # (bare stdout binary on success). Thread an explicit :tenant so the dock partitions KV/secrets by the
+        # caller's real identity; a missing tenant becomes a unique EPHEMERAL namespace (not the old "default").
+        js_opts =
+          [profile: Keyword.get(opts, :profile, :minimal)] ++
+            case Keyword.get(opts, :tenant) do
+              t when is_binary(t) and t != "" -> [tenant: t]
+              _ -> []
+            end
+
+        case Workbooks.JsDock.run(wasm_path, input, js_opts) do
           {:ok, out} -> if Keyword.get(opts, :with_status, false), do: {out, 0}, else: out
           {:error, _} = e -> e
         end

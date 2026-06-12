@@ -1365,3 +1365,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (host:port / host-only / *.suffix / nil). FOLLOW-UP (separate): thread a policy-derived granted scope from
   the docks (rust_dock/js_dock call the brokers with principal: only today) so the scope is ENFORCED end-to-
   end, not just available — pairs with the wb-an2v tenant-threading + the default-profile (compute) change.
+- 2026-06-12 (iter 100): **FIXED wb-an2v (HIGH tenant-isolation collapse) — CLOSED.** The docks defaulted a
+  missing :tenant to the SHARED CONSTANT "default", so every un-tenanted guest shared ONE KV partition +
+  secret namespace (cross-tenant read/overwrite) — and the whole command lane (CommandRegistry → PackageManager
+  → JsDock) carried no tenant, making this the PRODUCTION path. FIX: new Workbooks.Tenant.resolve/1 — explicit
+  :tenant used verbatim; a MISSING tenant falls back to a UNIQUE EPHEMERAL id ("eph-"<>strong_rand) instead of
+  a shared constant, so two un-tenanted runs get DISJOINT namespaces (fail-ISOLATED: can't see each other's
+  data, can't reach a real tenant's secrets). Wired into js_dock + rust_dock (replacing the "default"
+  fallback) and threaded an explicit :tenant through PackageManager.run -> JsDock.run so a caller's real
+  identity partitions KV/secrets end-to-end. 20 tests green incl wb-an2v isolation proof: two un-tenanted
+  principals CANNOT read each other's KV (the old "default" leaked it). The audit's most-severe open finding
+  is closed.

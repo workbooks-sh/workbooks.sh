@@ -26,7 +26,7 @@ defmodule Workbooks.RustDock do
     profile = Keyword.get(opts, :profile, :minimal)
     caps = Policy.caps(profile)
     vfs = Keyword.get(opts, :vfs)
-    tenant = Keyword.get(opts, :tenant, "default")
+    tenant = Workbooks.Tenant.resolve(opts)
 
     env =
       ambient()
