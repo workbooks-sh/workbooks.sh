@@ -16,7 +16,8 @@ FROM ${COMPILERS_REF} AS compilers
 # --- build: the canonical wbx CLI (cli/SPEC.md — agents in the container use
 # the SAME CLI users do; the escript is wb-rt engine plumbing, not shipped) ---
 FROM rust:1-slim-bookworm AS wbxcli
-WORKDIR /src
+WORKDIR /repo/cli
+COPY runtime/kernel /repo/runtime/kernel
 COPY cli/Cargo.toml cli/Cargo.lock ./
 COPY cli/src ./src
 RUN cargo build --release && strip target/release/wbx
@@ -59,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG WASMTIME_VERSION=v45.0.1
 RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
-COPY --from=wbxcli /src/target/release/wbx /usr/local/bin/wbx
+COPY --from=wbxcli /repo/cli/target/release/wbx /usr/local/bin/wbx
 
 # Bake the default semantic embedding model (Model2Vec/potion, ~30 MB) so the
 # runtime never downloads it. Checked before the WB_DATA cache.
