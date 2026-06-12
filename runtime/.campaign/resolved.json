@@ -867,6 +867,120 @@
 "recipe": "oniguruma 6.9.10 src/*.c + wasm32 config.h + unicode *_data.c :include_only + grep main",
 "smoke": "'^b' => banana,blueberry",
 "extent": "full Oniguruma regex (Ruby/PHP's engine); onig cmd = grep"
+},
+"uv": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (PyPI HTTPS fetch is uv's reason to exist) + fork-exec (spawns python/build backends) + native-thread tokio reactor. Independently, the mrustc lane can",
+"extent": "off-the-table (verified)"
+},
+"pipx": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec / subprocess + network-as-purpose: pipx's core is creating isolated virtualenvs, pip-installing from PyPI (network), and spawning installed CLI binaries as subp",
+"extent": "off-the-table (verified)"
+},
+"PEAR": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "PEAR's purpose is network-as-purpose package fetching plus native PECL C-extension build (phpize/native toolchain) and dynamic .so loading \u2014 fork-exec, native build, and ",
+"extent": "off-the-table (verified)"
+},
+"OPAM": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core purpose is fork-exec (spawns native OCaml compiler, C compiler, configure/make/dune) plus network-as-purpose (fetches package source tarballs). Both are sandbox-forb",
+"extent": "off-the-table (verified)"
+},
+"Dune": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec is the product. Dune's value is spawning ocamlopt/ocamlc/cc subprocesses and orchestrating a parallel build graph (process spawning + fs-watch). wasm32-wasi (wa",
+"extent": "off-the-table (verified)"
+},
+"Nimble": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose + fork-exec. Nimble's core function is git-clone/HTTPS package fetches (network is the whole point, not incidental) AND it invokes the external `nim` c",
+"extent": "off-the-table (verified)"
+},
+"Conan": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec of native compilers and network to remote Conan servers; both core, neither available under wasmtime.",
+"extent": "off-the-table (verified)"
+},
+"Hunter": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hunter has no standalone binary; its only execution path is CMake (no production wasm32-wasi build) whose purpose here is fork-exec of native C/C++ compilers plus network",
+"extent": "off-the-table (verified)"
+},
+"CPAN": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (CPAN exists to fetch modules from remote mirrors over HTTP/FTP) AND fork-exec (install flow spawns make + a native C compiler to build XS modules, plu",
+"extent": "off-the-table (verified)"
+},
+"dub": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core purpose is fork-exec of a native D compiler (dmd/ldc/gdc); also no D->wasm frontend exists in the toolchain to even build dub itself (LLVM present but no LDC/D). Bot",
+"extent": "off-the-table (verified)"
+},
+"shards": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two hard disqualifiers: (1) network-as-purpose \u2014 shards exists to fetch dependency source from remote git/GitHub over HTTPS/SSH; without network it does nothing useful. (",
+"extent": "off-the-table (verified)"
+},
+"Spago": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec of native `purs` compiler binary (separate GHC/Haskell native exe, not wasm) is Spago's core purpose; also requires git + network to fetch/build deps. Both fork",
+"extent": "off-the-table (verified)"
+},
+"GCC": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GCC is a multi-process compiler driver: it fork/execs cc1/cc1plus, as, and collect2/ld as separate subprocesses. wasm32-wasi under wasmtime has no fork/exec/posix_spawn, ",
+"extent": "off-the-table (verified)"
+},
+"TinyGo": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: TinyGo is an LLVM-based compiler that orchestrates clang/lld subprocesses (cgo + linking); the compiler is distributed only as OS-native binaries / Docker, nev",
+"extent": "off-the-table (verified)"
+},
+"gc (Go toolchain)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "The gc toolchain is a multi-process driver: `go build` orchestrates separate compile/asm/link (and cgo C-linker) subprocesses via os/exec. Under GOOS=wasip1 there is no f",
+"extent": "off-the-table (verified)"
+},
+"Emscripten": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Emscripten = Python emcc driver doing fork-exec orchestration (clang+wasm-ld+Node/Binaryen) emitting JS-glue WebAssembly for a JS/browser host \u2014 fork-exec + JS-host-targe",
+"extent": "off-the-table (verified)"
+},
+"Nuitka": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Nuitka's purpose is to fork-exec a native C compiler+linker to emit a native executable (forbidden: native fork-exec + native binary output). It also requires a full CPyt",
+"extent": "off-the-table (verified)"
+},
+"CMake": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "CMake's purpose IS fork-exec orchestration (try_compile/try_run/execute_process spawn the compiler, ninja/make, and probe binaries). WASI/wasmtime has no process spawn, s",
+"extent": "off-the-table (verified)"
+},
+"BEAM (Erlang/OTP)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32-wasi BEAM exists. (A) No prebuilt: mainline Erlang/OTP has no wasm32-wasi port; AtomVM's only WASM target is Emscripten (browser/Node.js js-pair), which i",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1479,6 +1593,13 @@
 "lane": "B",
 "recipe": "C++ engine, no JIT (interpreter), no threads (-DLLVM_ENABLE_THREADS=0), no network/fork-exec \u2014 runs ",
 "confidence": "medium",
+"verified": false
+},
+"Helm": {
+"verdict": "uncertain",
+"lane": "none",
+"recipe": "Helm is Go. Its core work (helm template: render Go-template charts to YAML using engine.Render / re",
+"confidence": "high",
 "verified": false
 }
 }
