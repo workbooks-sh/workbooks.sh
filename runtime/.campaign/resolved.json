@@ -316,10 +316,10 @@
 "flatc": {
 "verdict": "live-likely",
 "lane": "B",
-"source_url": "https://github.com/google/flatbuffers",
-"recipe": "Lane B (self-contained C++17, our clang.wasm C++ lane to wasm32-wasi). Clone google/flatbuffers (tag v25.12.19). Compile the flatc source se",
+"recipe": "flatbuffers src/*.cpp via C++ lane; builds but <cstring> libc++ search-path (wb-3b3u) blocks; once fixed: exclude flathash.cpp, -I/work/include",
 "confidence": "high",
-"verified": false
+"verified": false,
+"note": "C++ lane compiles it; blocked only on wb-3b3u libc++ <cstring>"
 },
 "JerryScript": {
 "verdict": "live-likely",
