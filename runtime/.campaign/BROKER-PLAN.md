@@ -450,3 +450,23 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   INBOUND serving.
   NEXT (iter 19): wire a real HTTP listener route -> ServeBroker.dispatch for an HTTP-level e2e (host-as-
   listener -> guest handler over actual HTTP), marshaling method/path/headers/body; then consolidate.
+- 2026-06-12 (iter 19): **STONE 5 FULLY e2e-PROVEN OVER REAL HTTP — host-as-listener -> guest handler.**
+  Added ServeBroker.encode_http_request (marshal method/path/body -> request bytes) + Workbooks.ServeBroker.
+  Plug (a Bandit/Plug adapter: HTTP request -> marshal -> ServeBroker.dispatch -> the guest's response bytes
+  become the HTTP body). HOST-AS-LISTENER e2e: a REAL Bandit 1.11 listener bound to 127.0.0.1:<port>; a real
+  HTTP GET /hello -> the Plug -> dispatch -> the sandboxed guest handler -> "echo:GET /hello\n\n" -> HTTP 200.
+  The host owns the socket (privileged op); the guest never touches it — it only sees request bytes and
+  returns response bytes. 2 tests green (serve-flip core + real-HTTP). The LAST networking-keystone item
+  (4, inbound server-flip / app-host) is DONE + proven.
+  ===== CAMPAIGN MILESTONE: FIVE brokered capabilities, the full host-brokered-capabilities platform =====
+    1. NETWORKING egress — deny-side comprehensively secured + red-team proven (SSRF floor both paths,
+       obfuscation, redirect, allow-list, audit); standard-tool reachability env/refactor-gated (wb-0beq).
+    2. EXEC (Stone 2) — guest e2e-proven (broker exec to 32 sandboxed cmds; no injection).
+    3. DURABLE STORAGE (Stone 3) — guest e2e-proven (persistent tenant-isolated KV, both docks).
+    4. DATA-PARALLELISM (Stone 4) — guest e2e-proven (fan a cmd over N inputs concurrently, both docks).
+    5. INBOUND SERVE (Stone 5) — guest e2e-proven OVER REAL HTTP (host listens, guest handles, sandboxed).
+  All five follow the one pattern: host does the privileged op, guest stays sandboxed, default-deny + quotas
+  + audit + adversarial tests + offline e2e. The frontier moved from one sandbox capability to a coherent
+  brokered platform spanning egress, process-spawning, persistent state, concurrency, AND inbound serving.
+  NEXT (iter 20): richer HTTP marshaling (forward headers + guest-set status/headers) for the serve-flip;
+  and/or consolidate (a capability/ABI reference doc). Networking's 323 reclamation stays gated on wb-0beq.

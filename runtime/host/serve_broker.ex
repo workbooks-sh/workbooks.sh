@@ -41,6 +41,14 @@ defmodule Workbooks.ServeBroker do
     }
   end
 
+  @doc """
+  Marshal an HTTP request into the bytes the guest handler sees: a request line + a blank line + body
+  (HTTP-ish; v1 omits header forwarding). Binary-safe in the body.
+  """
+  def encode_http_request(method, path, body) when is_binary(body) do
+    method <> " " <> path <> "\n\n" <> body
+  end
+
   @doc "Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}."
   def dispatch(serve_id, pid, request, timeout \\ 10_000) when is_binary(request) do
     put({serve_id, :req}, request)
@@ -76,6 +84,33 @@ defmodule Workbooks.ServeBroker do
     case :ets.lookup(table(), k) do
       [{_, v}] -> v
       _ -> nil
+    end
+  end
+end
+
+defmodule Workbooks.ServeBroker.Plug do
+  @moduledoc """
+  Bandit/Plug adapter for the inbound serve-flip: the HOST owns the listening socket; each HTTP request is
+  marshaled to bytes, handed to the GUEST's `handle`, and the guest's response bytes become the HTTP body.
+  The guest never touches the socket. opts: `:serve_id`, `:pid` (a persistent serving guest instance).
+  """
+  @behaviour Plug
+  import Plug.Conn
+  alias Workbooks.ServeBroker
+
+  @impl true
+  def init(opts), do: opts
+
+  @impl true
+  def call(conn, opts) do
+    serve_id = Keyword.fetch!(opts, :serve_id)
+    pid = Keyword.fetch!(opts, :pid)
+    {:ok, body, conn} = read_body(conn)
+    req = ServeBroker.encode_http_request(conn.method, conn.request_path, body)
+
+    case ServeBroker.dispatch(serve_id, pid, req) do
+      {:ok, resp} -> send_resp(conn, 200, resp)
+      {:error, _} -> send_resp(conn, 502, "guest handler error")
     end
   end
 end
