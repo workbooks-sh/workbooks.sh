@@ -12,41 +12,58 @@ defmodule Workbooks.NetGuard do
   This is the FLOOR (SSRF). A per-call/per-instance allow-list can layer on top (caller passes it).
   """
 
+  require Logger
+
   @doc """
   SSRF-guarded HTTP GET — the single choke point for the host-mediated egress path. Denies internal
-  destinations BEFORE any socket is opened. Returns `{:ok, body}` | `{:error, :denied | :request_failed}`.
+  destinations (SSRF floor) and, if an `:allow` list is given, non-listed hosts — BEFORE any socket
+  opens. Every blocked attempt is AUDIT-logged. Returns `{:ok, body}` | `{:error, reason}`.
+
+  Opts: `:timeout` (ms, default 10_000), `:allow` (host-pattern list — nil = no scoping; the URL host
+  must match one of "host" / "*.suffix" / "host:port").
   """
-  def get(url, timeout \\ 10_000) when is_binary(url), do: do_get(url, timeout, 5)
+  def get(url, opts \\ []) when is_binary(url) do
+    timeout = Keyword.get(opts, :timeout, 10_000)
+    allow = Keyword.get(opts, :allow, nil)
+    do_get(url, timeout, allow, 5)
+  end
 
-  defp do_get(_url, _timeout, hops) when hops < 0, do: {:error, :too_many_redirects}
+  defp do_get(_url, _timeout, _allow, hops) when hops < 0, do: {:error, :too_many_redirects}
 
-  defp do_get(url, timeout, hops) do
-    if allowed?(url) do
-      _ = Application.ensure_all_started(:inets)
-      _ = Application.ensure_all_started(:ssl)
+  defp do_get(url, timeout, allow, hops) do
+    cond do
+      not allowed?(url) ->
+        Logger.warning("wb-broker: DENY egress #{inspect(url)} — SSRF (internal/non-routable destination)")
+        {:error, :denied}
 
-      # autoredirect: false — :httpc would otherwise auto-FOLLOW a 3xx, bypassing the guard if a public
-      # URL redirects to an internal one. We follow manually so EVERY hop is re-SSRF-checked (and bounded).
-      case :httpc.request(
-             :get,
-             {String.to_charlist(url), []},
-             [{:timeout, timeout}, {:autoredirect, false}],
-             body_format: :binary
-           ) do
-        {:ok, {{_, status, _}, hdrs, body}} when status in 300..399 ->
-          case redirect_target(url, hdrs) do
-            nil -> {:ok, body}
-            next -> do_get(next, timeout, hops - 1)
-          end
+      not host_allowed_by_list?(url, allow) ->
+        Logger.warning("wb-broker: DENY egress #{inspect(url)} — host not in allow-list")
+        {:error, :denied}
 
-        {:ok, {{_, _status, _}, _hdrs, body}} ->
-          {:ok, body}
+      true ->
+        _ = Application.ensure_all_started(:inets)
+        _ = Application.ensure_all_started(:ssl)
 
-        _ ->
-          {:error, :request_failed}
-      end
-    else
-      {:error, :denied}
+        # autoredirect: false — :httpc would otherwise auto-FOLLOW a 3xx, bypassing the guard if a public
+        # URL redirects to an internal one. We follow manually so EVERY hop is re-checked (and bounded).
+        case :httpc.request(
+               :get,
+               {String.to_charlist(url), []},
+               [{:timeout, timeout}, {:autoredirect, false}],
+               body_format: :binary
+             ) do
+          {:ok, {{_, status, _}, hdrs, body}} when status in 300..399 ->
+            case redirect_target(url, hdrs) do
+              nil -> {:ok, body}
+              next -> do_get(next, timeout, allow, hops - 1)
+            end
+
+          {:ok, {{_, _status, _}, _hdrs, body}} ->
+            {:ok, body}
+
+          _ ->
+            {:error, :request_failed}
+        end
     end
   end
 
@@ -55,6 +72,33 @@ defmodule Workbooks.NetGuard do
       {_, loc} -> base |> URI.parse() |> URI.merge(to_string(loc)) |> URI.to_string()
       _ -> nil
     end
+  end
+
+  # Host allow-list (scoping ON TOP of the SSRF floor). nil = no scoping (any public host). A list means
+  # the URL's host must match one pattern. Mirrors the Rust wb_host_in_allowlist on the wasi path.
+  defp host_allowed_by_list?(_url, nil), do: true
+
+  defp host_allowed_by_list?(url, patterns) when is_list(patterns) do
+    host = URI.parse(url).host || ""
+    host_in_allowlist?(host, patterns)
+  end
+
+  @doc "Match a host against allow-list patterns: exact \"host\", \"host:port\", or \"*.suffix\" (case-insensitive)."
+  def host_in_allowlist?(host, patterns) when is_binary(host) and is_list(patterns) do
+    h = host |> String.trim_trailing(".") |> String.downcase()
+
+    Enum.any?(patterns, fn p ->
+      pat =
+        case String.split(String.downcase(String.trim(p)), ":", parts: 2) do
+          [hostpat, port] -> if Integer.parse(port) == :error, do: String.downcase(p), else: hostpat
+          [hostpat] -> hostpat
+        end
+
+      case pat do
+        "*." <> suffix -> h == suffix or String.ends_with?(h, "." <> suffix)
+        exact -> h == exact
+      end
+    end)
   end
 
   @doc "True only if the URL's host resolves entirely to public, externally-routable addresses."

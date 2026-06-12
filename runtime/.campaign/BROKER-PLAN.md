@@ -263,3 +263,24 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   by-construction (deny on resolve-fail or internal-IP) but not yet explicitly red-team-tested.
   NEXT (iter 9): body-size cap + conn/rate quota on NetGuard.get (DoS floor, testable); then allow-list arg
   (host-path parity) + denial audit (Logger + CaptureLog test); then explicit wasi-path red-team coverage.
+- 2026-06-12 (iter 9): **host-path ALLOW-LIST + AUDIT LOG (green).** NetGuard.get/2 now takes opts
+  [:timeout, :allow]; host_in_allowlist?/2 matches exact / *.suffix / host:port (case-insensitive, mirrors
+  the Rust wb_host_in_allowlist). Every blocked egress (SSRF or allow-list) is Logger.warning audit-logged.
+  10 ExUnit tests green: allow-list matcher, get denies a PUBLIC host (8.8.8.8) not on the list (proves the
+  list blocks, distinct from the floor), audit captured via CaptureLog. Call sites unchanged (get(url)
+  defaults opts=[]). HOST-MEDIATED PATH SECURITY CADENCE now: SSRF floor ✓, red-team obfuscation ✓, redirect
+  per-hop ✓, scoped allow-list ✓, audit ✓.
+- 2026-06-12 (iter 9 — STRATEGIC CLARITY on "networking done" + the 323):
+  * The HOST_HTTP_GET path (custom import, used by hand-written Rust/JS guests) is now WORKING (it fetches —
+    used in prod for web-search etc.; this dev env just has no outbound internet to re-prove locally) +
+    SECURE (the full cadence above, unit+adversarial tested). Remaining cadence: DoS body/conn caps, DNS-
+    rebinding pin, revocation, + Policy POPULATING the allow-list per-instance.
+  * RECLAIMING THE 323 STANDARD network tools (curl/wget/db-clients/pkg-mgrs) is GATED on the WASI seam,
+    NOT host_http_get: those tools use raw sockets / wasi-http, not our custom import. The wasi path's SSRF/
+    allow-list is built + e2e-deny-proven, BUT wasi-http OUTBOUND (the actual connect) panics in this wasmex
+    setup ("Cannot start a runtime from within a runtime") AND needs an internet env. So: securing is ahead
+    of functionality. The 323 reclamation needs the wasi-http-outbound connect path WORKING — a separate
+    investigation (wasmex component async + wasi-http driving), best done in an internet-enabled env.
+  NEXT (iter 10): finish the host-path cadence that IS offline-validatable — DoS body-size cap (stream +
+  abort) + per-instance conn/rate counter; then DNS-rebinding pin; then revocation. In parallel, file a bd
+  to investigate wasi-http-outbound connect (the 323-reclamation gate).

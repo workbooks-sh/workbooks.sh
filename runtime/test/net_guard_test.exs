@@ -1,5 +1,6 @@
 defmodule Workbooks.NetGuardTest do
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog
   alias Workbooks.NetGuard
 
   test "ip_allowed? denies internal/sensitive addresses" do
@@ -73,5 +74,33 @@ defmodule Workbooks.NetGuardTest do
     assert {:error, :denied} = NetGuard.get("http://127.0.0.1:4000/")
     assert {:error, :denied} = NetGuard.get("http://10.1.2.3/")
     assert {:error, :denied} = NetGuard.get("https://[::1]/")
+  end
+
+  test "host_in_allowlist? matches exact / *.suffix / host:port, case-insensitively" do
+    allow = ["example.com", "*.api.github.com", "secure.test:443"]
+    assert NetGuard.host_in_allowlist?("example.com", allow)
+    assert NetGuard.host_in_allowlist?("EXAMPLE.COM", allow)
+    assert NetGuard.host_in_allowlist?("v3.api.github.com", allow)
+    assert NetGuard.host_in_allowlist?("api.github.com", allow)
+    assert NetGuard.host_in_allowlist?("secure.test", allow)
+    refute NetGuard.host_in_allowlist?("evil.com", allow)
+    refute NetGuard.host_in_allowlist?("github.com", allow)
+    refute NetGuard.host_in_allowlist?("x.example.com", allow)
+    refute NetGuard.host_in_allowlist?("anything", [])
+  end
+
+  test "get with :allow denies a PUBLIC host not on the list (before any socket)" do
+    # 8.8.8.8 passes the SSRF floor (public) but is not in the allow-list -> denied. Proves the allow-list
+    # is the blocker (distinct from the floor), and it denies before connecting (hermetic).
+    assert {:error, :denied} = NetGuard.get("http://8.8.8.8/", allow: ["example.com"])
+    assert {:error, :denied} = NetGuard.get("http://1.1.1.1/", allow: ["*.example.com"])
+  end
+
+  test "audit: every blocked egress is logged" do
+    ssrf = capture_log(fn -> NetGuard.get("http://169.254.169.254/") end)
+    assert ssrf =~ "DENY egress" and ssrf =~ "SSRF"
+
+    listed = capture_log(fn -> NetGuard.get("http://8.8.8.8/", allow: ["example.com"]) end)
+    assert listed =~ "DENY egress" and listed =~ "allow-list"
   end
 end
