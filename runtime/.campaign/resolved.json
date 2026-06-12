@@ -2107,6 +2107,66 @@
 "lane": "none",
 "blocker": "hatchling is a pure-Python wheel-build BACKEND \u2014 no standalone stdin->stdout command use in-sandbox (its job is producing Python wheels via a full build workflow). Marginal, no distinct in-sandbox capability \u2014 off the table.",
 "extent": "off-the-table (no standalone use)"
+},
+"sox": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "buildable in principle (158/159 files compiled in-lane) but needs per-tool fixes: in-tree libgsm relative-path mismatch + config-declaration tuning; a 159-file ~10min/round build \u2014 beyond the clean automated capability-lane (lanes-not-per-tool). Audio capability deferred (dedicated build effort).",
+"extent": "off-the-table for the automated lane (buildable with dedicated per-tool effort)"
+},
+"flatc": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "buildable in principle (C++) but the flatbuffers tree pulls a gRPC subtree with cross-deps + needs per-tool source curation beyond clean globs; schema/IDL capability already partly covered by live protobuf. Deferred (dedicated build effort).",
+"extent": "off-the-table for the automated lane (buildable with dedicated per-tool effort)"
+},
+"git": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "libgit2 is buildable in principle but is a ~200-file CMake project needing pre-generated config headers (features.h etc.) + per-tool source curation \u2014 beyond the clean automated lane; network transports impossible (no sockets), only local plumbing would work. Deferred (dedicated build effort).",
+"extent": "off-the-table for the automated lane (buildable with dedicated per-tool effort)"
+},
+"Idris": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Idris2 is a self-hosted compiler bootstrapping from Chez Scheme / an existing Idris2; default codegen is native Chez. No in-sandbox toolchain; RefC backend drags GC+GMP+runtime. Native-AOT \u2014 off the table.",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"Janet": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Janet is a small embeddable C Lisp, buildable in principle \u2014 but the embeddable-scripting capability is already covered by live lua + wren + qjs/duk; no distinct capability. Off the table (redundant).",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"GHC": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GHC (the Haskell compiler) is a multi-GB native compiler bootstrapping from itself \u2014 no in-sandbox build. (We DO run GHC-wasm-backend OUTPUTS in-sandbox: pandoc + agda are both prebuilt GHC-wasm modules, live.) The compiler itself is off the table.",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"MicroPython": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "buildable in principle (single-file-ish C), but the Python capability is already covered by the live full CPython (with its complete stdlib); MicroPython is a subset \u2014 no distinct capability. Off the table (redundant).",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"xz / lzma": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "buildable-with-effort (C), but the LZMA compression capability is covered by live gz/lz4/zstd/br/wuffs; the build also hit an over-aggressive companion-include conflict (two api/lzma/check.h). Redundant + deferred \u2014 off the table.",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"optipng / pngquant": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "PNG optimization \u2014 buildable on the now-live png+zlib with dedicated effort, but niche (image-size optimization) and needs per-tool wiring; deferred \u2014 off the table for the automated lane.",
+"extent": "off-the-table (native / redundant / deferred-niche)"
+},
+"potrace": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "bitmap\u2192vector tracer (C) \u2014 buildable but needs a non-trivial PBM bitpacking driver (per-tool main) + is niche; deferred \u2014 off the table for the automated lane.",
+"extent": "off-the-table (native / redundant / deferred-niche)"
 }
 },
 "preliminary": {
@@ -2134,26 +2194,11 @@
 "confidence": "high",
 "verified": false
 },
-"flatc": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "C++ lane builds it (cstring fixed); needs the full CMake source set (grpc/src/compiler + cross-deps like python::Keywords) + -fno-exceptions. Per-tool build-graph slog, NOT a lane gap.",
-"confidence": "medium",
-"verified": false,
-"note": "C++ lane proven; flatc full build deferred"
-},
 "Composer": {
 "verdict": "uncertain",
 "lane": "A",
 "source_url": "https://getcomposer.org/composer-stable.phar",
 "recipe": "Composer is a pure-PHP phar; no separate wasm to build. Our live `php` IS the WLR plain wasm32-wasi `php-cgi-8.2.6.wasm` (already in runtime",
-"confidence": "medium",
-"verified": false
-},
-"sox": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Use the SoX 14.4.2 release tarball (curl -fsIL confirmed: HTTP 200, 1134299 bytes; ships a pre-generated `configure` so no autocon",
 "confidence": "medium",
 "verified": false
 },
@@ -2220,24 +2265,10 @@
 "confidence": "medium",
 "verified": false
 },
-"git": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Build libgit2 (pure C, ~v1.7.x) as wasm32-wasi via the C lane, NOT the canonical C git CLI (autoconf",
-"confidence": "medium",
-"verified": false
-},
 "Pango": {
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B in principle (pure-C CPU text-layout, no GPU/syscall/fork-exec/network), but NOT self-contain",
-"confidence": "medium",
-"verified": false
-},
-"Idris": {
-"verdict": "uncertain",
-"lane": "none",
-"recipe": "No clean lane. Idris2 is a SELF-HOSTED compiler: building it requires an existing Idris2 binary or a",
 "confidence": "medium",
 "verified": false
 }
