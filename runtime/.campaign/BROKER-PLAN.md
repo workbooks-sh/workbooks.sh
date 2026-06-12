@@ -432,3 +432,21 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 18): the app-host / INBOUND server-flip stone (host-as-listener -> guest handler) — likely
   larger and may meet the same component-async gate as outbound (wb-0beq); scope it first. js_dock
   host_parallel_map parity is a quick mechanical follow.
+- 2026-06-12 (iter 18): **js_dock host_parallel_map PARITY + STONE 5 (inbound serve-flip) CORE e2e-PROVEN.**
+  (a) js_dock host_parallel_map mirrored from rust_dock (commands-cap gated) — data-parallelism on both docks.
+  (b) STONE 5 = Workbooks.ServeBroker — the INBOUND server-flip (the last networking-keystone item + the
+  app-host stone). The host owns the socket (privileged op); a GUEST handles requests, sandboxed. Flow rides
+  the proven import pattern + an ETS channel (no host->guest memory writes): dispatch(serve_id,pid,req) stashes
+  the request + calls the guest's `handle` export; the guest fetches via host_request_get, processes, returns
+  via host_response_set; the host reads the response. A PERSISTENT instance is re-entered per request (long-
+  lived, like a server). GUEST e2e (C reactor, compile_c --no-entry export_name("handle")): dispatch "hello"
+  -> "echo:hello", then SAME instance dispatch "world" -> "echo:world" (re-entered). Response size-capped;
+  per-serve_id request channel. Green. (Found+fixed: rust no_mangle exports get GC'd by the lane; switched to
+  the established C-reactor export pattern — the kernel's --no-entry + export_name.)
+  CAMPAIGN: FIVE brokered capabilities now — net (deny-side proven), exec, durable storage, data-parallelism,
+  and inbound-serve — all guest-e2e-proven except networking's env-gated functional reachability. The host-
+  brokered-capabilities pattern (host does the privileged op, guest stays sandboxed, default-deny + quotas +
+  adversarial tests + offline e2e) now spans egress, process-spawning, persistent state, concurrency, and
+  INBOUND serving.
+  NEXT (iter 19): wire a real HTTP listener route -> ServeBroker.dispatch for an HTTP-level e2e (host-as-
+  listener -> guest handler over actual HTTP), marshaling method/path/headers/body; then consolidate.

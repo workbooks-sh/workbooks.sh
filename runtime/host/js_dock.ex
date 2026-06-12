@@ -106,6 +106,26 @@ defmodule Workbooks.JsDock do
              _ -> -1
            end
          end},
+      # Brokered data-parallelism (gated on commands cap). Mirrors rust_dock.
+      "host_parallel_map" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, rp, rl, op, oc ->
+           with true <- allow_exec,
+                req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
+                {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv) do
+             enc = Workbooks.ParallelBroker.encode_results(results)
+
+             if byte_size(enc) <= oc do
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, enc)
+               byte_size(enc)
+             else
+               -1
+             end
+           else
+             _ -> -1
+           end
+         end},
       # Durable per-tenant k/v (gated on vfs cap; tenant from the Dock, not the guest). Mirrors rust_dock.
       "host_kv_put" =>
         {:fn, [:i32, :i32, :i32, :i32], [:i32],

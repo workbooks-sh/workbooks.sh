@@ -1,0 +1,81 @@
+defmodule Workbooks.ServeBroker do
+  @moduledoc """
+  wb-broker INBOUND server-flip (Stone 5 / app-host) — the host listens, a GUEST handles. The host owns the
+  socket (the privileged op); per request it hands the guest the bytes and takes back the guest's response.
+  The guest never touches a socket — it stays sandboxed; only its handler logic runs.
+
+  Flow (no host->guest memory writes; everything rides the proven import + an ETS channel):
+    1. host: `dispatch(serve_id, pid, request)` stashes the request (ETS) and calls the guest's `handle`.
+    2. guest handle(): `host_request_get(buf, cap)` -> host writes the request into the guest's buffer
+       (ctx.memory); guest processes; `host_response_set(ptr, len)` -> host reads the response back.
+    3. host: returns the captured response.
+  A persistent guest instance is re-entered per request (the handler is long-lived, like a server).
+  Security: response size-capped; the request channel is per serve_id (one guest never sees another's).
+  """
+  @table :wb_serve
+
+  @doc "Env imports a serving guest needs. `serve_id` scopes its request/response channel."
+  def imports(serve_id, opts \\ []) do
+    max_resp = Keyword.get(opts, :max_response, 4 * 1024 * 1024)
+
+    %{
+      # host_request_get(out_ptr, out_cap) -> i32 : write the current request into the guest buffer, return
+      # its length (request bytes; truncated to cap).
+      "host_request_get" =>
+        {:fn, [:i32, :i32], [:i32],
+         fn ctx, ptr, cap ->
+           req = lookup({serve_id, :req}) || ""
+           n = min(byte_size(req), cap)
+           :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, ptr, binary_part(req, 0, n))
+           n
+         end},
+      # host_response_set(ptr, len) -> i32 : capture the guest's response (size-capped). Returns 0.
+      "host_response_set" =>
+        {:fn, [:i32, :i32], [:i32],
+         fn ctx, ptr, len ->
+           len = min(len, max_resp)
+           resp = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, ptr, len)
+           put({serve_id, :resp}, resp)
+           0
+         end}
+    }
+  end
+
+  @doc "Dispatch one request to the guest's `handle` export; returns {:ok, response} | {:error, reason}."
+  def dispatch(serve_id, pid, request, timeout \\ 10_000) when is_binary(request) do
+    put({serve_id, :req}, request)
+    delete({serve_id, :resp})
+
+    case Wasmex.call_function(pid, "handle", [], timeout) do
+      {:ok, _} -> {:ok, lookup({serve_id, :resp}) || ""}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # --- lazy public ETS channel (shared across the caller + the wasmex worker process) ---
+  defp table do
+    case :ets.whereis(@table) do
+      :undefined ->
+        try do
+          :ets.new(@table, [:named_table, :public, :set])
+        rescue
+          ArgumentError -> :ok
+        end
+
+        @table
+
+      _ ->
+        @table
+    end
+  end
+
+  defp put(k, v), do: :ets.insert(table(), {k, v})
+  defp delete(k), do: :ets.delete(table(), k)
+
+  defp lookup(k) do
+    case :ets.lookup(table(), k) do
+      [{_, v}] -> v
+      _ -> nil
+    end
+  end
+end
