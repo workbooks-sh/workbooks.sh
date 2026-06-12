@@ -1584,6 +1584,66 @@
 "lane": "none",
 "blocker": "Native multithreaded C++ (caffe2 threadpool + intra-op parallelism, MKL/oneDNN BLAS), build-time Python codegen of the ATen dispatcher (not pre-generated, so violates sel",
 "extent": "off-the-table (verified)"
+},
+"LibTorch": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "LibTorch (ATen/c10) is a giant multithreaded C++ tensor lib with hard native deps that wasm32-wasi cannot satisfy: (1) CPU compute path needs a BLAS/LAPACK backend (MKL/O",
+"extent": "off-the-table (verified)"
+},
+"OpenVINO": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only wasm target is emscripten (browser+JS glue), not standalone wasm32-wasi for wasmtime. CPU plugin is native C++ on oneDNN/oneTBB with mandatory x86 AVX2 (from 2026.0)",
+"extent": "off-the-table (verified)"
+},
+"XLA": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "In-guest native codegen (LLVM JIT/ORC) is XLA's core function and is impossible in wasm32-wasi \u2014 no machine-code emission or execution in the guest. GPU backend additiona",
+"extent": "off-the-table (verified)"
+},
+"WebGPU / wgpu": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hard GPU dependency. Every wgpu backend needs a real graphics API + GPU: native via Vulkan/Metal/DX12/GLES FFI; wasm via the browser's navigator.gpu/WebGL2 (JS imports). ",
+"extent": "off-the-table (verified)"
+},
+"Hyperscan": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hyperscan's value and implementation are x86 SIMD (SSE/AVX2/AVX-512) plus CPUID runtime dispatch; the acceleration engines are hand-written x86 intrinsics with no portabl",
+"extent": "off-the-table (verified)"
+},
+"Nix": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec: Nix builds derivations by clone()/fork-exec'ing native builder processes in OS sandboxes (namespaces/bind-mounts) and emits native ELF into /nix/store. Require",
+"extent": "off-the-table (verified)"
+},
+"Guix": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Guix is a fork-exec daemon architecture, not a library. Its core is guix-daemon (a C++ daemon forked from Nix) that manages /gnu/store and fork-execs native build process",
+"extent": "off-the-table (verified)"
+},
+"CockroachDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose + native-threads. CockroachDB is a distributed SQL database whose entire architecture is Raft consensus replication across nodes over gRPC \u2014 networking",
+"extent": "off-the-table (verified)"
+},
+"YugabyteDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose plus native-threads plus fork-exec multi-process daemons. Inherently a distributed networked database, not a standalone wasm module.",
+"extent": "off-the-table (verified)"
+},
+"TiDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose + fork-exec: TiDB is inherently a networked multi-node distributed cluster (gRPC between TiDB/PD/TiKV, Raft consensus over network). No single-process ",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {

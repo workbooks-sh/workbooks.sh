@@ -1,0 +1,102 @@
+[
+ {
+  "name": "LibTorch",
+  "lane": "none",
+  "source_url": "https://pytorch.org/cppdocs",
+  "recipe": "",
+  "smoke": "N/A \u2014 cannot build. Conceptual smoke would be: link a wasm32-wasi binary that calls torch::ones({2,2}) + matmul and prints the result under `wasmtime run`. No toolchain path produces this binary.",
+  "verdict": "impossible",
+  "blocker": "LibTorch (ATen/c10) is a giant multithreaded C++ tensor lib with hard native deps that wasm32-wasi cannot satisfy: (1) CPU compute path needs a BLAS/LAPACK backend (MKL/OpenBLAS/Eigen-BLAS) + XNNPACK \u2014 XNNPACK's wasm-simd lane is browser/native-tuned, not a clean standalone wasm32-wasi link, and the default MKL/OpenBLAS are x86/ARM asm. (2) Heavy reliance on native threads (at::parallel_for, c10 thread pool, std::thread, OpenMP, intra-op/inter-op parallelism) \u2014 no wasm threads under standalone wasmtime. (3) JIT/codegen paths (TorchScript executor, NNC/LLVM, inductor) need runtime native code gen. (4) Build is CMake-driven codegen (gen_aten, build_variables.bzl) generating thousands of op-dispatch sources \u2014 not pregenerated, not :include_only/:compile_only tractable. (5) Massive TU count + edition/template depth far exceeds the B-lane self-contained C++ envelope. The only real 'PyTorch on wasm' stories are wasi-nn (Wasmtime 27 PyTorch backend = HOST-native libtorch called via wasi-nn import, NOT in-sandbox) and executorch/inductor AOT codegen (per-model kernels, not the LibTorch library). All disqualifying. Eigen is already LIVE but that's the dense-linear-algebra header lib, not LibTorch.",
+  "confidence": "high"
+ },
+ {
+  "name": "OpenVINO",
+  "lane": "none",
+  "source_url": "https://github.com/openvinotoolkit/openvino/blob/master/docs/dev/build_webassembly.md",
+  "recipe": "N/A \u2014 no standalone wasm32-wasi path. OpenVINO's only wasm support is an Emscripten build (openvino.wasm + openvino.js glue) for the BROWSER, not a wasmtime-runnable wasm32-wasi module. It depends on emscripten's JS/threading/SIMD shims, not WASI. The wasi-nn integrations (WasmEdge, wasmtime-wasi-nn crate) go the OPPOSITE direction: wasmtime is the HOST and calls NATIVE OpenVINO through the wasi-nn host import \u2014 OpenVINO itself never runs in the sandbox. The CPU plugin is large native C++ (oneDNN/oneTBB, x86 AVX intrinsics with AVX2 mandatory from 2026.0, native multithreading); GPU/NPU plugins bind to Intel kernel drivers. None of this maps to plain wasm32-wasi under wasmtime.",
+  "smoke": "N/A \u2014 cannot build/run. Would-be smoke (load an IR model, run inference on CPU plugin under wasmtime CLI) is unreachable: no wasi target, and the inference engine requires native AVX2/oneDNN + native threads that wasm32-wasi single-threaded sandbox lacks.",
+  "verdict": "impossible",
+  "blocker": "Only wasm target is emscripten (browser+JS glue), not standalone wasm32-wasi for wasmtime. CPU plugin is native C++ on oneDNN/oneTBB with mandatory x86 AVX2 (from 2026.0) and native multithreading; GPU/NPU plugins need Intel drivers. wasi-nn integrations run OpenVINO NATIVELY as a host import, not in-sandbox. No maintained wasi target.",
+  "confidence": "high"
+ },
+ {
+  "name": "XLA",
+  "lane": "none",
+  "source_url": "https://openxla.org",
+  "recipe": "None. XLA is a multi-million-LOC C++ ML compiler (OpenXLA), Bazel-only, depending on LLVM/MLIR, abseil, Eigen, protobuf, native threads. Its core function is a JIT: it lowers HLO/StableHLO to LLVM IR and emits NATIVE CPU/GPU machine code at runtime via LLVM codegen / ORC JIT. wasm32-wasi has no in-guest codegen/JIT and cannot execute emitted machine code, so the tool's purpose is unreachable. The GPU backend needs CUDA/ROCm. The AOT path (tfcompile) does not help: tfcompile IS the full LLVM-based compiler run at BUILD time on a native host and emits a native ELF object file; the runtime is only a thin runner of that native object. So neither path produces a runnable in-sandbox wasm32-wasi XLA. Not a self-contained C/C++ tarball (Lane B), not Rust (Lane C), not pure-Python/JS (Lane D). Note: LLVM is already LIVE here, but that is the LLVM toolchain, not XLA, and does not provide XLA's runtime JIT codegen capability.",
+  "smoke": "N/A \u2014 cannot build/run. If hypothetically built: echo 'HLO {ROOT add = f32[] add(f32[] p0, f32[] p1)}' | xla_run --backend=cpu would require runtime LLVM native codegen, which fails in wasm32-wasi.",
+  "verdict": "impossible",
+  "blocker": "In-guest native codegen (LLVM JIT/ORC) is XLA's core function and is impossible in wasm32-wasi \u2014 no machine-code emission or execution in the guest. GPU backend additionally needs CUDA/ROCm. AOT tfcompile only relocates the LLVM compiler to a native build host and emits native object files, never a runnable in-sandbox wasm XLA.",
+  "confidence": "high"
+ },
+ {
+  "name": "WebGPU / wgpu",
+  "lane": "none",
+  "source_url": "https://wgpu.rs",
+  "recipe": "N/A \u2014 cannot build for wasm32-wasi/wasmtime. wgpu's wasm32 target is browser-only: it binds navigator.gpu (WebGPU) / WebGL2 via JS/wasm-bindgen imports, requiring a browser host + real GPU. Native backends (Vulkan/Metal/DX12/GLES) require host graphics drivers + GPU via FFI. Neither exists under bare wasmtime wasm32-wasi.",
+  "smoke": "None possible. There is no wgpu execution path under bare wasmtime: no GPU, no WebGPU implementation, no JS host to satisfy navigator.gpu/WebGL imports. Any wgpu instance request would fail to acquire an adapter.",
+  "verdict": "impossible",
+  "blocker": "Hard GPU dependency. Every wgpu backend needs a real graphics API + GPU: native via Vulkan/Metal/DX12/GLES FFI; wasm via the browser's navigator.gpu/WebGL2 (JS imports). Bare wasmtime wasm32-wasi has none of these. Compounding: wgpu is a large edition-2021/2024 Rust crate tree with proc-macros and native FFI, so Lane C (mrustc ~1.74) is also impossible.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hyperscan",
+  "lane": "none",
+  "source_url": "https://github.com/intel/hyperscan",
+  "recipe": "None viable. Lane B (C/C++ self-contained) fails: the entire codebase is saturated with x86 SIMD intrinsics (_mm_*, SSSE3/AVX2/AVX-512) for the Teddy/FDR/Shufti/Truffle acceleration engines that ARE the library \u2014 these do not compile under clang->wasm32-wasi without a full architectural port. Build depends on CMake + Ragel-generated parser + Boost headers + runtime CPUID feature dispatch. wasm has only 128-bit SIMD and no AVX/CPUID, so even a heroic port loses the perf core that is Hyperscan's sole reason to exist. Lanes A/C/D N/A (C++ project, no prebuilt wasm, not Rust/Python/JS).",
+  "smoke": "N/A \u2014 would not reach a runnable .wasm. (Had it built: hs_compile() a multi-pattern set + hs_scan() over a buffer expecting matched pattern IDs.)",
+  "verdict": "impossible",
+  "blocker": "Hyperscan's value and implementation are x86 SIMD (SSE/AVX2/AVX-512) plus CPUID runtime dispatch; the acceleration engines are hand-written x86 intrinsics with no portable fallback. wasm32 (128-bit SIMD only, no AVX, no CPUID, no native codegen) cannot compile or run it without a full port that discards the performance core. Regex need already covered by live pcre2 + onig.",
+  "confidence": "high"
+ },
+ {
+  "name": "Nix",
+  "lane": "none",
+  "source_url": "https://nixos.org",
+  "recipe": "N/A \u2014 architecturally impossible. Nix is a C++ build orchestrator whose core function is to fork/exec native builder processes inside OS sandboxes (clone(), namespaces, bind mounts) and populate /nix/store with native ELF binaries. None of that survives wasm32-wasi: no fork-exec, no clone/namespaces, no native build of arbitrary derivations, no /nix/store native binaries. The product cannot be reduced to a self-contained C/C++ pure-computation lane (B) because the orchestration of native subprocess builds IS the product. No prebuilt plain wasm32-wasi build exists (A), not a Rust crate (C), not pure-Python/JS (D).",
+  "smoke": "None \u2014 no viable lane. (Hypothetically `nix --version` would require linking sqlite/curl/seccomp/sandbox syscalls and still does nothing useful without fork-exec builders.)",
+  "verdict": "impossible",
+  "blocker": "fork-exec: Nix builds derivations by clone()/fork-exec'ing native builder processes in OS sandboxes (namespaces/bind-mounts) and emits native ELF into /nix/store. Requires fork-exec, native subprocess execution, OS sandboxing, and network fetching as its purpose \u2014 all forbidden under wasm32-wasi/wasmtime. Not reducible to a pure-computation B-lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "Guix",
+  "lane": "none",
+  "source_url": "https://guix.gnu.org",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "Guix is a fork-exec daemon architecture, not a library. Its core is guix-daemon (a C++ daemon forked from Nix) that manages /gnu/store and fork-execs native build processes inside Linux-namespace containers (clone/unshare/bind-mounts). The entire PURPOSE is building NATIVE derivations (native codegen + process spawning) and fetching binary substitutes over the network (network-as-purpose). All of these are categorical wasm32-wasi/wasmtime disqualifiers: no fork-exec, no Linux namespaces/containers, no native-thread builds, no network-as-purpose. The Guile Scheme layer (Hoot has an experimental wasm backend) is only the evaluation/UI front-end that emits derivations; compiling it to wasm yields nothing runnable because it still requires the daemon + native store builds it cannot perform in-sandbox. Not Lane A (no plain .wasm tool exists or is meaningful), not B/C/D (not a self-contained library).",
+  "confidence": "high"
+ },
+ {
+  "name": "CockroachDB",
+  "lane": "none",
+  "source_url": "https://www.cockroachlabs.com",
+  "recipe": "",
+  "smoke": "",
+  "verdict": "impossible",
+  "blocker": "Network-as-purpose + native-threads. CockroachDB is a distributed SQL database whose entire architecture is Raft consensus replication across nodes over gRPC \u2014 networking IS the product, not incidental. Even single-node operation depends on the multi-node replication/RPC machinery. Additionally it is a large Go system: Go's wasm32-wasi target (GOOS=wasip1) is single-threaded with no real OS threads, but Cockroach's runtime assumes heavy goroutine parallelism (Raft tickers, gRPC servers, Pebble background compactions, the Go scheduler across cores). No embedded/standalone in-process mode exists. Go compiles to wasm (not JIT-blocked), but that doesn't rescue a network-as-purpose + native-thread-dependent multi-million-LOC distributed system. Not Lane A (no prebuilt single .wasm), not B/C/D.",
+  "confidence": "high"
+ },
+ {
+  "name": "YugabyteDB",
+  "lane": "none",
+  "source_url": "https://www.yugabyte.com",
+  "recipe": "N/A. Distributed multi-node SQL DB. C++ DocDB/RocksDB storage, Raft consensus, separate master/tserver daemons plus real Postgres YSQL process per node. Purpose is the cluster network. No single standalone wasm32-wasi module possible.",
+  "smoke": "N/A. Even single-node spins up master plus tserver processes binding sockets and running Raft, impossible in a sandboxed wasm32-wasi guest.",
+  "verdict": "impossible",
+  "blocker": "network-as-purpose plus native-threads plus fork-exec multi-process daemons. Inherently a distributed networked database, not a standalone wasm module.",
+  "confidence": "high"
+ },
+ {
+  "name": "TiDB",
+  "lane": "none",
+  "source_url": "https://www.pingcap.com",
+  "recipe": "N/A \u2014 architecturally impossible. TiDB is a multi-component distributed cluster (TiDB SQL layer in Go + PD placement driver + TiKV storage in Rust with Raft/RocksDB). Components communicate over gRPC; Raft consensus and storage/compute separation are inter-node network traffic by design. Even single-node deployment (tiup playground) fork-execs multiple processes talking over loopback. No standalone single-binary embeddable mode exists.",
+  "smoke": "N/A \u2014 cannot run. A meaningful smoke test (connect MySQL client, run a query against a real TiDB cluster) inherently requires multi-node networking + fork-exec, both blocked in-sandbox.",
+  "verdict": "impossible",
+  "blocker": "network-as-purpose + fork-exec: TiDB is inherently a networked multi-node distributed cluster (gRPC between TiDB/PD/TiKV, Raft consensus over network). No single-process embeddable build. Languages target wasm but the architecture, not codegen, is the blocker. For embedded MySQL-compatible SQL in-sandbox, sqlite3 (already LIVE) is the substitute.",
+  "confidence": "high"
+ }
+]
