@@ -31,6 +31,14 @@ defmodule Workbooks.BrokerAudit do
       prune_ring()
     end
 
+    # Standard :telemetry event so external monitors (Prometheus, a SIEM, AppSignal, …) can attach to
+    # [:workbooks, :broker, :deny] / [:workbooks, :broker, :allow] without coupling to our ETS internals.
+    :telemetry.execute(
+      [:workbooks, :broker, outcome],
+      %{count: 1},
+      %{broker: broker, reason: reason, target: target}
+    )
+
     :ok
   end
 

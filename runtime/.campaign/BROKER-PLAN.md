@@ -1110,3 +1110,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (~0.45 ms/serve, so fresh instantiation from a pre-compiled component is cheap). So the production fresh-per-
   request app-host is VALIDATED: memory-stable, correct, and fast under sustained churn. The validation flagged
   as most-likely-to-find-a-defect PASSED — confidence + a permanent soak guard in the suite.
+- 2026-06-12 (iter 79): **BROKER TELEMETRY — observability now EXTERNALLY consumable via standard :telemetry.**
+  The counters + forensics ring (iter75-77) are queryable INTERNALLY; external monitors (Prometheus / a SIEM /
+  AppSignal) need standard events, not our ETS internals. Added :telemetry.execute([:workbooks, :broker,
+  outcome], %{count: 1}, %{broker, reason, target}) to BrokerAudit.record — a handler can attach to
+  [:workbooks, :broker, :deny] (alert on denials) / [:workbooks, :broker, :allow] with zero coupling. Test:
+  attach a handler -> record -> the event fires with the right metadata. 5 tests green. So the observability
+  story is COMPLETE on all three views: INTERNAL counters (stats/count/total_denials), INCIDENT-RESPONSE
+  forensics ring (recent/1 with targets), and EXTERNAL standard :telemetry. The "manageable" criterion is
+  fully realized — monitoring + incident-response + external-monitor integration. FOLLOW-UP: storage/queue
+  capacity counters; streaming bodies (the big remaining capability).

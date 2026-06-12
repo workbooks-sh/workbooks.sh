@@ -57,4 +57,24 @@ defmodule Workbooks.BrokerAuditTest do
     # newest-first: the most recent attempt heads the list, tagged broker + reason
     assert [{:net, :ssrf, "http://10.0.0.1/", _ts} | _] = recent
   end
+
+  test "telemetry — denials emit a [:workbooks, :broker, :deny] event external monitors can attach to" do
+    ref = make_ref()
+    parent = self()
+
+    :telemetry.attach(
+      "test-#{inspect(ref)}",
+      [:workbooks, :broker, :deny],
+      fn _event, measurements, metadata, _ -> send(parent, {:telemetry, measurements, metadata}) end,
+      nil
+    )
+
+    BrokerAudit.record(:net, :deny, :ssrf, "http://169.254.169.254/")
+
+    assert_receive {:telemetry, %{count: 1},
+                    %{broker: :net, reason: :ssrf, target: "http://169.254.169.254/"}},
+                   1_000
+
+    :telemetry.detach("test-#{inspect(ref)}")
+  end
 end
