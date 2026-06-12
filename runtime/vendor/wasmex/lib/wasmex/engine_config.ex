@@ -24,7 +24,11 @@ defmodule Wasmex.EngineConfig do
             wasm_backtrace_details: false,
             memory64: false,
             wasm_component_model: true,
-            debug_info: false
+            debug_info: false,
+            # wb-broker (wb-95o6): enable epoch-based interruption + a 1s epoch ticker so a store can set a
+            # wall-clock deadline. Lets the serve path TRAP a guest deadlocked on write-backpressure (a large
+            # response body) instead of leaking a blocked DirtyCpu thread. Off by default (no behavior change).
+            epoch_interruption: false
 
   @type t :: %__MODULE__{
           consume_fuel: boolean(),
@@ -32,7 +36,8 @@ defmodule Wasmex.EngineConfig do
           wasm_backtrace_details: boolean(),
           memory64: boolean(),
           wasm_component_model: boolean(),
-          debug_info: boolean()
+          debug_info: boolean(),
+          epoch_interruption: boolean()
         }
 
   @doc ~S"""

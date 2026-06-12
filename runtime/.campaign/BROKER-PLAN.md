@@ -1186,3 +1186,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   timeouts stop the request hanging forever, but the blocked DirtyCpu NIF thread LEAKS (flood = dirty-
   scheduler exhaustion). The 16MiB cap is ineffective (after the deadlock). FIX: async serve (proper; also
   unlocks unbounded streaming) or epoch-interruption deadline (safety) — both cross-cutting, scoped in wb-95o6.
+- 2026-06-12 (iter 86): **★ wb-95o6 STREAMING PATH FIXED + wb-t3sq UNBOUNDED STREAMING DELIVERED (concurrent
+  drain).** CORRECTED the iter-85 epoch plan: epoch interruption traps RUNNING wasm, but the large-body
+  deadlock is the guest PARKED in a host call (blocking_write_and_flush on a full channel) — epoch cannot trap
+  that. THE FIX: run handle() on a separate spawn_blocking thread while the NIF DRAINS the response-body
+  channel concurrently, so the guest's writes always make progress. Rewrote serve_http_stream: setup under
+  locks -> drop locks -> spawn_blocking(handle.call + post_return) -> block_on(rx) for the early-set response
+  -> drain resp_body.frame() concurrently -> join. The drain reads the DECOUPLED body channel (no store lock),
+  so it never contends with the handler thread's store lock. PROVEN: a 256KB body (64 flushes) that DEADLOCKED
+  at iter84 (300s timeout) now streams in 1.1s, multiple frames; small-body streaming + Bandit chunked +
+  buffered seam all green (no regression). Also added epoch_interruption engine config (OFF by default) as the
+  foundation for bounding a COMPUTE-spinning guest (a separate DoS that epoch CAN trap). REMAINING: apply the
+  same concurrent-drain to the BUFFERED serve_http (still deadlocks on bodies over the wasi-http buffer).

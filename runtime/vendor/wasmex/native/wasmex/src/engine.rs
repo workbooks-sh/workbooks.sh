@@ -28,6 +28,9 @@ pub struct ExEngineConfig {
     memory64: bool,
     wasm_component_model: bool,
     debug_info: bool,
+    // wb-broker (wb-95o6): enable epoch interruption + a 1s ticker so the serve path can wall-clock-bound a
+    // guest deadlocked on write-backpressure (large response body) via set_epoch_deadline, instead of hanging.
+    epoch_interruption: bool,
 }
 
 #[rustler::resource_impl()]
@@ -41,8 +44,29 @@ pub struct EngineResource {
 pub fn new(
     engine_config_ex: ExEngineConfig,
 ) -> Result<ResourceArc<EngineResource>, rustler::Error> {
+    let epoch = engine_config_ex.epoch_interruption;
     let config = engine_config(engine_config_ex);
     let engine = Engine::new(&config).map_err(|err| Error::Term(Box::new(err.to_string())))?;
+
+    // wb-95o6: a 1s epoch ticker. Holds only a WEAK ref so it stops when the engine is dropped — no leak.
+    // A store on this engine can `set_epoch_deadline(N)` to trap a call after ~N seconds of wall-clock.
+    if epoch {
+        let weak = engine.weak();
+        std::thread::Builder::new()
+            .name("wasmex-epoch".into())
+            .spawn(move || loop {
+                match weak.upgrade() {
+                    Some(e) => {
+                        e.increment_epoch();
+                        drop(e);
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                    }
+                    None => break,
+                }
+            })
+            .ok();
+    }
+
     let resource = ResourceArc::new(EngineResource {
         inner: Mutex::new(engine),
     });
@@ -93,6 +117,9 @@ pub(crate) fn engine_config(engine_config: ExEngineConfig) -> Config {
     // run under Wasmex. exnref rides on function-references; enable both.
     config.wasm_function_references(true);
     config.wasm_exceptions(true);
+    // wb-95o6: epoch interruption (off by default). When on, the engine's epoch is ticked once a second and
+    // a store can set_epoch_deadline; reaching it traps the running call (used to bound a deadlocked serve).
+    config.epoch_interruption(engine_config.epoch_interruption);
 
     config
 }

@@ -12,6 +12,7 @@ impl Guest for Component {
     fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
         // echo the request method back so the e2e can prove the request data reached the guest
         let method = format!("{:?}", request.method());
+        let path = request.path_with_query().unwrap_or_default();
 
         // SSRF-COMPOSITION probe: a (red-team) serving guest tries an OUTBOUND fetch to cloud metadata while
         // handling a request. It MUST go through the host's brokered send_request and be SSRF-blocked — a
@@ -27,8 +28,22 @@ impl Guest for Component {
         let body = resp.body().unwrap();
         ResponseOutparam::set(response_out, Ok(resp));
         let stream = body.write().unwrap();
-        let msg = format!("hello from brokered guest; method={}; outbound={}", method, outbound);
-        stream.blocking_write_and_flush(msg.as_bytes()).unwrap();
+
+        if path.contains("stream") {
+            // LARGE multi-chunk body (wb-95o6/wb-t3sq): 64 flushes of 4000 bytes = 256_000 bytes — far larger
+            // than the wasi-http output buffer. This used to DEADLOCK the synchronous serve (the guest blocked
+            // on write-backpressure while the host drained only after handle() returned). With the concurrent-
+            // drain fix the host drains as the guest writes, so this streams cleanly. Default path ("/") keeps
+            // the small single-frame body so the other serve tests are unaffected.
+            let chunk = "0123456789".repeat(400);
+            for _ in 0..64 {
+                stream.blocking_write_and_flush(chunk.as_bytes()).unwrap();
+            }
+        } else {
+            let msg = format!("hello from brokered guest; method={}; outbound={}", method, outbound);
+            stream.blocking_write_and_flush(msg.as_bytes()).unwrap();
+        }
+
         drop(stream);
         let _ = OutgoingBody::finish(body, None);
     }

@@ -603,6 +603,53 @@ defmodule Workbooks.BrokerNetE2ETest do
 
   @tag :build
   @tag :netdeps
+  @tag timeout: 120_000
+  test "STREAMING large body (wb-95o6) — a 256KB response streams in MULTIPLE frames, NO deadlock" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+    {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, inst} = Wasmex.Components.Instance.new(store, component, %{})
+
+    ref = make_ref()
+
+    # /stream makes the guest emit 256_000 bytes in 64 flushes — would DEADLOCK the old serve; the concurrent
+    # drain handles it. Run under a Task so a regression shows as a fast failure, not a hung suite.
+    task =
+      Task.async(fn ->
+        :ok =
+          Wasmex.Components.Instance.serve_http_stream(
+            inst,
+            "GET",
+            "/stream",
+            [{"host", "localhost"}],
+            "",
+            self(),
+            ref
+          )
+
+        assert_receive {^ref, :stream_start, 200, _headers}, 30_000
+        collect_stream(ref, "", 0)
+      end)
+
+    {body, frames} = Task.await(task, 60_000)
+
+    assert byte_size(body) == 256_000
+    assert frames > 1
+  end
+
+  @tag :build
+  @tag :netdeps
   @tag timeout: 300_000
   test "APP-HOST streaming — chunked transfer through Bandit to a real client (wb-t3sq)" do
     proj = "test/broker_e2e/wasi_http_handler"
