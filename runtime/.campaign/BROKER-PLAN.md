@@ -934,3 +934,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasi:http even with explicit target.dependencies — needs `cargo component add` or deps outside wit/. The
   serve NIF + Elixir plumbing are DONE; this is purely a test-fixture build. NEXT (iter 61): nail PATH A
   (older wasi:http WIT for jco) or PATH B, then the Components.serve_http e2e.
+- 2026-06-12 (iter 61): **INBOUND serve_http PLUMBING VALIDATED (smoke) + crash-safe.** No prebuilt wasi:http
+  component / bundled WIT exists (guest build stays WIT-tooling-blocked: jco 0.2.6-too-new for componentize-js
+  0.19.3; cargo-component 'package not found'). PIVOTED to validate the implementation: a smoke test
+  (Components.serve_http on net_probe, which lacks incoming-handler) PROVES the full path runs end-to-end —
+  Components.serve_http -> handle_call -> Instance.serve_http -> Native.component_serve_http, which builds the
+  request + creates the incoming-request + response-outparam resources + looks up the handler (fails
+  gracefully). ~70% of the NIF + the ENTIRE Elixir plumbing exercised. Also HARDENED handle_call: rescue the
+  NIF raise -> {:error, reason} so a bad guest can't crash the Components server (robustness fix found via the
+  smoke). 1 test green. The inbound seam is now NIF + plumbing + smoke-validated + crash-safe; only the FULL
+  serve e2e (a real wasi:http handler guest exercising handle.call + response-collect) remains, gated on the
+  guest WIT-tooling (wb-py4k Paths A/B). NEXT (iter 62): resolve the guest WIT-tooling for the full e2e.

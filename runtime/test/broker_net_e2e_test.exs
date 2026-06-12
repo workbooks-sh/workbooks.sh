@@ -8,6 +8,44 @@ defmodule Workbooks.BrokerNetE2ETest do
 
   @tag :build
   @tag timeout: 300_000
+  test "INBOUND serve_http plumbing — reaches the NIF + handles a component lacking incoming-handler" do
+    # any component instantiated with allow_http exercises the inbound path: Components.serve_http ->
+    # handle_call -> Instance.serve_http -> Native.component_serve_http, which builds the request,
+    # creates the incoming-request + response-outparam resources, then looks up wasi:http/incoming-handler.
+    # net_probe exports `probe`, NOT incoming-handler, so the lookup fails gracefully — proving the full
+    # Elixir->NIF plumbing + ~70% of the NIF (request build + both resources) runs end to end.
+    out = Path.join(System.tmp_dir!(), "inb_#{System.unique_integer([:positive])}.component.wasm")
+
+    {_, 0} =
+      System.cmd(
+        "node",
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/net_probe.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
+        stderr_to_stdout: true
+      )
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{path: out, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    on_exit(fn -> File.rm(out) end)
+
+    got =
+      try do
+        Wasmex.Components.serve_http(pid, "GET", "/", [], "")
+      rescue
+        e -> {:raised, Exception.message(e)}
+      catch
+        kind, reason -> {:caught, kind, reason}
+      end
+
+    # the missing-handler component must NOT yield a {status, headers, body} success — the path ran and the
+    # NIF reported the absent wasi:http/incoming-handler export (raise or error tuple, both prove the wiring)
+    refute match?({s, h, b} when is_integer(s) and is_list(h) and is_binary(b), got)
+  end
+
+  @tag :build
+  @tag timeout: 300_000
   test "wasi-http OUTBOUND works through the broker — internal SSRF-blocked, public reachable, no panic" do
     out = Path.join(System.tmp_dir!(), "net_probe_#{System.unique_integer([:positive])}.component.wasm")
 

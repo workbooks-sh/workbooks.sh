@@ -288,8 +288,15 @@ defmodule Wasmex.Components do
         _from,
         %{instance: instance} = state
       ) do
-    # the serve NIF is synchronous (returns {status, headers, body}); reply directly
-    result = Wasmex.Components.Instance.serve_http(instance, method, uri, headers, body)
+    # the serve NIF is synchronous (returns {status, headers, body}); a bad guest (no incoming-handler,
+    # trap, etc.) makes the NIF raise — rescue it into {:error, reason} so one request can't crash the server.
+    result =
+      try do
+        Wasmex.Components.Instance.serve_http(instance, method, uri, headers, body)
+      rescue
+        e -> {:error, Exception.message(e)}
+      end
+
     {:reply, result, state}
   end
 
