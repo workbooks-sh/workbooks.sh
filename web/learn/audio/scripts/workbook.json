@@ -1,0 +1,61 @@
+{
+ "slug": "workbook",
+ "title": "Workbooks — the unit",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "One file that is whole software",
+   "text": "Welcome to the first lesson — the workbook. Here's the whole idea in one sentence… a workbook is one file that is a whole piece of software. [curious] By the end of this, you'll go from \"okay, it's an HTML file\"… all the way to \"an agent can live inside it.\" And you can bail whenever you have what you need. That's the deal with all of these lessons."
+  },
+  {
+   "id": "problem",
+   "title": "Software you can't hand to anyone",
+   "text": "So here's something strange. Software became something you can't hand to anyone. Seriously — try it. Not a link to your app… the app itself. What would you even attach? A modern application is a git repository… a node modules folder with forty thousand files in it… a Dockerfile… six environment variables… and a database living in somebody's datacenter in Virginia. [sighs] There is no… thing. Nothing you can copy, carry, send, or keep. And here's what makes that genuinely weird. Computing already produced the perfect handable artifact, decades ago. An HTML file opens on any device made in the last twenty-five years. Any browser. No installer, no app store, no account. We just never asked it to do more than hold a page. [excited] A workbook asks it to do more."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "Okay — the definition. A workbook is a single HTML file that carries a whole piece of software. The interface… the code… the data… and the history of how it got that way. And it opens anywhere a browser does. The name is literal. A paper workbook is a textbook, your worked answers, and your notes in the margins — one binding, no loose pages. A workbook is that, for software. The program, its data, and the record of its own making… travelling as one object. That's the whole idea. Everything else is just unpacking it."
+  },
+  {
+   "id": "anatomy",
+   "title": "Open one up",
+   "text": "A workbook doesn't hide what it is. Crack one open, and every layer inside is a standard you've already heard of — that's deliberate. No invented format. The trick isn't a new ingredient… it's that nobody had put the existing ones in the same file. So — four layers. First: HTML, CSS, and JavaScript. The face of the file… an ordinary web page that renders the same on every screen on earth. Second: WebAssembly. Real computation, in any language — sandboxed by birthright. Third: SQLite. An actual queryable database, and a virtual file system… riding in the file. [curious] And fourth — the org layer. Intent, tasks, and memory. The part you and agents write. Four standards… one binding."
+  },
+  {
+   "id": "spectrum",
+   "title": "Document or app? Yes.",
+   "text": "So — is it a document, or is it an app? [chuckles] Yes. And that's not a dodge… dissolving that line is the point. Watch how many shapes one format carries. A report — whose charts are live queries against the data riding in the file. A brand book — that carries its own fonts and palettes. A store dashboard — inventory in the SQLite, interface up front. A game — compute in WebAssembly, save files in the database. And an agent's workspace — in one sendable object. Today, those live in five different systems… each with its own accounts, exports, and silos. The workbook's bet is that they're all the same shape. Interface… plus code… plus data. And one honest file can hold that shape."
+  },
+  {
+   "id": "not-a-zip",
+   "title": "Isn't this just a zip file?",
+   "text": "[curious] \"Isn't this just a zip file?\" Fair question — it's compressed, it has things inside. But a zip is storage. It's inert. Unpack it, or nothing happens. A workbook is runnable — double-click it, and it opens, renders, computes. \"Okay… so it's a container image.\" Closer — and worth slowing down for. An image also packages software with everything it needs. But it's a build artifact for a Linux kernel. It needs a daemon… it behaves differently across operating systems… and you can't open one. There's nothing to see. [excited] Here's the move that makes workbooks interesting. A workbook plays both roles. Opened in a browser — it's a document. Docked into an engine — it behaves exactly like a container image. The WebAssembly is the executable surface… the SQLite is the disk. Same file. No conversion step. One artifact, two readings. A document to a human… a container to an engine."
+  },
+  {
+   "id": "org-layer",
+   "title": "The writable layer",
+   "text": "This one's a depth rung — skip ahead if you don't care how the sausage is authored. Every system that humans and AI build in together needs a layer both can write. The obvious candidate is Markdown… and Markdown is great at what it was built for. It's a blogging language. But try to run a system on it. You can't validate Markdown… you can't write a test suite for it… you can't reliably parse a plan out of it. And YAML and JSON fail the opposite way — machines parse them fine, but nobody can think in them. Workbooks use org. A plain-text format with twenty years of history, from the lineage of literate programming. It reads like Markdown… but underneath, it's a parseable tree that natively understands tasks, states, dates… and runnable code. [excited] And here's the practical kicker. Those twenty years of documentation are in every model's training data. Agents don't have to be taught org. They arrived knowing it."
+  },
+  {
+   "id": "agent",
+   "title": "An agent can live in here",
+   "text": "Now the advanced bit. Strip an agent's needs to the floor, and the list is short. One: a file system to work in. Two: processes to run. Three: a memory of what it's doing. That's the whole computer, as far as an agent is concerned. Now look back at the anatomy. A workbook has a file system — the SQLite virtual file system. It has processes — WebAssembly, any language. And it has memory with actual chronology — the org layer. [excited] Which means an agent doesn't need your operating system. Not your real files… not your keychain… not your environment variables. It can work entirely inside the file — every bit of it sandboxed. And it's worth saying how unusual that is. The industry answer is to rent isolation. A fresh micro virtual machine per agent… metered by the second. The workbook carries that environment in the artifact itself. The workspace and the work product are the same object… [chuckles] and you can email it."
+  },
+  {
+   "id": "limits",
+   "title": "Where a file alone falls short",
+   "text": "Honesty section. A workbook on its own is still a file — and files have a hard limit. Nothing happens while it's closed. It can't run a schedule overnight. It can't keep an agent working after you walk away. It can't serve itself to a thousand people. That's not a flaw to apologize for… it's a boundary to know. The file is the artifact. For the living part, you dock it into an engine you own. That engine is the Nexus… and it's the next lesson."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire — the questions people actually ask. [curious] Do I need Workbooks installed to open one? No. And that's the most important answer on the page. A workbook opens in any browser, for anyone, forever. Viewing is never gated. How big can one get? Further than you'd guess. SQLite is comfortable holding gigabytes — but the pleasant range for sharing is tens of megabytes. Heavier data belongs behind an engine. What about private data? Default rule… sharing a workbook shares its contents. For the gated case, there are sealed sections — encrypted, releasing only through an engine that checks who's asking. [chuckles] What never happens is the theatrical version… a login screen drawn over data that's actually sitting in the file."
+  },
+  {
+   "id": "outro",
+   "title": "Wrapping up",
+   "text": "So that's the workbook. One file… the interface, the code, the data, and the history. And it opens anywhere a browser does. But a file alone is still inert while it's closed. The living part needs an engine… [curious] and that's the next lesson. The Nexus."
+  }
+ ]
+}

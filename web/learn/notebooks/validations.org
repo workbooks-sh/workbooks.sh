@@ -1,0 +1,91 @@
+#+TITLE: validating the written layer
+#+CATEGORY: quality
+#+DEK: You cannot write a test suite for Markdown. You can for org. Catch three real contradictions in a drifted file, mechanically.
+
+* a file with problems
+
+The org lesson's strongest claim is that drift becomes detectable when the
+written layer is parseable. Here is a project file an agent has been
+enthusiastic with, as editable org. Three things are wrong with it. The
+checks below find all three without reading it the way you just did.
+
+#+begin_src org :name file
+* TODO ship search
+  DEADLINE: <2026-06-01>
+* DONE write the parser
+* TODO write the parser
+* DONE deploy to prod
+  :PROPERTIES:
+  :DEPENDS: ship-search
+  :END:
+#+end_src
+
+* check one: duplicates
+
+The same task written twice, with two different states no less, is classic
+drift: the agent forgot it finished.
+
+#+begin_src js :action find duplicates
+nb.slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+nb.tasks = () => nb.oql.headlines(nb.org("file")).filter((h) => h.state);
+nb.findings = [];
+const seen = {};
+for (const t of nb.tasks()) {
+  const id = nb.slug(t.title);
+  if (seen[id]) nb.findings.push(`duplicate: "${t.title}" appears as ${seen[id]} and as ${t.state}`);
+  else seen[id] = t.state;
+}
+print(nb.findings[0] || "no duplicates");
+#+end_src
+
+* check two: dependencies that lie
+
+A DONE task whose dependency is not done is not history. It is fiction.
+
+#+begin_src js :action check the dependencies
+for (const t of nb.tasks().filter((t) => t.state === "DONE" && t.props.DEPENDS)) {
+  const dep = nb.tasks().find((x) => nb.slug(x.title) === t.props.DEPENDS);
+  if (!dep) nb.findings.push(`phantom: "${t.title}" depends on "${t.props.DEPENDS}", which is not a task`);
+  else if (dep.state !== "DONE") nb.findings.push(`fiction: "${t.title}" is DONE but "${dep.title}" is still ${dep.state}`);
+}
+print(nb.findings[nb.findings.length - 1] || "dependencies are honest");
+#+end_src
+
+* check three: the calendar does not lie
+
+Deadlines are native org timestamps, so the kernel hands them back as
+structured dates and overdue becomes arithmetic.
+
+#+begin_src js :action check the deadlines
+const today = "2026-06-12";
+for (const t of nb.tasks().filter((t) => t.state === "TODO" && t.deadline)) {
+  if (t.deadline.at < today) nb.findings.push(`overdue: "${t.title}" deadlined ${t.deadline.at}, today is ${today}`);
+}
+print("full report, " + nb.findings.length + " findings:");
+for (const f of nb.findings) print("  " + f);
+#+end_src
+
+Three contradictions, zero AI: a checker an engine can run on every write.
+Fix the file above and run the checks again. This is the boundary the
+[[org.html][grammar lesson]] draws honestly: structure is checkable, prose
+is not.
+
+#+begin_recipe
+Implement a drift checker for an org-based written layer.
+
+Build: a validator that parses org canonically (real parser, not regexes)
+and reports three classes of drift. One: duplicates, the same task id
+appearing twice, especially with different states. Two: fiction, a DONE
+task whose :DEPENDS: property names a task that is not DONE, or names no
+real task at all. Three: overdue, TODO tasks whose DEADLINE timestamp is
+in the past.
+
+Requirements:
+- Pure parse plus data checks; no AI anywhere in the checker.
+- Output is a findings list a human or agent can act on, each naming the
+  exact headline.
+- Cheap enough to run on every write to the layer.
+
+Acceptance: seed a file with one of each drift class; the checker finds
+all three and nothing else.
+#+end_recipe

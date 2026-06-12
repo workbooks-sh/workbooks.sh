@@ -1,0 +1,86 @@
+#+TITLE: telemetry, ambient
+#+CATEGORY: observability
+#+DEK: One event shape in, answers out. Counters, timings, and the question agents usually cannot answer: what was I doing, and in what order?
+
+* one event shape
+
+The autopoet lesson says improvement needs signal: one telemetry shape, not
+a zoo of log formats. Here is a morning of events from a small engine, as
+an editable org list. Every line is the same shape: time, actor, action,
+duration.
+
+#+begin_src org :name events
+- 100 wb-shop render 12
+- 220 agent-doc tool-search 340
+- 400 wb-shop query 8
+- 560 agent-doc tool-read 120
+- 700 wb-shop render 11
+- 810 agent-doc tool-read 95
+- 950 wb-blog render 230
+- 990 agent-doc file-issue 15
+#+end_src
+
+* what is hot?
+
+The first telemetry question is always volume. Group and count.
+
+#+begin_src js :action count by actor and action
+nb.events = () => nb.org("events").split("\n")
+  .map((l) => l.match(/-\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)/))
+  .filter(Boolean)
+  .map((m) => ({ t: +m[1], who: m[2], what: m[3], ms: +m[4] }));
+const count = (key) => nb.events().reduce((m, e) => { m[e[key]] = (m[e[key]] || 0) + 1; return m; }, {});
+print("by actor:", count("who"));
+print("by action:", count("what"));
+#+end_src
+
+* where does the time go?
+
+Counters say what happened. Durations say what it cost. One outlier jumps
+straight out.
+
+#+begin_src js :action build the timing table
+const groups = nb.events().reduce((m, e) => { (m[e.what] = m[e.what] || []).push(e.ms); return m; }, {});
+const table = Object.entries(groups).map(([what, ms]) => ({
+  what, calls: ms.length,
+  total: ms.reduce((a, b) => a + b, 0),
+  worst: Math.max(...ms),
+})).sort((a, b) => b.total - a.total);
+for (const r of table) print(`${r.what}  ${r.calls} calls  total ${r.total}ms  worst ${r.worst}ms`);
+print("that slow render on wb-blog is the issue an agent would file.");
+#+end_src
+
+* what was I doing?
+
+The agents lesson calls time the missing sense. With one event shape, catch
+me up is a filter and a sort, not an apology.
+
+#+begin_src js :action catch up agent-doc
+for (const e of nb.events().filter((e) => e.who === "agent-doc").sort((a, b) => a.t - b.t)) {
+  print(`t plus ${e.t}: ${e.what} (${e.ms}ms)`);
+}
+print("a mechanical answer to: what was this agent doing, and in what order?");
+#+end_src
+
+In the ecosystem the stream is the substrate's own, and what listens to it
+is the [[autopoet.html][gardener]]. Add a few event lines above and run the
+questions again.
+
+#+begin_recipe
+Implement ambient telemetry with one event shape.
+
+Build: an event log where every entry is the same record: time, actor,
+action, duration. Three queries over it: counts grouped by any field; a
+timing table per action with calls, total, and worst, sorted by total; and
+catchUp(actor), the actor's events in time order as a readable story.
+
+Requirements:
+- One shape for all emitters: agents, renders, tool calls. No per-source
+  formats.
+- catchUp answers what an actor was doing and in what order, mechanically,
+  with no model in the loop.
+- Surface the worst outlier per action; that is the issue a gardener files.
+
+Acceptance: given a day of mixed events, all three queries answer without
+any source-specific code paths.
+#+end_recipe

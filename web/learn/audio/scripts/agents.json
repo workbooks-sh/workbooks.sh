@@ -1,0 +1,51 @@
+{
+ "slug": "agents",
+ "title": "Agents — the crew",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Not a chat window",
+   "text": "Lesson five — agents. [curious] An agent here is not a chat window… it's a long-running worker. A model on a schedule — with files, tools, and memory — living on an engine you own. This lesson is how the construct works… and where its edges are."
+  },
+  {
+   "id": "problem",
+   "title": "Not a chatbot",
+   "text": "Strip away the hype… and an agent is a simple construct. A model… in a loop… with tools. The strange part is how the industry runs them. Like serverless functions — summoned for a message… evaporated right after — and then everyone wonders why they forget everything, repeat work, and can't be trusted with anything longer than a conversation. [sighs] But nothing about an agent is ephemeral. The whole point is memory. Files. Schedules. Follow-through… time. People feel this so strongly, they've taken to parking Mac minis in closets — [chuckles] just to give an agent somewhere permanent to exist. The instinct is right. The hardware… is silly. [excited] An agent isn't a function call. It's a long-running thing."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. An agent is a long-running worker in the ecosystem. A model on a schedule… with files, tools, and memory… and a place to live. Hired for outcomes — not messages. The mental model shift is from conversation… to tenure. [curious] You don't summon an agent. You give it a workspace, and a beat… and it carries work between your sessions."
+  },
+  {
+   "id": "needs",
+   "title": "What an agent actually needs",
+   "text": "[curious] So what does an agent actually need? Four things — and they're the same four a human colleague needs from a computer. Files… a workspace it owns. Here, that's inside a workbook — the virtual file system riding in the artifact it's tending. Processes… real programs to run, in the workbook's WebAssembly lane — sandboxed by construction. Memory… and not a vector database bolted on the side. The workbook's org layer. Notes, decisions, task states — it reads and writes them like you do. And time… schedules, persistence, the ability to exist while you're away. That's what docking is for. The Nexus is where agents live. [curious] And notice what's not on the list… [whispers] your operating system. An agent here never touches it."
+  },
+  {
+   "id": "onetool",
+   "title": "One tool, many toolkits",
+   "text": "Agents in this ecosystem get exactly one tool. [chuckles] One. A shell. Every capability beyond it comes from toolkits — real programs on the path, each carrying the manual that teaches its use. No bespoke integration per tool. No N-by-M plugin matrix. No… protocol zoo. [excited] An agent that can read a manual and run a command can use anything the ecosystem has — the same way you can."
+  },
+  {
+   "id": "chronology",
+   "title": "The missing sense is time",
+   "text": "[curious] Ask today's agents the questions that actually matter on real work. When did this happen? Why did we decide that… then? What was I doing before this? And they shrug. [chuckles] Context windows hold text — not chronology. Here… chronology is ambient. The org layer's tasks carry states and dates natively. The workbook carries its own history. Telemetry is part of the substrate. An agent that can answer \"what was I doing, and why\"… is the difference between a goldfish and a colleague. And it falls out of the grammar — not out of a bigger model."
+  },
+  {
+   "id": "boundaries",
+   "title": "Crew, not autopilot",
+   "text": "Honesty section — and a values one. The pitch is never \"software that runs itself.\" It's people and AI… building together. Agents here are crew. They carry work between your sessions, file what they found… and stop at the edges you set. Direction stays human. And the edges are real — not vibes. An agent's blast radius is its sandbox. Its capabilities are explicit grants. And what it changes is written in a layer you can read… diff… and revert. Trust is earned in increments — and the architecture is built so the increments are safe to give."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire — the questions people actually ask. [curious] Which models do agents use? Any. The construct is model-agnostic — an agent definition names its model the way it names its toolkits. Swap either without touching the rest. Can an agent modify the system itself? Only the declarative layer — toolkits, skills, definitions — never the engine. That boundary is the Autopoet's whole story… and it's the next lesson. [curious] How do I see what an agent did while I was away? Read its org layer. The task states and notes it kept… are the timesheet. And what does it cost to run one? Your engine… your meter. Agents live on a Nexus you own — so the marginal cost is model calls. [chuckles] Not a per-second rental for the computer they exist on."
+  },
+  {
+   "id": "outro",
+   "title": "Wrapping up",
+   "text": "So… that's an agent here. Not a chat window — a colleague. With files, tools, memory… and time. [curious] And once a crew is working, one more question appears — who keeps the whole toolbox getting better? That's the gardener. [excited] The Autopoet."
+  }
+ ]
+}

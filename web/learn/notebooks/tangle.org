@@ -1,0 +1,76 @@
+#+TITLE: tangling source blocks
+#+CATEGORY: grammar
+#+DEK: Code lives inside the explanation, and the kernel compiles the document into a build plan. Watch a real workflow tree become a world.
+
+* code inside the explanation
+
+Literate programming's stubborn idea: the document is the source of truth,
+and builds are derived from it. In this ecosystem that is not a metaphor.
+A workflow headline with component children below it is what the engine
+actually deploys. Here is one, as editable org.
+
+#+begin_src org :name doc
+* site build                                  :workflow:
+** render                                     :component:
+,#+begin_src js :out page
+export const page = () => "<h1>hello</h1>";
+,#+end_src
+** publish                                    :component:
+,#+begin_src js :in page :out site
+export const publish = (page) => "deployed: " + page;
+,#+end_src
+#+end_src
+
+* compile the document into a plan
+
+The kernel walks the tree and emits the build plan: components, the data
+edges between them, and what the world imports and exports. This is the
+same function the engine runs when you push a workbook.
+
+#+begin_src js :action compute the tangle plan
+const plan = nb.oql.tanglePlan(nb.org("doc"));
+const w = plan.worlds[0];
+if (!w) { print("no workflow found - the :workflow: tag is the entry point"); return; }
+print("world:", w.name);
+for (const c of w.components) print(`  component ${c.name} (${c.lang})  in: ${c.in || "none"}  out: ${c.out || "none"}`);
+for (const e of w.edges) print(`  edge: ${e.from} feeds ${e.to}`);
+print("exports:", w.exports.join(", ") || "none");
+#+end_src
+
+* validate before you build
+
+Break the document and the kernel tells you exactly what is wrong. Try it:
+in the source above, change =:in page= to =:in pages= and run this again.
+
+#+begin_src js :action validate the workflow
+const diags = nb.oql.validate(nb.org("doc"));
+if (!diags.length) print("clean - every input has a producer, every component has a language");
+for (const d of diags) print(`${d.level}: ${d.scope} - ${d.message}`);
+#+end_src
+
+The commas before the inner block markers are org's own escaping for
+blocks nested inside blocks; the page strips them for display. Read the
+[[org.html][grammar lesson]] for why source blocks carry header arguments,
+and the [[toolkit.html][toolkit lesson]] for where compiled components run.
+
+#+begin_recipe
+Implement tangle for org documents using a canonical org parser.
+
+Build: a compiler that reads an org document where a headline tagged
+:workflow: contains children tagged :component:, each carrying a source
+block with header args (:in name, :out name). Emit a build plan: the
+component list with languages, data edges computed by matching one
+component's :out to another's :in, and the world's exports (outputs nobody
+consumes).
+
+Requirements:
+- Parse with a real org parser; respect org's comma-escaping for nested
+  blocks.
+- Validate before building: every :in must have an upstream producer, and
+  every component must have a source language. Diagnostics name the exact
+  component.
+- The document is the only build input; no side manifest.
+
+Acceptance: a two-component document produces a plan with one edge and one
+export, and breaking an :in reference produces exactly one named error.
+#+end_recipe

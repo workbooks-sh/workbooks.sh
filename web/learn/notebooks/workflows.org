@@ -1,0 +1,102 @@
+#+TITLE: workflows from org
+#+CATEGORY: orchestration
+#+DEK: A plan written in org is an executable graph. Parse it with the real kernel, ask what is ready, and run the whole board.
+
+* a plan you can parse
+
+The org lesson makes a claim: a plan written in org is machine-readable
+without an AI in the loop. Here is a real plan, as editable org. Everything
+below reads it live, using the same parser the rest of the ecosystem uses,
+running as WebAssembly inside this page.
+
+States are the =TODO= and =DONE= keywords. Dependencies live in a
+properties drawer, the canonical org way to attach data to a headline.
+
+#+begin_src org :name plan :view doc
+* TODO ship the landing page
+** DONE write copy
+** TODO render hero art
+** TODO build page
+   :PROPERTIES:
+   :DEPENDS: render-hero-art
+   :END:
+** TODO deploy
+   :PROPERTIES:
+   :DEPENDS: build-page
+   :END:
+#+end_src
+
+* parse it with the real kernel
+
+Press the button. The plan above goes through the actual org kernel and
+comes back as rows: level, state, title, and the properties you wrote.
+
+#+begin_src js :action parse the plan
+const rows = nb.oql.headlines(nb.org("plan"));
+for (const h of rows) {
+  const dep = h.props.DEPENDS ? "   depends on: " + h.props.DEPENDS : "";
+  print(`${"  ".repeat(h.level - 1)}${h.state || "    "}  ${h.title}${dep}`);
+}
+return rows.length + " headlines, parsed canonically";
+#+end_src
+
+* ask what is ready
+
+The scheduler question every board answers: which tasks are unblocked right
+now? A task is ready when it is TODO and every dependency is DONE.
+
+#+begin_src js :action show what is ready
+nb.slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+nb.board = () => nb.oql.headlines(nb.org("plan")).filter((h) => h.state);
+nb.ready = () => nb.board().filter((t) =>
+  t.state === "TODO" &&
+  (!t.props.DEPENDS || nb.board().some((x) => nb.slug(x.title) === t.props.DEPENDS && x.state === "DONE"))
+);
+const r = nb.ready().map((t) => t.title);
+print(r.length ? "ready now: " + r.join(", ") : "nothing is ready");
+#+end_src
+
+* run the board
+
+Execute the ready tasks, write their new states back into the plan above,
+and repeat until the board is clear. Watch the plan itself change. That is
+the whole trick: the document is the state.
+
+#+begin_src js :action run the board
+if (!nb.ready) throw new Error("run the previous step first");
+let round = 0;
+while (nb.ready().length && round < 10) {
+  round++;
+  for (const t of nb.ready()) {
+    nb.org("plan", nb.org("plan").replace("TODO " + t.title, "DONE " + t.title));
+    print(`round ${round}: finished ${t.title}`);
+  }
+}
+const left = nb.board().filter((t) => t.state === "TODO").length;
+print(left === 0 ? "board clear in " + round + " rounds. Scroll up: the plan says DONE everywhere." : left + " tasks still blocked");
+#+end_src
+
+Notice what you never wrote: an execution order. The order fell out of the
+dependencies. That is why plans live in [[org.html][the grammar]] instead
+of a script. Edit the plan above, change a dependency, and run it again.
+
+#+begin_recipe
+Implement an org-driven workflow runner.
+
+Build: a runner that reads a plan written as org headlines with TODO and
+DONE states, where dependencies are declared in a properties drawer
+(:DEPENDS: task-id). It computes which tasks are ready (TODO with all
+dependencies DONE), executes them, writes the new state back into the org
+file, and repeats until the board is clear or stuck.
+
+Requirements:
+- Parse org canonically (use a real org parser, not regexes).
+- The plan file is the only source of truth. No execution order anywhere
+  else; order falls out of dependencies.
+- Detect and report cycles and dependencies that name no real task,
+  instead of hanging.
+- After each round, persist updated states so progress survives a crash.
+
+Acceptance: reordering headlines in the plan must not change the execution
+order; adding a dependency must.
+#+end_recipe

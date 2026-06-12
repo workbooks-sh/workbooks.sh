@@ -128,6 +128,9 @@ pub fn render(org: &str) -> String {
 // cargo-component generates `bindings` from wit/world.wit at build time. The
 // Component wraps the pure API above; behavior is identical to before the rlib
 // split. Compiled only for the wasm target so the native rlib stays clean.
+#[cfg(feature = "browser")]
+mod browser_abi;
+
 #[cfg(feature = "component")]
 #[allow(warnings)]
 mod bindings;

@@ -1,0 +1,10 @@
+{
+ "notebooks": [
+  { "id": "loops",       "title": "the agent loop",              "layer": "agents",        "domain": "platform", "dek": "a model, in a loop, with tools — built in four cells" },
+  { "id": "workflows",   "title": "workflows from org",          "layer": "orchestration", "domain": "platform", "dek": "an editable org plan drives a real scheduler" },
+  { "id": "context",     "title": "the context repository",      "layer": "agents",        "domain": "platform", "dek": "agent memory as org — remember, recall, compact" },
+  { "id": "tangle",      "title": "tangling source blocks",      "layer": "grammar",       "domain": "platform", "dek": "code lives in the doc; tangle out, untangle back" },
+  { "id": "telemetry",   "title": "telemetry, ambient",          "layer": "observability", "domain": "platform", "dek": "one event shape → counters, spans, chronology" },
+  { "id": "validations", "title": "validating the layer",        "layer": "quality",       "domain": "platform", "dek": "catch three real contradictions in a drifted org tree" }
+ ]
+}

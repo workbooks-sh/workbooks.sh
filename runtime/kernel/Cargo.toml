@@ -18,6 +18,9 @@ crate-type = ["cdylib", "rlib"]
 # native AND wasm) depend with default-features = false → no component glue.
 default = ["component"]
 component = ["dep:wit-bindgen-rt"]
+# plain wasm32-unknown-unknown cdylib with a minimal ptr/len ABI for direct
+# browser instantiation (the learn-site notebooks). No new deps.
+browser = []
 
 [dependencies]
 serde_json = "1"
@@ -38,3 +41,4 @@ world = "oql"
 opt-level = "z"
 lto = true
 codegen-units = 1
+

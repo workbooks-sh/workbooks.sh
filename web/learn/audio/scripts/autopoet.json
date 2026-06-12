@@ -1,0 +1,51 @@
+{
+ "slug": "autopoet",
+ "title": "Autopoet — the gardener",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "The standing gardener",
+   "text": "Lesson six — the Autopoet. The Autopoet is the ecosystem's standing gardener. It reads how the system is doing… and tends the declarative layer. Toolkits… skills… definitions. Never the engine. [curious] This lesson is why that's safe to want. And honestly… how young it is."
+  },
+  {
+   "id": "problem",
+   "title": "Software rots by default",
+   "text": "Entropy is undefeated. Dependencies drift. Docs quietly stop being true. The workaround becomes load-bearing… and the person who understood the cron job leaves. [sighs] Every fix requires a human to reopen the project, reload the context, and spend an afternoon. So most fixes never happen. Shipped software starts dying the day it ships. And here's the thing. The real promise of agents was never that they type faster than you. It's that improvement can become a standing process… instead of a heroic act. [excited] That standing process needs three things. A name… a safe lane… and a leash. Which is exactly what this lesson is about."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. The Autopoet is the ecosystem's gardener. A standing process that reads how the system is doing, and tends its declarative layer. Toolkits… skills… agent definitions… and never the engine itself. The name is from autopoiesis. \"Self-making\" — the biologists' word for systems that maintain themselves. It's not a product feature. It's a role the architecture makes safe to fill."
+  },
+  {
+   "id": "safe",
+   "title": "Why this is safe to want",
+   "text": "[chuckles] \"Software that edits itself\" sounds like the beginning of an incident report. The reason it isn't, here, comes down to one boundary the whole ecosystem is built around. The host — the engines — is deploy-fixed. Never self-edited. The loaded layer — toolkits, skills and manuals, agent definitions — is what the Autopoet tends. It edits the garden… never the ground. And everything in that garden is declarative. Written in the grammar… parseable… versioned… testable… and run inside the sandbox. [excited] Which means every change the Autopoet makes is the safest kind of change software can receive. A reviewable diff to configuration — not a mutation to a running engine."
+  },
+  {
+   "id": "does",
+   "title": "What it actually does",
+   "text": "[curious] What does it actually do? A loop — humble on purpose. Four steps. Step one: listen. Telemetry from the engine… and issues filed by the working crew. Agents are encouraged to file metacognitive tickets. [chuckles] \"My toolkit lacks a verb for this\"… \"this manual misled me here.\" Step two: tend. Implement the fix in the declarative layer. Extend a toolkit… correct a manual… tune a definition. Step three: verify. Build, test, sandbox-run. The same gates any change passes. And step four: swap. Loaded artifacts hot-swap. Nothing reboots. Nothing is redeployed. [excited] And the first resident is real. This project's own landing-site crew files issues about its tools… and the Autopoet lands the fixes. Workbooks in the wild… tending their own toolbox."
+  },
+  {
+   "id": "homogeneity",
+   "title": "You can't learn from noise",
+   "text": "[curious] Why does this need the rest of the ecosystem? Because improvement needs signal. When every project speaks its own stack — different formats, different logs, different plugin zoos — the data describing \"how it's going\" is noise. And nothing systematic can learn from noise. One grammar in… one telemetry shape out. Now patterns are visible. And the gardener can actually see which plants are thirsty. [excited] The tooling was never the interesting part. Consistent improvement is."
+  },
+  {
+   "id": "honest",
+   "title": "The youngest idea here",
+   "text": "Full honesty. The Autopoet is the most frontier construct in these lessons. Younger than toolkits… younger than everything. Today, it is an agent-and-process loop, editing the declarative layer behind gates. The long bet — models that read live runtime data and propose changes the way a forecaster reads weather — that's research… not product. And we'd rather tell you that, than imply otherwise. One thing it will never be, at any maturity… a pitch about software that runs itself. The ecosystem's whole shape is people and AI building together. The Autopoet is just the part that keeps what you built getting better… between your sessions."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Can it break production? Its lane is the declarative layer. Parseable… versioned… sandbox-run… gated by the same checks as any change. And revertible, like any diff. The engine itself is out of reach — by construction, not by policy. Can I turn it off? Yes. It's a standing process on your engine… not a property of the system. Stop it, and you simply have software that improves only when someone shows up. [chuckles] Like everything else you've ever run. Does it ever write engine code? Never. The host-loaded boundary is the design's spine. And — is this just AGI marketing? No. And the mundanity is the point. Telemetry in… reviewable diffs out. [chuckles] The most magical thing about it is how unmagical every individual step is."
+  },
+  {
+   "id": "outro",
+   "title": "Wrapping up",
+   "text": "So that's the Autopoet. The standing process that keeps what you built improving between your sessions… inside a boundary that makes it boring, in the best way. [curious] One lesson left. The tool that drives all of it, from your terminal. wbx."
+  }
+ ]
+}
