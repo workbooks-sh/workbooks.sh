@@ -43,11 +43,19 @@ defmodule Workbooks.UdpBroker do
   defp do_request(ip, port, datagram, max, timeout) do
     case :gen_udp.open(0, [:binary, active: false]) do
       {:ok, sock} ->
-        :ok = :gen_udp.send(sock, ip, port, datagram)
-
+        # wb-8w8x: CONNECT the socket to the pinned peer so the kernel only delivers datagrams FROM {ip,port}
+        # (the old unconnected socket returned the first datagram from ANY source — spoofable reply injection).
         res =
-          case :gen_udp.recv(sock, 0, timeout) do
-            {:ok, {_addr, _port, data}} -> {:ok, cap(data, max)}
+          with :ok <- :gen_udp.connect(sock, ip, port),
+               :ok <- :gen_udp.send(sock, datagram),
+               {:ok, {addr, src_port, data}} <- :gen_udp.recv(sock, 0, timeout) do
+            # belt-and-suspenders: even with connect, verify the reply came from the pinned peer
+            if addr == ip and src_port == port do
+              {:ok, cap(data, max)}
+            else
+              {:error, :spoofed_source}
+            end
+          else
             {:error, reason} -> {:error, {:recv_failed, reason}}
           end
 

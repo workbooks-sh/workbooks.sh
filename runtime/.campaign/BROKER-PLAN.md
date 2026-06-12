@@ -1326,3 +1326,10 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   size was unbounded (multi-MB keys) and the quota counted ENTRIES not bytes (10k × 1MB = 10GB/tenant).
   StorageBroker.put now caps byte_size(key) (@max_key_bytes 1024 -> :key_too_large) and enforces a per-tenant
   TOTAL-BYTE quota (@max_tenant_bytes 64MiB via a SUM(LENGTH(value)) query). 9 storage tests green.
+- 2026-06-12 (iter 96 cont): **FIXED wb-8w8x item: UDP source validation (LOW).** UdpBroker.do_request now
+  :gen_udp.connect(sock, ip, port) to the resolve-then-pinned peer (kernel only delivers datagrams FROM that
+  peer — closes spoofed-reply injection) + belt-and-suspenders verifies {addr,port}==pinned before returning
+  (else :spoofed_source). The moduledoc's prior "connect to the checked IP" claim is now TRUE. Existing real
+  DNS-roundtrip test (1.1.1.1:53) green -> the connect+verify path works end-to-end. THIS FIRE total: 3
+  wb-8w8x items fixed (RateLimiter atomicity, storage key/byte caps, UDP source). Remaining batch + wb-an2v
+  (tenant isolation, needs command-lane tenant threading) next.
