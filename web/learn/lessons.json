@@ -79,6 +79,28 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Hand a workbook to anyone with cryptographic identity attached: did:key signatures, single authentication, and what the recipient can verify without an account."
+            },
+            {
+              "slug": "postures",
+              "title": "postures",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Every workbook route has a security stance — public, gated_data, or gated_route — and the anti-leak invariant that decides what may be baked into a static file versus served only behind the auth ladder."
+            },
+            {
+              "slug": "publishing",
+              "title": "publishing",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Publish is distribution, not deploy: publish.org declares a surface (cloudflare-pages, gh-pages, self-hosted) with init/validate/apply convergence, ships only ASSEMBLED workbooks (bundle first), prints custom-domain URLs via PUBLISH_DOMAIN, and stays a separate axis from standing up the engine."
             }
           ]
         },
@@ -200,6 +222,61 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "No ambient network, ever: how brokered TCP/UDP/TLS and engine-held HTTP give workbooks exactly the connections they were granted."
+            },
+            {
+              "slug": "channels",
+              "title": "channels",
+              "sub": "implementation",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Messaging channels as runtime capabilities: credentials live host-side, adapters self-configure off env, and unknown senders are parked behind a pairing-code allowlist before anything reaches the inbox."
+            },
+            {
+              "slug": "secrets",
+              "title": "secrets",
+              "sub": "concept",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Secrets-by-reference: variables marked secret are ref-only — agents substitute {{secret:KEY}} placeholders, the host injects real values only at egress, and the deploy kit stages declared secret names per deployment and delivers values through provider hooks without ever baking them into images or config."
+            },
+            {
+              "slug": "browsing",
+              "title": "browsing",
+              "sub": "implementation",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The runtime's web capability: a free native browser by default, with fetch/crawl/search each routable to a swappable provider (Firecrawl, Exa, proxies) via config — no caller ever changes."
+            },
+            {
+              "slug": "tokens",
+              "title": "tokens",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Credentials with a no-rotation discipline: first cloud apply generates a 256-bit WB_PUBLIC_BEARER once and persists it (rotation would 401 every live client), clients present it as WB_ENGINE_TOKEN, and WB_SIGNING_KEY pins a stable DID across redeploys so prior signatures and ledgers keep verifying."
+            },
+            {
+              "slug": "changelogs",
+              "title": "changelogs",
+              "sub": "implementation",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Published apps serve their own history: an anonymous read-only /_changes feed (git log + agent status, public-plane rules) that the page itself consumes — classifying who made each commit, collapsing quiet human groups, and narrating the work live so visitors watch people and agents build together."
             }
           ]
         },
@@ -277,6 +354,17 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Verify and eval as the toolkit's quality gates: structural checks (manifest, skills, exec, caps, provenance), then bundled evals/*.org cases where an agent is run against a :TASK: with the toolkit's own manual injected and a judge model scores the result and tool trace against a :RUBRIC:."
+            },
+            {
+              "slug": "commands",
+              "title": "commands",
+              "sub": "mechanics",
+              "color": "#f3c5a3",
+              "icon": "../toolkit-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "A command is a CLI converted to sandboxed WASM — stdin in, stdout out, invoked by name through the Dock — and guests exec each other's commands only through a default-deny broker with structural argv and bounded nesting."
             }
           ]
         }
@@ -371,6 +459,17 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Tags as structure: categorize headlines, drive queries, and carry meaning machines can filter on."
+            },
+            {
+              "slug": "claims",
+              "title": "claims",
+              "sub": "concept",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Turn raw founder talk into an auditable working document: every load-bearing claim extracted as an org TODO item with an honesty status (CLAIMED → VALIDATING → KEPT/PARTIAL/UNKEPT/FUTURE/RETRACTED), every terminal status citing evidence — the gap between the spoken system and the shipped system becomes the backlog."
             }
           ]
         },
@@ -481,6 +580,39 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Judge agent output systematically: briefs in, judged runs out — the evaluation bench as a standing practice."
+            },
+            {
+              "slug": "the-ledger",
+              "title": "the ledger",
+              "sub": "concept",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "From editable step logs to tamper-evident provenance: every agent run's _steps.jsonl is hash-chained over raw bytes and the head is signed with the tenant's Ed25519 did:key, making runs verifiable and attributable."
+            },
+            {
+              "slug": "fleets",
+              "title": "fleets",
+              "sub": "implementation",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Run a multi-agent keeper from one declared org manifest: a worker per member with its own def, lifecycle, and namespaced state — staggered boots, a global concurrency gate that queues runs, and board claims as a def-level protocol the runtime deliberately does not enforce."
+            },
+            {
+              "slug": "rehearsals",
+              "title": "rehearsals",
+              "sub": "mechanics",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Self-demos for agents whose last hop can't be CI: drive the real persona and real tools through the production bridge with scripted human lines and no external service, writing a transcript that proves the whole conversation layer end-to-end."
             }
           ]
         },
@@ -547,6 +679,28 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Why the same crate compiles to your laptop and into the engine's sandbox — one Io trait (http/read/write/spawn) as the only place the two targets differ, native std/reqwest on one side, Dock-brokered host imports on the other, plus engine discovery via runtime.json."
+            },
+            {
+              "slug": "recipes",
+              "title": "recipes",
+              "sub": "implementation",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Bring-your-own-cloud without a recompile: a provider is a bootstrap.sh that sources the neutral recipe spine and fills five hooks (ensure_app, set_secrets, attach_volume, deploy_image, public_url) plus the lifecycle trio; recipes resolve from WB_PROVIDERS_DIR, the repo, or copies embedded in the binary — fly is just the bundled one."
+            },
+            {
+              "slug": "distribution",
+              "title": "distribution",
+              "sub": "setup",
+              "color": "#d9dbd3",
+              "icon": "icons/wbx.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "One static binary, three install lanes: a GitHub Release tagged wbx-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and wbx upgrade self-swaps the binary in place — plus a wb.wasm target published for in-sandbox agents."
             }
           ]
         },
@@ -634,6 +788,17 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "How a live plan changes safely — the Motoko/Candid-style subtyping rules (exports may grow but never shrink, imports may shrink but never grow, an output type may never change) that let the kernel refuse a breaking redeploy before it runs."
+            },
+            {
+              "slug": "dispatch",
+              "title": "dispatch",
+              "sub": "implementation",
+              "color": "#f2ddb0",
+              "icon": "icons/workflows.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "A conversational agent that hands work to background workflows and hears back: an authored org workflow per request, a supervised time-bounded run bound to a task ledger, completions queued as feedback the agent drains on its next turn, and a git-visible TASKS.org rendered from the runtime — never hand-edited."
             }
           ]
         },
@@ -711,6 +876,39 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Make FROM reach past the file: register a data-source plugin and a query against its entity routes to a live API instead of the local store — or run the sync daemon and keep a resident, queryable, agent-airgapped mirror of the outside world inside the disk."
+            },
+            {
+              "slug": "vectors",
+              "title": "vectors",
+              "sub": "implementation",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The tenant-scoped semantic index: pure-Elixir Model2Vec embeddings (no model runtime, just vocab + matrix + mean-pool), machine-probed embedding tiers, and one store interface over brute-force SQLite or pgvector ANN."
+            },
+            {
+              "slug": "backends",
+              "title": "backends",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The deploy-kit one-screen config: identical runtime code, swappable storage — blob store as local filesystem or any S3/R2 endpoint, structured data as SQLite or any Postgres URL (which also flips vector search from brute-force to pgvector ANN), with every operation tenant-scoped above the backend so swapping can never widen access."
+            },
+            {
+              "slug": "escrow",
+              "title": "escrow",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "icons/vfs.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Gated bundle bytes are noise without a key release: content keys are escrowed runtime-side behind posture checks, or sealed-box wrapped to recipient X25519 identities so no plaintext-key honeypot ever exists."
             }
           ]
         }
