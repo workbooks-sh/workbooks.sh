@@ -1313,28 +1313,12 @@
 "confidence": "high",
 "verified": false
 },
-"libSQL / Turso": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://github.com/tursodatabase/libsql",
-"recipe": "Lane B (self-contained C), but gated on a codegen step. libSQL's SQLite-fork C lives in libsql-sqlite3/ (language=C, JIT-free, portable, ide",
-"confidence": "high",
-"verified": false
-},
 "Cloudflare D1 (SQLite)": {
 "verdict": "live-likely",
 "lane": "B",
 "source_url": "https://sqlite.org/2024/sqlite-amalgamation-3470200.zip",
 "recipe": "D1 the managed Workers service is closed/network-as-purpose (impossible to replicate as-is), but its substance is SQLite, which has a first-",
 "confidence": "high",
-"verified": false
-},
-"grep": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://ftp.gnu.org/gnu/grep/grep-3.11.tar.gz",
-"recipe": "Lane B (self-contained C), but with a gnulib caveat. GNU grep 3.11 tarball (verified HTTP 200, 2.82 MB) ships a pre-generated `configure` an",
-"confidence": "medium",
 "verified": false
 },
 "awk (gawk)": {
@@ -1393,22 +1377,6 @@
 "confidence": "high",
 "verified": false
 },
-"FreeType": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://gitlab.freedesktop.org/freetype/freetype/-/archive/VER-2-13-3/freetype-V",
-"recipe": "Lane B (self-contained C, our C lane). FreeType 2.13.3 is plain portable C \u2014 verified source tarball (200, 4MB) has NO yacc/bison/lex (.y/.l",
-"confidence": "high",
-"verified": false
-},
-"libsodium": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz",
-"recipe": "Lane B (self-contained C, static lib). Pure C, no TLS/socket/threads. Use the stable RELEASE TARBALL (not git) \u2014 it ships a PREGENERATED aut",
-"confidence": "high",
-"verified": false
-},
 "wolfSSL": {
 "verdict": "live-likely",
 "lane": "B",
@@ -1463,14 +1431,6 @@
 "source_url": "https://getcomposer.org/composer-stable.phar",
 "recipe": "Composer is a pure-PHP phar; no separate wasm to build. Our live `php` IS the WLR plain wasm32-wasi `php-cgi-8.2.6.wasm` (already in runtime",
 "confidence": "medium",
-"verified": false
-},
-"LLVM": {
-"verdict": "live-likely",
-"lane": "A",
-"source_url": "https://registry.npmjs.org/@yowasp/clang/-/clang-22.0.0-git20542-10.tgz",
-"recipe": "ALREADY LIVE in-sandbox \u2014 capability already covered. Our clang lane (runtime/compilers/clang/build.sh) fetches YoWASP's LLVM (@yowasp/clang",
-"confidence": "high",
 "verified": false
 },
 "ffmpeg": {
@@ -1799,13 +1759,6 @@
 "verdict": "live-likely",
 "lane": "B",
 "recipe": "Lane B (self-contained C). Build libcrypto (+ optional libssl/libtls) from the libressl-portable tar",
-"confidence": "high",
-"verified": false
-},
-"Haskell": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "Haskell-the-compiler (GHC) is NOT shippable in-sandbox \u2014 GHC is a huge native cross-compiler with no",
 "confidence": "high",
 "verified": false
 },
