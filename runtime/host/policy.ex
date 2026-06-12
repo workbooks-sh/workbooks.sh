@@ -15,8 +15,16 @@ defmodule Workbooks.Policy do
 
   # `exec` (host_exec / host_parallel_map) and `kv` (durable host_kv) are DEDICATED least-privilege caps,
   # distinct from the broad `commands` / `vfs` — so a profile can grant durable storage or networking WITHOUT
-  # also granting the ability to spawn commands. The three standard profiles keep every capability; `compute`
-  # is the restrictive demo (pure compute + ephemeral vfs only — no exec, no durable kv, no net).
+  # also granting the ability to spawn commands.
+  #
+  # Cap matrix (wb-8w8x audit — keep this in sync with the table):
+  #   * compute — `vfs` ONLY (pure compute + ephemeral vfs; no exec, no durable kv, no secrets, no net).
+  #     This is the FAIL-CLOSED default for an unknown/typo'd profile (see fetch/1).
+  #   * minimal — every LOCAL cap (vfs, commands, exec, kv, secrets, queue) + the SSRF-brokered raw sockets
+  #     (tcp, udp, tls), but NO high-level net egress (net/llm/browse). "minimal network", not "minimal caps":
+  #     a caller selecting it still authorizes signing + raw-socket egress, so pick `compute` for true sandbox.
+  #   * network — minimal + net/llm/browse (host HTTP egress + LLM).
+  #   * posix — network + posix + parallel (the full surface).
   @profiles %{
     minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls), timeout: 5_000},
     network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls net llm browse), timeout: 30_000},
@@ -41,9 +49,10 @@ defmodule Workbooks.Policy do
   def timeout(profile), do: profile |> fetch() |> Map.fetch!(:timeout)
 
   @doc """
-  Whether this profile may use host network (wasi:http + inherit_network +
-  DNS). SECURITY (wb-sec, finding #7): derived from caps — ONLY profiles granting
-  `net` or `browse` get network. `minimal` (caps: vfs, commands) gets NONE.
+  Whether this profile may use host HIGH-LEVEL network (wasi:http + inherit_network
+  + DNS). SECURITY (wb-sec, finding #7): derived from caps — ONLY profiles granting
+  `net` or `browse` get it. `minimal` gets NONE (note: minimal still grants the
+  SSRF-brokered raw-socket caps tcp/udp/tls; this switch is the wasi:http/DNS gate).
 
   In stock wasmex, `WasiP2Options.allow_http` is the single switch that gates
   BOTH `wasmtime_wasi_http::add_only_http_to_linker_sync` AND, in store.rs,
@@ -57,5 +66,7 @@ defmodule Workbooks.Policy do
     "net" in caps or "browse" in caps
   end
 
-  defp fetch(profile), do: Map.get(@profiles, profile, @profiles.minimal)
+  # wb-8w8x: an UNKNOWN/typo'd profile FAILS CLOSED to `compute` (vfs-only) — NOT the over-granting `minimal`.
+  # A misspelled profile must yield LEAST privilege, never silently authorize secrets/exec/kv/raw-sockets.
+  defp fetch(profile), do: Map.get(@profiles, profile, @profiles.compute)
 end

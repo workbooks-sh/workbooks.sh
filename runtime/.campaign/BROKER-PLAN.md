@@ -1376,3 +1376,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   identity partitions KV/secrets end-to-end. 20 tests green incl wb-an2v isolation proof: two un-tenanted
   principals CANNOT read each other's KV (the old "default" leaked it). The audit's most-severe open finding
   is closed.
+- 2026-06-12 (iter 101): **FIXED wb-8w8x policy over-grant (the clear part) — unknown profile FAILS CLOSED.**
+  policy.ex fetch/1 fell back to :minimal (the OVER-granting profile) for an unknown/typo'd profile — a
+  fail-OPEN default that silently authorized secrets/exec/kv/raw-sockets. Now falls back to :compute (vfs-only)
+  — fail-CLOSED, least privilege. Also reconciled the STALE docstrings (module comment + allow_http?) that
+  falsely claimed minimal=vfs,commands; the cap matrix is now documented accurately (minimal = all LOCAL caps
+  + SSRF-brokered raw sockets, NO high-level net). Test: a bogus profile -> caps==[vfs], no exec/secrets/tcp,
+  no http, compute timeout. 18 tests green. The REMAINING part (should minimal itself drop secrets/sockets?)
+  is a DESIGN DECISION with breakage risk + a tested design intent -> filed wb-ltum for a deliberate owner call,
+  NOT changed unilaterally. Residual is bounded (tenant-pinned + SSRF/allow-list/rate floors).

@@ -65,4 +65,15 @@ defmodule Workbooks.PolicyNetworkTest do
       assert out["info"]["profile"] == "minimal"
     end
   end
+
+  test "wb-8w8x: an UNKNOWN/typo'd profile FAILS CLOSED to compute (vfs-only), not over-granting minimal" do
+    # a bogus profile must get LEAST privilege — no exec/kv/secrets/sockets/net
+    caps = Workbooks.Policy.caps(:totally_bogus_profile)
+    assert caps == ~w(vfs)
+    refute "exec" in caps
+    refute "secrets" in caps
+    refute "tcp" in caps
+    refute Workbooks.Policy.allow_http?(:totally_bogus_profile)
+    assert Workbooks.Policy.timeout(:totally_bogus_profile) == Workbooks.Policy.timeout(:compute)
+  end
 end
