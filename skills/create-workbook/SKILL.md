@@ -41,7 +41,7 @@ List every dependency the workbook needs, then classify each against
 - **Interpreted** (qjs / python / ruby / lua / yaegi) → already in-sandbox.
   `wbx toolkit build palette [<runtime>]`, invoke directly.
 - **Compiled** (C / Zig / Rust) → the compiler itself runs in WASM.
-  `wbx compiler build <lang>` then `wbx compiler run`. Recipes:
+  `wb-rt compiler build <lang>` then `wb-rt compiler run`. Recipes:
   `runtime/compilers/<lang>/`.
 - **npm / crate** → resolve → bundle → WASM via the PackageManager lane.
 

@@ -24,7 +24,7 @@ Relevant during authoring:
 | Command | Does |
 |---|---|
 | `wb content check [dir]` | content validation (alternative to `workbook check`) |
-| `wbx compiler build <lang>` / `wbx compiler run` | the compiled-dep WASM lane |
+| `wb-rt compiler build <lang>` / `wb-rt compiler run` | the compiled-dep WASM lane |
 | `wbx toolkit build palette [<runtime>]` | interpreted-runtime palette |
 | `wbx publish apply` | platform publish path |
 | `wbx sign` / `wbx verify` | sign / verify an artifact |

@@ -336,7 +336,7 @@ defmodule Workbooks.CLI do
   # main/1). Every verb is non-interactive, idempotent, and supports `--json`.
   def call(["deploy" | rest], _t), do: elem(deploy_run(rest), 0)
 
-  def call(["version"], _t), do: "wbx #{@version}"
+  def call(["version"], _t), do: "wb-rt #{@version} (engine plumbing — the user CLI is wbx)"
   def call(_, _t), do: usage()
 
   # Dispatch a deploy verb → {rendered_output, failed?}. `--json` anywhere in args

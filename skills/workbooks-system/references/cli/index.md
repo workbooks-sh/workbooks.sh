@@ -62,7 +62,7 @@ HTTP routes: `../http.md`. Org-file specs: `../org-specs.md`. Env: `../env.md`.
 | `wbx toolkit promote <name> <lang> <file>` | promote a session command → a durable workspace toolkit |
 | `wbx toolkit run <id> <task> -- <args>` | run a skill's `:role task` block with positional args |
 | `wbx toolkit sign <id>` | sign a toolkit with the tenant's did:key |
-| `wbx compiler list\|build\|run` | the in-WASM compiler lane (C/Zig/Rust/JS/…) |
+| `wb-rt compiler list\|build\|run` | the in-WASM compiler lane (C/Zig/Rust/JS/…) |
 | `wb isolation` | show the isolation-tier ladder |
 
 ## Configure (`engine.md`)

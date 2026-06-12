@@ -1,4 +1,4 @@
-# Toolkit commands — `wbx toolkit`, `wbx compiler`, `wb isolation`
+# Toolkit commands — `wbx toolkit`, `wb-rt compiler`, `wb isolation`
 
 A toolkit teaches an agent a CLI it has never seen: a directory with a
 `manifest.org` (the `:toolkit:` front door) and `skills/*.org` recipes read
@@ -78,7 +78,7 @@ TOC: list/show/search · verify · eval · build · build-inline/promote · run 
 
 Sign the toolkit with the tenant's did:key (the third-party-trust rail).
 
-## Compiler lane — `wbx compiler`
+## Compiler lane — `wb-rt compiler`
 
 The in-WASM compiler toolchain (zero native execution; compilers run in the sandbox).
 

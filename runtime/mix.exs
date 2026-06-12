@@ -13,7 +13,7 @@ defmodule Workbooks.MixProject do
       # app: nil → the escript does NOT auto-start :workbooks (which would load the
       # OQL/wasmex NIF, impossible from an escript archive). CLI.main starts the app
       # itself only for verbs that need the runtime; `wb deploy` stays NIF-free.
-      escript: [main_module: Workbooks.CLI, name: "wbx", app: nil],
+      escript: [main_module: Workbooks.CLI, name: "wb-rt", app: nil],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
