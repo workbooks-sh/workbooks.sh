@@ -477,6 +477,33 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # PCRE2 (Perl-compatible regex). Ships pre-generated headers (config.h.generic / pcre2.h.generic /
+  # pcre2_chartables.c.dist) so NO ./configure is needed — committed as fixtures + read at compile time,
+  # injected as config.h / pcre2.h / pcre2_chartables.c (with -I/work so src/*.c find them).
+  @pcre2_config File.read!(Path.join(__DIR__, "../priv/pcre2/config.h"))
+  @pcre2_h File.read!(Path.join(__DIR__, "../priv/pcre2/pcre2.h"))
+  @pcre2_tables File.read!(Path.join(__DIR__, "../priv/pcre2/pcre2_chartables.c"))
+  @pcre2_main ~S"""
+  #define PCRE2_CODE_UNIT_WIDTH 8
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "pcre2.h"
+  int main(int argc, char** argv) {
+    if (argc < 2) { fprintf(stderr, "usage: pcre2 <pattern>\n"); return 1; }
+    int err; PCRE2_SIZE eoff;
+    pcre2_code *re = pcre2_compile((PCRE2_SPTR)argv[1], PCRE2_ZERO_TERMINATED, 0, &err, &eoff, NULL);
+    if (!re) { fprintf(stderr, "bad pattern\n"); return 1; }
+    pcre2_match_data *md = pcre2_match_data_create_from_pattern(re, NULL);
+    char line[8192];
+    while (fgets(line, sizeof(line), stdin)) {
+      size_t len = strlen(line); if (len && line[len - 1] == '\n') line[--len] = 0;
+      if (pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, md, NULL) >= 0) printf("%s\n", line);
+    }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -604,6 +631,17 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "pcre2",
+      url: "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz",
+      sha: "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16",
+      build_opts: [
+        src_globs: ["src/pcre2_*.c", "src/*.h"],
+        exclude: ~w(pcre2_dftables.c pcre2_jit_test.c pcre2_fuzzsupport.c),
+        cflags: ["-DPCRE2_CODE_UNIT_WIDTH=8", "-DHAVE_CONFIG_H", "-I/work"],
+        extra_sources: [{"config.h", @pcre2_config}, {"pcre2.h", @pcre2_h}, {"pcre2_chartables.c", @pcre2_tables}, {"pmain.c", @pcre2_main}]
+      ]
     }
   ]
 

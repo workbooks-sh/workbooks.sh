@@ -110,6 +110,73 @@
 "recipe": "libjpeg-turbo WLR CLIs (cjpeg/djpeg/jpegtran)",
 "smoke": "cjpeg PPM->JPEG, SOI ff d8",
 "extent": "JPEG encode/decode/transform via cjpeg/djpeg/jpegtran (stdin/stdout)"
+},
+"PCRE2": {
+"verdict": "live",
+"lane": "B",
+"recipe": "pcre2 10.47 lib + injected generics (config/pcre2.h/chartables) + grep main",
+"smoke": "'^b' => banana,blueberry",
+"extent": "Full PCRE2 (interpreted, no JIT); grep-style line match"
+},
+"Grain": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Grain's compiler ships ONLY as a native ELF x86-64 binary (no .wasm release asset) and its source is OCaml/Reason (dune/esy) \u2014 not buildable on any of our in-sandbox lanes (not C, not a bare Rust crate, not Python/QuickJ",
+"extent": "off-the-table (verified)"
+},
+"PureScript": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "purs is a GHC-Haskell native binary with a large cabal dependency graph; no prebuilt wasm32-wasi asset exists on any source (project releases ship native-only; vmware-labs has no Haskell). Producing one requires the GHC ",
+"extent": "off-the-table (verified)"
+},
+"Qwik": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Optimizer wasm is a wasm-bindgen module (imports are all __wbg_*/__wbindgen_*, zero wasi_snapshot_preview1) requiring a JS host with an embedded WASM engine (WebAssembly.instantiate) \u2014 i.e. browser/Node. Our in-sandbox J",
+"extent": "off-the-table (verified)"
+},
+"Rollup (@rollup/wasm-node)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No standalone WASI lane exists. The shipped .wasm is a wasm-bindgen JS-host module (zero WASI imports, imports only ./bindings_wasm_bg.js) that contains ONLY the SWC parser+xxhash \u2014 not the bundler. Bundling is implement",
+"extent": "off-the-table (verified)"
+},
+"Boa": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt wasm32-wasi asset (Lane A absent). Lane C (mrustc ~1.74) cannot build it: Boa is edition=2024, MSRV 1.91.0, proc-macro-heavy (boa_macros + ICU4X yoke/zerofrom derives) \u2014 beyond mrustc's ceiling. It WOULD buil",
+"extent": "off-the-table (verified)"
+},
+"pnpm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "pnpm's core purpose is real networking (live npm-registry HTTP fetch) + a hardlink/symlink content-addressed store (fs.link) that WASI fs doesn't provide; also needs node>=22.13, worker_threads, child_process (node-gyp).",
+"extent": "off-the-table (verified)"
+},
+"Zig build / zigmod": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: zigmod's core function is git-cloning + HTTP-fetching remote Zig packages (deps zig-git, zig-nio/nfs) \u2014 dead in a no-real-networking sandbox. Plus native-threads runtime (std.Io.Threaded), circular se",
+"extent": "off-the-table (verified)"
+},
+"Binaryen (wasm-opt)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "C++ exceptions are load-bearing and cannot be compiled out. Upstream issue WebAssembly/binaryen#5206 \"standalone (non-js) binaryen.wasm\" is still OPEN (since 2022); the contributor who tried wasi-sdk reported: threads ar",
+"extent": "off-the-table (verified)"
+},
+"Rome / Biome": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only wasm shipped is a wasm-bindgen JS-host pair (biome_wasm.js + _bg.wasm) that imports __wbindgen_* and has no _start \u2014 won't instantiate under bare wasmtime. No plain wasm32-wasi asset exists anywhere (releases native",
+"extent": "off-the-table (verified)"
+},
+"Ber/SWI-Prolog VM": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "The sole maintained wasm port is Emscripten-targeted and JS-host-coupled by design: cmake/port/Emscripten.cmake sets SWIPL_ARCH=wasm-emscripten with Emscripten-only -fwasm-exceptions/-sSUPPORT_LONGJMP=wasm and an Emscrip",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -141,6 +208,86 @@
 "smoke": "After a successful build to sed.wasm: printf 'hello world\\n' | wasmtime sed.wasm 's/world/wasm/'  => expected stdout: \"h",
 "blocker": "No verifiable clean lane: (A) no plain wasm32-wasi sed binary exists anywhere I could confirm \u2014 uutils coreutils.wasm has no sed applet, wasmer registry empty, no busybox-wasi release; (B) GNU sed 4.9",
 "confidence": "medium",
+"verified": false
+},
+"Wuffs": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://raw.githubusercontent.com/google/wuffs/v0.4.0-alpha.9/release/c/wuffs-v0",
+"recipe": "Wuffs-the-library ships as a PRE-TRANSPILED single-file C header library (stb-style) at release/c/wuffs-vMAJOR.MINOR.c \u2014 NO transpiler, codegen, configure, or m",
+"confidence": "high",
+"verified": false
+},
+"J": {
+"verdict": "uncertain",
+"lane": "B",
+"source_url": "https://github.com/jsoftware/jsource",
+"recipe": "Source build only (no prebuilt WASI exists \u2014 verified absent in vmware-labs/webassembly-language-runtimes and via gh code/repo search). jsrc/ has ~239 plain .c/",
+"confidence": "high",
+"verified": false
+},
+"Dhall": {
+"verdict": "uncertain",
+"lane": "C",
+"source_url": "https://github.com/Nadrieril/dhall-rust",
+"recipe": "Rust impl: Nadrieril/dhall-rust (crate `dhall` 0.13.0 / `serde_dhall`). Pure, total evaluator \u2014 ideal sandbox shape, and upstream already gates network (reqwest",
+"confidence": "high",
+"verified": false
+},
+"SWC (@swc/wasm)": {
+"verdict": "uncertain",
+"lane": "D",
+"source_url": "https://registry.npmjs.org/@swc/wasm/-/wasm-1.15.41.tgz",
+"recipe": "SWC ships NO plain wasm32-wasi module. The published @swc/wasm@1.15.41 (verified 200, 15MB tarball: wasm.js + wasm_bg.wasm + wasm.d.ts) is a wasm-bindgen build:",
+"confidence": "high",
+"verified": false
+},
+"Microbundle": {
+"verdict": "uncertain",
+"lane": "D",
+"source_url": "https://registry.npmjs.org/microbundle/0.15.1",
+"recipe": "JS npm lane (NOT a .wasm). microbundle 0.15.1 is pure JS; bin = dist/cli.js, main = dist/microbundle.js. Pinned deps are all pure-JS npm: rollup ^2.35.1 (CRITIC",
+"confidence": "high",
+"verified": false
+},
+"protoc": {
+"verdict": "live-likely",
+"lane": "D",
+"source_url": "https://registry.npmjs.org/protobufjs-cli/latest",
+"recipe": "protoc itself is C++ with no plain wasm32-wasi build (Lanes A/B/C dead \u2014 see blocker). Use the pure-JS equivalent instead: npm `protobufjs-cli@2.5.4` ships `pbj",
+"confidence": "high",
+"verified": false
+},
+"LLD (wasm-ld)": {
+"verdict": "uncertain",
+"lane": "A",
+"source_url": "",
+"recipe": "No plain wasm32-wasi prebuilt asset confirmed. The runtime-shape is actually ideal \u2014 wasm-ld is the LLVM lld WebAssembly flavor: pure C++, no JIT, no GPU, no ne",
+"confidence": "medium",
+"verified": false
+},
+"flatc": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/google/flatbuffers/tree/v25.12.19-2026-02-06-03fffb2/src",
+"recipe": "flatc is self-contained C++11, fixed explicit source list (NO codegen, NO autotools, NO generated headers missing \u2014 reflection_generated.h ships checked-in), pu",
+"confidence": "high",
+"verified": false
+},
+"JerryScript": {
+"verdict": "live-likely",
+"lane": "B",
+"source_url": "https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v3.0.0.tar.",
+"recipe": "Lane B (self-contained C, CMake cross-build with wasi-sdk). No prebuilt plain-wasi .wasm exists (vmware-labs WLR has none; project releases are source zips only",
+"confidence": "high",
+"verified": false
+},
+"Zend Engine (PHP)": {
+"verdict": "live-likely",
+"lane": "A",
+"source_url": "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/p",
+"recipe": "Prebuilt PLAIN wasm32-wasi PHP CGI binary from VMware Labs WebAssembly Language Runtimes. Two confirmed-live variants at tag php/8.2.6+20230714-11be424: php-cgi",
+"confidence": "high",
 "verified": false
 }
 }
