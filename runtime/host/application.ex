@@ -90,6 +90,12 @@ defmodule Workbooks.Application do
         ok = Enum.count(results, fn {_n, r} -> r == :ok end)
         Logger.info("command pallet — #{ok}/#{map_size(results)} build-from-source tools provisioned")
       end
+
+      if System.get_env("WB_RUST") == "1" do
+        results = Workbooks.Pallet.seed_rust()
+        ok = Enum.count(results, fn {_n, r} -> r == :ok end)
+        Logger.info("command pallet — #{ok}/#{map_size(results)} Rust (Lane C) tools provisioned")
+      end
     end)
 
     trace("start: done")

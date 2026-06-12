@@ -502,6 +502,30 @@ defmodule Workbooks.Pallet do
     }
   ]
 
+  # Lane C — inline Rust recipes (built via mrustc.wasm → clang.wasm → wasm, full std, zero native exec).
+  # Each tool is just data: a name + std-only source. Proves/extends the Rust lane in the catalog.
+  @wfreq_src ~S"""
+  use std::io::Read;
+  use std::collections::HashMap;
+  fn main() {
+      let mut s = String::new();
+      std::io::stdin().read_to_string(&mut s).unwrap();
+      let mut counts: HashMap<String, u32> = HashMap::new();
+      for w in s.split_whitespace() {
+          *counts.entry(w.to_string()).or_insert(0) += 1;
+      }
+      let mut v: Vec<(String, u32)> = counts.into_iter().collect();
+      v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+      for (w, c) in v {
+          println!("{}\t{}", c, w);
+      }
+  }
+  """
+
+  @rust [
+    %{name: "wfreq", source: @wfreq_src, mode: :argv}
+  ]
+
   @doc "The build-from-source catalog (data — sha-pinned source tarballs + proven build recipes)."
   def csource_catalog, do: @csource
 
@@ -527,6 +551,35 @@ defmodule Workbooks.Pallet do
     else
       case CommandRegistry.build_and_register_c_source(n, u, s, opts) do
         {:ok, _addressed} -> :ok
+        other -> other
+      end
+    end
+  end
+
+  @doc "The Rust inline-source catalog (Lane C — name + std-only source + argv mode)."
+  def rust_catalog, do: @rust
+
+  @doc """
+  Build + register every :rust tool in-sandbox (mrustc.wasm → clang.wasm, full std; one-time, then
+  persisted + reloaded at boot). Returns `%{name => :ok | {:error, reason}}`.
+  """
+  def seed_rust, do: Map.new(@rust, fn r -> {r.name, seed_rust_one(r)} end)
+
+  @doc "Build + register one :rust entry by name (or the entry map)."
+  def seed_rust_one(name) when is_binary(name) do
+    case Enum.find(@rust, &(&1.name == name)) do
+      nil -> {:error, :unknown_rust_entry}
+      r -> seed_rust_one(r)
+    end
+  end
+
+  def seed_rust_one(%{name: n, source: src, mode: mode}) do
+    # idempotent: skip if already reloaded from the persisted cache (same as seed_csource_one)
+    if n in CommandRegistry.list() do
+      :ok
+    else
+      case CommandRegistry.build_and_register_inline(n, "rust", src, [], mode) do
+        {:ok, _} -> :ok
         other -> other
       end
     end

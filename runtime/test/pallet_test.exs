@@ -134,4 +134,24 @@ defmodule Workbooks.PalletTest do
     assert {:ok, a2} = CommandRegistry.run("argon2", "password", [])
     assert String.length(String.trim(a2)) == 64
   end
+
+  test "rust catalog entries are well-formed (Lane C)" do
+    refute Pallet.rust_catalog() == []
+
+    for r <- Pallet.rust_catalog() do
+      assert is_binary(r.name) and r.name != ""
+      assert is_binary(r.source) and r.source =~ "fn main"
+      assert r.mode in [:argv, :stdin1]
+    end
+  end
+
+  @tag :pallet
+  @tag timeout: 300_000
+  test "Lane C — a Rust tool builds in-sandbox (mrustc → clang) + runs" do
+    # proves the Rust lane end-to-end as a registered command (std io + HashMap + sort, zero native exec)
+    assert :ok = Pallet.seed_rust_one("wfreq")
+    assert "wfreq" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("wfreq", "the cat the dog the", [])
+    assert out =~ "3\tthe"
+  end
 end
