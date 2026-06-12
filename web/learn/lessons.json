@@ -87,7 +87,8 @@
               "color": "#f2ddb0",
               "icon": "icons/autopoet.svg",
               "audio": true,
-              "status": "live"
+              "status": "live",
+              "added": "2026-06-12"
             }
           ]
         },

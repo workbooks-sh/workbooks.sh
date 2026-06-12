@@ -52,6 +52,7 @@
     '.nav .drop .panel a .cat { font: 700 8.5px var(--mono, monospace); letter-spacing: .08em; color: var(--ink, #121316);',
     '  background: var(--swc, #ddd); border-radius: 5px; padding: 3px 6px; flex: 0 0 auto; }',
     '.nav .drop .panel .nbempty { font: 400 10.5px var(--mono, monospace); color: var(--dim, #565b54); padding: 8px 10px; }',
+    '.nav .drop .panel .subbody { max-height: 340px; overflow-y: auto; }',
     '.nav .drop .panel a.viewall { justify-content: center; font-size: 10.5px; color: var(--dim, #565b54); }',
     '.nav .drop .panel a.viewall:hover { color: var(--ink, #121316); }',
     '.nav a.gh { display: inline-flex; align-items: center; color: var(--ink, #121316); }',
@@ -153,23 +154,24 @@
           ? subs.map(subRow).join("")
           : '<div class="nbempty">nothing deeper here yet — the shelf grows</div>';
       }
-      function showAll() {
-        head.innerHTML = 'deep dives <small>hover a lesson</small>';
-        var html = "";
+      function showRecent() {
+        head.innerHTML = 'deep dives <small>most recent</small>';
+        var all = [];
         cat.tiers.forEach(function (t) {
           t.lessons.forEach(function (l) {
-            (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) {
-              html += subRow(x);
-            });
+            (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) { all.push(x); });
           });
         });
-        body.innerHTML = html || '<div class="nbempty">deep dives appear here as the shelf grows</div>';
+        all.sort(function (a, b) { return (b.added || "").localeCompare(a.added || ""); });
+        // show what fits — the panel scrolls when the shelf outgrows it
+        body.innerHTML = all.slice(0, 8).map(subRow).join("") ||
+          '<div class="nbempty">deep dives appear here as the shelf grows</div>';
       }
-      showAll();
+      showRecent();
       host.querySelectorAll("a[data-slug]").forEach(function (a) {
         a.addEventListener("mouseenter", function () { showSubs(a.dataset.slug); });
       });
-      nav.querySelector("[data-lessons]").addEventListener("mouseleave", showAll);
+      nav.querySelector("[data-lessons]").addEventListener("mouseleave", showRecent);
     })
     .catch(function () {});
 
