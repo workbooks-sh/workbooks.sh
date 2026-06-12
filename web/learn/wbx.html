@@ -42,7 +42,7 @@
   authors, builds, signs, ships, and docks workbooks. The <b>same binary</b> runs on
   your laptop, in CI, and inside the engine, so you and your agents speak one language.</p>
     <div class="meta">
-    <span class="on">the command</span><span>9 min read</span>
+    <span class="on">the command</span><span>13 min read</span>
   </div>
     </div>
     <figure class="heroart">
@@ -62,6 +62,10 @@
   <a href="#definition">The definition</a>
   <a href="#install">Install it</a>
   <a href="#families">The verb families</a>
+  <a href="#modes">Two audiences</a>
+  <a href="#first">First workbook, 2 min</a>
+  <a href="#import">Import anything</a>
+  <a href="#agents">Wire in an agent</a>
   <a href="#everywhere">Same binary everywhere</a>
   <a href="#story">A real session</a>
   <a href="#faq">FAQ</a>
@@ -99,15 +103,20 @@
 
 <section id="install">
   <h2>install IT</h2>
-  <p>Two honest paths today — npm, or a binary straight from the release:</p>
-  <pre class="orgsample">npm install -g @work.books/cli      <i># puts `wbx` on your PATH</i>
-wbx --version                       <i># → wbx 0.12.0</i></pre>
-  <p>macOS (Apple Silicon + Intel) and Linux (x64 + arm64) binaries ship from
+  <p>Two honest paths today — the installer, or npm:</p>
+  <pre class="orgsample">curl -fsSL https://workbooks.sh/cli.sh | sh    <i># detects your OS + arch</i>
+npm install -g @work.books/cli                 <i># same thing, npm-flavored</i>
+wbx --version                                  <i># → wbx 0.13.0</i></pre>
+  <p>macOS (Apple Silicon + Intel), Linux (x64 + arm64), and Windows (x64)
+  binaries ship from
   <a href="https://github.com/workbooks-sh/workbooks.sh/releases">GitHub
   Releases</a> — the npm package is a thin launcher that fetches the right
   one. (The bare npm name <code>wbx</code> belongs to someone else, so the
   package lives at <code>@work.books/cli</code>; the command is wbx either
   way.)</p>
+  <p>Then let the tool check itself:</p>
+  <pre class="orgsample">wbx doctor      <i># env + engine health, what's wired and what isn't</i>
+wbx             <i># bare wbx = where am I — version, engine state, next moves</i></pre>
 </section>
 
 <section id="families">
@@ -117,11 +126,12 @@ wbx --version                       <i># → wbx 0.12.0</i></pre>
   <figure class="diag" aria-label="wbx verb families">
     <div class="d-file">
       <span class="ftag">wbx — one command, five families</span>
-      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">author</span><span class="sub"><b>query · tangle · lint</b> — org in, structure out; the literate-programming surface</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">author</span><span class="sub"><b>init · dev · query · tangle · lint</b> — scaffold, live-preview, and shape org; the literate-programming surface</span></div>
       <div class="d-row"><span class="d-chip" style="background:#a8d4f0">make</span><span class="sub"><b>build · bundle · unbundle · run</b> — compile code to wasm, tangle everything into one artifact</span></div>
       <div class="d-row"><span class="d-chip" style="background:#aee5c2">trust</span><span class="sub"><b>sign · verify · ledger</b> — did:key provenance that travels with the file</span></div>
-      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">parts</span><span class="sub"><b>toolkit · workflow · agent</b> — discover, build, push, and run the extensibility surface</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">parts</span><span class="sub"><b>toolkit · workflow · agent</b> — discover, build, push, import, and run the extensibility surface</span></div>
       <div class="d-row"><span class="d-chip" style="background:#9fc4e8">engine</span><span class="sub"><b>deploy · publish · workbook · rt · var</b> — stand up a Nexus, ship to it, talk to it raw</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#d9dbd3">everyday</span><span class="sub"><b>doctor · status · open · upgrade · completions</b> — the tool looks after itself and you</span></div>
     </div>
     <figcaption class="dcap">plus the library — <b>store · fetch · search · checkout · checkin</b></figcaption>
   </figure>
@@ -129,7 +139,138 @@ wbx --version                       <i># → wbx 0.12.0</i></pre>
   check with <code>validate</code> or <code>lint</code>, act with
   <code>apply</code> or <code>build</code> — declarative org files in,
   converged state out. If you've used one family you've basically used them
-  all.</p>
+  all. And every success suggests the next verb, so the tool teaches its own
+  grammar as you go.</p>
+</section>
+
+<section id="modes">
+  <h2>two AUDIENCES, one binary</h2>
+  <p>Here's the design decision that shapes everything else: wbx knows it has
+  two kinds of users, and it changes its manners for each <b>without changing
+  what it does</b>.</p>
+  <p><b>You, at a terminal.</b> Human mode is deliberately dumb simple — the
+  tool does the work. Missing argument with an obvious default? It picks the
+  default and tells you. Genuinely your call? A tiny picker. Every success
+  ends with the next verb you probably want. You should never need the manual
+  for the happy path.</p>
+  <p><b>An agent, in a pipe.</b> The moment stdout isn't a terminal, wbx
+  switches: no prompts ever, no ANSI color, plain parseable output. Add
+  <code>--json</code> and every outcome — success or failure — arrives as one
+  envelope:</p>
+  <pre class="orgsample">{ "ok": false, "verb": "toolkit push",
+  "error": { "code": 3,
+             "message": "engine unreachable at 127.0.0.1:4000",
+             "hint": "start one with `wbx deploy local` or set WB_ENGINE_URL",
+             "retryable": true } }</pre>
+  <p>Failures carry a <b>stable exit-code map</b>, so a script can branch
+  without parsing prose:</p>
+  <table class="cmp">
+    <tr><th>code</th><th>meaning</th><th>what a script should do</th></tr>
+    <tr><td>0</td><td>ok</td><td>carry on</td></tr>
+    <tr><td>2</td><td>usage error</td><td>fix the invocation</td></tr>
+    <tr><td>3</td><td>engine unreachable</td><td>start one, then retry — it's retryable</td></tr>
+    <tr><td>4</td><td>not found</td><td>check the id/path with the matching list verb</td></tr>
+    <tr><td>5</td><td>verification failed</td><td>don't trust the artifact; re-sign or re-fetch</td></tr>
+    <tr><td>6</td><td>conflict</td><td>re-read state, retry</td></tr>
+    <tr><td>7</td><td>auth rejected</td><td>fix credentials; don't retry blindly</td></tr>
+  </table>
+  <div class="note"><p><b>Forcing a mode:</b> <code>--agent</code> or
+  <code>WBX_AGENT=1</code> gets agent manners on a TTY; <code>--json</code>
+  gets the envelope anywhere. Detection is just the default.</p></div>
+</section>
+
+<section id="first">
+  <h2>your first workbook, two MINUTES</h2>
+  <p>Step by step, nothing assumed. You need wbx installed — that's it, no
+  engine, no account.</p>
+  <p><b>1 — scaffold.</b> One command, one folder:</p>
+  <pre class="orgsample">wbx init field-notes
+<i>created field-notes/ — workbook.org + data/
+next: wbx dev field-notes</i></pre>
+  <p><b>2 — see it live.</b> <code>wbx dev</code> watches the org file,
+  re-renders on every save, and serves a preview that reloads itself:</p>
+  <pre class="orgsample">wbx dev field-notes
+<i>wbx dev: http://127.0.0.1:4321 — watching field-notes/workbook.org</i></pre>
+  <p>Open the URL, then open <code>workbook.org</code> in any editor. Change a
+  heading, save, watch the browser follow. That loop — org file on the left,
+  living page on the right — is the whole authoring experience.</p>
+  <p><b>3 — make it one file.</b> When it's worth keeping, tangle everything
+  into a single self-contained artifact and put your name on it:</p>
+  <pre class="orgsample">wbx bundle field-notes      <i># org + data + wasm → field-notes.html</i>
+wbx sign field-notes.html   <i># did:key provenance, embedded</i></pre>
+  <p>That HTML file opens in any browser, mails like an attachment, and
+  carries its own provenance. No server was involved at any point — the
+  engine only enters the story when you want the workbook to <em>keep
+  living</em> after you close the laptop, and that's
+  <code>wbx deploy local</code> + <code>wbx workbook deploy</code>, shown in
+  the session below.</p>
+</section>
+
+<section id="import">
+  <h2>import ANYTHING</h2>
+  <p>You probably already have capability lying around — Claude skills, MCP
+  servers, an OpenAPI spec, a little npm CLI. The intake ramp packages any of
+  it as a <a href="toolkit.html">toolkit</a>:</p>
+  <pre class="orgsample">wbx toolkit import ~/.claude/skills/my-skill
+<i>imported claude-skill → my-skill-toolkit/
+  manifest.org      the toolkit surface
+  skills/           3 skills
+audited 2 scripts — 1 ready · 1 convertible · 0 blocked</i></pre>
+  <p>Nine source kinds detect by shape — point it at the thing and it figures
+  out what the thing is (<code>--as</code> overrides):</p>
+  <figure class="diag" aria-label="import source kinds">
+    <div class="d-file">
+      <span class="ftag">wbx toolkit import — what it eats</span>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">claude-skill</span><span class="sub">SKILL.md + references + scripts → manifest + skill tree, docs translated to org</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">mcp-server</span><span class="sub">.mcp.json → a skill per server; the launch command becomes the audited bin. Env vars carry over by <b>name only</b> — secret values never enter the artifact</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">openapi</span><span class="sub">a JSON spec → a skill per operation, HTTP routed through the engine</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">npm-cli / pip-cli</span><span class="sub">package.json bin / pyproject scripts → README becomes the manual, entry points get audited honestly</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#9fc4e8">guidance</span><span class="sub">AGENTS.md · CLAUDE.md · .cursorrules · plain markdown · a folder of docs → guidance-only toolkits, a valid landing</span></div>
+    </div>
+  </figure>
+  <p>Import is three honest stages, and the second two run automatically:</p>
+  <p><b>Stage 1 — parse + scaffold.</b> Detect the kind, translate the docs to
+  org, write a real <code>manifest.org</code> that <code>wbx toolkit push</code>
+  will accept.</p>
+  <p><b>Stage 2 — the wasm audit.</b> Every carried script gets classified
+  against the sandbox lanes: <b>ready</b> (shell and JS run today),
+  <b>convertible</b> (a known recipe — npm deps bundle at build time, raw
+  <code>curl</code> becomes engine-brokered HTTP), or <b>blocked</b>
+  (python has no lane yet; <code>sudo</code> means nothing in a sandbox).
+  The findings are written <em>into the manifest</em>, so the artifact
+  carries its own audit.</p>
+  <p><b>Stage 3 — the fix-up plan.</b> Everything not ready becomes an org
+  TODO with concrete steps — which lane, which recipe, what to rewrite — and
+  the done-test spelled out. It reads like a manual because it is one: hand
+  the folder to an agent and the work is already itemized.</p>
+  <pre class="orgsample">** TODO fix-up plan [0/1]
+*** TODO scrape.py (blocked — python3)
+    - [ ] rewrite in JS for the quickjs lane — keep the CLI contract
+    - [ ] re-run =wbx toolkit audit= — scrape.py must classify ready</pre>
+  <p>And when an engine is reachable, <code>wbx toolkit audit --fix</code>
+  runs the convert for you: push → build → verify, one shot.</p>
+</section>
+
+<section id="agents">
+  <h2>wire in an AGENT</h2>
+  <p>If you're pointing a coding agent at wbx, three things make it fluent
+  immediately:</p>
+  <p><b>1 — let it discover the surface.</b> The whole verb tree is
+  machine-readable, so an agent never guesses at flags:</p>
+  <pre class="orgsample">wbx help --json     <i># every verb, sub-verb, arg, and flag as one JSON tree</i></pre>
+  <p><b>2 — give it the envelope.</b> Tell the agent to call everything with
+  <code>--json</code> and branch on <code>error.code</code> +
+  <code>error.retryable</code> instead of scraping stderr. The hint field is
+  written for the agent to act on — code 3's hint literally names the command
+  that fixes it.</p>
+  <p><b>3 — pipe freely.</b> Author verbs accept <code>-</code> for stdin, so
+  generated org never needs a temp file:</p>
+  <pre class="orgsample">cat generated.org | wbx lint -
+echo "* hello" | wbx query -</pre>
+  <p>That's the whole integration. No SDK, no API keys for the local surface —
+  the same binary you use, spoken plainly. This is the contract the
+  <a href="agents.html">runtime's own crews</a> use; nothing about it is
+  special-cased for them.</p>
 </section>
 
 <section id="everywhere">
@@ -177,15 +318,31 @@ wbx --version                       <i># → wbx 0.12.0</i></pre>
   </details>
   <details>
     <summary>Windows?</summary>
-    <p>macOS and Linux binaries ship today; Windows isn't in the release
-    matrix yet. WSL works in the meantime — and the honest answer is it'll
-    come when we can test it properly rather than nominally.</p>
+    <p>Yes, as of 0.13.0 — <code>wbx-windows-x64.exe</code> ships in every
+    release and the npm launcher picks it up. WSL still works if that's home
+    for you.</p>
   </details>
   <details>
     <summary>Is this the same CLI my agents use?</summary>
     <p>Identical — that's the point. The runtime image carries the same
     binary at <code>/usr/local/bin/wbx</code>, and the wasm build runs it
     in-sandbox. One tool, every hand that holds it.</p>
+  </details>
+  <details>
+    <summary>What's the difference between agent mode and --json?</summary>
+    <p>Agent mode is manners — no prompts, no color, plain output, kicks in
+    automatically when stdout is piped. <code>--json</code> is a format — the
+    one-envelope-per-outcome contract with stable error codes. Most agent
+    integrations want both; piping gets you the first for free.</p>
+  </details>
+  <details>
+    <summary>Can it really convert my Claude skill into a toolkit?</summary>
+    <p>It packages anything parseable immediately — docs become org, the
+    manifest is real, push accepts it. Scripts are the honest part: shell and
+    JS usually classify ready, python is blocked until there's a lane, and
+    everything in between gets a written fix-up plan rather than a shrug.
+    Guidance-only is a perfectly good landing; plenty of skills are
+    knowledge, not code.</p>
   </details>
 </section>
 
@@ -231,21 +388,21 @@ wbx --version                       <i># → wbx 0.12.0</i></pre>
   :HERO:   img/wbx-hero.jpg
   :END:
 ** og
-- author · make · trust · parts · engine
-- same binary: laptop, CI, inside the engine
-- npm i -g @work.books/cli
+- author · make · trust · parts · engine · everyday
+- human mode + agent mode + --json envelope
+- import anything: skill / mcp / openapi / cli → toolkit
+- curl workbooks.sh/cli.sh | sh
 </script>
 
 <script>
 window.LEARN = {
   mix: [["#aee5c2", .30], ["#a8d4f0", .26], ["#f2ddb0", .24], ["#f3c5a3", .20]],
   story: [
-    ["cmd", "wbx lint field-notes.org"],
-    ["ok", "clean — 0 errors · 1 note"],
-    ["cmd", "wbx build field-notes.org"],
-    ["out", "compiling code components → wasm (engine-backed)…"],
-    ["ok", "built"],
-    ["cmd", "wbx bundle field-notes.org"],
+    ["cmd", "wbx init field-notes"],
+    ["ok", "created — next: wbx dev field-notes"],
+    ["cmd", "wbx dev field-notes"],
+    ["out", "http://127.0.0.1:4321 — watching… (edit, save, it follows)"],
+    ["cmd", "wbx bundle field-notes"],
     ["out", "tangling… org + data + wasm → one artifact"],
     ["ok", "field-notes.html — self-contained"],
     ["cmd", "wbx sign field-notes.html"],
@@ -255,8 +412,11 @@ window.LEARN = {
     ["ok", "runtime up — http://127.0.0.1:4000"],
     ["cmd", "wbx workbook deploy notes field-notes.html"],
     ["ok", "docked — living at /w/notes"],
-    ["cmd", "wbx workbook list"],
-    ["out", "<span class=hi>notes</span>   live   just now"],
+    ["cmd", "wbx toolkit import ~/.claude/skills/retrofuturism"],
+    ["ok", "imported claude-skill → retrofuturism-toolkit/"],
+    ["out", "audited 1 script — 1 ready · 0 convertible · 0 blocked"],
+    ["cmd", "wbx toolkit push retrofuturism retrofuturism-toolkit/"],
+    ["ok", "shipped — your skill is now crew equipment"],
     ["dim", "  one tool the whole way — and your agents"],
     ["dim", "  are holding the same one."]],
 };
