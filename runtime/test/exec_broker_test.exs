@@ -34,6 +34,35 @@ defmodule Workbooks.ExecBrokerTest do
     assert log2 =~ "DENY exec" and log2 =~ "not granted"
   end
 
+  test "parse_request round-trips name + argv + stdin (length-prefixed LE, binary-safe)" do
+    assert {:ok, "coreutils", ["seq", "5"], ""} =
+             ExecBroker.parse_request(build_req("coreutils", ["seq", "5"], ""))
+
+    assert {:ok, "cat", [], "hello\nworld"} =
+             ExecBroker.parse_request(build_req("cat", [], "hello\nworld"))
+
+    # embedded newlines/nulls in args + stdin must survive (length-prefixed, not delimiter-split)
+    assert {:ok, "x", ["a\nb", <<0, 1, 2>>], <<255, 0>>} =
+             ExecBroker.parse_request(build_req("x", ["a\nb", <<0, 1, 2>>], <<255, 0>>))
+  end
+
+  test "parse_request rejects malformed input (no crash, deny-by-error)" do
+    assert :error = ExecBroker.parse_request(<<>>)
+    # name_len says 5 but only 2 bytes follow
+    assert :error = ExecBroker.parse_request(<<5::little-32, "ab">>)
+    # argc says 2 but no args present
+    assert :error = ExecBroker.parse_request(<<1::little-32, "x", 2::little-32>>)
+    assert :error = ExecBroker.parse_request("garbage")
+    assert :error = ExecBroker.parse_request(123)
+  end
+
+  defp build_req(name, argv, stdin) do
+    args = Enum.map_join(argv, "", fn a -> <<byte_size(a)::little-32, a::binary>> end)
+
+    <<byte_size(name)::little-32, name::binary, length(argv)::little-32, args::binary,
+      byte_size(stdin)::little-32, stdin::binary>>
+  end
+
   @tag :pallet
   @tag timeout: 120_000
   test "DISPATCH: a granted command actually runs in-sandbox, and argv is structural (no injection)" do

@@ -331,3 +331,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   guest exec's coreutils -> output). Then thread the nesting depth through CommandRegistry.run so a brokered
   command that itself execs is depth-counted. This unlocks build-tools/shells/orchestrators (the fork-exec
   class) — many of the 323 "impossible (fork-exec)" items become reachable via brokered exec to wasm cmds.
+- 2026-06-12 (iter 12): **host_exec WIRED into both Docks (rust_dock + js_dock), gated on the `commands`
+  cap; parse_request tested; escalation confined.** Added ExecBroker.parse_request/1 (length-prefixed LE
+  wire format: [name_len][name][argc][(arg_len)(arg)]*[stdin_len][stdin] — binary-safe, malformed->:error;
+  tested round-trip + rejection). Wired `host_exec(req_ptr,req_len,out_ptr,out_cap)->i32` into rust_dock
+  (maybe "commands" in caps -> exec_caps/0) and js_dock (allow_exec gate): read req from wasm mem ->
+  parse_request -> ExecBroker.exec(allow: true) -> write output (truncated to out_cap; -1 on deny/error).
+  SECURITY — escalation confined BY CONSTRUCTION: CommandRegistry.run -> PackageManager.run runs the catalog
+  tool as a STANDARD-WASI sandbox (stdio + only passed dirs); the 32 tools have NO Dock imports / no net, and
+  ExecBroker passes NO dirs -> a no-net/no-fs guest CANNOT gain net/fs by exec'ing a command. 8 ExecBroker
+  tests green + dispatch e2e green; both docks compile clean.
+  REMAINING for Stone 2: (a) full GUEST e2e — a Rust/JS guest actually CALLING host_exec end-to-end (the
+  marshaling layer is correct-by-construction over tested parse+exec + the proven host_http_get mem pattern,
+  but not yet guest-driven); (b) thread nesting DEPTH through CommandRegistry.run/ropts so a brokered command
+  that itself execs is depth-counted (today depth is per-call only); (c) a dedicated `exec` cap (default-off)
+  for finer control than the broad `commands` cap. NEXT (iter 13): build the minimal guest e2e (JS via JsDock
+  is the lighter path — add a host_exec JS-harness wrapper + a guest that exec's coreutils -> assert output).

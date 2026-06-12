@@ -26,12 +26,38 @@ defmodule Workbooks.RustDock do
       ambient()
       |> maybe(Policy.allow_http?(profile), &egress/0)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
+      |> maybe("commands" in caps, &exec_caps/0)
 
     %{"env" => env}
   end
 
   defp maybe(map, true, builder), do: Map.merge(map, builder.())
   defp maybe(map, _false, _builder), do: map
+
+  # Exec dispatch — ONLY merged on the "commands" cap. The guest writes a length-prefixed request
+  # (Workbooks.ExecBroker.parse_request) and the host runs the named REGISTERED wasm command in its own
+  # sandboxed instance (no dirs passed → no host-file escalation; the catalog tools have no net). The
+  # ExecBroker enforces default-deny / registered-only / depth / output-cap / structural-argv.
+  defp exec_caps do
+    %{
+      # host_exec(req_ptr,req_len, out_ptr,out_cap) -> i32 : run a sandboxed wasm command, write its
+      # output into the out buffer, return bytes written (truncated to out_cap; -1 on deny/error).
+      "host_exec" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, req_ptr, req_len, out_ptr, out_cap ->
+           req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
+
+           with {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true) do
+             n = min(byte_size(out), out_cap)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end}
+    }
+  end
 
   @doc """
   Run a compiled-Rust CORE wasm (built via rust_compile_to_wasm no_exceptions: true) under Wasmex

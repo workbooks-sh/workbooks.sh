@@ -66,6 +66,7 @@ defmodule Workbooks.JsDock do
   # the wasm never opens a socket); VFS is the Instance's sandboxed KV store (no host FS reach).
   defp env(profile, vfs) do
     allow_http = Policy.allow_http?(profile)
+    allow_exec = "commands" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -86,6 +87,22 @@ defmodule Workbooks.JsDock do
              end
            else
              -1
+           end
+         end},
+      # host_exec(req_ptr,req_len, out_ptr,out_cap) -> i32 : brokered exec to a sandboxed wasm command
+      # (gated on the "commands" cap; ExecBroker enforces default-deny/registered-only/depth/cap/no-inject).
+      "host_exec" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, req_ptr, req_len, out_ptr, out_cap ->
+           with true <- allow_exec,
+                req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len),
+                {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true) do
+             n = min(byte_size(out), out_cap)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
+             n
+           else
+             _ -> -1
            end
          end},
       "host_vfs_write" =>

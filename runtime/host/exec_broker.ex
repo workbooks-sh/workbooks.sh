@@ -61,6 +61,34 @@ defmodule Workbooks.ExecBroker do
     end
   end
 
+  @doc """
+  Parse the wire request a guest writes into wasm memory for `host_exec`. Length-prefixed, little-endian
+  (wasm32 is LE), so binary args/stdin are safe (no delimiter ambiguity):
+
+      [name_len:u32][name][argc:u32][ (arg_len:u32)(arg) ]*[stdin_len:u32][stdin]
+
+  Returns `{:ok, name, argv, stdin}` | `:error` (malformed). Trailing bytes are tolerated.
+  """
+  def parse_request(bin) when is_binary(bin) do
+    with <<nlen::little-32, name::binary-size(nlen), argc::little-32, rest1::binary>> <- bin,
+         {:ok, argv, rest2} <- parse_args(rest1, argc, []),
+         <<slen::little-32, stdin::binary-size(slen), _trailing::binary>> <- rest2 do
+      {:ok, name, argv, stdin}
+    else
+      _ -> :error
+    end
+  end
+
+  def parse_request(_), do: :error
+
+  defp parse_args(rest, 0, acc), do: {:ok, Enum.reverse(acc), rest}
+
+  defp parse_args(<<alen::little-32, arg::binary-size(alen), rest::binary>>, n, acc) when n > 0 do
+    parse_args(rest, n - 1, [arg | acc])
+  end
+
+  defp parse_args(_, _, _), do: :error
+
   defp cap(out, max) when byte_size(out) > max, do: binary_part(out, 0, max)
   defp cap(out, _max), do: out
 
