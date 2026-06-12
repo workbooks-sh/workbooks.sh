@@ -96,3 +96,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   inherit_network unmediated = the SSRF hole). Security cadence is the core gap. Plan written. Loop armed.
   NEXT: Phase 1a — decide mediated-egress mechanism (socket_addr_check allow-list vs host-implemented
   wasi-http) + read the wasmex/Rust store.rs net wiring to find the exact intercept point.
+- 2026-06-12 (iter 1): **EXACT PATCH POINT FOUND.** vendor/wasmex/native/wasmex/src/store.rs:260-263:
+  `if options.allow_http { wasi_ctx_builder.inherit_network().allow_ip_name_lookup(true); }` — this is the
+  SSRF hole (full host stack). wasmex is VENDORED+PATCHED already (vendor/wasmex/...), wasmtime 39.0.1 →
+  `WasiCtxBuilder::socket_addr_check(closure)` IS available. FIX (Phase 1a+2a+2b in one patch):
+  keep inherit_network() (provides the socket pool) but ADD `.socket_addr_check(|addr,_use| async move {
+  allowed })` where `allowed` = NOT(addr.ip().is_loopback() || is_private() || is_link_local() ||
+  is_unspecified() || is_metadata(169.254.169.254) || is_cgnat(100.64/10) || control_plane_port) AND
+  (allow_list empty ? allow_external : addr in allow_list). Thread a `net_allow: Vec<String>` +
+  `net_deny_internal: bool` through WasiP2Options (store.rs options struct ~line 50) ← Instance.ex (~line
+  65) ← Policy (new per-profile/per-instance net scope). Rust std::net::IpAddr gives is_loopback/is_private/
+  is_link_local/is_unspecified directly; 169.254.169.254 is caught by is_link_local. DNS-rebinding: socket_
+  addr_check sees the RESOLVED SocketAddr (post-DNS), so checking the IP there closes rebinding automatically
+  — that's why this hook is the right one (it fires at connect-time on the real IP, not the hostname).
+  NEXT (iter 2): write the store.rs socket_addr_check patch + the SSRF filter fn + thread net_allow through
+  WasiP2Options/Instance/Policy; cargo-rebuild the NIF; mix compile. Then iter 3: the adversarial red-team
+  test (guest tries metadata/localhost/RFC1918 → assert blocked; allowed host → assert reachable).
