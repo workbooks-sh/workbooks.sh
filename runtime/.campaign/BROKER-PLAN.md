@@ -1,0 +1,98 @@
+# Host-Brokered Capabilities Campaign — the next frontier
+
+**Mission:** extend the capability-lane philosophy from BUILD-time to RUN-time. The host (BEAM) performs
+the privileged primitive; the guest stays sandboxed; the Dock membrane mediates under explicit Policy.
+Keystone = host-brokered **networking**, done *securely*. Then re-run the 323 "impossible" items and
+reclaim every one that was only blocked by the no-broker assumption. Then the next stones. Keep pushing.
+
+> Read this first every turn. Execute the NEXT bounded step in the WORK QUEUE. Security-adversarially
+> test every step. mix compile + tests green before commit. Push working increments. Update STATE.
+> Never run real OS network/exec OUTSIDE the brokered + Policy-gated path. If blocked, file bd + move on.
+
+## GROUND TRUTH (confirmed 2026-06-12)
+
+What already EXISTS (do not reinvent):
+- `host/rust_dock.ex` — `host_http_get` / `host_http_get_many` custom imports. Host reads URL from wasm
+  mem → `:httpc.request` → writes bytes back. _many = concurrent via Task.async_stream (BEAM parallelism).
+  MEDIATED (host sees the URL) but only for Rust guests written to call it.
+- `host/js_dock.ex` — `host_http_get` exposed to JS as `Javy.Net`, gated by `Policy.allow_http?`. MEDIATED.
+- `host/policy.ex` — 3 profiles: `minimal` (vfs,commands — NO net), `network` (+net,llm,browse),
+  `posix` (+posix,parallel). `allow_http?` derives from caps.
+- wasmex `WasiP2Options.allow_http` flips `wasmtime_wasi_http::add_only_http_to_linker_sync` AND
+  `wasi_ctx_builder.inherit_network()` + `allow_ip_name_lookup`.
+- `host/browse.ex` — the web-browse path.
+
+THE SECURITY HOLE (the core problem to solve):
+- `inherit_network()` = the guest gets the HOST'S ENTIRE network stack (wasi-http + raw sockets + DNS),
+  gated only by a BINARY net-or-no-net cap. A `net`-profile guest can reach 169.254.169.254 (cloud
+  metadata/IAM creds), localhost:4000 (control plane), and RFC1918 internal ranges. No per-destination
+  scope, no SSRF filter, no rate limit, no audit, no revocation. THIS is "the security cadence."
+
+THE STANDARD-TOOL GAP:
+- The 32 catalog tools are pure standalone wasm32-wasi, compiled with NO net imports. A standard C tool
+  (curl, postgres client) uses raw BSD sockets, not our `host_http_get`. So today's broker only helps
+  guests we hand-wrote. Need the STANDARD seam: back wasi-http (outbound HTTP) AND wasi-sockets (raw TCP)
+  with a MEDIATED BEAM path, so unmodified WASI-standard tools transparently get safe brokered net.
+
+## WORK QUEUE  (current keystone: SECURE host-brokered networking)
+
+### PHASE 1 — Mediated egress seam (replace the inherit_network() hole)
+- [ ] 1a. Stop using raw `inherit_network()` for guests. Route egress through a MEDIATED path the host
+      fully controls: either (i) a wasmtime per-connection allow-list callback (socket_addr_check) so
+      every connect() is checked, or (ii) force all HTTP through host_http_get-style brokering + a
+      wasi-http handler the host implements (not inherit). Decide + implement. Keep `minimal` = no net.
+- [ ] 1b. wasi-http OUTBOUND: a tiny guest using the standard `wasi:http/outgoing-handler` fetches a URL
+      THROUGH the mediated broker (host does the I/O, Policy-checked). Prove it.
+- [ ] 1c. wasi-sockets (raw TCP): confirm wasmex/wasmtime support; if present, back it with the mediated
+      path; if absent, a custom host_tcp_connect/send/recv import + a tiny shim. Prove a raw-TCP guest.
+
+### PHASE 2 — THE SECURITY CADENCE  (the deliverable that makes this shippable)
+- [ ] 2a. SCOPED grants: Policy `net` becomes an ALLOW-LIST of {host, port} (or URL patterns), per
+      instance — not all-or-nothing. Add a `net_allow` field; default deny.
+- [ ] 2b. SSRF DEFENSE: before any connect, resolve the target and DENY loopback (127/8, ::1),
+      link-local (169.254/16 incl. metadata 169.254.169.254, fe80::/10), RFC1918 (10/8,172.16/12,
+      192.168/16), CGNAT (100.64/10), the host's own control-plane ports. Re-check AFTER DNS resolution
+      (DNS-rebinding defense): resolve once, pin the IP, connect to that IP.
+- [ ] 2c. RATE/QUOTA: per-instance caps — max requests, max bytes in/out, max concurrent conns, wall-clock.
+- [ ] 2d. AUDIT: log every brokered net op {instance, profile, dest, bytes, verdict, latency}.
+- [ ] 2e. REVOCATION: a running instance's net grant can be revoked mid-flight (in-flight conns dropped).
+- [ ] 2f. ADVERSARIAL RED-TEAM (must ALL be blocked + tested): a hostile guest tries to reach metadata IP,
+      localhost, RFC1918, the control plane; bypass the allow-list via IP-literals, IPv6, encoded/punycode
+      hosts, redirect-to-internal (3xx Location), DNS-rebinding, decimal/octal/hex IP encodings, userinfo@
+      tricks, open-redirect chaining; exfiltrate via DNS; DoS via huge bodies / many conns / slowloris.
+      Each → a test that asserts BLOCKED. This is the gate: networking is NOT "done" until red-team passes.
+
+### PHASE 3 — Inbound (server) flip
+- [ ] 3a. Host-as-listener (Phoenix/cowboy) → per-request invoke a guest `wasi:http/incoming-handler`
+      (or custom dispatch). Prove a guest "web app" serves a request, sandboxed, Policy-gated.
+- [ ] 3b. Security: request data is the only input; same SSRF/quota cadence applies to any egress it makes.
+
+### PHASE 4 — Reclaim the 323
+- [ ] Re-run the feasibility pass WITH brokering: which network/server items now work? Wire keystones:
+      a real HTTP client (curl-class), a DB client (not server), a package-manager fetch, an API tool.
+      Update the original resolved.json: flip the now-reachable ones live with the brokered-net recipe.
+
+## NEXT STONES (plan ahead — pull these once networking is proven secure)
+
+- **Stone 2 — Exec→CommandRegistry dispatch (fork-exec brokering):** a guest's exec(cmd) is intercepted
+  and dispatched to the in-sandbox CommandRegistry (32+ wasm commands). Unlocks Make/Ninja/shells/build-
+  orchestrators FOR the subset of commands we have as wasm. Same Policy/audit cadence. Adversarial:
+  command injection, arg-smuggling, reaching commands not granted.
+- **Stone 3 — Brokered durable storage:** beyond the ephemeral VFS — a Policy-scoped, per-instance durable
+  KV/blob store (host-backed), so stateful apps + "embedded DB" patterns persist. Quota'd, isolated.
+- **Stone 4 — Threading fallback:** the "needs threads for SPEED not correctness" tools (set n_threads=1)
+  + a host_parallel_map (fan out to fresh BEAM-managed instances) for embarrassingly-parallel work. The
+  genuinely-shared-memory work-stealing case stays out (conceded).
+- **Stone 5 — App-host platform:** productionize host-listener→guest-handler so the sandbox is a real
+  deploy target (a wasm web app, request-scoped, autoscaled across BEAM processes). The "calculator → 
+  platform" jump.
+
+Conceded permanently OUT (do not chase): GPU compute, shared-memory work-stealing threads, native-binary-
+emitting compilers-to-run-native (their wasm-targeting versions already answer the real need).
+
+## STATE  (append newest at the bottom each turn)
+
+- 2026-06-12: Campaign opened. Ground truth confirmed: host HTTP brokering EXISTS (host_http_get mediated;
+  inherit_network unmediated = the SSRF hole). Security cadence is the core gap. Plan written. Loop armed.
+  NEXT: Phase 1a — decide mediated-egress mechanism (socket_addr_check allow-list vs host-implemented
+  wasi-http) + read the wasmex/Rust store.rs net wiring to find the exact intercept point.
