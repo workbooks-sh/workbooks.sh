@@ -41,7 +41,7 @@ defmodule Workbooks.JsDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdin: si, stdout: so},
-               imports: %{"env" => env(profile, vfs)}
+               imports: %{"env" => env(profile, vfs, Keyword.get(opts, :tenant, "default"))}
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)
@@ -64,9 +64,10 @@ defmodule Workbooks.JsDock do
   # All three host fns are ALWAYS bound (the harness imports them unconditionally); each enforces
   # its own cap and returns -1 when denied → JS sees null/false. Egress is host-brokered (:httpc,
   # the wasm never opens a socket); VFS is the Instance's sandboxed KV store (no host FS reach).
-  defp env(profile, vfs) do
+  defp env(profile, vfs, tenant) do
     allow_http = Policy.allow_http?(profile)
     allow_exec = "commands" in Policy.caps(profile)
+    allow_kv = "vfs" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -100,6 +101,32 @@ defmodule Workbooks.JsDock do
                 {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true) do
              n = min(byte_size(out), out_cap)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end},
+      # Durable per-tenant k/v (gated on vfs cap; tenant from the Dock, not the guest). Mirrors rust_dock.
+      "host_kv_put" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, kp, kl, vp, vl ->
+           with true <- allow_kv,
+                key = Wasmex.Memory.read_string(ctx.caller, ctx.memory, kp, kl),
+                val = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, vp, vl),
+                :ok <- Workbooks.StorageBroker.Server.put(tenant, key, val) do
+             0
+           else
+             _ -> -1
+           end
+         end},
+      "host_kv_get" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, kp, kl, op, oc ->
+           with true <- allow_kv,
+                key = Wasmex.Memory.read_string(ctx.caller, ctx.memory, kp, kl),
+                {:ok, val} <- Workbooks.StorageBroker.Server.get(tenant, key) do
+             n = min(byte_size(val), oc)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(val, 0, n))
              n
            else
              _ -> -1

@@ -399,3 +399,18 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   durable-storage cap (vs reusing vfs); the WB_KV_DB default path should be a stable data-dir (not tmp) for
   real durability. NEXT (iter 16): js_dock host_kv parity, then the next stone (threading-fallback via
   host_parallel_map — fresh-instance BEAM processes — or app-host platform).
+- 2026-06-12 (iter 16): **js_dock host_kv PARITY + STONE 4 (threading-fallback) core built + validated.**
+  (a) js_dock host_kv_put/get mirrored from rust_dock (vfs-cap gated, tenant from Dock); compiles, 24 broker
+  unit tests green — JS guests now get the same durable per-tenant KV (mechanism already e2e-proven via
+  rust_dock). (b) STONE 4 = Workbooks.ParallelBroker — brokered DATA-PARALLELISM: a single wasm instance
+  can't thread, so the host runs a command over N inputs CONCURRENTLY across BEAM processes (Task.async_stream
+  over fresh sandboxes) and gathers results in order. Each task is a full ExecBroker.exec (whole exec cadence
+  applies per task) + parallelism limits: default-deny, max_inputs (fan-out cap), max_concurrency, per-task
+  timeout. 4 hermetic tests (deny, fan-out cap, order-preserving w/ per-task errors) + 1 :pallet DATA-PARALLEL
+  dispatch (map cat over [alpha,beta,gamma] -> [{:ok,alpha},{:ok,beta},{:ok,gamma}], concurrent, ordered) —
+  all green. This is the host-brokered substitute for within-program threads (system-concurrency already
+  exists via many isolated instances; this adds intra-task data-parallelism).
+  CAMPAIGN: FOUR brokered capabilities now — net (deny-side secured+proven; functional remainder env-gated),
+  exec (done+e2e), durable storage (done+e2e, both docks), data-parallelism (core+dispatch proven).
+  NEXT (iter 17): wire host_parallel_map Dock import (N-in / N-out length-prefixed ABI) + a guest e2e; then
+  the app-host platform stone. (Networking functional reclamation still gated on wb-0beq + internet env.)
