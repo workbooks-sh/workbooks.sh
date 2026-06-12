@@ -18,11 +18,11 @@ defmodule Workbooks.Policy do
   # also granting the ability to spawn commands. The three standard profiles keep every capability; `compute`
   # is the restrictive demo (pure compute + ephemeral vfs only — no exec, no durable kv, no net).
   @profiles %{
-    minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands exec kv), timeout: 5_000},
-    network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands exec kv net llm browse), timeout: 30_000},
+    minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets), timeout: 5_000},
+    network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets net llm browse), timeout: 30_000},
     posix: %{
       memory: 256 * 1024 * 1024,
-      caps: ~w(vfs commands exec kv net llm browse posix parallel),
+      caps: ~w(vfs commands exec kv secrets net llm browse posix parallel),
       timeout: 60_000
     },
     compute: %{memory: 64 * 1024 * 1024, caps: ~w(vfs), timeout: 5_000}

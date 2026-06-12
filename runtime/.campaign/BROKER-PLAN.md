@@ -593,3 +593,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (more demos / hardening) — the substantive brokered-capability platform is complete. NEXT (iter 29): if
   continuing, either a new capability beyond the plan (e.g. brokered secrets/credentials, inter-guest pub/sub)
   or incremental wb-0beq plumbing — but the campaign's defined goal is ACHIEVED.
+- 2026-06-12 (iter 29): **BROKERED SECRETS — a 6th capability beyond the original plan (green).** Workbooks.
+  SecretBroker: the host holds named PER-TENANT secrets; a guest can SIGN data (HMAC-SHA256) with a named
+  secret but can NEVER read its value — structurally (the module exposes only register/3 + sign/3, NO read/
+  get/value/fetch; secrets live in the Agent's private state, never crossing the membrane). Tenant isolation
+  + revocation. Wired host_sign into rust_dock on a new dedicated `secrets` cap (minimal/network/posix have
+  it; compute denied). GUEST e2e: a Rust guest sends only the secret NAME + data -> gets the 32-byte HMAC ->
+  never sees the secret (matches :crypto.mac). 5 unit + 1 guest e2e green. This is the "host holds creds"
+  pattern: a sandboxed guest authenticates webhooks/APIs/JWTs without possessing the credential.
+  PLATFORM now SIX brokered capabilities (egress/exec/storage/parallelism/serving/SECRETS), all e2e-proven
+  (except net-egress reachability, env-gated). NEXT (iter 30): js_dock host_sign parity (quick mirror); OR a
+  7th capability (inter-guest pub/sub for multi-guest coordination); OR wb-0beq (focused session).

@@ -1,7 +1,7 @@
 # Host-Brokered Capabilities — reference (campaign deliverable, 2026-06-12)
 
 The pattern: a wasm guest stays sandboxed; the **host performs the privileged op** behind a mediated,
-Policy-gated `env.*` import (the Dock membrane). Five capabilities, each with the same cadence —
+Policy-gated `env.*` import (the Dock membrane). Six capabilities, each with the same cadence —
 **default-deny, scoped, quota'd, audit-logged, mid-flight-revocable, adversarially tested, offline-e2e-proven** (where the dev env
 allows). Guests reach these via `RustDock`/`JsDock` (env imports gated by the profile's caps); inbound
 serving is via `ServeBroker`.
@@ -16,13 +16,14 @@ serving is via `ServeBroker`.
 | `host_parallel_map` | `(req,out)` → `[n][(len,-1=err)(body)]*` | `exec` | `ParallelBroker` | fan a cmd over N inputs CONCURRENTLY (BEAM); fan-out + concurrency caps |
 | `host_kv_put` | `(key_ptr,key_len, val_ptr,val_len)` → 0 / -1 | `kv` | `StorageBroker` | DURABLE, per-TENANT (tenant from Dock, not guest); size + key-count quotas |
 | `host_kv_get` | `(key_ptr,key_len, out_ptr,out_cap)` → val len / -1 | `kv` | `StorageBroker` | tenant-isolated read |
+| `host_sign` | `(name,data, out)` → sig len / -1 | `secrets` | `SecretBroker` | HMAC-SHA256 data with a host-held per-tenant secret; guest gets the SIGNATURE, never the key |
 | `host_request_get` | `(out_ptr,out_cap)` → req len | (serve instance) | `ServeBroker` | inbound: fetch the current request bytes |
 | `host_response_set` | `(ptr,len)` → 0 | (serve instance) | `ServeBroker` | inbound: return the response bytes (size-capped) |
 | ambient: `host_now`, `host_log`; vfs: `host_vfs_read/write` | | always / `vfs` | — | clock/log; ephemeral per-instance KV |
 
 Both `rust_dock` and `js_dock` expose the same `host_*` surface (gated identically by the profile's caps).
 
-## The five capabilities
+## The six capabilities
 
 1. **Networking egress** — `NetGuard` (host/net_guard.ex). The deny side is comprehensively secured and
    red-team proven: SSRF floor on BOTH paths (NIF `socket_addr_check`+`send_request` for wasi; Elixir
@@ -38,6 +39,7 @@ Both `rust_dock` and `js_dock` expose the same `host_*` surface (gated identical
 4. **Data-parallelism** — `ParallelBroker` (host/parallel_broker.ex). Run a cmd over N inputs concurrently
    across BEAM processes (each a fresh ExecBroker sandbox); default-deny, fan-out + concurrency caps. Guest
    e2e-proven (both docks).
+6. **Secrets (host holds creds)** — `SecretBroker` (host/secret_broker.ex). The host holds named per-tenant secrets; a guest can SIGN data (HMAC-SHA256) with a named secret but can NEVER read its value (no read op exists). Tenant-isolated + revocable. Lets a sandboxed guest authenticate webhooks/APIs/JWTs without possessing the credential. Guest e2e-proven.
 5. **Inbound HTTP serving** — `ServeBroker` (+ `.Plug`, host/serve_broker.ex). Host owns the socket; a guest
    handles requests sandboxed (persistent instance re-entered per request; request/response via the two
    serve imports + an ETS channel). Full HTTP marshaling (forward request headers; guest sets status +

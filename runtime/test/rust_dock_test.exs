@@ -182,4 +182,29 @@ fn main(){
     assert {:ok, out} = RustDock.run(w, profile: :minimal)
     assert String.trim(out) == "n=3 results=alpha,beta,gamma"
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "host_sign — guest signs with a host-held secret it NEVER sees (brokered secrets)" do
+    assert "host_sign" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+    tenant = "sec-#{System.unique_integer([:positive])}"
+    secret = "super-secret-#{System.unique_integer([:positive])}"
+    assert :ok = Workbooks.SecretBroker.register(tenant, "apikey", secret)
+
+    # The guest sends only the secret NAME + the data; it gets back the HMAC, never the secret value.
+    w =
+      build!(~S|
+extern "C" { fn host_sign(np:i32,nl:i32,dp:i32,dl:i32,op:i32,oc:i32) -> i32; }
+fn main(){
+  let name=b"apikey"; let data=b"payload"; let mut out=[0u8;32];
+  let n = unsafe { host_sign(name.as_ptr() as i32, name.len() as i32, data.as_ptr() as i32, data.len() as i32, out.as_mut_ptr() as i32, 32) };
+  let mut hex = String::new();
+  if n>0 { for b in out[..(n as usize)].iter() { hex.push_str(&format!("{:02x}", b)); } }
+  println!("sig={}", hex);
+}|)
+
+    assert {:ok, out} = RustDock.run(w, profile: :minimal, tenant: tenant)
+    expected = :crypto.mac(:hmac, :sha256, secret, "payload") |> Base.encode16(case: :lower)
+    assert String.trim(out) == "sig=" <> expected
+  end
 end

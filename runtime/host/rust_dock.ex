@@ -29,6 +29,7 @@ defmodule Workbooks.RustDock do
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
       |> maybe("exec" in caps, fn -> exec_caps(tenant) end)
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
+      |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -77,6 +78,31 @@ defmodule Workbooks.RustDock do
              end
            else
              _ -> -1
+           end
+         end}
+    }
+  end
+
+  # Secrets — merged on the "secrets" cap. The host holds the tenant's creds; the guest can SIGN with a
+  # named secret but never read it. Tenant captured from the Dock.
+  defp secret_caps(tenant) do
+    %{
+      # host_sign(name_ptr,name_len, data_ptr,data_len, out_ptr,out_cap) -> i32 : HMAC-SHA256 `data` with the
+      # tenant's named secret; writes the signature into out, returns its length (-1 on unknown/denied).
+      "host_sign" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, np, nl, dp, dl, op, oc ->
+           name = Wasmex.Memory.read_string(ctx.caller, ctx.memory, np, nl)
+           data = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
+
+           case Workbooks.SecretBroker.sign(tenant, name, data) do
+             {:ok, sig} ->
+               n = min(byte_size(sig), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(sig, 0, n))
+               n
+
+             {:error, _} ->
+               -1
            end
          end}
     }
