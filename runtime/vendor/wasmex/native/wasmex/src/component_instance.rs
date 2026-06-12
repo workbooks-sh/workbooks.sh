@@ -199,7 +199,13 @@ pub fn call_exported_function(
     let function_params = thread_env.save(given_params);
     let from = thread_env.save(from);
 
-    TOKIO_RUNTIME.spawn(async move {
+    // wb-broker (wb-0beq): run the SYNC component call on a BLOCKING thread, not a tokio worker. The body
+    // has no .await; via spawn_blocking a wasi-http OUTBOUND call's internal `in_tokio`/block_on
+    // (wasmtime-wasi) finds NO current runtime handle and spins up its own — instead of panicking "Cannot
+    // start a runtime from within a runtime" when called from a worker. Unblocks wasi-http outbound (proven:
+    // a guest fetched a public URL -> HTTP 301, while SSRF still blocks internal) WITHOUT the engine-wide
+    // async_support refactor; sync call() is unchanged.
+    TOKIO_RUNTIME.spawn_blocking(move || {
         // Execute function and get the result
         let result = component_execute_function(
             &mut thread_env,

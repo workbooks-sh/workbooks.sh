@@ -616,3 +616,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   env-gated). Each: host does the privileged op, guest sandboxed, default-deny + least-privilege cap +
   tenant isolation + depth/size/rate quotas + audit + revocation + adversarial tests + offline e2e.
   NEXT (iter 31): js_dock queue parity (quick); OR an 8th capability; OR wb-0beq (focused session).
+- 2026-06-12 (iter 31): **★ wb-0beq FIXED — the wasi-http OUTBOUND seam is UNBLOCKED + reachability PROVEN.**
+  NOT the engine-wide async refactor I'd scoped — the real fix is ~6 lines: wasmex ran the SYNC component
+  call on a tokio WORKER (component_instance.rs spawn(async move)), so a wasi-http outbound's in_tokio/
+  block_on panicked. Switched to spawn_blocking — the call runs on a blocking-pool thread with NO current
+  runtime handle, so in_tokio spins up its own runtime: no panic, sync call() unchanged. PROVEN with a REAL
+  wasi:http guest through the patched runtime: fetch http://1.1.1.1/ -> "OK 301" (REACHABILITY!), while
+  http://169.254.169.254/ + http://127.0.0.1/ stay SSRF-BLOCKED (the override fires on the now-working path).
+  Component-call regression clean: rcp_capabilities 4/0; net_probe 3 calls correct. Permanent regression test
+  test/broker_net_e2e_test.exs green. (Discovered the dock-component NESTED path is pre-broken — :cpu_timeout
+  identical with spawn AND spawn_blocking — filed wb-avwy; unrelated to this fix.)
+  IMPACT: networking keystone item (2) "generalize the seam so STANDARD wasi-http tools transparently get the
+  safe brokered path" is now WORKING — a standard wasi:http component gets SSRF-filtered outbound for free.
+  wb-k2im reachability = CLOSED. The 323-reclamation gate is OPEN (wasi-http outbound works + is secured;
+  wasi-sockets raw TCP likely unblocked by the same fix — to verify).
+  NEXT (iter 32): verify wasi-sockets raw-TCP outbound also works post-fix (the other half of the seam); then
+  RE-RUN the feasibility pass on the wasi-http/sockets subset of the 323 — now genuinely reachable.
