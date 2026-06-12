@@ -35,11 +35,16 @@ defmodule Workbooks.ExecBroker do
     max_output = Keyword.get(opts, :max_output, @default_max_output)
     depth = Keyword.get(opts, :depth, 0)
     principal = Keyword.get(opts, :principal)
+    rate = Keyword.get(opts, :rate)
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
         deny(name, "principal revoked")
         {:error, :revoked}
+
+      principal && rate && rate_denied?(principal, rate) ->
+        deny(name, "rate limited")
+        {:error, :rate_limited}
 
       not allow ->
         deny(name, "not granted (no commands cap)")
@@ -96,6 +101,9 @@ defmodule Workbooks.ExecBroker do
 
   defp cap(out, max) when byte_size(out) > max, do: binary_part(out, 0, max)
   defp cap(out, _max), do: out
+
+  defp rate_denied?(principal, {max, window}),
+    do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
 
   defp deny(name, why) do
     Logger.warning("wb-broker: DENY exec #{inspect(name)} — #{why}")

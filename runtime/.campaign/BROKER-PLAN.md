@@ -556,3 +556,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (wb-k2im, needs a server/internet); the 323 standard-tool reclamation (wb-0beq, wasi-seam async refactor).
   NEXT (iter 27): rate/conn quotas (the last listed cadence item — a per-principal request counter, testable
   via the revocation-style ETS), OR begin wb-0beq scoping (separate async engine for wasi-http guests).
+- 2026-06-12 (iter 27): **RATE QUOTA (green) — the last cadence primitive; the networking cadence is now
+  fully BUILT.** Workbooks.RateLimiter (per-principal fixed-window counter, monotonic-time, lazy ETS). Wired
+  a `:rate` {max, window_ms} opt into NetGuard.get + ExecBroker.exec (checked after revocation, before the
+  op). Tests: primitive (budget enforced / independent principals / window reopens) + net + exec integration
+  (a principal over budget -> {:error, :rate_limited}). 25 tests green. The limit is AVAILABLE per-call;
+  activating it for ALL dock guests is a one-line policy tuning (pass a default rate from the dock) — left as
+  a deployment policy choice, not hardcoded.
+  ===== NETWORKING CADENCE FULLY BUILT: default-deny + scoped allow-list + SSRF floor (both paths) + quotas
+  (size/key/fan-out/RATE) + audit + FULL mid-flight revocation + adversarial RED-TEAM (obfuscation/redirect/
+  IP-forms all proven-denied). On the SECURITY + MANAGEABILITY axes networking is DONE (red-team green,
+  manageable via revocation+rate+audit) and WORKING via the mediated host_http_get path. =====
+  The ONLY remaining networking items are env/refactor-gated, honestly filed (not false-claimed):
+    - DoS body-cap (huge bodies) + egress reachability -> wb-k2im (needs a server/internet to test).
+    - STANDARD-TOOL transparent reclamation (the 323) -> wb-0beq (wasi-seam async engine refactor).
+  NEXT (iter 28): begin wb-0beq scoping (a SEPARATE async wasmtime engine for wasi-http guests, leaving the
+  sync engine for modules/oql) — the gate to reclaiming the 323; OR pull a fresh NEXT STONE if one remains.

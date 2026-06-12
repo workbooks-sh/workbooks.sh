@@ -33,6 +33,14 @@ defmodule Workbooks.ExecBrokerTest do
     assert :ok = Workbooks.Revocation.unrevoke(p)
   end
 
+  test "RATE LIMIT: a principal over its exec budget is denied (DoS floor)" do
+    p = "rl-#{System.unique_integer([:positive])}"
+    # 'nope' is unregistered (so nothing runs) but the rate counter still ticks; 3rd call (max 2) is limited
+    assert {:error, :unknown_command} = ExecBroker.exec("nope", [], "", allow: true, principal: p, rate: {2, 60_000})
+    assert {:error, :unknown_command} = ExecBroker.exec("nope", [], "", allow: true, principal: p, rate: {2, 60_000})
+    assert {:error, :rate_limited} = ExecBroker.exec("nope", [], "", allow: true, principal: p, rate: {2, 60_000})
+  end
+
   test "every denial is audit-logged" do
     log = capture_log(fn -> ExecBroker.exec("rm", [], "", allow: true) end)
     assert log =~ "DENY exec" and log =~ "unknown"

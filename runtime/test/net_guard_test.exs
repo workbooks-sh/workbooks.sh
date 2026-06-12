@@ -111,4 +111,13 @@ defmodule Workbooks.NetGuardTest do
     assert {:error, :revoked} = NetGuard.get("http://8.8.8.8/", principal: p, allow: ["8.8.8.8"])
     assert :ok = Workbooks.Revocation.unrevoke(p)
   end
+
+  test "RATE LIMIT: a principal over its egress budget is denied (DoS floor)" do
+    p = "rl-#{System.unique_integer([:positive])}"
+    # internal URLs SSRF-deny (so no socket), but the rate counter still ticks; the 3rd call (max 2) is
+    # rate-limited BEFORE the SSRF check
+    assert {:error, :denied} = NetGuard.get("http://127.0.0.1/", principal: p, rate: {2, 60_000})
+    assert {:error, :denied} = NetGuard.get("http://127.0.0.1/", principal: p, rate: {2, 60_000})
+    assert {:error, :rate_limited} = NetGuard.get("http://127.0.0.1/", principal: p, rate: {2, 60_000})
+  end
 end
