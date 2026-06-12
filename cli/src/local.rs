@@ -21,7 +21,7 @@ use std::io::Write as _;
 
 /// Resolve the org source: a `.org` file, or a dir containing `workbook.org`
 /// (else exactly one `.org` file).
-fn find_org(src: &str) -> Result<std::path::PathBuf> {
+pub(crate) fn find_org(src: &str) -> Result<std::path::PathBuf> {
     let p = std::path::Path::new(src);
     if p.is_file() {
         return Ok(p.to_path_buf());
@@ -501,4 +501,54 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
         }
         _ => bail!("usage: wbx var set|get|list|ref"),
     }
+}
+
+// ─────────────────────────── scaffold ───────────────────────────
+
+/// `wbx init <name>` — a new workbook source that lints clean and bundles.
+pub fn init(name: &str, template: &str) -> Result<String> {
+    if template != "minimal" {
+        bail!("unknown template '{template}' (have: minimal)");
+    }
+    let dir = std::path::Path::new(name);
+    if dir.exists() {
+        bail!("{name} already exists");
+    }
+    std::fs::create_dir_all(dir.join("data")).with_context(|| format!("create {name}/data"))?;
+    let org = format!(
+        "#+TITLE: {name}
+
+         * {name}
+
+         A new workbook. Prose, data, and code live together in this file —
+         edit it, then preview with =wbx dev= and assemble with =wbx bundle=.
+
+         ** notes
+
+         - [ ] say what this workbook is for
+         - [ ] put source data in =data/=
+
+         ** code
+
+         #+begin_src javascript
+         // code blocks tangle into the workbook
+         #+end_src
+"
+    );
+    let org_path = dir.join("workbook.org");
+    std::fs::write(&org_path, &org).with_context(|| format!("write {}", org_path.display()))?;
+
+    // the scaffold must satisfy its own toolchain — refuse to ship a template
+    // that doesn't lint clean
+    let diags = oql::validate(&org);
+    if diags != "[]" {
+        bail!("template bug: scaffold has diagnostics:\n{diags}");
+    }
+    Ok(format!(
+        "{name}/
+  workbook.org   the source — prose + tasks + code
+  data/          files that travel with it
+
+next: cd {name} && wbx dev"
+    ))
 }

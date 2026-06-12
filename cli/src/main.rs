@@ -7,6 +7,7 @@
 
 mod commands; // engine-backed verbs
 mod deploy;
+mod dev;
 mod io;
 mod kernel;
 mod local;
@@ -32,6 +33,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    // ── start here (local) ──
+    /// Scaffold a new workbook source (workbook.org + data/)
+    Init { name: String, #[arg(long, default_value = "minimal")] template: String },
+    /// Watch + rebuild + serve a live preview (interactive; in agent contexts use `bundle`)
+    Dev { #[arg(default_value = ".")] src: String, #[arg(long)] port: Option<u16> },
     // ── source inspection (local, kernel) ──
     /// Org → headline rows (the query surface)
     Query { file: String },
@@ -188,6 +194,9 @@ fn run(cli: Cli) -> Result<String> {
     let io = io.as_ref();
 
     let out = match cli.cmd {
+        // start here
+        Cmd::Init { name, template } => local::init(&name, &template)?,
+        Cmd::Dev { src, port } => dev::dev(&src, port)?,
         // local kernel
         Cmd::Query { file } => kernel::query(io, &file)?,
         Cmd::Tangle { file } => kernel::tangle(io, &file)?,

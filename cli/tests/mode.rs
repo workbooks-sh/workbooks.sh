@@ -47,3 +47,54 @@ fn usage_error_is_exit_2() {
     let out = wbx().arg("no-such-verb").output().unwrap();
     assert_eq!(out.status.code(), Some(2), "clap usage errors exit 2");
 }
+
+#[test]
+fn init_scaffold_lints_and_bundles() {
+    let dir = std::env::temp_dir().join(format!("wbx-init-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let name = dir.join("demo");
+    let out = wbx().args(["init", name.to_str().unwrap()]).output().unwrap();
+    assert!(out.status.success(), "init: {}", String::from_utf8_lossy(&out.stderr));
+    let org = name.join("workbook.org");
+    assert!(org.is_file() && name.join("data").is_dir());
+    // the scaffold must satisfy the rest of the toolchain
+    let lint = wbx().args(["lint", org.to_str().unwrap()]).output().unwrap();
+    assert!(lint.status.success(), "lint: {}", String::from_utf8_lossy(&lint.stderr));
+    let bundle = wbx().args(["bundle", name.to_str().unwrap()]).output().unwrap();
+    assert!(bundle.status.success(), "bundle: {}", String::from_utf8_lossy(&bundle.stderr));
+    // re-init over an existing dir refuses
+    let again = wbx().args(["init", name.to_str().unwrap()]).output().unwrap();
+    assert!(!again.status.success());
+}
+
+#[test]
+fn dev_serves_and_reloads() {
+    let dir = std::env::temp_dir().join(format!("wbx-dev-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let name = dir.join("site");
+    assert!(wbx().args(["init", name.to_str().unwrap()]).output().unwrap().status.success());
+    let mut child = wbx()
+        .args(["dev", name.to_str().unwrap(), "--port", "4399"])
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    // wait for the server, then GET /
+    let mut ok = false;
+    for _ in 0..30 {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        if let Ok(mut s) = std::net::TcpStream::connect("127.0.0.1:4399") {
+            use std::io::{Read, Write};
+            let _ = s.write_all(b"GET / HTTP/1.1\r\nhost: x\r\n\r\n");
+            let mut buf = String::new();
+            let _ = s.read_to_string(&mut buf);
+            if buf.contains("200 OK") && buf.to_lowercase().contains("<html") {
+                ok = true;
+                break;
+            }
+        }
+    }
+    let _ = child.kill();
+    assert!(ok, "dev server never answered with HTML");
+}
