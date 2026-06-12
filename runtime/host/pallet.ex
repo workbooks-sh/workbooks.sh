@@ -715,6 +715,60 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # libxml2 — full XML (XPath/DOM/validation, richer than expat's SAX). configure-generated headers are
+  # hand-substituted: config.h (HAVE_*) inline + xmlversion.h (feature matrix: core on, network/iconv/zlib/
+  # threads off) vendored. -Wno-implicit-function-declaration + the global dup() stub cover wasi-libc's
+  # missing dup (wb-u1ly). `xml2 <xpath>` evaluates an XPath over stdin XML.
+  @libxml2_config ~S"""
+  #define HAVE_STDLIB_H 1
+  #define HAVE_STRING_H 1
+  #define HAVE_UNISTD_H 1
+  #define HAVE_FCNTL_H 1
+  #define HAVE_SYS_STAT_H 1
+  #define HAVE_SYS_TYPES_H 1
+  #define HAVE_STDINT_H 1
+  #define HAVE_INTTYPES_H 1
+  #define HAVE_MATH_H 1
+  #define HAVE_FLOAT_H 1
+  #define HAVE_LIMITS_H 1
+  #define HAVE_TIME_H 1
+  #define HAVE_ERRNO_H 1
+  #define HAVE_CTYPE_H 1
+  #define HAVE_ISNAN 1
+  #define HAVE_ISINF 1
+  #define VERSION "2.13.5"
+  """
+  @libxml2_xmlversion File.read!(Path.join(__DIR__, "../priv/libxml2/xmlversion.h"))
+  @libxml2_main ~S"""
+  #include <stdio.h>
+  #include <string.h>
+  #include <libxml/parser.h>
+  #include <libxml/xpath.h>
+  int main(int argc, char** argv) {
+    if (argc < 2) { fprintf(stderr, "usage: xml2 <xpath>\n"); return 1; }
+    static char buf[1 << 20]; size_t n = fread(buf, 1, sizeof buf, stdin);
+    xmlDocPtr doc = xmlReadMemory(buf, (int)n, "in.xml", NULL, 0);
+    if (!doc) { printf("parse-error\n"); return 1; }
+    xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+    xmlXPathObjectPtr r = xmlXPathEvalExpression((const xmlChar*)argv[1], ctx);
+    if (!r) { printf("xpath-error\n"); return 1; }
+    switch (r->type) {
+      case XPATH_NUMBER: printf("%g\n", r->floatval); break;
+      case XPATH_BOOLEAN: printf("%s\n", r->boolval ? "true" : "false"); break;
+      case XPATH_STRING: printf("%s\n", (char*)r->stringval); break;
+      case XPATH_NODESET:
+        if (r->nodesetval)
+          for (int i = 0; i < r->nodesetval->nodeNr; i++) {
+            xmlChar* c = xmlNodeGetContent(r->nodesetval->nodeTab[i]);
+            printf("%s\n", (char*)c); xmlFree(c);
+          }
+        break;
+      default: break;
+    }
+    return 0;
+  }
+  """
+
   # Eigen — header-only C++ linear algebra. No sources to compile (the lane grabs the extensionless umbrella
   # headers as companions + -I/work); the smoke main does a 2x2 matrix multiply.
   @eigen_main ~S"""
@@ -739,6 +793,17 @@ defmodule Workbooks.Pallet do
   """
 
   @csource [
+    %{
+      name: "xml2",
+      url: "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz",
+      sha: "74fc163217a3964257d3be39af943e08861263c4231f9ef5b496b6f6d4c7b2b6",
+      build_opts: [
+        src_globs: ["*.{c,h}", "include/**/*.h"],
+        exclude: ~w(nanoftp.c nanohttp.c xmlcatalog.c xmllint.c testModule.c testapi.c testchar.c testdict.c testlimits.c testparser.c testrecurse.c testThreads.c runtest.c runsuite.c runxmlconf.c),
+        cflags: ["-DHAVE_CONFIG_H", "-Wno-implicit-function-declaration", "-I/work", "-I/work/include"],
+        extra_sources: [{"config.h", @libxml2_config}, {"include/libxml/xmlversion.h", @libxml2_xmlversion}, {"xmlmain.c", @libxml2_main}]
+      ]
+    },
     %{
       name: "eigen",
       url: "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz",

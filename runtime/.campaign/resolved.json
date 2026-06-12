@@ -2022,6 +2022,13 @@
 "lane": "none",
 "blocker": "Multi-dep autotools-configure + codegen cascade, and redundant with live crypto. (1) GnuTLS core requires an autotools `configure` run to generate config.h plus headers from .in templates (version/ABI",
 "extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"libxml2": {
+"verdict": "live",
+"lane": "B",
+"recipe": "libxml2 2.13.5 + hand-subst config.h/xmlversion.h + dup stub (wb-u1ly -Wno-implicit-func-decl); xpath main",
+"smoke": "count(//item)=3",
+"extent": "full XML: parse/DOM/XPath/validation (richer than expat SAX); xml2 <xpath> over stdin"
 }
 },
 "preliminary": {
@@ -2236,13 +2243,6 @@
 "verdict": "uncertain",
 "lane": "none",
 "recipe": "No clean lane. Idris2 is a SELF-HOSTED compiler: building it requires an existing Idris2 binary or a",
-"confidence": "medium",
-"verified": false
-},
-"libxml2": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "buildable w/ config-subst (xmlversion.h filled) but needs dup/posix-decl shim; expat covers core XML",
 "confidence": "medium",
 "verified": false
 }

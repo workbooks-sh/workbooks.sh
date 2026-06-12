@@ -39,3 +39,11 @@ char *tmpnam(char *s) {
 FILE *tmpfile(void) {
   return NULL;
 }
+
+/* dup(2) — wasi-libc omits the declaration AND symbol (no fd duplication in WASI). Define it so tools
+ * that reference it (e.g. libxml2 xmlIO.c output path) LINK; the fd-dup escape simply fails at runtime.
+ * Callers compile via -Wno-implicit-function-declaration (the decl is absent in wasi-libc). wb-u1ly. */
+int dup(int oldfd) {
+  (void)oldfd;
+  return -1;
+}

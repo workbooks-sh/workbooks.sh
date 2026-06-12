@@ -148,15 +148,5 @@
   "smoke": "Build libcrypto+libssl, link tiny C driver: RAND_bytes(buf,32) then SHA256 of a string and assert digest matches known vector; optionally EVP_aes_256_gcm encrypt/decrypt round-trip. Run under wasmtime; getentropy backed by WASI random_get.",
   "blocker": "None blocking. Notes: must define OPENSSL_NO_ASM (skip all gen/bcm,gen/crypto .S/.asm); must build non-FIPS (BORINGSSL_FIPS guards the only sys/mman.h+mprotect use in bcm.cc); single-threaded wasi-libc fine (locks are no-ops). All codegen (perlasm .S, err_data.cc) and config (opensslconf.h) are COMMITTED in gen/ + include/ \u2014 confirmed no pregenerate/configure/codegen step needed. Distinct value vs live mbedtls/libsodium: full OpenSSL-compatible libcrypto+libssl TLS/X.509 API surface.",
   "confidence": "high"
- },
- {
-  "name": "libxml2",
-  "decisive": "live-buildable",
-  "lane": "B",
-  "url": "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz",
-  "build_opts": "deps: [{url:\"https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz\", strip:\"libxml2-2.13.5/\"}]; src_globs: [\"*.c\"]; exclude: [\"test*.c\",\"run*.c\",\"xmllint.c\",\"xmlcatalog.c\",\"nanohttp.c\",\"nanoftp.c\",\"xmlmodule.c\",\"xzlib.c\",\"c14n.c\",\"trio*.c\",\"python/**\",\"example/**\"]; (keep: buf chvalid dict encoding entities error globals hash list parser parserInternals pattern relaxng SAX2 schematron threads tree uri valid xinclude xlink xmlIO xmlmemory xmlreader xmlregexp xmlsave xmlschemas xmlschemastypes xmlstring xmlunicode xmlwriter xpath xpointer HTMLparser HTMLtree catalog debugXML legacy SAX); cflags: [\"-I.\",\"-Iinclude\",\"-DHAVE_CONFIG_H\",\"-D_WASI_EMULATED_SIGNAL\",\"-D_WASI_EMULATED_PROCESS_CLOCKS\",\"-O2\"]; extra_sources: hand-write include/libxml/xmlversion.h (fill @WITH_*@: HTTP=0 FTP=0 MODULES=0 ICONV=0 ICU=0 LZMA=0 ZLIB=0 THREADS=0 DEBUG=1 everything-else-on; @VERSION@=2.13.5 @LIBXML_VERSION_NUMBER@=21305) + config.h (define STDC_HEADERS, HAVE_STD*_H, HAVE_UNISTD_H, HAVE_FCNTL_H, HAVE_SYS_STAT_H, HAVE_STAT, HAVE_GETTIMEOFDAY, HAVE_SYS_TIME_H; leave socket/dlopen/mmap/getentropy/glob/poll/netdb UNDEF; PACKAGE strings = \"libxml2\"/\"2.13.5\"); main: n/a (static lib / link with host driver). NO configure, NO codegen \u2014 Unicode tables ship pre-generated as xmlunicode.c/chvalid.c in the tarball.",
-  "smoke": "Parse an inline XML string with xmlReadMemory(), run an XPath query (xmlXPathEvalExpression) over it, assert nodeset count, xmlFreeDoc \u2014 confirms parser+tree+xpath link and table init.",
-  "blocker": "None for the core lane. Excluded subsystems (nanohttp/nanoftp = socket, xmlmodule = dlopen, xzlib = lzma) are dropped via globs + WITH_*=0, not shimmed. c14n excluded only to avoid extra surface; can be re-added (pure C, no extra deps). If zlib/lzma-backed compressed-input is later wanted, add those as multi-tarball :deps and flip WITH_ZLIB/WITH_LZMA.",
-  "confidence": "high"
  }
 ]
