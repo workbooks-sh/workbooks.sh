@@ -832,3 +832,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   -> the host's TLS handshake -> decrypted HTTPS reply ("n_gt0=true has_http=true"). PLATFORM now TEN brokered
   capabilities: net(http+sockets) / exec / storage / parallel / serve / secrets / queue / raw-TCP / UDP / TLS.
   NEXT (iter 51): js_dock host_tls parity; OR the inbound seam (wb-py4k).
+- 2026-06-12 (iter 51): **js_dock host_tls parity (dock symmetry) + NETWORK RECLAMATION COMPLETE + inbound
+  depth-2.** (a) js_dock host_tls mirrors rust_dock — tcp/udp/tls now all present on BOTH docks as imports
+  (JS-callability awaits the harness bindings, wb-q2mo). 16 broker tests green. (b) BROAD re-scan vs all 10
+  caps: the 22 remaining network-ish impossible items ALL carry additional HARD blockers (native-threads,
+  fork-exec-of-native, distributed network-as-purpose, build-chains); wolfSSL/BoringSSL redundant (TLS crypto
+  already live). NONE purely network-blocked -> the NETWORK RECLAMATION IS COMPLETE: 61 reachable = ALL
+  network/socket/server-bound items; the 262 impossible are hard for NON-network reasons. (c) wb-py4k depth-2:
+  the proxy serve is ASYNC; wasmex's engine is SYNC (the spawn_blocking trick AVOIDED async_support) — the
+  inbound seam may need an ENGINE async_support change, not just a NIF fn. A large focused-session piece.
+  NEXT (iter 52): consolidation, or the inbound seam (large).

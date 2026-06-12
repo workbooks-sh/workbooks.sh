@@ -67,3 +67,14 @@ cargo-component IS installed. Built a REAL wasi:sockets REACTOR (std::net on was
 So BOTH halves of keystone item (2) — wasi-http outbound AND wasi-sockets raw TCP — are now E2E-PROVEN and
 SSRF-filtered. The 37 sockets-reclaimed items' path is e2e-verified (was by-construction). Permanent test +
 reproducible reactor source (test/broker_e2e/wasi_sockets_reactor/). 61 reclaimed, ALL e2e-path-proven.
+
+## UPDATE (iter 51) — NETWORK RECLAMATION COMPLETE (broad re-scan against all 10 capabilities)
+Re-scanned the 262 still-impossible items for ANYTHING the brokered-net platform (http/sockets/tcp/udp/tls/
+serve) now addresses. 22 matched on network keywords — but ALL have additional HARD blockers brokering can't
+solve: native-threads + fork-exec-of-native-compilers (build orchestrators: Stencil/Vike/Conan/SwiftPM/
+Farm/pipx/LuaRocks/GNU-Make), distributed "network-as-purpose" clustering (Dgraph/FoundationDB/Aerospike/
+Kudu/CockroachDB/YugabyteDB/TiDB/Cloudflare-D1/MonetDB), no-interpreter (renv), or REDUNDANT (wolfSSL/
+BoringSSL — TLS crypto already live via mbedtls/openssl). NONE are purely network-blocked. CONCLUSION: the
+brokered-net reclamation is COMPLETE — the 61 reachable are ALL the network/socket/server-bound items; the
+262 still-impossible are genuinely hard for NON-network reasons (build/codegen/thread/gpu/fork-exec-native/
+distributed). Final tally: 262 impossible / 61 reachable / 32 live / 1 deferred.
