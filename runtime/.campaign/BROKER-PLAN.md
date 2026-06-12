@@ -1385,3 +1385,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   no http, compute timeout. 18 tests green. The REMAINING part (should minimal itself drop secrets/sockets?)
   is a DESIGN DECISION with breakage risk + a tested design intent -> filed wb-ltum for a deliberate owner call,
   NOT changed unilaterally. Residual is bounded (tenant-pinned + SSRF/allow-list/rate floors).
+- 2026-06-12 (iter 102): **FIXED wb-8w8x: exec/pipe unbounded-stdout DoS (LOW) — at the WRITE layer.** The
+  finding (exec stdout buffered before the cap) has a deeper root: Wasmex.Pipe is an in-memory
+  Cursor<Vec<u8>> that was UNBOUNDED, and the wasm runs to COMPLETION (filling the host pipe) before the host
+  reads + caps — so the per-call output cap never bounded PEAK host memory. Added a hard MAX_PIPE_BYTES
+  (256MiB) backstop to BOTH Pipe write paths (Write::write + WasiFile::write_vectored): bytes past the cap are
+  DROPPED (pretend-consumed so the guest doesn't block/error; stdout just truncates at the cap, at write time).
+  No signature changes — every pipe is now bounded. 256MiB is generous vs the exec_broker functional cap (8MiB)
+  so it's a pure DoS floor that never affects legit output. 0 rust errors; 26 dock/exec tests green (real wasm
+  stdout unaffected). This was the last LOW audit finding. REMAINING: wasi:http https pin (MEDIUM, substantial
+  Rust — custom SNI-preserving connector) + the dock allow-list scope-threading + wb-ltum (minimal-caps
+  design decision, owner's call).

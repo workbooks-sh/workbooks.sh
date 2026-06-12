@@ -16,6 +16,14 @@ pub struct Pipe {
     buffer: Arc<RwLock<Cursor<Vec<u8>>>>,
 }
 
+// wb-8w8x: a Pipe is an in-memory Cursor<Vec<u8>> and was UNBOUNDED. A wasm command flushing stdout in a loop
+// could grow it without limit — and the wasm runs to COMPLETION (filling the host pipe) before the host reads
+// and caps the output, so the per-call output cap doesn't bound PEAK host memory. This hard backstop bounds
+// every pipe: writes past MAX_PIPE_BYTES are DROPPED (pretend-consumed so the guest doesn't block/error; its
+// stdout is simply truncated at the cap, at WRITE time). Generous vs the exec_broker functional cap (8 MiB),
+// so it's a pure DoS floor that never affects legitimate output.
+const MAX_PIPE_BYTES: usize = 256 * 1024 * 1024;
+
 impl Pipe {
     pub fn new() -> Self {
         Self::default()
@@ -48,7 +56,15 @@ impl Read for Pipe {
 impl Write for Pipe {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let buffer = &mut *(self.borrow());
-        buffer.write(buf)
+        let cur = buffer.get_ref().len();
+        if cur >= MAX_PIPE_BYTES {
+            // at the cap: silently drop (report full consumption so the guest's write() "succeeds")
+            return Ok(buf.len());
+        }
+        let n = (MAX_PIPE_BYTES - cur).min(buf.len());
+        let written = buffer.write(&buf[..n])?;
+        // report the whole buffer consumed; bytes beyond the cap are dropped
+        Ok(written + (buf.len() - n))
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -76,10 +92,31 @@ impl WasiFile for Pipe {
 
     async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
         let buffer = &mut *(self.borrow());
-        buffer
-            .write_vectored(bufs)
-            .map(|written| written as u64)
-            .map_err(wasi_common::Error::from)
+        let cur = buffer.get_ref().len();
+        let total: usize = bufs.iter().map(|b| b.len()).sum();
+
+        // wb-8w8x backstop (same as Write::write): bound peak pipe memory; drop bytes past MAX_PIPE_BYTES.
+        if cur >= MAX_PIPE_BYTES {
+            return Ok(total as u64);
+        }
+        if cur + total <= MAX_PIPE_BYTES {
+            return buffer
+                .write_vectored(bufs)
+                .map(|written| written as u64)
+                .map_err(wasi_common::Error::from);
+        }
+        // partial: write up to the cap from a flattened prefix, drop the remainder
+        let room = MAX_PIPE_BYTES - cur;
+        let mut flat: Vec<u8> = Vec::with_capacity(room);
+        for b in bufs {
+            if flat.len() >= room {
+                break;
+            }
+            let take = (room - flat.len()).min(b.len());
+            flat.extend_from_slice(&b[..take]);
+        }
+        buffer.write_all(&flat).map_err(wasi_common::Error::from)?;
+        Ok(total as u64)
     }
 
     async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
