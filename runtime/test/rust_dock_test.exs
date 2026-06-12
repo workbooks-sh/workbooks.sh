@@ -207,4 +207,32 @@ fn main(){
     expected = :crypto.mac(:hmac, :sha256, secret, "payload") |> Base.encode16(case: :lower)
     assert String.trim(out) == "sig=" <> expected
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "host_publish/host_poll — a PRODUCER guest hands a message to a separate CONSUMER guest (inter-guest)" do
+    assert "host_publish" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+    tenant = "q-#{System.unique_integer([:positive])}"
+
+    producer =
+      build!(~S|
+extern "C" { fn host_publish(tp:i32,tl:i32,mp:i32,ml:i32) -> i32; }
+fn main(){ let t=b"jobs"; let m=b"job-42";
+  let r=unsafe{host_publish(t.as_ptr() as i32,t.len() as i32,m.as_ptr() as i32,m.len() as i32)};
+  println!("pub={}", r); }|)
+
+    consumer =
+      build!(~S|
+extern "C" { fn host_poll(tp:i32,tl:i32,op:i32,oc:i32) -> i32; }
+fn main(){ let t=b"jobs"; let mut o=[0u8;64];
+  let n=unsafe{host_poll(t.as_ptr() as i32,t.len() as i32,o.as_mut_ptr() as i32,64)};
+  let g=if n>0{std::str::from_utf8(&o[..n as usize]).unwrap_or("")}else{"EMPTY"};
+  println!("got={}", g); }|)
+
+    # producer guest enqueues; a SEPARATE consumer guest (same tenant) drains it
+    assert {:ok, o1} = RustDock.run(producer, profile: :minimal, tenant: tenant)
+    assert String.trim(o1) == "pub=0"
+    assert {:ok, o2} = RustDock.run(consumer, profile: :minimal, tenant: tenant)
+    assert String.trim(o2) == "got=job-42"
+  end
 end

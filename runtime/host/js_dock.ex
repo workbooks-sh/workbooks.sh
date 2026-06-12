@@ -68,6 +68,7 @@ defmodule Workbooks.JsDock do
     allow_http = Policy.allow_http?(profile)
     allow_exec = "exec" in Policy.caps(profile)
     allow_kv = "kv" in Policy.caps(profile)
+    allow_secrets = "secrets" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -147,6 +148,21 @@ defmodule Workbooks.JsDock do
                 {:ok, val} <- Workbooks.StorageBroker.Server.get(tenant, key) do
              n = min(byte_size(val), oc)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(val, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end},
+      # Secrets (gated on secrets cap; tenant from Dock). Sign with a host-held secret; never read it.
+      "host_sign" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, np, nl, dp, dl, op, oc ->
+           with true <- allow_secrets,
+                name = Wasmex.Memory.read_string(ctx.caller, ctx.memory, np, nl),
+                data = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl),
+                {:ok, sig} <- Workbooks.SecretBroker.sign(tenant, name, data) do
+             n = min(byte_size(sig), oc)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(sig, 0, n))
              n
            else
              _ -> -1

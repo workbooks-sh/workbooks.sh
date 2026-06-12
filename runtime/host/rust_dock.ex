@@ -30,6 +30,7 @@ defmodule Workbooks.RustDock do
       |> maybe("exec" in caps, fn -> exec_caps(tenant) end)
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
       |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
+      |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -78,6 +79,40 @@ defmodule Workbooks.RustDock do
              end
            else
              _ -> -1
+           end
+         end}
+    }
+  end
+
+  # Inter-guest message queue — merged on the "queue" cap. Per-tenant topics; publish + poll (FIFO).
+  defp queue_caps(tenant) do
+    %{
+      # host_publish(topic_ptr,topic_len, msg_ptr,msg_len) -> i32 : enqueue (0 ok, -1 full/denied).
+      "host_publish" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, tp, tl, mp, ml ->
+           topic = Wasmex.Memory.read_string(ctx.caller, ctx.memory, tp, tl)
+           msg = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, mp, ml)
+
+           case Workbooks.QueueBroker.publish(tenant, topic, msg) do
+             :ok -> 0
+             {:error, _} -> -1
+           end
+         end},
+      # host_poll(topic_ptr,topic_len, out_ptr,out_cap) -> i32 : dequeue oldest (msg len, -1 empty/denied).
+      "host_poll" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, tp, tl, op, oc ->
+           topic = Wasmex.Memory.read_string(ctx.caller, ctx.memory, tp, tl)
+
+           case Workbooks.QueueBroker.poll(tenant, topic) do
+             {:ok, msg} ->
+               n = min(byte_size(msg), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(msg, 0, n))
+               n
+
+             _ ->
+               -1
            end
          end}
     }

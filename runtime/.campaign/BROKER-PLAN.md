@@ -604,3 +604,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   PLATFORM now SIX brokered capabilities (egress/exec/storage/parallelism/serving/SECRETS), all e2e-proven
   (except net-egress reachability, env-gated). NEXT (iter 30): js_dock host_sign parity (quick mirror); OR a
   7th capability (inter-guest pub/sub for multi-guest coordination); OR wb-0beq (focused session).
+- 2026-06-12 (iter 30): **js_dock host_sign parity + 7th capability INTER-GUEST MESSAGE QUEUE (green).**
+  (a) js_dock host_sign mirrored (secrets on BOTH docks). (b) Workbooks.QueueBroker: per-tenant topics, FIFO
+  publish/poll, depth cap (DoS floor), tenant isolation, revocation — serializing Agent so publish/poll are
+  ATOMIC (no lost/dup messages). Wired host_publish/host_poll into rust_dock on a new "queue" cap. INTER-
+  GUEST e2e: a PRODUCER guest publishes "job-42"; a SEPARATE CONSUMER guest (same tenant, different instance)
+  polls it -> gets "job-42". Sandboxed guests coordinate (work distribution / events) THROUGH the broker
+  WITHOUT shared memory. 5 unit + 1 inter-guest e2e green.
+  PLATFORM now SEVEN brokered capabilities: egress, exec, durable storage, data-parallelism, inbound HTTP
+  serving, secrets (host-holds-creds), inter-guest queue. All e2e-proven (except net-egress reachability,
+  env-gated). Each: host does the privileged op, guest sandboxed, default-deny + least-privilege cap +
+  tenant isolation + depth/size/rate quotas + audit + revocation + adversarial tests + offline e2e.
+  NEXT (iter 31): js_dock queue parity (quick); OR an 8th capability; OR wb-0beq (focused session).
