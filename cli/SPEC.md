@@ -117,6 +117,17 @@ interactivity (no prompts, no TTY detection — accidentally agent-safe,
 deliberately human-poor); errors are anyhow strings with exit code 1 for
 everything; no `--json` anywhere; no color; env vars are `WB_*`.
 
+### The prime DX directive
+
+**Human mode is dumb simple: the tool does the work.** Every choice the CLI
+can make for the user, it makes — and says what it chose, so trust builds
+instead of mystery. Defaults over questions; questions (pickers) only when a
+choice is genuinely the user's; never an error where a default + a note
+would do; every success teaches the next verb. Learning curve is a bug.
+Examples already in force: bare `wbx` = oriented landing, `deploy local` =
+scaffold-if-missing-then-apply, `upgrade` detects npm installs and redirects,
+`doctor` diagnoses without failing, hints chain build→bundle→sign→deploy.
+
 ### The mode model
 
 One switch, three ways to set it, sensible default:
