@@ -2095,6 +2095,18 @@
 "recipe": "pdf-lib npm bundled on Javy/QuickJS (async resolves \u2014 Javy pumps the promise queue)",
 "smoke": "create PDF => pdf bytes: 828",
 "extent": "PDF generation/manipulation (pdf-lib: create/merge/split/stamp/forms); pdf cmd text->PDF"
+},
+"csvkit": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "pure-Python so runnable-in-principle on the live CPython.wasm, BUT the CSV capability is already covered by python's csv+json stdlib (live); the full suite is an 18+ package vendor that pulls SQLAlchemy (C-ext, for csvsql). Marginal/redundant \u2014 off the table.",
+"extent": "off-the-table (marginal/redundant)"
+},
+"Hatch": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "hatchling is a pure-Python wheel-build BACKEND \u2014 no standalone stdin->stdout command use in-sandbox (its job is producing Python wheels via a full build workflow). Marginal, no distinct in-sandbox capability \u2014 off the table.",
+"extent": "off-the-table (no standalone use)"
 }
 },
 "preliminary": {
@@ -2129,22 +2141,6 @@
 "confidence": "medium",
 "verified": false,
 "note": "C++ lane proven; flatc full build deferred"
-},
-"csvkit": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://pypi.org/pypi/csvkit/2.2.0/json",
-"recipe": "Lane D (pure-Python pip pkg, Pyodide/CPython-on-wasm host). VERIFIED via PyPI JSON API: csvkit-2.2.0 ships csvkit-2.2.0-py3-none-any.whl. En",
-"confidence": "high",
-"verified": false
-},
-"Hatch": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://pypi.org/pypi/hatchling/json",
-"recipe": "Scope to the build-backend half (hatchling) \u2014 the pure-function packager \u2014 not the full `hatch` CLI. We already have CPython live in-sandbox",
-"confidence": "high",
-"verified": false
 },
 "Composer": {
 "verdict": "uncertain",

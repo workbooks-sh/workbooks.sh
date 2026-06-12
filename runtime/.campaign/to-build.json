@@ -10,26 +10,6 @@
   "confidence": "high"
  },
  {
-  "name": "csvkit",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://files.pythonhosted.org/packages/py3/c/csvkit/csvkit-2.2.0-py3-none-any.whl (verified via PyPI JSON: csvkit-2.2.0-py3-none-any.whl)",
-  "build_opts": "Lane D (pure-Python, CPython/Pyodide-on-wasm). Vendor site-packages: pip install --target=<sysroot>/site-packages csvkit==2.2.0 (resolves full pure-Python tree). Wheels: csvkit-2.2.0-py3-none-any, agate-1.14.2-py3-none-any, agate_excel-0.4.2, agate_dbf-0.2.4, agate_sql-0.7.3, openpyxl-3.1.5-py2.py3-none-any, xlrd-2.0.2, python_slugify-8.0.4, leather-0.4.1, parsedatetime, pytimeparse2, Babel, et_xmlfile, dbfread, greenlet(optional-skip), sqlalchemy-2.0.50 (use py3-none-any fallback wheel; C-ext optional). No native C-ext at runtime. Entry points: csvlook/csvcut/csvstat/in2csv/csvsql/csvgrep/csvjson etc. via console_scripts.",
-  "smoke": "printf 'a,b\\n1,2\\n3,4\\n' | python -m csvkit.utilities.csvcut -c 1   # or: csvcut -c 1 input.csv ; csvstat input.csv ; echo expect column-a values 1,3",
-  "blocker": "none \u2014 entire dep tree is pure-Python (py3-none-any wheels). Only nuance: SQLAlchemy ships cp-specific accelerator wheels but also a py3-none-any fallback; pin/select the pure wheel. greenlet (SQLAlchemy async extra) is C and unneeded for csvkit's sync use \u2014 exclude it.",
-  "confidence": "high"
- },
- {
-  "name": "hatchling",
-  "decisive": "live-buildable",
-  "lane": "D",
-  "url": "https://pypi.org/pypi/hatchling/json",
-  "build_opts": "lane D pure-python: pip download hatchling==1.30.1 + deps (packaging>=24.2, pathspec>=0.10.1, pluggy>=1.0.0, trove-classifiers; tomli on py<3.11) all py3-none-any wheels; unzip into site-packages on already-live CPython wasm32-wasi. No C-ext, no compile step.",
-  "smoke": "python -c \"import hatchling, hatchling.build as b; print(b.get_requires_for_build_wheel())\" then build a wheel for a trivial pyproject (build-backend=hatchling.build) and confirm the .whl is produced.",
-  "blocker": "none \u2014 pure-python build backend; only the build-backend half (hatchling), not the full hatch CLI.",
-  "confidence": "high"
- },
- {
   "name": "sox",
   "decisive": "live-buildable",
   "lane": "B",
