@@ -359,7 +359,7 @@ pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>, human: boo
     let msg = write_scaffold(&out_dir, kind, src, &t)?;
     // stage 2 runs automatically — the tool does the work, the artifact
     // carries its own audit; agents re-run with `wbx toolkit audit`
-    let audit_line = match crate::audit::audit(&out_dir.to_string_lossy(), human) {
+    let audit_line = match crate::audit::audit_static(&out_dir.to_string_lossy(), human) {
         Ok(report) if human => format!("\n\n{report}"),
         Ok(_) => String::new(),
         Err(e) => format!("\n\naudit skipped: {e:#}"),

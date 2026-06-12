@@ -198,17 +198,113 @@ pub fn write_into_manifest(dir: &Path, audits: &[ScriptAudit]) -> Result<()> {
         for f in &a.findings {
             section.push_str(&format!("    - {} ={}= :: {} — {}\n", f.kind, f.name, f.class.s(), f.note));
         }
-        if a.class != Class::Ready {
-            section.push_str(&format!("**** TODO make {} sandbox-ready (see notes above)\n", a.file));
-        }
     }
-    section.push_str("\n** TODO fix-up plan\n   Stage 3 turns the non-ready findings into concrete per-item recipes.\n");
+    let id = m
+        .lines()
+        .find_map(|l| l.strip_prefix("#+TOOLKIT:"))
+        .map(|v| v.trim().to_string())
+        .unwrap_or_else(|| "<id>".into());
+    section.push('\n');
+    section.push_str(&fixup_plan(&id, audits));
     std::fs::write(&mpath, format!("{}{}", &m[..cut], section))?;
     Ok(())
 }
 
-/// `wbx toolkit audit <dir>` — report per mode; exit 0 (a diagnosis isn't a failure).
-pub fn audit(dir: &str, human: bool) -> Result<String> {
+// ── stage 3: the fix-up plan (the agent manual) ─────────────────────────────
+
+/// Concrete steps per finding — which lane, which recipe, what to rewrite.
+fn recipe(f: &Finding) -> Vec<String> {
+    match (f.kind, f.name.as_str()) {
+        ("interpreter", "python" | "python3" | "ruby" | "perl") => vec![
+            format!("rewrite in JS for the quickjs lane — keep the script's CLI contract (same args in, same stdout out) so callers don't change"),
+            format!("or split the logic into org tasks the engine runs natively"),
+        ],
+        ("interpreter", "sh" | "bash" | "zsh" | "node" | "js") => vec![],
+        ("interpreter", _) => vec![
+            format!("identify the language; if it's in a compile lane (c/zig/rust/go) declare a build recipe in the manifest, then =wbx toolkit build= produces the wasm"),
+        ],
+        ("binary", "curl" | "wget") => vec![
+            format!("route HTTP through the Dock instead of a raw binary — in JS use =fetch= (engine-shimmed); in shell, call the engine's http capability from a task"),
+        ],
+        ("binary", "git") => vec![
+            format!("call engine-side git (a brokered capability) from the task instead of the local binary"),
+        ],
+        ("binary", "npm" | "npx" | "bun" | "node") => vec![
+            format!("drop install-at-runtime — declare the deps and let =wbx toolkit build= resolve + bundle them via the npm lane at build time"),
+        ],
+        ("binary", _) => vec![
+            format!("no sandbox equivalent — move this behavior onto an engine capability, or redesign the step out"),
+        ],
+        ("npm", _) => vec![
+            format!("declare ={}= as a dependency in the manifest; =wbx toolkit build= bundles it via the npm lane", f.name),
+        ],
+        ("pip", _) => vec![
+            format!("={}= goes away with the python rewrite (see the interpreter item)", f.name),
+        ],
+        _ => vec![],
+    }
+}
+
+/// The plan section: one TODO per non-ready script, concrete steps, and the
+/// done-test spelled out. Empty plans say so honestly.
+fn fixup_plan(id: &str, audits: &[ScriptAudit]) -> String {
+    let work: Vec<&ScriptAudit> = audits.iter().filter(|a| a.class != Class::Ready).collect();
+    if work.is_empty() {
+        return format!(
+            "** fix-up plan\n   nothing to fix — every script is sandbox-ready.\n                prove it: =wbx toolkit push {id} <dir>= then =wbx toolkit verify {id}=\n"
+        );
+    }
+    let mut out = format!("** TODO fix-up plan [0/{}]\n", work.len());
+    out.push_str(&format!(
+        "   The agent manual: work each item, check it off, then prove the whole\n   \
+         toolkit — done when =wbx toolkit push {id} <dir>= · =wbx toolkit build {id}=\n   \
+         · =wbx toolkit verify {id}= all pass. With an engine reachable,\n   \
+         =wbx toolkit audit <dir> --fix= runs that push→build→verify for you.\n"
+    ));
+    for a in &work {
+        out.push_str(&format!("*** TODO {} ({} — {})\n", a.file, a.class.s(), a.interpreter));
+        for f in &a.findings {
+            for step in recipe(f) {
+                out.push_str(&format!("    - [ ] {step}\n"));
+            }
+        }
+        out.push_str(&format!("    - [ ] re-run =wbx toolkit audit= — {} must classify ready\n", a.file));
+    }
+    out
+}
+
+/// `wbx toolkit audit <dir> [--fix]` — static report per mode (exit 0: a
+/// diagnosis isn't a failure); `--fix` is the auto-convert: push the toolkit
+/// to the engine, run its builds, verify — the engine errors map to the
+/// standard exit codes if it's unreachable.
+pub fn audit(dir: &str, human: bool, fix: bool, io: &dyn crate::io::Io) -> Result<String> {
+    let report = audit_static(dir, human)?;
+    if !fix {
+        return Ok(report);
+    }
+    let mpath = Path::new(dir).join("manifest.org");
+    let m = std::fs::read_to_string(&mpath)?;
+    let id = m
+        .lines()
+        .find_map(|l| l.strip_prefix("#+TOOLKIT:"))
+        .map(|v| v.trim().to_string())
+        .context("manifest.org has no #+TOOLKIT: id")?;
+    let pushed = crate::commands::toolkit_push(io, &id, dir)?;
+    let built = crate::commands::toolkit_build(io, &id, None)?;
+    let verified = crate::commands::toolkit_verify(io, &id)?;
+    if human {
+        Ok(format!("{report}\n\nfix: pushed {id} → built → verified\n{verified}"))
+    } else {
+        Ok(serde_json::json!({
+            "audit": serde_json::from_str::<serde_json::Value>(&report).unwrap_or(serde_json::json!({"text": report})),
+            "fix": { "pushed": pushed, "built": built, "verified": verified },
+        })
+        .to_string())
+    }
+}
+
+/// The static stages (2+3): scan, classify, write findings + plan into the manifest.
+pub fn audit_static(dir: &str, human: bool) -> Result<String> {
     let d = Path::new(dir);
     let audits = audit_dir(d)?;
     write_into_manifest(d, &audits)?;

@@ -169,7 +169,11 @@ enum ToolkitVerb {
     /// Run a toolkit task recipe (server-side gated: WB_TOOLKIT_EXEC=1)
     Run { id: String, task: String, #[arg(trailing_var_arg = true)] args: Vec<String> },
     /// Re-run the wasm-compatibility audit on an imported toolkit dir
-    Audit { #[arg(default_value = ".")] dir: String },
+    Audit {
+        #[arg(default_value = ".")] dir: String,
+        /// Auto-convert: push to the engine, run builds, verify
+        #[arg(long)] fix: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -328,7 +332,7 @@ fn run(cli: Cli, human: bool) -> Result<String> {
             ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
             ToolkitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
             ToolkitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref(), human)?,
-            ToolkitVerb::Audit { dir } => audit::audit(&dir, human)?,
+            ToolkitVerb::Audit { dir, fix } => audit::audit(&dir, human, fix, io)?,
             ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },
         // runtime ops

@@ -237,7 +237,9 @@ fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
     assert!(manifest.contains("#+TOOLKIT: demo-skill"), "id from frontmatter");
     assert!(manifest.contains("#+TAGLINE: does demo things"));
     assert!(manifest.contains("** dependency audit (static, auto)"), "import auto-runs stage 2");
-    assert!(manifest.contains("TODO fix-up plan"), "stage-3 handoff present");
+    // run.sh is plain sh → all-ready → the plan honestly has nothing to do
+    assert!(manifest.contains("** fix-up plan"), "stage-3 plan present");
+    assert!(manifest.contains("nothing to fix"), "all-ready plan is honest");
     assert!(manifest.contains("scripts/run.sh"), "carried script listed");
     assert!(out_dir.join("scripts/run.sh").is_file());
 
@@ -311,8 +313,22 @@ fn toolkit_audit_classifies_against_the_lanes() {
     assert!(!m.contains("** TODO dependency audit"));
     assert!(m.contains("npm =axios="), "npm dep surfaced");
     assert!(m.contains("pip =numpy="), "pip dep surfaced");
-    assert!(m.contains("TODO make calc.py sandbox-ready"));
-    assert!(m.contains("** TODO fix-up plan"));
+
+    // stage 3: the plan is the agent manual — one TODO per non-ready script,
+    // concrete steps, the done-test spelled out
+    assert!(m.contains("** TODO fix-up plan [0/3]"), "plan counts the work: {m}");
+    assert!(m.contains("*** TODO calc.py (blocked — python3)"));
+    assert!(m.contains("rewrite in JS for the quickjs lane"), "python recipe names the lane");
+    assert!(m.contains("route HTTP through the Dock"), "curl recipe is concrete");
+    assert!(m.contains("=wbx toolkit build= bundles it via the npm lane"), "npm recipe");
+    assert!(m.contains("wbx toolkit verify demo"), "done-test names the real id");
+
+    // --fix with no engine reachable → the standard engine exit code, no panic
+    let fix = wbx()
+        .args(["toolkit", "audit", dir.to_str().unwrap(), "--fix"])
+        .env("WBX_ENGINE_URL", "http://127.0.0.1:1")
+        .output().unwrap();
+    assert_eq!(fix.status.code(), Some(3), "fix needs an engine: {}", String::from_utf8_lossy(&fix.stderr));
 
     // human mode: summary line, exit 0
     let h = wbx().args(["toolkit", "audit", dir.to_str().unwrap()]).output().unwrap();
