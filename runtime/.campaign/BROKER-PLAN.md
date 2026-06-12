@@ -874,3 +874,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   ceiling, IS rate-limited). FOLLOW-UP: queue/secret/storage brokers take tenant-as-first-arg, not a :rate
   opt — assess whether they need a flood floor too. NEXT (iter 55): wire rate on queue/secret/storage; OR the
   inbound seam.
+- 2026-06-12 (iter 55): **DoS-cadence assessment — RESOLVED the iter-54 follow-up: queue/secret/storage do
+  NOT need the rate floor (by design).** Audited all three: each has Revocation + the APPROPRIATE resource
+  caps, ALL TESTED — queue depth 1000 (queue_full), storage 1MB value (value_too_large) + 10k keys
+  (quota_exceeded), secret no-read + sign-only. KEY INSIGHT: the rate floor is the right control for
+  VOLUME-DoS brokers (network/exec — SLOW ops, so the 2000/sec per-tenant floor bounds runaways while never
+  hampering legit use) but the WRONG control for the FAST growth-DoS brokers (queue/storage do µs ops; a
+  legit guest easily does thousands/sec — adding them to the shared per-tenant counter would HARM legit use
+  WITHOUT closing a gap, since their RESOURCE CAPS already bound the real DoS, which is unbounded GROWTH).
+  So the keystone "rate/byte/conn quotas" is COMPLETE with the right control per surface: RATE (volume) +
+  BYTE/DEPTH/KEY caps (growth, tested) + conn (naturally bounded by sequential broker calls + parallel_map's
+  fan-out cap). Holistic DoS-cadence sweep: 32 broker tests green. NO code change — extending the rate floor
+  to fast brokers would be a mistake; the design is correct as-is.
+  NEXT (iter 56): the inbound seam (wb-py4k, focused-session), or more auditing.
