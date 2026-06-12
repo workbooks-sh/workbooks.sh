@@ -1233,3 +1233,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   DoS FIXED (concurrent drain, both paths) + compute-DoS BOUNDED (epoch + response-timeout, both paths + the
   app-host Plug). A malicious/buggy hosted app can neither deadlock nor spin to hang the request or leak host
   threads.
+- 2026-06-12 (iter 90): **SECURITY POSTURE RE-VERIFIED after the DoS-fix restructuring (red-team still
+  green).** The iter86-89 work rewrote both serve NIFs (concurrent drain) + added epoch interruption — a large
+  change to the inbound path. Re-ran the adversarial suite to confirm no regression: Rust wb_ssrf unit suite
+  11/11 (SSRF classifier, IPv4-mapped normalization, allow-list matcher, DNS-exfil/IP-only scoping, the 400k-
+  check fuzz, and the egress rate meter), Elixir broker security 26/26 (NetGuard SSRF+allow-list+redirect,
+  tcp/udp brokers resolve-then-pin, BrokerAudit), plus the inbound red-team composition (a serving guest's
+  outbound metadata probe -> "outbound=blocked") all GREEN. So the keystone's "secure" criterion still holds
+  after the serve rewrite — the egress defenses are untouched (the changes were confined to the serve NIFs)
+  and the new DoS guards (backpressure concurrent-drain + compute-DoS epoch+timeout) are additive. The full
+  DoS + SSRF red-team is green; networking is secure, working, and manageable. MINOR open (cosmetic): the
+  app-host returns 504 via the Plug's receive backstop (not a faster 500) when a trapped guest yields its
+  default-response path — the serve still completes in ~8s (threads freed), so it's a routing nicety, not a
+  security gap.
