@@ -31,6 +31,7 @@ defmodule Workbooks.RustDock do
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
       |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
       |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
+      |> maybe("tcp" in caps, fn -> tcp_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -79,6 +80,30 @@ defmodule Workbooks.RustDock do
              end
            else
              _ -> -1
+           end
+         end}
+    }
+  end
+
+  # Raw-TCP request/response — merged on the "tcp" cap. The host opens the (resolve-then-pinned, SSRF-safe)
+  # connection; the guest never touches a socket. Tenant = revocation/rate principal.
+  defp tcp_caps(tenant) do
+    %{
+      # host_tcp(host_ptr,host_len, port, req_ptr,req_len, out_ptr,out_cap) -> i32 : response len (-1 denied).
+      "host_tcp" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, hp, hl, port, rp, rl, op, oc ->
+           host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
+           req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl)
+
+           case Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
+             {:ok, resp} ->
+               n = min(byte_size(resp), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
+               n
+
+             {:error, _} ->
+               -1
            end
          end}
     }

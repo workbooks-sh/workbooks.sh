@@ -651,3 +651,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   response, brokered+pinned+SSRF-safe; internal denied (audit-logged). 4 tests green. Covers line protocols
   (HTTP/1, Redis RESP, …) for hand-written guests. Also lands the keystone "resolve-then-pin" cadence item.
   PLATFORM now EIGHT brokered capabilities. NEXT (iter 34): wire host_tcp Dock import + guest e2e; OR more.
+- 2026-06-12 (iter 34): **host_tcp WIRED into rust_dock + GUEST e2e PROVEN (green).** Added a dedicated "tcp"
+  cap (minimal/network/posix; compute denied) + tcp_caps; host_tcp(host,port,req,out) reads the dest+request
+  from wasm mem -> TcpBroker.request(principal: tenant) -> writes the response. GUEST e2e: a Rust guest did
+  host_tcp("1.1.1.1", 80, "GET / HTTP/1.0...") -> the host opened a RESOLVE-THEN-PINNED, SSRF-checked TCP
+  connection -> the guest got an HTTP response ("n_gt0=true has_http=true"). The raw-TCP capability is now
+  guest-usable + e2e-proven (line protocols for hand-written guests, fully brokered+pinned+secured).
+  PLATFORM: EIGHT brokered capabilities, all guest-e2e-proven. NEXT (iter 35): js_dock host_tcp parity; OR a
+  concrete reclaimed live tool; OR more.

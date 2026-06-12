@@ -235,4 +235,25 @@ fn main(){ let t=b"jobs"; let mut o=[0u8;64];
     assert {:ok, o2} = RustDock.run(consumer, profile: :minimal, tenant: tenant)
     assert String.trim(o2) == "got=job-42"
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "host_tcp — guest does a brokered raw-TCP request to a public host (SSRF-safe, pinned)" do
+    assert "host_tcp" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+
+    w =
+      build!(~S|
+extern "C" { fn host_tcp(hp:i32,hl:i32,port:i32,rp:i32,rl:i32,op:i32,oc:i32) -> i32; }
+fn main(){
+  let host=b"1.1.1.1"; let req=b"GET / HTTP/1.0\r\nHost: one.one.one.one\r\n\r\n"; let mut out=[0u8;512];
+  let n=unsafe{ host_tcp(host.as_ptr() as i32,host.len() as i32, 80, req.as_ptr() as i32,req.len() as i32, out.as_mut_ptr() as i32, 512) };
+  let s=if n>0 { std::str::from_utf8(&out[..n as usize]).unwrap_or("") } else { "" };
+  println!("n_gt0={} has_http={}", n>0, s.contains("HTTP/"));
+}|)
+
+    # the guest's bytes went out over a host-opened, resolve-then-pinned, SSRF-checked TCP connection
+    assert {:ok, out} = RustDock.run(w, profile: :minimal)
+    assert String.trim(out) == "n_gt0=true has_http=true"
+  end
 end
