@@ -32,3 +32,17 @@ author). The 323 are **standard tools** that use **standard interfaces**:
   transparent reclamation, or per-tool hand-rewrites otherwise. Revisit after wb-0beq in an internet env.
 - Keep advancing capability via NEW brokered stones (durable storage next) + hand-written brokered tools,
   which is where the current brokers deliver real, validatable value.
+
+## UPDATE (iter 32, 2026-06-12) — the gate is OPEN; 24 reclaimed
+wb-0beq is FIXED (spawn_blocking) — brokered wasi-http OUTBOUND works + is SSRF-safe, PROVEN end-to-end:
+a standard wasi:http fetch tool retrieved example.com's real HTML through the broker while internal targets
+stayed blocked. So the earlier "gated, not unlocked" conclusion is SUPERSEDED for the http subset.
+- RE-RAN the feasibility split: **24 items flipped impossible -> "reachable"** in resolved.json (http-only
+  network blocker, no build/thread/gpu compounding) — package managers (Cargo, go mod, Poetry, conda, cpanm,
+  pixi, pdm, OPAM, Nimble, shards, …), yt-dlp, qpdf, Tectonic, Volta, etc. Their NETWORK blocker is removed;
+  each still needs a per-tool build to go fully "live" (so "reachable", not "live").
+- ~37 remain wasi-SOCKETS-pending (raw TCP / db clients / listen: Redis, netcat, dig, curl/wget, etc.) —
+  likely unblocked by the SAME spawn_blocking fix (the socket_addr_check SSRF filter is already wired) but
+  UNVERIFIED (no easy wasi-sockets guest via componentize-js; needs a cargo-component/C wasi-sockets build).
+- RECIPE (proven): build the tool as a wasi:http component -> run via Wasmex.Components with allow_http ->
+  SSRF-filtered outbound for free. Permanent test: test/broker_net_e2e_test.exs.

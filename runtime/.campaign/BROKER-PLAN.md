@@ -632,3 +632,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasi-sockets raw TCP likely unblocked by the same fix — to verify).
   NEXT (iter 32): verify wasi-sockets raw-TCP outbound also works post-fix (the other half of the seam); then
   RE-RUN the feasibility pass on the wasi-http/sockets subset of the 323 — now genuinely reachable.
+- 2026-06-12 (iter 32): **RECLAMATION — content retrieval PROVEN + 24 items reclaimed.** A standard wasi:http
+  fetch tool retrieved example.com's REAL HTML body ("Example Domain") through the brokered SSRF-filtered
+  path (internal still BLOCKED) — the full curl/httpie capability, reclaimed for standard wasi:http guests.
+  Permanent test broker_net_e2e_test.exs (no-panic + content-retrieval) green. RE-RAN the feasibility pass:
+  flipped 24 impossible -> "reachable" in resolved.json (http-only net blocker; pkg-managers/yt-dlp/qpdf/…);
+  counts now 299 impossible / 32 live / 24 reachable / 1 deferred. ~37 wasi-SOCKETS tools pending (likely
+  unblocked by the same fix — socket_addr_check is wired — but no easy wasi-sockets guest to verify yet).
+  NEXT (iter 33): produce a wasi-SOCKETS guest (cargo-component or C wasi:sockets) to verify raw-TCP outbound
+  is unblocked + SSRF-filtered (would reclaim the db-client/netcat subset); OR continue new capabilities.

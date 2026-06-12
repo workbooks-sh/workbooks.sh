@@ -51,4 +51,32 @@ defmodule Workbooks.BrokerNetE2ETest do
     # either way the component call no longer traps.
     assert {:ok, _pub} = probe.("http://1.1.1.1/")
   end
+
+  @tag :build
+  @tag :netdeps
+  test "RECLAMATION — a standard wasi:http fetch tool retrieves real web content through the broker (SSRF-safe)" do
+    out = Path.join(System.tmp_dir!(), "fetch_#{System.unique_integer([:positive])}.component.wasm")
+
+    {_, 0} =
+      System.cmd(
+        "node",
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/fetch.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
+        stderr_to_stdout: true
+      )
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{path: out, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    on_exit(fn -> File.rm(out) end)
+    probe = fn url -> Wasmex.Components.call_function(pid, "probe", [url], 15_000) end
+
+    # internal is still SSRF-blocked on the working path
+    assert {:ok, m} = probe.("http://169.254.169.254/")
+    assert m =~ "BLOCKED"
+    # public: REAL web content retrieved through the brokered, SSRF-filtered outbound path
+    assert {:ok, body} = probe.("http://example.com/")
+    assert body =~ "Example Domain"
+  end
 end
