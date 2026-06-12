@@ -1,0 +1,202 @@
+[
+ {
+  "name": "Inko",
+  "lane": "none",
+  "source_url": "https://inko-lang.org",
+  "recipe": "No viable recipe. Inko's compiler is a large multi-crate Rust workspace using LLVM as its codegen backend (impossible under mrustc Lane C and needs a native LLVM toolchain). The product itself emits native machine code, not wasm32-wasi, so there is nothing to run in-sandbox. No prebuilt plain wasm32-wasi .wasm is distributed (Lane A absent). Not C/C++ (Lane B), not Python/JS (Lane D).",
+  "smoke": "N/A \u2014 cannot build or run. Were it possible, smoke would be `inko --version` then compile+run `import std.stdio (Stdout)` hello; but the runtime requires native OS-thread M:N scheduling which wasm32-wasi single-thread cannot provide.",
+  "verdict": "impossible",
+  "blocker": "Native-codegen + native-threads: compiler uses LLVM to emit native binaries (not wasm), and the Rust runtime schedules an M:N green-process scheduler over OS threads. Both native machine-code generation and OS-thread spawning are unavailable in single-threaded wasm32-wasi under wasmtime. Compiler is also a large LLVM-dependent Rust workspace, out of mrustc Lane C scope.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hylo (Val)",
+  "lane": "none",
+  "source_url": "https://github.com/hylo-lang/hylo",
+  "recipe": "No viable recipe. Lane A: no prebuilt wasm32-wasi .wasm of the Hylo compiler exists (docs only list Windows/Linux/macOS executables; no wasm target). Lane B (self-contained C/C++): N/A \u2014 compiler is Swift 6.2, not C/C++. Lane C (mrustc Rust): N/A \u2014 not Rust. Lane D (pure-Python/JS): N/A \u2014 not Python or JS. Building it would require (1) a full Swift toolchain to compile the Swift sources (no in-sandbox Swift compiler available), and (2) LLVM 20 used as a native code-generating backend emitting object/asm \u2014 exactly the jitless-hostile native-codegen shape, not in-sandbox interpretable. Note: LLVM is already listed as LIVE in-sandbox, but only as a library; Hylo drives it as a native-codegen backend behind a heavy Swift frontend, which is the wrong shape.",
+  "smoke": "Intended smoke would be `hyloc hello.hylo -o hello.wasm && wasmtime hello.wasm` printing output \u2014 but there is no wasm build of `hyloc` to invoke under wasmtime, so no smoke is runnable.",
+  "verdict": "impossible",
+  "blocker": "Compiler is Swift 6.2 + LLVM 20 native codegen. Two compounding blockers: no in-sandbox Swift toolchain to build the Swift frontend, and LLVM is used as a native code-generating backend (jitless-hostile, wrong shape). No prebuilt wasm32-wasi .wasm exists. None of lanes A-D apply.",
+  "confidence": "high"
+ },
+ {
+  "name": "Agda",
+  "lane": "A",
+  "source_url": "https://github.com/agda-web/agda-wasm-dist/releases",
+  "recipe": "Lane A: fetch prebuilt agda.wasm from agda-web/agda-wasm-dist GitHub releases (latest tag v2.8.0-ghc9.10.3-r0; built via GHC 9.10.x wasm32-wasi backend). It is a plain wasm32-wasi module (~45MB raw, ~23MB after wasm-opt). No native build needed. Runtime requires a data dir holding the builtin prim library (lib/prim/Agda/... incl. agda-builtins.agda-lib, Agda/Primitive.agda, Agda/Primitive/Cubical.agda); point Agda_datadir env at it, or use --print-agda-data-dir to discover the default. Stage agda.wasm + the prim datadir into CommandRegistry; map the working dir via --dir so Agda can read .agda sources and write .agdai interface files. Use BATCH typecheck mode only (agda file.agda); avoid --interaction/REPL.",
+  "smoke": "printf 'module Test where\\nopen import Agda.Primitive\\nid : (A : Set) -> A -> A\\nid A x = x\\n' > /work/Test.agda && wasmtime run --dir /work --dir /data --env PWD=/work --env Agda_datadir=/data ./agda.wasm -- /work/Test.agda  # expect clean exit (no type errors) and a /work/Test.agdai written. Sanity: wasmtime run ./agda.wasm -- --version prints the Agda version.",
+  "verdict": "live-likely",
+  "blocker": "Batch typechecking is live-likely (HackMD author confirmed empty-file typecheck in 0.83s under wasmtime; serialization 64-bit-word/vector-hashtables overflow bug was patched and the fix released to Hackage, so .agdai interface writes work). Single-threaded only \u2014 fine for batch. Caveats: (1) --interaction/REPL mode is NOT viable in-sandbox (excessive poll_oneoff calls, and WASI lacks realpath causing path-canonicalization recursion/hangs across runtimes); restrict to one-shot `agda file.agda`. (2) Must supply the prim datadir or typechecking any module fails on missing builtins. (3) ~45MB module is large but within ceiling. Not in the LIVE list. Verify exact .wasm asset filename on the release (assets failed to render in fetch).",
+  "confidence": "high"
+ },
+ {
+  "name": "Pony (Savi/Mare)",
+  "lane": "none",
+  "source_url": "https://github.com/savi-lang/savi",
+  "recipe": "None viable. Savi is a Crystal-written compiler that uses an LLVM native-codegen backend, paired with the Pony runtime (work-stealing actor scheduler over OS threads + ORCA concurrent GC). Lane A: no prebuilt wasm32-wasi .wasm published. Lane B: not a self-contained C/C++ library \u2014 it is a full language compiler (Crystal) plus a thread-based native runtime; would require porting LLVM codegen and a single-threaded scheduler/GC. Lane C: not a Rust crate. Lane D: not Python/JS.",
+  "smoke": "N/A \u2014 cannot produce a wasm32-wasi module. Even hypothetically, a smoke would need the Pony scheduler to run jitless single-threaded under wasmtime, which the runtime does not support (it spawns OS scheduler threads and relies on ORCA concurrent GC).",
+  "verdict": "impossible",
+  "blocker": "Native LLVM codegen toolchain (compiler in Crystal) + Pony runtime requires native OS threads (work-stealing scheduler) and concurrent GC (ORCA) \u2014 both incompatible with jitless single-threaded wasm32-wasi under wasmtime. No prebuilt wasm exists.",
+  "confidence": "high"
+ },
+ {
+  "name": "mold",
+  "lane": "none",
+  "source_url": "https://github.com/rui314/mold",
+  "recipe": "N/A \u2014 no viable lane. mold is C++20 built with CMake, depending on Intel oneTBB and std::thread for its core parallel pipeline (parallel sort, lock-free hashing, concurrent section processing). Its entire value proposition is native multicore parallelism + mmap of real object files, and its output is native ELF/Mach-O/PE linker results. Lane A: no prebuilt wasm32-wasi .wasm exists or is meaningful (a linker producing native binaries has no use in-sandbox). Lane B fails: not self-contained C \u2014 it is large C++20 with TBB and CMake configure-time codegen, not pregenerated; relies on threads. Lanes C/D inapplicable (not Rust/Python/JS).",
+  "smoke": "N/A \u2014 nothing to run. Even hypothetically single-threaded, mold linking to native ELF/Mach-O has no function under wasmtime where the target format and the parallelism that justifies mold both do not apply.",
+  "verdict": "impossible",
+  "blocker": "native-threads (TBB/std::thread) are mold's core value prop and wasip1 has no threads; also mmap-on-native-files and native ELF/Mach-O output serve no purpose in-sandbox. C++20 + CMake configure-time codegen + TBB deps also break Lane B self-containment.",
+  "confidence": "high"
+ },
+ {
+  "name": "PyOxidizer",
+  "lane": "none",
+  "source_url": "https://github.com/indygreg/PyOxidizer",
+  "recipe": "None. PyOxidizer is a native binary-production build tool, not a self-contained library. Its job is to compile Rust, drive the host system linker (cc / ld / lld / link.exe), statically link a native libpython (CPython built for a concrete OS triple), and emit a platform-specific OS executable. That requires fork-exec of toolchain processes and native linking against platform libpython/libc \u2014 none available under wasm32-wasi/wasmtime. It is a huge Rust workspace (edition-2021/2024, proc-macros, build.rs codegen, vendored native CPython) so Lane C (mrustc) is also impossible. There is nothing to port: the deliverable is native binaries by definition.",
+  "smoke": "N/A \u2014 cannot run in sandbox. (For reference: native `pyoxidizer build` shells out to the C linker and produces a host-specific ELF/Mach-O/PE; no wasm32-wasi target exists.)",
+  "verdict": "impossible",
+  "blocker": "Whole purpose is emitting native OS executables: invokes system linker (fork-exec) and statically links native platform libpython + platform libc into a host-triple binary. No wasm32-wasi target, requires fork-exec + native linking which the sandbox forbids. Also redundant \u2014 embedded `python` is already LIVE.",
+  "confidence": "high"
+ },
+ {
+  "confidence": "high",
+  "verdict": "impossible",
+  "lane": "none",
+  "name": "MemGraph",
+  "source_url": "https://github.com/memgraph/memgraph",
+  "blocker": "Bolt TCP server is the product, so network-as-purpose; plus native pthreads, jemalloc and mmap, and a large CMake/Conan C++ tree.",
+  "smoke": "N/A cannot build. wasmtime memgraph.wasm fails to link: no pthread_create, no socket or listen for Bolt, jemalloc mmap breaks. No headless single-file query mode exists.",
+  "recipe": "No viable lane. Memgraph is a large multithreaded C++17/20 in-memory graph DBMS that exists to be a Bolt-protocol TCP server, which is network-as-purpose and disqualifying. CMake plus Conan build with native deps jemalloc, Boost, abseil. Parallel query and MVCC engine needs POSIX threads, mmap storage, TSC timing. Lanes A, B, C, D all fail. Single-shot wasm contradicts its always-on server design."
+ },
+ {
+  "name": "EdgeDB / Gel",
+  "lane": "none",
+  "source_url": "https://github.com/geldata/gel",
+  "recipe": "Not buildable as a standalone wasm32-wasi .wasm. Gel is a multi-process server: a Python (CPython) core + Rust extensions (tokenizer, query/SQL compilers, Postgres connection pool) that front a SEPARATE embedded PostgreSQL backend process which is the actual storage + query execution engine. Gel does not embed Postgres in-process \u2014 it spawns/manages a real postgres server and speaks the Postgres wire protocol to it over sockets. That fork-exec of a postmaster + multi-process child architecture + socket-based client/server networking-as-purpose is exactly what the sandbox forbids. Postgres itself does not build to wasm32-wasi without forking native code (postmaster fork() per connection, shared memory, signals). Even Lane D (Pyodide CPython.wasm + compile the Rust core + a hypothetical postgres-wasm) collapses: there is no real wasm32-wasi PostgreSQL server (pglite is a heavily-patched single-connection emscripten build, not the server Gel drives, and not wasm32-wasi), and you cannot wire three native subsystems into one single-threaded no-fork instance. None of A/B/C/D apply.",
+  "smoke": "N/A \u2014 no buildable artifact. If one existed, smoke would be: echo 'select 1+1;' | gel query, expecting 2. Impossible to reach: requires a live postmaster the sandbox cannot fork-exec.",
+  "verdict": "impossible",
+  "blocker": "Multi-process server that fork-execs and drives a SEPARATE embedded PostgreSQL backend over sockets (networking-as-purpose + fork-exec + multi-process). No wasm32-wasi PostgreSQL server exists; Postgres requires fork()/shmem/signals. Python+Rust core is only the front half and is useless without the Postgres execution engine it shells out to.",
+  "confidence": "high"
+ },
+ {
+  "name": "OpenBLAS",
+  "lane": "none",
+  "source_url": "https://github.com/OpenMathLib/OpenBLAS",
+  "recipe": "No viable recipe. Lane A: no prebuilt wasm32-wasi .wasm exists \u2014 every known wasm build (Pyodide, Kaldi-wasm2, issue #4023) goes through emscripten (emcc) producing emscripten-ABI artifacts, not standalone wasm32-wasi. Lane B (self-contained C) is the only conceptual fit but is blocked by the build system: OpenBLAS configures by compiling AND natively EXECUTING host codegen binaries (getarch, getarch_2nd) at build time to emit config.h/Makefile.conf, plus a Perl-driven per-TARGET KERNEL Makefile graph that selects among hundreds of arch-conditional kernel files. That is configure-time native fork-exec codegen, not a flat pregenerated C tarball, so it fails the no-codegen/no-configure-unless-pregenerated constraint and cannot be expressed via :include_only/:compile_only + config-substitution. On wasm the asm microkernels (AVX/NEON) do not exist, so TARGET=*_GENERIC falls back to plain C \u2014 meaning even a successful build yields generic C BLAS with none of OpenBLAS's per-CPU-tuned value.",
+  "smoke": "N/A \u2014 not buildable in-lane. (Reference smoke had it built: cblas_dgemm on two 2x2 double matrices, assert C == A*B; but the configure/getarch codegen step blocks reaching a .wasm.)",
+  "verdict": "impossible",
+  "blocker": "Build requires compiling + natively EXECUTING host codegen tools (getarch/getarch_2nd) at configure time to generate config.h/Makefile.conf, plus Perl-driven per-TARGET kernel Makefile selection across hundreds of arch-conditional files \u2014 native fork-exec codegen + configure, disqualifying Lane B. No prebuilt wasm32-wasi exists (Lane A); all wasm builds are emscripten-ABI via emcc. Not a bare/proc-macro-free Rust crate (C) and not pure-Python/JS. On wasm it degrades to generic C anyway, losing its entire reason to exist.",
+  "confidence": "high"
+ },
+ {
+  "name": "Sentence Transformers",
+  "lane": "none",
+  "source_url": "https://github.com/pyodide/pyodide/issues/1625",
+  "recipe": "No viable lane. Sentence Transformers is a pure-Python orchestration library (sbert.net) layered on PyTorch + HuggingFace transformers + tokenizers (Rust C-ext). The embedding compute requires a tensor backend, and PyTorch has NO plain wasm32-wasi build (confirmed: pyodide/pyodide#1625 \"PyTorch is not currently supported by Pyodide/WebAssembly\"). Lane D (pure-Python pip) fails because torch/transformers/tokenizers are native-extension deps, not pure Python. Lane A: no prebuilt torch/sentence-transformers .wasm exists. Lane B/C: the heavy compute is libtorch (massive C++/CUDA), not portable to standalone wasm. The only WASM+PyTorch path is WASI-NN (wasmtime 27 --features pytorch), which is the wasm guest importing a HOST function backed by native libtorch/OpenVINO \u2014 i.e. host-brokered native inference, the equivalent of fork-exec/native-backed compute, NOT standalone in-sandbox math.",
+  "smoke": "N/A \u2014 no standalone wasm artifact to run. The only \"wasm\" path (WASI-NN pytorch backend in wasmtime) requires building wasmtime with native libtorch and importing host inference functions, which violates the no-native-exec / standalone-compute constraint.",
+  "verdict": "impossible",
+  "blocker": "PyTorch tensor backend has no usable wasm32-wasi build; all WASM paths (WASI-NN) are host-brokered native inference, not standalone in-sandbox compute. sentence-transformers' Python deps (torch, transformers, tokenizers-Rust) are native C-exts, so even Pyodide/pure-python-pip cannot load them.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hugging Face Transformers",
+  "lane": "none",
+  "source_url": "https://github.com/huggingface/candle",
+  "recipe": "No in-sandbox recipe. All ML backends need native exec, threads, GPU, or network.",
+  "smoke": "none, no buildable artifact",
+  "verdict": "impossible",
+  "blocker": "PyTorch TF JAX have no wasm builds; standalone ONNX is wasi-nn native host; ggml needs native SIMD threads; transformers.js and candle are browser network targets; candle Rust is mrustc impossible.",
+  "confidence": "high"
+ },
+ {
+  "name": "Elixir",
+  "lane": "none",
+  "source_url": "https://elixir-lang.org",
+  "verdict": "impossible",
+  "confidence": "high",
+  "recipe": "No viable lane. Elixir runs only on the BEAM VM, which needs native threads. No BEAM to wasm exists. All lanes fail.",
+  "smoke": "No wasi BEAM build exists; nothing to run under wasmtime.",
+  "blocker": "BEAM needs native threads, forbidden under wasi."
+ },
+ {
+  "name": "Erlang",
+  "lane": "none",
+  "source_url": "https://www.erlang.org",
+  "recipe": "No viable recipe. Erlang/OTP's runtime is the BEAM VM (C, ~millions of LOC) with a preemptive reduction-counting scheduler, per-process heaps, async signal-driven I/O, and a NIF/dirty-scheduler model built on native OS threads. None of this maps to wasip1 under stock wasmtime: the scheduler's green-thread context switching needs either native threads or stack-switching (typed continuations / wasmfx) that stock wasmtime+wasip1 does not provide. Lane A (prebuilt .wasm): none exists for stock wasmtime. Lane B (self-contained C): BEAM's build is a giant autotools/configure tree with heavy threading + signal + dynamic-loading assumptions; not a self-contained no-configure C unit, and even compiled it would still need threads/continuations. Lane C/D: N/A (not Rust/Python/JS). Existing partial efforts confirm the gap: Firefly (ex-Lumen) requires installing FORKS of wasmtime and wasm-tools from the wasmfx repo for typed-continuation support (erlc+python -> textual BEAM -> WAT toolchain), i.e. not stock wasmtime; Lumen is abandoned/unmaintained (>1yr stale, builds failing); AtomVM's wasm target is Emscripten-based for browser/NodeJS, not a standalone wasm32-wasi module for wasmtime, and is a partial OTP subset.",
+  "smoke": "N/A \u2014 no artifact to run. If one existed, smoke would be: wasmtime run erl.wasm -- -noshell -eval 'io:format(\"~p~n\",[1+1]), halt().' expecting \"2\". This cannot be produced under stock wasmtime/wasip1 today.",
+  "verdict": "impossible",
+  "blocker": "BEAM's preemptive (reduction-counting) scheduler + per-process heaps + native-thread dirty-NIF model require native threads or stack-switching (typed continuations / wasmfx). Stock wasmtime + wasip1 provides neither. The only working BEAM-to-wasm path (Firefly) requires FORKED wasmtime+wasm-tools from the wasmfx repo, violating the stock-wasmtime constraint. Lumen is abandoned; AtomVM-wasm is Emscripten/browser-targeted and a partial OTP subset, not a standalone wasm32-wasi wasmtime module. Same BEAM story as Elixir.",
+  "confidence": "high"
+ },
+ {
+  "name": "Carbon",
+  "lane": "none",
+  "source_url": "https://github.com/carbon-language/carbon-lang",
+  "recipe": "None. No lane viable.\n\nLane A (prebuilt wasm32-wasi): none. Only Linux x86_64 nightly tarballs (carbon_toolchain-0.0.0-0.nightly.*.tar.gz), no wasm target.\n\nLane B (self-contained C/C++): impossible. The toolchain is a Bazel mega-build requiring clang/LLVM/lld/libc++/libc++abi as build deps; codegen IS LLVM. Not a self-contained C/C++ source tree compilable with :include_only/:compile_only + config-substitution. It would require bringing the entire LLVM backend (already LIVE separately, but Carbon's frontend is tightly coupled to a specific in-tree LLVM via Bazel, not a packagable tarball).\n\nLane C (mrustc Rust): N/A, not Rust.\n\nLane D (pure-Python/JS): N/A, it's C++.\n\nCore blockers regardless of lane: pre-1.0 experimental, no stable compiler, no shipping codegen, whole premise is C++ bidirectional interop requiring a full C++ toolchain present at runtime. No wasm32-wasi target exists.",
+  "smoke": "N/A \u2014 nothing to smoke-test; no buildable/runnable wasm artifact is producible.",
+  "verdict": "impossible",
+  "blocker": "No wasm32-wasi target and no stable/shipping compiler exist. Carbon is pre-1.0 experimental (only Linux x86_64 nightly tarballs). Build is a Bazel tree requiring clang/LLVM/lld/libc++; codegen is LLVM; its core premise (bidirectional C++ interop) needs a full C++ toolchain. Not packagable as self-contained C/C++ source via the rules_cc lanes. Impossible.",
+  "confidence": "high"
+ },
+ {
+  "name": "Mojo",
+  "lane": "none",
+  "source_url": "https://www.modular.com/mojo",
+  "recipe": "N/A \u2014 no buildable lane. Mojo's compiler is proprietary/closed-source (Modular committed to open-sourcing only in Fall 2026, per docs.modular.com/mojo/faq). Distributed as a closed binary SDK via pip/conda. No wasm32-wasi target, no compiler/stdlib source to port (Lane B/C dead), no prebuilt .wasm (Lane A dead), not pure-Python/JS (Lane D dead). Its value is MLIR-driven hardware-specific codegen for CPUs/GPUs \u2014 the native-codegen/GPU surface a wasm sandbox forbids.",
+  "smoke": "N/A \u2014 nothing to run in-sandbox. (Hypothetically: `mojo -c 'print(\"hi\")'` requires the closed native toolchain emitting host machine code; no wasm artifact exists to load under wasmtime.)",
+  "verdict": "impossible",
+  "blocker": "Closed-source proprietary compiler (no source to port until Fall 2026), no wasm32-wasi target, no prebuilt .wasm. Core value = native CPU/GPU MLIR codegen, which is exactly the native/GPU exec a wasm32-wasi sandbox cannot host. All four lanes (A/B/C/D) inapplicable.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hare",
+  "lane": "none",
+  "source_url": "https://harelang.org/documentation/install/",
+  "recipe": "None possible. Hare is a systems language whose toolchain (harec compiler + qbe backend + hare-mod build driver) emits native machine code only for aarch64, riscv64, and x86_64. There is NO wasm/wasm32-wasi backend in qbe and none planned. The OS targets are Linux/BSD only (DragonFlyBSD, FreeBSD, Linux, NetBSD, OpenBSD), and the runtime is built directly on raw OS syscalls \u2014 it deliberately rejects portability. Lane A: no prebuilt wasm exists. Lane B: the toolchain is self-codegen-ing to native arches, not a self-contained C/C++ lib we can statically run; harec+qbe themselves only target native and the language has no wasm32-wasi target to compile a program TO. Lane C: not Rust. Lane D: not Python/JS.",
+  "smoke": "N/A \u2014 no wasm32-wasi artifact can exist. qbe has no wasm backend and Hare's std runtime is raw Linux/BSD syscalls; a hypothetical `wasmtime hello.wasm` is unreachable because neither the compiler nor any compiled Hare program can be emitted as wasm32-wasi.",
+  "verdict": "impossible",
+  "blocker": "No wasm backend in qbe (only aarch64/riscv64/x86_64 native); Linux/BSD-only runtime built on raw OS syscalls; portability explicitly rejected. Cannot emit or run as wasm32-wasi.",
+  "confidence": "high"
+ },
+ {
+  "confidence": "high",
+  "blocker": "Needs native OS threads and shared-memory atomics for its work-stealing scheduler and concurrent GC; wasm32-wasi cannot host it. ponyc WASM backend is experimental with no WASI port.",
+  "verdict": "impossible",
+  "smoke": "N/A cannot build or run. ponyc to wasm32-wasi cannot link libponyrt; its threaded scheduler and concurrent GC have no wasm mapping. No pony.wasm to run under wasmtime.",
+  "recipe": "None. libponyrt is a multi-threaded work-stealing actor scheduler with concurrent GC on OS pthreads and atomics. ponyc WASM backend is preliminary and incomplete (help-wanted since 2016), no WASI target. Not Lane B (full LLVM compiler plus threaded native runtime). Not Lane C or D.",
+  "source_url": "https://www.ponylang.io",
+  "lane": "none",
+  "name": "Pony"
+ },
+ {
+  "name": "Beef",
+  "lane": "none",
+  "source_url": "https://github.com/beefytech/Beef/blob/master/wasm/build_wasm.bat",
+  "recipe": "N/A \u2014 no in-sandbox lane. Two failed interpretations: (1) Beef toolchain (compiler+IDE) is native C++/LLVM, Windows-first, assumes native threading + debugger-integrated workflow; not a wasm32-wasi artifact. (2) Beef's own wasm output backend is Emscripten-based: wasm/build_wasm.bat invokes emcc to build the Beef C++ runtime into Emscripten static libs (Beef042RT32_wasm.a, plus a _pthread variant with -pthread native threads), and fetch_wasm.bat pulls EmsdkDep1.zip (an Emscripten SDK dep). Emscripten emits browser-targeted wasm with JS/DOM glue, not standalone wasm32-wasi runnable under wasmtime. The only demo is a browser 'Space Game wasm example'.",
+  "smoke": "N/A. If a Beef-emitted .wasm were obtained, `wasmtime run app.wasm` would fail: Emscripten output imports a JS env (env.*, emscripten_* glue) absent under wasmtime, and the pthread variant needs shared-memory/native threads. No standalone _start/WASI entrypoint exists.",
+  "verdict": "impossible",
+  "blocker": "Beef's wasm backend is Emscripten (emcc) producing browser-targeted wasm requiring JS/DOM glue (not wasm32-wasi); the pthread variant requires native threads. The Beef toolchain itself is native C++/LLVM/Windows-first, debugger-integrated \u2014 not a sandboxable wasm artifact. Browser + native-threads = impossible per criteria.",
+  "confidence": "high"
+ },
+ {
+  "name": "Factor",
+  "lane": "none",
+  "source_url": "https://github.com/factor/factor",
+  "recipe": "No lane. Factor VM (C++/Zig) JITs native x86/ARM at runtime, needs FFI/dlopen and a native GUI. No prebuilt wasm, no WASM port. Not a C lib slice, not a Rust crate, not pure Python/JS.",
+  "smoke": "None possible. Bootstrap needs the native code generator the wasm sandbox cannot run.",
+  "verdict": "impossible",
+  "blocker": "Runtime native machine-code generation (JIT) plus FFI and native GUI, all unavailable under wasm32-wasi.",
+  "confidence": "high"
+ },
+ {
+  "name": "Red",
+  "lane": "none",
+  "source_url": "https://www.red-lang.org",
+  "recipe": "N/A \u2014 no in-sandbox path. Red is a full-stack language with its own native code generator (Red/System emits machine code for IA-32/ARM/ARM64/etc.) and bundles a GUI View engine + reactive layer. There is no wasm32-wasi target, no prebuilt .wasm, and the toolchain historically depends on a 32-bit native build pipeline. It is not a C/C++ library (Lane B), not a Rust crate (Lane C), and not a pure-Python/JS package (Lane D), so none of the lane recipes apply.",
+  "smoke": "N/A \u2014 cannot be built/run as standalone wasm32-wasi under wasmtime. (Reference native smoke only: `red --cli` REPL printing `print \"hello\"`, which requires native codegen and is out of scope.)",
+  "verdict": "impossible",
+  "blocker": "Red is a self-hosting language with its own NATIVE code generator (machine code only, no wasm backend) and a built-in GUI/reactive View engine. No wasm32-wasi target exists; the toolchain assumes native codegen + a 32-bit native bootstrap pipeline. Compiling/running it requires native codegen \u2014 disqualifying under the no-native-exec/JIT constraint. Fits no lane (not C/C++, not a Rust crate, not Python/JS).",
+  "confidence": "high"
+ }
+]

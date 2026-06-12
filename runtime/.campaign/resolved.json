@@ -1223,6 +1223,120 @@
 "recipe": "eigen 3.4.0 header-only C++ (headers as companions + -I/work, -fno-exceptions); 2x2 matmul main",
 "smoke": "[[1,2],[3,4]]^2 => 7 22",
 "extent": "Eigen linear algebra builds (dense/sparse matrix, decompositions); eigen cmd = matmul demo, ready for numerical compute"
+},
+"Inko": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native-codegen + native-threads: compiler uses LLVM to emit native binaries (not wasm), and the Rust runtime schedules an M:N green-process scheduler over OS threads. Bot",
+"extent": "off-the-table (verified)"
+},
+"Hylo (Val)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Compiler is Swift 6.2 + LLVM 20 native codegen. Two compounding blockers: no in-sandbox Swift toolchain to build the Swift frontend, and LLVM is used as a native code-gen",
+"extent": "off-the-table (verified)"
+},
+"Pony (Savi/Mare)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native LLVM codegen toolchain (compiler in Crystal) + Pony runtime requires native OS threads (work-stealing scheduler) and concurrent GC (ORCA) \u2014 both incompatible with ",
+"extent": "off-the-table (verified)"
+},
+"mold": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "native-threads (TBB/std::thread) are mold's core value prop and wasip1 has no threads; also mmap-on-native-files and native ELF/Mach-O output serve no purpose in-sandbox.",
+"extent": "off-the-table (verified)"
+},
+"PyOxidizer": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Whole purpose is emitting native OS executables: invokes system linker (fork-exec) and statically links native platform libpython + platform libc into a host-triple binar",
+"extent": "off-the-table (verified)"
+},
+"MemGraph": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Bolt TCP server is the product, so network-as-purpose; plus native pthreads, jemalloc and mmap, and a large CMake/Conan C++ tree.",
+"extent": "off-the-table (verified)"
+},
+"EdgeDB / Gel": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Multi-process server that fork-execs and drives a SEPARATE embedded PostgreSQL backend over sockets (networking-as-purpose + fork-exec + multi-process). No wasm32-wasi Po",
+"extent": "off-the-table (verified)"
+},
+"OpenBLAS": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Build requires compiling + natively EXECUTING host codegen tools (getarch/getarch_2nd) at configure time to generate config.h/Makefile.conf, plus Perl-driven per-TARGET k",
+"extent": "off-the-table (verified)"
+},
+"Sentence Transformers": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "PyTorch tensor backend has no usable wasm32-wasi build; all WASM paths (WASI-NN) are host-brokered native inference, not standalone in-sandbox compute. sentence-transform",
+"extent": "off-the-table (verified)"
+},
+"Hugging Face Transformers": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "PyTorch TF JAX have no wasm builds; standalone ONNX is wasi-nn native host; ggml needs native SIMD threads; transformers.js and candle are browser network targets; candle",
+"extent": "off-the-table (verified)"
+},
+"Elixir": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "BEAM needs native threads, forbidden under wasi.",
+"extent": "off-the-table (verified)"
+},
+"Erlang": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "BEAM's preemptive (reduction-counting) scheduler + per-process heaps + native-thread dirty-NIF model require native threads or stack-switching (typed continuations / wasm",
+"extent": "off-the-table (verified)"
+},
+"Carbon": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No wasm32-wasi target and no stable/shipping compiler exist. Carbon is pre-1.0 experimental (only Linux x86_64 nightly tarballs). Build is a Bazel tree requiring clang/LL",
+"extent": "off-the-table (verified)"
+},
+"Mojo": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Closed-source proprietary compiler (no source to port until Fall 2026), no wasm32-wasi target, no prebuilt .wasm. Core value = native CPU/GPU MLIR codegen, which is exact",
+"extent": "off-the-table (verified)"
+},
+"Hare": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No wasm backend in qbe (only aarch64/riscv64/x86_64 native); Linux/BSD-only runtime built on raw OS syscalls; portability explicitly rejected. Cannot emit or run as wasm3",
+"extent": "off-the-table (verified)"
+},
+"Pony": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Needs native OS threads and shared-memory atomics for its work-stealing scheduler and concurrent GC; wasm32-wasi cannot host it. ponyc WASM backend is experimental with n",
+"extent": "off-the-table (verified)"
+},
+"Beef": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Beef's wasm backend is Emscripten (emcc) producing browser-targeted wasm requiring JS/DOM glue (not wasm32-wasi); the pthread variant requires native threads. The Beef to",
+"extent": "off-the-table (verified)"
+},
+"Factor": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Runtime native machine-code generation (JIT) plus FFI and native GUI, all unavailable under wasm32-wasi.",
+"extent": "off-the-table (verified)"
+},
+"Red": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Red is a self-hosting language with its own NATIVE code generator (machine code only, no wasm backend) and a built-in GUI/reactive View engine. No wasm32-wasi target exis",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1802,6 +1916,13 @@
 "lane": "B",
 "recipe": "Lane B (self-contained C), but heavy multi-tarball with a configure cascade. Deps needed a",
 "confidence": "medium",
+"verified": false
+},
+"Agda": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "Lane A: fetch prebuilt agda.wasm from agda-web/agda-wasm-dist GitHub releases (latest tag ",
+"confidence": "high",
 "verified": false
 }
 }
