@@ -483,3 +483,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 21): CONSOLIDATE — a capability/ABI reference doc (the host_* import surface across both docks +
   ServeBroker) + a single green run of all broker unit suites; OR harden a deferred cadence item (dedicated
   exec/kv caps for least-privilege, or the DoS body-cap). Networking 323-reclamation stays gated on wb-0beq.
+- 2026-06-12 (iter 21): **CONSOLIDATION — unified validation + capability reference (green).** Ran all 5
+  broker unit/hermetic suites TOGETHER: 34 tests, 0 failures (net_guard, exec_broker, storage_broker,
+  parallel_broker, serve_broker). Dock additions regression-free: js_dock_test 4/0 (my host_exec/host_kv/
+  host_parallel_map additions didn't break existing dock tests). Wrote .campaign/BROKER-CAPABILITIES.md —
+  the full host_* import ABI surface (signatures, cap gates, broker module per import), the 5 capabilities,
+  the security cadence, and the e2e-proof status. The platform is now documented + coherence-verified.
+  PLATFORM = 5 brokered capabilities, all e2e-proven (except net-egress reachability, env-gated): net egress,
+  exec, durable storage, data-parallelism, inbound HTTP serving. One pattern: host does the privileged op,
+  guest stays sandboxed, default-deny + quotas + audit + adversarial tests + offline e2e.
+  NEXT (iter 22): least-privilege hardening — split the coarse caps (commands->exec, vfs->kv) into dedicated
+  caps so a profile can grant network/storage WITHOUT granting exec, etc. (add a no-exec profile to prove
+  it); OR a composition DEMO (a serve guest that execs a cmd + caches in KV per request — proving the
+  platform composes into real apps). Networking 323-reclamation stays gated on wb-0beq.
