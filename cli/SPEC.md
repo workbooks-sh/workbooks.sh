@@ -108,3 +108,54 @@ cli/
     └── deploy/        # the bootstrap `wb deploy` command (Rust)
         └── mod.rs
 ```
+
+## Ergonomics: two audiences, one binary (AX + DX)
+
+Audited 2026-06-12. Current facts: every command returns a single `String`
+printed once in `main` (one output channel — good); there is **zero**
+interactivity (no prompts, no TTY detection — accidentally agent-safe,
+deliberately human-poor); errors are anyhow strings with exit code 1 for
+everything; no `--json` anywhere; no color; env vars are `WB_*`.
+
+### The mode model
+
+One switch, three ways to set it, sensible default:
+
+```
+auto      stdout is a TTY → human · piped/redirected → agent
+--agent   force agent mode (alias: WBX_AGENT=1)
+--json    agent mode + single JSON envelope on stdout
+```
+
+**Agent mode (AX):** never prompts; no ANSI; stable output shapes; one JSON
+envelope `{ok, verb, data, error: {code, hint, retryable}}` under `--json`;
+documented exit-code map (0 ok · 2 usage · 3 engine unreachable · 4 not
+found · 5 verification failed · 6 conflict); accepts `-` for stdin where a
+file is expected; `wbx help --json` emits the verb tree so agents can
+introspect the surface instead of parsing help prose.
+
+**Human mode (DX):** color + tables + progress; interactive pickers fill
+missing args (e.g. `wbx deploy init` asks place/database when run bare on a
+TTY — the same flow agents do with flags); bare `wbx` prints a friendly
+where-am-I landing (tenant, engine, current dir state, top verbs) instead of
+a usage dump; every success suggests the next verb.
+
+Implementation seam: replace `-> String` with a small `Out` enum
+(`Human(String) | Data(serde_json::Value)`); main renders once per mode. The
+single-channel design makes this a mechanical refactor, not a rewrite.
+
+### Verb gaps (investigated, prioritized)
+
+P1 — the first ten minutes (launch-blocking):
+- `wbx init <name>`  scaffold a workbook source (org + data), `--template`
+- `wbx dev [src]`    watch → rebuild → serve preview
+- `wbx doctor`       top-level: PATH, version, engine reachability, disco
+- `wbx completions <shell>`  clap_complete
+P2 — daily ergonomics:
+- `wbx open <file>`  open a workbook in the default browser
+- `wbx status`       one-screen where-am-I (also the bare-`wbx` landing)
+- `wbx upgrade`      self-update from releases (cli.sh logic)
+- `WBX_*` env names accepted alongside `WB_*` (docs say WBX_*)
+P3 — reach:
+- windows release matrix (install.js already expects the asset name)
+- stdin pipelines across author/trust verbs
