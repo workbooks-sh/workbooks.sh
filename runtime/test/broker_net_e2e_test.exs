@@ -112,4 +112,34 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert probe.("127.0.0.1:22") =~ "ERR"
     assert probe.("169.254.169.254:80") =~ "ERR"
   end
+
+  @tag :build
+  @tag :netdeps
+  test "SCOPED ALLOW-LIST — a per-instance net_allow scopes a WORKING wasi:http guest (listed reachable, others blocked)" do
+    out = Path.join(System.tmp_dir!(), "scoped_#{System.unique_integer([:positive])}.component.wasm")
+
+    {_, 0} =
+      System.cmd(
+        "node",
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/net_probe.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
+        stderr_to_stdout: true
+      )
+
+    # this guest may ONLY reach example.com (default-deny everything else, on top of the SSRF floor)
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{
+        path: out,
+        wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true, net_allow: ["example.com"]}
+      })
+
+    on_exit(fn -> File.rm(out) end)
+    probe = fn url -> elem(Wasmex.Components.call_function(pid, "probe", [url], 12_000), 1) end
+
+    # example.com is on the allow-list -> reachable
+    assert probe.("http://example.com/") =~ "OK"
+    # a DIFFERENT public host (would pass the SSRF floor) is NOT on the list -> blocked by the scope
+    assert probe.("http://1.1.1.1/") =~ "BLOCKED"
+  end
 end

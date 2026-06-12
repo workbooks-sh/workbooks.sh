@@ -719,3 +719,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   CAMPAIGN: keystone FULLY complete (all 4 items working+secure+manageable+red-team-green, BOTH standard
   seams e2e-proven); 8 capabilities both docks; 61 reclaimed (all e2e-path-proven); full cadence.
   NEXT (iter 40): per-tool reclamation / a 9th capability — the keystone + reclamation gates are all open.
+- 2026-06-12 (iter 40): **SCOPED ALLOW-LIST e2e-PROVEN on the WORKING wasi:http path.** Previously the per-
+  instance net_allow was only deny-before-connect-tested (iter6, before outbound worked). Now: a guest with
+  net_allow=["example.com"] reaches example.com ("OK") but a DIFFERENT public host (1.1.1.1 — passes the SSRF
+  floor) is BLOCKED by the scope. Permanent test in broker_net_e2e_test.exs. This completes the keystone
+  cadence item "per-instance scoped {host,port} allow-list (default deny)" with full e2e validation on the
+  functional standard-tool path. The networking cadence is now e2e-validated end-to-end on a WORKING path:
+  SSRF floor (internal blocked) + scoped allow-list (listed reachable / others blocked), both e2e-proven;
+  plus the unit/adversarially-tested obfuscation defense, resolve-then-pin, rate/conn/body quotas, audit,
+  revocation. NEXT (iter 41): extend the allow-list to the wasi-SOCKETS path (IP/CIDR via socket_addr_check —
+  it has the resolved IP, no hostname); OR a 9th capability.
