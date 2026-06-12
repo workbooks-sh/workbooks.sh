@@ -1,0 +1,162 @@
+[
+ {
+  "name": "protobufjs-cli (protoc substitute)",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/protobufjs-cli/-/protobufjs-cli-2.5.4.tgz",
+  "build_opts": "npm lane: resolve+fetch+bundle `protobufjs-cli@2.5.4` (+ peer `protobufjs@^8.6.3`); deps all pure-JS (chalk, escodegen, espree, estraverse, glob, jsdoc, minimist, tmp) \u2014 NO gypfile/postinstall/node-gyp/native addons (verified registry manifest). Entry: bin pbjs (proto->JSON/static-JS/descriptor) and pbts (.d.ts). Run resulting bundle on QuickJS with JsDock Node fs/path shims (already live). bundlejob.js / compilers/js lane, no per-tool host work.",
+  "smoke": "echo 'syntax=\"proto3\"; message M { int32 id = 1; string name = 2; }' > a.proto; pbjs -t json a.proto  ->  expect JSON with nested.M.fields.id.type=int32, .name.type=string. Also pbjs -t static-module a.proto emits a JS encoder/decoder module.",
+  "blocker": "protoc itself (C++) has NO plain wasm32-wasi build (emscripten/js-pair only) and needs a bootstrap-protoc codegen step + abseil + CMake configure -> lanes A/B/C dead. protobufjs-cli is the pure-JS equivalent reached via lane D. Residual risk: pbts path pulls heavy `jsdoc`; if jsdoc trips a Node API the fs shim lacks, pbts (.d.ts gen) may degrade while core pbjs (.proto->JSON/JS) still works \u2014 not a build blocker, only a feature-surface caveat.",
+  "confidence": "medium"
+ },
+ {
+  "name": "flatc",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/google/flatbuffers (git clone --depth1; verified HEAD checkout 2026-06-11)",
+  "build_opts": "deps=[github:google/flatbuffers @ main tarball]; src_globs=[src/*.cpp, src/util.cpp, src/file_manager.cpp, src/file_name_manager.cpp, src/idl_parser.cpp, src/reflection.cpp, src/code_generators.cpp, src/binary_annotator.cpp, src/annotated_binary_text_gen.cpp, src/bfbs_gen_lua.cpp, src/bfbs_gen_nim.cpp, src/idl_gen_*.cpp, src/flatc.cpp, src/flatc_main.cpp, include/codegen/python.cc, grpc/src/compiler/*_generator.cc]; exclude=[tests/**, grpc/tests/**, src/idl_gen_lua.* (none), samples/**]; compile_only=[all above]; main=src/flatc_main.cpp; cflags=[-std=c++17, -Iinclude, -Igrpc, -fno-exceptions (flatc core throws no C++ exceptions; 'throw' tokens are only inside emitted-code string literals), -O2, --target=wasm32-wasi, -D_WASI_EMULATED_SIGNAL maybe]; libc++ (clang+libc++ amalgam lane). No configure_file C++ config header needed; reflection_generated.h is checked in; parser hand-written (no flex/bison).",
+  "smoke": "echo 'table T{a:int;} root_type T;' > t.fbs && flatc --cpp t.fbs && test -f t_generated.h && echo OK",
+  "blocker": "none \u2014 fixed file list is hand-enumerable (globs+excludes), no configure/codegen tool runs to build the flatc binary itself. Only nuance: must include grpc/src/compiler/*_generator.cc + include/codegen/python.cc because idl_gen_grpc.cpp/idl_gen_python.cpp reference them; this is enumeration, not configure-time discovery.",
+  "confidence": "high"
+ },
+ {
+  "name": "JerryScript",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/jerryscript-project/jerryscript",
+  "build_opts": "deps: [github jerryscript-project/jerryscript master]. src_globs: jerry-core/**/*.c, jerry-port/common/*.c, jerry-math/*.c. exclude: jerry-core/debugger/*.c, jerry-core/api/jerry-debugger*.c (debugger off). include_dirs: jerry-core/include, jerry-core, jerry-core/api, jerry-core/ecma/base, jerry-core/ecma/builtin-objects, jerry-core/ecma/builtin-objects/typedarray, jerry-core/ecma/operations, jerry-core/jcontext, jerry-core/jmem, jerry-core/jrt, jerry-core/lit, jerry-core/parser/js, jerry-core/parser/regexp, jerry-core/vm, jerry-port/include, jerry-math/include. cflags: --target=wasm32-wasi -O2 -DJERRY_GLOBAL_HEAP_SIZE='(512)' -DJERRY_PARSER=1 -DJERRY_DEBUGGER=0 -DJERRY_VALGRIND=0 -DJERRY_SYSTEM_ALLOCATOR=0. config: rename jerry-core/config.h -> jerryscript-config.h (the @JERRY_BUILD_CFG@ line is a comment; every JERRY_* define self-defaults via #ifndef, so NO configure run needed). extra_sources main: jerry-main/main-unix.c OR a 4-line driver calling jerry_init()/jerry_eval()/jerry_cleanup() reading stdin. No bison/flex (parser is hand-written), no codegen run (lit-*.inc.h unicode/magic-string/error tables are COMMITTED in jerry-core/lit + ecma/base), no CMake configure run.",
+  "smoke": "echo \"var s=0;for(var i=1;i<=100;i++)s+=i;print(s);\" | jerryscript.wasm  -> 5050 (use jerry-main snapshot/print or jerry_eval driver)",
+  "blocker": "none \u2014 but note overlap with already-live qjs (QuickJS). JerryScript still has distinct buildable value: ES2015+ IoT-targeted engine, self-contained jerry-math (no host libm), far smaller footprint, snapshot exec. Not redundant in capability though it shares the JS-engine slot.",
+  "confidence": "high"
+ },
+ {
+  "name": "csvkit",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://files.pythonhosted.org/packages/py3/c/csvkit/csvkit-2.2.0-py3-none-any.whl (verified via PyPI JSON: csvkit-2.2.0-py3-none-any.whl)",
+  "build_opts": "Lane D (pure-Python, CPython/Pyodide-on-wasm). Vendor site-packages: pip install --target=<sysroot>/site-packages csvkit==2.2.0 (resolves full pure-Python tree). Wheels: csvkit-2.2.0-py3-none-any, agate-1.14.2-py3-none-any, agate_excel-0.4.2, agate_dbf-0.2.4, agate_sql-0.7.3, openpyxl-3.1.5-py2.py3-none-any, xlrd-2.0.2, python_slugify-8.0.4, leather-0.4.1, parsedatetime, pytimeparse2, Babel, et_xmlfile, dbfread, greenlet(optional-skip), sqlalchemy-2.0.50 (use py3-none-any fallback wheel; C-ext optional). No native C-ext at runtime. Entry points: csvlook/csvcut/csvstat/in2csv/csvsql/csvgrep/csvjson etc. via console_scripts.",
+  "smoke": "printf 'a,b\\n1,2\\n3,4\\n' | python -m csvkit.utilities.csvcut -c 1   # or: csvcut -c 1 input.csv ; csvstat input.csv ; echo expect column-a values 1,3",
+  "blocker": "none \u2014 entire dep tree is pure-Python (py3-none-any wheels). Only nuance: SQLAlchemy ships cp-specific accelerator wheels but also a py3-none-any fallback; pin/select the pure wheel. greenlet (SQLAlchemy async extra) is C and unneeded for csvkit's sync use \u2014 exclude it.",
+  "confidence": "high"
+ },
+ {
+  "name": "pdftk",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+  "build_opts": "JS bundle on QuickJS/esbuild lane. npm pkg: pdf-lib@1.17.1. deps (all pure-JS, no C-ext): @pdf-lib/standard-fonts, @pdf-lib/upng, pako, tslib. esbuild bundle entry wrapping pdf-lib API (merge/split/stamp/rotate/fill-form/decrypt) -> single .js, run on qjs. No native, no codegen, no configure.",
+  "smoke": "qjs bundle.js: load 2 input PDFs via PDFDocument.load, mergeDocuments, save() -> assert output bytes start with %PDF and page count == sum of inputs; also rotate page 0 by 90 and re-save without error.",
+  "blocker": "pdftk itself is impossible (pdftk-java = JVM; original = C++/GCJ native, no plain wasm32-wasi). Capability is delivered instead via pdf-lib on the JS lane \u2014 covers merge/split/stamp/rotate/form-fill. Note: lacks pdftk's full uncompress/repair/burst PDF-internals parity, but covers the common verbs.",
+  "confidence": "high"
+ },
+ {
+  "name": "apache-arrow",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/apache-arrow/-/apache-arrow-21.1.0.tgz",
+  "build_opts": "npm:apache-arrow@21.1.0; pure-JS, no native; runtime deps tslib+flatbuffers+json-bignum+@swc/helpers all pure-JS; bundle ESM via esbuild lane, run on QuickJS-ng; exclude CLI deps command-line-args/command-line-usage (tooling-only)",
+  "smoke": "import { tableFromArrays, tableToIPC, tableFromIPC } from 'apache-arrow'; const t = tableFromArrays({ id: Int32Array.from([1,2,3]), v: Float64Array.from([1.5,2.5,3.5]) }); const buf = tableToIPC(t); const t2 = tableFromIPC(buf); console.log(t2.numRows===3 && t2.getChild('id').get(1)===2);",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "hatchling",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://pypi.org/pypi/hatchling/json",
+  "build_opts": "lane D pure-python: pip download hatchling==1.30.1 + deps (packaging>=24.2, pathspec>=0.10.1, pluggy>=1.0.0, trove-classifiers; tomli on py<3.11) all py3-none-any wheels; unzip into site-packages on already-live CPython wasm32-wasi. No C-ext, no compile step.",
+  "smoke": "python -c \"import hatchling, hatchling.build as b; print(b.get_requires_for_build_wheel())\" then build a wheel for a trivial pyproject (build-backend=hatchling.build) and confirm the .whl is produced.",
+  "blocker": "none \u2014 pure-python build backend; only the build-backend half (hatchling), not the full hatch CLI.",
+  "confidence": "high"
+ },
+ {
+  "name": "sox",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://downloads.sourceforge.net/project/sox/sox/14.4.2/sox-14.4.2.tar.gz",
+  "build_opts": "target=libsox (the library; skip the sox.c CLI driver which needs termios/glob/signals). src=src/ with an EXPLICIT literal list (no configure, no codegen). compile_only (core, all unconditional): adpcms.c aiff.c cvsd.c g711.c g721.c g723_24.c g723_40.c g72x.c vox.c raw.c formats.c formats_i.c skelform.c xmalloc.c getopt.c util.c libsox.c libsox_i.c sox-fmt.c; effects: bend.c biquad.c biquads.c chorus.c compand.c compandt.c contrast.c dcshift.c delay.c dft_filter.c dither.c divide.c downsample.c earwax.c echo.c echos.c effects.c effects_i.c effects_i_dsp.c fade.c fft4g.c fir.c firfit.c flanger.c gain.c hilbert.c input.c ladspa.c loudness.c mcompand.c noiseprof.c noisered.c output.c overdrive.c pad.c phaser.c rate.c remix.c repeat.c reverb.c reverse.c silence.c sinc.c skeleff.c speed.c splice.c stat.c stats.c stretch.c swap.c synth.c tempo.c tremolo.c trim.c upsample.c vad.c vol.c; formats: raw-fmt.c s1-fmt.c s2-fmt.c s3-fmt.c s4-fmt.c u1-fmt.c u2-fmt.c u3-fmt.c u4-fmt.c al-fmt.c la-fmt.c ul-fmt.c lu-fmt.c 8svx.c aiff-fmt.c aifc-fmt.c au.c avr.c cdr.c cvsd-fmt.c dvms-fmt.c dat.c hcom.c htk.c maud.c prc.c sf.c smp.c sounder.c soundtool.c sphere.c tx16w.c voc.c vox-fmt.c ima-fmt.c adpcm.c ima_rw.c wav.c wve.c xa.c nulfile.c f4-fmt.c f8-fmt.c gsrt.c. EXCLUDE: sox.c, example*.c, sox_sample_test.c, *coreaudio.c, alsa.c, ao.c, pulseaudio*, sndio.c, sunaudio.c, oss*, waveaudio*, flac.c, sndfile.c, mp3.c, opus*, vorbis*, wavpack.c, amr*.c, spectrogram.c (needs PNG), win32-*. deps (in-tree, built-in, no external libs): libgsm/*.c (for gsm format) + lpc10/*.c (for lpc10 format) \u2014 both plain-C amalgams already vendored in the tarball; add their .c globs as :compile_only too, with -Ilibgsm -Ilpc10 and define EXTERNAL_GSM/EXTERNAL_LPC10 UNSET. config: hand-write src/soxconfig.h (all #undef except HAVE_STDINT_H/STRING_H/STRINGS_H/UNISTD_H/FCNTL_H/INTTYPES_H/SYS_TYPES_H/SYS_STAT_H/VSNPRINTF/STRCASECMP/STRDUP/STDC_HEADERS=1 and PACKAGE_VERSION=\"14.4.2\"); leave HAVE_LIBLTDL/HAVE_POPEN/all codec HAVE_* undefined so only built-in formats/effects register. sox.h ships pre-generated (version 14.4.2 baked, SOX_LIB_VERSION_CODE present) \u2014 do not regenerate. cflags: -I src -I src/libgsm -I src/lpc10 -DNDEBUG -DHAVE_CONFIG_H -Wno-incompatible-function-pointer-types -Wno-format -fno-strict-aliasing. extra_sources_main=none (library target; expose lsx/sox_* entrypoints, drive via a tiny wasm shim calling sox_init/sox_open_read/sox_open_write/effects chain).",
+  "smoke": "curl -fsIL the 14.4.2 tarball -> HTTP 200, 1134299 bytes (verified). Extracted; libsox source list is an EXPLICIT literal enumeration in src/Makefile.am (no glob/codegen needed). Wrote a hand-made src/soxconfig.h (all-#undef template, only POSIX HAVE_*_H + STDC set) and ran clang -fsyntax-only on representative core sources targeting host clang: wav.c, effects.c, formats.c, reverb.c all parse CLEAN (warnings only). au.c throws one incompatible-function-pointer-types diagnostic from the uint64_t-vs-long seek typedef \u2014 cosmetic, cleared by -Wno-incompatible-function-pointer-types (SoX ships these suppressed). No configure run, no flex/bison/m4/autoheader needed; sox.h + soxconfig.h.in confirm config is pure preprocessor substitution. No unconditional fork/exec/popen/system anywhere in libsox (grep clean); all process/dlopen paths gated behind HAVE_LIBLTDL/HAVE_POPEN which stay undefined.",
+  "blocker": "None structural. Two minor, lane-handled items: (1) the sox CLI driver (sox.c) is NOT buildable (termios/glob/signal/realtime-audio) \u2014 build the LIBRARY (libsox) + a thin wasm shim instead, which is the right artifact anyway; (2) the LP64-vs-ILP32 seek function-pointer typedef mismatch needs -Wno-incompatible-function-pointer-types. Neither needs per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "@marko/compiler",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@marko/compiler/-/compiler-5.39.63.tgz",
+  "build_opts": "JS bundle on QuickJS via npm-resolve+bundle. Entry: @marko/compiler (dist/index.js). Full pure-JS import graph; resolver follows actual require() calls (not just package.json deps) so it pulls @babel/core@7.x + @babel/parser/generator/traverse/types + htmljs-parser, he, jsesc, kleur, raptor-util/regexp, complain, resolve-from, self-closing-tags, source-map-support. All verified pure JS: gypfile=null, no install scripts, no node-gyp, no native addons on any node in the graph. API: compiler.compileSync(src, filename, config) -> {code}. No emscripten, no native binary.",
+  "smoke": "const {compileSync}=require('@marko/compiler'); const out=compileSync('<div>${input.name}</div>','test.marko',{output:'source'}); expect typeof out.code==='string' && out.code.length>0",
+  "blocker": "None fundamental. Risk is QuickJS fidelity for a Babel-scale bundle (large graph; @babel/core uses some dynamic plugin resolution + does fs reads for browserslist/config that must be stubbed/disabled via output:'source' + explicit babelConfig to avoid filesystem lookups). Not a host-per-tool task \u2014 handled by the generic JS-bundle lane's shims, same as other Babel-family bundles.",
+  "confidence": "medium"
+ },
+ {
+  "name": "@enhance/ssr",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@enhance/ssr",
+  "build_opts": "JS bundle lane (esbuild --bundle --format=esm/iife --platform=browser) on QuickJS. entry: index.mjs. npm deps: @enhance/ssr@4.0.3, @begin/parse5@0.0.4 (bundles parse5@7, --no-builtins), nanoid@^4 (resolve random-browser.js via browser export condition to avoid node:crypto). No node fs/net needed for the render core. QuickJS crypto.getRandomValues shim covers nanoid; or pin esbuild conditions=browser.",
+  "smoke": "import enhance from bundle; render an HTML string containing a registered custom element template with slots; assert expanded/composed HTML output (slot fill + attribute pass-through) matches expected \u2014 pure string-in/string-out, no DOM, no network.",
+  "blocker": "none \u2014 pure-JS ESM; only nanoid touches randomness (resolved via browser crypto.getRandomValues shim / esbuild browser condition). parse5 explicitly opts out of node builtins.",
+  "confidence": "high"
+ },
+ {
+  "name": "glimmer-compiler",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@glimmer/compiler/-/compiler-0.94.11.tgz",
+  "build_opts": "JS bundle on QuickJS via the live npm lane (wb-spy). entry=@glimmer/compiler@0.94.11; deps (all pure-JS ESM, no C-ext): @glimmer/syntax@0.95.0, @glimmer/util@0.94.8, @glimmer/wire-format@0.94.8, @glimmer/interfaces@0.94.6, @handlebars/parser@~2.2.0, simple-html-tokenizer@^0.5.11. npm resolve+fetch+bundlejob.js \u2192 single ESM bundle, run on quickjs-ng. No native, no node builtins required for precompile().",
+  "smoke": "import { precompile } from bundle; precompile('<div>{{name}}</div>') returns a wire-format JSON template string (non-empty). Verify it parses and emits opcodes.",
+  "blocker": "none \u2014 full dep closure verified pure-JS ESM (npm pack of compiler + syntax + util + wire-format + interfaces; syntax pulls only @handlebars/parser + simple-html-tokenizer, both pure-JS). prod dist is plain ESM (49KB), import-only deps. No configure/codegen/native.",
+  "confidence": "high"
+ },
+ {
+  "name": "porffor",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/porffor/-/porffor-0.61.13.tgz",
+  "build_opts": "lane=D (JS-on-QuickJS bundle, NOT wasm32-wasi). entry=compiler/index.js (the compile API; do NOT use runtime/index.js \u2014 that's the Node CLI/REPL). pure-ESM, type=module. runtime deps: acorn (https://registry.npmjs.org/acorn/-/, pure JS, dist/acorn.mjs, zero deps, no gyp/install). node-repl-polyfill is REPL-only \u2014 exclude. Bundle: porffor compiler/*.js + builtins_precompiled.js (1.9M, SHIPPED in tarball, the precompiled stdlib \u2014 no codegen needed) + acorn into one qjs script. Shims: (1) parse.js L20 does import((globalThis.document?'https://esm.sh/':'')+parser) \u2014 no document in qjs \u2192 resolves bare 'acorn'; pre-bundle acorn so the dynamic import hits the bundled module. (2) fs/child_process/execSync are conditionally imported behind `typeof process?.version !== 'undefined'` and used ONLY for debug/disassemble/2c output \u2014 shim process={version:undefined, stdout:{write:print}} so the fs/execSync branches stay undefined and the pure compile path runs. API: default(source) -> {wasm: Uint8Array, exports, ...}; emit wasm bytes (assemble.js, pure-JS LEB128 via encoding.js, no Buffer/fs).",
+  "smoke": "In qjs: load bundle, call porffor('export default () => 40 + 2') and assert the returned object has a non-empty wasm Uint8Array starting with the WASM magic (0x00 0x61 0x73 0x6d); optionally instantiate that wasm with our wasmtime/wasm host and call the export to get 42.",
+  "blocker": "none for the compile-to-wasm-bytes path. Caveats (not blockers): set process.version=undefined so the node fs/child_process branches stay dormant \u2014 the -c (C output via 2c.js) and disassemble/debug paths assume Node and are out of scope; only the wasm-bytes path is in-scope. acorn dynamic import must be pre-resolved in the bundle.",
+  "confidence": "high"
+ },
+ {
+  "name": "git",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/libgit2/libgit2/archive/refs/tags/v1.7.2.tar.gz",
+  "build_opts": "deps: [libgit2 v1.7.2 tarball]. src_globs: src/libgit2/**/*.c, src/util/**/*.c, deps/xdiff/*.c, deps/llhttp/*.c, deps/pcre/*.c, deps/zlib/*.c. exclude: src/util/win32/**, src/libgit2/win32/**, src/util/hash/openssl.c, src/util/hash/mbedtls.c, src/util/hash/win32.c, src/util/hash/common_crypto.c, **/sha1dc/** (keep builtin sha via deps/zlib or src/util/hash/builtin.c \u2014 pick exactly one sha backend), src/cli/** (skip the CLI git binary first; build lib then add a single src/cli main). cflags: --target=wasm32-wasi --sysroot=$SYSROOT -DLIBGIT2_NO_FEATURES_H -DGIT_ARCH_32_or_64 -DGIT_THREADS=0 -DGIT_HTTPS=0 -DGIT_SSH=0 -DGIT_USE_NSEC=0 -DGIT_REGEX_BUILTIN=1 -DGIT_SHA1_BUILTIN=1 -DGIT_SHA256_BUILTIN=1 -DGIT_IO_POLL=0 -DGIT_IO_SELECT=0 -Isrc/util -Isrc/libgit2 -Iinclude -Ideps/xdiff -Ideps/llhttp -Ideps/pcre -Ideps/zlib -DNO_VIZ -DSTDC. extra_sources main: thin src/cli/cli.c (git CLI entrypoint) compiled last and linked against the lib objects. Hand-write include/git2_features.h-equivalent via -D set above (NO_FEATURES_H path); disable threads/tls/ssh/http-network features that need sockets.",
+  "smoke": "echo files into a tmp dir; run: git init /tmp/r && git add . && git commit -m x && git log --oneline (local object/refs ops only \u2014 no network clone/fetch).",
+  "blocker": "Network transports (clone/fetch/push over http/ssh) are unreachable in-sandbox: no sockets/TLS \u2014 those subcommands compile out (GIT_HTTPS=0/GIT_SSH=0). Threads disabled (GIT_THREADS=0). Must pick exactly ONE sha1/sha256 backend (builtin) and exclude the rest, and exclude all win32/ + openssl/mbedtls/commoncrypto hash sources or you get duplicate symbols / missing headers. The bundled CLI (src/cli) is secondary \u2014 build the library first, then a thin main; if CLI source-list proves fiddly, the libgit2 library itself is the live-buildable artifact.",
+  "confidence": "medium"
+ },
+ {
+  "name": "openssl",
+  "decisive": "live-buildable",
+  "lane": "A",
+  "url": "https://github.com/voltbuilder/openssl-wasm/releases/download/v1.1.1o/openssl.wasm",
+  "build_opts": "Lane A prebuilt fetch \u2014 no build. asset: openssl.wasm (1,962,334 bytes, contentType application/wasm) from voltbuilder/openssl-wasm tag v1.1.1o. Verified: magic 0x0061736d (\\0asm v1); ALL imports are wasi_snapshot_preview1 only (args/environ/clock/fd_*/path_*/poll_oneoff/proc_exit/random_get) \u2014 plain wasm32-wasi, NOT emscripten/JS-pair (no env module, no JS glue). No sock_* imports (offline crypto CLI). Register as CommandRegistry entry running on wasmtime with args passthrough + preopened cwd. Pin URL by tag (v1.1.1o = OpenSSL 1.1.1o).",
+  "smoke": "wasmtime run --dir=. openssl.wasm -- version   (expect: OpenSSL 1.1.1o). Then: openssl genrsa 2048 ; openssl dgst -sha256 <file> ; openssl enc -aes-256-cbc -pbkdf2 -in f -out f.enc \u2014 all pure local fs+compute, no network.",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "BoringSSL",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/google/boringssl (verified: gen/sources.json + gen/crypto/err_data.cc + all perlasm outputs committed; include/openssl/opensslconf.h is a static committed stub, no .in templates)",
+  "build_opts": "deps: [boringssl tarball]. lang: C++17 (clang + libc++). define: OPENSSL_NO_ASM, OPENSSL_NO_THREADS_CORRUPT_MEMORY_AND_LEAK_SECRETS_IF_THREADED off (single-thread default ok), NDEBUG. include_dirs: include/, crypto/, third_party/fiat/, gen/. src_globs (compile_only, from gen/sources.json crypto.srcs + ssl.srcs + bcm.srcs, all 'pure' entries i.e. NOT prefixed gen/ AND extra_source gen/crypto/err_data.cc): crypto/**/*.cc, ssl/**/*.cc, crypto/fipsmodule/bcm.cc (monolithic, #includes the *.cc.inc), gen/crypto/err_data.cc. exclude: gen/bcm/*.S, gen/crypto/*.S, gen/bcm/*.asm, third_party/fiat/asm/*.S (all asm -> OPENSSL_NO_ASM), **/*_test.cc, crypto/test/**, tool/**, pki/** (optional), fuzz/**, decrepit/** (optional), rust/**. NO -DBORINGSSL_FIPS (avoids sys/mman.h/mprotect in bcm.cc). cflags: -DOPENSSL_NO_ASM -std=c++17 -fno-exceptions. entropy: falls through target.h __wasm32__ -> OPENSSL_RAND_GETENTROPY (WASI random_get). No configure, no codegen run, no flex/bison/protoc.",
+  "smoke": "Build libcrypto+libssl, link tiny C driver: RAND_bytes(buf,32) then SHA256 of a string and assert digest matches known vector; optionally EVP_aes_256_gcm encrypt/decrypt round-trip. Run under wasmtime; getentropy backed by WASI random_get.",
+  "blocker": "None blocking. Notes: must define OPENSSL_NO_ASM (skip all gen/bcm,gen/crypto .S/.asm); must build non-FIPS (BORINGSSL_FIPS guards the only sys/mman.h+mprotect use in bcm.cc); single-threaded wasi-libc fine (locks are no-ops). All codegen (perlasm .S, err_data.cc) and config (opensslconf.h) are COMMITTED in gen/ + include/ \u2014 confirmed no pregenerate/configure/codegen step needed. Distinct value vs live mbedtls/libsodium: full OpenSSL-compatible libcrypto+libssl TLS/X.509 API surface.",
+  "confidence": "high"
+ },
+ {
+  "name": "libxml2",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz",
+  "build_opts": "deps: [{url:\"https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz\", strip:\"libxml2-2.13.5/\"}]; src_globs: [\"*.c\"]; exclude: [\"test*.c\",\"run*.c\",\"xmllint.c\",\"xmlcatalog.c\",\"nanohttp.c\",\"nanoftp.c\",\"xmlmodule.c\",\"xzlib.c\",\"c14n.c\",\"trio*.c\",\"python/**\",\"example/**\"]; (keep: buf chvalid dict encoding entities error globals hash list parser parserInternals pattern relaxng SAX2 schematron threads tree uri valid xinclude xlink xmlIO xmlmemory xmlreader xmlregexp xmlsave xmlschemas xmlschemastypes xmlstring xmlunicode xmlwriter xpath xpointer HTMLparser HTMLtree catalog debugXML legacy SAX); cflags: [\"-I.\",\"-Iinclude\",\"-DHAVE_CONFIG_H\",\"-D_WASI_EMULATED_SIGNAL\",\"-D_WASI_EMULATED_PROCESS_CLOCKS\",\"-O2\"]; extra_sources: hand-write include/libxml/xmlversion.h (fill @WITH_*@: HTTP=0 FTP=0 MODULES=0 ICONV=0 ICU=0 LZMA=0 ZLIB=0 THREADS=0 DEBUG=1 everything-else-on; @VERSION@=2.13.5 @LIBXML_VERSION_NUMBER@=21305) + config.h (define STDC_HEADERS, HAVE_STD*_H, HAVE_UNISTD_H, HAVE_FCNTL_H, HAVE_SYS_STAT_H, HAVE_STAT, HAVE_GETTIMEOFDAY, HAVE_SYS_TIME_H; leave socket/dlopen/mmap/getentropy/glob/poll/netdb UNDEF; PACKAGE strings = \"libxml2\"/\"2.13.5\"); main: n/a (static lib / link with host driver). NO configure, NO codegen \u2014 Unicode tables ship pre-generated as xmlunicode.c/chvalid.c in the tarball.",
+  "smoke": "Parse an inline XML string with xmlReadMemory(), run an XPath query (xmlXPathEvalExpression) over it, assert nodeset count, xmlFreeDoc \u2014 confirms parser+tree+xpath link and table init.",
+  "blocker": "None for the core lane. Excluded subsystems (nanohttp/nanoftp = socket, xmlmodule = dlopen, xzlib = lzma) are dropped via globs + WITH_*=0, not shimmed. c14n excluded only to avoid extra surface; can be re-added (pure C, no extra deps). If zlib/lzma-backed compressed-input is later wanted, add those as multi-tarball :deps and flip WITH_ZLIB/WITH_LZMA.",
+  "confidence": "high"
+ }
+]

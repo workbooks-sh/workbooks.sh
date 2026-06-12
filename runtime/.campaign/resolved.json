@@ -1644,39 +1644,387 @@
 "lane": "none",
 "blocker": "network-as-purpose + fork-exec: TiDB is inherently a networked multi-node distributed cluster (gRPC between TiDB/PD/TiKV, Raft consensus over network). No single-process ",
 "extent": "off-the-table (verified)"
+},
+"cbindgen": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt wasm32-wasi asset (verified: GitHub release 0.29.4 ships only native ELF binaries cbindgen-ubuntu22.04 x86_64 + aarch64; crates.io has source only). Lane C is not viable: cbindgen is NOT a",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Graphviz (dot)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Lane A dead: the only prebuilt Graphviz wasm (@hpcc-js/wasm-graphviz 1.22.0) is an emscripten js+.wasm pair, npm-only (GitHub release assets empty) \u2014 not plain wasm32-wasi. Lane B fails on two hard co",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"sed": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GNU sed is structurally a gnulib program: 100 gnulib .c files in lib/ each #include config.h, a 2575-line header with 612 autoconf-probed HAVE_/GNULIB_/_GL_ macros produced by a ./configure run that p",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"J (jsoftware/jsource \u2014 J array language engine)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi .wasm exists (lane A) \u2014 upstream's only wasm path is Emscripten (JS-pair, guarded by __wasm__ in jsrc/cpuinfo.c, ca.c, io.c, j.c), not plain WASI; absent from WASI runtim",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"dhall (serde_dhall / dhall-rust)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Lane C disqualified on three independent grounds. (1) Proc-macros: deps pest_consume 1.1 + pest 2.1 \u2014 the parser is built via pest's proc-macro derive machinery; mrustc ~1.74 has no proc-macro expansi",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"SWC (@swc/wasm)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Published @swc/wasm@1.15.41 (verified 200, 15MB, fileCount 5: wasm.js + wasm_bg.wasm + wasm.d.ts) is a wasm-bindgen build, NOT a plain wasm32-wasi module: the _bg.wasm imports wbindgen_* JS host funct",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"microbundle": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Pure-JS Node CLI bundler (bin dist/cli.js, main dist/microbundle.js) \u2014 no .wasm, so lanes A/B/C are out. Only candidate is lane D (JS on QuickJS), but microbundle is not a self-contained function bund",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"LLD (wasm-ld)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "REDUNDANT with already-live LLVM tool. wasm-ld is not a separate buildable target \u2014 it is the WebAssembly flavor of LLVM lld, and in this repo it ships as part of the SAME llvm.core.wasm multitool tha",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Cloudflare D1 (SQLite)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two disqualifiers, either sufficient: (1) REDUNDANT \u2014 D1's substance is SQLite, and sqlite3 is ALREADY LIVE as a prebuilt-WASI Lane-A pallet tool (confirmed runtime/host/application.ex: \"seed the preb",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"awk (gawk)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi gawk .wasm exists (Lane A fails: wasm-forge/gawk releases 404; GitHub repo search for \"gawk wasm\" returns total_count 0; the only \"gawk\" hit is the Wasmer/WASIX ecosystem",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"busybox": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two independent disqualifiers. (1) Configure/codegen: busybox builds via the Linux Kbuild/Kconfig system. `make defconfig` runs conf/mconf parsers generated from flex/bison lexers (scripts/kconfig/zco",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"findutils": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GNU findutils is an autotools+gnulib project that REQUIRES a ./configure run (generates config.h from hundreds of platform feature probes) plus gnulib bootstrap/codegen and per-tool source curation ac",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"7-Zip (7z/p7zip)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Build requires per-tool source-list curation, which violates the lanes-not-per-tool rule. The Alone2 7zz target is defined by makefile.gcc that includes nested .mak fragments (7zip_gcc.mak, Format7zF/",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"xmlstarlet": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "xmlstarlet is a thin C CLI over libxml2 + libxslt + libexslt \u2014 a three-tarball stack where each project's build is driven by an autotools/CMake CONFIGURE run that generates feature-gated headers the s",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"wolfSSL": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Redundant with already-live mbedTLS: wolfSSL is the same surface (TLS 1.2/1.3 + crypto primitives: AES/SHA/RSA/ECC/X25519/ChaCha-Poly), so it carries no distinct buildable value over the shipped mbedt",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"RE2": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Lane A fails: verified re2-wasm@1.0.2 build/wasm/re2.wasm imports _embind_register_* (embind) + emscripten_resize_heap/emscripten_memcpy_big \u2014 an emscripten+JS-glue pair (re2.js+re2.wasm), NOT plain w",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Fortran": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No automated lane reaches it. Lane A: LFortran ships only a source tarball (lfortran-0.63.0.tar.gz) + conda; NO confirmed prebuilt plain wasm32-wasi .wasm of the compiler \u2014 its 'wasm' story is emscrip",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"easy_install": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "easy_install is a pure-Python console script from setuptools/pkg_resources that simply rides CPython, which is already an ALREADY-LIVE tool (python). It is not a distinct buildable artifact: there is ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"composer": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Composer is a pure-PHP phar, NOT a wasm artifact. It rides the already-LIVE php command (php-cgi-8.2.6.wasm, VMware WLR plain wasm32-wasi, sha-pinned in runtime/host/pallet.ex). Two disqualifiers: (1)",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"ffmpeg": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "FFmpeg's build is gated on running ./configure, which is a per-tool host configure/codegen step our lanes can't run in-sandbox. configure generates config.h AND the component-registration source files",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"qpdf": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Verified against qpdf-12.3.2 tarball (HTTP 200). The auto_job/config generated headers ARE pre-shipped (no Python/YAML codegen needed), and crypto is fully native (rijndael.cc + sha2.c \u2014 openssl/gnutl",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"mutool (MuPDF)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Per-tool host work that violates lanes-not-per-tool: a multi-library integration build (8+ interdependent thirdparty C/C++ libs woven into the core), each requiring hand-maintained config headers and ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"tesseract": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi .wasm (only emscripten/JS tesseract.js pairs, disqualified). Lane B fails: tesseract is C++17 built via autotools/CMake requiring a CONFIGURE run (configure.ac uses AC_IN",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"llama.cpp / ggml": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Lane A dead: latest release b9603 ships NO plain wasm32-wasi .wasm (only native macos/ubuntu/win/android + xcframework.zip; gh release view confirmed). Lane B fails the no-configure / lanes-not-per-to",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"whisper.cpp": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "ggml CPU backend (ggml/src/ggml-cpu/ggml-cpu.c) is built on native threads as its core compute model: it unconditionally #include <pthread.h> and its ggml_threadpool struct uses pthread_t/pthread_cond",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"cairo": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Cairo does not rasterize itself \u2014 its image surface is gated on a MANDATORY external dependency, pixman (meson: `pixman_dep = dependency('pixman-1', ...)`; `CAIRO_HAS_IMAGE_SURFACE` is set only `if pi",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"TeX / LaTeX": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32-wasi build exists (SwiftLaTeX/busytex/texlive.js/TeXlyre are all Emscripten+JS-glue pairs, not WASI command modules \u2014 Lane A fails). Lane B fails on two independent host-codegen/config",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"pdm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose + fork-exec as core. pdm is a Python package/dep manager: its entire function is resolving and fetching packages over the network (httpx/httpcore/hishel HTTP, unearth/resolvelib res",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"RubyGems (gem)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Redundant with already-live ruby.wasm. RubyGems is pure-Ruby code that ships INSIDE the CRuby interpreter + stdlib \u2014 there is no distinct buildable .wasm artifact for `gem` itself; it's reachable toda",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Bundler": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Redundant with an ALREADY-LIVE tool: Bundler is Ruby code shipped inside CRuby/RubyGems, and Ruby is already live in-sandbox as ruby.wasm (wasm32-wasi, wasmtime). It is not a separate buildable .wasm ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"leveldb": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "LevelDB's PosixEnv (util/env_posix.cc) requires a real background compaction thread via std::thread + a pthread mutex/condvar (port_stdcxx.h) and mmap-based file access. The background compaction thre",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Oberon (OBNC)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "OBNC is a build orchestrator, not a self-contained compiler. The top-level `obnc` driver (src/obnc.c) is fork/exec-as-core: it popen()s `obnc-compile` (the transpiler) and then system()s the host C co",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Io": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Mandatory per-tool codegen step. The VM bootstrap source libs/iovm/source/IoVMInit.c is NOT checked into the repo; it must be generated by the custom host-native `io2c` tool (libs/iovm/tools/io2c.c, b",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"flex": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Fork-exec-as-core. The flex BINARY cannot produce a scanner without spawning GNU m4 as a subprocess at runtime: main.c calls filter_create_ext(output_chain, m4, \"-P\", 0) and filter.c implements the ou",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Tcl interpreter": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Fails lane-B \"no configure / no per-tool host work\" gate. (1) No pregenerated tclConfig.h ships \u2014 only unix/tclConfig.h.in with 175 #undef HAVE_* autoconf probes; tclInt.h/tclPort.h hard-require the g",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"htmlq": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Not reachable via any automated lane. Lane C (bare mrustc ~1.74) is the only candidate and it fails: (1) clap 4.5 uses the `derive` feature = clap_derive proc-macro (needs proc-macro2/syn/quote), whic",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"perl": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two independent blockers, both fatal. (1) Lane B build is impossible: zeroperl confirms Perl-to-wasm REQUIRES running Perl's Configure script (a system-probing shell script with a custom cross-compile",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"COBOL (GnuCOBOL)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GnuCOBOL (only portable COBOL impl; IBM Enterprise COBOL/EBCDIC/CICS/DB2/JCL is a separate non-portable mainframe dialect, out of scope). cobc is a COBOL-to-C TRANSPILER: verified in cobc/cobc.c it em",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Nim": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two compounding blockers. (1) Bootstrap: the only way to get a `nim` binary is the csources_v2 pre-transpiled C, but those .nim.c files are generated per concrete OS/CPU (amd64/arm + linux/macos: posi",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"V (vlang)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "V is a native-AOT codegen toolchain, not a droppable library. Verified: V's latest release (0.5.1) ships NO prebuilt wasm32-wasi .wasm asset (lane A out). V is distributed as bootstrap C (v.c amalgam ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Odin": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Earlier \"lane B live-likely\" flag conflated Odin's BUILD TARGET (TargetMetrics target_wasi_wasm32 \u2014 Odin can EMIT wasm32-wasi output) with Odin THE COMPILER running in-sandbox. Those are orthogonal. T",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Smalltalk": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32-wasi Smalltalk VM exists. OpenSmalltalk-vm's only WASM target is Catalyst \u2014 a SqueakJS+WASM/WASM-GC browser hybrid that requires a JS host (excluded: emscripten/js-pair, not standalone",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Modula-2": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only real M2 compiler is gm2 (a GCC front-end); GCC is native-AOT-codegen, does not emit wasm32-wasi, and requires a full autotools configure run plus bison/flex/m4 parser-generator codegen \u2014 all disa",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"yorick": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Yorick ships a `configure` script that generates `Make.cfg` with platform-specific config (the play/ portability layer + yapi), so building it requires a per-tool configure run we cannot perform in-sa",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"XS (Moddable) \u2014 xst shell": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Requires per-tool host porting that violates lanes-not-per-tool. Verified upstream (moddable@public): the ONLY wasm platform shipped is xs/platforms/wasm_xs.c, hard-coupled to emscripten.h + emscripte",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Perl interpreter (perl)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi .wasm exists (zeroperl has ZERO GitHub releases and no .wasm asset anywhere \u2014 verified via gh release list + code search). The only path is zeroperl's Docker pipeline, wh",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"WAMR (WebAssembly Micro Runtime) \u2014 classic/fast interpreter": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "WAMR is a wasm HOST runtime, not a wasm-targetable tool. core/config.h hard-requires a host BUILD_TARGET_* matching the CPU (x86_64/aarch64/arm/riscv/mips/xtensa/arc); __wasm32__ matches none -> #erro",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Berkeley DB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Public API + internal headers are NOT shipped; they are produced by the autoconf configure run. configure.ac declares AC_CONFIG_HEADERS plus assembles db.h:src/dbinc/db.in (3085-line template, ~40 @ty",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"ag (The Silver Searcher)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core value is pthread parallel search (native-threads-as-core); WASI lane has no native threads, leaving only a degraded single-threaded grep. Requires a configure run to generate config.h \u2014 source #i",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"GraphicsMagick": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GraphicsMagick is NOT a clean Lane B amalgam. (1) The coder layer (coders/*.c) is not a globbable source set: each format is conditionally compiled per configure-detected delegate lib, and the static ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"sharp / libvips": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Lane A fails: the only prebuilt sharp wasm (@img/sharp-wasm32@0.35.1) is an emscripten+emnapi build, NOT plain wasm32-wasi. Verified: wasm imports come from minified emscripten module \"a\" (import \"a\" ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"ghostscript": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No plain wasm32-wasi prebuilt exists: both wasm builds are emscripten/js-pair. jsscheller/ghostscript-wasm ships only an npm package built via emconfigure/emmake (arch_wasm.h emscripten arch header, M",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"poppler-utils": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core libpoppler (113 .cc) requires a CMake configure run beyond the two hand-writable config headers: GenerateExportHeader emits poppler_export.h, and check_c_source_compiles feature probes (jpeglib v",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"miller (mlr)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Pure-Go program (~99% Go, no C/Rust/Python/JS sources) \u2014 falls outside all four automated lanes. No prebuilt wasm32-wasi .wasm exists: release v6.18.1 ships only native-arch tarballs/deb/rpm (darwin/l",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"librsvg (rsvg-convert)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "librsvg is a large Rust workspace (now Rust core: cairo-rs/pango/gdk-pixbuf/glib gobject bindings + markup5ever/selectors proc-macro derives, edition 2021+, build-script codegen) \u2014 fails lane C (mrust",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"pango": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Pango is built on GLib/GObject and uses Meson exclusively. Reaching it requires per-tool host work our lanes forbid: GLib needs a Meson configure run (generated config.h probing platform features) plu",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"LibreSSL": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Verified against libressl-portable 4.3.2 tarball. NOT lane-B-clean: (1) crypto build is a 700-line curated CRYPTO_SRC list with per-arch conditionals; a glob over crypto/**/*.c pulls conflicting arch-",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Idris2": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Self-hosted compiler: bootstrapping Idris2 requires an existing Idris2 binary OR compiling its emitted Chez Scheme via Chez Scheme \u2014 an external bootstrap toolchain we cannot run in-sandbox. The codeb",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"ATS": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "ATS2/Postiats is a self-hosted compiler: 180k+ LOC written in ATS1, bootstrapped from pre-generated C. Building it requires an autotools ./configure run plus ATSLIB prelude/libats setup and PATSHOME e",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Hermes": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hermes (Facebook's JS engine) requires a full CMake configure run plus codegen that we cannot perform in-sandbox: it generates Unicode tables (genUnicode Python scripts -> .inc files), generated parse",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"Helm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Helm is written in Go. Our automated capability-lanes are A (prebuilt wasm32-wasi .wasm), B (self-contained C/C++ via clang+libc++), C (bare Rust via mrustc), D (pure-Python pip / JS-on-QuickJS). None",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"GHC RTS (Haskell)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No standalone wasm32-wasi RTS artifact exists. GHC's wasm support ships ONLY as a full cross-compiler toolchain (ghc-wasm-meta nix flake / bootstrap.sh installing wasm32-wasi-ghc to ~/.ghc-wasm). The ",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
+},
+"GnuTLS": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Multi-dep autotools-configure + codegen cascade, and redundant with live crypto. (1) GnuTLS core requires an autotools `configure` run to generate config.h plus headers from .in templates (version/ABI",
+"extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)"
 }
 },
 "preliminary": {
-"cbindgen": {
-"verdict": "uncertain",
-"lane": "C",
-"source_url": "https://crates.io/api/v1/crates/cbindgen/0.29.4/download",
-"recipe": "Lane C (Rust crate via mrustc ~1.74 + clang). Crate: cbindgen 0.29.4 (download verified at https://crates.io/api/v1/crates/cbindgen/0.29.4/download; releases page has NO wasm asset \u2014 only native ELF c",
-"smoke": "echo 'pub extern \"C\" fn add(a:i32,b:i32)->i32{a+b}' > /tmp/lib.rs; wasmtime run --dir /tmp cbindgen.wasm -- /tmp  # expe",
-"blocker": "No prebuilt wasm32-wasi asset exists (all cbindgen releases are native ELF; not on VMware WLR or wapm). Only path is mrustc, but the dep graph (syn full + serde_derive + clap derive + proc-macro2/quot",
-"confidence": "medium",
-"verified": false
-},
-"Graphviz (dot)": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/12.2.1/graphviz-12.2.1.tar.gz",
-"recipe": "Lane A is NOT viable: the widely-cited @hpcc-js/wasm Graphviz is emscripten/browser-targeted \u2014 its GitHub releases (wasm-graphviz-v1.22.0) ship EMPTY assets (npm-only) and the package is a .js+.wasm p",
-"smoke": "After a successful static-plugin wasm32-wasi build to dot.wasm: `printf 'digraph{a->b}' | wasmtime run dot.wasm -- -Tsvg",
-"blocker": "No plain wasm32-wasi prebuilt exists (hpcc-js is emscripten/JS-host-only, empty GitHub assets). Source builds but is configure-dependent (no pre-generated config.h) and uses a dlopen/ltdl plugin archi",
-"confidence": "high",
-"verified": false
-},
-"sed": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://ftp.gnu.org/gnu/sed/sed-4.9.tar.gz",
-"recipe": "Lane B (closest viable, but gated). GNU sed 4.9 source VERIFIED at https://ftp.gnu.org/gnu/sed/sed-4.9.tar.gz (HTTP 200). Core is small + WASI-friendly (pure stdin->stdout, only fs/stdio syscalls, no ",
-"smoke": "After a successful build to sed.wasm: printf 'hello world\\n' | wasmtime sed.wasm 's/world/wasm/'  => expected stdout: \"h",
-"blocker": "No verifiable clean lane: (A) no plain wasm32-wasi sed binary exists anywhere I could confirm \u2014 uutils coreutils.wasm has no sed applet, wasmer registry empty, no busybox-wasi release; (B) GNU sed 4.9",
-"confidence": "medium",
-"verified": false
-},
 "J": {
 "verdict": "uncertain",
 "lane": "B",
@@ -1690,14 +2038,6 @@
 "lane": "C",
 "source_url": "https://github.com/Nadrieril/dhall-rust",
 "recipe": "Rust impl: Nadrieril/dhall-rust (crate `dhall` 0.13.0 / `serde_dhall`). Pure, total evaluator \u2014 ideal sandbox shape, and upstream already gates network (reqwest",
-"confidence": "high",
-"verified": false
-},
-"SWC (@swc/wasm)": {
-"verdict": "uncertain",
-"lane": "D",
-"source_url": "https://registry.npmjs.org/@swc/wasm/-/wasm-1.15.41.tgz",
-"recipe": "SWC ships NO plain wasm32-wasi module. The published @swc/wasm@1.15.41 (verified 200, 15MB tarball: wasm.js + wasm_bg.wasm + wasm.d.ts) is a wasm-bindgen build:",
 "confidence": "high",
 "verified": false
 },
@@ -1717,14 +2057,6 @@
 "confidence": "high",
 "verified": false
 },
-"LLD (wasm-ld)": {
-"verdict": "uncertain",
-"lane": "A",
-"source_url": "",
-"recipe": "No plain wasm32-wasi prebuilt asset confirmed. The runtime-shape is actually ideal \u2014 wasm-ld is the LLVM lld WebAssembly flavor: pure C++, no JIT, no GPU, no ne",
-"confidence": "medium",
-"verified": false
-},
 "flatc": {
 "verdict": "live-likely",
 "lane": "B",
@@ -1739,54 +2071,6 @@
 "source_url": "https://github.com/jerryscript-project/jerryscript",
 "recipe": "Lane B portable C with CMake build core math port and desktop entry with clang for wasm wasi link to one wasm hand written parser no bison t",
 "confidence": "high",
-"verified": false
-},
-"Cloudflare D1 (SQLite)": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://sqlite.org/2024/sqlite-amalgamation-3470200.zip",
-"recipe": "D1 the managed Workers service is closed/network-as-purpose (impossible to replicate as-is), but its substance is SQLite, which has a first-",
-"confidence": "high",
-"verified": false
-},
-"awk (gawk)": {
-"verdict": "uncertain",
-"lane": "none",
-"source_url": "https://ftp.gnu.org/gnu/gawk/gawk-5.4.0.tar.xz",
-"recipe": "No clean lane for GNU gawk specifically. Lane A: no prebuilt plain wasm32-wasi gawk .wasm exists \u2014 wasm-forge/gawk releases, gawk-wasm repos",
-"confidence": "high",
-"verified": false
-},
-"busybox": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://busybox.net/downloads/busybox-1.36.1.tar.bz2",
-"recipe": "Lane B (C), but gated. Source tarball live (curl -fsIL 200, 2.5MB) and self-contained C (no external deps for the NOFORK subset). BLOCKER: b",
-"confidence": "medium",
-"verified": false
-},
-"findutils": {
-"verdict": "uncertain",
-"lane": "none",
-"source_url": "https://github.com/uutils/findutils",
-"recipe": "No viable clean lane. (A) No verified plain wasm32-wasi module: wapm/wasmer entries (wasmer.io/syrusakbary/findutils) redirect and are wasme",
-"confidence": "medium",
-"verified": false
-},
-"7-Zip (7z/p7zip)": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/ip7z/7zip",
-"recipe": "Build the standalone console binary 7zz from the official ip7z/7zip source under CPP/7zip/Bundles/Alone2/ using wasi-sdk clang instead of gc",
-"confidence": "medium",
-"verified": false
-},
-"xmlstarlet": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://downloads.sourceforge.net/project/xmlstar/xmlstarlet/1.6.1/xmlstarlet-1.",
-"recipe": "Lane B (self-contained C over libxml2/libxslt). 1) Build deps to wasm32-wasi first: libxml2 (known wasm builds), then libxslt + libexslt (pu",
-"confidence": "medium",
 "verified": false
 },
 "csvkit": {
@@ -1805,22 +2089,6 @@
 "confidence": "high",
 "verified": false
 },
-"wolfSSL": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/wolfSSL/wolfssl",
-"recipe": "Lane B (self-contained C, no yacc/bison). Skip autoconf entirely: compile sources directly with -DWOLFSSL_USER_SETTINGS and a hand-authored ",
-"confidence": "medium",
-"verified": false
-},
-"RE2": {
-"verdict": "uncertain",
-"lane": "B",
-"source_url": "https://github.com/google/re2",
-"recipe": "Lane B (C++/libc++). Prebuilt npm `re2-wasm@1.0.2` is NOT plain wasm32-wasi \u2014 its build/wasm/re2.wasm imports emscripten+embind (`emscripten",
-"confidence": "medium",
-"verified": false
-},
 "Apache Arrow": {
 "verdict": "live-likely",
 "lane": "D",
@@ -1829,27 +2097,11 @@
 "confidence": "medium",
 "verified": false
 },
-"Fortran": {
-"verdict": "uncertain",
-"lane": "none",
-"source_url": "https://github.com/lfortran/lfortran/releases/latest",
-"recipe": "No viable in-sandbox lane. Lane A: LFortran (the only Fortran compiler with a WASM story) ships ONLY a source tarball (lfortran-0.63.0.tar.g",
-"confidence": "high",
-"verified": false
-},
 "Hatch": {
 "verdict": "live-likely",
 "lane": "D",
 "source_url": "https://pypi.org/pypi/hatchling/json",
 "recipe": "Scope to the build-backend half (hatchling) \u2014 the pure-function packager \u2014 not the full `hatch` CLI. We already have CPython live in-sandbox",
-"confidence": "high",
-"verified": false
-},
-"easy_install": {
-"verdict": "live-likely",
-"lane": "D",
-"source_url": "https://setuptools.pypa.io/en/latest/deprecated/easy_install.html",
-"recipe": "Capability already covered \u2014 no port needed. easy_install is a pure-Python console script bundled with setuptools that rides CPython; it has",
 "confidence": "high",
 "verified": false
 },
@@ -1861,52 +2113,10 @@
 "confidence": "medium",
 "verified": false
 },
-"ffmpeg": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "No plain prebuilt .wasm release exists. Lane A fails because ffmpegwasm/ffmpeg.wasm is emscripten/JS-paired and both WASI repos sh",
-"confidence": "medium",
-"verified": false
-},
-"qpdf": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C++17 -> wasm32-wasi via our C++/libc++ lane). Fetch release tarball qpdf-12.3.2.tar.gz (CONFIRMED 200; lat",
-"confidence": "medium",
-"verified": false
-},
-"mutool (MuPDF)": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane A is OUT: the only prebuilt WASM (npm `mupdf@1.27.0`, dist/mupdf-wasm.wasm, 9.99MB) is emscripten-built \u2014 imports module `a` ",
-"confidence": "medium",
-"verified": false
-},
-"tesseract": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "Lane B (C++/libc++), multi-lib port \u2014 NOT a clean wire-up. Tesseract is C++17, mandatorily depends on Leptonica, which itself need",
-"confidence": "high",
-"verified": false
-},
 "sox": {
 "verdict": "live-likely",
 "lane": "B",
 "recipe": "Use the SoX 14.4.2 release tarball (curl -fsIL confirmed: HTTP 200, 1134299 bytes; ships a pre-generated `configure` so no autocon",
-"confidence": "medium",
-"verified": false
-},
-"llama.cpp / ggml": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane A dead: latest release (b9601) ships NO wasm/wasi asset (all native macos/ubuntu/win + xcframework; gh api confirmed). All pu",
-"confidence": "medium",
-"verified": false
-},
-"whisper.cpp": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C/C++, our C + C++/libc++ wasi-sdk lane). Core is plain C/C++ with NO codegen/configure: just inc",
 "confidence": "medium",
 "verified": false
 },
@@ -1917,52 +2127,10 @@
 "confidence": "medium",
 "verified": false
 },
-"TeX / LaTeX": {
-"verdict": "impossible",
-"lane": "none",
-"recipe": "No viable lane as a drop-in. Lane A FAILS: every known TeX-to-WASM build (SwiftLaTeX, busytex, texlive.js, TeXlyre/texly",
-"confidence": "medium",
-"verified": false
-},
-"pdm": {
-"verdict": "uncertain",
-"lane": "D",
-"recipe": "Pure-Python; rides existing CPython.wasm lane (python already LIVE). Install pdm + pure-Python deps (resolvelib, unearth",
-"confidence": "medium",
-"verified": false
-},
-"RubyGems (gem)": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "No new lane needed \u2014 Ruby is ALREADY LIVE. RubyGems ships inside the CRuby interpreter and stdlib; the official ruby.was",
-"confidence": "high",
-"verified": false
-},
-"Bundler": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "Bundler ships inside CRuby/RubyGems; Ruby is already LIVE in-sandbox as ruby.wasm (wasm32-wasi, wasmtime). No separate b",
-"confidence": "high",
-"verified": false
-},
 "LevelDB": {
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B (self-contained C++ via our clang/libc++ lane). No prebuilt plain wasm32-wasi .wasm exists (existing \"leveldb was",
-"confidence": "high",
-"verified": false
-},
-"Oberon (OBNC)": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "OBNC is an Oberon-07 -> C translator implemented in C (mirror: https://github.com/oberonforall/obnc). Build path under o",
-"confidence": "medium",
-"verified": false
-},
-"Io": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Build from IoLanguage/io master (the wasm32-wasi-first branch; native CMake path moved to `native` branch / 2026.04.20-n",
 "confidence": "high",
 "verified": false
 },
@@ -1994,20 +2162,6 @@
 "confidence": "medium",
 "verified": false
 },
-"Tcl interpreter": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C, our clang+libc wasi-sdk lane \u2014 same path as the already-LIVE ruby/php/lua). Fetch the Tcl core",
-"confidence": "medium",
-"verified": false
-},
-"htmlq": {
-"verdict": "uncertain",
-"lane": "C",
-"recipe": "Lane C (bare Rust via mrustc ~1.74). htmlq 0.5.0 deps: kuchikiki 0.8, html5ever 0.26, clap 4.5 (derive), lazy_static, ur",
-"confidence": "medium",
-"verified": false
-},
 "Perl": {
 "verdict": "live-likely",
 "lane": "A",
@@ -2019,41 +2173,6 @@
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "GnuCOBOL is the only portable COBOL impl (mainframe IBM Enterprise COBOL with EBCDIC/CICS/DB2/JCL is a separate dialect,",
-"confidence": "medium",
-"verified": false
-},
-"Nim": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Nim transpiles to portable C, then our existing clang.wasm + wasi-libc lane takes over. Author runs `nim c --compileOnly",
-"confidence": "high",
-"verified": false
-},
-"V (vlang)": {
-"verdict": "impossible",
-"lane": "none",
-"recipe": "No viable lane. V is a codegen toolchain, not a droppable library. The pragmatic \"V to C to clang.wasm\" path requires ru",
-"confidence": "medium",
-"verified": false
-},
-"Odin": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Odin is an LLVM-based compiler with a first-class `wasi_wasm32` build target (TargetMetrics target_wasi_wasm32 = {Target",
-"confidence": "medium",
-"verified": false
-},
-"Smalltalk": {
-"verdict": "uncertain",
-"lane": "D",
-"recipe": "No plain wasm32-wasi Smalltalk VM exists. The only WASM path (OpenSmalltalk \"Catalyst\") is a SqueakJS+WASM bro",
-"confidence": "medium",
-"verified": false
-},
-"Modula-2": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "No prebuilt wasm exists (Lane A=no; gm2 is a GCC front-end, GCC->wasm impractical). Only path is Lane B via th",
 "confidence": "medium",
 "verified": false
 },
@@ -2078,46 +2197,11 @@
 "confidence": "medium",
 "verified": false
 },
-"Perl interpreter (perl)": {
-"verdict": "uncertain",
-"lane": "A",
-"recipe": "zeroperl (github.com/6over3/zeroperl) builds Perl5 (default 5.42.0, configurable via PERL_VERSION) as a self-c",
-"confidence": "medium",
-"verified": false
-},
 "WAMR (WebAssembly Micro Runtime)": {
 "verdict": "live-likely",
 "lane": "B",
 "recipe": "Lane B self-contained C/C++. Build ONLY the classic or fast interpreter (pure portable C, zero codegen): defin",
 "confidence": "medium",
-"verified": false
-},
-"Berkeley DB": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C, same shape as the already-live sqlite3 but heavier). BDB is a mature ANSI/POSIX C li",
-"confidence": "medium",
-"verified": false
-},
-"ag (The Silver Searcher)": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "Lane B (self-contained C) is the only candidate path, but requires a heavy fork, not a clean compile. Steps if",
-"confidence": "high",
-"verified": false
-},
-"GraphicsMagick": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C/C++). GraphicsMagick 1.3.47 is portable C/C++ (MIT), pure pixel-compute \u2014 s",
-"confidence": "medium",
-"verified": false
-},
-"sharp / libvips": {
-"verdict": "impossible",
-"lane": "none",
-"recipe": "n/a",
-"confidence": "low",
 "verified": false
 },
 "git": {
@@ -2127,39 +2211,11 @@
 "confidence": "medium",
 "verified": false
 },
-"ghostscript": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "No plain wasm32-wasi artifact exists. Both prebuilt wasm builds (jsscheller/ghostscript-wasm, jerbob",
-"confidence": "high",
-"verified": false
-},
-"poppler-utils": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C++). Build libpoppler core + pdftotext only for the first cut. Toolchain: cl",
-"confidence": "medium",
-"verified": false
-},
 "openssl": {
 "verdict": "live-likely",
 "lane": "A",
 "recipe": "Lane A: fetch the prebuilt openssl.wasm CLI from voltbuilder/openssl-wasm releases (tags v1.1.1o etc",
 "confidence": "high",
-"verified": false
-},
-"miller (mlr)": {
-"verdict": "uncertain",
-"lane": "none",
-"recipe": "No viable lane under current toolchain. Miller is ~99% pure Go (zero runtime deps, no cgo, no networ",
-"confidence": "high",
-"verified": false
-},
-"librsvg (rsvg-convert)": {
-"verdict": "uncertain",
-"lane": "C",
-"recipe": "librsvg itself is impossible: rsvg-convert pulls cairo/pango/gdk-pixbuf/fontconfig/GLib (C deps, con",
-"confidence": "medium",
 "verified": false
 },
 "Pango": {
@@ -2176,52 +2232,10 @@
 "confidence": "medium",
 "verified": false
 },
-"LibreSSL": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B (self-contained C). Build libcrypto (+ optional libssl/libtls) from the libressl-portable tar",
-"confidence": "high",
-"verified": false
-},
 "Idris": {
 "verdict": "uncertain",
 "lane": "none",
 "recipe": "No clean lane. Idris2 is a SELF-HOSTED compiler: building it requires an existing Idris2 binary or a",
-"confidence": "medium",
-"verified": false
-},
-"ATS": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "No prebuilt wasm exists (no Lane A; confirmed via search \u2014 only Rust/C wasi targets surface, nothing",
-"confidence": "medium",
-"verified": false
-},
-"Hermes": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "C++ engine, no JIT (interpreter), no threads (-DLLVM_ENABLE_THREADS=0), no network/fork-exec \u2014 runs ",
-"confidence": "medium",
-"verified": false
-},
-"Helm": {
-"verdict": "uncertain",
-"lane": "none",
-"recipe": "Helm is Go. Its core work (helm template: render Go-template charts to YAML using engine.Render / re",
-"confidence": "high",
-"verified": false
-},
-"GHC RTS (Haskell)": {
-"verdict": "live-likely",
-"lane": "none",
-"recipe": "The GHC RTS itself is not a standalone wasm artifact you fetch or build via the C/C++/Rust",
-"confidence": "high",
-"verified": false
-},
-"GnuTLS": {
-"verdict": "uncertain",
-"lane": "B",
-"recipe": "Lane B (self-contained C), but heavy multi-tarball with a configure cascade. Deps needed a",
 "confidence": "medium",
 "verified": false
 },

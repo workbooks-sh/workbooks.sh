@@ -1,0 +1,792 @@
+[
+ {
+  "name": "cbindgen",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/mozilla/cbindgen/releases/download/0.29.4/cbindgen-ubuntu22.04",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No prebuilt wasm32-wasi asset (verified: GitHub release 0.29.4 ships only native ELF binaries cbindgen-ubuntu22.04 x86_64 + aarch64; crates.io has source only). Lane C is not viable: cbindgen is NOT a bare small crate \u2014 it is a large binary crate whose tree pulls proc-macro-heavy deps (syn, quote, serde+serde_derive, toml, clap, heck, log, indexmap) and edition2018+, well outside mrustc ~1.74 bare-crate scope (no proc-macros / large workspaces). Not B (Rust, not C/C++), not A, not D.",
+  "confidence": "high"
+ },
+ {
+  "name": "Graphviz (dot)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://gitlab.com/graphviz/graphviz/-/archive/12.2.1/graphviz-12.2.1.tar.gz",
+  "build_opts": "n/a",
+  "smoke": "n/a",
+  "blocker": "Lane A dead: the only prebuilt Graphviz wasm (@hpcc-js/wasm-graphviz 1.22.0) is an emscripten js+.wasm pair, npm-only (GitHub release assets empty) \u2014 not plain wasm32-wasi. Lane B fails on two hard codegen requirements: the core DOT parser in lib/cgraph needs bison/yacc (grammar.y) + flex/lex (scan.l), and the HTML-label parser (lib/common/htmlparse.y) and expression engine (lib/expr/exparse.y) need yacc too; plus the tree ships configure.ac/autogen.sh with no committed config.h (requires an autotools/CMake configure run to generate config.h). We can't run flex/bison/yacc or a configure step in-sandbox, so it violates lanes-not-per-tool. No Rust/Python/JS-bundle path. Verified: tarball returns HTTP 200; tar listing shows grammar.y, scan.l, htmlparse.y, exparse.y, gmlparse.y/gmlscan.l, mklang.y; npm dist.tarball = wasm-graphviz-1.22.0.tgz (npm-only emscripten build).",
+  "confidence": "high"
+ },
+ {
+  "name": "sed",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://ftp.gnu.org/gnu/sed/sed-4.9.tar.gz",
+  "build_opts": "",
+  "smoke": "printf 'a\\nb\\n' | sed 's/a/X/' -> expect 'X\\nb'",
+  "blocker": "GNU sed is structurally a gnulib program: 100 gnulib .c files in lib/ each #include config.h, a 2575-line header with 612 autoconf-probed HAVE_/GNULIB_/_GL_ macros produced by a ./configure run that probes the target libc. gnulib's entire purpose is configure-detected libc replacements; a wrong/hand-guessed macro set conflicts with wasi-libc decls and fails to compile. Lane B explicitly forbids any configure run, and hand-authoring a wasi-tuned config.h is precisely the per-tool host work the lanes prohibit (lanes-not-per-tool). No prebuilt plain wasm32-wasi .wasm exists (Lane A); it is C, not bare Rust/Python/JS (rules out C/D). The bundled lib/regex* is also redundant with already-live PCRE2/oniguruma. Verified: tarball HTTP 200; sed/*.c pulls 19 gnulib headers (xalloc, localcharset, acl, fwriting, unlocked-io, getopt, version-etc...); no flex/bison/yacc files (codegen not the blocker \u2014 the configure/gnulib coupling is).",
+  "confidence": "high"
+ },
+ {
+  "name": "J (jsoftware/jsource \u2014 J array language engine)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/jsoftware/jsource",
+  "build_opts": "n/a \u2014 not live-buildable",
+  "smoke": "n/a",
+  "blocker": "No prebuilt plain wasm32-wasi .wasm exists (lane A) \u2014 upstream's only wasm path is Emscripten (JS-pair, guarded by __wasm__ in jsrc/cpuinfo.c, ca.c, io.c, j.c), not plain WASI; absent from WASI runtime collections. Lane B fails on four independent fatal disqualifiers: (1) jsrc/viixamd64.asm + AES (.asm/NASM) and 31 SIMD-intrinsic .c files \u2014 NASM AOT-assembly we cannot run in-sandbox; C_NOMULTINTRINSIC only swaps the multiply-overflow path, not the asm routines. (2) GMP/MPIR hard dependency (jsrc/jgmpinit.c dlopens libmpir/mpir32) for J's extended-precision integer datatype \u2014 a separate native bignum lib, not a header-only amalgam. (3) Core pthread worker-thread pool (cip.c/ct.c/sl.c/xlp.c, nthreads) + OpenMP \u2014 native-threads-as-core. (4) Build is a per-platform shell-script chain (make2/jplatform64.sh + build_libj.sh) doing host CC/SDK selection and feature probing \u2014 per-tool configure-style host work, which violates lanes-not-per-tool. Not lane C (C, not Rust) or D (not Python/JS).",
+  "confidence": "high"
+ },
+ {
+  "name": "dhall (serde_dhall / dhall-rust)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/Nadrieril/dhall-rust",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Lane C disqualified on three independent grounds. (1) Proc-macros: deps pest_consume 1.1 + pest 2.1 \u2014 the parser is built via pest's proc-macro derive machinery; mrustc ~1.74 has no proc-macro expansion (still the pending frontier, not landed). (2) Build-time codegen: dhall/build.rs runs abnf_to_pest + pest_generator to convert src/syntax/text/dhall.abnf -> OUT_DIR/dhall.pest grammar during the build \u2014 a per-tool codegen step our lanes cannot run in-sandbox (same class as flex/bison/protoc). (3) Large multi-crate workspace (dhall + serde_dhall + abnf_to_pest + proc-macro helper), edition 2018, heavy generic/trait machinery (elsa, minicbor, once_cell, lazy_static) \u2014 well beyond a bare small crate. The 'pure total evaluator, ideal sandbox shape' observation is a RUNTIME property and does not bear on buildability; the build requires proc-macro expansion + ABNF->PEG codegen that the automated lanes cannot perform with no per-tool host work. Verified Cargo.toml + build.rs via gh api on master (crate 0.13.0).",
+  "confidence": "high"
+ },
+ {
+  "name": "SWC (@swc/wasm)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://registry.npmjs.org/@swc/wasm/-/wasm-1.15.41.tgz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Published @swc/wasm@1.15.41 (verified 200, 15MB, fileCount 5: wasm.js + wasm_bg.wasm + wasm.d.ts) is a wasm-bindgen build, NOT a plain wasm32-wasi module: the _bg.wasm imports wbindgen_* JS host functions and exposes no WASI/_start, so it cannot run without per-tool JS-glue host shims (forbidden per-tool host work) -> NOT lane A. Source is a massive multi-crate Cargo workspace (swc_*) with serde/derive proc-macros, build scripts, and edition 2021+ -> mrustc ~1.74 cannot build it (proc-macros + large workspace are disqualifiers) -> NOT lane C. Not C/C++ (B) or Python/JS-bundle (D). No automated capability-lane reaches it without per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "microbundle",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://registry.npmjs.org/microbundle/0.15.1",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Pure-JS Node CLI bundler (bin dist/cli.js, main dist/microbundle.js) \u2014 no .wasm, so lanes A/B/C are out. Only candidate is lane D (JS on QuickJS), but microbundle is not a self-contained function bundle: it is a heavyweight Node build orchestrator over rollup ^2.35.1 + @babel/core + typescript + postcss/autoprefixer + terser, with deep Node-builtin/fs dependence (tiny-glob filesystem walk, gzip-size/brotli-size native zlib/brotli, @surma/rollup-plugin-off-main-thread worker threads, builtin-modules). It reads/writes the filesystem and spawns a Rollup pipeline \u2014 Node-runtime-as-purpose, not a QuickJS-portable pure function. Also redundant: it IS a JS bundler, duplicating our already-live in-sandbox JS npm bundling lane (compilers/js/bundle/bundlejob.js, rollup). No distinct buildable value via automated lanes with no per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "protobufjs-cli (protoc substitute)",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/protobufjs-cli/-/protobufjs-cli-2.5.4.tgz",
+  "build_opts": "npm lane: resolve+fetch+bundle `protobufjs-cli@2.5.4` (+ peer `protobufjs@^8.6.3`); deps all pure-JS (chalk, escodegen, espree, estraverse, glob, jsdoc, minimist, tmp) \u2014 NO gypfile/postinstall/node-gyp/native addons (verified registry manifest). Entry: bin pbjs (proto->JSON/static-JS/descriptor) and pbts (.d.ts). Run resulting bundle on QuickJS with JsDock Node fs/path shims (already live). bundlejob.js / compilers/js lane, no per-tool host work.",
+  "smoke": "echo 'syntax=\"proto3\"; message M { int32 id = 1; string name = 2; }' > a.proto; pbjs -t json a.proto  ->  expect JSON with nested.M.fields.id.type=int32, .name.type=string. Also pbjs -t static-module a.proto emits a JS encoder/decoder module.",
+  "blocker": "protoc itself (C++) has NO plain wasm32-wasi build (emscripten/js-pair only) and needs a bootstrap-protoc codegen step + abseil + CMake configure -> lanes A/B/C dead. protobufjs-cli is the pure-JS equivalent reached via lane D. Residual risk: pbts path pulls heavy `jsdoc`; if jsdoc trips a Node API the fs shim lacks, pbts (.d.ts gen) may degrade while core pbjs (.proto->JSON/JS) still works \u2014 not a build blocker, only a feature-surface caveat.",
+  "confidence": "medium"
+ },
+ {
+  "name": "LLD (wasm-ld)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-33",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "REDUNDANT with already-live LLVM tool. wasm-ld is not a separate buildable target \u2014 it is the WebAssembly flavor of LLVM lld, and in this repo it ships as part of the SAME llvm.core.wasm multitool that provides clang. See runtime/compilers/clang/README.org: \"llvm.core.wasm is one wasm32-wasi command that dispatches on its first argv to act as clang OR wasm-ld.\" It is prebuilt+sha-pinned (npm @yowasp/clang, YoWASP LLVM 22.1.0 built for wasm32-wasi), provisioned by runtime/compilers/clang/build.sh, and already invoked on every build path \u2014 C (clang/README.org L29), Zig (.zig\u2192C\u2192clang\u2192wasm-ld, zig/README.org L8), and JS/QuickJS (js/build.sh L55-57: \"wasm-ld qjs-run.wasm\"). The clang lane IS the wasm-ld lane. Building or fetching wasm-ld separately yields no distinct value \u2014 it is already host-live as the LLVM tool listed in the redundancy exclusion set.",
+  "confidence": "high"
+ },
+ {
+  "name": "flatc",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/google/flatbuffers (git clone --depth1; verified HEAD checkout 2026-06-11)",
+  "build_opts": "deps=[github:google/flatbuffers @ main tarball]; src_globs=[src/*.cpp, src/util.cpp, src/file_manager.cpp, src/file_name_manager.cpp, src/idl_parser.cpp, src/reflection.cpp, src/code_generators.cpp, src/binary_annotator.cpp, src/annotated_binary_text_gen.cpp, src/bfbs_gen_lua.cpp, src/bfbs_gen_nim.cpp, src/idl_gen_*.cpp, src/flatc.cpp, src/flatc_main.cpp, include/codegen/python.cc, grpc/src/compiler/*_generator.cc]; exclude=[tests/**, grpc/tests/**, src/idl_gen_lua.* (none), samples/**]; compile_only=[all above]; main=src/flatc_main.cpp; cflags=[-std=c++17, -Iinclude, -Igrpc, -fno-exceptions (flatc core throws no C++ exceptions; 'throw' tokens are only inside emitted-code string literals), -O2, --target=wasm32-wasi, -D_WASI_EMULATED_SIGNAL maybe]; libc++ (clang+libc++ amalgam lane). No configure_file C++ config header needed; reflection_generated.h is checked in; parser hand-written (no flex/bison).",
+  "smoke": "echo 'table T{a:int;} root_type T;' > t.fbs && flatc --cpp t.fbs && test -f t_generated.h && echo OK",
+  "blocker": "none \u2014 fixed file list is hand-enumerable (globs+excludes), no configure/codegen tool runs to build the flatc binary itself. Only nuance: must include grpc/src/compiler/*_generator.cc + include/codegen/python.cc because idl_gen_grpc.cpp/idl_gen_python.cpp reference them; this is enumeration, not configure-time discovery.",
+  "confidence": "high"
+ },
+ {
+  "name": "JerryScript",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/jerryscript-project/jerryscript",
+  "build_opts": "deps: [github jerryscript-project/jerryscript master]. src_globs: jerry-core/**/*.c, jerry-port/common/*.c, jerry-math/*.c. exclude: jerry-core/debugger/*.c, jerry-core/api/jerry-debugger*.c (debugger off). include_dirs: jerry-core/include, jerry-core, jerry-core/api, jerry-core/ecma/base, jerry-core/ecma/builtin-objects, jerry-core/ecma/builtin-objects/typedarray, jerry-core/ecma/operations, jerry-core/jcontext, jerry-core/jmem, jerry-core/jrt, jerry-core/lit, jerry-core/parser/js, jerry-core/parser/regexp, jerry-core/vm, jerry-port/include, jerry-math/include. cflags: --target=wasm32-wasi -O2 -DJERRY_GLOBAL_HEAP_SIZE='(512)' -DJERRY_PARSER=1 -DJERRY_DEBUGGER=0 -DJERRY_VALGRIND=0 -DJERRY_SYSTEM_ALLOCATOR=0. config: rename jerry-core/config.h -> jerryscript-config.h (the @JERRY_BUILD_CFG@ line is a comment; every JERRY_* define self-defaults via #ifndef, so NO configure run needed). extra_sources main: jerry-main/main-unix.c OR a 4-line driver calling jerry_init()/jerry_eval()/jerry_cleanup() reading stdin. No bison/flex (parser is hand-written), no codegen run (lit-*.inc.h unicode/magic-string/error tables are COMMITTED in jerry-core/lit + ecma/base), no CMake configure run.",
+  "smoke": "echo \"var s=0;for(var i=1;i<=100;i++)s+=i;print(s);\" | jerryscript.wasm  -> 5050 (use jerry-main snapshot/print or jerry_eval driver)",
+  "blocker": "none \u2014 but note overlap with already-live qjs (QuickJS). JerryScript still has distinct buildable value: ES2015+ IoT-targeted engine, self-contained jerry-math (no host libm), far smaller footprint, snapshot exec. Not redundant in capability though it shares the JS-engine slot.",
+  "confidence": "high"
+ },
+ {
+  "name": "Cloudflare D1 (SQLite)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Two disqualifiers, either sufficient: (1) REDUNDANT \u2014 D1's substance is SQLite, and sqlite3 is ALREADY LIVE as a prebuilt-WASI Lane-A pallet tool (confirmed runtime/host/application.ex: \"seed the prebuilt-WASI tools \u2014 python/ruby/sqlite3/...\"). No distinct buildable value over the SQLite we already ship. (2) D1 the managed Cloudflare Workers service is network-as-purpose / closed-source \u2014 the remote HTTP database API cannot be replicated in-sandbox. Nothing to build; SQLite engine identical to existing live tool.",
+  "confidence": "high"
+ },
+ {
+  "name": "awk (gawk)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No prebuilt plain wasm32-wasi gawk .wasm exists (Lane A fails: wasm-forge/gawk releases 404; GitHub repo search for \"gawk wasm\" returns total_count 0; the only \"gawk\" hit is the Wasmer/WASIX ecosystem, an emscripten/WASIX pair, not a plain wasmtime wasm32-wasi module). Lane B fails: GNU gawk (current 5.4.0) is an autotools project that REQUIRES a ./configure run to generate config.h + Makefiles, probing dozens of platform features (locale, mmap, signals, wide-char, getpgrp, fork/pipe IO). Our lanes forbid a per-tool configure run, and hand-authoring gawk's config.h for wasm32-wasi is exactly the per-tool host work the lanes-not-per-tool rule excludes. Source also carries bison/yacc grammars (awkgram.y, command.y) \u2014 even though dist tarballs ship pregenerated .c, the configure requirement alone disqualifies it. Not Rust, not pure-Python/JS.",
+  "confidence": "high"
+ },
+ {
+  "name": "busybox",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://busybox.net/downloads/busybox-1.36.1.tar.bz2",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Two independent disqualifiers. (1) Configure/codegen: busybox builds via the Linux Kbuild/Kconfig system. `make defconfig` runs conf/mconf parsers generated from flex/bison lexers (scripts/kconfig/zconf.y, zconf.l), and the build compiles+RUNS host codegen tools \u2014 applets/applet_tables.c emits include/applet_tables.h, and scripts/gen_build_files.sh (sed/awk) emits include/applets.h / usage.h. These are per-tool configure + build-time exec codegen we cannot run in-sandbox; violates lanes-not-per-tool. A hand-written config header does not substitute for the applet_tables exec step. (2) Fundamental: busybox is a multicall binary whose core purpose is fork-exec of applets plus Linux process/syscall surface (mount, ps, raw sockets, /proc, tty/job control) \u2014 OS-process/syscall-as-core, which wasm32-wasi cannot provide; even a NOFORK subset depends on absent Linux syscalls. Also largely redundant with already-live coreutils/tar. Not live-buildable.",
+  "confidence": "high"
+ },
+ {
+  "name": "findutils",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "GNU findutils is an autotools+gnulib project that REQUIRES a ./configure run (generates config.h from hundreds of platform feature probes) plus gnulib bootstrap/codegen and per-tool source curation across find/ xargs/ locate/ gl/lib/ lib/ \u2014 this violates lane B (no configure, no codegen, no per-tool source-list curation). No verified plain wasm32-wasi .wasm exists: wasmer.io/syrusakbary/findutils returns HTTP 404, npm 404. Not a Rust crate, not pure-Python/JS. Independently, xargs is fork-exec-as-purpose (spawns child processes) \u2014 a fundamental wasm32-wasi blocker. No clean automated lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "7-Zip (7z/p7zip)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/ip7z/7zip (CPP/7zip/Bundles/Alone2/makefile.gcc)",
+  "build_opts": "",
+  "smoke": "N/A \u2014 not reachable via automated lanes.",
+  "blocker": "Build requires per-tool source-list curation, which violates the lanes-not-per-tool rule. The Alone2 7zz target is defined by makefile.gcc that includes nested .mak fragments (7zip_gcc.mak, Format7zF/Arc_gcc.mak, var_*.mak) enumerating ~150 hand-picked object files via explicit O_* lists + per-directory vpath rules across deep trees (UI/Common, UI/Console, Compress/*, Crypto/*, Archive/*, C/, Common/, Windows/). It is NOT a flat src_globs+excludes set: a glob of CPP/7zip/** also pulls DLL/GUI/FAR-plugin/Windows-resource and p7zip-variant .cpp files that fail under wasm32-wasi, and the correct Alone2 file subset is selectively drawn from directories that also hold non-target sources. Replicating the makefile's curated object lists by hand = exactly the disqualified per-tool curation. (Positives that DON'T save it: pure C/C++, self-contained, no autotools/CMake configure run, no flex/bison/yacc/codegen, assembly is optional with pure-C fallbacks, and it ships its own MyWindows.h POSIX shim \u2014 but the curated source set is the hard blocker. -Werror default would also need stripping.)",
+  "confidence": "high"
+ },
+ {
+  "name": "xmlstarlet",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "xmlstarlet is a thin C CLI over libxml2 + libxslt + libexslt \u2014 a three-tarball stack where each project's build is driven by an autotools/CMake CONFIGURE run that generates feature-gated headers the source #ifdefs on: libxml2 produces config.h AND include/libxml/xmlversion.h + xmlexports.h (LIBXML_*_ENABLED matrix); libxslt adds config.h + xsltconfig.h + xsltexports.h tightly coupled to libxml2's macros; xmlstarlet itself is autotools (configure.ac/Makefile.am). Hand-writing a single small config header does not cover xmlversion.h/xsltconfig.h, which encode the build-time feature matrix the entire codebase branches on \u2014 that is per-tool source/config curation a configure run, not our lanes. No flex/bison but the configure-cascade across 3 projects is the lane-violating blocker. No confirmed prebuilt plain wasm32-wasi .wasm exists (GitHub hits are Android/node-libxml/GH-action wrappers, none a wasi binary). XML-parse value also overlaps already-live expat and transform overlaps pandoc.",
+  "confidence": "high"
+ },
+ {
+  "name": "csvkit",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://files.pythonhosted.org/packages/py3/c/csvkit/csvkit-2.2.0-py3-none-any.whl (verified via PyPI JSON: csvkit-2.2.0-py3-none-any.whl)",
+  "build_opts": "Lane D (pure-Python, CPython/Pyodide-on-wasm). Vendor site-packages: pip install --target=<sysroot>/site-packages csvkit==2.2.0 (resolves full pure-Python tree). Wheels: csvkit-2.2.0-py3-none-any, agate-1.14.2-py3-none-any, agate_excel-0.4.2, agate_dbf-0.2.4, agate_sql-0.7.3, openpyxl-3.1.5-py2.py3-none-any, xlrd-2.0.2, python_slugify-8.0.4, leather-0.4.1, parsedatetime, pytimeparse2, Babel, et_xmlfile, dbfread, greenlet(optional-skip), sqlalchemy-2.0.50 (use py3-none-any fallback wheel; C-ext optional). No native C-ext at runtime. Entry points: csvlook/csvcut/csvstat/in2csv/csvsql/csvgrep/csvjson etc. via console_scripts.",
+  "smoke": "printf 'a,b\\n1,2\\n3,4\\n' | python -m csvkit.utilities.csvcut -c 1   # or: csvcut -c 1 input.csv ; csvstat input.csv ; echo expect column-a values 1,3",
+  "blocker": "none \u2014 entire dep tree is pure-Python (py3-none-any wheels). Only nuance: SQLAlchemy ships cp-specific accelerator wheels but also a py3-none-any fallback; pin/select the pure wheel. greenlet (SQLAlchemy async extra) is C and unneeded for csvkit's sync use \u2014 exclude it.",
+  "confidence": "high"
+ },
+ {
+  "name": "pdftk",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+  "build_opts": "JS bundle on QuickJS/esbuild lane. npm pkg: pdf-lib@1.17.1. deps (all pure-JS, no C-ext): @pdf-lib/standard-fonts, @pdf-lib/upng, pako, tslib. esbuild bundle entry wrapping pdf-lib API (merge/split/stamp/rotate/fill-form/decrypt) -> single .js, run on qjs. No native, no codegen, no configure.",
+  "smoke": "qjs bundle.js: load 2 input PDFs via PDFDocument.load, mergeDocuments, save() -> assert output bytes start with %PDF and page count == sum of inputs; also rotate page 0 by 90 and re-save without error.",
+  "blocker": "pdftk itself is impossible (pdftk-java = JVM; original = C++/GCJ native, no plain wasm32-wasi). Capability is delivered instead via pdf-lib on the JS lane \u2014 covers merge/split/stamp/rotate/form-fill. Note: lacks pdftk's full uncompress/repair/burst PDF-internals parity, but covers the common verbs.",
+  "confidence": "high"
+ },
+ {
+  "name": "wolfSSL",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/wolfSSL/wolfssl",
+  "build_opts": "n/a",
+  "smoke": "n/a",
+  "blocker": "Redundant with already-live mbedTLS: wolfSSL is the same surface (TLS 1.2/1.3 + crypto primitives: AES/SHA/RSA/ECC/X25519/ChaCha-Poly), so it carries no distinct buildable value over the shipped mbedtls. Secondary lane-B violation: wolfcrypt/src/*.c contains 4+ mutually-exclusive bignum/math backends in one glob (integer.c vs tfm.c vs sp_int.c, plus per-arch sp_arm32/arm64/x86_64/cortexm/dsp32.c + sm2 variants + *_asm.S), so a clean globs+excludes won't compile \u2014 it needs per-tool source-list curation to pick exactly one math backend and drop all conflicting arch variants, PQC (falcon/dilithium/sphincs), evp.c, asm.c. RNG also needs a hand-wired CUSTOM_RAND_GENERATE_SEED for WASI (no getrandom). Self-contained C with user_settings.h (no autotools/codegen) \u2014 but redundancy is the decisive blocker.",
+  "confidence": "high"
+ },
+ {
+  "name": "RE2",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://registry.npmjs.org/re2-wasm/-/re2-wasm-1.0.2.tgz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Lane A fails: verified re2-wasm@1.0.2 build/wasm/re2.wasm imports _embind_register_* (embind) + emscripten_resize_heap/emscripten_memcpy_big \u2014 an emscripten+JS-glue pair (re2.js+re2.wasm), NOT plain wasm32-wasi. Lane B fails: modern RE2 (main) hard-depends on Abseil (absl/base/call_once.h, absl/strings/string_view.h, plus absl/container, absl/synchronization, absl/flags across the tree); Abseil is a large multi-target C++ lib whose CMake/Bazel target graph needs per-tool source curation beyond globs+excludes \u2014 violates lanes-not-per-tool. Pinning a stale pre-Abseil RE2 fork to dodge it is itself banned per-tool curation. Also REDUNDANT: pcre2 + onig regex engines already live; RE2's linear-time guarantee is not distinct-buildable value worth an Abseil port.",
+  "confidence": "high"
+ },
+ {
+  "name": "apache-arrow",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/apache-arrow/-/apache-arrow-21.1.0.tgz",
+  "build_opts": "npm:apache-arrow@21.1.0; pure-JS, no native; runtime deps tslib+flatbuffers+json-bignum+@swc/helpers all pure-JS; bundle ESM via esbuild lane, run on QuickJS-ng; exclude CLI deps command-line-args/command-line-usage (tooling-only)",
+  "smoke": "import { tableFromArrays, tableToIPC, tableFromIPC } from 'apache-arrow'; const t = tableFromArrays({ id: Int32Array.from([1,2,3]), v: Float64Array.from([1.5,2.5,3.5]) }); const buf = tableToIPC(t); const t2 = tableFromIPC(buf); console.log(t2.numRows===3 && t2.getChild('id').get(1)===2);",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "Fortran",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/lfortran/lfortran/releases",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No automated lane reaches it. Lane A: LFortran ships only a source tarball (lfortran-0.63.0.tar.gz) + conda; NO confirmed prebuilt plain wasm32-wasi .wasm of the compiler \u2014 its 'wasm' story is emscripten/JS or a clang-wasi codegen path requiring WASI-SDK/emsdk on PATH (host configure tooling we can't run). Lane B: LFortran is a large LLVM-backed C++ project requiring CMake configure + bison/re2c codegen \u2014 violates no-configure/no-codegen rule. Lanes C/D: no bare Rust crate, no pure-Python pkg, no JS bundle. Fundamentally a native-AOT codegen compiler (LLVM JIT/codegen) \u2014 a blocked category.",
+  "confidence": "high"
+ },
+ {
+  "name": "hatchling",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://pypi.org/pypi/hatchling/json",
+  "build_opts": "lane D pure-python: pip download hatchling==1.30.1 + deps (packaging>=24.2, pathspec>=0.10.1, pluggy>=1.0.0, trove-classifiers; tomli on py<3.11) all py3-none-any wheels; unzip into site-packages on already-live CPython wasm32-wasi. No C-ext, no compile step.",
+  "smoke": "python -c \"import hatchling, hatchling.build as b; print(b.get_requires_for_build_wheel())\" then build a wheel for a trivial pyproject (build-backend=hatchling.build) and confirm the .whl is produced.",
+  "blocker": "none \u2014 pure-python build backend; only the build-backend half (hatchling), not the full hatch CLI.",
+  "confidence": "high"
+ },
+ {
+  "name": "easy_install",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "easy_install is a pure-Python console script from setuptools/pkg_resources that simply rides CPython, which is already an ALREADY-LIVE tool (python). It is not a distinct buildable artifact: there is no C/C++/Rust/wasm to compile \u2014 it is just setuptools site-packages on top of the live Python interpreter. Per the triage rule, redundant-with-an-already-live-tool (python) with no distinct buildable value = impossible. Additionally easy_install's actual job is network package installation (fetch+install from PyPI), which is network-as-purpose / fork-exec of build steps \u2014 long-deprecated and a non-capability in-sandbox. No port needed; capability already covered by the live python lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "composer",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://getcomposer.org/composer-stable.phar",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Composer is a pure-PHP phar, NOT a wasm artifact. It rides the already-LIVE php command (php-cgi-8.2.6.wasm, VMware WLR plain wasm32-wasi, sha-pinned in runtime/host/pallet.ex). Two disqualifiers: (1) redundant with an already-live tool (php) \u2014 no distinct buildable .wasm of its own; nothing to build via any lane. (2) Composer's defining function (install/update/require) is network-as-purpose: it resolves and downloads from repo.packagist.org over HTTPS, which the sandbox does not broker by default. Only trivial offline subcommands (--version/validate/dump-autoload) would parse, and even those are unverified given live php is CGI-SAPI not CLI (phar+argv pass-through unproven). Not live-buildable: there is no per-tool buildable artifact, and the product's purpose is the network.",
+  "confidence": "high"
+ },
+ {
+  "name": "ffmpeg",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "FFmpeg's build is gated on running ./configure, which is a per-tool host configure/codegen step our lanes can't run in-sandbox. configure generates config.h AND the component-registration source files that are NOT in the tree (libavcodec/codec_list.c, libavformat/protocol_list.c + muxer/demuxer lists, libavfilter/filter_list.c, bsf_list.c, parser_list.c) plus host-run table-generation tools (*_tablegen). This cannot be reduced to globs+excludes + a hand-written config header, so it fails Lane B's no-configure/no-codegen/no-source-curation constraints. Lane A: no confirmed plain prebuilt wasm32-wasi .wasm release exists \u2014 ffmpegwasm/ffmpeg.wasm is emscripten/JS-paired; the WASI repos (yanghaku, SebastiaanYN) ship build scripts/Dockerfiles that run configure+wasi-sdk, not a downloadable .wasm asset; the only registry artifact is Wasmer/WASIX, which our runtime deliberately does not adopt. Lanes C (Rust) and D (Python/JS) inapplicable \u2014 it is a large autotools-style C codebase.",
+  "confidence": "high"
+ },
+ {
+  "name": "qpdf",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/qpdf/qpdf/releases/download/v12.3.2/qpdf-12.3.2.tar.gz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Verified against qpdf-12.3.2 tarball (HTTP 200). The auto_job/config generated headers ARE pre-shipped (no Python/YAML codegen needed), and crypto is fully native (rijndael.cc + sha2.c \u2014 openssl/gnutls files can be excluded), so those are NOT blockers. The real blocker is stacked external C/C++ deps requiring per-tool host work, which violates lanes-not-per-tool: (1) zlib is MANDATORY \u2014 libqpdf/Pl_Flate.cc hard-includes <zlib.h> and drives z_stream deflate/inflate for the core PDF stream filter; our live 'gz' is a command, not a linkable zlib lib for the lane, so zlib must be added as a hand-configured multi-tarball dep. (2) libjpeg is required for the full lib: include/qpdf/Pl_DCT.hh hard-includes <jpeglib.h> and exposes jpeg_compress_struct in its PUBLIC API, and QPDFJob.cc (the actual job/CLI engine in core libqpdf) includes Pl_DCT.hh \u2014 so you cannot build the useful library without jpeglib. libjpeg(-turbo) is a configure/CMake-class dep (jconfig.h generation, SIMD/nasm). Stripping Pl_DCT.cc + QPDFJob.cc to dodge jpeg amounts to source-list curation beyond globs+excludes and guts the high-level API. Net: two stacked C/C++ deps (zlib + configure-class libjpeg) each needing hand-config headers, plus native-crypto file exclusions and source surgery \u2014 multi-tool host work, not a clean lane B pass. C++20/23 also required (CMAKE_CXX_STANDARD 20 min).",
+  "confidence": "high"
+ },
+ {
+  "name": "mutool (MuPDF)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://mupdf.com/downloads/archive/mupdf-1.27.0-source.tar.gz (HTTP 200, 66.9MB, bundles thirdparty); npm mupdf@1.27.0 = emscripten js-pair (lane A out)",
+  "build_opts": "N/A \u2014 not live-buildable. Lane B fails: mutool needs core 237 .c/.cpp PLUS ~8 mandatory bundled thirdparty libs (freetype, harfbuzz[C++], libjpeg, openjpeg, jbig2dec, lcms2, mujs, zlib, gumbo, brotli) each with hand-curated per-lib source lists + per-lib build CFLAGS + per-lib config-header substitution (scripts/freetype/slimftoptions.h, slimftmodules.h, scripts/libjpeg/jconfig.h, openjpeg opj_config.h). Driven by 391-line Makethird + Makerules with uname/pkg-config feature detection.",
+  "smoke": "N/A \u2014 would be `mutool draw -o out.png in.pdf` or `mutool info in.pdf`, but build is not reachable.",
+  "blocker": "Per-tool host work that violates lanes-not-per-tool: a multi-library integration build (8+ interdependent thirdparty C/C++ libs woven into the core), each requiring hand-maintained config headers and curated source lists beyond globs+excludes. No single amalgam exists. Even with all optional features off (tesseract/barcode/zxing), the mandatory render path still requires wiring freetype+harfbuzz+jpeg+jbig2+openjpeg+lcms+zlib+mujs together with per-lib config substitution. Font hexdump + cmap codegen ARE pre-shipped (generated/ + source/pdf/cmaps/*.h present), so codegen is not the blocker \u2014 the integration scale is. Also partially redundant: freetype+harfbuzz already-live but MuPDF re-bundles its own and expects them woven in (no clean reuse).",
+  "confidence": "high"
+ },
+ {
+  "name": "tesseract",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No prebuilt plain wasm32-wasi .wasm (only emscripten/JS tesseract.js pairs, disqualified). Lane B fails: tesseract is C++17 built via autotools/CMake requiring a CONFIGURE run (configure.ac uses AC_INIT/AM_INIT_AUTOMAKE + m4_esyscmd_s/m4) \u2014 not a config.h we can hand-write. It mandatorily depends on Leptonica, which generates config_auto.h from config.h.in via autoheader and probes libz/libpng/libjpeg/giflib/libtiff with AC_CHECK_LIB \u2014 a 6-library port (tesseract+leptonica+png+jpeg+tiff+gif+zlib), each needing its own configure-driven generated config header. This is per-tool host configure/codegen work across multiple libs, violating lanes-not-per-tool. Not C (lane C) and not pure-Python/JS (lane D).",
+  "confidence": "high"
+ },
+ {
+  "name": "sox",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://downloads.sourceforge.net/project/sox/sox/14.4.2/sox-14.4.2.tar.gz",
+  "build_opts": "target=libsox (the library; skip the sox.c CLI driver which needs termios/glob/signals). src=src/ with an EXPLICIT literal list (no configure, no codegen). compile_only (core, all unconditional): adpcms.c aiff.c cvsd.c g711.c g721.c g723_24.c g723_40.c g72x.c vox.c raw.c formats.c formats_i.c skelform.c xmalloc.c getopt.c util.c libsox.c libsox_i.c sox-fmt.c; effects: bend.c biquad.c biquads.c chorus.c compand.c compandt.c contrast.c dcshift.c delay.c dft_filter.c dither.c divide.c downsample.c earwax.c echo.c echos.c effects.c effects_i.c effects_i_dsp.c fade.c fft4g.c fir.c firfit.c flanger.c gain.c hilbert.c input.c ladspa.c loudness.c mcompand.c noiseprof.c noisered.c output.c overdrive.c pad.c phaser.c rate.c remix.c repeat.c reverb.c reverse.c silence.c sinc.c skeleff.c speed.c splice.c stat.c stats.c stretch.c swap.c synth.c tempo.c tremolo.c trim.c upsample.c vad.c vol.c; formats: raw-fmt.c s1-fmt.c s2-fmt.c s3-fmt.c s4-fmt.c u1-fmt.c u2-fmt.c u3-fmt.c u4-fmt.c al-fmt.c la-fmt.c ul-fmt.c lu-fmt.c 8svx.c aiff-fmt.c aifc-fmt.c au.c avr.c cdr.c cvsd-fmt.c dvms-fmt.c dat.c hcom.c htk.c maud.c prc.c sf.c smp.c sounder.c soundtool.c sphere.c tx16w.c voc.c vox-fmt.c ima-fmt.c adpcm.c ima_rw.c wav.c wve.c xa.c nulfile.c f4-fmt.c f8-fmt.c gsrt.c. EXCLUDE: sox.c, example*.c, sox_sample_test.c, *coreaudio.c, alsa.c, ao.c, pulseaudio*, sndio.c, sunaudio.c, oss*, waveaudio*, flac.c, sndfile.c, mp3.c, opus*, vorbis*, wavpack.c, amr*.c, spectrogram.c (needs PNG), win32-*. deps (in-tree, built-in, no external libs): libgsm/*.c (for gsm format) + lpc10/*.c (for lpc10 format) \u2014 both plain-C amalgams already vendored in the tarball; add their .c globs as :compile_only too, with -Ilibgsm -Ilpc10 and define EXTERNAL_GSM/EXTERNAL_LPC10 UNSET. config: hand-write src/soxconfig.h (all #undef except HAVE_STDINT_H/STRING_H/STRINGS_H/UNISTD_H/FCNTL_H/INTTYPES_H/SYS_TYPES_H/SYS_STAT_H/VSNPRINTF/STRCASECMP/STRDUP/STDC_HEADERS=1 and PACKAGE_VERSION=\"14.4.2\"); leave HAVE_LIBLTDL/HAVE_POPEN/all codec HAVE_* undefined so only built-in formats/effects register. sox.h ships pre-generated (version 14.4.2 baked, SOX_LIB_VERSION_CODE present) \u2014 do not regenerate. cflags: -I src -I src/libgsm -I src/lpc10 -DNDEBUG -DHAVE_CONFIG_H -Wno-incompatible-function-pointer-types -Wno-format -fno-strict-aliasing. extra_sources_main=none (library target; expose lsx/sox_* entrypoints, drive via a tiny wasm shim calling sox_init/sox_open_read/sox_open_write/effects chain).",
+  "smoke": "curl -fsIL the 14.4.2 tarball -> HTTP 200, 1134299 bytes (verified). Extracted; libsox source list is an EXPLICIT literal enumeration in src/Makefile.am (no glob/codegen needed). Wrote a hand-made src/soxconfig.h (all-#undef template, only POSIX HAVE_*_H + STDC set) and ran clang -fsyntax-only on representative core sources targeting host clang: wav.c, effects.c, formats.c, reverb.c all parse CLEAN (warnings only). au.c throws one incompatible-function-pointer-types diagnostic from the uint64_t-vs-long seek typedef \u2014 cosmetic, cleared by -Wno-incompatible-function-pointer-types (SoX ships these suppressed). No configure run, no flex/bison/m4/autoheader needed; sox.h + soxconfig.h.in confirm config is pure preprocessor substitution. No unconditional fork/exec/popen/system anywhere in libsox (grep clean); all process/dlopen paths gated behind HAVE_LIBLTDL/HAVE_POPEN which stay undefined.",
+  "blocker": "None structural. Two minor, lane-handled items: (1) the sox CLI driver (sox.c) is NOT buildable (termios/glob/signal/realtime-audio) \u2014 build the LIBRARY (libsox) + a thin wasm shim instead, which is the right artifact anyway; (2) the LP64-vs-ILP32 seek function-pointer typedef mismatch needs -Wno-incompatible-function-pointer-types. Neither needs per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "llama.cpp / ggml",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/ggml-org/llama.cpp/releases/tag/b9603 (no wasm32-wasi asset; native + xcframework only \u2014 gh api confirmed)",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Lane A dead: latest release b9603 ships NO plain wasm32-wasi .wasm (only native macos/ubuntu/win/android + xcframework.zip; gh release view confirmed). Lane B fails the no-configure / lanes-not-per-tool constraints: ggml is CMake-configure-driven. ggml/src/ggml-cpu/CMakeLists.txt assembles GGML_CPU_SOURCES via arch branches (GGML_SYSTEM_ARCH; wasm path only via CMAKE_SYSTEM_PROCESSOR MATCHES 'wasm') and runs configure-time feature probes (check_cxx_source_runs / check_cxx_compiler_flag) to pick SIMD defs. common/build-info.cpp.in needs @LLAMA_BUILD_NUMBER@/@COMMIT@ config-substitution wired to CMake vars. The backend registry uses GGML_BACKEND_DL (dlopen dynamic backend loading) \u2014 configure-driven, fork/dlopen-shaped. Reaching the wasm SIMD128 CPU build would require hand-curating the exact source list + every GGML_* SIMD/define per-tool and faking build-info \u2014 exactly the per-tool source-list curation + configure substitution Lane B forbids. Not reachable via an automated lane with zero per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "whisper.cpp",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "ggml CPU backend (ggml/src/ggml-cpu/ggml-cpu.c) is built on native threads as its core compute model: it unconditionally #include <pthread.h> and its ggml_threadpool struct uses pthread_t/pthread_cond_t/pthread_mutex_t for the parallel graph executor. wasm32-wasi in our wasmtime sandbox has no pthread/shared-memory threads, so the source does not compile as-is (not merely a runtime n_threads=1 toggle). Secondary blocker: the CPU backend requires per-arch SIMD source curation (ggml-cpu/arch/, amx/, kleidiai/, spacemit/, llamafile/ subtrees selected by CMake per target) \u2014 that is per-tool source-list curation beyond clean globs+excludes, violating lanes-not-per-tool. The earlier 'plain C/C++, no codegen' note only described whisper.cpp's thin top layer (src/whisper.cpp) and missed that the whole numeric core is ggml, which is pthread-coupled. Not a confirmed prebuilt wasm32-wasi .wasm either (upstream ships emscripten/JS pairs only).",
+  "confidence": "high"
+ },
+ {
+  "name": "cairo",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Cairo does not rasterize itself \u2014 its image surface is gated on a MANDATORY external dependency, pixman (meson: `pixman_dep = dependency('pixman-1', ...)`; `CAIRO_HAS_IMAGE_SURFACE` is set only `if pixman_dep.found()`). All actual pure-CPU compositing/gradient/sampling lives in pixman, a separate coupled library. So building Cairo is really building two libraries. Both need a CONFIGURE run: Cairo generates `config.h` (`configure_file(output:'config.h', configuration:conf)`) plus `cairo-features.h` from dozens of meson compile/header probes (`cc.compiles`, `built_features`/`feature_conf` machinery) that cannot be reduced to one hand-written small header; pixman additionally selects SIMD dispatch sources (sse2/mmx/neon variants) and its own pixman-config at configure time. This requires per-tool source-list curation across two libraries plus de-facto configure/feature-detection we cannot run in-sandbox \u2014 violating the lanes-not-per-tool rule. Not Lane A (no plain wasm32-wasi .wasm exists), not Lane B (needs configure + per-tool curation), not C/D. Impossible under automated lanes.",
+  "confidence": "high"
+ },
+ {
+  "name": "TeX / LaTeX",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No plain wasm32-wasi build exists (SwiftLaTeX/busytex/texlive.js/TeXlyre are all Emscripten+JS-glue pairs, not WASI command modules \u2014 Lane A fails). Lane B fails on two independent host-codegen/configure requirements we cannot run in-sandbox: (1) TeX engines are WEB/CWEB needing tangle/ctangle/web2c codegen to emit .c sources; (2) web2c/kpathsea/TeX Live require a full autotools configure run plus large curated source lists beyond globs+excludes. Not a small Rust crate (C) nor pure-Python/JS (D). Per-tool configure+codegen violates lanes-not-per-tool.",
+  "confidence": "high"
+ },
+ {
+  "name": "pdm",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "network-as-purpose + fork-exec as core. pdm is a Python package/dep manager: its entire function is resolving and fetching packages over the network (httpx/httpcore/hishel HTTP, unearth/resolvelib resolution against PyPI), downloading CPython via pbs-installer, creating virtualenvs, and shelling out to PEP517 build backends through pyproject-hooks (fork-exec). Pure-Python and would mechanically vendor onto the live CPython.wasm lane (lane D), but with no network and no subprocess in the sandbox it has zero useful behavior. Also redundant with our own PackageManager. Not live-buildable.",
+  "confidence": "high"
+ },
+ {
+  "name": "RubyGems (gem)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/ruby/ruby.wasm",
+  "build_opts": "",
+  "smoke": "wasmtime ruby.wasm -e 'require \"rubygems\"; puts Gem::VERSION'",
+  "blocker": "Redundant with already-live ruby.wasm. RubyGems is pure-Ruby code that ships INSIDE the CRuby interpreter + stdlib \u2014 there is no distinct buildable .wasm artifact for `gem` itself; it's reachable today as a subcommand of the already-seeded Lane-A ruby tool (runtime/host/application.ex pallet: python/ruby/sqlite3). Its actual PURPOSE \u2014 fetching/installing remote gems \u2014 is network-as-purpose and must be host-brokered (Dock), not an in-sandbox command. Native C-extension gems would additionally need per-gem compiler-lane builds. Confirmed in runtime/.campaign/wireup-validated.md which already lists RubyGems under host-brokered no-net tools, and worklist.json which notes it 'ships with the interpreter.' No distinct buildable value.",
+  "confidence": "high"
+ },
+ {
+  "name": "Bundler",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Redundant with an ALREADY-LIVE tool: Bundler is Ruby code shipped inside CRuby/RubyGems, and Ruby is already live in-sandbox as ruby.wasm (wasm32-wasi, wasmtime). It is not a separate buildable .wasm artifact (no C/C++/Rust/Python lane applies \u2014 it's interpreted Ruby that the live ruby.wasm already carries), so there is no distinct buildable value. Compounding this, Bundler's core purpose is dependency resolution by fetching gems from rubygems.org \u2014 network-as-purpose, a fundamental blocker for its install/resolve path. No live-buildable lane (A/B/C/D) applies.",
+  "confidence": "high"
+ },
+ {
+  "name": "leveldb",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/google/leveldb",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "LevelDB's PosixEnv (util/env_posix.cc) requires a real background compaction thread via std::thread + a pthread mutex/condvar (port_stdcxx.h) and mmap-based file access. The background compaction thread is architectural, not incidental: DBImpl::MaybeScheduleCompaction calls env_->Schedule which runs work on a spawned std::thread. Our wasm32-wasi lane is single-threaded (no pthread/wasi-threads), so the std::thread constructor traps/can't link \u2014 this is native-threads-as-core. (The port_config.h.in is NOT a true configure blocker; it is auto-skipped via __has_include and only gates optional crc32c/snappy/zstd accel, so Lane B's config-header concern is moot.) Independently REDUNDANT: sqlite3 is already a live tool and covers the embedded persistent-storage / KV value with no distinct buildable advantage.",
+  "confidence": "high"
+ },
+ {
+  "name": "Oberon (OBNC)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/amtoine/obnc/tree/version/0.16.1",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "OBNC is a build orchestrator, not a self-contained compiler. The top-level `obnc` driver (src/obnc.c) is fork/exec-as-core: it popen()s `obnc-compile` (the transpiler) and then system()s the host C compiler+linker to turn the emitted C into the final binary (src/obnc.c:179 popen, :281/:396/:695 system, :688 `cc -o ... ldLibs`). The README's own `dev-exec` branch narrative confirms it: they had to add a `Process.Execute` capability \"to run any external process\" / \"call clang from there\" precisely because the toolchain must shell out to a C compiler. That is fork-exec-as-purpose, which the sandbox cannot do. Secondary blockers: runtime dependency on Boehm GC (`LDLIBS=-lgc`, src/Util.env) and the GPL build script that re-runs lex/yacc when timestamps drift (lex.yy.c/y.tab.c ARE checked in, so codegen could be sidestepped, but the orchestration model is the disqualifier). Even the isolated obnc-compile transpiler only emits C text and produces no runnable artifact without the external toolchain \u2014 no distinct in-sandbox buildable value.",
+  "confidence": "high"
+ },
+ {
+  "name": "Io",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/IoLanguage/io (master branch \u2014 wasm32-wasi-first; native CMake moved to `native` branch)",
+  "build_opts": "",
+  "smoke": "wasmtime build/bin/io_static -e '\"hello\" println' (only after a successful build with the io2c codegen step)",
+  "blocker": "Mandatory per-tool codegen step. The VM bootstrap source libs/iovm/source/IoVMInit.c is NOT checked into the repo; it must be generated by the custom host-native `io2c` tool (libs/iovm/tools/io2c.c, built with HOST_CC), which reads libs/iovm/io/_imports.json and concatenates 28 ordered .io stdlib files into a C string-array. The Makefile seeds IoVMInit.c into ALL_SRCS and the static binary cannot link/run without it. This is exactly the lane-disqualifying case: a bespoke codegen tool plus curated source-ordering (_imports.json), i.e. per-tool host work, not a generic clang+libc lane over globs+excludes. The C itself (basekit 35 + gc 2 + iovm 45 + parson + libtommath 154 files) is self-contained WASI-targeting clang code with no autotools/CMake configure and no flex/bison/ragel, so the core would otherwise fit lane B \u2014 but the unavoidable io2c codegen + _imports.json source curation violates lanes-not-per-tool. No prebuilt plain wasm32-wasi .wasm is published (repo ships source only; browser target is a reactor JS-bridge module, not a standalone CLI .wasm).",
+  "confidence": "high"
+ },
+ {
+  "name": "@marko/compiler",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@marko/compiler/-/compiler-5.39.63.tgz",
+  "build_opts": "JS bundle on QuickJS via npm-resolve+bundle. Entry: @marko/compiler (dist/index.js). Full pure-JS import graph; resolver follows actual require() calls (not just package.json deps) so it pulls @babel/core@7.x + @babel/parser/generator/traverse/types + htmljs-parser, he, jsesc, kleur, raptor-util/regexp, complain, resolve-from, self-closing-tags, source-map-support. All verified pure JS: gypfile=null, no install scripts, no node-gyp, no native addons on any node in the graph. API: compiler.compileSync(src, filename, config) -> {code}. No emscripten, no native binary.",
+  "smoke": "const {compileSync}=require('@marko/compiler'); const out=compileSync('<div>${input.name}</div>','test.marko',{output:'source'}); expect typeof out.code==='string' && out.code.length>0",
+  "blocker": "None fundamental. Risk is QuickJS fidelity for a Babel-scale bundle (large graph; @babel/core uses some dynamic plugin resolution + does fs reads for browserslist/config that must be stubbed/disabled via output:'source' + explicit babelConfig to avoid filesystem lookups). Not a host-per-tool task \u2014 handled by the generic JS-bundle lane's shims, same as other Babel-family bundles.",
+  "confidence": "medium"
+ },
+ {
+  "name": "@enhance/ssr",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@enhance/ssr",
+  "build_opts": "JS bundle lane (esbuild --bundle --format=esm/iife --platform=browser) on QuickJS. entry: index.mjs. npm deps: @enhance/ssr@4.0.3, @begin/parse5@0.0.4 (bundles parse5@7, --no-builtins), nanoid@^4 (resolve random-browser.js via browser export condition to avoid node:crypto). No node fs/net needed for the render core. QuickJS crypto.getRandomValues shim covers nanoid; or pin esbuild conditions=browser.",
+  "smoke": "import enhance from bundle; render an HTML string containing a registered custom element template with slots; assert expanded/composed HTML output (slot fill + attribute pass-through) matches expected \u2014 pure string-in/string-out, no DOM, no network.",
+  "blocker": "none \u2014 pure-JS ESM; only nanoid touches randomness (resolved via browser crypto.getRandomValues shim / esbuild browser condition). parse5 explicitly opts out of node builtins.",
+  "confidence": "high"
+ },
+ {
+  "name": "glimmer-compiler",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/@glimmer/compiler/-/compiler-0.94.11.tgz",
+  "build_opts": "JS bundle on QuickJS via the live npm lane (wb-spy). entry=@glimmer/compiler@0.94.11; deps (all pure-JS ESM, no C-ext): @glimmer/syntax@0.95.0, @glimmer/util@0.94.8, @glimmer/wire-format@0.94.8, @glimmer/interfaces@0.94.6, @handlebars/parser@~2.2.0, simple-html-tokenizer@^0.5.11. npm resolve+fetch+bundlejob.js \u2192 single ESM bundle, run on quickjs-ng. No native, no node builtins required for precompile().",
+  "smoke": "import { precompile } from bundle; precompile('<div>{{name}}</div>') returns a wire-format JSON template string (non-empty). Verify it parses and emits opcodes.",
+  "blocker": "none \u2014 full dep closure verified pure-JS ESM (npm pack of compiler + syntax + util + wire-format + interfaces; syntax pulls only @handlebars/parser + simple-html-tokenizer, both pure-JS). prod dist is plain ESM (49KB), import-only deps. No configure/codegen/native.",
+  "confidence": "high"
+ },
+ {
+  "name": "flex",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Fork-exec-as-core. The flex BINARY cannot produce a scanner without spawning GNU m4 as a subprocess at runtime: main.c calls filter_create_ext(output_chain, m4, \"-P\", 0) and filter.c implements the output pipeline via fork()+execvp() (verified in /tmp/flextest/flex-2.6.4/src/filter.c lines 152-182, main.c 344-383). All generated scanner output is piped through external m4. No fork/exec/subprocess in wasm32-wasi, so the tool is non-functional even if it links. The pregenerated scan.c/parse.c/parse.h/skel.c in the dist tarball remove the build-time bison/flex/m4 codegen concern (so it is NOT a configure/codegen lane-B failure), but the runtime fork-exec-m4 dependency is the fundamental, unfixable blocker. Secondarily redundant with already-live regex (pcre2/onig).",
+  "confidence": "high"
+ },
+ {
+  "name": "Tcl interpreter",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://prdownloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Fails lane-B \"no configure / no per-tool host work\" gate. (1) No pregenerated tclConfig.h ships \u2014 only unix/tclConfig.h.in with 175 #undef HAVE_* autoconf probes; tclInt.h/tclPort.h hard-require the generated header, and hand-authoring a correct 535-line wasi config (every HAVE_*, sizeof/_FILE_OFFSET_BITS, locale/timezone/encoding probe) IS the per-tool configure run the lane forbids \u2014 not a \"small config header.\" (2) The interpreter is built on the unix port (tclUnixPipe.c/tclUnixSock.c/tclUnixNotfy.c/tclUnixChan.c) which implements core Tcl surface (exec, open |pipe, sockets, the event-loop notifier) on fork/execvp/pipe/socket syscalls with no in-tree wasi port \u2014 porting the whole unix layer is substantial per-tool host work, and fork-exec is core (Tcl's exec/pipe commands). No confirmed plain wasm32-wasi prebuilt .wasm exists (only emscripten/JS pairings). Not a bare Rust crate, not pure-Python, not a JS bundle.",
+  "confidence": "high"
+ },
+ {
+  "name": "htmlq",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Not reachable via any automated lane. Lane C (bare mrustc ~1.74) is the only candidate and it fails: (1) clap 4.5 uses the `derive` feature = clap_derive proc-macro (needs proc-macro2/syn/quote), which mrustc does not support reliably; (2) html5ever 0.26 + markup5ever (pulled in by both html5ever and kuchikiki 0.8) require build.rs CODEGEN \u2014 markup5ever's build script generates rules.rs/named entity + phf tables, and the tree-builder relies on the `match_token!`/`local_name!` macro-codegen infrastructure (string_cache_codegen / phf_codegen). That is per-tool build-script code generation, which violates the bare-Rust lane (no proc-macros / no codegen). Not Lane A (no plain wasm32-wasi .wasm published; htmlq ships only native release binaries). Not B/D (Rust, not C/C++/Python/JS). Net: needs proc-macros + build-script codegen across a multi-crate graph \u2014 outside mrustc capability, no automated path.",
+  "confidence": "high"
+ },
+ {
+  "name": "perl",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://esm.sh/@6over3/zeroperl-ts@1.0.10/dist/esm/zeroperl.wasm",
+  "build_opts": "",
+  "smoke": "Downloaded the only published prebuilt (npm CDN zeroperl.wasm, 25MB). wasm-tools parse confirms real wasm32-wasi (magic 0061736d, imports wasi_snapshot_preview1, NOT emscripten). BUT it is a reactor+asyncify js-pair: exports _initialize + zeroperl_run_file (no _start command entry) and imports env::call_host_function. It cannot `wasmtime run` standalone \u2014 requires zeroperl-ts JS glue (asyncify driver + host-function callback). No plain _start WASI-command .wasm is published at any URL.",
+  "blocker": "Two independent blockers, both fatal. (1) Lane B build is impossible: zeroperl confirms Perl-to-wasm REQUIRES running Perl's Configure script (a system-probing shell script with a custom cross-compile hint file) plus Perl's internal codegen (regen/embed.pl etc.). That is a per-tool configure+codegen run we cannot do in-sandbox \u2014 disqualified by the lanes-not-per-tool rule. (2) Lane A prebuilt is a js-pair, not a plain command: the only published .wasm (npm CDN) is a reactor with asyncify importing env::call_host_function and exporting zeroperl_run_file/_initialize \u2014 it needs the zeroperl-ts JS host glue to execute a Perl script (per-tool host work, which lane A forbids). The standalone _start WASI-command build exists only as a transient CI artifact / Docker build output, published at no verified URL. No automated capability-lane reaches a runnable Perl with zero per-tool host work.",
+  "confidence": "high"
+ },
+ {
+  "name": "COBOL (GnuCOBOL)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://ftp.gnu.org/gnu/gnucobol/gnucobol-3.2.tar.xz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "GnuCOBOL (only portable COBOL impl; IBM Enterprise COBOL/EBCDIC/CICS/DB2/JCL is a separate non-portable mainframe dialect, out of scope). cobc is a COBOL-to-C TRANSPILER: verified in cobc/cobc.c it emits C then system()/fork-execs an external native C compiler+linker (process()/call_system -> system(); lines build `%s -c %s -o %s` commands at cobc.c:8226-8253). Fork-exec of an external toolchain is its CORE compile mechanism = un-sandboxable (no fork-exec). Secondary: ships generated parser.c/scanner.c/pplex.c/ppparse.c (so flex/bison not strictly needed) but still an autotools configure + config.h.in requiring a configure run / hand-substitution. Also REDUNDANT: clang+libc++ is already a LIVE in-sandbox lane; a COBOL frontend that only shells out to a C compiler adds no distinct buildable value reachable via our automated lanes.",
+  "confidence": "high"
+ },
+ {
+  "name": "Nim",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/nim-lang/csources_v2 (bootstrap C, platform-keyed; no wasm32-wasi variant)",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Two compounding blockers. (1) Bootstrap: the only way to get a `nim` binary is the csources_v2 pre-transpiled C, but those .nim.c files are generated per concrete OS/CPU (amd64/arm + linux/macos: posix.nim.c, os.nim.c, osproc.nim.c) \u2014 there is NO wasm32-wasi-targeted csources set, so clang.wasm+wasi-libc cannot \"take over\" the bootstrap; the generated C assumes a real POSIX platform and fork/exec/posix_spawn. (2) Build orchestration: even past bootstrap, getting the real compiler needs `koch boot` \u2014 a multi-stage process that re-invokes the freshly built `nim` to recompile itself (self-hosting fork-exec loop driven by build.sh/koch). (3) Core runtime: the `nim` driver's PURPOSE is to transpile to C then fork-exec an external C compiler (execvp gcc/clang via osproc) \u2014 fork-exec-as-core. The earlier \"transpiles to portable C then our clang lane takes over\" note conflated *running Nim output* with *building the Nim tool*; the tool itself is unbuildable and unrunnable in-sandbox (fork-exec-as-core + configure/koch orchestration), violating lanes-not-per-tool.",
+  "confidence": "high"
+ },
+ {
+  "name": "V (vlang)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/vlang/v/releases/tag/0.5.1",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "V is a native-AOT codegen toolchain, not a droppable library. Verified: V's latest release (0.5.1) ships NO prebuilt wasm32-wasi .wasm asset (lane A out). V is distributed as bootstrap C (v.c amalgam + vlib/), but the v binary's core function is to transpile V source -> C and then fork-exec a backend C compiler (tcc/gcc/clang) to emit a native binary. That mechanism is native-AOT-codegen + fork-exec, both fundamental sandbox blockers. The pragmatic 'V -> C -> clang.wasm' path requires per-tool host orchestration (run V to emit C, then hand that C to our clang lane) which violates lanes-not-per-tool. The native/wasm backend is experimental/incomplete and not a usable library lane. Not lane B (it IS a codegen tool, not self-contained C library), not C/D.",
+  "confidence": "high"
+ },
+ {
+  "name": "Odin",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Earlier \"lane B live-likely\" flag conflated Odin's BUILD TARGET (TargetMetrics target_wasi_wasm32 \u2014 Odin can EMIT wasm32-wasi output) with Odin THE COMPILER running in-sandbox. Those are orthogonal. The Odin compiler itself is a native C++ AOT-codegen tool whose backend is LLVM: it generates LLVM IR and links libLLVM to produce machine code. Compiling Odin to wasm32-wasi for our sandbox is not lane-reachable: (1) it requires building/linking LLVM, which needs a CMake configure run + tablegen IR/codegen \u2014 exactly the configure+codegen per-tool host work the lanes forbid; (2) it is native-AOT-codegen, a fundamental blocker class; (3) LLVM is already on the already-live/redundant list, so there is no distinct buildable value. No prebuilt plain (non-emscripten) wasm32-wasi .wasm of the Odin compiler exists. Not a self-contained clang+libc++ amalgam \u2014 large C++ tree with LLVM dependency.",
+  "confidence": "high"
+ },
+ {
+  "name": "Smalltalk",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No plain wasm32-wasi Smalltalk VM exists. OpenSmalltalk-vm's only WASM target is Catalyst \u2014 a SqueakJS+WASM/WASM-GC browser hybrid that requires a JS host (excluded: emscripten/js-pair, not standalone wasi). Building the C VM from source is not lane-B reachable: it requires Slang (Smalltalk-to-C) codegen of the interpreter sources plus a CMake/autotools configure run and per-tool source curation around the image/plugin layout \u2014 all of which violate the no-configure/no-codegen/no-per-tool-curation rule. No bare mrustc-class Rust crate or pure-Python/JS Smalltalk exists. Fundamental host-coupling (JS host for the WASM path) + per-tool codegen blocker.",
+  "confidence": "high"
+ },
+ {
+  "name": "Modula-2",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Only real M2 compiler is gm2 (a GCC front-end); GCC is native-AOT-codegen, does not emit wasm32-wasi, and requires a full autotools configure run plus bison/flex/m4 parser-generator codegen \u2014 all disallowed in-sandbox (lanes-not-per-tool). m2c (M2->C translator) likewise needs lex/yacc codegen. No prebuilt plain wasm32-wasi .wasm exists (Lane A=no). Not a bare Rust crate / pure-Python / JS bundle (C/D=no).",
+  "confidence": "high"
+ },
+ {
+  "name": "yorick",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/LLNL/yorick",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Yorick ships a `configure` script that generates `Make.cfg` with platform-specific config (the play/ portability layer + yapi), so building it requires a per-tool configure run we cannot perform in-sandbox (violates lanes-not-per-tool). Beyond config: the play/ portability layer is built around a POSIX event loop (poll/select), terminal/tty I/O, and fork/exec subprocesses; gist/ wants X11. These are core to the interpreter's runtime (interactive REPL + event-driven I/O), not optional. Even though the parser is hand-written (no yacc/bison codegen) and the language core is plain ANSI C, you cannot reach a working `yorick` binary via our globs+excludes lane without (a) hand-authoring a Make.cfg-equivalent config header per platform AND (b) porting the play event-loop/fork-exec layer to wasm32-wasi. The prior lane-B note already concluded 'needs a port, not drop-in.' That makes it a per-tool host-work + fork-exec/event-loop blocker, not a clean lane-B amalgam.",
+  "confidence": "high"
+ },
+ {
+  "name": "XS (Moddable) \u2014 xst shell",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/Moddable-OpenSource/moddable/tree/public/xs",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Requires per-tool host porting that violates lanes-not-per-tool. Verified upstream (moddable@public): the ONLY wasm platform shipped is xs/platforms/wasm_xs.c, hard-coupled to emscripten.h + emscripten/html5.h (browser event loop) \u2014 i.e. the excluded emscripten/JS-pair target, not wasm32-wasi. No xs/makefiles/wasm/xst.mk exists (confirmed 404); wasm is wired only for the embedded `mc` simulator, never the standalone xst shell. xsPlatform.h gates wasm on #ifdef EMSCRIPTEN. The tool main xs/tools/xst.c uses native pthread_create (the test262 Atomics 'Agent' harness \u2014 native-threads-as-core), c_signal(SIGPIPE), and setjmp; the lin build links -ldl -lpthread -latomic. Although the source list itself is clean (flat fixed .c list across xs/sources + xs/tools + tools/fdlibm + tools/yaml + 3 modules dirs, NO configure run, NO flex/bison/yacc \u2014 hand-written xsLexical.c/xsSyntaxical.c lexer-parser, NO codegen), shipping wasm32-wasi would require hand-writing a brand-new WASI platform HAL to replace wasm_xs.c, stubbing the pthread agent harness in xst.c, and authoring a wasm makefile/source-list \u2014 bespoke per-tool host work, not a globs+excludes+config-header lane B fit.",
+  "confidence": "high"
+ },
+ {
+  "name": "porffor",
+  "decisive": "live-buildable",
+  "lane": "D",
+  "url": "https://registry.npmjs.org/porffor/-/porffor-0.61.13.tgz",
+  "build_opts": "lane=D (JS-on-QuickJS bundle, NOT wasm32-wasi). entry=compiler/index.js (the compile API; do NOT use runtime/index.js \u2014 that's the Node CLI/REPL). pure-ESM, type=module. runtime deps: acorn (https://registry.npmjs.org/acorn/-/, pure JS, dist/acorn.mjs, zero deps, no gyp/install). node-repl-polyfill is REPL-only \u2014 exclude. Bundle: porffor compiler/*.js + builtins_precompiled.js (1.9M, SHIPPED in tarball, the precompiled stdlib \u2014 no codegen needed) + acorn into one qjs script. Shims: (1) parse.js L20 does import((globalThis.document?'https://esm.sh/':'')+parser) \u2014 no document in qjs \u2192 resolves bare 'acorn'; pre-bundle acorn so the dynamic import hits the bundled module. (2) fs/child_process/execSync are conditionally imported behind `typeof process?.version !== 'undefined'` and used ONLY for debug/disassemble/2c output \u2014 shim process={version:undefined, stdout:{write:print}} so the fs/execSync branches stay undefined and the pure compile path runs. API: default(source) -> {wasm: Uint8Array, exports, ...}; emit wasm bytes (assemble.js, pure-JS LEB128 via encoding.js, no Buffer/fs).",
+  "smoke": "In qjs: load bundle, call porffor('export default () => 40 + 2') and assert the returned object has a non-empty wasm Uint8Array starting with the WASM magic (0x00 0x61 0x73 0x6d); optionally instantiate that wasm with our wasmtime/wasm host and call the export to get 42.",
+  "blocker": "none for the compile-to-wasm-bytes path. Caveats (not blockers): set process.version=undefined so the node fs/child_process branches stay dormant \u2014 the -c (C output via 2c.js) and disassemble/debug paths assume Node and are out of scope; only the wasm-bytes path is in-scope. acorn dynamic import must be pre-resolved in the bundle.",
+  "confidence": "high"
+ },
+ {
+  "name": "Perl interpreter (perl)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/6over3/zeroperl",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No prebuilt plain wasm32-wasi .wasm exists (zeroperl has ZERO GitHub releases and no .wasm asset anywhere \u2014 verified via gh release list + code search). The only path is zeroperl's Docker pipeline, which runs Perl's own Configure (full autotools-style configure run producing config.h) AND bootstraps a native miniperl to generate Perl C sources/headers (host-native codegen), plus applies wasi patches and custom C stubs. That is per-tool configure+codegen we cannot run in-sandbox \u2014 exactly the lanes-not-per-tool violation. Cannot be reduced to clang+libc amalgam with a hand-written config header (Perl's config is deeply host/probe-derived; sources are generated by running miniperl). Not lane A (no wasm), not B (needs Configure+codegen), not C (C not Rust), not D.",
+  "confidence": "high"
+ },
+ {
+  "name": "WAMR (WebAssembly Micro Runtime) \u2014 classic/fast interpreter",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/bytecodealliance/wasm-micro-runtime (no wasm32-wasi build target exists)",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "WAMR is a wasm HOST runtime, not a wasm-targetable tool. core/config.h hard-requires a host BUILD_TARGET_* matching the CPU (x86_64/aarch64/arm/riscv/mips/xtensa/arc); __wasm32__ matches none -> #error \"Build target isn't set\". No emscripten/wasm32 branch in config.h or the platform layer anywhere. Platform abstraction (core/shared/platform/common/posix/) is native-POSIX: os_mmap uses MAP_ANONYMOUS|MAP_PRIVATE|MAP_JIT and mprotect (maps executable memory), plus sigaction/pthread_sigmask/pthread_kill/pthread for blocking-op + threads -- none available under baseline wasm32-wasi. So even the pure-C interpreter (invokeNative_general.c, no asm) cannot link. Building it would be wasm-in-wasm interpreting wasm, redundant with our already-live wasmtime engine and forbidden by the host-brokered isolation model. Not a config-header fix; it is a fundamental target/ABI mismatch (native mmap/mprotect/signals/threads as core).",
+  "confidence": "high"
+ },
+ {
+  "name": "Berkeley DB",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://download.oracle.com/berkeley-db/db-18.1.40.tar.gz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Public API + internal headers are NOT shipped; they are produced by the autoconf configure run. configure.ac declares AC_CONFIG_HEADERS plus assembles db.h:src/dbinc/db.in (3085-line template, ~40 @type_decl@/@platform_header@/@db_seq_decl@ substitutions) + dbinc_auto/{api_flags,ext_def,ext_prot}.in, db_int.h:src/dbinc/db_int.in (@db_int_def@ = a configure-assembled typedef block, @DB_STRUCT_ALIGN8@, @PATH_SEPARATOR@), and db_config.h:config.hin (233 #undef HAVE_* feature-probe results). The clib/ and mutex/ source files are individually self-gated on HAVE_* macros (so they glob+self-exclude fine), and os_windows/os_vxworks/os_qnx/repmgr are excludable by dir \u2014 the source list is tractable. BUT the three required headers cannot be obtained without running configure: the @db_int_def@ typedef fragment and the 233 HAVE_* probe outcomes are configure-derived, not hand-writable constants. Reproducing them by hand = re-implementing the configure run per-tool, which violates the no-configure / lanes-not-per-tool rule. No prebuilt wasm32-wasi .wasm exists (Lane A negative; only emscripten/sql.js-style experiments). Not Lane B because it needs a CONFIGURE run for header codegen, far beyond a small hand-written config header.",
+  "confidence": "high"
+ },
+ {
+  "name": "ag (The Silver Searcher)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Core value is pthread parallel search (native-threads-as-core); WASI lane has no native threads, leaving only a degraded single-threaded grep. Requires a configure run to generate config.h \u2014 source #ifdefs on 15+ HAVE_* probes (fopencookie/madvise/fgetln/strlcpy/posix_fadvise) plus BSD-only headers (sys/cpuset.h, sys/endian.h, pthread_np.h), so hand-writing the config header is per-tool source curation + WASI-libc feature guessing, not a clean glob compile. Links PCRE1 (#include <pcre.h>, deprecated) + zlib + lzma. Also redundant: regex already covered by live pcre2/onig. Confirmed against ggreer/the_silver_searcher 2.2.0 source (src/main.c worker-pool, configure.ac PKG_CHECK_MODULES libpcre/liblzma + AX_PTHREAD + AC_CHECK_FUNCS). Matches prior 'heavy fork, not a clean compile' note.",
+  "confidence": "high"
+ },
+ {
+  "name": "GraphicsMagick",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "GraphicsMagick is NOT a clean Lane B amalgam. (1) The coder layer (coders/*.c) is not a globbable source set: each format is conditionally compiled per configure-detected delegate lib, and the static module registration table (magick/static.c MagickModuleInit) is generated per-configure to list exactly which coders exist \u2014 requiring per-tool source-list curation + hand-edited registration beyond globs+excludes, which the lane forbids. (2) Its real value-add formats (PS/PDF/SVG/many) are implemented via fork/exec to external delegates (Ghostscript etc.) wired through delegates.mgk \u2014 fork/exec is a fundamental sandbox blocker. (3) The only subset that would actually compile (pure-C MagickCore pixel ops: resize/blur/composite/convert over raw RGBA plus built-in PNG/JPEG via libpng/libjpeg deps) is redundant with already-live png + jpeg + pixel-compute, so no distinct buildable value remains. magick_config.h being hand-writable does not rescue it \u2014 the coder codegen/curation and delegate fork-exec are the disqualifiers.",
+  "confidence": "high"
+ },
+ {
+  "name": "sharp / libvips",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://registry.npmjs.org/@img/sharp-wasm32/-/sharp-wasm32-0.35.1.tgz",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Lane A fails: the only prebuilt sharp wasm (@img/sharp-wasm32@0.35.1) is an emscripten+emnapi build, NOT plain wasm32-wasi. Verified: wasm imports come from minified emscripten module \"a\" (import \"a\" \"b\"...), the .node.js glue is emscripten Module bootstrap, and embedded strings show /emsdk/emscripten/... and emnapi/src/uv/threadpool.c (pthreads/uv). Requires emscripten JS glue + emnapi napi runtime \u2014 explicitly excluded by lane A. Lane B fails: sharp is a thin C++ shim over libvips, and libvips needs a meson configure+codegen run plus ~20 transitive native libs (versions.json: glib 2.89, libffi 3.5, aom, heif, tiff, mozjpeg, webp, lcms, expat, png, zlib-ng, highway, plus Rust resvg 0.47). glib and libvips both require autotools/meson configure + code generation, libffi needs per-arch FFI trampolines, resvg is Rust (large workspace, not bare crate), and the codec set assumes pkg-config wiring \u2014 all violate the no-configure/no-codegen/lanes-not-per-tool rule. Several codecs (png/expat/jpeg) are also already-live-redundant. Not C, not Rust-bare, not Python, not JS-on-QuickJS.",
+  "confidence": "high"
+ },
+ {
+  "name": "git",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/libgit2/libgit2/archive/refs/tags/v1.7.2.tar.gz",
+  "build_opts": "deps: [libgit2 v1.7.2 tarball]. src_globs: src/libgit2/**/*.c, src/util/**/*.c, deps/xdiff/*.c, deps/llhttp/*.c, deps/pcre/*.c, deps/zlib/*.c. exclude: src/util/win32/**, src/libgit2/win32/**, src/util/hash/openssl.c, src/util/hash/mbedtls.c, src/util/hash/win32.c, src/util/hash/common_crypto.c, **/sha1dc/** (keep builtin sha via deps/zlib or src/util/hash/builtin.c \u2014 pick exactly one sha backend), src/cli/** (skip the CLI git binary first; build lib then add a single src/cli main). cflags: --target=wasm32-wasi --sysroot=$SYSROOT -DLIBGIT2_NO_FEATURES_H -DGIT_ARCH_32_or_64 -DGIT_THREADS=0 -DGIT_HTTPS=0 -DGIT_SSH=0 -DGIT_USE_NSEC=0 -DGIT_REGEX_BUILTIN=1 -DGIT_SHA1_BUILTIN=1 -DGIT_SHA256_BUILTIN=1 -DGIT_IO_POLL=0 -DGIT_IO_SELECT=0 -Isrc/util -Isrc/libgit2 -Iinclude -Ideps/xdiff -Ideps/llhttp -Ideps/pcre -Ideps/zlib -DNO_VIZ -DSTDC. extra_sources main: thin src/cli/cli.c (git CLI entrypoint) compiled last and linked against the lib objects. Hand-write include/git2_features.h-equivalent via -D set above (NO_FEATURES_H path); disable threads/tls/ssh/http-network features that need sockets.",
+  "smoke": "echo files into a tmp dir; run: git init /tmp/r && git add . && git commit -m x && git log --oneline (local object/refs ops only \u2014 no network clone/fetch).",
+  "blocker": "Network transports (clone/fetch/push over http/ssh) are unreachable in-sandbox: no sockets/TLS \u2014 those subcommands compile out (GIT_HTTPS=0/GIT_SSH=0). Threads disabled (GIT_THREADS=0). Must pick exactly ONE sha1/sha256 backend (builtin) and exclude the rest, and exclude all win32/ + openssl/mbedtls/commoncrypto hash sources or you get duplicate symbols / missing headers. The bundled CLI (src/cli) is secondary \u2014 build the library first, then a thin main; if CLI source-list proves fiddly, the libgit2 library itself is the live-buildable artifact.",
+  "confidence": "medium"
+ },
+ {
+  "name": "ghostscript",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No plain wasm32-wasi prebuilt exists: both wasm builds are emscripten/js-pair. jsscheller/ghostscript-wasm ships only an npm package built via emconfigure/emmake (arch_wasm.h emscripten arch header, MODULARIZE, EXPORTED_RUNTIME_METHODS, --pre-js/--post-js, no .wasm release asset); jerbob92 has no wasm release. Source build is not lane-B reachable: requires ./autogen.sh + ./configure (autoconf CONFIGURE run) plus --with-arch_h generated arch-detection header and genarch/echogs codegen + curated device list \u2014 per-tool configure/codegen we cannot run in-sandbox. Also relies on EMULATE_FUNCTION_POINTER_CASTS (function-pointer-cast UB), so only emscripten ports work; plain wasm32-wasi would trap.",
+  "confidence": "high"
+ },
+ {
+  "name": "poppler-utils",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "pdftotext input.pdf - (expect extracted UTF-8 text on stdout for an embedded-font PDF)",
+  "blocker": "Core libpoppler (113 .cc) requires a CMake configure run beyond the two hand-writable config headers: GenerateExportHeader emits poppler_export.h, and check_c_source_compiles feature probes (jpeglib version, FILE_OFFSET_BITS) set cmakedefines used in config.h. The 113-file source set is also not a clean glob+exclude \u2014 splash/cairo/glib/qt backends and JPEG/PNG/TIFF/LCMS image writers are interleaved and selected by CMake option conditionals, so isolating the text-only subset for pdftotext is per-tool source-list curation. Both violate lanes-not-per-tool (no configure/codegen, no per-tool curation). Freetype is REQUIRED but is already-live, so that is not itself the blocker.",
+  "confidence": "high"
+ },
+ {
+  "name": "openssl",
+  "decisive": "live-buildable",
+  "lane": "A",
+  "url": "https://github.com/voltbuilder/openssl-wasm/releases/download/v1.1.1o/openssl.wasm",
+  "build_opts": "Lane A prebuilt fetch \u2014 no build. asset: openssl.wasm (1,962,334 bytes, contentType application/wasm) from voltbuilder/openssl-wasm tag v1.1.1o. Verified: magic 0x0061736d (\\0asm v1); ALL imports are wasi_snapshot_preview1 only (args/environ/clock/fd_*/path_*/poll_oneoff/proc_exit/random_get) \u2014 plain wasm32-wasi, NOT emscripten/JS-pair (no env module, no JS glue). No sock_* imports (offline crypto CLI). Register as CommandRegistry entry running on wasmtime with args passthrough + preopened cwd. Pin URL by tag (v1.1.1o = OpenSSL 1.1.1o).",
+  "smoke": "wasmtime run --dir=. openssl.wasm -- version   (expect: OpenSSL 1.1.1o). Then: openssl genrsa 2048 ; openssl dgst -sha256 <file> ; openssl enc -aes-256-cbc -pbkdf2 -in f -out f.enc \u2014 all pure local fs+compute, no network.",
+  "blocker": "",
+  "confidence": "high"
+ },
+ {
+  "name": "miller (mlr)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/johnkerl/miller/releases/tag/v6.18.1",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Pure-Go program (~99% Go, no C/Rust/Python/JS sources) \u2014 falls outside all four automated lanes. No prebuilt wasm32-wasi .wasm exists: release v6.18.1 ships only native-arch tarballs/deb/rpm (darwin/linux/freebsd/windows/aix), zero wasm asset. Our only Go-in-sandbox lane is go-yaegi (a Go INTERPRETER), not a GOOS=wasip1 Go compiler; yaegi cannot run a full real-world CLI with heavy stdlib/reflection/build-tags/embedded assets, and tinygo/native go-build was deliberately dropped. Reaching it would require standing up a real Go-to-wasm compiler = per-tool host work, which violates lanes-not-per-tool. (Compounded: Miller's DSL parser is GOCC-generated codegen.)",
+  "confidence": "high"
+ },
+ {
+  "name": "librsvg (rsvg-convert)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "librsvg is a large Rust workspace (now Rust core: cairo-rs/pango/gdk-pixbuf/glib gobject bindings + markup5ever/selectors proc-macro derives, edition 2021+, build-script codegen) \u2014 fails lane C (mrustc ~1.74 bare-crate-only, no proc-macros/workspace). The rendering stack (cairo, pango, fontconfig, GLib/GObject, gdk-pixbuf) is C requiring meson/autotools configure runs + glib-mkenums/gobject codegen per dep \u2014 violates lanes-not-per-tool (B forbids configure+codegen). No prebuilt plain wasm32-wasi rsvg-convert .wasm exists (only emscripten/js demos). Multiple fundamental blockers; not reachable via any automated lane.",
+  "confidence": "high"
+ },
+ {
+  "name": "pango",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Pango is built on GLib/GObject and uses Meson exclusively. Reaching it requires per-tool host work our lanes forbid: GLib needs a Meson configure run (generated config.h probing platform features) plus codegen tools (glib-genmarshal, glib-mkenums, gobject-introspection); FontConfig and Cairo likewise need configure runs. No plain glob-buildable source list exists (Meson-only, generated headers). It also leans on HarfBuzz + FreeType which are already-live tools, making the shaping/raster value redundant; Pango's distinct bidi/itemization/line-breaking layer cannot be isolated without the GLib configure+codegen chain. Violates lanes-not-per-tool (configure + codegen) and partially redundant with live harfbuzz/freetype.",
+  "confidence": "high"
+ },
+ {
+  "name": "BoringSSL",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://github.com/google/boringssl (verified: gen/sources.json + gen/crypto/err_data.cc + all perlasm outputs committed; include/openssl/opensslconf.h is a static committed stub, no .in templates)",
+  "build_opts": "deps: [boringssl tarball]. lang: C++17 (clang + libc++). define: OPENSSL_NO_ASM, OPENSSL_NO_THREADS_CORRUPT_MEMORY_AND_LEAK_SECRETS_IF_THREADED off (single-thread default ok), NDEBUG. include_dirs: include/, crypto/, third_party/fiat/, gen/. src_globs (compile_only, from gen/sources.json crypto.srcs + ssl.srcs + bcm.srcs, all 'pure' entries i.e. NOT prefixed gen/ AND extra_source gen/crypto/err_data.cc): crypto/**/*.cc, ssl/**/*.cc, crypto/fipsmodule/bcm.cc (monolithic, #includes the *.cc.inc), gen/crypto/err_data.cc. exclude: gen/bcm/*.S, gen/crypto/*.S, gen/bcm/*.asm, third_party/fiat/asm/*.S (all asm -> OPENSSL_NO_ASM), **/*_test.cc, crypto/test/**, tool/**, pki/** (optional), fuzz/**, decrepit/** (optional), rust/**. NO -DBORINGSSL_FIPS (avoids sys/mman.h/mprotect in bcm.cc). cflags: -DOPENSSL_NO_ASM -std=c++17 -fno-exceptions. entropy: falls through target.h __wasm32__ -> OPENSSL_RAND_GETENTROPY (WASI random_get). No configure, no codegen run, no flex/bison/protoc.",
+  "smoke": "Build libcrypto+libssl, link tiny C driver: RAND_bytes(buf,32) then SHA256 of a string and assert digest matches known vector; optionally EVP_aes_256_gcm encrypt/decrypt round-trip. Run under wasmtime; getentropy backed by WASI random_get.",
+  "blocker": "None blocking. Notes: must define OPENSSL_NO_ASM (skip all gen/bcm,gen/crypto .S/.asm); must build non-FIPS (BORINGSSL_FIPS guards the only sys/mman.h+mprotect use in bcm.cc); single-threaded wasi-libc fine (locks are no-ops). All codegen (perlasm .S, err_data.cc) and config (opensslconf.h) are COMMITTED in gen/ + include/ \u2014 confirmed no pregenerate/configure/codegen step needed. Distinct value vs live mbedtls/libsodium: full OpenSSL-compatible libcrypto+libssl TLS/X.509 API surface.",
+  "confidence": "high"
+ },
+ {
+  "name": "LibreSSL",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-4.3.2.tar.gz",
+  "build_opts": "n/a \u2014 not reachable by globs+excludes+one config header",
+  "smoke": "n/a",
+  "blocker": "Verified against libressl-portable 4.3.2 tarball. NOT lane-B-clean: (1) crypto build is a 700-line curated CRYPTO_SRC list with per-arch conditionals; a glob over crypto/**/*.c pulls conflicting arch-companion C (bn/arch/amd64/*.c, aes/aes_amd64.c, *_aarch64.c/_amd64.c, every arch's crypto_cpu_caps.c) that duplicate symbols and reference asm \u2014 excludes can't substitute because the build REQUIRES exactly one crypto/arch/<arch>/{crypto_arch.c,crypto_arch.h} + one bn/arch/<arch>/ subtree, and NO wasm32 arch exists (only amd64/aarch64/riscv64/mips/ppc/sparc/loongarch). You'd have to author a brand-new wasm32 arch port (new crypto_arch.h, bn_arch.h, cpu_caps stub), not hand-write a single config header. (2) The portable compat layer keys off ~40 HAVE_* macros that configure derives via compile/link feature-tests against the target libc; wasi-libc has a non-obvious subset (no arc4random_buf/getauxval/syslog, getentropy/explicit_bzero/poll/endian-header quirks) \u2014 matching them is per-tool host configure work, not globs. (3) RNG (crypto/compat/getentropy_*.c) is OS-specific and needs a real wasm32-wasi getentropy port. This violates lanes-not-per-tool (needs a configure run or equivalent per-tool source/macro curation). Also redundant: mbedtls is already live and covers the TLS/crypto primitive need.",
+  "confidence": "high"
+ },
+ {
+  "name": "Idris2",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Self-hosted compiler: bootstrapping Idris2 requires an existing Idris2 binary OR compiling its emitted Chez Scheme via Chez Scheme \u2014 an external bootstrap toolchain we cannot run in-sandbox. The codebase is Idris2 (not C/C++/Rust/Python/JS), so lanes A-D do not apply: no prebuilt wasm32-wasi .wasm exists (lane A fails); the only C/C++ in the repo is the RTS support, not the compiler (lane B fails); not Rust (C); not a runnable pure-Python or QuickJS bundle without first bootstrapping (D). This is a native-AOT-codegen + self-hosting-bootstrap fundamental blocker.",
+  "confidence": "high"
+ },
+ {
+  "name": "ATS",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "https://github.com/githwxi/ATS-Postiats",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "ATS2/Postiats is a self-hosted compiler: 180k+ LOC written in ATS1, bootstrapped from pre-generated C. Building it requires an autotools ./configure run plus ATSLIB prelude/libats setup and PATSHOME env wiring \u2014 not a self-contained C amalgam buildable with globs+excludes. The configure-run requirement violates lane B (no configure/codegen permitted). No prebuilt plain wasm32-wasi .wasm exists (no Lane A; only Rust/C wasi targets surface, confirmed prior). Not a bare Rust crate (no Lane C), not pure-Python/JS (no Lane D). No automated capability-lane reaches it without per-tool host configure work.",
+  "confidence": "high"
+ },
+ {
+  "name": "Hermes",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Hermes (Facebook's JS engine) requires a full CMake configure run plus codegen that we cannot perform in-sandbox: it generates Unicode tables (genUnicode Python scripts -> .inc files), generated parser/lexer support, and feature-detection headers, and relies on a curated LLVM-derived ADT/Support subset (hundreds of files) whose source list is driven by CMake target definitions \u2014 not expressible as globs+excludes. This is per-tool host configure/codegen, which the lanes forbid. It is also a JS engine, redundant with the already-live QuickJS (qjs) lane, with no distinct buildable value reachable automatically. No confirmed prebuilt plain wasm32-wasi .wasm exists (only emscripten/asm.js artifacts ship from Hermes). Disabling the JIT yields an interpreter but does not remove the CMake+codegen barrier.",
+  "confidence": "high"
+ },
+ {
+  "name": "Helm",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Helm is written in Go. Our automated capability-lanes are A (prebuilt wasm32-wasi .wasm), B (self-contained C/C++ via clang+libc++), C (bare Rust via mrustc), D (pure-Python pip / JS-on-QuickJS). None covers Go: no Go compiler in-sandbox, and Go needs native AOT codegen which is an explicit fundamental blocker. No confirmed prebuilt plain (non-js) wasm32-wasi helm binary is published \u2014 Helm's only wasm path is a user-built GOOS=wasip1 module, which still requires the Go toolchain we can't run. The full helm binary also relies on kube API networking and plugin fork-exec as core. Even the render-only 'helm template' subset is unreachable because the language lane itself is absent.",
+  "confidence": "high"
+ },
+ {
+  "name": "GHC RTS (Haskell)",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "No standalone wasm32-wasi RTS artifact exists. GHC's wasm support ships ONLY as a full cross-compiler toolchain (ghc-wasm-meta nix flake / bootstrap.sh installing wasm32-wasi-ghc to ~/.ghc-wasm). The RTS is hand-written C+Cmm built as part of the GHC build via Hadrian/Cabal + autotools configure, with Cmm files compiled by GHC's own native-AOT backend (not clang). It is shipped as .a archives linked at GHC-link time, never a usable standalone .wasm. None of our lanes apply: not a fetchable plain wasm (A), not self-contained clang+libc++ buildable without configure/codegen \u2014 it needs the full GHC build system + configure + Cmm codegen (violates lanes-not-per-tool, fails B), not Rust (C), not Python/JS (D). Fundamental blocker: native-AOT-codegen toolchain requiring per-tool configure + a bespoke compiler backend.",
+  "confidence": "high"
+ },
+ {
+  "name": "GnuTLS",
+  "decisive": "impossible",
+  "lane": "none",
+  "url": "",
+  "build_opts": "",
+  "smoke": "",
+  "blocker": "Multi-dep autotools-configure + codegen cascade, and redundant with live crypto. (1) GnuTLS core requires an autotools `configure` run to generate config.h plus headers from .in templates (version/ABI/symbol logic) and uses gperf/codegen \u2014 we cannot run configure in-sandbox. (2) Hard deps GMP (bignum: configure-selected arch-specific mpn asm, not an amalgam) and nettle/hogweed (own autotools configure) are each per-tool configure jobs \u2014 violates lanes-not-per-tool. (3) ASN.1 via libtasn1 ships a generated parser. (4) TLS/crypto value is already covered by ALREADY-LIVE mbedtls + libsodium, so no distinct buildable value. Not Lane B (needs configure + codegen on itself and on 2+ deps); not A/C/D.",
+  "confidence": "high"
+ },
+ {
+  "name": "libxml2",
+  "decisive": "live-buildable",
+  "lane": "B",
+  "url": "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz",
+  "build_opts": "deps: [{url:\"https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.5.tar.xz\", strip:\"libxml2-2.13.5/\"}]; src_globs: [\"*.c\"]; exclude: [\"test*.c\",\"run*.c\",\"xmllint.c\",\"xmlcatalog.c\",\"nanohttp.c\",\"nanoftp.c\",\"xmlmodule.c\",\"xzlib.c\",\"c14n.c\",\"trio*.c\",\"python/**\",\"example/**\"]; (keep: buf chvalid dict encoding entities error globals hash list parser parserInternals pattern relaxng SAX2 schematron threads tree uri valid xinclude xlink xmlIO xmlmemory xmlreader xmlregexp xmlsave xmlschemas xmlschemastypes xmlstring xmlunicode xmlwriter xpath xpointer HTMLparser HTMLtree catalog debugXML legacy SAX); cflags: [\"-I.\",\"-Iinclude\",\"-DHAVE_CONFIG_H\",\"-D_WASI_EMULATED_SIGNAL\",\"-D_WASI_EMULATED_PROCESS_CLOCKS\",\"-O2\"]; extra_sources: hand-write include/libxml/xmlversion.h (fill @WITH_*@: HTTP=0 FTP=0 MODULES=0 ICONV=0 ICU=0 LZMA=0 ZLIB=0 THREADS=0 DEBUG=1 everything-else-on; @VERSION@=2.13.5 @LIBXML_VERSION_NUMBER@=21305) + config.h (define STDC_HEADERS, HAVE_STD*_H, HAVE_UNISTD_H, HAVE_FCNTL_H, HAVE_SYS_STAT_H, HAVE_STAT, HAVE_GETTIMEOFDAY, HAVE_SYS_TIME_H; leave socket/dlopen/mmap/getentropy/glob/poll/netdb UNDEF; PACKAGE strings = \"libxml2\"/\"2.13.5\"); main: n/a (static lib / link with host driver). NO configure, NO codegen \u2014 Unicode tables ship pre-generated as xmlunicode.c/chvalid.c in the tarball.",
+  "smoke": "Parse an inline XML string with xmlReadMemory(), run an XPath query (xmlXPathEvalExpression) over it, assert nodeset count, xmlFreeDoc \u2014 confirms parser+tree+xpath link and table init.",
+  "blocker": "None for the core lane. Excluded subsystems (nanohttp/nanoftp = socket, xmlmodule = dlopen, xzlib = lzma) are dropped via globs + WITH_*=0, not shimmed. c14n excluded only to avoid extra surface; can be re-added (pure C, no extra deps). If zlib/lzma-backed compressed-input is later wanted, add those as multi-tarball :deps and flip WITH_ZLIB/WITH_LZMA.",
+  "confidence": "high"
+ }
+]
