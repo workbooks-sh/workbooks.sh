@@ -36,11 +36,11 @@
 "extent": "Full Zend PHP 8.2 via php-cgi SAPI; run scripts with -f + a --dir mount (not -r/stdin). CGI mode."
 },
 "C++": {
-"verdict": "deferred",
+"verdict": "live",
 "lane": "B",
-"recipe": "clang.wasm handles C; needs libc++/libc++abi wired into the lane",
-"smoke": "none yet",
-"extent": "REACHABLE not impossible \u2014 the clang lane is C-only today; C++ needs libc++ in the sysroot + a cpp dispatch. Keep wire-up; revisit."
+"recipe": "clang lane now compiles C++ (per-file by ext) + links libc++/libc++abi from the sysroot",
+"smoke": "iostream+vector+numeric => 42",
+"extent": "C++17 (clang default) + libc++; unlocks flatc/protoc/JerryScript-class. EH untested (exception-using tools may need -fwasm-exceptions)"
 },
 "mruby": {
 "verdict": "impossible",

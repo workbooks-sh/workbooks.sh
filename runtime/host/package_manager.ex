@@ -228,18 +228,20 @@ defmodule Workbooks.PackageManager do
   with no extra flags; the registration lane passes a tool's :cflags here.
   """
   def build_c_dir(abs, extra_argv) when is_list(extra_argv) do
-    case Path.wildcard(Path.join(abs, "**/*.c")) do
+    case Path.wildcard(Path.join(abs, "**/*.{c,cpp,cc,cxx}")) do
       [] ->
-        {:error, "no .c sources in #{abs}"}
+        {:error, "no C/C++ sources in #{abs}"}
 
       [main | rest] ->
-        # Forward EVERY non-.c companion (headers + generated includes .inc/.def + data) into the guest
-        # workdir, structure preserved, so any relative #include resolves — not just .h (wb-yi7q; .inc
-        # generalization for Wren-class tools that #include generated foo.wren.inc).
+        # Forward EVERY non-source companion (headers + generated includes .inc/.def + data) into the
+        # guest workdir, structure preserved, so any relative #include resolves — not just .h (wb-yi7q;
+        # .inc generalization for Wren-class tools that #include generated foo.wren.inc).
+        sources = ~w(.c .cpp .cc .cxx)
+
         companions =
           Path.wildcard(Path.join(abs, "**/*"))
           |> Enum.filter(&File.regular?/1)
-          |> Enum.reject(fn f -> Path.extname(f) == ".c" end)
+          |> Enum.reject(fn f -> Path.extname(f) in sources end)
           |> Enum.map(fn f -> {f, Path.relative_to(f, abs)} end)
 
         compile_c_in_sandbox(
@@ -630,11 +632,19 @@ defmodule Workbooks.PackageManager do
     # the actual tmpnam() is stubbed (posix_stub.c) to fail safely.
     compat_defs = ["-DL_tmpnam=260"]
 
+    # C++ when any source is .cpp/.cc/.cxx → compile as C++ (clang auto-detects per-file by extension +
+    # auto-adds the sysroot's libc++ headers) and link libc++/libc++abi. Unlocks the C++ tool class.
+    # clang picks C++ per-file by extension (and its default std is c++17), so passing -std=c++17
+    # globally is wrong — it errors on the .c shims. Just link libc++/libc++abi when any C++ source is present.
+    cpp? = Enum.any?([main | rest], &(Path.extname(&1) in ~w(.cpp .cc .cxx)))
+    cpp_argv = []
+    cpp_libs = if cpp?, do: ["-lc++", "-lc++abi"], else: []
+
     opts = [
       extra_csrc: rest ++ [@mmap_shim, @posix_stub],
       aux_files: headers,
-      argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs ++ extra_argv,
-      link_libs: ["-lsetjmp"] ++ emu_libs,
+      argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs ++ cpp_argv ++ extra_argv,
+      link_libs: ["-lsetjmp"] ++ emu_libs ++ cpp_libs,
       ld_args: @mmap_wraps,
       # stage sources at their paths relative to the project root so unity builds (.c #include'ing a .c,
       # wb-4b61) AND relative-parent includes ("../foo.h", wb-jsc4 / zstd) resolve in the guest.
