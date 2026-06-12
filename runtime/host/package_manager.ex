@@ -247,7 +247,8 @@ defmodule Workbooks.PackageManager do
           rest,
           Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " ")])}.wasm"),
           companions,
-          extra_argv
+          extra_argv,
+          abs
         )
     end
   end
@@ -599,7 +600,7 @@ defmodule Workbooks.PackageManager do
   # mmap parity: the shim is linked (extra_csrc) and mmap/munmap/msync are --wrap'd to it
   # (ld_args), so a CLI that mmap()s a file works the same as on the old zig-cc lane —
   # now with zero native execution.
-  defp compile_c_in_sandbox(main, rest, out, headers \\ [], extra_argv \\ []) do
+  defp compile_c_in_sandbox(main, rest, out, headers \\ [], extra_argv \\ [], src_root \\ nil) do
     File.mkdir_p!(@cache)
 
     # Bring the project's headers into the guest (structure preserved) and -I every dir that holds
@@ -635,8 +636,9 @@ defmodule Workbooks.PackageManager do
       argv: inc_flags ++ sjlj ++ emu_defs ++ compat_defs ++ extra_argv,
       link_libs: ["-lsetjmp"] ++ emu_libs,
       ld_args: @mmap_wraps,
-      # keep original source basenames so unity-build tools (a .c #include'ing a .c) resolve (wb-4b61)
-      preserve_names: true
+      # stage sources at their paths relative to the project root so unity builds (.c #include'ing a .c,
+      # wb-4b61) AND relative-parent includes ("../foo.h", wb-jsc4 / zstd) resolve in the guest.
+      src_root: src_root
     ]
 
     case Workbooks.Compilers.compile_c(main, opts) do

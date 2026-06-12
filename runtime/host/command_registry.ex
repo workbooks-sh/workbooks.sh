@@ -427,9 +427,14 @@ defmodule Workbooks.CommandRegistry do
                   true -> ["*.{c,h}"]
                 end
 
+              # Copy preserving each file's path relative to the tarball top, so the build dir mirrors
+              # the source tree — tools with relative-parent #includes ("../foo.h", e.g. zstd) resolve.
               for g <- globs, f <- Path.wildcard(Path.join(top, g)), File.regular?(f) do
-                b = Path.basename(f)
-                unless b in exclude, do: File.cp!(f, Path.join(builddir, b))
+                unless Path.basename(f) in exclude do
+                  dst = Path.join(builddir, Path.relative_to(f, top))
+                  File.mkdir_p!(Path.dirname(dst))
+                  File.cp!(f, dst)
+                end
               end
 
               # :extra_sources — inject custom {filename, content} files (e.g. a minimal CLI main for a

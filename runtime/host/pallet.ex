@@ -292,6 +292,31 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `zstd` CLI on the zstd simple API (standard .zst frame): stdin → compressed stdout, `-d`
+  # decompresses. Interoperates with the zstd tool.
+  @zstd_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "zstd.h"
+  int main(int argc, char** argv) {
+    int dec = (argc >= 2 && !strcmp(argv[1], "-d"));
+    size_t cap = 1 << 20, len = 0; char* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    if (dec) {
+      unsigned long long os = ZSTD_getFrameContentSize(in, len);
+      size_t oc = (os > 0 && os < (1ULL << 40)) ? os : len * 30 + 1024; char* out = malloc(oc);
+      size_t n = ZSTD_decompress(out, oc, in, len);
+      if (!ZSTD_isError(n)) fwrite(out, 1, n, stdout); else fprintf(stderr, "err: %s\n", ZSTD_getErrorName(n));
+    } else {
+      size_t b = ZSTD_compressBound(len); char* out = malloc(b);
+      size_t n = ZSTD_compress(out, b, in, len, 3);
+      if (!ZSTD_isError(n)) fwrite(out, 1, n, stdout); else fprintf(stderr, "err: %s\n", ZSTD_getErrorName(n));
+    }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -351,6 +376,16 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/mity/md4c/tar.gz/refs/tags/release-0.5.2",
       sha: "55d0111d48fb11883aaee91465e642b8b640775a4d6993c2d0e7a8092758ef21",
       build_opts: [src_globs: ["src/*.{c,h}"], extra_sources: [{"md_main.c", @md_main}]]
+    },
+    %{
+      name: "zstd",
+      url: "https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz",
+      sha: "8c29e06cf42aacc1eafc4077ae2ec6c6fcb96a626157e0593d5e82a34fd403c1",
+      build_opts: [
+        src_globs: ["lib/*.h", "lib/common/*.{c,h}", "lib/compress/*.{c,h}", "lib/decompress/*.{c,h}"],
+        extra_sources: [{"zmain.c", @zstd_main}],
+        cflags: ["-DZSTD_DISABLE_ASM=1"]
+      ]
     }
   ]
 

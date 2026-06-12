@@ -116,5 +116,9 @@ defmodule Workbooks.PalletTest do
     assert {:ok, l4c} = CommandRegistry.run("lz4", "roundtrip-lz4", [])
     assert {:ok, l4b} = CommandRegistry.run("lz4", l4c, ["-d"])
     assert l4b =~ "roundtrip-lz4"
+
+    assert {:ok, zsc} = CommandRegistry.run("zstd", "roundtrip-zstd", [])
+    assert {:ok, zsb} = CommandRegistry.run("zstd", zsc, ["-d"])
+    assert zsb =~ "roundtrip-zstd"
   end
 end

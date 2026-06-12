@@ -202,26 +202,38 @@ defmodule Workbooks.Compilers do
         id = Integer.to_string(:erlang.unique_integer([:positive]))
         job = Path.join(System.tmp_dir!(), "clangjob-#{id}")
         File.mkdir_p!(Path.join(job, "tmp"))
-        # :preserve_names keeps each source's ORIGINAL basename in /work (vs src.c / extra<i>.c) so
-        # unity-build tools — a .c that `#include`s another .c BY NAME (lz4hc.c includes lz4.c) —
-        # resolve (wb-4b61). Opt-in: the mrustc/zig callers keep the fixed-name behavior. The C-dir
-        # harvest turns it on. Assumes unique basenames (true for a flattened build dir).
+        # Source staging — three modes (wb-4b61 unity + wb-jsc4 structure):
+        #   :src_root set + file under it → STRUCTURED: keep its path relative to the root, so a .c
+        #     #include'ing another .c by name (lz4hc.c→lz4.c) AND a relative-parent #include
+        #     "../foo.h" (zstd) both resolve. Subsumes :preserve_names. (The C-dir harvest sets this.)
+        #   :src_root or :preserve_names, file NOT under root (shims, injected mains) → basename at root.
+        #   neither → legacy fixed src.c / extra<i>.c (the mrustc/zig callers, untouched).
+        src_root = Keyword.get(opts, :src_root)
         preserve = Keyword.get(opts, :preserve_names, false)
+        root_abs = src_root && Path.expand(src_root)
+
+        stage = fn host, fallback ->
+          abs_host = Path.expand(host)
+
+          rel =
+            cond do
+              root_abs && String.starts_with?(abs_host, root_abs <> "/") -> Path.relative_to(abs_host, root_abs)
+              src_root || preserve -> Path.basename(host)
+              true -> fallback
+            end
+
+          dst = Path.join(job, rel)
+          File.mkdir_p!(Path.dirname(dst))
+          File.cp!(abs_host, dst)
+          rel
+        end
+
         ext = Path.extname(source_path)
-        srcname = if preserve, do: Path.basename(source_path), else: "src" <> if(ext == "", do: ".c", else: ext)
-        File.cp!(Path.expand(source_path), Path.join(job, srcname))
+        srcname = stage.(source_path, "src" <> if(ext == "", do: ".c", else: ext))
 
         # extra C sources compiled + linked alongside the main one (e.g. the zig wasi shim)
         extra_csrc = Keyword.get(opts, :extra_csrc, [])
-
-        extra_names =
-          extra_csrc
-          |> Enum.with_index()
-          |> Enum.map(fn {host, i} ->
-            nm = if preserve, do: Path.basename(host), else: "extra#{i}.c"
-            File.cp!(Path.expand(host), Path.join(job, nm))
-            nm
-          end)
+        extra_names = extra_csrc |> Enum.with_index() |> Enum.map(fn {host, i} -> stage.(host, "extra#{i}.c") end)
 
         # Companion files copied into /work but NOT compiled — project headers (so a relative
         # `#include "util.h"` resolves against the source dir) and any data the build reads.
