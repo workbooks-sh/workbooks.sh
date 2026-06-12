@@ -1102,6 +1102,120 @@
 "recipe": "libpng 1.6.43 + zlib 1.3.1 via :deps multi-tarball lane (excl gzFile); vendored pnglibconf.h",
 "smoke": "libpng 1.6.43 zlib 1.3.1",
 "extent": "PNG image lib + zlib build in-sandbox; png cmd prints versions, ready for PNG decode/encode"
+},
+"datasette": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Long-running HTTP server is the product; WASI under wasmtime cannot bind/listen on a TCP socket (network-as-purpose). Browser-only path (Datasette Lite via Pyodide + serv",
+"extent": "off-the-table (verified)"
+},
+"weasyprint": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core dep cffi dlopen's native Pango/HarfBuzz/Fontconfig/GObject shared libraries (weasyprint/text/ffi.py) for all text layout \u2014 native dynamic linking unavailable under w",
+"extent": "off-the-table (verified)"
+},
+"yt-dlp": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: yt-dlp's sole function is HTTP egress to thousands of arbitrary external hosts. Compounded by fork-exec dependencies (ffmpeg/ffprobe for muxing; a nat",
+"extent": "off-the-table (verified)"
+},
+"ssh / scp (OpenSSH)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: ssh/scp exist solely to open a raw outbound TCP socket and run the SSH protocol over it, which wasip1 cannot do. Compounded by hard dependence on fork",
+"extent": "off-the-table (verified)"
+},
+"Jupyter": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork-exec (kernel process spawning) + network-as-purpose (Tornado server + ZMQ inter-process sockets) + browser web UI. Only wasm path (JupyterLite) is emscripten/JS-in-b",
+"extent": "off-the-table (verified)"
+},
+"TeX Live": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No standalone wasm32-wasi build exists \u2014 all TeX-to-WASM is Emscripten+JS-glue (browser/MEMFS), not wasmtime-runnable. Beyond the engine, 'TeX Live' is a multi-GB distrib",
+"extent": "off-the-table (verified)"
+},
+"Objective-C": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "clang.wasm compiles the ObjC frontend (AOT, no JIT), but the LANGUAGE is inert without an ObjC runtime. Apple's libobjc + Foundation are macOS/iOS-only and closed. The po",
+"extent": "off-the-table (verified)"
+},
+"Parcel": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Core is native .node N-API addons (no wasm32-wasi build); architecture requires Node worker_threads + fork-exec for parallelism and native fs/watcher. Native-threads + fo",
+"extent": "off-the-table (verified)"
+},
+"Farm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "NAPI-RS native Node addon (.node), not wasm: requires rayon native threads + Node N-API host embedding + native disk cache + a networked dev-server as its purpose. fork-e",
+"extent": "off-the-table (verified)"
+},
+"Mako": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native-threads-as-purpose (rayon/tokio multi-threaded bundling), napi native Node binding, and native fs-watching (notify). No wasm artifact exists and porting requires s",
+"extent": "off-the-table (verified)"
+},
+"TDengine": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (cluster RPC/epoll) + native pthreads per vnode + raw disk IO; no prebuilt wasm and no standalone storage-engine library to isolate.",
+"extent": "off-the-table (verified)"
+},
+"DoltDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Written in Go; no Go compiler in the in-sandbox toolchain (clang/mrustc/zig/yaegi/quickjs only) and Go is not buildable by any of them. The only Go->wasm path (GOOS=wasip",
+"extent": "off-the-table (verified)"
+},
+"Crystal": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt standalone wasm32-wasi Crystal compiler/runtime exists, and Crystal is not a buildable self-contained C/C++ library \u2014 its toolchain is native LLVM + wasm-ld (",
+"extent": "off-the-table (verified)"
+},
+"Racket": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Chez Scheme native-code/JIT-shaped codegen incompatible with jitless wasm32-wasi; no prebuilt wasm; emscripten fallback is browser/JS-pair",
+"extent": "off-the-table (verified)"
+},
+"Vale": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Scala frontend needs a JVM with no wasm32-wasi JVM. C++ backend bound to native LLVM13 codegen. Multi-stage fork-exec toolchain, no prebuilt wasm. JIT and fork-exec both ",
+"extent": "off-the-table (verified)"
+},
+"Unison": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Haskell/GHC-RTS runtime (no wasm32-wasi build; needs green threads/native runtime) plus network-as-purpose (distributed code-as-hash + network codebase sync). Not C/Rust/",
+"extent": "off-the-table (verified)"
+},
+"Curry": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "All Curry systems require a host toolchain unavailable/unsuitable for wasm32-wasi under wasmtime: KiCS2 needs GHC-Haskell, PAKCS needs SWI-Prolog (only emscripten/JS wasm",
+"extent": "off-the-table (verified)"
+},
+"Eiffel": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No wasm build; self-hosting native compiler plus GC runtime.",
+"extent": "off-the-table (verified)"
+},
+"Sather": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt wasm; compiler is a self-hosting Sather/C bootstrap with a broken autoconf/configure + codegen build needing Boehm GC and its own runtime \u2014 not a self-contain",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1728,6 +1842,13 @@
 "lane": "none",
 "recipe": "The GHC RTS itself is not a standalone wasm artifact you fetch or build via the C/C++/Rust",
 "confidence": "high",
+"verified": false
+},
+"GnuTLS": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (self-contained C), but heavy multi-tarball with a configure cascade. Deps needed a",
+"confidence": "medium",
 "verified": false
 }
 }
