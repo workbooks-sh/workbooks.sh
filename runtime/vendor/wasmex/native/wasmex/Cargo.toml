@@ -15,6 +15,7 @@ path = "src/lib.rs"
 crate-type = ["dylib"]
 
 [dependencies]
+hyper = "1"  # wb-broker: name hyper::Request<HyperOutgoingBody> in the WasiHttpView::send_request SSRF override (matches wasmtime-wasi-http 39's hyper 1.8)
 rand = "0.9.1"
 rustler = { version = "0.37.2", features = ["big_integer", "serde"] }
 tokio = { version = "1.48", features = ["full"] }

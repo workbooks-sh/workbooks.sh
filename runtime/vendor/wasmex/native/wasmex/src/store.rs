@@ -13,7 +13,11 @@ use wasmtime::{
 use wasmtime_wasi::ResourceTable;
 use wasmtime_wasi::WasiCtx;
 use wasmtime_wasi::WasiView;
-use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi_http::{HttpError, HttpResult, WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi_http::body::HyperOutgoingBody;
+use wasmtime_wasi_http::types::{
+    default_send_request, HostFutureIncomingResponse, OutgoingRequestConfig,
+};
 
 // wb-broker SSRF defense — the egress capability cadence. Permit ONLY public, externally-routable
 // destinations; deny anything that could reach the host's own services or internal network. Used by
@@ -54,6 +58,28 @@ pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
                 || (s[0] & 0xffc0) == 0xfe80    // link-local fe80::/10
                 || (s[0] & 0xfe00) == 0xfc00)   // unique-local fc00::/7
         }
+    }
+}
+
+/// Resolve a request authority and permit it ONLY if EVERY resolved address is public/routable.
+/// Deny on resolution failure or empty result. Used by the wasi-http send_request override (the
+/// complement to socket_addr_check, since wasi-http connects via tokio directly). Closes IP-literal
+/// and static-DNS SSRF for HTTP; an active-DNS-rebinding window for hostnames remains until we pin the
+/// resolved IP into the connector (next refinement) — the raw-socket path already pins via the SocketAddr.
+pub(crate) fn wb_host_allowed(host: &str, port: u16) -> bool {
+    use std::net::ToSocketAddrs;
+    match (host, port).to_socket_addrs() {
+        Ok(addrs) => {
+            let mut any = false;
+            for a in addrs {
+                any = true;
+                if !wb_ip_allowed(a.ip()) {
+                    return false;
+                }
+            }
+            any
+        }
+        Err(_) => false,
     }
 }
 
@@ -195,6 +221,38 @@ impl WasiHttpView for ComponentStoreData {
 
     fn table(&mut self) -> &mut ResourceTable {
         &mut self.table
+    }
+
+    // wb-broker SSRF: wasi-http connects via tokio directly (bypassing socket_addr_check), so the egress
+    // policy MUST be enforced here too. Resolve the request authority and deny if any resolved IP is
+    // internal/sensitive (loopback/metadata/RFC1918/etc — see wb_ip_allowed). Denied requests fail at the
+    // boundary; allowed ones fall through to the default handler.
+    fn send_request(
+        &mut self,
+        request: hyper::Request<HyperOutgoingBody>,
+        config: OutgoingRequestConfig,
+    ) -> HttpResult<HostFutureIncomingResponse> {
+        let uri = request.uri();
+        let host = match uri.host() {
+            Some(h) => h.trim_start_matches('[').trim_end_matches(']').to_string(),
+            None => {
+                return Err(HttpError::trap(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "wb-broker: outgoing request has no host",
+                )));
+            }
+        };
+        let port = uri.port_u16().unwrap_or(match uri.scheme_str() {
+            Some("https") => 443,
+            _ => 80,
+        });
+        if !wb_host_allowed(&host, port) {
+            return Err(HttpError::trap(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "wb-broker: destination denied by egress policy (internal/non-routable address)",
+            )));
+        }
+        Ok(default_send_request(request, config))
     }
 }
 

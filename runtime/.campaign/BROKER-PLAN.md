@@ -130,3 +130,23 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
     (c) scoped per-instance allow-list (today = deny-internal/allow-all-public; not yet {host,port} scoped).
     (d) quotas, audit log, mid-flight revocation.
   NEXT (iter 3): the wasi-http send_request override (the bigger half of the SSRF close).
+- 2026-06-12 (iter 3): **wasi-http SSRF override LANDED (compiles + NIF loads/runs, green).** Added
+  `WasiHttpView::send_request` override on ComponentStoreData (store.rs:217) + `wb_host_allowed()` (resolves
+  the request authority, denies if ANY resolved IP fails wb_ip_allowed; denies on resolve-fail/empty).
+  Added `hyper = "1"` dep (matches wasmtime-wasi-http 39's hyper 1.8). Denial via HttpError::trap(io::Error
+  PermissionDenied). cargo build green, mix compile exit 0, NIF still loads+runs wasm (python 6*7=42 — no
+  regression). 3 SSRF unit tests still green.
+  NOW CLOSED: BOTH egress paths (raw wasi-sockets via socket_addr_check [pinned on resolved SocketAddr];
+  wasi-http via send_request resolve-check) deny internal/sensitive destinations. Redirects are safe BY
+  DESIGN — wasi-http returns 3xx to the guest; the guest's follow-up is a NEW request that re-enters
+  send_request → re-checked. Encoded/decimal/hex/punycode hosts resolve to the same IP → caught.
+  STILL OPEN (NOT declaring networking secure until these are done + e2e-proven):
+    (1) **e2e INTEGRATION PROOF** — a REAL guest using wasi-http/wasi-sockets to hit 169.254.169.254 /
+        127.0.0.1 must be demonstrably BLOCKED at runtime (so far: unit-tested filter + compile + NIF-load;
+        the live-guest-blocked path is NOT yet demonstrated). THIS IS THE NEXT PRIORITY — rigor demands it.
+    (2) active-DNS-rebinding window for wasi-http HOSTNAMES (raw-socket path is pinned; wasi-http resolve-
+        check has a check→connect re-resolve gap; fix = pin resolved IP into a custom connector w/ SNI=host).
+    (3) scoped per-instance {host,port} allow-list (today = deny-internal/allow-all-public).
+    (4) rate/byte/conn quotas, audit log, mid-flight revocation.
+  NEXT (iter 4): build a wasi-http (or wasi-sockets) TEST GUEST + prove at runtime it CANNOT reach metadata/
+  localhost/RFC1918 (asserts the override actually fires), and CAN reach an allowed public host.
