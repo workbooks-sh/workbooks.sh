@@ -15,8 +15,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "bundling-and-unbundling",
-              "title": "bundling and unbundling",
+              "slug": "bundles",
+              "title": "bundles",
               "sub": "mechanics",
               "color": "#a8d4f0",
               "icon": "../wb-file-icon.svg",
@@ -37,8 +37,8 @@
               "dek": "Workbooks inside workbooks: the org tree makes every workbook a graftable subtree, nested workflows compile into one DAG of sub-worlds with typed imports/exports, and an upgrade gate keeps combining and removing safe."
             },
             {
-              "slug": "signing-and-verifying",
-              "title": "signing and verifying",
+              "slug": "signatures",
+              "title": "signatures",
               "sub": "implementation",
               "color": "#a8d4f0",
               "icon": "../wb-file-icon.svg",
@@ -48,8 +48,8 @@
               "dek": "Make provenance travel with the bytes: sign a workbook with a self-certifying did:key (Ed25519 over canonical JSON, embedded in the file) and verify both the signature and that the artifact hasn't been touched since."
             },
             {
-              "slug": "spec-marker",
-              "title": "the spec marker",
+              "slug": "specs",
+              "title": "specs",
               "sub": "mechanics",
               "color": "#a8d4f0",
               "icon": "../wb-file-icon.svg",
@@ -81,8 +81,8 @@
               "dek": "The reader understands the Dock as a typed capability membrane: the host hands a workbook only the functions its grants permit, so a component asking for an ungranted power fails to even instantiate."
             },
             {
-              "slug": "grants-not-inheritance",
-              "title": "what a workbook may do",
+              "slug": "capabilities",
+              "title": "capabilities",
               "sub": "mechanics",
               "color": "#aee5c2",
               "icon": "../nexus-icon.svg",
@@ -92,8 +92,8 @@
               "dek": "The reader can read and reason about a Policy profile: the four standard profiles, how each maps to a memory ceiling, a wall-clock CPU trap, and a capability list — and why a minimal profile literally has no network stack."
             },
             {
-              "slug": "life-of-an-instance",
-              "title": "the life of an instance",
+              "slug": "sandboxes",
+              "title": "sandboxes",
               "sub": "mechanics",
               "color": "#aee5c2",
               "icon": "../nexus-icon.svg",
@@ -103,8 +103,8 @@
               "dek": "The reader can trace a docked workbook through its whole state machine — created → active → suspended → frozen → archived — and sees why 'freeze' is just 'stop the process, keep the SQLite file', no VM snapshot needed."
             },
             {
-              "slug": "alive-while-closed",
-              "title": "alive while closed",
+              "slug": "keepers",
+              "title": "keepers",
               "sub": "concept",
               "color": "#aee5c2",
               "icon": "../nexus-icon.svg",
@@ -114,8 +114,8 @@
               "dek": "The reader learns how a workbook keeps working with nobody watching: keeper workers ticking agent defs on intervals, singleton vs crew scheduling, lifecycle specs that decide what each tick is, and schedules declared in the org source."
             },
             {
-              "slug": "two-planes",
-              "title": "the two planes",
+              "slug": "planes",
+              "title": "planes",
               "sub": "mechanics",
               "color": "#aee5c2",
               "icon": "../nexus-icon.svg",
@@ -125,8 +125,8 @@
               "dek": "The reader understands why one Nexus runs two separate HTTP surfaces — an authed control plane and an anonymous GET-only content plane — and how a single BEAM node serves many custom domains via an ETS-backed SNI registry, no reverse proxy."
             },
             {
-              "slug": "one-file-two-places",
-              "title": "one file, two places",
+              "slug": "deployments",
+              "title": "deployments",
               "sub": "setup",
               "color": "#aee5c2",
               "icon": "../nexus-icon.svg",
@@ -147,8 +147,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "the-import-ramp",
-              "title": "the import ramp",
+              "slug": "imports",
+              "title": "imports",
               "sub": "implementation",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -158,8 +158,8 @@
               "dek": "Anything → toolkit: how wbx toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted."
             },
             {
-              "slug": "the-wasm-audit",
-              "title": "the wasm audit",
+              "slug": "audits",
+              "title": "audits",
               "sub": "mechanics",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -169,8 +169,8 @@
               "dek": "Ready, convertible, or blocked: how the static dependency audit classifies every carried script against the wasm lanes, writes findings INTO the toolkit's own manifest, and emits a checkbox fix-up plan an agent can work through to done — with --fix closing the loop as push → build → verify."
             },
             {
-              "slug": "the-compiler-lanes",
-              "title": "the compiler lanes",
+              "slug": "lanes",
+              "title": "lanes",
               "sub": "concept",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -180,8 +180,8 @@
               "dek": "The crux bet of the toolkit layer: C, Rust, Zig, Go, and JS compilers that are themselves compiled to WebAssembly, so untrusted source is built entirely inside the sandbox — c4, mrustc-to-C, zig1's C backend, yaegi interpretation, and QuickJS embedding, each a different trick to dodge native execution."
             },
             {
-              "slug": "the-promotion-ladder",
-              "title": "the promotion ladder",
+              "slug": "promotion",
+              "title": "promotion",
               "sub": "implementation",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -191,8 +191,8 @@
               "dek": "Session → workspace → registry: an agent writes a source file, build-inline registers it as a command in one step, and promote materializes it as a real source-owned toolkit — org owns the spec, wasm owns the artifact, and self-authoring never widens granted capabilities."
             },
             {
-              "slug": "signing-and-trust",
-              "title": "signing and trust",
+              "slug": "trust",
+              "title": "trust",
               "sub": "mechanics",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -202,8 +202,8 @@
               "dek": "What the signature actually binds: an Ed25519 did:key signature over the canonical manifest body ties the declared contract (EXEC/CAPS/BUILD_SRC) to an author identity, the build gate refuses any unsigned or tampered third-party toolkit, and the sandbox bounds damage regardless — two layers, distinct jobs."
             },
             {
-              "slug": "proving-a-toolkit",
-              "title": "proving a toolkit",
+              "slug": "verification",
+              "title": "verification",
               "sub": "implementation",
               "color": "#f3c5a3",
               "icon": "../toolkit-icon.svg",
@@ -230,8 +230,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "reading-org",
-              "title": "reading org",
+              "slug": "syntax",
+              "title": "syntax",
               "sub": "concept",
               "color": "#f2ddb0",
               "icon": "icons/org.svg",
@@ -252,8 +252,8 @@
               "dek": "Literate programming, weaponized: how source blocks plus six header args (:deps :uses :in :out :persist :dir) compile a document into a WIT-world-shaped build plan — components, capability imports, and a DAG of :out→:in edges."
             },
             {
-              "slug": "properties-drawers",
-              "title": "properties drawers",
+              "slug": "drawers",
+              "title": "drawers",
               "sub": "mechanics",
               "color": "#f2ddb0",
               "icon": "icons/org.svg",
@@ -263,8 +263,8 @@
               "dek": "How :PROPERTIES: drawers turn a headline into a typed record — the key-value mechanism behind toolkit manifests, agent identities, and the spec block inside every learn page."
             },
             {
-              "slug": "timestamps-and-repeaters",
-              "title": "timestamps and repeaters",
+              "slug": "timestamps",
+              "title": "timestamps",
               "sub": "mechanics",
               "color": "#f2ddb0",
               "icon": "icons/org.svg",
@@ -296,8 +296,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "the-loop",
-              "title": "the loop",
+              "slug": "loops",
+              "title": "loops",
               "sub": "mechanics",
               "color": "#9fc4e8",
               "icon": "icons/agents.svg",
@@ -307,8 +307,8 @@
               "dek": "What a single agent run actually is — the model→tools→append cycle, why every tool call is wall-clock bounded, and how a run leaves a fully readable trace."
             },
             {
-              "slug": "authoring-an-agent",
-              "title": "authoring an agent",
+              "slug": "authoring",
+              "title": "authoring",
               "sub": "implementation",
               "color": "#9fc4e8",
               "icon": "icons/agents.svg",
@@ -319,7 +319,7 @@
             },
             {
               "slug": "context-repo",
-              "title": "the context repo",
+              "title": "context repo",
               "sub": "concept",
               "color": "#9fc4e8",
               "icon": "icons/agents.svg",
@@ -362,8 +362,8 @@
               "dek": "Insert a real human checkpoint into a live run — a review canvas the agent opens, a commit the human makes, and a FIFO the agent polls mid-loop to pick the verdict up."
             },
             {
-              "slug": "runtime-configuration",
-              "title": "configuring at runtime",
+              "slug": "runtime-config",
+              "title": "runtime config",
               "sub": "setup",
               "color": "#9fc4e8",
               "icon": "icons/agents.svg",
@@ -395,8 +395,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "mode-model",
-              "title": "the mode model",
+              "slug": "modes",
+              "title": "modes",
               "sub": "concept",
               "color": "#d9dbd3",
               "icon": "icons/wbx.svg",
@@ -406,8 +406,8 @@
               "dek": "How one binary serves two audiences — TTY detection, the --agent/--json switches, the {ok, verb, data, error} envelope, and the stable exit-code map an agent can branch on without parsing prose."
             },
             {
-              "slug": "org-pipelines",
-              "title": "org on stdin",
+              "slug": "pipelines",
+              "title": "pipelines",
               "sub": "implementation",
               "color": "#d9dbd3",
               "icon": "icons/wbx.svg",
@@ -417,8 +417,8 @@
               "dek": "Build real pipelines with the kernel verbs — query, tangle, and lint accept '-' for stdin, emit JSON, and compose with --json and jq so generated org never touches a temp file."
             },
             {
-              "slug": "doctor-and-friends",
-              "title": "doctor, status, completions",
+              "slug": "doctor",
+              "title": "doctor",
               "sub": "setup",
               "color": "#d9dbd3",
               "icon": "icons/wbx.svg",
@@ -429,7 +429,7 @@
             },
             {
               "slug": "deploy-kit",
-              "title": "declare, then converge",
+              "title": "deploy kit",
               "sub": "setup",
               "color": "#d9dbd3",
               "icon": "icons/wbx.svg",
@@ -439,8 +439,8 @@
               "dek": "Stand up an engine with the deploy-kit — scaffold deployment.org with init, validate, apply, and watch one verb set converge a local container or a cloud provider, with secrets declared by name and never written into the artifact."
             },
             {
-              "slug": "capability-seam",
-              "title": "the capability seam",
+              "slug": "the-seam",
+              "title": "the seam",
               "sub": "mechanics",
               "color": "#d9dbd3",
               "icon": "icons/wbx.svg",
@@ -493,8 +493,8 @@
               "dek": "The full grammar of time in a plan — active vs inactive timestamps, +1w/.+/++ repeaters, the :SCHEDULE: cron property — and the keeper, the engine that actually fires them: workers, crews, lifecycle specs, and the breather between ticks."
             },
             {
-              "slug": "boards-as-renderings",
-              "title": "boards as renderings",
+              "slug": "boards",
+              "title": "boards",
               "sub": "concept",
               "color": "#f2ddb0",
               "icon": "icons/workflows.svg",
@@ -515,8 +515,8 @@
               "dek": "How a compiled world executes — topological waves where every step whose predecessors are done runs in parallel, producers' stdout piped into consumers' stdin along the edges, and agent-lang components fanning out sub-agents inside the same DAG."
             },
             {
-              "slug": "plan-to-world",
-              "title": "plan to world",
+              "slug": "worlds",
+              "title": "worlds",
               "sub": "mechanics",
               "color": "#f2ddb0",
               "icon": "icons/workflows.svg",
@@ -526,8 +526,8 @@
               "dek": "What tangle_plan actually computes — edges inferred by matching :out to :in, exports as the outputs nobody consumed, imports from :uses, nested workflows as sub-worlds — and why the result is shaped like a WIT world on purpose."
             },
             {
-              "slug": "upgrade-gate",
-              "title": "the upgrade gate",
+              "slug": "upgrades",
+              "title": "upgrades",
               "sub": "concept",
               "color": "#f2ddb0",
               "icon": "icons/workflows.svg",
@@ -548,8 +548,8 @@
           "status": "live",
           "sublessons": [
             {
-              "slug": "sql-over-the-disk",
-              "title": "sql over the disk",
+              "slug": "queries",
+              "title": "queries",
               "sub": "implementation",
               "color": "#a8d4f0",
               "icon": "icons/vfs.svg",
@@ -570,8 +570,8 @@
               "dek": "The disk isn't one undifferentiated tree — it's three named regions (workspace, memory, tmp) with different lifetimes, and knowing which one a byte lives in tells you whether it persists, travels, or evaporates."
             },
             {
-              "slug": "docked-disk",
-              "title": "the docked disk",
+              "slug": "sync",
+              "title": "sync",
               "sub": "mechanics",
               "color": "#a8d4f0",
               "icon": "icons/vfs.svg",
@@ -581,8 +581,8 @@
               "dek": "What 'the disk gets a heartbeat' actually means: the instance lifecycle state machine, freeze/resume as a file copy instead of a VM snapshot, WAL-mode streaming to off-box replicas, and clone-per-tenant so a thousand users each get their own copy of one template disk."
             },
             {
-              "slug": "what-ships-what-stays",
-              "title": "what ships, what stays",
+              "slug": "privacy",
+              "title": "privacy",
               "sub": "concept",
               "color": "#a8d4f0",
               "icon": "icons/vfs.svg",
