@@ -79,4 +79,34 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert {:ok, body} = probe.("http://example.com/")
     assert body =~ "Example Domain"
   end
+
+  @tag :build
+  @tag :netdeps
+  test "LIVE — a reclaimed wasi:http fetch tool runs via the PRODUCTION Instance lane (:network), SSRF-safe" do
+    out = Path.join(System.tmp_dir!(), "fetch_inst_#{System.unique_integer([:positive])}.component.wasm")
+
+    {_, 0} =
+      System.cmd(
+        "node",
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/fetch.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(out)
+    on_exit(fn -> File.rm(out) end)
+    id = "fetch-#{System.unique_integer([:positive])}"
+
+    # the SAME path the runtime uses for real component tools: Instance + the :network profile (allow_http)
+    {:ok, _} = Workbooks.Instance.Supervisor.start_instance(id, bytes, policy: :network)
+    on_exit(fn -> Workbooks.Instance.Supervisor.stop_instance(id) end)
+
+    # real web content retrieved via the production lane
+    assert {:ok, body} = Workbooks.Instance.call(id, "probe", ["http://example.com/"])
+    assert body =~ "Example Domain"
+    # SSRF floor enforced on the production lane
+    assert {:ok, blocked} = Workbooks.Instance.call(id, "probe", ["http://169.254.169.254/"])
+    assert blocked =~ "BLOCKED"
+  end
 end

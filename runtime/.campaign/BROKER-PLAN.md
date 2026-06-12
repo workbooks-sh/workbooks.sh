@@ -680,3 +680,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   CAMPAIGN STANDING: keystone COMPLETE (red-team green, working, manageable); 8 brokered capabilities both
   docks; wb-0beq fixed; 61 of 323 reclaimed; full security cadence. NEXT (iter 37): make a reachable tool
   LIVE (a registered brokered-net command), OR a 9th capability, OR install wit-bindgen to verify sockets.
+- 2026-06-12 (iter 37): **LIVE reclamation via the PRODUCTION lane (green) — the reachable->live path works.**
+  A reclaimed wasi:http fetch tool ran through Workbooks.Instance + the :network policy (host/instance.ex —
+  the runtime's REAL component-run lane, with allow_http -> the SSRF-filtered network), NOT just the test
+  Wasmex.Components API: it retrieved example.com's real content + the SSRF floor blocked metadata. So ANY
+  wasi:http tool run via Instance(:network) transparently gets brokered, SSRF-safe outbound — the curl/httpie
+  capability is genuinely LIVE through the production runtime. Permanent test in broker_net_e2e_test.exs.
+  This closes the "is reachable actually live?" question: YES, via the existing Instance lane (components are
+  run there, not the module CommandRegistry); the 61 reachable wasi:http tools become live by running as
+  components under Instance(:network) — no new runtime integration needed.
+  CAMPAIGN: keystone complete + red-team green; 8 capabilities both docks; wb-0beq fixed; 61 reclaimed +
+  live-path proven; full cadence. NEXT (iter 38): a 9th capability, OR the wit-bindgen sockets guest lane.
