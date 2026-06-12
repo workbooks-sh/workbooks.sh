@@ -1,7 +1,7 @@
 # Host-Brokered Capabilities — reference (campaign deliverable, 2026-06-12)
 
 The pattern: a wasm guest stays sandboxed; the **host performs the privileged op** behind a mediated,
-Policy-gated `env.*` import (the Dock membrane). Eight capabilities, each with the same cadence —
+Policy-gated `env.*` import (the Dock membrane). Nine capabilities, each with the same cadence —
 **default-deny, scoped, quota'd, audit-logged, mid-flight-revocable, adversarially tested, offline-e2e-proven** (where the dev env
 allows). Guests reach these via `RustDock`/`JsDock` (env imports gated by the profile's caps); inbound
 serving is via `ServeBroker`.
@@ -20,13 +20,14 @@ serving is via `ServeBroker`.
 | `host_publish` | `(topic, msg)` → 0 / -1 | `queue` | `QueueBroker` | enqueue to a per-tenant topic |
 | `host_poll` | `(topic, out)` → msg len / -1 | `queue` | `QueueBroker` | dequeue oldest (FIFO) — inter-guest coordination |
 | `host_tcp` (planned import) | `(host,port,req, out)` → resp len / -1 | `tcp` | `TcpBroker` | brokered raw-TCP request/response; RESOLVE-THEN-PIN (DNS-rebinding defense) + SSRF + rate/revoke |
+| `host_udp` | `(host,port,dgram, out)` → reply len / -1 | `udp` | `UdpBroker` | brokered UDP send/recv-one (DNS/NTP/STUN); resolve-then-pin + SSRF + rate/revoke |
 | `host_request_get` | `(out_ptr,out_cap)` → req len | (serve instance) | `ServeBroker` | inbound: fetch the current request bytes |
 | `host_response_set` | `(ptr,len)` → 0 | (serve instance) | `ServeBroker` | inbound: return the response bytes (size-capped) |
 | ambient: `host_now`, `host_log`; vfs: `host_vfs_read/write` | | always / `vfs` | — | clock/log; ephemeral per-instance KV |
 
 Both `rust_dock` and `js_dock` expose the same `host_*` surface (gated identically by the profile's caps).
 
-## The eight capabilities
+## The nine capabilities
 
 1. **Networking egress** — `NetGuard` (host/net_guard.ex). The deny side is comprehensively secured and
    red-team proven: SSRF floor on BOTH paths (NIF `socket_addr_check`+`send_request` for wasi; Elixir
@@ -42,6 +43,7 @@ Both `rust_dock` and `js_dock` expose the same `host_*` surface (gated identical
 4. **Data-parallelism** — `ParallelBroker` (host/parallel_broker.ex). Run a cmd over N inputs concurrently
    across BEAM processes (each a fresh ExecBroker sandbox); default-deny, fan-out + concurrency caps. Guest
    e2e-proven (both docks).
+9. **UDP send/recv** — `UdpBroker` (host/udp_broker.ex). Brokered one-shot UDP datagram + reply (DNS/NTP/STUN) — host opens the socket to a resolve-then-pinned, SSRF-checked IP. Real DNS-over-UDP e2e-proven. + rate/revoke/size-cap.
 8. **Raw-TCP request/response** — `TcpBroker` (host/tcp_broker.ex). The host opens the TCP connection (RESOLVE-THEN-PIN: resolves once, refuses internal, connects to the PINNED IP — closing the DNS-rebinding window the TLS http path can't), sends the request bytes, reads the reply, closes. Covers line protocols (HTTP/1, Redis) for hand-written guests. SSRF + revocation + rate + size-cap. Real public-TCP e2e-proven.
 7. **Inter-guest message queue** — `QueueBroker` (host/queue_broker.ex). Per-tenant topics; a guest publishes, another polls (FIFO). Lets sandboxed guests hand work to each other (producer/consumer, events) WITHOUT shared memory. Tenant-isolated + depth-capped + revocable. Inter-guest e2e-proven (a producer guest -> a separate consumer guest).
 6. **Secrets (host holds creds)** — `SecretBroker` (host/secret_broker.ex). The host holds named per-tenant secrets; a guest can SIGN data (HMAC-SHA256) with a named secret but can NEVER read its value (no read op exists). Tenant-isolated + revocable. Lets a sandboxed guest authenticate webhooks/APIs/JWTs without possessing the credential. Guest e2e-proven.

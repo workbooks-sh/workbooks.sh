@@ -32,6 +32,7 @@ defmodule Workbooks.RustDock do
       |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
       |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
       |> maybe("tcp" in caps, fn -> tcp_caps(tenant) end)
+      |> maybe("udp" in caps, fn -> udp_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -80,6 +81,30 @@ defmodule Workbooks.RustDock do
              end
            else
              _ -> -1
+           end
+         end}
+    }
+  end
+
+  # UDP send/recv — merged on the "udp" cap. The host opens the socket (resolve-then-pinned, SSRF-safe),
+  # sends the datagram, returns the first reply. For DNS/NTP/STUN/etc.
+  defp udp_caps(tenant) do
+    %{
+      # host_udp(host_ptr,host_len, port, dgram_ptr,dgram_len, out_ptr,out_cap) -> i32 : reply len (-1 denied)
+      "host_udp" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, hp, hl, port, dp, dl, op, oc ->
+           host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl)
+           dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl)
+
+           case Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
+             {:ok, resp} ->
+               n = min(byte_size(resp), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
+               n
+
+             {:error, _} ->
+               -1
            end
          end}
     }

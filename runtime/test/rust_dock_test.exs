@@ -256,4 +256,29 @@ fn main(){
     assert {:ok, out} = RustDock.run(w, profile: :minimal)
     assert String.trim(out) == "n_gt0=true has_http=true"
   end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "host_udp — guest sends a DNS query over brokered UDP and gets a valid reply (SSRF-safe, pinned)" do
+    assert "host_udp" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+
+    w =
+      build!(~S|
+extern "C" { fn host_udp(hp:i32,hl:i32,port:i32,dp:i32,dl:i32,op:i32,oc:i32) -> i32; }
+fn main(){
+  let host=b"1.1.1.1";
+  // DNS A-query for example.com, txid 0x1234, recursion-desired
+  let q: [u8;29] = [0x12,0x34, 0x01,0x00, 0,1, 0,0, 0,0, 0,0,
+    7,b'e',b'x',b'a',b'm',b'p',b'l',b'e', 3,b'c',b'o',b'm', 0, 0,1, 0,1];
+  let mut out=[0u8;512];
+  let n=unsafe{ host_udp(host.as_ptr() as i32,host.len() as i32, 53, q.as_ptr() as i32, q.len() as i32, out.as_mut_ptr() as i32, 512) };
+  let txid_ok = n>=2 && out[0]==0x12 && out[1]==0x34;
+  let ancount = if n>=8 { (out[6] as u32)*256 + (out[7] as u32) } else { 0 };
+  println!("n_gt0={} txid_ok={} ancount_gt0={}", n>0, txid_ok, ancount>0);
+}|)
+
+    assert {:ok, out} = RustDock.run(w, profile: :minimal)
+    assert String.trim(out) == "n_gt0=true txid_ok=true ancount_gt0=true"
+  end
 end

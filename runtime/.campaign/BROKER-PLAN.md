@@ -765,3 +765,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   userinfo@/v4-mapped) + redirect-to-internal + DNS-rebinding (ALL paths) + scoped allow-list (both paths) +
   rate/conn/body quotas + audit + revocation + DNS-exfil (IP-scope mode). EVERY red-team vector defended.
   KEYSTONE: complete + the entire adversarial suite covered. NEXT (iter 44): a 9th capability / reclamation.
+- 2026-06-12 (iter 44): **9th capability — UDP egress (host_udp) (green).** Workbooks.UdpBroker: the host
+  opens a UDP socket (resolve-then-PINNED, SSRF-checked IP), sends the datagram, returns the first reply.
+  Same cadence as TcpBroker (SSRF + pin + per-principal revocation + rate + size-cap). Wired host_udp into
+  rust_dock on a dedicated "udp" cap (compute denied). 3 unit tests (SSRF-deny / revoke+rate / REAL DNS-over-
+  UDP to 1.1.1.1:53 -> valid reply) + 1 GUEST e2e: a Rust guest sends a DNS A-query for example.com via
+  host_udp -> gets a valid DNS reply (txid 0x1234 echoed, ancount>0). Covers DNS/NTP/STUN/etc. for guests.
+  PLATFORM now NINE brokered capabilities: net(http+sockets) / exec / storage / parallel / serve / secrets /
+  queue / raw-TCP / UDP — all guest-e2e-proven, both docks (UDP js_dock parity pending). NEXT (iter 45):
+  js_dock host_udp parity; OR a 10th capability.
