@@ -61,7 +61,7 @@ defmodule Workbooks.RustDock do
 
            with {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
                 {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: principal) do
-             n = min(byte_size(out), out_cap)
+             n = min(byte_size(out), max(out_cap, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
            else
@@ -105,7 +105,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
              {:ok, resp} ->
-               n = min(byte_size(resp), oc)
+               n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
                n
 
@@ -129,7 +129,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.TlsBroker.request(host, port, req, principal: tenant) do
              {:ok, resp} ->
-               n = min(byte_size(resp), oc)
+               n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
                n
 
@@ -153,7 +153,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
              {:ok, resp} ->
-               n = min(byte_size(resp), oc)
+               n = min(byte_size(resp), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
                n
 
@@ -187,7 +187,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.QueueBroker.poll(tenant, topic) do
              {:ok, msg} ->
-               n = min(byte_size(msg), oc)
+               n = min(byte_size(msg), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(msg, 0, n))
                n
 
@@ -212,7 +212,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.SecretBroker.sign(tenant, name, data) do
              {:ok, sig} ->
-               n = min(byte_size(sig), oc)
+               n = min(byte_size(sig), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(sig, 0, n))
                n
 
@@ -247,7 +247,7 @@ defmodule Workbooks.RustDock do
 
            case Workbooks.StorageBroker.Server.get(tenant, key) do
              {:ok, val} ->
-               n = min(byte_size(val), oc)
+               n = min(byte_size(val), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(val, 0, n))
                n
 
@@ -329,7 +329,7 @@ defmodule Workbooks.RustDock do
            # wb-broker SSRF floor: deny internal/sensitive destinations BEFORE the socket opens.
            case Workbooks.NetGuard.get(url, principal: principal) do
              {:ok, body} ->
-               n = min(byte_size(body), out_cap)
+               n = min(byte_size(body), max(out_cap, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
                n
 
@@ -422,7 +422,7 @@ defmodule Workbooks.RustDock do
            path = Wasmex.Memory.read_string(ctx.caller, ctx.memory, pp, pl)
            case Agent.get(vfs, fn conn -> Workbooks.VFS.get(conn, path) end) do
              {:ok, content} ->
-               n = min(byte_size(content), oc)
+               n = min(byte_size(content), max(oc, 0))
                :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(content, 0, n))
                n
 

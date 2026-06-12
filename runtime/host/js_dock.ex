@@ -83,7 +83,7 @@ defmodule Workbooks.JsDock do
              # wb-broker SSRF floor on the host-mediated path (same as rust_dock).
              case Workbooks.NetGuard.get(url, principal: tenant) do
                {:ok, body} ->
-                 n = min(byte_size(body), out_cap)
+                 n = min(byte_size(body), max(out_cap, 0))
                  :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(body, 0, n))
                  n
 
@@ -103,7 +103,7 @@ defmodule Workbooks.JsDock do
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len),
                 {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
                 {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: tenant) do
-             n = min(byte_size(out), out_cap)
+             n = min(byte_size(out), max(out_cap, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
            else
@@ -149,7 +149,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_kv,
                 key = Wasmex.Memory.read_string(ctx.caller, ctx.memory, kp, kl),
                 {:ok, val} <- Workbooks.StorageBroker.Server.get(tenant, key) do
-             n = min(byte_size(val), oc)
+             n = min(byte_size(val), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(val, 0, n))
              n
            else
@@ -164,7 +164,7 @@ defmodule Workbooks.JsDock do
                 name = Wasmex.Memory.read_string(ctx.caller, ctx.memory, np, nl),
                 data = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl),
                 {:ok, sig} <- Workbooks.SecretBroker.sign(tenant, name, data) do
-             n = min(byte_size(sig), oc)
+             n = min(byte_size(sig), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(sig, 0, n))
              n
            else
@@ -179,7 +179,7 @@ defmodule Workbooks.JsDock do
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
                 {:ok, resp} <- Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
-             n = min(byte_size(resp), oc)
+             n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
            else
@@ -194,7 +194,7 @@ defmodule Workbooks.JsDock do
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 dgram = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, dp, dl),
                 {:ok, resp} <- Workbooks.UdpBroker.request(host, port, dgram, principal: tenant) do
-             n = min(byte_size(resp), oc)
+             n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
            else
@@ -209,7 +209,7 @@ defmodule Workbooks.JsDock do
                 host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
                 {:ok, resp} <- Workbooks.TlsBroker.request(host, port, req, principal: tenant) do
-             n = min(byte_size(resp), oc)
+             n = min(byte_size(resp), max(oc, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
            else
@@ -238,7 +238,7 @@ defmodule Workbooks.JsDock do
 
              case Agent.get(vfs, fn conn -> Workbooks.VFS.get(conn, path) end) do
                {:ok, content} ->
-                 n = min(byte_size(content), oc)
+                 n = min(byte_size(content), max(oc, 0))
                  :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(content, 0, n))
                  n
 

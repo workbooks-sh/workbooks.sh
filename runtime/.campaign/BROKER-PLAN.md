@@ -1350,3 +1350,9 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the drain ABORTS and sends {ref, :stream_aborted}; the Plug's stream_loop handles it (stop forwarding — the
   chunked response is already committed, so closing without the terminating chunk signals truncation). 0 rust
   errors; both streaming tests green (cap doesn't touch normal-size streams).
+- 2026-06-12 (iter 98 cont): **FIXED wb-8w8x: exec/dock out_cap negative-trap (LOW).** A guest-supplied i32
+  out_cap/oc, if NEGATIVE, made min(byte_size(x), out_cap) negative -> binary_part(x, 0, neg) TRAPS the import
+  callback (a guest can crash its own dock call deterministically). Clamped every min(byte_size(...), out_cap|
+  oc) site to max(cap, 0) across BOTH docks (17 sites: rust_dock 9 + js_dock 8). The fan-out sites
+  (http_get_many, parallel) already use `byte_size <= cap` -> negative cap just returns -1 (no trap), verified
+  safe. 16 dock tests green. THIS FIRE: 2 wb-8w8x items (streaming body cap + out_cap clamp).
