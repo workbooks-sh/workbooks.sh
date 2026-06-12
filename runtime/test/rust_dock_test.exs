@@ -304,4 +304,21 @@ fn main(){
     assert {:ok, out} = RustDock.run(w, profile: :minimal)
     assert String.trim(out) == "n_gt0=true has_http=true"
   end
+
+  test "capability surface — full broker set on :network, ALL gated off :compute (least-privilege guard)" do
+    net = RustDock.imports(profile: :network)["env"] |> Map.keys()
+    compute = RustDock.imports(profile: :compute)["env"] |> Map.keys()
+
+    caps = ~w(host_http_get host_exec host_kv_get host_kv_put host_sign
+              host_publish host_poll host_parallel_map host_tcp host_udp host_tls)
+
+    for imp <- caps do
+      assert imp in net, "#{imp} missing on :network (broker not wired)"
+      refute imp in compute, "#{imp} leaked to :compute (least-privilege violation)"
+    end
+
+    # :compute keeps ONLY the ambient host fns — every privileged capability is gated off it
+    assert compute |> Enum.filter(&String.starts_with?(&1, "host_")) |> Enum.sort() ==
+             ["host_log", "host_now"]
+  end
 end

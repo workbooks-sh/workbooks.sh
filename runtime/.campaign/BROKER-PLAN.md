@@ -842,3 +842,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the proxy serve is ASYNC; wasmex's engine is SYNC (the spawn_blocking trick AVOIDED async_support) — the
   inbound seam may need an ENGINE async_support change, not just a NIF fn. A large focused-session piece.
   NEXT (iter 52): consolidation, or the inbound seam (large).
+- 2026-06-12 (iter 52): **capability-surface coherence guard (green) + inbound seam DE-RISKED to additive-sync.**
+  (a) wb-py4k KEY finding: NO engine async_support refactor needed. add_only_http_to_linker_sync exists +
+  wasmex's engine is sync; the crate's ProxyPre is async-only, but I can call the wasi:http/incoming-handler
+  #handle export DIRECTLY from the already-instantiated SYNC Instance with host-created resource Vals
+  (new_incoming_request + new_response_outparam, both sync). Guest calls response-outparam::set during the
+  sync handle; receiver.try_recv() yields the response. ~100-150 LOC ADDITIVE NIF (revert-safe) -> downgraded
+  from "maybe-huge-engine-refactor" to a tractable focused-session piece. Updated wb-py4k with the full plan.
+  (b) WIN: a capability-surface coherence guard — asserts the full broker set (http/exec/kv/sign/publish/poll/
+  parallel/tcp/udp/tls) is present on :network and ALL gated off :compute (only host_log/host_now ambient) —
+  a least-privilege regression guard against un-gating or a missing dock wiring.
+  NEXT (iter 53): the inbound seam (wb-py4k, additive-sync), or more.
