@@ -55,7 +55,7 @@
   {
    "id": "faq",
    "title": "Questions people actually ask",
-   "text": "Quick fire. [curious] What happened to w b? Renamed. The command is wbx everywhere now. If you see the old name in the wild… it's historical sediment. Do I need the engine installed? Not for the local families. Author, make, and trust work on plain files. Windows? Yes — as of oh-thirteen, it ships in every release. What's the difference between agent mode and the JSON flag? Agent mode is manners — no prompts, no color. JSON is a format — the envelope contract. Most integrations want both… [chuckles] piping gets you the first for free. And — can it really convert my Claude skill into a toolkit? It packages anything parseable, immediately. Scripts are the honest part. Shell and JavaScript usually classify ready… python is blocked until there's a lane… and everything in between gets a written fix-up plan. Rather than a shrug."
+   "text": "Quick fire. [curious] Do I need the engine installed? Not for the local families. Author, make, and trust work on plain files. Windows? Yes — as of oh-thirteen, it ships in every release. What's the difference between agent mode and the JSON flag? Agent mode is manners — no prompts, no color. JSON is a format — the envelope contract. Most integrations want both… [chuckles] piping gets you the first for free. And — can it really convert my Claude skill into a toolkit? It packages anything parseable, immediately. Scripts are the honest part. Shell and JavaScript usually classify ready… python is blocked until there's a lane… and everything in between gets a written fix-up plan. Rather than a shrug."
   },
   {
    "id": "outro",
