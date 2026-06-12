@@ -64,11 +64,11 @@ jobs:
         with:
           targets: wasm32-wasip1
       - run: cargo build --release --target wasm32-wasip1 --manifest-path cli/Cargo.toml
-      - run: cp cli/target/wasm32-wasip1/release/wb.wasm wb.wasm
+      - run: cp cli/target/wasm32-wasip1/release/wbx.wasm wbx.wasm
       - uses: actions/upload-artifact@v4
         with:
           name: wb-wasm
-          path: wb.wasm
+          path: wbx.wasm
 
   release:
     needs: [version, build, wasm]
