@@ -704,6 +704,19 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # Eigen — header-only C++ linear algebra. No sources to compile (the lane grabs the extensionless umbrella
+  # headers as companions + -I/work); the smoke main does a 2x2 matrix multiply.
+  @eigen_main ~S"""
+  #include <cstdio>
+  #include <Eigen/Dense>
+  int main() {
+    Eigen::Matrix2d a; a << 1, 2, 3, 4;
+    Eigen::Matrix2d b = a * a;
+    printf("%g %g\n", b(0, 0), b(1, 1));
+    return 0;
+  }
+  """
+
   # libpng — built WITH zlib via the :deps multi-tarball lane (zlib's sources compiled alongside, minus its
   # gzFile API which needs lseek). pnglibconf.h is configure-generated → vendored from scripts/*.prebuilt.
   @libpng_config File.read!(Path.join(__DIR__, "../priv/libpng/pnglibconf.h"))
@@ -715,6 +728,16 @@ defmodule Workbooks.Pallet do
   """
 
   @csource [
+    %{
+      name: "eigen",
+      url: "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz",
+      sha: "8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72",
+      build_opts: [
+        src_globs: ["Eigen/**/*"],
+        cflags: ["-I/work", "-fno-exceptions"],
+        extra_sources: [{"eigmain.cpp", @eigen_main}]
+      ]
+    },
     %{
       name: "png",
       url: "https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.43.tar.gz",

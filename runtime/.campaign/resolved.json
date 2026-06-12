@@ -1216,6 +1216,13 @@
 "lane": "none",
 "blocker": "No prebuilt wasm; compiler is a self-hosting Sather/C bootstrap with a broken autoconf/configure + codegen build needing Boehm GC and its own runtime \u2014 not a self-contain",
 "extent": "off-the-table (verified)"
+},
+"Eigen": {
+"verdict": "live",
+"lane": "B",
+"recipe": "eigen 3.4.0 header-only C++ (headers as companions + -I/work, -fno-exceptions); 2x2 matmul main",
+"smoke": "[[1,2],[3,4]]^2 => 7 22",
+"extent": "Eigen linear algebra builds (dense/sparse matrix, decompositions); eigen cmd = matmul demo, ready for numerical compute"
 }
 },
 "preliminary": {
@@ -1578,13 +1585,6 @@
 "lane": "C",
 "recipe": "Lane C (bare Rust via mrustc ~1.74). htmlq 0.5.0 deps: kuchikiki 0.8, html5ever 0.26, clap 4.5 (derive), lazy_static, ur",
 "confidence": "medium",
-"verified": false
-},
-"Eigen": {
-"verdict": "live-likely",
-"lane": "B",
-"recipe": "Lane B :include_only. Eigen is a header-only C++ template library (verified: Eigen/Dense is just #includes of Core/LU/Ch",
-"confidence": "high",
 "verified": false
 },
 "Perl": {
