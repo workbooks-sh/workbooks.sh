@@ -20,6 +20,7 @@ WORKDIR /repo/cli
 COPY runtime/kernel /repo/runtime/kernel
 COPY cli/Cargo.toml cli/Cargo.lock ./
 COPY cli/src ./src
+COPY cli/deploy-kit ./deploy-kit
 RUN cargo build --release && strip target/release/wbx
 
 # --- build: the Elixir release ----------------------------------------------
