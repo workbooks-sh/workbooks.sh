@@ -249,6 +249,7 @@ pub fn serve_http<'a>(
     uri: String,
     headers: Vec<(String, String)>,
     body: rustler::Binary,
+    epoch_deadline_secs: u64,
 ) -> NifResult<(u16, Vec<(String, String)>, rustler::Binary<'a>)> {
     use bytes::Bytes;
     use http_body::Body;
@@ -331,6 +332,11 @@ pub fn serve_http<'a>(
     let handle_task = TOKIO_RUNTIME.spawn_blocking(move || {
         let mut g = store_arc.inner.lock().unwrap();
         let store: &mut Store<ComponentStoreData> = &mut g;
+        // wb-95o6 (compute-DoS): bound a guest spinning in handle() — epoch traps the running wasm at the
+        // deadline, freeing this worker thread (requires an epoch_interruption engine; caller passes 0 else).
+        if epoch_deadline_secs > 0 {
+            store.set_epoch_deadline(epoch_deadline_secs);
+        }
         match handle.call(
             &mut *store,
             &[Val::Resource(req_any), Val::Resource(out_any)],
@@ -344,10 +350,31 @@ pub fn serve_http<'a>(
         }
     });
 
-    let resp = TOKIO_RUNTIME
-        .block_on(rx)
-        .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
-        .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
+    // a guest spinning BEFORE it sets the response is trapped by epoch (frees the worker), but its response
+    // sender lingers in the store so rx never resolves — bound this wait too when a deadline is set.
+    let resp = if epoch_deadline_secs > 0 {
+        match TOKIO_RUNTIME.block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(epoch_deadline_secs + 5),
+                rx,
+            )
+            .await
+        }) {
+            Ok(Ok(Ok(resp))) => resp,
+            Ok(Ok(Err(e))) => return Err(Error::Term(Box::new(format!("response error: {e:?}")))),
+            Ok(Err(e)) => return Err(Error::Term(Box::new(format!("guest set no response: {e}")))),
+            Err(_) => {
+                return Err(Error::Term(Box::new(
+                    "wb-broker: serve response timed out (guest stuck)".to_string(),
+                )))
+            }
+        }
+    } else {
+        TOKIO_RUNTIME
+            .block_on(rx)
+            .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
+            .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?
+    };
     let (parts, mut resp_body) = resp.into_parts();
 
     // drain into a buffer capped at MAX_RESPONSE_BYTES, but KEEP draining past the cap (discarding) so the

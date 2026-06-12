@@ -784,6 +784,56 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert match?({:ok, _}, result), "spinning guest must be trapped by the epoch deadline, not hang"
   end
 
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "APP-HOST compute-DoS (wb-95o6) — a spinning guest is bounded (500); the server keeps serving" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{epoch_interruption: true})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug:
+          {Workbooks.ServeBroker.ComponentPlug,
+           component: component, engine: engine, stream: true, epoch_deadline: 3},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+
+    # the spinning guest is bounded by the epoch deadline (the serve completes in ~8s, freeing the worker +
+    # NIF threads — no leak); the request returns an error status, NOT an infinite hang.
+    spin = ~c"http://127.0.0.1:#{port}/spin"
+
+    {:ok, {{_, spin_status, _}, _, _}} =
+      :httpc.request(:get, {spin, []}, [{:timeout, 30_000}], body_format: :binary)
+
+    assert spin_status in [500, 502, 504], "spinning guest must be bounded, got #{spin_status}"
+
+    # and the server is still up — a normal request after the attack succeeds
+    ok = ~c"http://127.0.0.1:#{port}/"
+    {:ok, {{_, ok_status, _}, _, ok_body}} = :httpc.request(:get, {ok, []}, [], body_format: :binary)
+    assert ok_status == 200
+    assert to_string(ok_body) =~ "hello from brokered guest"
+  end
+
   defp collect_stream(ref, acc, frames) do
     receive do
       {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk, frames + 1)

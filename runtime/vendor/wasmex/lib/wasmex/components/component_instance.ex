@@ -59,7 +59,8 @@ defmodule Wasmex.Components.Instance do
         method,
         uri,
         headers,
-        body
+        body,
+        epoch_deadline_secs \\ 0
       ) do
     # body crosses the NIF as a BINARY both ways (no intermediate byte-list) — efficient for real payloads
     Wasmex.Native.component_serve_http(
@@ -68,7 +69,8 @@ defmodule Wasmex.Components.Instance do
       method,
       uri,
       headers,
-      body
+      body,
+      epoch_deadline_secs
     )
   end
 

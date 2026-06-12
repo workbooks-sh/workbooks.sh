@@ -99,7 +99,8 @@ defmodule Wasmex.Native do
 
   # wb-broker (wb-py4k): drive a guest's wasi:http/incoming-handler with a synthesized request, returning
   # {status, headers, body}. The inbound standard-component seam.
-  def component_serve_http(_store, _instance, _method, _uri, _headers, _body), do: error()
+  def component_serve_http(_store, _instance, _method, _uri, _headers, _body, _epoch_deadline_secs),
+    do: error()
 
   # wb-broker (wb-t3sq): like component_serve_http but STREAMS the response body to `caller` as
   # {ref, :stream_start, status, headers} / {ref, :stream_data, bin}* / {ref, :stream_done}.

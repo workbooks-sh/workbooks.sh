@@ -1220,3 +1220,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   default epoch_deadline=0 path keeps every existing streaming test green (no regression). FOLLOW-UP (same
   finding, before new features): the same guard for the BUFFERED serve_http + wire the app-host Plug to create
   an epoch engine and pass a default deadline so the app-host is protected without the caller opting in.
+- 2026-06-12 (iter 89): **COMPUTE-DoS guard COMPLETED (both serve paths + app-host Plug).** Extended the
+  iter88 streaming guard to the BUFFERED serve_http (epoch_deadline_secs param + set_epoch_deadline + the
+  response timeout). Wired the app-host Plug: a new `:epoch_deadline` opt passed through dispatch (buffered)
+  AND dispatch_stream (streaming) to the serve calls; the streaming Plug also sends :stream_error on a handler
+  failure (fail-fast). PROVEN at the app-host level: a guest SPINNING in handle() on an epoch engine (deadline
+  3s) is BOUNDED — the serve completes in ~8s (worker thread epoch-trapped + NIF freed by the response
+  timeout, NO leak) and the request returns an error status, NOT an infinite hang; the server stays up (a
+  normal request after the attack -> 200). NUANCE (minor follow-up): the trapped guest yields a default
+  response path so the Plug returns 504 via its 15s receive backstop rather than a faster 500; the underlying
+  serve completes at 8s regardless (the security property holds). FULL DoS PICTURE NOW: wb-95o6 backpressure
+  DoS FIXED (concurrent drain, both paths) + compute-DoS BOUNDED (epoch + response-timeout, both paths + the
+  app-host Plug). A malicious/buggy hosted app can neither deadlock nor spin to hang the request or leak host
+  threads.

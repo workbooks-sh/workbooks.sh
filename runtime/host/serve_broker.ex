@@ -277,6 +277,8 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
     component = Keyword.fetch!(opts, :component)
     engine = Keyword.fetch!(opts, :engine)
     wasi = Keyword.get(opts, :wasi_options, %Wasmex.Wasi.WasiP2Options{allow_http: true})
+    # compute-DoS guard (epoch engine + :epoch_deadline) — a spinning guest is trapped; 0 = no deadline.
+    epoch = Keyword.get(opts, :epoch_deadline, 0)
 
     with {:ok, store} <- Wasmex.Components.Store.new_wasi(wasi, nil, engine),
          {:ok, inst} <- Wasmex.Components.Instance.new(store, component, %{}) do
@@ -284,15 +286,22 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
       parent = self()
 
       spawn(fn ->
-        Wasmex.Components.Instance.serve_http_stream(
-          inst,
-          conn.method,
-          conn.request_path,
-          conn.req_headers,
-          body,
-          parent,
-          ref
-        )
+        try do
+          Wasmex.Components.Instance.serve_http_stream(
+            inst,
+            conn.method,
+            conn.request_path,
+            conn.req_headers,
+            body,
+            parent,
+            ref,
+            epoch
+          )
+        rescue
+          _ -> send(parent, {ref, :stream_error, :handler_error})
+        catch
+          _, _ -> send(parent, {ref, :stream_error, :handler_error})
+        end
       end)
 
       receive_stream_start(conn, ref)
@@ -307,6 +316,11 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
         conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
         conn = send_chunked(conn, status)
         stream_loop(conn, ref)
+
+      # the handler errored (e.g. a compute-DoS guest trapped by the epoch deadline) — fail fast rather than
+      # waiting out the receive timeout.
+      {^ref, :stream_error, _reason} ->
+        send_resp(conn, 500, "wasi:http component error")
     after
       15_000 -> send_resp(conn, 504, "stream start timeout")
     end
@@ -357,11 +371,22 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
       component ->
         engine = Keyword.fetch!(opts, :engine)
         wasi = Keyword.get(opts, :wasi_options, %Wasmex.Wasi.WasiP2Options{allow_http: true})
+        # compute-DoS guard: with an epoch engine + :epoch_deadline, a guest spinning in handle() is trapped
+        # (see Instance.serve_http). 0 (default) = no deadline (caller didn't opt into an epoch engine).
+        epoch = Keyword.get(opts, :epoch_deadline, 0)
 
         try do
           {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
           {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
-          Wasmex.Components.Instance.serve_http(instance, conn.method, conn.request_path, conn.req_headers, body)
+
+          Wasmex.Components.Instance.serve_http(
+            instance,
+            conn.method,
+            conn.request_path,
+            conn.req_headers,
+            body,
+            epoch
+          )
         rescue
           e -> {:error, Exception.message(e)}
         end
