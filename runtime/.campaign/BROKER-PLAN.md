@@ -1275,3 +1275,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   :httpc async-streaming format (stream_start carries headers but NO status), so the response-size cap will
   use Location-header redirect detection (SSRF-safe) + a streamed accumulate-to-max_bytes read. NEXT: when the
   audit lands, fix the confirmed findings in severity order (starting with wb-j3n8).
+- 2026-06-12 (iter 94): **wb-j3n8 FIX CORE built (Workbooks.CappedHttp) — standalone + tested, while the audit
+  runs.** Built the outbound response-cap component: a streaming :httpc GET that accumulates body parts only
+  up to max_bytes and :httpc.cancel_request the INSTANT it overflows (the host never buffers more than the
+  cap), plus an ABSOLUTE wall-clock deadline so a slowloris drip can't reset the timeout. Returns {:ok,
+  headers, body} | {:error, :too_large | :timeout | :request_failed}; the caller detects redirects via the
+  location header (streaming lacks the status line). 3 tests green: 6000-byte body vs a 5000 cap -> :too_large;
+  3000 within cap -> :ok; a slow response with a 1ms deadline -> timeout. This is the wb-j3n8 DoS-floor core,
+  developed in a NEW module (non-conflicting with the running adversarial audit's view of the broker files).
+  POST-AUDIT: integrate CappedHttp into NetGuard.do_get (replace the sync :httpc; Location-based redirect
+  re-validation) to close wb-j3n8, alongside any other confirmed egress findings from the audit.
