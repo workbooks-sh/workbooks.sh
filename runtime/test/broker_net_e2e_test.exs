@@ -123,6 +123,9 @@ defmodule Workbooks.BrokerNetE2ETest do
     sp = fn t -> elem(Wasmex.Components.call_function(scoped, "probe", [t], 12_000), 1) end
     assert sp.("1.1.1.1:80") =~ "OK"
     assert sp.("8.8.8.8:80") =~ "ERR"
+    # DNS-EXFIL defense: an IP-only-scoped guest has NO name lookup — it can't even resolve a hostname,
+    # so it can't leak data via DNS queries.
+    assert sp.("example.com:80") =~ "ERR"
   end
 
   @tag :build

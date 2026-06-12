@@ -67,6 +67,24 @@ pub(crate) fn wb_addr_allowed(addr: std::net::SocketAddr) -> bool {
     wb_ip_allowed(addr.ip())
 }
 
+// DNS-EXFIL defense: name lookup is needed only when the guest must resolve a HOSTNAME. If net_allow is set
+// and every entry is an IP literal (an IP-scoped guest), the guest never needs DNS — so we disable name
+// lookup entirely, closing DNS-exfil (a malicious guest can't leak data by resolving attacker subdomains).
+// Unscoped or hostname-scoped guests keep DNS (they need to resolve names to fetch).
+pub(crate) fn wb_dns_needed(net_allow: &Option<Vec<String>>) -> bool {
+    match net_allow {
+        Some(list) if !list.is_empty() => list.iter().any(|e| {
+            let host = match e.rsplit_once(':') {
+                Some((h, p)) if p.parse::<u16>().is_ok() => h,
+                _ => e.as_str(),
+            };
+            // a hostname (not parseable as an IP) means DNS is required
+            host.parse::<std::net::IpAddr>().is_err()
+        }),
+        _ => true,
+    }
+}
+
 pub(crate) fn wb_ip_allowed(ip: std::net::IpAddr) -> bool {
     use std::net::IpAddr;
     // Normalize IPv4-mapped IPv6 (::ffff:a.b.c.d) → V4 so e.g. ::ffff:127.0.0.1 / ::ffff:169.254.169.254
@@ -220,6 +238,19 @@ mod wb_ssrf_tests {
         assert!(!s(a([8, 8, 8, 8], 80), &Some(vec!["1.1.1.1".into()])));
         // hostname-only scope has no IP match -> raw sockets denied (least-privilege default)
         assert!(!s(a([1, 1, 1, 1], 80), &Some(vec!["example.com".into()])));
+    }
+
+    #[test]
+    fn dns_needed_only_for_hostname_scopes() {
+        use super::wb_dns_needed as d;
+        assert!(d(&None), "unscoped -> DNS on");
+        assert!(d(&Some(vec![])), "empty scope -> DNS on");
+        // IP-only scope -> no DNS (DNS-exfil closed)
+        assert!(!d(&Some(vec!["1.1.1.1".into()])));
+        assert!(!d(&Some(vec!["1.1.1.1".into(), "8.8.8.8:443".into()])));
+        // a hostname entry -> DNS needed
+        assert!(d(&Some(vec!["example.com".into()])));
+        assert!(d(&Some(vec!["1.1.1.1".into(), "example.com".into()])), "mixed -> DNS on");
     }
 
     #[test]
@@ -574,7 +605,8 @@ pub fn component_store_new_wasi(
         let net_allow_for_sockets = options.net_allow.clone();
         wasi_ctx_builder
             .inherit_network()
-            .allow_ip_name_lookup(true)
+            // DNS-exfil: an IP-only-scoped guest gets NO name lookup (it can't leak via DNS queries).
+            .allow_ip_name_lookup(wb_dns_needed(&options.net_allow))
             .socket_addr_check(move |addr, _use| {
                 let ok = wb_addr_allowed(addr) && wb_addr_in_scope(addr, &net_allow_for_sockets);
                 Box::pin(async move { ok })

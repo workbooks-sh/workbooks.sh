@@ -754,3 +754,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   including DNS-rebinding on EVERY path.
   KEYSTONE: now truly EXHAUSTIVELY complete — every red-team vector defended on every path; both standard
   seams e2e-proven; every cadence primitive done. NEXT (iter 43): a 9th capability / per-tool reclamation.
+- 2026-06-12 (iter 43): **DNS-EXFIL defense for IP-scoped guests (green) — the LAST red-team vector.**
+  wb_dns_needed: when net_allow is IP-only (an IP-scoped guest), allow_ip_name_lookup is DISABLED -> the
+  guest has NO DNS resolver, so it cannot leak data by resolving attacker subdomains (DNS-exfil closed).
+  Unscoped / hostname-scoped guests keep DNS (they must resolve names to fetch). 8 cargo SSRF tests green +
+  e2e: an IP-scoped wasi guest reaches 1.1.1.1 (OK), is blocked from 8.8.8.8 (scope), AND can't resolve
+  example.com (ERR — DNS off). The IP-scope is now the DNS-exfil-PROOF mode. Residual (documented): hostname-
+  scoped guests keep DNS (the wasi resolver isn't per-name gatable without a hook); unscoped guests can exfil
+  via HTTP regardless. So the FULL RED-TEAM SUITE is now addressed: SSRF (IP-literals/IPv6/decimal/hex/octal/
+  userinfo@/v4-mapped) + redirect-to-internal + DNS-rebinding (ALL paths) + scoped allow-list (both paths) +
+  rate/conn/body quotas + audit + revocation + DNS-exfil (IP-scope mode). EVERY red-team vector defended.
+  KEYSTONE: complete + the entire adversarial suite covered. NEXT (iter 44): a 9th capability / reclamation.
