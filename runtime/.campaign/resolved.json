@@ -179,10 +179,11 @@
 "extent": "off-the-table (verified)"
 },
 "Wuffs": {
-"verdict": "deferred",
+"verdict": "live",
 "lane": "B",
-"blocker": "single-file amalgamation (driver #includes the .c); lane compiles every .c (no :include_only). 3.3MB, can't vendor. Reachable; needs lane :include_only (filed).",
-"extent": "pending lane support"
+"recipe": "wuffs v0.4.0-alpha.9 amalgam via :include_only + CRC32 driver",
+"smoke": "crc32('hello')=3610a686",
+"extent": "Wuffs codec lib builds (memory-safe decoders/checksums); wuffs cmd = CRC32 hex"
 },
 "LLD": {
 "verdict": "impossible",
@@ -373,6 +374,60 @@
 "verdict": "impossible",
 "lane": "none",
 "blocker": "Only WASM artifact is Emscripten + JS-host bound (tfjs-tflite / browser tflite_web_api) \u2014 disqualified. From-source path is Bazel + XNNPACK/Eigen/Abseil/FlatBuffers-codegen giant, not reachable via th",
+"extent": "off-the-table (verified)"
+},
+"ort": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "ONNX Runtime's only wasm build is emscripten (ONNX Runtime Web) \u2014 .wasm + mandatory JS glue, browser/Node-targeted, NOT plain wasm32-wasi. No standalone wasmtime artifact exists. ort just FFI-wraps th",
+"extent": "off-the-table (verified)"
+},
+"Burn": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Large proc-macro Rust workspace (burn-derive + async runtime + generic backend trait + ndarray/bytemuck deps) is unbuildable by mrustc ~1.74; no prebuilt standalone wasm32-wasi .wasm exists \u2014 Burn's w",
+"extent": "off-the-table (verified)"
+},
+"OpenCV": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only official WASM build is Emscripten/JS (browser ABI, not WASI-standalone). No prebuilt wasm32-wasi .wasm. Self-compile blocked by giant CMake configure + pthreads; documented wasi-sdk build (issue ",
+"extent": "off-the-table (verified)"
+},
+"Skia": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt plain wasm32-wasi .wasm exists: official CanvasKit is an Emscripten JS+wasm pair, and from-source is a GN/Ninja multi-MLOC C++ tree with ICU/freetype/harfbuzz/image-codec deps and a custom",
+"extent": "off-the-table (verified)"
+},
+"Poetry": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose tool: Poetry's entire reason for existing is resolving and fetching package metadata/wheels from PyPI over the network, creating virtualenvs via subprocess, and invoking PEP 517 build ",
+"extent": "off-the-table (verified)"
+},
+"Pipenv": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hard dependency on process model: creating real virtualenvs and spawning subprocesses/shells (fork/exec/subprocess.Popen, `pipenv shell`/`pipenv run`). wasm32-wasi/wasmtime has no fork/exec/subprocess",
+"extent": "off-the-table (verified)"
+},
+"ReScript": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Compiler is OCaml; the only WASM build is js_of_ocaml/wasm_of_ocaml \u2014 a browser-hosted JS+wasm-gc pair with JS host imports and cmij runtime loading, NOT a standalone wasm32-wasi module runnable under",
+"extent": "off-the-table (verified)"
+},
+"Stencil": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Node-oriented build app: native-binary Rollup, esbuild, terser, ws dev server + live-reload file watcher, Puppeteer; engines.node>=16. Relies on process/fs/net + a network dev-server purpose. No singl",
+"extent": "off-the-table (verified)"
+},
+"Eleventy": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Full Node.js v18+ program: dynamic require() of config + template-engine plugins (nunjucks/liquid), recursive fs globbing, chokidar file-watch, Node stdlib + module resolution. QuickJS (the only in-sa",
 "extent": "off-the-table (verified)"
 }
 },
@@ -707,8 +762,78 @@
 "whisper.cpp": {
 "verdict": "live-likely",
 "lane": "B",
-"recipe": "Lane B (self-contained C/C++, our libc++ lane). Same ggml CPU lineage as llama.cpp. Compile the CPU backend only: ggml/src/ggml.c,",
+"recipe": "Lane B (self-contained C/C++, our C + C++/libc++ wasi-sdk lane). Core is plain C/C++ with NO codegen/configure: just inc",
 "confidence": "medium",
+"verified": false
+},
+"Cairo": {
+"verdict": "uncertain",
+"lane": "none",
+"recipe": "Lane B in theory: cairo image surface is pure-CPU software rasterization to a memory buffer (no display/GPU/net), so it ",
+"confidence": "medium",
+"verified": false
+},
+"TeX / LaTeX": {
+"verdict": "impossible",
+"lane": "none",
+"recipe": "No viable lane as a drop-in. Lane A FAILS: every known TeX-to-WASM build (SwiftLaTeX, busytex, texlive.js, TeXlyre/texly",
+"confidence": "medium",
+"verified": false
+},
+"pdm": {
+"verdict": "uncertain",
+"lane": "D",
+"recipe": "Pure-Python; rides existing CPython.wasm lane (python already LIVE). Install pdm + pure-Python deps (resolvelib, unearth",
+"confidence": "medium",
+"verified": false
+},
+"RubyGems (gem)": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "No new lane needed \u2014 Ruby is ALREADY LIVE. RubyGems ships inside the CRuby interpreter and stdlib; the official ruby.was",
+"confidence": "high",
+"verified": false
+},
+"Bundler": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "Bundler ships inside CRuby/RubyGems; Ruby is already LIVE in-sandbox as ruby.wasm (wasm32-wasi, wasmtime). No separate b",
+"confidence": "high",
+"verified": false
+},
+"LevelDB": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (self-contained C++ via our clang/libc++ lane). No prebuilt plain wasm32-wasi .wasm exists (existing \"leveldb was",
+"confidence": "high",
+"verified": false
+},
+"Oberon (OBNC)": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "OBNC is an Oberon-07 -> C translator implemented in C (mirror: https://github.com/oberonforall/obnc). Build path under o",
+"confidence": "medium",
+"verified": false
+},
+"Io": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Build from IoLanguage/io master (the wasm32-wasi-first branch; native CMake path moved to `native` branch / 2026.04.20-n",
+"confidence": "high",
+"verified": false
+},
+"Marko": {
+"verdict": "live-likely",
+"lane": "D",
+"recipe": "npm-resolve+bundle @marko/compiler@5.39.63 (pure JS, Babel-based: @babel/core/parser/traverse/generator \u2014 no node-gyp/.n",
+"confidence": "medium",
+"verified": false
+},
+"Enhance (@enhance/ssr render core)": {
+"verdict": "live-likely",
+"lane": "D",
+"recipe": "Lane D (JS-on-qjs via the runtime's npm/esbuild bundle lane). Scope: the @enhance/ssr render core ONLY (pure custom-elem",
+"confidence": "high",
 "verified": false
 }
 }

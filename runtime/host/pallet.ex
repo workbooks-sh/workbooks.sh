@@ -540,6 +540,25 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # `wuffs`: CRC32/IEEE of stdin → hex (Wuffs — Google's memory-safe codec lib). The driver #includes the
+  # single-file amalgamation wuffs-v0.3.c, which is :include_only (present, not compiled standalone).
+  @wuffs_driver ~S"""
+  #define WUFFS_IMPLEMENTATION
+  #define WUFFS_CONFIG__MODULES
+  #define WUFFS_CONFIG__MODULE__BASE
+  #define WUFFS_CONFIG__MODULE__CRC32
+  #include "wuffs-v0.3.c"
+  #include <stdio.h>
+  int main(void) {
+    wuffs_crc32__ieee_hasher h;
+    wuffs_crc32__ieee_hasher__initialize(&h, sizeof(h), WUFFS_VERSION, 0);
+    unsigned char buf[65536]; size_t n; uint32_t crc = 0;
+    while ((n = fread(buf, 1, sizeof buf, stdin)) > 0) crc = wuffs_crc32__ieee_hasher__update_u32(&h, wuffs_base__make_slice_u8(buf, n));
+    printf("%08x\n", crc);
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -667,6 +686,17 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "wuffs",
+      url: "https://codeload.github.com/google/wuffs/tar.gz/refs/tags/v0.4.0-alpha.9",
+      sha: "9e4cd20abe96e6c4c6ede9c3057108860126e7be2e2c3e35515476c250be1c13",
+      build_opts: [
+        src_globs: ["release/c/wuffs-v0.3.c"],
+        include_only: ["wuffs-v0.3.c"],
+        cflags: ["-I/work/release/c"],
+        extra_sources: [{"wmain.c", @wuffs_driver}]
+      ]
     },
     %{
       name: "sodium",

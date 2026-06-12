@@ -227,27 +227,33 @@ defmodule Workbooks.PackageManager do
   to enable a single-file interpreter's CLI, or `-I`/`-D` a tool needs). build_dir(dir,"c") is this
   with no extra flags; the registration lane passes a tool's :cflags here.
   """
-  def build_c_dir(abs, extra_argv) when is_list(extra_argv) do
-    case Path.wildcard(Path.join(abs, "**/*.{c,cpp,cc,cxx}")) do
+  def build_c_dir(abs, extra_argv, include_only \\ []) when is_list(extra_argv) do
+    src_exts = ~w(.c .cpp .cc .cxx)
+    all_src = Path.wildcard(Path.join(abs, "**/*.{c,cpp,cc,cxx}"))
+
+    # :include_only — .c/.cpp that a DRIVER #includes (amalgamation/single-file libs: wuffs-v0.4.c, the
+    # FreeType umbrella's parts, stb). They must be PRESENT (+ their dir -I'd) but NOT compiled standalone
+    # (else duplicate symbols / no IMPLEMENTATION) — wb-wun5. So they join the companions, not the sources.
+    {incl, sources} = Enum.split_with(all_src, fn f -> Path.basename(f) in include_only end)
+
+    case sources do
       [] ->
-        {:error, "no C/C++ sources in #{abs}"}
+        {:error, "no compilable C/C++ sources in #{abs}"}
 
       [main | rest] ->
-        # Forward EVERY non-source companion (headers + generated includes .inc/.def + data) into the
-        # guest workdir, structure preserved, so any relative #include resolves — not just .h (wb-yi7q;
-        # .inc generalization for Wren-class tools that #include generated foo.wren.inc).
-        sources = ~w(.c .cpp .cc .cxx)
-
+        # Forward EVERY non-source companion (headers + generated includes .inc/.def + data) AND the
+        # include_only sources into the guest workdir, structure preserved, so any #include resolves.
         companions =
-          Path.wildcard(Path.join(abs, "**/*"))
-          |> Enum.filter(&File.regular?/1)
-          |> Enum.reject(fn f -> Path.extname(f) in sources end)
+          (Path.wildcard(Path.join(abs, "**/*"))
+           |> Enum.filter(&File.regular?/1)
+           |> Enum.reject(fn f -> Path.extname(f) in src_exts end))
+          |> Kernel.++(incl)
           |> Enum.map(fn f -> {f, Path.relative_to(f, abs)} end)
 
         compile_c_in_sandbox(
           main,
           rest,
-          Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " ")])}.wasm"),
+          Path.join(@cache, "#{cache_key(["cdir", abs, Enum.join(extra_argv, " "), Enum.join(include_only, ",")])}.wasm"),
           companions,
           extra_argv,
           abs
