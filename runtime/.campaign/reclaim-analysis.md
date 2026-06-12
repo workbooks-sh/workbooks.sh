@@ -46,3 +46,15 @@ stayed blocked. So the earlier "gated, not unlocked" conclusion is SUPERSEDED fo
   UNVERIFIED (no easy wasi-sockets guest via componentize-js; needs a cargo-component/C wasi-sockets build).
 - RECIPE (proven): build the tool as a wasi:http component -> run via Wasmex.Components with allow_http ->
   SSRF-filtered outbound for free. Permanent test: test/broker_net_e2e_test.exs.
+
+## UPDATE (iter 36) — wasi-sockets subset flipped (blocker removed, e2e pending tooling)
+The wasi-sockets STANDARD-tool path: its runtime network blocker (the component-outbound panic) is REMOVED
+by the wb-0beq spawn_blocking fix — wasi-sockets goes through the IDENTICAL component-call + block_on
+outbound path that's e2e-proven for wasi-http, and socket_addr_check SSRF-filters raw sockets (unit-tested in
+wb_ssrf_tests). So 37 more items flipped impossible -> "reachable" (Redis/Valkey, netcat, dig, db clients,
+etc.). E2E-VERIFICATION still pending a wasi:sockets GUEST: componentize-js/StarlingMonkey traps node:net (no
+raw sockets); the project rust lane makes core modules (preview1, no sockets); wit-bindgen (needed for C
+wasi:sockets bindings) is NOT installed; cargo-component is out-of-lane. The raw-TCP CAPABILITY for hand-
+written guests is already delivered + e2e-proven via TcpBroker/host_tcp.
+RECLAIMED TOTAL: 61 (24 http e2e-proven + 37 sockets blocker-removed-by-construction). 262 still impossible
+(build/codegen/thread/gpu/compounding — the genuinely-hard core).

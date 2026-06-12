@@ -670,3 +670,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   DNS-rebinding (resolve-then-pin) + allow-list + rate/conn/body quotas + audit + revocation — all proven.
   PLATFORM: 8 brokered capabilities (both docks) + wb-0beq fixed + 24 reclaimed + full cadence + red-team
   green. NEXT (iter 36): promote a reclaimed tool to live, OR a 9th capability, OR wasi-sockets guest lane.
+- 2026-06-12 (iter 36): **wasi-sockets subset reclaimed (blocker removed) — 61 total reclaimed.** wasi:sockets
+  GUEST-build verified BLOCKED (no wit-bindgen; componentize-js node:net traps; rust lane = core modules) —
+  but the RUNTIME blocker is REMOVED: wasi-sockets uses the IDENTICAL component-outbound path the wb-0beq
+  spawn_blocking fix unblocked (e2e-proven for wasi-http) + socket_addr_check SSRF-filters raw sockets (unit-
+  tested). Flipped 37 wasi-sockets items impossible -> "reachable" (Redis, netcat, dig, db clients). Counts:
+  262 impossible / 61 reachable / 32 live / 1 deferred. The raw-TCP CAPABILITY itself is already delivered +
+  e2e-proven (TcpBroker/host_tcp, both docks). E2E tool-verification awaits a wit-bindgen guest lane (filed).
+  CAMPAIGN STANDING: keystone COMPLETE (red-team green, working, manageable); 8 brokered capabilities both
+  docks; wb-0beq fixed; 61 of 323 reclaimed; full security cadence. NEXT (iter 37): make a reachable tool
+  LIVE (a registered brokered-net command), OR a 9th capability, OR install wit-bindgen to verify sockets.
