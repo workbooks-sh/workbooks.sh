@@ -21,12 +21,14 @@ defmodule Workbooks.RustDock do
     profile = Keyword.get(opts, :profile, :minimal)
     caps = Policy.caps(profile)
     vfs = Keyword.get(opts, :vfs)
+    tenant = Keyword.get(opts, :tenant, "default")
 
     env =
       ambient()
       |> maybe(Policy.allow_http?(profile), &egress/0)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
       |> maybe("commands" in caps, &exec_caps/0)
+      |> maybe("vfs" in caps, fn -> kv_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -59,6 +61,41 @@ defmodule Workbooks.RustDock do
     }
   end
 
+  # Durable k/v — merged on the "vfs" cap. The TENANT is captured from the Dock (the guest never names it),
+  # so a guest can only ever touch its own persistent namespace. Backed by Workbooks.StorageBroker.Server.
+  defp kv_caps(tenant) do
+    %{
+      # host_kv_put(key_ptr,key_len, val_ptr,val_len) -> i32 : 0 ok, -1 on deny/quota/error.
+      "host_kv_put" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, kp, kl, vp, vl ->
+           key = Wasmex.Memory.read_string(ctx.caller, ctx.memory, kp, kl)
+           val = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, vp, vl)
+
+           case Workbooks.StorageBroker.Server.put(tenant, key, val) do
+             :ok -> 0
+             {:error, _} -> -1
+           end
+         end},
+      # host_kv_get(key_ptr,key_len, out_ptr,out_cap) -> i32 : value len written (-1 if missing/error).
+      "host_kv_get" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, kp, kl, op, oc ->
+           key = Wasmex.Memory.read_string(ctx.caller, ctx.memory, kp, kl)
+
+           case Workbooks.StorageBroker.Server.get(tenant, key) do
+             {:ok, val} ->
+               n = min(byte_size(val), oc)
+               :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(val, 0, n))
+               n
+
+             {:error, _} ->
+               -1
+           end
+         end}
+    }
+  end
+
   @doc """
   Run a compiled-Rust CORE wasm (built via rust_compile_to_wasm no_exceptions: true) under Wasmex
   with the profile's gated Dock imports. Manages an in-memory VFS conn (Agent) for the vfs cap.
@@ -79,7 +116,7 @@ defmodule Workbooks.RustDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdout: so},
-               imports: imports(profile: profile, vfs: vfs)
+               imports: imports(profile: profile, vfs: vfs, tenant: Keyword.get(opts, :tenant, "default"))
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)

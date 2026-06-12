@@ -385,3 +385,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   per-instance) + the persistent-conn lifecycle (app-supervised, durable DB path under the data dir), then a
   guest e2e (a Rust guest puts+gets a key, value persists). Then the next stone (threading-fallback or
   app-host platform).
+- 2026-06-12 (iter 15): **STONE 3 FULLY e2e-PROVEN (green) — durable per-tenant storage works end-to-end.**
+  Added StorageBroker.Server (lazy app-wide durable sqlite conn, serialized; WB_KV_DB path; TENANT supplied
+  by the Dock, never the guest). Wired host_kv_put/get into rust_dock (gated on the vfs cap; tenant threaded
+  from RustDock.run opts). GUEST e2e (rust_dock_test, @tag :build): one Rust guest run 3x proves —
+    * run 1 (tenant A): get miss -> put "durable-v1" -> "stored r=0"
+    * run 2 (tenant A): get HIT "durable-v1" — value PERSISTED ACROSS RUNS through the broker
+    * run 3 (tenant B): get miss — ISOLATED; B never sees A's "slot"
+  So durability-across-runs AND tenant-isolation both proven via real guests (8s). 6 unit + 1 guest e2e green.
+  STONE 3 STATUS = DONE + e2e-validated: StorageBroker core (isolation/quota/durable) + Server + rust_dock
+  wiring + guest e2e. A guest now has persistent, tenant-isolated, quota'd KV that survives across runs.
+  MINOR REMAINING: js_dock host_kv parity (mechanical mirror of host_exec/rust_dock wiring); a dedicated
+  durable-storage cap (vs reusing vfs); the WB_KV_DB default path should be a stable data-dir (not tmp) for
+  real durability. NEXT (iter 16): js_dock host_kv parity, then the next stone (threading-fallback via
+  host_parallel_map — fresh-instance BEAM processes — or app-host platform).

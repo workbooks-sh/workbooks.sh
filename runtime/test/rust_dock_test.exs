@@ -94,4 +94,42 @@ fn main(){
     assert {:ok, out} = RustDock.run(w, profile: :minimal)
     assert String.trim(out) == "n=9 ok=true"
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "host_kv — durable per-tenant storage: persists across runs + isolated between tenants (Stone 3)" do
+    assert "host_kv_put" in (RustDock.imports(profile: :minimal)["env"] |> Map.keys())
+    u = System.unique_integer([:positive])
+    ta = "e2e-#{u}-A"
+    tb = "e2e-#{u}-B"
+
+    w =
+      build!(~S|
+extern "C" {
+  fn host_kv_put(kp:i32,kl:i32,vp:i32,vl:i32) -> i32;
+  fn host_kv_get(kp:i32,kl:i32,op:i32,oc:i32) -> i32;
+}
+fn main(){
+  let k=b"slot"; let mut out=[0u8;64];
+  let n=unsafe{ host_kv_get(k.as_ptr() as i32,k.len() as i32, out.as_mut_ptr() as i32, 64) };
+  if n>0 {
+    let got=std::str::from_utf8(&out[..n as usize]).unwrap_or("");
+    println!("found={}", got);
+  } else {
+    let v=b"durable-v1";
+    let r=unsafe{ host_kv_put(k.as_ptr() as i32,k.len() as i32, v.as_ptr() as i32, v.len() as i32) };
+    println!("stored r={}", r);
+  }
+}|)
+
+    # run 1 (tenant A): empty -> stores
+    assert {:ok, o1} = RustDock.run(w, profile: :minimal, tenant: ta)
+    assert String.trim(o1) == "stored r=0"
+    # run 2 (tenant A): the value PERSISTED across runs (durable through the broker)
+    assert {:ok, o2} = RustDock.run(w, profile: :minimal, tenant: ta)
+    assert String.trim(o2) == "found=durable-v1"
+    # run 3 (tenant B): ISOLATED — B's namespace is empty, it never sees A's "slot"
+    assert {:ok, o3} = RustDock.run(w, profile: :minimal, tenant: tb)
+    assert String.trim(o3) == "stored r=0"
+  end
 end

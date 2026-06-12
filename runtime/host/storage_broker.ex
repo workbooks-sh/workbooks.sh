@@ -119,3 +119,42 @@ defmodule Workbooks.StorageBroker do
     end
   end
 end
+
+defmodule Workbooks.StorageBroker.Server do
+  @moduledoc """
+  App-wide durable k/v connection, lazily opened and SERIALIZING access (sqlite is single-writer). The Dock
+  imports go through this so one persistent connection backs all guests; the durable file is `WB_KV_DB`
+  (default a stable path). The TENANT is supplied by the Dock/host — never by the guest — so a guest can
+  only touch its own namespace (the isolation boundary lives in the host, not the guest's arguments).
+  """
+  use Agent
+  alias Workbooks.StorageBroker
+
+  def start_link(opts \\ []) do
+    path = Keyword.get(opts, :path, db_path())
+    Agent.start_link(fn -> elem(StorageBroker.open(path), 1) end, name: __MODULE__)
+  end
+
+  defp db_path, do: System.get_env("WB_KV_DB", Path.join(System.tmp_dir!(), "wb_kv.db"))
+
+  defp conn do
+    case Process.whereis(__MODULE__) do
+      nil ->
+        case start_link() do
+          {:ok, _} -> :ok
+          {:error, {:already_started, _}} -> :ok
+        end
+
+        Process.whereis(__MODULE__)
+
+      pid ->
+        pid
+    end
+  end
+
+  def put(tenant, key, value, opts \\ []),
+    do: Agent.get(conn(), &StorageBroker.put(&1, tenant, key, value, opts), 15_000)
+
+  def get(tenant, key), do: Agent.get(conn(), &StorageBroker.get(&1, tenant, key), 15_000)
+  def delete(tenant, key), do: Agent.get(conn(), &StorageBroker.delete(&1, tenant, key), 15_000)
+end
