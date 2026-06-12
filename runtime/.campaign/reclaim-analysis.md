@@ -58,3 +58,12 @@ wasi:sockets bindings) is NOT installed; cargo-component is out-of-lane. The raw
 written guests is already delivered + e2e-proven via TcpBroker/host_tcp.
 RECLAIMED TOTAL: 61 (24 http e2e-proven + 37 sockets blocker-removed-by-construction). 262 still impossible
 (build/codegen/thread/gpu/compounding — the genuinely-hard core).
+
+## UPDATE (iter 39) — wasi:sockets STANDARD path E2E-PROVEN; the seam is complete
+cargo-component IS installed. Built a REAL wasi:sockets REACTOR (std::net on wasm32-wasip2, exports
+`probe: func(string)->string` — callable via Wasmex.call_function). Run through the patched runtime:
+  PUBLIC 1.1.1.1:80 -> "OK n=256 has_http=true" (a real raw-TCP connect + HTTP reply, via spawn_blocking)
+  INTERNAL 127.0.0.1:22 + METADATA 169.254.169.254:80 -> "ERR Permission denied" (socket_addr_check SSRF)
+So BOTH halves of keystone item (2) — wasi-http outbound AND wasi-sockets raw TCP — are now E2E-PROVEN and
+SSRF-filtered. The 37 sockets-reclaimed items' path is e2e-verified (was by-construction). Permanent test +
+reproducible reactor source (test/broker_e2e/wasi_sockets_reactor/). 61 reclaimed, ALL e2e-path-proven.

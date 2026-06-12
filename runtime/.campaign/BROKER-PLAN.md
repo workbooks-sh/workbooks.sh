@@ -707,3 +707,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   provide+instantiate sockets" — the 37 sockets-reclaimed are well-supported by this evidence.
   NEXT (iter 39): cargo-component reactor for the full wasi:sockets connect e2e (focused: cargo install
   cargo-component); OR a 9th capability.
+- 2026-06-12 (iter 39): **★ wasi:sockets STANDARD path E2E-PROVEN — the standard-tool seam is COMPLETE.**
+  cargo-component (0.21.1) was already installed. Built a REAL wasi:sockets REACTOR (std::net on wasm32-
+  wasip2, exports probe:func(string)->string, callable via Wasmex.call_function — sidesteps the wasi:cli/run
+  command-invocation gap). Ran it through the patched runtime: PUBLIC 1.1.1.1:80 -> "OK n=256 has_http=true"
+  (real raw-TCP connect + HTTP reply, via spawn_blocking); INTERNAL 127.0.0.1:22 + METADATA -> "ERR
+  Permission denied" (socket_addr_check SSRF-blocks). Permanent test in broker_net_e2e_test.exs + reproducible
+  reactor source (test/broker_e2e/wasi_sockets_reactor/, target/ gitignored — not committing the .wasm).
+  IMPACT: BOTH halves of keystone item (2) — wasi-http outbound AND wasi-sockets raw TCP — are E2E-PROVEN +
+  SSRF-filtered. The standard-tool seam is COMPLETE. The 37 sockets-reclaimed are now e2e-path-verified.
+  CAMPAIGN: keystone FULLY complete (all 4 items working+secure+manageable+red-team-green, BOTH standard
+  seams e2e-proven); 8 capabilities both docks; 61 reclaimed (all e2e-path-proven); full cadence.
+  NEXT (iter 40): per-tool reclamation / a 9th capability — the keystone + reclamation gates are all open.

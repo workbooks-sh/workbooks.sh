@@ -14,23 +14,9 @@ defmodule Workbooks.BrokerNetE2ETest do
     {_, 0} =
       System.cmd(
         "node",
-        [
-          "node_modules/.bin/jco",
-          "componentize",
-          "test/broker_e2e/net_probe.js",
-          "--wit",
-          "test/broker_e2e/net_probe.wit",
-          "-n",
-          "net-probe",
-          "--enable",
-          "http",
-          "--enable",
-          "random",
-          "--enable",
-          "clocks",
-          "-o",
-          out
-        ],
+        ["node_modules/.bin/jco", "componentize", "test/broker_e2e/net_probe.js", "--wit",
+         "test/broker_e2e/net_probe.wit", "-n", "net-probe", "--enable", "http", "--enable",
+         "random", "--enable", "clocks", "-o", out],
         stderr_to_stdout: true
       )
 
@@ -40,15 +26,10 @@ defmodule Workbooks.BrokerNetE2ETest do
     on_exit(fn -> File.rm(out) end)
     probe = fn url -> Wasmex.Components.call_function(pid, "probe", [url], 12_000) end
 
-    # SSRF floor on the now-WORKING outbound path: internal targets are blocked by the host override
     assert {:ok, meta} = probe.("http://169.254.169.254/")
     assert meta =~ "BLOCKED"
     assert {:ok, loop} = probe.("http://127.0.0.1/")
     assert loop =~ "BLOCKED"
-
-    # The fix itself: a PUBLIC fetch now returns GRACEFULLY ({:ok, _}) instead of panicking the worker.
-    # With connectivity this is "OK <status>" (reachability); offline it's a graceful connection error —
-    # either way the component call no longer traps.
     assert {:ok, _pub} = probe.("http://1.1.1.1/")
   end
 
@@ -72,10 +53,8 @@ defmodule Workbooks.BrokerNetE2ETest do
     on_exit(fn -> File.rm(out) end)
     probe = fn url -> Wasmex.Components.call_function(pid, "probe", [url], 15_000) end
 
-    # internal is still SSRF-blocked on the working path
     assert {:ok, m} = probe.("http://169.254.169.254/")
     assert m =~ "BLOCKED"
-    # public: REAL web content retrieved through the brokered, SSRF-filtered outbound path
     assert {:ok, body} = probe.("http://example.com/")
     assert body =~ "Example Domain"
   end
@@ -98,15 +77,39 @@ defmodule Workbooks.BrokerNetE2ETest do
     on_exit(fn -> File.rm(out) end)
     id = "fetch-#{System.unique_integer([:positive])}"
 
-    # the SAME path the runtime uses for real component tools: Instance + the :network profile (allow_http)
     {:ok, _} = Workbooks.Instance.Supervisor.start_instance(id, bytes, policy: :network)
     on_exit(fn -> Workbooks.Instance.Supervisor.stop_instance(id) end)
 
-    # real web content retrieved via the production lane
     assert {:ok, body} = Workbooks.Instance.call(id, "probe", ["http://example.com/"])
     assert body =~ "Example Domain"
-    # SSRF floor enforced on the production lane
     assert {:ok, blocked} = Workbooks.Instance.call(id, "probe", ["http://169.254.169.254/"])
     assert blocked =~ "BLOCKED"
+  end
+
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "wasi-SOCKETS raw TCP through the broker — standard guest connects (public OK, internal SSRF-blocked)" do
+    # Build a REAL wasi:sockets component (std::net on wasm32-wasip2) via cargo-component.
+    proj = "test/broker_e2e/wasi_sockets_reactor"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    wasm = Path.join(proj, "target/wasm32-wasip2/release/netprobe.wasm")
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{path: wasm, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    probe = fn t -> elem(Wasmex.Components.call_function(pid, "probe", [t], 12_000), 1) end
+
+    # a standard wasi:sockets connect to a public host works (the spawn_blocking fix), got an HTTP reply
+    assert probe.("1.1.1.1:80") =~ "OK"
+    # socket_addr_check SSRF-blocks internal targets on the raw-socket path
+    assert probe.("127.0.0.1:22") =~ "ERR"
+    assert probe.("169.254.169.254:80") =~ "ERR"
   end
 end

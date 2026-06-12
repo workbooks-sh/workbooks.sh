@@ -178,7 +178,7 @@
    "lane": "none",
    "blocker": "The sole maintained wasm port is Emscripten-targeted and JS-host-coupled by design: cmake/port/Emscripten.cmake sets SWIPL_ARCH=wasm-emscripten with Emscripten-only -fwasm-exceptions/-sSUPPORT_LONGJMP=wasm and an Emscrip",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Wuffs": {
    "verdict": "live",
@@ -216,7 +216,7 @@
    "lane": "none",
    "blocker": "httpie is network-as-purpose: its only function is HTTP/TLS egress via requests/urllib3 sockets. Standalone wasm32-wasi under wasmtime has no socket/TLS support, and both upstream-suggested routes (Py",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Candle": {
    "verdict": "impossible",
@@ -272,7 +272,7 @@
    "lane": "none",
    "blocker": "pip's core function is network egress to PyPI (HTTPS index + wheel download); standalone wasm32-wasi under wasmtime has no socket/TLS layer. The only working routes need a browser/JS fetch host (Pyodi",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Buildout": {
    "verdict": "reachable",
@@ -350,7 +350,7 @@
    "lane": "none",
    "blocker": "Supabase is a networked multi-service server stack (network-as-purpose); no standalone wasm32-wasi build exists. Its only in-sandbox-Postgres proxy, pglite, is emscripten + JS-host (not plain wasm32-w",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Neon": {
    "verdict": "impossible",
@@ -473,7 +473,7 @@
    "lane": "none",
    "blocker": "SBCL = runtime native-code JIT (no jitless wasm). ECL = only WASM target is emscripten (JS-glue imports invoke_iii + setjmp emulation), documented to fail under wasmtime/wasmedge; ECL's WASI port expl",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Pascal (Free Pascal / FPC)": {
    "verdict": "impossible",
@@ -547,7 +547,7 @@
    "lane": "none",
    "blocker": "Long-running Node dev server: native HTTP listener + websockets (HMR) + fs watch = network-purpose + long-running server. Build path depends on native binaries \u2014 esbuild (Go native exec) and Rolldown/",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Webpack": {
    "verdict": "impossible",
@@ -560,7 +560,7 @@
    "lane": "none",
    "blocker": "libuv platform layer: native event loop, sockets/network, fork-exec (child_process), and curl HTTP \u2014 none available under jitless wasm32-wasi/wasmtime. The JS engine value (QuickJS-ng) is already cove",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "LLRT": {
    "verdict": "impossible",
@@ -668,14 +668,14 @@
    "lane": "none",
    "blocker": "Network-purpose: Redis IS a networked server (RESP over TCP sockets, remote clients, pub/sub broker) \u2014 server sockets + ae event loop + fork()-for-persistence have no plain wasm32-wasi/wasmtime equiva",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Valkey": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-purpose daemon: requires sockets/event-loop (raison d'\u00eatre), fork() for BGSAVE+COW persistence, and background threads \u2014 none available under plain wasm32-wasi/wasmtime; no embeddable library ",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Memcached": {
    "verdict": "impossible",
@@ -732,14 +732,14 @@
    "lane": "none",
    "blocker": "Network-purpose tool. wasip1 has no raw TCP/UDP socket syscalls (no sock_connect; only sock_accept on pre-opened FDs). Standalone wasm cannot open arbitrary network connections \u2014 t",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "dig / bind-tools": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Network-purpose tool: dig's entire function is sending DNS packets over the network. wasip1 has no UDP and no outbound socket creation, so there is no transport for raw DNS. Per ru",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "make": {
    "verdict": "impossible",
@@ -795,14 +795,14 @@
    "lane": "none",
    "blocker": "Only port is emscripten/browser webR (JS+wasm pair, not standalone wasm32-wasi); R core needs a Fortran/LAPACK toolchain (no Fortran lane) plus autoconf + emscripten patches \u2014 not ",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "D": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "No D tool ships as a prebuilt plain wasm32-wasi .wasm (no Lane A). D-to-wasm requires the LDC/LLVM-D compiler toolchain + wasi-libc + druntime port, which is not in the sandbox and",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Ada": {
    "verdict": "impossible",
@@ -821,7 +821,7 @@
    "lane": "none",
    "blocker": "32-bit-ABI-locked, self-hosting (bootstrap chicken-and-egg), abandoned-2006 autoconf toolchain that does not build on 64-bit hosts let alone wasm32 without a major port; not a self",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Dafny": {
    "verdict": "impossible",
@@ -860,14 +860,14 @@
    "lane": "none",
    "blocker": "Framework's purpose is a Node-hosted Vite dev-server + Nitro HTTP server (network-as-purpose, long-lived listener) plus a Vite/Rollup/esbuild plugin toolchain that requires the ful",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Rspack": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Native threading as the core architecture (rayon + parallel module graph) requires wasm32-wasip1-threads, plus napi-rs/emnapi N-API bindings and a JS/Web-Worker host (Atomics.wait,",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Rolldown": {
    "verdict": "impossible",
@@ -1044,14 +1044,14 @@
    "lane": "none",
    "blocker": "Network-as-purpose (gRPC server + multi-node Raft consensus over real TCP) is the entire value; additionally no Go->wasm32-wasi lane exists (only yaegi interpreter, insuf",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "InfluxDB": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-as-purpose: InfluxDB is a server daemon whose reason to exist is listening on a TCP socket (HTTP + Arrow Flight/gRPC). Compounded by native-threads (tokio reactor",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Dgraph": {
    "verdict": "impossible",
@@ -1112,21 +1112,21 @@
    "lane": "none",
    "blocker": "network-as-purpose: curl exists to move bytes over TCP/TLS, and wasm32-wasi/wasmtime (wasip1) has no raw sockets. All real curl-wasm ports rely on a browser WebSocket pro",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "wget": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-as-purpose: wget's sole function is HTTP(S)/FTP fetch; wasm32-wasi/wasip1 has no sockets, so connections are impossible without host-brokered net imports (network",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "rsync": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-as-purpose (SSH/socket transport to remote rsyncd is the entire value) + fork/exec multi-process architecture (generator/sender/receiver) + select()/poll over soc",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "gpg (GnuPG)": {
    "verdict": "impossible",
@@ -1146,7 +1146,7 @@
    "lane": "none",
    "blocker": "Long-running HTTP server is the product; WASI under wasmtime cannot bind/listen on a TCP socket (network-as-purpose). Browser-only path (Datasette Lite via Pyodide + serv",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "weasyprint": {
    "verdict": "impossible",
@@ -1166,14 +1166,14 @@
    "lane": "none",
    "blocker": "Network-as-purpose: ssh/scp exist solely to open a raw outbound TCP socket and run the SSH protocol over it, which wasip1 cannot do. Compounded by hard dependence on fork",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Jupyter": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "fork-exec (kernel process spawning) + network-as-purpose (Tornado server + ZMQ inter-process sockets) + browser web UI. Only wasm path (JupyterLite) is emscripten/JS-in-b",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "TeX Live": {
    "verdict": "impossible",
@@ -1444,7 +1444,7 @@
    "lane": "none",
    "blocker": "fork-exec is the entire product: vcpkg spawns cmake/git/curl/native compilers/linkers per port and probes the host toolchain. Also network-as-purpose (downloads source) a",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Spack": {
    "verdict": "impossible",
@@ -1463,7 +1463,7 @@
    "lane": "none",
    "blocker": "R's only wasm port is WebR (Emscripten/browser-Node, not wasm32-wasi standalone \u2014 won't run under wasmtime). install.packages fundamentally requires fork-exec of native c",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "renv": {
    "verdict": "impossible",
@@ -1530,21 +1530,21 @@
    "lane": "none",
    "blocker": "TimescaleDB is a PostgreSQL C extension (.so loaded by `shared_preload_libraries`) \u2014 it has no standalone existence; it requires a running Postgres backend, hooks into Po",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Couchbase": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Network-as-purpose clustered DB; multi-process fork-exec of separate Erlang/C++/Go service binaries; requires BEAM VM + Go runtime native threads and TCP networking. No w",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "RethinkDB": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Network-as-purpose: core value is a long-lived TCP changefeed/push server. Also requires native threads (thread-per-core + custom context-switch asm) and a custom storage",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "ArangoDB": {
    "verdict": "impossible",
@@ -1557,14 +1557,14 @@
    "lane": "none",
    "blocker": "Greenplum is a heavily-modified Postgres fork whose ENTIRE value proposition is massively-parallel processing (MPP): a coordinator process distributes queries across many",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "TerminusDB": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Database logic/query layer is SWI-Prolog, a large C runtime whose only wasm port is Emscripten/browser-targeted (needs JS glue + browser/Node VM), not standalone wasm32-w",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Aerospike": {
    "verdict": "impossible",
@@ -1583,7 +1583,7 @@
    "lane": "none",
    "blocker": "Network database server by purpose (TCP listener / iproto protocol is the whole point \u2014 network-as-purpose). Multiple independent hard blockers stack on top: (1) bundles ",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Apache Kudu": {
    "verdict": "impossible",
@@ -1596,7 +1596,7 @@
    "lane": "none",
    "blocker": "pgvector is meaningless without full PostgreSQL, and Postgres cannot run as wasm32-wasi under wasmtime: it depends on fork() (postmaster/backend process model), SysV/POSI",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Apache Hudi": {
    "verdict": "impossible",
@@ -1675,7 +1675,7 @@
    "lane": "none",
    "blocker": "fork-exec: Nix builds derivations by clone()/fork-exec'ing native builder processes in OS sandboxes (namespaces/bind-mounts) and emits native ELF into /nix/store. Require",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Guix": {
    "verdict": "impossible",
@@ -1796,7 +1796,7 @@
    "lane": "none",
    "blocker": "Lane A fails: verified re2-wasm@1.0.2 build/wasm/re2.wasm imports _embind_register_* (embind) + emscripten_resize_heap/emscripten_memcpy_big \u2014 an emscripten+JS-glue pair (re2.js+re2.wasm), NOT plain w",
    "extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Fortran": {
    "verdict": "impossible",
@@ -2033,7 +2033,7 @@
    "lane": "none",
    "blocker": "librsvg is a large Rust workspace (now Rust core: cairo-rs/pango/gdk-pixbuf/glib gobject bindings + markup5ever/selectors proc-macro derives, edition 2021+, build-script codegen) \u2014 fails lane C (mrust",
    "extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "pango": {
    "verdict": "impossible",
@@ -2185,7 +2185,7 @@
    "lane": "none",
    "blocker": "libgit2 is buildable in principle but is a ~200-file CMake project needing pre-generated config headers (features.h etc.) + per-tool source curation \u2014 beyond the clean automated lane; network transports impossible (no sockets), only local plumbing would work. Deferred (dedicated build effort).",
    "extent": "off-the-table for the automated lane (buildable with dedicated per-tool effort)",
-   "reclaim": "runtime network blocker REMOVED \u2014 the wb-0beq spawn_blocking fix unblocks the SAME component-outbound path used by wasi-sockets (e2e-proven for wasi-http); socket_addr_check SSRF-filters raw sockets (unit-tested). E2E-verification pending a wasi:sockets guest-build lane (no wit-bindgen)."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Idris": {
    "verdict": "impossible",
