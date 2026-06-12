@@ -33,7 +33,7 @@ defmodule Workbooks.UdpBroker do
             do_request(ip, port, datagram, max, timeout)
 
           :error ->
-            Workbooks.BrokerAudit.record(:udp, :deny, :ssrf)
+            Workbooks.BrokerAudit.record(:udp, :deny, :ssrf, "#{host}:#{port}")
             Logger.warning("wb-broker: DENY udp #{host}:#{port} — SSRF (internal/non-routable/unresolved)")
             {:error, :denied}
         end

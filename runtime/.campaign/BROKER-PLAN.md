@@ -1091,3 +1091,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (egress, iter75) + exec + serve = the 6 main brokers; every denial is queryable via BrokerAudit.stats/
   count/total_denials. FOLLOW-UP: storage/queue capacity denials (value_too_large/quota_exceeded/queue_full),
   a recent-events forensics ring (with targets), and :telemetry emission for external monitors.
+- 2026-06-12 (iter 77): **BROKER FORENSICS RING — recent denials WITH TARGETS (incident response).** Counters
+  answer "how many denials"; the ring answers "WHICH internal targets did the guest try to reach" — the first
+  question in any incident. Added a forensics ring to BrokerAudit: on each deny, append {broker, reason,
+  target, ts} to an ordered_set ring (last 128, monotonic-keyed, auto-pruned) + recent/1 (newest-first).
+  Wired the TARGET into egress denials: NetGuard SSRF/allowlist pass the URL; the socket brokers (tcp/udp/tls)
+  pass "host:port". E2E: 2 SSRF denials -> recent(10) returns both with their URLs, newest-first. 9 tests
+  green. So observability is now COUNTERS (rates, per broker/reason via stats/count/total_denials) +
+  FORENSICS RING (recent denials with targets via recent/1) — both the monitoring AND incident-response views
+  of the "manageable" criterion. FOLLOW-UP: storage/queue capacity counters + :telemetry emission for
+  external SIEMs.

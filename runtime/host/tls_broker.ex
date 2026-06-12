@@ -34,7 +34,7 @@ defmodule Workbooks.TlsBroker do
             do_request(ip, host, port, data, max, timeout)
 
           :error ->
-            Workbooks.BrokerAudit.record(:tls, :deny, :ssrf)
+            Workbooks.BrokerAudit.record(:tls, :deny, :ssrf, "#{host}:#{port}")
             Logger.warning("wb-broker: DENY tls #{host}:#{port} — SSRF (internal/non-routable/unresolved)")
             {:error, :denied}
         end

@@ -59,12 +59,12 @@ defmodule Workbooks.NetGuard do
   defp do_get(url, timeout, allow, hops) do
     cond do
       not allowed?(url) ->
-        Workbooks.BrokerAudit.record(:net, :deny, :ssrf)
+        Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — SSRF (internal/non-routable destination)")
         {:error, :denied}
 
       not host_allowed_by_list?(url, allow) ->
-        Workbooks.BrokerAudit.record(:net, :deny, :allowlist)
+        Workbooks.BrokerAudit.record(:net, :deny, :allowlist, url)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — host not in allow-list")
         {:error, :denied}
 

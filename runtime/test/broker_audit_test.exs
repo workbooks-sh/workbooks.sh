@@ -43,4 +43,18 @@ defmodule Workbooks.BrokerAuditTest do
     assert BrokerAudit.count({:exec, :deny}) >= 1
     assert BrokerAudit.count({:serve, :deny, :revoked}) >= 1
   end
+
+  test "forensics ring — recent/1 captures the denial TARGET (what the guest tried to reach)" do
+    BrokerAudit.reset()
+    assert {:error, :denied} = NetGuard.get("http://169.254.169.254/")
+    assert {:error, :denied} = NetGuard.get("http://10.0.0.1/")
+
+    recent = BrokerAudit.recent(10)
+    targets = Enum.map(recent, fn {_broker, _reason, t, _ts} -> t end)
+    # the ring records WHICH internal targets were attempted — the key incident-response question
+    assert "http://169.254.169.254/" in targets
+    assert "http://10.0.0.1/" in targets
+    # newest-first: the most recent attempt heads the list, tagged broker + reason
+    assert [{:net, :ssrf, "http://10.0.0.1/", _ts} | _] = recent
+  end
 end

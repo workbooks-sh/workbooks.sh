@@ -36,7 +36,7 @@ defmodule Workbooks.TcpBroker do
             do_request(ip, port, data, max, timeout)
 
           :error ->
-            Workbooks.BrokerAudit.record(:tcp, :deny, :ssrf)
+            Workbooks.BrokerAudit.record(:tcp, :deny, :ssrf, "#{host}:#{port}")
             Logger.warning("wb-broker: DENY tcp #{host}:#{port} — SSRF (internal/non-routable/unresolved)")
             {:error, :denied}
         end
