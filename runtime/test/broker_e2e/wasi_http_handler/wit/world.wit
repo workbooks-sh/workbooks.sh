@@ -1,4 +1,5 @@
 package wb:httpguest;
 world handler {
+  import wasi:http/outgoing-handler@0.2.6;
   export wasi:http/incoming-handler@0.2.6;
 }

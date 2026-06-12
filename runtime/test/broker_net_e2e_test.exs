@@ -70,6 +70,9 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert {"x-brokered", "yes"} in headers
     # the request reached the guest (it echoed the method) and the body flowed back
     assert body =~ "hello from brokered guest" and body =~ "Post"
+    # SSRF COMPOSITION: the serving guest tried an OUTBOUND fetch to cloud metadata while handling the
+    # request — it MUST be brokered/SSRF-blocked. A serving guest cannot become an SSRF pivot.
+    assert body =~ "outbound=blocked"
   end
 
   @tag :build

@@ -978,3 +978,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   The inbound seam now handles real HTTP payloads efficiently. NEXT: optional serving-guest outbound-SSRF
   composition test (the SSRF mechanism is global + already proven); otherwise the keystone is comprehensively
   done in every dimension.
+- 2026-06-12 (iter 65): **INBOUND SEAM SSRF-COMPOSITION PROVEN — a serving guest cannot SSRF-pivot (the last
+  security step).** The red-team mandate ("a guest must not reach metadata") applies to the inbound serving
+  path too. The wasi:http handler guest now imports wasi:http/outgoing-handler and, while handling each
+  request, attempts an OUTBOUND fetch to cloud metadata (169.254.169.254). serve_http -> the guest's outbound
+  goes through the host's brokered send_request -> SSRF-BLOCKED -> response body "outbound=blocked". So a
+  serving guest's outbound is SSRF-filtered exactly like any other guest's — the inbound seam does NOT open
+  an SSRF pivot. e2e green (asserts outbound=blocked). The inbound seam is now FULLY security-validated:
+  sandboxed guest (no socket) + brokered, SSRF-filtered outbound. ★ THE KEYSTONE IS COMPLETE AND EVERY STEP
+  IS ADVERSARIALLY TESTED — outbound (wasi:http+sockets) AND the inbound serving path (handler + its outbound). ★
