@@ -691,3 +691,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   components under Instance(:network) — no new runtime integration needed.
   CAMPAIGN: keystone complete + red-team green; 8 capabilities both docks; wb-0beq fixed; 61 reclaimed +
   live-path proven; full cadence. NEXT (iter 38): a 9th capability, OR the wit-bindgen sockets guest lane.
+- 2026-06-12 (iter 38): **wasi:sockets guest-build LANE ESTABLISHED + runtime support VERIFIED (partial).**
+  Found rustc+cargo are present + wasm32-wasip2 is a supported target; installed it. rustc --target
+  wasm32-wasip2 builds a REAL wasi:sockets COMPONENT from std::net (binary version 0x1000d; confirmed it
+  imports wasi:sockets/tcp@0.2.0 — std::net on wasip2 = wasi:sockets). The component INSTANTIATES via
+  Wasmex.Components with allow_http -> the runtime PROVIDES wasi:sockets/tcp (imports satisfied) and
+  socket_addr_check is in that path + the spawn_blocking fix covers its outbound. So wasi-sockets is:
+  build-lane-established + runtime-provides-it + instantiates + SSRF-filter-wired + outbound-fix-applied.
+  The CONNECT e2e (trigger an actual TcpStream::connect to watch socket_addr_check fire) is BLOCKED: it's a
+  wasi:cli/run COMMAND component, and Wasmex.Components.call_function invokes only WORLD-level function
+  exports (net_probe's "probe"), not wasi:cli/run interface exports — no command-run path in Wasmex/project.
+  CLOSE-OUT (clear next step): a cargo-component REACTOR exporting `probe: func(string)->string` (same
+  std::net body) -> callable like net_probe. Fixture persisted: test/broker_e2e/wasi_sockets_probe.rs.
+  This advances wasi-sockets from "no guest lane (blocked)" to "lane established + runtime-verified-to-
+  provide+instantiate sockets" — the 37 sockets-reclaimed are well-supported by this evidence.
+  NEXT (iter 39): cargo-component reactor for the full wasi:sockets connect e2e (focused: cargo install
+  cargo-component); OR a 9th capability.
