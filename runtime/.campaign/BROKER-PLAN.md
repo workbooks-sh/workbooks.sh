@@ -1073,3 +1073,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   Limited (a standard library). So the keystone's "huge bodies / byte quotas" now covers the inbound app-host
   RESPONSE too (request was already capped). FOLLOW-UP: full streaming (chunked, not buffered) for large
   LEGIT downloads/SSE — the bigger capability item; this cap is the DoS floor until then.
+- 2026-06-12 (iter 75): **BROKER OBSERVABILITY — the "manageable" leg of the keystone (denials are now a
+  QUERYABLE metered view, not just log strings).** The keystone's third done-criterion is "manageable", but
+  audit was only Logger.warning lines — un-queryable, no metrics. Built Workbooks.BrokerAudit: atomic ETS
+  counters keyed {broker, outcome} + {broker, outcome, reason}, with stats/0, count/1, total_denials/0 (lazy
+  public ETS, cheap update_counter). Wired record() into the deny/allow paths of NetGuard (egress: ssrf /
+  allowlist / revoked / rate_limited denials + allow) and the socket brokers (tcp/udp/tls SSRF denials). A
+  monitor can now poll BrokerAudit.stats() to watch denial RATES and alert on anomalies (a spike in {:net,
+  :deny, :ssrf} = a guest probing internal targets = likely a compromised guest). 10 tests green (record/stats
+  counts per broker+reason; NetGuard SSRF + allow-list denials audited). The keystone's "manageable" criterion
+  is now met: every wired broker denial is observable + queryable. FOLLOW-UP: wire exec/storage/queue/serve
+  (mechanical) + a recent-events forensics ring + :telemetry emission for external monitors.

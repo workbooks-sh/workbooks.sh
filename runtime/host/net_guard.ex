@@ -30,15 +30,24 @@ defmodule Workbooks.NetGuard do
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :revoked)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — principal revoked")
         {:error, :revoked}
 
       principal && rate && rate_denied?(principal, rate) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :rate_limited)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — rate limited")
         {:error, :rate_limited}
 
       true ->
-        do_get(url, timeout, allow, 5)
+        case do_get(url, timeout, allow, 5) do
+          {:ok, _} = ok ->
+            Workbooks.BrokerAudit.record(:net, :allow)
+            ok
+
+          other ->
+            other
+        end
     end
   end
 
@@ -50,10 +59,12 @@ defmodule Workbooks.NetGuard do
   defp do_get(url, timeout, allow, hops) do
     cond do
       not allowed?(url) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :ssrf)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — SSRF (internal/non-routable destination)")
         {:error, :denied}
 
       not host_allowed_by_list?(url, allow) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :allowlist)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — host not in allow-list")
         {:error, :denied}
 
