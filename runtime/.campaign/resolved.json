@@ -1464,6 +1464,126 @@
 "lane": "none",
 "blocker": "network-as-purpose (DB server over TCP/Unix sockets is the entire point) + native pthreads thread-per-connection model + POSIX signals; plus a massive C++ port with zero ",
 "extent": "off-the-table (verified)"
+},
+"MongoDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose (TCP server daemon) + native multithreading (WiredTiger/replication) + embedded JS JIT engine + codegen-driven cmake/SCons build. Any one is fatal unde",
+"extent": "off-the-table (verified)"
+},
+"FoundationDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose distributed system: Flow actor runtime over epoll networking, multi-process cluster requiring fork-exec + native threads. No single-process embeddable ",
+"extent": "off-the-table (verified)"
+},
+"TimescaleDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "TimescaleDB is a PostgreSQL C extension (.so loaded by `shared_preload_libraries`) \u2014 it has no standalone existence; it requires a running Postgres backend, hooks into Po",
+"extent": "off-the-table (verified)"
+},
+"Couchbase": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose clustered DB; multi-process fork-exec of separate Erlang/C++/Go service binaries; requires BEAM VM + Go runtime native threads and TCP networking. No w",
+"extent": "off-the-table (verified)"
+},
+"RethinkDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-as-purpose: core value is a long-lived TCP changefeed/push server. Also requires native threads (thread-per-core + custom context-switch asm) and a custom storage",
+"extent": "off-the-table (verified)"
+},
+"ArangoDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Large C++ server embedding V8 (a JIT engine that won't run jitless under wasmtime) for AQL/Foxx execution, plus RocksDB storage and a clustered network database server wh",
+"extent": "off-the-table (verified)"
+},
+"Greenplum": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Greenplum is a heavily-modified Postgres fork whose ENTIRE value proposition is massively-parallel processing (MPP): a coordinator process distributes queries across many",
+"extent": "off-the-table (verified)"
+},
+"TerminusDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Database logic/query layer is SWI-Prolog, a large C runtime whose only wasm port is Emscripten/browser-targeted (needs JS glue + browser/Node VM), not standalone wasm32-w",
+"extent": "off-the-table (verified)"
+},
+"Aerospike": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Aerospike is a 64-bit GNU/Linux-only clustered distributed KV store whose entire value IS the platform-pinned capabilities wasm32-wasi cannot expose: networking/clusterin",
+"extent": "off-the-table (verified)"
+},
+"DragonflyDB": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Multiple hard blockers, any one fatal for wasip1/wasmtime: (1) io_uring async IO \u2014 Linux-kernel-specific, unavailable in WASI; (2) shared-nothing MULTI-THREADED architect",
+"extent": "off-the-table (verified)"
+},
+"Tarantool": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network database server by purpose (TCP listener / iproto protocol is the whole point \u2014 network-as-purpose). Multiple independent hard blockers stack on top: (1) bundles ",
+"extent": "off-the-table (verified)"
+},
+"Apache Kudu": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "network-as-purpose (Raft replication + RPC between master/tablet servers) plus native-thread and fork-exec dependence; no embeddable single-lib mode \u2014 the clustered netwo",
+"extent": "off-the-table (verified)"
+},
+"pgvector": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "pgvector is meaningless without full PostgreSQL, and Postgres cannot run as wasm32-wasi under wasmtime: it depends on fork() (postmaster/backend process model), SysV/POSI",
+"extent": "off-the-table (verified)"
+},
+"Apache Hudi": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Reference Hudi is JVM/Spark/Hadoop-coupled (JIT-bound, not wasm). The only non-JVM path, hudi-rs, is a large multi-crate Rust workspace whose purpose is reading/writing t",
+"extent": "off-the-table (verified)"
+},
+"ObjectBox": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Closed-source core. Only the C binding (headers + glue) is open; the engine libobjectbox is a prebuilt closed C++ binary with no source and no published wasm32-wasi targe",
+"extent": "off-the-table (verified)"
+},
+"Realm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Only demonstrated wasm build is an Emscripten BROWSER target (realm-js alpha, nh/wasm/emscripten_target) needing a JS/DOM host + Asyncify; per MongoDB docs it stores loca",
+"extent": "off-the-table (verified)"
+},
+"libreoffice (soffice)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Requires native threads (pthreads/SharedArrayBuffer), fork-exec of subprocesses, and dlopen of UNO .so component plugins; only wasm port is Emscripten+Qt5+WebGL browser-o",
+"extent": "off-the-table (verified)"
+},
+"inkscape": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "GTK/GUI C++ application; CLI export still drags in full editor core, cairo, pango, GLib/GObject, and fork-exec Python extension subprocesses. fork-exec + GUI/GObject tool",
+"extent": "off-the-table (verified)"
+},
+"TensorFlow": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "native threads gpu and bazel build",
+"extent": "off-the-table (verified)"
+},
+"PyTorch": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Native multithreaded C++ (caffe2 threadpool + intra-op parallelism, MKL/oneDNN BLAS), build-time Python codegen of the ATen dispatcher (not pre-generated, so violates sel",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
