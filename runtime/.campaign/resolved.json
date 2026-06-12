@@ -710,6 +710,54 @@
 "recipe": "prebuilt pandoc.wasm (GHC wasm backend, haskell-wasm) 53MB",
 "smoke": "# Hello + **bold** -> <h1>Hello</h1> <p>..<strong>",
 "extent": "universal document converter \u2014 markdown/HTML/LaTeX/RST/docx/... formats, stdin->stdout"
+},
+"netcat (nc)": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose tool. wasip1 has no raw TCP/UDP socket syscalls (no sock_connect; only sock_accept on pre-opened FDs). Standalone wasm cannot open arbitrary network connections \u2014 t",
+"extent": "off-the-table (verified)"
+},
+"dig / bind-tools": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose tool: dig's entire function is sending DNS packets over the network. wasip1 has no UDP and no outbound socket creation, so there is no transport for raw DNS. Per ru",
+"extent": "off-the-table (verified)"
+},
+"make": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "make's purpose is spawning subprocess recipe commands via shell fork/exec; wasip1 has no fork/exec/posix_spawn/process-spawn and standalone wasmtime brokers no subprocess, so no re",
+"extent": "off-the-table (verified)"
+},
+"ring": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "build.rs compiles BoringSSL-derived C + perlasm-generated per-arch assembly via clang/cargo, which mrustc (Lane C) cannot drive; not a self-contained C amalgam (rules out Lane B); ",
+"extent": "off-the-table (verified)"
+},
+"Tectonic": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose by design: Tectonic auto-fetches the TeX package bundle over HTTPS at runtime (its core \"self-contained\" mechanism). Plus non-live C++ deps (ICU/graphite2/fontconfi",
+"extent": "off-the-table (verified)"
+},
+"libvips": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Hard dependency on the GLib/GObject/GIO/GModule runtime (type system + dlopen-style dynamic module loading + dynamic threadpool, GLib >=2.52) plus a threads/SIMD/exception-handling",
+"extent": "off-the-table (verified)"
+},
+"BLAS / LAPACK": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Reference impl is Fortran 90/77 and we have NO Fortran frontend (no flang/lfortran/gfortran/f2c) in the in-sandbox toolchain. Lanes B/C/D cannot consume Fortran; the f2c-translated",
+"extent": "off-the-table (verified)"
+},
+"Swift": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "swiftc is a native (non-wasm) LLVM toolchain; building Swift -> wasm32-wasi requires native exec, which is forbidden in-sandbox. No prebuilt standalone Swift .wasm program exists t",
+"extent": "off-the-table (verified)"
 }
 },
 "preliminary": {
@@ -1224,6 +1272,90 @@
 "verdict": "uncertain",
 "lane": "B",
 "recipe": "Lane B (self-contained C) is the only candidate path, but requires a heavy fork, not a clean compile. Steps if",
+"confidence": "high",
+"verified": false
+},
+"GraphicsMagick": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C/C++). GraphicsMagick 1.3.47 is portable C/C++ (MIT), pure pixel-compute \u2014 s",
+"confidence": "medium",
+"verified": false
+},
+"sharp / libvips": {
+"verdict": "impossible",
+"lane": "none",
+"recipe": "n/a",
+"confidence": "low",
+"verified": false
+},
+"git": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Build libgit2 (pure C, ~v1.7.x) as wasm32-wasi via the C lane, NOT the canonical C git CLI (autoconf",
+"confidence": "medium",
+"verified": false
+},
+"ghostscript": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "No plain wasm32-wasi artifact exists. Both prebuilt wasm builds (jsscheller/ghostscript-wasm, jerbob",
+"confidence": "high",
+"verified": false
+},
+"poppler-utils": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C++). Build libpoppler core + pdftotext only for the first cut. Toolchain: cl",
+"confidence": "medium",
+"verified": false
+},
+"openssl": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "Lane A: fetch the prebuilt openssl.wasm CLI from voltbuilder/openssl-wasm releases (tags v1.1.1o etc",
+"confidence": "high",
+"verified": false
+},
+"miller (mlr)": {
+"verdict": "uncertain",
+"lane": "none",
+"recipe": "No viable lane under current toolchain. Miller is ~99% pure Go (zero runtime deps, no cgo, no networ",
+"confidence": "high",
+"verified": false
+},
+"librsvg (rsvg-convert)": {
+"verdict": "uncertain",
+"lane": "C",
+"recipe": "librsvg itself is impossible: rsvg-convert pulls cairo/pango/gdk-pixbuf/fontconfig/GLib (C deps, con",
+"confidence": "medium",
+"verified": false
+},
+"Pango": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B in principle (pure-C CPU text-layout, no GPU/syscall/fork-exec/network), but NOT self-contain",
+"confidence": "medium",
+"verified": false
+},
+"BoringSSL": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C/C++). Vendor the BoringSSL tree (crypto/ + ssl/ + include/), which ships PR",
+"confidence": "medium",
+"verified": false
+},
+"LibreSSL": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Lane B (self-contained C). Build libcrypto (+ optional libssl/libtls) from the libressl-portable tar",
+"confidence": "high",
+"verified": false
+},
+"Haskell": {
+"verdict": "live-likely",
+"lane": "A",
+"recipe": "Haskell-the-compiler (GHC) is NOT shippable in-sandbox \u2014 GHC is a huge native cross-compiler with no",
 "confidence": "high",
 "verified": false
 }
