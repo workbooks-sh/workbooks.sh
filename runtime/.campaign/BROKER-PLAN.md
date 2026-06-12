@@ -1246,3 +1246,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   app-host returns 504 via the Plug's receive backstop (not a faster 500) when a trapped guest yields its
   default-response path — the serve still completes in ~8s (threads freed), so it's a routing nicety, not a
   security gap.
+- 2026-06-12 (iter 91): **App-host trapped-guest routing FIXED — fail fast (502) instead of the 504 backstop.**
+  Investigated the iter89 cosmetic nuance: for a trapped compute-DoS guest the serve completes (~8s, threads
+  freed) but its default response can't be forwarded as a start frame, so the streaming Plug used to wait out
+  its 15s receive backstop -> 504. Proper fix: the Plug now MONITORS the handler process; if it finishes or
+  crashes WITHOUT delivering a start frame, the Plug gets {:DOWN} and fails fast with 502. Demonitor on a
+  normal start (no effect on real streaming). RESULT: the app-host compute-DoS test now returns 502 in ~8s
+  (down from 504 in ~15s); normal Bandit chunked streaming still green (monitor/demonitor transparent). So the
+  one open cosmetic item is closed — a trapped/no-response guest now yields a fast, meaningful 502, the
+  request is bounded, and the server stays up. The DoS + red-team picture is fully green and clean.

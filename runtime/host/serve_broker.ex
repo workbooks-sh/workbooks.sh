@@ -285,44 +285,58 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
       ref = make_ref()
       parent = self()
 
-      spawn(fn ->
-        try do
-          Wasmex.Components.Instance.serve_http_stream(
-            inst,
-            conn.method,
-            conn.request_path,
-            conn.req_headers,
-            body,
-            parent,
-            ref,
-            epoch
-          )
-        rescue
-          _ -> send(parent, {ref, :stream_error, :handler_error})
-        catch
-          _, _ -> send(parent, {ref, :stream_error, :handler_error})
-        end
-      end)
+      pid =
+        spawn(fn ->
+          try do
+            Wasmex.Components.Instance.serve_http_stream(
+              inst,
+              conn.method,
+              conn.request_path,
+              conn.req_headers,
+              body,
+              parent,
+              ref,
+              epoch
+            )
+          rescue
+            _ -> send(parent, {ref, :stream_error, :handler_error})
+          catch
+            _, _ -> send(parent, {ref, :stream_error, :handler_error})
+          end
+        end)
 
-      receive_stream_start(conn, ref)
+      # MONITOR the handler: if it finishes/crashes WITHOUT delivering a start frame (e.g. a compute-DoS guest
+      # trapped by the epoch deadline yields a response the host can't forward), we get a :DOWN and fail fast
+      # with 502 instead of waiting out the receive backstop.
+      mon = Process.monitor(pid)
+      receive_stream_start(conn, ref, mon, pid)
     else
       _ -> send_resp(conn, 502, "wasi:http component error")
     end
   end
 
-  defp receive_stream_start(conn, ref) do
+  defp receive_stream_start(conn, ref, mon, pid) do
     receive do
       {^ref, :stream_start, status, headers} ->
+        Process.demonitor(mon, [:flush])
         conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
         conn = send_chunked(conn, status)
         stream_loop(conn, ref)
 
-      # the handler errored (e.g. a compute-DoS guest trapped by the epoch deadline) — fail fast rather than
-      # waiting out the receive timeout.
+      # the handler raised (caught in the spawn) — fail fast rather than waiting out the receive timeout.
       {^ref, :stream_error, _reason} ->
+        Process.demonitor(mon, [:flush])
         send_resp(conn, 500, "wasi:http component error")
+
+      # the handler finished/crashed without delivering a start frame (e.g. a trapped compute-DoS guest whose
+      # default response the host can't forward) — fail fast with 502.
+      {:DOWN, ^mon, :process, ^pid, _reason} ->
+        send_resp(conn, 502, "wasi:http component produced no response")
     after
-      15_000 -> send_resp(conn, 504, "stream start timeout")
+      # final backstop (e.g. a handler that neither delivers a start nor exits within the window).
+      15_000 ->
+        Process.demonitor(mon, [:flush])
+        send_resp(conn, 504, "stream start timeout")
     end
   end
 

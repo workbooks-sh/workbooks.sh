@@ -825,7 +825,9 @@ defmodule Workbooks.BrokerNetE2ETest do
     {:ok, {{_, spin_status, _}, _, _}} =
       :httpc.request(:get, {spin, []}, [{:timeout, 30_000}], body_format: :binary)
 
-    assert spin_status in [500, 502, 504], "spinning guest must be bounded, got #{spin_status}"
+    # the handler is monitored: a trapped guest that completes without a usable response fails FAST (500/502),
+    # not via the slow 504 receive backstop.
+    assert spin_status in [500, 502], "spinning guest must fail fast, got #{spin_status}"
 
     # and the server is still up — a normal request after the attack succeeds
     ok = ~c"http://127.0.0.1:#{port}/"
