@@ -309,3 +309,25 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NEXT (iter 11, fresh context): begin Stone 2 — design the host_exec Dock import (name+argv+stdin ->
   CommandRegistry.run, deny ungranted commands), wire it, and adversarially test it offline. Networking
   resumes when an internet env / a focused async-refactor session is available (wb-0beq, wb-k2im, wb-q962).
+
+## STONE 2 — exec -> CommandRegistry dispatch (the pivot; OFFLINE-validatable)
+- 2026-06-12 (iter 11): **Stone 2 CORE built + e2e-VALIDATED (green) — a real new capability, proven
+  offline.** Workbooks.ExecBroker.exec/4 brokers a guest's exec(cmd) to the in-sandbox CommandRegistry
+  (the 32+ wasm commands) — the host runs another SANDBOXED wasm command in its own isolated instance; NO
+  real OS exec. Security cadence (mirrors the net broker), all TESTED:
+    * DEFAULT-DENY (must be granted via the `commands` cap) ✓
+    * NO real OS exec — unregistered names (rm/bash//bin/sh) denied ✓
+    * COMMAND allow-list scoping (granted-but-not-listed -> denied) ✓
+    * BOUNDED nesting depth (recursion-bomb defense) ✓
+    * NO injection / arg-smuggling — argv is STRUCTURAL; e2e-proven `echo "ok; rm -rf /"` prints the
+      literal string, never interpreted ✓
+    * size-capped output + audit log on every denial ✓
+  DISPATCH E2E (the gold proof, fully offline): seeded coreutils + ExecBroker.exec("coreutils",["seq","5"])
+  -> "1\n2\n3\n4\n5" — a command actually RAN through the broker. 6 hermetic + 1 :pallet dispatch test green.
+  CONTRAST with networking: Stone 2 is FULLY offline-validatable (local wasm commands, no internet), so it's
+  proven end-to-end here — real capability delivered.
+  NEXT (iter 12): wire `host_exec` as a Dock import (thin wrapper: read name+argv+stdin from wasm mem ->
+  ExecBroker.exec(allow: "commands" in Policy.caps(profile)) -> write output), then a guest e2e (a Rust/JS
+  guest exec's coreutils -> output). Then thread the nesting depth through CommandRegistry.run so a brokered
+  command that itself execs is depth-counted. This unlocks build-tools/shells/orchestrators (the fork-exec
+  class) — many of the 323 "impossible (fork-exec)" items become reachable via brokered exec to wasm cmds.
