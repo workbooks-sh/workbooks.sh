@@ -14,6 +14,7 @@ use wasmtime_wasi::ResourceTable;
 use wasmtime_wasi::WasiCtx;
 use wasmtime_wasi::WasiView;
 use wasmtime_wasi_http::{HttpError, HttpResult, WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi_http::bindings::http::types::ErrorCode;
 use wasmtime_wasi_http::body::HyperOutgoingBody;
 use wasmtime_wasi_http::types::{
     default_send_request, HostFutureIncomingResponse, OutgoingRequestConfig,
@@ -311,10 +312,9 @@ impl WasiHttpView for ComponentStoreData {
         let host = match uri.host() {
             Some(h) => h.trim_start_matches('[').trim_end_matches(']').to_string(),
             None => {
-                return Err(HttpError::trap(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "wb-broker: outgoing request has no host",
-                )));
+                return Err(HttpError::from(ErrorCode::InternalError(Some(
+                    "wb-broker: outgoing request has no host".to_string(),
+                ))));
             }
         };
         let port = uri.port_u16().unwrap_or(match uri.scheme_str() {
@@ -322,19 +322,18 @@ impl WasiHttpView for ComponentStoreData {
             _ => 80,
         });
         if !wb_host_allowed(&host, port) {
-            return Err(HttpError::trap(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "wb-broker: destination denied by egress policy (internal/non-routable address)",
-            )));
+            return Err(HttpError::from(ErrorCode::InternalError(Some(
+                "wb-broker: destination denied by egress policy (internal/non-routable address)"
+                    .to_string(),
+            ))));
         }
         // Scoped allow-list (on top of the SSRF floor): if this instance was granted a non-empty list,
         // the destination host must match it. No list (None/empty) = no extra scoping.
         if let Some(list) = &self.net_allow {
             if !list.is_empty() && !wb_host_in_allowlist(&host, port, list) {
-                return Err(HttpError::trap(std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    "wb-broker: destination not in the instance egress allow-list",
-                )));
+                return Err(HttpError::from(ErrorCode::InternalError(Some(
+                    "wb-broker: destination not in the instance egress allow-list".to_string(),
+                ))));
             }
         }
         Ok(default_send_request(request, config))

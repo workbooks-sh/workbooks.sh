@@ -1,0 +1,5 @@
+package wb:e2e;
+
+world net-probe {
+  export probe: func(url: string) -> string;
+}

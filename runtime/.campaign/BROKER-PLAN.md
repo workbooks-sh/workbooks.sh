@@ -205,3 +205,26 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   a non-listed host -> "BLOCKED", an allow-listed public host -> reachable. THAT closes wb-q962 and proves
   the whole stack (SSRF + allow-list + wiring) at runtime — after which quotas/audit/revocation get added,
   each runtime-proven via this same harness.
+- 2026-06-12 (iter 6): **E2E PROVEN (deny paths) WITH A REAL wasi:http GUEST — wb-q962 mostly closed.**
+  Built the harness: jco componentize net_probe.js -> a 12.5MB wasi:http component (StarlingMonkey fetch ->
+  wasi:http/outgoing-handler -> our send_request override); ran it via Wasmex.Components with allow_http.
+  FOUND + FIXED a real bug only e2e could catch: HttpError::trap POISONED the instance ("cannot enter
+  component instance" on the next call) -> switched all 3 denials to graceful HttpError::from(ErrorCode::
+  InternalError(..)) so a denied fetch is a CATCHABLE error, instance survives. RE-RAN green:
+    - fetch http://169.254.169.254/  -> BLOCKED (SSRF floor)   [REAL GUEST, RUNTIME]
+    - fetch http://127.0.0.1/        -> BLOCKED (SSRF floor)   [REAL GUEST, RUNTIME]
+    - fetch http://8.8.8.8/ w/ net_allow=["example.com"] -> BLOCKED (ALLOW-LIST — 8.8.8.8 is public so the
+      floor would ALLOW it; the block is provably the allow-list)   [REAL GUEST, RUNTIME]
+    - instance survives every denial (graceful, not trap).
+  Reproducible: test/broker_e2e/{net_probe.js,net_probe.wit,deny_e2e.exs,README.md}.
+  HONESTLY STILL OPEN:
+    - ALLOW-REACHABILITY not proven: this dev env has NO outbound internet, so a listed/public host can't be
+      confirmed to actually CONNECT here; AND the connect path panics ("Cannot start a runtime from within a
+      runtime", wasmtime-wasi runtime.rs:108) — env-specific (no-internet) or a pre-existing wasmex async/
+      wasi-http issue. NEEDS: an internet-enabled env to prove reachability + investigate the connect panic
+      (likely the blocking to_socket_addrs in wb_host_allowed running on the async thread — should move to a
+      tokio spawn_blocking / use a non-blocking resolver). Filed under wb-q962.
+    - DNS-rebinding pin (http hostnames), rate/byte/conn quotas, audit log, revocation — next, each now
+      runtime-provable via this harness.
+  NEXT (iter 7): fix the blocking-resolver-on-async-thread (spawn_blocking) — it's likely the connect panic
+  AND a correctness issue (blocking the executor); then quotas + audit, each e2e-checked.
