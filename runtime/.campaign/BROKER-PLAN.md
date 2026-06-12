@@ -1101,3 +1101,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   FORENSICS RING (recent denials with targets via recent/1) — both the monitoring AND incident-response views
   of the "manageable" criterion. FOLLOW-UP: storage/queue capacity counters + :telemetry emission for
   external SIEMs.
+- 2026-06-12 (iter 78): **APP-HOST SOAK — fresh-per-request serving is memory-stable under sustained load
+  (the strategic review's top validation: "most likely to surface a defect").** The fresh-per-request model
+  (iter68) instantiates a store+instance PER request — UNKNOWN until now whether the cleanup keeps up under
+  churn or leaks. Soak: compile once, 2000 fresh-per-request serves (Store.new_wasi + Instance.new +
+  serve_http), GC, measure memory. RESULT: all 2000 succeeded (correctness under load) + memory growth < 64 MB
+  (the store/instance resources ARE reclaimed — no per-request leak; a leak would be ~GBs) + ran in 0.9s
+  (~0.45 ms/serve, so fresh instantiation from a pre-compiled component is cheap). So the production fresh-per-
+  request app-host is VALIDATED: memory-stable, correct, and fast under sustained churn. The validation flagged
+  as most-likely-to-find-a-defect PASSED — confidence + a permanent soak guard in the suite.

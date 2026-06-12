@@ -466,6 +466,61 @@ defmodule Workbooks.BrokerNetE2ETest do
 
   @tag :build
   @tag :netdeps
+  @tag timeout: 600_000
+  test "APP-HOST soak — sustained fresh-per-request serving is memory-stable (no per-request resource leak)" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    # compile ONCE; each "request" instantiates a fresh store+instance (the production serve model)
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+
+    serve = fn ->
+      {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+      {:ok, inst} = Wasmex.Components.Instance.new(store, component, %{})
+      Wasmex.Components.Instance.serve_http(inst, "GET", "/", [{"host", "localhost"}], "")
+    end
+
+    # warm up, then baseline memory after a GC
+    for _ <- 1..50, do: serve.()
+    :erlang.garbage_collect()
+    Process.sleep(100)
+    mem0 = :erlang.memory(:total)
+
+    # sustained churn: 2000 fresh instances created + dropped
+    oks =
+      Enum.reduce(1..2000, 0, fn _, acc ->
+        case serve.() do
+          {200, _h, _b} -> acc + 1
+          _ -> acc
+        end
+      end)
+
+    :erlang.garbage_collect()
+    Process.sleep(200)
+    mem1 = :erlang.memory(:total)
+
+    # correctness held under sustained load
+    assert oks == 2000
+    # and the runtime didn't balloon — 2000 fresh instances must be reclaimed, not leaked. A real leak would
+    # be ~GBs (instance linear memory × 2000); a healthy steady state is ~one instance's worth.
+    growth_mb = (mem1 - mem0) / 1_048_576
+
+    assert growth_mb < 64,
+           "memory grew #{Float.round(growth_mb, 1)} MB over 2000 fresh-per-request serves — likely a resource leak"
+  end
+
+  @tag :build
+  @tag :netdeps
   @tag timeout: 300_000
   test "APP-HOST mid-flight revocation — a revoked hosted app is refused (503), server keeps running" do
     proj = "test/broker_e2e/wasi_http_handler"
