@@ -69,6 +69,7 @@ defmodule Workbooks.JsDock do
     allow_exec = "exec" in Policy.caps(profile)
     allow_kv = "kv" in Policy.caps(profile)
     allow_secrets = "secrets" in Policy.caps(profile)
+    allow_tcp = "tcp" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -163,6 +164,21 @@ defmodule Workbooks.JsDock do
                 {:ok, sig} <- Workbooks.SecretBroker.sign(tenant, name, data) do
              n = min(byte_size(sig), oc)
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(sig, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end},
+      # Brokered raw-TCP request/response (resolve-then-pin, SSRF-safe). Mirrors rust_dock.
+      "host_tcp" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, hp, hl, port, rp, rl, op, oc ->
+           with true <- allow_tcp,
+                host = Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl),
+                req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
+                {:ok, resp} <- Workbooks.TcpBroker.request(host, port, req, principal: tenant) do
+             n = min(byte_size(resp), oc)
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(resp, 0, n))
              n
            else
              _ -> -1

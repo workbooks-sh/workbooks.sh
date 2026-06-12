@@ -659,3 +659,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   guest-usable + e2e-proven (line protocols for hand-written guests, fully brokered+pinned+secured).
   PLATFORM: EIGHT brokered capabilities, all guest-e2e-proven. NEXT (iter 35): js_dock host_tcp parity; OR a
   concrete reclaimed live tool; OR more.
+- 2026-06-12 (iter 35): **js_dock host_tcp PARITY (raw-TCP on both docks) + DoS red-team CLOSED.** js_dock
+  host_tcp mirrored from rust_dock (allow_tcp gate). 26 broker tests green. DoS RED-TEAM ASSESSMENT (the last
+  adversarial category): many-conns -> RATE quota (RateLimiter) + batch max_concurrency ✓; slowloris -> per-
+  op TIMEOUT ✓; huge-bodies -> guest-DELIVERED body is CAPPED everywhere (host_http_get truncates to the
+  guest out_cap; wasi-http bounded by the guest MEMORY limit; TcpBroker size-caps) ✓. Residual: the transient
+  host-side :httpc read in host_http_get is unbounded (filed, LOW priority — only our own hand-written guests;
+  the untrusted standard-tool path is wasi-http/memory-bounded; 10s timeout bounds it). The full red-team
+  suite is now GREEN: SSRF (IP-literals/IPv6/decimal/hex/octal/userinfo@/v4-mapped/redirect-to-internal) +
+  DNS-rebinding (resolve-then-pin) + allow-list + rate/conn/body quotas + audit + revocation — all proven.
+  PLATFORM: 8 brokered capabilities (both docks) + wb-0beq fixed + 24 reclaimed + full cadence + red-team
+  green. NEXT (iter 36): promote a reclaimed tool to live, OR a 9th capability, OR wasi-sockets guest lane.
