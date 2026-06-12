@@ -592,6 +592,13 @@ defmodule Workbooks.Pallet do
                          ftstroke.c ftsynth.c sfnt.c truetype.c cff.c type1.c type1cid.c autofit.c
                          smooth.c raster.c sdf.c psaux.c pshinter.c psnames.c ftgzip.c ftmain.c)
 
+  # HarfBuzz (text shaping) — C++ amalgam: src/harfbuzz.cc #includes all the parts (:compile_only).
+  @harfbuzz_main ~S"""
+  #include <stdio.h>
+  #include "hb.h"
+  int main(void) { printf("harfbuzz %s\n", hb_version_string()); return 0; }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -719,6 +726,17 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "harfbuzz",
+      url: "https://codeload.github.com/harfbuzz/harfbuzz/tar.gz/refs/tags/14.2.1",
+      sha: "3c2a9006a7e1bf58737e557014d7882c554c628fb379a9f00008f5ea53dbbdfb",
+      build_opts: [
+        src_globs: ["src/**/*.{cc,hh,h}"],
+        compile_only: ["harfbuzz.cc", "hbmain.c"],
+        cflags: ["-DHB_NO_MT", "-fno-exceptions", "-I/work/src"],
+        extra_sources: [{"hbmain.c", @harfbuzz_main}]
+      ]
     },
     %{
       name: "freetype",

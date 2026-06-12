@@ -496,6 +496,13 @@
 "lane": "none",
 "blocker": "Koka compiler is a Haskell/GHC program; no GHC->wasm32-wasi lane exists (not Lane A/B/C/D). The C/JS backends only help after the (off-sandbox) Haskell compiler has already emitted code, so Koka itsel",
 "extent": "off-the-table (verified)"
+},
+"HarfBuzz": {
+"verdict": "live",
+"lane": "B",
+"recipe": "harfbuzz 14.2.1 C++ amalgam (src/harfbuzz.cc via :compile_only, -DHB_NO_MT -fno-exceptions)",
+"smoke": "hb_version_string => harfbuzz 14.2.1",
+"extent": "text-shaping engine builds; harfbuzz cmd prints version, ready for hb_shape with a font"
 }
 },
 "preliminary": {
@@ -670,14 +677,6 @@
 "lane": "D",
 "source_url": "https://registry.npmjs.org/pdf-lib/latest",
 "recipe": "Do NOT compile pdftk-java (needs JVM; original C++/GCJ native/JIT). Cover capability with pure-JS pdf-lib on QuickJS/esbuild JS lane. Bundle",
-"confidence": "high",
-"verified": false
-},
-"HarfBuzz": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/harfbuzz/harfbuzz",
-"recipe": "HarfBuzz is a self-contained C++ OpenType shaping library: pure CPU, no syscalls, no GPU, no threads, no network. Strong Lane B fit on our C",
 "confidence": "high",
 "verified": false
 },
