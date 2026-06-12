@@ -40,6 +40,17 @@ defmodule Workbooks.Pallet do
       mode: :argv
     },
     %{
+      # Agda — dependently-typed language / proof assistant, prebuilt wasm32-wasi (GHC 9.10 wasm backend).
+      # Zip ships opt/agda-opt.wasm (wasm-opt'd, 31MB) + opt/lib/prim datadir. `--version` runs standalone;
+      # batch typecheck (agda file.agda) needs the prim datadir mounted (--dir + Agda_datadir) — follow-up.
+      name: "agda",
+      kind: :zip,
+      url: "https://github.com/agda-web/agda-wasm-dist/releases/download/v2.8.0-ghc9.10.3-r0/agda-wasm-v2.8.0-ghc9.10.3-r0.zip",
+      sha: "1aa2fb20e8c78bfb0ee1baf24be9517b61ad2f7e45c5c196df72a09f60d981d4",
+      wasm_rel: "opt/agda-opt.wasm",
+      mode: :argv
+    },
+    %{
       # pandoc — universal document converter (markdown/HTML/LaTeX/RST/docx/…), prebuilt wasm32-wasi
       # (GHC 9.12 wasm backend, no JS host). 53MB, fetched at seed. `pandoc -f <from> -t <to>` stdin→stdout.
       name: "pandoc",

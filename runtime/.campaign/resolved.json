@@ -1337,6 +1337,13 @@
 "lane": "none",
 "blocker": "Red is a self-hosting language with its own NATIVE code generator (machine code only, no wasm backend) and a built-in GUI/reactive View engine. No wasm32-wasi target exis",
 "extent": "off-the-table (verified)"
+},
+"Agda": {
+"verdict": "live",
+"lane": "A",
+"recipe": "prebuilt agda-opt.wasm (GHC 9.10 wasm backend, agda-web/agda-wasm-dist zip, 31MB)",
+"smoke": "agda --version => Agda version 2.8.0",
+"extent": "dependently-typed lang/proof assistant runs; --version live, batch typecheck needs prim datadir mount (follow-up)"
 }
 },
 "preliminary": {
@@ -1916,13 +1923,6 @@
 "lane": "B",
 "recipe": "Lane B (self-contained C), but heavy multi-tarball with a configure cascade. Deps needed a",
 "confidence": "medium",
-"verified": false
-},
-"Agda": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "Lane A: fetch prebuilt agda.wasm from agda-web/agda-wasm-dist GitHub releases (latest tag ",
-"confidence": "high",
 "verified": false
 }
 }
