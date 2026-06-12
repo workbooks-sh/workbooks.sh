@@ -927,3 +927,10 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   JS does NOT map to wasi:http/incoming-handler#handle in componentize-js 0.19.3. NEXT (iter 60): build the
   guest via the correct componentize-js handler-export format OR a cargo-component Rust guest (well-defined
   Guest trait), then the Components.serve_http e2e. NIF + Elixir plumbing are done + committed.
+- 2026-06-12 (iter 60): **inbound guest — both build paths' precise blockers pinned (NIF+plumbing committed).**
+  PATH A (jco): addEventListener + `--enable fetch-event` is RIGHT (passes world-resolution); blocker is the
+  crate's wasi:http@0.2.6 WIT is too NEW for componentize-js 0.19.3 — feed it the older (0.2.3) wasi:http it
+  expects (runs on the 0.2.6 host via minor-compat). PATH B (cargo-component, 0.2.6): 'package not found' for
+  wasi:http even with explicit target.dependencies — needs `cargo component add` or deps outside wit/. The
+  serve NIF + Elixir plumbing are DONE; this is purely a test-fixture build. NEXT (iter 61): nail PATH A
+  (older wasi:http WIT for jco) or PATH B, then the Components.serve_http e2e.
