@@ -57,6 +57,28 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "How a workbook identifies and describes itself from the inside — the inline org spec and embedded source markers that make the format filename-independent and self-explaining."
+            },
+            {
+              "slug": "git",
+              "title": "git",
+              "sub": "mechanics",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The artifact is version control native: one file, real diffs, the whole project's history in the repo you already have."
+            },
+            {
+              "slug": "sharing",
+              "title": "sharing",
+              "sub": "concept",
+              "color": "#a8d4f0",
+              "icon": "../wb-file-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Hand a workbook to anyone with cryptographic identity attached: did:key signatures, single authentication, and what the recipient can verify without an account."
             }
           ]
         },
@@ -134,6 +156,50 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "The reader stands up a Nexus both ways — a cloud-identical krunvm microVM on their laptop and a Fly deploy — and understands deployment.org as inert declarative config where moving to the cloud is editing one property."
+            },
+            {
+              "slug": "telemetry",
+              "title": "telemetry",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "One event shape across the whole engine — what gets recorded, how agents and the autopoet read it, and why one grammar of signal beats a zoo of logs."
+            },
+            {
+              "slug": "gitops",
+              "title": "gitops",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The engine syncs to git: tenant repos, commits as the public changelog, and push-to-live publishing."
+            },
+            {
+              "slug": "hot-swap",
+              "title": "hot swap",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Loaded artifacts replace themselves live — a git change lands, the new toolkit/def swaps in, nothing reboots."
+            },
+            {
+              "slug": "networking",
+              "title": "networking",
+              "sub": "mechanics",
+              "color": "#aee5c2",
+              "icon": "../nexus-icon.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "No ambient network, ever: how brokered TCP/UDP/TLS and engine-held HTTP give workbooks exactly the connections they were granted."
             }
           ]
         },
@@ -283,6 +349,28 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the wb CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website."
+            },
+            {
+              "slug": "todos",
+              "title": "to-dos",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "The TODO grammar in full: states, transitions, what DONE actually records, and how state changes become history."
+            },
+            {
+              "slug": "tags",
+              "title": "tags",
+              "sub": "mechanics",
+              "color": "#f2ddb0",
+              "icon": "icons/org.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Tags as structure: categorize headlines, drive queries, and carry meaning machines can filter on."
             }
           ]
         },
@@ -382,6 +470,17 @@
               "status": "planned",
               "added": "2026-06-12",
               "dek": "What an agent does between runs — a sleep phase that digests telemetry, commits, and the backlog into a dream journal whose verdicts mechanically steer the next waking run."
+            },
+            {
+              "slug": "evals",
+              "title": "evals",
+              "sub": "implementation",
+              "color": "#9fc4e8",
+              "icon": "icons/agents.svg",
+              "audio": false,
+              "status": "planned",
+              "added": "2026-06-12",
+              "dek": "Judge agent output systematically: briefs in, judged runs out — the evaluation bench as a standing practice."
             }
           ]
         },
