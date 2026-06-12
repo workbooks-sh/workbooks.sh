@@ -126,5 +126,9 @@ defmodule Workbooks.PalletTest do
 
     assert {:ok, b3} = CommandRegistry.run("b3", "abc", [])
     assert b3 =~ "6437b3ac"
+
+    assert {:ok, brc} = CommandRegistry.run("br", "roundtrip-brotli", [])
+    assert {:ok, brb} = CommandRegistry.run("br", brc, ["-d"])
+    assert brb =~ "roundtrip-brotli"
   end
 end

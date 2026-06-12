@@ -350,6 +350,28 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `br` CLI: brotli web compression — stdin → compressed stdout, `-d` decompresses.
+  @br_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "brotli/encode.h"
+  #include "brotli/decode.h"
+  int main(int argc, char** argv) {
+    int dec = (argc >= 2 && !strcmp(argv[1], "-d"));
+    size_t cap = 1 << 20, len = 0; uint8_t* in = malloc(cap); size_t r;
+    while ((r = fread(in + len, 1, cap - len, stdin)) > 0) { len += r; if (len == cap) { cap *= 2; in = realloc(in, cap); } }
+    if (dec) {
+      size_t oc = len * 30 + 1024; uint8_t* out = malloc(oc); size_t os = oc;
+      if (BrotliDecoderDecompress(len, in, &os, out) == BROTLI_DECODER_RESULT_SUCCESS) fwrite(out, 1, os, stdout); else fprintf(stderr, "br: decode failed\n");
+    } else {
+      size_t oc = BrotliEncoderMaxCompressedSize(len); uint8_t* out = malloc(oc); size_t os = oc;
+      if (BrotliEncoderCompress(BROTLI_DEFAULT_QUALITY, BROTLI_DEFAULT_WINDOW, BROTLI_MODE_GENERIC, len, in, &os, out)) fwrite(out, 1, os, stdout); else fprintf(stderr, "br: encode failed\n");
+    }
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -439,6 +461,16 @@ defmodule Workbooks.Pallet do
         exclude: ~w(blake3_avx2.c blake3_avx512.c blake3_neon.c blake3_sse2.c blake3_sse41.c example.c main.c),
         cflags: ~w(-DBLAKE3_NO_SSE2 -DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512 -DBLAKE3_USE_NEON=0),
         extra_sources: [{"b3main.c", @b3_main}]
+      ]
+    },
+    %{
+      name: "br",
+      url: "https://codeload.github.com/google/brotli/tar.gz/refs/tags/v1.1.0",
+      sha: "e720a6ca29428b803f4ad165371771f5398faba397edf6778837a18599ea13ff",
+      build_opts: [
+        src_globs: ["c/include/brotli/*.h", "c/common/*.{c,h}", "c/enc/*.{c,h}", "c/dec/*.{c,h}"],
+        cflags: ["-I/work/c/include"],
+        extra_sources: [{"brmain.c", @br_main}]
       ]
     }
   ]

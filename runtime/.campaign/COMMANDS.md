@@ -32,6 +32,7 @@ Provision once with `Pallet.seed_csource/0` (slow — one clang build each). 7 c
 | `gz` | gzip-compatible compression | `run("gz", data, [])` / `run("gz", comp, ["-d"])` |
 | `lz4` | LZ4 frame compression | `run("lz4", data, [])` / `run("lz4", comp, ["-d"])` |
 | `zstd` | Zstandard compression | `run("zstd", data, [])` / `run("zstd", comp, ["-d"])` |
+| `br` | brotli web compression | `run("br", data, [])` / `run("br", comp, ["-d"])` |
 | `qr` | text → ASCII QR code | `run("qr", "https://…", [])` |
 | `b2` | BLAKE2b-512 hash → hex | `run("b2", data, [])` |
 | `b3` | BLAKE3-256 hash → hex | `run("b3", data, [])` |
