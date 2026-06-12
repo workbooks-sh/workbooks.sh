@@ -40,6 +40,15 @@ defmodule Workbooks.Pallet do
       mode: :argv
     },
     %{
+      # pandoc — universal document converter (markdown/HTML/LaTeX/RST/docx/…), prebuilt wasm32-wasi
+      # (GHC 9.12 wasm backend, no JS host). 53MB, fetched at seed. `pandoc -f <from> -t <to>` stdin→stdout.
+      name: "pandoc",
+      kind: :wasm,
+      url: "https://haskell-wasm.github.io/pandoc-wasm/pandoc.wasm",
+      sha: "48d9ceed3ef805f6acc28e6f58c2439cdeb1f71864244fffcc155e2c045aa7fc",
+      mode: :argv
+    },
+    %{
       # libjpeg-turbo CLI tools (prebuilt WASI, vmware WLR). cjpeg/djpeg: PPM<->JPEG on stdin/stdout.
       name: "jpeg",
       kind: :archive_many,

@@ -703,6 +703,13 @@
 "recipe": "expat 2.8.1 lib/*.c + wasi config + xmltok_impl/ns :include_only + element-count main",
 "smoke": "<a><b/><c/></a> => 3",
 "extent": "XML parsing (SAX); expat cmd counts elements / checks well-formed"
+},
+"pandoc": {
+"verdict": "live",
+"lane": "A",
+"recipe": "prebuilt pandoc.wasm (GHC wasm backend, haskell-wasm) 53MB",
+"smoke": "# Hello + **bold** -> <h1>Hello</h1> <p>..<strong>",
+"extent": "universal document converter \u2014 markdown/HTML/LaTeX/RST/docx/... formats, stdin->stdout"
 }
 },
 "preliminary": {
@@ -973,13 +980,6 @@
 "lane": "B",
 "recipe": "No plain prebuilt .wasm release exists. Lane A fails because ffmpegwasm/ffmpeg.wasm is emscripten/JS-paired and both WASI repos sh",
 "confidence": "medium",
-"verified": false
-},
-"pandoc": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "Lane A \u2014 fetch the prebuilt standalone wasm32-wasi module from the official haskell-wasm/pandoc-wasm GitHub Pages deploy (built by",
-"confidence": "high",
 "verified": false
 },
 "qpdf": {
