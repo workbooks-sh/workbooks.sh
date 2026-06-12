@@ -393,6 +393,22 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # `mujs`: Artifex MuJS — a small ES5 JavaScript interpreter (distinct from qjs/duk). Minimal eval main.
+  @mujs_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include "mujs.h"
+  static void jsprint(js_State *J) { const char* s = js_tostring(J, 1); fputs(s, stdout); fputc('\n', stdout); js_pushundefined(J); }
+  int main(void) {
+    static char buf[1 << 16]; size_t n = fread(buf, 1, sizeof(buf) - 1, stdin); buf[n] = 0;
+    js_State *J = js_newstate(NULL, NULL, JS_STRICT);
+    js_newcfunction(J, jsprint, "print", 1); js_setglobal(J, "print");
+    if (js_dostring(J, buf)) fprintf(stderr, "mujs: error\n");
+    js_freestate(J);
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -499,6 +515,12 @@ defmodule Workbooks.Pallet do
       url: "https://monocypher.org/download/monocypher-4.0.2.tar.gz",
       sha: "38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c",
       build_opts: [src_globs: ["src/monocypher.{c,h}"], extra_sources: [{"a2main.c", @argon2_main}]]
+    },
+    %{
+      name: "mujs",
+      url: "https://codeload.github.com/ccxvii/mujs/tar.gz/refs/tags/1.3.5",
+      sha: "78a311ae4224400774cb09ef5baa2633c26971513f8b931d3224a0eb85b13e0b",
+      build_opts: [src_globs: ["*.{c,h}"], exclude: ~w(main.c one.c), extra_sources: [{"mujs_main.c", @mujs_main}]]
     }
   ]
 
