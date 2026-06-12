@@ -9,13 +9,21 @@ use bindings::wasi::http::types::{
 struct Component;
 
 impl Guest for Component {
-    fn handle(_request: IncomingRequest, response_out: ResponseOutparam) {
-        let resp = OutgoingResponse::new(Fields::new());
+    fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
+        // echo the request method back so the e2e can prove the request data reached the guest
+        let method = format!("{:?}", request.method());
+
+        // set a response header so the e2e exercises the NIF's response-header extraction path
+        let fields = Fields::new();
+        let _ = fields.append(&"x-brokered".to_string(), &b"yes".to_vec());
+
+        let resp = OutgoingResponse::new(fields);
         let _ = resp.set_status_code(200);
         let body = resp.body().unwrap();
         ResponseOutparam::set(response_out, Ok(resp));
         let stream = body.write().unwrap();
-        stream.blocking_write_and_flush(b"hello from brokered guest").unwrap();
+        let msg = format!("hello from brokered guest; method={}", method);
+        stream.blocking_write_and_flush(msg.as_bytes()).unwrap();
         drop(stream);
         let _ = OutgoingBody::finish(body, None);
     }

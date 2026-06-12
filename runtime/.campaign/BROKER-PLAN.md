@@ -958,3 +958,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   contained). wb-py4k CLOSED. BOTH standard-tool directions now e2e-proven: OUTBOUND (wasi:http + wasi:sockets)
   + INBOUND (wasi:http/incoming-handler). Keystone items (2) generalize-the-seam + (4) inbound-server-flip
   BOTH COMPLETE. ★ THE KEYSTONE IS NOW FULLY COMPLETE IN EVERY DIMENSION. ★
+- 2026-06-12 (iter 63): **inbound reclamation re-scan (no new items) + inbound seam E2E HARDENED.** (a)
+  Re-ran feasibility for SERVER/inbound items now that the inbound seam is proven: the 4 server-ish impossible
+  candidates (Cloudflare D1, Vike, Farm, mold) ALL carry non-network hard blockers (cloud-service, node build-
+  chain, native node-addon, native-threads) — NONE reclaimable. Consistent with the reclamation being complete
+  (61 network/socket/server-bound items reclaimed; the 262 remaining are non-network-hard). (b) HARDENED the
+  inbound e2e to cover the NIF paths the hello-world guest left untested: the guest now sets a response header
+  (x-brokered: yes) + echoes the request method; serve_http(POST) -> {200, [{"x-brokered","yes"}],
+  "hello from brokered guest; method=Method::Post"}. Validates request synthesis + RESPONSE-HEADER extraction
+  + REQUEST-METHOD passthrough + response collection — every serve-NIF path. 1 test green. The inbound seam is
+  now thoroughly validated. NEXT: body-as-Binary perf (large bodies cross as a list today) OR a serving-guest
+  outbound-SSRF composition test; both nice-to-have on a fully-complete keystone.

@@ -63,8 +63,13 @@ defmodule Workbooks.BrokerNetE2ETest do
 
     # the host synthesizes the request, drives the guest's wasi:http/incoming-handler#handle, and collects
     # the response the guest writes to the response-outparam — the guest never touches a socket.
-    assert {200, _headers, "hello from brokered guest"} =
-             Wasmex.Components.serve_http(pid, "GET", "/", [{"host", "localhost"}], "")
+    assert {200, headers, body} =
+             Wasmex.Components.serve_http(pid, "POST", "/", [{"host", "localhost"}], "hi")
+
+    # response-header extraction path: the header the guest set flows back to the host
+    assert {"x-brokered", "yes"} in headers
+    # the request reached the guest (it echoed the method) and the body flowed back
+    assert body =~ "hello from brokered guest" and body =~ "Post"
   end
 
   @tag :build
