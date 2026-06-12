@@ -351,6 +351,11 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
 
       {^ref, :stream_done} ->
         conn
+
+      # the host hit the cumulative response-body cap (wb-8w8x) — stop forwarding; the chunked response is
+      # already committed, so closing the connection (no terminating chunk) signals the truncation to the client.
+      {^ref, :stream_aborted} ->
+        conn
     after
       15_000 -> conn
     end

@@ -840,6 +840,7 @@ defmodule Workbooks.BrokerNetE2ETest do
     receive do
       {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk, frames + 1)
       {^ref, :stream_done} -> {acc, frames}
+      {^ref, :stream_aborted} -> {acc, frames}
     after
       5_000 -> flunk("stream did not complete")
     end

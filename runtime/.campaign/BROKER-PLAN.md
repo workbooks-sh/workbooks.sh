@@ -1344,3 +1344,9 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   ssrf_nat64_6to4_teredo (7 internal smuggles denied, 1 public NAT64 still allowed); wasi e2e green. NEXT
   remaining wb-8w8x: wasi:http https pin (custom connector, substantial Rust); inbound streaming-serve body
   cap; TLS/TCP/UDP allow-list; default-profile over-grant; exec stdout/out_cap. Plus HIGH wb-an2v tenant.
+- 2026-06-12 (iter 98): **FIXED wb-8w8x: inbound streaming-serve cumulative body cap (MEDIUM).**
+  serve_http_stream forwarded chunks with NO total cap — a guest could stream UNBOUNDED bytes (bandwidth/
+  transfer DoS; per-chunk memory was already bounded). Added MAX_STREAM_BYTES (256MiB) cumulative; on exceed
+  the drain ABORTS and sends {ref, :stream_aborted}; the Plug's stream_loop handles it (stop forwarding — the
+  chunked response is already committed, so closing without the terminating chunk signals truncation). 0 rust
+  errors; both streaming tests green (cap doesn't touch normal-size streams).

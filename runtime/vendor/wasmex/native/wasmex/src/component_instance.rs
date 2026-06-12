@@ -585,17 +585,30 @@ pub fn serve_http_stream(
     let start = rustler::Atom::from_str(env, "stream_start").unwrap();
     let data = rustler::Atom::from_str(env, "stream_data").unwrap();
     let done = rustler::Atom::from_str(env, "stream_done").unwrap();
+    let aborted = rustler::Atom::from_str(env, "stream_aborted").unwrap();
 
     let _ = env.send(
         &caller,
         (ref_term, start, parts.status.as_u16(), out_headers).encode(env),
     );
 
+    // wb-8w8x: cumulative response-body CAP for the streaming path. Streaming forwards chunk-by-chunk (so the
+    // host never buffers the whole body), but a guest could otherwise stream UNBOUNDED total bytes — a
+    // bandwidth/transfer DoS. Cap the cumulative bytes and ABORT (signal :stream_aborted) once exceeded.
+    const MAX_STREAM_BYTES: usize = 256 * 1024 * 1024;
+    let mut sent: usize = 0;
+    let mut over = false;
+
     // drain the body frame by frame — CONCURRENT with the handler thread writing it (no deadlock)
     loop {
         match TOKIO_RUNTIME.block_on(async { resp_body.frame().await }) {
             Some(Ok(frame)) => {
                 if let Ok(bytes) = frame.into_data() {
+                    sent += bytes.len();
+                    if sent > MAX_STREAM_BYTES {
+                        over = true;
+                        break;
+                    }
                     let mut bin = OwnedBinary::new(bytes.len()).unwrap();
                     bin.as_mut_slice().copy_from_slice(&bytes);
                     let _ = env.send(&caller, (ref_term, data, bin.release(env)).encode(env));
@@ -605,7 +618,12 @@ pub fn serve_http_stream(
         }
     }
 
-    let _ = env.send(&caller, (ref_term, done).encode(env));
+    if over {
+        // the cap was exceeded — tell the Plug to terminate the (already-committed chunked) response early
+        let _ = env.send(&caller, (ref_term, aborted).encode(env));
+    } else {
+        let _ = env.send(&caller, (ref_term, done).encode(env));
+    }
     let _ = TOKIO_RUNTIME.block_on(handle_task);
     Ok(rustler::Atom::from_str(env, "ok").unwrap())
 }
