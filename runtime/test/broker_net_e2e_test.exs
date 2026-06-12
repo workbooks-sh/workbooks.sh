@@ -597,7 +597,7 @@ defmodule Workbooks.BrokerNetE2ETest do
     # the DirtyCpu NIF ran synchronously, queuing the stream messages to our mailbox
     assert_receive {^ref, :stream_start, 200, headers}, 5_000
     assert is_list(headers)
-    body = collect_stream(ref, "")
+    {body, _frames} = collect_stream(ref, "", 0)
     assert body =~ "hello from brokered guest"
   end
 
@@ -653,10 +653,10 @@ defmodule Workbooks.BrokerNetE2ETest do
     end
   end
 
-  defp collect_stream(ref, acc) do
+  defp collect_stream(ref, acc, frames) do
     receive do
-      {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk)
-      {^ref, :stream_done} -> acc
+      {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk, frames + 1)
+      {^ref, :stream_done} -> {acc, frames}
     after
       5_000 -> flunk("stream did not complete")
     end

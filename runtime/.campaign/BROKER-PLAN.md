@@ -1162,3 +1162,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   Built in 3 fires (81 NIF compiling, 82 NIF proven, 83 chunked HTTP) — the genuine attempt per the inbound-
   seam lesson delivered the last big capability. REMAINING (refinement): a MULTI-chunk streaming guest (N
   flushes -> N frames) for incremental-delivery demonstration; outbound host_http_get streaming (lower-pri).
+- 2026-06-12 (iter 84): **STREAMING LIMITATION FOUND — synchronous model has a body-size ceiling; large/
+  incremental needs ASYNC.** Tried a multi-frame demonstration (a 256 KB guest body in 64 flushes) and it
+  DEADLOCKED (timeout). ROOT CAUSE: the serve NIF runs handle.call to COMPLETION, THEN reads the response
+  body — so for a large body the guest BLOCKS on backpressure mid-handle (the host isn't draining yet) and
+  handle.call never returns. The synchronous handle-then-read model works ONLY for bodies that fit the
+  wasi-http output buffer (those DO stream to the client via chunked transfer — iter83 stands). TRUE large/
+  incremental streaming needs ASYNC interleaving: run the guest handle as a FUTURE + drain the response body
+  CONCURRENTLY (guest writes a frame, host reads it, repeat) — a substantial change (async wasmtime executor +
+  polling the handle future and the body stream together). Reverted the multi-frame probe; the working small-
+  body streaming (iter83) stands. wb-t3sq updated with the async requirement; larger bodies use buffered
+  serve_http (16 MiB cap) until async lands. HONEST: streaming is delivered for the common case, not unbounded.
