@@ -76,6 +76,50 @@ defmodule Workbooks.BrokerNetE2ETest do
   end
 
   @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "APP-HOST — a REAL HTTP server drives a standard wasi:http component per request" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{bytes: bytes, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    # the HOST owns the listening socket; Bandit drives each request into the wasi:http component
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.ComponentPlug, pid: pid},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+
+    # a REAL HTTP GET over a real socket -> the component handles it -> its response comes back
+    {:ok, {{_, status, _}, hdrs, body}} =
+      :httpc.request(:get, {~c"http://127.0.0.1:#{port}/", []}, [], body_format: :binary)
+
+    body = to_string(body)
+    assert status == 200
+    assert {~c"x-brokered", ~c"yes"} in hdrs
+    assert body =~ "hello from brokered guest"
+    # and the component's own outbound (during handling) was still SSRF-brokered
+    assert body =~ "outbound=blocked"
+  end
+
+  @tag :build
   @tag timeout: 300_000
   test "wasi-http OUTBOUND works through the broker — internal SSRF-blocked, public reachable, no panic" do
     out = Path.join(System.tmp_dir!(), "net_probe_#{System.unique_integer([:positive])}.component.wasm")

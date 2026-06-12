@@ -987,3 +987,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   an SSRF pivot. e2e green (asserts outbound=blocked). The inbound seam is now FULLY security-validated:
   sandboxed guest (no socket) + brokered, SSRF-filtered outbound. ★ THE KEYSTONE IS COMPLETE AND EVERY STEP
   IS ADVERSARIALLY TESTED — outbound (wasi:http+sockets) AND the inbound serving path (handler + its outbound). ★
+- 2026-06-12 (iter 66): **★ APP-HOST PLATFORM for STANDARD wasi:http components — a REAL HTTP server now
+  drives a sandboxed wasi:http app.** The proven serve NIF (host drives the component) was only ever called
+  directly in tests; wired it to a real LISTENING SOCKET. Added Workbooks.ServeBroker.ComponentPlug
+  (Bandit/Plug): the HOST owns the socket, each request -> Wasmex.Components.serve_http -> a persistent
+  wasi:http SERVER COMPONENT -> its {status,headers,body} becomes the HTTP response; DoS floor (read_body
+  size cap -> 413). E2E: Bandit on 127.0.0.1, a REAL HTTP GET over a real socket -> {200, [{"x-brokered",
+  "yes"}], "hello...; outbound=blocked"} — the component handled the request, set status+header+body, and its
+  OWN outbound (during handling) was still SSRF-brokered. So keystone item (4) "host-as-listener -> guest
+  wasi:http/incoming-handler" is now a DEPLOYABLE SERVER for STANDARD wasi:http components — not just a
+  test-driven call. The guest never touches the socket; its outbound stays SSRF-filtered. The inbound seam
+  is now end-to-end deployable: a standard wasi:http app runs, fully sandboxed + brokered, behind a real
+  HTTP server.

@@ -208,3 +208,40 @@ defmodule Workbooks.ServeBroker.Plug do
     end
   end
 end
+
+defmodule Workbooks.ServeBroker.ComponentPlug do
+  @moduledoc """
+  Bandit/Plug adapter for the STANDARD-component inbound seam (the app-host platform). The HOST owns the
+  listening socket; each HTTP request is driven straight into a persistent wasi:http SERVER COMPONENT via
+  `Wasmex.Components.serve_http/6`, and the component's `{status, headers, body}` becomes the HTTP response.
+  The guest never touches the socket — only its `wasi:http/incoming-handler` runs, and any OUTBOUND it makes
+  is still SSRF-brokered. opts: `:pid` (a persistent wasi:http Components instance), `:max_request_bytes`.
+  """
+  @behaviour Plug
+  import Plug.Conn
+
+  @impl true
+  def init(opts), do: opts
+
+  @impl true
+  def call(conn, opts) do
+    pid = Keyword.fetch!(opts, :pid)
+    max_req = Keyword.get(opts, :max_request_bytes, 4 * 1024 * 1024)
+
+    # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
+    case read_body(conn, length: max_req) do
+      {:ok, body, conn} ->
+        case Wasmex.Components.serve_http(pid, conn.method, conn.request_path, conn.req_headers, body) do
+          {status, headers, resp_body} when is_integer(status) ->
+            conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+            send_resp(conn, status, resp_body)
+
+          {:error, _} ->
+            send_resp(conn, 502, "wasi:http component error")
+        end
+
+      {:more, _partial, conn} ->
+        send_resp(conn, 413, "request too large")
+    end
+  end
+end
