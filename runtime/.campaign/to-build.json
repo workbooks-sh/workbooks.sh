@@ -130,16 +130,6 @@
   "confidence": "medium"
  },
  {
-  "name": "openssl",
-  "decisive": "live-buildable",
-  "lane": "A",
-  "url": "https://github.com/voltbuilder/openssl-wasm/releases/download/v1.1.1o/openssl.wasm",
-  "build_opts": "Lane A prebuilt fetch \u2014 no build. asset: openssl.wasm (1,962,334 bytes, contentType application/wasm) from voltbuilder/openssl-wasm tag v1.1.1o. Verified: magic 0x0061736d (\\0asm v1); ALL imports are wasi_snapshot_preview1 only (args/environ/clock/fd_*/path_*/poll_oneoff/proc_exit/random_get) \u2014 plain wasm32-wasi, NOT emscripten/JS-pair (no env module, no JS glue). No sock_* imports (offline crypto CLI). Register as CommandRegistry entry running on wasmtime with args passthrough + preopened cwd. Pin URL by tag (v1.1.1o = OpenSSL 1.1.1o).",
-  "smoke": "wasmtime run --dir=. openssl.wasm -- version   (expect: OpenSSL 1.1.1o). Then: openssl genrsa 2048 ; openssl dgst -sha256 <file> ; openssl enc -aes-256-cbc -pbkdf2 -in f -out f.enc \u2014 all pure local fs+compute, no network.",
-  "blocker": "",
-  "confidence": "high"
- },
- {
   "name": "BoringSSL",
   "decisive": "live-buildable",
   "lane": "B",

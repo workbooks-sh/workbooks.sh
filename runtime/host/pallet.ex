@@ -40,6 +40,15 @@ defmodule Workbooks.Pallet do
       mode: :argv
     },
     %{
+      # openssl — the full OpenSSL CLI (dgst/enc/genrsa/x509/rand/…), prebuilt wasm32-wasi (voltbuilder),
+      # WASI-only imports. `openssl version` / `openssl dgst -sha256` on stdin.
+      name: "openssl",
+      kind: :wasm,
+      url: "https://github.com/voltbuilder/openssl-wasm/releases/download/v1.1.1o/openssl.wasm",
+      sha: "ad236c86d94687005e11ac14a1f6a7c2fac246b0297bc09e299808eb13a8e8dc",
+      mode: :argv
+    },
+    %{
       # Agda — dependently-typed language / proof assistant, prebuilt wasm32-wasi (GHC 9.10 wasm backend).
       # Zip ships opt/agda-opt.wasm (wasm-opt'd, 31MB) + opt/lib/prim datadir. `--version` runs standalone;
       # batch typecheck (agda file.agda) needs the prim datadir mounted (--dir + Agda_datadir) — follow-up.

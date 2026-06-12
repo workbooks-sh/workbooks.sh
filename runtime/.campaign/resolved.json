@@ -2029,6 +2029,13 @@
 "recipe": "libxml2 2.13.5 + hand-subst config.h/xmlversion.h + dup stub (wb-u1ly -Wno-implicit-func-decl); xpath main",
 "smoke": "count(//item)=3",
 "extent": "full XML: parse/DOM/XPath/validation (richer than expat SAX); xml2 <xpath> over stdin"
+},
+"openssl": {
+"verdict": "live",
+"lane": "A",
+"recipe": "prebuilt openssl.wasm (voltbuilder/openssl-wasm v1.1.1o, WASI-only, 1.96MB)",
+"smoke": "openssl version => OpenSSL 1.1.1o",
+"extent": "full OpenSSL CLI: dgst/enc/genrsa/rsa/x509/rand/base64/... crypto toolkit"
 }
 },
 "preliminary": {
@@ -2216,13 +2223,6 @@
 "lane": "B",
 "recipe": "Build libgit2 (pure C, ~v1.7.x) as wasm32-wasi via the C lane, NOT the canonical C git CLI (autoconf",
 "confidence": "medium",
-"verified": false
-},
-"openssl": {
-"verdict": "live-likely",
-"lane": "A",
-"recipe": "Lane A: fetch the prebuilt openssl.wasm CLI from voltbuilder/openssl-wasm releases (tags v1.1.1o etc",
-"confidence": "high",
 "verified": false
 },
 "Pango": {
