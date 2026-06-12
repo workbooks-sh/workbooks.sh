@@ -254,6 +254,31 @@ mod wb_ssrf_tests {
     }
 
     #[test]
+    fn egress_rate_quota_meters_the_wasi_http_path() {
+        use std::time::{Duration, Instant};
+        let mut sd = super::ComponentStoreData {
+            ctx: None,
+            http: None,
+            limits: wasmtime::StoreLimits::default(),
+            table: wasmtime_wasi::ResourceTable::new(),
+            net_allow: None,
+            egress_count: 0,
+            egress_window: None,
+        };
+        let t0 = Instant::now();
+        let win = Duration::from_secs(10);
+        // max = 2 within the window: first two pass, the third is over quota
+        assert!(sd.egress_allowed(t0, win, 2));
+        assert!(sd.egress_allowed(t0, win, 2));
+        assert!(!sd.egress_allowed(t0, win, 2), "3rd request in-window exceeds the quota");
+        // a fresh window resets the count
+        let t1 = t0 + Duration::from_secs(11);
+        assert!(sd.egress_allowed(t1, win, 2), "new window resets");
+        assert!(sd.egress_allowed(t1, win, 2));
+        assert!(!sd.egress_allowed(t1, win, 2));
+    }
+
+    #[test]
     fn allowlist_matching() {
         use super::wb_host_in_allowlist as m;
         let allow = vec![
@@ -377,6 +402,33 @@ pub struct ComponentStoreData {
     pub(crate) table: ResourceTable,
     // wb-broker: per-instance egress allow-list, read by the WasiHttpView::send_request SSRF/scope check.
     pub(crate) net_allow: Option<Vec<String>>,
+    // wb-broker: per-instance egress RATE meter (the wasi-http path was otherwise UNMETERED) — counts
+    // outbound requests in a sliding window so a runaway/red-team standard tool can't flood (rate/conn DoS).
+    pub(crate) egress_count: u32,
+    pub(crate) egress_window: Option<std::time::Instant>,
+}
+
+impl ComponentStoreData {
+    // Sliding-window egress meter: counts this outbound request and returns whether it's within `max` per
+    // `window`. A fresh window resets the count. (`now` is injected so the logic is unit-testable.)
+    pub(crate) fn egress_allowed(
+        &mut self,
+        now: std::time::Instant,
+        window: std::time::Duration,
+        max: u32,
+    ) -> bool {
+        match self.egress_window {
+            Some(start) if now.duration_since(start) < window => {
+                self.egress_count += 1;
+                self.egress_count <= max
+            }
+            _ => {
+                self.egress_window = Some(now);
+                self.egress_count = 1;
+                true
+            }
+        }
+    }
 }
 
 impl WasiHttpView for ComponentStoreData {
@@ -397,6 +449,19 @@ impl WasiHttpView for ComponentStoreData {
         request: hyper::Request<HyperOutgoingBody>,
         config: OutgoingRequestConfig,
     ) -> HttpResult<HostFutureIncomingResponse> {
+        // per-instance egress RATE quota (the wasi-http path was otherwise unmetered): bound a runaway /
+        // red-team standard tool — caps both sustained floods and concurrent-burst amplification (every
+        // in-flight request counts) to 50k outbound requests / 10s per instance.
+        if !self.egress_allowed(
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(10),
+            50_000,
+        ) {
+            return Err(HttpError::from(ErrorCode::InternalError(Some(
+                "wb-broker: egress rate quota exceeded".to_string(),
+            ))));
+        }
+
         let uri = request.uri();
         let host = match uri.host() {
             Some(h) => h.trim_start_matches('[').trim_end_matches(']').to_string(),
@@ -558,6 +623,8 @@ pub fn component_store_new(
             limits,
             table: wasmtime_wasi::ResourceTable::new(),
             net_allow: None,
+            egress_count: 0,
+            egress_window: None,
         },
     );
     store.limiter(|state| &mut state.limits);
@@ -634,6 +701,8 @@ pub fn component_store_new_wasi(
             http: http_option,
             table: wasmtime_wasi::ResourceTable::new(),
             net_allow: options.net_allow.clone(),
+            egress_count: 0,
+            egress_window: None,
         },
     );
     store.limiter(|state| &mut state.limits);

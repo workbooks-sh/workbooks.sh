@@ -1035,3 +1035,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the FULL security cadence on BOTH directions: outbound SSRF-brokered + scopable (net_allow) + revocable;
   inbound size-capped + rate-floored + revocable. App-host arc: deployable(66) -> concurrent(67) ->
   isolated(68) -> rate-floored(69) -> revocable(70) = PRODUCTION-COMPLETE.
+- 2026-06-12 (iter 71): **WASI-PATH EGRESS RATE QUOTA — closed the unmetered-path gap (wb-um2g, the #1
+  remaining security item from the strategic review).** The untrusted STANDARD-tool path (wasi:http outbound)
+  had SSRF + resolve-then-pin + allow-list but NO rate/conn quota — a runaway/red-team standard tool could
+  flood (the host_* brokers got a rate floor in iter54; the wasi path never did). Added a per-instance egress
+  meter to ComponentStoreData (egress_count + egress_window) + ComponentStoreData.egress_allowed (sliding
+  window), enforced at the top of send_request: 50k outbound requests / 10s per instance — caps sustained
+  floods AND concurrent-burst amplification (every in-flight request counts). 9 cargo unit tests green (incl
+  egress_rate_quota: max-2 -> 3rd denied, window resets) + the wasi-http e2e still green (50k cap doesn't
+  break normal use). The standard-tool wasi-http OUTBOUND path is now METERED, matching the host_* brokers.
+  FOLLOW-UP: the wasi-SOCKETS path (socket_addr_check closure, no &mut store) needs a different mechanism.
