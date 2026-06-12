@@ -14,6 +14,15 @@ impl Guest for Component {
         let method = format!("{:?}", request.method());
         let path = request.path_with_query().unwrap_or_default();
 
+        // compute-DoS probe (wb-95o6): spin forever BEFORE setting the response. The host's epoch deadline
+        // must trap this running-wasm loop (epoch interrupts wasm at loop backedges), unlike the backpressure
+        // case which is fixed by the concurrent drain.
+        if path.contains("spin") {
+            loop {
+                core::hint::black_box(());
+            }
+        }
+
         // SSRF-COMPOSITION probe: a (red-team) serving guest tries an OUTBOUND fetch to cloud metadata while
         // handling a request. It MUST go through the host's brokered send_request and be SSRF-blocked — a
         // serving guest must not become an SSRF pivot.

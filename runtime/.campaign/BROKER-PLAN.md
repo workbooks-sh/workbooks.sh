@@ -1209,3 +1209,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   keep reading). NOTE: a separate COMPUTE-DoS remains (a guest that spins in handle() before setting the
   response — the host's block_on(rx) waits) — the epoch_interruption infra (iter86) is the foundation to bound
   it (epoch CAN trap a spinning wasm guest); wiring it next.
+- 2026-06-12 (iter 88): **COMPUTE-DoS bounded (spinning guest) — streaming serve.** A guest that SPINS in
+  handle() before setting the response is a SEPARATE DoS from wb-95o6's backpressure: epoch CAN trap running
+  wasm (unlike a host-call park), so this one IS an epoch job. Wired it: serve_http_stream gains an
+  epoch_deadline_secs param; in the spawn_blocking handler it set_epoch_deadline (traps the spinning wasm at
+  the deadline -> frees the worker thread) AND the NIF's block_on(rx) is bounded by a (deadline + 5s) timeout
+  (a trapped guest's response sender lingers in the store so rx never resolves on its own -> the timeout frees
+  the NIF thread). Requires an epoch_interruption engine (the iter86 infra). PROVEN: a guest spinning in
+  handle() on an epoch engine (deadline 3s) returns in 8.7s instead of hanging to the 120s test timeout; the
+  default epoch_deadline=0 path keeps every existing streaming test green (no regression). FOLLOW-UP (same
+  finding, before new features): the same guard for the BUFFERED serve_http + wire the app-host Plug to create
+  an epoch engine and pass a default deadline so the app-host is protected without the caller opting in.

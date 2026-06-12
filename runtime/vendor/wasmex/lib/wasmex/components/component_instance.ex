@@ -85,7 +85,8 @@ defmodule Wasmex.Components.Instance do
         headers,
         body,
         caller,
-        ref
+        ref,
+        epoch_deadline_secs \\ 0
       ) do
     Wasmex.Native.component_serve_http_stream(
       store_resource,
@@ -95,7 +96,8 @@ defmodule Wasmex.Components.Instance do
       headers,
       body,
       caller,
-      ref
+      ref,
+      epoch_deadline_secs
     )
   end
 

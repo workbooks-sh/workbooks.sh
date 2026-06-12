@@ -733,6 +733,57 @@ defmodule Workbooks.BrokerNetE2ETest do
     end
   end
 
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "COMPUTE-DoS bound (wb-95o6) — a guest spinning in handle() is TRAPPED by the epoch deadline" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    # an EPOCH engine (the 1s ticker runs) so the serve store can set a wall-clock deadline
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{epoch_interruption: true})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+    {:ok, store} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, inst} = Wasmex.Components.Instance.new(store, component, %{})
+
+    ref = make_ref()
+
+    # /spin makes the guest loop forever before setting the response. With a 3s epoch deadline the call MUST
+    # trap (not hang). Run under a Task so a regression is a fast failure, not a hung suite.
+    task =
+      Task.async(fn ->
+        try do
+          Wasmex.Components.Instance.serve_http_stream(
+            inst,
+            "GET",
+            "/spin",
+            [{"host", "localhost"}],
+            "",
+            self(),
+            ref,
+            3
+          )
+        rescue
+          e -> {:trapped, Exception.message(e)}
+        catch
+          kind, e -> {:trapped, "#{kind}: #{inspect(e)}"}
+        end
+      end)
+
+    # without the epoch trap this would hang to the 120s test timeout; with it, it returns within ~10s
+    result = Task.yield(task, 30_000)
+    Task.shutdown(task, :brutal_kill)
+    assert match?({:ok, _}, result), "spinning guest must be trapped by the epoch deadline, not hang"
+  end
+
   defp collect_stream(ref, acc, frames) do
     receive do
       {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk, frames + 1)

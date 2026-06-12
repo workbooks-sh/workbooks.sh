@@ -411,6 +411,7 @@ pub fn serve_http_stream(
     body: rustler::Binary,
     caller: rustler::LocalPid,
     ref_term: rustler::Term,
+    epoch_deadline_secs: u64,
 ) -> NifResult<rustler::Atom> {
     use bytes::Bytes;
     use http_body::Body;
@@ -494,6 +495,13 @@ pub fn serve_http_stream(
     let handle_task = TOKIO_RUNTIME.spawn_blocking(move || {
         let mut g = store_arc.inner.lock().unwrap();
         let store: &mut Store<ComponentStoreData> = &mut g;
+        // wb-95o6 (compute-DoS): bound a guest that SPINS in handle() (e.g. an infinite wasm loop before it
+        // sets the response). Epoch CAN trap running wasm (unlike the backpressure case); reaching the
+        // deadline traps the call, handle() returns Err, the response sender drops, and rx unblocks below.
+        // Requires an epoch_interruption engine (else set_epoch_deadline panics) — caller passes 0 otherwise.
+        if epoch_deadline_secs > 0 {
+            store.set_epoch_deadline(epoch_deadline_secs);
+        }
         match handle.call(
             &mut *store,
             &[Val::Resource(req_any), Val::Resource(out_any)],
@@ -507,11 +515,33 @@ pub fn serve_http_stream(
         }
     });
 
-    // the guest set the response EARLY (before the body); receive it, then stream the body live.
-    let resp = TOKIO_RUNTIME
-        .block_on(rx)
-        .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
-        .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
+    // the guest set the response EARLY (before the body); receive it, then stream the body live. When an
+    // epoch deadline is set (compute-DoS guard), ALSO bound this wait: a guest spinning before it sets the
+    // response is trapped by epoch (frees the worker thread) but its response sender lingers in the store, so
+    // rx would never resolve — the timeout (deadline + margin) frees THIS thread.
+    let resp = if epoch_deadline_secs > 0 {
+        match TOKIO_RUNTIME.block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(epoch_deadline_secs + 5),
+                rx,
+            )
+            .await
+        }) {
+            Ok(Ok(Ok(resp))) => resp,
+            Ok(Ok(Err(e))) => return Err(Error::Term(Box::new(format!("response error: {e:?}")))),
+            Ok(Err(e)) => return Err(Error::Term(Box::new(format!("guest set no response: {e}")))),
+            Err(_) => {
+                return Err(Error::Term(Box::new(
+                    "wb-broker: serve response timed out (guest stuck)".to_string(),
+                )))
+            }
+        }
+    } else {
+        TOKIO_RUNTIME
+            .block_on(rx)
+            .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
+            .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?
+    };
     let (parts, mut resp_body) = resp.into_parts();
 
     let out_headers = parts
