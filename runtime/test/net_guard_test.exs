@@ -120,4 +120,12 @@ defmodule Workbooks.NetGuardTest do
     assert {:error, :denied} = NetGuard.get("http://127.0.0.1/", principal: p, rate: {2, 60_000})
     assert {:error, :rate_limited} = NetGuard.get("http://127.0.0.1/", principal: p, rate: {2, 60_000})
   end
+
+  @tag :netdeps
+  test "resolve-then-pin — http_get still retrieves real content via the pinned IP; internal stays denied" do
+    # the pin rewrites the URL host to the resolved IP + keeps Host: example.com; the server still serves
+    assert {:ok, body} = NetGuard.get("http://example.com/")
+    assert body =~ "Example Domain"
+    assert {:error, :denied} = NetGuard.get("http://169.254.169.254/")
+  end
 end

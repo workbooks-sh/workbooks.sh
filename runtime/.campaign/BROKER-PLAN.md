@@ -780,3 +780,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   rate_limiter) + 8 cargo SSRF/scope/dns-needed tests = 57 tests, 0 failures. The whole platform's unit layer
   is coherent + green. PLATFORM: 9 brokered capabilities, BOTH docks, every cadence primitive + red-team
   vector covered. NEXT (iter 46): a 10th capability, or per-tool reclamation.
+- 2026-06-12 (iter 46): **resolve-then-pin COMPLETE on ALL FIVE egress paths + inbound-seam frontier filed.**
+  (a) UDP-reclamation scan: NO genuine UDP/DNS/NTP impossible items (the 5 matches were build-blocked node
+  bundlers matching module-"resolver", not DNS). (b) Filed wb-py4k — the INBOUND standard-component seam
+  (drive a standard wasi:http/incoming-handler server component from the host, the inbound analog of the
+  proven outbound seam, reclaiming server/API tools). BLOCKER: Wasmex exposes only call_function (world-level
+  exports), no proxy/serve; needs a NIF addition (wasmtime_wasi_http::bindings::Proxy). The hand-written
+  serve_broker covers the inbound CAPABILITY today; the standard-component version is the next major frontier
+  (multi-fire). (c) Closed the LAST unpinned egress path: host_http_get (NetGuard.get via :httpc) re-resolved
+  the hostname (same rebind window wasi-http had). pin_for_http now resolve-then-pins for http (rewrite URL
+  host -> the checked IP, keep Host header for vhost; https stays SNI/cert-bound). 13 net_guard tests green
+  incl a content test (http_get to example.com via the pinned IP still returns "Example Domain"; internal
+  denied). RESOLVE-THEN-PIN now COMPLETE across ALL FIVE paths: TcpBroker + UdpBroker + wasi-sockets +
+  wasi-http + host_http_get — DNS-rebinding closed EVERYWHERE.
+  NEXT (iter 47): the inbound standard seam (wb-py4k, NIF), or a 10th capability.

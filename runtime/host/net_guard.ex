@@ -61,11 +61,16 @@ defmodule Workbooks.NetGuard do
         _ = Application.ensure_all_started(:inets)
         _ = Application.ensure_all_started(:ssl)
 
+        # resolve-then-PIN: connect to the IP we just checked, not the hostname (which :httpc would RE-resolve,
+        # leaving a DNS-rebind window). For http, swap the URL host for the pinned IP and keep the original
+        # Host header for vhost routing. https keeps its SNI hostname — cert validation binds the connection.
+        {req_url, req_headers} = pin_for_http(url)
+
         # autoredirect: false — :httpc would otherwise auto-FOLLOW a 3xx, bypassing the guard if a public
         # URL redirects to an internal one. We follow manually so EVERY hop is re-checked (and bounded).
         case :httpc.request(
                :get,
-               {String.to_charlist(url), []},
+               {req_url, req_headers},
                [{:timeout, timeout}, {:autoredirect, false}],
                body_format: :binary
              ) do
@@ -81,6 +86,23 @@ defmodule Workbooks.NetGuard do
           _ ->
             {:error, :request_failed}
         end
+    end
+  end
+
+  # Resolve-then-pin for the host_http_get path. http: return the IP-rewritten URL + a Host header carrying
+  # the original hostname. https / unresolvable: unchanged (cert validation binds https; allowed? already
+  # vetted the host so resolve rarely fails here).
+  defp pin_for_http(url) do
+    uri = URI.parse(url)
+
+    with "http" <- uri.scheme,
+         host when is_binary(host) and host != "" <- uri.host,
+         {:ok, ip} <- resolve_allowed_ip(host) do
+      host_hdr = if uri.port in [nil, 80], do: host, else: "#{host}:#{uri.port}"
+      pinned = URI.to_string(%{uri | host: :inet.ntoa(ip) |> to_string()})
+      {String.to_charlist(pinned), [{~c"host", String.to_charlist(host_hdr)}]}
+    else
+      _ -> {String.to_charlist(url), []}
     end
   end
 
