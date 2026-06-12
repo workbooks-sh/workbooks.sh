@@ -945,3 +945,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   smoke). 1 test green. The inbound seam is now NIF + plumbing + smoke-validated + crash-safe; only the FULL
   serve e2e (a real wasi:http handler guest exercising handle.call + response-collect) remains, gated on the
   guest WIT-tooling (wb-py4k Paths A/B). NEXT (iter 62): resolve the guest WIT-tooling for the full e2e.
+- 2026-06-12 (iter 62): **★★ INBOUND STANDARD-COMPONENT SEAM COMPLETE + E2E-PROVEN — the LAST keystone item.**
+  Cracked the guest WIT-tooling: cargo-component with a MINIMAL world (`export wasi:http/incoming-handler
+  @0.2.6`, NOT `include proxy`) + explicit wasi target.dependencies builds a real 77KB wasi:http server
+  component. Fixed 3 issues found via the live run: (1) body crosses the NIF as a byte LIST (rustler Vec<u8>
+  from a list, not a binary) -> Instance.serve_http does :binary.bin_to_list; (2) the request needs an
+  authority -> pass a Host header; (3) interface exports are VERSIONED -> the NIF tries
+  wasi:http/incoming-handler@{0.2.6,0.2.3,0.2.0,bare}. RESULT: Components.serve_http(pid,"GET","/",
+  [{"host","localhost"}],"") -> {200, [], "hello from brokered guest"} — the host synthesized the request,
+  drove the guest's wasi:http/incoming-handler#handle, collected the response; the guest never touched a
+  socket. Permanent e2e + guest fixture persisted (test/broker_e2e/wasi_http_handler/, 34 WIT files, self-
+  contained). wb-py4k CLOSED. BOTH standard-tool directions now e2e-proven: OUTBOUND (wasi:http + wasi:sockets)
+  + INBOUND (wasi:http/incoming-handler). Keystone items (2) generalize-the-seam + (4) inbound-server-flip
+  BOTH COMPLETE. ★ THE KEYSTONE IS NOW FULLY COMPLETE IN EVERY DIMENSION. ★

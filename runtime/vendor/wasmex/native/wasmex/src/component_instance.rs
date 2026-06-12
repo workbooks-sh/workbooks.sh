@@ -284,10 +284,21 @@ pub fn serve_http(
         .map_err(|e| Error::Term(Box::new(e.to_string())))?;
 
     // 4. resolve wasi:http/incoming-handler#handle
-    let iface = instance
-        .get_export(&mut *store, None, "wasi:http/incoming-handler")
-        .map(|(_, idx)| idx)
-        .ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
+    // component interface exports are versioned (e.g. "...@0.2.6") — try the known versions then the bare name
+    let mut iface = None;
+    for name in [
+        "wasi:http/incoming-handler@0.2.6",
+        "wasi:http/incoming-handler@0.2.3",
+        "wasi:http/incoming-handler@0.2.0",
+        "wasi:http/incoming-handler",
+    ] {
+        if let Some((_, idx)) = instance.get_export(&mut *store, None, name) {
+            iface = Some(idx);
+            break;
+        }
+    }
+    let iface =
+        iface.ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
     let handle_idx = instance
         .get_export(&mut *store, Some(&iface), "handle")
         .map(|(_, idx)| idx)

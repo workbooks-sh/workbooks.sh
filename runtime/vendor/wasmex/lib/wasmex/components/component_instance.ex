@@ -61,13 +61,14 @@ defmodule Wasmex.Components.Instance do
         headers,
         body
       ) do
+    # body crosses the NIF as a byte list (rustler decodes Vec<u8> from a list, not a binary)
     case Wasmex.Native.component_serve_http(
            store_resource,
            instance_resource,
            method,
            uri,
            headers,
-           body
+           :binary.bin_to_list(body)
          ) do
       {status, hdrs, body_bytes} when is_integer(status) and is_list(body_bytes) ->
         {status, hdrs, :erlang.list_to_binary(body_bytes)}

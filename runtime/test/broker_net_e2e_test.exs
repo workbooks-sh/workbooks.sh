@@ -46,6 +46,29 @@ defmodule Workbooks.BrokerNetE2ETest do
 
   @tag :build
   @tag timeout: 300_000
+  test "INBOUND standard seam — host drives a REAL wasi:http server component (200 + body)" do
+    # a STANDARD wasi:http server component (cargo-component, exports wasi:http/incoming-handler@0.2.6)
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+
+    {:ok, pid} =
+      Wasmex.Components.start_link(%{bytes: bytes, wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}})
+
+    # the host synthesizes the request, drives the guest's wasi:http/incoming-handler#handle, and collects
+    # the response the guest writes to the response-outparam — the guest never touches a socket.
+    assert {200, _headers, "hello from brokered guest"} =
+             Wasmex.Components.serve_http(pid, "GET", "/", [{"host", "localhost"}], "")
+  end
+
+  @tag :build
+  @tag timeout: 300_000
   test "wasi-http OUTBOUND works through the broker — internal SSRF-blocked, public reachable, no panic" do
     out = Path.join(System.tmp_dir!(), "net_probe_#{System.unique_integer([:positive])}.component.wasm")
 
