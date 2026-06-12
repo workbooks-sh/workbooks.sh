@@ -36,6 +36,7 @@ Provision once with `Pallet.seed_csource/0` (slow — one clang build each). 7 c
 | `qr` | text → ASCII QR code | `run("qr", "https://…", [])` |
 | `b2` | BLAKE2b-512 hash → hex | `run("b2", data, [])` |
 | `b3` | BLAKE3-256 hash → hex | `run("b3", data, [])` |
+| `argon2` | Argon2id password hash → hex | `run("argon2", pw, [])` |
 | `md` | CommonMark markdown → HTML | `run("md", "# Hi", [])` |
 
 ## Built-ins (always present)

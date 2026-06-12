@@ -372,6 +372,27 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # A minimal `argon2` CLI: Argon2id password hash of stdin → hex (Monocypher; fixed salt + params
+  # for a deterministic demo hasher — real use would random-salt per password).
+  @argon2_main ~S"""
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "monocypher.h"
+  int main(void) {
+    static char pw[4096]; size_t n = fread(pw, 1, sizeof(pw) - 1, stdin); pw[n] = 0;
+    while (n > 0 && (pw[n - 1] == '\n' || pw[n - 1] == '\r')) pw[--n] = 0;
+    uint8_t salt[16]; memcpy(salt, "wb-fixed-salt-16", 16);
+    uint32_t nb_blocks = 1024; void* work = malloc((size_t)nb_blocks * 1024);
+    uint8_t hash[32];
+    crypto_argon2_config cfg = { CRYPTO_ARGON2_ID, nb_blocks, 3, 1 };
+    crypto_argon2_inputs inp = { (const uint8_t*)pw, salt, (uint32_t)n, sizeof(salt) };
+    crypto_argon2(hash, sizeof(hash), work, cfg, inp, crypto_argon2_no_extras);
+    for (int i = 0; i < 32; i++) printf("%02x", hash[i]);
+    printf("\n"); free(work); return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -472,6 +493,12 @@ defmodule Workbooks.Pallet do
         cflags: ["-I/work/c/include"],
         extra_sources: [{"brmain.c", @br_main}]
       ]
+    },
+    %{
+      name: "argon2",
+      url: "https://monocypher.org/download/monocypher-4.0.2.tar.gz",
+      sha: "38d07179738c0c90677dba3ceb7a7b8496bcfea758ba1a53e803fed30ae0879c",
+      build_opts: [src_globs: ["src/monocypher.{c,h}"], extra_sources: [{"a2main.c", @argon2_main}]]
     }
   ]
 

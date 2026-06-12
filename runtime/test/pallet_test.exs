@@ -130,5 +130,8 @@ defmodule Workbooks.PalletTest do
     assert {:ok, brc} = CommandRegistry.run("br", "roundtrip-brotli", [])
     assert {:ok, brb} = CommandRegistry.run("br", brc, ["-d"])
     assert brb =~ "roundtrip-brotli"
+
+    assert {:ok, a2} = CommandRegistry.run("argon2", "password", [])
+    assert String.length(String.trim(a2)) == 64
   end
 end
