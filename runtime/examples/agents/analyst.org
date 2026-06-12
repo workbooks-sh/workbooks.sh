@@ -6,7 +6,7 @@
   :TYPE:      ai
   :MODEL:     xiaomi/mimo-v2.5
   :TAGLINE:   Processes JSON data via in-WASM commands and persists findings.
-  :TOOLKITS:  shell wb
+  :TOOLKITS:  shell wb sandbox
   :END:
 
 ** System prompt
