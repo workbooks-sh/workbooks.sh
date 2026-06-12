@@ -1,6 +1,6 @@
 {
  "slug": "agents",
- "title": "Agents — the crew",
+ "title": "Agents — the workers",
  "tracks": [
   {
    "id": "intro",
@@ -34,8 +34,8 @@
   },
   {
    "id": "boundaries",
-   "title": "Crew, not autopilot",
-   "text": "Honesty section — and a values one. The pitch is never software that runs itself. It's people and AI… building together. Agents here are crew. They carry work between your sessions, file what they found… and stop at the edges you set. Direction stays human. And the edges are real — not vibes. An agent's blast radius is its sandbox. Its capabilities are explicit grants. And what it changes is written in a layer you can read… diff… and revert. Trust is earned in increments — and the architecture is built so the increments are safe to give."
+   "title": "Agents, not autopilot",
+   "text": "Honesty section — and a values one. The pitch is never software that runs itself. It's people and AI… building together. Agents here carry work between your sessions, file what they found… and stop at the edges you set. Direction stays human. And the edges are real — not vibes. An agent's blast radius is its sandbox. Its capabilities are explicit grants. And what it changes is written in a layer you can read… diff… and revert. Trust is earned in increments — and the architecture is built so the increments are safe to give."
   },
   {
    "id": "faq",
@@ -45,7 +45,7 @@
   {
    "id": "outro",
    "title": "Wrapping up",
-   "text": "So… that's an agent here. Not a chat window — a colleague. With files, tools, memory… and time. [curious] And once a crew is working, one more question appears — who keeps the whole toolbox getting better? That's the gardener. [excited] The Autopoet."
+   "text": "So… that's an agent here. Not a chat window — a colleague. With files, tools, memory… and time. [curious] And once a agents is working, one more question appears — who keeps the whole toolbox getting better? That's the gardener. [excited] The Autopoet."
   }
  ]
 }

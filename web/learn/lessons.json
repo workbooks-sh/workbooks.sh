@@ -54,7 +54,7 @@
         {
           "slug": "agents",
           "title": "Agents",
-          "sub": "the crew",
+          "sub": "the workers",
           "color": "#9fc4e8",
           "icon": "icons/agents.svg",
           "audio": true,

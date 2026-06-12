@@ -145,7 +145,7 @@ for (const page of scripts) {
   manifest.episodes.push({
     slug: page.slug,
     title: page.title,
-    src: `audio/episodes/${page.slug}.mp3`,
+    src: `audio/episodes/${page.slug}.mp3?v=${Math.round(fdur(out))}`,
     dur: Math.round(fdur(out)),
     chapters,
   });

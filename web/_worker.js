@@ -19,7 +19,9 @@ export default {
       // versioned URLs are immutable; the rest revalidate hourly
       h.set("cache-control", url.search.includes("v=")
         ? "public, max-age=31536000, immutable"
-        : "public, max-age=3600, stale-while-revalidate=86400");
+        : url.pathname.endsWith(".json")
+          ? "public, max-age=60"
+          : "public, max-age=3600, stale-while-revalidate=86400");
       return new Response(r.body, { status: r.status, headers: h });
     }
 

@@ -2,8 +2,8 @@
  "episodes": [
   {
    "slug": "workbook",
-   "title": "Workbooks — the unit",
-   "src": "audio/episodes/workbook.mp3",
+   "title": "Workbooks \u2014 the unit",
+   "src": "audio/episodes/workbook.mp3?v=529",
    "dur": 529,
    "chapters": [
     {
@@ -65,8 +65,8 @@
   },
   {
    "slug": "nexus",
-   "title": "Nexus — the engine",
-   "src": "audio/episodes/nexus.mp3",
+   "title": "Nexus \u2014 the engine",
+   "src": "audio/episodes/nexus.mp3?v=650",
    "dur": 650,
    "chapters": [
     {
@@ -133,8 +133,8 @@
   },
   {
    "slug": "toolkit",
-   "title": "Toolkits — the parts",
-   "src": "audio/episodes/toolkit.mp3",
+   "title": "Toolkits \u2014 the parts",
+   "src": "audio/episodes/toolkit.mp3?v=582",
    "dur": 582,
    "chapters": [
     {
@@ -196,8 +196,8 @@
   },
   {
    "slug": "org",
-   "title": "Org — the grammar",
-   "src": "audio/episodes/org.mp3",
+   "title": "Org \u2014 the grammar",
+   "src": "audio/episodes/org.mp3?v=423",
    "dur": 423,
    "chapters": [
     {
@@ -254,8 +254,8 @@
   },
   {
    "slug": "agents",
-   "title": "Agents — the crew",
-   "src": "audio/episodes/agents.mp3",
+   "title": "Agents \u2014 the crew",
+   "src": "audio/episodes/agents.mp3?v=354",
    "dur": 354,
    "chapters": [
     {
@@ -307,8 +307,8 @@
   },
   {
    "slug": "autopoet",
-   "title": "Autopoet — the gardener",
-   "src": "audio/episodes/autopoet.mp3",
+   "title": "Autopoet \u2014 the gardener",
+   "src": "audio/episodes/autopoet.mp3?v=525",
    "dur": 525,
    "chapters": [
     {
@@ -360,8 +360,8 @@
   },
   {
    "slug": "wbx",
-   "title": "wbx — the command",
-   "src": "audio/episodes/wbx.mp3",
+   "title": "wbx \u2014 the command",
+   "src": "audio/episodes/wbx.mp3?v=591",
    "dur": 591,
    "chapters": [
     {
@@ -428,8 +428,8 @@
   },
   {
    "slug": "workflows",
-   "title": "Workflows — the plans",
-   "src": "audio/episodes/workflows.mp3",
+   "title": "Workflows \u2014 the plans",
+   "src": "audio/episodes/workflows.mp3?v=734",
    "dur": 734,
    "chapters": [
     {
@@ -506,8 +506,8 @@
   },
   {
    "slug": "vfs",
-   "title": "VFS — the disk",
-   "src": "audio/episodes/vfs.mp3",
+   "title": "VFS \u2014 the disk",
+   "src": "audio/episodes/vfs.mp3?v=785",
    "dur": 785,
    "chapters": [
     {
