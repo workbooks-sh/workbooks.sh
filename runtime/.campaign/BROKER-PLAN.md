@@ -905,3 +905,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   it; the wasi path is SSRF-safe but unmetered — naturally bounded by network latency / sandbox limits; LOWER
   priority). NEXT (iter 58): DEDICATE the fire to writing the serve NIF + iterating compiles (recipe ready,
   additive, revert-safe).
+- 2026-06-12 (iter 58): **★ INBOUND-SEAM NIF WRITTEN + COMPILING — the deferred frontier, done in one fire.**
+  Wrote component_serve_http (component_instance.rs) per the wb-py4k recipe: hyper request -> new_incoming_
+  request + new_response_outparam -> resolve wasi:http/incoming-handler#handle (get_export/get_func) -> SYNC
+  handle.call (no async_support) -> collect the response via the outparam channel -> {status,headers,body}.
+  The feared NIF was only 7 compile errors, ALL fixable: +2 deps (bytes, http-body-util — transitive, just
+  declared) + Infallible annotation on the Full body + `mut rx`. Elixir stub added (Native.component_serve_
+  http, auto-discovered via rustler::init). Runtime healthy: 8 broker tests green, NO regression (additive).
+  The hard part — driving a STANDARD wasi:http server component from wasmex's SYNC engine — is DONE.
+  REMAINING (iter 59): a Wasmex.Components.serve_http helper (GenServer handle_call -> the NIF) + a cargo-
+  component wasi:http server guest (exports wasi:http/incoming-handler) + the e2e. Down to Elixir plumbing.

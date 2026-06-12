@@ -237,6 +237,110 @@ pub fn call_exported_function(
     atoms::ok()
 }
 
+// wb-broker INBOUND standard-component seam (wb-py4k): drive a guest that exports wasi:http/incoming-handler.
+// The host synthesizes the request, calls handle (SYNC — the engine is sync), and collects the response the
+// guest writes to the response-outparam. Lets STANDARD wasi:http server components run as sandboxed guests.
+#[rustler::nif(name = "component_serve_http", schedule = "DirtyCpu")]
+pub fn serve_http(
+    component_store_resource: ResourceArc<ComponentStoreResource>,
+    instance_resource: ResourceArc<ComponentInstanceResource>,
+    method: String,
+    uri: String,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+) -> NifResult<(u16, Vec<(String, String)>, Vec<u8>)> {
+    use bytes::Bytes;
+    use http_body_util::{BodyExt, Full};
+    use wasmtime_wasi_http::bindings::http::types::Scheme;
+    use wasmtime_wasi_http::WasiHttpView;
+
+    let store: &mut Store<ComponentStoreData> =
+        &mut (component_store_resource.inner.lock().unwrap());
+    let instance = &mut instance_resource.inner.lock().unwrap();
+
+    // 1. build the hyper request (boxed body; Full's Infallible error widens to hyper::Error via match)
+    let mut builder = hyper::Request::builder()
+        .method(method.as_str())
+        .uri(uri.as_str());
+    for (k, v) in &headers {
+        builder = builder.header(k.as_str(), v.as_str());
+    }
+    let req_body = Full::new(Bytes::from(body))
+        .map_err(|e: std::convert::Infallible| match e {})
+        .boxed();
+    let hyper_req = builder
+        .body(req_body)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    // 2-3. incoming-request + response-outparam resources (sync WasiHttpView methods)
+    let req = store
+        .data_mut()
+        .new_incoming_request(Scheme::Http, hyper_req)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    let (tx, mut rx) = tokio::sync::oneshot::channel();
+    let out = store
+        .data_mut()
+        .new_response_outparam(tx)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    // 4. resolve wasi:http/incoming-handler#handle
+    let iface = instance
+        .get_export(&mut *store, None, "wasi:http/incoming-handler")
+        .map(|(_, idx)| idx)
+        .ok_or_else(|| Error::Term(Box::new("no wasi:http/incoming-handler export".to_string())))?;
+    let handle_idx = instance
+        .get_export(&mut *store, Some(&iface), "handle")
+        .map(|(_, idx)| idx)
+        .ok_or_else(|| Error::Term(Box::new("no #handle export".to_string())))?;
+    let handle = instance
+        .get_func(&mut *store, handle_idx)
+        .ok_or_else(|| Error::Term(Box::new("handle is not a func".to_string())))?;
+
+    // 5. resources -> component Vals
+    let req_any = req
+        .try_into_resource_any(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    let out_any = out
+        .try_into_resource_any(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    // 6. SYNC call (no async_support needed)
+    handle
+        .call(
+            &mut *store,
+            &[Val::Resource(req_any), Val::Resource(out_any)],
+            &mut [],
+        )
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+    handle
+        .post_return(&mut *store)
+        .map_err(|e| Error::Term(Box::new(e.to_string())))?;
+
+    // 7. collect the response the guest set on the outparam
+    let resp = rx
+        .try_recv()
+        .map_err(|e| Error::Term(Box::new(format!("guest set no response: {e}"))))?
+        .map_err(|e| Error::Term(Box::new(format!("response error: {e:?}"))))?;
+    let (parts, resp_body) = resp.into_parts();
+    let collected = TOKIO_RUNTIME
+        .block_on(async { resp_body.collect().await })
+        .map_err(|e| Error::Term(Box::new(format!("body collect: {e}"))))?;
+    let body_bytes = collected.to_bytes().to_vec();
+
+    let out_headers = parts
+        .headers
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str().to_string(),
+                String::from_utf8_lossy(v.as_bytes()).to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    Ok((parts.status.as_u16(), out_headers, body_bytes))
+}
+
 fn component_execute_function(
     thread_env: &mut OwnedEnv,
     component_store_resource: ResourceArc<ComponentStoreResource>,
