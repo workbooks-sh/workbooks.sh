@@ -23,30 +23,37 @@ export default {
       return new Response(r.body, { status: r.status, headers: h });
     }
 
+    // Pages/HTML: the edge copy serves FIRST (instant, globally cached);
+    // the fly origin is the fallback for routes the static tree doesn't
+    // know — the CMS surface — behind a hard timeout so a slow origin can
+    // never hold a page render hostage (it was measured holding one for 5s).
+    const edge = await env.ASSETS.fetch(req);
+    if (edge.status < 404) {
+      const h = new Headers(edge.headers);
+      h.set("x-wb-origin", "edge");
+      if (!h.get("cache-control")) h.set("cache-control", "public, max-age=300, stale-while-revalidate=3600");
+      return new Response(edge.body, { status: edge.status, headers: h });
+    }
+
     try {
       const res = await fetch("https://wb-site.fly.dev" + url.pathname + url.search, {
         method: req.method,
         headers: { accept: req.headers.get("accept") || "*/*", "user-agent": "wb-edge" },
-        redirect: "manual", // the origin's clean-URL 301s must reach the client
+        redirect: "manual",
+        signal: AbortSignal.timeout(2500),
       });
       if (res.status < 404 || res.status === 304) {
         const h = new Headers(res.headers);
         h.set("x-wb-origin", "fly");
-        // never leak the fly hostname in redirect targets
         const loc = h.get("location");
         if (loc && loc.startsWith("https://wb-site.fly.dev")) {
           h.set("location", loc.replace("https://wb-site.fly.dev", ""));
         }
         return new Response(res.body, { status: res.status, headers: h });
       }
-      var originNote = "origin-status-" + res.status; // wb-q: worker→fly subrequest 404s (empty body) while direct hits 200
-    } catch (e) {
-      var originNote = "err-" + String(e && e.message).slice(0, 60).replace(/[^\w.-]+/g, "_");
-    }
-    const r = await env.ASSETS.fetch(req);
-    const h = new Headers(r.headers);
-    h.set("x-wb-origin", "pages-fallback");
-    h.set("x-wb-origin-note", typeof originNote === "string" ? originNote : "none");
-    return new Response(r.body, { status: r.status, headers: h });
+    } catch (_) { /* origin slow or down — the edge 404 stands */ }
+    const h = new Headers(edge.headers);
+    h.set("x-wb-origin", "edge-404");
+    return new Response(edge.body, { status: edge.status, headers: h });
   },
 };
