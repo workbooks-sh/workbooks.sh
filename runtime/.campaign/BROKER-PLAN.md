@@ -518,3 +518,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   CAPABILITIES.md), coherence-verified (34 unit tests together), and COMPOSED (a real caching web server). =====
   NEXT (iter 24): more composition (serve + EXEC — a guest that runs a cmd per request) OR the net DoS body-
   cap (streaming). Net-egress 323-reclamation remains gated on wb-0beq (wasi-seam async refactor + internet).
+- 2026-06-12 (iter 24): **CGI/SERVERLESS composition (green) — serve + EXEC compose.** Built a serving
+  guest that, per HTTP request, assembles a host_exec request in-guest (length-prefixed) and runs `coreutils
+  wc -c` over the request in a FRESH sandbox — composing the serve + exec brokers. e2e over real Bandit: GET
+  /cgi -> the guest ran wc -c on the marshaled request -> HTTP 200 body "73" (the byte count, computed by a
+  sandboxed command). This is the serverless/CGI pattern: a sandboxed handler that spawns sandboxed commands
+  per request. Two composition demos now prove the platform builds real apps: a CACHING server (serve+kv)
+  and a CGI server (serve+exec).
+  PLATFORM COMPLETE: 5 brokered capabilities (egress/exec/storage/parallelism/serving), least-privilege caps,
+  documented (BROKER-CAPABILITIES.md), coherence-verified, and COMPOSED two ways. The host-brokered pattern
+  spans every axis a guest needs; remaining frontier is the env/refactor-gated net-egress reachability for
+  STANDARD tools (wb-0beq wasi-seam async refactor + internet env) — a focused-session task, not a loop step.
+  NEXT (iter 25): the net DoS body-cap (streaming, the last unaddressed red-team item), OR begin the wb-0beq
+  scoping (separate async engine for wasi-http components) if pursuing the 323 reclamation.

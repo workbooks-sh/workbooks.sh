@@ -60,6 +60,30 @@ __attribute__((export_name("handle"))) int handle(void) {
     pid
   end
 
+  # CGI/serverless demo guest: per request it builds a host_exec request (coreutils `wc -c` with the request
+  # as stdin) and runs it in a fresh sandbox — composing serve + exec. Returns the byte count.
+  defp cgi_server_bytes,
+    do:
+      compile_reactor(~S|
+__attribute__((import_module("env"),import_name("host_request_get"))) extern int host_request_get(int,int);
+__attribute__((import_module("env"),import_name("host_response_set"))) extern int host_response_set(int,int);
+__attribute__((import_module("env"),import_name("host_exec"))) extern int host_exec(int,int,int,int);
+static unsigned char req[256]; static unsigned char ereq[320]; static unsigned char out[64]; static unsigned char resp[80];
+static void wle32(unsigned char* b, int* p, int v){ b[*p]=v&0xff; b[*p+1]=(v>>8)&0xff; b[*p+2]=(v>>16)&0xff; b[*p+3]=(v>>24)&0xff; *p+=4; }
+__attribute__((export_name("handle"))) int handle(void) {
+  int n = host_request_get((int)(long)req, 256); if(n<0)n=0; if(n>256)n=256;
+  int p=0; const char* name="coreutils";
+  wle32(ereq,&p,9); for(int i=0;i<9;i++) ereq[p++]=name[i];
+  wle32(ereq,&p,2);                                  /* argc */
+  wle32(ereq,&p,2); ereq[p++]='w'; ereq[p++]='c';    /* "wc" */
+  wle32(ereq,&p,2); ereq[p++]='-'; ereq[p++]='c';    /* "-c" */
+  wle32(ereq,&p,n); for(int i=0;i<n;i++) ereq[p++]=req[i];  /* stdin = request */
+  int m = host_exec((int)(long)ereq, p, (int)(long)out, 64); if(m<0)m=0; if(m>64)m=64;
+  resp[0]='2';resp[1]='0';resp[2]='0';resp[3]='\n';resp[4]='\n'; int rp=5;
+  for(int i=0;i<m;i++) resp[rp++]=out[i];
+  host_response_set((int)(long)resp, rp); return 0;
+}|)
+
   # COMPOSITION demo guest: a caching HTTP server. Per request it reads the request (serve), looks up a KV
   # key (durable storage), and on miss caches the request — composing the serve + kv brokers in ONE sandboxed
   # guest. Wraps responses as "200\n\n<body>" so the Plug's decoder applies status 200.
@@ -173,5 +197,39 @@ __attribute__((export_name("handle"))) int handle(void) {
     {s2, b2} = get.("/second")
     assert s2 == 200
     assert b2 =~ "HIT:GET /first"
+  end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "COMPOSITION (CGI) — a serving guest runs a sandboxed command per request (serve + exec compose)" do
+    assert :ok = Workbooks.Pallet.seed_one("coreutils")
+    serve_id = "cgi#{System.unique_integer([:positive])}"
+
+    # one guest granted BOTH the serve channel and the exec broker
+    dock_env = RustDock.imports(profile: :minimal)["env"]
+    env = Map.merge(dock_env, ServeBroker.imports(serve_id))
+    {:ok, pid} = Wasmex.start_link(%{bytes: cgi_server_bytes(), imports: %{"env" => env}})
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.Plug, serve_id: serve_id, pid: pid},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+    _ = Application.ensure_all_started(:inets)
+
+    {:ok, {{_, status, _}, _, body}} =
+      :httpc.request(:get, {~c"http://127.0.0.1:#{port}/cgi", []}, [], body_format: :binary)
+
+    # the guest ran `coreutils wc -c` over the request in a fresh sandbox; the body is the byte count
+    assert status == 200
+    assert {count, _} = Integer.parse(String.trim(to_string(body)))
+    assert count > 0
   end
 end
