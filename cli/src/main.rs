@@ -10,6 +10,7 @@ mod deploy;
 mod io;
 mod kernel;
 mod local;
+mod mode;
 mod rcp;
 mod util;
 
@@ -19,6 +20,12 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "wbx", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
 struct Cli {
+    /// Force agent mode: never prompts, no ANSI (default when stdout is piped)
+    #[arg(long, global = true)]
+    agent: bool,
+    /// Agent mode + a single JSON envelope on stdout ({ok, verb, data|error})
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -166,8 +173,17 @@ enum WorkbookVerb {
     Deploy { id: String, file: String },
 }
 
-fn main() -> Result<()> {
+fn main() {
     let cli = Cli::parse();
+    let m = mode::detect(cli.json, cli.agent);
+    let verb = mode::verb_path();
+    match run(cli) {
+        Ok(out) => mode::render_ok(m, &verb, &out),
+        Err(e) => std::process::exit(mode::render_err(m, &verb, &e)),
+    }
+}
+
+fn run(cli: Cli) -> Result<String> {
     let io = io::platform();
     let io = io.as_ref();
 
@@ -235,8 +251,5 @@ fn main() -> Result<()> {
         Cmd::Var { args } => local::var(io, &args)?,
     };
 
-    if !out.is_empty() {
-        println!("{out}");
-    }
-    Ok(())
+    Ok(out)
 }

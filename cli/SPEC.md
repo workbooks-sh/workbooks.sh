@@ -130,7 +130,7 @@ auto      stdout is a TTY → human · piped/redirected → agent
 **Agent mode (AX):** never prompts; no ANSI; stable output shapes; one JSON
 envelope `{ok, verb, data, error: {code, hint, retryable}}` under `--json`;
 documented exit-code map (0 ok · 2 usage · 3 engine unreachable · 4 not
-found · 5 verification failed · 6 conflict); accepts `-` for stdin where a
+found · 5 verification failed · 6 conflict · 7 auth rejected); accepts `-` for stdin where a
 file is expected; `wbx help --json` emits the verb tree so agents can
 introspect the surface instead of parsing help prose.
 
