@@ -102,26 +102,26 @@
   <p>Four things — the same four a human colleague needs from a computer:</p>
   <ul>
     <li><b>Files</b> — a workspace it owns. Here that's
-    <a href="workbook.html#agent">inside a workbook</a>: the virtual file
+    <a href="workbook#agent">inside a workbook</a>: the virtual file
     system riding in the artifact it's tending.</li>
     <li><b>Processes</b> — real programs to run, in the workbook's
     WebAssembly lane, sandboxed by construction.</li>
     <li><b>Memory</b> — not a vector database bolted on the side, but the
-    workbook's <a href="org.html">org layer</a>: notes, decisions, and task
+    workbook's <a href="org">org layer</a>: notes, decisions, and task
     states it reads and writes like you do.</li>
     <li><b>Time</b> — schedules, persistence, the ability to exist while
-    you're away. That's what <a href="nexus.html#docking">docking</a> is for:
+    you're away. That's what <a href="nexus#docking">docking</a> is for:
     the Nexus is where agents live.</li>
   </ul>
   <p>Notice what's not on the list: your operating system. An agent here
-  never touches it (<a href="nexus.html#security">the security model</a>
+  never touches it (<a href="nexus#security">the security model</a>
   explains why that's structural, not polite).</p>
 </section>
 
 <section id="onetool">
   <h2>one tool, many TOOLKITS</h2>
   <p>Agents in this ecosystem get exactly <b>one</b> tool: a shell. Every
-  capability beyond it comes from <a href="toolkit.html">toolkits</a> — real
+  capability beyond it comes from <a href="toolkit">toolkits</a> — real
   programs on the path, each carrying the manual that teaches its use. No
   bespoke integration per tool, no N×M plugin matrix, no protocol zoo. An
   agent that can read a manual and run a command can use anything the
@@ -165,7 +165,7 @@
     <summary>Can an agent modify the system itself?</summary>
     <p>Only the declarative layer — toolkits, skills, definitions — never
     the engine. That boundary, and the standing process that works inside
-    it, is <a href="autopoet.html">the Autopoet's whole story</a>.</p>
+    it, is <a href="autopoet">the Autopoet's whole story</a>.</p>
   </details>
   <details>
     <summary>How do I see what an agent did while I was away?</summary>
@@ -186,13 +186,13 @@
   <p>The crew writes in the grammar, lives on the engine, and one standing
   member tends the whole garden.</p>
   <div class="cards">
-    <a href="autopoet.html"><span class="sw" style="background:#aee5c2"><b>❀</b></span>
+    <a href="autopoet"><span class="sw" style="background:#aee5c2"><b>❀</b></span>
       <div>The Autopoet<small>the gardener in the machine</small></div><span class="go">→</span></a>
-    <a href="org.html"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
       <div>Org<small>the layer everyone writes</small></div><span class="go">→</span></a>
-    <a href="nexus.html"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
       <div>What is the Nexus<small>where agents live</small></div><span class="go">→</span></a>
-    <a href="wbx.html#install"><span class="sw" style="background:#9fc4e8"><b>✦</b></span>
+    <a href="wbx#install"><span class="sw" style="background:#9fc4e8"><b>✦</b></span>
       <div>Get Workbooks<small>and meet the crew</small></div><span class="go">→</span></a>
   </div>
 </section>
@@ -204,7 +204,7 @@
   <div class="strip" data-dna aria-hidden="true"></div>
   <div class="row">
     <span>workbooks — living breathing software</span>
-    <a href="../index.html">← back to the big picture</a>
+    <a href="../">← back to the big picture</a>
   </div>
 </footer>
 

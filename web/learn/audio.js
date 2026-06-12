@@ -6,7 +6,7 @@
    Chapters within an episode are seekable. Markup + styles + behavior live
    HERE; pages just include <script src="audio.js" defer>.                 */
 (function () {
-  var slug = (location.pathname.match(/learn\/(\w+)\.html/) || [])[1] || "workbook";
+  var slug = (location.pathname.match(/learn\/([a-z]+?)(?:\.html)?\/?$/) || [])[1] || "workbook";
   var LS = "wbAudio.v2";
 
   var css = [

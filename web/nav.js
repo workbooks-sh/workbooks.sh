@@ -127,7 +127,7 @@
     '<div class="drop"><a href="#">Learn</a><div class="panel">' + lessonsCol + '<div class="vsep" aria-hidden="true"></div>' + notebooksCol + '</div></div>' +
     '<div class="drop"><a href="#">Docs</a><div class="panel">' + docsCol + '</div></div>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
-    (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index.html#download">Download</a>' : '');
+    (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '');
 
   var style = document.createElement("style");
   style.textContent = css;
