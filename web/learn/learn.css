@@ -383,3 +383,8 @@ pre.orgsample i { color: var(--dim); font-style: normal; }
   pre.orgsample { font-size: 10.5px; }
   .wbdl .dlbtn { font-size: 11.5px; padding: 12px 14px; }
 }
+
+/* reading state — the TOC is quietly an org task list: sections you've read
+   flip to done and the page remembers across visits */
+.ltoc a.done { color: rgba(86,91,84,.55); }
+.ltoc a.done::after { content: " ✓"; color: var(--ac); font-weight: 700; }

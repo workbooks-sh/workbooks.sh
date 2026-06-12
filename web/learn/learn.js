@@ -136,3 +136,34 @@ if (tb) {
     if (entries[0].isIntersecting) { obs.disconnect(); playStory(LEARN.story); }
   }, { threshold: 0.35 }).observe(tb);
 }
+
+/* ── reading state, remembered ──────────────────────────────────────────────
+   Scroll past a section and its TOC entry flips to done — state persists in
+   this browser per page, like task states in the page's own record. */
+(function () {
+  var slug = (location.pathname.match(/([a-z-]+)\.html/) || [])[1] || "page";
+  var KEY = "wb-read-" + slug;
+  var read;
+  try { read = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); }
+  catch (e) { return; }
+  var secs = Array.prototype.slice.call(document.querySelectorAll("article section[id]"));
+  function paint() {
+    document.querySelectorAll(".ltoc a").forEach(function (a) {
+      a.classList.toggle("done", read.has(a.getAttribute("href").slice(1)));
+    });
+  }
+  function check() {
+    var changed = false;
+    secs.forEach(function (sec) {
+      if (!read.has(sec.id) && sec.getBoundingClientRect().bottom < innerHeight * 0.5) {
+        read.add(sec.id); changed = true;
+      }
+    });
+    if (changed) {
+      try { localStorage.setItem(KEY, JSON.stringify(Array.from(read))); } catch (e) {}
+      paint();
+    }
+  }
+  addEventListener("scroll", check, { passive: true });
+  paint(); check();
+})();
