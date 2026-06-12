@@ -1120,3 +1120,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   forensics ring (recent/1 with targets), and EXTERNAL standard :telemetry. The "manageable" criterion is
   fully realized — monitoring + incident-response + external-monitor integration. FOLLOW-UP: storage/queue
   capacity counters; streaming bodies (the big remaining capability).
+- 2026-06-12 (iter 80): **OBSERVABILITY COMPLETE across ALL 8 brokers + streaming scoped.** Wired BrokerAudit
+  into the last two brokers' deny paths: storage (put: revoked / value_too_large / quota_exceeded; get:
+  revoked) and queue (publish: revoked / queue_full; poll: revoked). 17 tests green. So EVERY broker's
+  denials are now observable: net/tcp/udp/tls/exec/serve + storage/queue = all 8, across all three views
+  (counters via stats/count, forensics ring via recent/1, external :telemetry). The "manageable" criterion is
+  fully met across the entire broker surface. Filed wb-t3sq: STREAMING bodies — the one big remaining capability,
+  with the full architecture (push-model serve NIF that frames the response body + sends chunks to a pid; a
+  Plug that spawns the NIF call and forwards via send_chunked; a multi-chunk streaming guest). Outbound
+  wasi:http/sockets ALREADY stream (guest reads chunks, host passes through); the gap is the INBOUND serve NIF
+  (buffers) + host_http_get. Genuinely multi-fire (NIF->Plug->guest->e2e) like the inbound seam — the 16MiB
+  cap is the DoS floor until then.

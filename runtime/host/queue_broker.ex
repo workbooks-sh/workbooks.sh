@@ -20,6 +20,7 @@ defmodule Workbooks.QueueBroker do
     max = Keyword.get(opts, :max_depth, @max_depth)
 
     if Workbooks.Revocation.revoked?(tenant) do
+      Workbooks.BrokerAudit.record(:queue, :deny, :revoked)
       {:error, :revoked}
     else
       Agent.get_and_update(agent(), fn state ->
@@ -27,6 +28,7 @@ defmodule Workbooks.QueueBroker do
         q = Map.get(state, key, :queue.new())
 
         if :queue.len(q) >= max do
+          Workbooks.BrokerAudit.record(:queue, :deny, :queue_full)
           {{:error, :queue_full}, state}
         else
           {:ok, Map.put(state, key, :queue.in(msg, q))}
@@ -38,6 +40,7 @@ defmodule Workbooks.QueueBroker do
   @doc "Dequeue the oldest message on (`tenant`, `topic`). {:ok, msg} | :empty | {:error, :revoked}."
   def poll(tenant, topic) when is_binary(tenant) and is_binary(topic) do
     if Workbooks.Revocation.revoked?(tenant) do
+      Workbooks.BrokerAudit.record(:queue, :deny, :revoked)
       {:error, :revoked}
     else
       Agent.get_and_update(agent(), fn state ->

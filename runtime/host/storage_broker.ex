@@ -41,17 +41,30 @@ defmodule Workbooks.StorageBroker do
     max_keys = Keyword.get(opts, :max_keys, @max_keys)
 
     cond do
-      Workbooks.Revocation.revoked?(tenant) -> {:error, :revoked}
-      key == "" or tenant == "" -> {:error, :invalid_key}
-      byte_size(value) > max_value -> {:error, :value_too_large}
-      not exists?(conn, tenant, key) and count(conn, tenant) >= max_keys -> {:error, :quota_exceeded}
-      true -> do_put(conn, tenant, key, value)
+      Workbooks.Revocation.revoked?(tenant) ->
+        Workbooks.BrokerAudit.record(:storage, :deny, :revoked)
+        {:error, :revoked}
+
+      key == "" or tenant == "" ->
+        {:error, :invalid_key}
+
+      byte_size(value) > max_value ->
+        Workbooks.BrokerAudit.record(:storage, :deny, :value_too_large)
+        {:error, :value_too_large}
+
+      not exists?(conn, tenant, key) and count(conn, tenant) >= max_keys ->
+        Workbooks.BrokerAudit.record(:storage, :deny, :quota_exceeded)
+        {:error, :quota_exceeded}
+
+      true ->
+        do_put(conn, tenant, key, value)
     end
   end
 
   @doc "Fetch the value for (`tenant`, `key`). {:ok, value} | {:error, :not_found}."
   def get(conn, tenant, key) when is_binary(tenant) and is_binary(key) do
     if Workbooks.Revocation.revoked?(tenant) do
+      Workbooks.BrokerAudit.record(:storage, :deny, :revoked)
       {:error, :revoked}
     else
       do_get(conn, tenant, key)
