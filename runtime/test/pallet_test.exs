@@ -155,6 +155,16 @@ defmodule Workbooks.PalletTest do
     assert out =~ "3\tthe"
   end
 
+  @tag :pallet
+  @tag timeout: 600_000
+  test "Lane C — a Rust tool with a crates.io dependency (regex) builds + runs" do
+    # proves the Rust lane resolves a crate DEPENDENCY graph (regex + regex-syntax/aho-corasick/memchr)
+    assert :ok = Pallet.seed_rust_one("rgx")
+    assert "rgx" in CommandRegistry.list()
+    assert {:ok, out} = CommandRegistry.run("rgx", "apple\nbanana\nblueberry\ncherry", ["^b"])
+    assert String.trim(out) == "banana\nblueberry"
+  end
+
   test "python-tools catalog entries are well-formed (Lane D)" do
     refute Pallet.python_tools_catalog() == []
 

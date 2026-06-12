@@ -62,6 +62,8 @@
     JSON ={"template","data"}= → rendered text. =run("tmpl", json, [])=.
   - =wfreq= — word frequency, desc by count (a Rust tool built via mrustc→clang, Lane C).
     =run("wfreq", "the cat the dog the", [])= → =3⇥the / 1⇥cat / 1⇥dog=.
+  - =rgx= — regex line grep via the Rust =regex= crate (Lane C with a crates.io dep). pattern in argv:
+    =run("rgx", "apple\nbanana", ["^b"])= → =banana=.
 
 * Misc
 

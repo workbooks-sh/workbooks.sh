@@ -522,8 +522,26 @@ defmodule Workbooks.Pallet do
   }
   """
 
+  # `rgx`: line grep via the `regex` crate (+ transitive deps regex-syntax/aho-corasick/memchr) —
+  # proves Lane C resolves a crates.io DEPENDENCY graph, not just std (parallel to tmpl on Lane D).
+  @rgx_src ~S"""
+  use std::io::Read;
+  use regex::Regex;
+  fn main() {
+      let args: Vec<String> = std::env::args().collect();
+      let pat = args.get(1).map(|s| s.as_str()).unwrap_or(".");
+      let re = Regex::new(pat).unwrap();
+      let mut s = String::new();
+      std::io::stdin().read_to_string(&mut s).unwrap();
+      for line in s.lines() {
+          if re.is_match(line) { println!("{}", line); }
+      }
+  }
+  """
+
   @rust [
-    %{name: "wfreq", source: @wfreq_src, mode: :argv}
+    %{name: "wfreq", source: @wfreq_src, deps: [], mode: :argv},
+    %{name: "rgx", source: @rgx_src, deps: ["regex"], mode: :argv}
   ]
 
   # Lane D — pure-Python tools riding the CPython.wasm interpreter (Lane A) with a FROZEN site-packages
@@ -587,12 +605,14 @@ defmodule Workbooks.Pallet do
     end
   end
 
-  def seed_rust_one(%{name: n, source: src, mode: mode}) do
+  def seed_rust_one(%{name: n, source: src, mode: mode} = entry) do
     # idempotent: skip if already reloaded from the persisted cache (same as seed_csource_one)
     if n in CommandRegistry.list() do
       :ok
     else
-      case CommandRegistry.build_and_register_inline(n, "rust", src, [], mode) do
+      deps = Map.get(entry, :deps, [])
+
+      case CommandRegistry.build_and_register_inline(n, "rust", src, deps, mode) do
         {:ok, _} -> :ok
         other -> other
       end
