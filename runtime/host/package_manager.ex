@@ -602,16 +602,28 @@ defmodule Workbooks.PackageManager do
   # mmap parity: the shim is linked (extra_csrc) and mmap/munmap/msync are --wrap'd to it
   # (ld_args), so a CLI that mmap()s a file works the same as on the old zig-cc lane —
   # now with zero native execution.
+  # libc/C-standard header basenames — a project header by one of these names (flatbuffers/string.h)
+  # would shadow the real system header if its dir were -I'd; such dirs get -iquote instead (wb-3b3u).
+  @libc_header_names ~w(assert.h ctype.h errno.h fenv.h float.h inttypes.h iso646.h limits.h locale.h
+                        math.h setjmp.h signal.h stdalign.h stdarg.h stdatomic.h stdbool.h stddef.h
+                        stdint.h stdio.h stdlib.h stdnoreturn.h string.h strings.h tgmath.h time.h
+                        uchar.h wchar.h wctype.h complex.h)
+
   defp compile_c_in_sandbox(main, rest, out, headers \\ [], extra_argv \\ [], src_root \\ nil) do
     File.mkdir_p!(@cache)
 
-    # Bring the project's headers into the guest (structure preserved) and -I every dir that holds
-    # one, so both `#include "x.h"` and `#include <x.h>` resolve for multi-file C tools (wb-yi7q).
+    # Bring the project's headers into the guest (structure preserved) and add each dir that holds one
+    # to the search path, so both `#include "x.h"` and `#include <x.h>` resolve for multi-file tools
+    # (wb-yi7q). BUT a dir holding a header named like a libc header (e.g. flatbuffers/string.h) must use
+    # -iquote, not -I — else it captures the system `<string.h>` and breaks libc++ <cstring> (wb-3b3u).
     inc_flags =
       headers
-      |> Enum.map(fn {_host, rel} -> Path.dirname(rel) end)
-      |> Enum.uniq()
-      |> Enum.flat_map(fn d -> ["-I", if(d in [".", ""], do: "/work", else: "/work/#{d}")] end)
+      |> Enum.group_by(fn {_host, rel} -> Path.dirname(rel) end, fn {_h, rel} -> Path.basename(rel) end)
+      |> Enum.flat_map(fn {d, basenames} ->
+        guest = if d in [".", ""], do: "/work", else: "/work/#{d}"
+        flag = if Enum.any?(basenames, &(&1 in @libc_header_names)), do: "-iquote", else: "-I"
+        [flag, guest]
+      end)
 
     # setjmp/longjmp support (wb-nwd7): lower setjmp via wasm exception-handling. CRUCIAL:
     # -wasm-use-legacy-eh=false emits the MODERN exnref EH (wasmtime 45 supports only that, not the
