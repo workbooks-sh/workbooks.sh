@@ -15,11 +15,12 @@ defmodule Workbooks.TcpBroker do
 
   @default_max_response 1_048_576
 
-  @doc "Brokered TCP request/response. opts: :principal, :rate {max,window}, :max_response, :timeout."
+  @doc "Brokered TCP request/response. opts: :principal, :rate {max,window}, :allow (scope list), :max_response, :timeout."
   def request(host, port, data, opts \\ [])
       when is_binary(host) and is_integer(port) and is_binary(data) do
     principal = Keyword.get(opts, :principal)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    allow = Keyword.get(opts, :allow, nil)
     max = Keyword.get(opts, :max_response, @default_max_response)
     timeout = Keyword.get(opts, :timeout, 10_000)
 
@@ -29,6 +30,12 @@ defmodule Workbooks.TcpBroker do
 
       principal && rate && rate_denied?(principal, rate) ->
         {:error, :rate_limited}
+
+      # per-instance {host,port} allow-list (on top of the SSRF floor) — nil = no scoping; a list confines
+      # the destination to the granted endpoints (closes "any cap-holder reaches any public host:port").
+      not Workbooks.NetGuard.dest_allowed?(host, port, allow) ->
+        Workbooks.BrokerAudit.record(:tcp, :deny, :allowlist, "#{host}:#{port}")
+        {:error, :denied}
 
       true ->
         case Workbooks.NetGuard.resolve_allowed_ip(host) do

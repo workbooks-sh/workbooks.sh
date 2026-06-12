@@ -1356,3 +1356,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   oc) site to max(cap, 0) across BOTH docks (17 sites: rust_dock 9 + js_dock 8). The fan-out sites
   (http_get_many, parallel) already use `byte_size <= cap` -> negative cap just returns -1 (no trap), verified
   safe. 16 dock tests green. THIS FIRE: 2 wb-8w8x items (streaming body cap + out_cap clamp).
+- 2026-06-12 (iter 99): **FIXED wb-8w8x: TLS/TCP/UDP per-instance {host,port} ALLOW-LIST (MEDIUM).** Only the
+  HTTP path had :allow; the three socket brokers enforced the SSRF floor ALONE, so any cap-holder reached any
+  PUBLIC host:port (exfil/C2/host-as-proxy). Added a port-aware NetGuard.dest_allowed?/3 (nil=no scoping;
+  "host:port" pattern matches host AND port; bare "host"/"*.suffix" matches any port) and an :allow clause to
+  TcpBroker/UdpBroker/TlsBroker.request (denied BEFORE resolve/connect, audited as :allowlist). 12 socket-
+  broker tests green incl new: off-list public host denied, right-host/wrong-port denied, dest_allowed? unit
+  (host:port / host-only / *.suffix / nil). FOLLOW-UP (separate): thread a policy-derived granted scope from
+  the docks (rust_dock/js_dock call the brokers with principal: only today) so the scope is ENFORCED end-to-
+  end, not just available — pairs with the wb-an2v tenant-threading + the default-profile (compute) change.

@@ -174,6 +174,39 @@ defmodule Workbooks.NetGuard do
     end)
   end
 
+  @doc """
+  Port-aware destination allow-list for the raw-socket brokers (TCP/UDP/TLS). `nil` = no scoping (any public
+  host:port, after the SSRF floor). A list confines the destination: a `"host:port"` pattern must match BOTH
+  host and port; a bare `"host"` / `"*.suffix"` pattern matches the host on any port.
+  """
+  def dest_allowed?(_host, _port, nil), do: true
+
+  def dest_allowed?(host, port, patterns) when is_binary(host) and is_integer(port) and is_list(patterns) do
+    h = host |> String.trim_trailing(".") |> String.downcase()
+
+    Enum.any?(patterns, fn p ->
+      {hostpat, portpat} =
+        case String.split(String.downcase(String.trim(p)), ":", parts: 2) do
+          [hp, pp] ->
+            case Integer.parse(pp) do
+              {n, ""} -> {hp, n}
+              _ -> {String.downcase(String.trim(p)), nil}
+            end
+
+          [hp] ->
+            {hp, nil}
+        end
+
+      host_match =
+        case hostpat do
+          "*." <> suffix -> h == suffix or String.ends_with?(h, "." <> suffix)
+          exact -> h == exact
+        end
+
+      host_match and (portpat == nil or portpat == port)
+    end)
+  end
+
   @doc "True only if the URL's host resolves entirely to public, externally-routable addresses."
   def allowed?(url) when is_binary(url) do
     with %URI{host: host} when is_binary(host) and host != "" <- URI.parse(url),

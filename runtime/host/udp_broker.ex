@@ -17,6 +17,7 @@ defmodule Workbooks.UdpBroker do
       when is_binary(host) and is_integer(port) and is_binary(datagram) do
     principal = Keyword.get(opts, :principal)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    allow = Keyword.get(opts, :allow, nil)
     max = Keyword.get(opts, :max_response, @default_max_response)
     timeout = Keyword.get(opts, :timeout, 5_000)
 
@@ -26,6 +27,10 @@ defmodule Workbooks.UdpBroker do
 
       principal && rate && rate_denied?(principal, rate) ->
         {:error, :rate_limited}
+
+      not Workbooks.NetGuard.dest_allowed?(host, port, allow) ->
+        Workbooks.BrokerAudit.record(:udp, :deny, :allowlist, "#{host}:#{port}")
+        {:error, :denied}
 
       true ->
         case Workbooks.NetGuard.resolve_allowed_ip(host) do

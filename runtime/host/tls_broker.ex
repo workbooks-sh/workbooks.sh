@@ -13,11 +13,12 @@ defmodule Workbooks.TlsBroker do
 
   @default_max_response 1024 * 1024
 
-  @doc "Brokered TLS request/response. opts: :principal, :rate {max,window}, :max_response, :timeout."
+  @doc "Brokered TLS request/response. opts: :principal, :rate {max,window}, :allow (scope list), :max_response, :timeout."
   def request(host, port, data, opts \\ [])
       when is_binary(host) and is_integer(port) and is_binary(data) do
     principal = Keyword.get(opts, :principal)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    allow = Keyword.get(opts, :allow, nil)
     max = Keyword.get(opts, :max_response, @default_max_response)
     timeout = Keyword.get(opts, :timeout, 10_000)
 
@@ -27,6 +28,10 @@ defmodule Workbooks.TlsBroker do
 
       principal && rate && rate_denied?(principal, rate) ->
         {:error, :rate_limited}
+
+      not Workbooks.NetGuard.dest_allowed?(host, port, allow) ->
+        Workbooks.BrokerAudit.record(:tls, :deny, :allowlist, "#{host}:#{port}")
+        {:error, :denied}
 
       true ->
         case Workbooks.NetGuard.resolve_allowed_ip(host) do

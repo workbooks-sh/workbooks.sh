@@ -28,6 +28,19 @@ defmodule Workbooks.TcpBrokerTest do
     assert {:error, :denied} = TcpBroker.request("10.0.0.1", 6379, "x")
   end
 
+  test "wb-8w8x: per-instance {host,port} ALLOW-LIST confines TCP egress (hermetic — denied before connect)" do
+    # a public host NOT on the granted list is denied (the SSRF floor alone would have let it through)
+    assert {:error, :denied} = TcpBroker.request("1.1.1.1", 80, "x", allow: ["8.8.8.8:53"])
+    # right host, WRONG port -> denied (port-aware)
+    assert {:error, :denied} = TcpBroker.request("8.8.8.8", 80, "x", allow: ["8.8.8.8:53"])
+    # NetGuard.dest_allowed? unit: host+port match, host-only pattern, wildcard suffix
+    assert NetGuard.dest_allowed?("8.8.8.8", 53, ["8.8.8.8:53"])
+    assert NetGuard.dest_allowed?("api.example.com", 443, ["api.example.com"])
+    assert NetGuard.dest_allowed?("x.example.com", 443, ["*.example.com"])
+    refute NetGuard.dest_allowed?("evil.com", 443, ["*.example.com"])
+    assert NetGuard.dest_allowed?("anything", 1, nil), "nil = no scoping"
+  end
+
   test "REVOCATION + RATE gate the TCP broker" do
     p = "tcp-#{System.unique_integer([:positive])}"
     Workbooks.Revocation.revoke(p)
