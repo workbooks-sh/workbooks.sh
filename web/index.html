@@ -103,11 +103,33 @@ const WB_FLAGS = { desktopDownload: false };</script>
     text-transform: uppercase;
     letter-spacing: 0;
     font-size: clamp(48px, 8.6vw, 116px); line-height: .9; text-align: center;
-    /* the formula (2026-06-12): pastel fill, ink ring — bubble words carry
-       their context's color everywhere this style appears */
-    color: #aee5c2; -webkit-text-stroke: 1px var(--ink);
-    text-shadow: 3.5px 0.0px 0 var(--ink), 3.2px 1.3px 0 var(--ink), 2.5px 2.5px 0 var(--ink), 1.3px 3.2px 0 var(--ink), 0.0px 3.5px 0 var(--ink), -1.3px 3.2px 0 var(--ink), -2.5px 2.5px 0 var(--ink), -3.2px 1.3px 0 var(--ink), -3.5px 0.0px 0 var(--ink), -3.2px -1.3px 0 var(--ink), -2.5px -2.5px 0 var(--ink), -1.3px -3.2px 0 var(--ink), -0.0px -3.5px 0 var(--ink), 1.3px -3.2px 0 var(--ink), 2.5px -2.5px 0 var(--ink), 3.2px -1.3px 0 var(--ink);
+    /* the home hero exception (2026-06-12): mostly-white fill with soft
+       pastel light leaking in at the top and bottom edges, oscillating
+       slowly through the palette — the word breathes its own colors */
+    color: transparent; -webkit-text-fill-color: transparent;
+    background-image:
+      radial-gradient(120% 62% at 28% -4%, rgba(168,212,240,.95), transparent 60%),
+      radial-gradient(120% 62% at 74% 104%, rgba(174,229,194,.95), transparent 60%),
+      radial-gradient(100% 55% at 64% -4%, rgba(242,221,176,.85), transparent 56%),
+      radial-gradient(100% 55% at 20% 104%, rgba(243,197,163,.8), transparent 56%),
+      linear-gradient(#fff, #fff);
+    background-size: 220% 100%, 220% 100%, 220% 100%, 220% 100%, 100% 100%;
+    background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0;
+    -webkit-background-clip: text; background-clip: text;
+    animation: bub-breathe 16s ease-in-out infinite;
+    /* the ring is a centered stroke here — a shadow ring would show through
+       the clipped (transparent) fill and paint the word solid ink */
+    -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill;
     position: relative; z-index: 2; margin: -.42em 0 -.38em;
+  }
+
+  @keyframes bub-breathe {
+    0%   { background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0; }
+    50%  { background-position: 100% 0%, 0% 100%, 10% 0%, 85% 100%, 0 0; }
+    100% { background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lockup .jl:nth-child(2) { animation: none; }
   }
 
   .caption {
