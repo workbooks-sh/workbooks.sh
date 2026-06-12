@@ -23,6 +23,55 @@ defmodule Workbooks.PublicWebTest do
     end
   end
 
+  # pages are PAGES, not files: clean URLs resolve, .html URLs retire via 301
+  describe "clean URLs (serve_static)" do
+    setup do
+      case Workbooks.Domains.start_link(nil) do
+        {:ok, _} -> :ok
+        {:error, {:already_started, _}} -> :ok
+      end
+
+      dir = Path.join([System.get_env("WB_DATA") || File.cwd!(), "build", "public", "dev"])
+      File.mkdir_p!(Path.join(dir, "learn"))
+      File.write!(Path.join(dir, "index.html"), "<!doctype html><html><head></head><body>home</body></html>")
+      File.write!(Path.join([dir, "learn", "workbook.html"]), "<!doctype html><html><head></head><body>lesson</body></html>")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      :ok
+    end
+
+    defp get_path(path) do
+      conn(:get, path) |> Map.put(:host, "dev.apps.example") |> Workbooks.PublicWeb.call([])
+    end
+
+    test "extensionless URL serves the page" do
+      conn = get_path("/learn/workbook")
+      assert conn.status == 200
+      assert conn.resp_body =~ "lesson"
+    end
+
+    test ".html URL 301s to the clean form" do
+      conn = get_path("/learn/workbook.html")
+      assert conn.status == 301
+      assert get_resp_header(conn, "location") == ["/learn/workbook"]
+    end
+
+    test "/index.html canonicalizes to /" do
+      conn = get_path("/index.html")
+      assert conn.status == 301
+      assert get_resp_header(conn, "location") == ["/"]
+    end
+
+    test "directory default still serves its index" do
+      conn = get_path("/")
+      assert conn.status == 200
+      assert conn.resp_body =~ "home"
+    end
+
+    test "missing pages still 404" do
+      assert get_path("/learn/nope").status == 404
+    end
+  end
+
   # wb-5vm: /_changes — public read-only change feed
   describe "GET /_changes" do
     setup do

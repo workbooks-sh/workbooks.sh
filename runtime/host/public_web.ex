@@ -206,23 +206,59 @@ defmodule Workbooks.PublicWeb do
     end
   end
 
-  # Serve a file from the host's published static site dir (build/public/<app>/),
-  # with index.html as the directory default. Path-traversal safe: ".." segments
-  # are rejected AND the resolved path is contained within the site dir.
+  # Serve a file from the host's published static site dir (build/public/<app>/).
+  # Pages are PAGES, not files: clean URLs resolve extensionlessly
+  # (`/learn/workbook` → learn/workbook.html), directories default to their
+  # index, and inbound `.html` URLs 301 to the clean form so the suffix
+  # retires everywhere. Path-traversal safe: ".." segments are rejected AND
+  # the resolved path is contained within the site dir.
   defp serve_static(conn, dir) do
     with {:ok, rel} <- safe_rel(conn.request_path),
-         path <- index_default(Path.join(dir, rel)),
-         true <- contained?(dir, path) and File.regular?(path) do
-      ctype = MIME.from_path(path)
+         path when path != nil <- resolve(Path.join(dir, rel)),
+         true <- contained?(dir, path) do
+      cond do
+        # an explicit .html request for an existing page → canonical clean URL
+        String.ends_with?(rel, ".html") and File.regular?(path) ->
+          redirect(conn, clean_url(conn))
 
-      if String.starts_with?(ctype, "text/html") do
-        serve_html(conn, inject_marker(File.read!(path)))
-      else
-        conn |> put_resp_content_type(ctype) |> send_file(200, path)
+        String.starts_with?(MIME.from_path(path), "text/html") ->
+          serve_html(conn, inject_marker(File.read!(path)))
+
+        true ->
+          conn |> put_resp_content_type(MIME.from_path(path)) |> send_file(200, path)
       end
     else
       _ -> send_resp(conn, 404, "not found")
     end
+  end
+
+  # try-files: exact match → `<path>.html` (the clean-URL page) → dir index.
+  defp resolve(path) do
+    cond do
+      File.regular?(path) -> path
+      File.regular?(path <> ".html") -> path <> ".html"
+      File.dir?(path) and File.regular?(Path.join(path, "index.html")) -> Path.join(path, "index.html")
+      true -> nil
+    end
+  end
+
+  defp clean_url(conn) do
+    base =
+      case String.replace_suffix(conn.request_path, ".html", "") do
+        p when p in ["/index", "index"] -> "/"
+        p -> String.replace_suffix(p, "/index", "/")
+      end
+
+    case conn.query_string do
+      "" -> base
+      q -> base <> "?" <> q
+    end
+  end
+
+  defp redirect(conn, to) do
+    conn
+    |> put_resp_header("location", to)
+    |> send_resp(301, "moved: " <> to)
   end
 
   defp serve_html(conn, body),
