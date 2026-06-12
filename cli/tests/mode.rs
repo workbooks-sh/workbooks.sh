@@ -98,3 +98,28 @@ fn dev_serves_and_reloads() {
     let _ = child.kill();
     assert!(ok, "dev server never answered with HTML");
 }
+
+#[test]
+fn doctor_reports_and_exits_zero_even_without_engine() {
+    // agent default (piped): structured JSON body, exit 0 regardless of engine
+    let out = wbx().arg("doctor").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    assert!(out.status.success(), "doctor must not fail the shell");
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("doctor agent output is JSON");
+    assert!(v["engine"]["state"].is_string());
+    // --json wraps the same data in the envelope
+    let out = wbx().args(["--json", "doctor"]).env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["ok"], true);
+    assert!(v["data"]["engine"]["state"].is_string(), "envelope embeds structured doctor data");
+}
+
+#[test]
+fn completions_emit_for_zsh_and_bash() {
+    for shell in ["zsh", "bash"] {
+        let out = wbx().args(["completions", shell]).output().unwrap();
+        assert!(out.status.success());
+        let s = String::from_utf8_lossy(&out.stdout);
+        assert!(s.contains("wbx"), "{shell} script mentions wbx");
+        assert!(s.len() > 500, "{shell} script non-trivial");
+    }
+}

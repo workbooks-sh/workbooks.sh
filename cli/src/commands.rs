@@ -203,3 +203,89 @@ pub fn rt(io: &dyn Io, args: &[String]) -> Result<String> {
         _ => bail!("usage: wbx rt status | get <path> | post <path> [body]"),
     }
 }
+
+/// `wbx doctor` — environment + engine health, reported not judged (exit 0;
+/// agents read the structured form, humans the prose).
+pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    // PATH: is some wbx reachable, and is it this one?
+    let on_path = which_wbx();
+    let this = std::env::current_exe().ok().map(|p| p.display().to_string());
+
+    // engine: discovery → well-known probe, classified not thrown
+    let engine_url = std::env::var("WB_ENGINE_URL").ok();
+    let (engine, engine_detail) = match rcp::call(io, "GET", "/.well-known/workbooks-runtime", None) {
+        Ok(body) => ("reachable", body.chars().take(120).collect::<String>()),
+        Err(e) => {
+            let s = format!("{e:#}");
+            let class = if s.to_lowercase().contains("unauthorized") || s.contains("401") {
+                "auth-rejected"
+            } else {
+                "unreachable"
+            };
+            (class, s.chars().take(160).collect::<String>())
+        }
+    };
+
+    // workspace: what's in cwd
+    let here = |f: &str| std::path::Path::new(f).is_file();
+    let ws: Vec<&str> = [
+        ("workbook.org", here("workbook.org")),
+        ("deployment.org", here("deployment.org")),
+        ("publish.org", here("publish.org")),
+    ]
+    .iter()
+    .filter(|(_, p)| *p)
+    .map(|(n, _)| *n)
+    .collect();
+
+    if human {
+        let mut out = String::new();
+        out.push_str(&format!("wbx {version}\n"));
+        out.push_str(&format!(
+            "binary     {}\n",
+            this.as_deref().unwrap_or("unknown")
+        ));
+        out.push_str(&format!(
+            "on PATH    {}\n",
+            on_path.as_deref().unwrap_or("NOT on PATH — add the install dir")
+        ));
+        out.push_str(&format!(
+            "engine     {engine}{}\n",
+            engine_url.as_deref().map(|u| format!(" (WB_ENGINE_URL={u})")).unwrap_or_default()
+        ));
+        if engine != "reachable" {
+            out.push_str(&format!("           {engine_detail}\n"));
+            out.push_str("           → `wbx deploy local` stands one up\n");
+        }
+        out.push_str(&format!(
+            "workspace  {}\n",
+            if ws.is_empty() { "no org files here (start: `wbx init <name>`)".to_string() } else { ws.join(" · ") }
+        ));
+        Ok(out.trim_end().to_string())
+    } else {
+        Ok(serde_json::json!({
+            "version": version,
+            "binary": this,
+            "on_path": on_path,
+            "engine": { "state": engine, "url": engine_url, "detail": engine_detail },
+            "workspace": ws,
+        })
+        .to_string())
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn which_wbx() -> Option<String> {
+    let exe = if cfg!(windows) { "wbx.exe" } else { "wbx" };
+    std::env::var("PATH").ok()?.split(if cfg!(windows) { ';' } else { ':' }).find_map(|d| {
+        let p = std::path::Path::new(d).join(exe);
+        p.is_file().then(|| p.display().to_string())
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+fn which_wbx() -> Option<String> {
+    None
+}

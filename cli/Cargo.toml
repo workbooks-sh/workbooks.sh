@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 serde_json = "1"
 # The OQL kernel as a pure rlib — local org ops, no running runtime needed.
 # default-features = false drops the wasm-Component glue so it links cleanly on

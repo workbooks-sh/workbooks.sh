@@ -38,6 +38,10 @@ enum Cmd {
     Init { name: String, #[arg(long, default_value = "minimal")] template: String },
     /// Watch + rebuild + serve a live preview (interactive; in agent contexts use `bundle`)
     Dev { #[arg(default_value = ".")] src: String, #[arg(long)] port: Option<u16> },
+    /// Environment + engine health report (always exits 0; agents get JSON via --json)
+    Doctor,
+    /// Shell completions to stdout (bash | zsh | fish | elvish | powershell)
+    Completions { shell: clap_complete::Shell },
     // ── source inspection (local, kernel) ──
     /// Org → headline rows (the query surface)
     Query { file: String },
@@ -183,13 +187,13 @@ fn main() {
     let cli = Cli::parse();
     let m = mode::detect(cli.json, cli.agent);
     let verb = mode::verb_path();
-    match run(cli) {
+    match run(cli, m == mode::Mode::Human) {
         Ok(out) => mode::render_ok(m, &verb, &out),
         Err(e) => std::process::exit(mode::render_err(m, &verb, &e)),
     }
 }
 
-fn run(cli: Cli) -> Result<String> {
+fn run(cli: Cli, human: bool) -> Result<String> {
     let io = io::platform();
     let io = io.as_ref();
 
@@ -197,6 +201,13 @@ fn run(cli: Cli) -> Result<String> {
         // start here
         Cmd::Init { name, template } => local::init(&name, &template)?,
         Cmd::Dev { src, port } => dev::dev(&src, port)?,
+        Cmd::Doctor => commands::doctor(io, human)?,
+        Cmd::Completions { shell } => {
+            use clap::CommandFactory;
+            let mut buf = Vec::new();
+            clap_complete::generate(shell, &mut Cli::command(), "wbx", &mut buf);
+            String::from_utf8(buf)?
+        }
         // local kernel
         Cmd::Query { file } => kernel::query(io, &file)?,
         Cmd::Tangle { file } => kernel::tangle(io, &file)?,
