@@ -1,0 +1,51 @@
+{
+ "slug": "workflows",
+ "title": "Workflows — the plans",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Plans that run",
+   "text": "Lesson eight — workflows. A workflow is a plan written in the grammar. Tasks, states, dependencies, and schedules… in one parseable file. Boards render from it. Agents execute from it. [curious] And nothing ever needs syncing — because the plan is the state."
+  },
+  {
+   "id": "problem",
+   "title": "The plan is always stale",
+   "text": "Every project keeps a plan… and almost no project keeps it where the work happens. The board lives in one tool. The code in another. The schedule in a third. And the moment work moves, the plan is a screenshot of last week's intentions. [sighs] Someone's job quietly becomes updating the board. Which is to say… manually syncing reality into a database that only drifts away from it again. And agents made this worse before they made it better. An agent's plan typically lives in its context window. Invisible… unreviewable… gone when the session ends. You can't diff it. You can't validate it. You can't hand it to the next worker. [curious] The most plan-hungry collaborators we've ever had arrived… and we gave them the one format nothing else can read."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A workflow is a plan written in the grammar. Tasks, states, dependencies, and schedules, in one parseable file — which boards render from… and agents execute from. The whole trick is in those two verbs. Nothing renders to a workflow, and nothing exports from it. The file is the single source. Everything else is a view, or a worker. Change the file… and every board updates. Finish a task… and the file says so. [curious] There is no second copy to keep honest."
+  },
+  {
+   "id": "anatomy",
+   "title": "What a plan can say",
+   "text": "Because workflows are written in org, the things a plan needs are native grammar — not bolted-on convention. Five of them. First: states. The TODO and DONE keywords on headlines… the board columns, living in the file. Second: dependencies. A property on the task — and execution order falls out of them, never written down. Third: schedules. Real timestamps — so calendars and overdue checks become arithmetic. Fourth: prose. The why, in full sentences, exactly where the decision lives. And fifth: nesting. Workflows hold sub-workflows… a quarter holds projects, holds tasks. One tree. [curious] And the quiet property that matters most — every line of it is parseable. Duplicated tasks… dependencies pointing at nothing… a DONE resting on a TODO. Those are checkable facts. A test suite can read your plan."
+  },
+  {
+   "id": "boards",
+   "title": "Boards are renderings",
+   "text": "A kanban board. A timeline. A calendar of deadlines. In this ecosystem, those are renderings of the plan file — generated the way a browser generates a page from HTML. Drag a card to the done column… and the file's headline flips to DONE. Edit the file… and the board redraws. [chuckles] The two can't disagree. Because there aren't two. A board that's secretly a text file is a plan your tools, your agents, and your version control all read natively. The plan gets code review. The plan has a diff. [excited] The plan can be reverted."
+  },
+  {
+   "id": "execution",
+   "title": "How a plan runs",
+   "text": "Execution is almost embarrassingly simple — and that's the point. A task is ready when it's TODO, and every dependency is DONE. Workers — agents with toolkits in hand, on an engine you own — pick up ready tasks… do them… and write DONE back into the file. Repeat, until the board is clear. [curious] Notice what nobody wrote… an execution order. The order falls out of the dependencies. Reorder the headlines, and nothing changes. Add a dependency, and everything downstream waits. And because schedules are native, run-this-every-morning is a property on a headline… not a cron job in some other system. [excited] The engine compiles the same shape further down — a workflow's components become a deployable world, with typed inputs and outputs. One idea… from sticky-note scale to build-system scale."
+  },
+  {
+   "id": "honest",
+   "title": "Where it bites",
+   "text": "Honesty section. Plans drift. Agents writing freely will eventually duplicate a task, or contradict a state — and a workflow file doesn't prevent that, any more than any format does. What it does is make drift detectable. The checks run on every write… and the contradiction gets a name and a line number, instead of a shrug. And execution is not autonomy. The pitch is never software that runs itself. Direction stays human. Workers stop at the edges you set. And the edges are real — sandboxes… explicit grants… a written layer you can read, diff, and revert. [curious] A workflow makes follow-through cheap. It doesn't make judgment optional."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] How is this different from Jira, or Linear? Those are databases with views — the plan lives in their cloud, in their shape. A workflow lives next to the work, in plain text, in version control. And agents read it natively, because the grammar is in their training data. [chuckles] Use both if you like… only one of them can be diffed in a pull request. What stops circular dependencies? Validation. A cycle, a phantom dependency, a DONE resting on a TODO — the checker reports each one, named, before anything runs. Who actually executes the tasks? Anyone who can read the file. You… an agent on a schedule… a crew of them on an engine. The format doesn't care. [curious] Which is exactly what makes handoffs between humans and agents boring… in the good way."
+  },
+  {
+   "id": "outro",
+   "title": "Wrapping up",
+   "text": "So that's a workflow. One parseable plan — boards render from it, agents execute from it, and the order falls out of the dependencies. [curious] Next… the place all of that work actually lives. The disk that rides in the file. The VFS."
+  }
+ ]
+}

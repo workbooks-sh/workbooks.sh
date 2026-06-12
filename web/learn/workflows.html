@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>workflows — plans that run — Workbooks</title>
+<meta name="description" content="A workflow is a plan written in the grammar — tasks, states, dependencies, and schedules in one parseable file that boards render from and agents execute from. The plan is the state.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/workflows-hero.jpg" as="image" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="workflows — plans that run">
+<meta property="og:description" content="Tasks, states, dependencies, and schedules in one parseable file. Boards render from it; agents execute from it. The plan is the state.">
+<meta property="og:url" content="https://workbooks.sh/learn/workflows">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=3"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 08 — <b>the plans</b></div>
+      <h1><span class="ln">plans that</span><span class="ln bub">RUN</span><span class="ln">themselves out</span></h1>
+      <p class="dek">A <b>workflow</b> is a plan written in the grammar — tasks, states,
+      dependencies, and schedules in <b>one parseable file</b>. Boards render from it,
+      agents execute from it, and nothing ever needs syncing, because the plan
+      <b>is</b> the state.</p>
+      <div class="meta">
+        <span class="on">the plans</span><span>6 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/workflows-hero.jpg" alt="A figure before monumental canal locks opening in sequence, water flowing terrace to terrace — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/workflows.svg" alt=""></div><span>workflows</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The plan is always stale</a>
+  <a href="#definition">The definition</a>
+  <a href="#anatomy">What a plan can say</a>
+  <a href="#boards">Boards are renderings</a>
+  <a href="#execution">How a plan runs</a>
+  <a href="#honest">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the plan is always STALE</h2>
+  <p>Every project keeps a plan, and almost no project keeps it where the
+  work happens. The board lives in one tool, the code in another, the
+  schedule in a third — and the moment work moves, the plan is a screenshot
+  of last week's intentions. Someone's job quietly becomes <em>updating the
+  board</em>, which is to say: manually syncing reality into a database that
+  only ever drifts away from it again.</p>
+  <p>Agents made this worse before they made it better. An agent's "plan"
+  typically lives in its context window — invisible, unreviewable, gone when
+  the session ends. You can't diff it, can't validate it, can't hand it to
+  the next worker. The most plan-hungry collaborators we've ever had arrived,
+  and we gave them the one format nothing else can read.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">work·flow</span> <span class="pr">/ˈwɜrk·floʊ/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a plan written in <b>the grammar</b>:
+    tasks, states, dependencies, and schedules in one parseable file —
+    which boards <b>render from</b> and agents <b>execute from</b>.</p>
+  </div>
+  <p>The whole trick is in the two verbs. Nothing renders <em>to</em> a
+  workflow and nothing exports <em>from</em> it — the file is the single
+  source, and everything else is a view or a worker. Change the file and
+  every board updates; finish a task and the file says so. There is no
+  second copy to keep honest.</p>
+</section>
+
+<section id="anatomy">
+  <h2>what a plan can SAY</h2>
+  <p>Because workflows are written in <a href="org">org</a>, the things a
+  plan needs are native grammar, not bolted-on convention:</p>
+  <figure class="diag" aria-label="workflow anatomy">
+    <div class="d-file">
+      <span class="ftag">release-plan.org — one parseable tree</span>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">states</span><span class="sub"><b>TODO → DONE</b> keywords on headlines — the board columns, in the file</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">dependencies</span><span class="sub"><b>:DEPENDS:</b> properties — execution order falls out, never written down</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">schedules</span><span class="sub"><b>SCHEDULED / DEADLINE</b> timestamps — calendars and overdue checks become arithmetic</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">prose</span><span class="sub">the <b>why</b>, in full sentences, exactly where the decision lives</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#9fc4e8">nesting</span><span class="sub">workflows hold <b>sub-workflows</b> — a quarter holds projects holds tasks, one tree</span></div>
+    </div>
+    <figcaption class="dcap">every line of it parseable — <b>a test suite can read your plan</b></figcaption>
+  </figure>
+  <p>That last property is the quiet one that matters most. Duplicated tasks,
+  dependencies pointing at nothing, a DONE that depends on a TODO — these are
+  <em>checkable facts</em>, and the
+  <a href="nb-kernel">kernel checks them</a> the way a compiler checks types.</p>
+</section>
+
+<section id="boards">
+  <h2>boards are RENDERINGS</h2>
+  <p>A kanban board, a timeline, a calendar of deadlines — in this ecosystem
+  those are <b>renderings of the plan file</b>, generated the way a browser
+  generates a page from HTML. Drag a card to the done column and the file's
+  headline flips to DONE. Edit the file and the board redraws. The two can't
+  disagree, because there aren't two.</p>
+  <p>This is the same move the whole ecosystem keeps making — the
+  <a href="workbook">workbook</a> page calls it dissolving the document/app
+  line, the <a href="org">org</a> page calls it prose and structure refusing
+  to pick. A board that's secretly a text file is a plan your tools, your
+  agents, and your version control all read natively. The plan gets code
+  review. The plan has a diff. The plan can be reverted.</p>
+</section>
+
+<section id="execution">
+  <h2>how a plan RUNS</h2>
+  <p>Execution is almost embarrassingly simple, and that's the point. A task
+  is <b>ready</b> when it's TODO and every dependency is DONE. Workers — agents
+  with toolkits in hand, on <a href="nexus">an engine you own</a> — pick up
+  ready tasks, do them, and write DONE back into the file. Repeat until the
+  board is clear or something is genuinely stuck.</p>
+  <p>Notice what nobody wrote: an execution order. The order <em>falls out of
+  the dependencies</em> — reorder the headlines and nothing changes; add a
+  dependency and everything downstream waits. And because schedules are
+  native, "run this every morning" is a property on a headline, not a cron
+  job in some other system. The engine compiles the same shape further down:
+  a workflow's tagged components become a deployable world with typed inputs
+  and outputs — the <a href="nb-kernel">tangle plan</a> the kernel emits. One
+  idea, from sticky-note scale to build-system scale.</p>
+</section>
+
+<section id="honest">
+  <h2>where it BITES</h2>
+  <p>Honesty section. Plans drift — agents writing freely will eventually
+  duplicate a task or contradict a state, and a workflow file doesn't prevent
+  that any more than any format does. What it does is make drift
+  <b>detectable</b>: the checks run on every write, and the contradiction
+  gets a name and a line number instead of a shrug.</p>
+  <p>And execution is not autonomy. The pitch is never software that runs
+  itself — direction stays human, workers stop at the edges you set, and the
+  edges are real: sandboxes, explicit grants, a written layer you can read,
+  diff, and revert. A workflow makes follow-through cheap. It doesn't make
+  judgment optional.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>How is this different from Jira or Linear?</summary>
+    <p>Those are databases with views; the plan lives in their cloud, in
+    their shape, readable through their API. A workflow lives next to the
+    work, in plain text, in version control — and agents read it natively
+    because the grammar is in their training data. Use both if you like;
+    only one of them can be diffed in a pull request.</p>
+  </details>
+  <details>
+    <summary>What stops circular dependencies?</summary>
+    <p>Validation. A cycle, a dependency on a task that doesn't exist, a
+    DONE resting on a TODO — the checker reports each one, named, before
+    anything runs. It's the same class of check as the kernel's workflow
+    validation, and it's cheap enough to run on every save.</p>
+  </details>
+  <details>
+    <summary>Who actually executes the tasks?</summary>
+    <p>Anyone who can read the file. You, working down the ready list; an
+    agent on a schedule; a crew of them on an engine. The format doesn't
+    care — which is exactly what makes handoffs between humans and agents
+    boring, in the good way.</p>
+  </details>
+  <details>
+    <summary>Can a workflow trigger on time, not just on dependencies?</summary>
+    <p>Yes — schedules are native timestamps, and a docked workbook's engine
+    fires them. "Every weekday at nine" is a property on the headline, with
+    the task's history accumulating right below it.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Workflows sit on three other ideas — each has its own lesson.</p>
+  <div class="cards">
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>why the plan is parseable at all</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents, the crew<small>who picks up the ready tasks</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>where schedules actually fire</small></div><span class="go">→</span></a>
+    <a href="nb-kernel"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+      <div>The kernel notebook<small>run a plan in your tab, right now</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  the plans
+  :PROPERTIES:
+  :SLUG:   workflows
+  :KIND:   learn
+  :NN:     08
+  :KICKER: the plans
+  :TITLE1: plans that
+  :TITLE2: RUN
+  :TITLE3: themselves out
+  :CHIP:   the plans
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/workflows-hero.jpg
+  :END:
+** og
+- tasks · states · dependencies · schedules — one file
+- boards render from it; agents execute from it
+- the plan IS the state
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .34], ["#a8d4f0", .26], ["#aee5c2", .22], ["#f3c5a3", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>

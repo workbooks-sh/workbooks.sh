@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>the VFS — a disk that rides in the file — Workbooks</title>
+<meta name="description" content="The virtual file system is the workbook's own disk: real files and directories, SQLite-backed, riding inside the artifact — the workspace an agent works in is the file you can send.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/vfs-hero.jpg" as="image" fetchpriority="high">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="the VFS — a disk that rides in the file">
+<meta property="og:description" content="Real files and directories, SQLite-backed, inside the artifact. The workspace an agent works in is the file you can send.">
+<meta property="og:url" content="https://workbooks.sh/learn/vfs">
+<link rel="stylesheet" href="learn.css">
+</head>
+<body>
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=3"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 09 — <b>the disk</b></div>
+      <h1><span class="ln">a disk that</span><span class="ln bub">RIDES</span><span class="ln">in the file</span></h1>
+      <p class="dek">The <b>virtual file system</b> is the workbook's own disk: real files
+      and directories, SQLite-backed, riding inside the artifact. The workspace your
+      code and your agents work in is <b>the same file you can send</b> — and nothing
+      they do can touch the computer it's sitting on.</p>
+      <div class="meta">
+        <span class="on">the disk</span><span>5 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/vfs-hero.jpg" alt="An explorer inside a vast bright atrium that is the interior of one enormous book, walls of orderly drawers rising to a skylight — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/vfs.svg" alt=""></div><span>vfs</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Where does an agent keep files?</a>
+  <a href="#definition">The definition</a>
+  <a href="#anatomy">A disk you can query</a>
+  <a href="#readings">Two readings, again</a>
+  <a href="#workspace">The workspace is the artifact</a>
+  <a href="#safety">Why this is the safe shape</a>
+  <a href="#honest">Where the disk ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>where does an agent keep FILES?</h2>
+  <p>Give software somewhere to work and you've answered most of what it
+  needs. The industry's answer for agents has been one of two bad options:
+  hand over your real disk — your keychain, your documents, everything a bad
+  instruction can reach — or rent a computer in the cloud, metered by the
+  second, so the agent has a scratch directory that evaporates when the
+  meter stops.</p>
+  <p>Both answers share an assumption worth questioning: that a file system
+  has to belong to a <em>machine</em>. Yours, or someone else's. But the
+  amount of disk a project actually needs is small, and what it needs from
+  that disk is mundane — paths, directories, read, write, list. Nothing
+  about that requires an operating system underneath. It just requires
+  somewhere structured for bytes to live.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">v·f·s</span> <span class="pr">/ˌviː·ef·ˈes/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the workbook's own disk: a <b>virtual file
+    system</b> — real files and directories, SQLite-backed — riding inside
+    the artifact, readable and writable by the workbook's code and agents,
+    and <b>sealed off from the host machine</b> by construction.</p>
+  </div>
+  <p>It's the third layer of the <a href="workbook">workbook anatomy</a>:
+  the interface up front, WebAssembly for compute, and underneath them a
+  disk — so the file doesn't just describe a piece of software, it contains
+  the place where that software keeps its things.</p>
+</section>
+
+<section id="anatomy">
+  <h2>a disk you can QUERY</h2>
+  <p>Under the paths, the VFS is tables — and that duality is the feature:</p>
+  <figure class="diag" aria-label="vfs anatomy">
+    <div class="d-file">
+      <span class="ftag">one store, two faces</span>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">paths</span><span class="sub"><b>/notes/june.org · /data/orders.csv</b> — open, read, write, list, like any disk</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">tables</span><span class="sub">the same bytes, <b>queryable as SQLite</b> — your disk speaks SQL</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">metadata</span><span class="sub">sizes, times, kinds — <b>structure, not folklore</b>; listings are queries too</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">one binding</span><span class="sub">all of it gzip-bound into the html — <b>the disk travels with the program</b></span></div>
+    </div>
+    <figcaption class="dcap">"find every file the agent touched this week" is <b>one query</b>, not a crawl</figcaption>
+  </figure>
+  <p>Most file systems make you choose: easy paths or real queries. Because
+  this one is a database wearing a directory tree, questions that are
+  painful on a normal disk — everything modified since the last deploy,
+  every file over a megabyte, every note tagged urgent — are single
+  statements.</p>
+</section>
+
+<section id="readings">
+  <h2>two readings, AGAIN</h2>
+  <p>The workbook page describes one file with
+  <a href="workbook">two readings</a> — a document to a human, a container
+  to an engine. The VFS is where that duality becomes concrete:</p>
+  <p><b>Opened in a browser</b>, the VFS loads into memory. Code reads and
+  writes it for real — a game saves, a dashboard filters, an agent's notes
+  are right there — and when you close the tab, the file on your disk is
+  exactly what it was. The artifact stays honest: viewing never mutates.</p>
+  <p><b>Docked into a <a href="nexus">Nexus</a></b>, the same VFS becomes
+  the workbook's live disk — persistent, synced, served. Writes survive
+  restarts, schedules write into it overnight, and the copy you serve to a
+  thousand people reads from it. Same paths, same queries, same code; the
+  only thing that changed is that the disk now has a heartbeat.</p>
+</section>
+
+<section id="workspace">
+  <h2>the workspace IS the artifact</h2>
+  <p>Here's the consequence that makes the whole construct worth a lesson.
+  An agent's working directory — its notes, its drafts, its intermediate
+  data, its <a href="org">org-layer memory</a> — lives in the VFS of the
+  workbook it's tending. Which means the workspace and the work product are
+  <b>the same object</b>.</p>
+  <p>Hand someone the file and you've handed them the project: the app, its
+  data, and the entire working state of the crew that built it. No
+  "let me zip up my folder", no "it works on my sandbox". The thing you
+  collaborate on and the thing you ship stopped being different things.</p>
+</section>
+
+<section id="safety">
+  <h2>why this is the SAFE shape</h2>
+  <p>An agent that needs your file system is an agent you have to trust with
+  your file system. An agent whose entire disk is the workbook's VFS needs
+  no trust at all — there is nothing else its writes <em>can</em> reach. Not
+  your documents, not your keychain, not a stray <code>~/.env</code>. The
+  <a href="nexus">security model's</a> grants-not-inheritance rule starts
+  here: the default disk is the one riding in the artifact, and everything
+  beyond it is a specific, revocable permission.</p>
+  <p>This is also why the blast radius stays boring. A confused agent can
+  trash exactly one VFS — which is versioned, diffable, and restorable,
+  because it's inside a file that git has been tracking all along.</p>
+</section>
+
+<section id="honest">
+  <h2>where the disk ENDS</h2>
+  <p>Honesty section. The VFS is a project-scale disk, not a media vault —
+  SQLite holds gigabytes comfortably, but a workbook stays pleasant to
+  share in the tens of megabytes, so heavy assets belong behind an engine
+  with the workbook querying them. And in a browser, persistence is the
+  file's: changes live in memory until you save or dock — the open tab is
+  a reading room, not a writing desk. For durability, schedules, and
+  serving, the engine is the answer, the way it always is for the living
+  part.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Are they real files or "files"?</summary>
+    <p>Real, to everything inside: code opens paths, agents list
+    directories, tools read and write bytes. The quotation marks only
+    appear from the host machine's point of view — which is exactly the
+    point. Your OS sees one .html file; the workbook sees a disk.</p>
+  </details>
+  <details>
+    <summary>Can I get files out?</summary>
+    <p>Always. Unbundle the workbook and the tree unpacks to ordinary
+    files; or query the live VFS on an engine and export what you need.
+    The disk travels with the file — it's never trapped in it.</p>
+  </details>
+  <details>
+    <summary>What about two people writing at once?</summary>
+    <p>That's a docked question — through a Nexus, the engine holds the
+    live VFS and serializes writes, the same way it serves the workbook to
+    both of you. Two open browser copies are two readings; the engine is
+    where they become one disk.</p>
+  </details>
+  <details>
+    <summary>Why SQLite underneath, and not a custom store?</summary>
+    <p>Same reason as the rest of the anatomy: no invented formats. SQLite
+    is the most deployed database on earth, battle-tested for decades, and
+    it makes the disk queryable for free. The trick was never a new
+    ingredient — it's what the existing ones do when they share a file.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>The disk makes more sense the more of its neighbors you've met.</p>
+  <div class="cards">
+    <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>the anatomy this disk rides in</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents, the crew<small>who actually works in it</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>where the disk gets a heartbeat</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>the layer agents write into it</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  the disk
+  :PROPERTIES:
+  :SLUG:   vfs
+  :KIND:   learn
+  :NN:     09
+  :KICKER: the disk
+  :TITLE1: a disk that
+  :TITLE2: RIDES
+  :TITLE3: in the file
+  :CHIP:   the disk
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/vfs-hero.jpg
+  :END:
+** og
+- real files + directories, SQLite-backed, in the artifact
+- the workspace an agent works in is the file you can send
+- sealed off from the host by construction
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .34], ["#aee5c2", .26], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>
