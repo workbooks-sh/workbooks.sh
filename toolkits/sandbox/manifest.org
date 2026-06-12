@@ -33,6 +33,8 @@
   | =jq=                        | JSON          | filter / transform                              |
   | =md=                        | documents     | CommonMark markdown → HTML                      |
   | =qr=                        | encoding      | text → ASCII QR code                            |
+  | =yaml=                      | config        | YAML → JSON (PyYAML on CPython, Lane D)         |
+  | =wfreq=                     | text          | word frequency (Rust via mrustc→clang, Lane C)  |
   | =coreutils=                 | unix utils    | ~100 applets (=coreutils <applet> …=)           |
   | =wat2wasm= =wasm2wat= …     | wasm tooling  | WABT (12 tools)                                 |
   | =prolog= =wasm3=            | misc          | Trealla Prolog / Wasm3 interpreter              |

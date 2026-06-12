@@ -54,6 +54,13 @@
     =wasm-interp= =wasm-stats= =wasm2c= =wast2json= =wat-desugar= =spectest-interp=.
     File I/O via =--dir=. =run("wat2wasm", "", ["--version"])=.
 
+* Config / built-in-sandbox language tools
+
+  - =yaml= — YAML → JSON (PyYAML on CPython, Lane D). =run("yaml", "a: 1\nb: [x, y]", [])= →
+    ={"a": 1, "b": ["x", "y"]}=. Distinct: YAML is in no stdlib we have.
+  - =wfreq= — word frequency, desc by count (a Rust tool built via mrustc→clang, Lane C).
+    =run("wfreq", "the cat the dog the", [])= → =3⇥the / 1⇥cat / 1⇥dog=.
+
 * Misc
 
   - =prolog= — Trealla. One-shot goal: =run("prolog", "", ["-g", "X is 6*7, write(X), nl, halt"])=.
