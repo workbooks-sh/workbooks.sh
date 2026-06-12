@@ -187,12 +187,12 @@ work, and leave a manual — never a shrug.
 | claude-skill    | SKILL.md (+ references/, scripts/) or skills.sh ref | manifest + skill tree (md→org) |
 | markdown        | a single .md file                                | one-skill toolkit (md→org)       |
 | folder          | directory of scripts/docs                        | skills from docs, bins from scripts |
-| mcp-server      | mcp manifest / package exposing tools            | skill per tool; server runs as the bin |
-| cursor-rules    | .cursor/rules / .cursorrules                     | skill tree (guidance-only toolkit) |
-| agents-md       | AGENTS.md / CLAUDE.md                            | guidance-only toolkit            |
-| openapi-actions | OpenAPI spec (GPT actions style)                 | skill per operation; HTTP via engine |
-| npm-cli         | package.json with bin                            | manual + wasm-lane build plan    |
-| pip-cli         | pyproject/setup with console_scripts             | manual + wasm-lane build plan    |
+| mcp-server      | .mcp.json / mcp manifest (WIRED)                 | skill per server entry; launch synthesized as the audited bin |
+| cursor-rules    | .cursor/rules / .cursorrules (WIRED)             | skill tree (guidance-only toolkit) |
+| agents-md       | AGENTS.md / CLAUDE.md (WIRED)                    | guidance-only toolkit            |
+| openapi-actions | OpenAPI spec, JSON (WIRED; YAML → yq hint)       | skill per operation; HTTP via engine |
+| npm-cli         | package.json with bin (WIRED)                    | README → manual; bins carried for the audit + npm-lane plan |
+| pip-cli         | pyproject.toml console scripts (WIRED)           | entry stubs synthesized → audit says blocked, plan says rewrite |
 
 ### Pipeline (three honest stages)
 

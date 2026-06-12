@@ -12,6 +12,12 @@ pub enum Kind {
     ClaudeSkill,
     Markdown,
     Folder,
+    McpServer,
+    OpenApi,
+    NpmCli,
+    PipCli,
+    CursorRules,
+    AgentsMd,
 }
 
 impl Kind {
@@ -20,9 +26,15 @@ impl Kind {
             "claude-skill" => Kind::ClaudeSkill,
             "markdown" => Kind::Markdown,
             "folder" => Kind::Folder,
+            "mcp-server" => Kind::McpServer,
+            "openapi" => Kind::OpenApi,
+            "npm-cli" => Kind::NpmCli,
+            "pip-cli" => Kind::PipCli,
+            "cursor-rules" => Kind::CursorRules,
+            "agents-md" => Kind::AgentsMd,
             other => bail!(
-                "unknown --as kind '{other}' (have: claude-skill, markdown, folder; \
-                 mcp-server/openapi/npm-cli land with the source-taxonomy issue)"
+                "unknown --as kind '{other}' (have: claude-skill, markdown, folder, \
+                 mcp-server, openapi, npm-cli, pip-cli, cursor-rules, agents-md)"
             ),
         })
     }
@@ -31,6 +43,12 @@ impl Kind {
             Kind::ClaudeSkill => "claude-skill",
             Kind::Markdown => "markdown",
             Kind::Folder => "folder",
+            Kind::McpServer => "mcp-server",
+            Kind::OpenApi => "openapi",
+            Kind::NpmCli => "npm-cli",
+            Kind::PipCli => "pip-cli",
+            Kind::CursorRules => "cursor-rules",
+            Kind::AgentsMd => "agents-md",
         }
     }
 }
@@ -41,11 +59,38 @@ fn detect(src: &Path, forced: Option<&str>) -> Result<Kind> {
         return Kind::parse(k);
     }
     if src.is_file() {
-        let name = src.file_name().unwrap_or_default().to_string_lossy();
+        let name = src.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let lower = name.to_lowercase();
         if name.eq_ignore_ascii_case("SKILL.md") {
             return Ok(Kind::ClaudeSkill);
         }
-        if name.to_lowercase().ends_with(".md") {
+        // identity files before the generic .md catch-all
+        if name == "AGENTS.md" || name == "CLAUDE.md" {
+            return Ok(Kind::AgentsMd);
+        }
+        if name == ".cursorrules" {
+            return Ok(Kind::CursorRules);
+        }
+        if lower == ".mcp.json" || lower == "mcp.json" {
+            return Ok(Kind::McpServer);
+        }
+        if lower == "package.json" {
+            let body = std::fs::read_to_string(src).unwrap_or_default();
+            if body.contains("\"bin\"") {
+                return Ok(Kind::NpmCli);
+            }
+        }
+        if lower == "pyproject.toml" {
+            return Ok(Kind::PipCli);
+        }
+        // sniff specs by content, not just extension
+        if lower.ends_with(".json") || lower.ends_with(".yaml") || lower.ends_with(".yml") {
+            let head: String = std::fs::read_to_string(src).unwrap_or_default().chars().take(4096).collect();
+            if head.contains("\"openapi\"") || head.contains("\"swagger\"") || head.lines().any(|l| l.starts_with("openapi:") || l.starts_with("swagger:")) {
+                return Ok(Kind::OpenApi);
+            }
+        }
+        if lower.ends_with(".md") {
             return Ok(Kind::Markdown);
         }
         bail!("can't detect a kind for {name} — pass --as <kind>");
@@ -53,6 +98,20 @@ fn detect(src: &Path, forced: Option<&str>) -> Result<Kind> {
     if src.is_dir() {
         if src.join("SKILL.md").is_file() {
             return Ok(Kind::ClaudeSkill);
+        }
+        if src.join(".mcp.json").is_file() || src.join("mcp.json").is_file() {
+            return Ok(Kind::McpServer);
+        }
+        if src.join("package.json").is_file()
+            && std::fs::read_to_string(src.join("package.json")).unwrap_or_default().contains("\"bin\"")
+        {
+            return Ok(Kind::NpmCli);
+        }
+        if src.join("pyproject.toml").is_file() {
+            return Ok(Kind::PipCli);
+        }
+        if src.join(".cursorrules").is_file() || src.join(".cursor/rules").is_dir() {
+            return Ok(Kind::CursorRules);
         }
         return Ok(Kind::Folder);
     }
@@ -180,11 +239,13 @@ fn slug(s: &str) -> String {
 
 // ── the scaffold ────────────────────────────────────────────────────────────
 
+#[derive(Default)]
 struct Imported {
     id: String,
     tagline: String,
-    skills: Vec<(String, String)>, // (name, org body)
-    scripts: Vec<PathBuf>,         // carried verbatim, audited in stage 2
+    skills: Vec<(String, String)>,      // (name, org body)
+    scripts: Vec<PathBuf>,              // carried verbatim, audited in stage 2
+    synth_scripts: Vec<(String, String)>, // (filename, content) — written so the audit sees them
 }
 
 fn write_scaffold(out_dir: &Path, kind: Kind, src: &Path, t: &Imported) -> Result<String> {
@@ -213,7 +274,7 @@ fn write_scaffold(out_dir: &Path, kind: Kind, src: &Path, t: &Imported) -> Resul
         std::fs::write(skills_dir.join(&file), body)?;
         manifest.push_str(&format!("   - [[file:skills/{file}][{name}]]\n"));
     }
-    if !t.scripts.is_empty() {
+    if !t.scripts.is_empty() || !t.synth_scripts.is_empty() {
         let sdir = out_dir.join("scripts");
         std::fs::create_dir_all(&sdir)?;
         manifest.push_str("\n** carried scripts (unaudited)\n");
@@ -221,6 +282,10 @@ fn write_scaffold(out_dir: &Path, kind: Kind, src: &Path, t: &Imported) -> Resul
             let name = s.file_name().unwrap_or_default().to_string_lossy().to_string();
             std::fs::copy(s, sdir.join(&name)).with_context(|| format!("copy {}", s.display()))?;
             manifest.push_str(&format!("   - =scripts/{name}=\n"));
+        }
+        for (name, content) in &t.synth_scripts {
+            std::fs::write(sdir.join(name), content)?;
+            manifest.push_str(&format!("   - =scripts/{name}= (synthesized from the source's entry point)\n"));
         }
     }
     manifest.push_str(
@@ -236,10 +301,13 @@ fn write_scaffold(out_dir: &Path, kind: Kind, src: &Path, t: &Imported) -> Resul
         out_dir.display(),
         t.skills.len(),
         if t.skills.len() == 1 { "" } else { "s" },
-        if t.scripts.is_empty() {
+        if t.scripts.is_empty() && t.synth_scripts.is_empty() {
             String::new()
         } else {
-            format!("  scripts/          {} carried (unaudited — see the TODO)\n", t.scripts.len())
+            format!(
+                "  scripts/          {} carried (unaudited — see the TODO)\n",
+                t.scripts.len() + t.synth_scripts.len()
+            )
         },
         t.id,
     ))
@@ -283,7 +351,7 @@ fn import_claude_skill(src: &Path) -> Result<Imported> {
     }
     // scripts carried verbatim
     let scripts = collect_scripts(&dir)?;
-    Ok(Imported { id, tagline, skills, scripts })
+    Ok(Imported { id, tagline, skills, scripts, ..Default::default() })
 }
 
 fn import_markdown(src: &Path) -> Result<Imported> {
@@ -300,7 +368,7 @@ fn import_markdown(src: &Path) -> Result<Imported> {
         id: id.clone(),
         tagline,
         skills: vec![(id, md_to_org(&body))],
-        scripts: vec![],
+        ..Default::default()
     })
 }
 
@@ -323,7 +391,7 @@ fn import_folder(src: &Path) -> Result<Imported> {
         ));
     }
     let scripts = collect_scripts(src)?;
-    Ok(Imported { id: id.clone(), tagline: format!("imported from folder {id}"), skills, scripts })
+    Ok(Imported { id: id.clone(), tagline: format!("imported from folder {id}"), skills, scripts, ..Default::default() })
 }
 
 fn collect_scripts(dir: &Path) -> Result<Vec<PathBuf>> {
@@ -343,6 +411,239 @@ fn collect_scripts(dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(out)
 }
 
+
+/// .mcp.json — skill per server entry; each server's launch command becomes a
+/// synthesized script so the audit judges it (the server IS the bin).
+/// Tools are runtime-enumerated; that honesty goes in the skill text.
+fn import_mcp_server(src: &Path) -> Result<Imported> {
+    let cfg_path = if src.is_dir() {
+        ["mcp.json", ".mcp.json"].iter().map(|n| src.join(n)).find(|p| p.is_file())
+            .context("no mcp.json/.mcp.json in the directory")?
+    } else {
+        src.to_path_buf()
+    };
+    let v: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(&cfg_path).with_context(|| format!("read {}", cfg_path.display()))?,
+    ).context("mcp config is not valid JSON")?;
+    let servers = v.get("mcpServers").and_then(|s| s.as_object())
+        .or_else(|| v.as_object().filter(|o| o.values().any(|e| e.get("command").is_some())))
+        .context("no mcpServers map found (expected {\"mcpServers\": {name: {command, args}}})")?;
+
+    let stem = src.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let id = if servers.len() == 1 {
+        slug(servers.keys().next().unwrap())
+    } else {
+        slug(if src.is_dir() { &stem } else { "mcp-servers" })
+    };
+    let mut skills = vec![];
+    let mut synth_scripts = vec![];
+    for (name, entry) in servers {
+        let command = entry.get("command").and_then(|c| c.as_str()).unwrap_or("");
+        let args: Vec<String> = entry.get("args").and_then(|a| a.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        let env_keys: Vec<&str> = entry.get("env").and_then(|e| e.as_object())
+            .map(|o| o.keys().map(|k| k.as_str()).collect())
+            .unwrap_or_default();
+        let mut body = format!(
+            "* {name} (MCP server)\n\n  Launch: ={command} {}=\n", args.join(" ")
+        );
+        if !env_keys.is_empty() {
+            // names only — config values may be secrets, they never leave the source
+            body.push_str(&format!("  Env (names only; set values engine-side): {}\n", env_keys.join(", ")));
+        }
+        body.push_str(
+            "\n  MCP tools are enumerated at runtime, not in the config — run the\n  \
+             server to list them, then document each as its own skill.\n",
+        );
+        skills.push((slug(name), body));
+        synth_scripts.push((
+            format!("{}.sh", slug(name)),
+            format!("#!/bin/sh\n# the MCP server launch — the server is the toolkit bin\nexec {command} {}\n", args.join(" ")),
+        ));
+    }
+    Ok(Imported {
+        id,
+        tagline: format!("imported MCP config — {} server{}", servers.len(), if servers.len() == 1 { "" } else { "s" }),
+        skills,
+        synth_scripts,
+        ..Default::default()
+    })
+}
+
+/// OpenAPI (JSON) — skill per operation; HTTP goes through the engine.
+/// YAML specs get the convert-it hint rather than a half-parse.
+fn import_openapi(src: &Path) -> Result<Imported> {
+    let raw = std::fs::read_to_string(src).with_context(|| format!("read {}", src.display()))?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|_| {
+        anyhow::anyhow!(
+            "only JSON OpenAPI specs parse today — convert YAML first:\n  yq -o=json spec.yaml > spec.json && wbx toolkit import spec.json"
+        )
+    })?;
+    let info = &v["info"];
+    let id = slug(info["title"].as_str().unwrap_or("api"));
+    let tagline = info["description"].as_str()
+        .map(|d| d.replace('\n', " ").chars().take(220).collect())
+        .unwrap_or_else(|| format!("imported OpenAPI surface: {id}"));
+    let mut skills = vec![];
+    if let Some(paths) = v["paths"].as_object() {
+        for (path, ops) in paths {
+            let Some(ops) = ops.as_object() else { continue };
+            for (method, op) in ops {
+                if !["get", "post", "put", "patch", "delete", "head", "options"].contains(&method.as_str()) {
+                    continue;
+                }
+                let name = op["operationId"].as_str()
+                    .map(slug)
+                    .unwrap_or_else(|| slug(&format!("{method}-{path}")));
+                let summary = op["summary"].as_str().or(op["description"].as_str()).unwrap_or("");
+                let mut body = format!(
+                    "* {name}\n\n  ={}= ={path}=\n\n  {summary}\n", method.to_uppercase()
+                );
+                if let Some(params) = op["parameters"].as_array() {
+                    if !params.is_empty() {
+                        body.push_str("\n  Parameters:\n");
+                        for p in params {
+                            body.push_str(&format!(
+                                "  - ={}= ({}{})\n",
+                                p["name"].as_str().unwrap_or("?"),
+                                p["in"].as_str().unwrap_or("?"),
+                                if p["required"].as_bool().unwrap_or(false) { ", required" } else { "" },
+                            ));
+                        }
+                    }
+                }
+                body.push_str("\n  HTTP runs through the engine (Dock-brokered) — no raw sockets.\n");
+                skills.push((name, body));
+            }
+        }
+    }
+    if skills.is_empty() {
+        bail!("the spec has no operations under paths — nothing to import");
+    }
+    Ok(Imported { id, tagline, skills, ..Default::default() })
+}
+
+/// package.json with bin — README becomes the manual, the bin files are
+/// carried so the audit + fix-up plan judge the npm-lane build.
+fn import_npm_cli(src: &Path) -> Result<Imported> {
+    let dir = if src.is_dir() { src.to_path_buf() } else { src.parent().unwrap_or(Path::new(".")).to_path_buf() };
+    let pkg: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("package.json")).context("read package.json")?,
+    ).context("package.json is not valid JSON")?;
+    let raw_name = pkg["name"].as_str().unwrap_or("npm-cli");
+    let id = slug(raw_name.rsplit('/').next().unwrap_or(raw_name)); // strip @scope/
+    let tagline = pkg["description"].as_str().unwrap_or("imported npm CLI").to_string();
+
+    // bin: "path" or { name: "path" } — carry every target that exists
+    let mut scripts = vec![];
+    match &pkg["bin"] {
+        serde_json::Value::String(p) => scripts.push(dir.join(p)),
+        serde_json::Value::Object(m) => scripts.extend(m.values().filter_map(|p| p.as_str()).map(|p| dir.join(p))),
+        _ => {}
+    }
+    scripts.retain(|p| p.is_file());
+
+    let mut skills = vec![];
+    for readme in ["README.md", "readme.md", "Readme.md"] {
+        if let Ok(md) = std::fs::read_to_string(dir.join(readme)) {
+            skills.push((id.clone(), md_to_org(&md)));
+            break;
+        }
+    }
+    if skills.is_empty() {
+        skills.push((id.clone(), format!("* {id}\n\n  {tagline}\n\n  (no README found — document usage here)\n")));
+    }
+    Ok(Imported { id, tagline, skills, scripts, ..Default::default() })
+}
+
+/// pyproject.toml — each console script becomes a synthesized python stub so
+/// the audit tells the truth (blocked: no python lane) and the fix-up plan
+/// carries the rewrite instructions. Minimal line-parse; no toml dep.
+fn import_pip_cli(src: &Path) -> Result<Imported> {
+    let dir = if src.is_dir() { src.to_path_buf() } else { src.parent().unwrap_or(Path::new(".")).to_path_buf() };
+    let toml = std::fs::read_to_string(dir.join("pyproject.toml")).context("read pyproject.toml")?;
+    let field = |key: &str| {
+        toml.lines()
+            .map(str::trim)
+            .find_map(|l| l.strip_prefix(key).and_then(|r| r.trim().strip_prefix('=')))
+            .map(|v| v.trim().trim_matches(['"', '\'']).to_string())
+    };
+    let id = field("name").map(|n| slug(&n)).unwrap_or_else(|| slug(&dir.file_name().unwrap_or_default().to_string_lossy()));
+    let tagline = field("description").unwrap_or_else(|| "imported python CLI".into());
+
+    // [project.scripts] / [console_scripts] section: name = "module:func"
+    let mut synth_scripts = vec![];
+    let mut in_scripts = false;
+    for line in toml.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_scripts = line.contains("scripts]");
+            continue;
+        }
+        if in_scripts && line.contains('=') {
+            if let Some((name, target)) = line.split_once('=') {
+                synth_scripts.push((
+                    format!("{}.py", slug(name.trim())),
+                    format!(
+                        "#!/usr/bin/env python3\n# entry point: {} — synthesized for the audit;\n# the real implementation lives in the package\n",
+                        target.trim().trim_matches('"')
+                    ),
+                ));
+            }
+        }
+    }
+    let mut skills = vec![];
+    for readme in ["README.md", "readme.md"] {
+        if let Ok(md) = std::fs::read_to_string(dir.join(readme)) {
+            skills.push((id.clone(), md_to_org(&md)));
+            break;
+        }
+    }
+    if skills.is_empty() {
+        skills.push((id.clone(), format!("* {id}\n\n  {tagline}\n")));
+    }
+    Ok(Imported { id, tagline, skills, synth_scripts, ..Default::default() })
+}
+
+/// .cursorrules / .cursor/rules — guidance-only toolkit, one skill per rule file.
+fn import_cursor_rules(src: &Path) -> Result<Imported> {
+    let dir = if src.is_dir() { src.to_path_buf() } else { src.parent().unwrap_or(Path::new(".")).to_path_buf() };
+    let id = slug(&format!("{}-rules", dir.file_name().unwrap_or_default().to_string_lossy()));
+    let mut skills = vec![];
+    let single = if src.is_file() { src.to_path_buf() } else { dir.join(".cursorrules") };
+    if single.is_file() {
+        skills.push(("rules".into(), md_to_org(&std::fs::read_to_string(&single)?)));
+    }
+    let rules_dir = dir.join(".cursor/rules");
+    if rules_dir.is_dir() {
+        let mut entries: Vec<_> = std::fs::read_dir(&rules_dir)?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.is_file())
+            .collect();
+        entries.sort();
+        for p in entries {
+            let name = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            skills.push((slug(&name), md_to_org(&std::fs::read_to_string(&p)?)));
+        }
+    }
+    if skills.is_empty() {
+        bail!("no .cursorrules file or .cursor/rules directory found");
+    }
+    Ok(Imported { id, tagline: "imported cursor rules (guidance-only)".into(), skills, ..Default::default() })
+}
+
+/// AGENTS.md / CLAUDE.md — guidance-only toolkit.
+fn import_agents_md(src: &Path) -> Result<Imported> {
+    let md = std::fs::read_to_string(src).with_context(|| format!("read {}", src.display()))?;
+    let parent = src.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_string();
+    let id = slug(&format!("{parent}-agent-guide"));
+    let tagline = md.lines()
+        .find(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .unwrap_or("imported agent instructions (guidance-only)")
+        .chars().take(220).collect();
+    Ok(Imported { id: id.clone(), tagline, skills: vec![(id, md_to_org(&md))], ..Default::default() })
+}
+
 // ── entry ───────────────────────────────────────────────────────────────────
 
 pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>, human: bool) -> Result<String> {
@@ -352,6 +653,12 @@ pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>, human: boo
         Kind::ClaudeSkill => import_claude_skill(src)?,
         Kind::Markdown => import_markdown(src)?,
         Kind::Folder => import_folder(src)?,
+        Kind::McpServer => import_mcp_server(src)?,
+        Kind::OpenApi => import_openapi(src)?,
+        Kind::NpmCli => import_npm_cli(src)?,
+        Kind::PipCli => import_pip_cli(src)?,
+        Kind::CursorRules => import_cursor_rules(src)?,
+        Kind::AgentsMd => import_agents_md(src)?,
     };
     let out_dir = out
         .map(PathBuf::from)

@@ -336,3 +336,71 @@ fn toolkit_audit_classifies_against_the_lanes() {
     let txt = String::from_utf8_lossy(&h.stdout);
     assert!(txt.contains("ready") && txt.contains("blocked"), "summary present: {txt}");
 }
+
+#[test]
+fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
+    let dir = std::env::temp_dir().join(format!("wbx-tax-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // mcp-server: skill per server, launch synthesized as the bin, env VALUES never leak
+    let mcp = dir.join(".mcp.json");
+    std::fs::write(&mcp, r#"{"mcpServers": {"gh": {"command": "npx", "args": ["-y", "@x/server"], "env": {"TOKEN": "hunter2"}}}}"#).unwrap();
+    let out_dir = dir.join("mcp-tk");
+    let out = wbx().args(["toolkit", "import", mcp.to_str().unwrap(), "--out", out_dir.to_str().unwrap()]).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let launch = std::fs::read_to_string(out_dir.join("scripts/gh.sh")).unwrap();
+    assert!(launch.contains("exec npx -y @x/server"), "server launch is the bin");
+    let skill = std::fs::read_to_string(out_dir.join("skills/gh.org")).unwrap();
+    assert!(skill.contains("TOKEN"), "env NAME documented");
+    for f in ["manifest.org", "skills/gh.org", "scripts/gh.sh"] {
+        let body = std::fs::read_to_string(out_dir.join(f)).unwrap();
+        assert!(!body.contains("hunter2"), "secret leaked into {f}");
+    }
+
+    // openapi (json): skill per operation, engine-HTTP note
+    let api = dir.join("api.json");
+    std::fs::write(&api, r#"{"openapi":"3.0.0","info":{"title":"Pet Store"},"paths":{"/pets":{"get":{"operationId":"listPets","summary":"List"},"post":{"operationId":"createPet"}}}}"#).unwrap();
+    let api_tk = dir.join("api-tk");
+    assert!(wbx().args(["toolkit", "import", api.to_str().unwrap(), "--out", api_tk.to_str().unwrap()]).output().unwrap().status.success());
+    assert!(api_tk.join("skills/listpets.org").is_file() && api_tk.join("skills/createpet.org").is_file());
+    assert!(std::fs::read_to_string(api_tk.join("skills/listpets.org")).unwrap().contains("Dock-brokered"));
+    // yaml spec → honest convert-it hint, mapped error (no panic)
+    let yml = dir.join("api.yaml");
+    std::fs::write(&yml, "openapi: 3.0.0\npaths:\n").unwrap();
+    let bad = wbx().args(["toolkit", "import", yml.to_str().unwrap()]).output().unwrap();
+    assert!(!bad.status.success());
+    assert_ne!(bad.status.code(), Some(101));
+    assert!(String::from_utf8_lossy(&bad.stderr).contains("yq"), "yaml hint teaches the fix");
+
+    // npm-cli: bin carried, scoped name stripped
+    let npm = dir.join("npmpkg");
+    std::fs::create_dir_all(&npm).unwrap();
+    std::fs::write(npm.join("package.json"), r#"{"name":"@acme/huniq","description":"dedupe","bin":{"huniq":"cli.js"}}"#).unwrap();
+    std::fs::write(npm.join("cli.js"), "#!/usr/bin/env node\nconst c = require('commander');\n").unwrap();
+    std::fs::write(npm.join("README.md"), "# huniq\n").unwrap();
+    let npm_tk = dir.join("npm-tk");
+    assert!(wbx().args(["toolkit", "import", npm.to_str().unwrap(), "--out", npm_tk.to_str().unwrap()]).output().unwrap().status.success());
+    let m = std::fs::read_to_string(npm_tk.join("manifest.org")).unwrap();
+    assert!(m.contains("#+TOOLKIT: huniq"), "scope stripped: {m}");
+    assert!(npm_tk.join("scripts/cli.js").is_file(), "bin carried for the audit");
+    assert!(m.contains("npm =commander="), "audit saw the dep");
+
+    // pip-cli: console script synthesized → audit says blocked, plan says rewrite
+    let py = dir.join("pypkg");
+    std::fs::create_dir_all(&py).unwrap();
+    std::fs::write(py.join("pyproject.toml"), "[project]\nname = \"pycli\"\ndescription = \"py tool\"\n\n[project.scripts]\npycli = \"pycli.main:run\"\n").unwrap();
+    let py_tk = dir.join("py-tk");
+    assert!(wbx().args(["toolkit", "import", py.to_str().unwrap(), "--out", py_tk.to_str().unwrap()]).output().unwrap().status.success());
+    let m = std::fs::read_to_string(py_tk.join("manifest.org")).unwrap();
+    assert!(m.contains("** TODO fix-up plan [0/1]"), "python entry is real work: {m}");
+    assert!(m.contains("quickjs lane"), "plan carries the rewrite recipe");
+
+    // agents-md: guidance-only landing
+    let ag = dir.join("AGENTS.md");
+    std::fs::write(&ag, "# Rules\n\nBe terse.\n").unwrap();
+    let ag_tk = dir.join("ag-tk");
+    assert!(wbx().args(["toolkit", "import", ag.to_str().unwrap(), "--out", ag_tk.to_str().unwrap()]).output().unwrap().status.success());
+    let m = std::fs::read_to_string(ag_tk.join("manifest.org")).unwrap();
+    assert!(m.contains("nothing to fix"), "guidance-only is a clean landing");
+}
