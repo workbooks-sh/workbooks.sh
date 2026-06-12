@@ -152,7 +152,7 @@
   <p>That last property is the quiet one that matters most. Duplicated
   tasks, dependencies pointing at nothing, a DONE that depends on a TODO —
   these are <em>checkable facts</em>, and the
-  <a href="nb-kernel">kernel checks them</a> the way a compiler checks
+  <a href="org">kernel checks them</a> the way a compiler checks
   types. The <a href="org">org lesson</a> draws the boundary honestly:
   structure is checkable, prose is not. A workflow puts as much of the plan
   as possible on the checkable side of that line.</p>
@@ -238,7 +238,7 @@ flowchart TD
   </pre>
   <p>The arrows back into the file are the part trackers can't offer. Drag
   a card to the done column and the file's headline flips to DONE — the
-  same two-way binding the <a href="nb-kernel">kernel notebook</a> lets you
+  same two-way binding the kernel notebook lets you
   feel under your fingers, where ticking a checkbox rewrites the org
   source. Edit the file and the board redraws. The two can't disagree,
   because there aren't two.</p>
@@ -264,7 +264,7 @@ flowchart TD
   <p>On a <a href="nexus">docked</a> workbook, the engine fires these — a
   repeating <code>SCHEDULED</code> is a standing appointment for whichever
   worker picks it up, and a passed <code>DEADLINE</code> on a TODO is a
-  fact the <a href="nb-kernel">validator</a> reports, not a notification
+  fact the validator reports, not a notification
   you missed. The task's history accumulates under the same headline, so
   "when did this last run, and what happened?" is a read, not an
   investigation.</p>
@@ -322,7 +322,7 @@ flowchart LR
   style x fill:#13d943,stroke:#121316
   </pre>
   <p>Same grammar, same file, same validator — the
-  <a href="nb-kernel">kernel notebook</a> runs this exact compile in your
+  kernel notebook runs this exact compile in your
   tab. The conceptual rhyme is the point: <b>a to-do list and a build
   system are the same data structure</b> — tasks with dependencies — and
   the ecosystem refuses to make you learn them twice. From sticky-note
@@ -421,8 +421,6 @@ flowchart LR
       <div>Agents, the crew<small>who picks up the ready tasks</small></div><span class="go">→</span></a>
     <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
       <div>The Autopoet<small>a workflow tending the system itself</small></div><span class="go">→</span></a>
-    <a href="nb-kernel"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
-      <div>The kernel notebook<small>run a plan in your tab, right now</small></div><span class="go">→</span></a>
   </div>
 </section>
 

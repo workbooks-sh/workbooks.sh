@@ -139,12 +139,18 @@
       var body = nav.querySelector("[data-subpanel] .subbody");
       var head = nav.querySelector("[data-subpanel] .colhead");
 
+      function subRow(x) {
+        var icon = x.icon.indexOf("../") === 0 ? root + x.icon.slice(3) : root + "learn/" + x.icon;
+        return '<a href="' + root + 'learn/' + x.slug + '">' +
+          '<span class="sw" style="background:' + x.color + '"><img src="' + icon + '" alt=""></span> ' +
+          x.title + "</a>";
+      }
       function showSubs(slug) {
         var l = bylSlug[slug];
         var subs = (l.sublessons || []).filter(function (x) { return x.status === "live"; });
         head.innerHTML = "deep dives <small>in " + l.title.toLowerCase() + "</small>";
         body.innerHTML = subs.length
-          ? subs.map(lessonRow).join("")
+          ? subs.map(subRow).join("")
           : '<div class="nbempty">nothing deeper here yet — the shelf grows</div>';
       }
       function showAll() {
@@ -153,7 +159,7 @@
         cat.tiers.forEach(function (t) {
           t.lessons.forEach(function (l) {
             (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) {
-              html += lessonRow(x).replace("<small>", "<small>" + l.title.toLowerCase() + " · ");
+              html += subRow(x);
             });
           });
         });

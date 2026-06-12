@@ -309,52 +309,52 @@
    "slug": "autopoet",
    "title": "Autopoet — the gardener",
    "src": "audio/episodes/autopoet.mp3",
-   "dur": 369,
+   "dur": 525,
    "chapters": [
     {
      "id": "intro",
-     "title": "The standing gardener",
+     "title": "Two constructs, pointed inward",
      "t": 2
     },
     {
      "id": "problem",
      "title": "Software rots by default",
-     "t": 29
+     "t": 45
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 77
+     "t": 103
     },
     {
      "id": "safe",
      "title": "Why this is safe to want",
-     "t": 108
+     "t": 135
     },
     {
      "id": "does",
      "title": "What it actually does",
-     "t": 159
+     "t": 200
     },
     {
      "id": "homogeneity",
      "title": "You can't learn from noise",
-     "t": 219
+     "t": 359
     },
     {
      "id": "honest",
      "title": "The youngest idea here",
-     "t": 251
+     "t": 390
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 296
+     "t": 440
     },
     {
      "id": "outro",
-     "title": "Wrapping up",
-     "t": 352
+     "title": "Back up to the parents",
+     "t": 495
     }
    ]
   },
@@ -430,7 +430,7 @@
    "slug": "workflows",
    "title": "Workflows — the plans",
    "src": "audio/episodes/workflows.mp3",
-   "dur": 411,
+   "dur": 734,
    "chapters": [
     {
      "id": "intro",
@@ -440,42 +440,67 @@
     {
      "id": "problem",
      "title": "The plan is always stale",
-     "t": 27
+     "t": 28
     },
     {
      "id": "definition",
      "title": "The definition",
-     "t": 79
+     "t": 95
     },
     {
      "id": "anatomy",
      "title": "What a plan can say",
-     "t": 117
+     "t": 152
+    },
+    {
+     "id": "ready",
+     "title": "The ready set",
+     "t": 217
+    },
+    {
+     "id": "rounds",
+     "title": "Watching a board clear",
+     "t": 272
     },
     {
      "id": "boards",
      "title": "Boards are renderings",
-     "t": 183
+     "t": 335
     },
     {
-     "id": "execution",
-     "title": "How a plan runs",
-     "t": 224
+     "id": "schedules",
+     "title": "Time is native",
+     "t": 379
+    },
+    {
+     "id": "nesting",
+     "title": "Plans hold plans",
+     "t": 433
+    },
+    {
+     "id": "compile",
+     "title": "The compile story",
+     "t": 477
+    },
+    {
+     "id": "versus",
+     "title": "What it replaces",
+     "t": 527
     },
     {
      "id": "honest",
      "title": "Where it bites",
-     "t": 283
+     "t": 574
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 332
+     "t": 647
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 381
+     "t": 708
     }
    ]
   },
@@ -483,7 +508,7 @@
    "slug": "vfs",
    "title": "VFS — the disk",
    "src": "audio/episodes/vfs.mp3",
-   "dur": 425,
+   "dur": 785,
    "chapters": [
     {
      "id": "intro",
@@ -498,42 +523,57 @@
     {
      "id": "definition",
      "title": "The definition",
-     "t": 85
+     "t": 92
     },
     {
      "id": "anatomy",
      "title": "A disk you can query",
-     "t": 120
+     "t": 132
+    },
+    {
+     "id": "inside",
+     "title": "What's actually inside",
+     "t": 198
     },
     {
      "id": "readings",
      "title": "Two readings, again",
-     "t": 160
+     "t": 273
     },
     {
      "id": "workspace",
      "title": "The workspace is the artifact",
-     "t": 220
+     "t": 344
+    },
+    {
+     "id": "day",
+     "title": "A day in the life",
+     "t": 403
     },
     {
      "id": "safety",
      "title": "Why this is the safe shape",
-     "t": 258
+     "t": 468
+    },
+    {
+     "id": "versus",
+     "title": "Four places to keep bytes",
+     "t": 553
     },
     {
      "id": "honest",
      "title": "Where the disk ends",
-     "t": 307
+     "t": 614
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 347
+     "t": 666
     },
     {
      "id": "outro",
      "title": "Wrapping up",
-     "t": 405
+     "t": 745
     }
    ]
   }
