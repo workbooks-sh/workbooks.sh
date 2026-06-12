@@ -82,17 +82,15 @@
     return '<a href="' + root + href + '"><span class="sw" style="background:' + sw[0] + '">' + sw[1] + '</span> ' + name + ' <small>' + small + '</small></a>';
   }
 
-  var lessonsCol =
-    '<div class="col"><div class="colhead">lessons <small>the concepts</small></div>' +
-    item('learn/workbook.html', ['#a8d4f0', '<img src="' + root + 'wb-file-icon.svg" alt="">'], 'Workbooks', 'the unit') +
-    item('learn/nexus.html', ['#aee5c2', '<img src="' + root + 'nexus-icon.svg" alt="">'], 'Nexus', 'the engine') +
-    item('learn/toolkit.html', ['#f3c5a3', '<img src="' + root + 'toolkit-icon.svg" alt="">'], 'Toolkits', 'the parts') +
-    '<div class="sep" aria-hidden="true"></div>' +
-    item('learn/org.html', ['#f2ddb0', '<b>✳</b>'], 'Org', 'the grammar') +
-    item('learn/agents.html', ['#9fc4e8', '<b>✦</b>'], 'Agents', 'the crew') +
-    item('learn/autopoet.html', ['#aee5c2', '<b>❀</b>'], 'Autopoet', 'the gardener') +
-    item('learn/wbx.html', ['#d9dbd3', '<b>&gt;_</b>'], 'wbx', 'the command') +
-    '</div>';
+  // lessons come from THE catalog (learn/lessons.json) — the CMS seed.
+  var lessonsCol = '<div class="col" data-lessons><div class="colhead">lessons <small>loading…</small></div></div>';
+
+  function lessonRow(l) {
+    var icon = l.icon.indexOf("../") === 0 ? root + l.icon.slice(3) : root + "learn/" + l.icon;
+    return '<a href="' + root + 'learn/' + l.slug + '">' +
+      '<span class="sw" style="background:' + l.color + '"><img src="' + icon + '" alt=""></span> ' +
+      l.title + ' <small>' + l.sub + '</small></a>';
+  }
 
   var nbRows = NOTEBOOKS.map(function (n) {
     return '<a href="' + root + n.href + '" data-nb="' + (n.title + " " + n.cat).toLowerCase() + '">' +
