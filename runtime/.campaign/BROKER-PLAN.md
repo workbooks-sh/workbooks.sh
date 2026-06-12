@@ -1152,3 +1152,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   task so the Plug isn't blocked, forward each {ref,:stream_data} via send_chunked/chunk) + a MULTI-chunk
   streaming guest (N flushes -> N frames, proving TRUE chunked delivery vs the current 1 frame) + the full
   HTTP-through-Bandit e2e.
+- 2026-06-12 (iter 83): **★ STREAMING END-TO-END through Bandit (wb-t3sq core DELIVERED).** Added a :stream
+  mode to ComponentPlug: dispatch_stream instantiates a fresh instance, SPAWNS the blocking (DirtyCpu) stream
+  NIF in a separate process so the Plug process stays free to receive {ref, :stream_*} and forward each chunk
+  via send_chunked/chunk the instant it arrives. Full HTTP e2e via RAW socket (:httpc de-chunks + hides
+  Transfer-Encoding, so we read the wire bytes): GET through Bandit -> the raw response has "200" +
+  "transfer-encoding: chunked" + the guest body. So streaming WORKS end-to-end: a hosted wasi:http app's
+  response is delivered to a real client via chunked transfer AS the guest produces it, no host buffering.
+  Built in 3 fires (81 NIF compiling, 82 NIF proven, 83 chunked HTTP) — the genuine attempt per the inbound-
+  seam lesson delivered the last big capability. REMAINING (refinement): a MULTI-chunk streaming guest (N
+  flushes -> N frames) for incremental-delivery demonstration; outbound host_http_get streaming (lower-pri).

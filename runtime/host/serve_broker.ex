@@ -249,18 +249,82 @@ defmodule Workbooks.ServeBroker.ComponentPlug do
         # DoS floor: cap the host-side read (clean 413 instead of a crash / unbounded buffering)
         case read_body(conn, length: max_req) do
           {:ok, body, conn} ->
-            case dispatch(opts, conn, body) do
-              {status, headers, resp_body} when is_integer(status) ->
-                conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
-                send_resp(conn, status, resp_body)
+            if Keyword.get(opts, :stream) do
+              # STREAMING (`:stream` + `:component` + `:engine`): the response body is forwarded to the client
+              # via chunked transfer AS the guest produces it — large downloads / SSE without host buffering.
+              dispatch_stream(opts, conn, body)
+            else
+              case dispatch(opts, conn, body) do
+                {status, headers, resp_body} when is_integer(status) ->
+                  conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+                  send_resp(conn, status, resp_body)
 
-              {:error, _} ->
-                send_resp(conn, 502, "wasi:http component error")
+                {:error, _} ->
+                  send_resp(conn, 502, "wasi:http component error")
+              end
             end
 
           {:more, _partial, conn} ->
             send_resp(conn, 413, "request too large")
         end
+    end
+  end
+
+  # STREAMING dispatch: instantiate a fresh instance, spawn the (blocking, DirtyCpu) stream NIF in a separate
+  # process so THIS Plug process stays free to receive {ref, :stream_*} messages and forward each chunk via
+  # chunked transfer the instant it arrives. Large downloads / SSE flow without the host buffering the body.
+  defp dispatch_stream(opts, conn, body) do
+    component = Keyword.fetch!(opts, :component)
+    engine = Keyword.fetch!(opts, :engine)
+    wasi = Keyword.get(opts, :wasi_options, %Wasmex.Wasi.WasiP2Options{allow_http: true})
+
+    with {:ok, store} <- Wasmex.Components.Store.new_wasi(wasi, nil, engine),
+         {:ok, inst} <- Wasmex.Components.Instance.new(store, component, %{}) do
+      ref = make_ref()
+      parent = self()
+
+      spawn(fn ->
+        Wasmex.Components.Instance.serve_http_stream(
+          inst,
+          conn.method,
+          conn.request_path,
+          conn.req_headers,
+          body,
+          parent,
+          ref
+        )
+      end)
+
+      receive_stream_start(conn, ref)
+    else
+      _ -> send_resp(conn, 502, "wasi:http component error")
+    end
+  end
+
+  defp receive_stream_start(conn, ref) do
+    receive do
+      {^ref, :stream_start, status, headers} ->
+        conn = Enum.reduce(headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+        conn = send_chunked(conn, status)
+        stream_loop(conn, ref)
+    after
+      15_000 -> send_resp(conn, 504, "stream start timeout")
+    end
+  end
+
+  defp stream_loop(conn, ref) do
+    receive do
+      {^ref, :stream_data, data} ->
+        case chunk(conn, data) do
+          {:ok, conn} -> stream_loop(conn, ref)
+          # client disconnected mid-stream — stop forwarding, the response is already committed
+          {:error, _} -> conn
+        end
+
+      {^ref, :stream_done} ->
+        conn
+    after
+      15_000 -> conn
     end
   end
 

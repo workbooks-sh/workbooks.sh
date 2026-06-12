@@ -601,6 +601,58 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert body =~ "hello from brokered guest"
   end
 
+  @tag :build
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "APP-HOST streaming — chunked transfer through Bandit to a real client (wb-t3sq)" do
+    proj = "test/broker_e2e/wasi_http_handler"
+
+    {_, 0} =
+      System.cmd("cargo", ["component", "build", "--release", "--target", "wasm32-wasip2"],
+        cd: proj,
+        stderr_to_stdout: true
+      )
+
+    bytes = File.read!(Path.join(proj, "target/wasm32-wasip2/release/httpguest.wasm"))
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    {:ok, engine} = Wasmex.Engine.new(%Wasmex.EngineConfig{})
+    {:ok, s0} = Wasmex.Components.Store.new_wasi(wasi, nil, engine)
+    {:ok, component} = Wasmex.Components.Component.new(s0, bytes)
+
+    port = 45_000 + rem(System.unique_integer([:positive]), 4_000)
+
+    {:ok, srv} =
+      Bandit.start_link(
+        plug: {Workbooks.ServeBroker.ComponentPlug, component: component, engine: engine, stream: true},
+        scheme: :http,
+        ip: {127, 0, 0, 1},
+        port: port
+      )
+
+    on_exit(fn -> Process.exit(srv, :normal) end)
+    Process.sleep(150)
+
+    # raw socket: :httpc de-chunks and hides Transfer-Encoding, so read the wire bytes directly to PROVE the
+    # response was streamed via chunked transfer (send_chunked) rather than buffered with a Content-Length.
+    {:ok, sock} =
+      :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false, packet: :raw])
+
+    :ok = :gen_tcp.send(sock, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    raw = recv_all(sock, "")
+    :gen_tcp.close(sock)
+
+    assert raw =~ "200"
+    assert raw =~ ~r/transfer-encoding:\s*chunked/i
+    assert raw =~ "hello from brokered guest"
+  end
+
+  defp recv_all(sock, acc) do
+    case :gen_tcp.recv(sock, 0, 5_000) do
+      {:ok, data} -> recv_all(sock, acc <> data)
+      {:error, _} -> acc
+    end
+  end
+
   defp collect_stream(ref, acc) do
     receive do
       {^ref, :stream_data, chunk} -> collect_stream(ref, acc <> chunk)
