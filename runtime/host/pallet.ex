@@ -599,6 +599,30 @@ defmodule Workbooks.Pallet do
   int main(void) { printf("harfbuzz %s\n", hb_version_string()); return 0; }
   """
 
+  # mbedTLS — replace its default config with a minimal crypto-only one (MBEDTLS_CONFIG_FILE) so the build
+  # doesn't drag in net/entropy/PSA cascades; `mbedtls` = SHA-256 of stdin → hex.
+  @mbedtls_config ~S"""
+  #ifndef MBEDTLS_MIN_CONFIG_H
+  #define MBEDTLS_MIN_CONFIG_H
+  #define MBEDTLS_SHA256_C
+  #define MBEDTLS_SHA224_C
+  #define MBEDTLS_AES_C
+  #endif
+  """
+  @mbedtls_main ~S"""
+  #include <stdio.h>
+  #include "mbedtls/sha256.h"
+  int main(void) {
+    mbedtls_sha256_context ctx; mbedtls_sha256_init(&ctx); mbedtls_sha256_starts(&ctx, 0);
+    unsigned char buf[65536]; size_t n;
+    while ((n = fread(buf, 1, sizeof buf, stdin)) > 0) mbedtls_sha256_update(&ctx, buf, n);
+    unsigned char h[32]; mbedtls_sha256_finish(&ctx, h);
+    for (int i = 0; i < 32; i++) printf("%02x", h[i]);
+    printf("\n");
+    return 0;
+  }
+  """
+
   @csource [
     %{
       name: "lua",
@@ -726,6 +750,16 @@ defmodule Workbooks.Pallet do
       url: "https://codeload.github.com/rxi/microtar/tar.gz/27076e1b9290e9c7842bb7890a54fcf172406c84",
       sha: "08d28c3f3b3a3776123f7a375b47dbd7059c9e883977b1a99a518499c756e872",
       build_opts: [src_globs: ["src/microtar.{c,h}"], extra_sources: [{"tar_main.c", @tar_main}]]
+    },
+    %{
+      name: "mbedtls",
+      url: "https://codeload.github.com/Mbed-TLS/mbedtls/tar.gz/refs/tags/mbedtls-3.6.6",
+      sha: "de654c64688d0f6c71caf7336010e1fb54070e6e3d1df3999ee432ab59d0dbde",
+      build_opts: [
+        src_globs: ["library/*.{c,h}", "include/**/*.h"],
+        cflags: ["-I/work/include", "-I/work/library", "-DMBEDTLS_CONFIG_FILE=\"mbedtls_min.h\""],
+        extra_sources: [{"mbedtls_min.h", @mbedtls_config}, {"sha_main.c", @mbedtls_main}]
+      ]
     },
     %{
       name: "harfbuzz",

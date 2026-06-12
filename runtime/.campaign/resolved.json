@@ -503,6 +503,103 @@
 "recipe": "harfbuzz 14.2.1 C++ amalgam (src/harfbuzz.cc via :compile_only, -DHB_NO_MT -fno-exceptions)",
 "smoke": "hb_version_string => harfbuzz 14.2.1",
 "extent": "text-shaping engine builds; harfbuzz cmd prints version, ready for hb_shape with a font"
+},
+"C3": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "c3c links libLLVM (LLVM 19-23) as a library for codegen plus libcurl for network; needs a CMake configure + C11/C++17 build linking the multi-million-LOC LLVM library tree. No prebuilt wasm32-wasi bui",
+"extent": "off-the-table (verified)"
+},
+"Pkl": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "JVM/Truffle language: requires HotSpot JIT or a GraalVM native binary. Only wasm route is GraalVM Web Image, which is a browser/Node JS-coupled wasm+JS pair (experimental, JS-host imports), not a stan",
+"extent": "off-the-table (verified)"
+},
+"Gatsby": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Requires full Node runtime: native lmdb-store node-gyp addon (LMDB cache), webpack, GraphQL data layer, and parallel query running via OS worker pools (Node cluster/child_process fork-exec, threads). ",
+"extent": "off-the-table (verified)"
+},
+"Vike": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Vike is inseparable from Vite's Node-runtime build chain: esbuild (Go native binary, no plain wasm32-wasi build) + Rollup + a JS server, and a network/browser dev server with HMR. No standalone path; ",
+"extent": "off-the-table (verified)"
+},
+"Wakuwork / Waku": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Waku is a Node.js + Vite React Server Components framework, not a standalone program. There is no prebuilt wasm32-wasi .wasm (rules out Lane A). It is a JS app dependent on a full Node runtime: Vite/e",
+"extent": "off-the-table (verified)"
+},
+"Vite": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Long-running Node dev server: native HTTP listener + websockets (HMR) + fs watch = network-purpose + long-running server. Build path depends on native binaries \u2014 esbuild (Go native exec) and Rolldown/",
+"extent": "off-the-table (verified)"
+},
+"Webpack": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Full Node.js program: worker_threads, Node fs/module internals, enhanced-resolve, watchpack, and loaders that fork-exec / load native addons (sass-embedded, esbuild-loader, terser). No pure-JS single-",
+"extent": "off-the-table (verified)"
+},
+"txiki.js": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "libuv platform layer: native event loop, sockets/network, fork-exec (child_process), and curl HTTP \u2014 none available under jitless wasm32-wasi/wasmtime. The JS engine value (QuickJS-ng) is already cove",
+"extent": "off-the-table (verified)"
+},
+"LLRT": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Network-purpose serverless runtime: Tokio async I/O + sockets + TLS + built-in AWS SDK/HTTP networking, AWS-Lambda-bound, no WASM target (repo marks WASM API unsupported). The only sandbox-viable part",
+"extent": "off-the-table (verified)"
+},
+"Nova": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Rust edition 2024 + toolchain 1.92.0 + proc-macro/SIMD deps (oxc_*, sonic-rs, ecmascript_atomics) exceed the mrustc ~1.74 Lane-C ceiling; no prebuilt wasm32-wasi artifact and no C/Python/JS lane appli",
+"extent": "off-the-table (verified)"
+},
+"Kiesel": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "No prebuilt wasm32-wasi .wasm \u2014 build.zig wires only UEFI + native; the sole WASM is a browser/js-pair playground (excluded by Lane A). Core requires bdwgc (Boehm GC, C) which does not target wasm32-w",
+"extent": "off-the-table (verified)"
+},
+"Volta": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Purpose is host-PATH management + network download + fork-exec of native Node/npm/yarn binaries. None of these exist or are permitted under wasm32-wasi/wasmtime. A compiled .wasm would be a no-op shel",
+"extent": "off-the-table (verified)"
+},
+"go mod": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "fork/exec: the `go` command orchestrates subprocess tools (compile/link/asm/vcs) via os/exec, which is ENOSYS on wasip1 (WASI preview1 has no proc_exec/fork). Secondary blocker: module fetch needs net",
+"extent": "off-the-table (verified)"
+},
+"dep": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Go program \u2014 falls outside all four lanes (A prebuilt-wasm/B C-C++/C Rust-mrustc/D Python-JS), and no prebuilt wasm32-wasi binary is published. Independently disqualified: fork-exec of git/hg/svn/bzr ",
+"extent": "off-the-table (verified)"
+},
+"cpanm": {
+"verdict": "impossible",
+"lane": "none",
+"blocker": "Two hard impossibility flags: fork/exec (spawns tar/make/Makefile.PL/Build.PL per dist \u2014 WASI has no process spawn) and network-purpose (fetches from cpanmetadb/metacpan). Compounded by no live wasm32",
+"extent": "off-the-table (verified)"
+},
+"mbedTLS": {
+"verdict": "live",
+"lane": "B",
+"recipe": "mbedtls 3.6.6 library/*.c + minimal crypto config (MBEDTLS_CONFIG_FILE) + SHA-256 main",
+"smoke": "sha256('abc')=ba7816bf...",
+"extent": "mbedTLS crypto builds (SHA/AES/...); TLS protocol unusable in-sandbox (no net); mbedtls cmd = SHA-256 hex"
 }
 },
 "preliminary": {
@@ -693,14 +790,6 @@
 "lane": "B",
 "source_url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz",
 "recipe": "Lane B (self-contained C, static lib). Pure C, no TLS/socket/threads. Use the stable RELEASE TARBALL (not git) \u2014 it ships a PREGENERATED aut",
-"confidence": "high",
-"verified": false
-},
-"mbedTLS": {
-"verdict": "live-likely",
-"lane": "B",
-"source_url": "https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.6",
-"recipe": "Lane B (self-contained C). Use the 3.6 LTS branch (tag mbedtls-3.6.6), NOT 4.x \u2014 4.x splits crypto into the tf-psa-crypto git submodule (poi",
 "confidence": "high",
 "verified": false
 },
@@ -969,6 +1058,41 @@
 "verdict": "live-likely",
 "lane": "B",
 "recipe": "Odin is an LLVM-based compiler with a first-class `wasi_wasm32` build target (TargetMetrics target_wasi_wasm32 = {Target",
+"confidence": "medium",
+"verified": false
+},
+"Smalltalk": {
+"verdict": "uncertain",
+"lane": "D",
+"recipe": "No plain wasm32-wasi Smalltalk VM exists. The only WASM path (OpenSmalltalk \"Catalyst\") is a SqueakJS+WASM bro",
+"confidence": "medium",
+"verified": false
+},
+"Modula-2": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "No prebuilt wasm exists (Lane A=no; gm2 is a GCC front-end, GCC->wasm impractical). Only path is Lane B via th",
+"confidence": "medium",
+"verified": false
+},
+"Yorick": {
+"verdict": "uncertain",
+"lane": "B",
+"recipe": "Lane B (self-contained C), but NOT drop-in \u2014 needs a port. The core interpreter (yorick/*.c: parse.c, ops*.c, ",
+"confidence": "medium",
+"verified": false
+},
+"XS (Moddable)": {
+"verdict": "live-likely",
+"lane": "B",
+"recipe": "Build ONLY the standalone `xst` shell, NOT the Moddable SDK (skip mcconfig/xsbug/embedded HALs/GTK simulator e",
+"confidence": "medium",
+"verified": false
+},
+"Porffor": {
+"verdict": "uncertain",
+"lane": "D",
+"recipe": "Lane D JS on QuickJS. Bundle ESM compiler to one qjs script, pure JS acorn, shim fs and process, emit wasm to ",
 "confidence": "medium",
 "verified": false
 }
