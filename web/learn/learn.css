@@ -13,7 +13,7 @@
 @font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Bold.woff") format("woff"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Braked"; src: url("../fonts/BRAKED-Semibold.woff") format("woff"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Warlock"; src: url("../fonts/UMWarlock.woff") format("woff"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Groothan"; src: url("../fonts/GroothanMixed-Regular.woff2") format("woff2"), url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Groothan"; src: url("../fonts/GroothanMixed-Regular.woff2") format("woff2"), url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Groothan"; src: url("../fonts/GroothanMixed-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: "Muzzaro"; src: url("../fonts/Muzzaro.woff2") format("woff2"), url("../fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
 
