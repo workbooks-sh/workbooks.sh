@@ -19,6 +19,11 @@ hyper = "1"  # wb-broker: name hyper::Request<HyperOutgoingBody> in the WasiHttp
 bytes = "1"  # wb-broker (wb-py4k): build the inbound request body in component_serve_http
 http-body = "1"  # wb-broker (wb-t3sq): Body::frame for streaming the response body chunk-by-chunk
 http-body-util = "0.1"  # wb-broker (wb-py4k): Full request body + BodyExt::collect the response
+# wb-broker (wb-8w8x): IP-PINNED https for the wasi:http egress override — connect to the validated IP with
+# SNI=hostname (versions match wasmtime-wasi-http 39's own TLS stack so there's one resolved version each).
+rustls = "0.22"
+tokio-rustls = "0.25"
+webpki-roots = "0.26"
 rand = "0.9.1"
 rustler = { version = "0.37.2", features = ["big_integer", "serde"] }
 tokio = { version = "1.48", features = ["full"] }

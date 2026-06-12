@@ -1396,3 +1396,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   stdout unaffected). This was the last LOW audit finding. REMAINING: wasi:http https pin (MEDIUM, substantial
   Rust — custom SNI-preserving connector) + the dock allow-list scope-threading + wb-ltum (minimal-caps
   design decision, owner's call).
+- 2026-06-12 (iter 103): **FIXED wb-8w8x: wasi:http HTTPS now IP-PINNED (MEDIUM, last substantial finding).**
+  The wasi:http send_request override pinned only the HTTP path; HTTPS skipped the pin (default_send_request
+  derives BOTH the TCP target AND the TLS SNI from the authority, so rewriting it to the IP would break cert
+  validation) — leaving a DNS-rebinding window for TLS egress. FIX: wrote wb_pinned_https_send /
+  wb_pinned_https_handler (mirrors wasmtime-wasi-http's default_send_request_handler) — TcpStream::connect to
+  the VALIDATED PINNED IP, but rustls ServerName = the original HOSTNAME, validated against the system roots
+  (verify_peer). So the connection goes to the IP we SSRF-checked while the cert still binds to the hostname:
+  closes rebinding AND keeps MITM protection. Declared rustls 0.22 / tokio-rustls 0.25 / webpki-roots 0.26
+  (matching wasmtime-wasi-http 39's own TLS stack; TokioIo + IncomingResponse are pub). E2E PROVEN:
+  https://example.com/ through the wasi:http guest -> real content; https://169.254.169.254/ -> BLOCKED.
+  wasi-http OUTBOUND + RED-TEAM holistic + content tests all still green. ALL audit findings with a clear fix
+  are now CLOSED (CRITICAL + 2 HIGH + every MEDIUM/LOW). Remaining: the dock allow-list scope-threading
+  (follow-on wiring) + wb-ltum (minimal-caps design decision, owner's call).

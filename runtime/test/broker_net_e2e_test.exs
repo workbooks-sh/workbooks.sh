@@ -322,6 +322,13 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert m =~ "BLOCKED"
     assert {:ok, body} = probe.("http://example.com/")
     assert body =~ "Example Domain"
+
+    # wb-8w8x: HTTPS through the IP-PINNED wasi:http handler — real content arrives (pin + cert validation
+    # against the hostname both work), and an internal https target is still SSRF-blocked.
+    assert {:ok, https_body} = probe.("https://example.com/")
+    assert https_body =~ "Example Domain"
+    assert {:ok, https_blocked} = probe.("https://169.254.169.254/")
+    assert https_blocked =~ "BLOCKED"
   end
 
   @tag :build

@@ -663,30 +663,122 @@ impl WasiHttpView for ComponentStoreData {
             }
         }
 
-        // DNS-REBINDING PIN: connect to the IP we just checked, not the hostname (which default_send_request
-        // would RE-resolve, leaving a rebind window). For http, rewrite the authority to the pinned IP and
-        // keep the original Host header for vhost routing. For https we leave the SNI hostname intact —
-        // TLS cert validation already binds the connection to the hostname, so a rebind to an internal IP
-        // fails the handshake (it can't present the hostname's cert).
+        // DNS-REBINDING PIN: connect to the IP we just checked, not the hostname (which would otherwise be
+        // RE-resolved at connect time, leaving a rebind window). For HTTP, rewrite the authority to the pinned
+        // IP + keep the original Host header for vhost routing, then use the stock sender. For HTTPS the stock
+        // sender derives BOTH the TCP target AND the TLS SNI from the authority, so rewriting it would break
+        // cert validation — instead wb_pinned_https_send connects to the pinned IP but validates the cert
+        // against the original HOSTNAME (SNI), closing the rebind window without weakening TLS. (wb-8w8x.)
         let mut request = request;
-        if !is_https {
-            if let Ok(hv) = hyper::header::HeaderValue::from_str(&host) {
-                request.headers_mut().insert(hyper::header::HOST, hv);
-            }
-            let auth_str = match pinned {
-                std::net::IpAddr::V6(v6) => format!("[{}]:{}", v6, port),
-                v4 => format!("{}:{}", v4, port),
-            };
-            if let Ok(authority) = auth_str.parse::<hyper::http::uri::Authority>() {
-                let mut parts = request.uri().clone().into_parts();
-                parts.authority = Some(authority);
-                if let Ok(new_uri) = hyper::Uri::from_parts(parts) {
-                    *request.uri_mut() = new_uri;
-                }
+        if is_https {
+            return Ok(wb_pinned_https_send(request, host, pinned, port, config));
+        }
+
+        if let Ok(hv) = hyper::header::HeaderValue::from_str(&host) {
+            request.headers_mut().insert(hyper::header::HOST, hv);
+        }
+        let auth_str = match pinned {
+            std::net::IpAddr::V6(v6) => format!("[{}]:{}", v6, port),
+            v4 => format!("{}:{}", v4, port),
+        };
+        if let Ok(authority) = auth_str.parse::<hyper::http::uri::Authority>() {
+            let mut parts = request.uri().clone().into_parts();
+            parts.authority = Some(authority);
+            if let Ok(new_uri) = hyper::Uri::from_parts(parts) {
+                *request.uri_mut() = new_uri;
             }
         }
         Ok(default_send_request(request, config))
     }
+}
+
+// wb-8w8x: send an HTTPS request to a PINNED IP while validating the cert against the original HOSTNAME.
+// Mirrors wasmtime-wasi-http's default_send_request_handler, but TcpStream::connect targets the pinned
+// SocketAddr (not a re-resolved hostname) and the rustls ServerName is the hostname (so verify_peer still
+// binds the cert to the hostname). Closes the wasi:http DNS-rebinding window for the TLS path.
+fn wb_pinned_https_send(
+    request: hyper::Request<HyperOutgoingBody>,
+    host: String,
+    pinned: std::net::IpAddr,
+    port: u16,
+    config: OutgoingRequestConfig,
+) -> HostFutureIncomingResponse {
+    use wasmtime_wasi_http::bindings::http::types::ErrorCode;
+
+    let handle = wasmtime_wasi::runtime::spawn(async move {
+        Ok(wb_pinned_https_handler(request, host, pinned, port, config).await)
+    });
+    HostFutureIncomingResponse::pending(handle)
+}
+
+async fn wb_pinned_https_handler(
+    mut request: hyper::Request<HyperOutgoingBody>,
+    host: String,
+    pinned: std::net::IpAddr,
+    port: u16,
+    config: OutgoingRequestConfig,
+) -> Result<wasmtime_wasi_http::types::IncomingResponse, wasmtime_wasi_http::bindings::http::types::ErrorCode>
+{
+    use http_body_util::BodyExt;
+    use rustls::pki_types::ServerName;
+    use tokio::time::timeout;
+    use wasmtime_wasi_http::bindings::http::types::ErrorCode;
+    use wasmtime_wasi_http::io::TokioIo;
+
+    let addr = std::net::SocketAddr::new(pinned, port);
+    let tcp = timeout(config.connect_timeout, tokio::net::TcpStream::connect(addr))
+        .await
+        .map_err(|_| ErrorCode::ConnectionTimeout)?
+        .map_err(|_| ErrorCode::ConnectionRefused)?;
+
+    // TLS to the pinned socket, but SNI + cert validation bound to the HOSTNAME (system roots, verify_peer).
+    let root_cert_store = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.into(),
+    };
+    let client_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_cert_store)
+        .with_no_client_auth();
+    let connector = tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_config));
+    let domain = ServerName::try_from(host)
+        .map_err(|_| ErrorCode::TlsProtocolError)?
+        .to_owned();
+    let tls = connector
+        .connect(domain, tcp)
+        .await
+        .map_err(|_| ErrorCode::TlsProtocolError)?;
+    let io = TokioIo::new(tls);
+
+    let (mut sender, conn) = timeout(config.connect_timeout, hyper::client::conn::http1::handshake(io))
+        .await
+        .map_err(|_| ErrorCode::ConnectionTimeout)?
+        .map_err(|_| ErrorCode::ConnectionRefused)?;
+    let worker = wasmtime_wasi::runtime::spawn(async move {
+        let _ = conn.await;
+    });
+
+    // strip scheme+authority from the request line (http/1.1 origin-form), keeping path+query
+    *request.uri_mut() = hyper::http::Uri::builder()
+        .path_and_query(
+            request
+                .uri()
+                .path_and_query()
+                .map(|p| p.as_str())
+                .unwrap_or("/"),
+        )
+        .build()
+        .map_err(|_| ErrorCode::HttpRequestUriInvalid)?;
+
+    let resp = timeout(config.first_byte_timeout, sender.send_request(request))
+        .await
+        .map_err(|_| ErrorCode::ConnectionReadTimeout)?
+        .map_err(|_| ErrorCode::HttpProtocolError)?
+        .map(|body| body.map_err(|_| ErrorCode::HttpProtocolError).boxed());
+
+    Ok(wasmtime_wasi_http::types::IncomingResponse {
+        resp,
+        worker: Some(worker),
+        between_bytes_timeout: config.between_bytes_timeout,
+    })
 }
 
 impl WasiView for ComponentStoreData {
