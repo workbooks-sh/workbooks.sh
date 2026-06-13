@@ -11,6 +11,9 @@
   import { X } from "phosphor-svelte";
   import { dock } from "$lib/bridge/dock.svelte";
   import { themes } from "$lib/bridge/themes.svelte";
+  import { tabs } from "$lib/tabs/store.svelte";
+  import { dispatchSdk } from "$lib/sdk/browserSdk";
+  import { SDK_CALL, SDK_REPLY, SDK_EVENT, type SdkEventName } from "$lib/sdk/protocol";
 
   let iframeEl: HTMLIFrameElement | undefined = $state();
   let iframeReady = $state(false);
@@ -58,15 +61,56 @@
       /* iframe torn down mid-post — next load re-handshakes */
     }
   }
-  function onWindowMessage(e: MessageEvent) {
+  function emit(event: SdkEventName, payload: unknown) {
+    const win = iframeEl?.contentWindow;
+    if (!win || !iframeReady) return;
+    try {
+      win.postMessage({ type: SDK_EVENT, event, payload }, "*");
+    } catch {
+      /* iframe torn down — ignore */
+    }
+  }
+
+  async function onWindowMessage(e: MessageEvent) {
     const data = e.data as { type?: unknown } | null;
-    if (!data || typeof data !== "object" || data.type !== "wb-theme-ready") return;
-    if (iframeEl && e.source === iframeEl.contentWindow) {
+    if (!data || typeof data !== "object") return;
+    // Only accept messages from the active iframe panel.
+    if (!iframeEl || e.source !== iframeEl.contentWindow) return;
+
+    if (data.type === "wb-theme-ready") {
       iframeReady = true;
       lastPostedActiveId = themes.activeId;
       postTokens();
+      return;
+    }
+
+    // Browser SDK call → dispatch to host stores → reply (wb-aakl.15).
+    if (data.type === SDK_CALL) {
+      const call = data as { id: string; method: string; args?: unknown[] };
+      const win = iframeEl.contentWindow;
+      try {
+        const result = await dispatchSdk(call.method, call.args ?? []);
+        win?.postMessage({ type: SDK_REPLY, id: call.id, ok: true, result }, "*");
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        win?.postMessage({ type: SDK_REPLY, id: call.id, ok: false, error }, "*");
+      }
     }
   }
+
+  // Push SDK events to the active iframe panel as host state changes.
+  $effect(() => {
+    void tabs.activeId;
+    emit("tab-changed", tabs.active ? { id: tabs.active.id, path: tabs.active.path } : null);
+  });
+  $effect(() => {
+    const p = tabs.active?.path ?? null;
+    if (p) emit("workbook-opened", { path: p });
+  });
+  $effect(() => {
+    void themes.activeId;
+    emit("theme-changed", { activeId: themes.activeId });
+  });
   $effect(() => {
     const cur = themes.activeId;
     if (!iframeReady) return;
