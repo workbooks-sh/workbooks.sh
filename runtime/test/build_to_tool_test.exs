@@ -42,4 +42,49 @@ int main(void) {
     assert out =~ "max=5"
     assert out =~ "mean=2.8"
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "MULTI-STAGE build: an in-sandbox CODEGEN tool emits C source that is then compiled + run (codegen recipe)" do
+    # This is the reclaim recipe for the codegen-blocked C class (bash's mkbuiltins, etc.): a build needs a
+    # GENERATOR program compiled + RUN to emit .c/.h, which is then compiled into the final tool. Both stages
+    # run ENTIRELY in-sandbox (clang.wasm + wasmtime), no native toolchain.
+
+    # STAGE 1 — compile + run a codegen tool that emits a C lookup table to stdout.
+    gen = Path.join(System.tmp_dir!(), "gen_#{System.unique_integer([:positive])}.c")
+
+    File.write!(gen, ~S|
+#include <stdio.h>
+int main(void) {
+  printf("static const int squares[10] = {");
+  for (int i = 0; i < 10; i++) printf("%d,", i * i);
+  printf("};\n");
+  return 0;
+}
+|)
+
+    on_exit(fn -> File.rm(gen) end)
+    assert {:ok, gen_wasm, _} = Compilers.compile_c(gen)
+    on_exit(fn -> File.rm(gen_wasm) end)
+
+    generated = PackageManager.run(gen_wasm, "", [])
+    generated = if is_tuple(generated), do: elem(generated, 0), else: generated
+    assert generated =~ "static const int squares[10] = {0,1,4,9,16,25,36,49,64,81,};"
+
+    # STAGE 2 — compile a final tool that uses the GENERATED source, then run it sandboxed.
+    main = Path.join(System.tmp_dir!(), "usegen_#{System.unique_integer([:positive])}.c")
+
+    File.write!(main, "#include <stdio.h>\n" <> generated <> ~S|
+int main(void) { int x; if (scanf("%d", &x) == 1 && x >= 0 && x < 10) printf("%d\n", squares[x]); return 0; }
+|)
+
+    on_exit(fn -> File.rm(main) end)
+    assert {:ok, main_wasm, _} = Compilers.compile_c(main)
+    on_exit(fn -> File.rm(main_wasm) end)
+
+    out = PackageManager.run(main_wasm, "7\n", [])
+    out = if is_tuple(out), do: elem(out, 0), else: out
+    # 7^2 = 49 — the final tool used the in-sandbox-generated table correctly
+    assert String.trim(out) == "49"
+  end
 end

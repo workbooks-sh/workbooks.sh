@@ -1716,3 +1716,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   recipe for the self-contained-C class. This bridges the broker work and the build-lane frontier: the platform
   builds AND runs tools from source, sandboxed. The impossible-list reclaim of complex tools still needs the
   build-system / JS-host / newer-Rust lanes (wb-lcsj), each a substantial campaign.
+- 2026-06-12 (iter 130): **MULTI-STAGE CODEGEN BUILD recipe proven (the codegen-blocked reclaim path).** The
+  build-system bucket (31 items) is largely blocked on codegen-in-build (e.g. bash's mkbuiltins/mksyntax
+  compile+run to EMIT .c/.h before the main compile). Proved the recipe end-to-end, fully in-sandbox: STAGE 1
+  compile a codegen tool (clang.wasm) + RUN it (wasmtime) to emit C source; STAGE 2 compile the final tool
+  using that GENERATED source + run it. Test green: a gen tool emits a `static const int squares[10]` table ->
+  a final tool compiled with it -> stdin 7 -> 49 (7^2, using the in-sandbox-generated table). Both stages zero
+  native exec. So the platform can run a GENERATOR in-sandbox and feed its output back into the compiler — the
+  reclaim mechanism for the codegen-blocked C class. Build-lane reclaim recipes now proven: single-source C
+  (iter129) + multi-stage codegen (this fire). Remaining build-system items also need ./configure (shell-in-
+  sandbox, harder) + the JS-host/newer-Rust lanes (wb-lcsj) — each substantial, but the codegen piece is real.
