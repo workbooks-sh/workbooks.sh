@@ -136,9 +136,11 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-.sintro h1{ font-family:var(--read); font-weight:600; font-size:clamp(52px,7vw,102px); line-height:.94;
-  margin:16px 0 0; letter-spacing:-.02em; color:var(--ink); }
-.sintro h1 .bubl{ font-family:var(--display); font-weight:400; text-transform:uppercase; color:var(--pc); letter-spacing:0; }
+/* the duo display font (Groothan), all black: lowercase letters render grotesque,
+   the few uppercase letters render as bubble glyphs — a couple inner accents per
+   word, never the first letter. Case in the markup drives which is which. */
+.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(58px,8.4vw,120px); line-height:.9;
+  margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 .sintro .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
@@ -327,9 +329,9 @@ def lesson_page(l):
 
 def dashboard():
     first = next((x["slug"] for x in flat if x["status"] == "live"), flat[0]["slug"])
-    # serif title with a couple bubble-font accent letters per word (never numbers)
-    title = ('<span class="bubl">L</span>ear<span class="bubl">n</span>ing '
-             '<span class="bubl">C</span>ent<span class="bubl">e</span>r')
+    # Groothan duo, all black: lowercase = grotesque, the UPPERCASE letters = bubble
+    # accents (inner only, never the first letter of a word).
+    title = "leArNing ceNtEr"
     outs = [
         "Hold a whole app in a <b>single file</b> — and send it to anyone, like a photo.",
         "Build real software with <b>no server, no account, and no setup</b>.",
