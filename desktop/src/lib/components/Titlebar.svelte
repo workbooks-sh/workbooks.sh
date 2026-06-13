@@ -37,6 +37,9 @@
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { nav } from "$lib/bridge/nav.svelte";
+  import { workspaces } from "$lib/bridge/workspaces.svelte";
+  import { DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import NexusMark from "$lib/components/NexusMark.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
@@ -52,6 +55,10 @@
   import type { Tab } from "$lib/tabs/types";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
+
+  // Active workspace for the Shelf titlebar selector (demo during the tour).
+  const wsName = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "Workspace"));
+  const wsIcon = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.icon : (workspaces.active?.icon ?? ""));
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
   const engine = $derived.by(() => {
@@ -282,6 +289,23 @@
   >
     <SidebarSimple size={16} weight={chrome.sidebarOpen ? "fill" : "regular"} />
   </button>
+
+  <!-- Shelf moves the workspace selector up here (optimised for one / few
+       workspaces) — between the sidebar toggle and the ⌄ menu. -->
+  {#if nav.layout === "shelf"}
+    <button
+      type="button"
+      class="ws-pick"
+      data-tauri-drag-region="false"
+      title="Switch workspace"
+      aria-haspopup="menu"
+      onclick={(e) => chrome.openWorkspace(e.currentTarget)}
+    >
+      <span class="ws-pick-ic"><IconResolver value={wsIcon} name={wsName} size={14} /></span>
+      <span class="ws-pick-name">{wsName}</span>
+      <ChevronDown size={11} weight="bold" />
+    </button>
+  {/if}
 
   <button
     type="button"
@@ -590,6 +614,34 @@
     background: var(--color-page);
     color: var(--color-fg);
   }
+
+  /* Shelf workspace selector — a compact pill in the titlebar. */
+  .ws-pick {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 6px;
+    height: 26px;
+    max-width: 180px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: var(--color-fg);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .ws-pick:hover { background: var(--color-page); }
+  .ws-pick-ic { display: inline-flex; flex-shrink: 0; line-height: 0; }
+  .ws-pick-name {
+    font-size: 0.82rem;
+    font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ws-pick :global(svg) { flex-shrink: 0; color: var(--color-fg-subtle); }
 
   .ctx-shortcut {
     margin-left: auto;

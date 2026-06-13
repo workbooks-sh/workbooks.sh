@@ -103,6 +103,16 @@ class ChromeStore {
   nexusOpen = $state<boolean>(false);
   nexusAnchor = $state<HTMLElement | null>(null);
 
+  /** Workspace switcher popover (wb-aakl.16). Opened from the sidebar header
+   *  (Map) OR the titlebar (Shelf moves the selector up there). Anchor +
+   *  open live here so either surface can drive the one popover. */
+  workspaceOpen = $state<boolean>(false);
+  workspaceAnchor = $state<HTMLElement | null>(null);
+  openWorkspace(el: HTMLElement) {
+    this.workspaceAnchor = el;
+    this.workspaceOpen = !this.workspaceOpen;
+  }
+
   // The right-side panel is now the extension dock (wb-aakl.14, dock store);
   // the old chrome.agentOpen boolean is gone — the agent is one dock panel.
 

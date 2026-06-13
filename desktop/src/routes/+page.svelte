@@ -123,8 +123,6 @@
   let firstRunDone = $state(true);
 
   // Switcher popover state — anchor element + open flag.
-  let switcherAnchor = $state<HTMLElement | null>(null);
-  let switcherOpen = $state(false);
 
   // Sidebar resize — drag the right edge; nav stores width per layout and the
   // canvas (.main, flex:1) reflows automatically. `resizing` kills the width
@@ -464,8 +462,7 @@
   }
 
   function onSwitchWorkspace(anchor: HTMLElement) {
-    switcherAnchor = anchor;
-    switcherOpen = !switcherOpen;
+    chrome.openWorkspace(anchor);
   }
 
   async function onOnboardingComplete() {
@@ -652,8 +649,8 @@
     <DockHost />
 
     <WorkspaceSwitcher
-      anchor={switcherAnchor}
-      bind:open={switcherOpen}
+      anchor={chrome.workspaceAnchor}
+      bind:open={chrome.workspaceOpen}
     />
 
     <BookmarksPopover
