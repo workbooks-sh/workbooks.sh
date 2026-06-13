@@ -1455,3 +1455,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   concurrent test now admits EXACTLY 500 (atomicity + ownership both confirmed); 35 broker tests green. THREE
   self-audit fires (106 queue O(N) DoS, 107 ETS ownership crash) found real bugs IN THE REMEDIATION — auditing
   the fixes was worth it.
+- 2026-06-12 (iter 108): **SELF-AUDIT swept the transient-owner ETS bug across ALL broker modules — found a
+  FAIL-OPEN security bug in REVOCATION. FIXED.** The iter-107 finding (lazy named-ETS tables die with their
+  transient creator) wasn't isolated — grepped the pattern and found it in THREE more modules: Revocation,
+  ServeBroker, telemetry/WasmBridge. REVOCATION is security-critical: revoked?/1 is consulted by EVERY broker
+  op (incl. from transient ParallelBroker/app-host tasks), so if the first toucher was a transient task, its
+  exit would WIPE THE WHOLE REVOCATION TABLE — every revoked principal silently REGAINS access (fail-OPEN).
+  Fixed all three to own their table via BrokerTables (the iter-107 long-lived owner). PROVEN: new revocation
+  tests — a revoke made INSIDE a Task that then exits still holds from a separate process (fail-CLOSED), and
+  200 concurrent revokes from transient tasks all persist. 18 tests green (revocation + serve + audit).
+  Escrow + Domains already did it right (GenServer-owned) — left untouched. FOUR self-audit fires, THREE
+  classes of real bug found IN THE REMEDIATION + adjacent code (queue O(N) DoS, ETS-ownership crash, and now
+  the revocation fail-open). The fixes are now as adversarially-tested as the original surface.

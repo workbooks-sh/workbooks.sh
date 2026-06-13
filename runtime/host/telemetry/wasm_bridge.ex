@@ -76,16 +76,7 @@ defmodule Workbooks.Telemetry.WasmBridge do
 
   # Lazy public ETS table — span timing is shared across the enter/exit host
   # calls (separate component→host crossings) so it can't live in a closure.
-  defp ensure_table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set])
-        rescue
-          ArgumentError -> :ok
-        end
-
-      _ -> :ok
-    end
-  end
+  # owned by the long-lived Workbooks.BrokerTables process (wb self-audit: a transient caller that creates a
+  # named table takes it down on exit, losing span state).
+  defp ensure_table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 end

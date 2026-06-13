@@ -143,22 +143,9 @@ defmodule Workbooks.ServeBroker do
     end
   end
 
-  # --- lazy public ETS channel (shared across the caller + the wasmex worker process) ---
-  defp table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set])
-        rescue
-          ArgumentError -> :ok
-        end
-
-        @table
-
-      _ ->
-        @table
-    end
-  end
+  # public ETS channel owned by the long-lived Workbooks.BrokerTables process (wb self-audit: a transient
+  # caller that lazily creates a named table takes it down on exit, dropping serve state under concurrency).
+  defp table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 
   defp put(k, v), do: :ets.insert(table(), {k, v})
   defp delete(k), do: :ets.delete(table(), k)
