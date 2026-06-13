@@ -54,7 +54,10 @@
 
       vec2 pos = center + rot + warp * amp;
       float mask = gridMask(pos, u_cell);
-      vec3 col = mix(u_bg, u_line.rgb, u_line.a * mask);
+      // Boost the (very faint) token alpha with a visible floor so the grid
+      // reads as a real texture, not invisible.
+      float a = clamp(u_line.a * 4.0, 0.16, 0.34);
+      vec3 col = mix(u_bg, u_line.rgb, a * mask);
       gl_FragColor = vec4(col, 1.0);
     }
   `;

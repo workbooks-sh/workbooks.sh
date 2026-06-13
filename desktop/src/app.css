@@ -31,7 +31,7 @@
   --color-fg-subtle: rgba(18, 19, 22, 0.38);
   --color-accent: #121316;
   --color-ring: rgba(19, 217, 67, 0.5);
-  --color-grid-line: rgba(18, 19, 22, 0.05);
+  --color-grid-line: rgba(18, 19, 22, 0.11);
   /* Graph-paper backdrop — the canonical background behind the canvas + the
    * onboarding screen. Tight squares. */
   --grid-size: 22px;
@@ -104,7 +104,7 @@
     --color-fg-subtle: #6a6f68;
     --color-accent: #f7f6f1;
     --color-ring: rgba(19, 217, 67, 0.45);
-    --color-grid-line: rgba(247, 246, 241, 0.05);
+    --color-grid-line: rgba(247, 246, 241, 0.09);
     --color-brand: #13d943;
     --color-brand-soft: rgba(19, 217, 67, 0.14);
     --color-brand-ink: #0a2413;
@@ -131,7 +131,7 @@
   --color-fg-subtle: #6a6f68;
   --color-accent: #f7f6f1;
   --color-ring: rgba(19, 217, 67, 0.45);
-  --color-grid-line: rgba(247, 246, 241, 0.05);
+  --color-grid-line: rgba(247, 246, 241, 0.09);
   --color-brand: #13d943;
   --color-brand-soft: rgba(19, 217, 67, 0.14);
   --color-brand-ink: #0a2413;
