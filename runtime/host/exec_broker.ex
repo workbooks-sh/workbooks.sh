@@ -18,6 +18,11 @@ defmodule Workbooks.ExecBroker do
 
   @default_max_output 8 * 1024 * 1024
   @max_depth 8
+  # per-principal cap on TOTAL concurrent brokered execs (the unified fork-bomb WIDTH defense; @max_depth is
+  # the depth defense). Generous enough for legit fan-out (ParallelBroker is 16-wide), tight enough that a
+  # recursive process explosion can't OOM the host.
+  @max_concurrent_exec 64
+  @exec_slots :wb_exec_slots
 
   @doc """
   Run a sandboxed wasm command on behalf of a guest. Returns `{:ok, output}` | `{:error, reason}`.
@@ -63,12 +68,26 @@ defmodule Workbooks.ExecBroker do
         {:error, :unknown_command}
 
       true ->
-        # thread the current depth so THIS command's own host_exec runs its children at depth+1 — otherwise
-        # the @max_depth recursion-bomb bound is inert (every nested exec defaults to depth 0). wb depth-fix.
-        case CommandRegistry.run(name, stdin, argv, [], depth: depth) do
-          {:ok, out} when is_binary(out) -> {:ok, cap(out, max_output)}
-          {:error, reason} -> {:error, {:command_failed, reason}}
-          other -> {:error, {:command_failed, other}}
+        # UNIFIED FORK-BOMB DEFENSE (width): a per-PRINCIPAL cap on TOTAL concurrent brokered execs, acquired
+        # HERE — the single choke point ALL exec callers pass through (host_exec, ParallelBroker.map's tasks,
+        # ProcessBroker.spawn). The @max_depth bound limits recursion LEVELS but not total process count: a
+        # recursive host_parallel_map fans out ~16^depth, and the (generous) rate cap alone would let it spawn
+        # enough concurrent wasm instances to OOM the host. This concurrent cap bounds the LIVE total instead.
+        max_conc = Keyword.get(opts, :max_concurrent, @max_concurrent_exec)
+
+        if acquire_slot(principal, max_conc) do
+          try do
+            case CommandRegistry.run(name, stdin, argv, [], depth: depth) do
+              {:ok, out} when is_binary(out) -> {:ok, cap(out, max_output)}
+              {:error, reason} -> {:error, {:command_failed, reason}}
+              other -> {:error, {:command_failed, other}}
+            end
+          after
+            release_slot(principal)
+          end
+        else
+          deny(name, "concurrent-exec cap exceeded")
+          {:error, :too_many_processes}
         end
     end
   end
@@ -106,6 +125,26 @@ defmodule Workbooks.ExecBroker do
 
   defp rate_denied?(principal, {max, window}),
     do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
+
+  # concurrent-exec slot: bump the principal's live count; if it exceeds the cap, roll back and refuse. nil
+  # principal (host-internal calls) is uncapped. Atomic via :ets.update_counter on the long-lived table.
+  defp acquire_slot(nil, _max), do: true
+
+  defp acquire_slot(principal, max) do
+    n = :ets.update_counter(slots(), principal, {2, 1}, {principal, 0})
+
+    if n > max do
+      :ets.update_counter(slots(), principal, {2, -1}, {principal, 0})
+      false
+    else
+      true
+    end
+  end
+
+  defp release_slot(nil), do: :ok
+  defp release_slot(principal), do: :ets.update_counter(slots(), principal, {2, -1}, {principal, 0})
+
+  defp slots, do: Workbooks.BrokerTables.ensure(@exec_slots, [:named_table, :public, :set])
 
   defp deny(name, why) do
     Workbooks.BrokerAudit.record(:exec, :deny)

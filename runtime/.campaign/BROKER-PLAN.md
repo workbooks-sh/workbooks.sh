@@ -1657,3 +1657,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (exercises the depth+1 path) + the existing depth-bound test. This completes the fork-bomb defense across
   BOTH dimensions: WIDTH (ProcessBroker per-principal concurrent cap, iter122-123) + DEPTH (the now-LIVE
   @max_depth nesting bound, this fire) — for host_exec, host_parallel_map, AND ProcessBroker (opts pass-through).
+- 2026-06-12 (iter 125): **UNIFIED FORK-BOMB WIDTH DEFENSE — closed a real process-explosion OOM vector.**
+  Adversarial analysis of the (now depth-propagating) exec surface found the @max_depth bound limits recursion
+  LEVELS but NOT total process count: a recursive host_parallel_map fans out ~16^depth, and only the (generous
+  120k/min) RATE cap bounded it — enough concurrent wasm instances to OOM the host. The per-principal cap
+  ProcessBroker added (iter122) covered ONLY spawn, not host_exec/parallel_map. FIX: a UNIFIED per-principal
+  cap on TOTAL concurrent brokered execs, acquired at the SINGLE CHOKE POINT all callers pass through —
+  ExecBroker.exec (host_exec, ParallelBroker.map's per-task exec, AND ProcessBroker.spawn all go through it).
+  @max_concurrent_exec 64 (generous vs ParallelBroker's 16-wide, tight enough to prevent OOM); atomic acquire/
+  release via the long-lived BrokerTables-owned :wb_exec_slots; nil principal (host-internal) uncapped;
+  released in an `after` (no leak on error/exit). Test green: real exec acquires->runs->releases (count 0),
+  pre-fill to cap -> next exec :too_many_processes (refused before run), refused acquire rolls back (no leak).
+  15 exec/process tests + the new cap test green. So the FORK-BOMB DEFENSE is now COMPLETE across BOTH
+  dimensions for EVERY exec path: DEPTH (@max_depth nesting, now-live iter124) + WIDTH (unified per-principal
+  concurrent cap, this fire) — a recursive process explosion is bounded in levels AND total concurrency.

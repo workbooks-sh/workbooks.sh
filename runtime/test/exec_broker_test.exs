@@ -91,4 +91,25 @@ defmodule Workbooks.ExecBrokerTest do
     assert {:ok, evil} = ExecBroker.exec("coreutils", ["echo", "ok; rm -rf /"], "", allow: true)
     assert String.trim(evil) == "ok; rm -rf /"
   end
+
+  @tag :pallet
+  @tag timeout: 120_000
+  test "UNIFIED CONCURRENT-EXEC CAP — per-principal total brokered execs are bounded (fork-bomb width)" do
+    assert :ok = Workbooks.Pallet.seed_one("coreutils")
+    p = "exec-conc-#{System.unique_integer([:positive])}"
+
+    # a real exec acquires a slot, runs, and RELEASES it -> count back to 0 (no leak on the normal path)
+    assert {:ok, _} = ExecBroker.exec("coreutils", ["seq", "1"], "", allow: true, principal: p, max_concurrent: 4)
+    assert :ets.lookup(:wb_exec_slots, p) == [{p, 0}]
+
+    # pre-fill the principal's live count to the cap; the next exec's acquire bumps PAST it -> refused BEFORE
+    # the command runs (this is what bounds a recursive process explosion: total concurrent execs are capped).
+    :ets.insert(:wb_exec_slots, {p, 4})
+
+    assert {:error, :too_many_processes} =
+             ExecBroker.exec("coreutils", ["seq", "1"], "", allow: true, principal: p, max_concurrent: 4)
+
+    # the refused acquire rolled back -> count stays at the cap (not 5), so a refusal doesn't leak either
+    assert :ets.lookup(:wb_exec_slots, p) == [{p, 4}]
+  end
 end
