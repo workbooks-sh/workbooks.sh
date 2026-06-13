@@ -12,9 +12,19 @@
   // SignInOverlay intentionally not imported — auth UI is flag-gated
   // (WB_FF_AUTH_UI, wb-aakl.3) and surfaces only via the GeneralSettings
   // account card. The sidecar-offline overlay below is NOT auth.
-  import SetupWizard from "$lib/setup/SetupWizard.svelte";
+  // SetupWizard (in-app engine installer) is flag-gated (WB_FF_ONBOARDING,
+  // wb-aakl.5) and lazily imported — the CLI owns runtime install now, so
+  // a flags-off browser excludes the setup/ chunk entirely.
   import { auth } from "$lib/auth/store.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
+  import { features } from "$lib/bridge/features";
+
+  let SetupWizard =
+    $state<typeof import("$lib/setup/SetupWizard.svelte").default | null>(null);
+  $effect(() => {
+    if (features.onboarding && !SetupWizard)
+      void import("$lib/setup/SetupWizard.svelte").then((m) => (SetupWizard = m.default));
+  });
 
   let { children } = $props();
 
@@ -77,10 +87,12 @@
      overlay treatment as WorkgateModal. -->
 <EnvRequestModal />
 
-<!-- Engine install wizard. Always mounted; renders only when opened
-     (first run with no engine, or from the titlebar engine chip).
-     Offline-first: fully skippable, never blocks the app. -->
-<SetupWizard />
+<!-- Engine install wizard — flag-gated (WB_FF_ONBOARDING). Off in the
+     shipped browser: the CLI installs the runtime, so there is no in-app
+     installer. When on, renders only when opened from the titlebar chip. -->
+{#if features.onboarding && SetupWizard}
+  <SetupWizard />
+{/if}
 
 <style>
   /* Full-viewport shell. Titlebar sticks at the top; .body fills the

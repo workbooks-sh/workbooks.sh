@@ -22,11 +22,8 @@
   import DropOverlay from "$lib/viewer/DropOverlay.svelte";
   import ToastStack from "$lib/components/ToastStack.svelte";
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
-  import KeychainOnboarding from "$lib/setup/KeychainOnboarding.svelte";
-  import EngineOnboarding from "$lib/setup/EngineOnboarding.svelte";
   import OnboardingFlow from "$lib/onboarding/OnboardingFlow.svelte";
   import { setupStatus } from "$lib/bridge/setup.svelte";
-  import { engineStatus } from "$lib/bridge/engine.svelte";
   import WorkspaceSwitcher from "$lib/workspace/WorkspaceSwitcher.svelte";
   import EditNameModal from "$lib/workspace/EditNameModal.svelte";
   import EditIconModal from "$lib/workspace/EditIconModal.svelte";
@@ -39,7 +36,6 @@
   import { PencilSimple as Pencil, Smiley as Smile, Trash as Trash2 } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
-  import { wizard } from "$lib/setup/wizard.svelte";
   import { ws } from "$lib/bridge/ws.svelte";
   import { tabs } from "$lib/tabs/store.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
@@ -83,29 +79,20 @@
   let active = $state("home");
   let lastRail = $state("home");
 
-  // Onboarding gate — first launch only. The desktop install IS the
-  // monorepo root; without at least one Workspace it has nowhere to
-  // hang Packages.
+  // CLI owns setup (wb-aakl.5): the browser is installed by `wb desktop
+  // install` with the runtime already present, so there is no in-app
+  // engine-install or keychain first-run wizard. The engine/keychain
+  // setup gates are gone; engine state shows in the titlebar chip
+  // (offline-first canon), never a blocking gate.
   //
-  // Two-stage gate: keychain setup splash FIRST (so the OS keychain
-  // prompt fires with context, not as a boot-time surprise), then
-  // workspace onboarding. Each stage is non-dismissable; user has
-  // to click through.
-  // OFFLINE-FIRST: the app boots and is usable WITHOUT the engine (the
-  // workbook-native local tier needs no server). Engine state is surfaced in
-  // the titlebar, never as a blocking gate. So `initialized` starts true and the
-  // setup/onboarding splashes never block boot — they become opt-in flows later
-  // (Phase B), not a boot wall that hangs when a backend command is missing.
+  // Two gates remain, neither tied to "setup":
+  //   needsWorkspace → WorkspaceOnboarding (core file-system UX: a fresh
+  //     install with zero workspaces has nowhere to hang packages).
+  //   firstRunDone   → OnboardingFlow (personalization choices, wb-aakl.20;
+  //     `?onboarding` forces it for preview).
   let initialized = $state(true);
-  let engineInstalled = $state(true);
-  let keychainInitialized = $state(true);
-  // First-run onboarding (wb-hhf) — durable flag in setup.json; starts
-  // true (fail-open) and flips from the setup_status probe. `?onboarding`
-  // forces it for preview/testing.
+  let needsWorkspace = $state(false);
   let firstRunDone = $state(true);
-  const showEngineSetup = false;
-  const showKeychainSetup = false;
-  const showOnboarding = false;
 
   // Switcher popover state — anchor element + open flag.
   let switcherAnchor = $state<HTMLElement | null>(null);
@@ -421,59 +408,39 @@
 
   async function onOnboardingComplete() {
     await workspaces.refresh();
-  }
-
-  function onKeychainSetupComplete() {
-    keychainInitialized = true;
+    needsWorkspace = workspaces.workspaces.length === 0;
   }
 
   onMount(() => {
-    // After the first status snapshot, offer the engine setup wizard if no
-    // engine is configured (and the user hasn't dismissed it). Offline-first:
-    // it's skippable and never blocks the app.
-    sidecar.init().then(() => wizard.maybeAutoOpen());
+    // No in-app engine wizard auto-open — the CLI installs the runtime
+    // before the browser is ever opened (wb-aakl.5).
+    sidecar.init();
     ws.init();
     tabs.init();
     packageStore.init();
-    workspaces.init().then(() => (initialized = true));
+    workspaces.init().then(() => {
+      initialized = true;
+      // Core file-system UX: a fresh install with zero workspaces gets the
+      // create-first-workspace flow. Not "setup" — kept per wb-aakl.5.
+      needsWorkspace = workspaces.workspaces.length === 0;
+    });
     bookmarks.init();
     themes.init();
-    // Cheap, non-prompting check — reads ~/Workbooks/Engine/setup.json.
-    // If the keychain marker is set, skip the splash. If not, the
-    // KeychainOnboarding splash renders first.
-    // Preview/testing hook: ?onboarding forces the first-run flow
-    // (and wins over the probe below).
+    // Personalization onboarding (wb-aakl.20). first_run_done is a durable
+    // flag in setup.json; `?onboarding` forces the flow for preview.
     const forceOnboarding = new URLSearchParams(window.location.search).has(
       "onboarding",
     );
     if (forceOnboarding) firstRunDone = false;
     setupStatus()
       .then((s) => {
-        keychainInitialized = s.keychain_initialized;
         if (!forceOnboarding) firstRunDone = s.first_run_done;
       })
       .catch((e) => {
+        // Fail-open: skip the personalization flow if the probe fails.
         console.warn("[setup] status check failed:", e);
-        // Fail-open: if we can't talk to the backend, treat as
-        // initialized so the user can still use the app. Worst case
-        // they see the OS prompt anyway.
-        keychainInitialized = true;
-      });
-    // Engine install state — non-prompting probe; reads the launchd
-    // plist + discovery file. Fail-open mirrors the keychain path.
-    engineStatus()
-      .then((s) => {
-        engineInstalled = s.installed;
-      })
-      .catch((e) => {
-        console.warn("[engine] status check failed:", e);
-        engineInstalled = true;
       });
   });
-
-  function onEngineInstallComplete() {
-    engineInstalled = true;
-  }
 
   function onKey(e: KeyboardEvent) {
     // ⌃` (or ⌘`) — toggle the terminal drawer. Mirrors VS Code's
@@ -511,11 +478,9 @@
 
 {#if !initialized}
   <div class="loading"></div>
-{:else if showEngineSetup}
-  <EngineOnboarding oncomplete={onEngineInstallComplete} />
-{:else if showKeychainSetup}
-  <KeychainOnboarding oncomplete={onKeychainSetupComplete} />
-{:else if showOnboarding}
+{:else if needsWorkspace}
+  <!-- Core file-system UX (wb-aakl.5): create the first workspace so
+       packages have somewhere to live. Not a setup gate. -->
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
 {:else if !firstRunDone}
   <!-- Personalization onboarding (wb-aakl.20) — choices, never a gate.

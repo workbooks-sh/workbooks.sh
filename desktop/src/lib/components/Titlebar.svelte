@@ -447,7 +447,7 @@
     data-tauri-drag-region="false"
     title={engine.title}
     aria-label={engine.title}
-    onclick={() => wizard.open()}
+    onclick={() => features.onboarding && wizard.open()}
   >
     <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
   </button>
