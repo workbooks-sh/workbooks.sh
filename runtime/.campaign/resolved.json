@@ -2464,6 +2464,15 @@
    "test": "test/cpp_lane_test.exs",
    "caveats": "no-exceptions only (vendored libc++abi lacks EH); exceptions need an EH libc++/libunwind sysroot (roadmap, wb-i9nc)",
    "since": "iter156"
+  },
+  "cpp_exceptions": {
+   "capability": "C++ exceptions (try/throw/catch) in-sandbox",
+   "status": "roadmap",
+   "blocker": "no prebuilt EH-enabled wasi libc++/libc++abi/libunwind exists (wasi-sdk ships no-exceptions libc++abi + no libunwind) -> NOT a ready overlay like threads were",
+   "paths": "(A) L-XL from-source EH libc++ build on a provisioned machine; (B) M-uncertain compile the libc++abi EH sources + libunwind via our own clang.wasm lane -> overlay",
+   "meanwhile": "compile_cpp -fno-exceptions (LIVE) covers exceptions-free C++",
+   "tracked": "wb-i9nc",
+   "since": "iter157"
   }
  },
  "verdict_ladder": {
