@@ -2473,6 +2473,14 @@
    "meanwhile": "compile_cpp -fno-exceptions (LIVE) covers exceptions-free C++",
    "tracked": "wb-i9nc",
    "since": "iter157"
+  },
+  "rust_threads": {
+   "capability": "multithreaded Rust (std::thread/rayon) in-sandbox",
+   "status": "roadmap",
+   "blocker": "mrustc hardcodes cfg(target_feature=\"atomics\")=false (target.cpp:746) -> std 1.74 wasi Thread::new compiles the unsupported() stub; thread::spawn panics Unsupported, no wasi_thread_spawn import emitted",
+   "fix": "patch mrustc target_feature for a wasm32-wasi-threads spec + rebuild libstd from source (M effort, L/XL risk if mrustc miscompiles the std threads path) + a threads Rust compile lane (mechanical, mirrors compile_threads)",
+   "ready": "C-side infra all present (threads sysroot in mrustc-root, wasmtime flags, compile_threads template)",
+   "since": "iter157"
   }
  },
  "verdict_ladder": {
