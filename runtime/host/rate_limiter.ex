@@ -38,19 +38,7 @@ defmodule Workbooks.RateLimiter do
     :ok
   end
 
-  defp table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set])
-        rescue
-          ArgumentError -> :ok
-        end
-
-        @table
-
-      _ ->
-        @table
-    end
-  end
+  # the table is owned by the long-lived Workbooks.BrokerTables process — NOT the (possibly transient) caller,
+  # which would take the named table down with it when it dies (wb self-audit: concurrent-task table loss).
+  defp table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 end

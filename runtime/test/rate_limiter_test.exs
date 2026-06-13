@@ -30,4 +30,30 @@ defmodule Workbooks.RateLimiterTest do
     Process.sleep(5)
     assert :ok = RateLimiter.check(p, 1, 1)
   end
+
+  test "self-audit: CONCURRENT checks admit EXACTLY max (atomic, no lost-update undercount)" do
+    p = "rl-conc-#{System.unique_integer([:positive])}"
+    max = 500
+    # 2000 concurrent checks, a LARGE window so they all land in ONE bucket (no window-roll split).
+    # The atomic :ets.update_counter must admit EXACTLY `max` — the OLD read-then-bump would undercount under
+    # concurrency and let MORE than max through (the exact bug iter96 claimed to fix; proven here).
+    oks =
+      1..2000
+      |> Task.async_stream(fn _ -> RateLimiter.check(p, max, 600_000) end,
+        max_concurrency: 64,
+        ordered: false
+      )
+      |> Enum.count(fn {:ok, r} -> r == :ok end)
+
+    assert oks == max, "expected exactly #{max} admitted under concurrency, got #{oks}"
+  end
+
+  test "self-audit: reset clears EVERY bucket for a principal (key is {principal, bucket})" do
+    p = "rl-reset-#{System.unique_integer([:positive])}"
+    assert :ok = RateLimiter.check(p, 1, 600_000)
+    assert {:error, :rate_limited} = RateLimiter.check(p, 1, 600_000)
+    :ok = RateLimiter.reset(p)
+    # after reset the budget is fresh again (the bucketed key didn't survive)
+    assert :ok = RateLimiter.check(p, 1, 600_000)
+  end
 end

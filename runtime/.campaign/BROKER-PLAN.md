@@ -1441,3 +1441,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   topics via the O(1) count + decremented on poll). LESSON: remediation code itself needs adversarial review.
   NEXT self-audit targets: pinned-https worker-task lifecycle/leak, tenant ephemeral collision, rate-limiter
   window-boundary, pipe write_vectored partial path.
+- 2026-06-12 (iter 107): **SELF-AUDIT found a real PRODUCTION CRASH — lazy ETS tables owned by transient
+  callers. FIXED.** Wrote an adversarial concurrency test for the iter-96 rate-limiter (2000 concurrent checks,
+  max 500) — it didn't just prove atomicity, it CRASHED: "the table identifier does not refer to an existing
+  ETS table". ROOT CAUSE: RateLimiter + BrokerAudit created their named ETS tables LAZILY from whatever
+  process first touched them. Broker ops run in TRANSIENT processes (ParallelBroker Task.async_stream, the
+  app-host per-request tasks), and a :named_table is DELETED when its owner dies — so the first transient
+  caller creates the table, finishes, the table VANISHES, and the next call crashes (silently losing rate-
+  limit + audit state under concurrency). A real production bug, not just a test artifact. FIX: new
+  Workbooks.BrokerTables GenServer owns all broker ETS tables for the app lifetime; RateLimiter.table/
+  BrokerAudit.table+ring now ensure-create via it (owned by the never-dying GenServer, not the caller). Added
+  to the supervision tree; started unlinked from any ad-hoc first caller so it survives. PROVEN: the 2000-
+  concurrent test now admits EXACTLY 500 (atomicity + ownership both confirmed); 35 broker tests green. THREE
+  self-audit fires (106 queue O(N) DoS, 107 ETS ownership crash) found real bugs IN THE REMEDIATION — auditing
+  the fixes was worth it.

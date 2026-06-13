@@ -76,21 +76,9 @@ defmodule Workbooks.BrokerAudit do
     end
   end
 
-  defp ring do
-    case :ets.whereis(@ring) do
-      :undefined ->
-        try do
-          :ets.new(@ring, [:named_table, :public, :ordered_set])
-        rescue
-          ArgumentError -> :ok
-        end
-
-        @ring
-
-      _ ->
-        @ring
-    end
-  end
+  # owned by the long-lived Workbooks.BrokerTables process (wb self-audit: a transient caller that creates a
+  # named table takes it down on exit, crashing later broker calls).
+  defp ring, do: Workbooks.BrokerTables.ensure(@ring, [:named_table, :public, :ordered_set])
 
   @doc "All counters as a map keyed by {broker, outcome} and {broker, outcome, reason}."
   def stats, do: table() |> :ets.tab2list() |> Map.new()
@@ -119,19 +107,5 @@ defmodule Workbooks.BrokerAudit do
     :ok
   end
 
-  defp table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set])
-        rescue
-          ArgumentError -> :ok
-        end
-
-        @table
-
-      _ ->
-        @table
-    end
-  end
+  defp table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 end

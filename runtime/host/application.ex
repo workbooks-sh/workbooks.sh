@@ -16,6 +16,9 @@ defmodule Workbooks.Application do
 
     children =
       [
+        # long-lived owner of the broker ETS tables (rate-limiter, audit) — must outlive transient broker
+        # tasks, else a named table dies with its transient creator (wb self-audit).
+        Workbooks.BrokerTables,
         {Registry, keys: :unique, name: Workbooks.Instance.Registry},
         {Registry, keys: :unique, name: Workbooks.AgentSession.Registry},
         Workbooks.OQL,
