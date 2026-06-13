@@ -1136,15 +1136,18 @@
   }
 
   /* ── rows ─────────────────────────────────────────────────────── */
+  /* Brand idiom (lander nav ref): top-level rows carry a pastel
+   * rounded-square icon chip + a mono uppercase tracked label.
+   * Children (workbooks inside folders) stay quiet sans rows. */
   .row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    height: 30px;
+    height: 38px;
     padding: 0 8px;
     border: 0;
-    border-radius: 8px;
+    border-radius: 9px;
     background: transparent;
     color: var(--color-fg-muted);
     font: inherit;
@@ -1162,31 +1165,36 @@
   .row.active {
     background: var(--color-surface);
     color: var(--color-fg);
-    font-weight: 500;
     box-shadow:
-      0 1px 2px rgba(15, 15, 15, 0.07),
+      0 1px 2px rgba(18, 19, 22, 0.07),
       inset 0 0 0 1px var(--color-border);
   }
   .row-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
+    width: 26px;
+    height: 26px;
     flex-shrink: 0;
-    /* Brand-green lean instead of raw fg — kills the "white icon on
-     * gray" unfinished look without going full rainbow. */
-    color: color-mix(in srgb, var(--color-brand) 26%, var(--color-fg-muted));
+    border-radius: 7px;
+    /* pastel chip — ink glyph on a soft tint */
+    background: var(--color-chip-green);
+    color: #121316;
   }
-  .row.active .row-icon,
-  .row:hover .row-icon {
-    color: color-mix(in srgb, var(--color-brand) 55%, var(--color-fg-muted));
-  }
+  .row:nth-child(4n + 2) .row-icon { background: var(--color-chip-blue); }
+  .row:nth-child(4n + 3) .row-icon { background: var(--color-chip-peach); }
+  .row:nth-child(4n) .row-icon { background: var(--color-chip-lavender); }
   .row-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
     flex: 1 1 auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
   }
   /* Material file/folder icons (img assets). */
   .mi {
@@ -1217,6 +1225,10 @@
     transition: transform 0.12s;
   }
   .caret.open { transform: rotate(90deg); }
+  /* folders keep their colored folder glyph — no chip behind it */
+  .folder-row .row-icon {
+    background: transparent;
+  }
   .folder-row { color: var(--color-fg); cursor: grab; }
   .folder-row:active { cursor: grabbing; }
   /* Carrying an app/workbook over a folder = "drop inside" affordance. */
@@ -1249,9 +1261,23 @@
     padding-left: 18px;
   }
   .row.child {
-    height: 27px;
+    height: 28px;
     font-size: 12.5px;
     color: var(--color-fg-muted);
+  }
+  /* children drop the chip + mono idiom — quiet sans rows */
+  .row.child .row-icon {
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    color: var(--color-fg-subtle);
+  }
+  .row.child .row-label {
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
   }
   .child-note {
     padding: 4px 8px 5px 26px;
