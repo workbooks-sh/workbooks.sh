@@ -1736,3 +1736,22 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   self-contained-C class) are reachable now; what stays blocked needs proc-macros/edition-2024 (mrustc
   ceiling), autotools ./configure (shell-in-sandbox), or the JS-host engine — each a deliberate lane campaign
   (wb-lcsj). The platform builds AND runs tools from C and Rust source, sandboxed.
+- 2026-06-12 (iter 132): **RECLAIM ASSESSMENT CONCLUDED + CAMPAIGN-STATE CONSOLIDATION.** Did the accurate
+  reclaim pass the directive asks: checked the impossible list for items the proven recipes (self-contained C
+  iter129, C codegen iter130, self-contained Rust iter131) now reach — found NONE flips cleanly (the closest
+  candidates each have a compounding wall: ring=build.rs perlasm, cbindgen=clap/serde proc-macros, miller/Helm=
+  pure-Go, V=native-AOT). The recipes are real CAPABILITIES but the specific impossible items need the harder
+  lanes; did NOT inflate resolved.json. All 3 build-recipe tests green together (55.7s real mrustc+clang).
+  CAMPAIGN STATE — the host-brokered-capability platform is COMPLETE + certified across every dimension:
+  * NETWORKING keystone: egress (http in/out pinned+verified, TCP/UDP/TLS), ingress (wasi:http app-host +
+    raw-TCP server), full SSRF/DoS/rate/conn/byte/revocation cadence — RED-TEAM-GREEN on both host-mediated AND
+    standard-tool paths; 62-agent adversarial audit + 18-finding remediation + self-audit (3 more bug-classes).
+  * EXECUTION MODEL: sync host_exec + batch ParallelBroker + async ProcessBroker, fork-bomb-complete (WIDTH
+    unified concurrent cap + DEPTH propagated nesting bound), leak-proof lifecycles.
+  * STORAGE/QUEUE/SECRETS: capped, tenant-isolated, revocable. OBSERVABILITY: counters+ring+telemetry, all 11
+    brokers. 105 Elixir + 12 Rust broker tests green.
+  * BUILD-FROM-SOURCE: C (single+codegen) + Rust source -> sandboxed CLI tool, in-sandbox, zero native exec.
+  NEXT FRONTIER = the build-LANE campaigns (wb-lcsj): each (shell-in-sandbox for autotools-configure, JS-host
+  wasm-engine for emscripten, mrustc-beyond-1.74 for edition-2024/proc-macros, native-thread/fork models) is a
+  SUBSTANTIAL deliberate effort — NOT a bounded loop increment. The bounded networking+broker+recipe work is
+  genuinely exhausted; the next major capability needs owner direction on which lane to build.
