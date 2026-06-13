@@ -51,6 +51,18 @@ def bub_accent(text):
         low[i] = low[i].upper()
     return "".join(low)
 
+# set once the retrofuturism hype reel exists (Higgsfield); None = no splash video yet
+HYPE_VIDEO = "video/lms-hype.mp4"   # retrofuturism reel (test clip — full 1-min storyboard pending)
+HYPE_POSTER = "video/lms-hype.jpg"
+PLAY_SVG = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
+
+def vplayer_html(src, poster=""):
+    p = ' poster="%s"' % esc(poster) if poster else ""
+    return ('<div class="vplayer"><video preload="metadata" playsinline%s>'
+            '<source src="%s" type="video/mp4"></video>'
+            '<button class="vplay" aria-label="Play">%s</button>'
+            '<div class="vbar"><i></i></div></div>' % (p, esc(src), PLAY_SVG))
+
 WORDMARK = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true">'
   '<path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43'
   '0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717'
@@ -149,14 +161,18 @@ a{ color:inherit; text-decoration:none; }
 .li.cur .t{ font-weight:600; color:var(--ink); }
 
 /* ════ SPLASH — welcome to a living internet + what you'll be able to do + one CTA ════ */
-.splash{ min-height:100vh; display:flex; align-items:center; padding:6vh 6vw; }
+.splash{ min-height:100vh; display:flex; flex-direction:column; justify-content:center;
+  gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
+.hype{ width:100%; max-width:1180px; margin:0 auto; }
+.hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
+.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
 /* the duo display font (Groothan), all black: lowercase letters render grotesque,
    the few uppercase letters render as bubble glyphs — a couple inner accents per
    word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(58px,8.4vw,120px); line-height:.9;
+.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
@@ -176,7 +192,8 @@ a{ color:inherit; text-decoration:none; }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
 .souts li b{ font-weight:600; }
-@media (max-width:900px){ .splash{ min-height:0; padding:38px 22px 70px; }
+@media (max-width:900px){ .splash{ min-height:0; padding:30px 22px 70px; gap:30px; }
+  .hype .vplayer{ aspect-ratio:16/9; max-height:none; }
   .swrap{ grid-template-columns:1fr; gap:38px; }
   .souts{ border-left:0; padding-left:0; border-top:2px solid var(--ink); padding-top:28px; } }
 
@@ -216,6 +233,20 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
 .play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
 .play.playing .ico{ background:var(--bloomd); }
+/* ── custom video player (reusable: lesson rail + splash hype reel) ── */
+.vplayer{ position:relative; border:2px solid var(--ink); border-radius:12px; overflow:hidden;
+  box-shadow:4px 4px 0 var(--ink); background:#0c0d0f; aspect-ratio:16/9; cursor:pointer; }
+.vplayer video{ display:block; width:100%; height:100%; object-fit:cover; }
+.vplayer .vplay{ position:absolute; inset:0; margin:auto; width:54px; height:54px; border-radius:50%;
+  background:rgba(247,246,241,.94); border:2px solid var(--ink); display:flex; align-items:center; justify-content:center;
+  box-shadow:2px 2px 0 var(--ink); transition:opacity .15s, transform .1s; }
+.vplayer:hover .vplay{ transform:translateY(-1px); }
+.vplayer.playing .vplay{ opacity:0; pointer-events:none; }
+.vplayer .vplay svg{ width:19px; height:19px; fill:var(--ink); margin-left:2px; display:block; }
+.vplayer .vbar{ position:absolute; left:0; right:0; bottom:0; height:5px; background:rgba(255,255,255,.22); cursor:pointer; }
+.vplayer .vbar i{ display:block; height:100%; width:0; background:var(--pc); }
+.rail .vwrap{ margin:16px 0 0; }
+.rail .vwrap .vlab{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:0 0 8px; }
 .rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
   font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); background:var(--pc);
   border:2px solid var(--ink); border-radius:11px; padding:15px 18px; cursor:pointer; box-shadow:4px 4px 0 var(--ink);
@@ -295,6 +326,18 @@ JS = """
       else{ au.pause(); pl.classList.remove("playing"); lab.textContent="Listen"; }
     });
   }
+  // custom video players
+  document.querySelectorAll(".vplayer").forEach(function(vp){
+    var v=vp.querySelector("video"), bar=vp.querySelector(".vbar i"), track=vp.querySelector(".vbar");
+    if(!v) return;
+    function toggle(){ if(v.paused){ v.play(); vp.classList.add("playing"); } else { v.pause(); vp.classList.remove("playing"); } }
+    vp.addEventListener("click",function(e){ if(e.target.closest(".vbar")) return; toggle(); });
+    v.addEventListener("timeupdate",function(){ if(v.duration) bar.style.width=(v.currentTime/v.duration*100)+"%"; });
+    v.addEventListener("pause",function(){ vp.classList.remove("playing"); });
+    v.addEventListener("play",function(){ vp.classList.add("playing"); });
+    v.addEventListener("ended",function(){ vp.classList.remove("playing"); v.currentTime=0; });
+    if(track) track.addEventListener("click",function(e){ var r=this.getBoundingClientRect(); if(v.duration) v.currentTime=(e.clientX-r.left)/r.width*v.duration; });
+  });
 })();
 """.replace("%TOTAL%", str(TOTAL))
 
@@ -375,8 +418,15 @@ def dashboard():
     ]
     lis = "".join('<li><span class="ic"><svg viewBox="0 0 24 24">%s</svg></span><span class="tx">%s</span></li>'
                   % (I[k], t) for k, t in outs)
-    main = ('<div class="splash"><div class="swrap">'
-            '<div class="sintro"><div class="kick">welcome to the learning center</div>'
+    if HYPE_VIDEO:
+        hype = ('<div class="hype"><div class="wlabel">welcome to the learning center</div>%s</div>'
+                % vplayer_html(HYPE_VIDEO, HYPE_POSTER or ""))
+        kicker = ""
+    else:
+        hype = ""
+        kicker = '<div class="kick">welcome to the learning center</div>'
+    main = ('<div class="splash">' + hype + '<div class="swrap">'
+            '<div class="sintro">' + kicker +
             '<h1>%s</h1>'
             '<p class="lead">The internet is quietly becoming something you can hold — software that '
             'lives in a single file you own, send, and keep, with people and AI building it together. '
