@@ -14,6 +14,7 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import { features } from "$lib/bridge/features";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
+  import ConnectionSettings from "$lib/components/settings/ConnectionSettings.svelte";
   // AgentsSettings is lazy-loaded (wb-aakl.2): its static import pulled
   // chat/ (ModelPicker, AgentEditor) + agent stores into the main chunk.
   // The agents tab only appears under WB_FF_AGENTS, so a flags-off build
@@ -32,6 +33,7 @@
   // "MCPs" — the tab strip was getting too wide.
   type TabId =
     | "general"
+    | "connection"
     | "agents"
     | "themes"
     | "integrations"
@@ -47,6 +49,7 @@
   const tabs: Tab[] = (
     [
       { id: "general", label: "General", on: true },
+      { id: "connection", label: "Connection", on: true },
       { id: "agents", label: "Agents", on: features.agents },
       { id: "themes", label: "Themes", on: true },
       { id: "integrations", label: "Integrations", on: features.integrations },
@@ -95,6 +98,8 @@
   <div class="body">
     {#if active === "general"}
       <GeneralSettings />
+    {:else if active === "connection"}
+      <ConnectionSettings />
     {:else if active === "agents"}
       {#await import("$lib/components/AgentsSettings.svelte") then M}
         <M.default />
