@@ -182,6 +182,26 @@ defmodule Workbooks.Compilers do
   linked alongside the main one), `:ld_args` (extra wasm-ld link flags, e.g. `--wrap=mmap`
   for the mmap shim), `:crt` (link crt1, default true), `:run_opts`.
   """
+  @doc """
+  Compile + LINK C++ source to a runnable wasm — the C++ sibling of `compile_c/2`. The sysroot already ships
+  libc++ + libc++abi (wasm32-wasip1); this wires them in (`-x c++`, `-std=<std>`, `-lc++ -lc++abi`) so the full
+  STL + RTTI (dynamic_cast/typeid) + virtual dispatch + new/delete work in-sandbox.
+
+  NOTE — exceptions: the vendored libc++abi is the wasi-sdk NO-EXCEPTIONS build, so this defaults to
+  `-fno-exceptions`. Code using try/throw/catch fails at link (`__cxa_throw`/`_Unwind_*` undefined) until an
+  EH-enabled libc++/libunwind sysroot is staged (tracked separately). Pass `exceptions: true` only once that
+  lands. opts: `:std` (default "c++17"), plus everything `compile_c/2` accepts (`:argv`, `:link_libs`,
+  `:includes`, `:aux_files`, …).
+  """
+  def compile_cpp(source_path, opts \\ [], root \\ default_root()) do
+    std = Keyword.get(opts, :std, "c++17")
+    eh = if Keyword.get(opts, :exceptions, false), do: "-fexceptions", else: "-fno-exceptions"
+    cxx_argv = ["-x", "c++", "-std=#{std}", eh] ++ Keyword.get(opts, :argv, [])
+    cxx_libs = ["-lc++", "-lc++abi"] ++ Keyword.get(opts, :link_libs, [])
+
+    compile_c(source_path, Keyword.merge(opts, argv: cxx_argv, link_libs: cxx_libs), root)
+  end
+
   def compile_c(source_path, opts \\ [], root \\ default_root()) do
     m = Path.join([root, "clang", "manifest.org"])
     cli = kw(m, "CLI_BIN") || "clang"

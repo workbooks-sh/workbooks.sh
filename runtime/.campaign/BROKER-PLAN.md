@@ -2119,3 +2119,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   JSON all spec-correct; errors caught not crashed. Fetch routes through wasi:http->NetGuard (SSRF-safe, same
   brokered cadence). weval --aot is a later speed flag (embedding vendored). This is the full JS LANGUAGE
   universe in-wasm (beyond QuickJS's partial ES), inside our isolation model. wb-qnwn closed.
+- 2026-06-13 (iter 156): **STRATEGIC LEVERS SIZED (post-SpiderMonkey-host dead-end).** SpiderMonkey-as-wasm-host
+  CONFIRMED DEAD (WASM_DISABLED everywhere; jitless SM has no wasm interpreter, wasm needs JIT, W^X blocks it —
+  same wall as V8). The real within-WASM levers, now empirically sized: (1) THREADS — PROVEN (4-pthread demo @
+  330% CPU under wasmtime 45 .run path); M effort = stage a wasm32-wasi-threads sysroot + flag branch (wb-i982).
+  (2) C++ SOURCE-COMPILE — compile_cpp added + LIVE for the no-exceptions subset (full STL/RTTI/virtual/new-
+  delete via vendored libc++/libc++abi, test/cpp_lane_test.exs green); full exceptions needs an EH libc++/
+  libunwind sysroot (wb-i9nc, M-L). (3) host-brokered dynamic-wasm-compile = the only novel research artifact, but
+  small impossible-bucket impact. KEY REFRAME: the path to the 'Emscripten ecosystem' (SQLite/ffmpeg/DuckDB/
+  OpenCV/ImageMagick) is COMPILE-FROM-SOURCE via the C/C++ lane, NOT hosting their browser-wasm (which is
+  impossible). C is live; C++-no-exceptions is live now; C++-exceptions + threads are two sysroot-packaging tasks
+  away. No magic artifact breaks the JIT/browser-API/native walls — those are fundamental wasm invariants.
