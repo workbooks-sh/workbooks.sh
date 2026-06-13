@@ -11,8 +11,17 @@
    */
   import { Check, Plus } from "phosphor-svelte";
   import { workspaces, type Workspace } from "$lib/bridge/workspaces.svelte";
+  import { onboarding } from "$lib/onboarding/onboarding.svelte";
+  import { DEMO_WORKSPACES, DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import IconPickerMenu from "./IconPickerMenu.svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/ui/iconAccent.svelte";
+
+  // During the tour the store is empty — show the demo workspaces so the
+  // dropdown is populated like the rest of the demo content.
+  const wsItems = $derived(onboarding.active ? DEMO_WORKSPACES : workspaces.workspaces);
+  const activeWsId = $derived(
+    onboarding.active ? DEMO_ACTIVE_WORKSPACE.id : (workspaces.active?.id ?? null),
+  );
 
   let {
     /** Anchor element (the rail switch button). Used to position the
@@ -37,7 +46,11 @@
     return (name || "?").slice(0, 2).toUpperCase();
   }
 
-  async function pick(w: Workspace) {
+  async function pick(w: { id: string }) {
+    if (onboarding.active) {
+      open = false; // demo workspaces aren't real to switch to
+      return;
+    }
     try {
       await workspaces.setActive(w.id);
       open = false;
@@ -101,8 +114,8 @@
   >
     {#if mode === "list"}
       <div class="list">
-        {#each workspaces.workspaces as w (w.id)}
-          {@const isActive = workspaces.active?.id === w.id}
+        {#each wsItems as w (w.id)}
+          {@const isActive = activeWsId === w.id}
           {@const ac = iconAccent(w.icon)}
           <button
             type="button"

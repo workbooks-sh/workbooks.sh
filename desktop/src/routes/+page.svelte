@@ -51,6 +51,7 @@
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { applyBootPrefs } from "$lib/onboarding/prefs";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
+  import { DEMO_PACKAGES, DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import { commands } from "$lib/chrome/commands.svelte";
   import {
     MagnifyingGlass as SearchCmdIcon,
@@ -280,18 +281,15 @@
   });
 
   // Demo packages shown ONLY during onboarding, so the freshly-revealed
-  // sidebar is populated (the tour runs before any runtime/workspaces exist,
-  // so the real list is empty). Folder names drive the jewel-tone variety.
-  const DEMO_RAIL_PACKAGES: RailPackage[] = [
-    { id: "Reading", name: "Reading", isActive: false, icon: "", kind: "folder" },
-    { id: "Design", name: "Design", isActive: false, icon: "", kind: "folder" },
-    { id: "Clients", name: "Clients", isActive: false, icon: "", kind: "folder" },
-    { id: "Finance", name: "Finance", isActive: false, icon: "", kind: "folder" },
-    { id: "Research", name: "Research", isActive: false, icon: "", kind: "folder" },
-    { id: "Brand", name: "Brand", isActive: false, icon: "", kind: "folder" },
-    { id: "Roadmap", name: "Roadmap", isActive: false, icon: "", kind: "app" },
-    { id: "Notes", name: "Notes", isActive: false, icon: "", kind: "app" },
-  ];
+  // sidebar is populated (the tour runs before any runtime/workspaces exist).
+  // Folders (tinted) twirl open to demo files; one source in onboarding/demo.
+  const DEMO_RAIL_PACKAGES: RailPackage[] = DEMO_PACKAGES.map((p) => ({
+    id: p.id,
+    name: p.name,
+    isActive: false,
+    icon: "",
+    kind: p.kind,
+  }));
 
   // Filter the package list by the active workspace.
   const railPackages = $derived<RailPackage[]>(
@@ -559,7 +557,7 @@
   <!-- The REAL app shell. During onboarding (wb-aakl.20) its pieces reveal
        one at a time as a tutorial; `onboarding.shows()` is always true once
        onboarding is done. -->
-  <div class="app" class:ob-active={onboarding.active} inert={onboarding.active}>
+  <div class="app" class:ob-active={onboarding.active}>
     <div
       class="sidebar-host"
       class:closed={!chrome.sidebarOpen}
@@ -572,8 +570,8 @@
         createActive={active === "home" && chrome.mode === "app"}
         bind:active
         packages={railPackages}
-        workspaceName={workspaces.active?.name ?? ""}
-        workspaceIcon={workspaces.active?.icon ?? ""}
+        workspaceName={onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "")}
+        workspaceIcon={onboarding.active ? DEMO_ACTIVE_WORKSPACE.icon : (workspaces.active?.icon ?? "")}
         onSwitchWorkspace={onSwitchWorkspace}
         onSelectPackage={onSelectPackage}
         onOpenApp={onOpenApp}
@@ -594,7 +592,7 @@
       <SearchDrawer onclose={() => chrome.closeLeft()} />
     {/if}
 
-    <main class="main">
+    <main class="main" inert={onboarding.active}>
       <div class="main-content" class:ob-hide={!onboarding.shows("canvas")}>
         <DropOverlay />
         {#if chrome.mode === "doc"}

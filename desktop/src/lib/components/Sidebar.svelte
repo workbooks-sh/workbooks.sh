@@ -48,6 +48,7 @@
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
+  import { DEMO_WORKSPACES, DEMO_FOLDER_CHILDREN } from "$lib/onboarding/demo";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
   export type RailTab = {
@@ -125,22 +126,15 @@
 
   // Workspace icon-rail (Hub layout). Demo set during onboarding so the rail
   // is populated before any real workspaces exist; live workspaces otherwise.
-  const DEMO_WS = [
-    { id: "personal", name: "Personal", icon: "🏠" },
-    { id: "acme", name: "Acme", icon: "🅰" },
-    { id: "studio", name: "Studio", icon: "🎨" },
-    { id: "research", name: "Research", icon: "🔬" },
-  ];
   const wsList = $derived(
     onboarding.active
-      ? DEMO_WS
+      ? DEMO_WORKSPACES
       : workspaces.workspaces.map((w) => ({ id: w.id, name: w.name, icon: w.icon })),
   );
   const wsActiveId = $derived(
-    onboarding.active ? "personal" : (workspaces.active?.id ?? null),
+    onboarding.active ? DEMO_WORKSPACES[0].id : (workspaces.active?.id ?? null),
   );
   function pickWorkspace(id: string) {
-    if (onboarding.active) return; // inert during the tour
     void workspaces.setActive(id);
   }
 
@@ -162,6 +156,12 @@
   let folderBooks = $state<Record<string, WorkbookEntry[] | "loading">>({});
 
   async function loadFolder(id: string) {
+    // During the tour, twirling a folder shows demo files (real paths → real
+    // Material icons) so Shelf vs Map and the icon set are both demonstrable.
+    if (onboarding.active) {
+      folderBooks = { ...folderBooks, [id]: DEMO_FOLDER_CHILDREN[id] ?? [] };
+      return;
+    }
     if (!loadWorkbooks) return;
     folderBooks = { ...folderBooks, [id]: "loading" };
     try {
