@@ -15,6 +15,8 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { applyThemeMode } from "$lib/onboarding/prefs";
+  import { setupSaveModelKey } from "$lib/bridge/setup.svelte";
+  import { connections } from "$lib/bridge/connections.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { nav } from "$lib/bridge/nav.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
@@ -159,14 +161,48 @@
   }
   function pickGlyphs(g: Prefs["glyphs"]) { prefs.glyphs = g; nav.setGlyphs(g); }
 
-  // OpenRouter connect (SCAFFOLD). Waldo runs on OpenRouter — one key, every
-  // model. The real flow is an OAuth PKCE handshake that returns a key we
-  // store in the OS keychain; that's a Tauri/Rust follow-up. For now this
-  // tracks the connected state so the step reads correctly.
+  // Key connect — REAL keychain persistence (wb-2s09.3/.4/.5).
+  //  • OpenRouter → the model key Waldo's text lane runs on (setup_save_model_key).
+  //  • Gemini    → the voice-chat key, revealed to the Gemini Live WS by
+  //    connections_reveal_api_key("gemini"). Both land in the OS keychain.
+  let orKey = $state("");
+  let orBusy = $state(false);
+  let orErr = $state<string | null>(null);
   let orConnected = $state(false);
-  function connectOpenRouter() {
-    // TODO(wb-aakl): start OpenRouter OAuth PKCE → store key in keychain.
-    orConnected = true;
+  async function saveOpenRouter() {
+    const v = orKey.trim();
+    if (!v || orBusy) return;
+    orBusy = true;
+    orErr = null;
+    try {
+      await setupSaveModelKey({ name: "OpenRouter", provider: "openrouter", value: v });
+      orKey = "";
+      orConnected = true;
+    } catch (e) {
+      orErr = e instanceof Error ? e.message : String(e);
+    } finally {
+      orBusy = false;
+    }
+  }
+
+  let gemKey = $state("");
+  let gemBusy = $state(false);
+  let gemErr = $state<string | null>(null);
+  let gemConnected = $state(false);
+  async function saveGemini() {
+    const v = gemKey.trim();
+    if (!v || gemBusy) return;
+    gemBusy = true;
+    gemErr = null;
+    try {
+      await connections.connect({ service: "gemini", api_key: v });
+      gemKey = "";
+      gemConnected = true;
+    } catch (e) {
+      gemErr = e instanceof Error ? e.message : String(e);
+    } finally {
+      gemBusy = false;
+    }
   }
 
   function next() {
@@ -311,13 +347,46 @@
             <div class="text">
               <span class="kicker">Your resident agent</span>
               <h1>Meet Waldo</h1>
-              <p>Top-right, always here. Waldo runs on OpenRouter — one key, every model. Connect to add yours; it's stored in your keychain.</p>
+              <p>Add your keys to wake Waldo. Stored in your OS keychain — never synced. You can change these later in Settings.</p>
             </div>
-            <button type="button" class="connect-or" class:done={orConnected} onclick={connectOpenRouter}>
-              <Icon value="lobe:openrouter" name="OpenRouter" size={16} />
-              {orConnected ? "OpenRouter connected" : "Connect OpenRouter"}
-              {#if orConnected}<CheckCircle size={14} weight="fill" />{/if}
-            </button>
+            <div class="keys">
+              <div class="keyrow" class:done={orConnected}>
+                <span class="klabel">
+                  <Icon value="lobe:openrouter" name="OpenRouter" size={15} />
+                  OpenRouter <span class="kfor">chat · every model, one key</span>
+                </span>
+                {#if orConnected}
+                  <span class="kok"><CheckCircle size={14} weight="fill" /> Connected</span>
+                {:else}
+                  <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveOpenRouter(); }}>
+                    <input type="password" bind:value={orKey} placeholder="sk-or-…" spellcheck="false" autocomplete="off" disabled={orBusy} />
+                    <button type="submit" disabled={orBusy || !orKey.trim()}>{orBusy ? "…" : "Add"}</button>
+                  </form>
+                {/if}
+                {#if orErr}<div class="kerr">{orErr}</div>{/if}
+              </div>
+
+              <div class="keyrow" class:done={gemConnected}>
+                <span class="klabel">
+                  <Icon value="lobe:gemini-color" name="Gemini" size={15} />
+                  Gemini <span class="kfor">voice chat</span>
+                </span>
+                {#if gemConnected}
+                  <span class="kok"><CheckCircle size={14} weight="fill" /> Connected</span>
+                {:else}
+                  <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveGemini(); }}>
+                    <input type="password" bind:value={gemKey} placeholder="AIza…" spellcheck="false" autocomplete="off" disabled={gemBusy} />
+                    <button type="submit" disabled={gemBusy || !gemKey.trim()}>{gemBusy ? "…" : "Add"}</button>
+                  </form>
+                {/if}
+                {#if gemErr}<div class="kerr">{gemErr}</div>{/if}
+              </div>
+
+              <div class="kget">
+                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get OpenRouter key ↗</a>
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get Gemini key ↗</a>
+              </div>
+            </div>
           {/if}
         </div>
       {/key}
@@ -357,30 +426,59 @@
     justify-content: flex-end;
   }
   /* Connect-OpenRouter button in the Waldo coach. */
-  .connect-or {
+  /* Key entry — OpenRouter (chat) + Gemini (voice). */
+  .keys { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  .keyrow { display: flex; flex-direction: column; gap: 6px; }
+  .klabel {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 4px;
-    padding: 8px 14px;
+    gap: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-fg);
+  }
+  .klabel :global(img) { display: block; }
+  .kfor { font-weight: 400; color: var(--color-fg-subtle); font-size: 0.74rem; }
+  .kform { display: flex; gap: 6px; }
+  .kform input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
     border: 1px solid var(--color-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--color-surface-soft);
     color: var(--color-fg);
     font: inherit;
-    font-size: 0.84rem;
-    font-weight: 550;
+    font-size: 0.82rem;
+    outline: 0;
+    transition: border-color 0.15s;
+  }
+  .kform input:focus { border-color: var(--color-border-strong); }
+  .kform button {
+    flex-shrink: 0;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-fg);
+    color: var(--color-page);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
   }
-  .connect-or :global(img) { display: block; }
-  .connect-or:hover { border-color: var(--color-border-strong); }
-  .connect-or.done {
-    border-color: var(--color-brand);
-    background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
-    color: var(--color-brand);
+  .kform button:disabled { opacity: 0.45; cursor: default; }
+  .kok {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    font-weight: 550;
+    color: var(--color-ok);
   }
+  .kerr { color: var(--color-err); font-size: 0.74rem; word-break: break-word; }
+  .kget { display: flex; gap: 14px; margin-top: 2px; }
+  .kget a { color: var(--color-fg-subtle); font-size: 0.72rem; text-decoration: none; }
+  .kget a:hover { color: var(--color-fg-muted); text-decoration: underline; }
   .dock {
     position: relative;
     display: flex;
