@@ -1420,3 +1420,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   20 dock/tenant tests green. So a caller can now confine a guest's destinations to a granted {host,port} list
   across HTTP + raw TCP/UDP/TLS, enforced by the host. The audit's last follow-on item is closed; only wb-ltum
   (minimal-caps DESIGN decision, owner's call) remains.
+- 2026-06-12 (iter 105): **HOLISTIC VERIFICATION after the full audit remediation — all green.** After ~20
+  fires of security changes across the docks, brokers, policy, NIFs, and the TLS stack, ran a consolidated
+  regression of every audit-touched module: 72 Elixir tests (broker_audit, net_guard, tcp/udp/tls/queue/
+  storage brokers, tenant, capped_http, policy_network, exec_broker) + 12 Rust unit tests (wb_ssrf: SSRF
+  classifier, IPv4-mapped + NAT64/6to4/Teredo, 400k fuzz, allow-list, egress + conn rate meters) — 0 failures.
+  So the 17 audit fixes (CRITICAL https pin/verify + 2 HIGH [queue caps, tenant isolation] + every MEDIUM/LOW
+  + wasi:http https pin + dock scope-threading) compose cleanly with no regression. SECURITY POSTURE
+  CONSOLIDATED: every named red-team vector is closed AND tested. The ONLY open item is wb-ltum (a minimal-caps
+  DESIGN decision escalated to the owner — not a bug). The brokered-networking keystone is secure, working,
+  manageable, DoS-hardened, observable, load-validated, adversarially-audited, and fully remediated.
