@@ -297,13 +297,12 @@
       type="button"
       class="ws-pick"
       data-tauri-drag-region="false"
-      title="Switch workspace"
+      title="Switch workspace ({wsName})"
+      aria-label="Switch workspace ({wsName})"
       aria-haspopup="menu"
       onclick={(e) => chrome.openWorkspace(e.currentTarget)}
     >
-      <span class="ws-pick-ic"><IconResolver value={wsIcon} name={wsName} size={14} /></span>
-      <span class="ws-pick-name">{wsName}</span>
-      <ChevronDown size={11} weight="bold" />
+      <IconResolver value={wsIcon} name={wsName} size={15} />
     </button>
   {/if}
 
@@ -615,33 +614,28 @@
     color: var(--color-fg);
   }
 
-  /* Shelf workspace selector — a compact pill in the titlebar. */
+  /* Shelf workspace selector — just the workspace logo in a square (it's a
+   * switch; no name, no caret). */
   .ws-pick {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     align-self: center;
-    gap: 6px;
     height: 26px;
-    max-width: 180px;
-    padding: 0 8px;
+    width: 26px;
     border-radius: 8px;
-    border: 0;
-    background: transparent;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
     color: var(--color-fg);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.15s;
-  }
-  .ws-pick:hover { background: var(--color-page); }
-  .ws-pick-ic { display: inline-flex; flex-shrink: 0; line-height: 0; }
-  .ws-pick-name {
-    font-size: 0.82rem;
-    font-weight: 550;
+    line-height: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s;
   }
-  .ws-pick :global(svg) { flex-shrink: 0; color: var(--color-fg-subtle); }
+  .ws-pick:hover { border-color: var(--color-border-strong); }
+  .ws-pick :global(svg),
+  .ws-pick :global(img) { display: block; }
 
   .ctx-shortcut {
     margin-left: auto;
