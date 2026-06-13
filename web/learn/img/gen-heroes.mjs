@@ -26,6 +26,7 @@ const PAL = {
   "#e8c9e0": "cream, pale lilac, deep plum, and near-black ink",
   "#f0b8b8": "cream, pale rose, warm coral red, and near-black ink",
   "#c5b8e8": "cream, pale lavender, deep violet, and near-black ink",
+  "#d9c5f0": "cream, pale lavender, deep violet, and near-black ink",
   "#b8e0e8": "cream, pale aqua, deep teal, and near-black ink",
 };
 const palWords = (hex) =>

@@ -373,7 +373,7 @@
      "title": "Browser",
      "sub": "the surface",
      "color": "#d9c5f0",
-     "icon": "../wb-file-icon.svg",
+     "icon": "../browser-icon.svg",
      "audio": false,
      "status": "live",
      "sublessons": []

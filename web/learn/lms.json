@@ -292,7 +292,7 @@
    "lessons": [
     {
      "slug": "the-browser",
-     "title": "The app that is a workbook",
+     "title": "A desktop made of workbooks",
      "status": "live",
      "teaches": "The Workbooks Browser: a desktop app whose own interface is built out of workbooks — so the thing you use to open, weave, and run workbooks is made of the same stuff. Tabs, bookmarks, a file tree, a live connection to an engine, and a right-hand dock where any toolkit can mount its own panel — all of it composable, themeable, and drivable by an agent that lives in the app with you.",
      "docs": [
