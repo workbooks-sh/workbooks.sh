@@ -29,6 +29,19 @@ defmodule Workbooks.ProcessBroker do
     principal = Keyword.get(opts, :principal, "_anon")
     max_proc = Keyword.get(opts, :max_processes, @max_processes)
 
+    cond do
+      # MID-FLIGHT REVOCATION up front (like every other broker) — a revoked principal can't even reserve a
+      # slot, so it stops spawning IMMEDIATELY on revoke (not just at await when the inner exec would deny).
+      Workbooks.Revocation.revoked?(principal) ->
+        Workbooks.BrokerAudit.record(:process, :deny, :revoked, principal)
+        {:error, :revoked}
+
+      true ->
+        do_spawn(name, argv, stdin, opts, principal, max_proc)
+    end
+  end
+
+  defp do_spawn(name, argv, stdin, opts, principal, max_proc) do
     # reserve a process slot (refuse past the per-principal cap = fork-bomb gate). The WORKER process holds the
     # slot for its whole life and releases it exactly ONCE on exit — and it exits on REAP (await), the parent
     # DYING, or a max-lifetime. So a slot can never leak: abandoned/orphaned processes self-release (a guest

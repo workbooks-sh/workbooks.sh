@@ -1671,3 +1671,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   15 exec/process tests + the new cap test green. So the FORK-BOMB DEFENSE is now COMPLETE across BOTH
   dimensions for EVERY exec path: DEPTH (@max_depth nesting, now-live iter124) + WIDTH (unified per-principal
   concurrent cap, this fire) — a recursive process explosion is bounded in levels AND total concurrency.
+- 2026-06-12 (iter 126): **ProcessBroker REVOCATION-AT-SPAWN — cadence consistency fix (adversarial review of
+  the new broker).** Reviewing ProcessBroker, found a cadence inconsistency: revocation was only enforced
+  INSIDE the per-process exec (so a revoked principal's spawn still returned {:ok, handle} and RESERVED a slot,
+  held until reap/lifetime — denial only surfaced at await). Every OTHER broker denies a revoked principal up
+  front. FIX: ProcessBroker.spawn now checks Revocation.revoked? FIRST (before reserve) -> {:error, :revoked}
+  + audit (:process deny), so a revoke STOPS spawning immediately and consumes no slot. Test green: a revoked
+  principal is refused at spawn with live_count 0 (no slot reserved), unrevoke restores. 6 ProcessBroker tests
+  green. Mid-flight revocation now takes effect at the spawn boundary for the fork-exec model, matching the
+  net/exec/storage/queue/serve/tcp_serve brokers.

@@ -42,6 +42,18 @@ defmodule Workbooks.ProcessBrokerTest do
     assert {:ok, _} = ProcessBroker.spawn("sleepy", [], "", allow: true, principal: p, max_processes: 3)
   end
 
+  test "MID-FLIGHT REVOCATION — a revoked principal is refused AT SPAWN (no slot reserved); unrevoke restores" do
+    p = "proc-rev-#{System.unique_integer([:positive])}"
+    :ok = Workbooks.Revocation.revoke(p)
+
+    # refused up front (not just at await) -> and NO slot was reserved (count stays 0, the cap isn't consumed)
+    assert {:error, :revoked} = ProcessBroker.spawn("nope", [], "", allow: true, principal: p)
+    assert ProcessBroker.live_count(p) == 0
+
+    :ok = Workbooks.Revocation.unrevoke(p)
+    assert {:ok, _} = ProcessBroker.spawn("nope", [], "", allow: true, principal: p)
+  end
+
   test "DEFAULT-DENY — a spawn without the exec grant fails at await (ExecBroker cadence applies per process)" do
     p = "proc-deny-#{System.unique_integer([:positive])}"
     {:ok, h} = ProcessBroker.spawn("coreutils", ["cat"], "x", allow: false, principal: p)
