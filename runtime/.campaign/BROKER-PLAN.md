@@ -1772,3 +1772,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   egress -> flips httpie + the Python network-client class live. Also built Workbooks.BuildBroker (brokered
   build-from-source: C/Rust source -> sandboxed tool, full cadence default-deny/source-cap/rate/revocation/
   audit) — 6/6 incl real C+Rust brokered build+run — the build-orchestration lane's reusable foundation.
+- 2026-06-13 (iter 134): **CRITICAL FINDING — CPython wasip1 has NO OUTBOUND sockets; iter133 plan redirected
+  (wb-wb0c).** Inspected the provisioned CPython (vmware-labs python-3.12.0.wasm): a wasip1 CORE module whose only
+  wasi socket IMPORTS are sock_accept/sock_recv/sock_send/sock_shutdown — NO sock_connect/sock_open. wasip1 has
+  no outbound-connect syscall + this build omits it, so this CPython CANNOT connect outbound at all. So wiring
+  brokered net to the core wasi path does NOT help (the module never calls connect). Brokered networking
+  (socket_addr_check) only intercepts the wasip2/wasi:sockets path (proven with the Rust std::net reactor) — so
+  the wasip1 runtime tools (Python/QuickJS) can't reach it. CONSEQUENCE: the Python OUTBOUND reachable items
+  (pip/httpie/yt-dlp/conda/mamba/pixi/pdm ~7-10) are blocked on the RUNTIME BUILD, not on wiring. PATHS: (A)
+  provision a wasip2/network-capable CPython (wasi:sockets) -> runs via the component path that already brokers
+  net; or (B) HOST-IMPORT BROKERED TRANSPORT SHIM — a brokered HTTP via a host import / request-response file
+  protocol (works WITH wasip1 since the host does the net, reusing NetGuard/CappedHttp) + a Python urllib
+  transport adapter. RECOMMEND (B): reuses the built SSRF-safe brokers, no new runtime build. This is the
+  GENERAL wasip1 wall — only wasip2/wasi:sockets builds get brokered net; the reachable runtime tools need a
+  wasip2 runtime OR the brokered-transport shim. Pure-Python (no-net) tools remain DONE via Lane D.
