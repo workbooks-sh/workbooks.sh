@@ -1605,3 +1605,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   full DoS cadence (byte cap, per-client rate, global concurrency cap, slowloris deadline, revocation, audit) +
   egress-sandbox + loopback-bound. The inbound server-flip (keystone goal 4) is done for wasi:http AND raw TCP,
   both with the serving-guest-can't-pivot property held.
+- 2026-06-12 (iter 121): **HONEST CORRECTION — the brokered TCP-server does NOT reclaim the named server items
+  (compounding hard walls); roadmap refined (wb-lcsj).** Checked the 6 'network-as-purpose server' items
+  against the new TcpServeBroker: NONE is flipped live by it alone — each has a wall beyond 'guest can't
+  listen' (KeyDB/MonetDB: native pthreads + fork; Dgraph: distributed clustering; Neon: full-Postgres-C /
+  emscripten; Waku/Vike/Stencil: Node+Vite JS-host). So the brokered TCP-server CAPABILITY is genuinely new +
+  proven live (iter118), but it does NOT inflate the feasibility verdicts — they stay impossible on their OTHER
+  blockers. Did NOT touch resolved.json verdicts (avoided inflation). Refined wb-lcsj: the build-blocked items
+  need EXECUTION-MODEL + BUILD-LANE capability (fork-exec/multi-process model, JS-host engine, rust>mrustc,
+  native threads, native-compiler langs) — NONE reclaimed by the (complete) networking/exec/serve brokers
+  alone. CONCLUSION: the entire host-brokered-NETWORKING keystone + its capability surface (egress in/out,
+  ingress http+TCP, exec, storage, queue, serve, parallel, full cadence, red-team-green, audited+self-audited)
+  is COMPLETE. The frontier beyond is distinct build-lane/execution-model campaigns warranting owner direction.
