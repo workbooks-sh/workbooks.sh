@@ -1956,3 +1956,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   languages. 3 shim tests green (brokered HTTP public/internal + exec deny/grant + cross-lang orchestration).
   NEXT: a Rust shim (wb_broker.rs); reclaim a concrete multi-step build (a C driver that compiles+runs a tool
   via brokered commands); wire :broker into the toolkit authoring surface so authored tools opt in.
+- 2026-06-13 (iter 145): **PHASE-4 KEYSTONE SHIPPED — curl-class `http` client (real reclaim, not machinery).**
+  New Workbooks.BrokeredTools + `http` command (registered at boot in Application): a curl/httpie-class HTTP
+  client — `http [METHOD] URL [-H 'K: V']... [-d DATA]` — that runs SSRF-mediated via the brokered transport
+  (:pynet + requests shim), prints the body, and exits status-aware (>=400 -> 1, like curl --fail). 6 tests
+  green: registered first-class; SSRF metadata DENIED (non-zero, no leak); usage on no-URL; LIVE GET
+  example.com; 404 -> exit 1; allow-list SCOPE (8.8.8.8 denied under allow:[example.com]). The sandbox now
+  SHIPS a working curl-class HTTP client — no per-binary port, all egress host-mediated + scopable + revocable.
+  resolved.json: annotated capability_live on curl/httpie/wget + a live_capabilities.http_client marker (honest:
+  the CAPABILITY ships live; the upstream binaries aren't ported, so verdicts stay reachable). This is the
+  Phase-4 "wire a real HTTP client" deliverable. NEXT Phase-4 keystones: a DB client (brokered TCP to a real
+  DB, not the server), a package-manager FETCH (pip/npm metadata via brokered http), an API tool.

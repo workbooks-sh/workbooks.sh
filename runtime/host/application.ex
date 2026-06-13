@@ -88,6 +88,13 @@ defmodule Workbooks.Application do
       reloaded = Workbooks.CommandRegistry.reload_persisted()
       if reloaded > 0, do: Logger.info("command registry — #{reloaded} persisted command(s) reloaded")
 
+      # Phase-4 reclaim keystones: canonical host-brokered CLI tools (curl-class `http`, …) — first-class
+      # commands delivering a network capability through the mediated brokers (SSRF-safe). Cheap in-memory
+      # registration; the tools run on the `python` runtime (seeded via WB_PALLET).
+      btools = Workbooks.BrokeredTools.register_all()
+      bok = Enum.count(btools, fn {_n, r} -> r == :ok end)
+      Logger.info("brokered tools — #{bok}/#{map_size(btools)} registered (curl-class http)")
+
       if System.get_env("WB_CSOURCE") == "1" do
         results = Workbooks.Pallet.seed_csource()
         ok = Enum.count(results, fn {_n, r} -> r == :ok end)

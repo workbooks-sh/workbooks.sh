@@ -217,7 +217,8 @@
    "blocker": "httpie is network-as-purpose: its only function is HTTP/TLS egress via requests/urllib3 sockets. Standalone wasm32-wasi under wasmtime has no socket/TLS support, and both upstream-suggested routes (Py",
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
-   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed"
+   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
+   "capability_live": "brokered http command (host/brokered_tools.ex) \u2014 curl/httpie-class GET/POST/headers/-d, status-aware exit, SSRF-safe + allow-list-scopable, runs SSRF-mediated via PyNet. The HTTP-CLIENT CAPABILITY now ships live in the sandbox; the upstream binary itself is not ported (verdict stays reachable to stay honest)."
   },
   "Candle": {
    "verdict": "impossible",
@@ -1116,14 +1117,16 @@
    "lane": "none",
    "blocker": "network-as-purpose: curl exists to move bytes over TCP/TLS, and wasm32-wasi/wasmtime (wasip1) has no raw sockets. All real curl-wasm ports rely on a browser WebSocket pro",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "brokered http command (host/brokered_tools.ex) \u2014 curl/httpie-class GET/POST/headers/-d, status-aware exit, SSRF-safe + allow-list-scopable, runs SSRF-mediated via PyNet. The HTTP-CLIENT CAPABILITY now ships live in the sandbox; the upstream binary itself is not ported (verdict stays reachable to stay honest)."
   },
   "wget": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-as-purpose: wget's sole function is HTTP(S)/FTP fetch; wasm32-wasi/wasip1 has no sockets, so connections are impossible without host-brokered net imports (network",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "brokered http command (host/brokered_tools.ex) \u2014 curl/httpie-class GET/POST/headers/-d, status-aware exit, SSRF-safe + allow-list-scopable, runs SSRF-mediated via PyNet. The HTTP-CLIENT CAPABILITY now ships live in the sandbox; the upstream binary itself is not ported (verdict stays reachable to stay honest)."
   },
   "rsync": {
    "verdict": "reachable",
@@ -2241,5 +2244,17 @@
    "extent": "off-the-table (native / redundant / deferred-niche)"
   }
  },
- "preliminary": {}
+ "preliminary": {},
+ "live_capabilities": {
+  "http_client": {
+   "command": "http",
+   "delivers": [
+    "curl",
+    "httpie",
+    "wget"
+   ],
+   "recipe": "brokered-net :pynet command",
+   "since": "iter145"
+  }
+ }
 }
