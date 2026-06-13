@@ -57,6 +57,11 @@
   --gradient-aurora-c: #f3cfae;
   --gradient-aurora-d: #d4c9f0;
 
+  /* Icon knockout — flattens a (multicolor) icon to the page bg color so it
+   * reads as a cut-out on a pastel chip. Light: → near-white; dark sets the
+   * dark variant. Works on <img> SVGs + emoji silhouettes alike. */
+  --icon-knockout: brightness(0) invert(1);
+
   --radius-lg: 8px;
   --shadow-pop:
     0 1px 2px rgba(18, 19, 22, 0.06),
@@ -76,6 +81,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode]) {
     color-scheme: dark;
+    --icon-knockout: brightness(0);
     /* ink, inverted — neutral near-black, no color cast */
     --color-page: #121316;
     --color-surface: #1b1d20;
@@ -101,6 +107,7 @@
 }
 :root[data-mode="dark"] {
   color-scheme: dark;
+  --icon-knockout: brightness(0);
   --color-page: #121316;
   --color-surface: #1b1d20;
   --color-surface-soft: #232529;

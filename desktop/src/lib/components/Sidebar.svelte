@@ -975,25 +975,31 @@
     gap: 6px;
     padding: 2px 2px 6px;
   }
+  /* Bookmark tiles match the nav pastel-chip idiom: a soft pastel fill in
+   * the bookmark's own hue with a background-color knockout icon (below). */
   .tile {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 40px;
     border-radius: 10px;
-    border: 1px solid color-mix(in srgb, var(--tint) 18%, var(--color-border));
-    background: var(--tint-wash);
+    border: 0;
+    background: color-mix(in srgb, var(--tint) 42%, var(--color-surface));
     color: var(--tint);
     font-size: 16px;
     line-height: 1;
     cursor: pointer;
-    box-shadow: 0 1px 1.5px rgba(15, 15, 15, 0.05);
-    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.14s, border-color 0.14s;
+    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), filter 0.14s;
   }
   .tile:hover {
     transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--tint) 38%, var(--color-border));
-    box-shadow: 0 3px 8px color-mix(in srgb, var(--tint) 16%, rgba(15, 15, 15, 0.08));
+    filter: brightness(1.04);
+  }
+  /* knockout the glyph to the page bg color — cut-out on the pastel tile */
+  .tile :global(img),
+  .tile :global(.emoji),
+  .tile :global(.initials) {
+    filter: var(--icon-knockout);
   }
   .tile:active {
     transform: translateY(0) scale(0.97);
@@ -1282,6 +1288,14 @@
     height: 18px;
     object-fit: cover;
     border-radius: 5px;
+  }
+  /* Background-color knockout: flatten the (multicolor) glyph to the page
+   * bg color so it reads as a cut-out on the pastel chip. img SVGs + emoji
+   * silhouettes + initials all respond to the filter. */
+  .app-row .row-icon.app :global(img),
+  .app-row .row-icon.app :global(.emoji),
+  .app-row .row-icon.app :global(.initials) {
+    filter: var(--icon-knockout);
   }
   .row.dragging { opacity: 0.4; }
   .row.drop-target { box-shadow: inset 0 2px 0 var(--color-fg); }
