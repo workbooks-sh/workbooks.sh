@@ -1,0 +1,135 @@
+<p>Open a piece of software up — really open it — and try to find the
+part where it says <em>why</em>. Why this exists. What’s done and what’s
+still owed. What someone decided last spring, and what they were
+thinking when they decided it. You’ll hunt for a long time, because that
+part lives nowhere. There’s a README that’s half out of date, tickets in
+one tool, a spec in another, a thread of decisions buried in chat. The
+working software doesn’t carry its own story. It never has.</p>
+<p>That missing story is the most expensive thing in software, and
+almost nobody ships it. So before we talk about the moving parts — the
+agents, the data, the deployments — let’s talk about the material
+everything here is <em>written in</em>. Because a workbook does
+something quietly radical: it keeps the intent, the plan, the schedule,
+and the runnable parts in one plain-text layer you could read over
+someone’s shoulder, in one sitting, without being shown how.</p>
+<h2 id="the-trade-nobody-else-refuses">the trade nobody else
+refuses</h2>
+<p>Here’s the bind that every other format walks into.</p>
+<p>You can write your thinking in Markdown — and you should, it’s lovely
+to read. But Markdown is a <em>blogging</em> language. It has headings
+and bold text and bullet points, and that’s about where it stops. A
+machine looking at Markdown sees decoration. It cannot tell that one
+line is a task and another a finished task; it cannot find the deadline;
+it can’t check whether the plan still holds together. There are no
+states, no dates, no dependencies — “just headings and vibes,” as one of
+our own docs puts it. You cannot write a test for a Markdown file,
+because there’s nothing in it a machine can be wrong about.</p>
+<p>So people reach for the other kind of format — the structured kind,
+the configuration files full of tidy keys and values. Those parse
+perfectly. But try to write a paragraph of reasoning in one. Try to
+explain <em>why</em> inside a settings file. You can’t. There’s no room
+for a human thought in there.</p>
+<p>That’s the trade the whole industry has quietly accepted: prose
+<strong>or</strong> structure, pick one. Write something a person enjoys
+reading, or something a machine can act on — but not both, not in the
+same place. So intent and execution get torn apart and filed in
+different drawers, and drift apart forever after.</p>
+<p>A workbook refuses that trade. Everything in it — the prose, the
+tasks, the dates, the runnable code — is written in <em>one</em> format
+that’s readable by people, writable by agents, and testable by machines,
+all at once. That format has a name: <strong>org</strong>.</p>
+<h2 id="one-grammar-borrowed-not-invented">one grammar, borrowed not
+invented</h2>
+<p>The first thing to know about org is that we didn’t make it up.</p>
+<p>It comes from a twenty-year-old convention called org-mode, which
+began as a humble way to keep notes, to-do lists, and schedules in plain
+text. It sits in a long, stubborn tradition — the idea that code should
+live <em>inside</em> the explanation of why it exists, rather than the
+explanation being stapled on later. And over two decades, almost by
+accident, it grew exactly the feature set today’s AI systems are
+scrambling to reinvent, usually badly: task states, timestamps,
+dependencies, and a way to keep real, runnable source code right inside
+the document.</p>
+<p>The way to think about org’s role is by analogy to something you
+already trust. The web settled, long ago, on one format for what a page
+<em>looks like</em> — HTML. Nobody owns it; it’s just the shared
+agreement, and because everything speaks it, everything works together.
+Org plays that same role for what things <em>mean</em>. The face of the
+web is HTML; the meaning of a workbook is org.</p>
+<p>And there’s a happy accident baked in. Because org-mode has been
+around for twenty years, two decades of writing about it sit inside the
+training data of every modern AI model. The agents don’t have to be
+taught this format — they arrived already knowing it. Hand an agent a
+workbook and you’re handing it something it reads fluently on sight, not
+a proprietary dialect it has to puzzle out.</p>
+<h2 id="what-one-file-can-hold">what one file can hold</h2>
+<p>It helps to see what gets to coexist on a single page when the
+grammar is this expressive. Picture a short description of how a piece
+of software is deployed. In one small org file you can have all of this
+at once:</p>
+<p>A real heading structure — a hierarchy a machine can navigate, not
+just visual sizing. A line that sets where the engine runs. A line
+declaring which database it uses. A task that says <em>rotate the
+signing key</em>, marked as not-yet-done, with an actual scheduled date
+attached. And then, right underneath, a plain-English paragraph of
+reasoning — “single-tenant for now; revisit when the team joins.”</p>
+<p>Configuration, a scheduled task, and a human thought — all on one
+page, and <em>every line of it parseable</em>. The machine sees the
+deploy target as a deploy target, the task as a task, the date as a
+date. You see a document you can read like a memo. Neither of you had to
+translate for the other. The four things that usually live in four
+separate files — the structure, the plan, the schedule, the explanation
+— collapse into one tree, and once they’re in one place, they can’t
+drift out of sync, because there’s only one of them.</p>
+<h2 id="the-same-grammar-everywhere-you-look">the same grammar,
+everywhere you look</h2>
+<p>The quiet superpower isn’t any single feature. It’s that the
+<em>same</em> grammar shows up in every corner of the system, so every
+piece can read every other piece — and so can you.</p>
+<p>The intent, tasks, and memory inside a workbook are written in org. A
+toolkit’s manual — the human-readable page describing what a tool does —
+<em>is</em> its interface; the manual is the API. A deployment is one
+declarative org file describing the whole setup. A workflow — a plan
+with tasks, dependencies, and states — is written in org, and renders
+straight onto boards and timelines for agents to execute. Even an
+agent’s own identity — who it is, what it’s for — is written in the same
+grammar it works in.</p>
+<p>Learn to read org once, and you can read all of it. There’s no
+separate “config language” for deployments, no different “plan format”
+for workflows, no special dialect for agents. One set of conventions,
+reused everywhere — which is why a person who’s never seen your project
+can open any part of it and understand what they’re looking at. The
+system is legible to its own author, and that turns out to be rare and
+precious.</p>
+<h2 id="the-honest-edges">the honest edges</h2>
+<p>Two things to be straight about, because pretending otherwise would
+do you no favors.</p>
+<p>First, plain text drifts. An agent writing freely into an org file
+will, eventually, write too much, or write the same thing twice, or
+contradict something it said earlier. Org doesn’t <em>prevent</em> that
+— no format does. What it does is make the drift
+<strong>catchable</strong>. Because the layer is genuinely parseable, a
+checker — or another agent — can walk the tree, read the states and
+dates and structure, and <em>notice</em> the contradiction. Markdown
+can’t even do that; it has no idea anything’s wrong, because it never
+understood the content in the first place. Org’s gift isn’t perfection.
+It’s visibility.</p>
+<p>Second, org is not a database. It’s wonderful for prose, plans,
+configs, and memory — the things that <em>describe</em> a piece of
+software. But heavy structured data — the rows and rows you want to
+query and join at scale — does not belong in headlines; that lives in
+the workbook’s own database. Use each layer for what it’s for: org for
+what things <em>mean</em>, the database for the data itself.</p>
+<p>And a reassurance, since the word “format” can make people brace for
+homework: you are not about to spend your days hand-writing org. You’ll
+write prose and intentions; the tooling and the agents keep the
+structure tidy, the same way you don’t hand-edit the inner machinery of
+a version-control system. Your real job is mostly to <em>read</em> it —
+which takes about four minutes to learn, because it was designed to be
+read.</p>
+<p>So that’s the foundation underneath everything else here. One
+plain-text grammar, twenty years old and owned by no one, that holds
+prose and structure in the same breath — readable by you, writable by
+agents, testable by machines. Everything that follows is just
+discovering what such a humble, legible little language lets you
+build.</p>

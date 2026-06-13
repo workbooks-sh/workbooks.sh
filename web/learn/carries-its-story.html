@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,131 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="carries-its-story">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">The file that remembers how it was made</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li cur" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 1 · Foundations</div><h1>The file that remembers how it was made</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>How one file can carry its own source, its own identity, and a complete record of every change — so it explains itself and proves where it came from.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/specs"><b>specs</b><span>the deep doc</span></a><a class="dl" href="/learn/git"><b>git</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 2 of 20</div><button class="cont" id="cc" data-next="the-one-language"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/the-one-file">← Previous</a><a href="/learn/the-one-language">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li cur" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 1 · Foundations</div><h1>The file that remembers how it was made</h1><article><p>Take a file you made — say a brand book called <code>nike.html</code>
+— and rename it. Call it <code>final-v2 (3).html</code>. Rename it again
+to plain <code>untitled</code>, no extension at all. Now ask yourself
+what broke.</p>
+<p>Nothing broke. The app still recognizes it. It still opens, still
+works, still knows what it is.</p>
+<p>That ought to feel a little impossible, because almost everything
+else on your computer fails this test. A Word file is a Word file
+because it ends in <code>.docx</code>. A PDF announces itself in its
+very first bytes. Strip the name or scramble those bytes and the thing
+gets confused about its own nature — your computer no longer knows what
+it’s holding. The name <em>is</em> the identity, which means the
+identity is fragile, sitting right out on the surface where a careless
+rename can knock it loose.</p>
+<p>A workbook can’t play that game. Its entire promise is that it’s
+<em>just</em> an HTML file — it opens in any browser, survives email and
+chat and a thumb drive, lives anywhere a web page can live. So its
+identity couldn’t live in the name, which travels badly, and it couldn’t
+live in a special magic header, which would mean it had stopped being
+plain HTML. Identity had to go somewhere a rename can’t reach. It had to
+go <em>inside the file</em>.</p>
+<h2 id="a-small-block-that-says-what-the-file-is">a small block that
+says what the file is</h2>
+<p>Tucked into every workbook is a tiny labeled block — think of it as a
+name tag the file wears on the inside. It carries a short,
+machine-readable description of the file: what it’s called, what kind of
+thing it is, what shape it has. The rest of the document is the part you
+see and touch; this block is the part that quietly announces, to
+anything that opens the file, <em>here is what I am</em>.</p>
+<p>The clever bit is where it lives. HTML has exactly one place where
+you can stash a whole structured record that the page carries but the
+browser never runs — a script tag marked with a type the browser won’t
+execute. So the description rides along as cargo. It’s <em>in</em> the
+file, it travels with every copy, but it costs nothing: the browser
+ships those bytes and leaves them untouched. A short label out front
+says “this is the file’s self-description,” and anything reading the
+file knows exactly where to look.</p>
+<p>So the real test of “is this a workbook?” isn’t “what’s it named?”
+It’s “does it carry the marker?” Rename the file to anything you like
+and the answer doesn’t change, because the answer was never on the
+outside. This is why a folder of files can become a browsable library: a
+tool walks the folder and asks each file that one question, and the ones
+that answer yes are the workbooks. Not a guess, not a hand-kept list —
+just <em>does this file describe itself?</em></p>
+<p>The filename does keep one humble job. When you’re scanning a
+thousand files, it would be wasteful to crack open every image looking
+for a marker, so the scan glances at the extension first to narrow the
+pile. But that’s economy, not identity. The extension narrows the
+haystack; the marker is still the needle.</p>
+<h2 id="the-file-also-carries-how-it-was-made">the file also carries how
+it was made</h2>
+<p>Knowing what a file <em>is</em> turns out to be only half the story.
+There’s a quieter, more remarkable thing a workbook can carry: how it
+was <em>made</em>.</p>
+<p>Alongside the little self-description, a workbook can hold its own
+source — the readable, human-written form the finished page was built
+from — folded into a second inert block the browser ignores. So when you
+hand someone a workbook, you’re not just sending them the polished
+result. You’re sending the recipe baked into the same loaf. They can
+unpack it, read how it was put together, and re-author it as their own.
+The source travels with the artifact. Nothing about the format ever
+stopped being text, even when it’s wrapped up to look like one finished
+thing.</p>
+<p>This matters more than it first sounds, because a single-file
+artifact can <em>feel</em> like a sealed box — a binary you can’t see
+into or take apart. The opposite is true here. The thing you hold is
+both the finished object and the open record of how it came to be. You
+never have to trust a black box, because there is no black box: the
+making is right there inside it.</p>
+<h2 id="a-project-that-remembers-every-change">a project that remembers
+every change</h2>
+<p>Now widen the lens from one file to the project behind it, because
+the same instinct runs all the way down.</p>
+<p>Most projects scatter their history. Your code keeps its history in
+one place, your content somewhere else, and the record of <em>what got
+deployed and when</em> in some dashboard’s activity log — a list you can
+read but can’t take with you. Several kinds of history in several homes,
+none of them the same shape, none of them truly yours.</p>
+<p>A workbook project refuses that scattering by treating its own
+history the way the file treats its identity: as something it keeps
+inside, in a form anyone can carry off. Underneath, the project’s
+working space <em>is a version-controlled repository</em> — the same
+kind of change-tracking system software teams have relied on for
+decades, the kind that remembers every revision, can show you exactly
+what changed between any two moments, and can roll back to any of them.
+History, comparison, and undo come along for free, because remembering
+is just part of what the project is.</p>
+<p>The load-bearing fact is this: <strong>every time you publish, it’s
+recorded as a change.</strong> Not in a separate audit log you have to
+go find — in the project’s own history, with a real timestamp, a real
+description, and a real author. So “what did that last publish actually
+change?” stops being a question you ask a vendor’s dashboard and hope it
+answers honestly. It’s a question the project answers itself, the same
+way it would answer for any change ever made to it.</p>
+<h2 id="who-made-the-change-and-proof-it-was-them">who made the change,
+and proof it was them</h2>
+<p>A recorded change needs an author, and here the author isn’t a name
+somebody typed into a settings field and might have gotten wrong. It’s
+<em>who you actually are</em>. The identity you signed in as flows
+straight through into the authorship of every change, so the history
+doesn’t just say <em>what</em> happened — it says <em>who</em>, drawn
+from the one identity the whole system already knows you by.</p>
+<p>And underneath that readable name sits something sturdier: a real
+cryptographic identity, unique to you, that survives even if the machine
+it lives on is wiped and rebuilt. So your authorship is portable. It
+isn’t a label that’s only meaningful inside one company’s walls — it’s a
+genuine, verifiable mark that travels with the history wherever it
+goes.</p>
+<p>Put those pieces together and you get a file that does something
+genuinely unusual: it explains itself and it proves where it came from.
+The self-description says what it is. The embedded source says how it
+was made. The history says what changed, when, and by whom — each change
+attributed to a real, checkable identity. None of it depends on a server
+still being online, a company still being in business, or a dashboard
+you can read but never own. It’s all <em>inside</em>, traveling as one
+thing.</p>
+<p>That’s why the rename test matters so much, and why it’s the right
+place to start. A file that keeps its identity, its making, and its
+whole story inside itself is a file you can hand to anyone — and they
+receive not just the thing, but the truth about the thing. Everything
+else this Learning Center explores about workbooks leans on that quiet,
+durable honesty: the file carries its own story, and the story can’t be
+taken away from it.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/specs"><b>specs</b><span>the deep doc</span></a><a class="dl" href="/learn/git"><b>git</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 2 of 21</div><button class="cont" id="cc" data-next="the-one-language"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/the-one-file">← Previous</a><a href="/learn/the-one-language">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +312,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

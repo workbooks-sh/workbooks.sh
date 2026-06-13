@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,140 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="under-the-hood">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Why none of this is magic</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li cur" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 8 · Under the hood</div><h1>Why none of this is magic</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>A tour, no code required, of how the pieces actually fit — the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/the-kernel"><b>the kernel</b><span>the deep doc</span></a><a class="dl" href="/learn/the-seam"><b>the seam</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 20 of 20</div><button class="cont" id="cc" data-next=""><span>Complete & finish</span> →</button><div class="nav"><a href="/learn/secrets-in-the-open">← Previous</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li cur" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 9 · Under the hood</div><h1>Why none of this is magic</h1><article><p>You’ve spent this whole Learning Center watching a workbook do
+surprisingly grown-up things. It renders itself into a page. It reads a
+to-do list and turns it into a plan that actually runs. It refuses
+dangerous changes. It lets an agent live safely inside it. By now a
+reasonable person starts to suspect a trick — that somewhere behind the
+curtain there’s a sprawl of machinery, a different program for every
+job, all of it held together with tape and good intentions.</p>
+<p>There isn’t. The truth is stranger and calmer than the trick would
+have been.</p>
+<p>Almost everything you’ve seen rests on one small program. Not a
+framework, not a platform, not a fleet of services — a single piece of
+code small enough to read in an afternoon. It does one humble thing: it
+takes some text and gives back some text. Everything else in this system
+is that one idea, wearing different clothes.</p>
+<h2 id="the-part-that-does-the-reading">the part that does the
+reading</h2>
+<p>Let’s name the suspicion plainly, because it’s the right one to have.
+The whole system stands on a single way of writing things down — the
+plain-text format you met earlier, with its headlines and tags and
+little dependency markers. A format is only as good as the thing that
+<em>reads</em> it. And here’s where most systems quietly rot.</p>
+<p>Picture how it usually goes. You invent a format. You write a program
+on a server to read it. Then the web page needs to show the format
+without asking the server every time, so someone writes a
+<em>second</em> reader, for the browser. Then a command-line tool needs
+to check files without dragging the whole server along, so a
+<em>third</em> reader appears. Three readers, three slightly different
+ideas of what your own format means.</p>
+<p>Nobody decided to do this. It happens by gravity. And the day the
+three readers disagree — the server shows one thing, the page shows
+another, the tool accepts a file the server would reject — your format
+no longer has a meaning. It has a majority vote, and every bug becomes
+an argument about which reader was right.</p>
+<p>So the only question worth asking of a system like this is blunt:
+<em>what actually reads my file, and is it the same thing
+everywhere?</em></p>
+<p>The answer here is a single program. There is no second copy. One
+reader, for the whole ecosystem, and it is genuinely the same reader in
+the browser, in the command-line tool, and on the server. When it reads
+a tag one way, every surface reads that tag the same way, because there
+is only one of it.</p>
+<h2 id="one-program-with-no-hands">one program with no hands</h2>
+<p>Now the detail that makes the single reader possible, and it’s almost
+philosophical.</p>
+<p>This little program has no hands. It can’t open a file. It can’t
+reach out to the network. It can’t even ask what time it is. All it
+knows how to do is receive a piece of text and hand back a piece of
+text. That’s the entire deal. Text in, text out, nothing else.</p>
+<p>That sounds like a limitation. It’s actually the whole secret.</p>
+<p>A program that touches nothing has no opinion about <em>where it
+runs</em>. It doesn’t need a particular operating system, or special
+permissions, or a server humming somewhere — it just needs someone to
+hand it a string and somewhere to put the answer. And because it asks
+for nothing from the world, the very same program can be dropped into
+wildly different places that otherwise share nothing at all. The exact
+same code that reads your file inside a web page is the exact same code
+that reads it inside the command-line tool, which is the exact same code
+running on the server.</p>
+<p>This inverts how we usually think about software running
+“everywhere.” Normally, running in many places means <em>more</em> code
+— a version for each. Here it’s the opposite. The program runs
+everywhere precisely <em>because</em> it does so little. It was never
+ported to three places; it is unchanged across them. There is no
+“browser version” and “server version” with their inevitable drift.
+There is one version, aimed at three doors.</p>
+<p>When you used the live editor a couple of lessons back — typing text
+and watching it become a page in your browser, with no server in the
+loop — you weren’t using a clever browser imitation of the real thing.
+You were using the real thing: the identical code the server uses,
+brought to your tab.</p>
+<h2 id="the-same-idea-different-clothes">the same idea, different
+clothes</h2>
+<p>Here’s where the wonder is, if you’re the curious type this unit is
+for.</p>
+<p>The little reader answers a small handful of questions about your
+text, and at first they look like completely different jobs. <em>What
+does this look like as a page?</em> That’s the renderer you’ve been
+watching all along. <em>What’s actually in this document — which tasks,
+which tags, which deadlines?</em> That’s a different question. <em>Does
+this to-do list, with all its dependencies, turn into a sound plan I can
+run?</em> Different again. <em>Is replacing this running thing with that
+new version safe, or will it break something downstream?</em> That’s the
+safety gate from the upgrades lesson.</p>
+<p>Four jobs. They feel unrelated — drawing a page, listing tasks,
+building a plan, guarding a change. You’d expect four different
+tools.</p>
+<p>But they’re all the same move. Every one of them is: read the text,
+understand its structure, answer one question about it. The renderer and
+the planner and the safety gate aren’t separate machines that happen to
+live together. They’re one machine, asked different questions. A to-do
+list and a build plan, it turns out, are the <em>same shape</em> — tasks
+with dependencies — so the program that understands one already
+understands the other. It refuses to make you learn the idea twice.</p>
+<p>This is the sentence the whole unit is built around: everything in
+the system is really the same idea wearing different clothes. The page,
+the plan, the check — one small program reading one kind of text, viewed
+from different angles. Once you see it that way, the system stops
+looking like a pile of features and starts looking like a single clear
+thought, repeated.</p>
+<h2 id="why-its-built-to-do-so-little">why it’s built to do so
+little</h2>
+<p>You might reasonably ask: why hobble the program this way? Why a
+reader with no hands, when hands are useful?</p>
+<p>Because the hands are exactly where danger lives. A program that can
+open files, reach the network, and run other programs is a program that
+can do harm — by accident or otherwise. By building the central reader
+so it can do <em>none</em> of those things, the system makes a strong
+promise almost for free. When this program reads your file, it cannot
+quietly touch your disk, because it has no way to touch a disk. It
+cannot phone home, because it has no way to phone anywhere. The worst a
+bad file can do is produce a bad answer — it can’t reach out and break
+anything around it.</p>
+<p>That’s not an aesthetic preference. It’s the foundation under several
+promises you’ve already met. The reason an agent can live safely inside
+a workbook, the reason a page can render without a server, the reason
+the same code is trustworthy in your browser and on a stranger’s machine
+— all of it traces back to a reader deliberately built to be powerless,
+and therefore safe to put anywhere.</p>
+<p>The honest footnote: for the grunt work of actually breaking text
+into its pieces, this program leans on a well-regarded existing library.
+What it adds on top is the <em>judgment</em> — how a to-do list becomes
+a plan, which changes are safe, what the page should look like. It’s the
+opinion, not the dictionary. And being scrupulous about that line is
+exactly what keeps the single reader single.</p>
+<hr />
+<p>So that’s the machinery, and there’s less of it than you’d think.
+Underneath the rendering and the planning and the safe upgrades, there’s
+one small program that reads text and writes text and reaches for
+nothing. It runs in your browser, in the tool on your laptop, and on the
+server — not three copies kept in nervous agreement, but one program
+standing in three doorways. None of it is magic. It’s just a single good
+idea, refusing to become many.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/the-kernel"><b>the kernel</b><span>the deep doc</span></a><a class="dl" href="/learn/the-seam"><b>the seam</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 21 of 21</div><button class="cont" id="cc" data-next=""><span>Complete & finish</span> →</button><div class="nav"><a href="/learn/the-browser">← Previous</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +321,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

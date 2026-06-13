@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,135 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="going-live">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Putting it on the internet</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li cur" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 3 · The engine</div><h1>Putting it on the internet</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>What &#x27;deploying&#x27; actually means, why it&#x27;s usually terrifying, and how here it&#x27;s one push — plus how the live thing keeps a public history anyone can read.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/deployments"><b>deployments</b><span>the deep doc</span></a><a class="dl" href="/learn/deploy-kit"><b>deploy kit</b><span>the deep doc</span></a><a class="dl" href="/learn/planes"><b>planes</b><span>the deep doc</span></a><a class="dl" href="/learn/recipes"><b>recipes</b><span>the deep doc</span></a><a class="dl" href="/learn/distribution"><b>distribution</b><span>the deep doc</span></a><a class="dl" href="/learn/hot-swap"><b>hot swap</b><span>the deep doc</span></a><a class="dl" href="/learn/gitops"><b>gitops</b><span>the deep doc</span></a><a class="dl" href="/learn/changelogs"><b>changelogs</b><span>the deep doc</span></a><a class="dl" href="/learn/telemetry"><b>telemetry</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 9 of 20</div><button class="cont" id="cc" data-next="what-an-agent-is"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/safe-powers">← Previous</a><a href="/learn/what-an-agent-is">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li cur" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 3 · The engine</div><h1>Putting it on the internet</h1><article><p>There is a word in software that makes grown engineers go quiet, and
+the word is <em>deploy</em>. It’s the moment the thing you built on your
+own machine — where it behaved, where you understood it — has to go and
+live somewhere else, somewhere strangers can reach it. People schedule
+deploys for Friday afternoons and then regret it. People write runbooks
+for them. People have, more than once, taken the whole company offline
+by changing one line in a file nobody fully understood. So when you hear
+a promise like <em>flip one setting and your prototype is the
+product</em>, your skepticism is healthy. You’ve earned it. Let’s see
+whether it’s a brochure line or a true thing.</p>
+<h2 id="why-going-live-is-usually-terrifying">why going live is usually
+terrifying</h2>
+<p>The fear isn’t really about the new place. It’s about how many
+separate things have to agree, all at once, for the move to work.</p>
+<p>Think about what a normal deploy actually drags along. There’s
+<em>where</em> it runs — a cloud, a region, a machine. There’s <em>who’s
+allowed in</em> — accounts, passwords, tokens. There’s <em>where the
+data sleeps</em> — a database, a bucket of files somewhere. In the usual
+world, each of those is a different product, owned by a different
+vendor, configured in a different file, and glued together with hope.
+You don’t ship software so much as you assemble a small committee of
+services and pray they all show up.</p>
+<p>And the file that’s supposed to describe all this? You’ve met it
+before. It started as ten honest lines — a name, a port, a region. Then
+someone needed “just one hook,” and a year later it had grown teeth: a
+hidden program, a templating language nobody chose, a place where a
+stray string could quietly become a command. The label said
+<em>configuration</em>. The contents were software you couldn’t read.
+That’s the real terror of going live — not the act, but the not-knowing.
+You can’t hold the whole thing in your head, so you can’t be sure what
+it will do.</p>
+<p>The fix isn’t a braver deploy. It’s a description small enough to
+trust.</p>
+<h2 id="the-whole-move-in-one-property">the whole move, in one
+property</h2>
+<p>Here is the idea this lesson is built on, and it is almost rude in
+its simplicity.</p>
+<p>A deployment is just a short list of five decisions — and <em>where
+it runs is only one of them</em>. Where the engine lives, whether it’s
+serving one person or many, where files go, where the database lives,
+and how identity is checked. Five lines. You write down the end state
+you want, and the tooling makes reality match it. Not a sequence of
+steps you have to perform in the right order — a description it
+<em>converges</em> to. You can run it once or a hundred times and the
+result is the same.</p>
+<p>The quietly radical part is that this little description never
+<em>runs</em>. It isn’t a program wearing a config costume. It’s read by
+a plain scan that looks for those five settings and ignores everything
+else — there’s no place for a command to hide in it, because the reader
+has no way to execute anything. “Local” and “cloud” aren’t different
+kinds of thing. They are two values of one setting. Your laptop and the
+public internet sit on the same axis, one notch apart.</p>
+<p>Which means moving to production is, genuinely, editing one word.
+<em>Where does this run?</em> You change the answer from your desk to
+the cloud. The face it shows, the work it does, the very image it runs
+from — all of that is identical on both sides. The only thing that
+changed is the place.</p>
+<h2 id="the-part-that-refuses-to-let-you-lie">the part that refuses to
+let you lie</h2>
+<p>Now, “edit one word and you’re live” would be a brochure line if it
+let you make a mess. It doesn’t, and the reason is the most reassuring
+thing in this whole story: there’s a step whose entire job is to refuse
+configurations that would quietly betray you.</p>
+<p>It runs without touching anything — read-only, no machine started, no
+risk. And its complaints aren’t fussy style notes. Each one is a
+hard-won lesson it’s saving you from learning at two in the morning.</p>
+<p>Say you decide to serve many people instead of one, but you leave the
+database set to the simple single-user kind. It stops you, and tells you
+why: many people funneled through one writer doesn’t <em>fail</em> — it
+<em>works</em>, slowly, until the day it suddenly can’t, and it would
+rather you learn that now. Say you ask for many tenants but leave
+identity turned off. It stops you again: with no notion of <em>who</em>
+someone is, there is nothing to keep one person’s data separate from
+another’s. That isn’t a configuration, it’s a contradiction. Say you
+point your storage at the cloud but forget the credentials. It stops you
+a third time — and insists those credentials live in your environment,
+by name, never written into the description itself. Secrets in the file
+is the original sin, and this thing won’t be your accomplice.</p>
+<p>So when you do make the jump to the cloud, you don’t add settings
+because a tutorial told you to. You add them because the check
+<em>forced</em> you to — each new line is it refusing to let you ship
+something half-built. By the time it says yes, you have a configuration
+that can’t be lying to you. That’s the difference between a deploy you
+fear and one you can trust: not bravery, but a description that has
+already been argued with.</p>
+<h2 id="local-was-never-a-pretend-version">local was never a pretend
+version</h2>
+<p>One last fear worth naming, because it’s the one that keeps people
+from believing the rest: the suspicion that the thing on your laptop is
+a toy, a simulator, a polite fiction that will behave completely
+differently once it’s real.</p>
+<p>It isn’t. The engine on your desk is the very same packaged engine
+that runs in the cloud — the same bundle of bytes, started the same way.
+What differs is only the <em>place</em> it runs and the few settings you
+deliberately chose. The image is the constant. The place is one
+property. So “it worked on my machine” stops being a punchline and
+becomes a fact you can lean on, because your machine was running the
+real thing the whole time.</p>
+<p>And there’s a tidy promise on the way back down, too. When you take a
+local deployment apart, your data is <em>kept</em>. The running machine
+goes away; what you made stays behind. Going live and coming back down
+are both reversible, both calm. The dread was always about losing things
+— the work, the data, the understanding. Take away the losing, and you
+take away the dread.</p>
+<h2 id="the-live-thing-tells-its-own-story">the live thing tells its own
+story</h2>
+<p>Here’s the part that turns a deployment from a destination into
+something alive.</p>
+<p>Once your workbook is on the internet, it doesn’t just serve its face
+to visitors — it can serve its <em>history</em>, openly, to anyone.
+There’s a small public feed that hands back the real record of how the
+thing came to be: the recent changes, newest first, each with the note
+that explains it. No login. No special access. Anyone who visits can
+read, in plain terms, how the software in front of them got to be the
+way it is.</p>
+<p>Sit with how unusual that is. Almost everything you use online is a
+black box — you see what it does today and have no way to know how it
+got here, or who changed what, or why. A live workbook flips that. Its
+past is a public, readable thing, because remembering its own story was
+part of what the file was from the very beginning. Going live doesn’t
+hide the history behind a company wall. It puts it on the front
+step.</p>
+<p>That’s the real shape of going live here. Not a terrifying leap from
+your world into someone else’s — a single setting flipped, on an engine
+that was always real, behind a check that won’t let you lie, ending in a
+thing that runs in the open and tells the truth about itself. The file
+became a service, and it stayed honest the whole way.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/deployments"><b>deployments</b><span>the deep doc</span></a><a class="dl" href="/learn/deploy-kit"><b>deploy kit</b><span>the deep doc</span></a><a class="dl" href="/learn/planes"><b>planes</b><span>the deep doc</span></a><a class="dl" href="/learn/recipes"><b>recipes</b><span>the deep doc</span></a><a class="dl" href="/learn/distribution"><b>distribution</b><span>the deep doc</span></a><a class="dl" href="/learn/hot-swap"><b>hot swap</b><span>the deep doc</span></a><a class="dl" href="/learn/gitops"><b>gitops</b><span>the deep doc</span></a><a class="dl" href="/learn/changelogs"><b>changelogs</b><span>the deep doc</span></a><a class="dl" href="/learn/telemetry"><b>telemetry</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 9 of 21</div><button class="cont" id="cc" data-next="what-an-agent-is"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/safe-powers">← Previous</a><a href="/learn/what-an-agent-is">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +316,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

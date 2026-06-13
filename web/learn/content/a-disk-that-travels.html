@@ -1,0 +1,124 @@
+<p>Every piece of software needs somewhere to keep its things. Notes,
+numbers, a save file, the orders that came in last week — all of it has
+to live somewhere on a disk. And here’s a question almost nobody stops
+to ask: whose disk?</p>
+<p>For most software, the answer is uncomfortable once you look at it.
+The stuff your app remembers sits on a computer in a data center
+somewhere, or scattered across cloud buckets you rent by the gigabyte,
+or — for an AI agent working on your behalf — possibly on your own
+machine, where it can reach your documents and your keychain and that
+stray file of passwords you forgot to delete. The work and the place the
+work lives have always belonged to a <em>machine</em>. Yours, or someone
+else’s.</p>
+<p>A workbook makes a stranger and better choice. It gives the project
+its own disk — a place to keep things that rides <em>inside</em> the
+file. When you send the workbook, the disk goes with it. When you delete
+the file, the disk stops existing. It belongs to the project, not to a
+machine.</p>
+<h2 id="a-disk-that-isnt-a-computer">a disk that isn’t a computer</h2>
+<p>The industry has offered two answers for where an agent keeps files,
+both bad in the same way. One: hand it your real disk, and pray a bad
+instruction never wanders somewhere it shouldn’t. Two: rent it a
+computer in the cloud, where it gets a scratch folder that evaporates
+the moment you stop paying the meter.</p>
+<p>Both answers assume a file system has to belong to a machine. But
+think about what a project actually asks of a disk. It wants to write a
+file, read it back, list what’s there, organize things into folders.
+Those are humble verbs, and none of them require a whole machine humming
+beneath them. They just require somewhere structured for bytes to
+live.</p>
+<p>So the workbook supplies exactly that and nothing more. Inside the
+file, beneath the screen you see and the logic that runs, there’s a
+third layer: a real file system, with real paths and real directories,
+sealed off from your computer by the way it’s built. Code inside the
+workbook can open <code>/data/orders.csv</code> and write
+<code>/reports/week-24.org</code>, and these are, to everything inside,
+genuinely files. The quotation marks only appear from your computer’s
+point of view: your operating system sees one <code>.html</code> file
+sitting in a folder. The workbook sees an entire disk.</p>
+<h2 id="a-disk-you-can-ask-questions">a disk you can ask questions</h2>
+<p>Here’s where it stops being a clever trick and starts being something
+you couldn’t do before.</p>
+<p>Underneath the paths, this disk is built out of <em>tables</em> — the
+same kind of tables a database uses. That sounds like an implementation
+detail, but it’s the whole feature, because it means the disk has two
+faces at once. Code and agents come at it through paths: open, read,
+write, list, exactly like any disk you’ve ever used. But questions can
+come at it a second way — through plain database queries.</p>
+<p>So the things that are miserable to ask of a normal disk become a
+single sentence here. <em>Which files changed since I last shipped?</em>
+<em>Where are all the megabytes actually hiding?</em> <em>Show me
+everything in the reports folder.</em> On your laptop, that last one
+might spin up a progress bar while the machine crawls through folders
+one at a time. Here it’s instant, because a listing was never really a
+crawl — it was always a question with an answer waiting, and now you can
+just ask it.</p>
+<p>This matters most when an AI agent is involved. You can hand a
+workbook’s disk a question and get back a clean answer — which files
+exist, how big they are, when they last changed — without anyone writing
+special code to track all that. The disk knows its own contents the way
+a spreadsheet knows its own rows.</p>
+<p>And nothing here is exotic underneath. The store holds three mundane
+things: the names of files, the bytes inside them, and the facts about
+them — sizes, times, kinds. A folder, on this disk, isn’t a convention
+everyone has to agree to honor. It’s a fact recorded in a table. The
+boundary of the project is the edge of the store. <em>What’s in this
+project?</em> stops being folklore you reconstruct from a README and
+becomes a question with a real answer.</p>
+<h2 id="it-travels-and-it-lets-go">it travels, and it lets go</h2>
+<p>Because the disk is just bytes bound into the file, two things follow
+that change how the work moves around.</p>
+<p>The first: when you send the workbook, you send the disk. Not a copy
+of part of it, not a fresh empty version — the disk exactly as it stood
+when you hit send, every file in place. The person who receives it opens
+the same paths and asks the same questions, with no setup, no account,
+no “let me zip up my folder first.” The thing you collaborate on and the
+thing you ship stopped being two different things.</p>
+<p>The second, and it’s the one that keeps the whole arrangement honest:
+the disk never traps your files. Unbundle a workbook and its disk
+unpacks into ordinary files in ordinary folders on your real computer —
+open them in anything, keep them anywhere, walk away from workbooks
+entirely if you want to. And the store itself is built on the most
+widely used database format on Earth, the kind countless everyday
+programs already read. The format holds your files; it does not hold
+them hostage — no invented formats, nothing you can’t get back out.</p>
+<p>So a single file can leave the disk just as easily as the disk
+travels with the file. Your accountant wants the numbers and
+emphatically does not want a login? You pull one file out and email her
+a plain spreadsheet. The disk travels with the workbook, and any one
+file travels right back out of the disk.</p>
+<h2 id="the-workspace-and-the-work-are-the-same-object">the workspace
+and the work are the same object</h2>
+<p>Now the consequence that makes all of this worth a lesson.</p>
+<p>When an AI agent works inside a workbook, its entire workspace — its
+notes, its half-finished drafts, the intermediate data it’s chewing on —
+lives on that workbook’s disk. Which means the place the agent does its
+messy work and the finished thing you ship are <em>the same object</em>.
+There is no export step where the context dies, no “it worked in my
+sandbox,” no summary standing in for the real state. The agent’s scratch
+notes sit in one folder right next to the finished report in another, in
+the same file. Whoever opens the workbook next — another person, another
+agent, you next Tuesday — starts from the real, complete state of the
+work, not a description of it.</p>
+<p>And it makes the agent <em>safe</em> in a way that isn’t a setting
+you have to trust. An agent that needs your computer’s file system is an
+agent you’ve handed your documents and your keychain to. An agent whose
+whole disk is the workbook’s own disk needs no such trust, because there
+is nothing else its writing can reach. Even a confused agent, even one
+nudged by a sneaky instruction buried in some web page it read, can do
+nothing worse than rearrange one project-sized disk. And since that disk
+is bytes in a file, and files have the best undo humanity ever shipped,
+even the worst Tuesday is a quick step backward.</p>
+<h2 id="where-the-disk-ends">where the disk ends</h2>
+<p>Honesty matters, so: this is a project-scale disk, not a media vault.
+It holds plenty for real work, but a workbook stays pleasant to email
+when it’s measured in megabytes, not the entire archive of a streaming
+service. When a project genuinely needs a mountain of raw footage or a
+warehouse of data, that tonnage belongs behind a bigger machine, with
+the workbook keeping the catalog and querying the warehouse. Put the
+index in the file; leave the freight outside.</p>
+<p>That’s the whole idea. The work needs somewhere to live — and for the
+first time, that somewhere belongs to the work itself. It travels when
+the work travels, answers questions like a spreadsheet, lets go of any
+file you want back, and can’t reach a single byte beyond its own edges.
+A place to keep things, riding inside the thing you can hold.</p>

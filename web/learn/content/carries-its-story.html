@@ -1,0 +1,123 @@
+<p>Take a file you made — say a brand book called <code>nike.html</code>
+— and rename it. Call it <code>final-v2 (3).html</code>. Rename it again
+to plain <code>untitled</code>, no extension at all. Now ask yourself
+what broke.</p>
+<p>Nothing broke. The app still recognizes it. It still opens, still
+works, still knows what it is.</p>
+<p>That ought to feel a little impossible, because almost everything
+else on your computer fails this test. A Word file is a Word file
+because it ends in <code>.docx</code>. A PDF announces itself in its
+very first bytes. Strip the name or scramble those bytes and the thing
+gets confused about its own nature — your computer no longer knows what
+it’s holding. The name <em>is</em> the identity, which means the
+identity is fragile, sitting right out on the surface where a careless
+rename can knock it loose.</p>
+<p>A workbook can’t play that game. Its entire promise is that it’s
+<em>just</em> an HTML file — it opens in any browser, survives email and
+chat and a thumb drive, lives anywhere a web page can live. So its
+identity couldn’t live in the name, which travels badly, and it couldn’t
+live in a special magic header, which would mean it had stopped being
+plain HTML. Identity had to go somewhere a rename can’t reach. It had to
+go <em>inside the file</em>.</p>
+<h2 id="a-small-block-that-says-what-the-file-is">a small block that
+says what the file is</h2>
+<p>Tucked into every workbook is a tiny labeled block — think of it as a
+name tag the file wears on the inside. It carries a short,
+machine-readable description of the file: what it’s called, what kind of
+thing it is, what shape it has. The rest of the document is the part you
+see and touch; this block is the part that quietly announces, to
+anything that opens the file, <em>here is what I am</em>.</p>
+<p>The clever bit is where it lives. HTML has exactly one place where
+you can stash a whole structured record that the page carries but the
+browser never runs — a script tag marked with a type the browser won’t
+execute. So the description rides along as cargo. It’s <em>in</em> the
+file, it travels with every copy, but it costs nothing: the browser
+ships those bytes and leaves them untouched. A short label out front
+says “this is the file’s self-description,” and anything reading the
+file knows exactly where to look.</p>
+<p>So the real test of “is this a workbook?” isn’t “what’s it named?”
+It’s “does it carry the marker?” Rename the file to anything you like
+and the answer doesn’t change, because the answer was never on the
+outside. This is why a folder of files can become a browsable library: a
+tool walks the folder and asks each file that one question, and the ones
+that answer yes are the workbooks. Not a guess, not a hand-kept list —
+just <em>does this file describe itself?</em></p>
+<p>The filename does keep one humble job. When you’re scanning a
+thousand files, it would be wasteful to crack open every image looking
+for a marker, so the scan glances at the extension first to narrow the
+pile. But that’s economy, not identity. The extension narrows the
+haystack; the marker is still the needle.</p>
+<h2 id="the-file-also-carries-how-it-was-made">the file also carries how
+it was made</h2>
+<p>Knowing what a file <em>is</em> turns out to be only half the story.
+There’s a quieter, more remarkable thing a workbook can carry: how it
+was <em>made</em>.</p>
+<p>Alongside the little self-description, a workbook can hold its own
+source — the readable, human-written form the finished page was built
+from — folded into a second inert block the browser ignores. So when you
+hand someone a workbook, you’re not just sending them the polished
+result. You’re sending the recipe baked into the same loaf. They can
+unpack it, read how it was put together, and re-author it as their own.
+The source travels with the artifact. Nothing about the format ever
+stopped being text, even when it’s wrapped up to look like one finished
+thing.</p>
+<p>This matters more than it first sounds, because a single-file
+artifact can <em>feel</em> like a sealed box — a binary you can’t see
+into or take apart. The opposite is true here. The thing you hold is
+both the finished object and the open record of how it came to be. You
+never have to trust a black box, because there is no black box: the
+making is right there inside it.</p>
+<h2 id="a-project-that-remembers-every-change">a project that remembers
+every change</h2>
+<p>Now widen the lens from one file to the project behind it, because
+the same instinct runs all the way down.</p>
+<p>Most projects scatter their history. Your code keeps its history in
+one place, your content somewhere else, and the record of <em>what got
+deployed and when</em> in some dashboard’s activity log — a list you can
+read but can’t take with you. Several kinds of history in several homes,
+none of them the same shape, none of them truly yours.</p>
+<p>A workbook project refuses that scattering by treating its own
+history the way the file treats its identity: as something it keeps
+inside, in a form anyone can carry off. Underneath, the project’s
+working space <em>is a version-controlled repository</em> — the same
+kind of change-tracking system software teams have relied on for
+decades, the kind that remembers every revision, can show you exactly
+what changed between any two moments, and can roll back to any of them.
+History, comparison, and undo come along for free, because remembering
+is just part of what the project is.</p>
+<p>The load-bearing fact is this: <strong>every time you publish, it’s
+recorded as a change.</strong> Not in a separate audit log you have to
+go find — in the project’s own history, with a real timestamp, a real
+description, and a real author. So “what did that last publish actually
+change?” stops being a question you ask a vendor’s dashboard and hope it
+answers honestly. It’s a question the project answers itself, the same
+way it would answer for any change ever made to it.</p>
+<h2 id="who-made-the-change-and-proof-it-was-them">who made the change,
+and proof it was them</h2>
+<p>A recorded change needs an author, and here the author isn’t a name
+somebody typed into a settings field and might have gotten wrong. It’s
+<em>who you actually are</em>. The identity you signed in as flows
+straight through into the authorship of every change, so the history
+doesn’t just say <em>what</em> happened — it says <em>who</em>, drawn
+from the one identity the whole system already knows you by.</p>
+<p>And underneath that readable name sits something sturdier: a real
+cryptographic identity, unique to you, that survives even if the machine
+it lives on is wiped and rebuilt. So your authorship is portable. It
+isn’t a label that’s only meaningful inside one company’s walls — it’s a
+genuine, verifiable mark that travels with the history wherever it
+goes.</p>
+<p>Put those pieces together and you get a file that does something
+genuinely unusual: it explains itself and it proves where it came from.
+The self-description says what it is. The embedded source says how it
+was made. The history says what changed, when, and by whom — each change
+attributed to a real, checkable identity. None of it depends on a server
+still being online, a company still being in business, or a dashboard
+you can read but never own. It’s all <em>inside</em>, traveling as one
+thing.</p>
+<p>That’s why the rename test matters so much, and why it’s the right
+place to start. A file that keeps its identity, its making, and its
+whole story inside itself is a file you can hand to anyone — and they
+receive not just the thing, but the truth about the thing. Everything
+else this Learning Center explores about workbooks leans on that quiet,
+durable honesty: the file carries its own story, and the story can’t be
+taken away from it.</p>

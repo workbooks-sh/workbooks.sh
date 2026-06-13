@@ -52,8 +52,8 @@ def bub_accent(text):
     return "".join(low)
 
 # set once the retrofuturism hype reel exists (Higgsfield); None = no splash video yet
-HYPE_VIDEO = "video/lms-hype.mp4"   # retrofuturism reel (test clip — full 1-min storyboard pending)
-HYPE_POSTER = "video/lms-hype.jpg"
+HYPE_VIDEO = None   # video removed from production — lessons-only learning center
+HYPE_POSTER = None
 PLAY_SVG = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
 
 def vplayer_html(src, poster=""):

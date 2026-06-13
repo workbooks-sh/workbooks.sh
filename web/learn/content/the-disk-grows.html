@@ -1,0 +1,131 @@
+<p>Here is the worry that should arrive the moment you fall in love with
+the single sealed file: what happens when the work gets bigger than the
+file can hold?</p>
+<p>It’s a fair worry. The whole point of a workbook is that everything
+lives inside one sealed object you can hold — and that sealing is the
+safety story: nothing the code or an agent does can reach the machine
+underneath, because every path bottoms out inside the file. But the data
+you actually care about often <em>doesn’t</em> live in the file. It
+lives in your task tracker, your billing system, some endpoint your team
+stood up last quarter. And the file is only so big — files are happiest
+at megabytes, not the size of a warehouse. So sooner or later the work
+reaches the edge.</p>
+<p>The temptation there is to tear the seal open. Don’t. The remarkable
+thing — the thing this lesson is about — is that a project can grow in
+every way that matters while the seal stays exactly as tight, and while
+<em>nothing about how you use it changes.</em> The file learns to reach
+further without learning to leak.</p>
+<h2 id="reaching-past-the-edge-for-live-data">reaching past the edge for
+live data</h2>
+<p>Say your data lives out on the network, and you want a question
+answered fresh from that outside source. Two obvious moves are both
+wrong. Hand an agent the password and an open connection? That
+demolishes the seal — a steerable agent with a credential and an open
+port is a leak waiting for the wrong instruction. Paste an export into
+the file by hand? Honest and safe, but stale the moment you save it.</p>
+<p>The real answer is smaller than either. The workbook already lets you
+ask it questions by name — <em>give me everything from orders, from
+notes.</em> Normally such a name points inside the file. The trick is to
+let certain names point <em>outside</em>. Register a name — say,
+<code>orders</code> — as belonging to an outside source, and from then
+on asking for <code>orders</code> quietly fetches it live, while every
+other name behaves exactly as before, reading from inside the file. When
+a question arrives, the system glances at the name. Registered? Hand it
+to the little helper that knows how to fetch it. Not registered? Fall
+straight through to the file’s own disk, as always. The question-asking
+part never learned what the network is — it learned to recognize a name,
+and a small helper learned the rest.</p>
+<p>Here’s the quiet elegance: turning some outside service into one of
+these reachable names takes no code. You drop in a short description —
+<em>this name; that web address; the password lives here</em> — and the
+name is now answerable, the data showing up as if it had always been
+part of the workbook.</p>
+<p>And the password never leaves safe hands. The helper that fetches
+your data doesn’t open the connection itself or read the password on its
+own. The <em>host</em> — the trusted engine underneath everything —
+makes the request, and the password reaches it through a single audited
+path. The description file only <em>names</em> the password, never
+contains it. The thing doing the asking — your code, an agent — is
+handed rows, never keys.</p>
+<h2 id="the-safest-face-pull-the-world-in-dont-reach-out">the safest
+face: pull the world in, don’t reach out</h2>
+<p>Live fetching is one way to read past the edge. For an agent, you
+usually want the other way, because it’s structurally airtight. Instead
+of letting the agent reach out, run a quiet background worker that
+reaches out <em>for</em> it on a gentle schedule. The worker pulls the
+outside data in, writes it onto the workbook’s own disk as ordinary
+content, and steps back. The agent never reaches anywhere — it just
+reads a file on its own disk, the same as everything else. The fresh
+data is simply <em>there</em>, looking like any other page in the
+workbook.</p>
+<p>Picture two zones with a single bridge. On one side, the agent,
+reading — and only ever reading — a file. On the other, the worker,
+holding the password, pulling from the real service. Exactly one path
+crosses, carrying data in one direction: from the outside world onto the
+disk. The agent could be fully hijacked by a hostile instruction and
+there would <em>still</em> be nothing on its side of the bridge but text
+someone else already fetched. The data is as fresh as the last pull, a
+few minutes old, say — a little staleness for an agent that physically
+cannot reach the network. For an agent, that’s almost always the right
+trade.</p>
+<h2 id="remembering-by-meaning-not-by-matching-letters">remembering by
+meaning, not by matching letters</h2>
+<p>Reaching outside is one kind of growth; here’s a subtler one. Once
+your workbook holds a lot of notes and files, you’ll want to
+<em>find</em> things in it. The plain way to search is to match letters
+— the exact words you typed. But meaning doesn’t live in letters. Ask
+for the note about <em>waiting longer between retries</em> and if it
+actually says <em>back off between attempts</em>, plain search returns
+nothing. The words didn’t match. The meaning was sitting right
+there.</p>
+<p>The usual fix is heavy: a separate search service, an outside model
+called for every query, your text leaving the box. For a workbook that
+rides inside one file, that’s absurd. So instead it grows a <em>second
+way to ask</em> — by meaning — light enough to live in the same file and
+cheap enough to leave switched on.</p>
+<p>It stays cheap because of one decision: the meaning of each piece of
+content is worked out <em>when you save it</em>, once — not every time
+you search. Saving is rare, searching constant, so the expensive
+thinking happens on the rare event, and a search becomes a fast lookup
+against meaning already figured out. You can keep the whole step inside
+the box, your text never leaving, and reach for a paid, higher-quality
+option only if you want it. And because the search reads the
+<em>real</em> files, not a summary that drifts out of date, there’s
+nothing extra to maintain. For an agent, “remembering” is just writing
+something down — it becomes findable by meaning automatically, because
+the memory and the files are the same thing.</p>
+<h2 id="the-warehouse-behind-the-file">the warehouse behind the
+file</h2>
+<p>The last kind of growth is the most literal: sometimes the work needs
+more room or more muscle than one file can give — real storage, a real
+database, off-machine durability. The usual punishment for outgrowing
+your first storage choice is brutal — a migration, a vendor’s tools
+threaded through every corner of your code, so that “move from a local
+disk to cloud storage” means editing the program itself. The workbook
+<em>refuses to choose</em> on your behalf. The code never names where
+the bytes live; that decision lives in a handful of settings outside the
+program.</p>
+<p>So the same workbook a weekend project runs on a single local disk is
+the one a company runs on cloud storage and a managed database — the
+difference a few lines of configuration, not a line of code. Flip one
+setting and large files start landing in a cloud bucket; flip another
+and the small structured records move to a real database. The program
+doesn’t notice. It hands its data to the same slots it always used, and
+what’s behind those slots changed underneath it.</p>
+<p>What makes this safe rather than terrifying is <em>where the walls
+live.</em> The fence keeping one tenant’s data away from another’s sits
+<em>above</em> the storage, in how every request is stamped with whose
+data it is — there’s no path where the storage itself decides who sees
+what. So swapping a local disk for a shared cloud bucket can’t quietly
+widen who can read what. The backends are interchangeable precisely
+because they were never trusted with the secrets. And there’s a small
+gift in the climb: when you move the structured records to a real
+database, the meaning-search you just met gets faster on its own,
+graduating from scanning everything to an indexed lookup. Same search,
+same code, free upgrade.</p>
+<p>So the worry we started with is answered three times over. The work
+outgrows the file by reaching outside it, by remembering more deeply
+inside it, and by leaning on bigger machines behind it — and in all
+three, the seal holds, the credentials stay with the host, and the way
+you use the thing never changes. The file didn’t get bigger. It got
+further reach, and kept its word.</p>

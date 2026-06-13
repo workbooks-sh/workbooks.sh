@@ -1,0 +1,130 @@
+<p>Every project you’ve ever worked on kept a plan. And almost none of
+them kept it where the work actually happened.</p>
+<p>Think about your own week. The to-do list is in one app. The calendar
+is in another. The project board — the columns, the cards, the little
+colored labels — lives in a third. The work itself is somewhere else
+entirely: in files, in documents, in a website that’s slowly taking
+shape. Four places, four pictures of the same project, and none of them
+agrees with the others for more than an afternoon. So someone’s job
+quietly becomes <em>updating the board</em>. Dragging cards. Checking
+boxes. Copying what’s true into a tool that only ever drifts away from
+the truth again.</p>
+<p>That isn’t laziness, and it isn’t a tooling problem you can fix by
+buying a better tracker. It’s deeper than that. The plan and the work
+are two separate things, kept in two separate places, and nothing
+actually connects them. Every status meeting where someone reads the
+board aloud and someone else corrects it from memory is the price you
+pay for that gap.</p>
+<p>A workbook closes the gap with one stubborn idea: the plan isn’t a
+<em>note about</em> the work. The plan <strong>is</strong> the work.</p>
+<h2 id="one-file-the-person-reads-and-the-machine-runs">one file the
+person reads and the machine runs</h2>
+<p>Here’s the move. Instead of keeping the plan in a database somewhere
+and the real work somewhere else, you write the plan as plain text —
+readable sentences, in the same file as everything else — and that text
+is the only copy that exists.</p>
+<p>It’s an ordinary outline. A heading for each task. A little word in
+front of each one that says where it stands: <code>TODO</code> for
+not-yet, <code>DONE</code> for finished. Underneath a task you can write
+<em>why</em> — in full sentences, right where the decision lives,
+instead of buried in a comment thread three tools away. “Waiting on the
+brand pass — see the thread with Maria.” That note isn’t a sticky on top
+of the plan. It’s <em>in</em> the plan, traveling with it forever.</p>
+<p>The reason this works is that the file is written to be read by two
+readers at once. A person reads it and sees a to-do list. A machine
+reads the exact same lines and sees instructions it can carry out.
+Nobody translates between the two. Nothing renders <em>to</em> this file
+and nothing exports <em>from</em> it — it is the single source, and
+everything else is either a view of it or a worker acting on it. Change
+the file and every view updates. Finish a task and the file is what says
+so. There is no second copy to keep honest, because there is no second
+copy at all.</p>
+<p>And because it’s just text, the plan inherits everything text already
+has. It can be reviewed like code. It has a perfect history — six months
+from now, “why did we drop that feature?” is answered by looking back
+through the file’s own past, not by an archaeology dig through old chat
+logs.</p>
+<h2 id="the-only-rule-that-runs-the-whole-thing">the only rule that runs
+the whole thing</h2>
+<p>You might expect that turning a plan into something a machine can run
+takes a thicket of settings — priorities, schedulers, assignment rules.
+It takes almost nothing. The entire engine rests on one small word:
+<strong>ready</strong>.</p>
+<p>A task is <em>ready</em> when two things are true. It’s still
+unfinished, and everything it depends on is already done. That’s the
+whole definition. No scheduling configuration, no clever algorithm
+deciding who does what. Readiness is just a fact you can work out by
+reading the file.</p>
+<p>So you tell the plan which tasks depend on which — “you can’t build
+the page until the artwork is rendered” — and from those few hints the
+order of work simply <em>falls out</em>. You never draw the sequence
+yourself. You never maintain it. The plan works out, every single time,
+from the current state of the file: this is done, so that one is now
+ready; that’s still waiting, so the thing after it waits too.</p>
+<p>Then the work is a loop so simple it barely earns the name. Find the
+tasks that are ready. Do them. Write <code>DONE</code> back into the
+file. Look again. Anything that was waiting on those tasks is now ready,
+so do those next. Repeat until nothing’s left. The plan clears itself,
+one wave at a time, and nobody ever wrote down the order — the order was
+hiding in the dependencies all along.</p>
+<p>Two quiet payoffs come with this. First, work that never blocked
+anything gets noticed: a task with nothing depending on it can be done
+whenever someone has a free hour, and the dependency view points it out
+for you. Second, when the work stalls, the reason is never a mystery. If
+nothing is ready but tasks remain, something is <em>stuck</em> — and
+stuck always has a name, because the only thing that can hold a task
+back is a dependency you can point to. “Why isn’t this moving?” has an
+answer you can read, not a meeting you have to schedule.</p>
+<h2 id="your-board-your-calendar-your-cron-job-all-the-same-plan">your
+board, your calendar, your cron job — all the same plan</h2>
+<p>Now the part that makes the four-tools problem dissolve.</p>
+<p>A kanban board with its columns. A timeline. A calendar of deadlines.
+In a workbook, none of those is a separate thing with its own database.
+Each one is a <strong>rendering</strong> of the plan file — drawn from
+it the way a web page is drawn from its underlying text. The board
+doesn’t <em>store</em> anything. It shows you the file, arranged as
+columns. Drag a card from “doing” to “done” and the word in the file
+flips to <code>DONE</code>. Edit the file and the board redraws. The two
+can never disagree, because there aren’t two of them — there’s one file
+wearing different clothes.</p>
+<p>If you go looking for the machinery behind the board — a table of
+cards, a column schema, a sync job — the search comes up empty. There is
+no board stored anywhere. That absence isn’t a missing feature; it’s the
+entire design. There’s nothing to sync because there’s nothing to sync
+<em>between</em>.</p>
+<p>Time folds in the same way. The third place plans usually scatter to
+— after the board and the to-do list — is the scheduled job: that lonely
+corner where “what should happen, and when” lives, readable by one
+machine and reviewed by no one. A workbook absorbs it. “Every Friday at
+nine” is just a timestamp written on the task itself, sitting in the
+same readable file as everything else. A deadline that’s passed isn’t a
+notification you missed; it’s a fact anyone can read off the plan. The
+schedule stops being a fourth unreviewable system and becomes one more
+line in the document you already have open.</p>
+<p>And the workers? The loop genuinely does not care who they are. A
+person working down the ready list and a software agent waking up on a
+schedule are <em>interchangeable</em>. The agent might clear the first
+round of work overnight; you pick up the next round with your coffee;
+neither of you has to brief the other, because the file is the meeting.
+That’s what makes handoffs between people and machines boring — in the
+best possible way.</p>
+<h2 id="what-it-does-not-promise">what it does not promise</h2>
+<p>Two honest edges, because this is powerful enough to be worth being
+straight about.</p>
+<p>A plan made of free text can still drift. An agent writing into it
+can duplicate a task or mark something done that isn’t. What a workbook
+changes isn’t that drift becomes impossible — it’s that drift becomes
+<em>catchable</em>. Because the plan is structured, the contradictions
+are checkable facts: a task that depends on something that doesn’t
+exist, a finished task resting on an unfinished one. These get caught
+and named, with a line number, instead of passing as a quiet shrug at
+the next standup.</p>
+<p>And running a plan is not the plan running <em>itself</em>. This was
+never about software that works without you. Direction stays human. The
+workers stop at the edges you set. What changes is that following
+through gets cheap — the tedious part, the keeping-it-all-in-sync part,
+the dragging-cards part, simply goes away. The judgment doesn’t. That’s
+still yours, and it always will be.</p>
+<p>What’s left is the thing you wanted all along: one plan, in one file,
+that a person can read and a machine can run — with no copy to keep in
+sync, because there was only ever one.</p>

@@ -1,0 +1,138 @@
+<p>A workbook, on its own, can show you things and remember things. But
+sooner or later you want it to <em>do</em> something — read a PDF,
+crunch a column of numbers, fetch a page, draw a chart, run a real piece
+of software. The moment you reach for that, you hit the oldest, ugliest
+problem in computing: how do you let a program run code it didn’t write,
+do real work, and <em>not</em> be able to wreck your machine in the
+process?</p>
+<p>Most tools answer that question by quietly asking you to trust them.
+A workbook answers it differently. It hands code a job and a sealed room
+to do it in — and never the keys to anything else.</p>
+<h2 id="the-mess-were-escaping">the mess we’re escaping</h2>
+<p>Watch what happens when you try to give an AI agent some abilities
+today. One framework has its own plugin format. Another wants little
+tool-servers speaking their own protocol. The actual capabilities live
+in packages, each arriving with its own dependency tree, its own
+runtime, its own security story you’re supposed to audit but never do.
+Set up a second agent somewhere else and none of it carries over. You
+spend your time managing tools <em>for</em> your tools, and what you’ve
+built is a pile no two people assemble the same way.</p>
+<p>The instinct is always to fix this with one more format — which is
+precisely how we ended up with this many formats. The real fix is
+noticing that a useful tool is three things glued together, and today we
+keep them apart. A tool needs <strong>code that runs</strong>, <strong>a
+place it can run safely</strong>, and <strong>an explanation of how to
+use it</strong>. Right now those are three separate artifacts, from
+three separate ecosystems, that you’re left to source and stitch
+yourself. A <em>toolkit</em> is what you get when they finally arrive as
+one object.</p>
+<h2 id="the-toolbox-metaphor-taken-literally">the toolbox metaphor,
+taken literally</h2>
+<p>Think of a tradesman’s toolbox. It holds the tools, yes — but it’s
+also the case they lock into so nothing rattles loose, and there’s a
+dog-eared manual tucked in the lid. You pick the whole thing up and
+carry it as a single object. Nobody hands you a drill bit, a warehouse
+address, and a PDF in three separate shipments and calls that a
+toolbox.</p>
+<p>A toolkit is built the same way, in three layers that travel
+together.</p>
+<p><strong>The manual — the surface.</strong> The top of a toolkit is
+plain text: a small tree of documents describing what the tool does,
+when to reach for it, and how each command works, with worked examples.
+A person reads it like documentation. An agent reads it like a skill —
+enough structure to discover the tool, load only the part it needs, and
+use it correctly. Same words, both audiences. Write the manual once and
+you’ve onboarded every human <em>and</em> every agent that will ever
+meet the tool.</p>
+<p><strong>The muscle — the code.</strong> Underneath the manual is an
+actual working program — not a description of one. Real code, written in
+whatever language suited the job, compiled into a portable, universal
+form (the same kind that runs inside every web browser). This isn’t
+about rewriting the world’s software: a battle-tested library that’s
+existed for decades becomes a toolkit by being <em>brought across</em>,
+not reinvented.</p>
+<p><strong>The floor — the sandbox.</strong> A toolkit runs inside the
+engine’s sealed sandbox, with exactly the capabilities it was granted
+and nothing more. This is the quiet revolution. Today, installing a tool
+means trusting its author with your whole machine. Installing a toolkit
+means trusting it with exactly what you handed it — a sealed compartment
+and a short list of grants. The floor does the vetting that app-store
+review only pretends to do.</p>
+<p>One signed unit: manual, muscle, floor. That’s a toolkit.</p>
+<h2 id="the-manual-is-the-interface">the manual <em>is</em> the
+interface</h2>
+<p>Here’s the design choice that makes toolkits feel different from
+everything else.</p>
+<p>It turns out AI agents don’t work best with a hundred bespoke,
+custom-built integrations. They work best the way <em>people</em> work
+at a keyboard: with one general tool — a command line — and a set of
+useful small programs to call. That’s why the humble terminal never
+died. Composable little programs beat one giant monolithic interface for
+getting real work done.</p>
+<p>So a toolkit doesn’t bolt a new protocol onto your agent. It simply
+puts a command where the agent can find it, and the manual right next to
+it. And because the manual is <em>structured</em> text rather than
+free-form prose, it does double duty: it documents the tool for a human,
+and it’s precise enough to act as the tool’s instructions for a machine
+— examples you can run, commands a program can read and call. The
+documentation can never drift away from the truth, because the
+documentation is <em>how the tool is reached.</em> There’s no second
+source to fall out of sync.</p>
+<p>If you’ve ever handed a coding assistant a “skill file,” this is that
+idea taken all the way: the skill, the program it teaches, and the safe
+room it runs in — shipped as one sealed object instead of three loose
+pieces.</p>
+<h2 id="isnt-this-just-a-plugin">“isn’t this just a plugin?”</h2>
+<p>Fair question, and the honest answer is that every familiar
+alternative solves <em>one</em> of the three layers and leaves you
+holding the other two.</p>
+<p>A normal software package gives you code that runs — on your machine,
+at your risk, with a readme if you’re lucky, and none of it transfers. A
+tool-server gives you code and a protocol but hands the safe-place
+problem back to you, documented with a schema rather than guidance. A
+platform plugin runs in the host’s sandbox but is locked to that one
+host. Each is a reasonable idea. Each leaves two of the three supply
+chains for you to solve.</p>
+<p>A toolkit is the bet that code, sandbox, and manual were never
+supposed to be three separate supply chains in the first place. And
+notice the stance: a toolkit doesn’t compete with those existing tools —
+it happily <em>wraps</em> them. The claim was never “a better protocol.”
+It’s “these three things belong in one box.”</p>
+<p>This works because of one bet worth saying plainly: untrusted code is
+no longer the exception, it’s the <em>medium</em>. Tools you didn’t
+write, code an agent generated thirty seconds ago — all of it wants to
+run, and an install script is just untrusted code you’ve agreed to run
+with your own permissions. The portable code format toolkits use was
+<em>born</em> for this: designed from day one to run a stranger’s code,
+fast, inside a sealed box, on any hardware. And because that same format
+runs in browsers, the very tool the engine runs on a server can ride
+<em>inside</em> a workbook file and run on your screen, offline. The
+heavier abilities that genuinely need a server — saving data, holding
+secrets, reaching the network — light up when the workbook is plugged
+into an engine.</p>
+<h2 id="they-stack-and-the-box-keeps-filling">they stack, and the box
+keeps filling</h2>
+<p>Single tools are just the start. Because every toolkit shares the
+same shape — manual, muscle, floor — they stack without negotiation.
+Bundle a few toward a job and you have a research rig or a publishing
+pipeline. An agent, it turns out, is itself a toolkit-shaped thing: its
+manual describes <em>who it is</em>, and the tools are what it reaches
+for. Even the plan an agent follows is written in that same readable
+layer.</p>
+<p>And here’s the part that makes it grow. Build something useful
+<em>inside</em> a workbook — a parser, a chart kit, a little scraper —
+and one command promotes it into a toolkit the next workbook can pick
+up. The shared parts bin is fed by the things people actually make,
+which is the only way a parts bin ever gets good.</p>
+<p>Let’s be straight about where this stands, because it’s the youngest
+part of the system. The unit is stable, and the engine underneath is
+built on decades of proven infrastructure — but the parts bin itself is
+<em>early</em>: real, working, growing, and still small. The catalog
+grows one conversion at a time: a tool gets compiled, a library gets
+wrapped, a manual gets written. Most software crosses cleanly; some puts
+up a fight. But every fight won is permanent — convert a tool once and
+it works for every workbook, every agent, forever after. Which is the
+quiet invitation buried in all of this: the easiest way to give
+<em>your</em> workbook a new ability is often to bring across a tool you
+already love. And once you have, you’ve added it to everyone’s box
+too.</p>

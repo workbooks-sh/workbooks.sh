@@ -1,0 +1,129 @@
+<p>Think about the last time you wrote a real plan. Not a vague
+intention — an actual plan, with steps. <em>First fetch the numbers.
+Then clean them up. Then score them. Then send the report.</em> You
+wrote it down to keep it straight, so someone could follow it, so
+future-you would remember the order. It was a description of work. Notes
+about the work, sitting next to the work.</p>
+<p>Here is the quietly thrilling claim of this lesson: that plan,
+written for human eyes, can <em>be</em> the running system. Not a spec
+you hand to an engineer who builds the thing. Not a diagram you
+translate into code. The plan itself — the same steps, in the same
+order, with the same dependencies you’d naturally describe — is what
+executes. There is no second artifact. The list you wrote to organize
+the work is the program that does the work.</p>
+<p>Let’s see why that’s even possible, because it sounds like a trick,
+and it isn’t.</p>
+<h2 id="the-order-was-always-in-the-plan">the order was always in the
+plan</h2>
+<p>Every tool that runs steps for you makes you do extra work to say
+which steps can happen at the same time. The plan describes the steps;
+then, separately, you configure the parallelism — runners, pools,
+hand-written tables of what depends on what. Two descriptions of the
+same thing, and you have to keep them honest.</p>
+<p>But look back at your plan. When you wrote <em>clean the numbers,
+then score them</em>, you already said scoring depends on cleaning. Not
+as a configuration setting — as plain dependency: this step needs that
+step’s result. That’s the whole secret. <strong>The dependencies you
+naturally describe are already the schedule.</strong> Two steps that
+don’t need each other’s results can run together, and the plan already
+says which ones those are.</p>
+<p>The engine reads your plan and peels it into layers. A layer is every
+step whose required predecessors are all finished. Run that layer, mark
+those steps done, look again for whatever just became ready, run that.
+When nothing’s left, stop. Picture five steps: <strong>fetch</strong>
+and <strong>seed</strong> depend on nothing, <strong>clean</strong>
+needs fetch, <strong>score</strong> needs both clean and seed,
+<strong>report</strong> needs score. Nobody wrote the running order. It
+falls out of the dependencies — fetch and seed go first
+<em>together</em>, then clean, then score, then report. The plan was the
+schedule all along; the engine just noticed.</p>
+<h2 id="how-the-work-flows-between-steps">how the work flows between
+steps</h2>
+<p>So the steps run in the right order. But a plan isn’t just an order —
+it’s a hand-off. The report step needs the <em>output</em> of the score
+step, not just the knowledge that scoring finished.</p>
+<p>The mechanism is almost too plain to describe, which is why it’s
+trustworthy. The engine keeps one running list: each step’s name paired
+with what it produced. When a step finishes, its result lands under its
+name. When the next step runs, it looks up whoever feeds it and receives
+that result as its input. That’s the entire pipe. One step’s output is
+literally the next step’s input — visible, traceable, sitting right
+there in the record.</p>
+<p>One deliberate limit shapes how you write plans. <strong>Each step
+takes at most one input.</strong> A step can hand its result to many
+others — branch as wide as you like — but a single step can’t pull from
+two sources at once. If something genuinely needs to combine two earlier
+results, you arrange for one upstream step to produce the combined thing
+and feed <em>that</em> along. Joining two streams isn’t expressible
+directly today; it’s a known gap, not an accident. The single input is
+what keeps the dependency-matching clean enough to predict in your
+head.</p>
+<h2 id="the-same-plan-runs-people-and-machines">the same plan runs
+people <em>and</em> machines</h2>
+<p>Here’s the part that turns a neat idea into a powerful one. A step in
+your plan is usually a small piece of compiled work — some code that
+transforms its input. But a step can also be an <strong>agent</strong>:
+an AI given a job and let loose to do it. And the remarkable thing is
+that the engine running your plan doesn’t know the difference.</p>
+<p>When a step is marked as an agent, the instructions you wrote for it
+become its briefing, and whatever flows into it becomes its task. It
+runs a real agent — thinking, using its tools, working the problem — and
+its final answer drops into the same running list as any other step’s
+output, under the same rules. The scheduler that peels the plan into
+layers treats it identically. So the plan that organizes a week of work
+can have some steps done by code and some by an agent, side by side, and
+you write them the same way.</p>
+<p>This is where “two agents working in parallel” stops being something
+you configure and becomes something you simply <em>don’t</em> configure.
+Want two analysts on the same question at once — one finding a key fact,
+one finding a key risk? Write two agent steps and give them no
+dependency on each other. No dependency means neither waits, which means
+they land in the same layer, which means they run at the same time.
+<strong>Parallelism is the absence of a dependency, not a setting you
+flip.</strong> You expressed it the moment you didn’t connect them.</p>
+<p>And an agent inside a plan is still contained. It works in the
+workbook’s own space, with the workbook’s own tools — it can’t reach out
+and touch the rest of your machine. It’s a step in the plan, not an
+escape from it.</p>
+<h2 id="changing-the-plan-while-its-running">changing the plan while
+it’s running</h2>
+<p>Now the harder question — the one that separates a clever demo from
+something you’d trust to run live. Your plan is deployed. It runs every
+night. Somewhere downstream, <em>another</em> plan depends on what this
+one produces. Then you edit it — rename something, change what a step
+emits, drop a step you thought nobody used — and redeploy. The break
+doesn’t show up in your editor. It shows up later, at the far end, when
+the thing that depended on you can no longer find what it expected.</p>
+<p>Every platform’s answer is the same: process. Versioning policy,
+changelogs, a careful human promising to remember. All of it is people
+agreeing to recall something a machine could just <em>check</em>.
+Because whether a change is safe is not a matter of discipline — it’s a
+computable fact. And if it’s computable, the system can answer it
+<em>before</em> the redeploy goes live: will this change break a promise
+the old plan made?</p>
+<p>The rule it checks is beautifully one-directional, and once you see
+it you can apply it yourself. Sort everything a plan touches into two
+piles. There’s what the plan <strong>gives</strong> — the outputs other
+things read off it. And there’s what the plan <strong>demands</strong> —
+the capabilities it needs to be granted, like permission to send email.
+The safety rule is simply: <strong>what you give may grow but never
+shrink, and what you demand may shrink but never grow.</strong></p>
+<p>The reasoning is just who depends on which. Someone downstream reads
+what you give, so <em>taking away</em> an output might break them —
+adding one never can. A host grants what you demand, so <em>asking for
+more</em> might exceed what it’s willing to give — asking for less never
+does. Add an output: safe. Remove one: flagged as breaking. Need a
+brand-new capability: flagged for a human to weigh. Need <em>fewer</em>:
+always safe. The check produces a plain list of exactly which promises
+are about to break, scoped and named — not a yes/no, but the truth about
+the change.</p>
+<p>One honest note: this gate exists and computes correctly, but it
+isn’t yet wired to <em>stop</em> a deploy automatically — a gate with no
+hands can only tell the truth, and someone has to read it and decide.
+Treat it as a check you consult, not a wall that’s already up.</p>
+<p>So: the plan that organizes your week is the program. Its
+dependencies are its schedule. Its steps can be code or agents, run
+together by simply not chaining them. And when you change it, plain
+reasoning tells you whether you’ve kept your promises — before anyone
+downstream finds out the hard way. The notes about the work were the
+work the whole time.</p>

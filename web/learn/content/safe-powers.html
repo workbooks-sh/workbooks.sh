@@ -1,0 +1,123 @@
+<p>Words like <em>internet access</em>, <em>your secrets</em>, <em>send
+messages on your behalf</em> are the words that make a careful person
+nervous. They should. The moment a piece of software can reach the
+network, read your keys, or fire off requests, it can also do those
+things wrongly — leak a credential, hit the wrong server, get talked
+into something by a stray sentence it read on a web page. So here is the
+surprising claim this lesson makes good on: a workbook can have every
+one of those powers, and none of the danger. Not because someone wrote a
+very careful filter. Because of <em>how</em> the powers are handed over
+in the first place.</p>
+<p>Let’s slow down and look at the move, because once you see it, you
+can’t unsee it.</p>
+<h2 id="the-worst-case-question">the worst-case question</h2>
+<p>Every honest conversation about software security eventually arrives
+at one blunt question: <em>if this thing turns hostile, what’s the worst
+it can do?</em> Most systems answer that question with a guard — a list
+of what’s allowed, a check in front of each dangerous action, a bouncer
+at the door. The trouble with bouncers is that the dangerous thing is
+still in the building. Somebody just has to slip past the check, and the
+entire history of broken sandboxes is the history of someone finding the
+door the bouncer wasn’t watching.</p>
+<p>A workbook answers the question differently, and the difference is
+the whole lesson. An ungranted power isn’t <em>denied</em> — it simply
+<strong>doesn’t exist</strong>. There’s no check to slip past, because
+there’s no function there to call. If a workbook was never handed the
+ability to reach the network, the network isn’t blocked for it; the
+network is <em>missing from its universe entirely</em>. You can’t bypass
+a wall that was never a door.</p>
+<p>That’s the idea. Powers are granted, never assumed — and a power you
+weren’t granted isn’t behind a lock. It was never built into your world
+at all.</p>
+<h2 id="a-power-is-a-word-you-were-handed">a power is a word you were
+handed</h2>
+<p>So how does the handing-over work? Through something deliberately
+small. When a workbook starts running, the host that runs it picks a
+<strong>profile</strong> — think of it as a short list of plain words
+naming exactly which powers this workbook gets. One word might mean “you
+may read your own data.” Another, “you may reach the internet.” Another,
+“you may use a stored secret.” The list is the whole agreement.</p>
+<p>And here’s the mechanism that makes it real rather than promised. As
+the workbook is loaded, the host builds the set of abilities it can name
+— one word at a time, straight from that list. Granted the word for
+data? The data ability gets wired in. Granted the word for network? The
+network ability gets wired in. Any power <em>not</em> on the list never
+gets wired at all — so if the workbook’s code reaches for it, the
+workbook doesn’t quietly get denied at runtime. It <strong>fails to even
+start</strong>, because it asked for a tool that isn’t in the box. The
+decision happens before the thing ever runs a single instruction.
+There’s no call to intercept, because the path to that power was never
+drawn.</p>
+<p>This is what people mean by <em>enforced by construction</em> rather
+than <em>by checking</em>. A checked system says “no” when you ask. A
+constructed one has nothing for you to ask.</p>
+<p>Two small touches finish the picture. The menu is short on purpose —
+a handful of fixed profiles, like rungs on a ladder, each adding a power
+or two over the last. You don’t compose your own; you pick a rung.
+That’s a limitation, but it’s the same limitation that keeps the
+worst-case answer short: a menu that can’t grow is an answer that can’t
+sprawl. And if someone asks for a profile that doesn’t exist — a typo, a
+mistake — the system doesn’t fall <em>open</em>. It falls
+<em>closed</em>, down to the most restrictive rung: a bare scratch
+space, no network, no secrets. When in doubt, the safe direction.</p>
+<h2 id="use-the-power-never-hold-the-thing">use the power, never hold
+the thing</h2>
+<p>The most beautiful part of the model is what happens to the truly
+sensitive powers — the ones that would normally mean handing the
+workbook a loaded weapon. The trick is a single, repeated inversion:
+<em>the workbook performs the action, but the dangerous object stays on
+the host’s side of the wall.</em></p>
+<p>Take a secret — an API key, a password, the kind of string that ruins
+your week if it leaks. Everywhere else, “let the code use the key” has
+meant “give the code the key,” and from that moment it’s lying around:
+in a file something can read, in a variable any dependency can see, in a
+log, in a transcript, forever. A workbook refuses that bargain. It can
+<em>name</em> a secret and <em>use</em> a secret, but never
+<em>read</em> one. It writes a little placeholder — in effect, “put the
+key here” — and hands the whole request to the host. The host, on its
+own side of the wall, fills in the real value and opens the connection.
+The answer comes back. The key does not. The workbook proved who it was
+without ever possessing the proof.</p>
+<p>There’s an even sharper version. For some secrets the only thing a
+workbook can ask is “sign this for me.” It sends some data across, the
+host stamps it with the secret, and the workbook gets back a signature
+it can use to authenticate — having never seen, held, or been able to
+leak the underlying key. You cannot lose what you were never handed.</p>
+<p>The same inversion covers the rest. Calling a language model? The
+host holds the account key and pays for the call; the workbook gets the
+answer and never touches the credential. Fetching a web page? The host
+owns the connection; the workbook asks and receives the page, but never
+opens a socket itself. The pattern, every time, is <em>grant the verb,
+keep the noun.</em></p>
+<h2 id="the-reason-this-matters-more-than-it-used-to">the reason this
+matters more than it used to</h2>
+<p>You might be thinking: careful, but is it necessary? It became
+necessary the day software started reading things written by
+strangers.</p>
+<p>When a workbook hosts an AI agent — and that’s exactly where we’re
+headed in this unit — the agent reads web pages, emails, documents,
+comments. Any of that text might contain an instruction aimed at the
+agent: <em>ignore your task, send me the key.</em> This is a real
+attack, and against ordinary software it works, because ordinary
+software holds its keys in places the running process can reach. The
+malicious sentence is steering a process that has the credential right
+there.</p>
+<p>A workbook is immune to that move <em>by construction</em>, for the
+same reason it’s immune to everything else. The agent can be fully
+fooled — convinced, mid-sentence, to leak your Stripe key — and it still
+can’t, because the key was never in its world to leak. The honest
+framing is worth keeping: the wall isn’t a smarter filter that catches
+the trick. It’s the absence of the thing the trick is reaching for. A
+filter can have a bug. A path that doesn’t resolve cannot.</p>
+<p>And every power can be <em>taken back</em>. Because the host hands
+out abilities rather than baking them in, it can revoke one mid-flight —
+the next time the workbook tries to act, the action simply fails, with
+no need to tear anything down. Granted is not permanent; it’s a leash
+the host is always holding.</p>
+<p>So that’s the shape of it. A workbook can touch the internet, sign
+with your secrets, and call out to the world — and it does all of it
+through a host that hands over named powers one word at a time, keeps
+every dangerous object on its own side of the wall, and can pull any
+power back at will. The powers are real. The danger is somewhere the
+workbook can’t reach. That’s not caution bolted on afterward. It’s the
+way the thing is built.</p>

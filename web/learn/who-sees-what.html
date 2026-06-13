@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,157 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="who-sees-what">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Sharing without oversharing</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li cur" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 7 · Trust &amp; sharing</div><h1>Sharing without oversharing</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>A file you send is a file you&#x27;ve given away completely — so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/sharing"><b>sharing</b><span>the deep doc</span></a><a class="dl" href="/learn/postures"><b>postures</b><span>the deep doc</span></a><a class="dl" href="/learn/publishing"><b>publishing</b><span>the deep doc</span></a><a class="dl" href="/learn/privacy"><b>privacy</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 18 of 20</div><button class="cont" id="cc" data-next="secrets-in-the-open"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/proving-origin">← Previous</a><a href="/learn/secrets-in-the-open">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li cur" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 7 · Trust &amp; sharing</div><h1>Sharing without oversharing</h1><article><p>A workbook is a file you can hand to anyone. That was the whole
+promise — email someone your software, the real thing, data and all. But
+the moment you believe it, a worry creeps in. If everything rides inside
+the file, then <em>everything</em> rides inside the file. Your
+half-finished demo, fine. But the client’s numbers? The dataset you paid
+for? The internal tool nobody outside the building should even know
+exists?</p>
+<p>Here’s the question this lesson answers, sharper than it first
+sounds. How do you share the <em>app</em> without handing over the
+<em>secrets</em> inside it — when the app and the secrets are the same
+file?</p>
+<p>The honest answer is that you don’t try to lock the secret inside the
+file. You decide, ahead of time, whether the secret is ever allowed in
+the file at all. That decision has a name, and learning to make it is
+the whole skill.</p>
+<h2 id="the-lock-that-isnt-a-lock">the lock that isn’t a lock</h2>
+<p>You’ve seen the wrong way to do this a hundred times, even if you
+never named it. The “protected” report that asks for a password. The
+dashboard that hides its numbers behind a login screen written in the
+page itself. They feel safe. They are not.</p>
+<p>The trouble is that a single file carries both the lock and the thing
+it’s locking. Anyone who has the file can look inside it — every browser
+has a “view source” — and there sits the password check <em>and</em> the
+data it was guarding, traveling together in the same bundle. The guard
+shipped in the same suitcase as the treasure. A lock you can read past
+isn’t a lock; it’s a costume. Software people have a blunt word for it:
+theater.</p>
+<p>So the real rule, the one everything else hangs from, is almost rude
+in its simplicity. You cannot guard a secret that’s inside the file. The
+only way to keep a secret from the wrong hands is to <strong>keep it out
+of the file entirely.</strong> Not hidden in the file. Not encrypted in
+the file. Just — not there.</p>
+<p>That sounds like it would make secret-keeping impossible for
+something whose whole identity is “one file you can hold.” It does the
+opposite. It just means you say, up front, what kind of thing you’re
+sharing.</p>
+<h2 id="three-honest-answers">three honest answers</h2>
+<p>Before a workbook leaves home, you give it a stance — a single,
+declared answer to one question: <em>what part of this is public?</em>
+There are exactly three answers, and that’s the entire vocabulary.</p>
+<p><strong>Public.</strong> Everything is open. The screen, the logic,
+the data — all of it can be baked into one self-contained file that
+opens anywhere, forever, with nothing standing behind it. This is the
+demo, the report, the brand book, the thing whose entire point is “share
+with anyone.” There’s no secret to protect, so there’s nothing to hold
+back.</p>
+<p><strong>Gated data.</strong> The <em>shell</em> is public — the look,
+the layout, the empty app — but the actual contents are not. Anyone can
+open the page and see the app’s face, but the real numbers aren’t in the
+file at all. They’re fetched, one request at a time, from a server that
+checks who’s asking first. Think of a free app that shows you its whole
+interface but won’t load your account until you sign in. The face
+travels; the contents stay home.</p>
+<p><strong>Gated route.</strong> Even the shell is private. Not just the
+data — the app’s very <em>existence</em> is hidden, served only to
+someone who’s already proven they’re allowed. This is the internal tool
+that shouldn’t show up for a stranger at all.</p>
+<p>Notice what these three really are. Not features you switch on, but a
+promise about where the bytes are allowed to live. And declaring one is
+almost nothing — a single line of plain text riding along with the
+workbook. The system is picky about that line: it forgives small things
+like spacing and capitalization, but if you write a stance it doesn’t
+recognize, it refuses to guess. A security decision is the one place a
+tool should never improvise.</p>
+<h2 id="refused-at-the-door-not-caught-in-the-act">refused at the door,
+not caught in the act</h2>
+<p>Here’s the part that makes the rule trustworthy instead of merely
+well-intentioned.</p>
+<p>You might expect the protection to live at the moment someone tries
+to open the file — a check that runs when the page loads. But you
+already know why that fails: by then the secret is in the reader’s
+hands. So the protection lives much earlier, in the moment the workbook
+is being <em>turned into a file</em> in the first place.</p>
+<p>When you go to publish a workbook to a public spot — the kind of
+free, simple web host that hands your page to anyone with the link — the
+system looks at the stance you declared. If you marked it gated, it
+doesn’t warn you. It doesn’t ship it with a lock. It flatly
+<strong>refuses to build the file at all.</strong> The error is plain
+about why: a public host gives the whole thing to anyone, so a lock
+inside it would be theater. Pick a place that can actually check who’s
+asking, it says, and try again.</p>
+<p>Sit with how different that is. The leak isn’t caught after it
+happens. The leaking file is <em>never created.</em> You cannot
+accidentally ship the secret, because the tool won’t produce the
+artifact that would contain it. And this guard isn’t a polite suggestion
+in a settings menu — it’s wired into the machinery that makes files, in
+more than one place, so there’s no quiet path around it.</p>
+<p>There’s a stubborn consistency here. Even when you build a gated
+workbook for your own trusted laptop, the file you get is just the empty
+shell — the real content still arrives over the wire, after a check. Why
+be that strict on a machine you trust? Because a file is a file. Files
+get copied. The thing you built for your laptop can be dragged onto a
+public website by accident, and the rule refuses to trust the situation.
+It trusts only how the file was built. If the secret was never put in,
+it can never leak out.</p>
+<h2 id="who-made-this-and-has-it-been-touched">who made this, and has it
+been touched?</h2>
+<p>Keeping secrets <em>out</em> is one half of safe sharing. The other
+half runs the opposite direction: when something arrives, how do you
+know it’s really from who it claims, and that nobody tampered with it on
+the way?</p>
+<p>A workbook answers this by carrying a kind of wax seal inside itself.
+When a maker shares one, their identity gets stamped right into the file
+— not a link to a certificate on some company’s server, not a badge from
+an app store, but proof woven into the bytes themselves. Anyone who
+receives the file can check that seal using nothing but the file. No
+account. No connection to a verification service. No asking the sender.
+The proof rides along with the thing it’s proving.</p>
+<p>This matters precisely <em>because</em> a workbook can be forwarded
+freely. Every other way software proves “this is genuine” depends on
+some authority standing by at the moment you check — the secure
+connection, the app store, the certificate company. Forward a file over
+email and all of that evaporates; there’s no connection left to vouch
+for anything. So the proof had to move into the file, or there’d be no
+proof at all.</p>
+<p>The seal makes two honest claims and no more. It tells you
+<em>who</em> stamped it, and that the file hasn’t changed a single
+character since. Edit the page, and the seal breaks and the check fails
+— visibly. Re-stamp the altered version with your <em>own</em> identity,
+and the check passes, but now it carries <em>your</em> name, not the
+original maker’s. That’s the elegant trap: an imposter can keep your
+work or keep a valid seal, but never both. They can never put your name
+on something you didn’t make.</p>
+<p>Be clear about what this does <em>not</em> promise. A seal proves
+origin, not goodness — a genuinely-from-the-maker file can still be
+junk; you just know whom to blame. And a seal is not a lock: it proves
+who made the bytes, it does nothing to hide them. Knowing who sent a
+letter and being unable to read it are two different guarantees. Sharing
+safely usually wants both, side by side.</p>
+<h2 id="the-line-drawn">the line, drawn</h2>
+<p>So here’s the whole shape of it. Sharing a workbook splits into two
+questions that never trade against each other.</p>
+<p><em>Who’s allowed to read this?</em> — answered by the stance you
+declare before the file is ever built. Public means the secret was never
+put in. Gated means the secret lives behind a gatekeeper, and only the
+shell travels.</p>
+<p><em>Is this really from who it says, untouched?</em> — answered by
+the seal that rides inside, checkable by anyone, needing nothing but the
+file.</p>
+<p>A workbook can be public and sealed, or gated and unsealed, in any
+combination — they’re simply different promises about different things.
+And the price of the gated versions is worth saying out loud: a gated
+workbook needs something alive and answering — a gatekeeper with a power
+supply — for as long as you want the secret kept. The hand-it-to-anyone
+magic still works for the shell. The secret parts just go quiet without
+someone trustworthy to release them.</p>
+<p>Which is exactly right. The only way a file truly can’t leak a secret
+is if the file never held it — and then something else, somewhere safer,
+holds it for you.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/sharing"><b>sharing</b><span>the deep doc</span></a><a class="dl" href="/learn/postures"><b>postures</b><span>the deep doc</span></a><a class="dl" href="/learn/publishing"><b>publishing</b><span>the deep doc</span></a><a class="dl" href="/learn/privacy"><b>privacy</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 18 of 21</div><button class="cont" id="cc" data-next="secrets-in-the-open"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/proving-origin">← Previous</a><a href="/learn/secrets-in-the-open">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +338,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

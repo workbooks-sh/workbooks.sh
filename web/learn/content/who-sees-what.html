@@ -1,0 +1,149 @@
+<p>A workbook is a file you can hand to anyone. That was the whole
+promise — email someone your software, the real thing, data and all. But
+the moment you believe it, a worry creeps in. If everything rides inside
+the file, then <em>everything</em> rides inside the file. Your
+half-finished demo, fine. But the client’s numbers? The dataset you paid
+for? The internal tool nobody outside the building should even know
+exists?</p>
+<p>Here’s the question this lesson answers, sharper than it first
+sounds. How do you share the <em>app</em> without handing over the
+<em>secrets</em> inside it — when the app and the secrets are the same
+file?</p>
+<p>The honest answer is that you don’t try to lock the secret inside the
+file. You decide, ahead of time, whether the secret is ever allowed in
+the file at all. That decision has a name, and learning to make it is
+the whole skill.</p>
+<h2 id="the-lock-that-isnt-a-lock">the lock that isn’t a lock</h2>
+<p>You’ve seen the wrong way to do this a hundred times, even if you
+never named it. The “protected” report that asks for a password. The
+dashboard that hides its numbers behind a login screen written in the
+page itself. They feel safe. They are not.</p>
+<p>The trouble is that a single file carries both the lock and the thing
+it’s locking. Anyone who has the file can look inside it — every browser
+has a “view source” — and there sits the password check <em>and</em> the
+data it was guarding, traveling together in the same bundle. The guard
+shipped in the same suitcase as the treasure. A lock you can read past
+isn’t a lock; it’s a costume. Software people have a blunt word for it:
+theater.</p>
+<p>So the real rule, the one everything else hangs from, is almost rude
+in its simplicity. You cannot guard a secret that’s inside the file. The
+only way to keep a secret from the wrong hands is to <strong>keep it out
+of the file entirely.</strong> Not hidden in the file. Not encrypted in
+the file. Just — not there.</p>
+<p>That sounds like it would make secret-keeping impossible for
+something whose whole identity is “one file you can hold.” It does the
+opposite. It just means you say, up front, what kind of thing you’re
+sharing.</p>
+<h2 id="three-honest-answers">three honest answers</h2>
+<p>Before a workbook leaves home, you give it a stance — a single,
+declared answer to one question: <em>what part of this is public?</em>
+There are exactly three answers, and that’s the entire vocabulary.</p>
+<p><strong>Public.</strong> Everything is open. The screen, the logic,
+the data — all of it can be baked into one self-contained file that
+opens anywhere, forever, with nothing standing behind it. This is the
+demo, the report, the brand book, the thing whose entire point is “share
+with anyone.” There’s no secret to protect, so there’s nothing to hold
+back.</p>
+<p><strong>Gated data.</strong> The <em>shell</em> is public — the look,
+the layout, the empty app — but the actual contents are not. Anyone can
+open the page and see the app’s face, but the real numbers aren’t in the
+file at all. They’re fetched, one request at a time, from a server that
+checks who’s asking first. Think of a free app that shows you its whole
+interface but won’t load your account until you sign in. The face
+travels; the contents stay home.</p>
+<p><strong>Gated route.</strong> Even the shell is private. Not just the
+data — the app’s very <em>existence</em> is hidden, served only to
+someone who’s already proven they’re allowed. This is the internal tool
+that shouldn’t show up for a stranger at all.</p>
+<p>Notice what these three really are. Not features you switch on, but a
+promise about where the bytes are allowed to live. And declaring one is
+almost nothing — a single line of plain text riding along with the
+workbook. The system is picky about that line: it forgives small things
+like spacing and capitalization, but if you write a stance it doesn’t
+recognize, it refuses to guess. A security decision is the one place a
+tool should never improvise.</p>
+<h2 id="refused-at-the-door-not-caught-in-the-act">refused at the door,
+not caught in the act</h2>
+<p>Here’s the part that makes the rule trustworthy instead of merely
+well-intentioned.</p>
+<p>You might expect the protection to live at the moment someone tries
+to open the file — a check that runs when the page loads. But you
+already know why that fails: by then the secret is in the reader’s
+hands. So the protection lives much earlier, in the moment the workbook
+is being <em>turned into a file</em> in the first place.</p>
+<p>When you go to publish a workbook to a public spot — the kind of
+free, simple web host that hands your page to anyone with the link — the
+system looks at the stance you declared. If you marked it gated, it
+doesn’t warn you. It doesn’t ship it with a lock. It flatly
+<strong>refuses to build the file at all.</strong> The error is plain
+about why: a public host gives the whole thing to anyone, so a lock
+inside it would be theater. Pick a place that can actually check who’s
+asking, it says, and try again.</p>
+<p>Sit with how different that is. The leak isn’t caught after it
+happens. The leaking file is <em>never created.</em> You cannot
+accidentally ship the secret, because the tool won’t produce the
+artifact that would contain it. And this guard isn’t a polite suggestion
+in a settings menu — it’s wired into the machinery that makes files, in
+more than one place, so there’s no quiet path around it.</p>
+<p>There’s a stubborn consistency here. Even when you build a gated
+workbook for your own trusted laptop, the file you get is just the empty
+shell — the real content still arrives over the wire, after a check. Why
+be that strict on a machine you trust? Because a file is a file. Files
+get copied. The thing you built for your laptop can be dragged onto a
+public website by accident, and the rule refuses to trust the situation.
+It trusts only how the file was built. If the secret was never put in,
+it can never leak out.</p>
+<h2 id="who-made-this-and-has-it-been-touched">who made this, and has it
+been touched?</h2>
+<p>Keeping secrets <em>out</em> is one half of safe sharing. The other
+half runs the opposite direction: when something arrives, how do you
+know it’s really from who it claims, and that nobody tampered with it on
+the way?</p>
+<p>A workbook answers this by carrying a kind of wax seal inside itself.
+When a maker shares one, their identity gets stamped right into the file
+— not a link to a certificate on some company’s server, not a badge from
+an app store, but proof woven into the bytes themselves. Anyone who
+receives the file can check that seal using nothing but the file. No
+account. No connection to a verification service. No asking the sender.
+The proof rides along with the thing it’s proving.</p>
+<p>This matters precisely <em>because</em> a workbook can be forwarded
+freely. Every other way software proves “this is genuine” depends on
+some authority standing by at the moment you check — the secure
+connection, the app store, the certificate company. Forward a file over
+email and all of that evaporates; there’s no connection left to vouch
+for anything. So the proof had to move into the file, or there’d be no
+proof at all.</p>
+<p>The seal makes two honest claims and no more. It tells you
+<em>who</em> stamped it, and that the file hasn’t changed a single
+character since. Edit the page, and the seal breaks and the check fails
+— visibly. Re-stamp the altered version with your <em>own</em> identity,
+and the check passes, but now it carries <em>your</em> name, not the
+original maker’s. That’s the elegant trap: an imposter can keep your
+work or keep a valid seal, but never both. They can never put your name
+on something you didn’t make.</p>
+<p>Be clear about what this does <em>not</em> promise. A seal proves
+origin, not goodness — a genuinely-from-the-maker file can still be
+junk; you just know whom to blame. And a seal is not a lock: it proves
+who made the bytes, it does nothing to hide them. Knowing who sent a
+letter and being unable to read it are two different guarantees. Sharing
+safely usually wants both, side by side.</p>
+<h2 id="the-line-drawn">the line, drawn</h2>
+<p>So here’s the whole shape of it. Sharing a workbook splits into two
+questions that never trade against each other.</p>
+<p><em>Who’s allowed to read this?</em> — answered by the stance you
+declare before the file is ever built. Public means the secret was never
+put in. Gated means the secret lives behind a gatekeeper, and only the
+shell travels.</p>
+<p><em>Is this really from who it says, untouched?</em> — answered by
+the seal that rides inside, checkable by anyone, needing nothing but the
+file.</p>
+<p>A workbook can be public and sealed, or gated and unsealed, in any
+combination — they’re simply different promises about different things.
+And the price of the gated versions is worth saying out loud: a gated
+workbook needs something alive and answering — a gatekeeper with a power
+supply — for as long as you want the secret kept. The hand-it-to-anyone
+magic still works for the shell. The secret parts just go quiet without
+someone trustworthy to release them.</p>
+<p>Which is exactly right. The only way a file truly can’t leak a secret
+is if the file never held it — and then something else, somewhere safer,
+holds it for you.</p>

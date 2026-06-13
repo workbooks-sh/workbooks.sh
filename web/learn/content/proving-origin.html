@@ -1,0 +1,134 @@
+<p>Here is the uncomfortable thing about a file you can hand to anyone:
+the moment you do, you lose track of it. A workbook forwarded through
+three inboxes looks exactly like one that was quietly edited in the
+second inbox. The bytes don’t remember. There is no tell, no little
+asterisk that says <em>someone touched me on the way here</em>. And
+that’s the price of the whole pitch. Every other kind of software hands
+you, for free, the one thing a portable file can’t: a server that knows
+where the bytes came from and whether anyone tampered with them.</p>
+<p>So if you’re going to give away files and still trust them, you need
+to put that knowledge somewhere. The only place left is <em>inside the
+file itself</em>.</p>
+<h2 id="the-problem-with-every-obvious-fix">the problem with every
+obvious fix</h2>
+<p>Think about how you’d normally solve this. You’d ship a little
+signature file alongside the workbook — a separate <code>.sig</code>
+that proves the original. But now you have two files, and one file was
+the entire point. Or you’d register the workbook on a website, so anyone
+can look it up and confirm it’s real. But a lookup needs a server, and
+the workbook is supposed to keep working offline, on a thumb drive, ten
+years from now when that server is long gone. Or you’d let the platform
+vouch for it. But the file just <em>left</em> the platform — that’s what
+made it a workbook.</p>
+<p>Every reflexive answer re-attaches the very string the workbook was
+built to cut. So the requirement turns out to be awkward and specific.
+The proof has to ride <em>inside</em> the artifact. It has to survive
+being copied byte-for-byte. And anyone holding the file alone has to be
+able to check it — no account, no phone call home, nothing but the file
+in front of them.</p>
+<p>That’s a tall order. But it’s solvable, and the solution is a kind of
+wax seal you can’t peel off.</p>
+<h2 id="a-seal-that-travels-in-the-bytes">a seal that travels in the
+bytes</h2>
+<p>A workbook proves its origin with a <strong>signature</strong> — a
+small block of text tucked into the page, just before it ends. Inside
+that block are a few plain facts: who signed it, when, what tool did the
+signing, and two pieces of cryptography that do the actual work. The
+first is the signer’s identity. The second is a fingerprint of the page
+itself.</p>
+<p>Here’s the elegant part, and it’s worth slowing down for. The
+signer’s <em>identity</em> isn’t a name that points at a key kept on
+some server. The identity <strong>is</strong> the key. It’s a long
+string that, when you read it correctly, <em>is</em> the public half of
+the signer’s cryptographic keypair, written out in full. There’s nothing
+to look up. When you want to check who signed a workbook, you don’t
+query a registry or fetch a certificate — you read the verifying key
+straight out of the identity string sitting in the file. The name
+carries its own proof.</p>
+<p>This is the move that makes everything else possible. Because the
+identity is self-proving, verification needs nothing but the file. No
+registry to be compromised, no certificate authority to trust, no
+network at all. A browser with no server behind it could check a
+workbook’s signature. That’s why offline verification works: the file is
+genuinely complete.</p>
+<h2 id="why-checking-asks-two-questions-not-one">why checking asks two
+questions, not one</h2>
+<p>When you verify a signed workbook, you might expect a single answer —
+<em>real</em> or <em>fake</em>. It’s actually two questions, asked
+separately and then combined, and keeping them apart is the whole reason
+this design is useful.</p>
+<p>The first question is about the <strong>signature</strong>: was this
+seal produced by the holder of this identity’s key, and is the seal
+itself untouched? You answer it by checking the cryptographic signature
+against the key read out of the identity string.</p>
+<p>The second question is completely different. It’s about the
+<strong>bytes</strong>: does the page still match what was signed? You
+answer it by taking a fresh fingerprint of the workbook and comparing it
+to the fingerprint stored in the seal. If they match, nothing has
+changed since signing.</p>
+<p>A workbook is only valid when <em>both</em> are true. And the magic
+is in the cases where they disagree. Suppose you edit a single character
+somewhere in a signed workbook and check it again. The signature check
+still comes back true — the seal block itself wasn’t touched, so it’s
+perfectly genuine. But the byte check flips to false, because the rest
+of the page moved underneath it. The result is a verdict no single
+yes-or-no could ever give you: <em>the seal is real, but the envelope
+has been opened</em>. The workbook tells you not just that something is
+wrong, but exactly what kind of wrong.</p>
+<p>If there’s no seal at all, you get a third answer — not “fake,” just
+“nothing was ever signed here.” Honest about what it doesn’t know.</p>
+<h2 id="signing-the-thing-youre-changing">signing the thing you’re
+changing</h2>
+<p>There’s a riddle hiding inside “the seal lives in the file.” To sign
+the bytes, you first have to take their fingerprint. But the instant you
+tuck the seal into the page, you’ve changed the bytes you just
+fingerprinted. Fingerprint it again and you’d need to re-sign; re-sign
+and the bytes move again. The snake eats its tail.</p>
+<p>The trick that dissolves it is simple once you see it:
+<strong>fingerprint the page as if the seal weren’t there.</strong>
+Strip out any seal first, take the fingerprint of what remains, and
+store <em>that</em>. Now adding the seal back can’t spoil the
+fingerprint, because the fingerprint was always taken of the seal-free
+page. When someone verifies later, they strip the seal the same way,
+take the same fingerprint, and the numbers line up.</p>
+<p>This also makes signing tidy. Because signing always strips any old
+seal before writing a new one, you can sign the same file ten times and
+it still carries exactly one seal — the latest. Nothing piles up. That’s
+what lets a workbook get re-signed every time it’s saved or revised
+without accumulating a graveyard of dead seals, each new version
+honestly stamped with what it is.</p>
+<h2 id="what-this-proves-and-what-it-doesnt">what this proves, and what
+it doesn’t</h2>
+<p>Here’s where honesty matters, because a self-made seal is easy to
+over-read. What verification actually tells you is this, stated without
+inflation: <em>the bytes are untouched since they were signed, by the
+holder of this key.</em> That’s real, and it’s genuinely useful. But
+notice what it does <strong>not</strong> say. It doesn’t tell you
+<em>who</em> that holder is. There’s no master list of trusted authors,
+no way to revoke a key, no expiry date. Self-certifying means
+self-asserted — the seal vouches for continuity, not for character.</p>
+<p>The sharpest consequence is one you should sit with: <strong>anyone
+can strip the seal off a workbook and re-sign it with their own
+key.</strong> The new version will verify perfectly — under
+<em>their</em> identity. The system detects tampering <em>under a
+claimed name</em>; it doesn’t stop someone from claiming a new name. So
+the protection only means something when you already know whose identity
+to expect. You compare the signer against one you’ve decided to trust,
+and that comparison happens out in the world — in the email it came
+from, the person who sent it — not inside the file.</p>
+<p>Two smaller limits round it out. The timestamp in the seal is the
+signer’s <em>word</em> for when it was signed, not a proof — there’s no
+neutral clock witnessing it. And this is a deliberate cousin of a known
+provenance standard rather than the real thing; it borrows the
+vocabulary and skips the heavy certificate machinery on purpose, which
+means it won’t light up the official “verified content” badges in tools
+that look for them. That trade — drop the machinery, keep the idea — is
+the whole design.</p>
+<p>So the seal isn’t a guarantee that a workbook is
+<em>trustworthy</em>. It’s a guarantee that the workbook in your hands
+is the same one its signer made, unchanged, and that the signer is who
+their identity says they are. Whether to trust that signer is your call
+— and the workbook never pretends otherwise. What it gives you is a
+thing you can copy infinitely that still can’t be quietly altered
+without anyone noticing. For software meant to travel the world, that’s
+the seal that makes the gift safe to open.</p>

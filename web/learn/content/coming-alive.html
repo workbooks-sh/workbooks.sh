@@ -1,0 +1,127 @@
+<p>A workbook sitting on your laptop is a quiet thing. It’s a file. You
+can open it, read it, send it to a friend, keep it in a folder for a
+decade — and the whole time, it does nothing on its own. Close the tab
+and it goes dark. That’s not a flaw. That’s exactly what a document is,
+and it’s a wonderful thing to be.</p>
+<p>But there’s a second life waiting inside that file, and it switches
+on the moment you plug it into something. The same file that was inert
+on your laptop can suddenly answer requests from across the internet,
+keep working through the night while you sleep, remember everything
+between visits, and serve a hundred people at once. Nothing about the
+file changes. What changes is where it’s running.</p>
+<p>This lesson is about that boundary — the line where a workbook stops
+being a document and starts being a living service — and the one piece
+of the system that lives on the far side of it.</p>
+<h2 id="the-thing-that-isnt-a-file">the thing that isn’t a file</h2>
+<p>Everything else in this Learning Center has been about the file. The
+face, the work, the contents, the story — all bound into one portable
+object you can hold. The file is the star.</p>
+<p>The engine is the stage.</p>
+<p>It’s called the <em>Nexus</em>, and it is the one part of the whole
+system that is a <em>place</em> rather than a thing you hand around. You
+run it — on your own laptop, on a server, in your own cloud account —
+and it sits there, awake, ready. A workbook is the thing you carry to
+it; the Nexus is the thing you plug it into. The name fits the job: it’s
+the point where your workbooks, your data, your services, and your
+agents all connect.</p>
+<p>And here’s the part worth slowing down for. Plugging a workbook into
+the Nexus is called <em>docking</em>, and docking doesn’t convert your
+file, export it, or deploy it in the old sense. The file before and
+after is byte-for-byte the same. Three things simply switch on.</p>
+<h2 id="what-switches-on-when-you-dock">what switches on when you
+dock</h2>
+<p>Think of docking as flipping three lights at once, on a file that a
+moment ago was just sitting there.</p>
+<p><strong>It becomes isolated.</strong> The workbook now runs inside
+its own sealed compartment. It can’t reach the machine it’s running on,
+can’t peek at your keychain, can’t touch any other workbook. It gets
+exactly the abilities you choose to grant it, and nothing more. This
+isn’t a promise the engine is hoping to keep — it’s the shape of the
+room the workbook lives in.</p>
+<p><strong>It becomes stateful.</strong> Its little database wakes up
+and stays awake. The workbook keeps running even while it’s closed: a
+schedule can fire at three in the morning, the state survives a restart,
+and the version you serve to other people stays current without anyone
+refreshing it. The document that went dark when you closed the tab now
+keeps a pulse.</p>
+<p><strong>It becomes agentic.</strong> An AI agent attached to the
+workbook finally gets somewhere permanent to live — not a chat window
+that evaporates when you close it, but a real, lasting home, its own
+files and memory kept inside the workbook it’s tending. The agent can
+work long, run on a schedule, and pick up where it left off.</p>
+<p>Same file. Three lights on. That’s the whole trick, and the rest of
+this lesson is just earning your trust in it.</p>
+<h2 id="why-youd-want-an-engine-you-own">why you’d want an engine you
+own</h2>
+<p>There’s a quiet assumption buried in almost everything we use: that
+your software lives on someone else’s computer, and what you actually
+own is a login. For plenty of things, that’s a fine trade. But notice
+what it does to software <em>you</em> build. Your own creation lives
+somewhere you can’t see, billed per request, on terms that can change
+underneath you.</p>
+<p>The arrival of AI agents turned that quiet itch into a real bill. An
+agent needs a computer to live on — a genuine one, with files and time
+and a place to keep going. The industry’s answer has been to rent that
+computer in slices: a fresh little virtual machine per agent, metered by
+the second. While you’re prototyping it feels nearly free. Then you
+grow, and you discover the meter <em>is</em> the business model.</p>
+<p>The Nexus answers differently. Instead of renting isolation by the
+second from someone else, the engine <em>is</em> the isolation, running
+on a machine you own. One modest server can hold thousands of docked
+workbooks and agents at the same time. When you outgrow it, you don’t
+watch a line of bills multiply — you grow the machine. The thing that
+runs your software is a thing you control.</p>
+<h2 id="why-a-forty-year-old-phone-system-makes-this-safe">why a
+forty-year-old phone system makes this safe</h2>
+<p>Here’s the reason to trust the design, told up front instead of
+buried in a footnote. The Nexus is built on a foundation called the BEAM
+— the engine behind the languages Erlang and Elixir. It is not new, not
+trendy, and not an experiment. It was built decades ago to run telephone
+exchanges: millions of simultaneous calls, each one isolated from every
+other, on a system essentially never allowed to fail. The famous claim
+is about thirty-one milliseconds of downtime per year.</p>
+<p>The idea that gets there is almost insultingly simple. Everything is
+a tiny, isolated process. A phone call is a process. A web request is a
+process. If one crashes, it takes nothing else down with it — a
+supervisor notices, replaces it on the spot, and the rest of the system
+hums along undisturbed.</p>
+<p>The Nexus inherits all of that for free. Every docked workbook, every
+agent, every request is one of those tiny processes. One workbook
+crashing is a non-event: its process dies, its supervisor restarts it,
+and not one neighbor notices. This is also <em>why</em> one ordinary
+machine can hold so much — the BEAM was built to juggle millions of
+these processes at once, so “thousands of workbooks on one server” isn’t
+an ambitious goal, it’s the engine’s resting state.</p>
+<p>And there’s a second wall behind the first. Because a workbook can
+carry code written by anyone, that code runs inside a separate sandbox —
+the same containment web browsers trust to run untrusted code safely. So
+it nests: machine, then engine, then process, then sandbox. Code in a
+workbook would have to break out of two unrelated cages just to reach
+the workbook next door, let alone your computer.</p>
+<h2 id="the-line-you-dont-have-to-cross">the line you don’t have to
+cross</h2>
+<p>The honest part, because it matters more than the pitch.</p>
+<p>You do not need a Nexus to <em>open</em> a workbook. Files open in
+any browser, with no engine in sight — that never goes away, and it
+never costs anything. The Nexus is only for the <em>living</em> part:
+running on a schedule, keeping state between visits, hosting agents,
+serving other people. Viewing is free, forever, by design. The engine is
+what you reach for the day you want your document to stop being just a
+document.</p>
+<p>And one truth about the engine is worth saying plainly: it isn’t
+magic, it’s a server. That’s the entire point. “Nothing to operate” was
+always the pitch that ended with the meter running. The Nexus asks one
+thing of you — knowing the thing exists and runs somewhere you control —
+and in return hands you isolation, persistence, agents, and ownership,
+all on hardware that’s yours.</p>
+<p>There’s a lovely symmetry to it, too. There is exactly one Nexus: the
+engine on your laptop and the engine in your cloud are the <em>same</em>
+engine, and where a workbook runs is one simple setting. The prototype
+you built for yourself this morning becomes the product your team runs
+tomorrow — no rebuild, no “now make it real” rewrite. You change where
+it points, and the thing you already made is simply <em>there</em>.</p>
+<p>So that’s the boundary, and it’s the hinge the rest of the engine
+turns on. A workbook on your laptop is a document. Dock it into a Nexus
+and three lights come on — isolated, stateful, agentic — and the file
+becomes software that runs, remembers, and serves. The file never
+changed. It just found a place to come alive.</p>

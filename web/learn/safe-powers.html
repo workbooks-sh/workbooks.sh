@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,131 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="safe-powers">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Giving software powers, safely</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li cur" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 3 · The engine</div><h1>Giving software powers, safely</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>How a workbook gets dangerous-sounding powers — the internet, your secrets, sending messages — without any of the danger: every power is handed over deliberately and can be taken back.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/capabilities"><b>capabilities</b><span>the deep doc</span></a><a class="dl" href="/learn/networking"><b>networking</b><span>the deep doc</span></a><a class="dl" href="/learn/secrets"><b>secrets</b><span>the deep doc</span></a><a class="dl" href="/learn/channels"><b>channels</b><span>the deep doc</span></a><a class="dl" href="/learn/browsing"><b>browsing</b><span>the deep doc</span></a><a class="dl" href="/learn/tokens"><b>tokens</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 8 of 20</div><button class="cont" id="cc" data-next="going-live"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/coming-alive">← Previous</a><a href="/learn/going-live">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li cur" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 3 · The engine</div><h1>Giving software powers, safely</h1><article><p>Words like <em>internet access</em>, <em>your secrets</em>, <em>send
+messages on your behalf</em> are the words that make a careful person
+nervous. They should. The moment a piece of software can reach the
+network, read your keys, or fire off requests, it can also do those
+things wrongly — leak a credential, hit the wrong server, get talked
+into something by a stray sentence it read on a web page. So here is the
+surprising claim this lesson makes good on: a workbook can have every
+one of those powers, and none of the danger. Not because someone wrote a
+very careful filter. Because of <em>how</em> the powers are handed over
+in the first place.</p>
+<p>Let’s slow down and look at the move, because once you see it, you
+can’t unsee it.</p>
+<h2 id="the-worst-case-question">the worst-case question</h2>
+<p>Every honest conversation about software security eventually arrives
+at one blunt question: <em>if this thing turns hostile, what’s the worst
+it can do?</em> Most systems answer that question with a guard — a list
+of what’s allowed, a check in front of each dangerous action, a bouncer
+at the door. The trouble with bouncers is that the dangerous thing is
+still in the building. Somebody just has to slip past the check, and the
+entire history of broken sandboxes is the history of someone finding the
+door the bouncer wasn’t watching.</p>
+<p>A workbook answers the question differently, and the difference is
+the whole lesson. An ungranted power isn’t <em>denied</em> — it simply
+<strong>doesn’t exist</strong>. There’s no check to slip past, because
+there’s no function there to call. If a workbook was never handed the
+ability to reach the network, the network isn’t blocked for it; the
+network is <em>missing from its universe entirely</em>. You can’t bypass
+a wall that was never a door.</p>
+<p>That’s the idea. Powers are granted, never assumed — and a power you
+weren’t granted isn’t behind a lock. It was never built into your world
+at all.</p>
+<h2 id="a-power-is-a-word-you-were-handed">a power is a word you were
+handed</h2>
+<p>So how does the handing-over work? Through something deliberately
+small. When a workbook starts running, the host that runs it picks a
+<strong>profile</strong> — think of it as a short list of plain words
+naming exactly which powers this workbook gets. One word might mean “you
+may read your own data.” Another, “you may reach the internet.” Another,
+“you may use a stored secret.” The list is the whole agreement.</p>
+<p>And here’s the mechanism that makes it real rather than promised. As
+the workbook is loaded, the host builds the set of abilities it can name
+— one word at a time, straight from that list. Granted the word for
+data? The data ability gets wired in. Granted the word for network? The
+network ability gets wired in. Any power <em>not</em> on the list never
+gets wired at all — so if the workbook’s code reaches for it, the
+workbook doesn’t quietly get denied at runtime. It <strong>fails to even
+start</strong>, because it asked for a tool that isn’t in the box. The
+decision happens before the thing ever runs a single instruction.
+There’s no call to intercept, because the path to that power was never
+drawn.</p>
+<p>This is what people mean by <em>enforced by construction</em> rather
+than <em>by checking</em>. A checked system says “no” when you ask. A
+constructed one has nothing for you to ask.</p>
+<p>Two small touches finish the picture. The menu is short on purpose —
+a handful of fixed profiles, like rungs on a ladder, each adding a power
+or two over the last. You don’t compose your own; you pick a rung.
+That’s a limitation, but it’s the same limitation that keeps the
+worst-case answer short: a menu that can’t grow is an answer that can’t
+sprawl. And if someone asks for a profile that doesn’t exist — a typo, a
+mistake — the system doesn’t fall <em>open</em>. It falls
+<em>closed</em>, down to the most restrictive rung: a bare scratch
+space, no network, no secrets. When in doubt, the safe direction.</p>
+<h2 id="use-the-power-never-hold-the-thing">use the power, never hold
+the thing</h2>
+<p>The most beautiful part of the model is what happens to the truly
+sensitive powers — the ones that would normally mean handing the
+workbook a loaded weapon. The trick is a single, repeated inversion:
+<em>the workbook performs the action, but the dangerous object stays on
+the host’s side of the wall.</em></p>
+<p>Take a secret — an API key, a password, the kind of string that ruins
+your week if it leaks. Everywhere else, “let the code use the key” has
+meant “give the code the key,” and from that moment it’s lying around:
+in a file something can read, in a variable any dependency can see, in a
+log, in a transcript, forever. A workbook refuses that bargain. It can
+<em>name</em> a secret and <em>use</em> a secret, but never
+<em>read</em> one. It writes a little placeholder — in effect, “put the
+key here” — and hands the whole request to the host. The host, on its
+own side of the wall, fills in the real value and opens the connection.
+The answer comes back. The key does not. The workbook proved who it was
+without ever possessing the proof.</p>
+<p>There’s an even sharper version. For some secrets the only thing a
+workbook can ask is “sign this for me.” It sends some data across, the
+host stamps it with the secret, and the workbook gets back a signature
+it can use to authenticate — having never seen, held, or been able to
+leak the underlying key. You cannot lose what you were never handed.</p>
+<p>The same inversion covers the rest. Calling a language model? The
+host holds the account key and pays for the call; the workbook gets the
+answer and never touches the credential. Fetching a web page? The host
+owns the connection; the workbook asks and receives the page, but never
+opens a socket itself. The pattern, every time, is <em>grant the verb,
+keep the noun.</em></p>
+<h2 id="the-reason-this-matters-more-than-it-used-to">the reason this
+matters more than it used to</h2>
+<p>You might be thinking: careful, but is it necessary? It became
+necessary the day software started reading things written by
+strangers.</p>
+<p>When a workbook hosts an AI agent — and that’s exactly where we’re
+headed in this unit — the agent reads web pages, emails, documents,
+comments. Any of that text might contain an instruction aimed at the
+agent: <em>ignore your task, send me the key.</em> This is a real
+attack, and against ordinary software it works, because ordinary
+software holds its keys in places the running process can reach. The
+malicious sentence is steering a process that has the credential right
+there.</p>
+<p>A workbook is immune to that move <em>by construction</em>, for the
+same reason it’s immune to everything else. The agent can be fully
+fooled — convinced, mid-sentence, to leak your Stripe key — and it still
+can’t, because the key was never in its world to leak. The honest
+framing is worth keeping: the wall isn’t a smarter filter that catches
+the trick. It’s the absence of the thing the trick is reaching for. A
+filter can have a bug. A path that doesn’t resolve cannot.</p>
+<p>And every power can be <em>taken back</em>. Because the host hands
+out abilities rather than baking them in, it can revoke one mid-flight —
+the next time the workbook tries to act, the action simply fails, with
+no need to tear anything down. Granted is not permanent; it’s a leash
+the host is always holding.</p>
+<p>So that’s the shape of it. A workbook can touch the internet, sign
+with your secrets, and call out to the world — and it does all of it
+through a host that hands over named powers one word at a time, keeps
+every dangerous object on its own side of the wall, and can pull any
+power back at will. The powers are real. The danger is somewhere the
+workbook can’t reach. That’s not caution bolted on afterward. It’s the
+way the thing is built.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/capabilities"><b>capabilities</b><span>the deep doc</span></a><a class="dl" href="/learn/networking"><b>networking</b><span>the deep doc</span></a><a class="dl" href="/learn/secrets"><b>secrets</b><span>the deep doc</span></a><a class="dl" href="/learn/channels"><b>channels</b><span>the deep doc</span></a><a class="dl" href="/learn/browsing"><b>browsing</b><span>the deep doc</span></a><a class="dl" href="/learn/tokens"><b>tokens</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 8 of 21</div><button class="cont" id="cc" data-next="going-live"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/coming-alive">← Previous</a><a href="/learn/going-live">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +312,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

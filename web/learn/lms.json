@@ -1,30 +1,30 @@
 {
- "comment": "The Learning Center curriculum \u2014 net-new, deep CONCEPTUAL lessons for people with no technical foundation (managers, marketers, vibe-coders, people building with Claude). NOT the docs. Each lesson teaches one big idea thoroughly, jargon-light, and links out to the deep doc pages (web/learn/<doc>.html) for the literals. Depth = understanding, not brevity. Order is the learning path.",
+ "comment": "The Learning Center curriculum — net-new, deep CONCEPTUAL lessons for people with no technical foundation (managers, marketers, vibe-coders, people building with Claude). NOT the docs. Each lesson teaches one big idea thoroughly, jargon-light, and links out to the deep doc pages (web/learn/<doc>.html) for the literals. Depth = understanding, not brevity. Order is the learning path.",
  "units": [
   {
    "n": 1,
    "title": "Foundations",
-   "dek": "What the whole thing is made of \u2014 before any of the moving parts.",
+   "dek": "What the whole thing is made of — before any of the moving parts.",
    "lessons": [
     {
      "slug": "the-one-file",
      "title": "A workbook is one file you can hold",
      "status": "live",
-     "teaches": "The core idea: a whole piece of software \u2014 its screen, its logic, its data, its history \u2014 living inside a single file you can email, the way you'd email a photo.",
+     "teaches": "The core idea: a whole piece of software — its screen, its logic, its data, its history — living inside a single file you can email, the way you'd email a photo.",
      "docs": [
       "workbook",
       "bundles",
       "nesting"
      ],
-     "promise": "A whole piece of software \u2014 its screen, its logic, its data, even its memory \u2014 living inside a single file you could email to a friend, the way you'd email a photo.",
+     "promise": "A whole piece of software — its screen, its logic, its data, even its memory — living inside a single file you could email to a friend, the way you'd email a photo.",
      "audio": "audio/episodes/workbook.mp3",
      "mins": "12 min"
     },
     {
      "slug": "carries-its-story",
      "title": "The file that remembers how it was made",
-     "status": "planned",
-     "teaches": "How one file can carry its own source, its own identity, and a complete record of every change \u2014 so it explains itself and proves where it came from.",
+     "status": "live",
+     "teaches": "How one file can carry its own source, its own identity, and a complete record of every change — so it explains itself and proves where it came from.",
      "docs": [
       "specs",
       "git"
@@ -33,8 +33,8 @@
     {
      "slug": "the-one-language",
      "title": "The plain language underneath everything",
-     "status": "planned",
-     "teaches": "Why everything in a workbook \u2014 text, structure, tasks, dates, data \u2014 is written in one simple, human-readable format you could read over someone's shoulder.",
+     "status": "live",
+     "teaches": "Why everything in a workbook — text, structure, tasks, dates, data — is written in one simple, human-readable format you could read over someone's shoulder.",
      "docs": [
       "org",
       "syntax",
@@ -54,8 +54,8 @@
     {
      "slug": "giving-it-abilities",
      "title": "Giving a workbook real abilities",
-     "status": "planned",
-     "teaches": "What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things \u2014 without ever touching your computer.",
+     "status": "live",
+     "teaches": "What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things — without ever touching your computer.",
      "docs": [
       "toolkit",
       "commands",
@@ -68,8 +68,8 @@
     {
      "slug": "code-in-the-document",
      "title": "When the writing and the program are the same thing",
-     "status": "planned",
-     "teaches": "How a document can BE the program \u2014 the same words a person reads are the instructions the machine runs \u2014 and why that makes software you can actually trust.",
+     "status": "live",
+     "teaches": "How a document can BE the program — the same words a person reads are the instructions the machine runs — and why that makes software you can actually trust.",
      "docs": [
       "tangling",
       "claims"
@@ -78,8 +78,8 @@
     {
      "slug": "the-one-command",
      "title": "The one command you type",
-     "status": "planned",
-     "teaches": "Meet wbx, the single tool you talk to \u2014 what it does for you, and why you mostly won't need it to understand any of the rest.",
+     "status": "live",
+     "teaches": "Meet wbx, the single tool you talk to — what it does for you, and why you mostly won't need it to understand any of the rest.",
      "docs": [
       "wbx",
       "modes",
@@ -97,7 +97,7 @@
     {
      "slug": "coming-alive",
      "title": "Where a workbook comes alive",
-     "status": "planned",
+     "status": "live",
      "teaches": "The Nexus: a workbook on your laptop is a document; plug it into an engine and it becomes a living thing that answers requests, runs on a schedule, and serves other people.",
      "docs": [
       "nexus",
@@ -109,8 +109,8 @@
     {
      "slug": "safe-powers",
      "title": "Giving software powers, safely",
-     "status": "planned",
-     "teaches": "How a workbook gets dangerous-sounding powers \u2014 the internet, your secrets, sending messages \u2014 without any of the danger: every power is handed over deliberately and can be taken back.",
+     "status": "live",
+     "teaches": "How a workbook gets dangerous-sounding powers — the internet, your secrets, sending messages — without any of the danger: every power is handed over deliberately and can be taken back.",
      "docs": [
       "capabilities",
       "networking",
@@ -123,8 +123,8 @@
     {
      "slug": "going-live",
      "title": "Putting it on the internet",
-     "status": "planned",
-     "teaches": "What 'deploying' actually means, why it's usually terrifying, and how here it's one push \u2014 plus how the live thing keeps a public history anyone can read.",
+     "status": "live",
+     "teaches": "What 'deploying' actually means, why it's usually terrifying, and how here it's one push — plus how the live thing keeps a public history anyone can read.",
      "docs": [
       "deployments",
       "deploy-kit",
@@ -142,13 +142,13 @@
   {
    "n": 4,
    "title": "Agents",
-   "dek": "Software that does work on its own \u2014 what that really means, and how to keep it honest.",
+   "dek": "Software that does work on its own — what that really means, and how to keep it honest.",
    "lessons": [
     {
      "slug": "what-an-agent-is",
      "title": "What an agent really is",
-     "status": "planned",
-     "teaches": "Strip away the hype: an agent is a loop \u2014 it reads, it acts, it looks at what happened, it goes again. Understand that one loop and the rest stops being magic.",
+     "status": "live",
+     "teaches": "Strip away the hype: an agent is a loop — it reads, it acts, it looks at what happened, it goes again. Understand that one loop and the rest stops being magic.",
      "docs": [
       "agents",
       "loops",
@@ -158,8 +158,8 @@
     {
      "slug": "agents-that-persist",
      "title": "Agents that keep working when you're not watching",
-     "status": "planned",
-     "teaches": "How an agent goes from a thing you chat with to a thing that runs on its own \u2014 standing watch, taking shifts, resting between runs, and pausing to ask you when it should.",
+     "status": "live",
+     "teaches": "How an agent goes from a thing you chat with to a thing that runs on its own — standing watch, taking shifts, resting between runs, and pausing to ask you when it should.",
      "docs": [
       "spawning",
       "orchestration",
@@ -174,7 +174,7 @@
     {
      "slug": "did-it-do-well",
      "title": "Knowing whether the agent actually did well",
-     "status": "planned",
+     "status": "live",
      "teaches": "The hard part of trusting software that thinks: how you measure whether it did a good job, catch it when it drifts, and keep a record you can't fake.",
      "docs": [
       "evals",
@@ -186,13 +186,13 @@
   {
    "n": 5,
    "title": "Automation",
-   "dek": "Plans that aren't just notes about the work \u2014 they ARE the work.",
+   "dek": "Plans that aren't just notes about the work — they ARE the work.",
    "lessons": [
     {
      "slug": "plans-that-run",
      "title": "Plans that run themselves",
-     "status": "planned",
-     "teaches": "Why your to-do list, your calendar, and your project board are all the same thing here \u2014 one plain plan that a person reads and a machine carries out, with no copy to keep in sync.",
+     "status": "live",
+     "teaches": "Why your to-do list, your calendar, and your project board are all the same thing here — one plain plan that a person reads and a machine carries out, with no copy to keep in sync.",
      "docs": [
       "workflows",
       "schedules",
@@ -205,8 +205,8 @@
     {
      "slug": "compiled-plans",
      "title": "When a plan becomes a program",
-     "status": "planned",
-     "teaches": "The deeper idea: the same plan that organizes your week can, with no new tools, become an actual running system \u2014 and how it changes safely while it's live.",
+     "status": "live",
+     "teaches": "The deeper idea: the same plan that organizes your week can, with no new tools, become an actual running system — and how it changes safely while it's live.",
      "docs": [
       "waves",
       "worlds",
@@ -218,12 +218,12 @@
   {
    "n": 6,
    "title": "The disk",
-   "dek": "Where the work lives \u2014 a place to keep things that travels with the project.",
+   "dek": "Where the work lives — a place to keep things that travels with the project.",
    "lessons": [
     {
      "slug": "a-disk-that-travels",
      "title": "A place to keep things that travels with the work",
-     "status": "planned",
+     "status": "live",
      "teaches": "Every project needs somewhere to keep files. Here that somewhere lives INSIDE the workbook, travels when you send it, and can be asked questions like a spreadsheet.",
      "docs": [
       "vfs",
@@ -235,8 +235,8 @@
     {
      "slug": "the-disk-grows",
      "title": "When the work outgrows one file",
-     "status": "planned",
-     "teaches": "What happens when a project gets big \u2014 reaching out to outside data, remembering things by meaning, and swapping in real storage \u2014 without changing how any of it works.",
+     "status": "live",
+     "teaches": "What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.",
      "docs": [
       "foreign-tables",
       "vectors",
@@ -253,7 +253,7 @@
     {
      "slug": "proving-origin",
      "title": "Proving where it came from",
-     "status": "planned",
+     "status": "live",
      "teaches": "If anyone can copy a file, how do you know a workbook is really from who it claims? The idea of a signature that travels with the bytes and can't be faked.",
      "docs": [
       "signatures",
@@ -264,8 +264,8 @@
     {
      "slug": "who-sees-what",
      "title": "Sharing without oversharing",
-     "status": "planned",
-     "teaches": "A file you send is a file you've given away completely \u2014 so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.",
+     "status": "live",
+     "teaches": "A file you send is a file you've given away completely — so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.",
      "docs": [
       "sharing",
       "postures",
@@ -276,8 +276,8 @@
     {
      "slug": "secrets-in-the-open",
      "title": "Keeping a secret inside a file you hand out",
-     "status": "planned",
-     "teaches": "The surprising trick: part of a file you give to everyone can be readable only by the one person holding the right key \u2014 locked in the open, opened only on permission.",
+     "status": "live",
+     "teaches": "The surprising trick: part of a file you give to everyone can be readable only by the one person holding the right key — locked in the open, opened only on permission.",
      "docs": [
       "sealed-sections",
       "escrow"
@@ -287,14 +287,35 @@
   },
   {
    "n": 8,
+   "title": "The browser",
+   "dek": "Where you actually work — the app that is itself a workbook, and how everything you've learned shows up in one place.",
+   "lessons": [
+    {
+     "slug": "the-browser",
+     "title": "The app that is a workbook",
+     "status": "live",
+     "teaches": "The Workbooks Browser: a desktop app whose own interface is built out of workbooks — so the thing you use to open, weave, and run workbooks is made of the same stuff. Tabs, bookmarks, a file tree, a live connection to an engine, and a right-hand dock where any toolkit can mount its own panel — all of it composable, themeable, and drivable by an agent that lives in the app with you.",
+     "docs": [
+      "workbook",
+      "nexus",
+      "toolkit",
+      "the-dock"
+     ],
+     "promise": "The surprising last turn: the app you use to work with workbooks is itself made of workbooks — so the front door to the whole system is built from the same parts as everything inside it, and you can reshape it the same way you reshape anything else.",
+     "mins": "11 min"
+    }
+   ]
+  },
+  {
+   "n": 9,
    "title": "Under the hood",
    "dek": "Optional. The why behind the magic, for the curious.",
    "lessons": [
     {
      "slug": "under-the-hood",
      "title": "Why none of this is magic",
-     "status": "planned",
-     "teaches": "A tour, no code required, of how the pieces actually fit \u2014 the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.",
+     "status": "live",
+     "teaches": "A tour, no code required, of how the pieces actually fit — the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.",
      "docs": [
       "the-kernel",
       "the-seam"

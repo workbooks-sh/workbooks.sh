@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,146 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="giving-it-abilities">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Giving a workbook real abilities</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li cur" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 2 · Making things</div><h1>Giving a workbook real abilities</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things — without ever touching your computer.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/toolkit"><b>Toolkits</b><span>the deep doc</span></a><a class="dl" href="/learn/commands"><b>commands</b><span>the deep doc</span></a><a class="dl" href="/learn/imports"><b>imports</b><span>the deep doc</span></a><a class="dl" href="/learn/audits"><b>audits</b><span>the deep doc</span></a><a class="dl" href="/learn/lanes"><b>lanes</b><span>the deep doc</span></a><a class="dl" href="/learn/promotion"><b>promotion</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 4 of 20</div><button class="cont" id="cc" data-next="code-in-the-document"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/the-one-language">← Previous</a><a href="/learn/code-in-the-document">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li cur" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 2 · Making things</div><h1>Giving a workbook real abilities</h1><article><p>A workbook, on its own, can show you things and remember things. But
+sooner or later you want it to <em>do</em> something — read a PDF,
+crunch a column of numbers, fetch a page, draw a chart, run a real piece
+of software. The moment you reach for that, you hit the oldest, ugliest
+problem in computing: how do you let a program run code it didn’t write,
+do real work, and <em>not</em> be able to wreck your machine in the
+process?</p>
+<p>Most tools answer that question by quietly asking you to trust them.
+A workbook answers it differently. It hands code a job and a sealed room
+to do it in — and never the keys to anything else.</p>
+<h2 id="the-mess-were-escaping">the mess we’re escaping</h2>
+<p>Watch what happens when you try to give an AI agent some abilities
+today. One framework has its own plugin format. Another wants little
+tool-servers speaking their own protocol. The actual capabilities live
+in packages, each arriving with its own dependency tree, its own
+runtime, its own security story you’re supposed to audit but never do.
+Set up a second agent somewhere else and none of it carries over. You
+spend your time managing tools <em>for</em> your tools, and what you’ve
+built is a pile no two people assemble the same way.</p>
+<p>The instinct is always to fix this with one more format — which is
+precisely how we ended up with this many formats. The real fix is
+noticing that a useful tool is three things glued together, and today we
+keep them apart. A tool needs <strong>code that runs</strong>, <strong>a
+place it can run safely</strong>, and <strong>an explanation of how to
+use it</strong>. Right now those are three separate artifacts, from
+three separate ecosystems, that you’re left to source and stitch
+yourself. A <em>toolkit</em> is what you get when they finally arrive as
+one object.</p>
+<h2 id="the-toolbox-metaphor-taken-literally">the toolbox metaphor,
+taken literally</h2>
+<p>Think of a tradesman’s toolbox. It holds the tools, yes — but it’s
+also the case they lock into so nothing rattles loose, and there’s a
+dog-eared manual tucked in the lid. You pick the whole thing up and
+carry it as a single object. Nobody hands you a drill bit, a warehouse
+address, and a PDF in three separate shipments and calls that a
+toolbox.</p>
+<p>A toolkit is built the same way, in three layers that travel
+together.</p>
+<p><strong>The manual — the surface.</strong> The top of a toolkit is
+plain text: a small tree of documents describing what the tool does,
+when to reach for it, and how each command works, with worked examples.
+A person reads it like documentation. An agent reads it like a skill —
+enough structure to discover the tool, load only the part it needs, and
+use it correctly. Same words, both audiences. Write the manual once and
+you’ve onboarded every human <em>and</em> every agent that will ever
+meet the tool.</p>
+<p><strong>The muscle — the code.</strong> Underneath the manual is an
+actual working program — not a description of one. Real code, written in
+whatever language suited the job, compiled into a portable, universal
+form (the same kind that runs inside every web browser). This isn’t
+about rewriting the world’s software: a battle-tested library that’s
+existed for decades becomes a toolkit by being <em>brought across</em>,
+not reinvented.</p>
+<p><strong>The floor — the sandbox.</strong> A toolkit runs inside the
+engine’s sealed sandbox, with exactly the capabilities it was granted
+and nothing more. This is the quiet revolution. Today, installing a tool
+means trusting its author with your whole machine. Installing a toolkit
+means trusting it with exactly what you handed it — a sealed compartment
+and a short list of grants. The floor does the vetting that app-store
+review only pretends to do.</p>
+<p>One signed unit: manual, muscle, floor. That’s a toolkit.</p>
+<h2 id="the-manual-is-the-interface">the manual <em>is</em> the
+interface</h2>
+<p>Here’s the design choice that makes toolkits feel different from
+everything else.</p>
+<p>It turns out AI agents don’t work best with a hundred bespoke,
+custom-built integrations. They work best the way <em>people</em> work
+at a keyboard: with one general tool — a command line — and a set of
+useful small programs to call. That’s why the humble terminal never
+died. Composable little programs beat one giant monolithic interface for
+getting real work done.</p>
+<p>So a toolkit doesn’t bolt a new protocol onto your agent. It simply
+puts a command where the agent can find it, and the manual right next to
+it. And because the manual is <em>structured</em> text rather than
+free-form prose, it does double duty: it documents the tool for a human,
+and it’s precise enough to act as the tool’s instructions for a machine
+— examples you can run, commands a program can read and call. The
+documentation can never drift away from the truth, because the
+documentation is <em>how the tool is reached.</em> There’s no second
+source to fall out of sync.</p>
+<p>If you’ve ever handed a coding assistant a “skill file,” this is that
+idea taken all the way: the skill, the program it teaches, and the safe
+room it runs in — shipped as one sealed object instead of three loose
+pieces.</p>
+<h2 id="isnt-this-just-a-plugin">“isn’t this just a plugin?”</h2>
+<p>Fair question, and the honest answer is that every familiar
+alternative solves <em>one</em> of the three layers and leaves you
+holding the other two.</p>
+<p>A normal software package gives you code that runs — on your machine,
+at your risk, with a readme if you’re lucky, and none of it transfers. A
+tool-server gives you code and a protocol but hands the safe-place
+problem back to you, documented with a schema rather than guidance. A
+platform plugin runs in the host’s sandbox but is locked to that one
+host. Each is a reasonable idea. Each leaves two of the three supply
+chains for you to solve.</p>
+<p>A toolkit is the bet that code, sandbox, and manual were never
+supposed to be three separate supply chains in the first place. And
+notice the stance: a toolkit doesn’t compete with those existing tools —
+it happily <em>wraps</em> them. The claim was never “a better protocol.”
+It’s “these three things belong in one box.”</p>
+<p>This works because of one bet worth saying plainly: untrusted code is
+no longer the exception, it’s the <em>medium</em>. Tools you didn’t
+write, code an agent generated thirty seconds ago — all of it wants to
+run, and an install script is just untrusted code you’ve agreed to run
+with your own permissions. The portable code format toolkits use was
+<em>born</em> for this: designed from day one to run a stranger’s code,
+fast, inside a sealed box, on any hardware. And because that same format
+runs in browsers, the very tool the engine runs on a server can ride
+<em>inside</em> a workbook file and run on your screen, offline. The
+heavier abilities that genuinely need a server — saving data, holding
+secrets, reaching the network — light up when the workbook is plugged
+into an engine.</p>
+<h2 id="they-stack-and-the-box-keeps-filling">they stack, and the box
+keeps filling</h2>
+<p>Single tools are just the start. Because every toolkit shares the
+same shape — manual, muscle, floor — they stack without negotiation.
+Bundle a few toward a job and you have a research rig or a publishing
+pipeline. An agent, it turns out, is itself a toolkit-shaped thing: its
+manual describes <em>who it is</em>, and the tools are what it reaches
+for. Even the plan an agent follows is written in that same readable
+layer.</p>
+<p>And here’s the part that makes it grow. Build something useful
+<em>inside</em> a workbook — a parser, a chart kit, a little scraper —
+and one command promotes it into a toolkit the next workbook can pick
+up. The shared parts bin is fed by the things people actually make,
+which is the only way a parts bin ever gets good.</p>
+<p>Let’s be straight about where this stands, because it’s the youngest
+part of the system. The unit is stable, and the engine underneath is
+built on decades of proven infrastructure — but the parts bin itself is
+<em>early</em>: real, working, growing, and still small. The catalog
+grows one conversion at a time: a tool gets compiled, a library gets
+wrapped, a manual gets written. Most software crosses cleanly; some puts
+up a fight. But every fight won is permanent — convert a tool once and
+it works for every workbook, every agent, forever after. Which is the
+quiet invitation buried in all of this: the easiest way to give
+<em>your</em> workbook a new ability is often to bring across a tool you
+already love. And once you have, you’ve added it to everyone’s box
+too.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/toolkit"><b>Toolkits</b><span>the deep doc</span></a><a class="dl" href="/learn/commands"><b>commands</b><span>the deep doc</span></a><a class="dl" href="/learn/imports"><b>imports</b><span>the deep doc</span></a><a class="dl" href="/learn/audits"><b>audits</b><span>the deep doc</span></a><a class="dl" href="/learn/lanes"><b>lanes</b><span>the deep doc</span></a><a class="dl" href="/learn/promotion"><b>promotion</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 4 of 21</div><button class="cont" id="cc" data-next="code-in-the-document"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/the-one-language">← Previous</a><a href="/learn/code-in-the-document">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +327,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

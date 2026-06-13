@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,138 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="plans-that-run">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Plans that run themselves</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li cur" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 5 · Automation</div><h1>Plans that run themselves</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>Why your to-do list, your calendar, and your project board are all the same thing here — one plain plan that a person reads and a machine carries out, with no copy to keep in sync.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/workflows"><b>Workflows</b><span>the deep doc</span></a><a class="dl" href="/learn/schedules"><b>schedules</b><span>the deep doc</span></a><a class="dl" href="/learn/boards"><b>boards</b><span>the deep doc</span></a><a class="dl" href="/learn/validations"><b>validations</b><span>the deep doc</span></a><a class="dl" href="/learn/autopoet"><b>Autopoet</b><span>the deep doc</span></a><a class="dl" href="/learn/dispatch"><b>dispatch</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 13 of 20</div><button class="cont" id="cc" data-next="compiled-plans"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/did-it-do-well">← Previous</a><a href="/learn/compiled-plans">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li cur" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 5 · Automation</div><h1>Plans that run themselves</h1><article><p>Every project you’ve ever worked on kept a plan. And almost none of
+them kept it where the work actually happened.</p>
+<p>Think about your own week. The to-do list is in one app. The calendar
+is in another. The project board — the columns, the cards, the little
+colored labels — lives in a third. The work itself is somewhere else
+entirely: in files, in documents, in a website that’s slowly taking
+shape. Four places, four pictures of the same project, and none of them
+agrees with the others for more than an afternoon. So someone’s job
+quietly becomes <em>updating the board</em>. Dragging cards. Checking
+boxes. Copying what’s true into a tool that only ever drifts away from
+the truth again.</p>
+<p>That isn’t laziness, and it isn’t a tooling problem you can fix by
+buying a better tracker. It’s deeper than that. The plan and the work
+are two separate things, kept in two separate places, and nothing
+actually connects them. Every status meeting where someone reads the
+board aloud and someone else corrects it from memory is the price you
+pay for that gap.</p>
+<p>A workbook closes the gap with one stubborn idea: the plan isn’t a
+<em>note about</em> the work. The plan <strong>is</strong> the work.</p>
+<h2 id="one-file-the-person-reads-and-the-machine-runs">one file the
+person reads and the machine runs</h2>
+<p>Here’s the move. Instead of keeping the plan in a database somewhere
+and the real work somewhere else, you write the plan as plain text —
+readable sentences, in the same file as everything else — and that text
+is the only copy that exists.</p>
+<p>It’s an ordinary outline. A heading for each task. A little word in
+front of each one that says where it stands: <code>TODO</code> for
+not-yet, <code>DONE</code> for finished. Underneath a task you can write
+<em>why</em> — in full sentences, right where the decision lives,
+instead of buried in a comment thread three tools away. “Waiting on the
+brand pass — see the thread with Maria.” That note isn’t a sticky on top
+of the plan. It’s <em>in</em> the plan, traveling with it forever.</p>
+<p>The reason this works is that the file is written to be read by two
+readers at once. A person reads it and sees a to-do list. A machine
+reads the exact same lines and sees instructions it can carry out.
+Nobody translates between the two. Nothing renders <em>to</em> this file
+and nothing exports <em>from</em> it — it is the single source, and
+everything else is either a view of it or a worker acting on it. Change
+the file and every view updates. Finish a task and the file is what says
+so. There is no second copy to keep honest, because there is no second
+copy at all.</p>
+<p>And because it’s just text, the plan inherits everything text already
+has. It can be reviewed like code. It has a perfect history — six months
+from now, “why did we drop that feature?” is answered by looking back
+through the file’s own past, not by an archaeology dig through old chat
+logs.</p>
+<h2 id="the-only-rule-that-runs-the-whole-thing">the only rule that runs
+the whole thing</h2>
+<p>You might expect that turning a plan into something a machine can run
+takes a thicket of settings — priorities, schedulers, assignment rules.
+It takes almost nothing. The entire engine rests on one small word:
+<strong>ready</strong>.</p>
+<p>A task is <em>ready</em> when two things are true. It’s still
+unfinished, and everything it depends on is already done. That’s the
+whole definition. No scheduling configuration, no clever algorithm
+deciding who does what. Readiness is just a fact you can work out by
+reading the file.</p>
+<p>So you tell the plan which tasks depend on which — “you can’t build
+the page until the artwork is rendered” — and from those few hints the
+order of work simply <em>falls out</em>. You never draw the sequence
+yourself. You never maintain it. The plan works out, every single time,
+from the current state of the file: this is done, so that one is now
+ready; that’s still waiting, so the thing after it waits too.</p>
+<p>Then the work is a loop so simple it barely earns the name. Find the
+tasks that are ready. Do them. Write <code>DONE</code> back into the
+file. Look again. Anything that was waiting on those tasks is now ready,
+so do those next. Repeat until nothing’s left. The plan clears itself,
+one wave at a time, and nobody ever wrote down the order — the order was
+hiding in the dependencies all along.</p>
+<p>Two quiet payoffs come with this. First, work that never blocked
+anything gets noticed: a task with nothing depending on it can be done
+whenever someone has a free hour, and the dependency view points it out
+for you. Second, when the work stalls, the reason is never a mystery. If
+nothing is ready but tasks remain, something is <em>stuck</em> — and
+stuck always has a name, because the only thing that can hold a task
+back is a dependency you can point to. “Why isn’t this moving?” has an
+answer you can read, not a meeting you have to schedule.</p>
+<h2 id="your-board-your-calendar-your-cron-job-all-the-same-plan">your
+board, your calendar, your cron job — all the same plan</h2>
+<p>Now the part that makes the four-tools problem dissolve.</p>
+<p>A kanban board with its columns. A timeline. A calendar of deadlines.
+In a workbook, none of those is a separate thing with its own database.
+Each one is a <strong>rendering</strong> of the plan file — drawn from
+it the way a web page is drawn from its underlying text. The board
+doesn’t <em>store</em> anything. It shows you the file, arranged as
+columns. Drag a card from “doing” to “done” and the word in the file
+flips to <code>DONE</code>. Edit the file and the board redraws. The two
+can never disagree, because there aren’t two of them — there’s one file
+wearing different clothes.</p>
+<p>If you go looking for the machinery behind the board — a table of
+cards, a column schema, a sync job — the search comes up empty. There is
+no board stored anywhere. That absence isn’t a missing feature; it’s the
+entire design. There’s nothing to sync because there’s nothing to sync
+<em>between</em>.</p>
+<p>Time folds in the same way. The third place plans usually scatter to
+— after the board and the to-do list — is the scheduled job: that lonely
+corner where “what should happen, and when” lives, readable by one
+machine and reviewed by no one. A workbook absorbs it. “Every Friday at
+nine” is just a timestamp written on the task itself, sitting in the
+same readable file as everything else. A deadline that’s passed isn’t a
+notification you missed; it’s a fact anyone can read off the plan. The
+schedule stops being a fourth unreviewable system and becomes one more
+line in the document you already have open.</p>
+<p>And the workers? The loop genuinely does not care who they are. A
+person working down the ready list and a software agent waking up on a
+schedule are <em>interchangeable</em>. The agent might clear the first
+round of work overnight; you pick up the next round with your coffee;
+neither of you has to brief the other, because the file is the meeting.
+That’s what makes handoffs between people and machines boring — in the
+best possible way.</p>
+<h2 id="what-it-does-not-promise">what it does not promise</h2>
+<p>Two honest edges, because this is powerful enough to be worth being
+straight about.</p>
+<p>A plan made of free text can still drift. An agent writing into it
+can duplicate a task or mark something done that isn’t. What a workbook
+changes isn’t that drift becomes impossible — it’s that drift becomes
+<em>catchable</em>. Because the plan is structured, the contradictions
+are checkable facts: a task that depends on something that doesn’t
+exist, a finished task resting on an unfinished one. These get caught
+and named, with a line number, instead of passing as a quiet shrug at
+the next standup.</p>
+<p>And running a plan is not the plan running <em>itself</em>. This was
+never about software that works without you. Direction stays human. The
+workers stop at the edges you set. What changes is that following
+through gets cheap — the tedious part, the keeping-it-all-in-sync part,
+the dragging-cards part, simply goes away. The judgment doesn’t. That’s
+still yours, and it always will be.</p>
+<p>What’s left is the thing you wanted all along: one plan, in one file,
+that a person can read and a machine can run — with no copy to keep in
+sync, because there was only ever one.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/workflows"><b>Workflows</b><span>the deep doc</span></a><a class="dl" href="/learn/schedules"><b>schedules</b><span>the deep doc</span></a><a class="dl" href="/learn/boards"><b>boards</b><span>the deep doc</span></a><a class="dl" href="/learn/validations"><b>validations</b><span>the deep doc</span></a><a class="dl" href="/learn/autopoet"><b>Autopoet</b><span>the deep doc</span></a><a class="dl" href="/learn/dispatch"><b>dispatch</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 13 of 21</div><button class="cont" id="cc" data-next="compiled-plans"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/did-it-do-well">← Previous</a><a href="/learn/compiled-plans">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +319,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

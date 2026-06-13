@@ -57,7 +57,7 @@ a{ color:inherit; text-decoration:none; }
   gap:clamp(28px,4vh,50px); padding:5vh 6vw; }
 .hype{ width:100%; max-width:1180px; margin:0 auto; }
 .hype .wlabel{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
-.hype .vplayer{ aspect-ratio:21/9; max-height:50vh; }
+.hype .vplayer{ aspect-ratio:16/9; max-height:58vh; margin:0 auto; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
@@ -68,18 +68,18 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+/* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
-  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
-.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
+  text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:16px 28px; box-shadow:0 5px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.start:hover{ background:var(--paper); transform:translateY(-1px); box-shadow:0 6px 0 var(--ink); }
+.start:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
 .souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
-.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px;
   display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
 .souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .souts li .tx{ padding-top:6px; }
@@ -180,8 +180,143 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 <body class="lesson" data-slug="the-one-language">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">The plain language underneath everything</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li cur" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 1 · Foundations</div><h1>The plain language underneath everything</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>Why everything in a workbook — text, structure, tasks, dates, data — is written in one simple, human-readable format you could read over someone&#x27;s shoulder.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/org"><b>Org</b><span>the deep doc</span></a><a class="dl" href="/learn/syntax"><b>syntax</b><span>the deep doc</span></a><a class="dl" href="/learn/tags"><b>tags</b><span>the deep doc</span></a><a class="dl" href="/learn/drawers"><b>drawers</b><span>the deep doc</span></a><a class="dl" href="/learn/timestamps"><b>timestamps</b><span>the deep doc</span></a><a class="dl" href="/learn/todos"><b>to-dos</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 3 of 20</div><button class="cont" id="cc" data-next="giving-it-abilities"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/carries-its-story">← Previous</a><a href="/learn/giving-it-abilities">Next →</a></div></aside></div></div>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 21 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li cur" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>The browser</div><a class="li" data-slug="the-browser" href="/learn/the-browser"><span class="dot"></span><span class="t">The app that is a workbook</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 9</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 1 · Foundations</div><h1>The plain language underneath everything</h1><article><p>Open a piece of software up — really open it — and try to find the
+part where it says <em>why</em>. Why this exists. What’s done and what’s
+still owed. What someone decided last spring, and what they were
+thinking when they decided it. You’ll hunt for a long time, because that
+part lives nowhere. There’s a README that’s half out of date, tickets in
+one tool, a spec in another, a thread of decisions buried in chat. The
+working software doesn’t carry its own story. It never has.</p>
+<p>That missing story is the most expensive thing in software, and
+almost nobody ships it. So before we talk about the moving parts — the
+agents, the data, the deployments — let’s talk about the material
+everything here is <em>written in</em>. Because a workbook does
+something quietly radical: it keeps the intent, the plan, the schedule,
+and the runnable parts in one plain-text layer you could read over
+someone’s shoulder, in one sitting, without being shown how.</p>
+<h2 id="the-trade-nobody-else-refuses">the trade nobody else
+refuses</h2>
+<p>Here’s the bind that every other format walks into.</p>
+<p>You can write your thinking in Markdown — and you should, it’s lovely
+to read. But Markdown is a <em>blogging</em> language. It has headings
+and bold text and bullet points, and that’s about where it stops. A
+machine looking at Markdown sees decoration. It cannot tell that one
+line is a task and another a finished task; it cannot find the deadline;
+it can’t check whether the plan still holds together. There are no
+states, no dates, no dependencies — “just headings and vibes,” as one of
+our own docs puts it. You cannot write a test for a Markdown file,
+because there’s nothing in it a machine can be wrong about.</p>
+<p>So people reach for the other kind of format — the structured kind,
+the configuration files full of tidy keys and values. Those parse
+perfectly. But try to write a paragraph of reasoning in one. Try to
+explain <em>why</em> inside a settings file. You can’t. There’s no room
+for a human thought in there.</p>
+<p>That’s the trade the whole industry has quietly accepted: prose
+<strong>or</strong> structure, pick one. Write something a person enjoys
+reading, or something a machine can act on — but not both, not in the
+same place. So intent and execution get torn apart and filed in
+different drawers, and drift apart forever after.</p>
+<p>A workbook refuses that trade. Everything in it — the prose, the
+tasks, the dates, the runnable code — is written in <em>one</em> format
+that’s readable by people, writable by agents, and testable by machines,
+all at once. That format has a name: <strong>org</strong>.</p>
+<h2 id="one-grammar-borrowed-not-invented">one grammar, borrowed not
+invented</h2>
+<p>The first thing to know about org is that we didn’t make it up.</p>
+<p>It comes from a twenty-year-old convention called org-mode, which
+began as a humble way to keep notes, to-do lists, and schedules in plain
+text. It sits in a long, stubborn tradition — the idea that code should
+live <em>inside</em> the explanation of why it exists, rather than the
+explanation being stapled on later. And over two decades, almost by
+accident, it grew exactly the feature set today’s AI systems are
+scrambling to reinvent, usually badly: task states, timestamps,
+dependencies, and a way to keep real, runnable source code right inside
+the document.</p>
+<p>The way to think about org’s role is by analogy to something you
+already trust. The web settled, long ago, on one format for what a page
+<em>looks like</em> — HTML. Nobody owns it; it’s just the shared
+agreement, and because everything speaks it, everything works together.
+Org plays that same role for what things <em>mean</em>. The face of the
+web is HTML; the meaning of a workbook is org.</p>
+<p>And there’s a happy accident baked in. Because org-mode has been
+around for twenty years, two decades of writing about it sit inside the
+training data of every modern AI model. The agents don’t have to be
+taught this format — they arrived already knowing it. Hand an agent a
+workbook and you’re handing it something it reads fluently on sight, not
+a proprietary dialect it has to puzzle out.</p>
+<h2 id="what-one-file-can-hold">what one file can hold</h2>
+<p>It helps to see what gets to coexist on a single page when the
+grammar is this expressive. Picture a short description of how a piece
+of software is deployed. In one small org file you can have all of this
+at once:</p>
+<p>A real heading structure — a hierarchy a machine can navigate, not
+just visual sizing. A line that sets where the engine runs. A line
+declaring which database it uses. A task that says <em>rotate the
+signing key</em>, marked as not-yet-done, with an actual scheduled date
+attached. And then, right underneath, a plain-English paragraph of
+reasoning — “single-tenant for now; revisit when the team joins.”</p>
+<p>Configuration, a scheduled task, and a human thought — all on one
+page, and <em>every line of it parseable</em>. The machine sees the
+deploy target as a deploy target, the task as a task, the date as a
+date. You see a document you can read like a memo. Neither of you had to
+translate for the other. The four things that usually live in four
+separate files — the structure, the plan, the schedule, the explanation
+— collapse into one tree, and once they’re in one place, they can’t
+drift out of sync, because there’s only one of them.</p>
+<h2 id="the-same-grammar-everywhere-you-look">the same grammar,
+everywhere you look</h2>
+<p>The quiet superpower isn’t any single feature. It’s that the
+<em>same</em> grammar shows up in every corner of the system, so every
+piece can read every other piece — and so can you.</p>
+<p>The intent, tasks, and memory inside a workbook are written in org. A
+toolkit’s manual — the human-readable page describing what a tool does —
+<em>is</em> its interface; the manual is the API. A deployment is one
+declarative org file describing the whole setup. A workflow — a plan
+with tasks, dependencies, and states — is written in org, and renders
+straight onto boards and timelines for agents to execute. Even an
+agent’s own identity — who it is, what it’s for — is written in the same
+grammar it works in.</p>
+<p>Learn to read org once, and you can read all of it. There’s no
+separate “config language” for deployments, no different “plan format”
+for workflows, no special dialect for agents. One set of conventions,
+reused everywhere — which is why a person who’s never seen your project
+can open any part of it and understand what they’re looking at. The
+system is legible to its own author, and that turns out to be rare and
+precious.</p>
+<h2 id="the-honest-edges">the honest edges</h2>
+<p>Two things to be straight about, because pretending otherwise would
+do you no favors.</p>
+<p>First, plain text drifts. An agent writing freely into an org file
+will, eventually, write too much, or write the same thing twice, or
+contradict something it said earlier. Org doesn’t <em>prevent</em> that
+— no format does. What it does is make the drift
+<strong>catchable</strong>. Because the layer is genuinely parseable, a
+checker — or another agent — can walk the tree, read the states and
+dates and structure, and <em>notice</em> the contradiction. Markdown
+can’t even do that; it has no idea anything’s wrong, because it never
+understood the content in the first place. Org’s gift isn’t perfection.
+It’s visibility.</p>
+<p>Second, org is not a database. It’s wonderful for prose, plans,
+configs, and memory — the things that <em>describe</em> a piece of
+software. But heavy structured data — the rows and rows you want to
+query and join at scale — does not belong in headlines; that lives in
+the workbook’s own database. Use each layer for what it’s for: org for
+what things <em>mean</em>, the database for the data itself.</p>
+<p>And a reassurance, since the word “format” can make people brace for
+homework: you are not about to spend your days hand-writing org. You’ll
+write prose and intentions; the tooling and the agents keep the
+structure tidy, the same way you don’t hand-edit the inner machinery of
+a version-control system. Your real job is mostly to <em>read</em> it —
+which takes about four minutes to learn, because it was designed to be
+read.</p>
+<p>So that’s the foundation underneath everything else here. One
+plain-text grammar, twenty years old and owned by no one, that holds
+prose and structure in the same breath — readable by you, writable by
+agents, testable by machines. Everything that follows is just
+discovering what such a humble, legible little language lets you
+build.</p>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/org"><b>Org</b><span>the deep doc</span></a><a class="dl" href="/learn/syntax"><b>syntax</b><span>the deep doc</span></a><a class="dl" href="/learn/tags"><b>tags</b><span>the deep doc</span></a><a class="dl" href="/learn/drawers"><b>drawers</b><span>the deep doc</span></a><a class="dl" href="/learn/timestamps"><b>timestamps</b><span>the deep doc</span></a><a class="dl" href="/learn/todos"><b>to-dos</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 3 of 21</div><button class="cont" id="cc" data-next="giving-it-abilities"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/carries-its-story">← Previous</a><a href="/learn/giving-it-abilities">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -189,7 +324,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=21;
   document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
   ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });

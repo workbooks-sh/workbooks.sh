@@ -1,0 +1,131 @@
+<p>Imagine writing a description of a piece of software — the kind of
+plain explanation you’d give a colleague. <em>First we fetch the events.
+Then we summarize them. Then we email the summary out every
+morning.</em> Now imagine that the description doesn’t sit beside the
+software, getting slowly out of date. Imagine the description
+<em>is</em> the software. The same sentences a person reads are the
+exact instructions the machine follows. There is no second copy hiding
+in a config file somewhere, no gap to drift open.</p>
+<p>That sounds like a small convenience. It isn’t. It’s a different
+relationship with software entirely — one where what’s written down and
+what actually runs can never quietly disagree, because they’re the same
+thing.</p>
+<h2 id="where-the-wiring-usually-lives">where the wiring usually
+lives</h2>
+<p>Start with the problem, because it’s worse than it looks. Every
+system that does more than one step has <em>wiring</em>: what feeds
+what, what each piece is allowed to touch, when the whole thing runs.
+That wiring is the most important part of the system — and in most
+setups it has no real home. It’s stranded in some orchestrator’s
+configuration language nobody enjoys reading, sitting next to
+documentation nobody trusts, next to code in a place the documentation
+has never heard of.</p>
+<p>The deep cause is a split. The <em>interface</em> of a system — its
+inputs, its dependencies, its schedule — gets described in one language,
+while the <em>logic</em> that does the work is written in another,
+somewhere else. The instant either one changes, they drift apart. The
+diagram on the wall says one thing; the running system does another; and
+the only person who knows which is true is the one who built it.</p>
+<p>A workbook closes that split by refusing to make two copies in the
+first place. You write one document. From that document, everything else
+is <em>derived</em>.</p>
+<h2 id="a-document-that-compiles-into-a-plan">a document that compiles
+into a plan</h2>
+<p>The move has an old name: <em>tangling</em>. It comes from a style of
+programming where you write a human document and then extract the
+runnable code from it. The classic version writes out a pile of source
+files. The version here does something stranger and more useful — it
+writes out a <em>plan for a whole system</em>.</p>
+<p>Here’s the shape of it. In the document, a heading marked as a
+workflow becomes a little world. The headings beneath it, each marked as
+a component, become its working parts. A component is almost nothing: a
+name, and a single block of source code underneath it. Everything else
+about how that component connects to the others isn’t written in the
+code at all. It’s written in a handful of short tags on the line where
+the code begins — plain labels saying <em>this depends on those
+libraries</em>, <em>this needs permission to touch the network</em>,
+<em>this takes in a list of events</em>, <em>this puts out a
+summary</em>.</p>
+<p>That’s the quiet genius of it. The connections live in the prose
+layer, not the code. So the language inside the block — whether it’s
+Rust, JavaScript, Go — is completely irrelevant to how the pieces wire
+together. They all declare their inputs and outputs the same plain way.
+One system can be built from three different languages, stitched
+together by nothing more than matching labels.</p>
+<h2 id="the-part-where-nothing-is-drawn">the part where nothing is
+drawn</h2>
+<p>Now the surprising bit. The function that figures out a component’s
+place in the system <em>never reads the code inside it</em>. It works
+entirely from those short tags on the surface. And from them, it derives
+the whole structure without anyone drawing it.</p>
+<p>It works out the <strong>capabilities</strong> — pool together every
+“this needs the network,” “this needs the database,” and you have the
+full list of powers the system asks for. It works out the
+<strong>connections</strong> — for every component that takes in a list
+of events, find the one that puts out a list of events, and a line
+appears between them, automatically. It works out the <strong>loose
+ends</strong> — any output that nobody downstream consumes becomes a
+result the whole system hands back to you.</p>
+<p>Picture a real one: a nightly digest. The first piece fetches events
+and announces it produces <em>a list of events</em>. The second piece
+announces it consumes <em>a list of events</em> — so a connection
+appears between them, derived purely from those two labels meeting. The
+second piece produces a summary; the third consumes it and emails it
+out. Three pieces, in three languages, and not a single connecting line
+was written by hand. They all fell out of the labels.</p>
+<p>This is the heart of the lesson. The structure of the system is
+<em>computed from the document</em>, never separately maintained. There
+is no wiring diagram to keep in sync, because the diagram is just a view
+of what the words already say.</p>
+<h2 id="a-plan-you-can-check-before-it-runs">a plan you can check before
+it runs</h2>
+<p>Once the structure is something a machine derives rather than
+something a person hand-maintains, you can do something you can’t do
+with ordinary prose: you can run a test suite against a
+<em>document</em>.</p>
+<p>Before anything builds, the plan can be validated. The check is
+humble and exact. Is there a component with no actual code in it? That’s
+an error, named and reported. Is there a piece that asks for <em>a list
+of events</em> when nothing in the system produces one — a dangling
+input wired to nowhere? That’s an error too, caught and pointed at by
+name, before a single line of code is compiled.</p>
+<p>Think about what that means. A broken connection in your software
+stops being something you discover at 2 a.m. when it fails in front of a
+customer. It becomes a fact about the document — checkable, like a
+spelling mistake — found the moment you write it. The thing you describe
+and the thing that runs are the same thing, so describing it wrong is
+the same as building it wrong, and both get caught at the same early
+door.</p>
+<h2 id="why-the-same-thing-is-the-whole-point">why “the same thing” is
+the whole point</h2>
+<p>You can run all of this on your own machine with no server involved —
+feed it the document, get back the plan. And when the system runs, it
+does the obvious thing: it builds each piece, runs them in the right
+order so producers go before the consumers that depend on them, and
+pipes the output of one straight into the next. The plan describes the
+work, and the work follows the plan exactly, because there’s only one of
+them.</p>
+<p>That single-source quality is what earns your trust. In the ordinary
+world, you read a description of software and you simply have to hope
+it’s accurate — the description and the system are separate objects
+maintained by separate hands, and hope is doing all the work. Here, hope
+is unnecessary. There is no second document to fall out of date, because
+the document was never a description <em>of</em> the system. It is the
+system. When you read it, you are reading exactly what will run. When
+you change a sentence, you have changed the program.</p>
+<p>The derived plan can also stand guard as the system grows up. The
+same surface that wires everything together can be compared between two
+versions — so if a new version quietly stops handing back a result
+something else relied on, or quietly demands a new power it didn’t need
+before, that change is visible and can be questioned. One honest
+description, doing two jobs at once: wiring the system today, and
+keeping its evolution honest tomorrow.</p>
+<p>It’s worth being plain about the edges. Connections match by exact
+label, and the labels aren’t yet a full type system — a matching name is
+taken on faith. Permissions a component declares are recorded truthfully
+but aren’t yet enforced as hard grants. These are named gaps, not hidden
+ones.</p>
+<p>But the foundation is already real and already strange and wonderful:
+a document you can read, that a machine can check, that wires itself
+together from nothing but the words on the page — and then runs as
+exactly what it says.</p>
