@@ -174,18 +174,26 @@ export const nexusWebProvider: SearchProvider = {
         headers: token ? { authorization: `Bearer ${token}` } : {},
         signal: AbortSignal.timeout(8000),
       });
-      if (!res.ok) return [];
+      if (!res.ok) return mockWeb(q); // nexus reachable but no route → preview
       const data = (await res.json()) as { results?: { title: string; url: string; snippet?: string }[] };
-      return (data.results ?? []).map((r, i) => ({
-        kind: "web",
-        title: r.title || r.url,
-        subtitle: r.snippet || r.url,
-        url: r.url,
-        providerId: "web",
-        score: 100 - i, // preserve SERP order
-      }));
+      const results = (data.results ?? []).map((r, i) => {
+        let host = "";
+        try { host = new URL(r.url).host; } catch { /* leave blank */ }
+        return {
+          kind: "web" as const,
+          title: r.title || r.url,
+          subtitle: r.snippet || r.url,
+          url: r.url,
+          host,
+          providerId: "web",
+          score: 100 - i, // preserve SERP order
+          image: thumb(host + r.url),
+        };
+      });
+      // No live results (dead/empty route) → preview so the UI still shows.
+      return results.length ? results : mockWeb(q);
     } catch {
-      return [];
+      return mockWeb(q); // unreachable nexus → preview
     }
   },
 };
