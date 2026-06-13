@@ -1726,3 +1726,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   reclaim mechanism for the codegen-blocked C class. Build-lane reclaim recipes now proven: single-source C
   (iter129) + multi-stage codegen (this fire). Remaining build-system items also need ./configure (shell-in-
   sandbox, harder) + the JS-host/newer-Rust lanes (wb-lcsj) — each substantial, but the codegen piece is real.
+- 2026-06-12 (iter 131): **RUST source -> sandboxed-tool recipe proven (the 2nd-largest reclaim language).** A
+  self-contained Rust-2021 CLI (a wc-like tool: std I/O, no proc-macros/deps) is compiled ENTIRELY in-sandbox
+  via the mrustc -> clang -> wasm-ld lane (zero native rustc) and RUN sandboxed (wasmtime, stdin->stdout). Test
+  green: "one two\nthree four five" -> lines=2 words=5. So self-contained Rust-2021 tools join self-contained
+  C as reclaimable-from-source. RECLAIM RECIPES NOW PROVEN across the platform: C single-source (iter129) + C
+  multi-stage codegen (iter130) + Rust self-contained (this fire), all building from SOURCE to a working
+  sandboxed tool with NO native toolchain. The rust>mrustc bucket's self-contained-2021 items (and the
+  self-contained-C class) are reachable now; what stays blocked needs proc-macros/edition-2024 (mrustc
+  ceiling), autotools ./configure (shell-in-sandbox), or the JS-host engine — each a deliberate lane campaign
+  (wb-lcsj). The platform builds AND runs tools from C and Rust source, sandboxed.

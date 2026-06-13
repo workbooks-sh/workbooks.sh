@@ -87,4 +87,38 @@ int main(void) { int x; if (scanf("%d", &x) == 1 && x >= 0 && x < 10) printf("%d
     # 7^2 = 49 — the final tool used the in-sandbox-generated table correctly
     assert String.trim(out) == "49"
   end
+
+  @tag :build
+  @tag timeout: 600_000
+  test "a self-contained RUST wc-like tool is compiled in-sandbox (mrustc) and runs sandboxed" do
+    # the second-largest reclaim language: a self-contained Rust-2021 CLI (std I/O, no proc-macros/deps) builds
+    # via the in-sandbox mrustc->clang->wasm-ld lane (zero native rustc) and runs sandboxed (stdin->stdout).
+    src = Path.join(System.tmp_dir!(), "wc_#{System.unique_integer([:positive])}.rs")
+
+    File.write!(src, ~S|
+use std::io::Read;
+fn main() {
+    let mut s = String::new();
+    std::io::stdin().read_to_string(&mut s).unwrap();
+    let lines = s.lines().count();
+    let words = s.split_whitespace().count();
+    println!("lines={} words={} bytes={}", lines, words, s.len());
+}
+|)
+
+    on_exit(fn -> File.rm(src) end)
+
+    case Compilers.rust_compile_to_wasm(src, no_exceptions: true) do
+      {:ok, wasm, _} ->
+        on_exit(fn -> File.rm(wasm) end)
+        out = PackageManager.run(wasm, "one two\nthree four five\n", [])
+        out = if is_tuple(out), do: elem(out, 0), else: out
+        assert out =~ "lines=2"
+        assert out =~ "words=5"
+
+      {:error, reason} ->
+        # surface the lane's limit honestly rather than a green-by-skip
+        flunk("rust_compile_to_wasm failed for a self-contained CLI: #{inspect(reason) |> String.slice(0, 200)}")
+    end
+  end
 end
