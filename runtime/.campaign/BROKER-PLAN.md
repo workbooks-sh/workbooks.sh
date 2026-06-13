@@ -1545,3 +1545,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   EXHAUSTIVE ON BOTH PATHS: SSRF (IPv4+IPv6 literal, decimal/hex/octal/short, v4-mapped, NAT64/6to4/Teredo),
   DNS-rebinding (resolve-then-pin, http+https), DNS-exfil, userinfo@, redirect-to-internal, allow-list scope,
   rate/conn/byte DoS, revocation — all closed + tested on host-mediated AND standard-tool paths.
+- 2026-06-12 (iter 116): **FEASIBILITY RE-RUN -> BUILD-LANE FRONTIER SCOPED (wb-lcsj).** Networking is red-team-
+  green on both egress paths (nothing left but padding), so executed the directive's "re-run the feasibility
+  pass to reclaim": confirmed NONE of the 262 build-blocked items is reclaimable by the current in-sandbox
+  lanes (C/clang.wasm, Rust/mrustc-1.74, Zig, Go, QuickJS) — they're blocked by structural build issues, not
+  networking. Bucketed all 262 by the NEW lane each class needs (see wb-lcsj): 56 emscripten/JS-host-only (needs
+  a JS-host wasm-engine lane) | 41 native-threads | 32 fork-exec | 31 heavy-build-system (CMake/autotools/Bazel
+  configure-in-wasm) | 23 rust>mrustc-1.74 | 18 native-compiler-langs | 6 network-as-purpose servers (the one
+  networking-adjacent reclaim: brokered RAW-TCP INBOUND, host-as-listener->guest, extends the wasi:http app-
+  host to raw TCP) | 1 GPU | 54 other. Each bucket = a substantial NEW campaign. This is the honest end-state:
+  the networking keystone + all 4 stones are COMPLETE, audited, self-audited, and exhaustively red-team-green;
+  the next frontier (build-lanes) is scoped + filed and warrants owner direction to launch. Highest-ROI: the
+  JS-host wasm-engine lane (56 items) + raw-TCP brokered inbound (6, networking-adjacent).
