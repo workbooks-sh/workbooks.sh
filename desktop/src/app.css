@@ -57,10 +57,13 @@
   --gradient-aurora-c: #f3cfae;
   --gradient-aurora-d: #d4c9f0;
 
-  /* Folder body: how much of the (saturated) tint to keep when shading
-   * with black. Light keeps it bright; dark brings it down (below) while
-   * black-shading preserves vibrancy so the white badge reads. */
-  --folder-keep: 88%;
+  /* Folder body: `--folder-keep`% of the tint mixed with `--folder-shade`.
+   * LIGHT mode shades toward CREAM → soft, background-near pastels, with a
+   * BLACK badge glyph (the icon reads on the pale folder). DARK mode shades
+   * toward black → vivid jewel tones with a WHITE badge. */
+  --folder-keep: 56%;
+  --folder-shade: #faf8f1;
+  --folder-badge-filter: brightness(0);
 
   --radius-lg: 8px;
   --shadow-pop:
@@ -82,6 +85,8 @@
   :root:not([data-mode]) {
     color-scheme: dark;
     --folder-keep: 64%;
+    --folder-shade: #000;
+    --folder-badge-filter: brightness(0) invert(1);
     /* ink, inverted — neutral near-black, no color cast */
     --color-page: #121316;
     --color-surface: #1b1d20;
@@ -108,6 +113,8 @@
 :root[data-mode="dark"] {
   color-scheme: dark;
   --folder-keep: 64%;
+  --folder-shade: #000;
+  --folder-badge-filter: brightness(0) invert(1);
   --color-page: #121316;
   --color-surface: #1b1d20;
   --color-surface-soft: #232529;

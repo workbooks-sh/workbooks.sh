@@ -90,9 +90,9 @@
 {:else if isImage}
   <img src={value} alt="" />
 {:else if value && !isPrefixed}
-  <span class="emoji" aria-hidden="true">{value}</span>
+  <span class="emoji" aria-hidden="true" style="font-size: {size}px;">{value}</span>
 {:else}
-  <span class="initials" aria-hidden="true">{initials(name)}</span>
+  <span class="initials" aria-hidden="true" style="font-size: {Math.round(size * 0.62)}px;">{initials(name)}</span>
 {/if}
 
 <style>

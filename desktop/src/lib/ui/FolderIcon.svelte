@@ -17,7 +17,7 @@
   }: { color?: string; badge?: string; name?: string; size?: number } =
     $props();
 
-  const badgePx = $derived(Math.max(9, Math.round(size * 0.62)));
+  const badgePx = $derived(Math.max(11, Math.round(size * 0.66)));
   /** Material's own folder construction: glyph in a light tint ON the
    *  colored folder, never a full-color logo (red rocket on blue folder
    *  reads as a clash). Non-emoji badges render as a WHITE silhouette —
@@ -51,13 +51,12 @@
   .glyph {
     width: 100%;
     height: 100%;
-    /* Shade the (saturated) tint with pure BLACK, not navy — black keeps
-       the hue + saturation while dropping lightness (a vivid jewel tone),
-       where navy muddied it into a low-contrast slate that blended into
-       the dark bg. --folder-keep is theme-aware (app.css): brighter in
-       light, brought down in dark while staying vibrant, so the white
-       badge always reads. */
-    fill: color-mix(in srgb, var(--c) var(--folder-keep, 82%), #000);
+    /* Tint shaded toward --folder-shade (theme-aware, app.css): CREAM in
+       light → soft pastels that sit near the background, BLACK in dark →
+       vivid jewel tones. --folder-keep tunes how much tint survives. The
+       badge glyph color (--folder-badge-filter) flips to match: black on
+       the pale light folder, white on the dark one. */
+    fill: color-mix(in srgb, var(--c) var(--folder-keep, 56%), var(--folder-shade, #000));
   }
   /* Badge — tucked in the bottom-right corner, sitting on the folder
      with a hint of overflow. */
@@ -71,12 +70,12 @@
     line-height: 1;
     font-size: var(--bs);
   }
-  /* White silhouette for svg/image badges — any icon on any folder
-     color, both themes. ~90% opacity reads as material's pale-tint
-     glyph rather than stark white. */
+  /* Silhouette for svg/image badges — theme-aware: black on the pale light
+     folder, white on the dark one (--folder-badge-filter). Reads on every
+     tint in both themes. */
   .badge.silhouette {
-    filter: brightness(0) invert(1) drop-shadow(0 0.5px 0.5px rgba(15, 20, 40, 0.4));
-    opacity: 0.95;
+    filter: var(--folder-badge-filter, brightness(0) invert(1));
+    opacity: 0.82;
   }
   .badge :global(img) {
     width: var(--bs);

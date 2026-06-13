@@ -145,18 +145,22 @@
   }
 
   // Expand every folder when the glyph step asks for it, so the emoji↔icon
-  // flip shows at the file level too. Writes `expanded`/folder caches only;
-  // reads onboarding.expandAll + packages (no self-referential loop).
+  // flip shows at the file level too. Builds FRESH expanded + folderBooks
+  // objects and assigns once — it must NOT read either (loadFolder spreads
+  // folderBooks, which would make this effect depend on what it writes →
+  // infinite loop). Demo children only; this path is onboarding-scoped.
   $effect(() => {
     if (!onboarding.expandAll) return;
-    const next: Record<string, boolean> = {};
+    const exp: Record<string, boolean> = {};
+    const books: Record<string, WorkbookEntry[]> = {};
     for (const pkg of packages) {
       if ((pkg.kind ?? "folder") !== "app") {
-        next[pkg.id] = true;
-        void loadFolder(pkg.id);
+        exp[pkg.id] = true;
+        books[pkg.id] = DEMO_FOLDER_CHILDREN[pkg.id] ?? [];
       }
     }
-    expanded = next;
+    expanded = exp;
+    folderBooks = books;
   });
 
   function initials(name: string): string {
