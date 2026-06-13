@@ -19,17 +19,33 @@ MKE2FS="${MKE2FS:-$(command -v mke2fs || echo /opt/homebrew/opt/e2fsprogs/sbin/m
 # The netboot initramfs lacks ext4.ko (it lives in the modloop), so we pull
 # the matching linux-virt apk and append ext4 + deps as a second cpio.gz.
 fetch_kernel_initramfs() {
-  [ -f vmlinuz-virt ]   || curl -fsSLO "$ALPINE_MIRROR/releases/aarch64/netboot/vmlinuz-virt"
   [ -f initramfs-virt ] || curl -fsSLO "$ALPINE_MIRROR/releases/aarch64/netboot/initramfs-virt"
 
+  # Kernel + modules MUST be the same version, so pull BOTH from the one
+  # linux-virt apk. The netboot release kernel drifts out of sync with the
+  # rolling main/ apk (a frozen 6.18.22 netboot vs a 6.18.35 apk), so the old
+  # "guess the apk filename from the netboot KVER" 404'd. Discover the apk that
+  # ACTUALLY exists on the mirror (same trick the busybox fetch below uses).
+  if [ ! -f linux-virt.apk ]; then
+    local LV_APK
+    LV_APK=$(curl -fsSL "$ALPINE_MIRROR/main/aarch64/" | grep -o 'linux-virt-[0-9][^"]*\.apk' | head -1)
+    [ -n "$LV_APK" ] || { echo "no linux-virt apk at $ALPINE_MIRROR/main/aarch64/"; return 1; }
+    curl -fsSL -o linux-virt.apk "$ALPINE_MIRROR/main/aarch64/$LV_APK"
+  fi
+  mkdir -p apk-x && tar -xzf linux-virt.apk -C apk-x 2>/dev/null || true
+  local KVER
+  KVER=$(ls apk-x/lib/modules)                    # e.g. 6.18.35-0-virt — matches the apk kernel
+
+  # kernel-image from the apk's own vmlinuz-virt (so it matches the modules).
   if [ ! -f kernel-image ]; then
-    if [ "$(xxd -p -s 4 -l 4 vmlinuz-virt)" = "7a696d67" ]; then   # "zimg"
+    local VMLINUZ=apk-x/boot/vmlinuz-virt
+    if [ "$(xxd -p -s 4 -l 4 "$VMLINUZ")" = "7a696d67" ]; then   # "zimg"
       local OFF LEN
-      OFF=$((0x$(xxd -p -s 8  -l 4 vmlinuz-virt | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
-      LEN=$((0x$(xxd -p -s 12 -l 4 vmlinuz-virt | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
-      dd if=vmlinuz-virt bs=1 skip="$OFF" count="$LEN" 2>/dev/null | gunzip > kernel-image
+      OFF=$((0x$(xxd -p -s 8  -l 4 "$VMLINUZ" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
+      LEN=$((0x$(xxd -p -s 12 -l 4 "$VMLINUZ" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
+      dd if="$VMLINUZ" bs=1 skip="$OFF" count="$LEN" 2>/dev/null | gunzip > kernel-image
     else
-      cp -f vmlinuz-virt kernel-image
+      cp -f "$VMLINUZ" kernel-image
     fi
   fi
 
@@ -37,13 +53,6 @@ fetch_kernel_initramfs() {
     rm -rf initramfs-x addon
     mkdir -p initramfs-x
     (cd initramfs-x && gunzip -c ../initramfs-virt | cpio -idm --quiet)
-    local KVER
-    KVER=$(ls initramfs-x/lib/modules)            # e.g. 6.18.35-0-virt
-
-    [ -f linux-virt.apk ] || curl -fsSL -o linux-virt.apk \
-      "$ALPINE_MIRROR/main/aarch64/linux-virt-${KVER%-virt}.apk" || {
-        echo "guess linux-virt-${KVER%-virt}.apk failed — check $ALPINE_MIRROR/main/aarch64/"; return 1; }
-    mkdir -p apk-x && tar -xzf linux-virt.apk -C apk-x 2>/dev/null || true
 
     # NB: in the alpine initramfs /lib is a symlink -> usr/lib. The kernel's
     # cpio unpacker REPLACES an existing symlink with a directory entry, which
