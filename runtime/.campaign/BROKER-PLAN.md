@@ -1580,3 +1580,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   reclaim items) is now reachable: a TCP-protocol daemon can run BROKERED — host-owned listener + sandboxed
   wasm handler + full cadence (per-client rate, byte cap, revocation, audit, loopback-bound). The inbound
   server-flip (keystone goal 4) is now COMPLETE for BOTH wasi:http AND raw TCP, each proven with a real guest.
+- 2026-06-12 (iter 119): **RAW-TCP INBOUND — DoS cadence COMPLETED (slowloris + many-conns, the directive's
+  named vectors).** Hardened the two remaining gaps in TcpServeBroker: (1) SLOWLORIS — the read loop had a
+  per-recv timeout but no ABSOLUTE deadline, so a steady drip (1 byte < the per-recv gap) held a handler
+  process for ~days; added :max_request_ms (default 30s) wall-clock deadline on the whole request read, and
+  the per-recv wait is bounded by the remaining time so the deadline is honored promptly. (2) MANY CONNS
+  (distributed flood) — per-client rate alone doesn't bound TOTAL concurrency (many IPs each under their
+  budget); added a GLOBAL concurrent-connection cap via a lock-free :atomics counter (reserve a slot at accept,
+  refuse+close past :max_concurrent, default 256, release on handler exit). PROVEN: a stalled client is dropped
+  at the 500ms deadline (<3s, not infinite); 5 simultaneous connections with max_concurrent 2 + a slow handler
+  -> only 2 served, >=3 refused. 7 TcpServeBroker tests green. So the raw-TCP server platform now has the FULL
+  DoS cadence: huge-bodies (byte cap) + many-conns (per-client rate + global concurrency cap) + slowloris
+  (absolute deadline) + revocation — matching the directive's "huge bodies/many conns/slowloris" for inbound.

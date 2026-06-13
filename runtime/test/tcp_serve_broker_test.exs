@@ -69,6 +69,46 @@ defmodule Workbooks.TcpServeBrokerTest do
     assert refused >= 5
   end
 
+  test "SLOWLORIS — a client that stalls is closed by the absolute deadline (not held forever)" do
+    # max_request_ms 500: a client that connects and never completes its request is dropped at the deadline.
+    {:ok, lsock} = TcpServeBroker.start(handler: fn r -> r end, max_request_ms: 500)
+    port = TcpServeBroker.port(lsock)
+    on_exit(fn -> TcpServeBroker.stop(lsock) end)
+
+    t0 = System.monotonic_time(:millisecond)
+    {:ok, sock} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false, packet: :raw], 2_000)
+    # send NOTHING (a stalled/slowloris client); the server must close us at ~500ms, not hang
+    resp = recv_all(sock, "")
+    elapsed = System.monotonic_time(:millisecond) - t0
+    :gen_tcp.close(sock)
+
+    assert resp == ""
+    assert elapsed < 3_000, "slowloris must be dropped at the deadline, took #{elapsed}ms"
+  end
+
+  test "GLOBAL CONCURRENCY CAP — connections beyond max_concurrent are refused (bounded handler processes)" do
+    # a slow handler holds each slot; max_concurrent 2 means only 2 of 5 simultaneous connections are served.
+    {:ok, lsock} =
+      TcpServeBroker.start(
+        handler: fn r -> Process.sleep(1_500); r end,
+        max_concurrent: 2,
+        rate: {1_000, 60_000}
+      )
+
+    port = TcpServeBroker.port(lsock)
+    on_exit(fn -> TcpServeBroker.stop(lsock) end)
+
+    results =
+      1..5
+      |> Task.async_stream(fn _ -> connect_send_recv(port, "c") end, max_concurrency: 5, timeout: 10_000)
+      |> Enum.map(fn {:ok, r} -> r end)
+
+    served = Enum.count(results, &(&1 == "c"))
+    # at most max_concurrent are in flight at once -> the rest (which arrive while both slots are held) refused
+    assert served <= 2
+    assert Enum.count(results, &(&1 == "")) >= 3
+  end
+
   @tag :build
   @tag timeout: 300_000
   test "GUEST-BACKED — a real SANDBOXED wasm command serves the TCP request/response (full brokered model)" do

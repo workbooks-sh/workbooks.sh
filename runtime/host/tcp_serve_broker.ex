@@ -31,13 +31,28 @@ defmodule Workbooks.TcpServeBroker do
     handler = Keyword.fetch!(opts, :handler)
     serve_id = Keyword.get(opts, :serve_id, "tcpserve-#{System.unique_integer([:positive])}")
     max_req = Keyword.get(opts, :max_request_bytes, 1024 * 1024)
+    # absolute wall-clock deadline for reading the WHOLE request — a slowloris dripping bytes under the per-
+    # recv timeout would otherwise hold a handler process indefinitely (DoS the directive names).
+    max_req_ms = Keyword.get(opts, :max_request_ms, 30_000)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    # GLOBAL concurrent-connection cap (across ALL clients) — bounds total handler processes against a
+    # distributed flood (many IPs each under the per-client rate). An atomics counter (lock-free).
+    max_concurrent = Keyword.get(opts, :max_concurrent, 256)
+    conns = :atomics.new(1, signed: false)
     ip = Keyword.get(opts, :ip, {127, 0, 0, 1})
     port = Keyword.get(opts, :port, 0)
 
     case :gen_tcp.listen(port, [:binary, ip: ip, active: false, packet: :raw, reuseaddr: true, backlog: 64]) do
       {:ok, lsock} ->
-        cfg = %{handler: handler, serve_id: serve_id, max_req: max_req, rate: rate}
+        cfg = %{
+          handler: handler,
+          serve_id: serve_id,
+          max_req: max_req,
+          max_req_ms: max_req_ms,
+          rate: rate,
+          max_concurrent: max_concurrent,
+          conns: conns
+        }
         # unlinked acceptor so it survives the caller; it exits when the listen socket is closed
         spawn(fn -> accept_loop(lsock, cfg) end)
         {:ok, lsock}
@@ -73,11 +88,26 @@ defmodule Workbooks.TcpServeBroker do
     end
   end
 
-  defp accept_loop(lsock, cfg) do
+  defp accept_loop(lsock, %{conns: conns, max_concurrent: max_conc} = cfg) do
     case :gen_tcp.accept(lsock) do
       {:ok, conn} ->
-        # handle each connection in its own process so a slow client can't block the acceptor
-        spawn(fn -> serve_conn(conn, cfg) end)
+        # GLOBAL concurrency gate: reserve a slot atomically; refuse (close) if over the cap so the total
+        # handler-process count is bounded regardless of how many distinct clients connect (distributed flood).
+        if :atomics.add_get(conns, 1, 1) > max_conc do
+          :atomics.sub(conns, 1, 1)
+          Workbooks.BrokerAudit.record(:tcp_serve, :deny, :max_concurrent, nil)
+          :gen_tcp.close(conn)
+        else
+          # handle each connection in its own process; release the slot when it finishes
+          spawn(fn ->
+            try do
+              serve_conn(conn, cfg)
+            after
+              :atomics.sub(conns, 1, 1)
+            end
+          end)
+        end
+
         accept_loop(lsock, cfg)
 
       {:error, :closed} ->
@@ -88,7 +118,7 @@ defmodule Workbooks.TcpServeBroker do
     end
   end
 
-  defp serve_conn(conn, %{handler: handler, serve_id: serve_id, max_req: max_req, rate: rate}) do
+  defp serve_conn(conn, %{handler: handler, serve_id: serve_id, max_req: max_req, max_req_ms: max_req_ms, rate: rate}) do
     client_ip =
       case :inet.peername(conn) do
         {:ok, {addr, _port}} -> addr |> :inet.ntoa() |> to_string()
@@ -107,10 +137,11 @@ defmodule Workbooks.TcpServeBroker do
         :gen_tcp.close(conn)
 
       true ->
-        # read the request up to the byte cap (a clean close past it, never unbounded buffering), broker the
-        # bytes to the guest handler, write back the response. One request/response per connection (the
-        # common line/binary-protocol shape); keep-alive is a later refinement.
-        case read_capped(conn, max_req, <<>>) do
+        # read the request up to the byte cap AND an absolute wall-clock deadline (slowloris floor), broker the
+        # bytes to the guest handler, write back the response. One request/response per connection.
+        deadline = System.monotonic_time(:millisecond) + max_req_ms
+
+        case read_capped(conn, max_req, deadline, <<>>) do
           {:ok, request} ->
             response =
               try do
@@ -124,22 +155,35 @@ defmodule Workbooks.TcpServeBroker do
             if is_binary(response) and response != "", do: :gen_tcp.send(conn, response)
             :gen_tcp.close(conn)
 
-          {:error, :too_large} ->
+          {:error, _reason} ->
             :gen_tcp.close(conn)
         end
     end
   end
 
-  # read until the client stops sending (a short recv timeout marks request end) or the cap is hit
-  defp read_capped(conn, max, acc) do
-    if byte_size(acc) > max do
-      {:error, :too_large}
-    else
-      case :gen_tcp.recv(conn, 0, 300) do
-        {:ok, data} -> read_capped(conn, max, acc <> data)
-        {:error, :timeout} -> {:ok, acc}
-        {:error, _closed} -> {:ok, acc}
-      end
+  # read until the client stops sending (a short recv gap marks request end) or a limit trips: the byte cap OR
+  # the ABSOLUTE deadline (a slowloris dripping under the per-recv timeout can't hold the process past it).
+  defp read_capped(conn, max, deadline, acc) do
+    cond do
+      byte_size(acc) > max ->
+        {:error, :too_large}
+
+      System.monotonic_time(:millisecond) >= deadline ->
+        {:error, :timeout}
+
+      true ->
+        # bound the per-recv wait by the remaining time to the deadline (so the deadline is honored promptly)
+        remaining = max(0, deadline - System.monotonic_time(:millisecond))
+        wait = min(300, remaining)
+
+        case :gen_tcp.recv(conn, 0, wait) do
+          {:ok, data} -> read_capped(conn, max, deadline, acc <> data)
+          # a recv gap (no data within `wait`) marks the request complete — but only if we actually have data;
+          # an empty-and-still-before-deadline gap loops so a deadline-exceeding slow client is caught above.
+          {:error, :timeout} when acc != <<>> -> {:ok, acc}
+          {:error, :timeout} -> read_capped(conn, max, deadline, acc)
+          {:error, _closed} -> {:ok, acc}
+        end
     end
   end
 
