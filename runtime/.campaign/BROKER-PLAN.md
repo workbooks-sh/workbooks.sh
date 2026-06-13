@@ -1922,3 +1922,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   test: a register_pynet("recurse-self") tool that execs itself with depth+1 TERMINATES, cut off by @max_depth
   (CHILD_RC N 1 denial in the chain), never reaching its own limit of 50 / DEPTH 20. 11 tests green (py_exec +
   pynet_command). The exec-dispatch channel now has BOTH width (ExecBroker concurrent cap) + depth defense.
+- 2026-06-13 (iter 142): **BROKERED TRANSPORT GENERALIZED to standard compiled tools (language-agnostic).**
+  Factored the PyNet watcher into a reusable PyNet.with_broker(opts, run_fn) + run_wasm(wasm, stdin, argv) — the
+  file-protocol transport is NOT Python-specific: any wasip1 guest with file I/O speaks it. PROVED from C: a
+  self-contained C HTTP client (write req.json + poll resp.ready + strstr the verdict — no JSON/base64 lib),
+  compiled to wasm IN-SANDBOX (clang.wasm, zero native toolchain) and run via run_wasm with the broker mounted,
+  does SSRF-safe brokered HTTP. 2 C-transport tests green: (a) C tool fetches example.com -> BROKERED_OK (no
+  guest socket); (b) RED-TEAM C tool -> cloud-metadata DENIED (BROKERED_DENIED, non-zero) — host re-validates
+  every URL regardless of guest language. 14 PyNet/exec regression green (the factor didn't break Python). This
+  realizes keystone goal 2 (generalize the seam to STANDARD WASI tools) via the file-protocol transport, for
+  BOTH the wasip1 runtimes (Python/CPython) AND in-sandbox-built C/Rust CLIs — the same SSRF/allow-list/pin/
+  rate/revocation cadence, no per-tool host code. NEXT: a reusable C/Rust shim header (wb_broker.h) wrapping the
+  protocol as wb_http_get()/wb_exec(); wire run_wasm into BuildBroker so built tools opt into the transport.

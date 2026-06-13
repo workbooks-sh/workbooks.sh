@@ -35,31 +35,53 @@ defmodule Workbooks.PyNet do
   @default_max_requests 64
 
   @doc """
-  Run CPython `script` (a Python program string, passed as `-c`) with a brokered-HTTP transport mounted at
-  `/b`. While the script runs, a concurrent host watcher services its HTTP request-files via `NetGuard.request`.
-  Returns the script's stdout (`{:ok, out}`), `{:error, reason}` on failure.
-
-  opts: `:allow` (host allow-list applied to EVERY brokered request, default deny-list/SSRF floor only),
-  `:principal` (rate/revocation), `:rate`, `:deadline_ms`, `:max_requests`, `:mount` (guest mount, default
-  `"/b"`), `:dirs` (extra read preopens, e.g. the python stdlib pack).
+  GENERIC broker transport (language-agnostic): preopen a fresh broker dir, spawn the concurrent host watcher
+  (which services net + exec request-files via the SAME mediated brokers), and invoke `run_fn` with the dirs to
+  preopen (the broker dir at `:mount`, default `/b`, ahead of any caller `:dirs`). `run_fn.(dirs)` runs the
+  guest however it likes (a registered command, a built wasm) and returns `{:ok, out, status}` | `{:error, _}`.
+  Any wasip1 guest with file I/O (CPython, a clang-built C tool, …) can use the file protocol — the transport
+  is not Python-specific. The watcher is torn down + the dir removed when `run_fn` returns.
   """
-  def run_python(script, opts \\ []) when is_binary(script) do
+  def with_broker(opts, run_fn) when is_function(run_fn, 1) do
     mount = Keyword.get(opts, :mount, "/b")
-    stdin = Keyword.get(opts, :stdin, "")
-    argv = Keyword.get(opts, :argv, [])
-    bdir = Path.join(System.tmp_dir!(), "pynet_#{System.unique_integer([:positive])}")
+    bdir = Path.join(System.tmp_dir!(), "wbroker_#{System.unique_integer([:positive])}")
     File.mkdir_p!(bdir)
 
     parent = self()
     stop = make_ref()
-
-    # the watcher runs concurrently with the (blocking) CPython run, servicing request-files as they appear.
-    watcher =
-      spawn_link(fn -> watch_loop(bdir, opts, parent, stop, Keyword.get(opts, :max_requests, @default_max_requests)) end)
-
+    max_req = Keyword.get(opts, :max_requests, @default_max_requests)
+    watcher = spawn_link(fn -> watch_loop(bdir, opts, parent, stop, max_req) end)
     dirs = ["#{bdir}::#{mount}" | Keyword.get(opts, :dirs, [])]
 
     try do
+      run_fn.(dirs)
+    after
+      send(watcher, {stop, :done})
+      File.rm_rf(bdir)
+    end
+  end
+
+  @doc """
+  Run a built wasm tool (a `.wasm` path, e.g. a clang/mrustc-compiled C/Rust CLI) with the brokered transport
+  mounted — so a STANDARD compiled tool gets brokered net + exec via the file protocol (+ a small guest shim),
+  no Python involved. `{:ok, out, status}` | `{:error, _}`.
+  """
+  def run_wasm(wasm_path, stdin, argv, opts \\ []) when is_binary(wasm_path) and is_list(argv) do
+    with_broker(opts, fn dirs ->
+      case Workbooks.PackageManager.run(wasm_path, stdin, argv, dirs, with_status: true) do
+        {out, status} when is_binary(out) -> {:ok, out, status}
+        out when is_binary(out) -> {:ok, out, 0}
+        other -> {:error, {:run_failed, other}}
+      end
+    end)
+  end
+
+  @doc "Run CPython `script` (`-c`) with the brokered transport mounted at `/b`. `{:ok, out, status}`."
+  def run_python(script, opts \\ []) when is_binary(script) do
+    stdin = Keyword.get(opts, :stdin, "")
+    argv = Keyword.get(opts, :argv, [])
+
+    with_broker(opts, fn dirs ->
       # `python -c <script> <argv...>` exposes argv to the tool as sys.argv[1:]; stdin is the tool's input.
       # run_status preserves the guest's EXIT CODE — a tool that errors (e.g. SSRF-denied request -> URLError ->
       # sys.exit(1)) must report non-zero, not be flattened to success.
@@ -69,10 +91,7 @@ defmodule Workbooks.PyNet do
         body when is_binary(body) -> {:ok, body, 0}
         other -> {:error, {:run_failed, other}}
       end
-    after
-      send(watcher, {stop, :done})
-      File.rm_rf(bdir)
-    end
+    end)
   end
 
   @doc """
