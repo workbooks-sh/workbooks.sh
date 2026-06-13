@@ -58,7 +58,7 @@
 </script>
 
 <div class="shell">
-  <div class="tb-host" class:ob-hide={!onboarding.shows("titlebar")}>
+  <div class="tb-host" class:ob-hide={!onboarding.shows("titlebar")} inert={onboarding.active}>
     <Titlebar />
   </div>
   <div class="body">
