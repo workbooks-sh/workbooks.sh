@@ -49,6 +49,7 @@
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { DEMO_WORKSPACES, DEMO_FOLDER_CHILDREN } from "$lib/onboarding/demo";
+  import { setSidebar, type SidebarApi } from "$lib/sidebar/context";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
   export type RailTab = {
@@ -496,6 +497,38 @@
     if (menu && menu.contains(t)) return;
     closeAccountMenu();
   }
+
+  function folderLeave(p: RailPackage) {
+    if (folderHotId === p.id) folderHotId = null;
+  }
+
+  // Sidebar SDK (wb-aakl.16) — expose this host's state + actions through the
+  // shared contract. Getters keep reactivity flowing to section/layout
+  // components. This is the seam the built-in layouts (and, later, toolkit
+  // sidebars) consume; sections move onto it incrementally.
+  const api: SidebarApi = {
+    get layout() { return nav.layout; },
+    get packages() { return orderedPackages; },
+    isExpanded: (id) => !!expanded[id],
+    childrenOf: (id) => folderBooks[id],
+    toggleFolder,
+    get dragId() { return dragId; },
+    get overId() { return overId; },
+    get folderHotId() { return folderHotId; },
+    startDrag: onDragStart,
+    dragOver: onDragOver,
+    dragEnd: onDragEnd,
+    folderOver,
+    folderLeave,
+    folderDrop,
+    openApp: (id) => onOpenApp?.(id),
+    openWorkbook: (path) => onOpenWorkbook?.(path),
+    packageContext: (id, x, y) => onPackageContext?.(id, x, y),
+    workbookContext: onWorkbookContext,
+    dndStart: (payload, e) => dnd.start(payload, e),
+    dndEnd: () => dnd.end(),
+  };
+  setSidebar(api);
 </script>
 
 <svelte:window onclick={onWindowClick} onkeydown={handleMenuKey} />
