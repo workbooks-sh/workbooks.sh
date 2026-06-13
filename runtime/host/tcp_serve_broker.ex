@@ -47,6 +47,21 @@ defmodule Workbooks.TcpServeBroker do
     end
   end
 
+  @doc """
+  Build a handler backed by a SANDBOXED WASM COMMAND (the real brokered guest): each connection's request
+  bytes become the command's stdin, and its stdout is the response. The command runs in its OWN isolated
+  wasm instance via CommandRegistry (the full exec sandbox) — so a TCP server's request/response logic is a
+  guest that never touches the socket. `name`/`argv` are the registered command + its args.
+  """
+  def command_handler(name, argv \\ []) when is_binary(name) and is_list(argv) do
+    fn request ->
+      case Workbooks.CommandRegistry.run(name, request, argv) do
+        {:ok, out} when is_binary(out) -> out
+        _ -> <<>>
+      end
+    end
+  end
+
   @doc "Stop a server by closing its listen socket (the accept loop then exits)."
   def stop(lsock), do: :gen_tcp.close(lsock)
 

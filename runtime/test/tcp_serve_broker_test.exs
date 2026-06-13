@@ -53,4 +53,33 @@ defmodule Workbooks.TcpServeBrokerTest do
     # server never stopped listening -> serving again after unrevoke
     assert connect_send_recv(port, "ping") == "ping"
   end
+
+  test "PER-CLIENT FLOOD — many rapid connections from one client are rate-limited (the server survives)" do
+    sid = "tcpserve-flood-#{System.unique_integer([:positive])}"
+    # budget of 3 connections per (server, client-IP) window — the 4th+ are refused
+    {:ok, lsock} = TcpServeBroker.start(handler: fn r -> r end, serve_id: sid, rate: {3, 60_000})
+    port = TcpServeBroker.port(lsock)
+    on_exit(fn -> TcpServeBroker.stop(lsock) end)
+
+    results = for _ <- 1..8, do: connect_send_recv(port, "x")
+    served = Enum.count(results, &(&1 == "x"))
+    refused = Enum.count(results, &(&1 == ""))
+    # at most the budget is served; the rest are refused — the flood is bounded, the server stays up
+    assert served <= 3
+    assert refused >= 5
+  end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "GUEST-BACKED — a real SANDBOXED wasm command serves the TCP request/response (full brokered model)" do
+    assert :ok = Workbooks.Pallet.seed_one("coreutils")
+
+    # the handler IS a sandboxed wasm command: `coreutils cat` echoes stdin->stdout. So this TCP server's
+    # logic runs entirely inside a fresh isolated wasm instance per connection — the guest never sees the socket.
+    {:ok, lsock} = TcpServeBroker.start(handler: TcpServeBroker.command_handler("coreutils", ["cat"]))
+    port = TcpServeBroker.port(lsock)
+    on_exit(fn -> TcpServeBroker.stop(lsock) end)
+
+    assert connect_send_recv(port, "brokered through a wasm sandbox") == "brokered through a wasm sandbox"
+  end
 end

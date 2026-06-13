@@ -1569,3 +1569,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   handler over a real client connection), byte-cap refusal, revoke->refuse->unrevoke->serve. The handler is a
   plain fn (mechanism + test seam); NEXT slice wires a real sandboxed wasm guest (via ServeBroker.dispatch)
   + per-client/flood adversarial tests. So inbound is now host-mediated for BOTH wasi:http AND raw TCP.
+- 2026-06-12 (iter 118): **★ RAW-TCP INBOUND — full brokered model PROVEN with a real sandboxed wasm guest.**
+  Wired TcpServeBroker.command_handler(name, argv): the connection's request bytes become a SANDBOXED WASM
+  COMMAND's stdin, its stdout is the response — so a TCP server's request/response logic runs entirely inside
+  a fresh isolated wasm instance (via CommandRegistry), the guest never touching the socket. GUEST-BACKED test
+  green: a real `coreutils cat` command serves a TCP echo over a real client connection (host owns the
+  listener, wasm guest does the work). Added the PER-CLIENT FLOOD adversarial test: 8 rapid connections from
+  one client with a budget of 3 -> <=3 served, >=5 refused, server stays up. 5 TcpServeBroker tests green
+  (round-trip, byte-cap, revocation, flood, guest-backed). So the network-as-purpose SERVER class (the 6
+  reclaim items) is now reachable: a TCP-protocol daemon can run BROKERED — host-owned listener + sandboxed
+  wasm handler + full cadence (per-client rate, byte cap, revocation, audit, loopback-bound). The inbound
+  server-flip (keystone goal 4) is now COMPLETE for BOTH wasi:http AND raw TCP, each proven with a real guest.
