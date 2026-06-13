@@ -55,6 +55,17 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
   "Side Projects": { icon: "mi:rocket", kind: "folder" },
   Acme: { icon: "mi:table", kind: "folder" },
   Internal: { icon: "mi:settings", kind: "app" },
+  // Extra folders to preview the varied jewel-tone folder colors — one per
+  // tint slot so all eight hues show (mi: badges render as white
+  // silhouettes on the dark-pastel folder body):
+  Photos: { icon: "mi:image", kind: "folder" }, // green
+  Design: { icon: "mi:svg", kind: "folder" }, // teal
+  People: { icon: "mi:lib", kind: "folder" }, // violet
+  Finance: { icon: "mi:table", kind: "folder" }, // amber
+  Research: { icon: "mi:database", kind: "folder" }, // gold
+  Archive: { icon: "mi:zip", kind: "folder" }, // red
+  Brand: { icon: "mi:rocket", kind: "folder" }, // fuchsia
+  Marketing: { icon: "mi:video", kind: "folder" }, // blue
 };
 
 /** Workbook path served per app. The real Kanban workbook lives as a
@@ -80,7 +91,7 @@ const WORKSPACES = [
     id: "ws_personal",
     name: "Personal",
     icon: "🪐",
-    package_names: ["Kanban", "Notes", "Clients", "Tracker", "Side Projects", "Reading"],
+    package_names: ["Kanban", "Notes", "Tracker", "Reading", "Clients", "Side Projects", "Photos", "Design", "People", "Finance", "Research", "Archive", "Brand", "Marketing"],
     created_at: 1_700_000_000_000,
   },
   {
