@@ -15,6 +15,7 @@
   import { Check, Copy, Trash as Trash2, Palette } from "phosphor-svelte";
   import { confirm as tauriConfirm } from "@tauri-apps/plugin-dialog";
   import { themes, type Theme } from "$lib/bridge/themes.svelte";
+  import { nav } from "$lib/bridge/nav.svelte";
   import SettingsPanel from "./settings/SettingsPanel.svelte";
   import EmptyState from "./ui/EmptyState.svelte";
 
@@ -117,6 +118,23 @@
     </form>
   {/if}
 
+  <!-- Layout preset (wb-aakl.16) — composable left navigation. -->
+  <div class="layout-card">
+    <span class="layout-label">Sidebar layout</span>
+    <div class="layout-opts">
+      {#each [["library", "Library"], ["rail", "Rail"]] as [id, label] (id)}
+        <button
+          type="button"
+          class="layout-opt"
+          class:sel={nav.layout === id}
+          onclick={() => nav.setLayout(id as "rail" | "library")}
+        >
+          {label}
+        </button>
+      {/each}
+    </div>
+  </div>
+
   {#if themes.themes.length === 0}
     <EmptyState
       icon={Palette}
@@ -173,6 +191,48 @@
 </SettingsPanel>
 
 <style>
+  .layout-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+  }
+  .layout-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+  }
+  .layout-opts {
+    margin-left: auto;
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+  }
+  .layout-opt {
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 14px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .layout-opt.sel {
+    background: var(--color-fg);
+    color: var(--color-page);
+  }
+
   .new-row {
     display: flex;
     gap: 0.4rem;

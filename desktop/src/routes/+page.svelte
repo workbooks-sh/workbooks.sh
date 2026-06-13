@@ -74,6 +74,19 @@
     if (features.network && !NetworkPanel)
       void import("$lib/network/NetworkPanel.svelte").then((m) => (NetworkPanel = m.default));
   });
+
+  // Section registry (wb-aakl.16) — main-area panel per rail id. Replaces a
+  // hardcoded if/else chain; network is flag-gated + lazy. A function (not a
+  // static Map) so the reactive NetworkPanel import is picked up on resolve.
+  function sectionFor(id: string) {
+    switch (id) {
+      case "home": return HomePanel;
+      case "kanban": return BoardPanel;
+      case "settings": return SettingsContainer;
+      case "network": return features.network ? NetworkPanel : null;
+      default: return null;
+    }
+  }
   const sectionLabels: Record<string, string> = {
     home: "Create",
     network: "Network",
@@ -558,14 +571,9 @@
         <DropOverlay />
         {#if chrome.mode === "doc"}
           <DocViewer />
-        {:else if active === "home"}
-          <HomePanel />
-        {:else if active === "kanban"}
-          <BoardPanel />
-        {:else if active === "network" && features.network && NetworkPanel}
-          <NetworkPanel />
-        {:else if active === "settings"}
-          <SettingsContainer />
+        {:else}
+          {@const Section = sectionFor(active)}
+          {#if Section}<Section />{/if}
         {/if}
       </div>
       <TerminalDrawer />

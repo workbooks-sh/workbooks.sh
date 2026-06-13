@@ -41,6 +41,8 @@
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
+  import { features } from "$lib/bridge/features";
+  import { nav } from "$lib/bridge/nav.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
@@ -475,7 +477,7 @@
 <svelte:window onclick={onWindowClick} onkeydown={handleMenuKey} />
 
 <nav
-  class="sidebar"
+  class="sidebar layout-{nav.layout}"
   aria-label="Primary"
   oncontextmenu={(e) => {
     // Empty-space right-click → the New menu (create / import). Any
@@ -729,33 +731,37 @@
     </button>
   {/if}
 
-  <!-- Bottom toolbar — avatar (account menu) + icon-only utility nav. -->
+  <!-- Bottom toolbar — account avatar (auth-UI-gated, wb-aakl.16/.3) +
+       icon-only utility nav. The shipped browser shows just the utility
+       nav; the account row returns with WB_FF_AUTH_UI. -->
   <div class="bottom-bar">
-    <button
-      type="button"
-      class="avatar-btn"
-      bind:this={accountBtnEl}
-      title={accountLabel}
-      aria-label={accountLabel}
-      aria-haspopup="menu"
-      aria-expanded={accountMenuOpen}
-      onclick={handleAccountClick}
-      disabled={auth.status === "checking" || accountBusy}
-    >
-      {#if auth.status === "signed-in"}
-        {#if auth.user?.picture}
-          <img class="account-avatar lg2 account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
+    {#if features.authUI}
+      <button
+        type="button"
+        class="avatar-btn"
+        bind:this={accountBtnEl}
+        title={accountLabel}
+        aria-label={accountLabel}
+        aria-haspopup="menu"
+        aria-expanded={accountMenuOpen}
+        onclick={handleAccountClick}
+        disabled={auth.status === "checking" || accountBusy}
+      >
+        {#if auth.status === "signed-in"}
+          {#if auth.user?.picture}
+            <img class="account-avatar lg2 account-avatar-img" src={auth.user.picture} alt="" referrerpolicy="no-referrer" />
+          {:else}
+            <span class="account-avatar lg2">{accountInitial()}</span>
+          {/if}
+        {:else if auth.status === "sidecar-offline"}
+          <span class="account-anon lg2 offline">
+            <ArrowsClockwise size={14} weight="fill" class={accountBusy ? "spinning" : ""} />
+          </span>
         {:else}
-          <span class="account-avatar lg2">{accountInitial()}</span>
+          <span class="account-anon lg2"><UserIcon size={15} weight="fill" /></span>
         {/if}
-      {:else if auth.status === "sidecar-offline"}
-        <span class="account-anon lg2 offline">
-          <ArrowsClockwise size={14} weight="fill" class={accountBusy ? "spinning" : ""} />
-        </span>
-      {:else}
-        <span class="account-anon lg2"><UserIcon size={15} weight="fill" /></span>
-      {/if}
-    </button>
+      </button>
+    {/if}
     {#each bottomTabs as tab (tab.id)}
       {@const TabIcon = tab.icon}
       <button
@@ -772,7 +778,7 @@
     {/each}
   </div>
 
-  {#if accountMenuOpen}
+  {#if accountMenuOpen && features.authUI}
     <div
       class="account-menu"
       role="menu"
@@ -1139,6 +1145,15 @@
   /* Brand idiom (lander nav ref): top-level rows carry a pastel
    * rounded-square icon chip + a mono uppercase tracked label.
    * Children (workbooks inside folders) stay quiet sans rows. */
+  /* Composable nav presets (wb-aakl.16): "library" is the comfortable,
+   * full-label default; "rail" is a compact, tighter density. Both keep
+   * chips + labels — rail just trims the rhythm. (A future icon-only rail
+   * is a further preset.) */
+  .layout-rail .row { height: 30px; gap: 8px; }
+  .layout-rail .row-icon { width: 22px; height: 22px; border-radius: 6px; }
+  .layout-rail .row-label { font-size: 10px; letter-spacing: 0.07em; }
+  .layout-rail .ws-header { padding-top: 6px; padding-bottom: 6px; }
+
   .row {
     display: flex;
     align-items: center;
