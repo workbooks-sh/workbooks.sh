@@ -1617,3 +1617,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   alone. CONCLUSION: the entire host-brokered-NETWORKING keystone + its capability surface (egress in/out,
   ingress http+TCP, exec, storage, queue, serve, parallel, full cadence, red-team-green, audited+self-audited)
   is COMPLETE. The frontier beyond is distinct build-lane/execution-model campaigns warranting owner direction.
+- 2026-06-12 (iter 122): **★ FORK-EXEC / MULTI-PROCESS MODEL — first slice (new execution-model stone, the
+  largest build-blocked bucket's keystone capability).** Per the directive's "keep pushing toward greater
+  sandbox capability", started the execution-model frontier (wb-lcsj). Built Workbooks.ProcessBroker: the
+  host-brokered substitute for fork()+exec()/posix_spawn (which wasip1/p2 lack). A guest gets a brokered
+  SANDBOXED process — host starts the command in a fresh isolated wasm instance (via ExecBroker, full exec
+  cadence per process), hands back a HANDLE, and exposes the ASYNC lifecycle real fork-exec needs: spawn
+  (non-blocking) -> await (reap output+exit) / kill. SECURITY ANCHOR = FORK-BOMB DEFENSE: a per-PRINCIPAL cap
+  on CONCURRENT live processes (@max_processes 32, atomic ETS counter via BrokerTables); slots held until
+  REAPED (await/kill) = correct zombie semantics, so a guest can't spawn unbounded processes (the nesting
+  @max_depth + this concurrency cap together bound depth AND width of a process explosion). 3 tests green:
+  fork-bomb (3 live -> 4th refused -> reap frees a slot), default-deny (exec cadence per process), ASYNC
+  LIFECYCLE (3 real sandboxed `coreutils cat` subprocesses spawned concurrently + awaited, each echoes its
+  stdin in its own fresh instance, live count back to 0). This is the fork-exec primitive ParallelBroker
+  (batch map) + ExecBroker (sync one-shot) didn't expose. NEXT slices: streaming stdin/stdout pipes between
+  parent+child; wire it as a dock import (host_spawn/host_await) so guests reach it. Execution-model frontier
+  launched, security-first.
