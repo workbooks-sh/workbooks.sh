@@ -11,7 +11,7 @@
    * lands near the end. Never a gate.
    */
   import { onMount } from "svelte";
-  import { ArrowRight, CheckCircle, Palette, Translate, Cards } from "phosphor-svelte";
+  import { ArrowRight, CheckCircle, Palette, Translate, Cards, CaretLeft, CaretRight } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { applyThemeMode } from "$lib/onboarding/prefs";
@@ -21,6 +21,7 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
   import OnboardingAgents from "$lib/onboarding/OnboardingAgents.svelte";
+  import LessonOverlay from "$lib/onboarding/LessonOverlay.svelte";
   import Icon from "$lib/ui/Icon.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
@@ -34,6 +35,37 @@
   // just appears above it, no need to move. It drops to the bottom dock once
   // the sidebar comes in (step 2+), so the left side is clear to look at.
   const centered = $derived(stepIdx <= 1);
+
+  // ── Learn-more (port → edge → DOM highlight) ─────────────────────────
+  // Learn steps carry "lessons": each points the coach's port at a DOM
+  // target and shows a small tip. Arrows navigate lessons (top of the coach);
+  // Continue (bottom) advances the step. The first learn step forces the user
+  // to explore so they discover the arrows. Form steps have no lessons.
+  type Lesson = { target: string; title: string; body: string };
+  const LEARN: Record<string, Lesson[]> = {
+    titlebar: [
+      { target: ".bench-host", title: "The bench", body: "Toolkit shortcuts. Each icon opens a panel on the right — click again to close. Build your own." },
+      { target: ".search-badge", title: "Search", body: "A built-in toolkit with a global ⌘K — summon it anywhere to find files, tabs, the web." },
+      { target: ".engine", title: "Nexus", body: "Your runtime connection. The badge shows engine status; click it to manage or switch." },
+      { target: ".dock-host", title: "Waldo", body: "Your resident agent, top-right. Ask by text or voice; it works issues with you." },
+    ],
+  };
+  const lessons = $derived(LEARN[step] ?? []);
+  const isLearn = $derived(lessons.length > 0);
+  let lessonIdx = $state(-1); // -1 = intro, not yet exploring
+  let portEl = $state<HTMLElement | null>(null);
+  let benchExplored = $state(false);
+  const mustExplore = $derived(step === "titlebar");
+  const canContinue = $derived(!mustExplore || benchExplored);
+  function nextLesson() {
+    if (lessonIdx < lessons.length - 1) {
+      lessonIdx++;
+      if (step === "titlebar" && lessonIdx === lessons.length - 1) benchExplored = true;
+    }
+  }
+  function prevLesson() {
+    if (lessonIdx > -1) lessonIdx--;
+  }
 
   type Prefs = {
     theme: "system" | "dark" | "light";
@@ -71,6 +103,7 @@
   // the app before.
   function go(s: Step) {
     step = s;
+    lessonIdx = -1; // back to the step intro; arrows re-enter lessons
     const i = STEPS.indexOf(s);
     // Reveal one surface per beat. Waldo (agent) reveals WITH the titlebar —
     // it's part of the bar from the start; the agent step just opens its
@@ -152,13 +185,28 @@
       <button type="button" class="skip" onclick={finish} transition:fly={{ y: 6, duration: 160 }}>Skip</button>
     {/if}
 
-    <div class="coach">
+    <div class="coach" class:learn-active={isLearn && lessonIdx >= 0}>
       <div class="dots" role="presentation">
         {#each STEPS as s, i (s)}
           <button type="button" class="dot" class:on={i === stepIdx} class:past={i < stepIdx}
             aria-label={s} onclick={() => { if (i <= stepIdx) go(s); }}></button>
         {/each}
       </div>
+
+      <!-- Learn-more: a node-port + arrows. The port emits an edge to the
+           highlighted DOM target for the active lesson; arrows cycle lessons. -->
+      {#if isLearn}
+        <div class="learn-bar">
+          <button type="button" class="larrow" aria-label="Previous tip" onclick={prevLesson} disabled={lessonIdx < 0}>
+            <CaretLeft size={12} weight="bold" />
+          </button>
+          <span class="port" bind:this={portEl} class:emitting={lessonIdx >= 0}></span>
+          <span class="lcount">{lessonIdx < 0 ? "Learn" : `${lessonIdx + 1}/${lessons.length}`}</span>
+          <button type="button" class="larrow" aria-label="Next tip" onclick={nextLesson} disabled={lessonIdx >= lessons.length - 1}>
+            <CaretRight size={12} weight="bold" />
+          </button>
+        </div>
+      {/if}
 
       {#key step}
         <div class="body" in:fly={{ x: 14, duration: 180, easing: cubicOut }}>
@@ -175,11 +223,19 @@
             <button type="button" class="primary" onclick={next}>Start <ArrowRight size={14} weight="bold" /></button>
 
           {:else if step === "titlebar"}
-            <div class="text">
-              <span class="kicker">The bench</span>
-              <h1>Toolkit shortcuts, up top</h1>
-              <p>Those icons (look up) are your bench — each opens a panel on the right; click again to close. They're custom toolkits you can build. Search is a default one — its own badge, summon it anywhere with ⌘K.</p>
-            </div>
+            {#if lessonIdx >= 0}
+              <div class="text">
+                <span class="kicker">Learn · {lessonIdx + 1} of {lessons.length}</span>
+                <h1>{lessons[lessonIdx].title}</h1>
+                <p>{lessons[lessonIdx].body}</p>
+              </div>
+            {:else}
+              <div class="text">
+                <span class="kicker">The bar</span>
+                <h1>What's up top</h1>
+                <p>Use the arrows <CaretRight size={11} weight="bold" /> to learn what lives up here — the bench, search, nexus and Waldo. Explore them, then continue.</p>
+              </div>
+            {/if}
 
           {:else if step === "sidebar"}
             <div class="text">
@@ -253,7 +309,7 @@
       {#if started}
         <div class="nav">
           <button type="button" class="ghost" onclick={back}>Back</button>
-          <button type="button" class="primary" onclick={next}>
+          <button type="button" class="primary" onclick={next} disabled={!canContinue}>
             {step === "waldo" ? "Open the browser" : "Continue"}
             <ArrowRight size={14} weight="bold" />
           </button>
@@ -261,6 +317,11 @@
       {/if}
     </div>
   </div>
+
+  <!-- Learn-more overlay: edge from the coach port to the highlighted target. -->
+  {#if isLearn && lessonIdx >= 0}
+    <LessonOverlay {portEl} target={lessons[lessonIdx].target} />
+  {/if}
 </div>
 
 <style>
@@ -415,6 +476,60 @@
   }
   .primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
   .primary:active { transform: scale(0.985); }
+  .primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    filter: none;
+    transform: none;
+  }
+
+  /* Learn-more bar — node-port + lesson arrows, top of the coach. */
+  .learn-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .larrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition: border-color 0.14s, color 0.14s, background 0.14s;
+  }
+  .larrow:hover:not(:disabled) { border-color: var(--color-border-strong); color: var(--color-fg); }
+  .larrow:disabled { opacity: 0.35; cursor: not-allowed; }
+  .lcount {
+    min-width: 40px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    color: var(--color-fg-subtle);
+    text-transform: uppercase;
+  }
+  /* The port — a little node-port box that emits the edge when active. */
+  .port {
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 3px;
+    background: var(--color-surface);
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  }
+  .port.emitting {
+    border-color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-brand) 30%, var(--color-surface));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+  }
   .ghost {
     padding: 9px 14px; border: 0; border-radius: 10px;
     background: transparent; color: var(--color-fg-muted);
