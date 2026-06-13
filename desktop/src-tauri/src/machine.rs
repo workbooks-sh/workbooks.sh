@@ -118,6 +118,14 @@ pub fn engine() -> Option<Engine> {
         Some(Engine::Docker)
     } else if podman_ready() {
         Some(Engine::Podman)
+    } else if vfkit_bin().is_some() {
+        // No ready daemon, but vfkit IS available (bundled or PATH): prefer it
+        // and fetch the engine-disk on demand. vfkit is the reliable lane
+        // (0-2s, direct-kernel boot, /health 200 proven) — strictly better than
+        // krunvm, whose libkrun TSI networking measured 8-min-to-never. A dev
+        // machine actively using docker/podman still wins above; this only
+        // beats the krunvm fallback. `WB_ENGINE` overrides either way.
+        Some(Engine::Vfkit)
     } else if command_exists("krunvm") {
         Some(Engine::Krunvm)
     } else {
