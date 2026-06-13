@@ -44,6 +44,37 @@ defmodule Workbooks.BrokerAuditTest do
     assert BrokerAudit.count({:serve, :deny, :revoked}) >= 1
   end
 
+  test "the NEW execution-model + raw-TCP brokers are observable (process + tcp_serve denials queryable)" do
+    BrokerAudit.reset()
+
+    # ProcessBroker: a revoked principal's spawn is denied + audited (:process)
+    p = "audit-proc-#{System.unique_integer([:positive])}"
+    :ok = Workbooks.Revocation.revoke(p)
+    assert {:error, :revoked} = Workbooks.ProcessBroker.spawn("nope", [], "", allow: true, principal: p)
+    :ok = Workbooks.Revocation.unrevoke(p)
+
+    # TcpServeBroker: start a revoked server; a connection is refused + audited (:tcp_serve)
+    sid = "audit-tcps-#{System.unique_integer([:positive])}"
+    {:ok, lsock} = Workbooks.TcpServeBroker.start(handler: fn r -> r end, serve_id: sid)
+    port = Workbooks.TcpServeBroker.port(lsock)
+    :ok = Workbooks.Revocation.revoke(sid)
+    {:ok, sock} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 2_000)
+    :gen_tcp.send(sock, "x")
+    _ = :gen_tcp.recv(sock, 0, 1_000)
+    :gen_tcp.close(sock)
+    Process.sleep(100)
+    Workbooks.TcpServeBroker.stop(lsock)
+    :ok = Workbooks.Revocation.unrevoke(sid)
+
+    # both new brokers' denials are in the queryable counters + the forensics ring + total
+    assert BrokerAudit.count({:process, :deny, :revoked}) >= 1
+    assert BrokerAudit.count({:tcp_serve, :deny, :revoked}) >= 1
+    assert BrokerAudit.total_denials() >= 2
+    brokers = BrokerAudit.recent(50) |> Enum.map(fn {b, _r, _t, _ts} -> b end)
+    assert :process in brokers
+    assert :tcp_serve in brokers
+  end
+
   test "forensics ring — recent/1 captures the denial TARGET (what the guest tried to reach)" do
     BrokerAudit.reset()
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/")

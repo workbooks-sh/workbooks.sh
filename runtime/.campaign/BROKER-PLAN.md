@@ -1691,3 +1691,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   raw-TCP server's DoS cadence is now COMPLETE: huge-bodies (byte cap) + many-conns (per-client RATE + GLOBAL
   concurrency + PER-CLIENT concurrency) + slowloris (absolute deadline) + revocation + audit — every DoS vector
   the directive names, on the inbound TCP path.
+- 2026-06-12 (iter 128): **NEW-BROKER OBSERVABILITY + CONSOLIDATED CERTIFICATION (the 'manageable' criterion,
+  whole surface).** Closed the last manageable-coverage gap: the new execution-model + raw-TCP brokers
+  (:process, :tcp_serve) record denials but had no test proving they're QUERYABLE. Added one: a revoked
+  ProcessBroker.spawn (:process deny) + a revoked TcpServeBroker connection (:tcp_serve deny) both show up in
+  BrokerAudit counters + the forensics ring (recent/1) + total_denials. So EVERY broker (net/tcp/udp/tls/exec/
+  parallel/process/serve/tcp_serve/storage/queue) is now observable. Then ran a CONSOLIDATED regression of the
+  whole broker surface — 16 test files, 105 Elixir tests, 0 failures (+ 12 Rust SSRF/fuzz unit tests, iter90).
+  So after ~30 fires of changes (networking keystone + audit + self-audit + raw-TCP inbound + fork-exec model +
+  all the hardening) the entire brokered-capability platform is GREEN, OBSERVABLE, and MANAGEABLE with no
+  cross-cutting regression. The platform: secure networking (egress in/out + ingress http/TCP, full red-team-
+  green cadence both paths), execution model (sync/batch/async exec, fork-bomb-complete width+depth), storage/
+  queue/secrets (capped, tenant-isolated, revocable), and uniform observability — every broker default-deny,
+  capped, audited, revocable-up-front, adversarially tested.
