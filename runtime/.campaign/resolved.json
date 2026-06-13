@@ -2535,6 +2535,16 @@
    "fix": "~6-line codegen_c.cpp patch lowering wait32/notify(/wait64) to __builtin_wasm_memory_atomic_* (clang compiles them, verified) + rebuild mrustc + re-run threads-libstd prebuild + wire deps into compile_rust_threads. SAME patch site unblocks the ~40 llvm.wasm.* SIMD intrinsics. CROSSES the no-mrustc-fork stance (first true mrustc-binary patch).",
    "caveat": "top-level rayon par_iter sugar does NOT compile (mrustc trait-resolution ceiling); productize against rayon-core join/scope/ThreadPool API",
    "since": "iter160"
+  },
+  "duckdb": {
+   "capability": "DuckDB SQL engine from C++ source -> wasm",
+   "status": "proven",
+   "proof": "9/9 split-amalgamation TUs compile clean through build_c_dir (the C++ exceptions lane): ~25s/TU, <=700MB RSS (well under clang.wasm 4GB), incl. fmt/re2/httplib TUs + the C-API driver. NO clang.wasm OOM (the single-25MB-TU fear is dead \u2014 split amalgam fixes it).",
+   "full_build": "~29 CPU-min, RAM-bound NOT toolchain-bound at lane concurrency-6 (~4GB aggregate); on this 16GB/15GB-used box it swaps to ~50min wall; give >=6GB free or cap concurrency ~2 -> lands, then one wasm-ld link of ~70 objs (~30MB)",
+   "recipe": "DuckDB v1.1.3; python3 scripts/amalgamation.py --splits=64 --no-linenumbers; 3 source patches (single-thread Semaphore shim \u2014 NOT -DDUCKDB_NO_THREADS which dup-defines; excise cpp-httplib ~9376 lines from duckdb-internal.hpp; InstallFromHttpUrl throws); -D_WASI_EMULATED_MMAN -DDUCKDB_AMALGAMATION -DNDEBUG. Full recipe: forge-runs/duckdb-recipe.md",
+   "to_live": "run the full 70-TU build at low concurrency + link + run the SELECT (characterized: RAM/time only, no toolchain wall) -> productize as a post-amalgamation patch recipe under compilers/",
+   "validates": "the C++ exceptions keystone (build_c_dir EH) on a real large C++ codebase",
+   "since": "iter160"
   }
  },
  "verdict_ladder": {
