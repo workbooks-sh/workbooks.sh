@@ -19,7 +19,7 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import { ArrowRight, Plus, Sparkle as Sparkles, BookOpen, MagicWand as Wand2, Kanban, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
+  import { ArrowRight, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
