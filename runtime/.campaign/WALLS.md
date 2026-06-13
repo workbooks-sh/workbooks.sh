@@ -91,9 +91,14 @@ Our own in-sandbox compilers can't yet *produce* certain wasm. Not a wall — ea
 it's our home turf (where effort reliably converts to live capability).
 
 Members:
-- mrustc frozen at 1.74 + `target_feature=false` → Rust threads, edition-2024, proc-macros
-- no EH-enabled libc++ → C++ exceptions
-- no Go / Fortran / OCaml / etc. compiler → those language ecosystems
+- mrustc frozen at 1.74 + `target_feature=false` → Rust threads, edition-2024, proc-macros (roadmap)
+- ~~no EH-enabled libc++ → C++ exceptions~~ → **PROVEN 2026-06-13** (from-source EH runtime via our
+  clang.wasm: llvmorg-22.1.0 libcxxabi/libunwind built `-fwasm-exceptions -mllvm
+  -wasm-use-legacy-eh=false` → `libc++abi-eh.a`+`libunwind-eh.a`; throwing C++ catches with full
+  unwinding). KEYSTONE — unblocks C++-from-source-to-wasi (DuckDB-class). Wiring to live in progress.
+- no Go compiler → Go ecosystem: **scoping now** — Go's native `GOOS=wasip1` emits clean wasi (esbuild
+  the headline). Likely a provision-time build tool producing staged .wasm (like prebuilt sqlite).
+- no Fortran / OCaml / etc. → those ecosystems (roadmap)
 
 ## How to use this
 - Tag every `roadmap` capability in resolved.json with its wall (bedrock | bridge | forge).

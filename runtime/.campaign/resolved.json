@@ -2466,13 +2466,14 @@
    "since": "iter156"
   },
   "cpp_exceptions": {
-   "capability": "C++ exceptions (try/throw/catch) in-sandbox",
-   "status": "roadmap",
-   "blocker": "no prebuilt EH-enabled wasi libc++/libc++abi/libunwind exists (wasi-sdk ships no-exceptions libc++abi + no libunwind) -> NOT a ready overlay like threads were",
-   "paths": "(A) L-XL from-source EH libc++ build on a provisioned machine; (B) M-uncertain compile the libc++abi EH sources + libunwind via our own clang.wasm lane -> overlay",
-   "meanwhile": "compile_cpp -fno-exceptions (LIVE) covers exceptions-free C++",
-   "tracked": "wb-i9nc",
-   "since": "iter157"
+   "capability": "C++ exceptions (try/throw/catch + unwinding) in-sandbox",
+   "status": "proven",
+   "proof": "throwing C++ compiles+links+runs under wasmtime 45 -W exceptions=y, catches correctly: full stack unwinding (RAII destructors in order), type-matched handlers, rethrow, primitive catches",
+   "recipe": "from-source EH runtime built via our own clang.wasm: 6 EH objects (cxa_exception/cxa_exception_storage/fallback_malloc/cxa_personality/private_typeinfo + Unwind-wasm.c + __cpp_exception tag.o) from llvmorg-22.1.0, built -fwasm-exceptions -mllvm -wasm-use-legacy-eh=false (NEW EH; wasmtime45 rejects legacy) -> libc++abi-eh.a + libunwind-eh.a",
+   "wiring": "IN PROGRESS \u2014 fold archive build into build.sh overlay + branch compile_cpp exceptions:true + stage-tools take + flip cpp_lane_test (~0.5-1day)",
+   "keystone": "unblocks C++-from-source-to-wasi = DuckDB-class libs",
+   "caveat": "single-threaded EH (wasip1); wasm32-wasi-threads lane needs its own EH archive",
+   "since": "iter158"
   },
   "rust_threads": {
    "capability": "multithreaded Rust (std::thread/rayon) in-sandbox",
