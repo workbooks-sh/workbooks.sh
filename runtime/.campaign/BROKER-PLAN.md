@@ -1645,3 +1645,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   lifecycle (3 real sandboxed coreutils subprocesses). The brokered fork-exec primitive is now leak-proof +
   fork-bomb-resistant. NEXT: wire host_spawn/host_await dock imports (with depth propagation so recursive
   spawn is depth-bounded) so guests can reach it; then streaming stdin/stdout pipes.
+- 2026-06-12 (iter 124): **FIXED an INERT exec-recursion-bomb defense — depth now propagates across host_exec
+  (the DEPTH dimension of the fork-bomb defense).** Found while completing the fork-exec model: host_exec
+  (rust_dock + js_dock) called ExecBroker.exec WITHOUT :depth, so every nested exec defaulted to depth 0 — the
+  documented @max_depth (8) recursion bound was NEVER reached (a guest could exec-recurse unboundedly by the
+  depth check; only wall-clock/memory bounded it). FIX: threaded :depth through the whole chain — ExecBroker.
+  exec -> CommandRegistry.run -> PackageManager.run -> JsDock.env / RustDock.exec_caps, and the dock host_exec
+  + host_parallel_map now call ExecBroker.exec/ParallelBroker.map with depth: depth+1 (children one level
+  deeper); ParallelBroker.run threads depth to its per-task exec too. So a recursive host_exec chain now
+  increments depth and is BOUNDED at @max_depth. 38 tests green incl the real rust_dock/js_dock host_exec e2e
+  (exercises the depth+1 path) + the existing depth-bound test. This completes the fork-bomb defense across
+  BOTH dimensions: WIDTH (ProcessBroker per-principal concurrent cap, iter122-123) + DEPTH (the now-LIVE
+  @max_depth nesting bound, this fire) — for host_exec, host_parallel_map, AND ProcessBroker (opts pass-through).

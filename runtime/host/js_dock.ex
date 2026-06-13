@@ -41,7 +41,7 @@ defmodule Workbooks.JsDock do
                bytes: bytes,
                store_limits: Policy.store_limits(profile),
                wasi: %Wasmex.Wasi.WasiOptions{stdin: si, stdout: so},
-               imports: %{"env" => env(profile, vfs, Workbooks.Tenant.resolve(opts), Keyword.get(opts, :net_allow, nil))}
+               imports: %{"env" => env(profile, vfs, Workbooks.Tenant.resolve(opts), Keyword.get(opts, :net_allow, nil), Keyword.get(opts, :depth, 0))}
              }),
            {:ok, _} <- Wasmex.call_function(pid, "_start", [], timeout) do
         Wasmex.Pipe.seek(so, 0)
@@ -64,7 +64,7 @@ defmodule Workbooks.JsDock do
   # All three host fns are ALWAYS bound (the harness imports them unconditionally); each enforces
   # its own cap and returns -1 when denied → JS sees null/false. Egress is host-brokered (:httpc,
   # the wasm never opens a socket); VFS is the Instance's sandboxed KV store (no host FS reach).
-  defp env(profile, vfs, tenant, net_allow) do
+  defp env(profile, vfs, tenant, net_allow, depth) do
     allow_http = Policy.allow_http?(profile)
     allow_exec = "exec" in Policy.caps(profile)
     allow_kv = "kv" in Policy.caps(profile)
@@ -102,7 +102,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_exec,
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len),
                 {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
-                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: tenant) do
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: tenant, depth: depth + 1) do
              n = min(byte_size(out), max(out_cap, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
@@ -117,7 +117,7 @@ defmodule Workbooks.JsDock do
            with true <- allow_exec,
                 req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, rp, rl),
                 {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
-                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: tenant) do
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: tenant, depth: depth + 1) do
              enc = Workbooks.ParallelBroker.encode_results(results)
 
              if byte_size(enc) <= oc do

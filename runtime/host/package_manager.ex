@@ -993,7 +993,7 @@ defmodule Workbooks.PackageManager do
         # (bare stdout binary on success). Thread an explicit :tenant so the dock partitions KV/secrets by the
         # caller's real identity; a missing tenant becomes a unique EPHEMERAL namespace (not the old "default").
         js_opts =
-          [profile: Keyword.get(opts, :profile, :minimal)] ++
+          [profile: Keyword.get(opts, :profile, :minimal), depth: Keyword.get(opts, :depth, 0)] ++
             case Keyword.get(opts, :tenant) do
               t when is_binary(t) and t != "" -> [tenant: t]
               _ -> []

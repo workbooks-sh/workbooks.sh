@@ -27,6 +27,7 @@ defmodule Workbooks.RustDock do
     caps = Policy.caps(profile)
     vfs = Keyword.get(opts, :vfs)
     tenant = Workbooks.Tenant.resolve(opts)
+    depth = Keyword.get(opts, :depth, 0)
     # per-instance egress SCOPE (wb-8w8x): a granted {host,port} allow-list confining ALL net brokers. nil =
     # no extra scoping (the SSRF floor still applies). The caller passes it to confine a guest's destinations.
     net_allow = Keyword.get(opts, :net_allow, nil)
@@ -35,7 +36,7 @@ defmodule Workbooks.RustDock do
       ambient()
       |> maybe(Policy.allow_http?(profile), fn -> egress(tenant, net_allow) end)
       |> maybe("vfs" in caps and vfs != nil, fn -> vfs_caps(vfs) end)
-      |> maybe("exec" in caps, fn -> exec_caps(tenant) end)
+      |> maybe("exec" in caps, fn -> exec_caps(tenant, depth) end)
       |> maybe("kv" in caps, fn -> kv_caps(tenant) end)
       |> maybe("secrets" in caps, fn -> secret_caps(tenant) end)
       |> maybe("queue" in caps, fn -> queue_caps(tenant) end)
@@ -53,7 +54,7 @@ defmodule Workbooks.RustDock do
   # (Workbooks.ExecBroker.parse_request) and the host runs the named REGISTERED wasm command in its own
   # sandboxed instance (no dirs passed → no host-file escalation; the catalog tools have no net). The
   # ExecBroker enforces default-deny / registered-only / depth / output-cap / structural-argv.
-  defp exec_caps(principal) do
+  defp exec_caps(principal, depth) do
     %{
       # host_exec(req_ptr,req_len, out_ptr,out_cap) -> i32 : run a sandboxed wasm command, write its
       # output into the out buffer, return bytes written (truncated to out_cap; -1 on deny/error).
@@ -63,7 +64,7 @@ defmodule Workbooks.RustDock do
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
 
            with {:ok, name, argv, stdin} <- Workbooks.ExecBroker.parse_request(req),
-                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: principal) do
+                {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: principal, depth: depth + 1) do
              n = min(byte_size(out), max(out_cap, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
              n
@@ -79,7 +80,7 @@ defmodule Workbooks.RustDock do
            req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
 
            with {:ok, name, argv, inputs} <- Workbooks.ParallelBroker.parse_map_request(req),
-                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: principal) do
+                {:ok, results} <- Workbooks.ParallelBroker.map(name, inputs, allow: true, argv: argv, principal: principal, depth: depth + 1) do
              enc = Workbooks.ParallelBroker.encode_results(results)
 
              if byte_size(enc) <= out_cap do

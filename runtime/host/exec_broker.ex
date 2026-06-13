@@ -63,7 +63,9 @@ defmodule Workbooks.ExecBroker do
         {:error, :unknown_command}
 
       true ->
-        case CommandRegistry.run(name, stdin, argv) do
+        # thread the current depth so THIS command's own host_exec runs its children at depth+1 — otherwise
+        # the @max_depth recursion-bomb bound is inert (every nested exec defaults to depth 0). wb depth-fix.
+        case CommandRegistry.run(name, stdin, argv, [], depth: depth) do
           {:ok, out} when is_binary(out) -> {:ok, cap(out, max_output)}
           {:error, reason} -> {:error, {:command_failed, reason}}
           other -> {:error, {:command_failed, other}}
