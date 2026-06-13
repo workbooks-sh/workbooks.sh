@@ -74,6 +74,15 @@ defmodule Workbooks.BrokeredToolsTest do
 
   @tag :netdeps
   @tag timeout: 120_000
+  test "LIVE — npm-fetch retrieves npm registry metadata + tarball URL over HTTPS (npm/pnpm/yarn network half)" do
+    assert {:ok, out, 0} = CommandRegistry.run_status("npm-fetch", "", ["left-pad"])
+    assert out =~ "name: left-pad"
+    assert out =~ "version:"
+    assert out =~ "tarball:" and out =~ "registry.npmjs.org"
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
   test "SCOPE — a per-instance allow-list can confine the http client (off-list host denied)" do
     :ok = BrokeredTools.register_http(%{allow: ["example.com"]})
     # on-list works

@@ -152,7 +152,8 @@
    "verdict": "impossible",
    "lane": "none",
    "blocker": "pnpm's core purpose is real networking (live npm-registry HTTP fetch) + a hardlink/symlink content-addressed store (fs.link) that WASI fs doesn't provide; also needs node>=22.13, worker_threads, child_process (node-gyp).",
-   "extent": "off-the-table (verified)"
+   "extent": "off-the-table (verified)",
+   "capability_live": "npm-fetch command (host/brokered_tools.ex) \u2014 package metadata + tarball URL from the npm registry over the brokered HTTPS stack. The npm/pnpm/yarn NETWORK-FETCH half is reclaimed live; the install (download tarball + unpack + lifecycle scripts) is the separate remaining step."
   },
   "Zig build / zigmod": {
    "verdict": "reachable",
@@ -555,7 +556,8 @@
    "lane": "none",
    "blocker": "Long-running Node dev server: native HTTP listener + websockets (HMR) + fs watch = network-purpose + long-running server. Build path depends on native binaries \u2014 esbuild (Go native exec) and Rolldown/",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "npm-fetch command (host/brokered_tools.ex) \u2014 package metadata + tarball URL from the npm registry over the brokered HTTPS stack. The npm/pnpm/yarn NETWORK-FETCH half is reclaimed live; the install (download tarball + unpack + lifecycle scripts) is the separate remaining step."
   },
   "Webpack": {
    "verdict": "impossible",
@@ -593,7 +595,8 @@
    "lane": "none",
    "blocker": "Purpose is host-PATH management + network download + fork-exec of native Node/npm/yarn binaries. None of these exist or are permitted under wasm32-wasi/wasmtime. A compiled .wasm would be a no-op shel",
    "extent": "off-the-table (verified)",
-   "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live."
+   "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live.",
+   "capability_live": "npm-fetch command (host/brokered_tools.ex) \u2014 package metadata + tarball URL from the npm registry over the brokered HTTPS stack. The npm/pnpm/yarn NETWORK-FETCH half is reclaimed live; the install (download tarball + unpack + lifecycle scripts) is the separate remaining step."
   },
   "go mod": {
    "verdict": "reachable",
@@ -2269,6 +2272,17 @@
    ],
    "recipe": "brokered-HTTPS PyPI JSON API",
    "half": "network-fetch (metadata+URLs); install/build separate",
+   "since": "iter146"
+  },
+  "npm_fetch": {
+   "command": "npm-fetch",
+   "delivers": [
+    "npm",
+    "pnpm",
+    "yarn"
+   ],
+   "recipe": "brokered-HTTPS npm registry",
+   "half": "network-fetch; install separate",
    "since": "iter146"
   }
  }

@@ -70,11 +70,37 @@ defmodule Workbooks.BrokeredTools do
       sys.stderr.write("error: %s\n" % e); sys.exit(1)
   """
 
+  # `npm-fetch` — the network half of npm/pnpm/yarn: package metadata + tarball URL from the npm registry over
+  # the brokered HTTPS stack. Usage: npm-fetch PACKAGE
+  @npm_fetch ~S"""
+  import sys, json
+  if len(sys.argv) < 2:
+      sys.stderr.write("usage: npm-fetch PACKAGE\n"); sys.exit(2)
+  pkg = sys.argv[1]
+  import requests, urllib.error
+  try:
+      r = requests.get("https://registry.npmjs.org/%s" % pkg)
+      if r.status_code != 200:
+          sys.stderr.write("not found: %s (%d)\n" % (pkg, r.status_code)); sys.exit(1)
+      data = r.json()
+      latest = data.get("dist-tags", {}).get("latest")
+      print("name:", data.get("name"))
+      print("version:", latest)
+      dist = data.get("versions", {}).get(latest, {}).get("dist", {})
+      print("tarball:", dist.get("tarball"))
+      sys.exit(0)
+  except urllib.error.URLError as e:
+      sys.stderr.write("error: %s\n" % e.reason); sys.exit(1)
+  except Exception as e:
+      sys.stderr.write("error: %s\n" % e); sys.exit(1)
+  """
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
     %{
       "http" => register_http(),
-      "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{})
+      "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{}),
+      "npm-fetch" => Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{})
     }
   end
 

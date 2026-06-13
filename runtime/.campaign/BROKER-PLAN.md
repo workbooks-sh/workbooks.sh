@@ -1978,3 +1978,8 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   live on pip/Poetry/pdm/Buildout + live_capabilities.pkg_fetch (honest: fetch-half live, install/build separate).
   NEXT Phase-4: an npm-fetch sibling (registry.npmjs.org); a DB client over brokered raw-TCP (Redis/PG wire); an
   API tool (already largely covered by `http -H/-d`).
+- 2026-06-13 (iter 146 cont): **npm-fetch sibling — npm/pnpm/yarn network-fetch half reclaimed.** `npm-fetch
+  PACKAGE` -> metadata + tarball URL from registry.npmjs.org over the brokered HTTPS stack. Live: npm-fetch
+  left-pad -> name/version/tarball on registry.npmjs.org. 10 brokered_tools tests green. resolved.json:
+  capability_live on npm-class + live_capabilities.npm_fetch. The package-registry FETCH capability now ships
+  for BOTH ecosystems (PyPI + npm); install/build remains the separate next step.
