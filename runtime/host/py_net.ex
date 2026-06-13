@@ -31,8 +31,7 @@ defmodule Workbooks.PyNet do
   require Logger
 
   @poll_ms 20
-  # safety ceiling so a wedged guest can't spin the watcher forever
-  @default_deadline_ms 30_000
+  # safety ceiling so a wedged guest can't spin the watcher forever (bounds total serviced requests)
   @default_max_requests 64
 
   @doc """
