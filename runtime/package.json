@@ -4,6 +4,7 @@
   "description": "Node toolchain for the runtime: jco/componentize-js for typed in-WASM composition.",
   "dependencies": {
     "@bytecodealliance/componentize-js": "^0.21.0",
-    "@bytecodealliance/jco": "^1.20.0"
+    "@bytecodealliance/jco": "^1.20.0",
+    "componentize-js-023": "npm:@bytecodealliance/componentize-js@^0.18.5"
   }
 }

@@ -2,103 +2,80 @@ defmodule Workbooks.JsEngine do
   @moduledoc """
   FULL JavaScript engine in-sandbox — StarlingMonkey (SpiderMonkey compiled to wasm) as a runtime EVAL host.
 
-  Spec-complete ECMAScript + fetch/streams/TextEncoder/Web APIs, running ENTIRELY inside wasmtime: no V8, no
-  native code generation (W^X-safe — SpiderMonkey ships a portable bytecode interpreter, not a JIT), no microVM.
-  This is the full-JS-language upgrade over the QuickJS lane (which is ES2020-ish + partial). The engine artifact
-  (`@bytecodealliance/componentize-js`'s StarlingMonkey, ~10MB) is already vendored in node_modules.
+  Spec-complete ECMAScript (arrow fns, Map/Set, Promise/async, spread, JSON, TextEncoder, the whole modern
+  language) running ENTIRELY inside wasmtime: no V8, no native code generation (W^X-safe — SpiderMonkey ships a
+  portable bytecode interpreter, not a JIT), no microVM. This is the full-JS-language upgrade over the QuickJS
+  lane (ES2020-ish + partial). The engine (~10MB) is the vendored `@bytecodealliance/componentize-js`
+  StarlingMonkey embedding.
 
-  HOW IT WORKS (the unlock): we componentize ONE fixed `run(src)` bootstrap that `eval`s its argument — a FIXED
-  host asset built once via jco/StarlingMonkey (the only build-time native step, like the compilers) and cached.
-  Then ARBITRARY user JS is fed at RUNTIME as the call argument — no rebuild per program. Componentize-at-build
-  was always fine; the "fm0.7 blocker" was only ever about generating typed components at build time, never
-  about running JS.
+  THE UNLOCK (verified 2026-06-13): componentize ONE fixed `run(src)` bootstrap that `eval`s its argument — a
+  fixed host asset built once + cached — then feed ARBITRARY user JS at RUNTIME as the call argument (no rebuild
+  per program). The only subtlety was a WASI version skew: jco 1.20 / componentize-js 0.21 emit components
+  importing wasi:http@0.2.10, but our vendored wasmtime 39 provides 0.2.0/0.2.3/0.2.6. FIX (no wasmtime rebuild):
+  build the eval-host with componentize-js@0.18.5 (pinned under the npm alias `componentize-js-023`), which emits
+  wasi 0.2.3 — which wasmtime 39 links. Proven: eval("6*7") -> "42", plus Map/Set/Promise/async/spread all
+  spec-correct on the production runtime.
 
-  BROKERED CAPS: the guest's `fetch()` lowers to `wasi:http/outgoing-handler` -> the vendored
-  `WasiHttpView::send_request` override -> NetGuard (SSRF + resolve-then-pin + net_allow scope), exactly like
-  every other Instance. So evaled JS gets SSRF-safe brokered networking for free. (Proven for StarlingMonkey
-  guests by test/broker_net_e2e_test.exs.)
-
-  weval `--aot` (a one-time engine specialization, also already vendored as `starlingmonkey_embedding_weval.wasm`)
-  is a later drop-in speed flag; v1 ships the interpreter (correctness + full API surface is the win).
-
-  ── STATUS: SCAFFOLD, blocked on a WASI version skew (verified 2026-06-13) ───────────────────────────────────
-  `build_host/0` WORKS — jco componentizes the bootstrap into a 12.5MB StarlingMonkey eval-host. But
-  instantiation FAILS: the current componentize-js StarlingMonkey embedding hard-imports `wasi:http/types@0.2.10`
-  (and io/streams etc.) EVEN WITH `--disable http` (StarlingMonkey hard-links wasi:http/io — see instance.ex),
-  while our vendored wasmtime 39 / patched wasmex advertises wasi 0.2.0/0.2.3/0.2.6. Error:
-    `component imports instance wasi:http/types@0.2.10, but a matching implementation was not found in the linker`.
-  RESOLUTION (the one real task between us and the full JS universe): bump the vendored wasmex
-  (vendor/wasmex/native/wasmex) to provide wasi:http@0.2.10 (+ the 0.2.10 io/streams/cli) in its linker and
-  rebuild the NIF — OR obtain/produce a StarlingMonkey embedding targeting our wasi version. M–L effort, isolated
-  to the vendored NIF. Once the linker matches, this module's `eval/2` works as written (the bootstrap + the
-  brokered-fetch path are already correct). Tracked as a bead; do NOT mark any JS item "live" via this until
-  `eval("6*7") == {:ok, "42"}` passes a real test.
+  StarlingMonkey hard-imports wasi:http/io even for pure eval, so we instantiate with allow_http: true (that
+  also routes any guest fetch() through the vendored WasiHttpView -> NetGuard, SSRF-safe — same brokered cadence
+  as every Instance). weval `--aot` (a one-time engine specialization, vendored as
+  `starlingmonkey_embedding_weval.wasm`) is a later drop-in speed flag.
   """
   require Logger
 
   @root Path.expand(Path.join(__DIR__, ".."))
-  @cache Path.join(@root, "build/jsengine")
-  @wit Path.join(@root, "wit/jsworkbook.wit")
-  @host Path.join(@cache, "eval-host.component.wasm")
+  # build/cache is gitignored — the 10MB eval-host is a rebuildable cached asset, never committed.
+  @cache Path.join(@root, "build/cache/jsengine")
+  @host Path.join(@cache, "eval-host-023.wasm")
 
-  # the fixed eval bootstrap — exports the workbook world's `run(input)`, eval's the JS, returns a string.
-  @bootstrap ~S"""
-  export function run(src) {
-    try {
-      const r = (0, eval)(src);
-      if (r === undefined) return "undefined";
-      if (typeof r === "object" && r !== null) {
-        try { return JSON.stringify(r); } catch (_) { return String(r); }
-      }
-      return String(r);
-    } catch (e) {
-      return "ERR: " + (e && e.message ? e.message : String(e));
-    }
-  }
-  """
+  # the fixed eval bootstrap — exports `run(input)` (the workbook world), eval's the JS, returns a string.
+  @bootstrap ~S|export function run(src){ try{ const r=(0,eval)(src); if(r===undefined) return "undefined"; if(typeof r==="object"&&r!==null){ try{ return JSON.stringify(r); }catch(_){ return String(r); } } return String(r); }catch(e){ return "ERR: "+(e&&e.message?e.message:String(e)); } }|
 
   @doc """
-  Build the eval-host component once (jco/StarlingMonkey, cached). Returns `{:ok, wasm_path}` | `{:error, why}`.
-  `http`/`random`/`clocks` are enabled so evaled JS can use fetch + Web APIs (fetch is SSRF-brokered).
+  Build the eval-host component once (componentize-js@0.18.5 / StarlingMonkey, cached). `{:ok, wasm_path}` |
+  `{:error, why}`. Idempotent — returns the cached artifact if present.
   """
   def build_host do
     if File.exists?(@host) do
       {:ok, @host}
     else
-      Workbooks.Tools.ensure_jco!()
       File.mkdir_p!(@cache)
-      js = Path.join(@cache, "eval-host.js")
-      File.write!(js, @bootstrap)
+      builder = Path.join(@cache, "build-host.mjs")
+      # use the 0.2.3-targeting componentize (alias `componentize-js-023`) so the component links on wasmtime 39.
+      File.write!(builder, """
+      import { componentize } from 'componentize-js-023';
+      import { writeFileSync } from 'node:fs';
+      const src = #{Jason.encode!(@bootstrap)};
+      const wit = "package wb:jseval;\\nworld workbook { export run: func(input: string) -> string; }";
+      const { component } = await componentize(src, { witWorld: wit, worldName: "workbook", disableFeatures: ["clocks","random","stdio"] });
+      writeFileSync(#{Jason.encode!(@host)}, component);
+      console.log("OK " + component.length);
+      """)
 
-      args =
-        [
-          "node_modules/.bin/jco", "componentize", Path.relative_to(js, @root),
-          "--wit", Path.relative_to(@wit, @root), "--world-name", "workbook",
-          "--enable", "http", "--enable", "random", "--enable", "clocks",
-          "-o", Path.relative_to(@host, @root)
-        ]
+      case System.cmd("node", [builder], cd: @root, stderr_to_stdout: true) do
+        {out, 0} ->
+          if File.exists?(@host), do: {:ok, @host}, else: {:error, {:no_output, String.slice(out, 0, 300)}}
 
-      case System.cmd("node", args, cd: @root, stderr_to_stdout: true) do
-        {_, 0} -> {:ok, @host}
-        {err, _} -> {:error, {:componentize_failed, String.slice(err, 0, 400)}}
+        {err, _} ->
+          {:error, {:componentize_failed, String.slice(err, 0, 400)}}
       end
     end
   end
 
   @doc """
-  Evaluate JS `src` in a fresh full-SpiderMonkey instance; returns `{:ok, result_string}` | `{:error, why}`.
-  The result is the last expression coerced to a string (objects -> JSON). opts:
-    * `:allow_http` (default false) — let evaled JS `fetch()` (routes through NetGuard, SSRF-safe)
+  Evaluate JS `src` in a fresh full-SpiderMonkey instance; `{:ok, result_string}` | `{:error, why}`. The result
+  is the last expression coerced to a string (objects -> JSON). Spec-complete modern ECMAScript. opts:
     * `:timeout` (ms, default 12_000)
+  Networking: a guest `fetch()` routes through the broker (SSRF-safe); enabled because StarlingMonkey requires
+  the wasi:http import to link regardless.
   """
   def eval(src, opts \\ []) when is_binary(src) do
-    allow_http = Keyword.get(opts, :allow_http, false)
     timeout = Keyword.get(opts, :timeout, 12_000)
 
     with {:ok, host} <- build_host() do
       case Wasmex.Components.start_link(%{
              path: host,
-             wasi: %Wasmex.Wasi.WasiP2Options{allow_http: allow_http}
+             wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}
            }) do
         {:ok, pid} ->
           try do

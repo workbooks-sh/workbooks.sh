@@ -2436,6 +2436,15 @@
    "guard": "test/brokered_pkg_install_test.exs + brokered_tools_test.exs",
    "limits": "heavy CLIs perf-limited; servers need serve-flip; native-ext/Rust/C++ packages out of lane",
    "since": "iter154"
+  },
+  "js_engine_full": {
+   "capability": "full spec-complete SpiderMonkey JS engine in-wasm (modern ECMAScript: arrow/Map/Set/Promise/async/spread/JSON), runtime eval, no V8/native/microVM",
+   "module": "host/js_engine.ex JsEngine.eval",
+   "recipe": "componentize a fixed run(src) eval bootstrap via componentize-js@0.18.5 (wasi 0.2.3, links on wasmtime 39); feed arbitrary JS at runtime; fetch brokered via wasi:http->NetGuard",
+   "test": "test/js_engine_test.exs (3 green)",
+   "vs": "replaces the QuickJS lanes ES2020-ish partial with the full Firefox JS engine",
+   "weval": "starlingmonkey_embedding_weval.wasm vendored \u2014 --aot speed flag is a later drop-in",
+   "since": "iter155"
   }
  }
 }

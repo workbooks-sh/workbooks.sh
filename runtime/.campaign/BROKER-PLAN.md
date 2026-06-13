@@ -2109,3 +2109,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   / 1 deferred / 0 reachable. NOTE: the 20 run-1 LIVE flips are experiment-proven in /tmp by the agents
   (provenance recorded); wiring permanent integration-tests for each is the follow-up to make them durably
   green. SpiderMonkey full-JS-engine track = wb-qnwn (wasi:http@0.2.10 vendored-NIF bump).
+- 2026-06-13 (iter 155): **FULL SpiderMonkey JS ENGINE LIVE in-wasm (the JS-universe unlock).** StarlingMonkey
+  (SpiderMonkey-to-wasm) runs as a runtime eval host under our wasmtime — spec-complete modern ECMAScript, no
+  V8, no native codegen (W^X-safe portable interpreter), no microVM. host/js_engine.ex JsEngine.eval(src):
+  componentize a fixed run(src) eval bootstrap ONCE (cached), feed arbitrary JS at runtime. THE skew that
+  blocked it (jco 1.20/componentize-js 0.21 emit wasi:http@0.2.10; vendored wasmtime 39 provides <=0.2.6) was
+  resolved WITHOUT a wasmtime bump: build with componentize-js@0.18.5 (npm alias componentize-js-023) -> wasi
+  0.2.3, which wasmtime 39 links. test/js_engine_test.exs 3 green: eval 6*7=42; Map/Set/Promise/async/spread/
+  JSON all spec-correct; errors caught not crashed. Fetch routes through wasi:http->NetGuard (SSRF-safe, same
+  brokered cadence). weval --aot is a later speed flag (embedding vendored). This is the full JS LANGUAGE
+  universe in-wasm (beyond QuickJS's partial ES), inside our isolation model. wb-qnwn closed.
