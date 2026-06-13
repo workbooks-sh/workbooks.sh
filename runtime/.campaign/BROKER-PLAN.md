@@ -1503,3 +1503,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   query to 1.1.1.1:53 returns answers (ancount>=1) through the broker; internal UDP (127.0.0.1:53,
   169.254.169.254:53) SSRF-blocked. So the standard wasi:sockets UDP class (DNS/NTP/STUN/QUIC clients) is now
   LIVE + adversarially proven, alongside TCP. Real capability + a bug fix, not grind.
+- 2026-06-12 (iter 112): **CLOSED an inbound-listener bypass that iter-111 would have opened (adversarial
+  follow-through).** iter-111 allowed ALL non-egress socket binds to make UDP clients work — but that meant a
+  guest could TcpListener::bind("0.0.0.0:PORT") and accept UNMEDIATED inbound connections, bypassing the host-
+  brokered serve path (violating keystone goal 4: inbound must be host-as-listener -> guest handler, never a
+  guest-opened listener). REFINED socket_addr_check: BIND is allowed ONLY for an EPHEMERAL port (addr.port()
+  == 0 — the source port a UDP/TCP CLIENT needs); a SPECIFIC-port bind (a listener) is DENIED; any future
+  non-egress use defaults to deny. PROVEN: the UDP DNS client (binds 0.0.0.0:0) still works; a guest probing
+  "listen:8080" (TcpListener::bind to a specific port) is now DENIED (no LISTENING surface). So the standard
+  wasi:sockets generalization is complete AND secure on BOTH axes: egress is SSRF+scope+rate brokered, and the
+  guest cannot open an unmediated inbound listener — inbound stays exclusively on the brokered serve path.

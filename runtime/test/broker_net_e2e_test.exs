@@ -405,6 +405,12 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert probe.("udp:1.1.1.1:53") =~ ~r/OK dns ancount=[1-9]/
     assert probe.("udp:127.0.0.1:53") =~ "ERR"
     assert probe.("udp:169.254.169.254:53") =~ "ERR"
+
+    # INBOUND-LISTENER bypass defense: a guest must NOT open its own TCP listener (a specific-port bind) — that
+    # would be an unmediated inbound surface bypassing the host-brokered serve path. Ephemeral client binds
+    # (port 0, used by the UDP DNS probe above) stay allowed; a specific-port listener is denied.
+    refute probe.("listen:8080") =~ "LISTENING"
+    assert probe.("listen:8080") =~ "ERR"
   end
 
   @tag :build

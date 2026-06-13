@@ -9,6 +9,15 @@ impl Guest for Component {
         if let Some(addr) = target.strip_prefix("udp:") {
             return udp_dns_probe(addr);
         }
+        // "listen:PORT" -> try to open an INBOUND TCP listener on a specific port (an unmediated inbound
+        // surface that must be DENIED — inbound goes through the brokered serve path, not a guest listener).
+        if let Some(port) = target.strip_prefix("listen:") {
+            use std::net::TcpListener;
+            return match TcpListener::bind(format!("0.0.0.0:{}", port)) {
+                Ok(_) => format!("LISTENING on {}", port),
+                Err(e) => format!("ERR {}", e),
+            };
+        }
 
         use std::io::{Read, Write};
         use std::net::TcpStream;

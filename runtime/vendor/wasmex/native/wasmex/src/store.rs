@@ -945,23 +945,25 @@ pub fn component_store_new_wasi(
                 // LOCAL op (e.g. UdpSocket::bind to 0.0.0.0:0 for an ephemeral source port) — applying the
                 // SSRF deny to it wrongly blocked all UDP, since 0.0.0.0 is (correctly) an internal/non-
                 // routable EGRESS target but a valid LOCAL bind address. (wb-8w8x: found by the UDP proof.)
-                let egress = matches!(
-                    use_,
+                let ok = match use_ {
+                    // EGRESS: SSRF + per-instance scope + connection-rate quota.
                     SocketAddrUse::TcpConnect
-                        | SocketAddrUse::UdpConnect
-                        | SocketAddrUse::UdpOutgoingDatagram
-                );
-                let ok = if egress {
-                    wb_conn_rate_ok(
-                        &conn_meter,
-                        std::time::Instant::now(),
-                        std::time::Duration::from_secs(10),
-                        50_000,
-                    ) && wb_addr_allowed(addr)
-                        && wb_addr_in_scope(addr, &net_allow_for_sockets)
-                } else {
-                    // local bind / other non-egress uses
-                    true
+                    | SocketAddrUse::UdpConnect
+                    | SocketAddrUse::UdpOutgoingDatagram => {
+                        wb_conn_rate_ok(
+                            &conn_meter,
+                            std::time::Instant::now(),
+                            std::time::Duration::from_secs(10),
+                            50_000,
+                        ) && wb_addr_allowed(addr)
+                            && wb_addr_in_scope(addr, &net_allow_for_sockets)
+                    }
+                    // BIND: allow ONLY an EPHEMERAL bind (port 0) — the source port a UDP/TCP CLIENT needs.
+                    // A bind to a SPECIFIC port is a LISTENER (an inbound surface); deny it so inbound only
+                    // ever arrives through the host-brokered serve path, never a guest-opened listener.
+                    SocketAddrUse::TcpBind | SocketAddrUse::UdpBind => addr.port() == 0,
+                    // any future non-egress use: deny by default
+                    _ => false,
                 };
                 Box::pin(async move { ok })
             });
