@@ -2482,6 +2482,22 @@
    "fix": "patch mrustc target_feature for a wasm32-wasi-threads spec + rebuild libstd from source (M effort, L/XL risk if mrustc miscompiles the std threads path) + a threads Rust compile lane (mechanical, mirrors compile_threads)",
    "ready": "C-side infra all present (threads sysroot in mrustc-root, wasmtime flags, compile_threads template)",
    "since": "iter157"
+  },
+  "go_wasip1": {
+   "capability": "Go -> wasm32-wasip1 compile lane (clean wasi)",
+   "status": "live",
+   "proof": "trivial Go + esbuild both run wasi-only (zero syscall/js) through our runtime; Go 1.26.1 GOOS=wasip1",
+   "shape": "provision-time host build tool (native Go builds the wasi artifact; output runs sandboxed) \u2014 clean under Bedrock. In-guest path also exists: yaegi interprets untrusted Go in-sandbox (stdlib-only). No mature AOT Go-compiler-in-wasm (honest ceiling).",
+   "since": "iter158"
+  },
+  "esbuild": {
+   "capability": "esbuild bundler/minifier in-sandbox (wasi)",
+   "status": "live",
+   "proof": "esbuild v0.28.1 built to wasip1, bundles+minifies real ESM projects through our runtime; wired at compilers.ex:1688 as the universal bundler under JS/TS/Svelte lanes; staged",
+   "perf": "~23min QuickJS-interpreted bundle -> ~0.4s here (~3400x) \u2014 the amortization thesis: build the tool once natively, ship the fast wasi artifact",
+   "reproducible": "compilers/esbuild/build.sh added (was untracked/non-reproducible); pinned v0.28.1, -trimpath deterministic, ~8s",
+   "remaining": "add esbuild/build.sh to stage-tools build loop (batching with C++ EH stage-tools edit)",
+   "since": "iter158"
   }
  },
  "verdict_ladder": {
