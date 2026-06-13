@@ -38,4 +38,39 @@ defmodule Workbooks.PyNetTest do
   test "BROKERED FETCH respects the allow-list for a permitted host" do
     assert {:ok, %{status: 200}} = PyNet.fetch(:get, "http://example.com/", allow: ["example.com"])
   end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "URLLIB ADAPTER — UNMODIFIED urllib.request.urlopen code runs brokered (no source changes)" do
+    # a plain Python program using the stdlib urllib — no awareness of the broker — works because the adapter
+    # reroutes urlopen through the file protocol.
+    script = ~S"""
+    import urllib.request
+    r = urllib.request.urlopen("http://example.com/")
+    body = r.read()
+    print("CODE", r.status)
+    print("BYTES", len(body))
+    print("HASTITLE", "Example Domain" in body.decode("utf-8", "replace"))
+    """
+
+    assert {:ok, out} = PyNet.run_python_urllib(script)
+    assert out =~ "CODE 200"
+    assert out =~ "HASTITLE True"
+  end
+
+  test "URLLIB ADAPTER — SSRF still enforced through the adapter (urlopen to metadata raises)" do
+    # even the convenient urlopen path can't reach internal targets — the host denies, the adapter raises.
+    script = ~S"""
+    import urllib.request, urllib.error
+    try:
+        urllib.request.urlopen("http://169.254.169.254/latest/")
+        print("REACHED")
+    except urllib.error.URLError as e:
+        print("BLOCKED", e.reason)
+    """
+
+    assert {:ok, out} = PyNet.run_python_urllib(script)
+    assert out =~ "BLOCKED"
+    refute out =~ "REACHED"
+  end
 end

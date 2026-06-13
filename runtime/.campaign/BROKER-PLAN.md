@@ -1811,3 +1811,11 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   named host. NEXT: a Python urllib/requests transport adapter (monkeypatch urlopen -> the file protocol) so
   UNMODIFIED Python net tools (httpie etc.) run brokered; then wrap the reclaimed tools as commands. Same
   transport generalizes to QuickJS (also wasip1-no-connect).
+- 2026-06-13 (iter 135 cont): **URLLIB ADAPTER — UNMODIFIED Python HTTP code runs brokered (PyNet.run_python_
+  urllib).** Injects a prelude that monkeypatches urllib.request.urlopen onto the file protocol, returning a
+  BytesIO subclass that behaves like an http.client.HTTPResponse (.read/.status/.getcode/.headers). So a plain
+  `urllib.request.urlopen("http://...")` (and anything built on urllib) works SSRF-safe via the host with ZERO
+  source changes — the reclaim enabler for Python net tools. 6 PyNet tests green incl: unmodified urlopen
+  fetches example.com (200) brokered; urlopen to cloud-metadata raises URLError (SSRF enforced THROUGH the
+  adapter, not just the raw client). NEXT: wrap reclaimed Python net tools as commands using this lane; a
+  `requests`-shim (requests.get/post -> urlopen) widens coverage; QuickJS gets the same transport.

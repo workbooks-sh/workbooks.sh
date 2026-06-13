@@ -107,6 +107,57 @@ defmodule Workbooks.PyNet do
     end
   end
 
+  @doc """
+  Run a user Python `script` with a urllib ADAPTER injected — `urllib.request.urlopen(...)` is transparently
+  rerouted through the brokered file protocol, so UNMODIFIED Python HTTP code (and anything built on urllib)
+  runs SSRF-safe via the host with no source changes. Same opts/cadence as `run_python/2`.
+  """
+  def run_python_urllib(script, opts \\ []) when is_binary(script) do
+    run_python(urllib_prelude() <> "\n" <> script, opts)
+  end
+
+  # injected once at the top of the guest program: replaces urllib.request.urlopen with a brokered client that
+  # speaks the /b file protocol. Returns a BytesIO subclass so .read()/.status/.getcode()/.headers behave like a
+  # real http.client.HTTPResponse for the common cases.
+  defp urllib_prelude do
+    ~S"""
+    import json as _wbj, os as _wbos, time as _wbt, base64 as _wbb, io as _wbio
+    import urllib.request as _wbreq, urllib.error as _wberr
+
+    class _WBResp(_wbio.BytesIO):
+        pass
+
+    def _wb_urlopen(url, data=None, timeout=None, *a, **k):
+        if isinstance(url, _wbreq.Request):
+            full = url.full_url; method = url.get_method()
+            hdrs = {str(x): str(y) for x, y in url.header_items()}
+            data = url.data if url.data is not None else data
+        else:
+            full = url; hdrs = {}; method = "POST" if data is not None else "GET"
+        payload = {"method": method, "url": full, "headers": hdrs}
+        if data is not None:
+            if isinstance(data, str): data = data.encode()
+            payload["body_b64"] = _wbb.b64encode(data).decode()
+            if payload["method"] == "GET": payload["method"] = "POST"
+        open("/b/req.json", "w").write(_wbj.dumps(payload))
+        open("/b/req.ready", "w").write("1")
+        out = {"ok": False, "error": "timeout"}
+        for _ in range(1500):
+            if _wbos.path.exists("/b/resp.ready"):
+                out = _wbj.load(open("/b/resp.json")); _wbos.remove("/b/resp.ready"); break
+            _wbt.sleep(0.02)
+        if not out.get("ok"):
+            raise _wberr.URLError(out.get("error", "brokered request failed"))
+        body = _wbb.b64decode(out.get("body_b64", "")) if out.get("body_b64") else b""
+        r = _WBResp(body)
+        r.status = out.get("status"); r.code = out.get("status")
+        r.getcode = lambda: out.get("status"); r.headers = {}; r.url = full
+        return r
+
+    _wbreq.urlopen = _wb_urlopen
+    """
+  end
+
   defp parse_fetch(stdout) do
     lines = String.split(stdout, "\n", trim: true)
     status = grab(lines, "STATUS ")
