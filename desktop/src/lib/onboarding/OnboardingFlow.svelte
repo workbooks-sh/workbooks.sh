@@ -25,6 +25,10 @@
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
   const started = $derived(step !== "welcome");
+  // The coach stays centered for welcome AND the titlebar beat — the titlebar
+  // just appears above it, no need to move. It drops to the bottom dock once
+  // the sidebar comes in (step 2+), so the left side is clear to look at.
+  const centered = $derived(stepIdx <= 1);
 
   type Prefs = {
     theme: "system" | "dark" | "light";
@@ -83,7 +87,7 @@
     <div class="grid" aria-hidden="true" transition:fly={{ duration: 200 }}></div>
   {/if}
 
-  <div class="dock" class:centered={!started}>
+  <div class="dock" class:centered={centered}>
     {#if started}
       <button type="button" class="skip" onclick={finish} transition:fly={{ y: 6, duration: 160 }}>Skip</button>
     {/if}
