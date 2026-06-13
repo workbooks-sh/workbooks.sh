@@ -13,6 +13,24 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, "ok")
   end
 
+  # Web search for the desktop browser's composable-search "Web" provider
+  # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
+  # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)
+  # and returns [{title,url,snippet}]. GET so the browser's fetch is trivial.
+  get "/api/browse/search" do
+    q = conn.params["q"] || ""
+    limit = String.to_integer(conn.params["limit"] || "8")
+
+    results =
+      case String.trim(q) do
+        "" -> []
+        query -> Workbooks.Browse.Search.query(query, limit: limit)
+      end
+
+    json = Jason.encode!(%{results: results})
+    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
+  end
+
   # The groundskeeper voice-agent bridge (wb-3ojf) — own credential, see router.
   forward("/gk", to: Workbooks.Groundskeeper.Router)
 

@@ -1,110 +1,59 @@
 <script lang="ts">
   /**
-   * SearchDrawer — left-side pop-out search panel.
+   * SearchDrawer (wb-aakl.19) — composable search.
    *
-   * Sibling to PackageTreeDrawer. Custom search input with the search
-   * icon inline, fuzzy results list underneath. Click a result to open
-   * as a tab; drag a result to spawn a drag operation other surfaces
-   * can consume (the main editor will wire drop targets later — for
-   * now the drag carries text/uri-list + text/plain so external apps
-   * accept it too).
-   *
-   * Searches every file across every Package in the active Workspace.
+   * Runs every enabled SearchProvider (registry) and renders results
+   * grouped by provider: local files/workbooks, bookmarks, open tabs, and
+   * the nexus web lane. Click a local result to open it as a tab; a web
+   * result opens its URL in a tab (the readability path). Toolkits add
+   * providers via the Browser SDK — they appear here as peers.
    */
-  import { MagnifyingGlass as Search, File as FileIcon, X } from "phosphor-svelte";
-  import { fileTree, type FsEntry } from "$lib/bridge/fs_tree.svelte";
-  import {
-    packageStore,
-    type Package as PackageDef,
-  } from "$lib/bridge/package.svelte";
-  import { workspaces } from "$lib/bridge/workspaces.svelte";
+  import { MagnifyingGlass as Search, X } from "phosphor-svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
+  import { search, type ProviderResults } from "$lib/search/registry.svelte";
+  import type { SearchResult } from "$lib/search/types";
 
   let { onclose }: { onclose?: () => void } = $props();
 
   let query = $state("");
   let inputEl: HTMLInputElement | null = $state(null);
   let highlighted = $state(0);
-  let packageData = $state<Record<string, PackageDef>>({});
+  let groups = $state<ProviderResults[]>([]);
+  let busy = $state(false);
 
-  // Lazy-load full Package records for every name in the active
-  // workspace so we can compute folders across all of them. Mirrors
-  // the same pattern in FileTreePanel — they could share a helper
-  // later, but for now duplication is fine while shape stabilises.
+  // Run all providers on query change (debounced). The empty query shows
+  // each provider's default set (recent files etc.).
+  let runToken = 0;
   $effect(() => {
-    const names = workspaces.active?.package_names ?? [];
-    for (const name of names) {
-      if (!packageData[name]) {
-        packageStore
-          .load(name)
-          .then((p) => (packageData = { ...packageData, [name]: p }))
-          .catch(() => {});
-      }
-    }
+    const q = query;
+    const token = ++runToken;
+    busy = true;
+    const t = setTimeout(() => {
+      void search.searchAll(q).then((g) => {
+        if (token !== runToken) return; // a newer query superseded this
+        groups = g.filter((x) => x.results.length > 0 || x.error);
+        busy = false;
+      });
+    }, 120);
+    return () => clearTimeout(t);
   });
 
-  function pkgFor(name: string): PackageDef | null {
-    if (packageStore.active?.name === name) return packageStore.active;
-    return packageData[name] ?? null;
-  }
-
-  // Collect (package, root, entry) for every file in every package in
-  // the active workspace. Skips directories.
-  type Hit = { pkg: string; root: string; entry: FsEntry };
-  const allEntries = $derived.by<Hit[]>(() => {
-    const out: Hit[] = [];
-    const names = workspaces.active?.package_names ?? [];
-    for (const name of names) {
-      const p = pkgFor(name);
-      if (!p) continue;
-      for (const root of p.folders) {
-        const tree = fileTree.trees[root];
-        if (!tree) continue;
-        for (const e of tree.entries) {
-          if (!e.is_dir) out.push({ pkg: name, root, entry: e });
-        }
-      }
-    }
-    return out;
-  });
-
-  const results = $derived.by(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allEntries.slice(0, 200);
-    const ranked = allEntries
-      .map((h) => {
-        const name = h.entry.name.toLowerCase();
-        const rel = h.entry.rel.toLowerCase();
-        let score = 0;
-        if (name === q) score = 1000;
-        else if (name.startsWith(q)) score = 800;
-        else if (name.includes(q)) score = 600;
-        else if (rel.includes(q)) score = 400;
-        else return null;
-        score -= rel.length;
-        return { ...h, score };
-      })
-      .filter((x): x is Hit & { score: number } => !!x)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 200);
-    return ranked.map(({ pkg, root, entry }) => ({ pkg, root, entry }));
-  });
+  // Flat list (in group order) for keyboard nav.
+  const flat = $derived(groups.flatMap((g) => g.results));
 
   $effect(() => {
     void query;
     highlighted = 0;
   });
-
-  // Focus the input on mount — the drawer only mounts when open.
   $effect(() => {
     queueMicrotask(() => inputEl?.focus());
   });
 
-  async function openResult(idx: number) {
-    const r = results[idx];
-    if (!r) return;
+  async function open(r: SearchResult) {
     try {
-      await tabsStore.open(r.entry.path);
+      // Local results open by path; web results open their URL in a tab
+      // (the viewer's readability path renders it inside the browser).
+      await tabsStore.open(r.path ?? r.url ?? "");
     } catch (e) {
       console.warn("[search] open failed", e);
     }
@@ -114,41 +63,38 @@
     if (document.activeElement !== inputEl) return;
     if (e.key === "Escape") {
       e.preventDefault();
-      if (query) {
-        query = "";
-      } else {
-        onclose?.();
-      }
+      if (query) query = "";
+      else onclose?.();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      highlighted = Math.min(highlighted + 1, Math.max(0, results.length - 1));
+      highlighted = Math.min(highlighted + 1, Math.max(0, flat.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       highlighted = Math.max(highlighted - 1, 0);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      void openResult(highlighted);
+      const r = flat[highlighted];
+      if (r) void open(r);
     }
   }
 
-  function onDragStart(e: DragEvent, path: string) {
+  function onDragStart(e: DragEvent, r: SearchResult) {
     if (!e.dataTransfer) return;
-    // text/uri-list lets file managers accept it; text/plain is the
-    // universal fallback. The path is the raw filesystem path so an
-    // in-app drop target can pass it straight to `tabsStore.open`.
+    const target = r.path ?? r.url ?? "";
     e.dataTransfer.effectAllowed = "copy";
-    e.dataTransfer.setData("text/uri-list", `file://${path}`);
-    e.dataTransfer.setData("text/plain", path);
-    e.dataTransfer.setData(
-      "application/x-workbooks-file-path",
-      path,
-    );
+    e.dataTransfer.setData("text/uri-list", r.path ? `file://${target}` : target);
+    e.dataTransfer.setData("text/plain", target);
+    if (r.path) e.dataTransfer.setData("application/x-workbooks-file-path", r.path);
   }
 
-  function relPath(root: string, rel: string): string {
-    const parts = root.split(/[\\/]/).filter(Boolean);
-    const base = parts[parts.length - 1] ?? "";
-    return base ? `${base}/${rel}` : rel;
+  // Index of a result within the flat list, for keyboard highlight.
+  function flatIndex(g: ProviderResults, i: number): number {
+    let n = 0;
+    for (const grp of groups) {
+      if (grp === g) return n + i;
+      n += grp.results.length;
+    }
+    return n + i;
   }
 </script>
 
@@ -161,47 +107,48 @@
         bind:this={inputEl}
         bind:value={query}
         type="text"
-        placeholder="Search workspace files…"
+        placeholder="Search files, bookmarks, the web…"
         spellcheck="false"
         autocomplete="off"
       />
       {#if query}
-        <button
-          type="button"
-          class="clear"
-          aria-label="Clear search"
-          onclick={() => (query = "")}
-        >
+        <button type="button" class="clear" aria-label="Clear search" onclick={() => (query = "")}>
           <X weight="bold" size={11} />
         </button>
       {/if}
     </div>
 
     <div class="results" role="listbox" aria-label="Search results">
-      {#if !workspaces.active}
-        <div class="empty">No active workspace.</div>
-      {:else if results.length === 0}
+      {#if groups.length === 0}
         <div class="empty">
-          {query ? "No matches." : "Files will appear here as packages are walked."}
+          {busy ? "Searching…" : query ? "No matches." : "Search across files, bookmarks, tabs and the web."}
         </div>
       {:else}
-        {#each results as r, i (r.entry.path)}
-          <button
-            type="button"
-            class="result"
-            class:active={i === highlighted}
-            role="option"
-            aria-selected={i === highlighted}
-            draggable="true"
-            ondragstart={(e) => onDragStart(e, r.entry.path)}
-            onmouseenter={() => (highlighted = i)}
-            onclick={() => openResult(i)}
-            title={r.entry.path}
-          >
-            <FileIcon weight="fill" size={12} />
-            <span class="name">{r.entry.name}</span>
-            <span class="path">{r.pkg} · {relPath(r.root, r.entry.rel)}</span>
-          </button>
+        {#each groups as g (g.provider.id)}
+          <div class="group-head">
+            {#if g.provider.icon}{@const Icon = g.provider.icon}<Icon weight="fill" size={11} />{/if}
+            <span>{g.provider.label}</span>
+            {#if g.error}<span class="g-err">unavailable</span>{/if}
+          </div>
+          {#each g.results as r, i (g.provider.id + (r.path ?? r.url ?? "") + i)}
+            {@const fi = flatIndex(g, i)}
+            <button
+              type="button"
+              class="result"
+              class:active={fi === highlighted}
+              role="option"
+              aria-selected={fi === highlighted}
+              draggable="true"
+              ondragstart={(e) => onDragStart(e, r)}
+              onmouseenter={() => (highlighted = fi)}
+              onclick={() => open(r)}
+              title={r.path ?? r.url ?? r.title}
+            >
+              <span class="kind kind-{r.kind}" aria-hidden="true"></span>
+              <span class="name">{r.title}</span>
+              {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
+            </button>
+          {/each}
         {/each}
       {/if}
     </div>
@@ -293,6 +240,33 @@
     font-weight: 500;
     flex-shrink: 0;
   }
+
+  .group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 8px 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+  }
+  .group-head .g-err { margin-left: auto; color: var(--color-warn); text-transform: none; letter-spacing: 0; }
+  /* kind dot — a quiet color cue per result kind */
+  .kind {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    background: var(--color-fg-subtle);
+  }
+  .kind-workbook { background: var(--color-brand); }
+  .kind-web { background: var(--color-chip-blue); }
+  .kind-bookmark { background: var(--color-chip-peach); }
+  .kind-tab { background: var(--color-chip-lavender); }
+  .kind-answer { background: var(--color-brand); border-radius: 50%; }
   .result .path {
     color: var(--color-fg-muted);
     font-size: 11px;

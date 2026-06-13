@@ -46,6 +46,8 @@
   import { dock } from "$lib/bridge/dock.svelte";
   import DockHost from "$lib/components/DockHost.svelte";
   import { ChatCircle as MessageCircle } from "phosphor-svelte";
+  import { search } from "$lib/search/registry.svelte";
+  import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -430,6 +432,9 @@
     themes.init();
     // `wb desktop open <path>` deep link — read the intent on boot + focus.
     openIntent.watch();
+    // Composable search (wb-aakl.19): register the built-in providers
+    // (files/workbooks, bookmarks, tabs, nexus web). Toolkits add more.
+    for (const p of BUILTIN_PROVIDERS) search.register(p);
     // Register the agent panel into the extension dock (wb-aakl.14) — only
     // under WB_FF_AGENTS, lazily loaded so a flags-off build excludes it.
     if (features.agents) {
