@@ -95,12 +95,35 @@ defmodule Workbooks.BrokeredTools do
       sys.stderr.write("error: %s\n" % e); sys.exit(1)
   """
 
+  # `tcp-send` — brokered one-shot raw TCP: send stdin bytes to HOST PORT, write the response to stdout. Covers
+  # the DB-client / line-protocol class (Redis RESP, an HTTP/1 probe, a wire protocol) — the host opens the
+  # socket (SSRF-pinned, {host,port}-scopable), the guest never does. Usage: tcp-send HOST PORT
+  @tcp_send ~S"""
+  import sys
+  if len(sys.argv) < 3:
+      sys.stderr.write("usage: tcp-send HOST PORT  (stdin bytes -> sent; response -> stdout)\n"); sys.exit(2)
+  host = sys.argv[1]
+  try:
+      port = int(sys.argv[2])
+  except ValueError:
+      sys.stderr.write("port must be an integer\n"); sys.exit(2)
+  data = sys.stdin.buffer.read()
+  try:
+      resp = wb_tcp(host, port, data)
+      sys.stdout.buffer.write(resp); sys.exit(0)
+  except OSError as e:
+      sys.stderr.write("error: %s\n" % e); sys.exit(1)
+  """
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
     %{
       "http" => register_http(),
       "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{}),
-      "npm-fetch" => Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{})
+      "npm-fetch" => Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{}),
+      # raw TCP is a broader grant than http -> explicit :tcp_allow on this tool only.
+      "tcp-send" =>
+        Workbooks.CommandRegistry.register_pynet("tcp-send", @tcp_send, :argv, %{tcp_allow: true})
     }
   end
 

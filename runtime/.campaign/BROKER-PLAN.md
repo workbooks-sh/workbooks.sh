@@ -1983,3 +1983,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   left-pad -> name/version/tarball on registry.npmjs.org. 10 brokered_tools tests green. resolved.json:
   capability_live on npm-class + live_capabilities.npm_fetch. The package-registry FETCH capability now ships
   for BOTH ecosystems (PyPI + npm); install/build remains the separate next step.
+- 2026-06-13 (iter 147): **RAW-TCP transport + tcp-send tool — TcpBroker driven by a shipped command (DB-client
+  class).** Added a "tcp" kind to the brokered transport (py_net do_brokered -> TcpBroker.request) + a wb_tcp()
+  Python helper + a `tcp-send HOST PORT` command (stdin bytes -> response). Raw sockets are a BROADER capability
+  than http (arbitrary ports/protocols) so they're gated on a SEPARATE :tcp_allow grant (default off; threaded
+  through the :pynet dispatch). Full cadence via TcpBroker: SSRF + resolve-then-pin (connect to the pinned IP) +
+  {host,port} allow-list + rate + revocation + size cap. 14 brokered_tools tests green incl: tcp-send registered
+  + usage; RAW-TCP SSRF (127.0.0.1 DENIED before connect); DEFAULT-DENY (wb_tcp -> tcp_denied without the grant);
+  LIVE raw HTTP/1 to example.com:80 -> "HTTP/1" + "Example Domain". The transport now covers http + exec + raw-
+  TCP; the one untested broker path (raw TCP) is now driven by a shipped tool. resolved.json: capability_live on
+  netcat/Redis/Valkey/curl(raw) + live_capabilities.raw_tcp (DB-client/line-protocol transport live; a specific
+  RESP/PG codec is a thin tool on top). NEXT Phase-4: a real Redis/PG client tool over tcp-send; the install half
+  of pkg-fetch (stage a fetched pure-Python wheel as a runnable tool).

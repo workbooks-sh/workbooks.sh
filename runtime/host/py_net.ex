@@ -271,6 +271,22 @@ defmodule Workbooks.PyNet do
 
     _wbsub.run = _wb_run
     _wbsub.check_output = _wb_check_output
+
+    # wb_tcp — brokered one-shot raw TCP (host does the connect; SSRF-pinned, {host,port}-scoped). Send `data`
+    # to host:port, return the response bytes; raises OSError on deny. Gated on the host's :tcp_allow grant.
+    def wb_tcp(host, port, data=b""):
+        if isinstance(data, str): data = data.encode()
+        payload = {"kind": "tcp", "host": host, "port": int(port)}
+        if data: payload["data_b64"] = _wbb.b64encode(data).decode()
+        open("/b/req.json", "w").write(_wbj.dumps(payload)); open("/b/req.ready", "w").write("1")
+        out = {"ok": False, "error": "timeout"}
+        for _ in range(1500):
+            if _wbos.path.exists("/b/resp.ready"):
+                out = _wbj.load(open("/b/resp.json")); _wbos.remove("/b/resp.ready"); break
+            _wbt.sleep(0.02)
+        if not out.get("ok"):
+            raise OSError("brokered tcp denied: %s" % out.get("error"))
+        return _wbb.b64decode(out.get("data_b64", "")) if out.get("data_b64") else b""
     """
   end
 
@@ -348,6 +364,31 @@ defmodule Workbooks.PyNet do
     case Workbooks.ExecBroker.exec(name, argv, stdin, call_opts) do
       {:ok, out} -> %{"ok" => true, "stdout_b64" => Base.encode64(out), "status" => 0}
       {:error, reason} -> %{"ok" => false, "error" => exec_reason(reason)}
+    end
+  end
+
+  # RAW-TCP dispatch: a guest's one-shot raw-TCP request/response (Redis RESP, a DB wire protocol, line
+  # protocols) routes through TcpBroker — SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation +
+  # size cap. Raw sockets are a BROADER capability than http (arbitrary ports/protocols), so they're gated on a
+  # SEPARATE :tcp_allow grant (default off) — an http tool doesn't get raw TCP for free.
+  defp do_brokered(%{"kind" => "tcp"} = req, opts) do
+    if Keyword.get(opts, :tcp_allow, false) do
+      host = req["host"] || ""
+      port = req["port"] || 0
+      data = case req["data_b64"] do nil -> ""; b64 -> Base.decode64!(b64) end
+
+      call_opts =
+        []
+        |> put_if(:allow, Keyword.get(opts, :allow))
+        |> put_if(:principal, Keyword.get(opts, :principal))
+        |> put_if(:rate, Keyword.get(opts, :rate))
+
+      case Workbooks.TcpBroker.request(host, port, data, call_opts) do
+        {:ok, resp} -> %{"ok" => true, "data_b64" => Base.encode64(resp)}
+        {:error, reason} -> %{"ok" => false, "error" => to_string(reason)}
+      end
+    else
+      %{"ok" => false, "error" => "tcp_denied"}
     end
   end
 

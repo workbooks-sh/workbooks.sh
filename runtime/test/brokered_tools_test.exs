@@ -81,6 +81,42 @@ defmodule Workbooks.BrokeredToolsTest do
     assert out =~ "tarball:" and out =~ "registry.npmjs.org"
   end
 
+  test "tcp-send is registered + prints usage on missing args" do
+    assert "tcp-send" in CommandRegistry.list()
+    assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "", ["example.com"])
+    assert status != 0
+  end
+
+  test "RAW-TCP SSRF — tcp-send to an internal host is denied (host-pinned, before connect)" do
+    # the host resolves + refuses internal/non-routable before opening the socket; the guest never connects.
+    assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "x", ["127.0.0.1", "80"])
+    assert status != 0
+  end
+
+  test "RAW-TCP DEFAULT-DENY — wb_tcp is refused unless the tool's registration granted :tcp_allow" do
+    # same tool body, registered WITHOUT :tcp_allow -> the brokered tcp is denied (raw sockets aren't ambient).
+    script = ~S"""
+    try:
+        wb_tcp("example.com", 80, b"x")
+        print("REACHED")
+    except OSError as e:
+        print("BLOCKED", e)
+    """
+
+    assert {:ok, out, _s} = Workbooks.PyNet.run_tool(script, "", [])
+    assert out =~ "BLOCKED" and out =~ "tcp_denied"
+    refute out =~ "REACHED"
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "LIVE — tcp-send does a raw HTTP/1 request to example.com:80 through the broker (DB-client class)" do
+    req = "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
+    assert {:ok, out, 0} = CommandRegistry.run_status("tcp-send", req, ["example.com", "80"])
+    assert out =~ "HTTP/1"
+    assert out =~ "Example Domain"
+  end
+
   @tag :netdeps
   @tag timeout: 120_000
   test "SCOPE — a per-instance allow-list can confine the http client (off-list host denied)" do

@@ -679,14 +679,16 @@
    "lane": "none",
    "blocker": "Network-purpose: Redis IS a networked server (RESP over TCP sockets, remote clients, pub/sub broker) \u2014 server sockets + ae event loop + fork()-for-persistence have no plain wasm32-wasi/wasmtime equiva",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top."
   },
   "Valkey": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "network-purpose daemon: requires sockets/event-loop (raison d'\u00eatre), fork() for BGSAVE+COW persistence, and background threads \u2014 none available under plain wasm32-wasi/wasmtime; no embeddable library ",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top."
   },
   "Memcached": {
    "verdict": "impossible",
@@ -743,7 +745,8 @@
    "lane": "none",
    "blocker": "Network-purpose tool. wasip1 has no raw TCP/UDP socket syscalls (no sock_connect; only sock_accept on pre-opened FDs). Standalone wasm cannot open arbitrary network connections \u2014 t",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top."
   },
   "dig / bind-tools": {
    "verdict": "reachable",
@@ -2284,6 +2287,13 @@
    "recipe": "brokered-HTTPS npm registry",
    "half": "network-fetch; install separate",
    "since": "iter146"
+  },
+  "raw_tcp": {
+   "command": "tcp-send",
+   "transport": "wb_tcp / TcpBroker",
+   "class": "DB-client / line-protocol (Redis RESP, HTTP/1, wire protocols)",
+   "gated": "tcp_allow default-deny",
+   "since": "iter147"
   }
  }
 }
