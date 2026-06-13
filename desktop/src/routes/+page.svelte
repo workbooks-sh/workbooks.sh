@@ -48,6 +48,7 @@
   import { ChatCircle as MessageCircle } from "phosphor-svelte";
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
+  import { applyBootPrefs } from "$lib/onboarding/prefs";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -430,6 +431,8 @@
     });
     bookmarks.init();
     themes.init();
+    // Apply persisted personalization (theme mode — wb-aakl.20).
+    applyBootPrefs();
     // `wb desktop open <path>` deep link — read the intent on boot + focus.
     openIntent.watch();
     // Composable search (wb-aakl.19): register the built-in providers

@@ -24,6 +24,7 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import AsciiShader from "$lib/ui/AsciiShader.svelte";
+  import { applyThemeMode } from "$lib/onboarding/prefs";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
@@ -150,7 +151,10 @@
                 type="button"
                 class="choice"
                 class:sel={prefs.theme === id}
-                onclick={() => (prefs.theme = id as Prefs["theme"])}
+                onclick={() => {
+                  prefs.theme = id as Prefs["theme"];
+                  applyThemeMode(prefs.theme); // live preview
+                }}
               >
                 <span
                   class="swatch"

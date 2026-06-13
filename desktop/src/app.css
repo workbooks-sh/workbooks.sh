@@ -68,8 +68,13 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Dark tokens. Applied when the OS prefers dark AND the user hasn't forced
+ * a mode (system), OR when the user forced dark via the onboarding theme
+ * choice (data-mode="dark", wb-aakl.20). Forced light is just the default
+ * :root above — the media query's :not([data-mode]) lets an explicit choice
+ * win over the OS. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-mode]) {
     color-scheme: dark;
     /* ink, inverted — neutral near-black, no color cast */
     --color-page: #121316;
@@ -93,6 +98,32 @@
       0 1px 2px rgba(0, 0, 0, 0.3),
       0 14px 34px rgba(0, 0, 0, 0.42);
   }
+}
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --color-page: #121316;
+  --color-surface: #1b1d20;
+  --color-surface-soft: #232529;
+  --color-border: rgba(247, 246, 241, 0.1);
+  --color-border-strong: rgba(247, 246, 241, 0.22);
+  --color-fg: #f7f6f1;
+  --color-fg-muted: #9ba095;
+  --color-fg-subtle: #6a6f68;
+  --color-accent: #f7f6f1;
+  --color-ring: rgba(19, 217, 67, 0.45);
+  --color-grid-line: rgba(247, 246, 241, 0.05);
+  --color-brand: #13d943;
+  --color-brand-soft: rgba(19, 217, 67, 0.14);
+  --color-brand-ink: #0a2413;
+  --color-ok: #13d943;
+  --color-warn: #e0b34a;
+  --color-err: #ef4444;
+  --shadow-pop:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 14px 34px rgba(0, 0, 0, 0.42);
+}
+:root[data-mode="light"] {
+  color-scheme: light;
 }
 
 html,
