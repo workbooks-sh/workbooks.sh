@@ -9,6 +9,7 @@ cp -R "$ROOT/web/"* "$STAGE/"
 rm -rf "$STAGE/brand" "$STAGE/og/build.py" "$STAGE/publish.sh" "$STAGE/deploy"
 # audio build scratch — regenerable, never served (player reads manifest.json + episodes/)
 rm -rf "$STAGE/learn/audio/raw" "$STAGE/learn/audio/align" "$STAGE/learn/audio/cues" "$STAGE/learn/audio/scripts"
+rm -rf "$STAGE/learn/audio/episodes"
 cp -f "$ROOT/desktop/scripts/install.sh" "$STAGE/install.sh"
 find "$STAGE" -name "._*" -delete
 

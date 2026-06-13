@@ -44,6 +44,10 @@
     '.nav .drop .panel .sep { height: 2px; margin: 7px 6px;',
     '  background-image: repeating-linear-gradient(90deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
     '.nav .drop .panel .col { display: flex; flex-direction: column; min-width: 230px; }',
+    /* Learn column: short noun list, everything on one line (no wrapping) */
+    '.nav .drop .panel .learncol { min-width: 340px; }',
+    '.nav .drop .panel .learncol a { white-space: nowrap; }',
+    '.nav .drop .panel .learncol a small { white-space: nowrap; }',
     '.nav .drop .panel .vsep { width: 2px; margin: 6px 10px; flex: 0 0 auto;',
     '  background-image: repeating-linear-gradient(180deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
     '.nav .drop .panel .colhead { font: 700 9px var(--mono, monospace); letter-spacing: .22em;',
@@ -134,18 +138,10 @@
     return '<a href="' + href + '"><span class="sw" style="background:#d9dbd3"><b>¶</b></span> ' + name + ' <small>' + small + '</small></a>';
   }
 
-  // Learn — the Learning Center + the concept pages (workbook / nexus / toolkit
-  // / browser). The old per-lesson deep-dives drilldown is gone.
-  var learnCol =
-    '<div class="col">' +
-    '<a class="viewall" href="' + root + 'learn/index.html">Learning Center → <small>the full course</small></a>' +
-    '<div class="sep" aria-hidden="true"></div>' +
-    '<div class="colhead">the concepts</div>' +
-    item('learn/workbook', ['#a8d4f0', '<b>◆</b>'], 'What is a workbook?', 'the unit') +
-    item('learn/nexus', ['#aee5c2', '<b>✦</b>'], 'What is the Nexus?', 'the engine') +
-    item('learn/toolkit', ['#f3c5a3', '<b>⬢</b>'], 'What is a toolkit?', 'the parts') +
-    item('learn/browser', ['#d9c5f0', '<b>▦</b>'], 'What is the Browser?', 'the surface') +
-    '</div>';
+  // Learn — short noun list from lessons.json (the concepts + the constructs),
+  // Learning Center link at the bottom. Populated by the fetch below. The old
+  // per-lesson deep-dives drilldown is gone.
+  var learnCol = '<div class="col learncol" data-learn><div class="colhead">the concepts</div></div>';
 
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
@@ -163,6 +159,33 @@
   nav.innerHTML = html;
   var mount = document.getElementById("site-nav");
   if (mount) mount.replaceWith(nav);
+
+  // Populate the Learn dropdown from lessons.json: the concepts + the
+  // constructs (short noun labels), then a Learning Center link at the bottom.
+  fetch(root + "learn/lessons.json")
+    .then(function (r) { return r.json(); })
+    .then(function (cat) {
+      var host = nav.querySelector("[data-learn]");
+      if (!host) return;
+      function row(l) {
+        var icon = l.icon.indexOf("../") === 0 ? root + l.icon.slice(3) : root + "learn/" + l.icon;
+        return '<a href="' + root + 'learn/' + l.slug + '">' +
+          '<span class="sw" style="background:' + l.color + '"><img src="' + icon + '" alt=""></span> ' +
+          l.title + ' <small>' + (l.sub || "") + '</small></a>';
+      }
+      var html = "";
+      cat.tiers.forEach(function (t) {
+        html += '<div class="colhead">' + t.title + '</div>';
+        t.lessons.forEach(function (l) { html += row(l); });
+      });
+      html += '<div class="sep" aria-hidden="true"></div>';
+      html += '<a class="viewall" href="' + root + 'learn/index.html">Learning Center <small>the full course</small></a>';
+      host.innerHTML = html;
+    })
+    .catch(function () {
+      var host = nav.querySelector("[data-learn]");
+      if (host) host.innerHTML = '<a class="viewall" href="' + root + 'learn/index.html">Learning Center</a>';
+    });
 
   nav.querySelectorAll(".drop > a").forEach(function (drop) {
     drop.addEventListener("click", function (e) {

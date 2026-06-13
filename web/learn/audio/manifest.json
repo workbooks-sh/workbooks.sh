@@ -3,7 +3,7 @@
   {
    "slug": "workbook",
    "title": "Workbooks — the unit",
-   "src": "audio/episodes/workbook.mp3?v=616",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/workbook.mp3?v=616",
    "dur": 616,
    "chapters": [
     {
@@ -66,7 +66,7 @@
   {
    "slug": "bundles",
    "title": "bundles — under workbook",
-   "src": "audio/episodes/bundles.mp3?v=879",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/bundles.mp3?v=879",
    "dur": 879,
    "chapters": [
     {
@@ -129,7 +129,7 @@
   {
    "slug": "nesting",
    "title": "nesting — under workbook",
-   "src": "audio/episodes/nesting.mp3?v=937",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/nesting.mp3?v=937",
    "dur": 937,
    "chapters": [
     {
@@ -197,7 +197,7 @@
   {
    "slug": "signatures",
    "title": "signatures — under workbook",
-   "src": "audio/episodes/signatures.mp3?v=1241",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/signatures.mp3?v=1241",
    "dur": 1241,
    "chapters": [
     {
@@ -265,7 +265,7 @@
   {
    "slug": "specs",
    "title": "specs — under workbook",
-   "src": "audio/episodes/specs.mp3?v=1108",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/specs.mp3?v=1108",
    "dur": 1108,
    "chapters": [
     {
@@ -333,7 +333,7 @@
   {
    "slug": "git",
    "title": "git — under workbook",
-   "src": "audio/episodes/git.mp3?v=1049",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/git.mp3?v=1049",
    "dur": 1049,
    "chapters": [
     {
@@ -406,7 +406,7 @@
   {
    "slug": "sharing",
    "title": "sharing — under workbook",
-   "src": "audio/episodes/sharing.mp3?v=1220",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/sharing.mp3?v=1220",
    "dur": 1220,
    "chapters": [
     {
@@ -479,7 +479,7 @@
   {
    "slug": "postures",
    "title": "postures — under workbook",
-   "src": "audio/episodes/postures.mp3?v=1234",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/postures.mp3?v=1234",
    "dur": 1234,
    "chapters": [
     {
@@ -547,7 +547,7 @@
   {
    "slug": "publishing",
    "title": "publishing — under workbook",
-   "src": "audio/episodes/publishing.mp3?v=1029",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/publishing.mp3?v=1029",
    "dur": 1029,
    "chapters": [
     {
@@ -610,7 +610,7 @@
   {
    "slug": "nexus",
    "title": "Nexus — the engine",
-   "src": "audio/episodes/nexus.mp3?v=703",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/nexus.mp3?v=703",
    "dur": 703,
    "chapters": [
     {
@@ -678,7 +678,7 @@
   {
    "slug": "capabilities",
    "title": "capabilities — under nexus",
-   "src": "audio/episodes/capabilities.mp3?v=1105",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/capabilities.mp3?v=1105",
    "dur": 1105,
    "chapters": [
     {
@@ -746,7 +746,7 @@
   {
    "slug": "sandboxes",
    "title": "sandboxes — under nexus",
-   "src": "audio/episodes/sandboxes.mp3?v=1212",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/sandboxes.mp3?v=1212",
    "dur": 1212,
    "chapters": [
     {
@@ -814,7 +814,7 @@
   {
    "slug": "keepers",
    "title": "keepers — under nexus",
-   "src": "audio/episodes/keepers.mp3?v=1111",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/keepers.mp3?v=1111",
    "dur": 1111,
    "chapters": [
     {
@@ -882,7 +882,7 @@
   {
    "slug": "planes",
    "title": "planes — under nexus",
-   "src": "audio/episodes/planes.mp3?v=936",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/planes.mp3?v=936",
    "dur": 936,
    "chapters": [
     {
@@ -950,7 +950,7 @@
   {
    "slug": "deployments",
    "title": "deployments — under nexus",
-   "src": "audio/episodes/deployments.mp3?v=1342",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/deployments.mp3?v=1342",
    "dur": 1342,
    "chapters": [
     {
@@ -1018,7 +1018,7 @@
   {
    "slug": "gitops",
    "title": "gitops — under nexus",
-   "src": "audio/episodes/gitops.mp3?v=1062",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/gitops.mp3?v=1062",
    "dur": 1062,
    "chapters": [
     {
@@ -1091,7 +1091,7 @@
   {
    "slug": "hot-swap",
    "title": "hot swap — under nexus",
-   "src": "audio/episodes/hot-swap.mp3?v=1016",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/hot-swap.mp3?v=1016",
    "dur": 1016,
    "chapters": [
     {
@@ -1164,7 +1164,7 @@
   {
    "slug": "networking",
    "title": "networking — under nexus",
-   "src": "audio/episodes/networking.mp3?v=1245",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/networking.mp3?v=1245",
    "dur": 1245,
    "chapters": [
     {
@@ -1242,7 +1242,7 @@
   {
    "slug": "channels",
    "title": "channels — under nexus",
-   "src": "audio/episodes/channels.mp3?v=1038",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/channels.mp3?v=1038",
    "dur": 1038,
    "chapters": [
     {
@@ -1305,7 +1305,7 @@
   {
    "slug": "secrets",
    "title": "secrets — under nexus",
-   "src": "audio/episodes/secrets.mp3?v=1082",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/secrets.mp3?v=1082",
    "dur": 1082,
    "chapters": [
     {
@@ -1378,7 +1378,7 @@
   {
    "slug": "browsing",
    "title": "browsing — under nexus",
-   "src": "audio/episodes/browsing.mp3?v=1070",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/browsing.mp3?v=1070",
    "dur": 1070,
    "chapters": [
     {
@@ -1456,7 +1456,7 @@
   {
    "slug": "tokens",
    "title": "tokens — under nexus",
-   "src": "audio/episodes/tokens.mp3?v=1061",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/tokens.mp3?v=1061",
    "dur": 1061,
    "chapters": [
     {
@@ -1529,7 +1529,7 @@
   {
    "slug": "changelogs",
    "title": "changelogs — under nexus",
-   "src": "audio/episodes/changelogs.mp3?v=1065",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/changelogs.mp3?v=1065",
    "dur": 1065,
    "chapters": [
     {
@@ -1597,7 +1597,7 @@
   {
    "slug": "toolkit",
    "title": "Toolkits — the parts",
-   "src": "audio/episodes/toolkit.mp3?v=643",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/toolkit.mp3?v=643",
    "dur": 643,
    "chapters": [
     {
@@ -1660,7 +1660,7 @@
   {
    "slug": "imports",
    "title": "imports — under toolkit",
-   "src": "audio/episodes/imports.mp3?v=1052",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/imports.mp3?v=1052",
    "dur": 1052,
    "chapters": [
     {
@@ -1728,7 +1728,7 @@
   {
    "slug": "audits",
    "title": "audits — under toolkit",
-   "src": "audio/episodes/audits.mp3?v=1125",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/audits.mp3?v=1125",
    "dur": 1125,
    "chapters": [
     {
@@ -1801,7 +1801,7 @@
   {
    "slug": "lanes",
    "title": "lanes — under toolkit",
-   "src": "audio/episodes/lanes.mp3?v=1313",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/lanes.mp3?v=1313",
    "dur": 1313,
    "chapters": [
     {
@@ -1874,7 +1874,7 @@
   {
    "slug": "promotion",
    "title": "promotion — under toolkit",
-   "src": "audio/episodes/promotion.mp3?v=1142",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/promotion.mp3?v=1142",
    "dur": 1142,
    "chapters": [
     {
@@ -1942,7 +1942,7 @@
   {
    "slug": "commands",
    "title": "commands — under toolkit",
-   "src": "audio/episodes/commands.mp3?v=1331",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/commands.mp3?v=1331",
    "dur": 1331,
    "chapters": [
     {
@@ -2020,7 +2020,7 @@
   {
    "slug": "org",
    "title": "Org — the grammar",
-   "src": "audio/episodes/org.mp3?v=454",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/org.mp3?v=454",
    "dur": 454,
    "chapters": [
     {
@@ -2078,7 +2078,7 @@
   {
    "slug": "syntax",
    "title": "syntax — under org",
-   "src": "audio/episodes/syntax.mp3?v=1177",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/syntax.mp3?v=1177",
    "dur": 1177,
    "chapters": [
     {
@@ -2156,7 +2156,7 @@
   {
    "slug": "drawers",
    "title": "drawers — under org",
-   "src": "audio/episodes/drawers.mp3?v=902",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/drawers.mp3?v=902",
    "dur": 902,
    "chapters": [
     {
@@ -2224,7 +2224,7 @@
   {
    "slug": "timestamps",
    "title": "timestamps — under org",
-   "src": "audio/episodes/timestamps.mp3?v=983",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/timestamps.mp3?v=983",
    "dur": 983,
    "chapters": [
     {
@@ -2297,7 +2297,7 @@
   {
    "slug": "the-kernel",
    "title": "the kernel — under org",
-   "src": "audio/episodes/the-kernel.mp3?v=1089",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-kernel.mp3?v=1089",
    "dur": 1089,
    "chapters": [
     {
@@ -2365,7 +2365,7 @@
   {
    "slug": "tags",
    "title": "tags — under org",
-   "src": "audio/episodes/tags.mp3?v=1018",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/tags.mp3?v=1018",
    "dur": 1018,
    "chapters": [
     {
@@ -2428,7 +2428,7 @@
   {
    "slug": "claims",
    "title": "claims — under org",
-   "src": "audio/episodes/claims.mp3?v=931",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/claims.mp3?v=931",
    "dur": 931,
    "chapters": [
     {
@@ -2496,7 +2496,7 @@
   {
    "slug": "agents",
    "title": "Agents — the workers",
-   "src": "audio/episodes/agents.mp3?v=351",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/agents.mp3?v=351",
    "dur": 351,
    "chapters": [
     {
@@ -2549,7 +2549,7 @@
   {
    "slug": "loops",
    "title": "loops — under agents",
-   "src": "audio/episodes/loops.mp3?v=1120",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/loops.mp3?v=1120",
    "dur": 1120,
    "chapters": [
     {
@@ -2617,7 +2617,7 @@
   {
    "slug": "authoring",
    "title": "authoring — under agents",
-   "src": "audio/episodes/authoring.mp3?v=1047",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/authoring.mp3?v=1047",
    "dur": 1047,
    "chapters": [
     {
@@ -2680,7 +2680,7 @@
   {
    "slug": "context-repo",
    "title": "context repo — under agents",
-   "src": "audio/episodes/context-repo.mp3?v=1144",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/context-repo.mp3?v=1144",
    "dur": 1144,
    "chapters": [
     {
@@ -2748,7 +2748,7 @@
   {
    "slug": "spawning",
    "title": "spawning — under agents",
-   "src": "audio/episodes/spawning.mp3?v=997",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/spawning.mp3?v=997",
    "dur": 997,
    "chapters": [
     {
@@ -2821,7 +2821,7 @@
   {
    "slug": "orchestration",
    "title": "orchestration — under agents",
-   "src": "audio/episodes/orchestration.mp3?v=972",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/orchestration.mp3?v=972",
    "dur": 972,
    "chapters": [
     {
@@ -2889,7 +2889,7 @@
   {
    "slug": "human-in-the-loop",
    "title": "human in the loop — under agents",
-   "src": "audio/episodes/human-in-the-loop.mp3?v=1145",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/human-in-the-loop.mp3?v=1145",
    "dur": 1145,
    "chapters": [
     {
@@ -2957,7 +2957,7 @@
   {
    "slug": "runtime-config",
    "title": "runtime config — under agents",
-   "src": "audio/episodes/runtime-config.mp3?v=918",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/runtime-config.mp3?v=918",
    "dur": 918,
    "chapters": [
     {
@@ -3030,7 +3030,7 @@
   {
    "slug": "dreaming",
    "title": "dreaming — under agents",
-   "src": "audio/episodes/dreaming.mp3?v=947",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/dreaming.mp3?v=947",
    "dur": 947,
    "chapters": [
     {
@@ -3103,7 +3103,7 @@
   {
    "slug": "evals",
    "title": "evals — under agents",
-   "src": "audio/episodes/evals.mp3?v=1010",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/evals.mp3?v=1010",
    "dur": 1010,
    "chapters": [
     {
@@ -3171,7 +3171,7 @@
   {
    "slug": "fleets",
    "title": "fleets — under agents",
-   "src": "audio/episodes/fleets.mp3?v=1020",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/fleets.mp3?v=1020",
    "dur": 1020,
    "chapters": [
     {
@@ -3249,7 +3249,7 @@
   {
    "slug": "rehearsals",
    "title": "rehearsals — under agents",
-   "src": "audio/episodes/rehearsals.mp3?v=928",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/rehearsals.mp3?v=928",
    "dur": 928,
    "chapters": [
     {
@@ -3317,7 +3317,7 @@
   {
    "slug": "wbx",
    "title": "wbx — the command",
-   "src": "audio/episodes/wbx.mp3?v=663",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/wbx.mp3?v=663",
    "dur": 663,
    "chapters": [
     {
@@ -3385,7 +3385,7 @@
   {
    "slug": "modes",
    "title": "modes — under wbx",
-   "src": "audio/episodes/modes.mp3?v=1276",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/modes.mp3?v=1276",
    "dur": 1276,
    "chapters": [
     {
@@ -3458,7 +3458,7 @@
   {
    "slug": "pipelines",
    "title": "pipelines — under wbx",
-   "src": "audio/episodes/pipelines.mp3?v=1109",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/pipelines.mp3?v=1109",
    "dur": 1109,
    "chapters": [
     {
@@ -3531,7 +3531,7 @@
   {
    "slug": "doctor",
    "title": "doctor — under wbx",
-   "src": "audio/episodes/doctor.mp3?v=968",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/doctor.mp3?v=968",
    "dur": 968,
    "chapters": [
     {
@@ -3604,7 +3604,7 @@
   {
    "slug": "deploy-kit",
    "title": "deploy kit — under wbx",
-   "src": "audio/episodes/deploy-kit.mp3?v=1120",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/deploy-kit.mp3?v=1120",
    "dur": 1120,
    "chapters": [
     {
@@ -3672,7 +3672,7 @@
   {
    "slug": "recipes",
    "title": "recipes — under wbx",
-   "src": "audio/episodes/recipes.mp3?v=1088",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/recipes.mp3?v=1088",
    "dur": 1088,
    "chapters": [
     {
@@ -3745,7 +3745,7 @@
   {
    "slug": "distribution",
    "title": "distribution — under wbx",
-   "src": "audio/episodes/distribution.mp3?v=1204",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/distribution.mp3?v=1204",
    "dur": 1204,
    "chapters": [
     {
@@ -3818,7 +3818,7 @@
   {
    "slug": "workflows",
    "title": "Workflows — the plans",
-   "src": "audio/episodes/workflows.mp3?v=828",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/workflows.mp3?v=828",
    "dur": 828,
    "chapters": [
     {
@@ -3896,7 +3896,7 @@
   {
    "slug": "autopoet",
    "title": "Autopoet — the gardener",
-   "src": "audio/episodes/autopoet.mp3?v=504",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/autopoet.mp3?v=504",
    "dur": 504,
    "chapters": [
     {
@@ -3949,7 +3949,7 @@
   {
    "slug": "schedules",
    "title": "schedules — under workflows",
-   "src": "audio/episodes/schedules.mp3?v=1009",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/schedules.mp3?v=1009",
    "dur": 1009,
    "chapters": [
     {
@@ -4017,7 +4017,7 @@
   {
    "slug": "boards",
    "title": "boards — under workflows",
-   "src": "audio/episodes/boards.mp3?v=1170",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/boards.mp3?v=1170",
    "dur": 1170,
    "chapters": [
     {
@@ -4085,7 +4085,7 @@
   {
    "slug": "dispatch",
    "title": "dispatch — under workflows",
-   "src": "audio/episodes/dispatch.mp3?v=1000",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/dispatch.mp3?v=1000",
    "dur": 1000,
    "chapters": [
     {
@@ -4153,7 +4153,7 @@
   {
    "slug": "vfs",
    "title": "VFS — the disk",
-   "src": "audio/episodes/vfs.mp3?v=774",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/vfs.mp3?v=774",
    "dur": 774,
    "chapters": [
     {
@@ -4226,7 +4226,7 @@
   {
    "slug": "queries",
    "title": "queries — under vfs",
-   "src": "audio/episodes/queries.mp3?v=981",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/queries.mp3?v=981",
    "dur": 981,
    "chapters": [
     {
@@ -4294,7 +4294,7 @@
   {
    "slug": "sync",
    "title": "sync — under vfs",
-   "src": "audio/episodes/sync.mp3?v=1210",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/sync.mp3?v=1210",
    "dur": 1210,
    "chapters": [
     {
@@ -4367,7 +4367,7 @@
   {
    "slug": "privacy",
    "title": "privacy — under vfs",
-   "src": "audio/episodes/privacy.mp3?v=1036",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/privacy.mp3?v=1036",
    "dur": 1036,
    "chapters": [
     {
@@ -4440,7 +4440,7 @@
   {
    "slug": "sealed-sections",
    "title": "sealed sections — under vfs",
-   "src": "audio/episodes/sealed-sections.mp3?v=1085",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/sealed-sections.mp3?v=1085",
    "dur": 1085,
    "chapters": [
     {
@@ -4508,7 +4508,7 @@
   {
    "slug": "foreign-tables",
    "title": "foreign tables — under vfs",
-   "src": "audio/episodes/foreign-tables.mp3?v=1096",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/foreign-tables.mp3?v=1096",
    "dur": 1096,
    "chapters": [
     {
@@ -4586,7 +4586,7 @@
   {
    "slug": "backends",
    "title": "backends — under vfs",
-   "src": "audio/episodes/backends.mp3?v=1191",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/backends.mp3?v=1191",
    "dur": 1191,
    "chapters": [
     {
@@ -4659,7 +4659,7 @@
   {
    "slug": "escrow",
    "title": "escrow — under vfs",
-   "src": "audio/episodes/escrow.mp3?v=873",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/escrow.mp3?v=873",
    "dur": 873,
    "chapters": [
     {
