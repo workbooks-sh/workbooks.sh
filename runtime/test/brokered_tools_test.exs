@@ -46,6 +46,32 @@ defmodule Workbooks.BrokeredToolsTest do
     assert status == 1
   end
 
+  test "pip-fetch is registered + prints usage on no arg" do
+    assert "pip-fetch" in CommandRegistry.list()
+    assert {:ok, _out, status} = CommandRegistry.run_status("pip-fetch", "", [])
+    assert status != 0
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "LIVE — pip-fetch retrieves PyPI metadata + dist URLs over HTTPS through the broker (pip's network half)" do
+    # the network-as-purpose blocker for pip is reclaimed: fetch a package's metadata + wheel/sdist URLs from
+    # the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer -> requests shim).
+    assert {:ok, out, 0} = CommandRegistry.run_status("pip-fetch", "", ["six"])
+    assert out =~ "name: six"
+    assert out =~ "version:"
+    assert out =~ "file:" and out =~ "pythonhosted.org"
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "pip-fetch — a nonexistent package exits non-zero (404 handled)" do
+    assert {:ok, _out, status} =
+             CommandRegistry.run_status("pip-fetch", "", ["wb-nonexistent-pkg-xyzzy-9920"])
+
+    assert status != 0
+  end
+
   @tag :netdeps
   @tag timeout: 120_000
   test "SCOPE — a per-instance allow-list can confine the http client (off-list host denied)" do

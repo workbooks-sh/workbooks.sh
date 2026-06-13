@@ -275,7 +275,8 @@
    "blocker": "pip's core function is network egress to PyPI (HTTPS index + wheel download); standalone wasm32-wasi under wasmtime has no socket/TLS layer. The only working routes need a browser/JS fetch host (Pyodi",
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
-   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed"
+   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
+   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
   },
   "Buildout": {
    "verdict": "reachable",
@@ -283,7 +284,8 @@
    "blocker": "Network-as-purpose (fetches distributions from PyPI) + subprocess/native-exec for recipe execution (configure/make, zdaemon, setuptools builds). The pure-Python module imports fine on our CPython lane",
    "extent": "off-the-table (verified)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
-   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed"
+   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
+   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
   },
   "grep": {
    "verdict": "live",
@@ -416,7 +418,8 @@
    "blocker": "Network-purpose tool: Poetry's entire reason for existing is resolving and fetching package metadata/wheels from PyPI over the network, creating virtualenvs via subprocess, and invoking PEP 517 build ",
    "extent": "off-the-table (verified)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
-   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed"
+   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
+   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
   },
   "Pipenv": {
    "verdict": "impossible",
@@ -1884,7 +1887,8 @@
    "blocker": "network-as-purpose + fork-exec as core. pdm is a Python package/dep manager: its entire function is resolving and fetching packages over the network (httpx/httpcore/hishel HTTP, unearth/resolvelib res",
    "extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
-   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed"
+   "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
+   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
   },
   "RubyGems (gem)": {
    "verdict": "impossible",
@@ -2255,6 +2259,17 @@
    ],
    "recipe": "brokered-net :pynet command",
    "since": "iter145"
+  },
+  "pkg_fetch": {
+   "command": "pip-fetch",
+   "delivers": [
+    "pip",
+    "poetry",
+    "pdm"
+   ],
+   "recipe": "brokered-HTTPS PyPI JSON API",
+   "half": "network-fetch (metadata+URLs); install/build separate",
+   "since": "iter146"
   }
  }
 }

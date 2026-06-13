@@ -1967,3 +1967,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the CAPABILITY ships live; the upstream binaries aren't ported, so verdicts stay reachable). This is the
   Phase-4 "wire a real HTTP client" deliverable. NEXT Phase-4 keystones: a DB client (brokered TCP to a real
   DB, not the server), a package-manager FETCH (pip/npm metadata via brokered http), an API tool.
+- 2026-06-13 (iter 146): **PHASE-4 KEYSTONE — pip-fetch (pip's network half reclaimed) + HTTPS proven E2E.**
+  New `pip-fetch PACKAGE` brokered command: retrieves a package's metadata + wheel/sdist URLs from the PyPI
+  JSON API over the FULL brokered HTTPS stack (NetGuard pin + verify_peer -> requests shim -> file protocol ->
+  CPython). Live proof: pip-fetch six -> name: six, version 1.17.0, bdist_wheel + sdist URLs on
+  files.pythonhosted.org. This reclaims the NETWORK-FETCH half of pip/poetry/pdm (their network-as-purpose
+  blocker is gone); the full install (download + unpack + build native exts) is the separate next step. Also
+  the first proof that HTTPS works through the entire brokered transport (not just plain http). 9 brokered_tools
+  tests green (http + pip-fetch: registered, usage, live PyPI fetch, 404->non-zero). resolved.json: capability_
+  live on pip/Poetry/pdm/Buildout + live_capabilities.pkg_fetch (honest: fetch-half live, install/build separate).
+  NEXT Phase-4: an npm-fetch sibling (registry.npmjs.org); a DB client over brokered raw-TCP (Redis/PG wire); an
+  API tool (already largely covered by `http -H/-d`).

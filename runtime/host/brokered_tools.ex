@@ -44,9 +44,38 @@ defmodule Workbooks.BrokeredTools do
       sys.stderr.write("error: %s\n" % e); sys.exit(1)
   """
 
+  # `pip-fetch` — the network half of pip, reclaimed: retrieve a package's metadata + distribution URLs from the
+  # PyPI JSON API over the brokered transport (HTTPS through the full mediated stack). pip's blocker was
+  # "network egress to PyPI"; this delivers exactly that, SSRF-safe. Usage: pip-fetch PACKAGE
+  @pip_fetch ~S"""
+  import sys, json
+  if len(sys.argv) < 2:
+      sys.stderr.write("usage: pip-fetch PACKAGE\n"); sys.exit(2)
+  pkg = sys.argv[1]
+  import requests, urllib.error
+  try:
+      r = requests.get("https://pypi.org/pypi/%s/json" % pkg)
+      if r.status_code != 200:
+          sys.stderr.write("not found: %s (%d)\n" % (pkg, r.status_code)); sys.exit(1)
+      data = r.json()
+      info = data.get("info", {})
+      print("name:", info.get("name"))
+      print("version:", info.get("version"))
+      for f in data.get("releases", {}).get(info.get("version"), []):
+          print("file:", f.get("packagetype"), f.get("url"))
+      sys.exit(0)
+  except urllib.error.URLError as e:
+      sys.stderr.write("error: %s\n" % e.reason); sys.exit(1)
+  except Exception as e:
+      sys.stderr.write("error: %s\n" % e); sys.exit(1)
+  """
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
-    %{"http" => register_http()}
+    %{
+      "http" => register_http(),
+      "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{})
+    }
   end
 
   @doc "Register the curl-class `http` client. `opts` may carry a per-instance `:allow` net scope (default: SSRF floor only)."
