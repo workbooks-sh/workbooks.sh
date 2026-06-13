@@ -59,6 +59,7 @@
   const isLearn = $derived(lessons.length > 0);
   let lessonIdx = $state(-1); // -1 = intro, not yet exploring
   let portEl = $state<HTMLElement | null>(null);
+  let coachEl = $state<HTMLElement | null>(null);
   let benchExplored = $state(false);
   const mustExplore = $derived(step === "titlebar");
   const canContinue = $derived(!mustExplore || benchExplored);
@@ -172,16 +173,13 @@
 </script>
 
 <div class="screen">
-  {#if !started}
-    <div class="grid" aria-hidden="true" transition:fly={{ duration: 200 }}></div>
-  {/if}
 
   <div class="dock" class:centered={centered}>
     {#if started}
       <button type="button" class="skip" onclick={finish} transition:fly={{ y: 6, duration: 160 }}>Skip</button>
     {/if}
 
-    <div class="coach" class:learn-active={isLearn && lessonIdx >= 0}>
+    <div class="coach" class:learn-active={isLearn && lessonIdx >= 0} bind:this={coachEl}>
       <!-- Top row: carousel dots pinned LEFT, learn-more arrows + port pinned
            RIGHT — clearly separate, not stacked/grouped. -->
       <div class="coach-top">
@@ -325,9 +323,9 @@
        On the intro (no lesson yet), just outline the arrows so "use the arrows"
        is unmistakable — no edge. -->
   {#if isLearn && lessonIdx >= 0}
-    <LessonOverlay {portEl} target={lessons[lessonIdx].target} />
+    <LessonOverlay {portEl} {coachEl} target={lessons[lessonIdx].target} />
   {:else if isLearn}
-    <LessonOverlay {portEl} target=".learn-bar" edge={false} />
+    <LessonOverlay {portEl} {coachEl} target=".learn-bar" edge={false} />
   {/if}
 </div>
 
@@ -367,13 +365,6 @@
     border-color: var(--color-brand);
     background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
     color: var(--color-brand);
-  }
-  .grid {
-    position: absolute;
-    inset: 0;
-    background-color: var(--color-page);
-    background-image: var(--grid-image);
-    background-size: var(--grid-size) var(--grid-size);
   }
   .dock {
     position: relative;

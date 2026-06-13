@@ -122,9 +122,12 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    /* Chrome frame color shows through the gaps around the floating
-     * content canvas (inset style). */
-    background: var(--color-chrome);
+    /* Canonical graph-paper backdrop — shows behind everything (gaps around
+     * the floating canvas, and the whole screen during onboarding). The
+     * sidebar/titlebar paint their chrome on top; the canvas its own grid. */
+    background-color: var(--color-chrome);
+    background-image: var(--grid-image);
+    background-size: var(--grid-size) var(--grid-size);
   }
   .body {
     flex: 1 1 auto;
