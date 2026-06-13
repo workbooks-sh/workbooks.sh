@@ -143,16 +143,21 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-.sintro .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink); border-radius:999px;
-  padding:18px 32px; box-shadow:4px 4px 0 var(--bloomd); }
-.sintro .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
+/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+.start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
+  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
+.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-.souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:17px; }
-.souts li{ font-size:20px; line-height:1.4; color:var(--ink); padding-left:30px; position:relative; }
-.souts li::before{ content:"→"; position:absolute; left:0; top:0; color:var(--bloomd); font-family:var(--mono); font-weight:700; }
+.souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
+.souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+  display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
+.souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.souts li .tx{ padding-top:6px; }
 .souts li b{ font-weight:600; }
 @media (max-width:900px){ .splash{ min-height:0; padding:38px 22px 70px; }
   .swrap{ grid-template-columns:1fr; gap:38px; }
@@ -195,10 +200,12 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
 .play.playing .ico{ background:var(--bloomd); }
 .rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
-  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink);
-  border:2px solid var(--ink); border-radius:12px; padding:15px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
-.rail .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
-.rail .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
+  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); background:var(--pc);
+  border:2px solid var(--ink); border-radius:11px; padding:15px 18px; cursor:pointer; box-shadow:4px 4px 0 var(--ink);
+  transition:transform .1s, box-shadow .1s; }
+.rail .cont:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+.rail .cont:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+.rail .cont.done{ background:var(--bloom); }
 .rail .nav{ margin:24px 0 0; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:18px; }
 .rail .nav a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:9px 0; }
 .rail .nav a:hover{ color:var(--ink); }
@@ -332,14 +339,22 @@ def dashboard():
     # Groothan duo, all black: lowercase = grotesque, the UPPERCASE letters = bubble
     # accents (inner only, never the first letter of a word).
     title = "leArNing ceNtEr"
+    I = {  # simple line icons, one per outcome
+        "file": '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+        "bolt": '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+        "spark": '<path d="M12 3l2.1 5.8L20 11l-5.9 2.2L12 19l-2.1-5.8L4 11l5.9-2.2z"/>',
+        "loop": '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+        "globe": '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/>',
+    }
     outs = [
-        "Hold a whole app in a <b>single file</b> — and send it to anyone, like a photo.",
-        "Build real software with <b>no server, no account, and no setup</b>.",
-        "Put <b>AI agents</b> to work safely, inside files that can't touch your computer.",
-        "Turn a plain to-do list into <b>software that runs itself</b>.",
-        "Ship something <b>living to the internet</b> — and prove that it's yours.",
+        ("file",  "Hold a whole app in a <b>single file</b> — and send it to anyone, like a photo."),
+        ("bolt",  "Build real software with <b>no server, no account, and no setup</b>."),
+        ("spark", "Put <b>AI agents</b> to work safely, inside files that can't touch your computer."),
+        ("loop",  "Turn a plain to-do list into <b>software that runs itself</b>."),
+        ("globe", "Ship something <b>living to the internet</b> — and prove that it's yours."),
     ]
-    lis = "".join("<li>%s</li>" % o for o in outs)
+    lis = "".join('<li><span class="ic"><svg viewBox="0 0 24 24">%s</svg></span><span class="tx">%s</span></li>'
+                  % (I[k], t) for k, t in outs)
     main = ('<div class="splash"><div class="swrap">'
             '<div class="sintro"><div class="kick">welcome to the learning center</div>'
             '<h1>%s</h1>'

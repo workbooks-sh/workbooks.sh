@@ -57,21 +57,28 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-.sintro h1{ font-family:var(--read); font-weight:600; font-size:clamp(52px,7vw,102px); line-height:.94;
-  margin:16px 0 0; letter-spacing:-.02em; color:var(--ink); }
-.sintro h1 .bubl{ font-family:var(--display); font-weight:400; text-transform:uppercase; color:var(--pc); letter-spacing:0; }
+/* the duo display font (Groothan), all black: lowercase letters render grotesque,
+   the few uppercase letters render as bubble glyphs — a couple inner accents per
+   word, never the first letter. Case in the markup drives which is which. */
+.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(58px,8.4vw,120px); line-height:.9;
+  margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
-.sintro .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink); border-radius:999px;
-  padding:18px 32px; box-shadow:4px 4px 0 var(--bloomd); }
-.sintro .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
+/* brand button: squared, flat pastel plate with a hard offset lip (light-on-light, not a black two-tone) */
+.start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ink); background:var(--pc); border:2px solid var(--ink); border-radius:11px;
+  padding:17px 30px; box-shadow:4px 4px 0 var(--ink); transition:transform .1s, box-shadow .1s; }
+.start:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+.start:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink); }
 .sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
 .souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-.souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:17px; }
-.souts li{ font-size:20px; line-height:1.4; color:var(--ink); padding-left:30px; position:relative; }
-.souts li::before{ content:"→"; position:absolute; left:0; top:0; color:var(--bloomd); font-family:var(--mono); font-weight:700; }
+.souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
+.souts li{ display:flex; gap:15px; align-items:flex-start; font-size:20px; line-height:1.38; color:var(--ink); }
+.souts li .ic{ flex:0 0 auto; width:38px; height:38px; border:2px solid var(--ink); border-radius:10px; background:var(--pc);
+  display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink); }
+.souts li .ic svg{ width:19px; height:19px; stroke:var(--ink); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.souts li .tx{ padding-top:6px; }
 .souts li b{ font-weight:600; }
 @media (max-width:900px){ .splash{ min-height:0; padding:38px 22px 70px; }
   .swrap{ grid-template-columns:1fr; gap:38px; }
@@ -114,10 +121,12 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
 .play.playing .ico{ background:var(--bloomd); }
 .rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
-  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink);
-  border:2px solid var(--ink); border-radius:12px; padding:15px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
-.rail .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
-.rail .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
+  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); background:var(--pc);
+  border:2px solid var(--ink); border-radius:11px; padding:15px 18px; cursor:pointer; box-shadow:4px 4px 0 var(--ink);
+  transition:transform .1s, box-shadow .1s; }
+.rail .cont:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+.rail .cont:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+.rail .cont.done{ background:var(--bloom); }
 .rail .nav{ margin:24px 0 0; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:18px; }
 .rail .nav a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:9px 0; }
 .rail .nav a:hover{ color:var(--ink); }
