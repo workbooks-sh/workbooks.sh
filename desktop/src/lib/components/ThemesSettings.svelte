@@ -122,12 +122,12 @@
   <div class="layout-card">
     <span class="layout-label">Sidebar layout</span>
     <div class="layout-opts">
-      {#each [["library", "Library"], ["rail", "Rail"]] as [id, label] (id)}
+      {#each [["shelf", "Shelf"], ["hub", "Hub"], ["map", "Map"]] as [id, label] (id)}
         <button
           type="button"
           class="layout-opt"
           class:sel={nav.layout === id}
-          onclick={() => nav.setLayout(id as "rail" | "library")}
+          onclick={() => nav.setLayout(id as "shelf" | "hub" | "map")}
         >
           {label}
         </button>

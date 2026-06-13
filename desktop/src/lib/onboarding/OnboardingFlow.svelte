@@ -35,7 +35,7 @@
 
   type Prefs = {
     theme: "system" | "dark" | "light";
-    sidebar: "rail" | "library";
+    sidebar: "shelf" | "hub" | "map";
     search: { ai: "summary" | "first" | "off" };
   };
   let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, search: { ai: "summary" } });
@@ -161,11 +161,12 @@
             <div class="text">
               <span class="kicker">Your sidebar</span>
               <h1>Pick a left side</h1>
-              <p>Rail is compact; Library shows full labels. It restyles live — look left.</p>
+              <p>Shelf is compact + bookmark-forward. Hub adds a workspace rail for many spaces. Map is a roomy page tree. Restyles live — look left.</p>
             </div>
             <div class="opts">
-              <button type="button" class="opt" class:sel={prefs.sidebar === "rail"} onclick={() => pickSidebar("rail")}>Rail</button>
-              <button type="button" class="opt" class:sel={prefs.sidebar === "library"} onclick={() => pickSidebar("library")}>Library</button>
+              <button type="button" class="opt" class:sel={prefs.sidebar === "shelf"} onclick={() => pickSidebar("shelf")}>Shelf</button>
+              <button type="button" class="opt" class:sel={prefs.sidebar === "hub"} onclick={() => pickSidebar("hub")}>Hub</button>
+              <button type="button" class="opt" class:sel={prefs.sidebar === "map"} onclick={() => pickSidebar("map")}>Map</button>
             </div>
 
           {:else if step === "search"}

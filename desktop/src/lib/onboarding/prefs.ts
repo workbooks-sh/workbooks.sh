@@ -8,7 +8,7 @@ export type ThemeMode = "system" | "dark" | "light";
 
 export interface BrowserPrefs {
   theme: ThemeMode;
-  sidebar: "rail" | "library";
+  sidebar: "shelf" | "hub" | "map";
   search: { ai: "summary" | "first" | "off" };
 }
 

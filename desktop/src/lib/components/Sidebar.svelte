@@ -46,6 +46,8 @@
   import { nav } from "$lib/bridge/nav.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
+  import { workspaces } from "$lib/bridge/workspaces.svelte";
+  import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
   export type RailTab = {
@@ -120,6 +122,27 @@
     onWorkspaceContext?: (x: number, y: number) => void;
     onPackageContext?: (id: string, x: number, y: number) => void;
   } = $props();
+
+  // Workspace icon-rail (Hub layout). Demo set during onboarding so the rail
+  // is populated before any real workspaces exist; live workspaces otherwise.
+  const DEMO_WS = [
+    { id: "personal", name: "Personal", icon: "🏠" },
+    { id: "acme", name: "Acme", icon: "🅰" },
+    { id: "studio", name: "Studio", icon: "🎨" },
+    { id: "research", name: "Research", icon: "🔬" },
+  ];
+  const wsList = $derived(
+    onboarding.active
+      ? DEMO_WS
+      : workspaces.workspaces.map((w) => ({ id: w.id, name: w.name, icon: w.icon })),
+  );
+  const wsActiveId = $derived(
+    onboarding.active ? "personal" : (workspaces.active?.id ?? null),
+  );
+  function pickWorkspace(id: string) {
+    if (onboarding.active) return; // inert during the tour
+    void workspaces.setActive(id);
+  }
 
   function initials(name: string): string {
     const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
@@ -489,6 +512,28 @@
     onCreatePackageMenu?.(new DOMRect(e.clientX, e.clientY, 0, 0));
   }}
 >
+  <!-- Hub layout — a far-left workspace icon-rail. One icon per workspace;
+       click switches. Only rendered in Hub; Shelf/Map are single-column. -->
+  {#if nav.layout === "hub"}
+    <div class="ws-rail" aria-label="Workspaces">
+      {#each wsList as w (w.id)}
+        <button
+          type="button"
+          class="ws-rail-btn"
+          class:active={w.id === wsActiveId}
+          title={w.name}
+          aria-label={w.name}
+          aria-pressed={w.id === wsActiveId}
+          onclick={() => pickWorkspace(w.id)}
+        >
+          {#if w.icon}<span class="ws-rail-glyph">{w.icon}</span>
+          {:else}<span class="ws-rail-initials">{initials(w.name)}</span>{/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  <div class="sb-body">
   <!-- Workspace header -->
   <button
     type="button"
@@ -878,6 +923,7 @@
       {/if}
     </div>
   {/if}
+  </div>
 </nav>
 
 <ContextMenu bind:open={bmMenuOpen} x={bmMenuX} y={bmMenuY}>
@@ -957,16 +1003,70 @@
     height: 100%;
     min-height: 100%;
     display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 0.6rem 0.5rem 0.75rem;
+    flex-direction: row;
     /* The shared chrome surface (same as the titlebar) so the shell
      * reads as one frame; the canvas floats inside it. */
     background: var(--color-chrome);
     position: relative;
     z-index: 100;
+    overflow: hidden;
+  }
+  /* The scrolling single column that holds the header, bookmarks + library.
+   * In Hub it sits right of the workspace rail; in Shelf/Map it's the whole
+   * sidebar. */
+  .sb-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.6rem 0.5rem 0.75rem;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+
+  /* ── Hub — workspace icon-rail ───────────────────────────────────── */
+  .layout-hub { width: 288px; }
+  .ws-rail {
+    flex: 0 0 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 0.6rem 0 0.75rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 1px solid var(--color-border);
+  }
+  .ws-rail-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.14s, border-color 0.14s, box-shadow 0.14s;
+  }
+  .ws-rail-btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-border-strong);
+  }
+  .ws-rail-btn.active {
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 30%, transparent);
+  }
+  .ws-rail-initials {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   /* ── pinned app tiles ─────────────────────────────────────────── */
@@ -1167,10 +1267,11 @@
    * full-label default; "rail" is a compact, tighter density. Both keep
    * chips + labels — rail just trims the rhythm. (A future icon-only rail
    * is a further preset.) */
-  .layout-rail .row { height: 30px; gap: 8px; }
-  .layout-rail .row-icon { width: 22px; height: 22px; border-radius: 6px; }
-  .layout-rail .row-label { font-size: 10px; letter-spacing: 0.07em; }
-  .layout-rail .ws-header { padding-top: 6px; padding-bottom: 6px; }
+  /* Shelf — compact, bookmark-forward density. */
+  .layout-shelf .row { height: 30px; gap: 8px; }
+  .layout-shelf .row-icon { width: 22px; height: 22px; border-radius: 6px; }
+  .layout-shelf .row-label { font-size: 10px; letter-spacing: 0.07em; }
+  .layout-shelf .ws-header { padding-top: 6px; padding-bottom: 6px; }
 
   .row {
     display: flex;
