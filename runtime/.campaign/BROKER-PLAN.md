@@ -1633,3 +1633,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (batch map) + ExecBroker (sync one-shot) didn't expose. NEXT slices: streaming stdin/stdout pipes between
   parent+child; wire it as a dock import (host_spawn/host_await) so guests reach it. Execution-model frontier
   launched, security-first.
+- 2026-06-12 (iter 123): **ProcessBroker LIFECYCLE HARDENED — no slot leak, exactly-once release (fork-exec
+  robustness).** The iter-122 first slice held a slot until await/kill, so a guest that spawned-and-abandoned
+  (or whose parent died) leaked slots permanently -> self-DoS exhausting its own cap. Rebuilt the lifecycle:
+  await/kill release the slot SYNCHRONOUSLY in the caller (so a new spawn right after a reap fits, no race);
+  the worker is the SAFETY NET for orphan (monitors the parent -> releases on its death) and abandon (a
+  :max_lifetime deadline -> releases); a per-spawn :atomics flag (0->1 swap won by exactly one path) guarantees
+  the slot decrements EXACTLY ONCE regardless of which path wins. So a slot can NEVER leak: reaped, orphaned,
+  or abandoned, it always frees. 5 tests green: fork-bomb (cap enforced + reap frees a slot for a new spawn),
+  default-deny, ABANDON (never-awaited -> auto-release at lifetime), ORPHAN (parent dies -> release), async
+  lifecycle (3 real sandboxed coreutils subprocesses). The brokered fork-exec primitive is now leak-proof +
+  fork-bomb-resistant. NEXT: wire host_spawn/host_await dock imports (with depth propagation so recursive
+  spawn is depth-bounded) so guests can reach it; then streaming stdin/stdout pipes.

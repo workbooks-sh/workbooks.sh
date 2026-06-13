@@ -29,20 +29,34 @@ defmodule Workbooks.ProcessBroker do
     principal = Keyword.get(opts, :principal, "_anon")
     max_proc = Keyword.get(opts, :max_processes, @max_processes)
 
-    # reserve a process slot (refuse past the per-principal cap = fork-bomb gate). The slot is held until the
-    # process is REAPED (await) or killed — fork-exec semantics: a finished-but-unreaped process is a zombie
-    # that still occupies a slot until the parent wait()s on it.
+    # reserve a process slot (refuse past the per-principal cap = fork-bomb gate). The WORKER process holds the
+    # slot for its whole life and releases it exactly ONCE on exit — and it exits on REAP (await), the parent
+    # DYING, or a max-lifetime. So a slot can never leak: abandoned/orphaned processes self-release (a guest
+    # can't permanently exhaust its cap by spawning-without-await or dying).
     if reserve(principal, max_proc) do
       ref = make_ref()
       parent = self()
+      lifetime = Keyword.get(opts, :max_lifetime, 60_000)
+      # released-once flag (0 = slot live, 1 = released). await/kill release SYNCHRONOUSLY in the caller; the
+      # worker is the safety net for orphan (parent death) / abandon (lifetime). The atomic flag guarantees
+      # the slot decrements EXACTLY once no matter which path wins.
+      flag = :atomics.new(1, signed: false)
 
       pid =
         Kernel.spawn(fn ->
+          pmon = Process.monitor(parent)
           result = Workbooks.ExecBroker.exec(name, argv, stdin, opts)
           send(parent, {__MODULE__, ref, :done, result})
+
+          receive do
+            {__MODULE__, ^ref, :stop} -> :ok
+            {:DOWN, ^pmon, :process, _, _} -> guarded_release(flag, principal)
+          after
+            lifetime -> guarded_release(flag, principal)
+          end
         end)
 
-      {:ok, %{ref: ref, pid: pid, principal: principal}}
+      {:ok, %{ref: ref, pid: pid, principal: principal, flag: flag}}
     else
       Workbooks.BrokerAudit.record(:process, :deny, :max_processes, principal)
       {:error, :max_processes}
@@ -51,22 +65,23 @@ defmodule Workbooks.ProcessBroker do
 
   @doc """
   Wait for (REAP) a spawned process; returns its ExecBroker result ({:ok, output} | {:error, _}) and releases
-  the process's slot. Awaiting is idempotent-ish — a second await on the same handle returns {:error, :timeout}.
+  the process's slot SYNCHRONOUSLY. A second await on the same handle returns {:error, :timeout}.
   """
-  def await(%{ref: ref, principal: principal}, timeout \\ 30_000) do
+  def await(%{ref: ref, pid: pid, principal: principal, flag: flag}, timeout \\ 30_000) do
     receive do
       {__MODULE__, ^ref, :done, result} ->
-        release(principal)
+        guarded_release(flag, principal)
+        if Process.alive?(pid), do: send(pid, {__MODULE__, ref, :stop})
         result
     after
       timeout -> {:error, :timeout}
     end
   end
 
-  @doc "Kill a still-running spawned process and release (reap) its slot."
-  def kill(%{pid: pid, principal: principal}) do
-    if Process.alive?(pid), do: Process.exit(pid, :kill)
-    release(principal)
+  @doc "Reap a spawned process WITHOUT collecting its output, releasing its slot synchronously."
+  def kill(%{ref: ref, pid: pid, principal: principal, flag: flag}) do
+    guarded_release(flag, principal)
+    if Process.alive?(pid), do: send(pid, {__MODULE__, ref, :stop})
     :ok
   end
 
@@ -83,6 +98,11 @@ defmodule Workbooks.ProcessBroker do
     else
       true
     end
+  end
+
+  # release the slot EXACTLY ONCE — the atomic flag's 0->1 swap is won by only one caller (await/kill/worker)
+  defp guarded_release(flag, principal) do
+    if :atomics.exchange(flag, 1, 1) == 0, do: release(principal)
   end
 
   defp release(principal), do: :ets.update_counter(table(), principal, {2, -1}, {principal, 0})
