@@ -1478,3 +1478,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the remaining new-code paths (pinned-https worker lifecycle, pipe write_vectored partial) reviewed correct.
   The networking keystone is now secure + audited + self-audited + verified end-to-end. The remaining frontier
   is the compiler/WASM build lanes (262 build-blocked items) — a deliberate NEW campaign per the owner's steer.
+- 2026-06-12 (iter 110): **ALL FOUR BROKER-PLAN STONES CONFIRMED COMPLETE.** Verified the last unconfirmed
+  stone — threading-fallback = ParallelBroker (Stone 4): host-brokered DATA-PARALLELISM (Task.async_stream
+  over FRESH isolated instances, full exec cadence per task, fan-out + concurrency + timeout caps). 7 tests
+  green incl a new self-audit tie-in: ParallelBroker is THE canonical transient-task caller (async_stream ->
+  ExecBroker -> Revocation/RateLimiter), the exact path that exposed the iter-107/108 ETS-owner bug — so the
+  BrokerTables fix is precisely what makes the threading-fallback stone concurrency-safe; proven it now
+  respects DURABLE revocation. Stone status: exec(ExecBroker) + storage(StorageBroker) + threading-fallback
+  (ParallelBroker) + app-host(ServeBroker/ComponentPlug) = ALL DONE + tested. The directive's entire work
+  queue is complete: keystone (secure networking) DONE + audited + self-audited + verified; all 4 stones DONE.
+  True within-program wasm threads (shared memory/atomics) remain deliberately DEFERRED as niche (wb-y72) —
+  BEAM system-concurrency + brokered data-parallelism is the chosen model. The ONLY remaining frontiers are
+  NEW campaigns: compiler/WASM build-lanes (262 build-blocked items) per the owner's steer, + wb-ltum (a
+  policy design decision). No manufactured networking grind remains.

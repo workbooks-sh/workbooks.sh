@@ -53,4 +53,18 @@ defmodule Workbooks.ParallelBrokerTest do
 
     assert results == [{:ok, "alpha"}, {:ok, "beta"}, {:ok, "gamma"}]
   end
+
+  test "self-audit tie-in: the threading-fallback fan-out respects DURABLE revocation" do
+    # ParallelBroker is THE canonical transient-task caller (Task.async_stream -> ExecBroker -> Revocation/
+    # RateLimiter) — the exact scenario that exposed the iter-107/108 ETS-owner bug. A revoked principal must
+    # be denied; and because the revocation table is now owned by the long-lived BrokerTables (not a transient
+    # task), each per-task exec consults a DURABLE table — no task could slip through on table loss.
+    p = "par-rev-#{System.unique_integer([:positive])}"
+    :ok = Workbooks.Revocation.revoke(p)
+
+    assert {:error, :revoked} =
+             ParallelBroker.map("coreutils", ["a", "b", "c"], allow: true, argv: ["cat"], principal: p)
+
+    :ok = Workbooks.Revocation.unrevoke(p)
+  end
 end
