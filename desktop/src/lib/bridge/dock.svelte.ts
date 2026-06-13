@@ -20,6 +20,9 @@ export interface DockPanel {
   title: string;
   /** Toolbar icon — a phosphor-svelte (or any) component, or null. */
   icon?: Component<any> | null;
+  /** Render only the icon in the toolbar (no text label) — for a custom
+   *  wordmark that already reads as the name (e.g. Waldo). */
+  iconOnly?: boolean;
   /** Eager DOM-mounted component… */
   component?: Component<any>;
   /** …or a lazy loader (resolved + cached on first activation). */

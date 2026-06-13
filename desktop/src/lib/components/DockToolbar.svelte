@@ -16,6 +16,7 @@
     type="button"
     class="dock-btn"
     class:active={dock.isOpen(p.id)}
+    class:icon-only={p.iconOnly}
     data-tauri-drag-region="false"
     title={p.title}
     aria-label={p.title}
@@ -24,13 +25,17 @@
   >
     {#if p.icon}
       {@const Icon = p.icon}
-      <Icon size={12} weight="fill" />
+      <Icon size={p.iconOnly ? 16 : 12} weight="fill" />
     {/if}
-    <span>{p.title}</span>
+    {#if !p.iconOnly}<span>{p.title}</span>{/if}
   </button>
 {/each}
 
 <style>
+  .dock-btn.icon-only {
+    padding: 0 9px;
+    color: var(--color-fg);
+  }
   .dock-btn {
     display: inline-flex;
     align-items: center;

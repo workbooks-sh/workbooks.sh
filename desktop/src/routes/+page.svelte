@@ -45,7 +45,8 @@
   import { openIntent } from "$lib/bridge/openIntent";
   import { dock } from "$lib/bridge/dock.svelte";
   import DockHost from "$lib/components/DockHost.svelte";
-  import { ChatCircle as MessageCircle, Sparkle as WaldoIcon } from "phosphor-svelte";
+  import { ChatCircle as MessageCircle } from "phosphor-svelte";
+  import WaldoMark from "$lib/components/WaldoMark.svelte";
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { applyBootPrefs } from "$lib/onboarding/prefs";
@@ -468,7 +469,8 @@
     dock.register({
       id: "waldo",
       title: "Waldo",
-      icon: WaldoIcon,
+      icon: WaldoMark,
+      iconOnly: true,
       load: () => import("$lib/components/WaldoPanel.svelte"),
     });
     // The multi-agent chat panel is dev-only (WB_FF_AGENTS); it coexists
