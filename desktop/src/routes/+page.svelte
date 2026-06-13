@@ -42,6 +42,7 @@
   import { packageStore } from "$lib/bridge/package.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { features } from "$lib/bridge/features";
+  import { openIntent } from "$lib/bridge/openIntent";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -427,6 +428,8 @@
     });
     bookmarks.init();
     themes.init();
+    // `wb desktop open <path>` deep link — read the intent on boot + focus.
+    openIntent.watch();
     // Personalization onboarding (wb-aakl.20). first_run_done is a durable
     // flag in setup.json; `?onboarding` forces the flow for preview.
     const forceOnboarding = new URLSearchParams(window.location.search).has(

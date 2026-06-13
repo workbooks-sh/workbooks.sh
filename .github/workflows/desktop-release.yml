@@ -66,6 +66,27 @@ jobs:
         working-directory: desktop
         run: bun install
 
+      # Flags-off bundle budget (wb-aakl.10): the shipped browser leaves
+      # WB_FF_* unset (all default false), so the strip-down surfaces
+      # (agents/network/integrations/setup) must code-split out of the main
+      # entry chunk. Build once and assert the entry doesn't statically pull
+      # them in. tauri-action rebuilds below; this is a fast canary.
+      - name: Assert flags-off bundle budget
+        working-directory: desktop
+        run: |
+          bun run build
+          entry=$(ls -S build/_app/immutable/entry/*.js | head -1)
+          echo "checking entry chunk: $entry"
+          fail=0
+          for mod in NetworkPanel ChatPanel IntegrationsSettings AgentsSettings SetupWizard; do
+            if grep -q "$mod" "$entry"; then
+              echo "::error::flagged module '$mod' is in the entry chunk — it must be lazy/flag-gated"
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && echo "ok — no flagged modules in the entry chunk"
+          exit $fail
+
       - name: Build + bundle (tauri)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -144,3 +165,20 @@ jobs:
           # idempotent. cp to a stable asset name so the download URL is clean.
           cp desktop/scripts/install.sh install.sh
           gh release upload "${GITHUB_REF_NAME}" install.sh --clobber --repo "${GITHUB_REPOSITORY}"
+      - name: Attach stable-named bundle aliases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Versionless copies of the main bundles so permanent URLs work:
+        #   releases/latest/download/Workbooks-macos-arm64.dmg  (etc.)
+        # The lander links these — no lander edit needed per release.
+        run: |
+          mkdir -p orig stable && cd orig
+          gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*.dmg' --pattern '*.AppImage' --pattern '*setup.exe'
+          shopt -s nullglob
+          for f in *aarch64*.dmg; do cp -f "$f" ../stable/Workbooks-macos-arm64.dmg; done
+          for f in *x64*.dmg;     do cp -f "$f" ../stable/Workbooks-macos-intel.dmg; done
+          for f in *.AppImage;    do cp -f "$f" ../stable/Workbooks-linux.AppImage; done
+          for f in *setup.exe;    do cp -f "$f" ../stable/Workbooks-windows-setup.exe; done
+          cd ../stable && ls -l
+          gh release upload "${GITHUB_REF_NAME}" ./* --clobber --repo "${GITHUB_REPOSITORY}"
