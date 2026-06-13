@@ -83,3 +83,9 @@ examples/groundwork/app/native/node_modules/
 examples/groundwork/app/native/ios/
 examples/groundwork/app/native/www/
 examples/groundwork/app/native/package-lock.json
+
+# audio build intermediates — regenerable, never served (de-bloat 2026-06-13)
+web/learn/audio/raw/
+web/learn/audio/align/
+web/learn/audio/cues/
+web/learn/audio/scripts/

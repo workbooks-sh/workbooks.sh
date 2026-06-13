@@ -6,7 +6,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGE="$(mktemp -d)"
 cp -R "$ROOT/web/"* "$STAGE/"
-rm -rf "$STAGE/brand" "$STAGE/og/build.py" "$STAGE/publish.sh"
+rm -rf "$STAGE/brand" "$STAGE/og/build.py" "$STAGE/publish.sh" "$STAGE/deploy"
+# audio build scratch — regenerable, never served (player reads manifest.json + episodes/)
+rm -rf "$STAGE/learn/audio/raw" "$STAGE/learn/audio/align" "$STAGE/learn/audio/cues" "$STAGE/learn/audio/scripts"
 cp -f "$ROOT/desktop/scripts/install.sh" "$STAGE/install.sh"
 find "$STAGE" -name "._*" -delete
 
@@ -28,9 +30,10 @@ export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-6d4b74aeb10f455fbf8814190
 wrangler pages deploy "$STAGE" --project-name=workbooks-shell --branch=main --commit-dirty=true
 rm -rf "$STAGE"
 
-# Refresh the fly origin (root data source) from GitHub main — push first.
+# Refresh the fly origin (secondary origin) from GitHub main — push first.
 # Single source of the on-machine logic: web/deploy/origin-refresh.sh.
-if command -v fly >/dev/null 2>&1 && fly status --app wb-site >/dev/null 2>&1; then
+# Skip with WB_PUBLISH_SKIP_ORIGIN=1 (CF Pages is what serves workbooks.sh).
+if [ -z "${WB_PUBLISH_SKIP_ORIGIN:-}" ] && command -v fly >/dev/null 2>&1 && fly status --app wb-site >/dev/null 2>&1; then
   echo "refreshing origin wb-site from GitHub main…"
   B64=$(base64 < "$ROOT/web/deploy/origin-refresh.sh" | tr -d '\n')
   fly ssh console -a wb-site -C "sh -c 'echo $B64 | base64 -d | sh'" 2>&1 | tail -1
