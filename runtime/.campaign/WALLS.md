@@ -91,7 +91,11 @@ Our own in-sandbox compilers can't yet *produce* certain wasm. Not a wall — ea
 it's our home turf (where effort reliably converts to live capability).
 
 Members:
-- mrustc frozen at 1.74 + `target_feature=false` → Rust threads, edition-2024, proc-macros (roadmap)
+- mrustc frozen at 1.74 + `target_feature=false` → edition-2024, proc-macros (roadmap). **Rust threads:
+  PROVEN 2026-06-13 WITHOUT a fork** — pass `--cfg target_feature=atomics` (mrustc's cfg.cpp checks CLI
+  `--cfg` before the hardcoded false callback, so `target.cpp:746` is bypassed, not patched) + a 2-file
+  std TLS patch. 4-thread Rust runs to exactly 1,000,000. The "no mrustc fork" stance HOLDS. Wiring a
+  `compile_rust_threads` lane in progress.
 - ~~no EH-enabled libc++ → C++ exceptions~~ → **PROVEN 2026-06-13** (from-source EH runtime via our
   clang.wasm: llvmorg-22.1.0 libcxxabi/libunwind built `-fwasm-exceptions -mllvm
   -wasm-use-legacy-eh=false` → `libc++abi-eh.a`+`libunwind-eh.a`; throwing C++ catches with full
