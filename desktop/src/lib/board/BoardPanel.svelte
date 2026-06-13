@@ -37,13 +37,27 @@
     type BoardView,
     type LiveSession,
   } from "./api";
-  import { agents } from "$lib/bridge/agents.svelte";
+  import { features } from "$lib/bridge/features";
   import {
     STARTER_COLUMNS,
     type BoardCardItem,
     type BoardColumn as BoardColumnType,
     type BoardHeadline,
   } from "./types";
+
+  // The agents catalog is multi-agent chrome (WB_FF_AGENTS, wb-aakl.2):
+  // lazily loaded so a flags-off build excludes it. Only the "assigned"
+  // grouping view reads it; with agents off, those columns fall back to
+  // raw slugs (graceful — this is the kanban demo surface).
+  let agents = $state<typeof import("$lib/bridge/agents.svelte").agents | null>(null);
+  $effect(() => {
+    if (!features.agents || agents) return;
+    void import("$lib/bridge/agents.svelte").then((m) => {
+      agents = m.agents;
+      m.agents.init();
+    });
+  });
+  const agentCatalog = $derived(agents?.agents ?? []);
 
   let views = $state<BoardView[]>([]);
   let activeViewId = $state<string | null>(null);
@@ -141,7 +155,7 @@
     const kind = (view?.group_by ?? "status").trim();
     if (kind !== "assigned") return null;
     if (key === "(unassigned)") return "Unassigned";
-    const a = agents.agents.find((x) => x.slug === key);
+    const a = agentCatalog.find((x) => x.slug === key);
     return a?.title ?? key;
   }
 
@@ -151,7 +165,7 @@
     }
     if (kind === "assigned") {
       // Every agent in the catalog gets a column, sorted by title.
-      const sorted = [...agents.agents].sort((a, b) =>
+      const sorted = [...agentCatalog].sort((a, b) =>
         (a.title ?? a.slug).localeCompare(b.title ?? b.slug),
       );
       const cols = sorted.map((a) => a.slug);

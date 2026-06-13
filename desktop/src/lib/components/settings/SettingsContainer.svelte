@@ -14,7 +14,10 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import { features } from "$lib/bridge/features";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
-  import AgentsSettings from "$lib/components/AgentsSettings.svelte";
+  // AgentsSettings is lazy-loaded (wb-aakl.2): its static import pulled
+  // chat/ (ModelPicker, AgentEditor) + agent stores into the main chunk.
+  // The agents tab only appears under WB_FF_AGENTS, so a flags-off build
+  // never reaches the dynamic import and the whole chain is excluded.
   import McpServersSettings from "$lib/components/McpServersSettings.svelte";
   import PluginsSettings from "$lib/components/PluginsSettings.svelte";
   import IntegrationsSettings from "$lib/components/IntegrationsSettings.svelte";
@@ -91,7 +94,9 @@
     {#if active === "general"}
       <GeneralSettings />
     {:else if active === "agents"}
-      <AgentsSettings />
+      {#await import("$lib/components/AgentsSettings.svelte") then M}
+        <M.default />
+      {/await}
     {:else if active === "themes"}
       <ThemesSettings />
     {:else if active === "integrations"}

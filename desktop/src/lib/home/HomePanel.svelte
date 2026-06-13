@@ -24,10 +24,27 @@
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
-  import { agents } from "$lib/bridge/agents.svelte";
-  import AgentPickerDropdown from "$lib/chat/AgentPickerDropdown.svelte";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { features } from "$lib/bridge/features";
+
+  // Multi-agent chrome (the agents catalog + its picker) is gated by
+  // WB_FF_AGENTS (wb-aakl.2) and lazily imported so a flags-off build
+  // excludes the catalog store. The single Workhorse chatSession + voice
+  // below are NOT gated — they're the transport Waldo (wb-aakl.21) lifts.
+  let agents = $state<typeof import("$lib/bridge/agents.svelte").agents | null>(null);
+  let AgentPickerDropdown =
+    $state<typeof import("$lib/chat/AgentPickerDropdown.svelte").default | null>(null);
+  $effect(() => {
+    if (!features.agents || agents) return;
+    void import("$lib/bridge/agents.svelte").then((m) => {
+      agents = m.agents;
+      m.agents.init();
+    });
+    void import("$lib/chat/AgentPickerDropdown.svelte").then(
+      (m) => (AgentPickerDropdown = m.default),
+    );
+  });
   import { createPackage } from "./createPackage.svelte";
   import {
     geminiLive,
@@ -171,7 +188,7 @@
       }
     } else if (chip.tool === "set_active_agent") {
       const slug = typeof chip.args.slug === "string" ? chip.args.slug : "";
-      if (slug) agents.select(slug);
+      if (slug) agents?.select(slug);
     }
     bubbles = bubbles.map((b) =>
       b.kind === "chip" && b.id === chip.id ? { ...b, status: "accepted" } : b,
@@ -292,7 +309,7 @@
 
   onMount(() => {
     chatSession.init();
-    agents.init();
+    // agents.init() fires from the gated $effect above (flag-on only).
     // Wait a tick so the textarea is mounted, then focus.
     queueMicrotask(() => textareaEl?.focus());
   });
@@ -378,7 +395,9 @@
         ></textarea>
         <div class="composer-foot">
           <div class="foot-left">
-            <AgentPickerDropdown oncreate={() => { /* TBD */ }} />
+            {#if features.agents && AgentPickerDropdown}
+              <AgentPickerDropdown oncreate={() => { /* TBD */ }} />
+            {/if}
           </div>
           <span class="hint">
             {#if sidecar.status.state !== "ready"}
