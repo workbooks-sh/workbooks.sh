@@ -2489,7 +2489,8 @@
    "status": "live",
    "proof": "trivial Go + esbuild both run wasi-only (zero syscall/js) through our runtime; Go 1.26.1 GOOS=wasip1",
    "shape": "provision-time host build tool (native Go builds the wasi artifact; output runs sandboxed) \u2014 clean under Bedrock. In-guest path also exists: yaegi interprets untrusted Go in-sandbox (stdlib-only). No mature AOT Go-compiler-in-wasm (honest ceiling).",
-   "since": "iter158"
+   "since": "iter158",
+   "note_2026_06_13": "The IN-GUEST go lane is yaegi (interpreter, stdlib-only). The PROVISION-TIME native GOOS=wasip1 go build path (used by esbuild) is the real Forge path for shipping Go CLIs \u2014 yq/jq-via-Go etc. are the SAME shape as esbuild (tractable S/M), NOT roadmap. Sweep initially mis-flagged these as roadmap by only seeing the yaegi lane."
   },
   "esbuild": {
    "capability": "esbuild bundler/minifier in-sandbox (wasi)",
@@ -2499,6 +2500,20 @@
    "reproducible": "compilers/esbuild/build.sh added (was untracked/non-reproducible); pinned v0.28.1, -trimpath deterministic, ~8s",
    "remaining": "add esbuild/build.sh to stage-tools build loop (batching with C++ EH stage-tools edit)",
    "since": "iter158"
+  },
+  "c_leaf_libs": {
+   "capability": "self-contained C/C++ leaf libraries via the C dir-build lane",
+   "status": "proven",
+   "proven_tools": {
+    "zstd": "compress roundtrip OK (9000->66)",
+    "brotli": "compress roundtrip OK (9000->50)",
+    "md4c": "markdown->HTML (# Hello **bold** -> <h1>+<strong>)",
+    "tinyscheme": "(fact 10)=3628800, (* 6 7)=42"
+   },
+   "lane": "PackageManager.build_c_dir / BuildBroker.build_and_run(:c) \u2014 recipes in sweep result",
+   "more_available": "same-shape S vein: xxHash, cmark, libyaml, miniz, CRC/hash tools \u2014 build through build_c_dir with little/no flag work",
+   "wiring": "proven on-demand; standing-CLI registration is a packaging step (not yet done)",
+   "since": "iter159"
   }
  },
  "verdict_ladder": {
