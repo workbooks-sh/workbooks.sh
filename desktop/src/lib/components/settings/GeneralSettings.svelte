@@ -28,6 +28,7 @@
   import { ws } from "$lib/bridge/ws.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { loadIdentity, type IdentityView } from "$lib/bridge/network.svelte";
+  import { features } from "$lib/bridge/features";
 
   let identity = $state<IdentityView | null>(null);
   let identityLoading = $state(false);
@@ -47,6 +48,9 @@
   onMount(async () => {
     sidecar.init();
     ws.init();
+    // Network identity is part of the (auth-UI-gated) account card —
+    // skip the fetch entirely when WB_FF_AUTH_UI is off (wb-aakl.3).
+    if (!features.authUI) return;
     identityLoading = true;
     try {
       identity = await loadIdentity();
@@ -206,7 +210,11 @@
     </span>
   </header>
 
-  <!-- Identity card: account + network identity, fused. -->
+  <!-- Identity card: account + network identity, fused. Auth UI is
+       flag-gated (WB_FF_AUTH_UI, wb-aakl.3) — off in the shipped browser,
+       which leaves just the engine status chip + version footer. The
+       sidecar status chip above is NOT auth and always shows. -->
+  {#if features.authUI}
   <section class="identity" class:signed-out={auth.status === "signed-out"}>
     {#if auth.status === "checking"}
       <p class="muted center">Checking your session…</p>
@@ -272,6 +280,7 @@
       <p class="action-err">{actionError}</p>
     {/if}
   </section>
+  {/if}
 
   <!-- Engine version footer — informational, intentionally quiet. -->
   <footer class="engine-foot">

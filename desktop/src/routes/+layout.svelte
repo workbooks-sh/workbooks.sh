@@ -9,7 +9,9 @@
   import WorkgateModal from "$lib/workgate/WorkgateModal.svelte";
   import EnvRequestModal from "$lib/env_request/EnvRequestModal.svelte";
   import SidecarOfflineOverlay from "$lib/auth/SidecarOfflineOverlay.svelte";
-  import SignInOverlay from "$lib/auth/SignInOverlay.svelte";
+  // SignInOverlay intentionally not imported — auth UI is flag-gated
+  // (WB_FF_AUTH_UI, wb-aakl.3) and surfaces only via the GeneralSettings
+  // account card. The sidecar-offline overlay below is NOT auth.
   import SetupWizard from "$lib/setup/SetupWizard.svelte";
   import { auth } from "$lib/auth/store.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
