@@ -26,7 +26,7 @@
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
-  const STEPS = ["welcome", "titlebar", "sidebar", "glyph", "search", "theme", "connect", "waldo"] as const;
+  const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "search", "theme", "connect", "waldo"] as const;
   type Step = (typeof STEPS)[number];
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
@@ -46,8 +46,13 @@
     titlebar: [
       { target: ".bench-host", title: "The bench", body: "Toolkit shortcuts. Each icon opens a panel on the right — click again to close. Build your own." },
       { target: ".search-badge", title: "Search", body: "A built-in toolkit with a global ⌘K — summon it anywhere to find files, tabs, the web." },
-      { target: ".engine", title: "Nexus", body: "Your runtime connection. The badge shows engine status; click it to manage or switch." },
+      { target: ".nexus-badge", title: "Nexus", body: "Your runtime connection. The badge shows engine status; click it to manage or switch." },
       { target: ".dock-host", title: "Waldo", body: "Your resident agent, top-right. Ask by text or voice; it works issues with you." },
+    ],
+    "sidebar-tour": [
+      { target: ".create-cta", title: "Create", body: "Start a new workbook or folder. The branded button, always at the bottom of the sidebar." },
+      { target: ".folder-row", title: "Folders", body: "Twirl one open to see its files; drag to reorder, or drop a file in to move it. Folders nest." },
+      { target: ".sb-body", title: "Your library", body: "Everything in the active workspace lives here. The layout you just picked shapes how it reads." },
     ],
   };
   const lessons = $derived(LEARN[step] ?? []);
@@ -111,7 +116,7 @@
     // the sidebar step is purely about the sidebar — no create screen yet.
     if (i >= 1) onboarding.reveal("titlebar", "bench", "agent");
     if (i >= 2) onboarding.reveal("sidebar");
-    if (i >= 5) onboarding.reveal("canvas"); // at the theme beat
+    if (i >= 6) onboarding.reveal("canvas"); // at the theme beat
     spotlight(s);
   }
 
@@ -125,7 +130,7 @@
     chrome.nexusOpen = false;
     // "search" focuses the sidebar's own file-search bar (inline, shown by
     // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
-    if (s === "sidebar" || s === "search" || s === "glyph") chrome.sidebarOpen = true;
+    if (s === "sidebar" || s === "sidebar-tour" || s === "search" || s === "glyph") chrome.sidebarOpen = true;
     else if (s === "waldo") dock.open("waldo");
     // "connect" shows the agents page above the coach — nothing to open.
     // The glyph step expands every folder so the emoji↔icon flip is visible
@@ -171,15 +176,6 @@
     <div class="grid" aria-hidden="true" transition:fly={{ duration: 200 }}></div>
   {/if}
 
-  <!-- Page-above-the-coach: rich content rendered in the canvas area, centered
-       and lifted so it never overlaps the docked coach. The connect step uses
-       it for the agent-integration cards. -->
-  {#if step === "connect"}
-    <div class="ob-page" transition:fly={{ y: 16, duration: 260, easing: cubicOut }}>
-      <OnboardingAgents />
-    </div>
-  {/if}
-
   <div class="dock" class:centered={centered}>
     {#if started}
       <button type="button" class="skip" onclick={finish} transition:fly={{ y: 6, duration: 160 }}>Skip</button>
@@ -214,7 +210,14 @@
 
       {#key step}
         <div class="body" in:fly={{ x: 14, duration: 180, easing: cubicOut }}>
-          {#if step === "welcome"}
+          {#if isLearn && lessonIdx >= 0}
+            <!-- Active lesson (any learn step) — generic display. -->
+            <div class="text">
+              <span class="kicker">Learn · {lessonIdx + 1} of {lessons.length}</span>
+              <h1>{lessons[lessonIdx].title}</h1>
+              <p>{lessons[lessonIdx].body}</p>
+            </div>
+          {:else if step === "welcome"}
             <div class="logo">
               <svg viewBox="0 0 113.444 65.6002" width="28" height="16" aria-hidden="true" style="display:block">
                 <path d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z" fill="currentColor" />
@@ -227,19 +230,18 @@
             <button type="button" class="primary" onclick={next}>Start <ArrowRight size={14} weight="bold" /></button>
 
           {:else if step === "titlebar"}
-            {#if lessonIdx >= 0}
-              <div class="text">
-                <span class="kicker">Learn · {lessonIdx + 1} of {lessons.length}</span>
-                <h1>{lessons[lessonIdx].title}</h1>
-                <p>{lessons[lessonIdx].body}</p>
-              </div>
-            {:else}
-              <div class="text">
-                <span class="kicker">The bar</span>
-                <h1>What's up top</h1>
-                <p>Use the arrows (top-right) to learn what lives up here — the bench, search, nexus and Waldo. Explore them, then continue.</p>
-              </div>
-            {/if}
+            <div class="text">
+              <span class="kicker">The bar</span>
+              <h1>What's up top</h1>
+              <p>Use the arrows (top-right) to learn what lives up here — the bench, search, nexus and Waldo. Explore them, then continue.</p>
+            </div>
+
+          {:else if step === "sidebar-tour"}
+            <div class="text">
+              <span class="kicker">Your sidebar</span>
+              <h1>A quick tour</h1>
+              <p>Use the arrows (top-right) to see what the sidebar does — create, folders, your library. Optional; continue when you like.</p>
+            </div>
 
           {:else if step === "sidebar"}
             <div class="text">
@@ -289,11 +291,8 @@
             </div>
 
           {:else if step === "connect"}
-            <div class="text">
-              <span class="kicker">Your agents</span>
-              <h1>Bring your own</h1>
-              <p>Workbooks plugs into the agents you already run — check the ones above and we'll set them up for you, no copy-paste.</p>
-            </div>
+            <!-- The coach expands to host the agent scan + cards inline. -->
+            <OnboardingAgents embedded />
 
           {:else}
             <div class="text">
@@ -344,17 +343,6 @@
     flex-direction: column;
     justify-content: flex-end;
   }
-  /* Page-above-the-coach — fills the space above the docked coach and centers
-   * its content (lifted a touch so it never crowds the dock). */
-  .ob-page {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 4vh 24px 8px;
-    pointer-events: none; /* the inner card re-enables it */
-  }
   /* Connect-OpenRouter button in the Waldo coach. */
   .connect-or {
     display: inline-flex;
@@ -383,11 +371,9 @@
   .grid {
     position: absolute;
     inset: 0;
-    background: var(--color-page);
-    background-image:
-      linear-gradient(var(--color-grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px);
-    background-size: 32px 32px;
+    background-color: var(--color-page);
+    background-image: var(--grid-image);
+    background-size: var(--grid-size) var(--grid-size);
   }
   .dock {
     position: relative;

@@ -450,7 +450,7 @@
 
   <button
     type="button"
-    class="engine engine-{engine.cls}"
+    class="engine nexus-badge engine-{engine.cls}"
     class:alive={engine.cls === "ok"}
     data-tauri-drag-region="false"
     title={engine.title}

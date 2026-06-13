@@ -879,7 +879,11 @@
     margin: 0 8px 8px 0;
     border-radius: 12px;
     border: 1px solid var(--color-border);
-    background: var(--color-page);
+    /* Graph-paper backdrop — the canonical canvas surface (create page +
+     * empty states show it; open docs paint over it). */
+    background-color: var(--color-page);
+    background-image: var(--grid-image);
+    background-size: var(--grid-size) var(--grid-size);
     box-shadow:
       0 1px 2px rgba(15, 15, 15, 0.05),
       0 4px 16px rgba(15, 15, 15, 0.04);

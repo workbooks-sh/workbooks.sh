@@ -54,6 +54,10 @@
     } catch { /* selectable */ }
   }
 
+  // `embedded` drops the standalone card chrome so this sits inside the coach
+  // (the coach expands to hold it) rather than floating as its own page.
+  let { embedded = false }: { embedded?: boolean } = $props();
+
   const foundCount = $derived(AGENTS.filter((a) => a.detected).length);
 
   // Scan-then-reveal: even though detection is instant here, show a brief
@@ -66,7 +70,7 @@
   });
 </script>
 
-<div class="agents">
+<div class="agents" class:embedded>
   <header>
     <h1>Connect your agents</h1>
     {#if scanning}
@@ -142,6 +146,15 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+  /* Embedded in the coach — no card chrome; the coach is the card. */
+  .agents.embedded {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    gap: 12px;
   }
   header h1 {
     margin: 0 0 6px;

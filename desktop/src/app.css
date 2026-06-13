@@ -32,6 +32,12 @@
   --color-accent: #121316;
   --color-ring: rgba(19, 217, 67, 0.5);
   --color-grid-line: rgba(18, 19, 22, 0.05);
+  /* Graph-paper backdrop — the canonical background behind the canvas + the
+   * onboarding screen. Tight squares. */
+  --grid-size: 22px;
+  --grid-image:
+    linear-gradient(var(--color-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px);
 
   /* the one accent — bloom green. Pair with INK text, never white. */
   --color-brand: #13d943;
