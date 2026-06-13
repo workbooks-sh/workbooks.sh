@@ -1523,3 +1523,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   ok / internal blocked), DNS-based SSRF (public host ok / internal host blocked), DNS-exfil (IP-scoped guest
   can't resolve), per-instance allow-list scope, UDP client (DNS ok / internal blocked), ephemeral-bind-ok /
   listener-bind-denied. Every standard-tool socket vector the keystone names is now tested + green.
+- 2026-06-12 (iter 114): **IPv6 SSRF on the standard wasi:sockets path — adversarially proven.** All prior
+  socket tests used IPv4 literals/hostnames; the IPv6 vector (a named red-team item) was handled by wb_ip_
+  allowed's V6 branch but NEVER e2e-tested on the standard raw-socket path. Added hermetic assertions: a
+  standard guest connecting to internal IPv6 LITERALS is blocked by socket_addr_check — ::1 (loopback),
+  fc00::1 (ULA), fe80::1 (link-local), and ::ffff:127.0.0.1 (v4-mapped loopback — confirms the v4-mapped
+  normalization fires even when passed as an IPv6 literal to a raw socket). Green. STANDARD wasi:sockets
+  red-team coverage is now COMPLETE across every named vector: IPv4 + IPv6 literal egress (public ok/internal
+  blocked), DNS-based SSRF (host public ok/internal blocked), DNS-exfil (IP-scoped no-lookup), per-instance
+  allow-list scope, UDP client (DNS ok/internal blocked), ephemeral-bind-ok/listener-bind-denied. Three fires
+  (111-114) of running real standard tools closed every socket vector + found 2 real bugs (UDP over-block,
+  listener under-restrict). The standard-tool generalization (keystone goal 2) is exhaustively red-team-green.

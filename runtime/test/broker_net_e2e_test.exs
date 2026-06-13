@@ -384,6 +384,14 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert probe.("127.0.0.1:22") =~ "ERR"
     assert probe.("169.254.169.254:80") =~ "ERR"
 
+    # IPv6 SSRF on the raw-socket path (a named red-team vector, never e2e-tested on standard sockets before):
+    # internal IPv6 LITERALS must be blocked by socket_addr_check (wb_ip_allowed classifies V6). Hermetic —
+    # denied before any network. ::1 loopback, fc00::/7 ULA, fe80::/10 link-local, ::ffff: v4-mapped loopback.
+    assert probe.("[::1]:22") =~ "ERR"
+    assert probe.("[fc00::1]:80") =~ "ERR"
+    assert probe.("[fe80::1]:80") =~ "ERR"
+    assert probe.("[::ffff:127.0.0.1]:80") =~ "ERR"
+
     # DNS-BASED SSRF on the raw-socket path: an UNSCOPED guest may use a HOSTNAME (name lookup enabled), and a
     # public hostname resolves+connects — but a hostname that RESOLVES to an internal target is blocked, because
     # socket_addr_check vets the POST-resolution address (no rebind window: it sees the actual connect IP).
