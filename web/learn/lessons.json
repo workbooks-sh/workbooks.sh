@@ -42,9 +42,9 @@
        "sub": "implementation",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "Make provenance travel with the bytes: sign a workbook with a self-certifying did:key (Ed25519 over canonical JSON, embedded in the file) and verify both the signature and that the artifact hasn't been touched since."
       },
       {
@@ -240,9 +240,9 @@
        "sub": "concept",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "Secrets-by-reference: variables marked secret are ref-only \u2014 agents substitute {{secret:KEY}} placeholders, the host injects real values only at egress, and the deploy kit stages declared secret names per deployment and delivers values through provider hooks without ever baking them into images or config."
       },
       {
@@ -262,9 +262,9 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "Credentials with a no-rotation discipline: first cloud apply generates a 256-bit WB_PUBLIC_BEARER once and persists it (rotation would 401 every live client), clients present it as WB_ENGINE_TOKEN, and WB_SIGNING_KEY pins a stable DID across redeploys so prior signatures and ledgers keep verifying."
       },
       {
@@ -433,9 +433,9 @@
        "sub": "mechanics",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "Inside OQL \u2014 one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the wb CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website."
       },
       {
@@ -455,9 +455,9 @@
        "sub": "mechanics",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "Tags as structure: categorize headlines, drive queries, and carry meaning machines can filter on."
       },
       {
@@ -521,9 +521,9 @@
        "sub": "mechanics",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
-       "added": "2026-06-12",
+       "audio": true,
+       "status": "live",
+       "added": "2026-06-13",
        "dek": "How a run comes to exist and stays alive \u2014 supervised sessions you start with one call, then poll or stream while the agent works for minutes, surviving the caller that launched it."
       },
       {
@@ -716,7 +716,7 @@
        "title": "Autopoet",
        "sub": "the gardener",
        "color": "#f2ddb0",
-       "icon": "icons/autopoet.svg",
+       "icon": "icons/workflows.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12"

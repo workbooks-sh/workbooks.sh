@@ -195,6 +195,74 @@
    ]
   },
   {
+   "slug": "signatures",
+   "title": "signatures — under workbook",
+   "src": "audio/episodes/signatures.mp3?v=1241",
+   "dur": 1241,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Provenance that travels with the bytes",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Forwarded twice, edited once",
+     "t": 49
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 140
+    },
+    {
+     "id": "two-checks",
+     "title": "Why verify asks two questions",
+     "t": 256
+    },
+    {
+     "id": "strip-then-hash",
+     "title": "Signing a file from inside it",
+     "t": 380
+    },
+    {
+     "id": "did-key",
+     "title": "The name that is the key",
+     "t": 502
+    },
+    {
+     "id": "canonical-json",
+     "title": "The one byte contract",
+     "t": 633
+    },
+    {
+     "id": "keys",
+     "title": "Where the private half lives",
+     "t": 732
+    },
+    {
+     "id": "flows",
+     "title": "Where signing fires for you",
+     "t": 861
+    },
+    {
+     "id": "limits",
+     "title": "What it is not",
+     "t": 965
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1103
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the workbook",
+     "t": 1195
+    }
+   ]
+  },
+  {
    "slug": "specs",
    "title": "specs — under workbook",
    "src": "audio/episodes/specs.mp3?v=1108",
@@ -1235,6 +1303,79 @@
    ]
   },
   {
+   "slug": "secrets",
+   "title": "secrets — under nexus",
+   "src": "audio/episodes/secrets.mp3?v=1082",
+   "dur": 1082,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A key you use but never read",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The key in the prompt",
+     "t": 52
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 109
+    },
+    {
+     "id": "reference",
+     "title": "Marking and handling refs",
+     "t": 162
+    },
+    {
+     "id": "two-modes",
+     "title": "Guest mode versus host mode",
+     "t": 261
+    },
+    {
+     "id": "physics",
+     "title": "Enforcement, not etiquette",
+     "t": 358
+    },
+    {
+     "id": "no-read",
+     "title": "The missing import",
+     "t": 466
+    },
+    {
+     "id": "signing",
+     "title": "Use without an egress point",
+     "t": 558
+    },
+    {
+     "id": "deploying",
+     "title": "Names in the file, values in the vault",
+     "t": 643
+    },
+    {
+     "id": "providers",
+     "title": "Delivery hooks",
+     "t": 757
+    },
+    {
+     "id": "limits",
+     "title": "What this isn't",
+     "t": 858
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 963
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the nexus",
+     "t": 1039
+    }
+   ]
+  },
+  {
    "slug": "browsing",
    "title": "browsing — under nexus",
    "src": "audio/episodes/browsing.mp3?v=1070",
@@ -1309,6 +1450,79 @@
      "id": "outro",
      "title": "Back up to the Nexus",
      "t": 1015
+    }
+   ]
+  },
+  {
+   "slug": "tokens",
+   "title": "tokens — under nexus",
+   "src": "audio/episodes/tokens.mp3?v=1061",
+   "dur": 1061,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Three lifetimes, one rule",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Rotate everything, until it breaks you",
+     "t": 62
+    },
+    {
+     "id": "definition",
+     "title": "Three tokens, three lifetimes",
+     "t": 136
+    },
+    {
+     "id": "first-apply",
+     "title": "The once machine",
+     "t": 230
+    },
+    {
+     "id": "the-lock",
+     "title": "One env var locks the plane",
+     "t": 325
+    },
+    {
+     "id": "presenting",
+     "title": "The client half",
+     "t": 432
+    },
+    {
+     "id": "before-credentials",
+     "title": "Reading the rung first",
+     "t": 513
+    },
+    {
+     "id": "the-rotating-one",
+     "title": "The one that does rotate",
+     "t": 584
+    },
+    {
+     "id": "signing-key",
+     "title": "The token that is a name",
+     "t": 657
+    },
+    {
+     "id": "when-you-must",
+     "title": "Rotating anyway",
+     "t": 785
+    },
+    {
+     "id": "limits",
+     "title": "What this isn't",
+     "t": 857
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 935
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the Nexus",
+     "t": 1016
     }
    ]
   },
@@ -2081,6 +2295,137 @@
    ]
   },
   {
+   "slug": "the-kernel",
+   "title": "the kernel — under org",
+   "src": "audio/episodes/the-kernel.mp3?v=1089",
+   "dur": 1089,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Three parsers, three truths",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 72
+    },
+    {
+     "id": "purity",
+     "title": "No host calls, no clock",
+     "t": 145
+    },
+    {
+     "id": "verbs",
+     "title": "Six verbs, one contract",
+     "t": 220
+    },
+    {
+     "id": "tangle",
+     "title": "From headline to world",
+     "t": 295
+    },
+    {
+     "id": "gate",
+     "title": "The upgrade gate",
+     "t": 426
+    },
+    {
+     "id": "surface-native",
+     "title": "Surface one — the CLI",
+     "t": 536
+    },
+    {
+     "id": "surface-component",
+     "title": "Surface two — the runtime and desktop",
+     "t": 599
+    },
+    {
+     "id": "surface-browser",
+     "title": "Surface three — this very page",
+     "t": 745
+    },
+    {
+     "id": "limits",
+     "title": "Where the story bends",
+     "t": 846
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 942
+    },
+    {
+     "id": "outro",
+     "title": "Back up to org",
+     "t": 1032
+    }
+   ]
+  },
+  {
+   "slug": "tags",
+   "title": "tags — under org",
+   "src": "audio/episodes/tags.mp3?v=1018",
+   "dur": 1018,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The kind problem",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 72
+    },
+    {
+     "id": "grammar",
+     "title": "How a tag is read",
+     "t": 119
+    },
+    {
+     "id": "canon",
+     "title": "The five tags that run the ecosystem",
+     "t": 212
+    },
+    {
+     "id": "query",
+     "title": "Tags on the query surface",
+     "t": 313
+    },
+    {
+     "id": "compile",
+     "title": "The tag that compiles",
+     "t": 470
+    },
+    {
+     "id": "division",
+     "title": "Tags, states, and properties",
+     "t": 566
+    },
+    {
+     "id": "trust",
+     "title": "A tag is not a permission",
+     "t": 662
+    },
+    {
+     "id": "limits",
+     "title": "Where it bites",
+     "t": 726
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 863
+    },
+    {
+     "id": "outro",
+     "title": "Back up to org",
+     "t": 953
+    }
+   ]
+  },
+  {
    "slug": "claims",
    "title": "claims — under org",
    "src": "audio/episodes/claims.mp3?v=931",
@@ -2397,6 +2742,79 @@
      "id": "outro",
      "title": "Back up to agents",
      "t": 1082
+    }
+   ]
+  },
+  {
+   "slug": "spawning",
+   "title": "spawning — under agents",
+   "src": "audio/episodes/spawning.mp3?v=997",
+   "dur": 997,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The run that outlives the request",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The run that outlives the request",
+     "t": 51
+    },
+    {
+     "id": "definition",
+     "title": "Spawning, defined",
+     "t": 99
+    },
+    {
+     "id": "one-call",
+     "title": "One call, an id, a 202",
+     "t": 139
+    },
+    {
+     "id": "receptionist",
+     "title": "The receptionist and the worker",
+     "t": 232
+    },
+    {
+     "id": "fanout",
+     "title": "Every step, three sinks",
+     "t": 329
+    },
+    {
+     "id": "watching",
+     "title": "Poll or stream",
+     "t": 421
+    },
+    {
+     "id": "self-address",
+     "title": "The run that knows its name",
+     "t": 524
+    },
+    {
+     "id": "standing",
+     "title": "The other spawner, born at boot",
+     "t": 580
+    },
+    {
+     "id": "clocks",
+     "title": "Bounded at every layer",
+     "t": 703
+    },
+    {
+     "id": "honesty",
+     "title": "What dies, what survives",
+     "t": 786
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 881
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 949
     }
    ]
   },
