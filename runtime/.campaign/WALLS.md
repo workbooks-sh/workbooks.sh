@@ -95,8 +95,14 @@ Members:
   PROVEN 2026-06-13 WITHOUT a fork** — pass `--cfg target_feature=atomics` (mrustc's cfg.cpp checks CLI
   `--cfg` before the hardcoded false callback, so `target.cpp:746` is bypassed, not patched) + a 2-file
   std TLS patch. 4-thread Rust runs to exactly 1,000,000. The "no mrustc fork" stance HOLDS. **LIVE** —
-  `compile_rust_threads` lane wired + green test; reproducible threads-libstd build. The `--cfg` bypass
-  is a general lever worth remembering for other mrustc-ceiling items (edition-2024/proc-macros).
+  `compile_rust_threads` lane wired + green test; reproducible threads-libstd build.
+- **wasm SIMD (v128) → LIVE** (`rust_compile_to_wasm(simd: true)`): `-msimd128 -O2` autovectorizes the
+  user-code C compile (mrustc lowers Rust SIMD intrinsics to scalar C, so autovec — not `--cfg` — is the
+  path; `-O2` required). Proven: saxpy 0→12 v128 ops, test green.
+- **The `--cfg` lever is NOT universal** (proven): it unlocks ONLY threads/atomics. edition-2024 is a
+  PARSER ceiling (mrustc crashes on `gen` blocks), proc-macros are a separate mechanism, and ~40
+  `llvm.wasm.*` SIMD intrinsics abort in mrustc codegen — none are `--cfg`-fixable. Stop hoping it reaches
+  them; autovectorization is the SIMD mitigation.
 - ~~no EH-enabled libc++ → C++ exceptions~~ → **PROVEN 2026-06-13** (from-source EH runtime via our
   clang.wasm: llvmorg-22.1.0 libcxxabi/libunwind built `-fwasm-exceptions -mllvm
   -wasm-use-legacy-eh=false` → `libc++abi-eh.a`+`libunwind-eh.a`; throwing C++ catches with full

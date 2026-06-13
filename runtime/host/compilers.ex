@@ -623,6 +623,13 @@ defmodule Workbooks.Compilers do
         @rust_clang_flags
       end
 
+    # wasm SIMD (proven via the CFG sweep): -msimd128 enables the v128 target feature and -O2 turns on clang
+    # AUTOVECTORIZATION (off at -O1 even with -msimd128) — the only path to real v128 ops, since mrustc lowers
+    # Rust SIMD intrinsics to scalar C. Applies to the user-code compile. Orthogonal to the threads lane (SIMD
+    # is a C-compile flag; atomics is an mrustc cfg), so they compose. -O2 overrides the earlier -O1 (last wins).
+    clang_flags =
+      if Keyword.get(opts, :simd, false), do: clang_flags ++ ["-msimd128", "-O2"], else: clang_flags
+
     mr = fn args ->
       wasmtime(
         ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728",

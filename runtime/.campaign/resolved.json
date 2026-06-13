@@ -2519,6 +2519,13 @@
    "more_available": "same-shape S vein: xxHash, cmark, libyaml, miniz, CRC/hash tools \u2014 build through build_c_dir with little/no flag work",
    "wiring": "proven on-demand; standing-CLI registration is a packaging step (not yet done)",
    "since": "iter159"
+  },
+  "rust_simd": {
+   "capability": "wasm SIMD (v128) in the Rust lane",
+   "status": "live",
+   "proof": "vectorizable saxpy loop: baseline 0 v128 ops -> simd:true 12 v128 ops, correct result (sum=33546240); test rust_simd_test.exs green",
+   "recipe": "rust_compile_to_wasm(simd: true) appends -msimd128 -O2 to the user-code clang compile (autovec is OFF at -O1). NOT a --cfg win: mrustc lowers Rust SIMD intrinsics to scalar C, so clang autovectorization is the only path to real v128. Composes orthogonally with the threads lane.",
+   "since": "iter160"
   }
  },
  "verdict_ladder": {
@@ -2526,5 +2533,8 @@
   "proven": "empirically works in a real experiment, but NOT wired into the system \u2014 not usable yet",
   "wired": "integrated + tested + functional, but NOT yet usable \u2014 too slow, or big caveats still being solved",
   "live": "integrated, optimized, genuinely usable \u2014 production-grade"
+ },
+ "cfg_lever_scope": {
+  "note": "The mrustc --cfg bypass (cfg.cpp checks CLI --cfg before the hardcoded callback) is NOT a universal key \u2014 proven by the sweep. It unlocks exactly ONE real thing: threads/atomics (target_feature=atomics, the only target_feature with real std gates). panic= has no cfg gates; simd128 has no std cfg gates (it is a clang -msimd128 autovec win, not cfg). NOT-cfg-fixable (confirmed empirically): edition-2024 (PARSER ceiling \u2014 gen blocks crash mrustc in Parse_Expr2), proc-macros (separate mechanism), ~40 llvm.wasm.* SIMD intrinsics (codegen_c.cpp aborts on Extern LLVM \u2014 i8x16_bitmask/swizzle/narrow/relaxed_* etc.; autovec is the mitigation). Stop hoping --cfg reaches these."
  }
 }
