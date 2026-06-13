@@ -92,7 +92,24 @@ defmodule Workbooks.BrokeredToolsTest do
   test "LIVE — pip-run INSTALLS a pure-Python wheel (brokered download + zipimport) and imports it" do
     # the install half of pip: fetch the wheel over brokered HTTPS, download the bytes, zipimport it -> usable.
     assert {:ok, out, 0} = CommandRegistry.run_status("pip-run", "", ["six"])
-    assert out =~ "installed six"
+    assert out =~ "installed: six 1." and out =~ "import ok: six"
+  end
+
+  @tag :netdeps
+  @tag timeout: 300_000
+  test "LIVE — pip-run resolves + installs a TRANSITIVE dependency tree (markdown-it-py -> mdurl)" do
+    # markdown-it-py (import name markdown_it) requires mdurl — both pure-Python + import-clean. pip-run
+    # recursively resolves requires_dist, downloads every wheel, zipimports the lot; markdown_it's import only
+    # succeeds if mdurl was installed too. This is dependency RESOLUTION, not just single-package install.
+    assert {:ok, out, 0} =
+             CommandRegistry.run_status("pip-run", "", [
+               "markdown-it-py",
+               "-c",
+               "import markdown_it, mdurl; print('MD', markdown_it.__version__)"
+             ])
+
+    assert out =~ "installed:" and out =~ "markdown-it-py" and out =~ "mdurl"
+    assert out =~ ~r/MD \d+\.\d+/
   end
 
   @tag :netdeps

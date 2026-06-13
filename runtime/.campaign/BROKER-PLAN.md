@@ -2006,3 +2006,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   + live_capabilities.pip_install. Native-extension wheels still need the in-sandbox build lane to compile the
   C/Rust ext (separate). NEXT: a wheel with a sub-package dir (requests-class, multi-module) to confirm
   zipimport handles package trees; transitive deps (resolve + zipimport a small dep chain).
+- 2026-06-13 (iter 149): **pip-run TRANSITIVE DEP RESOLUTION — real dependency trees, not just single packages.**
+  Upgraded pip-run to recursively resolve requires_dist: for each package, fetch metadata, find the pure-Python
+  (none-any) wheel, download it, zipimport it, then resolve+install its deps (skipping optional extras via the
+  "; extra ==" marker). Drops freshly-installed names from sys.modules first so a real install isn't shadowed by
+  a prelude shim. 19 brokered_tools tests green incl: LIVE markdown-it-py -> mdurl ("installed: markdown-it-py
+  4.2.0, mdurl 0.1.2" + MD 4.2.0 — markdown_it's import only succeeds if mdurl was installed too). HONEST LIMITS
+  recorded: (a) native-extension wheels still need the in-sandbox build lane; (b) packages whose import chain
+  needs working ssl/socket AT IMPORT (requests/urllib3) install+download fine but ABORT on import in wasip1
+  CPython (exit 134) — a CPython-wasip1 limit, not a resolver bug. So pip-install is live for the pure-Python +
+  import-clean subset, WITH dependency resolution. NEXT: a brokered ssl/socket shim so import-time socket probes
+  don't abort (would unlock requests-class); the native-extension subset via the build lane.

@@ -2299,8 +2299,9 @@
    "command": "pip-run",
    "delivers": "pip install+use for pure-Python wheels",
    "recipe": "brokered HTTPS download + zipimport",
-   "excludes": "native-extension wheels (need in-sandbox compile)",
-   "since": "iter148"
+   "excludes": "native-extension wheels (need in-sandbox compile) AND packages whose import chain needs working ssl/socket at import time (e.g. requests/urllib3 abort in wasip1 CPython) \u2014 install resolves+downloads them, but import may crash",
+   "since": "iter148",
+   "deps": "transitive dependency resolution (recursive requires_dist -> download all pure-Python wheels -> zipimport the tree); proven markdown-it-py -> mdurl"
   }
  }
 }

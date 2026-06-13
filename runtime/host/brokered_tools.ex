@@ -121,32 +121,65 @@ defmodule Workbooks.BrokeredTools do
   # install + use" for the no-native-extension subset, entirely sandboxed + SSRF-mediated. Usage:
   #   pip-run PACKAGE [-c CODE]
   @pip_run ~S"""
-  import sys, json
+  import sys, json, re
   args = sys.argv[1:]
   if not args:
       sys.stderr.write("usage: pip-run PACKAGE [-c CODE]\n"); sys.exit(2)
   pkg = args[0]
   code = args[2] if len(args) >= 3 and args[1] == "-c" else None
   import requests, urllib.error
-  try:
-      r = requests.get("https://pypi.org/pypi/%s/json" % pkg)
+
+  installed = {}
+  def _norm(n): return n.lower().replace("_", "-")
+
+  def _meta(name):
+      r = requests.get("https://pypi.org/pypi/%s/json" % name)
       if r.status_code != 200:
-          sys.stderr.write("not found: %s (%d)\n" % (pkg, r.status_code)); sys.exit(1)
-      data = r.json(); ver = data["info"]["version"]
-      wheel = None
-      for f in data.get("releases", {}).get(ver, []):
+          return None, None, []
+      d = r.json(); ver = d["info"]["version"]; wheel = None
+      for f in d.get("releases", {}).get(ver, []):
           if f.get("packagetype") == "bdist_wheel" and "none-any" in f.get("filename", ""):
               wheel = f["url"]; break
+      return wheel, ver, d["info"].get("requires_dist") or []
+
+  def _deps(requires_dist):
+      out = []
+      for r in requires_dist:
+          if ";" in r:
+              req, marker = r.split(";", 1)
+              if "extra ==" in marker:   # optional-extra dep -> skip
+                  continue
+          else:
+              req = r
+          m = re.match(r"\s*([A-Za-z0-9_.\-]+)", req)
+          if m: out.append(m.group(1))
+      return out
+
+  def _install(name):
+      n = _norm(name)
+      if n in installed: return
+      wheel, ver, rd = _meta(name)
       if not wheel:
-          sys.stderr.write("no pure-python wheel for %s %s (has native code)\n" % (pkg, ver)); sys.exit(3)
-      blob = requests.get(wheel).content
-      open("/b/pkg.whl", "wb").write(blob)
-      sys.path.insert(0, "/b/pkg.whl")
+          sys.stderr.write("skip (no pure-python wheel): %s\n" % name); return
+      path = "/b/%s.whl" % n.replace("-", "_")
+      open(path, "wb").write(requests.get(wheel).content)
+      sys.path.insert(0, path); installed[n] = ver
+      for d in _deps(rd):
+          _install(d)
+
+  try:
+      _install(pkg)
+      if not installed:
+          sys.stderr.write("not found / no pure-python wheel: %s\n" % pkg); sys.exit(3)
+      # a freshly-installed real package must not be shadowed by a prelude shim of the same name -> drop ours.
+      for n in list(installed):
+          sys.modules.pop(n.replace("-", "_"), None)
+      print("installed:", ", ".join("%s %s" % (k, v) for k, v in installed.items()))
       if code:
           exec(code)
       else:
-          mod = __import__(pkg.replace("-", "_"))
-          print("installed %s %s" % (pkg, getattr(mod, "__version__", ver)))
+          __import__(pkg.replace("-", "_"))
+          print("import ok:", pkg)
       sys.exit(0)
   except urllib.error.URLError as e:
       sys.stderr.write("error: %s\n" % e.reason); sys.exit(1)
