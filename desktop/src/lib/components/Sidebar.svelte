@@ -74,8 +74,6 @@
   let {
     tabs = [],
     bottomTabs = [],
-    onCreate,
-    createActive = false,
     active = $bindable(),
     packages = [],
     workspaceName = "",
@@ -94,9 +92,6 @@
   }: {
     tabs?: RailTab[];
     bottomTabs?: RailTab[];
-    /** The branded Create CTA pinned above the bottom nav. */
-    onCreate?: () => void;
-    createActive?: boolean;
     active: string;
     packages?: RailPackage[];
     workspaceName?: string;
@@ -832,18 +827,6 @@
 
   <span class="bottom-spacer" aria-hidden="true"></span>
 
-  {#if onCreate}
-    <button
-      type="button"
-      class="create-cta"
-      class:engaged={createActive}
-      onclick={onCreate}
-    >
-      <Plus size={15} weight="bold" aria-hidden="true" />
-      Create
-    </button>
-  {/if}
-
   <!-- Bottom toolbar — account avatar (auth-UI-gated, wb-aakl.16/.3) +
        icon-only utility nav. The shipped browser shows just the utility
        nav; the account row returns with WB_FF_AUTH_UI. -->
@@ -1226,54 +1209,6 @@
     50% { opacity: 1; }
   }
 
-  /* ── Create — THE primary CTA: live green, ink text, mono voice. ── */
-  /* Soft, blended fill (not bright white) with a physical lip: a thicker
-   * darker bottom edge + a top sheen + a contact shadow give it depth,
-   * like a pressable key. Pressing collapses the lip. */
-  .create-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    width: 100%;
-    height: 34px;
-    margin-bottom: 0.2rem;
-    border: 1px solid var(--color-border-strong);
-    border-bottom-width: 3px;
-    border-bottom-color: var(--color-fg-subtle);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface));
-    color: var(--color-fg);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-    cursor: pointer;
-    flex-shrink: 0;
-    /* top sheen (raised) + soft contact shadow below */
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--color-page) 65%, transparent),
-      0 3px 8px -3px rgba(18, 19, 22, 0.2);
-    transition:
-      background 0.12s,
-      border-color 0.12s,
-      box-shadow 0.12s,
-      border-bottom-width 0.06s,
-      transform 0.06s;
-  }
-  .create-cta:hover,
-  .create-cta.engaged {
-    background: color-mix(in srgb, var(--color-fg) 10%, var(--color-surface));
-    border-color: var(--color-fg-subtle);
-  }
-  /* press: lip collapses + the button sinks onto its shadow */
-  .create-cta:active {
-    border-bottom-width: 1px;
-    transform: translateY(2px);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--color-page) 65%, transparent),
-      0 1px 3px -2px rgba(18, 19, 22, 0.2);
-  }
 
   /* ── workspace header ─────────────────────────────────────────── */
   .ws-header {

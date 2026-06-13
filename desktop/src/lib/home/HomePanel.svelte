@@ -366,18 +366,6 @@
 
 <div class="home">
   <div class="hero">
-    <button
-      type="button"
-      class="palette-chip"
-      onclick={openPalette}
-      aria-label="Ask the workspace anything"
-      title="Ask the workspace (⌘/)"
-    >
-      <Sparkles weight="fill" size={12} aria-hidden="true" />
-      <span>Ask the workspace anything…</span>
-      <kbd>⌘/</kbd>
-    </button>
-
     {#if !voiceMode}
       <form
         class="composer"
@@ -497,34 +485,7 @@
       </button>
     {/if}
 
-    {#if !voiceMode}
-      <div class="quick" in:fade={{ duration: 180 }}>
-        <button type="button" class="chip" onclick={newPackage}>
-          <Plus weight="bold" size={11} /> Package
-        </button>
-        <button
-          type="button"
-          class="chip"
-          onclick={() => openWizardInPalette("create-board", "Create a kanban board")}
-        >
-          <Kanban weight="fill" size={11} /> Board
-        </button>
-        <button
-          type="button"
-          class="chip"
-          onclick={() => openWizardInPalette("create-workbook", "Create a workbook")}
-        >
-          <BookOpen weight="fill" size={11} /> Workbook
-        </button>
-        <button
-          type="button"
-          class="chip"
-          onclick={() => openWizardInPalette("create-skill", "Create a skill")}
-        >
-          <Wand2 weight="fill" size={11} /> Skill
-        </button>
-      </div>
-    {:else}
+    {#if voiceMode}
       <div
         class="voice-transcript"
         bind:this={transcriptEl}

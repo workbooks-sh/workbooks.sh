@@ -167,11 +167,12 @@
   .hero {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    background: var(--color-brand-soft);
-    color: var(--color-brand);
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    color: var(--color-fg);
   }
   .intro h2 {
     margin: 0;
@@ -195,8 +196,8 @@
   .hero { transition: background 0.3s, color 0.3s; }
   .hero.alive { animation: hero-pulse 2.4s ease-in-out infinite; }
   @keyframes hero-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 22%, transparent); }
-    50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-brand) 0%, transparent); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-fg) 16%, transparent); }
+    50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-fg) 0%, transparent); }
   }
   @media (prefers-reduced-motion: reduce) { .hero.alive { animation: none; } }
 
@@ -260,8 +261,8 @@
   }
   .bubble.you {
     align-self: flex-end;
-    background: var(--color-brand);
-    color: var(--color-brand-ink);
+    background: var(--color-fg);
+    color: var(--color-page);
   }
   .bubble.waldo {
     align-self: flex-start;

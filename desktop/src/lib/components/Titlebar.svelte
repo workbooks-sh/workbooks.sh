@@ -328,6 +328,17 @@
     ondragleave={() => (stripHot = false)}
     ondrop={stripDrop}
   >
+    <button
+      type="button"
+      class="new-tab"
+      data-tauri-drag-region="false"
+      title="New tab"
+      aria-label="New tab"
+      onclick={newTab}
+    >
+      <Plus size={15} weight="bold" />
+    </button>
+
     {#each stripTabs as tab (tab.id)}
       {#if splitIds[0] === tab.id}
         <!-- combined tab — one pill for the whole split -->
@@ -435,17 +446,6 @@
         </div>
       {/if}
     {/each}
-
-    <button
-      type="button"
-      class="new-tab"
-      data-tauri-drag-region="false"
-      title="New tab"
-      aria-label="New tab"
-      onclick={newTab}
-    >
-      <Plus size={15} weight="bold" />
-    </button>
   </div>
 
   <span class="spacer" data-tauri-drag-region></span>
@@ -767,7 +767,7 @@
     color: var(--color-fg-muted);
     cursor: pointer;
     flex-shrink: 0;
-    margin-left: 2px;
+    margin-right: 2px;
     transition: background 0.15s, color 0.15s;
   }
   .new-tab:hover { background: var(--color-page); color: var(--color-fg); }

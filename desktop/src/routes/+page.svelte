@@ -69,8 +69,9 @@
   // Order = left→right in the sidebar's bottom toolbar (after avatar).
   // Network is flag-gated (wb-aakl.1) — the tab disappears entirely when
   // WB_FF_NETWORK is off (the shipped browser default).
+  // Settings moved into the titlebar ⌄ menu (alongside Search/Bookmarks/
+  // Terminal). The bottom rail is now Network-only, and only when flagged on.
   const bottomRailTabs: RailTab[] = [
-    { id: "settings", label: "Settings", icon: SettingsIcon },
     ...(features.network
       ? [{ id: "network", label: "Network", icon: NetworkIcon }]
       : []),
@@ -498,6 +499,7 @@
     commands.register({ id: "search", label: "Search…", group: "menu", icon: SearchCmdIcon, shortcut: "⌘K", order: 0, run: () => chrome.openSearch() });
     commands.register({ id: "bookmarks", label: "Bookmarks", group: "menu", icon: BookmarkCmdIcon, order: 1, run: () => (chrome.bookmarksOpen = true) });
     commands.register({ id: "terminal", label: "Terminal", group: "menu", icon: TerminalCmdIcon, shortcut: "⌃`", order: 2, run: () => terminalDrawer.show() });
+    commands.register({ id: "settings", label: "Settings", group: "menu", icon: SettingsIcon, order: 3, run: () => { chrome.mode = "app"; active = "settings"; } });
     // Waldo (wb-aakl.21) — the ONE resident agent, a first-party dock panel
     // registered ALWAYS (not flag-gated; it replaces the multi-agent chrome
     // with a single voice). Lazy-loaded like any dock panel.
@@ -589,8 +591,6 @@
     >
       <Sidebar
         bottomTabs={bottomRailTabs}
-        onCreate={() => (active = "home")}
-        createActive={active === "home" && chrome.mode === "app"}
         bind:active
         packages={railPackages}
         workspaceName={onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "")}
