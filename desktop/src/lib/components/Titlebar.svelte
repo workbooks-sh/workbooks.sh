@@ -26,9 +26,6 @@
     X,
     Plus,
     CaretDown as ChevronDown,
-    MagnifyingGlass as Search,
-    BookmarkSimple as Bookmark,
-    Terminal as TerminalIcon,
     FileText,
     FileCode,
     Hash,
@@ -38,9 +35,9 @@
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
-  import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
+  import { commands } from "$lib/chrome/commands.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import IconResolver from "$lib/ui/Icon.svelte";
@@ -86,22 +83,11 @@
     const r = menuBtnEl?.getBoundingClientRect();
     menuX = r ? r.left : 8;
     menuY = r ? r.bottom + 4 : 40;
-    menuOpen = true;
-  }
-
-  function menuSearch() {
-    menuOpen = false;
-    chrome.openSearch();
-  }
-  function menuBookmarks() {
-    menuOpen = false;
-    // Anchor the bookmarks popover to the menu button.
+    // Anchor the bookmarks popover to the menu button up-front, so the
+    // registry's "bookmarks" command (which just sets bookmarksOpen) lands
+    // in the right place.
     chrome.bookmarksAnchor = menuBtnEl ?? null;
-    chrome.bookmarksOpen = true;
-  }
-  function menuTerminal() {
-    menuOpen = false;
-    terminalDrawer.show();
+    menuOpen = true;
   }
 
   // ── tabs ─────────────────────────────────────────────────────────
@@ -479,6 +465,20 @@
     Bookmark
   </button>
   <button class="ctx-item" onclick={menuCopyPath}>Copy path</button>
+  <!-- Registry-contributed per-tab actions (wb-aakl.17) — toolkits add
+       "tab" commands; the target tab is passed as ctx. -->
+  {#each commands.byGroup("tab") as cmd (cmd.id)}
+    <button
+      class="ctx-item"
+      onclick={() => {
+        tabMenuOpen = false;
+        cmd.run(tabMenuTarget);
+      }}
+    >
+      {#if cmd.icon}{@const Icon = cmd.icon}<Icon size={13} weight="fill" />{/if}
+      {cmd.label}
+    </button>
+  {/each}
   <div class="ctx-sep"></div>
   <button class="ctx-item" onclick={menuClose}>Close</button>
   <button
@@ -509,17 +509,21 @@
 {/if}
 
 <ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
-  <button class="ctx-item" onclick={menuSearch}>
-    <Search size={13} weight="bold" /> Search…
-    <span class="ctx-shortcut">⌘K</span>
-  </button>
-  <button class="ctx-item" onclick={menuBookmarks}>
-    <Bookmark size={13} weight="fill" /> Bookmarks
-  </button>
-  <button class="ctx-item" onclick={menuTerminal}>
-    <TerminalIcon size={13} weight="fill" /> Terminal
-    <span class="ctx-shortcut">⌃`</span>
-  </button>
+  <!-- Rendered from the chrome command registry (wb-aakl.17) — built-ins
+       and any SDK/toolkit-registered "menu" commands appear here. -->
+  {#each commands.byGroup("menu") as cmd (cmd.id)}
+    <button
+      class="ctx-item"
+      onclick={() => {
+        menuOpen = false;
+        cmd.run();
+      }}
+    >
+      {#if cmd.icon}{@const Icon = cmd.icon}<Icon size={13} weight="fill" />{/if}
+      {cmd.label}
+      {#if cmd.shortcut}<span class="ctx-shortcut">{cmd.shortcut}</span>{/if}
+    </button>
+  {/each}
 </ContextMenu>
 
 <style>

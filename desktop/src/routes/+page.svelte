@@ -49,6 +49,12 @@
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { applyBootPrefs } from "$lib/onboarding/prefs";
+  import { commands } from "$lib/chrome/commands.svelte";
+  import {
+    MagnifyingGlass as SearchCmdIcon,
+    BookmarkSimple as BookmarkCmdIcon,
+    Terminal as TerminalCmdIcon,
+  } from "phosphor-svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -451,6 +457,11 @@
     // Composable search (wb-aakl.19): register the built-in providers
     // (files/workbooks, bookmarks, tabs, nexus web). Toolkits add more.
     for (const p of BUILTIN_PROVIDERS) search.register(p);
+    // Chrome command registry (wb-aakl.17): the built-in overflow-menu +
+    // global commands register through the same seam toolkits use (dogfood).
+    commands.register({ id: "search", label: "Search…", group: "menu", icon: SearchCmdIcon, shortcut: "⌘K", order: 0, run: () => chrome.openSearch() });
+    commands.register({ id: "bookmarks", label: "Bookmarks", group: "menu", icon: BookmarkCmdIcon, order: 1, run: () => (chrome.bookmarksOpen = true) });
+    commands.register({ id: "terminal", label: "Terminal", group: "menu", icon: TerminalCmdIcon, shortcut: "⌃`", order: 2, run: () => terminalDrawer.show() });
     // Waldo (wb-aakl.21) — the ONE resident agent, a first-party dock panel
     // registered ALWAYS (not flag-gated; it replaces the multi-agent chrome
     // with a single voice). Lazy-loaded like any dock panel.
