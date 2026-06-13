@@ -34,6 +34,23 @@ if [ ! -f "$CORE" ]; then
   rm -f "$ROOT/llvm-resources.tar"
 fi
 
+# wb: wasm32-wasi-threads OVERLAY (shared-memory pthreads). The yowasp package ships only wasm32-wasip1, so we
+# overlay the threads libc/crt/headers from the wasi-sdk sysroot package — enabling Compilers.compile_threads.
+# Additive + idempotent (skips if already present), so it lands on fresh AND already-provisioned roots.
+THR_URL="https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sysroot-25.0.tar.gz"
+THR_SHA="d09c62c18efcddffe4b2fdd8c5830109cc8e36130cdbc9acdc0bd1b204c942bb"
+if [ -d "$ROOT/sysroot/lib" ] && [ ! -d "$ROOT/sysroot/lib/wasm32-wasi-threads" ]; then
+  TTH="$SD/wasi-sysroot-25.0.tar.gz"
+  if [ ! -f "$TTH" ]; then echo "[clang] fetching wasm32-wasi-threads sysroot"; curl -fsSL -o "$TTH" "$THR_URL"; fi
+  echo "$THR_SHA  $TTH" | shasum -a 256 -c - || { echo "[clang] threads sysroot SHA MISMATCH — refusing"; exit 1; }
+  echo "[clang] overlaying wasm32-wasi-threads sysroot"
+  THRTMP="$SD/.thr-tmp"; rm -rf "$THRTMP"; mkdir -p "$THRTMP"
+  tar -xzf "$TTH" -C "$THRTMP"
+  cp -R "$THRTMP/wasi-sysroot-25.0/lib/wasm32-wasi-threads" "$ROOT/sysroot/lib/"
+  cp -R "$THRTMP/wasi-sysroot-25.0/include/wasm32-wasi-threads" "$ROOT/sysroot/include/"
+  rm -rf "$THRTMP"
+fi
+
 [ -f "$CORE" ] || { echo "[clang] no llvm.core.wasm after extract"; exit 1; }
 [ -d "$ROOT/sysroot/lib" ] || { echo "[clang] no sysroot after extract"; exit 1; }
 echo "$CORE" 1>&3

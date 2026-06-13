@@ -202,6 +202,40 @@ defmodule Workbooks.Compilers do
     compile_c(source_path, Keyword.merge(opts, argv: cxx_argv, link_libs: cxx_libs), root)
   end
 
+  @threads_libdir "/usr/lib/wasm32-wasi-threads"
+
+  @doc """
+  Compile + LINK C source to a SHARED-MEMORY MULTITHREADED wasm (wasm32-wasi-threads) — real pthreads/atomics.
+  Targets the threads sysroot (shared-memory libc + pthread crt), builds with `-pthread`, and links with
+  `--shared-memory --import-memory --export-memory --max-memory` + `-lpthread`. The produced wasm imports
+  `wasi:thread-spawn` and a SHARED memory; run it via `PackageManager.run(wasm, …, threads: true)` (which sets
+  `-W threads -W shared-memory -S threads` and drops fuel/timeout — they trap child threads). opts: `:max_memory`
+  (bytes, default 1 GiB) + everything `compile_c/2` accepts. (Needs the wasm32-wasi-threads sysroot staged.)
+  """
+  def compile_threads(source_path, opts \\ [], root \\ default_root()) do
+    max_mem = Keyword.get(opts, :max_memory, 1024 * 1024 * 1024)
+
+    th_argv = ["-pthread"] ++ Keyword.get(opts, :argv, [])
+
+    th_ld =
+      ["--shared-memory", "--import-memory", "--export-memory", "--max-memory=#{max_mem}"] ++
+        Keyword.get(opts, :ld_args, [])
+
+    th_libs = ["-lpthread"] ++ Keyword.get(opts, :link_libs, [])
+
+    compile_c(
+      source_path,
+      Keyword.merge(opts,
+        target: "wasm32-wasi-threads",
+        libc_dir: @threads_libdir,
+        argv: th_argv,
+        ld_args: th_ld,
+        link_libs: th_libs
+      ),
+      root
+    )
+  end
+
   def compile_c(source_path, opts \\ [], root \\ default_root()) do
     m = Path.join([root, "clang", "manifest.org"])
     cli = kw(m, "CLI_BIN") || "clang"
@@ -209,6 +243,9 @@ defmodule Workbooks.Compilers do
     target = Keyword.get(opts, :target, kw(m, "TARGET") || "wasm32-wasip1")
     extra = Keyword.get(opts, :argv, [])
     includes = Keyword.get(opts, :includes, [])
+    # the libc/crt dir inside the sysroot — overridable so the threads lane (compile_threads) can point at
+    # wasm32-wasi-threads (shared-memory libc + pthread crt) instead of the default wasm32-wasip1.
+    libc_dir = Keyword.get(opts, :libc_dir, @clang_lib_c)
 
     cond do
       not File.dir?(Path.join(sysroot, "lib")) ->
@@ -314,7 +351,7 @@ defmodule Workbooks.Compilers do
           if all_objs? do
             # crt1 provides _start for plain C; a zig C-backend object brings its own _start
             # (and libc init), so the zig chain links with crt: false to avoid a dup _start.
-            crt = if Keyword.get(opts, :crt, true), do: ["#{@clang_lib_c}/crt1-command.o"], else: []
+            crt = if Keyword.get(opts, :crt, true), do: ["#{libc_dir}/crt1-command.o"], else: []
             obj_paths = Enum.map(objs, &"/work/#{&1}")
 
             # opts[:ld_args] are extra wasm-ld flags (e.g. --wrap=mmap for the mmap
@@ -332,7 +369,7 @@ defmodule Workbooks.Compilers do
             # FILE* stdio's lazy buffer. 8 MiB matches native expectations so any
             # C command compiles to a robust binary. (wb-9ja)
             c2 =
-              ["wasm-ld", "-m", "wasm32", "-z", "stack-size=8388608", "-L#{@clang_lib_rt}", "-L#{@clang_lib_c}"] ++
+              ["wasm-ld", "-m", "wasm32", "-z", "stack-size=8388608", "-L#{@clang_lib_rt}", "-L#{libc_dir}"] ++
                 ld_extra ++ crt ++ obj_paths ++ link_libs ++
                 ["-lc", "#{@clang_lib_rt}/libclang_rt.builtins.a", "-o", "/work/out.wasm"]
 

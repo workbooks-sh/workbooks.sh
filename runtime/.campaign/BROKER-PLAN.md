@@ -2130,3 +2130,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   OpenCV/ImageMagick) is COMPILE-FROM-SOURCE via the C/C++ lane, NOT hosting their browser-wasm (which is
   impossible). C is live; C++-no-exceptions is live now; C++-exceptions + threads are two sysroot-packaging tasks
   away. No magic artifact breaks the JIT/browser-API/native walls — those are fundamental wasm invariants.
+- 2026-06-13 (iter 157): **TAXONOMY + THREADS WIRED LIVE.** (1) Verdict ladder adopted (resolved.json
+  verdict_ladder): roadmap < proven < wired < live. "impossible" was misleading -> renamed ALL 296 to ROADMAP
+  (believed-reachable backlog, not abandoned). New middle rung "wired" = integrated+tested but not-yet-usable
+  (slow/caveats). (2) THREADS: proven -> LIVE in one wiring pass (stopped false-gating on the "manual
+  republish"). Compilers.compile_threads (wasm32-wasi-threads target, shared-memory libc, -pthread, --shared-
+  memory --import-memory --export-memory --max-memory -lpthread) + PackageManager.run(threads: true) (-W threads
+  -W shared-memory -S threads, fuel/timeout DROPPED — they trap child threads). compilers/clang/build.sh
+  overlays the wasm32-wasi-threads sysroot from wasi-sdk-25 (sha-pinned, idempotent) so it's durable on fresh
+  provision. test/threads_lane_test.exs GREEN: 4 threads x 250k atomic incs = exactly 1000000. CAVEATS: -S
+  threads hard-errors in wasmtime 47 (2026-07-20, migrate); Rust/rayon needs a threads Rust toolchain (roadmap).
+  (3) C++ lane: Compilers.compile_cpp LIVE (STL+RTTI, no-exceptions; exceptions = roadmap wb-i9nc). Tally now:
+  60 live / 296 roadmap. Threads + C++(no-eh) = two real capability levers now LIVE, not "stuck on packaging".

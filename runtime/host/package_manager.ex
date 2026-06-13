@@ -1023,6 +1023,10 @@ defmodule Workbooks.PackageManager do
   defp run_wasmtime(wasm_path, input, argv, dirs, opts) do
     timeout_ms = Keyword.get(opts, :timeout_ms, @default_run_timeout_ms)
     fuel = Keyword.get(opts, :fuel, @default_fuel)
+    # opt-in shared-memory threads (wasm32-wasi-threads artifacts). The threads runtime path is INCOMPATIBLE
+    # with -W fuel/-W timeout (they trap spawned child threads at memory-init), so we drop both and rely on the
+    # OS-level System.cmd wall-clock kill for DoS. Default (single-thread) path is untouched.
+    threads = Keyword.get(opts, :threads, false)
     env = Keyword.get(opts, :env, [])
     inp = Path.join(System.tmp_dir!(), "wb-in-#{:erlang.unique_integer([:positive])}")
 
@@ -1049,7 +1053,13 @@ defmodule Workbooks.PackageManager do
       # memory64=y → compilers-in-wasm (wb-cwasm) that exceed the wasm32 4GB ceiling on
       # large inputs (LLVM-class). Both harmless for modules that don't use them.
       # (Wasm 3.0 / W3C standard; wasmtime implements them.)
-      wopts = wasmtime_cache_args() ++ ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+      wopts =
+        if threads do
+          wasmtime_cache_args() ++
+            ["-W", "exceptions=y", "-W", "memory64=y", "-W", "threads=y", "-W", "shared-memory=y", "-W", "bulk-memory=y", "-S", "threads=y"]
+        else
+          wasmtime_cache_args() ++ ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+        end
       envs = Enum.flat_map(env, &["--env", &1])
       parts = wopts ++ envs ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
       cmd = "wasmtime " <> Enum.map_join(parts, " ", &sh_escape/1) <> " < " <> sh_escape(inp)
