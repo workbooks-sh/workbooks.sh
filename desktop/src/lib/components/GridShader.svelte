@@ -39,24 +39,23 @@
       float edge = smoothstep(0.4, 1.15, length(d));
       float t = u_time;
 
-      // Smooth, looping 2D warp field (px), only felt toward the edges.
+      // Very slow, viscous looping warp (px), only felt toward the edges.
       vec2 warp = vec2(
-        sin(frag.y * 0.011 + t * 0.7) + 0.5 * sin(frag.x * 0.009 - t * 0.5),
-        cos(frag.x * 0.011 + t * 0.6) + 0.5 * cos(frag.y * 0.010 + t * 0.45)
+        sin(frag.y * 0.011 + t * 0.16) + 0.5 * sin(frag.x * 0.009 - t * 0.11),
+        cos(frag.x * 0.011 + t * 0.14) + 0.5 * cos(frag.y * 0.010 + t * 0.10)
       );
-      float amp = u_cell * 0.7 * edge;
+      float amp = u_cell * 0.6 * edge;
 
-      // Gentle rotation about the centre, also edge-weighted.
-      float ang = edge * 0.18 * sin(t * 0.3);
+      // Gentle, slow rotation about the centre, edge-weighted.
+      float ang = edge * 0.16 * sin(t * 0.06);
       vec2 rd = frag - center;
       vec2 rot = vec2(rd.x * cos(ang) - rd.y * sin(ang),
                       rd.x * sin(ang) + rd.y * cos(ang));
 
       vec2 pos = center + rot + warp * amp;
       float mask = gridMask(pos, u_cell);
-      // Boost the (very faint) token alpha with a visible floor so the grid
-      // reads as a real texture, not invisible.
-      float a = clamp(u_line.a * 4.0, 0.16, 0.34);
+      // Faint, and fainter still toward the edges (crisp in the middle).
+      float a = 0.12 * (1.0 - edge * 0.6);
       vec3 col = mix(u_bg, u_line.rgb, a * mask);
       gl_FragColor = vec4(col, 1.0);
     }
