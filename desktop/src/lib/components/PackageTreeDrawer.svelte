@@ -19,6 +19,26 @@
   import FileTreePanel from "./FileTreePanel.svelte";
   import PackageGridView from "./PackageGridView.svelte";
   import { packageStore, type Layout } from "$lib/bridge/package.svelte";
+  import { chrome } from "$lib/ui/chrome.svelte";
+
+  // Resize by dragging the right edge (it's a left-side panel).
+  let dragging = $state(false);
+  function startResize(e: PointerEvent) {
+    dragging = true;
+    const startX = e.clientX;
+    const startW = chrome.filesWidth;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (dragging) chrome.setFilesWidth(startW + (ev.clientX - startX));
+    };
+    const up = () => {
+      dragging = false;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
   // Per-session override; null = use the Package's stored default.
   let override = $state<Layout | null>(null);
@@ -36,7 +56,8 @@
   }
 </script>
 
-<aside class="drawer" aria-label="Package files">
+<aside class="drawer" class:dragging aria-label="Package files" style="width: {chrome.filesWidth}px">
+  <button type="button" class="resize" class:dragging aria-label="Resize files" onpointerdown={startResize}></button>
   <header class="hdr">
     <span class="label">{packageStore.active?.name ?? "Package"}</span>
     <div class="switcher" role="tablist" aria-label="Layout">
@@ -76,16 +97,38 @@
 
 <style>
   .drawer {
+    position: relative;
     flex-shrink: 0;
-    width: 280px;
-    min-width: 220px;
-    max-width: 420px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     background: var(--color-surface);
     border-right: 1px solid var(--color-border);
   }
+  .drawer.dragging { user-select: none; }
+  /* Resize handle straddling the right edge. */
+  .resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -5px;
+    width: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    z-index: 2;
+  }
+  .resize::after {
+    content: "";
+    position: absolute;
+    inset: 8px 4px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .resize:hover::after,
+  .resize.dragging::after { background: var(--color-border-strong); }
   .hdr {
     display: flex;
     align-items: center;

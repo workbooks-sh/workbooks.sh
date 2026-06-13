@@ -11,9 +11,29 @@
   import { MagnifyingGlass as Search, X } from "phosphor-svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import { search, type ProviderResults } from "$lib/search/registry.svelte";
+  import { chrome } from "$lib/ui/chrome.svelte";
   import type { SearchResult } from "$lib/search/types";
 
   let { onclose }: { onclose?: () => void } = $props();
+
+  // Resize by dragging the left edge (it's a right-side panel, like the dock).
+  let dragging = $state(false);
+  function startResize(e: PointerEvent) {
+    dragging = true;
+    const startX = e.clientX;
+    const startW = chrome.searchWidth;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (dragging) chrome.setSearchWidth(startW + (startX - ev.clientX));
+    };
+    const up = () => {
+      dragging = false;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
   let query = $state("");
   let inputEl: HTMLInputElement | null = $state(null);
@@ -100,7 +120,14 @@
 
 <svelte:window onkeydown={onKey} />
 
-<aside class="drawer" aria-label="Search">
+<aside class="drawer" class:dragging aria-label="Search" style="width: {chrome.searchWidth}px">
+    <button
+      type="button"
+      class="resize"
+      class:dragging
+      aria-label="Resize search"
+      onpointerdown={startResize}
+    ></button>
     <div class="search-row">
       <Search weight="bold" size={13} />
       <input
@@ -155,30 +182,62 @@
 </aside>
 
 <style>
+  /* Floating rounded card on the right, matching the inset canvas (gaps,
+   * radius, hairline border, soft shadow). Width is resizable (chrome). */
   .drawer {
+    position: relative;
     flex-shrink: 0;
-    width: 280px;
-    min-width: 220px;
-    max-width: 420px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    /* Opens from the RIGHT — border faces the canvas on its left. */
-    border-left: 1px solid var(--color-border-strong);
+    margin: 0 8px 8px 0;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 1px 2px rgba(15, 15, 15, 0.05),
+      0 8px 28px rgba(15, 15, 15, 0.10);
   }
+  .drawer.dragging { user-select: none; }
+  /* Resize handle straddling the left edge. */
+  .resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -5px;
+    width: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    z-index: 2;
+  }
+  .resize::after {
+    content: "";
+    position: absolute;
+    inset: 8px 4px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .resize:hover::after,
+  .resize.dragging::after { background: var(--color-border-strong); }
 
   .search-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
+    margin: 8px 8px 6px;
+    padding: 0.5rem 0.7rem;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
     color: var(--color-fg-muted);
     flex-shrink: 0;
   }
+  .search-row:focus-within { border-color: var(--color-border-strong); }
   .search-row input {
     flex: 1 1 auto;
     background: transparent;

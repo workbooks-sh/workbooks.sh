@@ -50,6 +50,24 @@ class ChromeStore {
   /** Which left-side panel is open (file tree, search, or none). */
   leftPanel = $state<LeftPanel>(null);
 
+  /** Resizable widths for the files panel (left) + search drawer (right),
+   *  persisted, clamped on write. */
+  #w(key: string, def: number): number {
+    if (typeof localStorage === "undefined") return def;
+    const v = Number(localStorage.getItem(key));
+    return Number.isFinite(v) && v >= 220 && v <= 560 ? v : def;
+  }
+  filesWidth = $state<number>(this.#w("chrome.filesWidth", 280));
+  searchWidth = $state<number>(this.#w("chrome.searchWidth", 340));
+  setFilesWidth(px: number) {
+    this.filesWidth = Math.max(220, Math.min(560, Math.round(px)));
+    try { localStorage.setItem("chrome.filesWidth", String(this.filesWidth)); } catch { /* non-fatal */ }
+  }
+  setSearchWidth(px: number) {
+    this.searchWidth = Math.max(220, Math.min(560, Math.round(px)));
+    try { localStorage.setItem("chrome.searchWidth", String(this.searchWidth)); } catch { /* non-fatal */ }
+  }
+
   /** Convenience setters — keep the mutual exclusion in one place so
    *  callers don't have to remember to clear the sibling.
    *

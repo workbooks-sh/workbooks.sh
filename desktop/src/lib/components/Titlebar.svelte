@@ -443,7 +443,7 @@
     data-tauri-drag-region="false"
     title="Search (⌘K)"
     aria-label="Search"
-    onclick={() => chrome.openSearch()}
+    onclick={() => chrome.toggleSearch()}
   >
     <MagnifyingGlass size={15} weight="bold" />
   </button>
