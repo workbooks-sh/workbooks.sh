@@ -36,10 +36,10 @@
   type Prefs = {
     theme: "system" | "dark" | "light";
     sidebar: "shelf" | "hub" | "map";
-    bookmarks: "pinned" | "search";
+    sidebarTop: "bookmarks" | "search" | "both";
     search: { ai: "summary" | "first" | "off" };
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, bookmarks: nav.bookmarks, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, search: { ai: "summary" } });
 
   // Demo bench toolkits — registered only for the tour so the bench has real,
   // toggleable shortcuts to showcase the "build your own toolkit" concept.
@@ -86,14 +86,15 @@
     dock.close();
     chrome.bookmarksOpen = false;
     chrome.nexusOpen = false;
-    if (s === "sidebar") chrome.sidebarOpen = true; // make sure it's expanded
-    else if (s === "search") chrome.openSearch();
+    // "search" focuses the sidebar's own file-search bar (inline, shown by
+    // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
+    if (s === "sidebar" || s === "search") chrome.sidebarOpen = true;
     else if (s === "agent") dock.open("waldo");
   }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
-  function pickBookmarks(b: Prefs["bookmarks"]) { prefs.bookmarks = b; nav.setBookmarks(b); }
+  function pickSidebarTop(b: Prefs["sidebarTop"]) { prefs.sidebarTop = b; nav.setSidebarTop(b); }
 
   const CMD_SKILLS = "npx skills add workbooks-sh/workbooks.sh";
   const CMD_MCP = "claude mcp add workbooks -- wb desktop mcp";
@@ -177,13 +178,14 @@
 
           {:else if step === "search"}
             <div class="text">
-              <span class="kicker">Search · a default toolkit</span>
-              <h1>Bookmarks, or just search?</h1>
-              <p>⌘K from anywhere; results open here. Pin a bookmark grid in the sidebar too, or keep it lean and recall everything through search.</p>
+              <span class="kicker">Find · top of the sidebar</span>
+              <h1>How do you find files?</h1>
+              <p>A file-search bar (searches your local files, separate from the ⌘K bar up top), a pinned bookmark grid, or both. Look left — it changes live.</p>
             </div>
             <div class="opts">
-              <button type="button" class="opt" class:sel={prefs.bookmarks === "pinned"} onclick={() => pickBookmarks("pinned")}>Search + bookmarks</button>
-              <button type="button" class="opt" class:sel={prefs.bookmarks === "search"} onclick={() => pickBookmarks("search")}>Search only</button>
+              <button type="button" class="opt" class:sel={prefs.sidebarTop === "bookmarks"} onclick={() => pickSidebarTop("bookmarks")}>Bookmarks</button>
+              <button type="button" class="opt" class:sel={prefs.sidebarTop === "search"} onclick={() => pickSidebarTop("search")}>File search</button>
+              <button type="button" class="opt" class:sel={prefs.sidebarTop === "both"} onclick={() => pickSidebarTop("both")}>Both</button>
             </div>
 
           {:else if step === "theme"}

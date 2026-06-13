@@ -50,6 +50,7 @@
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { DEMO_WORKSPACES, DEMO_FOLDER_CHILDREN } from "$lib/onboarding/demo";
   import { setSidebar, type SidebarApi } from "$lib/sidebar/context";
+  import SidebarSearch from "$lib/components/SidebarSearch.svelte";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
   export type RailTab = {
@@ -598,16 +599,20 @@
   </button>
   {/if}
 
+  <!-- Top zone (wb-aakl.19) — a file-system search bar, a pinned bookmark
+       grid, or both, per nav.sidebarTop. The search bar searches local files
+       (distinct from the titlebar's global ⌘K) with inline results. -->
+  {#if nav.sidebarTop !== "bookmarks"}
+    <SidebarSearch onOpen={onOpenWorkbook} />
+  {/if}
+
   <!-- Bookmarks — Arc-style tile grid. Holds ONLY what was explicitly
        dragged in (apps or workbooks — every tile is a reference to a
        real file in a real folder; nothing is created here). Drop
        between tiles to insert. Max 3 rows of 4. Empty state is a
        persistent dashed slot with a bookmark glyph — always there to
-       drag onto, no words.
-       Shelf + Hub are bookmark-forward (grid shows); Map is tree-forward
-       (grid hidden). The grid also hides when bookmarks are "search" mode —
-       you recall them through search instead of pinning them. -->
-  {#if nav.layout !== "map" && nav.bookmarks === "pinned"}
+       drag onto, no words. -->
+  {#if nav.sidebarTop !== "search"}
   {#if orderedBookmarks.length === 0}
     <div
       class="bm-empty"

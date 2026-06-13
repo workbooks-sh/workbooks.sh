@@ -9,7 +9,7 @@ export type ThemeMode = "system" | "dark" | "light";
 export interface BrowserPrefs {
   theme: ThemeMode;
   sidebar: "shelf" | "hub" | "map";
-  bookmarks: "pinned" | "search";
+  sidebarTop: "bookmarks" | "search" | "both";
   search: { ai: "summary" | "first" | "off" };
 }
 

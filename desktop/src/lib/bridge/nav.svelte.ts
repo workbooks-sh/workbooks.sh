@@ -10,13 +10,13 @@ import { loadPrefs } from "$lib/onboarding/prefs";
 
 export type NavLayout = "shelf" | "hub" | "map";
 
-// Bookmarks surface (wb-aakl.16/.19): "pinned" = a pinned bookmark grid in the
-// sidebar alongside search; "search" = no pinned grid, you recall things
-// through search instead.
-export type BookmarksMode = "pinned" | "search";
+// What sits at the top of the sidebar (wb-aakl.19): a pinned bookmark grid, an
+// inline file-system search bar (distinct from the titlebar's global ⌘K
+// search), or both.
+export type SidebarTop = "bookmarks" | "search" | "both";
 
 const KEY = "wb.nav.layout";
-const BM_KEY = "wb.nav.bookmarks";
+const TOP_KEY = "wb.nav.sidebarTop";
 
 // Migrate the old two-preset values to the new named set.
 function coerce(v: string | null | undefined): NavLayout | null {
@@ -35,12 +35,17 @@ function initialLayout(): NavLayout {
   return coerce(loadPrefs().sidebar) ?? "shelf";
 }
 
-function initialBookmarks(): BookmarksMode {
+function initialSidebarTop(): SidebarTop {
   if (typeof localStorage !== "undefined") {
-    const saved = localStorage.getItem(BM_KEY);
-    if (saved === "pinned" || saved === "search") return saved;
+    const saved = localStorage.getItem(TOP_KEY);
+    if (saved === "bookmarks" || saved === "search" || saved === "both") return saved;
+    // Migrate the old 2-way bookmarks pref.
+    const legacy = localStorage.getItem("wb.nav.bookmarks");
+    if (legacy === "search") return "search";
+    if (legacy === "pinned") return "bookmarks";
   }
-  return loadPrefs().bookmarks === "search" ? "search" : "pinned";
+  const pref = loadPrefs().sidebarTop;
+  return pref === "search" || pref === "both" ? pref : "bookmarks";
 }
 
 // Per-layout sidebar width (resizable). Each layout remembers its own width —
@@ -69,7 +74,7 @@ function initialWidths(): Record<NavLayout, number> {
 class NavStore {
   layout = $state<NavLayout>(initialLayout());
   widths = $state<Record<NavLayout, number>>(initialWidths());
-  bookmarks = $state<BookmarksMode>(initialBookmarks());
+  sidebarTop = $state<SidebarTop>(initialSidebarTop());
 
   /** Current layout's sidebar width in px. */
   get sidebarWidth(): number {
@@ -87,11 +92,11 @@ class NavStore {
     }
   }
 
-  setBookmarks(m: BookmarksMode): void {
-    this.bookmarks = m;
+  setSidebarTop(m: SidebarTop): void {
+    this.sidebarTop = m;
     if (typeof localStorage !== "undefined") {
       try {
-        localStorage.setItem(BM_KEY, m);
+        localStorage.setItem(TOP_KEY, m);
       } catch {
         /* best-effort */
       }
