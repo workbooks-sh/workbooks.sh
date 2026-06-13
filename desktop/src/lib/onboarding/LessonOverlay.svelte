@@ -12,7 +12,11 @@
    * (Edge is a smooth vertical bezier — the node-port aesthetic without the
    * heavy elkjs routing dep; swap to ELK if we ever route many edges.)
    */
-  let { portEl, target }: { portEl: HTMLElement | null; target: string } = $props();
+  let {
+    portEl,
+    target,
+    edge = true,
+  }: { portEl: HTMLElement | null; target: string; edge?: boolean } = $props();
 
   let port = $state<DOMRect | null>(null);
   let tgt = $state<DOMRect | null>(null);
@@ -70,8 +74,10 @@
       height={geom.box.h}
       rx="9"
     />
-    <path class="edge" d={geom.path} />
-    <circle class="tip" cx={geom.tip.x} cy={geom.tip.y} r="3.5" />
+    {#if edge}
+      <path class="edge" d={geom.path} />
+      <circle class="tip" cx={geom.tip.x} cy={geom.tip.y} r="3.5" />
+    {/if}
   </svg>
 {/if}
 

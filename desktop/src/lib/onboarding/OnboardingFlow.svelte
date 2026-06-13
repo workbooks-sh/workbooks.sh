@@ -237,7 +237,7 @@
               <div class="text">
                 <span class="kicker">The bar</span>
                 <h1>What's up top</h1>
-                <p>Use the arrows <CaretRight size={11} weight="bold" /> to learn what lives up here — the bench, search, nexus and Waldo. Explore them, then continue.</p>
+                <p>Use the arrows (top-right) to learn what lives up here — the bench, search, nexus and Waldo. Explore them, then continue.</p>
               </div>
             {/if}
 
@@ -322,9 +322,13 @@
     </div>
   </div>
 
-  <!-- Learn-more overlay: edge from the coach port to the highlighted target. -->
+  <!-- Learn-more overlay: edge from the coach port to the highlighted target.
+       On the intro (no lesson yet), just outline the arrows so "use the arrows"
+       is unmistakable — no edge. -->
   {#if isLearn && lessonIdx >= 0}
     <LessonOverlay {portEl} target={lessons[lessonIdx].target} />
+  {:else if isLearn}
+    <LessonOverlay {portEl} target=".learn-bar" edge={false} />
   {/if}
 </div>
 
