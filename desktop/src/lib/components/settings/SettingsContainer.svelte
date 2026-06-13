@@ -18,10 +18,12 @@
   // chat/ (ModelPicker, AgentEditor) + agent stores into the main chunk.
   // The agents tab only appears under WB_FF_AGENTS, so a flags-off build
   // never reaches the dynamic import and the whole chain is excluded.
-  import McpServersSettings from "$lib/components/McpServersSettings.svelte";
-  import PluginsSettings from "$lib/components/PluginsSettings.svelte";
-  import IntegrationsSettings from "$lib/components/IntegrationsSettings.svelte";
-  import SkillsSettings from "$lib/components/SkillsSettings.svelte";
+  // Integrations cluster (Integrations/Skills/MCPs/Plugins) is lazy-loaded
+  // (wb-aakl.4): these tabs only appear under WB_FF_INTEGRATIONS, and the
+  // dynamic imports keep their chunks — plus the connections.svelte store
+  // + Connect/Composio/Detect modals reached only through Integrations —
+  // out of a flags-off release bundle. keys/env_vars stores stay (nexus
+  // connection + theming may use the keychain).
   import ThemesSettings from "$lib/components/ThemesSettings.svelte";
 
   // Account folds into General — sign-in lives next to sidecar
@@ -100,13 +102,21 @@
     {:else if active === "themes"}
       <ThemesSettings />
     {:else if active === "integrations"}
-      <IntegrationsSettings />
+      {#await import("$lib/components/IntegrationsSettings.svelte") then M}
+        <M.default />
+      {/await}
     {:else if active === "skills"}
-      <SkillsSettings />
+      {#await import("$lib/components/SkillsSettings.svelte") then M}
+        <M.default />
+      {/await}
     {:else if active === "mcp"}
-      <McpServersSettings />
+      {#await import("$lib/components/McpServersSettings.svelte") then M}
+        <M.default />
+      {/await}
     {:else if active === "plugins"}
-      <PluginsSettings />
+      {#await import("$lib/components/PluginsSettings.svelte") then M}
+        <M.default />
+      {/await}
     {/if}
   </div>
 </div>
