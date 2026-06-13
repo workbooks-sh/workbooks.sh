@@ -131,26 +131,30 @@ a{ color:inherit; text-decoration:none; }
 .li.cur .dot::after{ content:""; position:absolute; inset:2px; background:var(--ink); border-radius:50%; }
 .li.cur .t{ font-weight:600; color:var(--ink); }
 
-/* ════ DASHBOARD — one calm screen: the whole concept + the 8 units + one CTA ════ */
-.dash{ min-height:100vh; display:flex; flex-direction:column; justify-content:center;
-  gap:clamp(28px,5vh,58px); padding:6vh 6vw; }
-.dhead .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,7vw,104px); line-height:.9;
-  margin:14px 0 0; display:flex; flex-wrap:wrap; gap:0 .22em; align-items:baseline; }
-.dhead h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
-.dhead .dek{ margin:20px 0 0; font-size:20px; line-height:1.5; color:#34372f; max-width:40em; }
-.arc{ display:flex; gap:18px; }
-.arc .u{ flex:1 1 0; min-width:0; border-top:2px solid var(--ink); padding-top:13px; }
-.arc .u .n{ font-family:var(--display); font-size:24px; line-height:1; color:var(--pc); -webkit-text-stroke:1px var(--ink); }
-.arc .u h3{ font-family:var(--display); font-weight:400; font-size:15px; text-transform:lowercase; line-height:1.05; margin:7px 0 0; }
-.arc .u p{ font-family:var(--read); font-size:13.5px; line-height:1.38; color:var(--dim); margin:7px 0 0; }
-.dcta{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
-.dcta .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
+/* ════ SPLASH — welcome to a living internet + what you'll be able to do + one CTA ════ */
+.splash{ min-height:100vh; display:flex; align-items:center; padding:6vh 6vw; }
+.swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
+  width:100%; max-width:1180px; margin:0 auto; }
+.sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
+.sintro h1{ font-family:var(--read); font-weight:600; font-size:clamp(52px,7vw,102px); line-height:.94;
+  margin:16px 0 0; letter-spacing:-.02em; color:var(--ink); }
+.sintro h1 .bubl{ font-family:var(--display); font-weight:400; text-transform:uppercase; color:var(--pc); letter-spacing:0; }
+.sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
+.sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.sintro .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
   text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink); border-radius:999px;
   padding:18px 32px; box-shadow:4px 4px 0 var(--bloomd); }
-.dcta .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
-.dcta .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-@media (max-width:1080px){ .arc{ flex-wrap:wrap; } .arc .u{ flex:1 1 30%; } }
+.sintro .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
+.sintro .note{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.souts{ border-left:2px solid var(--ink); padding-left:clamp(24px,3vw,46px); }
+.souts .lab{ font:700 11px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+.souts ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:17px; }
+.souts li{ font-size:20px; line-height:1.4; color:var(--ink); padding-left:30px; position:relative; }
+.souts li::before{ content:"→"; position:absolute; left:0; top:0; color:var(--bloomd); font-family:var(--mono); font-weight:700; }
+.souts li b{ font-weight:600; }
+@media (max-width:900px){ .splash{ min-height:0; padding:38px 22px 70px; }
+  .swrap{ grid-template-columns:1fr; gap:38px; }
+  .souts{ border-left:0; padding-left:0; border-top:2px solid var(--ink); padding-top:28px; } }
 
 /* ════ LESSON PLAYER — three panes ════ */
 .pane{ display:grid; grid-template-columns:minmax(0,1fr) 326px; gap:0; }
@@ -323,19 +327,28 @@ def lesson_page(l):
 
 def dashboard():
     first = next((x["slug"] for x in flat if x["status"] == "live"), flat[0]["slug"])
-    arc = "".join('<div class="u"><div class="n">%02d</div><h3>%s</h3><p>%s</p></div>'
-                  % (u["n"], esc(u["title"]), esc(u["dek"])) for u in units)
-    main = ('<div class="dash">'
-            '<div class="dhead"><div class="kick">learn workbooks from zero</div>'
-            '<h1><span>learning</span> <span class="bub">CENTER</span></h1>'
-            '<p class="dek">No technical background needed. Eight short units carry you from '
-            'what a workbook even is, all the way to how the whole thing stays trustworthy — '
-            'one big idea at a time, with the technical docs always one click away.</p></div>'
-            '<div class="arc">%s</div>'
-            '<div class="dcta"><a class="start" id="startbtn" data-first="%s" href="/learn/%s">'
+    # serif title with a couple bubble-font accent letters per word (never numbers)
+    title = ('<span class="bubl">L</span>ear<span class="bubl">n</span>ing '
+             '<span class="bubl">C</span>ent<span class="bubl">e</span>r')
+    outs = [
+        "Hold a whole app in a <b>single file</b> — and send it to anyone, like a photo.",
+        "Build real software with <b>no server, no account, and no setup</b>.",
+        "Put <b>AI agents</b> to work safely, inside files that can't touch your computer.",
+        "Turn a plain to-do list into <b>software that runs itself</b>.",
+        "Ship something <b>living to the internet</b> — and prove that it's yours.",
+    ]
+    lis = "".join("<li>%s</li>" % o for o in outs)
+    main = ('<div class="splash"><div class="swrap">'
+            '<div class="sintro"><div class="kick">welcome to the learning center</div>'
+            '<h1>%s</h1>'
+            '<p class="lead">The internet is quietly becoming something you can hold — software that '
+            'lives in a single file you own, send, and keep, with people and AI building it together. '
+            'This is where you learn it, from zero. No technical background required.</p>'
+            '<div class="cta"><a class="start" id="startbtn" data-first="%s" href="/learn/%s">'
             '<span>Start the course</span> →</a>'
-            '<span class="note">%d lessons · start at the top</span></div></div>'
-            % (arc, esc(first), esc(first), TOTAL))
+            '<span class="note">%d lessons · no experience needed</span></div></div>'
+            '<div class="souts"><div class="lab">What you\'ll be able to do</div><ul>%s</ul></div>'
+            '</div></div>' % (title, esc(first), esc(first), TOTAL, lis))
     return HEAD.format(
         title="Learning Center — Workbooks",
         desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
