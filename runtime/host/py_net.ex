@@ -205,6 +205,53 @@ defmodule Workbooks.PyNet do
     _wbrequests.delete = lambda url, **k: _wb_rrequest("DELETE", url, **k)
     _wbrequests.head = lambda url, **k: _wb_rrequest("HEAD", url, **k)
     _wbsys.modules["requests"] = _wbrequests
+
+    # subprocess shim — wasip1 has no fork/exec, so route subprocess.run/check_output through the brokered exec
+    # (host runs a REGISTERED wasm command via ExecBroker; default-deny + no shell/injection). A Python tool can
+    # orchestrate brokered commands (build-driver/pipx class) but can't escape to a host shell.
+    import subprocess as _wbsub
+
+    def _wb_exec(name, argv=None, stdin=b""):
+        if isinstance(stdin, str): stdin = stdin.encode()
+        payload = {"kind": "exec", "name": name, "argv": [str(a) for a in (argv or [])]}
+        if stdin: payload["stdin_b64"] = _wbb.b64encode(stdin).decode()
+        open("/b/req.json", "w").write(_wbj.dumps(payload))
+        open("/b/req.ready", "w").write("1")
+        out = {"ok": False, "error": "timeout"}
+        for _ in range(1500):
+            if _wbos.path.exists("/b/resp.ready"):
+                out = _wbj.load(open("/b/resp.json")); _wbos.remove("/b/resp.ready"); break
+            _wbt.sleep(0.02)
+        if not out.get("ok"):
+            raise _wbsub.SubprocessError("brokered exec denied: %s" % out.get("error"))
+        return _wbb.b64decode(out.get("stdout_b64", "")) if out.get("stdout_b64") else b""
+
+    class _WBCompleted:
+        def __init__(self, args, returncode, stdout, stderr=b""):
+            self.args = args; self.returncode = returncode; self.stdout = stdout; self.stderr = stderr
+        def check_returncode(self):
+            if self.returncode:
+                raise _wbsub.CalledProcessError(self.returncode, self.args, self.stdout, self.stderr)
+
+    def _wb_run(argv, input=None, capture_output=False, text=False, check=False, **k):
+        if isinstance(argv, str): argv = [argv]
+        data = input if input is not None else b""
+        try:
+            out = _wb_exec(argv[0], argv[1:], data); rc = 0
+        except _wbsub.SubprocessError:
+            out = b""; rc = 1
+        if text and isinstance(out, (bytes, bytearray)): out = out.decode("utf-8", "replace")
+        cp = _WBCompleted(argv, rc, out)
+        if check: cp.check_returncode()
+        return cp
+
+    def _wb_check_output(argv, input=b"", text=False, **k):
+        if isinstance(argv, str): argv = [argv]
+        out = _wb_exec(argv[0], argv[1:], input)
+        return out.decode("utf-8", "replace") if text else out
+
+    _wbsub.run = _wb_run
+    _wbsub.check_output = _wb_check_output
     """
   end
 
@@ -261,6 +308,28 @@ defmodule Workbooks.PyNet do
     File.write!(Path.join(dir, "resp.ready"), "1")
   end
 
+  # EXEC dispatch (exec->CommandRegistry stone, Python lane): a guest's subprocess call routes here. The exec
+  # runs through ExecBroker — default-deny, REGISTERED-commands-only, no shell/injection, output-capped, depth +
+  # concurrency bounded. So a Python tool can ORCHESTRATE brokered wasm commands (the build-driver/pipx class)
+  # but can NEVER escape to a host shell or run an arbitrary binary. exec is OFF unless the host grants
+  # :exec_allow; :commands scopes WHICH commands (default :all of the registry).
+  defp do_brokered(%{"kind" => "exec"} = req, opts) do
+    name = req["name"] || ""
+    argv = for a <- req["argv"] || [], do: to_string(a)
+    stdin = case req["stdin_b64"] do nil -> ""; b64 -> Base.decode64!(b64) end
+
+    call_opts =
+      [allow: Keyword.get(opts, :exec_allow, false)]
+      |> put_if(:commands, Keyword.get(opts, :commands))
+      |> put_if(:principal, Keyword.get(opts, :principal))
+      |> put_if(:depth, Keyword.get(opts, :depth))
+
+    case Workbooks.ExecBroker.exec(name, argv, stdin, call_opts) do
+      {:ok, out} -> %{"ok" => true, "stdout_b64" => Base.encode64(out), "status" => 0}
+      {:error, reason} -> %{"ok" => false, "error" => exec_reason(reason)}
+    end
+  end
+
   defp do_brokered(req, opts) do
     method = (req["method"] || "GET") |> String.downcase() |> String.to_atom()
     url = req["url"] || ""
@@ -292,4 +361,7 @@ defmodule Workbooks.PyNet do
 
   defp put_if(kw, _k, nil), do: kw
   defp put_if(kw, k, v), do: Keyword.put(kw, k, v)
+
+  defp exec_reason({:command_failed, r}), do: "command_failed:#{inspect(r)}"
+  defp exec_reason(r), do: to_string(r)
 end

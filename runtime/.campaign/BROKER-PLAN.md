@@ -1888,3 +1888,18 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   mode (net_allow nil) still allows guest DNS — inherent without a scope, same documented tradeoff as the HTTP
   path; the defense IS providing a scope. NEXT PHASE: networking proven; pull the next stone (exec->Command-
   Registry dispatch / brokered durable storage / threading-fallback / app-host platform) + reclaim feasibility.
+=== NETWORKING KEYSTONE COMPLETE (iter139). NEXT STONE: exec->CommandRegistry dispatch ===
+- 2026-06-13 (iter 140): **BROKERED EXEC in the Python lane (exec->CommandRegistry dispatch stone).** Extended
+  the PyNet transport from HTTP-only to also broker EXEC: a {kind:"exec", name, argv, stdin_b64} request routes
+  through ExecBroker -> CommandRegistry, and a subprocess SHIM in the prelude patches subprocess.run/
+  check_output onto it. So a wasip1 CPython (no fork/exec) can ORCHESTRATE brokered REGISTERED wasm commands —
+  the build-driver/pipx/Make-class reclaim path — while the full ExecBroker cadence applies: DEFAULT-DENY (off
+  unless host grants :exec_allow), REGISTERED-commands-ONLY (no arbitrary binary), :commands scope (which
+  commands), no shell/injection, output-cap, depth + concurrency bounds. 4 py_exec tests green: default-deny;
+  granted -> dispatches to brokered jq (RC 0, output returned); command-scope (jq denied when only grep
+  granted); NO SHELL ESCAPE (/bin/sh refused even when exec granted). 13 total (py_exec + py_net regression).
+  Reclaim assessment (post-networking): 59 impossible items mention an addressable blocker w/ no hard wall; the
+  dominant class is fork-exec ORCHESTRATORS (Make/Ninja/bash/CMake/pipx/Pipenv) — this Python-lane exec
+  dispatch is the first wedge (Python orchestrators). NEXT: generalize exec-dispatch to the C/clang build lane
+  (a libc spawn-shim -> host_exec import, for Make/Ninja built in-sandbox); wire :exec_allow into :pynet
+  command registration so reclaimed Python orchestrators register as commands.
