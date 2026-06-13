@@ -28,7 +28,6 @@
     CaretDown as ChevronDown,
     MagnifyingGlass as Search,
     BookmarkSimple as Bookmark,
-    ChatCircle as MessageCircle,
     Terminal as TerminalIcon,
     FileText,
     FileCode,
@@ -41,7 +40,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
-  import { features } from "$lib/bridge/features";
+  import DockToolbar from "$lib/components/DockToolbar.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import IconResolver from "$lib/ui/Icon.svelte";
@@ -51,7 +50,6 @@
   import ShareDrawer from "$lib/share/ShareDrawer.svelte";
   import WorkbookProvenance from "$lib/network/components/WorkbookProvenance.svelte";
   import type { Tab } from "$lib/tabs/types";
-  import { geminiLive } from "$lib/live/gemini.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
 
@@ -456,31 +454,10 @@
     <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
   </button>
 
-  <!-- Multi-agent chat toggle — gated by WB_FF_AGENTS (wb-aakl.1). The
-       resident agent Waldo (wb-aakl.21) gets its own dock entry point. -->
-  {#if features.agents}
-    <button
-      type="button"
-      class="agent-btn"
-      class:active={chrome.agentOpen}
-      class:live={geminiLive.active}
-      data-tauri-drag-region="false"
-      title={geminiLive.active
-        ? geminiLive.muted
-          ? "Agent (live, muted — press space)"
-          : "Agent (live)"
-        : "Agent (⌘J)"}
-      aria-label="Agent (⌘J)"
-      aria-pressed={chrome.agentOpen}
-      onclick={() => (chrome.agentOpen = !chrome.agentOpen)}
-    >
-      <MessageCircle size={12} weight="fill" />
-      <span>Agent</span>
-      {#if geminiLive.active}
-        <span class="live-dot" class:muted={geminiLive.muted} aria-hidden="true"></span>
-      {/if}
-    </button>
-  {/if}
+  <!-- Extension dock toolbar (wb-aakl.14) — one icon per registered dock
+       panel. The agent panel registers here only under WB_FF_AGENTS;
+       toolkits (Browser SDK) register their own. -->
+  <DockToolbar />
 </div>
 
 <ContextMenu bind:open={tabMenuOpen} x={tabMenuX} y={tabMenuY}>
@@ -820,56 +797,5 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .engine-pending .engine-dot { animation: none; }
-  }
-
-  /* Agent button — pinned to the right edge of the titlebar. */
-  .agent-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    align-self: center;
-    height: 24px;
-    padding: 0 0.7rem;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    background: var(--color-page);
-    color: var(--color-fg-muted);
-    font-size: 12px;
-    font-family: var(--font-mono);
-    font-weight: 500;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-  .agent-btn:hover { color: var(--color-fg); }
-  .agent-btn.active {
-    background: var(--color-fg);
-    color: var(--color-page);
-    border-color: var(--color-brand);
-  }
-
-  /* Live-session indicator on the agent button: small pulsing dot.
-   * Mutes to a static dim dot when geminiLive.muted is true so the
-   * user can tell at a glance whether the mic is hot. */
-  .live-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-ok);
-    box-shadow: 0 0 0 0 var(--color-ring);
-    animation: live-dot-pulse 1.6s ease-out infinite;
-  }
-  .live-dot.muted {
-    background: var(--color-warn);
-    animation: none;
-  }
-  @keyframes live-dot-pulse {
-    0%   { box-shadow: 0 0 0 0 var(--color-ring); }
-    70%  { box-shadow: 0 0 0 6px transparent; }
-    100% { box-shadow: 0 0 0 0 transparent; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .live-dot { animation: none; }
   }
 </style>

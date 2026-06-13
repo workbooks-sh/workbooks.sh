@@ -43,6 +43,9 @@
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { features } from "$lib/bridge/features";
   import { openIntent } from "$lib/bridge/openIntent";
+  import { dock } from "$lib/bridge/dock.svelte";
+  import DockHost from "$lib/components/DockHost.svelte";
+  import { ChatCircle as MessageCircle } from "phosphor-svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -59,14 +62,11 @@
       : []),
   ];
 
-  // Flagged panels are lazily imported so a flags-off release build drops
-  // their chunks entirely (the literal `false` makes the branch dead code).
-  let AgentPanel = $state<typeof import("$lib/components/AgentPanel.svelte").default | null>(null);
+  // The agent panel is now a dock registrant (wb-aakl.14): when WB_FF_AGENTS
+  // is on it registers an "agent" panel + toolbar icon, lazily loaded so a
+  // flags-off build still excludes the chunk. NetworkPanel stays a main-area
+  // section, lazily imported behind its flag.
   let NetworkPanel = $state<typeof import("$lib/network/NetworkPanel.svelte").default | null>(null);
-  $effect(() => {
-    if (features.agents && !AgentPanel)
-      void import("$lib/components/AgentPanel.svelte").then((m) => (AgentPanel = m.default));
-  });
   $effect(() => {
     if (features.network && !NetworkPanel)
       void import("$lib/network/NetworkPanel.svelte").then((m) => (NetworkPanel = m.default));
@@ -430,6 +430,16 @@
     themes.init();
     // `wb desktop open <path>` deep link — read the intent on boot + focus.
     openIntent.watch();
+    // Register the agent panel into the extension dock (wb-aakl.14) — only
+    // under WB_FF_AGENTS, lazily loaded so a flags-off build excludes it.
+    if (features.agents) {
+      dock.register({
+        id: "agent",
+        title: "Agent",
+        icon: MessageCircle,
+        load: () => import("$lib/components/AgentPanel.svelte"),
+      });
+    }
     // Personalization onboarding (wb-aakl.20). first_run_done is a durable
     // flag in setup.json; `?onboarding` forces the flow for preview.
     const forceOnboarding = new URLSearchParams(window.location.search).has(
@@ -465,7 +475,7 @@
       chrome.toggleSidebar();
     } else if (e.key === "j" && features.agents) {
       e.preventDefault();
-      chrome.agentOpen = !chrome.agentOpen;
+      dock.toggle("agent");
     } else if (/^[1-9]$/.test(e.key)) {
       // ⌘1..⌘9 — open the bookmark in that slot, if any.
       const slot = Number(e.key);
@@ -544,9 +554,7 @@
       <TerminalDrawer />
     </main>
 
-    {#if features.agents && chrome.agentOpen && AgentPanel}
-      <AgentPanel />
-    {/if}
+    <DockHost />
 
     <WorkspaceSwitcher
       anchor={switcherAnchor}

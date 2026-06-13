@@ -27,6 +27,7 @@
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { features } from "$lib/bridge/features";
+  import { dock } from "$lib/bridge/dock.svelte";
 
   // Multi-agent chrome (the agents catalog + its picker) is gated by
   // WB_FF_AGENTS (wb-aakl.2) and lazily imported so a flags-off build
@@ -331,8 +332,8 @@
     // prompt. Drop the undo chip.
     priorPrompt = null;
     try {
-      // Open the right-side Agent panel so the user sees the thread.
-      chrome.agentOpen = true;
+      // Open the agent dock panel so the user sees the thread (wb-aakl.14).
+      if (features.agents) dock.open("agent");
       await chatSession.send(t);
       prompt = "";
     } catch (e) {

@@ -35,6 +35,7 @@
   import QuestionField from "$lib/wizard/QuestionField.svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { dock } from "$lib/bridge/dock.svelte";
 
   // Keep the chrome store's paletteOpen flag in sync so peer surfaces
   // (LiveBar, etc.) know to defer to us while we're up.
@@ -321,7 +322,7 @@
   async function launchWizardFollowOn(
     step: Extract<WizardStep, { status: "done" }>,
   ) {
-    chrome.agentOpen = true;
+    dock.open("agent"); // no-op if the agent panel isn't registered (flags off)
     chatSession.init();
     const wid = step.wizard_id ?? activeWizard?.id ?? "";
     const wtitle = step.wizard_title ?? activeWizard?.title ?? wid;

@@ -85,8 +85,8 @@ class ChromeStore {
   nexusOpen = $state<boolean>(false);
   nexusAnchor = $state<HTMLElement | null>(null);
 
-  /** Right-side Agent panel (phase 2 — empty slot until that lands). */
-  agentOpen = $state<boolean>(false);
+  // The right-side panel is now the extension dock (wb-aakl.14, dock store);
+  // the old chrome.agentOpen boolean is gone — the agent is one dock panel.
 
   /** Whether the AI command palette modal is open (wb-5hc0 / wb-dj5r).
    *  Other surfaces watch this so they don't compete for attention with
