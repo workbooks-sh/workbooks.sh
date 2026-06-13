@@ -1,17 +1,18 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <!-- master app icon — regenerate the set with: bunx tauri icon icons/icon-master.png
-       brand: lander canon (bg #0c0d10, ink #eceef2) · glyph from web/logo-lockup.html -->
+       brand: paper canon (ink plate #121316, paper #f7f6f1 glyph) · matches
+       static/favicon.svg + the deployed lander (web/index.html). -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1d2027"/>
-      <stop offset="1" stop-color="#0c0d10"/>
+      <stop offset="0" stop-color="#1b1d20"/>
+      <stop offset="1" stop-color="#121316"/>
     </linearGradient>
   </defs>
   <!-- macOS grid: 824px squircle centered on 1024 canvas -->
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="rgba(255,255,255,.08)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="rgba(247,246,241,.08)"/>
   <!-- W glyph: 280x206 → 460 wide, centered -->
   <g transform="translate(282 342.7) scale(1.642857)">
-    <path d="M0 206V0.00231123H69.1194V76L126.393 0L168.946 0.00231123V76L223.295 0L280 0.00231147L223.295 88L248.626 176.683C252.823 191.375 241.791 206 226.511 206H116.27L112.626 140.5L41.5 206H0Z" fill="#eceef2"/>
+    <path d="M0 206V0.00231123H69.1194V76L126.393 0L168.946 0.00231123V76L223.295 0L280 0.00231147L223.295 88L248.626 176.683C252.823 191.375 241.791 206 226.511 206H116.27L112.626 140.5L41.5 206H0Z" fill="#f7f6f1"/>
   </g>
 </svg>
