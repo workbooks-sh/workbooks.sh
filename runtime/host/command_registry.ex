@@ -1045,6 +1045,7 @@ defmodule Workbooks.CommandRegistry do
       |> maybe_put(:exec_allow, Map.get(opts, :exec_allow))
       |> maybe_put(:commands, Map.get(opts, :commands))
       |> maybe_put(:tcp_allow, Map.get(opts, :tcp_allow))
+      |> maybe_put(:udp_allow, Map.get(opts, :udp_allow))
       # propagate the inbound exec DEPTH (set by ExecBroker when this :pynet cmd was itself brokered) so a
       # chain of orchestrators advances toward @max_depth — the fork-bomb depth bound spans the PyNet hop.
       |> maybe_put(:depth, Keyword.get(ropts, :depth))

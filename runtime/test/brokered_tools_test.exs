@@ -175,6 +175,38 @@ defmodule Workbooks.BrokeredToolsTest do
     refute out =~ "EXFIL_REACHED"
   end
 
+  test "dns is registered + prints usage on no arg" do
+    assert "dns" in CommandRegistry.list()
+    assert {:ok, _out, status} = CommandRegistry.run_status("dns", "", [])
+    assert status != 0
+  end
+
+  test "UDP SSRF — dns via an internal resolver is denied (host-pinned, before send)" do
+    assert {:ok, _out, status} = CommandRegistry.run_status("dns", "", ["example.com", "127.0.0.1"])
+    assert status != 0
+  end
+
+  test "UDP DEFAULT-DENY — wb_udp is refused unless the tool's registration granted :udp_allow" do
+    script = ~S"""
+    try:
+        wb_udp("8.8.8.8", 53, b"x")
+        print("REACHED")
+    except OSError as e:
+        print("BLOCKED", e)
+    """
+
+    assert {:ok, out, _s} = Workbooks.PyNet.run_tool(script, "", [])
+    assert out =~ "BLOCKED" and out =~ "udp_denied"
+    refute out =~ "REACHED"
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "LIVE — dns resolves A records over brokered DNS-over-UDP (reclaims dig/nslookup/host)" do
+    assert {:ok, out, 0} = CommandRegistry.run_status("dns", "", ["example.com"])
+    assert out =~ ~r/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/m
+  end
+
   test "tcp-send is registered + prints usage on missing args" do
     assert "tcp-send" in CommandRegistry.list()
     assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "", ["example.com"])

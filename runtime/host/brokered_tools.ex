@@ -210,10 +210,57 @@ defmodule Workbooks.BrokeredTools do
   @pypi_scope ["pypi.org", "files.pythonhosted.org", "*.pythonhosted.org"]
   @npm_scope ["registry.npmjs.org", "*.npmjs.org"]
 
+  # `dns` — reclaims dig/nslookup/host: resolve a name's A records via DNS-over-UDP through the brokered UDP
+  # transport (the host sends the datagram to a resolve-pinned, SSRF-checked resolver). Builds + parses the DNS
+  # wire format inline (no dnspython). Usage: dns NAME [RESOLVER]   (default resolver 8.8.8.8)
+  @dns ~S"""
+  import sys, struct, random
+  if len(sys.argv) < 2:
+      sys.stderr.write("usage: dns NAME [RESOLVER]\n"); sys.exit(2)
+  name = sys.argv[1]
+  resolver = sys.argv[2] if len(sys.argv) > 2 else "8.8.8.8"
+  tid = random.randint(0, 0xFFFF)
+  q = struct.pack(">HHHHHH", tid, 0x0100, 1, 0, 0, 0)
+  for label in name.split("."):
+      q += bytes([len(label)]) + label.encode()
+  q += b"\x00" + struct.pack(">HH", 1, 1)   # QTYPE=A, QCLASS=IN
+  try:
+      resp = wb_udp(resolver, 53, q)
+  except OSError as e:
+      sys.stderr.write("error: %s\n" % e); sys.exit(1)
+  if len(resp) < 12:
+      sys.stderr.write("short response\n"); sys.exit(1)
+  ancount = struct.unpack(">H", resp[6:8])[0]
+  # skip the question's name + QTYPE/QCLASS
+  i = 12
+  while i < len(resp) and resp[i] != 0:
+      if resp[i] & 0xC0 == 0xC0: i += 1; break
+      i += resp[i] + 1
+  i += 1 + 4
+  ips = []
+  for _ in range(ancount):
+      if i >= len(resp): break
+      if resp[i] & 0xC0 == 0xC0: i += 2
+      else:
+          while i < len(resp) and resp[i] != 0: i += resp[i] + 1
+          i += 1
+      if i + 10 > len(resp): break
+      rtype, _rclass, _ttl, rdlen = struct.unpack(">HHIH", resp[i:i+10]); i += 10
+      rdata = resp[i:i+rdlen]; i += rdlen
+      if rtype == 1 and rdlen == 4:
+          ips.append(".".join(str(b) for b in rdata))
+  if not ips:
+      sys.stderr.write("no A records for %s\n" % name); sys.exit(1)
+  for ip in ips: print(ip)
+  sys.exit(0)
+  """
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
     %{
       "http" => register_http(),
+      # DNS is UDP-purpose -> explicit :udp_allow on this tool only.
+      "dns" => Workbooks.CommandRegistry.register_pynet("dns", @dns, :argv, %{udp_allow: true}),
       "pip-fetch" =>
         Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{allow: @pypi_scope}),
       "pip-run" =>

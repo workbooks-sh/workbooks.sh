@@ -746,14 +746,16 @@
    "blocker": "Network-purpose tool. wasip1 has no raw TCP/UDP socket syscalls (no sock_connect; only sock_accept on pre-opened FDs). Standalone wasm cannot open arbitrary network connections \u2014 t",
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
-   "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top."
+   "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top.",
+   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live)."
   },
   "dig / bind-tools": {
    "verdict": "reachable",
    "lane": "none",
    "blocker": "Network-purpose tool: dig's entire function is sending DNS packets over the network. wasip1 has no UDP and no outbound socket creation, so there is no transport for raw DNS. Per ru",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live)."
   },
   "make": {
    "verdict": "impossible",
@@ -2304,6 +2306,22 @@
    "deps": "transitive dependency resolution (recursive requires_dist -> download all pure-Python wheels -> zipimport the tree); proven markdown-it-py -> mdurl",
    "hardening": "pip-fetch/pip-run REGISTRY-SCOPED (allow:[pypi.org, files.pythonhosted.org, *.pythonhosted.org]); npm-fetch scoped to *.npmjs.org. A malicious package import-time code cannot exfil to arbitrary hosts \u2014 off-registry requests are denied pre-DNS (red-team tested).",
    "dos_bound": "pip-run dependency tree bounded: --max-pkgs (default 100) + --max-mb (default 200) \u2014 a malicious package cannot force unbounded install/download; cap -> exit 4 (red-team tested)."
+  },
+  "native_ext": {
+   "status": "BLOCKED",
+   "why": "the prebuilt wasip1 CPython registers NO dynamic-extension suffixes (extension_suffixes()==[]) \u2014 wasip1 has no dlopen, so a compiled .so/.pyd can never be loaded regardless of building it. Native-extension wheels would need a whole-CPython rebuild with the extension statically linked (out of scope, like compile-to-run-native concessions).",
+   "since": "iter152"
+  },
+  "dns": {
+   "command": "dns",
+   "transport": "wb_udp / UdpBroker",
+   "delivers": [
+    "dig",
+    "nslookup",
+    "host"
+   ],
+   "gated": "udp_allow default-deny",
+   "since": "iter152"
   }
  }
 }

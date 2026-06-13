@@ -2036,3 +2036,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   pip reclaim surface is now hardened on BOTH axes: registry-SCOPED (anti-exfil, iter150) + tree-BOUNDED
   (anti-DoS, iter151). NEXT: native-extension wheels via the in-sandbox build lane (compile the C ext with
   clang.wasm against the CPython ABI) — the remaining pip-install frontier.
+- 2026-06-13 (iter 152): **RAW-UDP transport + dns tool (UdpBroker driven by a shipped tool) + native-ext BLOCKED
+  finding.** (1) Confirmed the native-extension frontier is BLOCKED: the prebuilt wasip1 CPython has
+  extension_suffixes()==[] (no dlopen in wasip1) -> a compiled .so can NEVER be loaded regardless of building it;
+  would need a whole-CPython rebuild with the ext statically linked (out of scope). Recorded honestly, not
+  chased. (2) Added a "udp" kind to the brokered transport (py_net -> UdpBroker.request) + a wb_udp() helper +
+  a `dns NAME [RESOLVER]` command that resolves A records via DNS-over-UDP (builds/parses the DNS wire format
+  inline, no dnspython). UDP gated on a separate :udp_allow grant (default off). Full cadence via UdpBroker:
+  resolve-pin + SSRF + rate + revocation + size cap. 26 brokered_tools tests green incl: dns registered+usage;
+  UDP SSRF (internal resolver 127.0.0.1:53 DENIED); UDP DEFAULT-DENY (wb_udp -> udp_denied without grant); LIVE
+  dns example.com -> real A records (172.66.x, 104.20.x). The transport now drives ALL FOUR broker egress paths
+  by shipped tools: http (http) + exec (subprocess) + raw-TCP (tcp-send) + raw-UDP (dns). resolved.json:
+  capability_live_dns on dig/netcat + live_capabilities.dns + native_ext=BLOCKED. NEXT: NTP/STUN over wb_udp;
+  app-host serve+egress composition (BFF pattern) if a bounded guest.

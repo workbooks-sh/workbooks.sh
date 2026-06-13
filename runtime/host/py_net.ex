@@ -287,6 +287,21 @@ defmodule Workbooks.PyNet do
         if not out.get("ok"):
             raise OSError("brokered tcp denied: %s" % out.get("error"))
         return _wbb.b64decode(out.get("data_b64", "")) if out.get("data_b64") else b""
+
+    # wb_udp — brokered one-shot datagram (DNS/NTP/STUN): send `data` to host:port, return the first reply.
+    def wb_udp(host, port, data=b""):
+        if isinstance(data, str): data = data.encode()
+        payload = {"kind": "udp", "host": host, "port": int(port)}
+        if data: payload["data_b64"] = _wbb.b64encode(data).decode()
+        open("/b/req.json", "w").write(_wbj.dumps(payload)); open("/b/req.ready", "w").write("1")
+        out = {"ok": False, "error": "timeout"}
+        for _ in range(1500):
+            if _wbos.path.exists("/b/resp.ready"):
+                out = _wbj.load(open("/b/resp.json")); _wbos.remove("/b/resp.ready"); break
+            _wbt.sleep(0.02)
+        if not out.get("ok"):
+            raise OSError("brokered udp denied: %s" % out.get("error"))
+        return _wbb.b64decode(out.get("data_b64", "")) if out.get("data_b64") else b""
     """
   end
 
@@ -371,6 +386,30 @@ defmodule Workbooks.PyNet do
   # protocols) routes through TcpBroker — SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation +
   # size cap. Raw sockets are a BROADER capability than http (arbitrary ports/protocols), so they're gated on a
   # SEPARATE :tcp_allow grant (default off) — an http tool doesn't get raw TCP for free.
+  # RAW-UDP dispatch: a guest's one-shot datagram query/response (DNS, NTP, STUN) routes through UdpBroker —
+  # SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap. Like raw TCP it's a broader
+  # capability than http, gated on a separate :udp_allow grant (default off).
+  defp do_brokered(%{"kind" => "udp"} = req, opts) do
+    if Keyword.get(opts, :udp_allow, false) do
+      host = req["host"] || ""
+      port = req["port"] || 0
+      data = case req["data_b64"] do nil -> ""; b64 -> Base.decode64!(b64) end
+
+      call_opts =
+        []
+        |> put_if(:allow, Keyword.get(opts, :allow))
+        |> put_if(:principal, Keyword.get(opts, :principal))
+        |> put_if(:rate, Keyword.get(opts, :rate))
+
+      case Workbooks.UdpBroker.request(host, port, data, call_opts) do
+        {:ok, resp} -> %{"ok" => true, "data_b64" => Base.encode64(resp)}
+        {:error, reason} -> %{"ok" => false, "error" => to_string(reason)}
+      end
+    else
+      %{"ok" => false, "error" => "udp_denied"}
+    end
+  end
+
   defp do_brokered(%{"kind" => "tcp"} = req, opts) do
     if Keyword.get(opts, :tcp_allow, false) do
       host = req["host"] || ""
