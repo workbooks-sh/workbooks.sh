@@ -1934,3 +1934,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   BOTH the wasip1 runtimes (Python/CPython) AND in-sandbox-built C/Rust CLIs — the same SSRF/allow-list/pin/
   rate/revocation cadence, no per-tool host code. NEXT: a reusable C/Rust shim header (wb_broker.h) wrapping the
   protocol as wb_http_get()/wb_exec(); wire run_wasm into BuildBroker so built tools opt into the transport.
+- 2026-06-13 (iter 143): **wb_broker.h SHIM + BuildBroker :broker mode — ergonomic brokered net+exec for built
+  tools.** Embedded the canonical wb_broker.h in BuildBroker (self-contained: inline base64 decode + flat-JSON
+  extraction, no libs): a C tool `#include "wb_broker.h"` and calls wb_http_get(url,buf,cap) / wb_exec(name,
+  argv_json,buf,cap) — the file protocol wrapped as functions. BuildBroker.build_and_run(..., broker: true)
+  stages the header (aux_files) at compile + runs the built tool through PyNet.run_wasm so its wb_* calls hit
+  the mediated brokers; net scope via :net_allow, exec via :exec_allow + :commands. 2 shim tests green: a C tool
+  gets PUBLIC 1 (example.com via broker) / INTERNAL 0 (metadata SSRF-DENIED) / EXEC 1 (jq dispatched when
+  granted); and exec DEFAULT-DENY (EXEC 0 without :exec_allow, audit "DENY exec jq — not granted") while net
+  still works. 6 BuildBroker + 14 PyNet regression green. The C/Rust build lane now has ergonomic brokered
+  net+exec matching the Python lane — the build-driver/orchestrator class is writable in C, zero native
+  toolchain, no per-tool host code. NEXT: stdin for wb_exec (base64-encode); a Rust shim (wb_broker.rs); reclaim
+  a concrete fork-exec orchestrator (e.g. a make-lite driver) as a brokered tool.
