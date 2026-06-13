@@ -208,6 +208,34 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Register a Python NET tool (`:pynet` kind): `script` is run under CPython with the brokered urllib/requests
+  transport. This makes a network CLI a first-class command with no wasip2 build — every request it issues is
+  SSRF-mediated by the host. `opts` is a map that may carry `:allow` (per-instance host allow-list — the net
+  scope, default deny-list/SSRF floor only), `:principal`, `:rate`, `:max_bytes`. `mode` shapes argv (default
+  `:argv` → the tool reads sys.argv[1:]).
+  """
+  def register_pynet(name, script, mode \\ :argv, opts \\ %{})
+      when is_binary(script) and is_map(opts) do
+    cond do
+      not is_binary(name) or name == "" -> {:error, :invalid_name}
+      name in @reserved -> {:error, :reserved_name}
+      not Regex.match?(@name_re, name) -> {:error, :invalid_name}
+      true ->
+        cur = :persistent_term.get(@dynamic, %{})
+
+        if not Map.has_key?(cur, name) and map_size(cur) >= @max_dynamic do
+          {:error, :registry_full}
+        else
+          :persistent_term.put(@dynamic, Map.put(cur, name, {:pynet, script, mode, opts}))
+          :ok
+        end
+    end
+  end
+
+  defp maybe_put(kw, _k, nil), do: kw
+  defp maybe_put(kw, k, v), do: Keyword.put(kw, k, v)
+
   # A registered path must canonicalize to a file strictly inside the content-
   # addressed commands store. Confines registration to managed build outputs.
   defp confined_command_path?(path) when is_binary(path) do
@@ -997,6 +1025,26 @@ defmodule Workbooks.CommandRegistry do
       Map.get(opts, :dirs, []) ++ dirs,
       Keyword.merge(Map.get(opts, :run_opts, []), ropts)
     )
+  end
+
+  # A Python NET tool: runs CPython with the brokered urllib/requests transport (PyNet). This is the per-tool
+  # LIVE path for the reachable Python net-tool class (httpie/pip/… style) — a network CLI is a first-class
+  # command with NO wasip2 build, and every request it makes is SSRF-mediated by the host (red-team-green).
+  # opts carries the per-instance net scope (:allow), :principal/:rate for quota+revocation, :max_bytes.
+  defp run_builtin({:pynet, script, mode, opts}, input, argv, dirs, ropts) do
+    {stdin, args} = apply_argmode(mode, input, argv)
+
+    tool_opts =
+      [dirs: dirs]
+      |> maybe_put(:allow, Map.get(opts, :allow))
+      |> maybe_put(:principal, Map.get(opts, :principal))
+      |> maybe_put(:rate, Map.get(opts, :rate))
+      |> maybe_put(:max_bytes, Map.get(opts, :max_bytes))
+
+    case Workbooks.PyNet.run_tool(script, stdin, args, tool_opts) do
+      {:ok, out, status} -> {:ok, maybe_trim(out, ropts), status}
+      {:error, _} = err -> err
+    end
   end
 
   defp run_builtin({:src, lang, src, mode}, input, argv, dirs, ropts) do

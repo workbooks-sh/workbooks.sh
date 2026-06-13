@@ -1837,3 +1837,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   tests green (14-target red-team loop + requests live fetch + requests-SSRF-denied + urllib + transport).
   Python net lane is now red-team-green end-to-end. NEXT: wrap a reclaimed Python net tool as a real command;
   generalize the transport to QuickJS (wasip1-no-connect); then re-run feasibility to flip reclaimed items.
+- 2026-06-13 (iter 136 cont): **REACHABLE->LIVE MECHANISM — :pynet command kind (wb-5p9e).** CommandRegistry now
+  dispatches a {:pynet, script, mode, opts} spec via PyNet.run_tool: a Python net CLI runs under CPython with
+  the brokered urllib/requests transport — a FIRST-CLASS registry command with NO wasip2 build, every request
+  SSRF-mediated, exit status preserved. register_pynet(name, script, mode, opts) registers one; opts.allow is
+  the per-instance net scope (default-deny for off-list hosts). Proven: brokered-fetch (curl/wget CORE
+  capability — GET a URL, SSRF-safe) + scoped-fetch (allow-list confined). 13 tests green (4 command + 9 py_net)
+  incl: internal target -> non-zero exit + no body; live example.com GET (exit 0); off-list 8.8.8.8 denied
+  under an allow:[example.com] scope. Also hardened the redirect-to-internal red-team test to assert the REAL
+  invariant (no metadata content leaks) instead of "call fails" — so a flaky httpbin (503) can't masquerade as
+  a regression. resolved.json: annotated the wasip1 PyNet route (no wasip2 build needed) on the pure-Python net
+  tools (httpie/pip/datasette/conda/Mamba/pixi/Poetry/pdm/yt-dlp/Buildout/Jupyter) — verdicts kept "reachable"
+  (honest: per-tool packaging still required; tracked in wb-5p9e). NEXT: package a real tool live; QuickJS transport.

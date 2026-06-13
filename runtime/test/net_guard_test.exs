@@ -74,10 +74,20 @@ defmodule Workbooks.NetGuardTest do
     # public host redirecting to cloud metadata can't smuggle the guest there. httpbin issues the 302; we
     # assert the internal target is NEVER reached (denied), regardless of whether httpbin itself is reachable.
     redirect =
-      "http://httpbin.org/redirect-to?url=" <> URI.encode_www_form("http://169.254.169.254/latest/")
+      "http://httpbin.org/redirect-to?url=" <> URI.encode_www_form("http://169.254.169.254/latest/meta-data/")
 
-    refute match?({:ok, _}, NetGuard.get(redirect)),
-           "redirect-to-internal must not reach the internal target"
+    # The security property is "the INTERNAL TARGET is never fetched" — NOT "the call fails". When httpbin is up
+    # and 302s, NetGuard re-checks the hop and returns {:error, :denied}. When httpbin is flaky (503/down), the
+    # call returns {:ok, <httpbin's own page>} — still safe, the metadata service was never reached. Assert the
+    # real invariant (no metadata content leaks) so a flaky external service can't masquerade as a regression.
+    case NetGuard.get(redirect) do
+      {:error, _} ->
+        :ok
+
+      {:ok, body} ->
+        refute body =~ "meta-data" or body =~ "ami-id" or body =~ "instance-id" or body =~ "iam/",
+               "redirect-to-internal must not return cloud-metadata content"
+    end
   end
 
   @tag :netdeps

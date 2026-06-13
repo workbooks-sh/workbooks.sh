@@ -46,6 +46,8 @@ defmodule Workbooks.PyNet do
   """
   def run_python(script, opts \\ []) when is_binary(script) do
     mount = Keyword.get(opts, :mount, "/b")
+    stdin = Keyword.get(opts, :stdin, "")
+    argv = Keyword.get(opts, :argv, [])
     bdir = Path.join(System.tmp_dir!(), "pynet_#{System.unique_integer([:positive])}")
     File.mkdir_p!(bdir)
 
@@ -59,12 +61,13 @@ defmodule Workbooks.PyNet do
     dirs = ["#{bdir}::#{mount}" | Keyword.get(opts, :dirs, [])]
 
     try do
-      out = Workbooks.CommandRegistry.run("python", "", ["-c", script], dirs)
-
-      case out do
-        {:ok, body} -> {:ok, body}
-        body when is_binary(body) -> {:ok, body}
-        {body, _status} when is_binary(body) -> {:ok, body}
+      # `python -c <script> <argv...>` exposes argv to the tool as sys.argv[1:]; stdin is the tool's input.
+      # run_status preserves the guest's EXIT CODE — a tool that errors (e.g. SSRF-denied request -> URLError ->
+      # sys.exit(1)) must report non-zero, not be flattened to success.
+      case Workbooks.CommandRegistry.run_status("python", stdin, ["-c", script | argv], dirs) do
+        {:ok, body, status} when is_binary(body) -> {:ok, body, status}
+        {:ok, body} when is_binary(body) -> {:ok, body, 0}
+        body when is_binary(body) -> {:ok, body, 0}
         other -> {:error, {:run_failed, other}}
       end
     after
@@ -102,7 +105,7 @@ defmodule Workbooks.PyNet do
     """
 
     case run_python(script, opts) do
-      {:ok, stdout} -> parse_fetch(stdout)
+      {:ok, stdout, _status} -> parse_fetch(stdout)
       other -> other
     end
   end
@@ -113,7 +116,20 @@ defmodule Workbooks.PyNet do
   runs SSRF-safe via the host with no source changes. Same opts/cadence as `run_python/2`.
   """
   def run_python_urllib(script, opts \\ []) when is_binary(script) do
-    run_python(urllib_prelude() <> "\n" <> script, opts)
+    case run_python(urllib_prelude() <> "\n" <> script, opts) do
+      {:ok, out, _status} -> {:ok, out}
+      other -> other
+    end
+  end
+
+  @doc """
+  Run a registered Python net TOOL (a `:pynet` command): the urllib/requests-adapted `script` with `stdin` and
+  `argv` (exposed as `sys.stdin` / `sys.argv[1:]`). This is the per-tool LIVE path for the Python net-tool
+  class — a brokered network CLI is a first-class command with no wasip2 build. Returns `{:ok, out, status}`
+  (the guest's EXIT CODE preserved) | `{:error, _}`.
+  """
+  def run_tool(script, stdin, argv, opts \\ []) when is_binary(script) and is_list(argv) do
+    run_python(urllib_prelude() <> "\n" <> script, Keyword.merge(opts, stdin: stdin, argv: argv))
   end
 
   # injected once at the top of the guest program: replaces urllib.request.urlopen with a brokered client that
