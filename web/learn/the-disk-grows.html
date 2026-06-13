@@ -12,155 +12,171 @@
 <meta property="og:title" content="When the work outgrows one file — Learning Center — Workbooks"><meta property="og:description" content="What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.">
 <meta property="og:url" content="https://workbooks.sh/learn/the-disk-grows">
 <style>
-:root{ --paper:#f7f6f1; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68; --line:#e7e5db; --pc:#a8d4f0;
+:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+  --line:#e7e5db; --pc:#a8d4f0;
   --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
 a{ color:inherit; text-decoration:none; }
 .app{ display:flex; align-items:flex-start; min-height:100vh; }
+.main{ flex:1; min-width:0; }
 
-/* ── curriculum sidebar ── */
-.side{ width:316px; flex:0 0 316px; position:sticky; top:0; height:100vh; overflow-y:auto;
-  border-right:2px solid var(--ink); background:var(--paper); padding:24px 16px 40px; z-index:30; }
-.brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 18px; }
-.brand svg{ width:26px; height:auto; color:var(--ink); }
+/* ── curriculum sidebar (persistent app rail) ── */
+.side{ width:300px; flex:0 0 300px; position:sticky; top:0; height:100vh; overflow-y:auto;
+  border-right:2px solid var(--ink); background:var(--paper); padding:22px 14px 40px; z-index:30; }
+.brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 16px; }
+.brand svg{ width:25px; height:auto; color:var(--ink); }
 .brand span{ font:700 13px var(--mono); letter-spacing:.04em; }
-.overview{ display:block; font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim);
-  padding:8px; border-radius:7px; }
+.overview{ display:flex; align-items:center; gap:9px; font:700 10px var(--mono); letter-spacing:.16em;
+  text-transform:uppercase; color:var(--dim); padding:9px 8px; border-radius:8px; }
+.overview svg{ width:14px; height:14px; }
 .overview:hover{ background:rgba(18,19,22,.05); color:var(--ink); }
-.prog{ margin:8px 8px 20px; }
+.overview.on{ background:var(--ink); color:var(--paper); }
+.prog{ margin:14px 8px 18px; }
 .prog .bar{ height:7px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; background:#fff; }
 .prog .bar i{ display:block; height:100%; width:0; background:var(--bloom); transition:width .3s; }
 .prog span{ display:block; margin-top:7px; font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.umod{ margin-bottom:14px; }
-.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 7px; font:700 12px var(--mono); letter-spacing:.02em; }
+.umod{ margin-bottom:13px; }
+.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 6px; font:700 12px var(--mono); }
 .uhd .un{ font-size:8.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-.li{ display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:8px; font-size:15px; line-height:1.3;
-  color:#3a3e38; }
+.li{ display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:8px; font-size:14.5px; line-height:1.3; color:#3a3e38; }
 .li:hover{ background:rgba(18,19,22,.05); }
-.li .dot{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; border:2px solid var(--dim); border-radius:50%;
-  position:relative; }
+.li .dot{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; border:2px solid var(--dim); border-radius:50%; position:relative; }
 .li.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
-.li.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px;
-  border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.li.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
 .li.cur{ background:var(--pc); }
 .li.cur .dot{ border-color:var(--ink); }
 .li.cur .dot::after{ content:""; position:absolute; inset:2px; background:var(--ink); border-radius:50%; }
 .li.cur .t{ font-weight:600; color:var(--ink); }
 
-/* ── lesson pane ── */
-.pane{ flex:1; min-width:0; max-width:744px; margin:0 auto; padding:74px 44px 60px; }
-.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
-.pane h1{ font-family:var(--display); font-weight:400; font-size:clamp(34px,4.6vw,52px); line-height:1.04;
-  margin:14px 0 0; letter-spacing:-.005em; }
-.promise{ font-size:clamp(19px,2.4vw,23px); line-height:1.5; color:#34372f; margin:18px 0 0; font-style:italic; }
-.play{ display:flex; align-items:center; gap:13px; margin:28px 0 0; padding:12px 16px; border:2px solid var(--ink);
-  border-radius:999px; width:max-content; max-width:100%; background:#fff; box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none; }
-.play .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; }
-.play .ico svg{ width:12px; height:12px; fill:var(--paper); display:block; }
-.play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
-.play .time{ font:500 11px var(--mono); color:var(--dim); }
-.play.playing .ico{ background:var(--bloomd); }
+/* ════ DASHBOARD — wide ════ */
+.dband{ display:flex; gap:32px; align-items:stretch; padding:46px 46px 0; flex-wrap:wrap; }
+.dintro{ flex:1 1 460px; min-width:0; }
+.dintro .kick{ font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
+.dintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(44px,5.4vw,78px); line-height:.92;
+  margin:13px 0 0; display:flex; flex-wrap:wrap; gap:0 .22em; align-items:baseline; }
+.dintro h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
+.dintro .dek{ margin:20px 0 0; font-size:20px; line-height:1.55; color:#34372f; max-width:34em; }
+.dcard{ flex:0 0 340px; max-width:100%; border:2px solid var(--ink); border-radius:18px; background:var(--card);
+  box-shadow:5px 5px 0 var(--ink); padding:24px; display:flex; flex-direction:column; justify-content:space-between; gap:18px; }
+.dcard .cu{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+.dcard .nl{ font-family:var(--display); font-size:25px; line-height:1.08; margin:8px 0 0; }
+.dcard .nd{ font-family:var(--read); font-size:15px; line-height:1.45; color:var(--dim); margin:8px 0 0; }
+.dcard .pwrap{ }
+.dcard .pbar{ height:9px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; background:#fff; }
+.dcard .pbar i{ display:block; height:100%; width:0; background:var(--bloom); transition:width .3s; }
+.dcard .pn{ margin-top:8px; font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.dcard .start{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font:700 12px var(--mono);
+  letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink);
+  border-radius:999px; padding:14px 20px; box-shadow:3px 3px 0 var(--bloomd); }
+.dcard .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
 
-article{ margin-top:42px; }
+.dunits{ padding:38px 46px 100px; display:grid; grid-template-columns:repeat(auto-fill,minmax(412px,1fr));
+  gap:18px; align-items:start; }
+.ucard{ border:2px solid var(--ink); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--ink);
+  padding:20px 20px 12px; }
+.ucard .uch{ display:flex; align-items:flex-start; gap:12px; border-bottom:1px solid var(--line); padding-bottom:13px; margin-bottom:8px; }
+.ucard .uch .num{ font-family:var(--display); font-size:30px; line-height:.9; color:var(--pc);
+  -webkit-text-stroke:1px var(--ink); flex:0 0 auto; }
+.ucard .uch .ut{ min-width:0; }
+.ucard .uch .un{ font:700 9px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+.ucard .uch h2{ font-family:var(--display); font-weight:400; font-size:22px; line-height:1; margin:5px 0 0; }
+.ucard .uch p{ font-size:14px; line-height:1.4; color:var(--dim); margin:6px 0 0; }
+.ucard .umeta{ margin-left:auto; flex:0 0 auto; font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); text-align:right; }
+.ll{ display:flex; align-items:center; gap:11px; padding:11px 8px; border-radius:9px; }
+.ll:hover{ background:rgba(18,19,22,.04); }
+.ll .dot{ width:15px; height:15px; flex:0 0 auto; border:2px solid var(--dim); border-radius:50%; position:relative; }
+.ll.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
+.ll.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.ll .lt{ font-size:16px; line-height:1.25; flex:1; min-width:0; }
+.ll .go{ font-size:15px; color:var(--bloomd); opacity:0; flex:0 0 auto; }
+.ll:hover .go{ opacity:1; }
+.ll.soon{ opacity:.5; }
+.ll.soon .lt{ color:var(--dim); }
+.ll.soon .tag{ font:700 8px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+  border:1.5px solid currentColor; border-radius:5px; padding:2px 5px; flex:0 0 auto; }
+
+/* ════ LESSON PLAYER — three panes ════ */
+.pane{ display:grid; grid-template-columns:minmax(0,1fr) 326px; gap:0; }
+.reading{ min-width:0; max-width:760px; margin:0 auto; padding:60px 56px 80px; justify-self:center; width:100%; }
+.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
+.reading h1{ font-family:var(--display); font-weight:400; font-size:clamp(34px,4vw,52px); line-height:1.04; margin:14px 0 0; letter-spacing:-.005em; }
+.promise{ font-size:clamp(19px,2.2vw,23px); line-height:1.5; color:#34372f; margin:18px 0 0; font-style:italic; }
+article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:#26282b; }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3.4vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
-article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:#fff; font-size:18.5px;
-  line-height:1.6; color:#34372f; border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.8vw,33px); line-height:1.18;
-  margin:42px 0; letter-spacing:-.01em; }
+article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:#34372f; border-radius:0 10px 10px 0; }
+article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
-
-.deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--ink); border-radius:16px; background:#fff; box-shadow:4px 4px 0 var(--ink); }
+.deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--ink); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--ink); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
 .deeper p{ font-size:17px; line-height:1.55; margin:8px 0 15px; color:#34372f; }
 .deeper .links{ display:flex; flex-direction:column; gap:8px; }
 .deeper a.dl{ display:flex; align-items:center; gap:11px; padding:11px 13px; border:1.5px solid var(--line); border-radius:10px; }
 .deeper a.dl:hover{ border-color:var(--ink); background:rgba(18,19,22,.03); }
 .deeper a.dl b{ font:700 13px var(--mono); } .deeper a.dl span{ font-size:11px; color:var(--dim); margin-left:auto; }
-
-.foot{ display:flex; align-items:center; gap:14px; margin:54px 0 0; padding-top:28px; border-top:1px solid var(--line); }
-.foot .prevl{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); }
-.foot .prevl:hover{ color:var(--ink); }
-.foot .cont{ margin-left:auto; display:inline-flex; align-items:center; gap:9px; font:700 12px var(--mono);
-  letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink);
-  border-radius:999px; padding:13px 22px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
-.foot .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
-.foot .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
-
-/* soon pane */
-.soon-pane{ margin-top:42px; }
-.soon-pane .badge{ display:inline-block; font:700 10px var(--mono); letter-spacing:.16em; text-transform:uppercase;
-  color:var(--dim); border:2px dashed rgba(18,19,22,.3); border-radius:999px; padding:8px 15px; }
+.soon-pane{ margin-top:40px; }
+.soon-pane .badge{ display:inline-block; font:700 10px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); border:2px dashed rgba(18,19,22,.3); border-radius:999px; padding:8px 15px; }
 .soon-pane p{ font-size:20px; line-height:1.6; margin:22px 0; color:#34372f; }
 
-/* topbar (mobile only) */
+/* right pane — course controls */
+.rail{ border-left:2px solid var(--ink); padding:60px 26px; position:sticky; top:0; align-self:start; min-height:100vh; }
+.rail .pos{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.rail .audio{ margin:16px 0 0; }
+.play{ display:flex; align-items:center; gap:13px; padding:12px 16px; border:2px solid var(--ink); border-radius:999px;
+  background:var(--card); box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none; }
+.play .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; }
+.play .ico svg{ width:12px; height:12px; fill:var(--paper); display:block; }
+.play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
+.play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
+.play.playing .ico{ background:var(--bloomd); }
+.rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink);
+  border:2px solid var(--ink); border-radius:12px; padding:15px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
+.rail .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
+.rail .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
+.rail .nav{ margin:14px 0 0; display:flex; flex-direction:column; gap:8px; }
+.rail .nav a{ font:700 11px var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--dim);
+  border:1.5px solid var(--line); border-radius:9px; padding:11px 13px; }
+.rail .nav a:hover{ border-color:var(--ink); color:var(--ink); }
+.rail .nav a small{ display:block; font-weight:400; letter-spacing:0; text-transform:none; font-family:var(--read);
+  font-size:13px; color:var(--ink); margin-top:3px; }
+
+/* topbar (mobile) */
 .topbar{ display:none; }
 .scrim{ display:none; }
 
-/* ── dashboard ── */
-.dash{ flex:1; min-width:0; }
-.dhero{ max-width:900px; margin:0 auto; padding:120px 7vw 0; }
-.dhero .kick{ font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
-.dhero h1{ font-family:var(--display); font-weight:400; font-size:clamp(44px,7vw,88px); line-height:.92; margin:14px 0 0;
-  display:flex; flex-wrap:wrap; gap:0 .22em; align-items:baseline; }
-.dhero h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
-.dhero .dek{ margin:22px 0 0; font-size:21px; line-height:1.55; color:#34372f; max-width:30em; }
-.dhero .cta{ margin:30px 0 0; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-.dhero .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink); border-radius:999px;
-  padding:15px 26px; box-shadow:4px 4px 0 var(--bloomd); }
-.dhero .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
-.dhero .dprog{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.dunits{ max-width:900px; margin:56px auto 0; padding:0 7vw 120px; display:flex; flex-direction:column; gap:50px; }
-.dunit .duh{ border-bottom:2px solid var(--ink); padding-bottom:13px; margin-bottom:16px; }
-.dunit .duh .un{ font:700 10px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
-.dunit .duh h2{ font-family:var(--display); font-weight:400; font-size:clamp(25px,3.2vw,34px); line-height:1; margin:8px 0 0; }
-.dunit .duh p{ margin:9px 0 0; font-size:16px; line-height:1.5; color:var(--dim); max-width:48em; }
-.dsteps{ display:flex; flex-direction:column; gap:8px; }
-.dstep{ display:flex; align-items:center; gap:14px; padding:15px 18px; border:2px solid var(--ink); border-radius:13px;
-  background:#fff; box-shadow:3px 3px 0 var(--ink); transition:transform .12s,box-shadow .12s; }
-.dstep:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.dstep .dot{ width:17px; height:17px; flex:0 0 auto; border:2px solid var(--dim); border-radius:50%; position:relative; }
-.dstep.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
-.dstep.done .dot::after{ content:""; position:absolute; left:5px; top:1px; width:4px; height:9px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
-.dstep .lt{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
-.dstep .lt b{ font-family:var(--display); font-weight:400; font-size:19px; }
-.dstep .lt i{ font-style:normal; font-size:15px; line-height:1.45; color:var(--dim); }
-.dstep .go{ margin-left:auto; font-size:17px; color:var(--bloomd); opacity:0; }
-.dstep:hover .go{ opacity:1; }
-.dstep.soon{ background:none; box-shadow:none; border-style:dashed; border-color:rgba(18,19,22,.26); opacity:.62; }
-.dstep.soon:hover{ transform:none; box-shadow:none; }
-.dstep.soon .tag{ margin-left:auto; font:700 8.5px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); border:1.5px solid currentColor; border-radius:5px; padding:2px 6px; }
-
+@media (max-width:1080px){
+  .pane{ grid-template-columns:1fr; }
+  .rail{ border-left:0; border-top:2px solid var(--ink); position:static; min-height:0; padding:26px 56px 60px;
+    max-width:760px; margin:0 auto; width:100%; display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .rail .audio{ margin:0; } .rail .cont{ margin:0; width:auto; flex:1; min-width:220px; } .rail .nav{ margin:0; width:100%; flex-direction:row; }
+  .rail .nav a{ flex:1; }
+  .reading{ padding:40px 56px 40px; }
+}
 @media (max-width:900px){
   .topbar{ display:flex; align-items:center; gap:13px; position:sticky; top:0; z-index:40; background:var(--paper);
     border-bottom:2px solid var(--ink); padding:11px 16px; }
-  .topbar .burger{ width:26px; height:19px; display:flex; flex-direction:column; justify-content:center; gap:5px;
-    background:none; border:0; padding:0; cursor:pointer; }
+  .topbar .burger{ width:26px; height:19px; display:flex; flex-direction:column; justify-content:center; gap:5px; background:none; border:0; padding:0; cursor:pointer; }
   .topbar .burger span{ display:block; height:2.5px; border-radius:2px; background:var(--ink); }
-  .topbar .tt{ font:700 11px var(--mono); letter-spacing:.04em; }
-  .topbar .tp{ margin-left:auto; font:700 10px var(--mono); color:var(--dim); }
-  .side{ position:fixed; top:0; left:0; height:100vh; transform:translateX(-100%); transition:transform .25s ease;
-    box-shadow:6px 0 0 rgba(0,0,0,.08); }
+  .topbar .tt{ font:700 11px var(--mono); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar .tp{ margin-left:auto; font:700 10px var(--mono); color:var(--dim); white-space:nowrap; }
+  .side{ position:fixed; top:0; left:0; height:100vh; transform:translateX(-100%); transition:transform .25s ease; box-shadow:6px 0 0 rgba(0,0,0,.08); }
   .side.open{ transform:translateX(0); }
   .scrim.show{ display:block; position:fixed; inset:0; background:rgba(0,0,0,.32); z-index:25; }
-  .pane{ padding:30px 22px 90px; max-width:none; }
-  .dhero{ padding-top:30px; } .dunits{ padding-bottom:80px; }
-  .foot{ flex-wrap:wrap; } .foot .cont{ margin-left:0; width:100%; justify-content:center; }
+  .dband{ padding:26px 22px 0; gap:22px; } .dcard{ flex-basis:100%; } .dunits{ padding:26px 22px 80px; grid-template-columns:1fr; }
+  .reading{ padding:28px 22px 30px; max-width:none; } .rail{ padding:22px 22px 70px; max-width:none; }
 }
 </style>
 </head>
 <body class="lesson" data-slug="the-disk-grows">
 <header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">When the work outgrows one file</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
 <div class="app">
-<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn">Course overview</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li cur" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
-<main class="pane">
-<div class="crumb">Unit 6 · The disk · Lesson 16</div><h1>When the work outgrows one file</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/foreign-tables"><b>foreign tables</b><span>the deep doc</span></a><a class="dl" href="/learn/vectors"><b>vectors</b><span>the deep doc</span></a><a class="dl" href="/learn/backends"><b>backends</b><span>the deep doc</span></a></div></div><div class="foot"><a class="prevl" href="/learn/a-disk-that-travels">← A place to keep things that travels with the work</a><button class="cont" id="cc" data-next="proving-origin"><span>Mark complete & continue</span> →</button></div>
-</main>
+<aside class="side" id="side"><a class="brand" href="/"><svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true"><path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.430.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.0220.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.8660.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.9151.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg><span>Workbooks</span></a><a class="overview" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a><div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of 20 complete</span></div><nav class="curr" id="curr"><div class="umod"><div class="uhd"><span class="un">Unit 1</span>Foundations</div><a class="li" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="t">A workbook is one file you can hold</span></a><a class="li" data-slug="carries-its-story" href="/learn/carries-its-story"><span class="dot"></span><span class="t">The file that remembers how it was made</span></a><a class="li" data-slug="the-one-language" href="/learn/the-one-language"><span class="dot"></span><span class="t">The plain language underneath everything</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 2</span>Making things</div><a class="li" data-slug="giving-it-abilities" href="/learn/giving-it-abilities"><span class="dot"></span><span class="t">Giving a workbook real abilities</span></a><a class="li" data-slug="code-in-the-document" href="/learn/code-in-the-document"><span class="dot"></span><span class="t">When the writing and the program are the same thing</span></a><a class="li" data-slug="the-one-command" href="/learn/the-one-command"><span class="dot"></span><span class="t">The one command you type</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 3</span>The engine</div><a class="li" data-slug="coming-alive" href="/learn/coming-alive"><span class="dot"></span><span class="t">Where a workbook comes alive</span></a><a class="li" data-slug="safe-powers" href="/learn/safe-powers"><span class="dot"></span><span class="t">Giving software powers, safely</span></a><a class="li" data-slug="going-live" href="/learn/going-live"><span class="dot"></span><span class="t">Putting it on the internet</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 4</span>Agents</div><a class="li" data-slug="what-an-agent-is" href="/learn/what-an-agent-is"><span class="dot"></span><span class="t">What an agent really is</span></a><a class="li" data-slug="agents-that-persist" href="/learn/agents-that-persist"><span class="dot"></span><span class="t">Agents that keep working when you&#x27;re not watching</span></a><a class="li" data-slug="did-it-do-well" href="/learn/did-it-do-well"><span class="dot"></span><span class="t">Knowing whether the agent actually did well</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 5</span>Automation</div><a class="li" data-slug="plans-that-run" href="/learn/plans-that-run"><span class="dot"></span><span class="t">Plans that run themselves</span></a><a class="li" data-slug="compiled-plans" href="/learn/compiled-plans"><span class="dot"></span><span class="t">When a plan becomes a program</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 6</span>The disk</div><a class="li" data-slug="a-disk-that-travels" href="/learn/a-disk-that-travels"><span class="dot"></span><span class="t">A place to keep things that travels with the work</span></a><a class="li cur" data-slug="the-disk-grows" href="/learn/the-disk-grows"><span class="dot"></span><span class="t">When the work outgrows one file</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 7</span>Trust &amp; sharing</div><a class="li" data-slug="proving-origin" href="/learn/proving-origin"><span class="dot"></span><span class="t">Proving where it came from</span></a><a class="li" data-slug="who-sees-what" href="/learn/who-sees-what"><span class="dot"></span><span class="t">Sharing without oversharing</span></a><a class="li" data-slug="secrets-in-the-open" href="/learn/secrets-in-the-open"><span class="dot"></span><span class="t">Keeping a secret inside a file you hand out</span></a></div><div class="umod"><div class="uhd"><span class="un">Unit 8</span>Under the hood</div><a class="li" data-slug="under-the-hood" href="/learn/under-the-hood"><span class="dot"></span><span class="t">Why none of this is magic</span></a></div></nav></aside>
+<div class="main"><div class="pane"><div class="reading"><div class="crumb">Unit 6 · The disk</div><h1>When the work outgrows one file</h1><div class="soon-pane"><span class="badge">Lesson coming soon</span><p>What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/foreign-tables"><b>foreign tables</b><span>the deep doc</span></a><a class="dl" href="/learn/vectors"><b>vectors</b><span>the deep doc</span></a><a class="dl" href="/learn/backends"><b>backends</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 16 of 20</div><button class="cont" id="cc" data-next="proving-origin"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/a-disk-that-travels">← Previous<small>A place to keep things that travels with the work</small></a><a href="/learn/proving-origin">Next →<small>Proving where it came from</small></a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -169,41 +185,33 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
   var d=done(), total=20;
-  // paint sidebar + progress
-  document.querySelectorAll(".li,.dstep").forEach(function(el){
-    if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done");
-  });
+  document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
-  var bar=document.getElementById("pbar"), txt=document.getElementById("ptxt");
-  if(bar) bar.style.width=pct+"%";
-  if(txt) txt.textContent=d.length+" of "+total+" complete";
+  ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });
+  var pt=document.getElementById("ptxt"); if(pt) pt.textContent=d.length+" of "+total+" complete";
+  var dpn=document.getElementById("dpn"); if(dpn) dpn.textContent=d.length+" of "+total+" lessons complete";
   var tp=document.getElementById("tprog"); if(tp) tp.textContent=pct+"%";
-  var dp=document.getElementById("dprog"); if(dp) dp.textContent=(d.length?d.length+" of "+total+" complete":total+" lessons");
-  // record visit (for continue)
   var cur=document.body.dataset.slug;
   if(cur) localStorage.setItem(LAST, cur);
-  // continue button on dashboard
-  var cont=document.getElementById("startbtn");
-  if(cont){
-    var last=localStorage.getItem(LAST);
-    if(last && d.length){ cont.textContent="Continue →"; cont.href="/learn/"+last; }
+  // dashboard continue card
+  var sb=document.getElementById("startbtn"), nl=document.getElementById("nextlesson"), nld=document.getElementById("nextdek"), cu=document.getElementById("cuptext");
+  if(sb){
+    var last=localStorage.getItem(LAST), target=sb.dataset.first, label="Start the course";
+    if(last && d.length){ target=last; label="Resume lesson"; if(cu) cu.textContent="Pick up where you left off"; }
+    sb.href="/learn/"+target; sb.querySelector("span").textContent=label;
   }
-  // complete & continue
   var cc=document.getElementById("cc");
   if(cc){
-    if(d.indexOf(cur)>=0){ cc.classList.add("done"); cc.firstChild.textContent="Completed "; }
+    if(d.indexOf(cur)>=0){ cc.classList.add("done"); cc.querySelector("span").textContent="Completed"; }
     cc.addEventListener("click",function(){
       var a=done(); if(a.indexOf(cur)<0){ a.push(cur); save(a); }
-      var nx=cc.dataset.next;
-      if(nx) location.href="/learn/"+nx; else location.href="/learn";
+      var nx=cc.dataset.next; location.href = nx ? "/learn/"+nx : "/learn";
     });
   }
-  // mobile drawer
   var side=document.getElementById("side"), scrim=document.getElementById("scrim"), b=document.getElementById("burger");
   function close(){ side&&side.classList.remove("open"); scrim&&scrim.classList.remove("show"); }
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
   if(scrim) scrim.addEventListener("click",close);
-  // audio
   var pl=document.getElementById("play");
   if(pl){ var au=null, lab=document.getElementById("playlab");
     pl.addEventListener("click",function(){

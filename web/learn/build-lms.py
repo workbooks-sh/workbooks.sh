@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Build the Learning Center — a real course interface (Kajabi-style), not blog
-posts. Generates from lms.json + content/<slug>.html:
-  /learn/index.html        the course dashboard (overview + start/continue)
-  /learn/<slug>.html       the lesson player (curriculum sidebar + lesson pane)
-Progress lives in the browser (localStorage); no backend. Re-run after edits.
+"""Build the Learning Center — a WIDE, dashboard-style course app (not a narrow
+column). Generates from lms.json + content/<slug>.html:
+  /learn/index.html     the course dashboard — full-width: curriculum rail +
+                        a progress/continue band + a grid of unit cards.
+  /learn/<slug>.html    the lesson player — three panes: curriculum · reading ·
+                        course controls (audio, position, prev/next, complete).
+Progress lives in the browser (localStorage). Re-run after edits.
 """
 import json, os, html
 
@@ -11,7 +13,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 lms = json.load(open(os.path.join(HERE, "lms.json")))
 units = lms["units"]
 
-# flat ordered list with unit context + prev/next
 flat = []
 for u in units:
     for l in u["lessons"]:
@@ -23,7 +24,6 @@ for i, l in enumerate(flat):
 TOTAL = len(flat)
 LIVE = sum(1 for l in flat if l["status"] == "live")
 
-# doc metadata for the go-deeper box (titles from the catalog)
 cat = json.load(open(os.path.join(HERE, "lessons.json")))
 doc_title = {}
 for t in cat["tiers"]:
@@ -47,7 +47,8 @@ WORDMARK = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="tr
 def sidebar(cur_slug=None):
     out = ['<aside class="side" id="side">',
            '<a class="brand" href="/">%s<span>Workbooks</span></a>' % WORDMARK,
-           '<a class="overview" href="/learn">Course overview</a>',
+           '<a class="overview%s" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>'
+              % (" on" if cur_slug is None else ""),
            '<div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of %d complete</span></div>' % TOTAL,
            '<nav class="curr" id="curr">']
     for u in units:
@@ -81,9 +82,7 @@ HEAD = """<!doctype html>
 {topbar}
 <div class="app">
 {sidebar}
-<main class="pane">
-{main}
-</main>
+<div class="main">{main}</div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>{js}</script>
@@ -92,145 +91,163 @@ HEAD = """<!doctype html>
 """
 
 CSS = """
-:root{ --paper:#f7f6f1; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68; --line:#e7e5db; --pc:#a8d4f0;
+:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+  --line:#e7e5db; --pc:#a8d4f0;
   --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
 a{ color:inherit; text-decoration:none; }
 .app{ display:flex; align-items:flex-start; min-height:100vh; }
+.main{ flex:1; min-width:0; }
 
-/* ── curriculum sidebar ── */
-.side{ width:316px; flex:0 0 316px; position:sticky; top:0; height:100vh; overflow-y:auto;
-  border-right:2px solid var(--ink); background:var(--paper); padding:24px 16px 40px; z-index:30; }
-.brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 18px; }
-.brand svg{ width:26px; height:auto; color:var(--ink); }
+/* ── curriculum sidebar (persistent app rail) ── */
+.side{ width:300px; flex:0 0 300px; position:sticky; top:0; height:100vh; overflow-y:auto;
+  border-right:2px solid var(--ink); background:var(--paper); padding:22px 14px 40px; z-index:30; }
+.brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 16px; }
+.brand svg{ width:25px; height:auto; color:var(--ink); }
 .brand span{ font:700 13px var(--mono); letter-spacing:.04em; }
-.overview{ display:block; font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim);
-  padding:8px; border-radius:7px; }
+.overview{ display:flex; align-items:center; gap:9px; font:700 10px var(--mono); letter-spacing:.16em;
+  text-transform:uppercase; color:var(--dim); padding:9px 8px; border-radius:8px; }
+.overview svg{ width:14px; height:14px; }
 .overview:hover{ background:rgba(18,19,22,.05); color:var(--ink); }
-.prog{ margin:8px 8px 20px; }
+.overview.on{ background:var(--ink); color:var(--paper); }
+.prog{ margin:14px 8px 18px; }
 .prog .bar{ height:7px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; background:#fff; }
 .prog .bar i{ display:block; height:100%; width:0; background:var(--bloom); transition:width .3s; }
 .prog span{ display:block; margin-top:7px; font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.umod{ margin-bottom:14px; }
-.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 7px; font:700 12px var(--mono); letter-spacing:.02em; }
+.umod{ margin-bottom:13px; }
+.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 6px; font:700 12px var(--mono); }
 .uhd .un{ font-size:8.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-.li{ display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:8px; font-size:15px; line-height:1.3;
-  color:#3a3e38; }
+.li{ display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:8px; font-size:14.5px; line-height:1.3; color:#3a3e38; }
 .li:hover{ background:rgba(18,19,22,.05); }
-.li .dot{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; border:2px solid var(--dim); border-radius:50%;
-  position:relative; }
+.li .dot{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; border:2px solid var(--dim); border-radius:50%; position:relative; }
 .li.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
-.li.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px;
-  border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.li.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
 .li.cur{ background:var(--pc); }
 .li.cur .dot{ border-color:var(--ink); }
 .li.cur .dot::after{ content:""; position:absolute; inset:2px; background:var(--ink); border-radius:50%; }
 .li.cur .t{ font-weight:600; color:var(--ink); }
 
-/* ── lesson pane ── */
-.pane{ flex:1; min-width:0; max-width:744px; margin:0 auto; padding:74px 44px 60px; }
-.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
-.pane h1{ font-family:var(--display); font-weight:400; font-size:clamp(34px,4.6vw,52px); line-height:1.04;
-  margin:14px 0 0; letter-spacing:-.005em; }
-.promise{ font-size:clamp(19px,2.4vw,23px); line-height:1.5; color:#34372f; margin:18px 0 0; font-style:italic; }
-.play{ display:flex; align-items:center; gap:13px; margin:28px 0 0; padding:12px 16px; border:2px solid var(--ink);
-  border-radius:999px; width:max-content; max-width:100%; background:#fff; box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none; }
-.play .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; }
-.play .ico svg{ width:12px; height:12px; fill:var(--paper); display:block; }
-.play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
-.play .time{ font:500 11px var(--mono); color:var(--dim); }
-.play.playing .ico{ background:var(--bloomd); }
+/* ════ DASHBOARD — wide ════ */
+.dband{ display:flex; gap:32px; align-items:stretch; padding:46px 46px 0; flex-wrap:wrap; }
+.dintro{ flex:1 1 460px; min-width:0; }
+.dintro .kick{ font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
+.dintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(44px,5.4vw,78px); line-height:.92;
+  margin:13px 0 0; display:flex; flex-wrap:wrap; gap:0 .22em; align-items:baseline; }
+.dintro h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
+.dintro .dek{ margin:20px 0 0; font-size:20px; line-height:1.55; color:#34372f; max-width:34em; }
+.dcard{ flex:0 0 340px; max-width:100%; border:2px solid var(--ink); border-radius:18px; background:var(--card);
+  box-shadow:5px 5px 0 var(--ink); padding:24px; display:flex; flex-direction:column; justify-content:space-between; gap:18px; }
+.dcard .cu{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+.dcard .nl{ font-family:var(--display); font-size:25px; line-height:1.08; margin:8px 0 0; }
+.dcard .nd{ font-family:var(--read); font-size:15px; line-height:1.45; color:var(--dim); margin:8px 0 0; }
+.dcard .pwrap{ }
+.dcard .pbar{ height:9px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; background:#fff; }
+.dcard .pbar i{ display:block; height:100%; width:0; background:var(--bloom); transition:width .3s; }
+.dcard .pn{ margin-top:8px; font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.dcard .start{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font:700 12px var(--mono);
+  letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink);
+  border-radius:999px; padding:14px 20px; box-shadow:3px 3px 0 var(--bloomd); }
+.dcard .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
 
-article{ margin-top:42px; }
+.dunits{ padding:38px 46px 100px; display:grid; grid-template-columns:repeat(auto-fill,minmax(412px,1fr));
+  gap:18px; align-items:start; }
+.ucard{ border:2px solid var(--ink); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--ink);
+  padding:20px 20px 12px; }
+.ucard .uch{ display:flex; align-items:flex-start; gap:12px; border-bottom:1px solid var(--line); padding-bottom:13px; margin-bottom:8px; }
+.ucard .uch .num{ font-family:var(--display); font-size:30px; line-height:.9; color:var(--pc);
+  -webkit-text-stroke:1px var(--ink); flex:0 0 auto; }
+.ucard .uch .ut{ min-width:0; }
+.ucard .uch .un{ font:700 9px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+.ucard .uch h2{ font-family:var(--display); font-weight:400; font-size:22px; line-height:1; margin:5px 0 0; }
+.ucard .uch p{ font-size:14px; line-height:1.4; color:var(--dim); margin:6px 0 0; }
+.ucard .umeta{ margin-left:auto; flex:0 0 auto; font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); text-align:right; }
+.ll{ display:flex; align-items:center; gap:11px; padding:11px 8px; border-radius:9px; }
+.ll:hover{ background:rgba(18,19,22,.04); }
+.ll .dot{ width:15px; height:15px; flex:0 0 auto; border:2px solid var(--dim); border-radius:50%; position:relative; }
+.ll.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
+.ll.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.ll .lt{ font-size:16px; line-height:1.25; flex:1; min-width:0; }
+.ll .go{ font-size:15px; color:var(--bloomd); opacity:0; flex:0 0 auto; }
+.ll:hover .go{ opacity:1; }
+.ll.soon{ opacity:.5; }
+.ll.soon .lt{ color:var(--dim); }
+.ll.soon .tag{ font:700 8px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+  border:1.5px solid currentColor; border-radius:5px; padding:2px 5px; flex:0 0 auto; }
+
+/* ════ LESSON PLAYER — three panes ════ */
+.pane{ display:grid; grid-template-columns:minmax(0,1fr) 326px; gap:0; }
+.reading{ min-width:0; max-width:760px; margin:0 auto; padding:60px 56px 80px; justify-self:center; width:100%; }
+.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
+.reading h1{ font-family:var(--display); font-weight:400; font-size:clamp(34px,4vw,52px); line-height:1.04; margin:14px 0 0; letter-spacing:-.005em; }
+.promise{ font-size:clamp(19px,2.2vw,23px); line-height:1.5; color:#34372f; margin:18px 0 0; font-style:italic; }
+article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:#26282b; }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3.4vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
-article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:#fff; font-size:18.5px;
-  line-height:1.6; color:#34372f; border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.8vw,33px); line-height:1.18;
-  margin:42px 0; letter-spacing:-.01em; }
+article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:#34372f; border-radius:0 10px 10px 0; }
+article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
-
-.deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--ink); border-radius:16px; background:#fff; box-shadow:4px 4px 0 var(--ink); }
+.deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--ink); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--ink); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
 .deeper p{ font-size:17px; line-height:1.55; margin:8px 0 15px; color:#34372f; }
 .deeper .links{ display:flex; flex-direction:column; gap:8px; }
 .deeper a.dl{ display:flex; align-items:center; gap:11px; padding:11px 13px; border:1.5px solid var(--line); border-radius:10px; }
 .deeper a.dl:hover{ border-color:var(--ink); background:rgba(18,19,22,.03); }
 .deeper a.dl b{ font:700 13px var(--mono); } .deeper a.dl span{ font-size:11px; color:var(--dim); margin-left:auto; }
-
-.foot{ display:flex; align-items:center; gap:14px; margin:54px 0 0; padding-top:28px; border-top:1px solid var(--line); }
-.foot .prevl{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); }
-.foot .prevl:hover{ color:var(--ink); }
-.foot .cont{ margin-left:auto; display:inline-flex; align-items:center; gap:9px; font:700 12px var(--mono);
-  letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink);
-  border-radius:999px; padding:13px 22px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
-.foot .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
-.foot .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
-
-/* soon pane */
-.soon-pane{ margin-top:42px; }
-.soon-pane .badge{ display:inline-block; font:700 10px var(--mono); letter-spacing:.16em; text-transform:uppercase;
-  color:var(--dim); border:2px dashed rgba(18,19,22,.3); border-radius:999px; padding:8px 15px; }
+.soon-pane{ margin-top:40px; }
+.soon-pane .badge{ display:inline-block; font:700 10px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); border:2px dashed rgba(18,19,22,.3); border-radius:999px; padding:8px 15px; }
 .soon-pane p{ font-size:20px; line-height:1.6; margin:22px 0; color:#34372f; }
 
-/* topbar (mobile only) */
+/* right pane — course controls */
+.rail{ border-left:2px solid var(--ink); padding:60px 26px; position:sticky; top:0; align-self:start; min-height:100vh; }
+.rail .pos{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.rail .audio{ margin:16px 0 0; }
+.play{ display:flex; align-items:center; gap:13px; padding:12px 16px; border:2px solid var(--ink); border-radius:999px;
+  background:var(--card); box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none; }
+.play .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; }
+.play .ico svg{ width:12px; height:12px; fill:var(--paper); display:block; }
+.play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
+.play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
+.play.playing .ico{ background:var(--bloomd); }
+.rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--paper); background:var(--ink);
+  border:2px solid var(--ink); border-radius:12px; padding:15px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
+.rail .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
+.rail .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
+.rail .nav{ margin:14px 0 0; display:flex; flex-direction:column; gap:8px; }
+.rail .nav a{ font:700 11px var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--dim);
+  border:1.5px solid var(--line); border-radius:9px; padding:11px 13px; }
+.rail .nav a:hover{ border-color:var(--ink); color:var(--ink); }
+.rail .nav a small{ display:block; font-weight:400; letter-spacing:0; text-transform:none; font-family:var(--read);
+  font-size:13px; color:var(--ink); margin-top:3px; }
+
+/* topbar (mobile) */
 .topbar{ display:none; }
 .scrim{ display:none; }
 
-/* ── dashboard ── */
-.dash{ flex:1; min-width:0; }
-.dhero{ max-width:900px; margin:0 auto; padding:120px 7vw 0; }
-.dhero .kick{ font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
-.dhero h1{ font-family:var(--display); font-weight:400; font-size:clamp(44px,7vw,88px); line-height:.92; margin:14px 0 0;
-  display:flex; flex-wrap:wrap; gap:0 .22em; align-items:baseline; }
-.dhero h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
-.dhero .dek{ margin:22px 0 0; font-size:21px; line-height:1.55; color:#34372f; max-width:30em; }
-.dhero .cta{ margin:30px 0 0; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-.dhero .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
-  text-transform:uppercase; color:var(--paper); background:var(--ink); border:2px solid var(--ink); border-radius:999px;
-  padding:15px 26px; box-shadow:4px 4px 0 var(--bloomd); }
-.dhero .start:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:4px 4px 0 var(--ink); }
-.dhero .dprog{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.dunits{ max-width:900px; margin:56px auto 0; padding:0 7vw 120px; display:flex; flex-direction:column; gap:50px; }
-.dunit .duh{ border-bottom:2px solid var(--ink); padding-bottom:13px; margin-bottom:16px; }
-.dunit .duh .un{ font:700 10px var(--mono); letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
-.dunit .duh h2{ font-family:var(--display); font-weight:400; font-size:clamp(25px,3.2vw,34px); line-height:1; margin:8px 0 0; }
-.dunit .duh p{ margin:9px 0 0; font-size:16px; line-height:1.5; color:var(--dim); max-width:48em; }
-.dsteps{ display:flex; flex-direction:column; gap:8px; }
-.dstep{ display:flex; align-items:center; gap:14px; padding:15px 18px; border:2px solid var(--ink); border-radius:13px;
-  background:#fff; box-shadow:3px 3px 0 var(--ink); transition:transform .12s,box-shadow .12s; }
-.dstep:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
-.dstep .dot{ width:17px; height:17px; flex:0 0 auto; border:2px solid var(--dim); border-radius:50%; position:relative; }
-.dstep.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
-.dstep.done .dot::after{ content:""; position:absolute; left:5px; top:1px; width:4px; height:9px; border:solid var(--ink); border-width:0 2px 2px 0; transform:rotate(45deg); }
-.dstep .lt{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
-.dstep .lt b{ font-family:var(--display); font-weight:400; font-size:19px; }
-.dstep .lt i{ font-style:normal; font-size:15px; line-height:1.45; color:var(--dim); }
-.dstep .go{ margin-left:auto; font-size:17px; color:var(--bloomd); opacity:0; }
-.dstep:hover .go{ opacity:1; }
-.dstep.soon{ background:none; box-shadow:none; border-style:dashed; border-color:rgba(18,19,22,.26); opacity:.62; }
-.dstep.soon:hover{ transform:none; box-shadow:none; }
-.dstep.soon .tag{ margin-left:auto; font:700 8.5px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); border:1.5px solid currentColor; border-radius:5px; padding:2px 6px; }
-
+@media (max-width:1080px){
+  .pane{ grid-template-columns:1fr; }
+  .rail{ border-left:0; border-top:2px solid var(--ink); position:static; min-height:0; padding:26px 56px 60px;
+    max-width:760px; margin:0 auto; width:100%; display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .rail .audio{ margin:0; } .rail .cont{ margin:0; width:auto; flex:1; min-width:220px; } .rail .nav{ margin:0; width:100%; flex-direction:row; }
+  .rail .nav a{ flex:1; }
+  .reading{ padding:40px 56px 40px; }
+}
 @media (max-width:900px){
   .topbar{ display:flex; align-items:center; gap:13px; position:sticky; top:0; z-index:40; background:var(--paper);
     border-bottom:2px solid var(--ink); padding:11px 16px; }
-  .topbar .burger{ width:26px; height:19px; display:flex; flex-direction:column; justify-content:center; gap:5px;
-    background:none; border:0; padding:0; cursor:pointer; }
+  .topbar .burger{ width:26px; height:19px; display:flex; flex-direction:column; justify-content:center; gap:5px; background:none; border:0; padding:0; cursor:pointer; }
   .topbar .burger span{ display:block; height:2.5px; border-radius:2px; background:var(--ink); }
-  .topbar .tt{ font:700 11px var(--mono); letter-spacing:.04em; }
-  .topbar .tp{ margin-left:auto; font:700 10px var(--mono); color:var(--dim); }
-  .side{ position:fixed; top:0; left:0; height:100vh; transform:translateX(-100%); transition:transform .25s ease;
-    box-shadow:6px 0 0 rgba(0,0,0,.08); }
+  .topbar .tt{ font:700 11px var(--mono); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar .tp{ margin-left:auto; font:700 10px var(--mono); color:var(--dim); white-space:nowrap; }
+  .side{ position:fixed; top:0; left:0; height:100vh; transform:translateX(-100%); transition:transform .25s ease; box-shadow:6px 0 0 rgba(0,0,0,.08); }
   .side.open{ transform:translateX(0); }
   .scrim.show{ display:block; position:fixed; inset:0; background:rgba(0,0,0,.32); z-index:25; }
-  .pane{ padding:30px 22px 90px; max-width:none; }
-  .dhero{ padding-top:30px; } .dunits{ padding-bottom:80px; }
-  .foot{ flex-wrap:wrap; } .foot .cont{ margin-left:0; width:100%; justify-content:center; }
+  .dband{ padding:26px 22px 0; gap:22px; } .dcard{ flex-basis:100%; } .dunits{ padding:26px 22px 80px; grid-template-columns:1fr; }
+  .reading{ padding:28px 22px 30px; max-width:none; } .rail{ padding:22px 22px 70px; max-width:none; }
 }
 """
 
@@ -240,41 +257,33 @@ JS = """
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
   var d=done(), total=%TOTAL%;
-  // paint sidebar + progress
-  document.querySelectorAll(".li,.dstep").forEach(function(el){
-    if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done");
-  });
+  document.querySelectorAll(".li,.ll").forEach(function(el){ if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done"); });
   var pct=Math.round(d.length/total*100);
-  var bar=document.getElementById("pbar"), txt=document.getElementById("ptxt");
-  if(bar) bar.style.width=pct+"%";
-  if(txt) txt.textContent=d.length+" of "+total+" complete";
+  ["pbar","dpbar"].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.width=pct+"%"; });
+  var pt=document.getElementById("ptxt"); if(pt) pt.textContent=d.length+" of "+total+" complete";
+  var dpn=document.getElementById("dpn"); if(dpn) dpn.textContent=d.length+" of "+total+" lessons complete";
   var tp=document.getElementById("tprog"); if(tp) tp.textContent=pct+"%";
-  var dp=document.getElementById("dprog"); if(dp) dp.textContent=(d.length?d.length+" of "+total+" complete":total+" lessons");
-  // record visit (for continue)
   var cur=document.body.dataset.slug;
   if(cur) localStorage.setItem(LAST, cur);
-  // continue button on dashboard
-  var cont=document.getElementById("startbtn");
-  if(cont){
-    var last=localStorage.getItem(LAST);
-    if(last && d.length){ cont.textContent="Continue →"; cont.href="/learn/"+last; }
+  // dashboard continue card
+  var sb=document.getElementById("startbtn"), nl=document.getElementById("nextlesson"), nld=document.getElementById("nextdek"), cu=document.getElementById("cuptext");
+  if(sb){
+    var last=localStorage.getItem(LAST), target=sb.dataset.first, label="Start the course";
+    if(last && d.length){ target=last; label="Resume lesson"; if(cu) cu.textContent="Pick up where you left off"; }
+    sb.href="/learn/"+target; sb.querySelector("span").textContent=label;
   }
-  // complete & continue
   var cc=document.getElementById("cc");
   if(cc){
-    if(d.indexOf(cur)>=0){ cc.classList.add("done"); cc.firstChild.textContent="Completed "; }
+    if(d.indexOf(cur)>=0){ cc.classList.add("done"); cc.querySelector("span").textContent="Completed"; }
     cc.addEventListener("click",function(){
       var a=done(); if(a.indexOf(cur)<0){ a.push(cur); save(a); }
-      var nx=cc.dataset.next;
-      if(nx) location.href="/learn/"+nx; else location.href="/learn";
+      var nx=cc.dataset.next; location.href = nx ? "/learn/"+nx : "/learn";
     });
   }
-  // mobile drawer
   var side=document.getElementById("side"), scrim=document.getElementById("scrim"), b=document.getElementById("burger");
   function close(){ side&&side.classList.remove("open"); scrim&&scrim.classList.remove("show"); }
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
   if(scrim) scrim.addEventListener("click",close);
-  // audio
   var pl=document.getElementById("play");
   if(pl){ var au=null, lab=document.getElementById("playlab");
     pl.addEventListener("click",function(){
@@ -302,70 +311,81 @@ def deeper_box(docs):
 
 def lesson_page(l):
     live = l["status"] == "live" and os.path.exists(os.path.join(HERE, "content", l["slug"] + ".html"))
-    crumb = "Unit %d · %s · Lesson %d" % (l["unit"], esc(l["unit_title"]), l["i"]+1)
-    player = ""
-    if l.get("audio"):
-        player = ('<div class="play" id="play" data-src="%s"><span class="ico">'
-                  '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>'
-                  '<span class="lab" id="playlab">Listen</span><span class="time">%s</span></div>'
-                  % (esc(l["audio"]), esc(l.get("mins", ""))))
+    crumb = "Unit %d · %s" % (l["unit"], esc(l["unit_title"]))
     if live:
         body = open(os.path.join(HERE, "content", l["slug"] + ".html")).read()
-        main = ('<div class="crumb">%s</div><h1>%s</h1>%s%s<article>%s</article>%s'
-                % (crumb, esc(l["title"]),
-                   '<p class="promise">%s</p>' % esc(l["promise"]) if l.get("promise") else "",
-                   player, body, deeper_box(l.get("docs"))))
+        reading = ('<div class="crumb">%s</div><h1>%s</h1>%s<article>%s</article>%s'
+                   % (crumb, esc(l["title"]),
+                      '<p class="promise">%s</p>' % esc(l["promise"]) if l.get("promise") else "",
+                      body, deeper_box(l.get("docs"))))
     else:
-        main = ('<div class="crumb">%s</div><h1>%s</h1>'
-                '<div class="soon-pane"><span class="badge">Lesson coming soon</span>'
-                '<p>%s</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div>%s'
-                % (crumb, esc(l["title"]), esc(l.get("teaches", "")), deeper_box(l.get("docs"))))
-    prev = ('<a class="prevl" href="/learn/%s">← %s</a>' % (esc(l["prev"]["slug"]), esc(l["prev"]["title"])) if l["prev"] else '<a class="prevl" href="/learn">← Overview</a>')
+        reading = ('<div class="crumb">%s</div><h1>%s</h1>'
+                   '<div class="soon-pane"><span class="badge">Lesson coming soon</span><p>%s</p>'
+                   '<p>While this lesson is being written, the technical docs below already cover the ground.</p></div>%s'
+                   % (crumb, esc(l["title"]), esc(l.get("teaches", "")), deeper_box(l.get("docs"))))
+    audio = ""
+    if l.get("audio"):
+        audio = ('<div class="audio"><div class="play" id="play" data-src="%s"><span class="ico">'
+                 '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>'
+                 '<span class="lab" id="playlab">Listen</span><span class="time">%s</span></div></div>'
+                 % (esc(l["audio"]), esc(l.get("mins", ""))))
+    nav = ""
+    if l["prev"]:
+        nav += '<a href="/learn/%s">← Previous<small>%s</small></a>' % (esc(l["prev"]["slug"]), esc(l["prev"]["title"]))
+    if l["next"]:
+        nav += '<a href="/learn/%s">Next →<small>%s</small></a>' % (esc(l["next"]["slug"]), esc(l["next"]["title"]))
     nxt = l["next"]["slug"] if l["next"] else ""
-    cclabel = "Mark complete & continue" if l["next"] else "Mark complete & finish"
-    foot = ('<div class="foot">%s<button class="cont" id="cc" data-next="%s"><span>%s</span> →</button></div>'
-            % (prev, esc(nxt), cclabel))
+    cclabel = "Complete & continue" if l["next"] else "Complete & finish"
+    rail = ('<aside class="rail"><div class="pos">Lesson %d of %d</div>%s'
+            '<button class="cont" id="cc" data-next="%s"><span>%s</span> →</button>'
+            '<div class="nav">%s</div></aside>'
+            % (l["i"]+1, TOTAL, audio, esc(nxt), cclabel, nav))
+    main = '<div class="pane"><div class="reading">%s</div>%s</div>' % (reading, rail)
     return HEAD.format(
         title=esc(l["title"]) + " — Learning Center — Workbooks",
         desc=esc(l.get("teaches", "")), ogtype="article",
         url="https://workbooks.sh/learn/" + l["slug"], css=CSS, js=JS,
         bodycls='lesson" data-slug="%s' % esc(l["slug"]),
-        topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]),
-        main=main + foot)
+        topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]), main=main)
 
 def dashboard():
     first = next((x["slug"] for x in flat if x["status"] == "live"), flat[0]["slug"])
-    secs = ""
-    n = 0
+    nxt_meta = next((x for x in flat if x["status"] == "live"), flat[0])
+    cards = ""
     for u in units:
-        rows = ""
+        lessons = ""
         for l in u["lessons"]:
-            n += 1
             on = l["status"] == "live"
-            inner = ('<span class="dot"></span><span class="lt"><b>%s</b><i>%s</i></span>'
-                     % (esc(l["title"]), esc(l.get("teaches", ""))))
             if on:
-                rows += '<a class="dstep" data-slug="%s" href="/learn/%s">%s<span class="go">→</span></a>' % (esc(l["slug"]), esc(l["slug"]), inner)
+                lessons += ('<a class="ll" data-slug="%s" href="/learn/%s"><span class="dot"></span>'
+                            '<span class="lt">%s</span><span class="go">→</span></a>'
+                            % (esc(l["slug"]), esc(l["slug"]), esc(l["title"])))
             else:
-                rows += '<div class="dstep soon" data-slug="%s">%s<span class="tag">soon</span></div>' % (esc(l["slug"]), inner)
-        secs += ('<div class="dunit"><div class="duh"><span class="un">Unit %d</span>'
-                 '<h2>%s</h2><p>%s</p></div><div class="dsteps">%s</div></div>'
-                 % (u["n"], esc(u["title"]), esc(u["dek"]), rows))
-    main = ('<div class="dash"><header class="dhero"><div class="kick">learn workbooks from zero</div>'
+                lessons += ('<div class="ll soon" data-slug="%s"><span class="dot"></span>'
+                            '<span class="lt">%s</span><span class="tag">soon</span></div>'
+                            % (esc(l["slug"]), esc(l["title"])))
+        nlive = sum(1 for x in u["lessons"] if x["status"] == "live")
+        cards += ('<div class="ucard"><div class="uch"><span class="num">%d</span><div class="ut">'
+                  '<div class="un">Unit %d</div><h2>%s</h2><p>%s</p></div>'
+                  '<span class="umeta">%d<br>lessons</span></div>%s</div>'
+                  % (u["n"], u["n"], esc(u["title"]), esc(u["dek"]), len(u["lessons"]), lessons))
+    band = ('<div class="dband"><div class="dintro"><div class="kick">learn workbooks from zero</div>'
             '<h1><span>Learning</span> <span class="bub">CENTER</span></h1>'
-            '<p class="dek">No technical background needed. %d deep, plain-language lessons in order — each a single big idea, with the technical docs one click away.</p>'
-            '<div class="cta"><a class="start" id="startbtn" href="/learn/%s">Start the course →</a>'
-            '<span class="dprog" id="dprog">%d lessons</span></div></header>'
-            '<div class="dunits">%s</div></div>'
-            % (TOTAL, esc(first), TOTAL, secs))
+            '<p class="dek">No technical background needed — %d deep, plain-language lessons in order. '
+            'Each teaches one big idea, with the technical docs one click away.</p></div>'
+            '<div class="dcard"><div><div class="cu" id="cuptext">Begin the course</div>'
+            '<div class="nl" id="nextlesson">%s</div><div class="nd" id="nextdek">%s</div></div>'
+            '<div class="pwrap"><div class="pbar"><i id="dpbar"></i></div><div class="pn" id="dpn">%d lessons</div></div>'
+            '<a class="start" id="startbtn" data-first="%s" href="/learn/%s"><span>Start the course</span> →</a></div></div>'
+            % (TOTAL, esc(nxt_meta["title"]), esc(nxt_meta.get("teaches", "")), TOTAL, esc(first), esc(first)))
+    main = band + '<div class="dunits">' + cards + '</div>'
     return HEAD.format(
         title="Learning Center — Workbooks",
         desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
         ogtype="website", url="https://workbooks.sh/learn", css=CSS, js=JS,
-        bodycls="dashpage", topbar=topbar("Learning Center"), sidebar="", main=main)
+        bodycls="dashpage", topbar=topbar("Learning Center"), sidebar=sidebar(None), main=main)
 
-# write everything
 open(os.path.join(HERE, "index.html"), "w").write(dashboard())
 for l in flat:
     open(os.path.join(HERE, l["slug"] + ".html"), "w").write(lesson_page(l))
-print("Learning Center built: dashboard + %d lesson pages (%d live)" % (TOTAL, LIVE))
+print("Learning Center (wide) built: dashboard + %d lesson pages (%d live)" % (TOTAL, LIVE))
