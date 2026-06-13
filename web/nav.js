@@ -117,19 +117,6 @@
     return '<a href="' + root + href + '"><span class="sw" style="background:' + sw[0] + '">' + sw[1] + '</span> ' + name + ' <small>' + small + '</small></a>';
   }
 
-  // lessons come from THE catalog (learn/lessons.json) — the CMS seed.
-  var lessonsCol = '<div class="col" data-lessons><div class="colhead">lessons <small>loading…</small></div></div>';
-  // hovering a lesson on the left fills this panel with its deep dives
-  var subPanel = '<div class="col" data-subpanel><div class="colhead">deep dives <small>hover a lesson</small></div><div class="subbody"></div></div>';
-
-  function lessonRow(l) {
-    var icon = l.icon.indexOf("../") === 0 ? root + l.icon.slice(3) : root + "learn/" + l.icon;
-    return '<a href="' + root + 'learn/' + l.slug + '">' +
-      '<span class="sw" style="background:' + l.color + '"><img src="' + icon + '" alt=""></span> ' +
-      l.title + ' <small>' + l.sub + '</small></a>';
-  }
-
-
   // Docs — stubbed category panel; everything points at the repo until the
   // documentation CMS lands (the categories are the future information
   // architecture, shown early on purpose)
@@ -149,7 +136,7 @@
 
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
-    '<div class="drop"><a href="#">Learn</a><div class="panel">' + lessonsCol + '<div class="vsep" aria-hidden="true"></div>' + subPanel + '</div></div>' +
+    '<a class="lnk" href="' + root + 'learn/index.html">Learn</a>' +
     '<div class="drop"><a href="#">Docs</a><div class="panel">' + docsCol + '</div></div>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
     (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '') +
@@ -163,75 +150,6 @@
   nav.innerHTML = html;
   var mount = document.getElementById("site-nav");
   if (mount) mount.replaceWith(nav);
-
-  fetch(root + "learn/lessons.json")
-    .then(function (r) { return r.json(); })
-    .then(function (cat) {
-      var host = nav.querySelector("[data-lessons]");
-      if (!host) return;
-      var html = "";
-      cat.tiers.forEach(function (tier, i) {
-        if (i > 0) html += '<div class="sep" aria-hidden="true"></div>';
-        html += '<div class="colhead">' + (i === 0 ? "lessons" : "") + ' <small>' + tier.title + "</small></div>";
-        tier.lessons.filter(function (l) { return l.status === "live"; }).forEach(function (l) {
-          html += lessonRow(l).replace("<a ", '<a data-slug="' + l.slug + '" ');
-        });
-      });
-      host.innerHTML = html;
-
-      var bylSlug = {};
-      cat.tiers.forEach(function (t) { t.lessons.forEach(function (l) { bylSlug[l.slug] = l; }); });
-      var body = nav.querySelector("[data-subpanel] .subbody");
-      var head = nav.querySelector("[data-subpanel] .colhead");
-
-      function subRow(x) {
-        var icon = x.icon.indexOf("../") === 0 ? root + x.icon.slice(3) : root + "learn/" + x.icon;
-        var chip = '<span class="sw" style="background:' + x.color + '"><img src="' + icon + '" alt=""></span> ';
-        if (x.status === "planned") {
-          return '<a class="soon" aria-disabled="true">' + chip + x.title + ' <small>soon</small></a>';
-        }
-        return '<a href="' + root + 'learn/' + x.slug + '">' + chip + x.title + "</a>";
-      }
-      function showSubs(slug) {
-        var l = bylSlug[slug];
-        var subs = (l.sublessons || []).filter(function (x) { return x.status !== "hidden"; });
-        head.innerHTML = "deep dives <small>in " + l.title.toLowerCase() + "</small>";
-        body.innerHTML = subs.length
-          ? subs.map(subRow).join("")
-          : '<div class="nbempty">nothing deeper here yet — the shelf grows</div>';
-      }
-      function showRecent() {
-        head.innerHTML = 'deep dives <small>most recent</small>';
-        var all = [];
-        cat.tiers.forEach(function (t) {
-          t.lessons.forEach(function (l) {
-            (l.sublessons || []).filter(function (x) { return x.status === "live"; }).forEach(function (x) { all.push(x); });
-          });
-        });
-        all.sort(function (a, b) { return (b.added || "").localeCompare(a.added || ""); });
-        // show what fits — the panel scrolls when the shelf outgrows it
-        body.innerHTML = all.slice(0, 8).map(subRow).join("") ||
-          '<div class="nbempty">deep dives appear here as the shelf grows</div>';
-      }
-      showRecent();
-      function clearPin() {
-        host.querySelectorAll("a.on").forEach(function (x) { x.classList.remove("on"); });
-      }
-      host.querySelectorAll("a[data-slug]").forEach(function (a) {
-        a.addEventListener("mouseenter", function () {
-          clearPin();
-          a.classList.add("on");
-          showSubs(a.dataset.slug);
-        });
-      });
-      // the selection survives the trip across to the deep-dives panel;
-      // it resets only when the cursor leaves the dropdown entirely
-      host.closest(".panel").addEventListener("mouseleave", function () {
-        clearPin();
-        showRecent();
-      });
-    })
-    .catch(function () {});
 
   nav.querySelectorAll(".drop > a").forEach(function (drop) {
     drop.addEventListener("click", function (e) {
