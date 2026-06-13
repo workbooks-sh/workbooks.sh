@@ -30,6 +30,7 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import SearchDrawer from "$lib/components/SearchDrawer.svelte";
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
+  import NexusPopover from "$lib/components/NexusPopover.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import { panes } from "$lib/viewer/panes.svelte";
   import { themes } from "$lib/bridge/themes.svelte";
@@ -552,6 +553,11 @@
     <BookmarksPopover
       anchor={chrome.bookmarksAnchor}
       bind:open={chrome.bookmarksOpen}
+    />
+
+    <NexusPopover
+      anchor={chrome.nexusAnchor}
+      bind:open={chrome.nexusOpen}
     />
 
     <ContextMenu bind:open={wsMenuOpen} x={wsMenuX} y={wsMenuY}>

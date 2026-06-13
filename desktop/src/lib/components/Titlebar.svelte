@@ -53,7 +53,6 @@
   import type { Tab } from "$lib/tabs/types";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
-  import { wizard } from "$lib/setup/wizard.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
@@ -447,7 +446,12 @@
     data-tauri-drag-region="false"
     title={engine.title}
     aria-label={engine.title}
-    onclick={() => features.onboarding && wizard.open()}
+    onclick={(e) => {
+      // Open the nexus switcher (wb-aakl.9). The engine-install wizard is
+      // only reachable when onboarding is flagged on (CLI owns setup).
+      chrome.nexusAnchor = e.currentTarget as HTMLElement;
+      chrome.nexusOpen = !chrome.nexusOpen;
+    }}
   >
     <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
   </button>

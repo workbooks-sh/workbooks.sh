@@ -6,16 +6,20 @@
 // base URL + an OidcAdapter) — same RcpClient, different target. That symmetry
 // is the whole point of RCP.
 
-import { sidecar } from "$lib/bridge/sidecar.svelte";
+import { nexus } from "$lib/bridge/nexus.svelte";
 import { LocalTokenAdapter } from "../adapters";
 import { RcpClient } from "../client";
 import type { RcpTarget } from "../types";
 
-/** Target backed by the local daemon discovery (trusted rung). */
-const localTarget: RcpTarget = {
-  getBaseUrl: () => sidecar.status.url,
-  auth: new LocalTokenAdapter(() => sidecar.status.token),
+/** Target backed by the ACTIVE nexus (wb-aakl.9). The default nexus is
+ *  `local`, whose base URL + token resolve live from the daemon discovery
+ *  (the `sidecar` store, fed by runtime.json); the user can switch to a
+ *  saved remote nexus and every RCP call follows. Same RcpClient, the
+ *  target just reads a different endpoint — that symmetry is RCP's point. */
+const activeTarget: RcpTarget = {
+  getBaseUrl: () => nexus.activeUrl,
+  auth: new LocalTokenAdapter(() => nexus.activeToken),
 };
 
-/** The app-wide RCP client for the local runtime. */
-export const rcp = new RcpClient(localTarget);
+/** The app-wide RCP client — points at whichever nexus is active. */
+export const rcp = new RcpClient(activeTarget);

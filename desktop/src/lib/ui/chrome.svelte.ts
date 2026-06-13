@@ -80,6 +80,11 @@ class ChromeStore {
   bookmarksOpen = $state<boolean>(false);
   bookmarksAnchor = $state<HTMLElement | null>(null);
 
+  /** Nexus switcher popover anchored to the titlebar engine chip
+   *  (wb-aakl.9). Same anchor pattern as bookmarks. */
+  nexusOpen = $state<boolean>(false);
+  nexusAnchor = $state<HTMLElement | null>(null);
+
   /** Right-side Agent panel (phase 2 — empty slot until that lands). */
   agentOpen = $state<boolean>(false);
 
