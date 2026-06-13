@@ -2049,3 +2049,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   by shipped tools: http (http) + exec (subprocess) + raw-TCP (tcp-send) + raw-UDP (dns). resolved.json:
   capability_live_dns on dig/netcat + live_capabilities.dns + native_ext=BLOCKED. NEXT: NTP/STUN over wb_udp;
   app-host serve+egress composition (BFF pattern) if a bounded guest.
+- 2026-06-13 (iter 153): **STONE 5 CAPSTONE — app-host BFF (serve + brokered egress compose).** Proved the
+  sandbox as a real deploy target: a single sandboxed C-reactor guest composes INBOUND (ServeBroker host-
+  listener -> guest `handle`) + OUTBOUND (brokered SSRF-mediated egress via host_http_get) into a complete web
+  app — the BFF/API-gateway pattern. test/broker_app_host_test.exs: (a) guest receives an inbound HTTP request,
+  fetches example.com through brokered egress, returns it (200 + "Example Domain"); (b) RED-TEAM: a serving
+  guest pointed at the metadata IP gets host_http_get -1 -> emits UPSTREAM_DENIED (a serving app can't be
+  tricked into SSRF either — same cadence as any egress). 2 tests green (build+netdeps). This composes serve +
+  egress (the one composition not previously shown; serve+KV + serve+exec already proven), completing Stone 5:
+  inbound + outbound + storage + exec all compose in one sandboxed guest. resolved.json: live_capabilities.
+  app_host. NEXT: NTP over wb_udp; a deployable app-host definition (productionize the guest + Bandit wiring).

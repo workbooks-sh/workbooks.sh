@@ -2322,6 +2322,12 @@
    ],
    "gated": "udp_allow default-deny",
    "since": "iter152"
+  },
+  "app_host": {
+   "pattern": "BFF / API-gateway",
+   "delivers": "sandboxed wasm web app composing inbound (ServeBroker host-listener -> guest handler) + outbound (brokered SSRF-mediated egress via host_http_get)",
+   "proof": "test/broker_app_host_test.exs \u2014 guest serves example.com via brokered egress; a metadata-fetch is SSRF-denied (UPSTREAM_DENIED)",
+   "since": "iter153"
   }
  }
 }
