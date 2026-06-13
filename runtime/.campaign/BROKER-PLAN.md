@@ -1704,3 +1704,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   green cadence both paths), execution model (sync/batch/async exec, fork-bomb-complete width+depth), storage/
   queue/secrets (capped, tenant-isolated, revocable), and uniform observability — every broker default-deny,
   capped, audited, revocable-up-front, adversarially tested.
+- 2026-06-12 (iter 129): **BUILD-LANE PROBE — SOURCE -> SANDBOXED-CLI-TOOL pipeline proven end-to-end (C
+  class).** Probed the build-lane frontier (owner's steer + the directive's "reclaim" instruction). Finding:
+  the impossible-list C items are blocked by AUTOTOOLS/CODEGEN/large-deps (needing the build-SYSTEM lane, a
+  separate campaign), NOT by C compilation itself — so no quick reclaim of those. BUT the BASE capability is
+  real + now demonstrated concretely: a genuinely-useful, non-trivial, self-contained C tool (a stats
+  calculator reading stdin -> count/sum/min/max/mean) is COMPILED entirely in-sandbox (Compilers.compile_c /
+  clang.wasm, zero native exec) and RUN sandboxed (wasmtime, no network, stdin->stdout) via the brokered
+  execution lane (PackageManager.run). Test green: 3 1 4 1 5 -> count=5 sum=14 min=1 max=5 mean=2.8. So ANY
+  single-source C utility is now a working sandboxed command from SOURCE, no native toolchain — the reclaim
+  recipe for the self-contained-C class. This bridges the broker work and the build-lane frontier: the platform
+  builds AND runs tools from source, sandboxed. The impossible-list reclaim of complex tools still needs the
+  build-system / JS-host / newer-Rust lanes (wb-lcsj), each a substantial campaign.
