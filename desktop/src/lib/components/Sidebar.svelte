@@ -38,6 +38,18 @@
   import Icon from "$lib/ui/Icon.svelte";
   import { tintFor, tintWash } from "$lib/ui/tint.svelte";
   import { fileIconUrl } from "$lib/ui/materialIcon";
+
+  // Folders get a varied DARK PASTEL body (FolderIcon deepens it over navy
+  // + renders a white badge): pick one of the chip pastels by name hash.
+  const FOLDER_PASTELS = ["#aecbf2", "#b6e2bd", "#f3cfae", "#d4c9f0"];
+  function pastelFor(name: string): string {
+    let h = 2166136261;
+    for (let i = 0; i < name.length; i++) {
+      h ^= name.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return FOLDER_PASTELS[Math.abs(h) % FOLDER_PASTELS.length];
+  }
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -668,7 +680,7 @@
                  chosen icon as a corner badge (composable, not swapped). -->
             <FolderIcon
               size={20}
-              color={tintFor(pkg.name)}
+              color={pastelFor(pkg.name)}
               badge={emojiIcon(pkg.icon) ?? ""}
               name={pkg.name}
             />
@@ -975,31 +987,25 @@
     gap: 6px;
     padding: 2px 2px 6px;
   }
-  /* Bookmark tiles match the nav pastel-chip idiom: a soft pastel fill in
-   * the bookmark's own hue with a background-color knockout icon (below). */
+  /* Bookmark tiles: the native icon as-is on a faint neutral surface (no
+   * pastel matte, no recolor — same icon treatment as the nav rows). */
   .tile {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 40px;
     border-radius: 10px;
-    border: 0;
-    background: color-mix(in srgb, var(--tint) 42%, var(--color-surface));
-    color: var(--tint);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
     font-size: 16px;
     line-height: 1;
     cursor: pointer;
-    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), filter 0.14s;
+    box-shadow: 0 1px 1.5px rgba(18, 19, 22, 0.05);
+    transition: transform 0.14s cubic-bezier(0.2, 0, 0, 1), border-color 0.14s;
   }
   .tile:hover {
     transform: translateY(-1px);
-    filter: brightness(1.04);
-  }
-  /* knockout the glyph to the page bg color — cut-out on the pastel tile */
-  .tile :global(img),
-  .tile :global(.emoji),
-  .tile :global(.initials) {
-    filter: var(--icon-knockout);
+    border-color: var(--color-border-strong);
   }
   .tile:active {
     transform: translateY(0) scale(0.97);
@@ -1207,6 +1213,11 @@
       0 1px 2px rgba(18, 19, 22, 0.07),
       inset 0 0 0 1px var(--color-border);
   }
+  /* Icons render AS-IS from the universal library — native Material Icon
+   * Theme colors (Kanban green, Notes blue, the HTML5 mark…) and emoji in
+   * their own colors. No pastel chip matte, no recolor. (Dropping the chip
+   * also kills the matte-flicker on folder expand — there's no nth-child
+   * color cycle to reshuffle anymore.) */
   .row-icon {
     display: inline-flex;
     align-items: center;
@@ -1214,14 +1225,7 @@
     width: 26px;
     height: 26px;
     flex-shrink: 0;
-    border-radius: 7px;
-    /* pastel chip — ink glyph on a soft tint */
-    background: var(--color-chip-green);
-    color: #121316;
   }
-  .row:nth-child(4n + 2) .row-icon { background: var(--color-chip-blue); }
-  .row:nth-child(4n + 3) .row-icon { background: var(--color-chip-peach); }
-  .row:nth-child(4n) .row-icon { background: var(--color-chip-lavender); }
   .row-label {
     white-space: nowrap;
     overflow: hidden;
@@ -1291,14 +1295,6 @@
     height: 18px;
     object-fit: cover;
     border-radius: 5px;
-  }
-  /* Background-color knockout: flatten the (multicolor) glyph to the page
-   * bg color so it reads as a cut-out on the pastel chip. img SVGs + emoji
-   * silhouettes + initials all respond to the filter. */
-  .app-row .row-icon.app :global(img),
-  .app-row .row-icon.app :global(.emoji),
-  .app-row .row-icon.app :global(.initials) {
-    filter: var(--icon-knockout);
   }
   .row.dragging { opacity: 0.4; }
   .row.drop-target { box-shadow: inset 0 2px 0 var(--color-fg); }
