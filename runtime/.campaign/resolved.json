@@ -2301,7 +2301,8 @@
    "recipe": "brokered HTTPS download + zipimport",
    "excludes": "native-extension wheels (need in-sandbox compile) AND packages whose import chain needs working ssl/socket at import time (e.g. requests/urllib3 abort in wasip1 CPython) \u2014 install resolves+downloads them, but import may crash",
    "since": "iter148",
-   "deps": "transitive dependency resolution (recursive requires_dist -> download all pure-Python wheels -> zipimport the tree); proven markdown-it-py -> mdurl"
+   "deps": "transitive dependency resolution (recursive requires_dist -> download all pure-Python wheels -> zipimport the tree); proven markdown-it-py -> mdurl",
+   "hardening": "pip-fetch/pip-run REGISTRY-SCOPED (allow:[pypi.org, files.pythonhosted.org, *.pythonhosted.org]); npm-fetch scoped to *.npmjs.org. A malicious package import-time code cannot exfil to arbitrary hosts \u2014 off-registry requests are denied pre-DNS (red-team tested)."
   }
  }
 }

@@ -187,13 +187,22 @@ defmodule Workbooks.BrokeredTools do
       sys.stderr.write("error: %s\n" % e); sys.exit(1)
   """
 
+  # The package-manager tools fetch from — and zipimport+execute code from — package registries. They are
+  # SCOPED to those registry hosts (default-deny everything else), so a malicious package's import-time code
+  # cannot turn the tool's net access into arbitrary-host EXFIL: an off-registry request is denied pre-DNS.
+  @pypi_scope ["pypi.org", "files.pythonhosted.org", "*.pythonhosted.org"]
+  @npm_scope ["registry.npmjs.org", "*.npmjs.org"]
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
     %{
       "http" => register_http(),
-      "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{}),
-      "pip-run" => Workbooks.CommandRegistry.register_pynet("pip-run", @pip_run, :argv, %{}),
-      "npm-fetch" => Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{}),
+      "pip-fetch" =>
+        Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{allow: @pypi_scope}),
+      "pip-run" =>
+        Workbooks.CommandRegistry.register_pynet("pip-run", @pip_run, :argv, %{allow: @pypi_scope}),
+      "npm-fetch" =>
+        Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{allow: @npm_scope}),
       # raw TCP is a broader grant than http -> explicit :tcp_allow on this tool only.
       "tcp-send" =>
         Workbooks.CommandRegistry.register_pynet("tcp-send", @tcp_send, :argv, %{tcp_allow: true})

@@ -2017,3 +2017,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   CPython (exit 134) — a CPython-wasip1 limit, not a resolver bug. So pip-install is live for the pure-Python +
   import-clean subset, WITH dependency resolution. NEXT: a brokered ssl/socket shim so import-time socket probes
   don't abort (would unlock requests-class); the native-extension subset via the build lane.
+- 2026-06-13 (iter 150): **SECURITY HARDENING — package-manager tools REGISTRY-SCOPED (anti-exfil).** Diagnosed
+  the requests-class import-abort: `import socket` works but `import ssl`/`socket.socket()` raise CLEAN
+  ImportErrors (not the 134 abort) — so the requests-class needs real TLS/sockets, a low-value path (the prelude
+  requests-SHIM already brokers the common case). Instead closed a real gap on the reclaim surface: pip-run
+  imports + EXECUTES arbitrary downloaded package code, and was registered UNSCOPED, so a malicious package's
+  import-time code could turn the tool's net access into arbitrary-host EXFIL. Fix: pip-fetch/pip-run scoped to
+  allow:[pypi.org, files.pythonhosted.org, *.pythonhosted.org]; npm-fetch to *.npmjs.org — off-registry requests
+  denied PRE-DNS (no leak). 20 brokered_tools tests green incl RED-TEAM: pip-run six still installs (registry
+  allowed) but a package's urlopen('http://example.com') -> EXFIL_BLOCKED. A malicious package is now confined to
+  its registry. NEXT: bound pip-run's dep-tree (max packages + total bytes) for DoS; native-ext via build lane.
