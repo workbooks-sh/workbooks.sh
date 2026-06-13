@@ -39,17 +39,6 @@
   import { tintFor, tintWash } from "$lib/ui/tint.svelte";
   import { fileIconUrl } from "$lib/ui/materialIcon";
 
-  // Folders get a varied DARK PASTEL body (FolderIcon deepens it over navy
-  // + renders a white badge): pick one of the chip pastels by name hash.
-  const FOLDER_PASTELS = ["#aecbf2", "#b6e2bd", "#f3cfae", "#d4c9f0"];
-  function pastelFor(name: string): string {
-    let h = 2166136261;
-    for (let i = 0; i < name.length; i++) {
-      h ^= name.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return FOLDER_PASTELS[Math.abs(h) % FOLDER_PASTELS.length];
-  }
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { auth } from "$lib/auth/store.svelte";
@@ -680,7 +669,7 @@
                  chosen icon as a corner badge (composable, not swapped). -->
             <FolderIcon
               size={20}
-              color={pastelFor(pkg.name)}
+              color={tintFor(pkg.name)}
               badge={emojiIcon(pkg.icon) ?? ""}
               name={pkg.name}
             />

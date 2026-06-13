@@ -51,10 +51,13 @@
   .glyph {
     width: 100%;
     height: 100%;
-    /* Deepen whatever tint comes in — white badges need a folder dark
-       enough to sit on (a light teal folder swallowed the silhouette).
-       72% tint over deep navy keeps the hue but guarantees contrast. */
-    fill: color-mix(in srgb, var(--c) 72%, #141c30);
+    /* Shade the (saturated) tint with pure BLACK, not navy — black keeps
+       the hue + saturation while dropping lightness (a vivid jewel tone),
+       where navy muddied it into a low-contrast slate that blended into
+       the dark bg. --folder-keep is theme-aware (app.css): brighter in
+       light, brought down in dark while staying vibrant, so the white
+       badge always reads. */
+    fill: color-mix(in srgb, var(--c) var(--folder-keep, 82%), #000);
   }
   /* Badge — tucked in the bottom-right corner, sitting on the folder
      with a hint of overflow. */
