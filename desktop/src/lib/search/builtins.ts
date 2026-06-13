@@ -25,14 +25,33 @@ const PREVIEW_FILES = [
   "Finance/Q3 Forecast.xlsx",
   "Clients/Acme Proposal.md",
 ];
+// Inline SVG gradient thumbnail (no network) — deterministic per seed, so
+// preview web results have real-looking images.
+function thumb(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const a = h % 360;
+  const b = (a + 40 + ((h >> 5) % 90)) % 360;
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='72'>` +
+    `<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>` +
+    `<stop offset='0' stop-color='hsl(${a},62%,58%)'/>` +
+    `<stop offset='1' stop-color='hsl(${b},58%,42%)'/></linearGradient></defs>` +
+    `<rect width='96' height='72' fill='url(#g)'/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
 function mockWeb(q: string): SearchResult[] {
   const enc = encodeURIComponent(q);
   const slug = q.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "example";
+  const r = (title: string, host: string, url: string, subtitle: string, score: number): SearchResult => ({
+    kind: "web", title, subtitle, url, host, providerId: "web", score, image: thumb(host + url),
+  });
   return [
-    { kind: "web", title: `${q} — Wikipedia`, subtitle: `en.wikipedia.org › wiki — overview, history, key concepts.`, url: `https://en.wikipedia.org/wiki/${enc}`, providerId: "web", score: 100 },
-    { kind: "web", title: `${q}: docs & guides`, subtitle: `docs.${slug}.com — get started, API reference, examples.`, url: `https://docs.${slug}.com`, providerId: "web", score: 90 },
-    { kind: "web", title: `Best ${q} tools in 2026`, subtitle: `example.com › blog — a practical roundup with comparisons.`, url: `https://example.com/blog/${slug}`, providerId: "web", score: 80 },
-    { kind: "web", title: `${q} — GitHub`, subtitle: `github.com › search — repositories and discussions.`, url: `https://github.com/search?q=${enc}`, providerId: "web", score: 70 },
+    r(`${q} — Wikipedia`, "en.wikipedia.org", `https://en.wikipedia.org/wiki/${enc}`, `Overview, history and key concepts for ${q}.`, 100),
+    r(`${q}: docs & guides`, `docs.${slug}.com`, `https://docs.${slug}.com`, `Get started, API reference and worked examples.`, 90),
+    r(`Best ${q} tools in 2026`, "example.com", `https://example.com/blog/${slug}`, `A practical roundup with side-by-side comparisons.`, 80),
+    r(`${q} — GitHub`, "github.com", `https://github.com/search?q=${enc}`, `Repositories, issues and discussions about ${q}.`, 70),
+    r(`Understanding ${q}`, "medium.com", `https://medium.com/search?q=${enc}`, `A long-read explainer with diagrams and takeaways.`, 60),
   ];
 }
 

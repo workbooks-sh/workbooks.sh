@@ -30,6 +30,10 @@ export interface SearchResult {
   providerId: string;
   /** Higher sorts first within a provider group. */
   score?: number;
+  /** Optional thumbnail (data-URI or url) — web results render richer cards. */
+  image?: string;
+  /** Optional source host for web results (e.g. "en.wikipedia.org"). */
+  host?: string;
 }
 
 export interface SearchProvider {

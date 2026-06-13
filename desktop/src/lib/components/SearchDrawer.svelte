@@ -238,25 +238,61 @@
             <span>{g.provider.label}</span>
             {#if g.error}<span class="g-err">unavailable</span>{/if}
           </div>
-          {#each g.results as r, i (g.provider.id + (r.path ?? r.url ?? "") + i)}
-            {@const fi = flatIndex(g, i)}
-            <button
-              type="button"
-              class="result"
-              class:active={fi === highlighted}
-              role="option"
-              aria-selected={fi === highlighted}
-              draggable="true"
-              ondragstart={(e) => onDragStart(e, r)}
-              onmouseenter={() => (highlighted = fi)}
-              onclick={() => open(r)}
-              title={r.path ?? r.url ?? r.title}
-            >
-              <span class="kind kind-{r.kind}" aria-hidden="true"></span>
-              <span class="name">{r.title}</span>
-              {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
-            </button>
-          {/each}
+
+          {#if g.provider.id === "web"}
+            <!-- Web — a richer, search-engine-style group: an image strip +
+                 cards with thumbnail, source host and snippet. -->
+            {@const imgs = g.results.filter((r) => r.image)}
+            {#if imgs.length}
+              <div class="web-strip">
+                {#each imgs as r, i (i)}
+                  <button type="button" class="web-img" onclick={() => open(r)} title={r.title}>
+                    <img src={r.image} alt="" />
+                  </button>
+                {/each}
+              </div>
+            {/if}
+            {#each g.results as r, i (g.provider.id + (r.url ?? "") + i)}
+              {@const fi = flatIndex(g, i)}
+              <button
+                type="button"
+                class="web-card"
+                class:active={fi === highlighted}
+                role="option"
+                aria-selected={fi === highlighted}
+                onmouseenter={() => (highlighted = fi)}
+                onclick={() => open(r)}
+                title={r.url ?? r.title}
+              >
+                {#if r.image}<img class="web-thumb" src={r.image} alt="" />{/if}
+                <span class="web-tx">
+                  <span class="web-host">{r.host ?? r.url}</span>
+                  <span class="web-title">{r.title}</span>
+                  {#if r.subtitle}<span class="web-snip">{r.subtitle}</span>{/if}
+                </span>
+              </button>
+            {/each}
+          {:else}
+            {#each g.results as r, i (g.provider.id + (r.path ?? r.url ?? "") + i)}
+              {@const fi = flatIndex(g, i)}
+              <button
+                type="button"
+                class="result"
+                class:active={fi === highlighted}
+                role="option"
+                aria-selected={fi === highlighted}
+                draggable="true"
+                ondragstart={(e) => onDragStart(e, r)}
+                onmouseenter={() => (highlighted = fi)}
+                onclick={() => open(r)}
+                title={r.path ?? r.url ?? r.title}
+              >
+                <span class="kind kind-{r.kind}" aria-hidden="true"></span>
+                <span class="name">{r.title}</span>
+                {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
+              </button>
+            {/each}
+          {/if}
         {/each}
       {/if}
     </div>
@@ -473,4 +509,78 @@
     transition: border-color 0.14s, color 0.14s, background 0.14s;
   }
   .ai-q:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface-soft); }
+
+  /* Web — search-engine-style: image strip + thumbnail cards. */
+  .web-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 12px 8px;
+    scrollbar-width: none;
+  }
+  .web-strip::-webkit-scrollbar { display: none; }
+  .web-img {
+    flex: 0 0 auto;
+    width: 84px;
+    height: 60px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    overflow: hidden;
+    background: var(--color-surface-soft);
+    cursor: pointer;
+    transition: border-color 0.14s, transform 0.14s;
+  }
+  .web-img:hover { border-color: var(--color-border-strong); transform: translateY(-1px); }
+  .web-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .web-card {
+    display: flex;
+    gap: 10px;
+    width: calc(100% - 16px);
+    margin: 0 8px 6px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 11px;
+    background: var(--color-surface-soft);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.14s, background 0.14s;
+  }
+  .web-card:hover,
+  .web-card.active { border-color: var(--color-border-strong); background: var(--color-surface); }
+  .web-thumb {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    display: block;
+  }
+  .web-tx { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+  .web-host {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    color: var(--color-fg-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .web-title {
+    font-size: 0.85rem;
+    font-weight: 550;
+    color: var(--color-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .web-snip {
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: var(--color-fg-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 </style>
