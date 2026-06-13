@@ -123,13 +123,21 @@ defmodule Workbooks.BrokeredTools do
   @pip_run ~S"""
   import sys, json, re
   args = sys.argv[1:]
-  if not args:
-      sys.stderr.write("usage: pip-run PACKAGE [-c CODE]\n"); sys.exit(2)
-  pkg = args[0]
-  code = args[2] if len(args) >= 3 and args[1] == "-c" else None
+  pkg = None; code = None; max_pkgs = 100; max_mb = 200
+  i = 0
+  while i < len(args):
+      a = args[i]
+      if a == "-c" and i + 1 < len(args): code = args[i + 1]; i += 2
+      elif a == "--max-pkgs" and i + 1 < len(args): max_pkgs = int(args[i + 1]); i += 2
+      elif a == "--max-mb" and i + 1 < len(args): max_mb = int(args[i + 1]); i += 2
+      elif pkg is None: pkg = a; i += 1
+      else: i += 1
+  if not pkg:
+      sys.stderr.write("usage: pip-run PACKAGE [-c CODE] [--max-pkgs N] [--max-mb N]\n"); sys.exit(2)
   import requests, urllib.error
 
-  installed = {}
+  class _Cap(Exception): pass
+  installed = {}; total = [0]
   def _norm(n): return n.lower().replace("_", "-")
 
   def _meta(name):
@@ -158,11 +166,18 @@ defmodule Workbooks.BrokeredTools do
   def _install(name):
       n = _norm(name)
       if n in installed: return
+      # DoS backstop: a malicious package can't blow up the host with a huge/deep dependency tree.
+      if len(installed) >= max_pkgs:
+          raise _Cap("package cap exceeded (max %d)" % max_pkgs)
       wheel, ver, rd = _meta(name)
       if not wheel:
           sys.stderr.write("skip (no pure-python wheel): %s\n" % name); return
+      blob = requests.get(wheel).content
+      total[0] += len(blob)
+      if total[0] > max_mb * 1024 * 1024:
+          raise _Cap("download byte cap exceeded (max %d MB)" % max_mb)
       path = "/b/%s.whl" % n.replace("-", "_")
-      open(path, "wb").write(requests.get(wheel).content)
+      open(path, "wb").write(blob)
       sys.path.insert(0, path); installed[n] = ver
       for d in _deps(rd):
           _install(d)
@@ -181,6 +196,8 @@ defmodule Workbooks.BrokeredTools do
           __import__(pkg.replace("-", "_"))
           print("import ok:", pkg)
       sys.exit(0)
+  except _Cap as e:
+      print("CAP:", e); sys.exit(4)
   except urllib.error.URLError as e:
       sys.stderr.write("error: %s\n" % e.reason); sys.exit(1)
   except Exception as e:

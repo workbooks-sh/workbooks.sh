@@ -2027,3 +2027,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   denied PRE-DNS (no leak). 20 brokered_tools tests green incl RED-TEAM: pip-run six still installs (registry
   allowed) but a package's urlopen('http://example.com') -> EXFIL_BLOCKED. A malicious package is now confined to
   its registry. NEXT: bound pip-run's dep-tree (max packages + total bytes) for DoS; native-ext via build lane.
+- 2026-06-13 (iter 151): **DoS BACKSTOP — pip-run dependency tree bounded.** A malicious package could declare a
+  huge/deep dependency tree to exhaust the host (many wheels, huge downloads). Added max-package-count +
+  max-total-byte caps to pip-run's resolver (generous defaults: 100 pkgs / 200 MB; overridable via --max-pkgs /
+  --max-mb), raising a _Cap -> exit 4 when exceeded. The `installed` dict already prevents cycles; these bound
+  the breadth + total bytes. 22 brokered_tools tests green incl RED-TEAM: markdown-it-py --max-pkgs 1 -> "CAP:
+  package cap exceeded" exit 4; click --max-mb 0 -> "CAP: ... byte cap" exit 4; normal installs unaffected. The
+  pip reclaim surface is now hardened on BOTH axes: registry-SCOPED (anti-exfil, iter150) + tree-BOUNDED
+  (anti-DoS, iter151). NEXT: native-extension wheels via the in-sandbox build lane (compile the C ext with
+  clang.wasm against the CPython ABI) — the remaining pip-install frontier.

@@ -81,6 +81,26 @@ defmodule Workbooks.BrokeredToolsTest do
     assert out =~ "tarball:" and out =~ "registry.npmjs.org"
   end
 
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "DoS BACKSTOP — pip-run bounds the dependency tree (--max-pkgs cuts off a malicious/huge tree)" do
+    # markdown-it-py needs mdurl (2 packages). --max-pkgs 1 installs the first, then refuses the dep -> CAP,
+    # exit 4. Proves a malicious package can't force unbounded install/download.
+    assert {:ok, out, status} =
+             CommandRegistry.run_status("pip-run", "", ["markdown-it-py", "--max-pkgs", "1"])
+
+    assert status == 4
+    assert out =~ "CAP:" and out =~ "package cap exceeded"
+  end
+
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "DoS BACKSTOP — a tiny byte budget refuses an oversized download" do
+    assert {:ok, out, status} = CommandRegistry.run_status("pip-run", "", ["click", "--max-mb", "0"])
+    assert status == 4
+    assert out =~ "CAP:" and out =~ "byte cap"
+  end
+
   test "pip-run is registered + prints usage on no arg" do
     assert "pip-run" in CommandRegistry.list()
     assert {:ok, _out, status} = CommandRegistry.run_status("pip-run", "", [])
