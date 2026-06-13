@@ -1557,3 +1557,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the networking keystone + all 4 stones are COMPLETE, audited, self-audited, and exhaustively red-team-green;
   the next frontier (build-lanes) is scoped + filed and warrants owner direction to launch. Highest-ROI: the
   JS-host wasm-engine lane (56 items) + raw-TCP brokered inbound (6, networking-adjacent).
+- 2026-06-12 (iter 117): **★ RAW-TCP INBOUND broker — first slice (keystone goal 4 extended past wasi:http).**
+  Per the iter-116 feasibility scope, started the ONE networking-adjacent frontier: brokered raw-TCP INBOUND
+  (the 6 network-as-purpose server items — Redis-class daemons). Built Workbooks.TcpServeBroker: the HOST owns
+  the :gen_tcp listener (the privileged op a guest can't have — guest listeners are denied at socket_addr_
+  check, iter112), accepts each connection, brokers the request BYTES to a handler(binary)->binary (the guest
+  logic), writes back the response. The raw-TCP sibling of the wasi:http app-host (ServeBroker fronted by
+  Bandit). Security cadence mirrored: PER-CLIENT rate (remote IP), REQUEST BYTE CAP (clean close, no unbounded
+  buffer), MID-FLIGHT REVOCATION (revoked serve_id refuses new conns, server keeps listening), audit
+  (:tcp_serve). Binds LOOPBACK by default (host owns exposure). 3 tests green: real TCP round-trip (uppercase
+  handler over a real client connection), byte-cap refusal, revoke->refuse->unrevoke->serve. The handler is a
+  plain fn (mechanism + test seam); NEXT slice wires a real sandboxed wasm guest (via ServeBroker.dispatch)
+  + per-client/flood adversarial tests. So inbound is now host-mediated for BOTH wasi:http AND raw TCP.
