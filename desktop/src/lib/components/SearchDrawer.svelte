@@ -166,7 +166,8 @@
     background: color-mix(in srgb, var(--color-surface) 88%, transparent);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border-right: 1px solid var(--color-border-strong);
+    /* Opens from the RIGHT — border faces the canvas on its left. */
+    border-left: 1px solid var(--color-border-strong);
   }
 
   .search-row {

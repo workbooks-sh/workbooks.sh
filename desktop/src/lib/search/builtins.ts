@@ -11,6 +11,31 @@ import type { SearchProvider, SearchResult } from "./types";
 
 const WORKBOOK_EXT = /\.(html?|org)$/i;
 
+// Preview content (wb-aakl.19) — shown so the "everything search" UI is
+// demonstrable before a nexus/file index exists. Files: a small stand-in set
+// used only when the real index is empty. Web: plausible mock results when no
+// nexus is connected. Both vanish the moment real backends return data.
+const PREVIEW_FILES = [
+  "Reading/Designing Data-Intensive Apps.md",
+  "Design/Brand System.canvas",
+  "Research/Notebook.ipynb",
+  "Research/analysis.py",
+  "Notes/Daily.md",
+  "Roadmap/2026 Plan.org",
+  "Finance/Q3 Forecast.xlsx",
+  "Clients/Acme Proposal.md",
+];
+function mockWeb(q: string): SearchResult[] {
+  const enc = encodeURIComponent(q);
+  const slug = q.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "example";
+  return [
+    { kind: "web", title: `${q} — Wikipedia`, subtitle: `en.wikipedia.org › wiki — overview, history, key concepts.`, url: `https://en.wikipedia.org/wiki/${enc}`, providerId: "web", score: 100 },
+    { kind: "web", title: `${q}: docs & guides`, subtitle: `docs.${slug}.com — get started, API reference, examples.`, url: `https://docs.${slug}.com`, providerId: "web", score: 90 },
+    { kind: "web", title: `Best ${q} tools in 2026`, subtitle: `example.com › blog — a practical roundup with comparisons.`, url: `https://example.com/blog/${slug}`, providerId: "web", score: 80 },
+    { kind: "web", title: `${q} — GitHub`, subtitle: `github.com › search — repositories and discussions.`, url: `https://github.com/search?q=${enc}`, providerId: "web", score: 70 },
+  ];
+}
+
 function fuzzyScore(q: string, name: string, rel: string): number | null {
   const n = name.toLowerCase();
   const r = rel.toLowerCase();
@@ -34,6 +59,19 @@ export const filesProvider: SearchProvider = {
     fileIndex.ensure();
     const q = query.trim().toLowerCase();
     const hits = fileIndex.entries;
+    // Preview: no real index yet → show stand-in files so the UI populates.
+    if (hits.length === 0) {
+      return PREVIEW_FILES.filter((p) => !q || p.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((p, i) => ({
+          kind: WORKBOOK_EXT.test(p) ? "workbook" : "file",
+          title: p.split("/").pop() ?? p,
+          subtitle: p,
+          path: p,
+          providerId: "files",
+          score: 50 - i,
+        }));
+    }
     const ranked = (q
       ? hits
           .map((h) => {
@@ -107,7 +145,7 @@ export const nexusWebProvider: SearchProvider = {
     const q = query.trim();
     if (!q) return [];
     const base = nexus.activeUrl;
-    if (!base) return [];
+    if (!base) return mockWeb(q); // preview until a nexus is connected
     const token = nexus.activeToken;
     try {
       const res = await fetch(`${base}/api/browse/search?q=${encodeURIComponent(q)}`, {

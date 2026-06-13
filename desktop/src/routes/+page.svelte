@@ -624,8 +624,6 @@
 
     {#if chrome.leftPanel === "files"}
       <PackageTreeDrawer />
-    {:else if chrome.leftPanel === "search"}
-      <SearchDrawer onclose={() => chrome.closeLeft()} />
     {/if}
 
     <main class="main" inert={onboarding.active}>
@@ -644,6 +642,12 @@
       </div>
       <TerminalDrawer />
     </main>
+
+    <!-- Search drawer — opens from the RIGHT (the browser "everything"
+         search). Sits right of the canvas, beside the dock. -->
+    {#if chrome.leftPanel === "search"}
+      <SearchDrawer onclose={() => chrome.closeLeft()} />
+    {/if}
 
     <DockHost />
 
