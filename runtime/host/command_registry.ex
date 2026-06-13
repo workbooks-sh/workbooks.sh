@@ -1040,6 +1040,10 @@ defmodule Workbooks.CommandRegistry do
       |> maybe_put(:principal, Map.get(opts, :principal))
       |> maybe_put(:rate, Map.get(opts, :rate))
       |> maybe_put(:max_bytes, Map.get(opts, :max_bytes))
+      # exec orchestration: a registered Python tool may drive brokered commands only if its registration
+      # granted :exec_allow; :commands scopes WHICH commands. Both default to off/none (no ambient exec).
+      |> maybe_put(:exec_allow, Map.get(opts, :exec_allow))
+      |> maybe_put(:commands, Map.get(opts, :commands))
 
     case Workbooks.PyNet.run_tool(script, stdin, args, tool_opts) do
       {:ok, out, status} -> {:ok, maybe_trim(out, ropts), status}

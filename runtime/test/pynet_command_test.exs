@@ -50,6 +50,33 @@ defmodule Workbooks.PyNetCommandTest do
     assert out =~ "BYTES"
   end
 
+  @orch_tool ~S"""
+  import subprocess
+  cp = subprocess.run(["jq", "."], input='{"x":1}', text=True)
+  print("RC", cp.returncode)
+  print("LEN", len(cp.stdout))
+  """
+
+  test "ORCHESTRATOR — a registered :pynet command drives a brokered command ONLY when granted :exec_allow" do
+    # granted: the registration carries :exec_allow + a :commands scope, so the Python tool can run brokered jq.
+    :ok = CommandRegistry.register_pynet("orch-yes", @orch_tool, :argv, %{exec_allow: true, commands: ["jq"]})
+    assert {:ok, out, 0} = CommandRegistry.run_status("orch-yes", "", [])
+    assert out =~ "RC 0"
+    assert out =~ "LEN" and not (out =~ "LEN 0")
+
+    # not granted: same tool, no :exec_allow -> the brokered exec is default-denied (the guest sees rc 1).
+    :ok = CommandRegistry.register_pynet("orch-no", @orch_tool, :argv, %{})
+    assert {:ok, out2, 0} = CommandRegistry.run_status("orch-no", "", [])
+    assert out2 =~ "RC 1"
+  end
+
+  test "ORCHESTRATOR SCOPE — :commands confines which brokered commands a registered tool may run" do
+    # exec granted but the scope excludes jq -> the tool's jq call is denied (command_not_granted), rc 1.
+    :ok = CommandRegistry.register_pynet("orch-scoped", @orch_tool, :argv, %{exec_allow: true, commands: ["grep"]})
+    assert {:ok, out, 0} = CommandRegistry.run_status("orch-scoped", "", [])
+    assert out =~ "RC 1"
+  end
+
   @tag :netdeps
   @tag timeout: 120_000
   test "SCOPE — a per-instance allow-list confines the command (default-deny for off-list hosts)" do

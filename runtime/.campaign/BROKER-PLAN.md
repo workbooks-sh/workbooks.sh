@@ -1903,3 +1903,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   dispatch is the first wedge (Python orchestrators). NEXT: generalize exec-dispatch to the C/clang build lane
   (a libc spawn-shim -> host_exec import, for Make/Ninja built in-sandbox); wire :exec_allow into :pynet
   command registration so reclaimed Python orchestrators register as commands.
+- 2026-06-13 (iter 141): **:pynet commands can ORCHESTRATE brokered commands (exec-dispatch wiring complete).**
+  Wired :exec_allow + :commands from register_pynet's opts through the :pynet dispatch into PyNet.run_tool ->
+  the exec branch. So a REGISTERED Python tool is a first-class brokered orchestrator: it composes brokered NET
+  (urllib/requests) + brokered EXEC (subprocess -> ExecBroker -> CommandRegistry), all under one registration's
+  grants. Default-deny preserved: a :pynet command gets NO exec unless its registration carried :exec_allow;
+  :commands scopes which brokered commands it may drive. 6 pynet_command tests green incl: orch granted ->
+  drives brokered jq (rc 0); orch ungranted -> jq default-denied (rc 1, audit "DENY exec jq — not granted");
+  orch scope -> jq denied when only grep granted. This closes the Python-lane exec-dispatch loop (the build-
+  driver/pipx orchestrator class registers + runs end-to-end). NEXT: generalize exec-dispatch to the C/clang
+  build lane (libc spawn-shim -> host_exec) so Make/Ninja built in-sandbox drive brokered compiles.
