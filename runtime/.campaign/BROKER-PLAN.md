@@ -1755,3 +1755,20 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   wasm-engine for emscripten, mrustc-beyond-1.74 for edition-2024/proc-macros, native-thread/fork models) is a
   SUBSTANTIAL deliberate effort — NOT a bounded loop increment. The bounded networking+broker+recipe work is
   genuinely exhausted; the next major capability needs owner direction on which lane to build.
+- 2026-06-13 (iter 133): **REACHABLE-SECTION TRIAGE + BuildBroker + the Python-lane gap (owner steer: do the
+  reachable).** Triaged all 61 reachable items by ACTUAL build need (not the generic network boilerplate): they
+  are NOT existing-lane grind — they split into package-managers (~18: pip/poetry/conda/cargo/...), network
+  servers (~12: redis/etcd/...), network clients (~10: curl/httpie/wget/...), Node frameworks (~6: vite/...),
+  language-bound (~6). KEY: the reachable items mostly need the SAME new RUNTIME lanes the impossible items do —
+  networking (done) just moved them off the network blocker. The single highest-ROI lane = PYTHON (unblocks
+  pip/poetry/conda/mamba/pixi/pdm/buildout/httpie/yt-dlp/datasette ~10 reachable + impossible Python tools).
+  FINDING: the PYTHON LANE ALREADY EXISTS ('Lane D', pallet.ex) — CPython 3.12 wasm registered + @python_tools
+  catalog (PyYAML/Jinja2/arrow/protobuf/pdf-lib) + tests proving pure-Python tools run in-sandbox (verified
+  green). THE PRECISE GAP for the NETWORK Python tools (pip/httpie/etc.): python tools run via run_wasmtime
+  (wasmtime CLI, NO network), so pure-Python tools work but network ones can't reach the broker. The brokered
+  networking (allow_http -> inherit_network + SSRF socket_addr_check) lives ONLY on the COMPONENT path
+  (component_store_new_wasi); CPython is a core wasip1 module. NEXT SLICE: extend the brokered-network block to
+  the CORE wasip1 path (store_new_wasi) + run CPython through it -> Python network tools get SSRF-safe brokered
+  egress -> flips httpie + the Python network-client class live. Also built Workbooks.BuildBroker (brokered
+  build-from-source: C/Rust source -> sandboxed tool, full cadence default-deny/source-cap/rate/revocation/
+  audit) — 6/6 incl real C+Rust brokered build+run — the build-orchestration lane's reusable foundation.
