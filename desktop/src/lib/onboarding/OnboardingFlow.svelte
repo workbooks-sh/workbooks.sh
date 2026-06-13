@@ -125,9 +125,9 @@
       <div class="body" in:fly={{ x: 16, duration: 200, easing: cubicOut }}>
         {#if step === "welcome"}
           <div class="hero brand">
-            <svg viewBox="0 0 280 206" width="30" height="22" aria-hidden="true" style="display:block">
+            <svg viewBox="0 0 113.444 65.6002" width="30" height="17" aria-hidden="true" style="display:block">
               <path
-                d="M0 206V0.00231123H69.1194V76L126.393 0L168.946 0.00231123V76L223.295 0L280 0.00231147L223.295 88L248.626 176.683C252.823 191.375 241.791 206 226.511 206H116.27L112.626 140.5L41.5 206H0Z"
+                d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z"
                 fill="currentColor"
               />
             </svg>
@@ -143,7 +143,7 @@
           </button>
 
         {:else if step === "theme"}
-          <div class="hero"><PaintBrushBroad size={30} weight="fill" /></div>
+          <div class="hero hue-lavender"><PaintBrushBroad size={28} weight="fill" /></div>
           <h1>Pick a theme</h1>
           <p class="sub">
             Themes are tokens, not skins — workbooks, panels and toolkits
@@ -177,7 +177,7 @@
           </div>
 
         {:else if step === "sidebar"}
-          <div class="hero"><SidebarSimple size={30} weight="fill" /></div>
+          <div class="hero hue-blue"><SidebarSimple size={28} weight="fill" /></div>
           <h1>Your left side</h1>
           <p class="sub">
             How do you want to move around? The canvas and titlebar stay
@@ -215,7 +215,7 @@
           </div>
 
         {:else if step === "search"}
-          <div class="hero"><MagnifyingGlass size={30} weight="fill" /></div>
+          <div class="hero hue-peach"><MagnifyingGlass size={28} weight="fill" /></div>
           <h1>How should search answer?</h1>
           <p class="sub">One choice. Everything else has good defaults.</p>
           <div class="choice-row">
@@ -245,7 +245,7 @@
           </p>
 
         {:else}
-          <div class="hero waldo"><WaldoMark size={26} /></div>
+          <div class="hero hue-green"><WaldoMark size={24} /></div>
           <h1>Wire up your agent</h1>
           <p class="sub">
             Everything you just picked — and everything you didn't — is
@@ -371,11 +371,11 @@
       transform 0.15s;
   }
   .dot.on {
-    background: var(--color-brand);
-    transform: scale(1.25);
+    background: var(--color-chip-green);
+    transform: scale(1.3);
   }
   .dot.past {
-    background: var(--color-brand-soft);
+    background: color-mix(in srgb, var(--color-chip-green) 50%, transparent);
   }
 
   .body {
@@ -392,21 +392,19 @@
     width: 56px;
     height: 56px;
     border-radius: 16px;
-    background: var(--color-brand-soft);
-    color: var(--color-brand);
   }
-  /* Welcome: the workbooks W mark on ink (the brand chip). */
+  /* Welcome: the workbooks lander mark on the ink brand chip. */
   .hero.brand {
     background: var(--color-fg);
     color: var(--color-page);
     box-shadow: var(--shadow-pop);
   }
-  /* Agent: the Waldo wordmark, ink on paper-ish chip. */
-  .hero.waldo {
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-    border: 1px solid var(--color-border);
-  }
+  /* Step heroes — a soft pastel chip per step with a dark (ink) glyph, the
+   * same pastel idiom as the sidebar. Pastels, never lime green. */
+  .hero.hue-lavender { background: var(--color-chip-lavender); color: #121316; }
+  .hero.hue-blue { background: var(--color-chip-blue); color: #121316; }
+  .hero.hue-peach { background: var(--color-chip-peach); color: #121316; }
+  .hero.hue-green { background: var(--color-chip-green); color: #121316; }
   h1 {
     margin: 0;
     font-size: 1.3rem;
@@ -455,8 +453,8 @@
     transform: translateY(-2px);
   }
   .choice.sel {
-    border-color: var(--color-brand);
-    box-shadow: 0 0 0 1px var(--color-brand);
+    border-color: var(--color-chip-green);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chip-green) 55%, transparent);
   }
   .swatch {
     width: 100%;
@@ -470,7 +468,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--color-brand);
+    background: var(--color-chip-green);
   }
 
   /* layout wireframes */
@@ -507,7 +505,7 @@
     background: var(--color-border-strong);
   }
   .wire-nav span:first-child {
-    background: var(--color-brand);
+    background: var(--color-chip-green);
     opacity: 0.7;
   }
   .wire-main {
@@ -523,8 +521,8 @@
   .wire-ai {
     height: 20px;
     border-radius: 3px;
-    background: var(--color-brand-soft);
-    border: 1px solid var(--color-brand);
+    background: color-mix(in srgb, var(--color-chip-green) 35%, transparent);
+    border: 1px solid var(--color-chip-green);
   }
   .wire-link {
     height: 8px;
@@ -592,7 +590,7 @@
     color: var(--color-fg-subtle);
   }
   .hint-caret {
-    color: var(--color-brand);
+    color: var(--color-chip-green);
   }
   .nav {
     display: flex;
