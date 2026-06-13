@@ -384,6 +384,12 @@ defmodule Workbooks.BrokerNetE2ETest do
     assert probe.("127.0.0.1:22") =~ "ERR"
     assert probe.("169.254.169.254:80") =~ "ERR"
 
+    # DNS-BASED SSRF on the raw-socket path: an UNSCOPED guest may use a HOSTNAME (name lookup enabled), and a
+    # public hostname resolves+connects — but a hostname that RESOLVES to an internal target is blocked, because
+    # socket_addr_check vets the POST-resolution address (no rebind window: it sees the actual connect IP).
+    assert probe.("example.com:80") =~ "OK"
+    assert probe.("localhost:80") =~ "ERR"
+
     # SCOPED allow-list on the raw-socket path (IP-based): a guest scoped to ["1.1.1.1"] may reach it but
     # NOT another public host (8.8.8.8, which passes the SSRF floor) — default-deny per-instance scope.
     {:ok, scoped} =

@@ -1513,3 +1513,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   "listen:8080" (TcpListener::bind to a specific port) is now DENIED (no LISTENING surface). So the standard
   wasi:sockets generalization is complete AND secure on BOTH axes: egress is SSRF+scope+rate brokered, and the
   guest cannot open an unmediated inbound listener — inbound stays exclusively on the brokered serve path.
+- 2026-06-12 (iter 113): **DNS-based SSRF on the standard wasi:sockets path — adversarially proven defended.**
+  Prior socket tests used only IP literals; the HOSTNAME path (a guest using TcpStream::connect("host:port")
+  where wasi does the name lookup) was untested — a named red-team vector (hostname/DNS-rebinding). Added: an
+  UNSCOPED guest connecting to a public hostname (example.com:80) WORKS (name lookup -> public IP -> connect),
+  while a hostname RESOLVING to internal (localhost:80 -> 127.0.0.1) is BLOCKED, because socket_addr_check
+  vets the POST-resolution address (it sees the actual connect IP, so there's no rebind window on the raw-
+  socket path). Green. Standard wasi:sockets red-team coverage is now comprehensive: IP-literal egress (public
+  ok / internal blocked), DNS-based SSRF (public host ok / internal host blocked), DNS-exfil (IP-scoped guest
+  can't resolve), per-instance allow-list scope, UDP client (DNS ok / internal blocked), ephemeral-bind-ok /
+  listener-bind-denied. Every standard-tool socket vector the keystone names is now tested + green.
