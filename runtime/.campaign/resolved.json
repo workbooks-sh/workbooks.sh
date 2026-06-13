@@ -2529,12 +2529,12 @@
   },
   "rayon": {
    "capability": "data-parallel Rust (rayon-core work-stealing) in-sandbox",
-   "status": "proven",
-   "proof": "rayon-core 1.12.1 + full dep tree (crossbeam-utils/epoch/deque, either) compile through the threads lane + link to a runnable wasm with real wasi:thread-spawn + shared memory (NOT serial fallback)",
-   "blocker": "ONE codegen gap: mrustc C backend does not lower wasm futex intrinsics llvm.wasm.memory.atomic.wait32/notify (codegen_c.cpp:2842 catch-all aborts) -> rayon Condvar/LockLatch worker-park traps at runtime",
-   "fix": "~6-line codegen_c.cpp patch lowering wait32/notify(/wait64) to __builtin_wasm_memory_atomic_* (clang compiles them, verified) + rebuild mrustc + re-run threads-libstd prebuild + wire deps into compile_rust_threads. SAME patch site unblocks the ~40 llvm.wasm.* SIMD intrinsics. CROSSES the no-mrustc-fork stance (first true mrustc-binary patch).",
+   "status": "live",
+   "proof": "rayon_core::join + ThreadPoolBuilder(4) recursive sum 0..1_000_000 = 499999500000, current_num_threads()==4, real wasi:thread-spawn + shared memory. test/rust_rayon_lane_test.exs green (independently re-verified, 49.5s). 5 regression tests (threads/simd/single-thread Rust) green \u2014 no regressions.",
    "caveat": "top-level rayon par_iter sugar does NOT compile (mrustc trait-resolution ceiling); productize against rayon-core join/scope/ThreadPool API",
-   "since": "iter160"
+   "since": "iter160",
+   "wiring": "COMPLETE \u2014 mrustc codegen_c.cpp patched (futex wait32/wait64/notify + ~30 llvm.wasm.* SIMD intrinsics lowered to __builtin_wasm_*; was Extern-LLVM abort) reproducibly via compilers/rust/mrustc-patch/ (idempotent apply script + reference) wired into provision-rust.sh; rebuilt mrustc + threads libstd; compile_rust_threads dep-lane wired (deps build into output-wasi-174-threads/deps with --cfg target_feature=atomics)",
+   "no_fork_note": "First deliberate mrustc-SOURCE patch (user-authorized) \u2014 surgical (one intrinsic-lowering block) + reproducible via provision, NOT a divergent fork. The standing no-mrustc-fork stance is relaxed for this kind of upstreamable codegen-completeness patch."
   },
   "duckdb": {
    "capability": "DuckDB SQL engine from C++ source -> wasm",
@@ -2544,6 +2544,13 @@
    "recipe": "DuckDB v1.1.3; python3 scripts/amalgamation.py --splits=64 --no-linenumbers; 3 source patches (single-thread Semaphore shim \u2014 NOT -DDUCKDB_NO_THREADS which dup-defines; excise cpp-httplib ~9376 lines from duckdb-internal.hpp; InstallFromHttpUrl throws); -D_WASI_EMULATED_MMAN -DDUCKDB_AMALGAMATION -DNDEBUG. Full recipe: forge-runs/duckdb-recipe.md",
    "to_live": "run the full 70-TU build at low concurrency + link + run the SELECT (characterized: RAM/time only, no toolchain wall) -> productize as a post-amalgamation patch recipe under compilers/",
    "validates": "the C++ exceptions keystone (build_c_dir EH) on a real large C++ codebase",
+   "since": "iter160"
+  },
+  "wasm_simd_intrinsics": {
+   "capability": "wasm SIMD intrinsics (llvm.wasm.* \u2014 bitmask/swizzle/narrow/relaxed/etc.) in the Rust lane",
+   "status": "proven",
+   "proof": "~30 llvm.wasm.* SIMD intrinsics now LOWERED in mrustc codegen (same codegen_c.cpp patch as the rayon futex) instead of the Extern-LLVM abort \u2014 the ~40-intrinsic wall the CFG sweep found is largely cleared",
+   "caveat": "codegen-unblocked + the patch compiles; a dedicated runtime proof per-intrinsic (e.g. i8x16_bitmask) is the remaining TBD",
    "since": "iter160"
   }
  },

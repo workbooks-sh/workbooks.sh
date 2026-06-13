@@ -14,6 +14,12 @@ if [ ! -f "$COMPILERS/clang/clang-root/llvm.core.wasm" ]; then
   say "building clang.wasm lane"; bash "$COMPILERS/clang/build.sh" >&2
 else say "clang.wasm present — skip"; fi
 
+# 1b. mrustc C-backend patch: lower the `llvm.wasm.*` intrinsics (rayon futex park/wake + wasm
+#     SIMD) that mrustc's codegen_c.cpp otherwise aborts on. Idempotent; MUST run before ANY
+#     mrustc compile (both mrustc.wasm via build.sh AND the native make below).
+say "applying mrustc codegen patch (wasm futex + SIMD intrinsics)"
+python3 "$SD/mrustc-patch/apply-mrustc-codegen-patch.py" "$MR/src/trans/codegen_c.cpp" >&2
+
 # 2. mrustc.wasm (no_std) + std-patched mrustc_std.wasm (the -O1 build; -O0 is broken)
 if [ ! -f "$SD/mrustc-root/mrustc_std.wasm" ]; then
   say "building mrustc.wasm + applying std patch + mrustc_std.wasm"

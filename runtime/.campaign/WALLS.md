@@ -100,9 +100,14 @@ Members:
   user-code C compile (mrustc lowers Rust SIMD intrinsics to scalar C, so autovec — not `--cfg` — is the
   path; `-O2` required). Proven: saxpy 0→12 v128 ops, test green.
 - **The `--cfg` lever is NOT universal** (proven): it unlocks ONLY threads/atomics. edition-2024 is a
-  PARSER ceiling (mrustc crashes on `gen` blocks), proc-macros are a separate mechanism, and ~40
-  `llvm.wasm.*` SIMD intrinsics abort in mrustc codegen — none are `--cfg`-fixable. Stop hoping it reaches
-  them; autovectorization is the SIMD mitigation.
+  PARSER ceiling (mrustc crashes on `gen` blocks), proc-macros are a separate mechanism.
+- **rayon (rayon-core) → LIVE** + **the `llvm.wasm.*` intrinsic wall cleared**: a surgical, user-authorized
+  mrustc-SOURCE patch (`codegen_c.cpp`) lowers the wasm futex intrinsics (`memory.atomic.wait32/wait64/
+  notify`) + ~30 SIMD intrinsics to `__builtin_wasm_*` instead of aborting. rayon_core::join on 4 threads =
+  499999500000 (test green). Reproducible via `compilers/rust/mrustc-patch/` (apply script wired into
+  provision). This is the FIRST deliberate mrustc-source patch — surgical + reproducible, NOT a divergent
+  fork; the "no mrustc fork" stance is relaxed for upstreamable codegen-completeness patches. (Top-level
+  `rayon` par_iter sugar still blocked — mrustc trait-resolution ceiling; use rayon-core's join/scope.)
 - ~~no EH-enabled libc++ → C++ exceptions~~ → **PROVEN 2026-06-13** (from-source EH runtime via our
   clang.wasm: llvmorg-22.1.0 libcxxabi/libunwind built `-fwasm-exceptions -mllvm
   -wasm-use-legacy-eh=false` → `libc++abi-eh.a`+`libunwind-eh.a`; throwing C++ catches with full

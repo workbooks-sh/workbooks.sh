@@ -829,62 +829,86 @@ defmodule Workbooks.Compilers do
       )
     end
 
-    # transpile .rs → C against the THREADS libstd, with the atomics-cfg bypass so mrustc emits
-    # shared-memory-aware code paths (and selects the threads std cfg the HIR was built with).
-    user_args =
-      ["#{@threads_o}/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
-       "-L", @threads_o, "--out-dir", @threads_o, "--target", "wasm32-wasi",
-       "--edition", "2021", "--cfg", "target_feature=atomics"]
+    # wb-rayon: crates.io deps on the THREADS lane (rayon-core et al). Same dep machinery as the base
+    # lane, driven by threads_deps_ctx → output-wasi-174-threads/deps + @rust_threads_clang_flags +
+    # `--cfg target_feature=atomics`. Pure-Rust/build.rs only (rayon-core's tree: either + crossbeam-*
+    # — no proc-macros), so no pm-server routing here. Fresh deps/ per build (mirrors base lane wb-mrz).
+    File.rm_rf(Path.join(o, "deps"))
 
-    log1 = mr.(user_args)
+    case ensure_deps(
+           Keyword.get(opts, :deps, []),
+           mrdir,
+           o,
+           mr,
+           cl,
+           Keyword.get(opts, :dep_features, %{}),
+           threads_deps_ctx()
+         ) do
+      {:error, _} = depserr ->
+        for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+        depserr
 
-    # shared shim + unwind-stub objects, built for the THREADS target (wasm32-wasi-threads) so they
-    # link against the same shared-memory libc. ustub.o supplies the _Unwind_Resume stub (panic=abort).
-    ensure_rust_threads_obj(o, "wasi_shim", shim_src, cl)
-    ensure_rust_threads_obj(o, "ustub", ustub_src, cl)
+      {:ok, extern_args, _dep_objs} ->
+        all_dep_objs = Path.wildcard(Path.join(o, "deps/*.rlib.o"))
 
-    result =
-      if File.regular?(Path.join(o, "#{name}.c")) do
-        cl.(["clang"] ++ @rust_threads_clang_flags ++
-              ["-c", "/work/#{@threads_o}/#{name}.c", "-o", "/work/#{@threads_o}/#{name}.o"])
+        dep_obj_args =
+          all_dep_objs |> Enum.sort() |> Enum.map(&"/work/#{@threads_o}/deps/#{Path.basename(&1)}")
 
-        if File.regular?(Path.join(o, "#{name}.o")) do
-          libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/#{@threads_o}/#{Path.basename(&1)}")
+        ldirs = if all_dep_objs == [], do: [], else: ["-L", "#{@threads_o}/deps"]
 
-          # Link mirrors the C threads lane (compile_threads): shared imported/exported memory +
-          # -lpthread against the wasm32-wasi-threads sysroot. crt1.o (the threads crt provides the
-          # thread-spawn-aware _start + TLS init), threads libc, builtins from wasm32-unknown-wasip1.
-          ld =
-            ["wasm-ld", "-m", "wasm32",
-             "--shared-memory", "--import-memory", "--export-memory", "--max-memory=#{max_mem}",
-             "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasi-threads",
-             "/usr/lib/wasm32-wasi-threads/crt1.o", "/work/#{@threads_o}/#{name}.o"] ++
-              libstd ++
-              ["/work/#{@threads_o}/wasi_shim.o", "/work/#{@threads_o}/ustub.o",
-               "-lc", "-lpthread", "-lsetjmp",
-               "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
-               "-o", "/work/#{@threads_o}/#{name}.wasm"]
+        # transpile .rs → C against the THREADS libstd, with the atomics-cfg bypass so mrustc emits
+        # shared-memory-aware code paths (and selects the threads std cfg the HIR was built with).
+        user_args =
+          ["#{@threads_o}/#{name}.rs", "--crate-name", name, "--crate-type", "bin", "-L", @threads_o] ++
+            ldirs ++
+            extern_args ++
+            ["--out-dir", @threads_o, "--target", "wasm32-wasi", "--edition", "2021", "--cfg", "target_feature=atomics"]
 
-          log2 = cl.(ld)
-          outw = Path.join(o, "#{name}.wasm")
+        log1 = mr.(user_args)
 
-          if File.regular?(outw) do
-            dest = Path.join(System.tmp_dir!(), "wbrust-threads-#{id}.wasm")
-            File.cp!(outw, dest)
-            {:ok, dest, {log1, log2}}
+        # shared shim + unwind-stub objects, built for the THREADS target (wasm32-wasi-threads) so they
+        # link against the same shared-memory libc. ustub.o supplies the _Unwind_Resume stub (panic=abort).
+        ensure_rust_threads_obj(o, "wasi_shim", shim_src, cl)
+        ensure_rust_threads_obj(o, "ustub", ustub_src, cl)
+
+        result =
+          if File.regular?(Path.join(o, "#{name}.c")) do
+            cl.(["clang"] ++ @rust_threads_clang_flags ++ ["-c", "/work/#{@threads_o}/#{name}.c", "-o", "/work/#{@threads_o}/#{name}.o"])
+
+            if File.regular?(Path.join(o, "#{name}.o")) do
+              libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/#{@threads_o}/#{Path.basename(&1)}")
+
+              # Link mirrors the C threads lane (compile_threads): shared imported/exported memory +
+              # -lpthread against the wasm32-wasi-threads sysroot. crt1.o (the threads crt provides the
+              # thread-spawn-aware _start + TLS init), threads libc, builtins from wasm32-unknown-wasip1.
+              # dep_obj_args carries the compiled crates.io dependency objects (rayon-core et al).
+              ld =
+                ["wasm-ld", "-m", "wasm32", "--shared-memory", "--import-memory", "--export-memory", "--max-memory=#{max_mem}", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasi-threads", "/usr/lib/wasm32-wasi-threads/crt1.o", "/work/#{@threads_o}/#{name}.o"] ++
+                  dep_obj_args ++
+                  libstd ++
+                  ["/work/#{@threads_o}/wasi_shim.o", "/work/#{@threads_o}/ustub.o", "-lc", "-lpthread", "-lsetjmp", "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a", "-o", "/work/#{@threads_o}/#{name}.wasm"]
+
+              log2 = cl.(ld)
+              outw = Path.join(o, "#{name}.wasm")
+
+              if File.regular?(outw) do
+                dest = Path.join(System.tmp_dir!(), "wbrust-threads-#{id}.wasm")
+                File.cp!(outw, dest)
+                {:ok, dest, {log1, log2}}
+              else
+                {:error, {:link_failed, log2}}
+              end
+            else
+              {:error, {:cc_failed, log1}}
+            end
           else
-            {:error, {:link_failed, log2}}
+            {:error, {:rustc_failed, log1}}
           end
-        else
-          {:error, {:cc_failed, log1}}
-        end
-      else
-        {:error, {:rustc_failed, log1}}
-      end
 
-    for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
-    File.rm(Path.join(o, "lib#{name}.rlib"))
-    result
+        for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+        File.rm(Path.join(o, "lib#{name}.rlib"))
+        result
+    end
   end
 
   # ── crates.io dependency support (wb-3s8 / wb-6lh) ──────────────────────────
@@ -892,15 +916,28 @@ defmodule Workbooks.Compilers do
   # CDN, compiled (with its default features) via mrustc.wasm→clang.wasm into output-wasi-174/deps/,
   # cached by name+version. Returns {:ok, extern_args, dep_object_guest_paths} | {:error, _}.
   # Pure-Rust only (no proc-macros / build.rs / transitive deps yet — the next slices).
-  defp ensure_deps([], _mrdir, _o, _mr, _cl, _feats), do: {:ok, [], []}
+  # wb-rayon: deps-lane CONTEXT — lets the SAME dep machinery target either the base lane
+  # (output-wasi-174 + @rust_clang_flags) or the THREADS lane (output-wasi-174-threads +
+  # @rust_threads_clang_flags + `--cfg target_feature=atomics`), instead of forking the recursion.
+  #   :o_rel       — the lane's output dir relative to mrdir (the guest /work root)
+  #   :clang_flags — the clang .c→.o flags for this lane
+  #   :cfgs        — extra mrustc `--cfg` args every crate in the lane is transpiled with
+  defp base_deps_ctx, do: %{o_rel: "output-wasi-174", clang_flags: @rust_clang_flags, cfgs: []}
 
-  defp ensure_deps(deps, mrdir, o, mr, cl, feats) do
+  defp threads_deps_ctx,
+    do: %{o_rel: @threads_o, clang_flags: @rust_threads_clang_flags, cfgs: ["--cfg", "target_feature=atomics"]}
+
+  defp ensure_deps(deps, mrdir, o, mr, cl, feats, ctx \\ nil)
+  defp ensure_deps([], _mrdir, _o, _mr, _cl, _feats, _ctx), do: {:ok, [], []}
+
+  defp ensure_deps(deps, mrdir, o, mr, cl, feats, ctx0) do
+    ctx = ctx0 || base_deps_ctx()
     File.mkdir_p!(Path.join(o, "deps"))
 
     Enum.reduce_while(deps, {:ok, [], []}, fn dep, {:ok, externs, objs} ->
       {name, version} = parse_dep(dep)
 
-      case compile_dep(name, version, mrdir, o, mr, cl, feats, true, false) do
+      case compile_dep(name, version, mrdir, o, mr, cl, feats, true, false, ctx) do
         {:ok, rlib_rel, obj_guest, dep_objs} ->
           {:cont, {:ok, externs ++ ["--extern", "#{crate_id(name)}=#{rlib_rel}"], objs ++ [obj_guest | dep_objs]}}
 
@@ -972,10 +1009,10 @@ defmodule Workbooks.Compilers do
   # the WHOLE proc-macro subtree (serde_derive → syn/quote/proc-macro2/unicode-ident) compiles with
   # a target_os-spoofed spec — syn gates parse_macro_input on not(wasm32+wasi), so building it for
   # os=wasi excludes the macro. See build_dep_version (wb-vqx / wb-zq4 gap #1).
-  defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?, pm_ctx?) do
-    rlib_rel = "output-wasi-174/deps/lib#{name}.rlib"
+  defp compile_dep(name, req, mrdir, o, mr, cl, feats, top?, pm_ctx?, ctx) do
+    rlib_rel = "#{ctx.o_rel}/deps/lib#{name}.rlib"
     obj_host = Path.join(o, "deps/lib#{name}.rlib.o")
-    obj_guest = "/work/output-wasi-174/deps/lib#{name}.rlib.o"
+    obj_guest = "/work/#{ctx.o_rel}/deps/lib#{name}.rlib.o"
 
     if File.regular?(obj_host) do
       {:ok, rlib_rel, obj_guest, []}
@@ -1005,7 +1042,7 @@ defmodule Workbooks.Compilers do
           Enum.reduce_while(modes, {:error, []}, fn mode, {:error, tried} ->
             inner =
               Enum.reduce_while(candidates, {:error, tried}, fn {version, subdeps}, {:error, tr} ->
-                case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?) do
+                case build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?, ctx) do
                   {:ok, _, _, _} = ok -> {:halt, ok}
                   {:error, _} -> (clean_dep_artifacts(o, name); {:cont, {:error, [version | tr]}})
                 end
@@ -1027,17 +1064,17 @@ defmodule Workbooks.Compilers do
 
   # Build a SPECIFIC version of a dep under a feature MODE: compile sub-deps first, then it.
   # mode: {:override, feats} verbatim | :full (default features only) | :reduce (no_std variants).
-  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?) do
+  defp build_dep_version(name, version, subdeps, rlib_rel, obj_host, obj_guest, mrdir, o, mr, cl, feats, mode, pm_ctx?, ctx) do
     with {:ok, lib_rs, def_features, edition, pm?} <- fetch_crate(name, version, Path.join(o, "deps")),
          # wb-vqx: once we know THIS crate is a proc-macro (pm?), its whole sub-tree must be spoofed
          # too (syn is a sub-dep, not itself a proc-macro crate, yet it carries parse_macro_input).
          spoof? = pm_ctx? or pm?,
-         {:ok, sub_externs0, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats, spoof?) do
+         {:ok, sub_externs0, sub_objs} <- build_subdeps(subdeps, mrdir, o, mr, cl, feats, spoof?, ctx) do
       rel_src = Path.relative_to(lib_rs, mrdir)
       cdst = Path.join(o, "deps/lib#{name}.rlib.c")
       # wb-zq4: proc-macro crate → wire the compiler `proc_macro` crate from the std chain.
       sub_externs =
-        if pm?, do: sub_externs0 ++ ["--extern", "proc_macro=output-wasi-174/libproc_macro.rlib"], else: sub_externs0
+        if pm?, do: sub_externs0 ++ ["--extern", "proc_macro=#{ctx.o_rel}/libproc_macro.rlib"], else: sub_externs0
 
       # wb-vqx (wb-zq4 gap #1): proc-macro subtree compiles against a target_os-spoofed spec so
       # syn's `not(all(wasm32, os in (unknown,wasi)))` guard PASSES and parse_macro_input surfaces.
@@ -1096,8 +1133,8 @@ defmodule Workbooks.Compilers do
               File.rm(cdst)
 
               mr.([rel_src, "--crate-name", crate_id(name), "--crate-type", dep_crate_type, "-o", rlib_rel,
-                   "-L", "output-wasi-174", "-L", "output-wasi-174/deps"] ++ sub_externs ++
-                  ["--out-dir", "output-wasi-174/deps", "--target", dep_target, "--edition", ed] ++ cfgs)
+                   "-L", ctx.o_rel, "-L", "#{ctx.o_rel}/deps"] ++ sub_externs ++
+                  ["--out-dir", "#{ctx.o_rel}/deps", "--target", dep_target, "--edition", ed] ++ cfgs ++ ctx.cfgs)
 
               if File.regular?(cdst), do: {:halt, true}, else: {:cont, false}
             end)
@@ -1106,7 +1143,7 @@ defmodule Workbooks.Compilers do
         end)
 
       if compiled? do
-        cl.(["clang"] ++ @rust_clang_flags ++ ["-c", "/work/output-wasi-174/deps/lib#{name}.rlib.c", "-o", obj_guest])
+        cl.(["clang"] ++ ctx.clang_flags ++ ["-c", "/work/#{ctx.o_rel}/deps/lib#{name}.rlib.c", "-o", obj_guest])
         if File.regular?(obj_host) do
           # wb-v3d: drop marker files so the post-ensure_deps pass can route proc-macros without
           # threading pm-state through the whole dep recursion. `.pmonly` = this object is in a
@@ -1131,9 +1168,9 @@ defmodule Workbooks.Compilers do
     end
   end
 
-  defp build_subdeps(subdeps, mrdir, o, mr, cl, feats, pm_ctx?) do
+  defp build_subdeps(subdeps, mrdir, o, mr, cl, feats, pm_ctx?, ctx) do
     Enum.reduce_while(subdeps, {:ok, [], []}, fn {sn, sreq}, {:ok, ex, objs} ->
-      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats, false, pm_ctx?) do
+      case compile_dep(sn, sreq, mrdir, o, mr, cl, feats, false, pm_ctx?, ctx) do
         {:ok, srlib, sobj, sub_objs} -> {:cont, {:ok, ex ++ ["--extern", "#{crate_id(sn)}=#{srlib}"], objs ++ [sobj | sub_objs]}}
         {:error, _} = e -> {:halt, e}
       end
@@ -1622,7 +1659,13 @@ defmodule Workbooks.Compilers do
 
     unless File.regular?(obj) do
       File.cp!(src, Path.join(o, "#{name}.c"))
-      cl.(["clang", "--target=wasm32-wasi-threads", "--sysroot=/usr", "-pthread", "-matomics",
+      # wasi_shim.c includes <wasi/wasip1.h>, which the clang sysroot ships ONLY under the
+      # wasm32-wasip1 target include dir — the wasm32-wasi-threads target dir has wasip2.h, not
+      # wasip1.h. The wasi API decls are target-agnostic, so add the wasip1 include explicitly (the
+      # base lane gets it implicitly via --target=wasm32-wasip1). Without it a cold (FORCE-cleared)
+      # threads dir fails to build the shim → link error "cannot open …/wasi_shim.o".
+      cl.(["clang", "--target=wasm32-wasi-threads", "--sysroot=/usr",
+           "-I/usr/include/wasm32-wasip1", "-pthread", "-matomics",
            "-mbulk-memory", "-O1", "-w",
            "-c", "/work/#{@threads_o}/#{name}.c", "-o", "/work/#{@threads_o}/#{name}.o"])
     end
