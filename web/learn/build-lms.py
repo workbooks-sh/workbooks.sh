@@ -1,17 +1,97 @@
-<!doctype html>
+#!/usr/bin/env python3
+"""Build the Learning Center — a real course interface (Kajabi-style), not blog
+posts. Generates from lms.json + content/<slug>.html:
+  /learn/index.html        the course dashboard (overview + start/continue)
+  /learn/<slug>.html       the lesson player (curriculum sidebar + lesson pane)
+Progress lives in the browser (localStorage); no backend. Re-run after edits.
+"""
+import json, os, html
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+lms = json.load(open(os.path.join(HERE, "lms.json")))
+units = lms["units"]
+
+# flat ordered list with unit context + prev/next
+flat = []
+for u in units:
+    for l in u["lessons"]:
+        flat.append({**l, "unit": u["n"], "unit_title": u["title"]})
+for i, l in enumerate(flat):
+    l["i"] = i
+    l["prev"] = flat[i-1] if i > 0 else None
+    l["next"] = flat[i+1] if i < len(flat)-1 else None
+TOTAL = len(flat)
+LIVE = sum(1 for l in flat if l["status"] == "live")
+
+# doc metadata for the go-deeper box (titles from the catalog)
+cat = json.load(open(os.path.join(HERE, "lessons.json")))
+doc_title = {}
+for t in cat["tiers"]:
+    for cl in t["lessons"]:
+        doc_title[cl["slug"]] = cl.get("title", cl["slug"])
+        for s in cl.get("sublessons", []):
+            doc_title[s["slug"]] = s.get("title", s["slug"])
+
+def esc(s): return html.escape(s or "")
+
+WORDMARK = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true">'
+  '<path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43'
+  '0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717'
+  '-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022'
+  '0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452'
+  '-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683'
+  '-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866'
+  '0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915'
+  '1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>')
+
+def sidebar(cur_slug=None):
+    out = ['<aside class="side" id="side">',
+           '<a class="brand" href="/">%s<span>Workbooks</span></a>' % WORDMARK,
+           '<a class="overview" href="/learn">Course overview</a>',
+           '<div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of %d complete</span></div>' % TOTAL,
+           '<nav class="curr" id="curr">']
+    for u in units:
+        out.append('<div class="umod"><div class="uhd"><span class="un">Unit %d</span>%s</div>'
+                   % (u["n"], esc(u["title"])))
+        for l in u["lessons"]:
+            cls = "li" + (" cur" if l["slug"] == cur_slug else "")
+            out.append('<a class="%s" data-slug="%s" href="/learn/%s">'
+                       '<span class="dot"></span><span class="t">%s</span></a>'
+                       % (cls, l["slug"], esc(l["slug"]), esc(l["title"])))
+        out.append('</div>')
+    out.append('</nav></aside>')
+    return "".join(out)
+
+HEAD = """<!doctype html>
 <html lang="en" style="--pc:#a8d4f0;">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Learning Center — Workbooks</title>
-<meta name="description" content="Learn Workbooks from zero — 20 plain-language lessons, no technical background needed.">
+<title>{title}</title>
+<meta name="description" content="{desc}">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta property="og:type" content="website"><meta property="og:site_name" content="Workbooks · Learning Center">
-<meta property="og:title" content="Learning Center — Workbooks"><meta property="og:description" content="Learn Workbooks from zero — 20 plain-language lessons, no technical background needed.">
-<meta property="og:url" content="https://workbooks.sh/learn">
-<style>
+<meta property="og:type" content="{ogtype}"><meta property="og:site_name" content="Workbooks · Learning Center">
+<meta property="og:title" content="{title}"><meta property="og:description" content="{desc}">
+<meta property="og:url" content="{url}">
+<style>{css}</style>
+</head>
+<body class="{bodycls}">
+{topbar}
+<div class="app">
+{sidebar}
+<main class="pane">
+{main}
+</main>
+</div>
+<div class="scrim" id="scrim"></div>
+<script>{js}</script>
+</body>
+</html>
+"""
+
+CSS = """
 :root{ --paper:#f7f6f1; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68; --line:#e7e5db; --pc:#a8d4f0;
   --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
@@ -152,23 +232,14 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   .dhero{ padding-top:30px; } .dunits{ padding-bottom:80px; }
   .foot{ flex-wrap:wrap; } .foot .cont{ margin-left:0; width:100%; justify-content:center; }
 }
-</style>
-</head>
-<body class="dashpage">
-<header class="topbar"><button class="burger" id="burger" aria-label="Curriculum"><span></span><span></span><span></span></button><span class="tt">Learning Center</span><span class="tp">Learning Center · <b id="tprog">0%</b></span></header>
-<div class="app">
+"""
 
-<main class="pane">
-<div class="dash"><header class="dhero"><div class="kick">learn workbooks from zero</div><h1><span>Learning</span> <span class="bub">CENTER</span></h1><p class="dek">No technical background needed. 20 deep, plain-language lessons in order — each a single big idea, with the technical docs one click away.</p><div class="cta"><a class="start" id="startbtn" href="/learn/the-one-file">Start the course →</a><span class="dprog" id="dprog">20 lessons</span></div></header><div class="dunits"><div class="dunit"><div class="duh"><span class="un">Unit 1</span><h2>Foundations</h2><p>What the whole thing is made of — before any of the moving parts.</p></div><div class="dsteps"><a class="dstep" data-slug="the-one-file" href="/learn/the-one-file"><span class="dot"></span><span class="lt"><b>A workbook is one file you can hold</b><i>The core idea: a whole piece of software — its screen, its logic, its data, its history — living inside a single file you can email, the way you&#x27;d email a photo.</i></span><span class="go">→</span></a><div class="dstep soon" data-slug="carries-its-story"><span class="dot"></span><span class="lt"><b>The file that remembers how it was made</b><i>How one file can carry its own source, its own identity, and a complete record of every change — so it explains itself and proves where it came from.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="the-one-language"><span class="dot"></span><span class="lt"><b>The plain language underneath everything</b><i>Why everything in a workbook — text, structure, tasks, dates, data — is written in one simple, human-readable format you could read over someone&#x27;s shoulder.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 2</span><h2>Making things</h2><p>How a workbook gets real abilities, and how you drive it.</p></div><div class="dsteps"><div class="dstep soon" data-slug="giving-it-abilities"><span class="dot"></span><span class="lt"><b>Giving a workbook real abilities</b><i>What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things — without ever touching your computer.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="code-in-the-document"><span class="dot"></span><span class="lt"><b>When the writing and the program are the same thing</b><i>How a document can BE the program — the same words a person reads are the instructions the machine runs — and why that makes software you can actually trust.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="the-one-command"><span class="dot"></span><span class="lt"><b>The one command you type</b><i>Meet wbx, the single tool you talk to — what it does for you, and why you mostly won&#x27;t need it to understand any of the rest.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 3</span><h2>The engine</h2><p>Where a workbook stops being a file and starts being a living service.</p></div><div class="dsteps"><div class="dstep soon" data-slug="coming-alive"><span class="dot"></span><span class="lt"><b>Where a workbook comes alive</b><i>The Nexus: a workbook on your laptop is a document; plug it into an engine and it becomes a living thing that answers requests, runs on a schedule, and serves other people.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="safe-powers"><span class="dot"></span><span class="lt"><b>Giving software powers, safely</b><i>How a workbook gets dangerous-sounding powers — the internet, your secrets, sending messages — without any of the danger: every power is handed over deliberately and can be taken back.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="going-live"><span class="dot"></span><span class="lt"><b>Putting it on the internet</b><i>What &#x27;deploying&#x27; actually means, why it&#x27;s usually terrifying, and how here it&#x27;s one push — plus how the live thing keeps a public history anyone can read.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 4</span><h2>Agents</h2><p>Software that does work on its own — what that really means, and how to keep it honest.</p></div><div class="dsteps"><div class="dstep soon" data-slug="what-an-agent-is"><span class="dot"></span><span class="lt"><b>What an agent really is</b><i>Strip away the hype: an agent is a loop — it reads, it acts, it looks at what happened, it goes again. Understand that one loop and the rest stops being magic.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="agents-that-persist"><span class="dot"></span><span class="lt"><b>Agents that keep working when you&#x27;re not watching</b><i>How an agent goes from a thing you chat with to a thing that runs on its own — standing watch, taking shifts, resting between runs, and pausing to ask you when it should.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="did-it-do-well"><span class="dot"></span><span class="lt"><b>Knowing whether the agent actually did well</b><i>The hard part of trusting software that thinks: how you measure whether it did a good job, catch it when it drifts, and keep a record you can&#x27;t fake.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 5</span><h2>Automation</h2><p>Plans that aren&#x27;t just notes about the work — they ARE the work.</p></div><div class="dsteps"><div class="dstep soon" data-slug="plans-that-run"><span class="dot"></span><span class="lt"><b>Plans that run themselves</b><i>Why your to-do list, your calendar, and your project board are all the same thing here — one plain plan that a person reads and a machine carries out, with no copy to keep in sync.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="compiled-plans"><span class="dot"></span><span class="lt"><b>When a plan becomes a program</b><i>The deeper idea: the same plan that organizes your week can, with no new tools, become an actual running system — and how it changes safely while it&#x27;s live.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 6</span><h2>The disk</h2><p>Where the work lives — a place to keep things that travels with the project.</p></div><div class="dsteps"><div class="dstep soon" data-slug="a-disk-that-travels"><span class="dot"></span><span class="lt"><b>A place to keep things that travels with the work</b><i>Every project needs somewhere to keep files. Here that somewhere lives INSIDE the workbook, travels when you send it, and can be asked questions like a spreadsheet.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="the-disk-grows"><span class="dot"></span><span class="lt"><b>When the work outgrows one file</b><i>What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 7</span><h2>Trust &amp; sharing</h2><p>How something you can copy infinitely stays trustworthy and safe to share.</p></div><div class="dsteps"><div class="dstep soon" data-slug="proving-origin"><span class="dot"></span><span class="lt"><b>Proving where it came from</b><i>If anyone can copy a file, how do you know a workbook is really from who it claims? The idea of a signature that travels with the bytes and can&#x27;t be faked.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="who-sees-what"><span class="dot"></span><span class="lt"><b>Sharing without oversharing</b><i>A file you send is a file you&#x27;ve given away completely — so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.</i></span><span class="tag">soon</span></div><div class="dstep soon" data-slug="secrets-in-the-open"><span class="dot"></span><span class="lt"><b>Keeping a secret inside a file you hand out</b><i>The surprising trick: part of a file you give to everyone can be readable only by the one person holding the right key — locked in the open, opened only on permission.</i></span><span class="tag">soon</span></div></div></div><div class="dunit"><div class="duh"><span class="un">Unit 8</span><h2>Under the hood</h2><p>Optional. The why behind the magic, for the curious.</p></div><div class="dsteps"><div class="dstep soon" data-slug="under-the-hood"><span class="dot"></span><span class="lt"><b>Why none of this is magic</b><i>A tour, no code required, of how the pieces actually fit — the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.</i></span><span class="tag">soon</span></div></div></div></div></div>
-</main>
-</div>
-<div class="scrim" id="scrim"></div>
-<script>
+JS = """
 (function(){
   var KEY="wb-lms-done", LAST="wb-lms-last";
   function done(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
   function save(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
-  var d=done(), total=20;
+  var d=done(), total=%TOTAL%;
   // paint sidebar + progress
   document.querySelectorAll(".li,.dstep").forEach(function(el){
     if(d.indexOf(el.dataset.slug)>=0) el.classList.add("done");
@@ -213,6 +284,88 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
     });
   }
 })();
-</script>
-</body>
-</html>
+""".replace("%TOTAL%", str(TOTAL))
+
+def topbar(label):
+    return ('<header class="topbar"><button class="burger" id="burger" aria-label="Curriculum">'
+            '<span></span><span></span><span></span></button>'
+            '<span class="tt">%s</span><span class="tp">Learning Center · <b id="tprog">0%%</b></span></header>'
+            % esc(label))
+
+def deeper_box(docs):
+    if not docs: return ""
+    links = "".join('<a class="dl" href="/learn/%s"><b>%s</b><span>the deep doc</span></a>'
+                    % (esc(s), esc(doc_title.get(s, s))) for s in docs)
+    return ('<div class="deeper"><div class="dh">Go deeper — the technical docs</div>'
+            '<p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p>'
+            '<div class="links">%s</div></div>' % links)
+
+def lesson_page(l):
+    live = l["status"] == "live" and os.path.exists(os.path.join(HERE, "content", l["slug"] + ".html"))
+    crumb = "Unit %d · %s · Lesson %d" % (l["unit"], esc(l["unit_title"]), l["i"]+1)
+    player = ""
+    if l.get("audio"):
+        player = ('<div class="play" id="play" data-src="%s"><span class="ico">'
+                  '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>'
+                  '<span class="lab" id="playlab">Listen</span><span class="time">%s</span></div>'
+                  % (esc(l["audio"]), esc(l.get("mins", ""))))
+    if live:
+        body = open(os.path.join(HERE, "content", l["slug"] + ".html")).read()
+        main = ('<div class="crumb">%s</div><h1>%s</h1>%s%s<article>%s</article>%s'
+                % (crumb, esc(l["title"]),
+                   '<p class="promise">%s</p>' % esc(l["promise"]) if l.get("promise") else "",
+                   player, body, deeper_box(l.get("docs"))))
+    else:
+        main = ('<div class="crumb">%s</div><h1>%s</h1>'
+                '<div class="soon-pane"><span class="badge">Lesson coming soon</span>'
+                '<p>%s</p><p>While this lesson is being written, the technical docs below already cover the ground.</p></div>%s'
+                % (crumb, esc(l["title"]), esc(l.get("teaches", "")), deeper_box(l.get("docs"))))
+    prev = ('<a class="prevl" href="/learn/%s">← %s</a>' % (esc(l["prev"]["slug"]), esc(l["prev"]["title"])) if l["prev"] else '<a class="prevl" href="/learn">← Overview</a>')
+    nxt = l["next"]["slug"] if l["next"] else ""
+    cclabel = "Mark complete & continue" if l["next"] else "Mark complete & finish"
+    foot = ('<div class="foot">%s<button class="cont" id="cc" data-next="%s"><span>%s</span> →</button></div>'
+            % (prev, esc(nxt), cclabel))
+    return HEAD.format(
+        title=esc(l["title"]) + " — Learning Center — Workbooks",
+        desc=esc(l.get("teaches", "")), ogtype="article",
+        url="https://workbooks.sh/learn/" + l["slug"], css=CSS, js=JS,
+        bodycls='lesson" data-slug="%s' % esc(l["slug"]),
+        topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]),
+        main=main + foot)
+
+def dashboard():
+    first = next((x["slug"] for x in flat if x["status"] == "live"), flat[0]["slug"])
+    secs = ""
+    n = 0
+    for u in units:
+        rows = ""
+        for l in u["lessons"]:
+            n += 1
+            on = l["status"] == "live"
+            inner = ('<span class="dot"></span><span class="lt"><b>%s</b><i>%s</i></span>'
+                     % (esc(l["title"]), esc(l.get("teaches", ""))))
+            if on:
+                rows += '<a class="dstep" data-slug="%s" href="/learn/%s">%s<span class="go">→</span></a>' % (esc(l["slug"]), esc(l["slug"]), inner)
+            else:
+                rows += '<div class="dstep soon" data-slug="%s">%s<span class="tag">soon</span></div>' % (esc(l["slug"]), inner)
+        secs += ('<div class="dunit"><div class="duh"><span class="un">Unit %d</span>'
+                 '<h2>%s</h2><p>%s</p></div><div class="dsteps">%s</div></div>'
+                 % (u["n"], esc(u["title"]), esc(u["dek"]), rows))
+    main = ('<div class="dash"><header class="dhero"><div class="kick">learn workbooks from zero</div>'
+            '<h1><span>Learning</span> <span class="bub">CENTER</span></h1>'
+            '<p class="dek">No technical background needed. %d deep, plain-language lessons in order — each a single big idea, with the technical docs one click away.</p>'
+            '<div class="cta"><a class="start" id="startbtn" href="/learn/%s">Start the course →</a>'
+            '<span class="dprog" id="dprog">%d lessons</span></div></header>'
+            '<div class="dunits">%s</div></div>'
+            % (TOTAL, esc(first), TOTAL, secs))
+    return HEAD.format(
+        title="Learning Center — Workbooks",
+        desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
+        ogtype="website", url="https://workbooks.sh/learn", css=CSS, js=JS,
+        bodycls="dashpage", topbar=topbar("Learning Center"), sidebar="", main=main)
+
+# write everything
+open(os.path.join(HERE, "index.html"), "w").write(dashboard())
+for l in flat:
+    open(os.path.join(HERE, l["slug"] + ".html"), "w").write(lesson_page(l))
+print("Learning Center built: dashboard + %d lesson pages (%d live)" % (TOTAL, LIVE))
