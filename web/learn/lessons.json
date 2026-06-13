@@ -912,5 +912,148 @@
     }
    ]
   }
- ]
+ ],
+ "curriculum": {
+  "comment": "Linear learning order (units, easy\u2192advanced, interleaved across parents). Drives the Learning Center page + the rewrite sequence. Edit freely to re-order.",
+  "units": [
+   {
+    "n": 1,
+    "title": "Foundations",
+    "dek": "The file, and the language it's written in.",
+    "lessons": [
+     "workbook",
+     "specs",
+     "bundles",
+     "git",
+     "nesting",
+     "org",
+     "syntax",
+     "tags",
+     "drawers",
+     "timestamps",
+     "todos"
+    ]
+   },
+   {
+    "n": 2,
+    "title": "Making things",
+    "dek": "Turn code into sandboxed parts, and drive it from the command line.",
+    "lessons": [
+     "toolkit",
+     "commands",
+     "imports",
+     "audits",
+     "lanes",
+     "promotion",
+     "tangling",
+     "claims",
+     "wbx",
+     "modes",
+     "pipelines",
+     "doctor"
+    ]
+   },
+   {
+    "n": 3,
+    "title": "The engine",
+    "dek": "Stand up a Nexus and give workbooks real, brokered capabilities.",
+    "lessons": [
+     "nexus",
+     "the-dock",
+     "capabilities",
+     "sandboxes",
+     "planes",
+     "deployments",
+     "deploy-kit",
+     "keepers",
+     "hot-swap",
+     "gitops",
+     "networking",
+     "browsing",
+     "channels",
+     "secrets",
+     "tokens",
+     "changelogs",
+     "telemetry",
+     "recipes",
+     "distribution"
+    ]
+   },
+   {
+    "n": 4,
+    "title": "Agents",
+    "dek": "Author, run, and supervise agents that work inside a workbook.",
+    "lessons": [
+     "agents",
+     "loops",
+     "authoring",
+     "context-repo",
+     "spawning",
+     "orchestration",
+     "runtime-config",
+     "human-in-the-loop",
+     "fleets",
+     "dreaming",
+     "evals",
+     "rehearsals"
+    ]
+   },
+   {
+    "n": 5,
+    "title": "Plans & automation",
+    "dek": "Workflows: plans that render to boards and run themselves down.",
+    "lessons": [
+     "workflows",
+     "schedules",
+     "boards",
+     "validations",
+     "dispatch",
+     "autopoet"
+    ]
+   },
+   {
+    "n": 6,
+    "title": "The disk",
+    "dek": "The VFS: a queryable disk that travels with the workbook.",
+    "lessons": [
+     "vfs",
+     "queries",
+     "volumes",
+     "sync",
+     "foreign-tables",
+     "backends",
+     "vectors"
+    ]
+   },
+   {
+    "n": 7,
+    "title": "Trust & sharing",
+    "dek": "Provenance, access posture, and shipping the artifact safely.",
+    "lessons": [
+     "signatures",
+     "sharing",
+     "postures",
+     "publishing",
+     "privacy",
+     "sealed-sections",
+     "escrow",
+     "trust",
+     "verification"
+    ]
+   },
+   {
+    "n": 8,
+    "title": "Internals",
+    "dek": "Optional deep cuts: how the pieces are built under the hood.",
+    "lessons": [
+     "the-kernel",
+     "the-seam",
+     "worlds",
+     "waves",
+     "upgrades",
+     "the-ledger"
+    ]
+   }
+  ]
+ }
 }

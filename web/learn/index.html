@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#2b6fd0;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learning Center — Workbooks</title>
+<meta name="description" content="Learn Workbooks from zero. 20 deep, plain-language lessons in order — no technical background needed. Each one teaches a single big idea, then points you to the docs for the details.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="Learning Center — Workbooks">
+<meta property="og:description" content="Learn Workbooks from zero — 20 plain-language lessons, no technical background needed.">
+<meta property="og:url" content="https://workbooks.sh/learn">
+<style>
+:root{ --paper:#f7f6f1; --ink:#1a1b1e; --bloom:#13d943; --dim:#6a6f68; --line:#e3e1d8;
+  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+*{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+a{ color:inherit; text-decoration:none; }
+.lchero{ max-width:1180px; margin:0 auto; padding:140px 7vw 0; }
+.lchero .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
+.lchero h1{ font-family:var(--display); font-weight:400; font-size:clamp(46px,8vw,96px); line-height:.92; margin:14px 0 0; display:flex; flex-wrap:wrap; gap:0 .24em; align-items:baseline; }
+.lchero h1 .bub{ color:var(--pc); --bub-stroke:5.4; }
+.lchero .dek{ margin:22px 0 0; font-size:21px; line-height:1.55; color:#34372f; max-width:30em; }
+.lchero .stat{ margin-top:22px; display:flex; gap:8px; flex-wrap:wrap; }
+.lchero .stat span{ font:700 10.5px var(--mono); letter-spacing:.08em; text-transform:uppercase; border:2px solid var(--ink); border-radius:999px; padding:7px 13px; }
+.lchero .stat span.on{ background:var(--pc); }
+.center{ display:grid; grid-template-columns:210px 1fr; gap:56px; align-items:start; max-width:1180px; margin:50px auto 0; padding:0 7vw 120px; }
+.rail{ position:sticky; top:118px; display:flex; flex-direction:column; gap:1px; }
+.rail a{ display:flex; align-items:center; gap:11px; padding:9px 10px; border-radius:8px; font:700 11px var(--mono); letter-spacing:.03em; color:var(--dim); }
+.rail a span{ width:13px; height:13px; flex:0 0 auto; border-radius:4px; border:1.5px solid var(--ink); }
+.rail a:hover{ color:var(--ink); background:rgba(18,19,22,.05); }
+.units{ display:flex; flex-direction:column; gap:60px; min-width:0; }
+.unit{ scroll-margin-top:108px; }
+.uh{ border-bottom:2px solid var(--ink); padding-bottom:15px; margin-bottom:20px; }
+.uh .un{ font:700 10px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
+.uh h2{ font-family:var(--display); font-weight:400; font-size:clamp(27px,3.4vw,38px); line-height:1; margin:8px 0 0; }
+.uh p{ margin:10px 0 0; font-family:var(--read); font-size:17px; line-height:1.5; color:var(--dim); max-width:50em; }
+.steps{ display:flex; flex-direction:column; gap:9px; }
+.step{ display:flex; align-items:center; gap:15px; padding:16px 18px; border:2px solid var(--ink); border-radius:13px; background:#fff; box-shadow:3px 3px 0 var(--ink); transition:transform .12s, box-shadow .12s; }
+.step:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+.step .seq{ font:700 12px var(--mono); color:var(--ua,var(--dim)); flex:0 0 auto; }
+.step .lt{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+.step .lt b{ font-family:var(--display); font-weight:400; font-size:19px; letter-spacing:.005em; }
+.step .lt i{ font-style:normal; font-size:15px; line-height:1.45; color:var(--dim); }
+.step .go{ margin-left:auto; font-size:17px; color:var(--ac); flex:0 0 auto; opacity:0; transition:opacity .12s; }
+.step:hover .go{ opacity:1; }
+.step.soon{ background:none; box-shadow:none; border-style:dashed; border-color:rgba(18,19,22,.26); opacity:.6; }
+.step.soon:hover{ transform:none; box-shadow:none; }
+.step .tag{ margin-left:auto; font:700 8.5px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); border:1.5px solid currentColor; border-radius:5px; padding:2px 6px; flex:0 0 auto; }
+@media (max-width:860px){
+  .lchero{ padding-top:104px; }
+  .center{ grid-template-columns:1fr; gap:0; padding-bottom:90px; }
+  .rail{ position:static; flex-direction:row; flex-wrap:wrap; gap:6px; margin-bottom:34px; }
+  .rail a{ border:2px solid rgba(18,19,22,.16); }
+}
+</style>
+</head>
+<body>
+<!-- the order is the teacher. each lesson assumes the ones above and points to the ones below.
+     this is the plain-language path; the literal proofs live one click away in the docs. -->
+<div id="site-nav"></div>
+<script src="../nav.js?v=9"></script>
+<header class="lchero">
+  <div class="kick">learn workbooks from zero</div>
+  <h1><span>Learning</span> <span class="bub">CENTER</span></h1>
+  <p class="dek">No technical background needed. 20 lessons, in the order that makes them teach — each one a single big idea, in plain language, with the deep docs one click away.</p>
+  <div class="stat"><span class="on">8 units</span><span>1 of 20 ready</span><span>start at the top</span></div>
+</header>
+<div class="center">
+  <nav class="rail" aria-label="Units"><a href="#u1"><span style="background:#a8d4f0"></span>Foundations</a><a href="#u2"><span style="background:#f3c5a3"></span>Making things</a><a href="#u3"><span style="background:#aee5c2"></span>The engine</a><a href="#u4"><span style="background:#c5b8e8"></span>Agents</a><a href="#u5"><span style="background:#f2ddb0"></span>Automation</a><a href="#u6"><span style="background:#b8e0e8"></span>The disk</a><a href="#u7"><span style="background:#f0b8b8"></span>Trust &amp; sharing</a><a href="#u8"><span style="background:#d9dbd3"></span>Under the hood</a></nav>
+  <div class="units"><section class="unit" id="u1" style="--ua:#a8d4f0"><header class="uh"><span class="un">Unit 1</span><h2>Foundations</h2><p>What the whole thing is made of — before any of the moving parts.</p></header><div class="steps"><a class="step" href="the-one-file"><span class="seq">01</span><span class="lt"><b>A workbook is one file you can hold</b><i>The core idea: a whole piece of software — its screen, its logic, its data, its history — living inside a single file you can email, the way you&#x27;d email a photo.</i></span><span class="go">→</span></a><div class="step soon"><span class="seq">02</span><span class="lt"><b>The file that remembers how it was made</b><i>How one file can carry its own source, its own identity, and a complete record of every change — so it explains itself and proves where it came from.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">03</span><span class="lt"><b>The plain language underneath everything</b><i>Why everything in a workbook — text, structure, tasks, dates, data — is written in one simple, human-readable format you could read over someone&#x27;s shoulder.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u2" style="--ua:#f3c5a3"><header class="uh"><span class="un">Unit 2</span><h2>Making things</h2><p>How a workbook gets real abilities, and how you drive it.</p></header><div class="steps"><div class="step soon"><span class="seq">04</span><span class="lt"><b>Giving a workbook real abilities</b><i>What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things — without ever touching your computer.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">05</span><span class="lt"><b>When the writing and the program are the same thing</b><i>How a document can BE the program — the same words a person reads are the instructions the machine runs — and why that makes software you can actually trust.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">06</span><span class="lt"><b>The one command you type</b><i>Meet wbx, the single tool you talk to — what it does for you, and why you mostly won&#x27;t need it to understand any of the rest.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u3" style="--ua:#aee5c2"><header class="uh"><span class="un">Unit 3</span><h2>The engine</h2><p>Where a workbook stops being a file and starts being a living service.</p></header><div class="steps"><div class="step soon"><span class="seq">07</span><span class="lt"><b>Where a workbook comes alive</b><i>The Nexus: a workbook on your laptop is a document; plug it into an engine and it becomes a living thing that answers requests, runs on a schedule, and serves other people.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">08</span><span class="lt"><b>Giving software powers, safely</b><i>How a workbook gets dangerous-sounding powers — the internet, your secrets, sending messages — without any of the danger: every power is handed over deliberately and can be taken back.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">09</span><span class="lt"><b>Putting it on the internet</b><i>What &#x27;deploying&#x27; actually means, why it&#x27;s usually terrifying, and how here it&#x27;s one push — plus how the live thing keeps a public history anyone can read.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u4" style="--ua:#c5b8e8"><header class="uh"><span class="un">Unit 4</span><h2>Agents</h2><p>Software that does work on its own — what that really means, and how to keep it honest.</p></header><div class="steps"><div class="step soon"><span class="seq">10</span><span class="lt"><b>What an agent really is</b><i>Strip away the hype: an agent is a loop — it reads, it acts, it looks at what happened, it goes again. Understand that one loop and the rest stops being magic.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">11</span><span class="lt"><b>Agents that keep working when you&#x27;re not watching</b><i>How an agent goes from a thing you chat with to a thing that runs on its own — standing watch, taking shifts, resting between runs, and pausing to ask you when it should.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">12</span><span class="lt"><b>Knowing whether the agent actually did well</b><i>The hard part of trusting software that thinks: how you measure whether it did a good job, catch it when it drifts, and keep a record you can&#x27;t fake.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u5" style="--ua:#f2ddb0"><header class="uh"><span class="un">Unit 5</span><h2>Automation</h2><p>Plans that aren&#x27;t just notes about the work — they ARE the work.</p></header><div class="steps"><div class="step soon"><span class="seq">13</span><span class="lt"><b>Plans that run themselves</b><i>Why your to-do list, your calendar, and your project board are all the same thing here — one plain plan that a person reads and a machine carries out, with no copy to keep in sync.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">14</span><span class="lt"><b>When a plan becomes a program</b><i>The deeper idea: the same plan that organizes your week can, with no new tools, become an actual running system — and how it changes safely while it&#x27;s live.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u6" style="--ua:#b8e0e8"><header class="uh"><span class="un">Unit 6</span><h2>The disk</h2><p>Where the work lives — a place to keep things that travels with the project.</p></header><div class="steps"><div class="step soon"><span class="seq">15</span><span class="lt"><b>A place to keep things that travels with the work</b><i>Every project needs somewhere to keep files. Here that somewhere lives INSIDE the workbook, travels when you send it, and can be asked questions like a spreadsheet.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">16</span><span class="lt"><b>When the work outgrows one file</b><i>What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u7" style="--ua:#f0b8b8"><header class="uh"><span class="un">Unit 7</span><h2>Trust &amp; sharing</h2><p>How something you can copy infinitely stays trustworthy and safe to share.</p></header><div class="steps"><div class="step soon"><span class="seq">17</span><span class="lt"><b>Proving where it came from</b><i>If anyone can copy a file, how do you know a workbook is really from who it claims? The idea of a signature that travels with the bytes and can&#x27;t be faked.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">18</span><span class="lt"><b>Sharing without oversharing</b><i>A file you send is a file you&#x27;ve given away completely — so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.</i></span><span class="tag">soon</span></div><div class="step soon"><span class="seq">19</span><span class="lt"><b>Keeping a secret inside a file you hand out</b><i>The surprising trick: part of a file you give to everyone can be readable only by the one person holding the right key — locked in the open, opened only on permission.</i></span><span class="tag">soon</span></div></div></section><section class="unit" id="u8" style="--ua:#d9dbd3"><header class="uh"><span class="un">Unit 8</span><h2>Under the hood</h2><p>Optional. The why behind the magic, for the curious.</p></header><div class="steps"><div class="step soon"><span class="seq">20</span><span class="lt"><b>Why none of this is magic</b><i>A tour, no code required, of how the pieces actually fit — the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.</i></span><span class="tag">soon</span></div></div></section></div>
+</div>
+</body>
+</html>
