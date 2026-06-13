@@ -1263,8 +1263,11 @@
     transition: transform 0.12s;
   }
   .caret.open { transform: rotate(90deg); }
-  /* folders keep their colored folder glyph — no chip behind it */
-  .folder-row .row-icon {
+  /* Folders are NEVER a pastel chip — just the colored folder glyph, no
+   * matte. The .row.folder-row selector matches the nth-child chip rules'
+   * specificity and wins on source order, so folders stay transparent
+   * regardless of their position in the list. */
+  .row.folder-row .row-icon {
     background: transparent;
   }
   .folder-row { color: var(--color-fg); cursor: grab; }
