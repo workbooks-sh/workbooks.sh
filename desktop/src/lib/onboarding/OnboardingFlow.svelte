@@ -25,7 +25,7 @@
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
-  const STEPS = ["welcome", "titlebar", "sidebar", "search", "theme", "connect", "waldo"] as const;
+  const STEPS = ["welcome", "titlebar", "sidebar", "glyph", "search", "theme", "connect", "waldo"] as const;
   type Step = (typeof STEPS)[number];
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
@@ -39,9 +39,10 @@
     theme: "system" | "dark" | "light";
     sidebar: "shelf" | "hub" | "map";
     sidebarTop: "bookmarks" | "search" | "both";
+    glyphs: "icon" | "emoji";
     search: { ai: "summary" | "first" | "off" };
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, glyphs: nav.glyphs, search: { ai: "summary" } });
 
   // Demo bench toolkits — registered only for the tour so the bench has real,
   // toggleable shortcuts to showcase the "build your own toolkit" concept.
@@ -60,6 +61,7 @@
       for (const t of DEMO_TOOLKITS) dock.unregister(t.id);
       chrome.closeLeft();
       dock.close();
+      onboarding.setExpandAll(false);
     };
   });
 
@@ -76,7 +78,7 @@
     // the sidebar step is purely about the sidebar — no create screen yet.
     if (i >= 1) onboarding.reveal("titlebar", "bench", "agent");
     if (i >= 2) onboarding.reveal("sidebar");
-    if (i >= 4) onboarding.reveal("canvas");
+    if (i >= 5) onboarding.reveal("canvas"); // at the theme beat
     spotlight(s);
   }
 
@@ -90,14 +92,18 @@
     chrome.nexusOpen = false;
     // "search" focuses the sidebar's own file-search bar (inline, shown by
     // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
-    if (s === "sidebar" || s === "search") chrome.sidebarOpen = true;
+    if (s === "sidebar" || s === "search" || s === "glyph") chrome.sidebarOpen = true;
     else if (s === "waldo") dock.open("waldo");
     // "connect" shows the agents page above the coach — nothing to open.
+    // The glyph step expands every folder so the emoji↔icon flip is visible
+    // at the file level too.
+    onboarding.setExpandAll(s === "glyph");
   }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
   function pickSidebarTop(b: Prefs["sidebarTop"]) { prefs.sidebarTop = b; nav.setSidebarTop(b); }
+  function pickGlyphs(g: Prefs["glyphs"]) { prefs.glyphs = g; nav.setGlyphs(g); }
 
   // OpenRouter connect (SCAFFOLD). Waldo runs on OpenRouter — one key, every
   // model. The real flow is an OAuth PKCE handshake that returns a key we
@@ -185,6 +191,17 @@
               <button type="button" class="opt" class:sel={prefs.sidebar === "shelf"} onclick={() => pickSidebar("shelf")}>Shelf</button>
               <button type="button" class="opt" class:sel={prefs.sidebar === "hub"} onclick={() => pickSidebar("hub")}>Hub</button>
               <button type="button" class="opt" class:sel={prefs.sidebar === "map"} onclick={() => pickSidebar("map")}>Map</button>
+            </div>
+
+          {:else if step === "glyph"}
+            <div class="text">
+              <span class="kicker">Your style</span>
+              <h1>Emoji or icon?</h1>
+              <p>Pick how items look — clean icons from the libraries, or emoji. Workspaces, folder badges and files all follow. Look left, folders are open.</p>
+            </div>
+            <div class="opts">
+              <button type="button" class="opt" class:sel={prefs.glyphs === "icon"} onclick={() => pickGlyphs("icon")}>Icons</button>
+              <button type="button" class="opt" class:sel={prefs.glyphs === "emoji"} onclick={() => pickGlyphs("emoji")}>Emoji</button>
             </div>
 
           {:else if step === "search"}

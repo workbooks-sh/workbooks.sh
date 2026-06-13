@@ -8,17 +8,21 @@
 
 import type { WorkbookEntry } from "$lib/bridge/package.svelte";
 
+// Each demo item carries BOTH glyph forms so the "emoji vs icon" onboarding
+// step can flip the whole sidebar live. `icon` is the emoji; `mi` is the
+// Material-icon ref used in icon mode.
 export interface DemoWorkspace {
   id: string;
   name: string;
-  icon: string;
+  icon: string; // emoji
+  mi: string; // material-icon ref
 }
 
 export const DEMO_WORKSPACES: DemoWorkspace[] = [
-  { id: "personal", name: "Personal", icon: "🏠" },
-  { id: "acme", name: "Acme", icon: "🅰" },
-  { id: "studio", name: "Studio", icon: "🎨" },
-  { id: "research", name: "Research", icon: "🔬" },
+  { id: "personal", name: "Personal", icon: "🏠", mi: "mi:todo" },
+  { id: "acme", name: "Acme", icon: "🅰", mi: "mi:rocket" },
+  { id: "studio", name: "Studio", icon: "🎨", mi: "mi:image" },
+  { id: "research", name: "Research", icon: "🔬", mi: "mi:database" },
 ];
 
 export const DEMO_ACTIVE_WORKSPACE = DEMO_WORKSPACES[0];
@@ -27,20 +31,34 @@ export interface DemoPackage {
   id: string;
   name: string;
   kind: "folder" | "app";
+  emoji: string; // folder badge in emoji mode
+  badge: string; // folder badge (material-icon ref) in icon mode
 }
 
 // All folders — the tinted FolderIcon is the picked identity; twirl them open
-// to reveal files whose icons come from the Material Icon Theme by extension.
+// to reveal files whose icons come from the Material Icon Theme by extension
+// (icon mode) or an emoji (emoji mode). Each folder carries both badge forms.
 export const DEMO_PACKAGES: DemoPackage[] = [
-  { id: "Reading", name: "Reading", kind: "folder" },
-  { id: "Design", name: "Design", kind: "folder" },
-  { id: "Clients", name: "Clients", kind: "folder" },
-  { id: "Finance", name: "Finance", kind: "folder" },
-  { id: "Research", name: "Research", kind: "folder" },
-  { id: "Brand", name: "Brand", kind: "folder" },
-  { id: "Roadmap", name: "Roadmap", kind: "folder" },
-  { id: "Notes", name: "Notes", kind: "folder" },
+  { id: "Reading", name: "Reading", kind: "folder", emoji: "📚", badge: "mi:lib" },
+  { id: "Design", name: "Design", kind: "folder", emoji: "🎨", badge: "mi:image" },
+  { id: "Clients", name: "Clients", kind: "folder", emoji: "🤝", badge: "mi:todo" },
+  { id: "Finance", name: "Finance", kind: "folder", emoji: "💰", badge: "mi:table" },
+  { id: "Research", name: "Research", kind: "folder", emoji: "🔬", badge: "mi:database" },
+  { id: "Brand", name: "Brand", kind: "folder", emoji: "✨", badge: "mi:svg" },
+  { id: "Roadmap", name: "Roadmap", kind: "folder", emoji: "🗺️", badge: "mi:rocket" },
+  { id: "Notes", name: "Notes", kind: "folder", emoji: "📝", badge: "mi:document" },
 ];
+
+// Emoji for a file path (emoji mode) — by extension, mirroring how the icon
+// mode resolves a Material icon from the same extension.
+const EXT_EMOJI: Record<string, string> = {
+  md: "📝", org: "📑", canvas: "🖼️", svg: "🖼️", json: "⚙️", py: "🐍",
+  ipynb: "📓", css: "🎨", xlsx: "📊", csv: "📈", html: "🌐", txt: "📄",
+};
+export function emojiForPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return EXT_EMOJI[ext] ?? "📄";
+}
 
 export const DEMO_FOLDER_CHILDREN: Record<string, WorkbookEntry[]> = {
   Reading: [

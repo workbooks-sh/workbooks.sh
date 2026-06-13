@@ -20,8 +20,16 @@ class Onboarding {
     agent: false,
   });
 
+  // The glyph step sets this so the sidebar expands every folder — the
+  // emoji↔icon flip is then visible at the file level too.
+  expandAll = $state(false);
+
   start(): void {
     this.active = true;
+  }
+
+  setExpandAll(v: boolean): void {
+    this.expandAll = v;
   }
 
   reveal(...parts: Part[]): void {

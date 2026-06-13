@@ -302,19 +302,22 @@
 
   // Demo packages shown ONLY during onboarding, so the freshly-revealed
   // sidebar is populated (the tour runs before any runtime/workspaces exist).
-  // Folders (tinted) twirl open to demo files; one source in onboarding/demo.
-  const DEMO_RAIL_PACKAGES: RailPackage[] = DEMO_PACKAGES.map((p) => ({
-    id: p.id,
-    name: p.name,
-    isActive: false,
-    icon: "",
-    kind: p.kind,
-  }));
+  // The folder badge is the emoji or the material-icon ref per the glyph pick,
+  // so the emoji-vs-icon step flips the badges live.
+  const demoRailPackages = $derived<RailPackage[]>(
+    DEMO_PACKAGES.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isActive: false,
+      icon: nav.glyphs === "emoji" ? p.emoji : p.badge,
+      kind: p.kind,
+    })),
+  );
 
   // Filter the package list by the active workspace.
   const railPackages = $derived<RailPackage[]>(
     (() => {
-      if (onboarding.active) return DEMO_RAIL_PACKAGES;
+      if (onboarding.active) return demoRailPackages;
       const ws_ = workspaces.active;
       if (!ws_) return [];
       // Order follows the workspace's package_names (the rail order the user
@@ -593,7 +596,7 @@
         bind:active
         packages={railPackages}
         workspaceName={onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "")}
-        workspaceIcon={onboarding.active ? DEMO_ACTIVE_WORKSPACE.icon : (workspaces.active?.icon ?? "")}
+        workspaceIcon={onboarding.active ? (nav.glyphs === "emoji" ? DEMO_ACTIVE_WORKSPACE.icon : DEMO_ACTIVE_WORKSPACE.mi) : (workspaces.active?.icon ?? "")}
         onSwitchWorkspace={onSwitchWorkspace}
         onSelectPackage={onSelectPackage}
         onOpenApp={onOpenApp}

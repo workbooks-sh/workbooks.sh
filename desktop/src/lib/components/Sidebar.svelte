@@ -48,7 +48,7 @@
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
-  import { DEMO_WORKSPACES, DEMO_FOLDER_CHILDREN } from "$lib/onboarding/demo";
+  import { DEMO_WORKSPACES, DEMO_FOLDER_CHILDREN, emojiForPath } from "$lib/onboarding/demo";
   import { setSidebar, type SidebarApi } from "$lib/sidebar/context";
   import SidebarSearch from "$lib/components/SidebarSearch.svelte";
   import type { WorkbookEntry } from "$lib/bridge/package.svelte";
@@ -130,8 +130,12 @@
   // is populated before any real workspaces exist; live workspaces otherwise.
   const wsList = $derived(
     onboarding.active
-      ? DEMO_WORKSPACES
-      : workspaces.workspaces.map((w) => ({ id: w.id, name: w.name, icon: w.icon })),
+      ? DEMO_WORKSPACES.map((w) => ({
+          id: w.id,
+          name: w.name,
+          glyph: nav.glyphs === "emoji" ? w.icon : w.mi,
+        }))
+      : workspaces.workspaces.map((w) => ({ id: w.id, name: w.name, glyph: w.icon })),
   );
   const wsActiveId = $derived(
     onboarding.active ? DEMO_WORKSPACES[0].id : (workspaces.active?.id ?? null),
@@ -139,6 +143,21 @@
   function pickWorkspace(id: string) {
     void workspaces.setActive(id);
   }
+
+  // Expand every folder when the glyph step asks for it, so the emoji↔icon
+  // flip shows at the file level too. Writes `expanded`/folder caches only;
+  // reads onboarding.expandAll + packages (no self-referential loop).
+  $effect(() => {
+    if (!onboarding.expandAll) return;
+    const next: Record<string, boolean> = {};
+    for (const pkg of packages) {
+      if ((pkg.kind ?? "folder") !== "app") {
+        next[pkg.id] = true;
+        void loadFolder(pkg.id);
+      }
+    }
+    expanded = next;
+  });
 
   function initials(name: string): string {
     const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
@@ -560,8 +579,7 @@
           aria-pressed={w.id === wsActiveId}
           onclick={() => pickWorkspace(w.id)}
         >
-          {#if w.icon}<span class="ws-rail-glyph">{w.icon}</span>
-          {:else}<span class="ws-rail-initials">{initials(w.name)}</span>{/if}
+          <span class="ws-rail-glyph"><Icon value={w.glyph} name={w.name} size={18} /></span>
         </button>
       {/each}
     </div>
@@ -586,13 +604,7 @@
     }}
   >
     <span class="ws-tile" class:has-image={workspaceIcon.startsWith("data:image/")}>
-      {#if workspaceIcon.startsWith("data:image/")}
-        <img class="ws-img" src={workspaceIcon} alt="" />
-      {:else if workspaceIcon}
-        <span class="ws-glyph">{workspaceIcon}</span>
-      {:else}
-        <span class="ws-initials">{initials(workspaceName)}</span>
-      {/if}
+      <Icon value={workspaceIcon} name={workspaceName} size={15} />
     </span>
     <span class="ws-name">{workspaceName || "Workspace"}</span>
     <CaretUpDown size={13} weight="bold" class="ws-caret" aria-hidden="true" />
@@ -796,7 +808,9 @@
                   title={book.path}
                 >
                   <span class="row-icon book">
-                    {#if identity}
+                    {#if onboarding.active && nav.glyphs === "emoji"}
+                      <Icon value={emojiForPath(book.path)} name={book.title} size={14} />
+                    {:else if identity}
                       <Icon value={identity} name={book.title} size={14} />
                     {:else}
                       <img class="mi sm" src={fileIconUrl(book.path)} alt="" />

@@ -15,8 +15,13 @@ export type NavLayout = "shelf" | "hub" | "map";
 // search), or both.
 export type SidebarTop = "bookmarks" | "search" | "both";
 
+// Glyph style (wb-aakl.20): item icons across the sidebar are drawn from the
+// icon libraries (Material / LobeHub) or from emoji.
+export type GlyphStyle = "icon" | "emoji";
+
 const KEY = "wb.nav.layout";
 const TOP_KEY = "wb.nav.sidebarTop";
+const GLYPH_KEY = "wb.nav.glyphs";
 
 // Migrate the old two-preset values to the new named set.
 function coerce(v: string | null | undefined): NavLayout | null {
@@ -48,6 +53,14 @@ function initialSidebarTop(): SidebarTop {
   return pref === "search" || pref === "both" ? pref : "bookmarks";
 }
 
+function initialGlyphs(): GlyphStyle {
+  if (typeof localStorage !== "undefined") {
+    const saved = localStorage.getItem(GLYPH_KEY);
+    if (saved === "icon" || saved === "emoji") return saved;
+  }
+  return loadPrefs().glyphs === "emoji" ? "emoji" : "icon";
+}
+
 // Per-layout sidebar width (resizable). Each layout remembers its own width —
 // Hub is wider by default for the workspace rail. Clamped on read + write.
 const W_KEY = "wb.nav.widths";
@@ -75,6 +88,7 @@ class NavStore {
   layout = $state<NavLayout>(initialLayout());
   widths = $state<Record<NavLayout, number>>(initialWidths());
   sidebarTop = $state<SidebarTop>(initialSidebarTop());
+  glyphs = $state<GlyphStyle>(initialGlyphs());
 
   /** Current layout's sidebar width in px. */
   get sidebarWidth(): number {
@@ -97,6 +111,17 @@ class NavStore {
     if (typeof localStorage !== "undefined") {
       try {
         localStorage.setItem(TOP_KEY, m);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
+  setGlyphs(g: GlyphStyle): void {
+    this.glyphs = g;
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(GLYPH_KEY, g);
       } catch {
         /* best-effort */
       }

@@ -10,6 +10,7 @@ export interface BrowserPrefs {
   theme: ThemeMode;
   sidebar: "shelf" | "hub" | "map";
   sidebarTop: "bookmarks" | "search" | "both";
+  glyphs: "icon" | "emoji";
   search: { ai: "summary" | "first" | "off" };
 }
 
