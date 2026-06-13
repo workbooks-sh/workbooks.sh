@@ -10,7 +10,6 @@
     type RailPackage,
   } from "$lib/components/Sidebar.svelte";
   import SettingsContainer from "$lib/components/settings/SettingsContainer.svelte";
-  import AgentPanel from "$lib/components/AgentPanel.svelte";
   import HomePanel from "$lib/home/HomePanel.svelte";
   import PackageTreeDrawer from "$lib/components/PackageTreeDrawer.svelte";
   import BoardPanel from "$lib/board/BoardPanel.svelte";
@@ -19,7 +18,6 @@
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { createPackage } from "$lib/home/createPackage.svelte";
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
-  import NetworkPanel from "$lib/network/NetworkPanel.svelte";
   import DocViewer from "$lib/viewer/DocViewer.svelte";
   import DropOverlay from "$lib/viewer/DropOverlay.svelte";
   import ToastStack from "$lib/components/ToastStack.svelte";
@@ -46,6 +44,7 @@
   import { tabs } from "$lib/tabs/store.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
+  import { features } from "$lib/bridge/features";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
@@ -53,10 +52,27 @@
   /* Sidebar sections. Create is the branded CTA above the bottom nav
    * (not a plain row); Network/Settings are bottom-pinned utility rows. */
   // Order = left→right in the sidebar's bottom toolbar (after avatar).
+  // Network is flag-gated (wb-aakl.1) — the tab disappears entirely when
+  // WB_FF_NETWORK is off (the shipped browser default).
   const bottomRailTabs: RailTab[] = [
     { id: "settings", label: "Settings", icon: SettingsIcon },
-    { id: "network", label: "Network", icon: NetworkIcon },
+    ...(features.network
+      ? [{ id: "network", label: "Network", icon: NetworkIcon }]
+      : []),
   ];
+
+  // Flagged panels are lazily imported so a flags-off release build drops
+  // their chunks entirely (the literal `false` makes the branch dead code).
+  let AgentPanel = $state<typeof import("$lib/components/AgentPanel.svelte").default | null>(null);
+  let NetworkPanel = $state<typeof import("$lib/network/NetworkPanel.svelte").default | null>(null);
+  $effect(() => {
+    if (features.agents && !AgentPanel)
+      void import("$lib/components/AgentPanel.svelte").then((m) => (AgentPanel = m.default));
+  });
+  $effect(() => {
+    if (features.network && !NetworkPanel)
+      void import("$lib/network/NetworkPanel.svelte").then((m) => (NetworkPanel = m.default));
+  });
   const sectionLabels: Record<string, string> = {
     home: "Create",
     network: "Network",
@@ -476,7 +492,7 @@
     } else if (e.key === "b") {
       e.preventDefault();
       chrome.toggleSidebar();
-    } else if (e.key === "j") {
+    } else if (e.key === "j" && features.agents) {
       e.preventDefault();
       chrome.agentOpen = !chrome.agentOpen;
     } else if (/^[1-9]$/.test(e.key)) {
@@ -550,7 +566,7 @@
           <HomePanel />
         {:else if active === "kanban"}
           <BoardPanel />
-        {:else if active === "network"}
+        {:else if active === "network" && features.network && NetworkPanel}
           <NetworkPanel />
         {:else if active === "settings"}
           <SettingsContainer />
@@ -559,7 +575,7 @@
       <TerminalDrawer />
     </main>
 
-    {#if chrome.agentOpen}
+    {#if features.agents && chrome.agentOpen && AgentPanel}
       <AgentPanel />
     {/if}
 

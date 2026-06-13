@@ -32,6 +32,10 @@ function fullReloadOnSrcChange(): Plugin {
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit(), fullReloadOnSrcChange()],
   clearScreen: false,
+  /* Expose WB_FF_* feature flags to client code via import.meta.env
+   * (wb-aakl.1), alongside SvelteKit's own PUBLIC_ vars. VITE_ kept so
+   * the default Vite prefix still resolves. */
+  envPrefix: ["VITE_", "PUBLIC_", "WB_FF_"],
   server: {
     port: 5178,
     strictPort: true,

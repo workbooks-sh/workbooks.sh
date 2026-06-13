@@ -12,6 +12,7 @@
    * The container consumes + clears the request after applying it.
    */
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { features } from "$lib/bridge/features";
   import GeneralSettings from "$lib/components/settings/GeneralSettings.svelte";
   import AgentsSettings from "$lib/components/AgentsSettings.svelte";
   import McpServersSettings from "$lib/components/McpServersSettings.svelte";
@@ -33,16 +34,22 @@
     | "mcp"
     | "plugins";
 
-  type Tab = { id: TabId; label: string };
-  const tabs: Tab[] = [
-    { id: "general", label: "General" },
-    { id: "agents", label: "Agents" },
-    { id: "themes", label: "Themes" },
-    { id: "integrations", label: "Integrations" },
-    { id: "skills", label: "Skills" },
-    { id: "mcp", label: "MCPs" },
-    { id: "plugins", label: "Plugins" },
-  ];
+  // Flag-gated tabs (wb-aakl.1): Agents needs WB_FF_AGENTS; the
+  // Integrations/Skills/MCPs/Plugins cluster needs WB_FF_INTEGRATIONS.
+  // The shipped browser shows only General + Themes (+ Connection later,
+  // wb-aakl.6). Deep bundle-exclusion of these panels is wb-aakl.4.
+  type Tab = { id: TabId; label: string; on: boolean };
+  const tabs: Tab[] = (
+    [
+      { id: "general", label: "General", on: true },
+      { id: "agents", label: "Agents", on: features.agents },
+      { id: "themes", label: "Themes", on: true },
+      { id: "integrations", label: "Integrations", on: features.integrations },
+      { id: "skills", label: "Skills", on: features.integrations },
+      { id: "mcp", label: "MCPs", on: features.integrations },
+      { id: "plugins", label: "Plugins", on: features.integrations },
+    ] satisfies Tab[]
+  ).filter((t) => t.on);
 
   let active = $state<TabId>("general");
 

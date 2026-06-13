@@ -41,6 +41,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { terminalDrawer } from "$lib/bridge/terminal.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { features } from "$lib/bridge/features";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import IconResolver from "$lib/ui/Icon.svelte";
@@ -451,27 +452,31 @@
     <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
   </button>
 
-  <button
-    type="button"
-    class="agent-btn"
-    class:active={chrome.agentOpen}
-    class:live={geminiLive.active}
-    data-tauri-drag-region="false"
-    title={geminiLive.active
-      ? geminiLive.muted
-        ? "Agent (live, muted — press space)"
-        : "Agent (live)"
-      : "Agent (⌘J)"}
-    aria-label="Agent (⌘J)"
-    aria-pressed={chrome.agentOpen}
-    onclick={() => (chrome.agentOpen = !chrome.agentOpen)}
-  >
-    <MessageCircle size={12} weight="fill" />
-    <span>Agent</span>
-    {#if geminiLive.active}
-      <span class="live-dot" class:muted={geminiLive.muted} aria-hidden="true"></span>
-    {/if}
-  </button>
+  <!-- Multi-agent chat toggle — gated by WB_FF_AGENTS (wb-aakl.1). The
+       resident agent Waldo (wb-aakl.21) gets its own dock entry point. -->
+  {#if features.agents}
+    <button
+      type="button"
+      class="agent-btn"
+      class:active={chrome.agentOpen}
+      class:live={geminiLive.active}
+      data-tauri-drag-region="false"
+      title={geminiLive.active
+        ? geminiLive.muted
+          ? "Agent (live, muted — press space)"
+          : "Agent (live)"
+        : "Agent (⌘J)"}
+      aria-label="Agent (⌘J)"
+      aria-pressed={chrome.agentOpen}
+      onclick={() => (chrome.agentOpen = !chrome.agentOpen)}
+    >
+      <MessageCircle size={12} weight="fill" />
+      <span>Agent</span>
+      {#if geminiLive.active}
+        <span class="live-dot" class:muted={geminiLive.muted} aria-hidden="true"></span>
+      {/if}
+    </button>
+  {/if}
 </div>
 
 <ContextMenu bind:open={tabMenuOpen} x={tabMenuX} y={tabMenuY}>
