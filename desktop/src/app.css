@@ -57,10 +57,11 @@
   --gradient-aurora-c: #f3cfae;
   --gradient-aurora-d: #d4c9f0;
 
-  /* Icon knockout — flattens a (multicolor) icon to the page bg color so it
-   * reads as a cut-out on a pastel chip. Light: → near-white; dark sets the
-   * dark variant. Works on <img> SVGs + emoji silhouettes alike. */
-  --icon-knockout: brightness(0) invert(1);
+  /* Icon knockout — flattens a (multicolor) icon to PURE BLACK so it reads
+   * as a clean high-contrast cut-out on the light pastel chips (in both
+   * light + dark — the chip tokens are light pastels either way). Works on
+   * <img> SVGs + emoji silhouettes + initials alike. */
+  --icon-knockout: brightness(0);
 
   --radius-lg: 8px;
   --shadow-pop:
