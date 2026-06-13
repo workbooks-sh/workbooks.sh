@@ -39,6 +39,7 @@
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import NexusMark from "$lib/components/NexusMark.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
+  import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
   import IconResolver from "$lib/ui/Icon.svelte";
@@ -443,9 +444,11 @@
   </button>
 
   <!-- Extension dock toolbar (wb-aakl.14) — one icon per registered dock
-       panel. The agent panel registers here only under WB_FF_AGENTS;
-       toolkits (Browser SDK) register their own. -->
-  <DockToolbar />
+       panel (Waldo + any toolkit panels). Reveals at the onboarding agent
+       step; always shown once onboarding is done. -->
+  <span class="dock-host" class:ob-hide={!onboarding.shows("agent")}>
+    <DockToolbar />
+  </span>
 </div>
 
 <ContextMenu bind:open={tabMenuOpen} x={tabMenuX} y={tabMenuY}>
@@ -788,6 +791,12 @@
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
   .engine :global(svg) { display: block; }
+  .dock-host {
+    display: inline-flex;
+    align-items: center;
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .dock-host.ob-hide { opacity: 0; transform: translateY(-8px); pointer-events: none; }
   .engine:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
   .engine-ok { color: var(--color-ok); }
   .engine-pending { color: var(--color-warn); animation: engine-pulse 1.4s ease-in-out infinite; }

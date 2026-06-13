@@ -50,6 +50,7 @@
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { applyBootPrefs } from "$lib/onboarding/prefs";
+  import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
   import {
     MagnifyingGlass as SearchCmdIcon,
@@ -539,15 +540,15 @@
   <!-- Core file-system UX (wb-aakl.5): create the first workspace so
        packages have somewhere to live. Not a setup gate. -->
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
-{:else if !firstRunDone}
-  <!-- Personalization onboarding (wb-aakl.20) — owns the view, builds the
-       UI up one concept at a time (non-interactive preview), never a gate. -->
-  <OnboardingFlow oncomplete={() => (firstRunDone = true)} />
 {:else}
-  <div class="app">
+  <!-- The REAL app shell. During onboarding (wb-aakl.20) its pieces reveal
+       one at a time as a tutorial; `onboarding.shows()` is always true once
+       onboarding is done. -->
+  <div class="app" class:ob-active={onboarding.active} inert={onboarding.active}>
     <div
       class="sidebar-host"
       class:closed={!chrome.sidebarOpen}
+      class:ob-hide={!onboarding.shows("sidebar")}
       inert={!chrome.sidebarOpen}
     >
       <Sidebar
@@ -579,7 +580,7 @@
     {/if}
 
     <main class="main">
-      <div class="main-content">
+      <div class="main-content" class:ob-hide={!onboarding.shows("canvas")}>
         <DropOverlay />
         {#if chrome.mode === "doc"}
           <DocViewer />
@@ -687,6 +688,12 @@
       />
     {/if}
   </div>
+
+  <!-- Coach lives OUTSIDE the inert .app so it stays interactive while the
+       real shell behind it is frozen during the build-up. -->
+  {#if !firstRunDone}
+    <OnboardingFlow oncomplete={() => (firstRunDone = true)} />
+  {/if}
 {/if}
 
 <ToastStack />
@@ -742,10 +749,17 @@
     width: 232px;
     display: flex;
     overflow: hidden;
-    transition: width 0.22s cubic-bezier(0.2, 0, 0, 1);
+    transition: width 0.22s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .sidebar-host.closed {
     width: 0;
+  }
+  /* Onboarding build-up: reveal the real sidebar with a slide-in. */
+  .sidebar-host.ob-hide {
+    opacity: 0;
+    transform: translateX(-16px);
+    pointer-events: none;
   }
   .sidebar-host :global(.sidebar) {
     transition:
@@ -792,6 +806,13 @@
     box-shadow:
       0 1px 2px rgba(15, 15, 15, 0.05),
       0 4px 16px rgba(15, 15, 15, 0.04);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Onboarding build-up: reveal the real canvas (with demo content). */
+  .main-content.ob-hide {
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
   }
   /* Style danger context-menu items — ContextMenu uses :global(.ctx-item),
    * so this hook also has to be :global. */
