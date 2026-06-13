@@ -58,6 +58,13 @@ defmodule Workbooks.Instance do
     # is closed: only `net`/`browse` profiles get egress.
     allow_http = Policy.allow_http?(profile)
 
+    # SECURITY (DNS-exfil + scope correctness): the per-instance raw-socket scope is RESOLVE-THEN-PINNED to
+    # public IPs host-side. wasmtime's socket_addr_check matches the connect IP against net_allow, so hostname
+    # entries can't match a connection AND keeping them enables guest name-lookup (a DNS-exfil channel). Pinning
+    # to IPs makes the scope both functional and exfil-safe (guest DNS auto-disabled when the scope is all-IPs).
+    # nil scope = unscoped (SSRF floor only, DNS on) — unchanged default.
+    net_allow = Workbooks.NetGuard.pin_allow_list(Keyword.get(opts, :net_allow))
+
     {:ok, pid} =
       Wasmex.Components.start_link(%{
         bytes: bytes,
@@ -66,7 +73,8 @@ defmodule Workbooks.Instance do
           inherit_stdin: false,
           inherit_stdout: false,
           inherit_stderr: false,
-          allow_http: allow_http
+          allow_http: allow_http,
+          net_allow: net_allow
         },
         imports: imports
       })

@@ -1872,3 +1872,19 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   (pre-DNS), NOT :ssrf (post-resolve) — count({:net,:deny,:ssrf})==0. 34 tests green (net_guard + py_net +
   pynet_command, incl all netdeps). The brokered net is now red-team-green on DNS-exfil too. NEXT STONE:
   inbound server-flip for wasip1 (CPython sock_accept on a host-preopened listener) OR package a real tool.
+- 2026-06-13 (iter 139): **NETWORKING KEYSTONE — verified COMPLETE + closed the last wasip2 edge (resolve-pin
+  the socket scope).** Audit confirmed red-team-green across the whole surface: EGRESS (NetGuard: SSRF/obfusc-
+  ated-IP/redirect-hop/rebind-pin/DNS-exfil/byte-cap/rate/revocation), INBOUND raw-TCP (TcpServeBroker: byte-
+  cap/slowloris-deadline/per-client+global conn caps/rate/revocation/guest-backed), INBOUND wasi:http
+  (ServeBroker: revocation/rate/per-serve isolation/response-cap/real-HTTP + KV/CGI compositions), and the
+  wasip1 PyNet transport (full cadence). FOUND + FIXED a real residual edge on the wasip2 RAW-SOCKET path:
+  socket_addr_check matches the CONNECT IP against net_allow (wb_addr_in_scope compares addr.ip()), so a
+  HOSTNAME entry could never match a connection AND (worse) kept guest name-lookup ON (wb_dns_needed), a
+  DNS-exfil channel — and Instance.ex never even set net_allow (nil -> DNS on). Fix: NetGuard.pin_allow_list/1
+  resolve-then-pins each scope entry to a public IP host-side (SSRF-safe; internal/unresolvable DROPPED),
+  yielding a pure-IP scope that (a) actually matches guest connections and (b) makes wb_dns_needed false ->
+  guest DNS DISABLED -> no exfil. Wired Instance.ex to pin opts[:net_allow] into WasiP2Options.net_allow
+  (additive; nil default = unscoped, unchanged). 23 net_guard + 20 instance/wasip2-e2e tests green. Unscoped
+  mode (net_allow nil) still allows guest DNS — inherent without a scope, same documented tradeoff as the HTTP
+  path; the defense IS providing a scope. NEXT PHASE: networking proven; pull the next stone (exec->Command-
+  Registry dispatch / brokered durable storage / threading-fallback / app-host platform) + reclaim feasibility.

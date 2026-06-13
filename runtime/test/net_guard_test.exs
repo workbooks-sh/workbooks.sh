@@ -180,6 +180,25 @@ defmodule Workbooks.NetGuardTest do
     assert Workbooks.BrokerAudit.count({:net, :deny, :ssrf}) == 0
   end
 
+  test "pin_allow_list — keeps public IPs, drops internal, passes nil/[] through (hermetic)" do
+    # public IP literals (with/without port) are kept verbatim — they already match a connect addr + need no DNS
+    assert NetGuard.pin_allow_list(["8.8.8.8", "1.1.1.1:443"]) == ["8.8.8.8", "1.1.1.1:443"]
+    # internal IP literals are DROPPED (fail-closed) so an internal target can't ride the socket scope
+    assert NetGuard.pin_allow_list(["127.0.0.1", "10.0.0.1", "169.254.169.254", "192.168.1.1:80"]) == []
+    # the unscoped cases pass through (SSRF floor only; DNS-exfil inherent without a scope, as on HTTP)
+    assert NetGuard.pin_allow_list(nil) == nil
+    assert NetGuard.pin_allow_list([]) == []
+  end
+
+  @tag :netdeps
+  test "pin_allow_list — a hostname scope is RESOLVED to a public IP (so the socket scope works + DNS stays off)" do
+    # a hostname can never match a connect addr (which is an IP) and would keep guest DNS on; we pin it to an IP
+    [pinned] = NetGuard.pin_allow_list(["example.com"])
+    assert {:ok, _ip} = :inet.parse_address(String.to_charlist(pinned))
+    # an internal hostname resolves to a loopback/internal address -> DROPPED (no scope entry, no DNS leak)
+    assert NetGuard.pin_allow_list(["localhost"]) == []
+  end
+
   test "request/3 — full-method brokered client keeps SSRF on EVERY method (hermetic)" do
     # POST/PUT/DELETE to internal targets must be SSRF-denied just like GET — before any socket opens.
     assert {:error, :denied} = NetGuard.request(:post, "http://127.0.0.1/", body: "x")

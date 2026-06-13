@@ -354,6 +354,57 @@ defmodule Workbooks.NetGuard do
 
   def resolve_allowed_ip(_), do: :error
 
+  @doc """
+  Resolve-then-pin an allow-list for the wasip2 RAW-SOCKET path (`WasiP2Options.net_allow`). wasmtime's
+  `socket_addr_check` matches the CONNECT IP against the scope (`wb_addr_in_scope` compares `addr.ip()`), so a
+  hostname entry can NEVER match a connection — and worse, leaving a hostname in the scope keeps guest DNS
+  enabled (`wb_dns_needed`), letting a guest resolve arbitrary names and EXFIL data via DNS before the connect
+  is blocked. So we pin host-side: each entry is resolved to a public IP here (SSRF-safe — internal/unresolvable
+  hosts are DROPPED), yielding a pure-IP scope that (a) actually matches the guest's connections and (b) makes
+  `wb_dns_needed` false → guest name-lookup is DISABLED → no DNS-exfil. `nil`/`[]` pass through unchanged (the
+  unscoped case — DNS-exfil is inherent without a scope, exactly as on the HTTP path).
+
+  Returns the pinned `[ip | "ip:port"]` list (or `nil`). An entry that won't resolve to a public IP is omitted
+  (fail-closed — better to drop a name than to leave the scope leaky or the connection silently denied).
+  """
+  def pin_allow_list(nil), do: nil
+
+  def pin_allow_list(allow) when is_list(allow) do
+    allow
+    |> Enum.flat_map(fn entry ->
+      {host, port} = split_host_port(entry)
+
+      case :inet.parse_address(String.to_charlist(host)) do
+        # already an IP literal — keep as-is only if it's a public/allowed address (drop internal IPs too)
+        {:ok, ip} ->
+          if ip_allowed?(ip), do: [entry], else: []
+
+        _ ->
+          # a hostname — resolve to a pinned public IP (or drop)
+          case resolve_allowed_ip(host) do
+            {:ok, ip} -> [with_port(:inet.ntoa(ip) |> to_string(), port)]
+            :error -> []
+          end
+      end
+    end)
+  end
+
+  # "host" or "host:port" — but NOT a bare IPv6 literal (which contains ':'). Bracketed IPv6 keeps its brackets.
+  defp split_host_port(entry) do
+    cond do
+      String.starts_with?(entry, "[") -> {entry, nil}
+      match?({:ok, _}, :inet.parse_address(String.to_charlist(entry))) -> {entry, nil}
+      true ->
+        case String.split(entry, ":", parts: 2) do
+          [h, p] -> {h, p}
+          [h] -> {h, nil}
+        end
+    end
+  end
+
+  defp with_port(ip, nil), do: ip
+  defp with_port(ip, port), do: "#{ip}:#{port}"
+
   # Resolve a host (IP literal or DNS name) to a list of inet address tuples. Tries literal first, then
   # A and AAAA. Deny (empty/error) if nothing resolves.
   defp resolve(host) do
