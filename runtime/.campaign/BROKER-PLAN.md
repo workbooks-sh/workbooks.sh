@@ -1861,3 +1861,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   NOTE: registered `qjs` excludes quickjs-libc.c (no guest file I/O) so the QuickJS transport needs a libc-
   enabled rebuild — deprioritized; softened the PyNet doc's QuickJS claim. NEXT STONE: inbound server-flip for
   wasip1 (CPython sock_accept on a host-preopened listener — datasette class) OR package a real tool live.
+- 2026-06-13 (iter 138): **DNS-EXFIL DEFENSE — allow-list checked BEFORE resolution (red-team list item).**
+  Found a real leak: both do_get and do_request checked allowed?() (which DNS-RESOLVES the host for the SSRF/IP
+  check) BEFORE the syntactic allow-list. So under a scope like allow:[example.com], a guest requesting
+  http://STOLEN-SECRET.evil.com/ caused the host to RESOLVE that name — leaking the guest-chosen label to the
+  attacker's nameserver — before the HTTP request was denied. Fix: reorder so host_allowed_by_list? (pure
+  string match on the URL host, NO DNS) runs first; an off-list host is denied with ZERO resolution. Safe:
+  host_allowed_by_list?(_, nil)=true, so the no-allow-list case is unchanged (DNS-exfil is inherent there — the
+  defense IS the allow-list). Hermetic red-team proof: an off-list NON-RESOLVABLE host denies as :allowlist
+  (pre-DNS), NOT :ssrf (post-resolve) — count({:net,:deny,:ssrf})==0. 34 tests green (net_guard + py_net +
+  pynet_command, incl all netdeps). The brokered net is now red-team-green on DNS-exfil too. NEXT STONE:
+  inbound server-flip for wasip1 (CPython sock_accept on a host-preopened listener) OR package a real tool.

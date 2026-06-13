@@ -97,13 +97,18 @@ defmodule Workbooks.NetGuard do
 
   defp do_request(method, url, headers, body, ctype, timeout, allow, max_bytes, hops) do
     cond do
+      # ALLOW-LIST FIRST (DNS-exfil defense): the allow-list match is purely SYNTACTIC (operates on the URL's
+      # hostname string, no DNS). allowed?/SSRF RESOLVES the host — so checking it first would send a DNS query
+      # for an off-list hostname BEFORE denying it, leaking guest-chosen labels to an attacker's nameserver
+      # (e.g. http://stolen-secret.evil.com under allow:[example.com]). Denying off-list hosts here means NO
+      # resolution ever happens for them. (When no allow-list is set this is `true`, so behavior is unchanged.)
+      not host_allowed_by_list?(url, allow) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :allowlist, url)
+        {:error, :denied}
+
       not allowed?(url) ->
         Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} (#{method}) — SSRF")
-        {:error, :denied}
-
-      not host_allowed_by_list?(url, allow) ->
-        Workbooks.BrokerAudit.record(:net, :deny, :allowlist, url)
         {:error, :denied}
 
       true ->
@@ -170,14 +175,17 @@ defmodule Workbooks.NetGuard do
 
   defp do_get(url, timeout, allow, hops) do
     cond do
-      not allowed?(url) ->
-        Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
-        Logger.warning("wb-broker: DENY egress #{inspect(url)} — SSRF (internal/non-routable destination)")
-        {:error, :denied}
-
+      # ALLOW-LIST FIRST (DNS-exfil defense — see do_request): the syntactic allow-list check runs before the
+      # resolving SSRF check, so an off-list hostname is denied WITHOUT a DNS query (no label leak to an
+      # attacker nameserver). No-allow-list case is `true` here, so behavior is unchanged.
       not host_allowed_by_list?(url, allow) ->
         Workbooks.BrokerAudit.record(:net, :deny, :allowlist, url)
         Logger.warning("wb-broker: DENY egress #{inspect(url)} — host not in allow-list")
+        {:error, :denied}
+
+      not allowed?(url) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
+        Logger.warning("wb-broker: DENY egress #{inspect(url)} — SSRF (internal/non-routable destination)")
         {:error, :denied}
 
       true ->
