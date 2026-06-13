@@ -94,6 +94,48 @@ defmodule Workbooks.JsDock do
              -1
            end
          end},
+      # host_http(method,url,headers,body, out,out_cap) -> i32 : brokered HTTP with an arbitrary METHOD
+      # (POST/PUT/…) + headers + body. Generalizes host_http_get; same NetGuard SSRF cadence. `headers` is
+      # newline-joined "k:v" lines (blank → none). Returns the response BODY byte count, or -1.
+      "host_http" =>
+        {:fn, [:i32, :i32, :i32, :i32, :i32, :i32, :i32, :i32, :i32, :i32], [:i32],
+         fn ctx, mp, ml, up, ul, hp, hl, bp, bl, op, oc ->
+           if allow_http do
+             method = Wasmex.Memory.read_string(ctx.caller, ctx.memory, mp, ml)
+             url = Wasmex.Memory.read_string(ctx.caller, ctx.memory, up, ul)
+             hdr_raw = if hl > 0, do: Wasmex.Memory.read_string(ctx.caller, ctx.memory, hp, hl), else: ""
+             body = if bl > 0, do: Wasmex.Memory.read_binary(ctx.caller, ctx.memory, bp, bl), else: ""
+
+             headers =
+               hdr_raw
+               |> String.split("\n", trim: true)
+               |> Enum.flat_map(fn line ->
+                 case String.split(line, ":", parts: 2) do
+                   [k, v] -> [{String.trim(k), String.trim(v)}]
+                   _ -> []
+                 end
+               end)
+
+             m = method |> String.downcase() |> String.to_atom()
+
+             case Workbooks.NetGuard.request(m, url,
+                    headers: headers,
+                    body: body,
+                    principal: tenant,
+                    allow: net_allow
+                  ) do
+               {:ok, %{body: rbody}} ->
+                 n = min(byte_size(rbody), max(oc, 0))
+                 :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, op, binary_part(rbody, 0, n))
+                 n
+
+               {:error, _} ->
+                 -1
+             end
+           else
+             -1
+           end
+         end},
       # host_exec(req_ptr,req_len, out_ptr,out_cap) -> i32 : brokered exec to a sandboxed wasm command
       # (gated on the "commands" cap; ExecBroker enforces default-deny/registered-only/depth/cap/no-inject).
       "host_exec" =>

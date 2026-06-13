@@ -67,21 +67,25 @@ function resolveFile(files, p) {
 }
 
 // Node core builtins we shim in-sandbox (wb-spy.T2.5) — injected by Elixir as __shims__/<name>.js.
-var SHIM = { assert: 1, buffer: 1, crypto: 1, events: 1, path: 1, process: 1, querystring: 1, string_decoder: 1, timers: 1, url: 1, util: 1 };
-// Builtins available ONLY in the JsDock lane (wb-e1x): host-brokered fs/http/https shims backed
-// by Javy.VFS / Javy.Net. Permitted when the bundle is dock-targeted (input.dock); otherwise they
+var SHIM = { assert: 1, buffer: 1, crypto: 1, events: 1, os: 1, path: 1, process: 1, querystring: 1, stream: 1, string_decoder: 1, timers: 1, url: 1, util: 1, zlib: 1 };
+// Builtins available ONLY in the JsDock lane (wb-e1x): host-brokered shims backed by Javy.VFS /
+// Javy.Net / Javy.Exec. Permitted when the bundle is dock-targeted (input.dock); otherwise they
 // fall through to NATIVE and are build-rejected (the plain CLI lane has no host caps).
-var DOCKSHIM = { fs: 1, http: 1, https: 1 };
-// Builtins that need native OS/threads/raw sockets — not available in any lane → build-time reject.
+//   fs → Javy.VFS · http/https → Javy.Net (get + host_http POST/etc) · child_process → Javy.Exec
+//   (host_exec→ExecBroker) · net → Javy.Net.tcp · dgram → Javy.Net.udp.
+var DOCKSHIM = { fs: 1, http: 1, https: 1, child_process: 1, net: 1, dgram: 1 };
+// Builtins that need native OS/threads we can't broker — not available in any lane → build-time reject.
 var NATIVE = {
   fs: "needs the JsDock lane (host VFS) — not available on the plain CLI lane",
-  net: "raw TCP sockets are not available in-sandbox",
+  net: "needs the JsDock lane (host-brokered TCP) — not available on the plain CLI lane",
   http: "needs the JsDock lane (host-brokered fetch) — not available on the plain CLI lane",
   https: "needs the JsDock lane (host-brokered fetch) — not available on the plain CLI lane",
-  http2: "no native network", tls: "no native TLS sockets", dgram: "no UDP", dns: "no resolver",
-  child_process: "no subprocesses in-sandbox", worker_threads: "no threads", cluster: "no clustering",
+  dgram: "needs the JsDock lane (host-brokered UDP) — not available on the plain CLI lane",
+  child_process: "needs the JsDock lane (host-brokered exec) — not available on the plain CLI lane",
+  http2: "no native network", tls: "no native TLS sockets", dns: "no resolver",
+  worker_threads: "no threads", cluster: "no clustering",
   vm: "no nested VM", v8: "no V8 internals", inspector: "no inspector", repl: "no repl",
-  readline: "no TTY", os: "not shimmed yet", stream: "not shimmed yet", zlib: "not shimmed yet"
+  readline: "no TTY"
 };
 
 function resolveBare(files, req) {
