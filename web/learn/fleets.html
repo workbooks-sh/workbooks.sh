@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fleets — a team is a protocol — Workbooks</title>
+<meta name="description" content="A fleet is a multi-agent keeper declared in one org manifest: one keeper worker per member, each with its own def, cadence, and namespaced state. The runtime adds a stagger and a gate — and deliberately does not coordinate the agents. A sub-lesson under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/fleets-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="fleets — a team is a protocol">
+<meta property="og:description" content="One keeper engine, instantiated N times from one org manifest. The runtime adds a stagger and a concurrency gate — and deliberately does not coordinate the agents. Claiming is a protocol on a shared board, not a lock.">
+<meta property="og:url" content="https://workbooks.sh/learn/fleets">
+<meta property="og:image" content="https://workbooks.sh/og/fleets.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="fleets — a team is a protocol">
+<meta name="twitter:description" content="One keeper engine, instantiated N times from one org manifest. The runtime stagger-and-throttles; it does not coordinate. Claiming is a protocol on a shared board, not a lock.">
+<meta name="twitter:image" content="https://workbooks.sh/og/fleets.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/fleets.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * the manifest, parsed by the page you're reading
+  ** wren  :DEF: writer.org   :INTERVAL: 15m
+  ** moss  :DEF: researcher.org :INTERVAL: 15m
+  *** the runtime starts one keeper per heading, staggers their boots,
+      caps how many run at once — and then gets OUT OF THE WAY.
+      who works what is decided on the board, in git, by the agents.
+      coordination correctness lives in the def, not in here.   :claim:
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·11 — <b>under agents · fleets</b></div>
+      <h1><span class="ln">one agent is a worker</span><span class="ln bub">A TEAM</span><span class="ln">is a protocol</span></h1>
+      <p class="dek">A <b>fleet</b> isn't a new construct — it's the same
+      <a href="agents">keeper</a> engine, instantiated many times from one
+      <a href="org">org manifest</a>. Each member is a full keeper with its own
+      def, its own cadence, its own namespaced state. The runtime adds exactly
+      two things on top — a <b>stagger</b> and a <b>gate</b> — and then
+      deliberately does nothing else. Who works what is a protocol the agents
+      follow, on a shared board, in git.</p>
+      <div class="meta">
+        <span class="on">fleets</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/fleets-hero.jpg" alt="A small spacesuited figure standing on a gantry before a fleet of four identical monumental cargo ships, each tagged with a glowing name and queued at a single launch tower — bright blue-and-green 1970s sci-fi style, the figure dwarfed by the ordered formation">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>fleets</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">One worker, then a team</a>
+  <a href="#definition">The definition</a>
+  <a href="#manifest">One file, one heading per agent</a>
+  <a href="#workers">N copies of one engine</a>
+  <a href="#stagger">Booting without the herd</a>
+  <a href="#gate">The gate: a 66-line semaphore</a>
+  <a href="#namespaces">Why two agents never share a clock</a>
+  <a href="#claims">Claims are a protocol, not a lock</a>
+  <a href="#newsroom">A real fleet: the newsroom</a>
+  <a href="#wire">Watching a fleet</a>
+  <a href="#boundaries">What the runtime won't do</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>one worker, then a TEAM</h2>
+  <p>This is a sub-lesson, and the placement is the first thing it teaches.
+  You already have one standing agent working — the <a href="agents">agents
+  lesson</a> built the keeper, and <a href="orchestration">orchestration</a>
+  walked its tick. Now you want a team: a researcher feeding a writer feeding
+  an editor, each on its own beat, handing work down a pipeline.</p>
+  <p>Every multi-agent framework you've seen answers "team" with a
+  heavyweight orchestrator — a message bus, a role graph, a supervisor model
+  deciding who speaks next. You suspect, correctly, that most of that is
+  machinery for problems you don't have. What a team actually needs is
+  smaller and stranger: <b>N workers</b>, a <b>budget ceiling</b> so they
+  don't all hammer the model at once, and a way for them <b>not to collide</b>
+  on the same task. That's the whole list. This lesson is those three things,
+  and a careful account of the one thing the runtime refuses to do for you.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">fleet</span> <span class="pr">/fliːt/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a multi-agent <b>keeper</b> declared in one
+    <b>org manifest</b>: one keeper worker per member, each with its own def,
+    its own lifecycle, and its own namespaced state — to which the runtime
+    adds a <b>stagger</b> and a <b>gate</b>, and deliberately
+    <b>nothing else</b>.</p>
+  </div>
+  <p>Read the negative space. There's no orchestrator in that definition, no
+  scheduler, no supervisor model. The fleet machinery is two source files —
+  the crew supervisor and the gate — totalling around 270 lines. The
+  intelligence isn't in the runtime. It's in the defs and on the board, which
+  is exactly where the agent's non-deterministic reasoning already lives.</p>
+</section>
+
+<section id="manifest">
+  <h2>one file, one heading per AGENT</h2>
+  <p>A fleet is turned on by pointing <code>WB_CREW_DEF</code> at one org file
+  — the manifest. Each top-level heading is an agent's name; its
+  <code>:PROPERTIES:</code> drawer is its config. Here is the real bit.ml
+  newsroom manifest, whole — four agents, one file:</p>
+  <pre class="orgsample">#+TITLE: crew — the bit.ml newsroom manifest
+
+* desk
+:PROPERTIES:
+:DEF: /data/agents/desk.org
+:INTERVAL: 45m
+:END:
+* moss
+:PROPERTIES:
+:DEF: /data/agents/researcher.org
+:INTERVAL: 15m
+:END:
+* wren
+:PROPERTIES:
+:DEF: /data/agents/writer.org
+:INTERVAL: 15m
+:END:
+* hale
+:PROPERTIES:
+:DEF: /data/agents/editor.org
+:INTERVAL: 20m
+:END:</pre>
+  <p>Three properties do all the work, and only one is required:</p>
+  <table class="cmp">
+    <tr><th>property</th><th>required?</th><th>default</th><th>what it means</th></tr>
+    <tr><td><code>:DEF:</code></td><td class="y">yes</td><td>—</td><td>the agent org def to run each tick. A member <b>without</b> a <code>:DEF:</code> is dropped and logged — it never becomes a worker.</td></tr>
+    <tr><td><code>:LIFECYCLE:</code></td><td class="n">no</td><td>absent → plain interval ticks</td><td>an optional state-machine spec, for agents whose cadence has phases. Most members don't carry one.</td></tr>
+    <tr><td><code>:INTERVAL:</code></td><td class="n">no</td><td><code>1h</code></td><td>fallback cadence between ticks. Grammar is <code>10m</code> / <code>2h</code> / <code>90s</code> / a bare millisecond count.</td></tr>
+  </table>
+  <p>The manifest and the singleton are <b>mutually exclusive</b>: at boot,
+  <code>WB_CREW_DEF</code> set starts the crew supervisor; otherwise
+  <code>WB_KEEPER_DEF</code> set starts the lone keeper; otherwise neither
+  runs. You never get both — a fleet replaces the singleton, it doesn't run
+  beside it. The crew counts as active only when the manifest parses to at
+  least one member that actually carries a <code>:DEF:</code>.</p>
+</section>
+
+<section id="workers">
+  <h2>N copies of one ENGINE</h2>
+  <p>Here's the move that keeps the whole thing small. A fleet member is not a
+  new kind of agent — it's the singleton keeper's tick engine, lifted out
+  verbatim and parameterized. One implementation; two callers. The singleton
+  is one instance of it; each fleet member is another. Everything you learned
+  about a keeper run — the exec shell, the workdir on the tenant git repo, the
+  sixty-step ceiling, the <code>plan</code> mode — is identical here, because
+  it is literally the same code.</p>
+  <p>What varies between instances is a small config struct: the member's
+  name, its def path, its interval, a key suffix for its files, and — for
+  fleet members only — an <code>acquire</code> and <code>release</code> pair
+  that reaches the gate. The crew supervisor builds one worker per manifest
+  heading and starts them under a <code>one_for_one</code> strategy, with the
+  gate as its very first child so every worker can borrow a slot from the
+  moment it boots:</p>
+  <pre class="mermaid">
+flowchart TD
+  sup["Crew Supervisor  (one_for_one)"]
+  gate["Gate — first child<br/>counting semaphore · max 2"]
+  desk["worker: desk<br/>def desk.org · 45m<br/>keeper-last-run-desk"]
+  moss["worker: moss<br/>def researcher.org · 15m<br/>keeper-last-run-moss"]
+  wren["worker: wren<br/>def writer.org · 15m<br/>keeper-last-run-wren"]
+  hale["worker: hale<br/>def editor.org · 20m<br/>keeper-last-run-hale"]
+  sup --> gate
+  sup --> desk
+  sup --> moss
+  sup --> wren
+  sup --> hale
+  desk -. "acquire / release" .-> gate
+  moss -. "acquire / release" .-> gate
+  wren -. "acquire / release" .-> gate
+  hale -. "acquire / release" .-> gate
+  style sup fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style gate fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style desk fill:#ffffff,stroke:#121316
+  style moss fill:#ffffff,stroke:#121316
+  style wren fill:#ffffff,stroke:#121316
+  style hale fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Four independent keepers, each pointed at its own def, each on its own
+  clock, each writing its own state file — and all four reaching back to one
+  shared gate. The supervisor doesn't sequence them. It starts them and
+  restarts any that crash. The only thing in the picture that makes the four
+  aware of each other at all is that single green box.</p>
+</section>
+
+<section id="stagger">
+  <h2>booting without the HERD</h2>
+  <p>Depth rung. If four workers all boot and tick at once, they fire four
+  model calls in the same instant — a thundering herd at the worst possible
+  moment, startup. So the supervisor staggers them: the i-th worker delays its
+  <em>first</em> tick by <code>i × WB_CREW_STAGGER_MS</code>, default thirty
+  seconds, on top of a sixty-second boot grace floor. The agents visibly
+  overlap on the wire later, but they don't pile onto the LLM at boot.</p>
+  <p>For the four-member newsroom, with defaults, the first ticks land like
+  this:</p>
+  <table class="cmp">
+    <tr><th>member</th><th>index</th><th>first tick at</th></tr>
+    <tr><td>desk</td><td>0</td><td>t = 60s  (grace + 0×30)</td></tr>
+    <tr><td>moss</td><td>1</td><td>t = 90s  (grace + 1×30)</td></tr>
+    <tr><td>wren</td><td>2</td><td>t = 120s (grace + 2×30)</td></tr>
+    <tr><td>hale</td><td>3</td><td>t = 150s (grace + 3×30)</td></tr>
+  </table>
+  <p>After the first tick, each worker runs on its own interval. And the
+  cadence clock is <b>persisted</b>, not reset on restart — each worker writes
+  its last-run timestamp to a file and schedules catch-up from there. Restart
+  the engine and a worker that was due doesn't wait a fresh full interval; it
+  picks up where its clock left off. Stagger smooths the boot; persistence
+  keeps the beat honest across restarts.</p>
+</section>
+
+<section id="gate">
+  <h2>the gate: a 66-line SEMAPHORE</h2>
+  <p>The gate is the entire concurrency story, and it is a tiny GenServer — a
+  counting semaphore, sixty-six lines, default maximum of two
+  (<code>WB_CREW_MAX_CONCURRENT</code>). Every fleet worker wraps each run in
+  <code>acquire → try → after release</code>. That's the whole contract, and
+  three details make it correct:</p>
+  <ul>
+    <li><b>Acquire blocks.</b> It's a <code>GenServer.call</code> with an
+    <code>:infinity</code> timeout. A free slot returns <code>:ok</code>
+    immediately; otherwise the caller is <em>parked</em> in a FIFO queue —
+    held, no reply yet, until a slot frees. FIFO means no worker starves: the
+    one that waited longest goes next.</li>
+    <li><b>Release hands off directly.</b> When a run finishes, release checks
+    the queue. If someone's waiting, the slot is transferred straight to the
+    queue head — the freed count never even touches the pool, so the slot
+    can't be stolen by a newcomer. Only if nobody's queued does the slot
+    return to the pool.</li>
+    <li><b>Release runs in an <code>after</code>.</b> A crashed run, or one
+    killed at the fifteen-minute wall-clock ceiling, still hits its
+    <code>after</code> and returns its slot. A wedged worker can never deadlock
+    the fleet.</li>
+  </ul>
+  <p>Watch three workers contend for two slots:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant W as wren
+  participant M as moss
+  participant H as hale
+  participant G as Gate (max 2)
+  W->>G: acquire
+  G-->>W: :ok  (slot 1 of 2)
+  M->>G: acquire
+  G-->>M: :ok  (slot 2 of 2)
+  H->>G: acquire
+  Note over H,G: no slot — hale PARKED in FIFO queue<br/>(blocked call, :infinity timeout)
+  Note over W: wren's run ends — release (in after)
+  W->>G: release
+  G-->>H: :ok  (slot handed straight to hale)
+  Note over G: free count never touched the pool<br/>FIFO order preserved
+  </pre>
+  <p>The singleton keeper, for contrast, does not use the gate at all — its
+  acquire and release are no-ops. A lone worker has no one to contend with, so
+  there's nothing to count. The gate exists precisely because a fleet does.</p>
+</section>
+
+<section id="namespaces">
+  <h2>why two agents never share a CLOCK</h2>
+  <p>Depth rung. Two keepers running off the same engine could clobber each
+  other's state files if nothing kept them apart. The thing that keeps them
+  apart is a <code>key_suffix</code> — <code>"-&lt;name&gt;"</code> — threaded
+  through every piece of persistence. The singleton's files are unsuffixed;
+  each fleet worker's are tagged with its name:</p>
+  <table class="cmp">
+    <tr><th>what</th><th>singleton keeper</th><th>fleet worker (e.g. wren)</th></tr>
+    <tr><td>last-run timestamp</td><td><code>keeper-last-run</code></td><td><code>keeper-last-run-wren</code></td></tr>
+    <tr><td>lifecycle position</td><td><code>lifecycle-pos</code></td><td><code>lifecycle-pos-wren</code></td></tr>
+    <tr><td>status (persistent_term)</td><td><code>{Keeper, :status}</code></td><td><code>{Keeper, :status, "-wren"}</code></td></tr>
+    <tr><td>registered name</td><td>—</td><td><code>Keeper.Crew.wren</code></td></tr>
+  </table>
+  <p>Because each worker owns its own last-run file and its own lifecycle
+  position, two agents never share a cadence clock — wren advancing through its
+  states can't nudge moss's. The tested behaviour is exactly this: two workers
+  write their own last-run files and their own status keys; two agents advance
+  their lifecycle positions without interfering; and the singleton's namespace
+  stays unsuffixed throughout.</p>
+  <p>One more deliberate choice: status is read from
+  <code>:persistent_term</code>, never through a <code>GenServer.call</code>.
+  Ticks run synchronously, so a status call would block for the entire length
+  of a run — up to fifteen minutes. Reading a term is instant, which is what
+  lets the public feed enumerate a busy fleet without ever waiting on a worker.</p>
+</section>
+
+<section id="claims">
+  <h2>claims are a protocol, not a LOCK</h2>
+  <p>This is the core of the page. The runtime gives you isolation (per-worker
+  workdir and state) and throttling (the gate). It does <b>not</b> coordinate
+  the agents. There is no lock on the board, no central allocator handing tasks
+  to workers. Claiming is the <em>agents'</em> protocol — a board state change
+  plus an <code>:AGENT:</code> property that the claiming agent commits to git
+  <b>before</b> doing the work, visible to its peers. Coordination correctness
+  lives in the def and on the board, the same place the non-deterministic
+  interior already does.</p>
+  <p>Concretely, here is the protocol from bit.ml's shared laws file, made of
+  git commits. A task sits on the board, unclaimed:</p>
+  <pre class="orgsample">#+TODO: ASSIGNED RESEARCH WRITING EDIT | PUBLISHED KILLED
+*** ASSIGNED hello world — one story through the whole pipeline</pre>
+  <p>moss ticks. It finds the first task in <em>its</em> state — ASSIGNED —
+  with no <code>:AGENT:</code> property, and claims it before touching the
+  work: it sets the property and commits <code>research: claim hello-world</code>.</p>
+  <pre class="orgsample">*** RESEARCH hello world — one story through the whole pipeline
+:PROPERTIES:
+:AGENT: moss
+:END:</pre>
+  <p>Then it works — writes the research skeleton — advances the task to
+  WRITING, <b>clears</b> its <code>:AGENT:</code>, appends a log line, and
+  commits <code>research: hello-world — 9 facts, 4 sources, gaps: …</code>.
+  Here's the sequence, and the crucial part is the last actor:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant B as the board (git)
+  participant M as moss (researcher)
+  participant W as wren (writer)
+  M->>B: read — first unclaimed ASSIGNED task
+  M->>B: set :AGENT: moss · commit "research: claim hello-world"
+  Note over M: work — write content/research/hello-world.org
+  M->>B: advance → WRITING · clear :AGENT: · commit "research: …"
+  Note over W: wren's next tick
+  W->>B: read — task is WRITING, unclaimed → wren claims it
+  Note over B,W: a task carrying ANOTHER agent's :AGENT:<br/>is invisible to you
+  </pre>
+  <p>The runtime never read that board. The agents did. A task claimed by
+  another agent is simply invisible to you — that's a rule in the def, enforced
+  by every agent following it, recorded in git for anyone to audit. Why put
+  correctness here instead of in a lock? Because this is where the agent's
+  judgment already is. The same file that holds an agent's reasoning holds its
+  claiming discipline, so you can read it, edit it, and watch it fail — in plain
+  text, in the git log — rather than debugging a coordinator you can't see.</p>
+</section>
+
+<section id="newsroom">
+  <h2>a real fleet: the NEWSROOM</h2>
+  <p>The bit.ml newsroom is the worked example. Four agents, none carrying a
+  lifecycle — all plain interval workers: <b>desk</b> (assignment only, never
+  writes, 45m), <b>moss</b> (researcher, 15m), <b>wren</b> (writer, 15m),
+  <b>hale</b> (editor, 20m). Every member reads one shared laws file first via
+  <code>#+SHARED:</code>; each role def adds only its own territory and its
+  hand-offs. The pipeline states double as the workflow — a story <em>is</em>
+  a task, and agents claim by state:</p>
+  <pre class="mermaid">
+flowchart LR
+  A["ASSIGNED"] -->|moss claims| R["RESEARCH"]
+  R -->|moss advances| Wr["WRITING"]
+  Wr -->|wren writes| E["EDIT"]
+  E -->|hale approves| P["PUBLISHED"]
+  E -. "hale bounces back" .-> Wr
+  desk["desk — opens 2–6 assignments<br/>leads, not facts"] -.-> A
+  style A fill:#f2ddb0,stroke:#121316
+  style R fill:#a8d4f0,stroke:#121316
+  style Wr fill:#9fc4e8,stroke:#121316
+  style E fill:#f3c5a3,stroke:#121316
+  style P fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style desk fill:#fbfaf6,stroke:#121316
+  </pre>
+  <p>The hand-off chain <em>is</em> the pipeline. desk opens assignments but
+  never writes facts. moss claims an ASSIGNED task, researches it into a fact
+  skeleton with sources and a <code>* gaps</code> section, advances it to
+  WRITING. wren picks up WRITING tasks under one law —
+  <i>the skeleton is your only universe of facts</i> — and never invents
+  beyond it. hale alone publishes: it gates on sources, and can bounce a story
+  back to WRITING. No agent reaches into another's state; each advances and
+  clears, and the next role finds the task waiting.</p>
+  <p>The public record is the git log itself, with typed commit prefixes —
+  <code>desk:</code> / <code>research:</code> / <code>write:</code> /
+  <code>edit:</code> / <code>publish:</code> — so the whole newsroom's activity
+  reads as a changelog. And when an agent finds nothing in its state, it ends
+  its run with done text beginning <code>NO-WORK</code>; the worker reads that
+  signal and stretches its next tick, idle-backing-off from minutes toward a
+  thirty-minute cap until there's work again. (Honest caveat: the bit.ml repo
+  is a scaffold; the fleet machinery and its tests are real and shipped, but
+  there's no live URL to point at yet.)</p>
+</section>
+
+<section id="wire">
+  <h2>watching a FLEET</h2>
+  <p>Depth rung. A fleet's activity is public and read-only at
+  <code>GET /_activity</code>. For a fleet it returns a crew shape with three
+  keys — per-agent entries, a merged wire, and one legacy block for
+  crew-unaware frontends:</p>
+  <pre class="orgsample">{
+  "agents": [
+    {"name": "moss", "running": true, "lifecycle": null,
+     "steps": [{"tool": "fetch", "target": "https://arxiv.org/abs/…",
+                "ts": 1760000000, "agent": "moss"}],
+     "thought": "reading the primary source"},
+    {"name": "wren", "running": false, "lifecycle": null,
+     "steps": [], "thought": null}
+  ],
+  "wire":  [ /* last 10 steps across ALL agents, each tagged "agent": … */ ],
+  "agent": { /* legacy: the busiest agent, for crew-unaware frontends */ }
+}</pre>
+  <p>Each <code>agents</code> entry carries that member's running flag,
+  lifecycle, last few steps, and current thought. The <code>wire</code> is the
+  last ten steps across everyone, merged and tagged. The <code>agent</code>
+  block is a courtesy for older frontends — the busiest running agent, or the
+  most recent if all are idle. And it all comes from <b>one</b> shared
+  <code>_steps.jsonl</code> in the tenant repo: every event carries an
+  <code>agent</code> tag, and the feed simply filters by it. The fleet doesn't
+  keep four logs — it keeps one, agent-stamped, which is the same ledger the
+  <a href="the-ledger">the-ledger</a> lesson seals. The crew exposes member
+  names and per-agent contexts precisely so the public plane can enumerate and
+  read worker status without a single GenServer call.</p>
+</section>
+
+<section id="boundaries">
+  <h2>what the runtime won't DO for you</h2>
+  <p>Honesty section. The fleet is deliberately thin, and the thinness has
+  edges you should know before you lean on it.</p>
+  <ul>
+    <li><b>The gate throttles; it doesn't schedule.</b> There are no
+    priorities and no fairness beyond FIFO. If you need agent X to always go
+    before agent Y, the gate won't give you that — it only counts.</li>
+    <li><b>Claims are advisory.</b> A misbehaving def <em>can</em> grab a task
+    another agent claimed. The defence isn't a lock — it's the def and the git
+    record. You catch a bad claim by reading history, not by trusting the
+    runtime to forbid it.</li>
+    <li><b>There's a race window.</b> Within a single staggered tick, two
+    agents could read the board and both try to claim the same task; commit
+    order decides the winner. Claiming first shrinks the window — it doesn't
+    eliminate it.</li>
+    <li><b>Adding a member means a restart.</b> The supervisor's child list is
+    fixed when it starts. The manifest is re-read from disk on each access, but
+    editing it to add or remove a live worker most likely needs the crew
+    supervisor to restart — don't count on hot hot-add.</li>
+    <li><b>NO-WORK honesty is def-level.</b> Idle backoff only quiets an agent
+    that <em>admits</em> it's idle. An agent whose def invents busywork will
+    burn budget happily — the gate caps concurrency, not imagination.</li>
+  </ul>
+  <p>And the values line, because it's the whole posture: this is never a
+  newsroom that runs itself. Humans set the board's objectives — the leads,
+  the assignments, the direction. The agents work the pipeline. A fleet makes
+  the working cheap and legible; it doesn't make the judgment go away.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can two agents grab the same task?</summary>
+    <p>In the common case, no — claiming-before-working plus FIFO state
+    discipline makes a claimed task invisible to peers. But it's a protocol,
+    not a lock: inside one staggered tick there's a narrow race where two
+    agents read the board before either commits, and commit order decides it.
+    The protocol shrinks that window; it doesn't close it. You audit it in git.</p>
+  </details>
+  <details>
+    <summary>Why doesn't the runtime just lock the board?</summary>
+    <p>Because coordination correctness belongs in the same layer as the
+    agent's reasoning — the def — where you can read, edit, and review it. A
+    runtime lock would move that logic somewhere you can't see or diff. The
+    runtime isolates runs and throttles concurrency; it deliberately leaves
+    coordination to the board, in plain text, in git.</p>
+  </details>
+  <details>
+    <summary>How do I add a fifth agent?</summary>
+    <p>Add a heading with a <code>:DEF:</code> to the manifest and restart the
+    crew. The supervisor builds its worker list at startup, so a new member
+    becomes a worker on the next boot — not live, mid-run. The manifest itself
+    is cheap to re-read, but the worker set is fixed when the supervisor
+    starts.</p>
+  </details>
+  <details>
+    <summary>Does the singleton keeper change when I use a fleet?</summary>
+    <p>You don't run both — they're mutually exclusive at boot. The fleet
+    worker <em>is</em> the singleton's engine, lifted out and parameterized, so
+    the run mechanics are identical. The only differences are namespaced state
+    files and a real gate (the singleton's acquire and release are no-ops).</p>
+  </details>
+  <details>
+    <summary>What does a fleet cost to run?</summary>
+    <p>The gate is your budget ceiling — at most <code>WB_CREW_MAX_CONCURRENT</code>
+    runs happen at once, default two, no matter how many members you have. And
+    NO-WORK backoff quiets idle agents toward a thirty-minute tick, so a fleet
+    with little to do stops paying for itself until work arrives. You scale
+    members for coverage and cap spend with one number.</p>
+  </details>
+  <details>
+    <summary>Is this like the Autopoet?</summary>
+    <p>Opposite shape. The <a href="autopoet">Autopoet</a> is one standing
+    agent tending the system. A fleet is many standing agents working a
+    pipeline. Same engine underneath; different count, different subject.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>A fleet is the agents lesson, multiplied — and it leans on three more.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the keeper a fleet copies</small></div><span class="go">→</span></a>
+    <a href="orchestration"><span class="sw" style="background:#9fc4e8"><b>↻</b></span>
+      <div>Orchestration<small>the single tick this generalizes</small></div><span class="go">→</span></a>
+    <a href="boards"><span class="sw" style="background:#f2ddb0"><b>▦</b></span>
+      <div>Boards<small>where the claims live</small></div><span class="go">→</span></a>
+    <a href="the-ledger"><span class="sw" style="background:#aee5c2"><b>≣</b></span>
+      <div>The ledger<small>the steps the wire reads</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · fleets
+  :PROPERTIES:
+  :SLUG:   fleets
+  :KIND:   learn
+  :NN:     05.11
+  :KICKER: under agents · fleets
+  :TITLE1: one agent is a worker
+  :TITLE2: A TEAM
+  :TITLE3: is a protocol
+  :CHIP:   fleets
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/fleets-hero.jpg
+  :END:
+** og
+- one keeper engine, instantiated N times from one org manifest
+- the runtime adds a stagger and a gate — and nothing else
+- claiming is a protocol on a shared board, not a lock
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .36], ["#a8d4f0", .24], ["#aee5c2", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

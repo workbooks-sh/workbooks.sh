@@ -20,8 +20,16 @@ const REVIEW_SCHEMA = {
 
 const REPO = '/Users/shinyobjectz/Apps/workbooks'
 
-// args may arrive as a JSON string depending on the caller — normalize
-const input = typeof args === 'string' ? JSON.parse(args) : args
+// args may arrive as a JSON string depending on the caller — normalize.
+// {file: "<path>"} loads the lesson list from disk (the library run).
+let input = typeof args === 'string' ? JSON.parse(args) : args
+if (input && input.file) {
+  const loader = await agent(
+    'Print the EXACT raw contents of ' + input.file + ' and nothing else — no commentary, no fences.',
+    { label: 'load:args' }
+  )
+  input = JSON.parse(loader.slice(loader.indexOf('{')))
+}
 const lessons = Array.isArray(input) ? input : input.lessons
 if (!Array.isArray(lessons) || !lessons.length) throw new Error('args.lessons must be a non-empty array')
 
@@ -43,7 +51,7 @@ Produce a dossier as your final message:
 3. SECTION OUTLINE — 8-12 sections in house order (problem → definition → mechanics/depth sections → honesty → FAQ), with one line each on what it covers and which diagram (mermaid flowchart/sequence/table) would genuinely explain it. Mark depth-rung (skippable) sections.
 4. CROSS-LINKS — which other lessons/deep-dives this should reference (extensionless hrefs).
 5. THREE WORKED DETAILS — concrete examples/snippets (real org, real commands, real output shapes) the writer must include so nothing stays abstract.`,
-    { label: `research:${l.slug}`, phase: 'Research' }
+    { label: `research:${l.slug}`, phase: 'Research', model: 'opus' }
   ).then((dossier) => ({ l, dossier })),
 
   // ── 2 · WRITE: the full page + narration script ──
@@ -71,7 +79,7 @@ Write ${REPO}/web/learn/audio/scripts/${l.slug}.json:
 - EYES-CLOSED RULE (README rule 6, hard): every track opens by speaking its section's headline naturally; every mermaid diagram, org sample, and table in that section gets a spoken walkthrough woven into the narration (describe the graph as a story, read the sample aloud, give the table's verdict) — never "as shown above/below". A driver must fully follow the argument.
 
 VERIFY before finishing: the JSON parses (python3 json.load); zero '\"' inside script text values; zero internal .html hrefs in the page; mermaid loader present if any pre.mermaid; all includes present. Return one line per file written plus the section count.`,
-    { label: `write:${l.slug}`, phase: 'Write' }
+    { label: `write:${l.slug}`, phase: 'Write', model: 'opus' }
   ).then((note) => ({ l, dossier, note })),
 
   // ── 3 · REVIEW: adversarial gate ──
@@ -89,7 +97,7 @@ If anything fails: FIX IT YOURSELF in the files (you have write access) when the
 
 Writer's note for context: ${note}
 Dossier summary (first 2000 chars): ${String(dossier).slice(0, 2000)}`,
-    { label: `review:${l.slug}`, phase: 'Review', schema: REVIEW_SCHEMA }
+    { label: `review:${l.slug}`, phase: 'Review', schema: REVIEW_SCHEMA, model: 'opus' }
   ).then((review) => ({ slug: l.slug, parent: l.parent, nn: l.nn, verdict: review.verdict, findings: review.findings }))
 )
 

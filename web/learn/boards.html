@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>boards — a rendering, not a database — Workbooks</title>
+<meta name="description" content="There is no board model anywhere in the runtime. A board is the kernel's render() over the plan file plus a write path back into it — kanban, status page, an agent's ready list, all the same one-file two-way binding. A sub-lesson under workflows.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/boards-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="boards — a rendering, not a database">
+<meta property="og:description" content="Grep the runtime for a Board table and you find a one-line denial. A board is render() over the plan file plus a write path back into it — every surface is the same composition. A sub-lesson under workflows.">
+<meta property="og:url" content="https://workbooks.sh/learn/boards">
+<meta property="og:image" content="https://workbooks.sh/og/boards.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="boards — a rendering, not a database">
+<meta name="twitter:description" content="There is no Board table. A board is render() over the plan file plus a path back into it. A sub-lesson under workflows.">
+<meta name="twitter:image" content="https://workbooks.sh/og/boards.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+   * TODO render this page          :board:
+     # a board is two functions you already have:
+     #   render(org) -> html       (the read half — one line of Rust)
+     #   PUT /w/:id  -> stored      (the write half — back into the same file)
+     # there is no third thing. grep the runtime for a Board table; you'll
+     # find a moduledoc that says "there is no separate 'board'." this comment
+     # is the page's own plan, rendered by the same idea it describes.
+   ** DONE write the prose
+   ** DONE draw the graphs
+   ** TODO flip me to DONE — by editing this file, the only API there is
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 08·4 — <b>under workflows · boards</b></div>
+      <h1><span class="ln">a rendering,</span><span class="ln bub">NOT A</span><span class="ln">database</span></h1>
+      <p class="dek">Every tracker you've used is a second database with views. Grep
+      this runtime for the <b>Board table</b> and the search comes back empty — on
+      purpose. A board is the kernel's <code>render()</code> over the
+      <a href="workflows">plan file</a>, plus a write path back into it. Two verbs,
+      zero models. This page is why that's the whole trick — and where it bites.</p>
+      <div class="meta">
+        <span class="on">boards</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/boards-hero.jpg" alt="A small figure standing before a single colossal illuminated wall-sized board whose columns of glowing task-cards are visibly drawn from one enormous open book on a pedestal below it, beams of light running from the book's pages up into each column — bright, monumental, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/workflows.svg" alt=""></div><span>boards</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Where's the Board table?</a>
+  <a href="#definition">A board, decomposed</a>
+  <a href="#grep">The one-line denial</a>
+  <a href="#render">One line of Rust, three surfaces</a>
+  <a href="#callhome">The page that talks back</a>
+  <a href="#planview">The board is the runner, paused</a>
+  <a href="#liveboard">A status page that is two file reads</a>
+  <a href="#readylist">The agent is a board consumer</a>
+  <a href="#wild">Boards running in production</a>
+  <a href="#honest">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>where's the BOARD table?</h2>
+  <p>You've read the <a href="workflows#boards">parent lesson's claim</a> — boards
+  are renderings of the plan file — and a reasonable instinct kicks in: that's a
+  nice sentence, but where's the machinery? Every tracker you've ever opened is a
+  second system of record. Somewhere there is a <code>boards</code> table, a
+  <code>columns</code> schema, a <code>card</code> row with a <code>status</code>
+  enum, and a sync job whose entire job is dragging that database back toward
+  reality after reality moves.</p>
+  <p>So go looking. Open the runtime and grep for it — Board structs, column
+  models, a kanban service. You should be told this upfront, because the search
+  is short: it comes back empty. There is no Board table in the host. There is no
+  card schema. There is no sync job, because there is nothing to sync <em>between</em>.
+  The thing you expected to find is the thing that was deliberately not built.</p>
+  <p>That absence is not a gap — it's the design. The rest of this page is the
+  account of what's there instead, and it's smaller than the table you went
+  looking for.</p>
+</section>
+
+<section id="definition">
+  <h2>a board, DECOMPOSED</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">board</span> <span class="pr">/bɔrd/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the kernel's <b>render(org)&nbsp;→&nbsp;html</b>
+    over a <a href="workflows">plan file</a>, plus a <b>write path back into that
+    same file</b> — kanban, status page, calendar, an agent's ready list are all
+    the same composition with different clothes. Two verbs, zero models.</p>
+  </div>
+  <p>The whole construct decomposes into exactly two functions that already exist
+  for other reasons. The read half is the kernel turning org into HTML. The write
+  half is editing the file the HTML was rendered from. Nothing renders <em>to</em>
+  a board and nothing is stored <em>as</em> a board — the file is the single
+  source, and a board is a view of it that knows the way home.</p>
+  <p>Here is the <a href="workflows#boards">parent's diagram</a> redrawn with the
+  actual function names on the arrows. The plan file fans out into any surface
+  through one read function; every surface's only mutation is a write back into
+  the same file:</p>
+  <pre class="mermaid">
+flowchart TD
+  file[["plan.org — the single source"]]
+  file -- "render(org)" --> board["kanban surface"]
+  file -- "render(org)" --> status["status page"]
+  file -- "render(org)" --> cal["deadline calendar"]
+  file -- "tangle_plan(org)" --> ready["an agent's ready list"]
+  board -. "file write (PUT /w/:id)" .-> file
+  ready -. "file write (exec)" .-> file
+  style file fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style board fill:#ffffff,stroke:#121316
+  style status fill:#ffffff,stroke:#121316
+  style cal fill:#ffffff,stroke:#121316
+  style ready fill:#ffffff,stroke:#121316
+  </pre>
+  <p>The dashed arrows are dashed on purpose, and we'll be honest about why in the
+  <a href="#honest">limits section</a>: today the write path is a file write, not
+  a mutation API. But notice what's missing from the picture — there is no box in
+  the middle holding state. There is no board between the file and its views,
+  because the runtime never learned what one is.</p>
+</section>
+
+<section id="grep">
+  <h2>the one-line DENIAL</h2>
+  <p>You don't have to take the diagram's word for it. The runtime states the
+  position itself, in the moduledoc of the module you'd expect to find a board
+  inside — <code>workflow.ex</code>. Verbatim:</p>
+  <pre class="orgsample">A workflow is the unit of orchestration — there is no separate
+"board". A native Org :workflow: headline IS the DAG… Org owns the
+orchestration spec; the runtime just executes it — no DSL, no board model.</pre>
+  <p>Grep the whole host layer for the word <em>board</em> and you find it in only
+  three kinds of place: that denial; the names of org <em>files</em>
+  (<code>plan.org</code>, <code>BOARD.org</code>) that some agents generate; and
+  one module, <code>groundskeeper/board.ex</code>, whose job is to <em>write an org
+  file</em> — not to model a board. There is no Board struct, no table, no schema
+  anywhere in the engine.</p>
+  <p>This is the <a href="autopoet#safe">host-versus-loaded boundary</a> showing
+  through. The host holds primitives — parse, render, run. A board is a product
+  behavior, and product behavior lives in the <a href="org">declarative layer</a>:
+  it's org text and a little CSS, not engine code. The runtime can't drift from a
+  board model for the same reason it can't have a bug in one — it doesn't have one.</p>
+</section>
+
+<section id="render">
+  <h2>one line of Rust, three SURFACES</h2>
+  <p>Depth rung — this is the read half, all the way down, and it really is one
+  line. The <a href="org">kernel</a> declares a single export in its interface
+  type: <code>export render: func(org: string) -&gt; string</code>. Every export
+  is string-to-string; the kernel takes no host imports at all, which is its own
+  kind of safety — give it anything but a string and the fault traps inside the
+  WebAssembly runtime before it can touch a thing. The implementation behind that
+  export is the entire definition:</p>
+  <pre class="orgsample">pub fn render(org: &amp;str) -&gt; String {
+    Org::parse(org).to_html()
+}</pre>
+  <p>Parse the org, emit the HTML. The heavy lifting is borrowed — <code>orgize</code>,
+  an MIT-licensed org parser — so the kernel's own contribution to rendering a board
+  is a function body you can read in one breath. And because it's that small and
+  that pure, the <em>same</em> function reaches three surfaces without a second
+  implementation:</p>
+  <pre class="mermaid">
+flowchart LR
+  src["crate::render — one function"]
+  src --> comp["wasm Component (WIT)"]
+  src --> babi["browser ABI (ptr/len)"]
+  src --> rlib["native rlib"]
+  comp --> rt["the runtime page<br/>/w/:id"]
+  babi --> learn["this learn notebook<br/>in your tab"]
+  rlib --> cli["the wb / wbx CLI"]
+  style src fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style rt fill:#ffffff,stroke:#121316
+  style learn fill:#ffffff,stroke:#121316
+  style cli fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Three exits from one function. The runtime embeds the compiled
+  <code>oql.wasm</code> at build time and calls <code>render/1</code> as a plain
+  GenServer call, handing back the raw HTML string — that's the page you get at
+  <code>GET /w/:id</code>. A second ABI compiles the same crate for the browser,
+  exporting <code>oql_render</code> over a pointer-and-length calling convention,
+  so the identical kernel runs directly in a web page — which is how these learn
+  notebooks render org with no server at all. And the native build links the crate
+  as an ordinary rlib for the CLI. As the kernel source itself puts it: there is no
+  &quot;wasm version&quot; of the logic — one body, three wrappers.</p>
+</section>
+
+<section id="callhome">
+  <h2>the page that TALKS BACK</h2>
+  <p>Rendering gives you a board you can look at. What makes it a board you can
+  <em>use</em> is that the served page ships with a way home. The runtime hands
+  every workbook page a tiny client — <code>window.wb</code> — pointed back at the
+  same engine that rendered it. Verbatim, the page carries:</p>
+  <pre class="orgsample">window.wb = {
+  call: (fn, org) =&gt; fetch("/w/&lt;id&gt;/call", …),
+  live: (fn, org) =&gt; …WebSocket("/w/&lt;id&gt;/ws")
+};
+// the Workbook UI talks to its backend — this same runtime.</pre>
+  <p>So the full loop is four arrows between a browser and one runtime, against one
+  file. Walk it: you <code>PUT</code> the org source up; you <code>GET</code> the
+  rendered page back; the page calls home over HTTP or streams over a socket; and
+  every verb resolves against the same stored org:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant B as browser
+  participant R as the runtime (one file)
+  B->>R: PUT /w/:id  (the plan.org source)
+  R-->>B: 201 stored
+  B->>R: GET /w/:id  (render the board)
+  R-->>B: the rendered page + window.wb
+  B->>R: wb.call("validate", org)  → POST /w/:id/call
+  B->>R: wb.live("render", org)  → WS /w/:id/ws  {"fn","org"}
+  </pre>
+  <p>The HTTP <code>call</code> endpoint dispatches a small verb set —
+  <code>parse</code>, <code>tangle</code>, <code>validate</code> — straight into
+  the kernel. The <code>ws</code> endpoint upgrades to a socket whose frames are
+  just <code>{fn, org}</code>, adds <code>render</code> to the same dispatch, and
+  streams the result; its moduledoc calls it &quot;the interactive upgrade over the
+  HTTP backend — same dispatch, streamed.&quot; Either way, the page and its backend
+  cannot disagree, because they're the same runtime reading the same file you
+  <code>PUT</code>.</p>
+</section>
+
+<section id="planview">
+  <h2>the board is the runner, PAUSED</h2>
+  <p>Here is the cleanest proof that the board and the execution are one thing. The
+  runtime exposes a single workflow endpoint with a flag. With <code>?plan=1</code>
+  it returns the schedule — the board view, no execution. Without the flag it runs
+  the same plan. Both branches start from the identical kernel call,
+  <code>tangle_plan(org)</code>: the board is literally the dry-run of the runner.</p>
+  <pre class="orgsample">POST /api/workflow?plan=1   -d '{"org": "..."}'
+# → [{"workflow":"Hello, Workbook",
+#     "schedule":{"at":"2026-06-06T09:00","repeat":"+1d","active":true},
+#     "tasks":["Greet"], "sub_workflows":[]}]
+
+POST /api/workflow          -d '{"org":"...","input":""}'
+# → same shape, but tasks now carry outputs; exports surfaced;
+#   executed in topological waves</pre>
+  <p>What comes back from each, side by side:</p>
+  <table class="cmp">
+    <tr><th></th><th>?plan=1 — the board</th><th>run — the worker</th></tr>
+    <tr><td>kernel call</td><td><code>tangle_plan(org)</code></td><td><code>tangle_plan(org)</code> — same call</td></tr>
+    <tr><td>what comes back</td><td><code>{workflow, schedule, tasks, sub_workflows}</code></td><td>same shape + task outputs + exports</td></tr>
+    <tr><td>what runs</td><td class="n">nothing — the schedule only</td><td class="y">every step, in topological waves</td></tr>
+    <tr><td>tasks field holds</td><td>component names</td><td>component names + their outputs</td></tr>
+  </table>
+  <p>An <code>agent</code>-typed component runs as a real agent; anything else runs
+  as a WebAssembly filter step. And execution order isn't configured anywhere —
+  it's <a href="waves">topological waves</a>: each wave is the set of steps whose
+  predecessors are all done, and steps within a wave are independent, so they run
+  in parallel. The plan view is that exact computation with the running switched
+  off. You are never looking at a different artifact than the one that executes —
+  you're looking at it at rest.</p>
+</section>
+
+<section id="liveboard">
+  <h2>a status page that is two FILE READS</h2>
+  <p>Depth rung. A live board — the thing that shows you a run clearing in
+  real time — sounds like it must need a stateful server pushing card updates.
+  It doesn't. Watch the lifecycle of the TODO runner, where the native org outline
+  <em>is</em> the state machine — no custom tags, the keywords are the columns:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as client
+  participant R as runtime
+  participant F as /tmp/bb/wf-4217/_status.json
+  C->>R: POST /api/workflow/todo  (the org outline)
+  R->>F: write {slug, stage:"running"}
+  R-->>C: 202 {slug, status:"running"}
+  Note over R,F: spawned runner works the tasks
+  C->>R: GET /api/brand-book/:slug  (poll)
+  R->>F: File.read
+  F-->>C: {stage:"running"}  …then {stage:"done", tasks:[…]}
+  </pre>
+  <p>Read it as a story. You <code>POST</code> a TODO outline; the runtime writes a
+  one-line status file, spawns the runner asynchronously, and answers
+  <code>202 {slug, status:"running"}</code> immediately. While the runner works, you
+  poll a status endpoint — and that endpoint is nothing but
+  <code>File.read</code> of <code>_status.json</code>. On finish the runner
+  overwrites the file with <code>{stage:"done", tasks:[…]}</code>; on a crash, with
+  <code>{stage:"error", error}</code>. The whole loop in three curls:</p>
+  <pre class="orgsample">curl -X POST /api/workflow/todo -d '{"org":"* TODO ship\n** TODO write copy\n** TODO build"}'
+# → 202 {"slug":"wf-4217","status":"running"}
+
+curl /api/brand-book/wf-4217
+# mid-run → {"slug":"wf-4217","stage":"running"}
+# after   → {"slug":"wf-4217","stage":"done","tasks":[
+#   {"id":"write-copy","idx":1,"title":"write copy","state":"DONE","output":"…","ts":1765500000}, …]}
+
+curl /api/telemetry/wf-4217
+# → {"stage":"done","tasks":[…],"tool_calls":23,"total_ms":48210,"errors":[],"recent":[…]}</pre>
+  <p>The richer telemetry endpoint reads two files instead of one:
+  <code>_status.json</code> for the stage and tasks, and <code>_steps.jsonl</code>
+  — a line per tool call, written at the chokepoint every exec agent passes through
+  — and rolls them into <code>{stage, tasks, tool_calls, total_ms, errors, recent}</code>.
+  It's observable mid-flight precisely because there's no board object to query; the
+  truth is on disk, and a status page is just someone reading it. A cross-run index
+  over all of <code>/tmp/bb</code> is a pure scan that writes nothing, so it can
+  never drift from the per-run files it summarizes.</p>
+  <p>And the minimum-viable kanban? It's three CSS lines in the runtime's own
+  viewer — columns are classes computed from the file's own keywords:</p>
+  <pre class="orgsample">.kw-TODO { background:#fce8e6; color:#c5221f }   /* red    */
+.kw-DONE { background:#e6f4ea; color:#137333 }   /* green  */
+.kw-NEXT,.kw-WAIT { background:#feefc3; color:#b06000 } /* amber */</pre>
+  <p>A small JavaScript pass lifts the leading keyword of each headline into a
+  badge. That's the entire board styling — semantics from the file, layout from
+  your stylesheet.</p>
+</section>
+
+<section id="readylist">
+  <h2>the agent is a board CONSUMER</h2>
+  <p>There's a third board, and it has no pixels: the ready set an
+  <a href="agents">agent</a> reads to decide what to do next. The TODO runner treats
+  the org outline as the whole specification — keywords are states, nesting is
+  sub-workflows, ordering and edges are properties — and the agent consumes it the
+  way a worker reads a board:</p>
+  <table class="cmp">
+    <tr><th>org construct</th><th>board meaning</th></tr>
+    <tr><td>a TODO / NEXT / DOING keyword</td><td>the card's column</td></tr>
+    <tr><td>TODO + all deps DONE</td><td>ready — pick it up</td></tr>
+    <tr><td>nesting</td><td>a sub-workflow</td></tr>
+    <tr><td><code>:ORDERED: t</code></td><td>siblings run in sequence</td></tr>
+    <tr><td>absence of <code>:ORDERED:</code></td><td>siblings run in parallel (max 8 at once)</td></tr>
+    <tr><td><code>:BLOCKER:</code></td><td>an explicit cross-edge</td></tr>
+    <tr><td><code>:done-when:</code> / <code>:check</code> block</td><td>the gate that lets a card reach DONE</td></tr>
+    <tr><td>an already-DONE headline</td><td>the resume cursor — skipped on rerun</td></tr>
+  </table>
+  <p>Two of those rows carry more than they look. DONE is <a href="validations">not
+  a free claim</a>: a task with a <code>:done-when:</code> shell command or a
+  <code>:check</code> source block only reaches DONE if that check passes — and it
+  runs in the <em>WASM shell</em>, fail-closed, never on the native host, keyed off a
+  sentinel string. And because already-DONE tasks are skipped, the file's own states
+  <em>are</em> the resume cursor: kill a run, restart it, and it picks up exactly where
+  the file says the work stopped. The board isn't a view of the agent's progress —
+  it's the surface the agent reads, mutates, and resumes from, all in one file.</p>
+</section>
+
+<section id="wild">
+  <h2>boards running in PRODUCTION</h2>
+  <p>This isn't a thought experiment — real standing agents work real boards through
+  this exact seam every day. Three of them, and the contrast between them is the
+  lesson:</p>
+  <table class="cmp">
+    <tr><th>surface</th><th>reads from</th><th>writes back?</th><th>direction</th></tr>
+    <tr><td><code>plan.org</code> (the keeper)</td><td>its own backlog</td><td class="y">yes — NEXT / TODO / CANCELLED</td><td>two-way</td></tr>
+    <tr><td>dream verdicts</td><td>last run's telemetry</td><td class="y">yes — mechanical edits to plan.org</td><td>two-way</td></tr>
+    <tr><td><code>BOARD.org</code> (groundskeeper)</td><td>the bd task store</td><td class="n">never hand-edited</td><td>one-way, by choice</td></tr>
+  </table>
+  <p>The keeper that tends this project's landing site runs in <em>plan</em> mode by
+  default: the agent only critiques and updates its backlog — it never edits the
+  page directly. Its <code>plan.org</code> is a standing board that, in the
+  lifecycle's own words, &quot;is the ongoing task DAG — it never 'completes'.&quot;
+  Each night the <a href="agents">dream phase</a> writes back into it
+  through a deliberately mechanical protocol: a verdict must name the exact heading
+  text of a task on the board, and the agent applies it by rule — pick up becomes
+  NEXT, put down becomes TODO, cancel becomes CANCELLED. That's a real agent
+  exercising the write half nightly.</p>
+  <p>The counter-example is the instructive one. <code>BOARD.org</code> is
+  regenerated <em>from</em> the bd task store in one direction, grouped by priority,
+  committed when a flag is set — and its own header says it: &quot;never hand-edited,
+  no two-way sync.&quot; That's not a limitation of the architecture. It's a surface
+  that <em>chose</em> to be read-only, because for that board the source of truth
+  lives elsewhere. Direction is per-surface policy, not a property of boards — which
+  is exactly the freedom this design buys you.</p>
+</section>
+
+<section id="honest">
+  <h2>where it BITES</h2>
+  <p>Honesty section. The clean story above has real edges, and you should know them
+  before you build on it.</p>
+  <ul>
+    <li><b>The RPC seam is read-only.</b> The <code>call</code> and <code>ws</code>
+    verbs are <code>parse</code>, <code>tangle</code>, <code>validate</code>,
+    <code>render</code> — all reads. There is no <code>set-state</code> or
+    <code>flip-to-DONE</code> verb. Mutation today means writing the file: an agent
+    with exec, a human with an editor, or a <code>PUT /w/:id</code>. The parent's
+    &quot;drag a card → file&quot; picture is the architecture's <em>affordance</em>,
+    not a shipped widget.</li>
+    <li><b>There is no drag-drop kanban in the repo.</b> None ships. The
+    <code>kw-</code> badges in the viewer are the pattern at minimum viable scale, and
+    a full board is yours to build on the read/write seam.</li>
+    <li><b>render() gives you semantics, not layout.</b> It emits generic HTML with
+    keyword classes. Columns, swimlanes, and drag handles are your CSS and JS over
+    those states — the kernel will never opinion-ate your board's shape.</li>
+    <li><b>The live board lives in <code>/tmp/bb</code>.</b> <code>_status.json</code>
+    and <code>_steps.jsonl</code> are ephemeral by design; durable history is the
+    sealed <a href="agents">ledger</a> and the SQLite telemetry db, not
+    the tmp files a poll reads.</li>
+    <li><b>One-way is a choice you must make on purpose.</b> Nothing stops two writers
+    from fighting over one file. <code>BOARD.org</code> avoids that by declaring
+    itself generated-only. If your board has an upstream source of truth, say so —
+    the architecture won't decide direction for you.</li>
+  </ul>
+  <p>None of these is a missing feature pretending to be a principle. The design
+  gives you the two verbs and the one file; what you render and which direction you
+  let it flow are decisions it deliberately leaves to you.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>So how do I flip a card to DONE?</summary>
+    <p>You edit the file. Change the headline's keyword to DONE and
+    <code>PUT /w/:id</code> the new source — or let an agent with exec do it as part
+    of working the task. There is no flip-a-card endpoint because the file is the
+    card; the only mutation is a write to it.</p>
+  </details>
+  <details>
+    <summary>Can I build a real kanban on this?</summary>
+    <p>Yes — and you have both halves already. For columns, call <code>render</code>
+    (or <code>tangle_plan</code> if you want the structured tasks) and group by
+    keyword. For writes, <code>PUT</code> the edited org back. The runtime's own
+    <code>kw-</code> CSS is the smallest version of exactly this; a richer board is
+    more stylesheet, not more engine.</p>
+  </details>
+  <details>
+    <summary>Why isn't there a mutation API?</summary>
+    <p>Because the file is the API. A <code>set-state</code> RPC would be a second
+    writer to a thing that already has one perfectly good way to be written — and a
+    second writer is exactly how a board drifts from its source. Keeping mutation as
+    &quot;edit the org&quot; keeps the single-source guarantee the whole design rests
+    on.</p>
+  </details>
+  <details>
+    <summary>Isn't BOARD.org a contradiction — a one-way board?</summary>
+    <p>No. Direction is policy, not architecture. <code>BOARD.org</code> is generated
+    from the bd store and declares itself never-hand-edited because for that surface
+    the truth lives upstream. Two-way is available; one-way was chosen. Both are
+    boards.</p>
+  </details>
+  <details>
+    <summary>Does this scale past /tmp?</summary>
+    <p>The <em>live</em> view is meant to be ephemeral — a run's status and step log
+    in <code>/tmp/bb</code>, cheap to read and fine to lose. Durable truth is the
+    plan file in version control plus the sealed ledger and the telemetry SQLite db.
+    Don't treat the tmp files as the record; treat them as the window.</p>
+  </details>
+  <details>
+    <summary>Is the Autopoet's backlog one of these?</summary>
+    <p>Exactly one of these — a standing agent working a plan file against the system
+    itself, picking up TODOs and writing DONE back. It's the
+    <a href="autopoet">worked example</a> of every idea on this page.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Boards are the read-and-write face of the plan — each neighbor goes one layer
+  deeper.</p>
+  <div class="cards">
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the plan a board renders</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>the grammar render() understands</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>who holds the ready list</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>a standing agent on its own board</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workflows · boards
+  :PROPERTIES:
+  :SLUG:   boards
+  :KIND:   learn
+  :NN:     08.4
+  :KICKER: under workflows · boards
+  :TITLE1: a rendering,
+  :TITLE2: NOT A
+  :TITLE3: database
+  :CHIP:   boards
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/boards-hero.jpg
+  :END:
+** og
+- there is no Board table in the runtime — grep finds a denial
+- a board is render(org) over the plan file + a write path home
+- kanban, status page, ready list — one file, two verbs
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .36], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

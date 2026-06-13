@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>telemetry — one event, many readers — Workbooks</title>
+<meta name="description" content="The engine records exactly one thing — a tool-call event with nine fields — at one chokepoint, into one append-only file per run. Every observer is a reader of those lines, not a second logger. A sub-lesson under the nexus.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/telemetry-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="telemetry — one event, many readers">
+<meta property="og:description" content="One tool-call event, nine fields, one append-only file per run. The CLI summary, the live website wire, the dream journal, the signed ledger — all just different readers of the same lines.">
+<meta property="og:url" content="https://workbooks.sh/learn/telemetry">
+<meta property="og:image" content="https://workbooks.sh/og/telemetry.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="telemetry — one event, many readers">
+<meta name="twitter:description" content="One tool-call event, nine fields, one append-only file per run. Every observer is a reader, not a second logger.">
+<meta name="twitter:image" content="https://workbooks.sh/og/telemetry.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    {"step":0,"agent":"reader","tool":"read","args":{"path":"telemetry.html"},"output":"…","exit_code":0,"error":null,"dur_ms":1,"ts":0}
+
+    you just generated a telemetry event. one line, nine fields, appended.
+    every tool the agent touches writes exactly this shape to one file —
+    and the summary, the website wire, the dream, the signed ledger are
+    all just readers of these lines. nothing escapes, because the writer
+    sits INSIDE the loop, not beside it. now you know the whole trick.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02·7 — <b>under nexus · telemetry</b></div>
+      <h1><span class="ln">one event,</span><span class="ln bub">MANY</span><span class="ln">readers</span></h1>
+      <p class="dek">The engine records exactly one thing — a <b>tool-call event</b>, nine
+      fields, at one chokepoint, into one append-only file per run. The CLI summary,
+      the live website wire, the agent's dream journal, the signed ledger — every
+      observer is a <b>reader of the same lines</b>, not a second logger. Nothing
+      escapes, because the writer sits <b>inside</b> the loop.</p>
+      <div class="meta">
+        <span class="on">the record</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/telemetry-hero.jpg" alt="A small figure at a desk before a monumental wall of identical glowing punch-card slots, a single bright ticker-tape line threading out of it and feeding many different readers — gauges, a journal, a sealed vault — all drinking from the one tape — 1970s sci-fi style, bright and warm">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>◷</b></div><span>telemetry</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Software that works unwatched</a>
+  <a href="#definition">The definition</a>
+  <a href="#chokepoint">The chokepoint</a>
+  <a href="#writers">Three writers, one grammar</a>
+  <a href="#read">The read stack</a>
+  <a href="#dreams">Record → memory</a>
+  <a href="#ledger">Record → proof</a>
+  <a href="#seam">Record → self-extension</a>
+  <a href="#broker">The second lane</a>
+  <a href="#private">Private by default</a>
+  <a href="#honest">What it isn't</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>software that works UNWATCHED</h2>
+  <p>You run things that work while you're not looking — keepers overnight,
+  agents on a schedule, a workflow that fires at nine. The next morning the
+  only question that matters is small and unanswerable in most stacks:
+  <em>what did it actually do?</em></p>
+  <p>The industry's answer to that question is a zoo. Stdout in one place,
+  app logs in another, traces in a third, metrics in a fourth, a dashboard
+  bolted over all of it, and an APM bill at the end of the month. Each tool
+  has its own format; each integration is its own little project. You don't
+  have an answer — you have five partial answers in five shapes, and the work
+  of reconciling them is yours.</p>
+  <p>For agent systems it's worse, because the interesting unit isn't a
+  request — it's a <b>tool call</b>. The thing you want to know is the
+  sequence of moves: read this, ran that, fetched the other, hit a wall here.
+  And half of those moves happen inside a <a href="sandboxes">sandbox</a> you
+  can't <code>printf</code> from. The most observable-hungry collaborator you've
+  ever run is the one you can see the least.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">te·lem·e·try</span> <span class="pr">/təˈlɛm·ə·tri/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> <b>one event shape</b> — a tool-call
+    record of nine fields — written at <b>one chokepoint</b>, appended to
+    <b>one file per run</b>; where every observer is a <b>reader</b> of
+    those lines, never a second logger.</p>
+  </div>
+  <p>The whole design is in that last clause. There is one grammar of
+  signal — the tool-call event — and many <em>literacies</em>: the summary
+  command reads it, the website wire reads it, the dream digest reads it, the
+  ledger seals it. Nothing exports a second format because nothing needs to.
+  Here are the nine fields, with their real limits:</p>
+  <table class="cmp">
+    <tr><th>field</th><th>what it holds</th></tr>
+    <tr><td><code>step</code></td><td>monotonic counter for this run (the Dock lane uses an atomic counter; WASM spans leave it null)</td></tr>
+    <tr><td><code>agent</code></td><td>which agent took the step — the agent's name, or null for a singleton. This is how the activity wire groups by worker.</td></tr>
+    <tr><td><code>tool</code></td><td>the tool name — <code>shell</code>, <code>read</code>, or a prefixed origin: <code>command:&lt;name&gt;</code>, <code>wasm:&lt;name&gt;</code></td></tr>
+    <tr><td><code>args</code></td><td>the call's arguments — path, cmd, query, url</td></tr>
+    <tr><td><code>output</code></td><td>the result — sliced to <b>4000 chars</b> in memory, <b>200 chars</b> in the file line. A record, not a transcript.</td></tr>
+    <tr><td><code>exit_code</code></td><td>0 for success, non-zero for failure</td></tr>
+    <tr><td><code>error</code></td><td>the error string, or null</td></tr>
+    <tr><td><code>dur_ms</code></td><td>wall time from the monotonic clock</td></tr>
+    <tr><td><code>ts</code></td><td>wall-clock seconds — <code>system_time(:second)</code></td></tr>
+  </table>
+  <p>That file is <code>_steps.jsonl</code> — one JSON line per tool call,
+  appended for the life of the run. Everything else on this page is a way of
+  reading it.</p>
+</section>
+
+<section id="chokepoint">
+  <h2>the CHOKEPOINT</h2>
+  <p>The reason nothing escapes is structural, and it's worth being precise
+  about. The event isn't built by the caller and isn't optional. It's
+  assembled and appended at a single function — <code>Agent.log_step</code> —
+  that sits <b>inside the tool-call loop</b>, fired for every step regardless
+  of any caller-supplied <code>on_step</code> hook. A caller can subscribe to
+  the live feed; a caller cannot opt a step out of the record. The phrase in
+  the source is exact: <i>nothing escapes by construction</i>.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant M as the model
+  participant L as the tool loop
+  participant F as _steps.jsonl
+  participant S as on_step subscriber (optional)
+  M->>L: call a tool
+  Note over L: exec_bounded — 150s wall-clock ceiling
+  L->>F: append one event (lock-free)
+  L-->>S: same event, if anyone is watching
+  Note over F: the append always happens<br/>the subscriber is a bonus
+  </pre>
+  <p>Two details in that picture carry weight. First, the append is
+  <b>lock-free</b> — it's the cheap, common path, so logging never becomes
+  the bottleneck the loop is trying to observe. Second, every tool call is
+  wrapped in a <b>150-second wall-clock bound</b>. A wedged tool doesn't
+  stall the run forever and vanish from the record — it times out, and the
+  timeout becomes a tool-error event like any other. A hang is data, not a
+  black hole. That single property is why the summary you read in the
+  morning can be trusted to be complete even when last night went badly.</p>
+</section>
+
+<section id="writers">
+  <h2>three writers, one GRAMMAR</h2>
+  <p>Depth rung — skippable, but it's the part that makes the rest free. An
+  agent doesn't only call native tools. It calls <a href="toolkit">toolkit</a>
+  commands across the <a href="the-dock">Dock</a> membrane, and it runs work
+  inside the <a href="sandboxes">WASM sandbox</a>. Those are different worlds
+  with different boundaries — and all three write the <em>same</em> file in
+  the <em>same</em> shape:</p>
+  <pre class="mermaid">
+flowchart TD
+  n["native agent tools<br/>tool: shell · read · fetch"]
+  d["Dock command calls<br/>tool: command:&lt;name&gt;"]
+  w["WASM spans<br/>tool: wasm:&lt;name&gt;"]
+  f[["_steps.jsonl — one shape, one file"]]
+  n --> f
+  d --> f
+  w --> f
+  f --> sum["summary / index"]
+  f --> wire["the /_activity wire"]
+  f --> dream["the dream digest"]
+  f --> seal["the signed ledger"]
+  style f fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style n fill:#ffffff,stroke:#121316
+  style d fill:#9fc4e8,stroke:#121316
+  style w fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>The convergence is the whole trick. A Dock command call appends
+  <code>tool: "command:&lt;name&gt;"</code> with its own exit code and timing;
+  its step counter is an atomic so concurrent commands can't collide. The
+  workdir it writes to is held in <em>host</em> context — the component
+  inside the sandbox never sees the path, so a guest can't aim a write at the
+  log. A WASM span — the host side of an <code>instrument-enter</code> /
+  <code>instrument-exit</code> import pair — writes
+  <code>tool: "wasm:&lt;name&gt;"</code> on exit, with the span's duration
+  computed from a public span-stack because enter and exit are two separate
+  crossings back into the host.</p>
+  <p>Because all three land the same nine fields in the same file, the reader
+  that rolls up a run needs <b>zero new query code</b> to count a sandboxed
+  command the same as a native one. One grammar in; one read out. That's not
+  a convenience — it's the reason the read stack below is small.</p>
+  <p>One honest note on this lane: the WASM-span path is a complete host
+  <em>sink</em>, but it isn't wired end-to-end yet. No <code>telemetry</code>
+  capability exists in the policy profiles for a guest to call it through, and
+  no test exercises it. The feasibility spike confirmed nested spans roll up
+  correctly — a two-call run summing to forty milliseconds — but the guest-side
+  transform tooling is an external blocker. We'd rather mark that clearly than
+  imply the sandbox is already narrating itself.</p>
+</section>
+
+<section id="read">
+  <h2>the READ stack</h2>
+  <p>Once the lines exist, observing is just reading them at different
+  altitudes. The same grammar answers different questions:</p>
+  <table class="cmp">
+    <tr><th>reader</th><th>question it answers</th><th>surface</th><th>liveness</th></tr>
+    <tr><td><code>summary/1</code></td><td>what happened in this one run?</td><td><code>wb telemetry &lt;slug&gt;</code> · <code>/api/telemetry/:slug</code></td><td class="y">live — works mid-flight, no db needed</td></tr>
+    <tr><td><code>index/2</code></td><td>what ran lately, across sessions?</td><td><code>wb telemetry</code> · <code>/api/telemetry</code></td><td class="y">live — a pure scan, no extra writes</td></tr>
+    <tr><td><code>persist/3</code></td><td>the durable per-run query db</td><td><code>_telemetry.db</code> (SQLite)</td><td class="n">at run end — single writer, no contention</td></tr>
+    <tr><td><code>/_activity</code></td><td>what is it doing right now? (public)</td><td>the public plane, anonymous read-only</td><td class="y">live — last 8 lines, slimmed</td></tr>
+    <tr><td><code>AgentStream</code></td><td>watch this run unfold, step by step</td><td><code>/api/run/:id/stream</code> WebSocket</td><td class="y">live — per-step frames</td></tr>
+  </table>
+  <p>The two live readers earn the most. <code>summary/1</code> is
+  <b>universal and live</b>: it rolls a run up into stage, task count, tool
+  calls, total milliseconds, errors, and the last fifteen steps — by reading
+  the file directly, so any run is observable even mid-flight and even with no
+  persisted database. <code>index/2</code> is the cross-session view, newest
+  first: it's a <b>pure scan</b> of the runs directory, which means it costs
+  nothing and can't drift from the per-run truth, because it has no truth of
+  its own to drift from.</p>
+  <p>Here's the loop you'll actually live in. The index, then a single run,
+  then the proof:</p>
+  <pre class="orgsample">$ wbx telemetry
+SLUG          STAGE    CALLS  ERRORS  MS
+wulu-refresh  done     42     0       183204
+brand-run     error    17     3       96110
+
+$ wbx telemetry brand-run
+stage=error calls=17 errors=3 total_ms=96110
+  ! step 9 shell: tool timeout
+  ! step 11 fetch: exit 1 …
+
+$ wb ledger wulu-refresh
+tamper-evident=ok attributable=ok count=42 did=did:key:z6Mk…</pre>
+  <p>That second block is the morning answer to <em>what did my agent
+  actually do</em> — the failing run named, the two bad steps quoted with
+  their exit shape, the timeout from the 150s bound showing up exactly where
+  the chokepoint promised it would. No dashboard, no integration. One command
+  reading one file.</p>
+  <p>Two softer readers ride on the same feed. The
+  <code>/_activity</code> wire is the anonymous, read-only public view —
+  it tails the last few lines of the tenant's <code>_steps.jsonl</code> and
+  slims each to a tool, a target, a timestamp, and an agent, so a stranger can
+  watch a public workbook work without seeing its outputs. And
+  <code>Thoughts</code> writes the eight-word, debounced narration of the live
+  feed you see on a board — generated lazily, only when someone is actually
+  watching, and never otherwise.</p>
+</section>
+
+<section id="dreams">
+  <h2>record → MEMORY</h2>
+  <p>Here the record stops being logging and becomes something logs never
+  are: <b>memory</b>. After a run, a sleep phase digests the recent telemetry,
+  the git log, and the backlog into a single journal entry. The agent reads
+  its newest entry when it next wakes — so the trace of last night isn't a
+  graveyard of lines, it's the thing the next run orients against.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant R as run ends
+  participant G as gather(steps + git log + plan)
+  participant M as a small model
+  participant J as rem/*.org
+  participant N as the next waking run
+  R->>G: last 25 steps, reformatted
+  G->>M: digest it
+  M->>J: one org entry — five fixed headings
+  N->>J: read newest at orient time
+  Note over N: resume from carry —<br/>don't re-read the world
+  </pre>
+  <p>The transformation is concrete. The full dream takes the last
+  <b>25</b> steps and reformats each line to a terse move —
+  <code>shell wb toolkit verify rss (exit 0)</code> — then feeds that, the git
+  log, and the plan to a small model (<code>inception/mercury-2</code> by
+  default). Out comes an entry like <code>rem/2026-06-12-0415.org</code> under
+  five fixed headings: <code>* tale</code>, <code>* goals</code>,
+  <code>* blue sky</code>, <code>* fears</code>, <code>* verdicts</code>,
+  <code>* carry</code>. The <code>* verdicts</code> lines —
+  <code>pick up:</code>, <code>put down:</code>, <code>cancel:</code> — are
+  applied <em>mechanically</em> to the plan board, and <code>* carry</code> is
+  the resume-state the next run reads <em>instead of</em> re-reading
+  everything from scratch.</p>
+  <p>The cadence is deliberate. A full dream only fires after an
+  <code>audit:</code> commit and at least fifty minutes since the last one;
+  it commits as <code>rem: &lt;first line&gt;</code>. A lighter
+  <em>daydream</em> — forty words, never committed — fires every twelve
+  minutes or so from just the last six tool names. The agent reads its newest
+  dream at orient time; it never writes one. Sleeping and waking are separate
+  jobs, and telemetry is the bridge between them. The full story lives in the
+  <a href="dreaming">dreaming</a> lesson.</p>
+</section>
+
+<section id="ledger">
+  <h2>record → PROOF</h2>
+  <p>Depth rung. The same file that feeds memory can be <b>sealed</b> into
+  proof. The ledger doesn't write a second log — it computes a seal
+  <em>over</em> the one the telemetry already wrote.</p>
+  <pre class="mermaid">
+flowchart LR
+  s[["_steps.jsonl — raw bytes"]]
+  s -- "h_i = sha256(h_i-1 ‖ line_i)" --> chain["hash chain<br/>genesis: workbooks-ledger-v1"]
+  chain -- "sign head with did:key" --> seal["_ledger.json<br/>{v, did, count, head, sig, ts}"]
+  seal -- "anchor: commit into the repo" --> git["the tenant repo"]
+  style s fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style seal fill:#13d943,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>The chain hashes each raw line into the next, genesis string
+  <code>workbooks-ledger-v1</code>; the head is signed with the tenant's
+  Ed25519 <code>did:key</code>. Verification returns two facts —
+  <b>tamper-evident</b> (no line was changed) and <b>attributable</b> (this
+  agent, this key, signed it) — plus the count and head. It's the same
+  <code>wb ledger &lt;slug&gt;</code> line from the read stack above, sealed
+  automatically at the end of a workflow run. The seal lives over the log, not
+  beside it; the <a href="the-ledger">ledger</a> lesson owns the full
+  story.</p>
+</section>
+
+<section id="seam">
+  <h2>record → SELF-EXTENSION</h2>
+  <p>The last transformation closes a loop. When an agent hits a capability
+  wall — its toolkit can't do the thing — it doesn't stall and it doesn't
+  fake success. It files an issue with one field that matters:
+  <code>tried</code>, the evidence of the wall, which is precisely a
+  telemetry-shaped trace of what failed. The recorded failure becomes a
+  request for a new capability.</p>
+  <pre class="mermaid">
+flowchart LR
+  wall["an agent hits a wall<br/>tried: the failing trace"] --> fi["file_issue"]
+  fi --> bl["the autopoet backlog<br/>org files · SEEN dedup"]
+  bl --> run["the autopoet works it<br/>agent: autopoet"]
+  run --> verify{"wb toolkit verify"}
+  verify -- ok --> done["DONE"]
+  verify -- unverified --> open["downgrade to OPEN"]
+  style wall fill:#f3c5a3,stroke:#121316
+  style done fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style open fill:#ffffff,stroke:#121316
+  </pre>
+  <p>The reply to the agent tells it to carry on — its job isn't to fix its
+  own tools mid-run. The issue lands as an org file with a kind and a status;
+  a duplicate from the same tenant bumps a <code>SEEN</code> count instead of
+  re-filing, so the backlog is liberal to write but triaged by frequency. The
+  <a href="autopoet">autopoet</a> picks the most-seen issue first and works
+  it — and here's the part that matters for this page: the autopoet's own run
+  goes through the same agent path, so <em>its</em> steps land in the same
+  <code>_steps.jsonl</code> grammar, stamped <code>agent: "autopoet"</code>.
+  The system that extends the system is observable by the same telemetry it
+  observes.</p>
+  <p>One guard is non-negotiable. A self-reported DONE is
+  <b>independently re-verified</b> with <code>wb toolkit verify</code>; an
+  unverified DONE is downgraded back to OPEN. The agent's word is a claim, not
+  a proof — and the same honesty that runs through the record runs through the
+  fix. The full account is the <a href="autopoet">autopoet</a> lesson's; this
+  page only owes you the seam.</p>
+</section>
+
+<section id="broker">
+  <h2>the SECOND lane</h2>
+  <p>Depth rung. There's a second stream of signal that is deliberately
+  <em>not</em> the step grammar, because it answers a different question:
+  ops metering. Every broker decision — every allow or deny of a
+  <a href="capabilities">capability</a> request — increments an atomic
+  counter keyed by broker and outcome, and denials land in a small forensics
+  ring (the last 128), with the guest-controlled target truncated to 512
+  bytes so a hostile component can't exhaust memory through the audit itself.</p>
+  <p>The important move is at the boundary: alongside its own counters, the
+  broker audit emits a <b>standard Erlang <code>:telemetry</code> event</b> —
+  <code>[:workbooks, :broker, outcome]</code> with the broker, reason, and
+  target. That's the well-known observability contract the whole BEAM
+  ecosystem speaks, so Prometheus, a SIEM, or an APM like AppSignal can attach
+  to the engine's security signal <em>without coupling to any internal ETS
+  layout</em>. The step grammar is for <em>you</em>, reading your own runs;
+  this lane is where the engine's signal meets the outside monitoring world on
+  the world's terms.</p>
+</section>
+
+<section id="private">
+  <h2>private by DEFAULT</h2>
+  <p>All of this telemetry is intensely personal — it's the minute-by-minute
+  record of how your agent thinks. So the rule is one sentence:
+  <b>sharing exposes work, never the session that produced it.</b> One module
+  owns that boundary, and every egress path — git, bundle, library — consults
+  it before anything leaves the machine.</p>
+  <table class="cmp">
+    <tr><th>sidecar file</th><th>what it is</th><th>written at</th><th>ships when shared?</th></tr>
+    <tr><td><code>_steps.jsonl</code></td><td>the always-on step log</td><td>every tool call</td><td class="n">never</td></tr>
+    <tr><td><code>_status.json</code></td><td>stage — running / done / error</td><td>at stage transitions</td><td class="n">never</td></tr>
+    <tr><td><code>_trace.jsonl</code></td><td>a slim per-step trace (out ≤140)</td><td>per step, web runs</td><td class="n">never</td></tr>
+    <tr><td><code>_telemetry.db</code></td><td>run-end SQLite query db</td><td>at run end</td><td class="n">never</td></tr>
+    <tr><td><code>_ledger.json</code></td><td>the signed seal</td><td>at workflow end</td><td class="n">never</td></tr>
+  </table>
+  <p>The boundary isn't a list someone has to maintain — it's a pattern. The
+  <code>_*</code> prefix paired with a <code>.jsonl</code> / <code>.json</code> /
+  <code>.db</code> suffix catches every sidecar here <em>and</em> any future
+  one the same way, so a new telemetry file is private the day it's invented.
+  The same module auto-writes a <code>.gitignore</code>, which makes
+  <code>git add -A</code> safe by default — you can't accidentally commit your
+  own session. When you <a href="sharing">share a workbook</a>, the work goes
+  and the diary stays.</p>
+</section>
+
+<section id="honest">
+  <h2>what it ISN'T</h2>
+  <p>Honesty section, in full. The WASM-span lane is a complete host sink
+  with <b>no guest wiring</b> yet — there is no <code>telemetry</code>
+  capability for a sandboxed component to call it through, and no test
+  exercises it. The spike confirmed it works; the guest-side transform tooling
+  is the blocker. Treat sandbox self-narration as confirmed-feasible, not
+  shipped.</p>
+  <p>The file is a <b>record, not a transcript</b>. Outputs are sliced to 200
+  characters in the jsonl line — enough to know what a step did and whether it
+  worked, not enough to replay it verbatim. If you need the full output, you
+  needed it at the moment it ran.</p>
+  <p>Workflow runs index under an <b>ephemeral path</b> (<code>/tmp/bb</code>).
+  The live summary and index are real and free, but they're reading a working
+  directory, not a warehouse — the durable copy is the run-end
+  <code>_telemetry.db</code> and the sealed ledger, not the scan.</p>
+  <p>The step grammar is <b>not an OTel exporter</b>. Only the broker lane
+  emits standard <code>:telemetry</code> events; the per-step record is its
+  own shape, designed to be read by one file's worth of code, not piped into a
+  vendor. And the log is <b>editable until sealed</b> — its tamper-evidence
+  comes from the <a href="the-ledger">ledger</a>'s hash chain, applied at run
+  end, not from the append itself.</p>
+  <p>Last and most important: none of this ever leaves your machine. This is
+  <em>your</em> telemetry — the record you read to understand your own
+  software — not product analytics, not a phone-home, not a metric we collect.
+  The privacy section above isn't a setting. It's the default the whole egress
+  path enforces.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can I watch a run live?</summary>
+    <p>Yes, two ways. <code>wb telemetry &lt;slug&gt;</code> rolls up a run
+    even mid-flight, because the summary reads the file directly and needs no
+    finished database. And <code>/api/run/:id/stream</code> is a WebSocket that
+    pushes a frame per step as it happens — read this, ran that — then a done
+    frame. On a public workbook, <code>/_activity</code> shows the slimmed,
+    anonymous version of the same feed.</p>
+  </details>
+  <details>
+    <summary>Does my telemetry leave my machine?</summary>
+    <p>No. The step log and its sidecars are private by construction — one
+    module gates every egress path, and the <code>_*</code> naming pattern
+    keeps them out of git, bundles, and the library automatically. Sharing a
+    workbook ships the work, never the session that produced it. There is no
+    collection, no phone-home, no analytics endpoint.</p>
+  </details>
+  <details>
+    <summary>How do I hook up Prometheus or a SIEM?</summary>
+    <p>Through the second lane. The broker audit emits standard Erlang
+    <code>:telemetry</code> events — <code>[:workbooks, :broker, outcome]</code>
+    with broker, reason, and target — which is the contract the BEAM
+    observability ecosystem already speaks. Attach there and you get the
+    engine's security signal without coupling to any internal layout. The
+    per-step record is a different shape, meant for reading your own runs, not
+    for scraping.</p>
+  </details>
+  <details>
+    <summary>Can the agent fake its own log?</summary>
+    <p>The append is written at one chokepoint inside the loop, fired for every
+    step regardless of the caller — so a step can't quietly skip itself. The
+    log is editable after the fact, though, which is exactly why the
+    <a href="the-ledger">ledger</a> exists: a hash chain over the raw lines,
+    signed with the tenant's key, makes any later edit detectable and the run
+    attributable. Trust the seal, not the raw file.</p>
+  </details>
+  <details>
+    <summary>Where do the files go when I share a workbook?</summary>
+    <p>Nowhere — they stay. <code>_steps.jsonl</code>, <code>_status.json</code>,
+    <code>_trace.jsonl</code>, <code>_telemetry.db</code>, and
+    <code>_ledger.json</code> all match the private-by-default pattern, so the
+    egress path leaves them behind. The recipient gets your work and your
+    files; they don't get your run's diary.</p>
+  </details>
+  <details>
+    <summary>Why one file instead of proper logs, traces, and metrics?</summary>
+    <p>Because for agent work the interesting unit is the tool call, and one
+    event shape captures it whole. Splitting it across three subsystems buys
+    you three formats to reconcile and three integrations to maintain. One
+    append-only file means the summary, the website wire, the dream, and the
+    ledger are all just readers — no new query code per reader, no drift
+    between copies, because there's only one copy.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Telemetry is the nexus watching itself — and it feeds three of the most
+  interesting ideas downstream. Start with the parent, then follow the
+  transformations.</p>
+  <div class="cards">
+    <a href="nexus"><span class="sw" style="background:#a8d4f0"><b>◆</b></span>
+      <div>The nexus<small>the engine this watches</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The autopoet<small>a recorded wall becomes a capability</small></div><span class="go">→</span></a>
+    <a href="dreaming"><span class="sw" style="background:#aee5c2"><b>☾</b></span>
+      <div>Dreaming<small>telemetry digested into memory</small></div><span class="go">→</span></a>
+    <a href="the-ledger"><span class="sw" style="background:#aee5c2"><b>⛓</b></span>
+      <div>The ledger<small>the same lines, sealed into proof</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under nexus · telemetry
+  :PROPERTIES:
+  :SLUG:   telemetry
+  :KIND:   learn
+  :NN:     02.7
+  :KICKER: under nexus · telemetry
+  :TITLE1: one event,
+  :TITLE2: MANY
+  :TITLE3: readers
+  :CHIP:   the record
+  :PC:     #aee5c2
+  :AC:     #13d943
+  :HERO:   img/telemetry-hero.jpg
+  :END:
+** og
+- one tool-call event, nine fields, one append-only file per run
+- summary, activity wire, dream journal, signed ledger — all readers
+- private by default; this is YOUR telemetry, not analytics
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .36], ["#a8d4f0", .24], ["#f3c5a3", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

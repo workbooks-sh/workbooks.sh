@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rehearsals — proving a voice agent without the phone — Workbooks</title>
+<meta name="description" content="A rehearsal is a text self-demo of a voice-agent conversation: scripted human lines, a live model, every tool call through the real production router — no provider, no human. The transcript is the test. A sub-lesson under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/rehearsals-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="rehearsals — proving a voice agent without the phone">
+<meta property="og:description" content="A text self-demo: scripted human lines, a live model, every tool call through the real production router. The transcript is the test. A sub-lesson under agents.">
+<meta property="og:url" content="https://workbooks.sh/learn/rehearsals">
+<meta property="og:image" content="https://workbooks.sh/og/rehearsals.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="rehearsals — proving a voice agent without the phone">
+<meta name="twitter:description" content="A text self-demo: scripted human lines, a live model, every tool call through the real production router. The transcript is the test.">
+<meta name="twitter:image" content="https://workbooks.sh/og/rehearsals.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * founder
+    Does this rehearsal thing actually prove anything?
+  * groundskeeper
+    Everything below the telephony hop is our code — persona, model,
+    auth header, JSON, the five tools, the ledger. A rehearsal drives
+    all of it with scripted lines and a live model, routing every tool
+    call through the REAL router in-process. The transcript is the proof,
+    and it's committed. The one hop it can't reach is the phone line we
+    don't own — and we say so. A green rehearsal is read, not asserted.
+    tool calls:
+     - =repo_state({"query":"summary"})= → grounded, never guessed   :honesty:
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·12 — <b>under agents · rehearsals</b></div>
+      <h1><span class="ln">prove the call</span><span class="ln bub">WITHOUT</span><span class="ln">the phone</span></h1>
+      <p class="dek">A <b>rehearsal</b> is a text self-demo of a voice-agent
+      conversation — scripted human lines, a live model, and <b>every tool call
+      through the real production router</b>. No provider, no human on the line.
+      The untested surface shrinks to exactly one hop you don't own, and
+      <b>the transcript is the test</b> — a thing you can read, diff, and commit.</p>
+      <div class="meta">
+        <span class="on">rehearsals</span><span>10 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/rehearsals-hero.jpg" alt="A small figure rehearsing alone on a vast empty soundstage before a monumental dark telephone switchboard, a single bright spotlight and one unlit doorway marked with an X — 1970s sci-fi style, bold and luminous">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>rehearsals</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The last hop can't be CI</a>
+  <a href="#definition">The definition</a>
+  <a href="#seam">Cut at the last seam</a>
+  <a href="#loop">One line, six rounds</a>
+  <a href="#realrouter">Through the real router</a>
+  <a href="#persona">One def, two consumers</a>
+  <a href="#transcript">The transcript is the artifact</a>
+  <a href="#ladder">Where it sits on the ladder</a>
+  <a href="#boundaries">What it doesn't prove</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the last hop can't be CI</h2>
+  <p>You built an <a href="agents">agent</a> whose front door is something
+  CI can't drive — a phone call, a voice provider, a webhook console you don't
+  host. Your unit tests are honest about the parts they reach: the tool
+  implementations, the auth check, the ledger. But the <b>conversation
+  itself</b> goes untested. Does the persona hold for a whole exchange? Does
+  the model call <code>repo_state</code> instead of confidently inventing the
+  project's status? Does the entire auth-marshalling-ledger chain actually
+  hold up when a live model — not a fixture — is the thing driving it?</p>
+  <p>The usual answer is "call it and see," which means a human on every check
+  and a provider key in every environment. That's not a test, it's a chore —
+  and it's exactly the chore that doesn't get done. The groundskeeper, this
+  project's voice agent over its own repo, hit this wall directly: voice can't
+  be CI because the founder isn't always on the call, and the conversation key
+  may not even be provisioned. So the conversation layer — the most important
+  layer — was the one nothing covered.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">re·hears·al</span> <span class="pr">/rɪ·ˈhɜːr·səl/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a <b>text self-demo</b> of a voice-agent
+    conversation: scripted human lines drive a <b>live model</b> wearing the
+    production persona, and every tool call runs <b>through the real production
+    router</b> — no external service, no human. The output is a committed
+    <b>transcript</b>.</p>
+  </div>
+  <p>A rehearsal is three things at once — a test, a demo, and a document.
+  It tests because a model really drives the conversation through real code.
+  It demos because the side effects are real (more on that, honestly, below).
+  And it documents because the result is a datestamped org file you can read
+  the way you read any plan. "Persona held" stops being a vibe and becomes a
+  line you can point at, diff, and revert.</p>
+</section>
+
+<section id="seam">
+  <h2>cut at the last SEAM</h2>
+  <p>The whole idea is one decision: where do you put the knife? Stack the
+  conversation as a layer cake. At the top is the telephony hop — the
+  provider's network, their voice synthesis, their webhook delivery. That's
+  theirs; you don't own a line of it. Everything <em>below</em> it is yours:
+  the persona, the model, the router's auth header, the five tool
+  implementations, the task ledger. A rehearsal cuts at the highest seam it
+  can reach and exercises everything underneath:</p>
+  <pre class="mermaid">
+flowchart TD
+  tele["telephony · voice synth · webhook delivery<br/>— the provider's, NOT yours —"]:::out
+  persona["persona + live model<br/>does it hold? does it call tools?"]
+  auth["router auth — x-gk-secret, fails closed"]
+  tools["the five tool implementations"]
+  ledger["the task ledger"]
+  tele -. "the one hop a rehearsal can't reach" .-> persona
+  persona --> auth --> tools --> ledger
+  classDef out fill:#e7e4dc,stroke:#9a9a9a,stroke-dasharray:5 4,color:#6a6a6a
+  style persona fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style auth fill:#9fc4e8,stroke:#121316
+  style tools fill:#aee5c2,stroke:#121316
+  style ledger fill:#f2ddb0,stroke:#121316
+  </pre>
+  <p>Read the picture top to bottom. The grayed, dashed box at the top is the
+  only thing left untested — the provider's telephony, struck out because it's
+  not your code. Below the cut, four solid layers light up: persona and model
+  in green, then auth, then tool implementations, then the ledger. The knife
+  goes <b>right under the provider</b>, so the untested surface is as small as
+  it can possibly be — one hop you genuinely don't own, and nothing else.</p>
+</section>
+
+<section id="loop">
+  <h2>one line, six ROUNDS</h2>
+  <p>Mechanically, a rehearsal is a reduce over scripted human lines. You hand
+  <code>Rehearsal.run/2</code> a list of "founder" lines; the agent side is a
+  live model. For each line, the model completes — and if it wants tools, it
+  calls them, the results are appended, and it completes again, up to
+  <code>@max_tool_rounds 6</code> rounds before it's forced to answer in
+  plain words. One founder line, then, can chain several tool calls before the
+  reply lands:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant F as founder line (scripted)
+  participant M as live model (persona)
+  participant R as the real router
+  participant L as the ledger
+  F->>M: a scripted human line
+  M->>R: round 1 — repo_state(summary)
+  R->>L: read state
+  L-->>M: grounded answer
+  M->>R: round 2 — dispatch(goal)
+  R->>L: file task gk-201
+  L-->>M: dispatched
+  Note over M: ≤ 6 rounds, then forced to answer
+  M-->>F: plain reply — written to the transcript
+  </pre>
+  <p>Walk the exchange. A scripted line goes to the model. The model asks the
+  real router for repo state and gets a grounded answer back from the ledger.
+  It dispatches a background goal, the ledger files a task, the router confirms.
+  After at most six such rounds, the model is forced to stop calling tools and
+  answer in words — and that reply, plus every tool call along the way, is
+  written into the transcript. One detail keeps it faithful to production: the
+  assistant message sent back to the model API is stripped to just its role,
+  content, and tool calls — the same echo convention the real agent loop uses.
+  And if the model errors, the rehearsal doesn't crash; the turn simply reads
+  <code>(llm error: …)</code>, so a flaky model never costs you the whole run.</p>
+</section>
+
+<section id="realrouter">
+  <h2>through the REAL router</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the thirteen lines that
+  make it not a mock</span></p>
+  <p>Here is the seam itself. When the model calls a tool, the rehearsal does
+  not reach into a fake — it builds an in-process HTTP request and hands it to
+  the literal router module that serves production:</p>
+  <pre class="orgsample">conn =
+  Plug.Test.conn(:post, "/tool/#{name}", Jason.encode!(args))
+  |&gt; Plug.Conn.put_req_header("content-type", "application/json")
+  |&gt; Plug.Conn.put_req_header("x-gk-secret", secret)
+  |&gt; Workbooks.Groundskeeper.Router.call(Workbooks.Groundskeeper.Router.init([]))</pre>
+  <p>Now set that beside what the deployed provider actually sends. The
+  provisioned webhook tool posts to <code>{base_url}/gk/tool/{name}</code> with
+  the header <code>x-gk-secret</code> and the args as a JSON body. Same route,
+  same header, same body schema. <b>Only the HTTP transport differs</b> — the
+  rehearsal's request is constructed in memory instead of arriving over the
+  wire, and from there it is byte-for-byte the production path. So a single
+  rehearsal exercises, for free, everything that path touches: the
+  constant-time secret compare that fails <em>closed</em> with a 503 when the
+  secret is unset, the JSON marshalling, the five real tool implementations,
+  and the ledger writes. A mocked tool call skips all of it.</p>
+  <table class="cmp">
+    <tr><th></th><th>a mocked tool call</th><th>the real-router call</th></tr>
+    <tr><td>auth header check</td><td class="n">skipped — no router</td><td class="y">runs — constant-time compare, fails closed</td></tr>
+    <tr><td>JSON marshalling</td><td class="n">bypassed — you pass a map</td><td class="y">encode in, decode out, as in prod</td></tr>
+    <tr><td>tool implementation</td><td class="n">stubbed return value</td><td class="y">the real five, with real side effects</td></tr>
+    <tr><td>the ledger</td><td class="n">untouched</td><td class="y">real reads and writes</td></tr>
+    <tr><td>what's faked</td><td>everything below the call</td><td class="y">only the wire transport</td></tr>
+  </table>
+  <p>The verdict of that table is the whole reason a rehearsal counts: a mock
+  fakes everything below the call, while the real-router rehearsal fakes only
+  the wire — auth, marshalling, the implementations, and the ledger all run
+  exactly as production runs them.</p>
+</section>
+
+<section id="persona">
+  <h2>one def, two CONSUMERS</h2>
+  <p>A demo that drifts from production isn't a demo of production. So the
+  persona isn't retyped for the rehearsal — it's read from the <em>same</em>
+  definition file the live provisioning reads. Both the rehearsal and the
+  provider-provisioning code extract the prompt from <code>groundskeeper.org</code>,
+  from under the <code>** System prompt</code> heading, and both <b>raise if
+  it's missing</b> rather than running an agent with an empty brain:</p>
+  <pre class="mermaid">
+flowchart TD
+  def[["agent/groundskeeper.org<br/>** System prompt — the single source"]]
+  def --> prov["provisioning → the live deployed agent"]
+  def --> reh["Rehearsal.run → the self-demo"]
+  style def fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style prov fill:#ffffff,stroke:#121316
+  style reh fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>One file, two arrows. The deployed agent and the rehearsal both pull their
+  persona from the exact same heading in the exact same file — so the personality
+  you prove in a rehearsal is, definitionally, the one production runs. The
+  <code>** System prompt</code> heading is load-bearing here: a def whose prompt
+  doesn't live under it parses to nothing and the agent runs empty — a failure
+  this project has actually shipped before, which is why both consumers raise
+  loudly instead of falling through. The <a href="authoring">authoring lesson</a>
+  is where that convention lives.</p>
+</section>
+
+<section id="transcript">
+  <h2>the transcript is the ARTIFACT</h2>
+  <p>A rehearsal writes itself down. The result lands in a datestamped org file
+  under <code>rehearsals/</code> — a first-class directory of the method, sitting
+  beside the agent's sources and workflows. Each turn is a <code>* founder</code>
+  heading and a <code>* groundskeeper</code> heading, and any tool calls follow
+  as a list, each one showing the call and its result truncated to 200
+  characters. Here is one real turn, verbatim, from the first rehearsal that
+  proved the groundskeeper — the founder asks for background research, the agent
+  names task <b>gk-201</b>, then the tools fire:</p>
+  <pre class="orgsample">* groundskeeper
+  Sent it out. Task **gk-201** — researching E2B and Daytona pricing
+  from their official pages, docs, and recent real-world mentions.
+  I'll bring it back when it lands.
+  tool calls:
+   - =dispatch({"goal":"Research E2B (e2b.dev) and Daytona (daytona.io)
+     pricing: …"})=
+     → {"dispatched":true,"task":"gk-201",
+        "workflow":"workflows/research-e2b-…-3.org"}
+   - =capture({"kind":"idea","text":"The founder wants to sharpen the
+     workbook-as-container pitch …"})=
+     → {"captured":true,"file":"sources/captures/2026-06-11.org"}</pre>
+  <p>Read what that proves. The first reply in the run was a <b>grounded</b>
+  repo answer — the model called <code>repo_state(summary)</code> before
+  asserting anything about the project, exactly as its tool description demands.
+  This turn shows a <b>real dispatch</b>: the goal went to the runtime, task
+  <code>gk-201</code> was filed, and a workflow file was written —
+  <code>workflows/research-e2b-…-3.org</code>, a six-leaf ordered org outline
+  with <code>:done-when:</code> shell gates, which <b>still exists in the
+  repo</b>. The captures were <em>silent</em> — saved, never read back, per the
+  capture tool's instruction. And the run ends with honesty you can see in
+  text: a later <code>tasks({})</code> call returns <code>"finished":null</code>,
+  and the agent says it's still working, no results back yet. No fabricated
+  completion. That readback is observable, in plain text, forever.</p>
+  <p>The dispatched workflow persisting in the repo isn't a leak — it's the
+  point. A rehearsal's side effects are <b>real artifacts</b>, which is exactly
+  what makes it a demo and not a mock. The closest sibling page,
+  <a href="dispatch">dispatch</a>, is where that spawn lane is taught in full.</p>
+</section>
+
+<section id="ladder">
+  <h2>where it sits on the LADDER</h2>
+  <p>A rehearsal isn't the only rung — it's the middle one, and knowing its
+  neighbors is how you read its result honestly. Below it sits ordinary CI:
+  unit tests where every model and author call is <em>injected</em>, so there's
+  no network at all — they cover auth failing closed, the capture file's shape,
+  a crash routing to BLOCKED, the post-call HMAC check with a forged-but-valid
+  signature. Above the rehearsal sits a rung that <em>does</em> use the
+  provider: a server-side conversation simulation, which runs the agent's real
+  deployed prompt and tool config through the provider's own text simulator —
+  and needs the conversation key the rehearsal deliberately does not. At the
+  very top is a live call with a human on the line.</p>
+  <table class="cmp">
+    <tr><th>rung</th><th>what's real</th><th>what's faked</th><th>passing proves</th></tr>
+    <tr><td>CI unit tests</td><td>the tool + auth code</td><td class="n">model + author injected, no network</td><td>each piece works in isolation</td></tr>
+    <tr><td><b>rehearsal</b></td><td class="y">live model + real router + real tools + ledger</td><td>only the telephony wire</td><td class="y">the conversation layer holds, end to end</td></tr>
+    <tr><td>provider simulation</td><td>the deployed prompt + tool config, provider-side</td><td>the human voice</td><td>the provider drives the agent as configured</td></tr>
+    <tr><td>a live call</td><td class="y">everything</td><td class="y">nothing</td><td>it actually works on the phone</td></tr>
+  </table>
+  <p>The verdict that table delivers: the rehearsal is the rung where a live
+  model meets the real router with no provider in the loop — the most coverage
+  you can get for the least ceremony, needing an ordinary model key and no voice
+  key at all. It's how the groundskeeper's go-live readiness was proven <em>while
+  still blocked</em> on the conversation key: shipped and proven by rehearsal,
+  no human, no provider. Persona held. The agent went live afterward.</p>
+</section>
+
+<section id="boundaries" class="faq">
+  <h2>what a green rehearsal DOESN'T prove</h2>
+  <p>Honesty section — because a test you over-read is worse than no test.
+  Four limits, stated plainly:</p>
+  <p><b>The telephony hop stays untested.</b> A rehearsal passing is not voice
+  working. The proof of that is in the history: the missing-permission block on
+  the conversation key was discovered by <em>trying to go live</em>, not by any
+  rehearsal. The one hop you don't own is the one a rehearsal can't reach, by
+  construction.</p>
+  <p><b>The side effects are real, and there is no dry-run.</b> Captures land in
+  <code>sources/captures/</code>, dispatches really run workflows and burn model
+  calls, issues really file. This is a feature — it's a demo of the real thing —
+  but it means a rehearsal dirties your repo and spends tokens every time. Run
+  it knowing that.</p>
+  <p><b>The tool specs are hand-mirrored.</b> The rehearsal keeps its own copy of
+  the five tool specs, mirroring the provider provisioning's source of truth.
+  The code's own comment admits it. That mirror can drift — if the provisioned
+  specs change and the rehearsal's copy doesn't, you'd be rehearsing a slightly
+  different agent than you ship.</p>
+  <p><b>"Persona held" is a judgment, not an assertion.</b> A rehearsal is
+  pass-or-fail <em>by reading</em>. Nothing in the run asserts that the tone was
+  right or the answers were grounded — a human, or a judge, has to read the
+  transcript and say so. The asserted sibling of a read-by-human transcript is a
+  judged <a href="evals">eval</a>; a rehearsal is the document you'd hand the
+  judge.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is this just mocking the conversation?</summary>
+    <p>No — and that's the entire distinction. Nothing below the cut is mocked.
+    The model is live, the router is the literal production module, the tools
+    are the real five, the ledger really writes. The only thing absent is the
+    provider's wire transport. A mock fakes the code under test; a rehearsal
+    fakes only the network you don't own.</p>
+  </details>
+  <details>
+    <summary>Why a live model instead of canned replies?</summary>
+    <p>Because tool selection <em>is</em> the thing under test. The question a
+    rehearsal answers is whether the model calls <code>repo_state</code> instead
+    of guessing, whether it dispatches when the founder commits to work, whether
+    it captures silently. Canned replies would assert the answers you're trying
+    to discover.</p>
+  </details>
+  <details>
+    <summary>Can I run one with no keys at all?</summary>
+    <p>You need a model key — not the voice key. That's the point of the rung:
+    it proves the conversation layer using ordinary inference, with no
+    conversation provider provisioned. An unset router secret doesn't stop the
+    run either; it just produces 503s inside the transcript, because failing
+    closed is part of what gets rehearsed.</p>
+  </details>
+  <details>
+    <summary>Does it dirty my repo?</summary>
+    <p>Yes — deliberately. Captures, dispatched workflows, and ledger entries are
+    real artifacts, and there's no dry-run mode. That's what makes it a demo of
+    the real bridge rather than a simulation of it. Run it where real side
+    effects are acceptable.</p>
+  </details>
+  <details>
+    <summary>Is "rehearsal" a generic Workbooks verb?</summary>
+    <p>No. It's a method, shown on one agent — the groundskeeper — in roughly a
+    hundred and forty lines, invoked host-side as a maintainer op rather than
+    shipped as a user command. The value of this page isn't a button to press;
+    it's the recipe to copy for <em>your</em> un-CI-able agent — voice, SMS,
+    Slack, anything provider-fronted.</p>
+  </details>
+  <details>
+    <summary>So how do I actually run it?</summary>
+    <p>Host-side, with a router secret and a list of scripted lines —
+    no voice key needed:</p>
+    <pre class="orgsample">WB_GK_SECRET=… mix run --no-start -e '
+  Workbooks.Groundskeeper.Rehearsal.run([
+    "Hey. Where are we with the project right now?",
+    "Can you look into E2B and Daytona pricing in the background?",
+    "What do you have running right now?"
+  ]) |&gt; IO.inspect()'
+# =&gt; %{turns: [%{founder: "…", groundskeeper: "…", tool_calls: […]}, …],
+#      file: "examples/groundwork/rehearsals/2026-06-11-045937.org"}</pre>
+    <p>The model is <code>WB_GK_BRAIN_MODEL</code> or the runtime's default; every
+    tool call hits the real router with the real secret.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Rehearsals are how you prove an agent — so the parent lesson is the place
+  to start, and the neighbors fill in the pieces the recipe leans on.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the construct a rehearsal proves</small></div><span class="go">→</span></a>
+    <a href="dispatch"><span class="sw" style="background:#aee5c2"><img src="icons/workflows.svg" alt=""></span>
+      <div>Dispatch<small>the spawn lane the gk-201 turn fires</small></div><span class="go">→</span></a>
+    <a href="evals"><span class="sw" style="background:#f2ddb0"><b>✓</b></span>
+      <div>Evals<small>the judged sibling — asserted, not read</small></div><span class="go">→</span></a>
+    <a href="authoring"><span class="sw" style="background:#9fc4e8"><b>✳</b></span>
+      <div>Authoring<small>the ** System prompt convention</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · rehearsals
+  :PROPERTIES:
+  :SLUG:   rehearsals
+  :KIND:   learn
+  :NN:     05.12
+  :KICKER: under agents · rehearsals
+  :TITLE1: prove the call
+  :TITLE2: WITHOUT
+  :TITLE3: the phone
+  :CHIP:   rehearsals
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/rehearsals-hero.jpg
+  :END:
+** og
+- a text self-demo of a voice-agent conversation
+- scripted lines + live model + the real production router
+- the transcript is the test — read, diffed, committed
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .38], ["#aee5c2", .24], ["#f2ddb0", .22], ["#f3c5a3", .16]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

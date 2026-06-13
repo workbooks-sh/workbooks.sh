@@ -1,0 +1,71 @@
+{
+ "slug": "volumes",
+ "title": "volumes — under vfs",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Three lifetimes, one disk",
+   "text": "Lesson nine point two — volumes. A sub-lesson, under the VFS. The parent lesson sold you one thing… one disk, riding in the file, sealed from the host machine. True. And here is its geography. A volume is not a folder. It is not a mount. It is one column of a two-column key. Three names… three lifetime contracts. [curious] First — workspace, which persists and travels. Second — memory, which persists but stays home. And third — tmp, which evaporates on the next wake. And the whole policy that enforces all three… is two one-line SQL statements. That's the promise of this page."
+  },
+  {
+   "id": "problem",
+   "title": "Three lifetimes, one disk",
+   "text": "First — the problem. Three lifetimes, one disk. An agent's scratch junk… its half-thoughts… sit on that disk right next to the deliverable. So when you share the file — or the engine freezes an idle session overnight — what exactly survives? [curious] On a normal operating system, that question is folklore. The temp directory evaporates… except sometimes it doesn't. The cache folder is disposable… by convention. A gitignore keeps secrets out of a push… until someone forgets a line. Does this byte persist, travel, or disappear — that's answered by tribal knowledge. A habit. A thing the person who left used to know. Here it cannot be folklore. Because agents make it urgent — their scratch lives beside your work, on a disk that is a file you can email. So the lifetime of a byte has to be a fact… something the engine enforces… not something you remember."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A volume is a named region of the workbook's disk — keyed, not mounted. One of exactly three… workspace, memory, and tmp. And each one carries a lifetime contract the engine enforces — whether its bytes survive an overnight freeze, and whether they travel when you share the file. Three is the whole set. And it's closed by construction — the runtime names workspace, memory, and tmp, and a function guard makes a fourth name a failure with no place to land. Not three for now… three, full stop."
+  },
+  {
+   "id": "three",
+   "title": "The three contracts",
+   "text": "Now — the three contracts. One region per role… and each role is a sentence about time. Let me give you the whole table as three promises. First — workspace. It's the working tree, the workbook's files. It survives a resume, and it ships when you share. It's the deliverable. And it's the default — everything writes here unless told otherwise. Second — memory. The agent's long-term memory. It survives a freeze… but it never leaves. A recipient of the file never sees it. And third — tmp. Scratch. The most disposable thing in the system. It does not survive the next wake, and it never ships. [curious] So the verdict, in one breath. Workspace persists and travels. Memory persists but stays home. Tmp evaporates and stays home. And none of that is bolted on afterward — it all falls out of two SQL statements, which the rest of the page builds toward."
+  },
+  {
+   "id": "key",
+   "title": "A column, not a folder",
+   "text": "Here's the move that makes the word volume precise. A depth rung — skippable, but worth it. A volume is not a directory, and not a mount point. It is the first column of a two-column primary key. The whole VFS is one SQLite table — columns volume, path, content, and a modified time, with the primary key being the pair… volume and path together. And that pairing is the magic. The same path can exist in all three volumes at once, each holding different bytes. [curious] Picture one store with three lanes. A single write to slash-note in workspace holds the string… the workbook files. A write to slash-note in memory holds… what the agent learned. A write to slash-note in tmp holds… scratch. Same name. Three rows. Three different contents. No collision — blue, green, and clay, side by side. And every write stamps the modified time with the wall clock, so what changed and when is a column… not folklore. One more thing. The set is closed by the language itself. The write function carries a guard — the volume must be one of the three — so writing to a volume that doesn't exist isn't an error you handle. It's a function clause with no match. You cannot typo your way into a fourth region. There's nowhere for the call to land."
+  },
+  {
+   "id": "default",
+   "title": "The default is the working tree",
+   "text": "Next — the default is the working tree. Every write and every read defaults to workspace. The volume is the optional last argument. So picture three lines of code. Line one — a write to slash-report, no volume named… it lands in workspace. Line two — the same write, with workspace spelled out… identical. Line three — a write to slash-scratch with tmp named explicitly… and that's the only way into tmp. You have to ask. [curious] This is deliberate. The Dock's filesystem calls — what a component or a toolkit makes to read and write files — name no volume, so they land in workspace. An agent's own event log lands in workspace. Components, agents, tools — all workspace, unless they say otherwise. So naive code does the right thing twice over. It's persistent — it survives a freeze. And it's public-shaped — it's the region that travels. The dangerous default would be the reverse… scratch that accidentally ships, or work that accidentally evaporates. Here you have to opt in to a private or disposable lifetime by naming the volume. The silent path is the safe one."
+  },
+  {
+   "id": "evaporate",
+   "title": "What resume clears",
+   "text": "Now the lifetimes, made real — what resume clears. Two engine moments do all the work. The first is the freeze and resume cycle the engine runs on idle sessions. Let me walk you through it as a story. A session goes quiet. After fifteen minutes of silence… it suspends. After twenty-four hours… the engine freezes it. And freeze is almost nothing — it copies the SQLite file to cold storage. Stop the process, keep the file. No snapshot. All three volumes ride along in the frozen file, untouched. Then something wakes it. The engine copies the cold file back to live, opens it… and runs exactly one statement. Delete from the table… where the volume equals tmp. [curious] That single delete is the entire — tmp is scratch — mechanism. Workspace and memory persist for the most boring reason possible. Nothing touches them. So the session comes back up… workspace whole… memory whole… tmp empty. Those thresholds — fifteen minutes to suspend, twenty-four hours to freeze — are the rhythm that makes tmp's lifetime concrete. A session quiet overnight wakes with its scratch gone. The full state machine belongs to the sync lesson. Here… just hold onto the one delete."
+  },
+  {
+   "id": "travel",
+   "title": "What shipping strips",
+   "text": "The second moment is egress — what shipping strips. The instant the disk leaves the building. And the rule is stated plainly in the runtime… sharing exposes work, never the session that produced it. That's not abstract — it was written after a real leak, where a task tracker's private data rode a push to GitHub. Exactly one volume is public… workspace. So when the engine ships a bundle, picture one arrow that makes it out, and two that bend back home. The full disk has all three volumes. The ship step runs a function that deletes every volume that is not workspace… then vacuums the file, so the deleted bytes are gone-gone, not merely unlinked. What lands in the bundle is workspace alone. The memory and tmp arrows curve back into the live disk. They stayed put. [curious] And the opt-in is always legible from the outside. The bundle carries a manifest — a small record. It says the format is wbundle version one. It says volumes… workspace, and only workspace. It says private included… false. The demo that produces this wrote a string — carried across the wire — into the memory volume… shipped without the private flag… and the read on the other side comes back as an error. The byte stayed home, and the manifest says so. Flip the switch to include private, and the volumes list grows to all three, and private included flips to true. Whether a session rode along is never a guess. It's stamped on the package."
+  },
+  {
+   "id": "mirror",
+   "title": "The same boundary in git",
+   "text": "Another depth rung — skippable. The same boundary, in git's terms. The VFS can be unpacked to a real directory tree. And when it is, the same line has to hold — not just in SQLite, but in git. So the runtime emits the private volumes as gitignore lines, generated from the very same list it uses for the egress strip. One source of truth. Every tenant repo gets two lines written into its gitignore automatically. First… memory, as a directory. Second… tmp, as a directory. That's the volume set, minus the public one, rendered as folder patterns. So if the disk is ever walked out to a tree and committed, git treats memory and tmp as private… for the same reason the egress strip does. They aren't the work. The full boundary module is the privacy lesson's territory. Here, the point is only this — the line is drawn once, and it holds in both forms."
+  },
+  {
+   "id": "choose",
+   "title": "Which volume does this byte go in",
+   "text": "The practical question. Which volume does this byte go in? For any byte you're about to write, three questions, in order, settle it. First question… is it the work? A deliverable, something a recipient is meant to receive? If yes — it's workspace. And you don't even need to name it, because workspace is the default. If no, second question… is it learned context the agent should keep across sessions, but that should never leave the box? If yes — it's memory. And if it's neither — a half-finished intermediate, a cache, a thought you're glad to lose — then third, it's tmp. Expect it gone by the next wake. [curious] One name collision to defuse before it bites you. SQLite has a connection string — colon, memory, colon — that means keep this whole database in RAM. And the runtime uses it for throwaway instances. That is a storage location. It is not the memory volume. One is where a database lives. The other is a value in a key column. Same word… unrelated ideas. Don't let the spelling fool you."
+  },
+  {
+   "id": "honest",
+   "title": "Where the names end",
+   "text": "Now the honest part — where the names end. The volume names promise less than they might seem to, and the gaps are worth stating plainly. First… stripping is on resume and egress — not continuous. Tmp isn't being scrubbed in the background. It's cleared at the moment of resume, and private volumes are removed at the moment of ship. A session frozen in cold storage still contains its tmp and its memory, intact, in the file. The policy is two events… not a daemon. Second… the strip function fails open on garbage. If the bytes handed to it aren't valid SQLite, it returns them unmodified rather than raising. That's a fail-open fallback, and we'd rather you know it. Third… volumes are lifetime boundaries, not security boundaries. They are not quotas, not permissions, not encryption. All three are the same bytes, in the same file, in one trust domain, until egress. And fourth… memory is reserved canon, more than hot path. The runtime reserves the memory volume as the named, persisted, never-shipped home for agent memory — that's the contract. But in production today, most agent memory lives as ordinary files in a context repo. Don't read this as — agents are constantly writing the memory volume. Read it as — the region exists, with its contract guaranteed, for when they do."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Can I add a fourth volume? No. The set is closed by a function guard — a fourth name has no clause to land in. Three lifetimes was the whole design. Is the memory volume encrypted? No. Private means it doesn't travel on share… not that it's sealed. For bytes that stay opaque even to code inside the box — that's sealed sections, a different mechanism. Does freezing lose my tmp? No — freeze loses nothing. All three volumes ride into cold storage intact. It's resume that clears tmp, with one delete, at wake time. Can one component read another volume? Yes — if it's been granted the vfs capability. And that's the point worth internalizing. Volumes are lifetime boundaries, not security boundaries. They decide what survives a wake and what travels on a share… not who's allowed to look. And — what does colon-memory-colon mean, then? It's a SQLite string meaning keep this database in RAM. [chuckles] Identical spelling to the memory volume… completely unrelated concept."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the disk",
+   "text": "So that's volumes. Not a folder, not a mount — one column of a key. Three names, three contracts. Workspace persists and travels. Memory persists but stays home. Tmp evaporates on the next wake. And the entire policy is two delete statements, at two moments — one on resume, one on share. [curious] The way back up is short. This is a sub-lesson under the VFS — lesson nine — the disk these volumes partition. Go back there for the whole geography… and on to queries, privacy, and sync for the neighbors that fill in the rest."
+  }
+ ]
+}

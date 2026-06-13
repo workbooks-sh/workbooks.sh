@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>foreign tables — when FROM reaches past the file — Workbooks</title>
+<meta name="description" content="A foreign table is an entity name registered by a data-source plugin, so FROM <entity> resolves past the file — to a live API or a resident local mirror. The OQL read face of a federation toolkit. A deep-dive under the VFS.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/foreign-tables-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="foreign tables — when FROM reaches past the file">
+<meta property="og:description" content="Register an entity name to a data-source plugin and FROM <entity> stops meaning a table in the file and starts meaning the outside world — live, or mirrored to disk. A deep-dive under the VFS.">
+<meta property="og:url" content="https://workbooks.sh/learn/foreign-tables">
+<meta property="og:image" content="https://workbooks.sh/og/foreign-tables.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="foreign tables — when FROM reaches past the file">
+<meta name="twitter:description" content="Register an entity name to a data-source plugin and FROM <entity> stops meaning a table in the file and starts meaning the outside world — live, or mirrored to disk.">
+<meta name="twitter:image" content="https://workbooks.sh/og/foreign-tables.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    -- the lesson, in one query
+    SELECT outside_world FROM linear-issue;
+    -- 'linear-issue' is not a table in this file. it's a NAME.
+    -- a regex pulled it out of FROM; a map said "that name belongs
+    -- to a plugin"; the plugin went and got it. the query engine
+    -- never learned what HTTP is. a seam is just a name you agreed
+    -- to route on. and the safer trick is the opposite direction:
+    -- don't let the agent reach out — pull the world IN, render it
+    -- as :task: headlines on the disk, and let the agent read text.
+    -- the daemon holds the key. the agent holds nothing. that's the
+    -- airgap, and it's made of construction, not policy.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 09·6 — <b>under vfs · foreign tables</b></div>
+      <h1><span class="ln">when from</span><span class="ln bub">REACHES</span><span class="ln">past the file</span></h1>
+      <p class="dek">A <b>foreign table</b> is an entity name registered to a data-source
+      plugin — so <code>FROM linear-issue</code> stops meaning a table in the file and
+      starts meaning <b>the outside world</b>. One regex, one map, zero new query engine.
+      And for agents, the safer trick is the opposite direction: pull the world in,
+      mirror it to disk as plain text, and never hand over the key.</p>
+      <div class="meta">
+        <span class="on">foreign tables</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/foreign-tables-hero.jpg" alt="A small figure standing at the edge of a sealed white reading-room, reaching one hand through a single doorway in the wall toward a vast bright machine-city of data towers outside — only the doorway connects the two — 1970s sci-fi style, monumental scale, luminous">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/vfs.svg" alt=""></div><span>foreign tables</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The disk ends at the file's edge</a>
+  <a href="#definition">The definition</a>
+  <a href="#routing">One FROM, two destinations</a>
+  <a href="#contract">The whole contract is one callback</a>
+  <a href="#discovery">Plugins announce themselves in org</a>
+  <a href="#zero-code">Any JSON API in six lines</a>
+  <a href="#credentials">One audited path for the key</a>
+  <a href="#mirror">The second face: a resident mirror</a>
+  <a href="#airgap">Why the mirror is the safe face</a>
+  <a href="#faces">Pick your face</a>
+  <a href="#honest">What FROM does not do</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the disk ends at the file's EDGE</h2>
+  <p>The <a href="vfs">parent lesson</a> sold a sealed disk, and it meant it:
+  every path bottoms out inside the file, by construction, and nothing the
+  code or the agents do can reach the machine underneath. That's the whole
+  safety story. It's also, eventually, a wall — because the data you actually
+  care about doesn't live in the file. It lives in Linear, in Asana, in
+  Stripe, in some REST endpoint your team stood up last quarter.</p>
+  <p>Two bad instincts present themselves, and both undo something. The first:
+  hand the agent the API key and a network socket. That demolishes the
+  sealed-disk story the VFS lesson just spent a page building — a steerable
+  agent with a credential and an open port is an exfiltration machine waiting
+  for the wrong instruction. The second: paste exports into the disk by hand.
+  Honest, safe, and stale the moment you save it.</p>
+  <p>So the missing piece isn't a bigger disk or a looser sandbox. It's a way
+  for <code>FROM</code> to mean <em>past the file</em> when you want it to —
+  without the query engine learning what HTTP is, and without the agent ever
+  touching the wire. That's this lesson.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">for·eign ta·ble</span> <span class="pr">/ˈfɒr·ən ˈteɪ·bəl/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> an entity name registered by a
+    <b>data-source plugin</b>, so that <code>FROM &lt;entity&gt;</code> resolves
+    <b>past the file</b> — to a live external source or a resident local
+    mirror — instead of to a table inside the workbook's disk. The
+    <b>OQL read face</b> of a <a href="toolkit">federation toolkit</a>.</p>
+  </div>
+  <p>It is not a new query engine and not a new primitive. It's a routing
+  decision: an unregistered name falls through to the local
+  <a href="vfs">VFS</a> exactly as before; a registered name is handed to a
+  plugin. The whole construct is one regex, one <code>:persistent_term</code>
+  map, and a one-callback behaviour — and the rest of this page is what those
+  three pieces buy you.</p>
+</section>
+
+<section id="routing">
+  <h2>one FROM, two DESTINATIONS</h2>
+  <p>Here is the core mechanic, and it's smaller than you'd guess. When a
+  query arrives, <code>Federation.query</code> runs a single regex over it —
+  <code>\bFROM\s+([A-Za-z0-9_-]+)</code>, the first <code>FROM</code> only —
+  to lift the entity name out. Then it asks the registry one question: is this
+  name registered? If yes, the matching plugin's <code>query/3</code> is
+  called and its rows come back live. If no, it returns a plain atom,
+  <code>:not_federated</code>, and the caller falls through to the local VFS
+  across every workbook member's SQLite store — the same query you'd have run
+  before any of this existed.</p>
+  <pre class="mermaid">
+flowchart TD
+  sql["a query arrives<br/>SELECT … FROM x"]
+  rx["lift the entity from the first FROM<br/>regex · letters, digits, dash, underscore"]
+  reg{"is x registered<br/>in the source map?"}
+  plug["module.query(x, {sql, config}, opts)<br/>the plugin goes and gets it"]
+  live["live rows<br/>federated: true"]
+  nf["return :not_federated"]
+  vfs["fall through — vfs_query across<br/>every member's SQLite disk"]
+  sql --> rx --> reg
+  reg -- "yes" --> plug --> live
+  reg -- "no" --> nf --> vfs
+  style sql fill:#ffffff,stroke:#121316
+  style rx fill:#ffffff,stroke:#121316
+  style reg fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style plug fill:#a8d4f0,stroke:#121316
+  style live fill:#a8d4f0,stroke:#121316
+  style nf fill:#f3c5a3,stroke:#121316
+  style vfs fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>Read that graph as a fork with a fallback. The query walks in; the regex
+  pulls one name off the front of <code>FROM</code>; the registry is a yes-or-no
+  gate. Down the yes branch the plugin does all the real work and the result
+  comes back flagged <code>federated: true</code>. Down the no branch nothing
+  exotic happens at all — the literal atom <code>:not_federated</code> rides
+  back to the caller, which quietly does what it always did: query the local
+  disk. The query engine never learned about HTTP, GraphQL, or any external
+  protocol. It learned to route on a name, and a plugin learned the rest.</p>
+  <p>That fall-through is deliberately the caller's job, not the router's.
+  <code>Library.query</code> tries federation first; an <code>{:ok, rows}</code>
+  becomes a federated result, an <code>{:error, …}</code> surfaces the error,
+  and <code>:not_federated</code> is the signal to go local. One seam, two
+  destinations, and the boundary between them is a single word in the
+  <code>FROM</code> clause.</p>
+</section>
+
+<section id="contract">
+  <h2>the whole contract is one CALLBACK</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the behaviour, for the curious</span></p>
+  <p>A data source is one function. The <code>Workbooks.DataSource</code>
+  behaviour has exactly one callback —
+  <code>query(entity, q, opts)</code> returning <code>{:ok, [map()]}</code> or
+  <code>{:error, term()}</code>. Today <code>q</code> is
+  <code>%{sql: raw, config: cfg}</code>: the plugin gets the <em>raw SQL string</em>
+  and parses what it needs from it, plus its own per-entity config. The rows
+  it returns are headline-shaped maps — the same shape the rest of the system
+  reads.</p>
+  <p>The registry lives in <code>:persistent_term</code> — rare write, fast
+  read, the same posture as the command registry. Four functions reach it:</p>
+  <table class="cmp">
+    <tr><th>call</th><th>what it does</th><th>returns</th></tr>
+    <tr><td><code>register(entity, module, config)</code></td><td>bind a name to a plugin module + its config</td><td class="y">the entity is now foreign</td></tr>
+    <tr><td><code>lookup(entity)</code></td><td>find the module for a name</td><td>the module, or <code>nil</code></td></tr>
+    <tr><td><code>config(entity)</code></td><td>fetch that entity's config map</td><td>a map (default <code>%{}</code>)</td></tr>
+    <tr><td><code>entities()</code></td><td>list every registered name</td><td>the foreign namespace</td></tr>
+  </table>
+  <p>The verdict of that table: registration is the entire surface. Bind a name
+  with <code>register</code>, and <code>lookup</code> is what the router calls
+  on every query to decide the fork above. <code>config</code> is how
+  per-entity settings — a URL, a rows path, an env key — reach the plugin as
+  <code>q.config</code>. There is no schema to declare, no migration, no
+  adapter interface beyond the one function. That deliberate smallness is why
+  a generic source can make <em>any</em> JSON endpoint a table without writing
+  code at all — which is the next section.</p>
+</section>
+
+<section id="discovery">
+  <h2>plugins announce themselves in ORG</h2>
+  <p>Nobody calls <code>register</code> by hand. Plugins announce themselves in
+  the grammar. <code>Federation.discover</code> globs
+  <code>toolkits/*/plugin/manifest.org</code> and reads a small keyword set out
+  of each one: <code>#+SLOT</code> (must be <code>data-source</code>),
+  <code>#+ENTITIES</code> (a whitespace-split list of names this source owns),
+  <code>#+IMPL</code> (the Elixir module that implements <code>query/3</code>),
+  plus generic config like <code>#+URL</code>, <code>#+ROWS_PATH</code>,
+  <code>#+ENV_KEYS</code>. The toolkits root is <code>$WB_TOOLKITS_ROOT</code>
+  if it names a real directory, else the in-tree <code>toolkits/</code>.</p>
+  <pre class="mermaid">
+flowchart TD
+  glob["glob toolkits/*/plugin/manifest.org"]
+  parse["parse keywords<br/>#+SLOT · #+ENTITIES · #+IMPL · #+URL · …"]
+  slot{"#+SLOT is<br/>data-source?"}
+  load{"module exists +<br/>exports query/3?"}
+  reg["register each entity → module + config"]
+  skip["skip — silently, not an error"]
+  glob --> parse --> slot
+  slot -- "no" --> skip
+  slot -- "yes" --> load
+  load -- "yes" --> reg
+  load -- "no" --> skip
+  style glob fill:#ffffff,stroke:#121316
+  style parse fill:#ffffff,stroke:#121316
+  style slot fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style load fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style reg fill:#a8d4f0,stroke:#121316
+  style skip fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>Walk that graph and notice the forgiving shape. Discovery globs the
+  manifests, parses the keywords, then checks two gates: is this slot a data
+  source, and does the named module actually exist and export
+  <code>query/3</code>? Pass both and every listed entity registers. Fail
+  either — most importantly, a manifest that names a module which doesn't
+  exist yet — and the source is <b>skipped, not crashed</b>. That's a designed
+  property: a toolkit can ship its declarative manifest before its
+  implementation lands, and discovery treats the gap as "not ready," not as a
+  fatal error.</p>
+  <p>One honest caveat: <code>discover</code> has no boot call site today. It's
+  idempotent and invoked on demand — by tests, the console, and a planned
+  provision walk — but registration does not happen automatically when the
+  engine starts. You run discovery; you don't inherit it.</p>
+</section>
+
+<section id="zero-code">
+  <h2>any JSON API in six LINES</h2>
+  <p>The only shipped implementation is also the most useful one:
+  <code>Workbooks.DataSource.Http</code> turns any JSON HTTP endpoint into a
+  table with zero code. You write a manifest, not a module. Here is one a
+  reader could drop in today, at <code>toolkits/orders/plugin/manifest.org</code>:</p>
+  <pre class="orgsample">#+TITLE: orders
+#+SLOT: data-source
+#+ENTITIES: shop-order
+#+IMPL: Workbooks.DataSource.Http
+#+URL: https://api.example.com/v1/orders
+#+ROWS_PATH: data.items
+#+ENV_KEYS: SHOP_API_KEY</pre>
+  <p>Run <code>Federation.discover()</code> and <code>shop-order</code> is now
+  a foreign table. Then <code>wbx library query "SELECT * FROM shop-order"</code>
+  returns <code>%{federated: true, rows: [%{member: "federation", rows: […]}],
+  skipped: []}</code> — while the same query against
+  <code>FROM workspace_files</code> falls straight through to the local disk.
+  The <code>#+ROWS_PATH</code> is an optional dotted path that digs into nested
+  JSON: <code>data.items</code> reaches <code>response["data"]["items"]</code>;
+  omit it and the response body is itself taken as the array. Non-map elements
+  are dropped; what survives is your rows.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant Q as a query
+  participant H as DataSource.Http
+  participant E as the host — :httpc
+  participant A as api.example.com
+  Q->>H: query("shop-order", {sql, config}, opts)
+  H->>E: GET the #+URL — host egress, 10s timeout
+  E->>A: HTTP request
+  A-->>E: 200 · JSON body
+  E-->>H: status 200..299 → body
+  H->>H: Jason.decode! → dig #+ROWS_PATH → drop non-maps
+  H-->>Q: {:ok, rows}
+  </pre>
+  <p>Read that exchange as a relay where the plugin never opens a socket. The
+  query calls the Http source; the source asks the <em>host</em> to make the
+  GET — the comment in the code is exact, "the plugin never opens a socket
+  itself" — and the host's <code>:httpc</code> does the egress with a
+  ten-second timeout. A status in <code>200..299</code> returns the body; the
+  source decodes it, digs the dotted rows path, drops anything that isn't a
+  map, and hands back the rows. And when it fails, it fails honestly: a 500
+  comes back as <code>{:error, {:http_status, 500}}</code>, propagated
+  untouched all the way through <code>Federation.query</code>. No URL at all
+  is <code>{:error, :no_url}</code>. Linear and Asana, when they land, are
+  specializations of exactly this pattern — their own <code>query/3</code>
+  translating OQL into their GraphQL.</p>
+</section>
+
+<section id="credentials">
+  <h2>one audited path for the KEY</h2>
+  <p>That manifest named <code>#+ENV_KEYS: SHOP_API_KEY</code>, and the way that
+  key reaches the request is the whole trust story. The plugin never calls
+  <code>System.get_env</code>. It calls
+  <code>Workbooks.Plugin.Auth.fetch("SHOP_API_KEY", opts)</code> — a single
+  audited resolution path — and the Http source builds the
+  <code>authorization: Bearer &lt;token&gt;</code> header itself, from the
+  first <code>#+ENV_KEYS</code> entry. Credentials have one home, not a scatter
+  of <code>get_env</code> calls across plugin code.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant P as the plugin
+  participant A as Plugin.Auth.fetch
+  participant R as deploy resolver
+  participant V as host env
+  participant H as the request
+  P->>A: fetch("SHOP_API_KEY", opts)
+  A->>R: resolver(key)?  — the keychain seam
+  alt resolver returns a value
+    R-->>A: token
+  else resolver nil or empty
+    A->>V: System.get_env(key)
+    V-->>A: token or nil
+  end
+  A-->>P: token (or nil → no header)
+  P->>H: authorization: Bearer <token>
+  </pre>
+  <p>Follow that ladder of precedence. The plugin asks <code>Auth.fetch</code>
+  for the key; <code>fetch</code> tries the deploy's resolver first — a
+  <code>(key → binary | nil)</code> function that is the keychain or broker
+  seam — and the resolver's value wins. If the resolver returns <code>nil</code>
+  or an empty string, it falls back to the host environment. If the key is
+  missing everywhere, <code>fetch</code> returns <code>nil</code> and the
+  request still goes — bare, with no auth header at all. The test pins this
+  exactly: it asserts the literal header <code>Bearer sekret</code> when a
+  token is present. The key never enters plugin code as a string the plugin
+  fetched, and — the next section's point — the toolkit that ships the
+  manifest contains no credentials at all.</p>
+</section>
+
+<section id="mirror">
+  <h2>the second face: a resident MIRROR</h2>
+  <p>Live reads are one face. For agents you usually want the other one. Don't
+  let the agent reach out — run a daemon that pulls the world <em>in</em>,
+  renders the rows as plain org headlines on the disk, and let the agent read
+  the disk like any other workbook. That daemon is
+  <code>Workbooks.Plugin.Sync</code>: a supervised GenServer whose pure,
+  testable core is <code>pull_once</code> — it runs
+  <code>SELECT * FROM &lt;entity&gt;</code> through federation, renders the
+  rows to org, and writes them into the VFS at
+  <code>sync/&lt;entity&gt;.org</code>.</p>
+  <p>The render is mechanical and worth seeing literally. Given
+  <code>pull_once("shop-order", …)</code> against two rows
+  <code>{"id":1,"title":"alpha"}</code> and <code>{"id":2,"title":"beta"}</code>,
+  the bytes written are exactly:</p>
+  <pre class="orgsample">#+TITLE: shop-order (synced)
+#+SYNCED_FROM: shop-order
+
+* alpha :task:
+:PROPERTIES:
+:ID: 1
+:TITLE: alpha
+:END:
+
+* beta :task:
+:PROPERTIES:
+:ID: 2
+:TITLE: beta
+:END:</pre>
+  <p>It returns <code>{:ok, 2, org}</code>, and the file reads back through
+  <code>VFS.get</code> like anything else. The title for each headline is
+  picked by a cascade — the first present of
+  <code>title</code>, <code>name</code>, <code>summary</code>, <code>id</code>
+  — every key goes into the <code>:PROPERTIES:</code> drawer UPCASED, and any
+  non-scalar value is JSON-encoded. A <code>#+SYNCED_FROM</code> line marks the
+  provenance. The daemon ticks on a default five-minute interval
+  (<code>300_000</code> ms), scheduled with <code>Process.send_after</code> —
+  and notably it does <em>not</em> pull at boot, so a freshly started daemon
+  has scheduled its first tick but not yet reached out.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant T as the 5-min timer
+  participant S as Plugin.Sync
+  participant F as Federation.query
+  participant D as the VFS — workspace volume
+  participant Ag as an agent
+  T->>S: :pull
+  S->>F: SELECT * FROM shop-order
+  F-->>S: rows
+  S->>S: render → :task: headlines + UPCASED drawer
+  S->>D: VFS.put sync/shop-order.org
+  Note over Ag,D: the agent only ever reads the file
+  Ag->>D: open sync/shop-order.org
+  D-->>Ag: org text
+  </pre>
+  <p>Read that loop as a one-way conveyor. The timer fires; the daemon runs the
+  federated query; the rows come back; the daemon renders them to
+  <code>:task:</code> headlines and <em>puts</em> them into the VFS — by
+  default into the workspace volume at <code>sync/shop-order.org</code>. The
+  agent, on the far side, only ever opens that file. It reads org text. It
+  never appears anywhere near the query, the timer, or the source. The
+  moduledoc's claim is exact: the mirror is "a resident, queryable local
+  mirror, airgapped from the agent — it only ever writes to the VFS; the agent
+  reads the mirror like any other workbook."</p>
+</section>
+
+<section id="airgap">
+  <h2>why the mirror is the SAFE face</h2>
+  <p>That one-way conveyor is the entire safety argument, and it's structural,
+  not a policy you trust. The agent never touches the API and never sees the
+  credential. The daemon holds the key; the agent holds nothing. Their only
+  contact surface is org headlines on disk — exactly the
+  <a href="vfs">grants-not-inheritance</a> instinct from the parent's safety
+  section, now extended one step past the file's edge.</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph inside["the workbook + VFS — where the agent lives"]
+    ag["an agent<br/>even a steerable one"]
+    file["sync/shop-order.org<br/>:task: headlines on disk"]
+    ag -- "reads only" --> file
+  end
+  subgraph outside["the daemon + external API"]
+    d["Plugin.Sync<br/>holds the key · supervised daemon"]
+    api["Linear / Asana / your API"]
+    d -- "pulls, holds LINEAR_API_KEY" --> api
+  end
+  d -- "writes org headlines<br/>the ONLY crossing edge" --> file
+  style ag fill:#a8d4f0,stroke:#121316
+  style file fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style d fill:#f3c5a3,stroke:#121316
+  style api fill:#d9dbd3,stroke:#121316
+  style inside fill:#fbfaf6,stroke:#121316
+  style outside fill:#fbfaf6,stroke:#121316
+  </pre>
+  <p>Picture two zones with one bridge. On the left, inside the workbook and
+  its VFS, the agent reads — and only reads — the synced
+  <code>:task:</code> file. On the right, outside, the daemon holds the
+  credential and pulls from the real API. Exactly one edge crosses between
+  them, and it carries org headlines in one direction. The agent could be
+  fully steered by a hostile instruction and there is still nothing on its
+  side of the bridge but text someone else already fetched.</p>
+  <p>The structure is what makes that hold. The daemon is a <em>supervised</em>
+  <code>Plugin.Sync</code> GenServer, driven from a <code>:daemon:</code> node in
+  a <code>sync.org</code> face — not something an agent inside the workbook
+  spawns or steers. And the direction is one-way by construction: the generic
+  <code>pull_once</code> only ever <em>reads</em> the source and <em>writes</em>
+  the VFS — there is no write-back path in this core at all. The toolkit that
+  wires the faces together holds no creds itself — its three faces (base,
+  data-source, sync daemon) are one authoring unit, but the credential lives
+  with the host, never the toolkit.</p>
+</section>
+
+<section id="faces">
+  <h2>pick your FACE</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — choosing between the two faces</span></p>
+  <p>A federation toolkit gives you two ways to read past the file, and they
+  trade differently. Line them up honestly:</p>
+  <table class="cmp">
+    <tr><th></th><th>freshness</th><th>where rows live</th><th>who holds the key</th><th>agent's contact surface</th><th>failure mode</th></tr>
+    <tr><td><b>live read</b><br/><code>FROM entity</code></td><td class="y">current — fetched per query</td><td class="n">nowhere — transient</td><td>host (via Auth), at query time</td><td class="n">the live API, indirectly</td><td><code>{:error, …}</code> surfaces now</td></tr>
+    <tr><td><b>resident mirror</b><br/>the sync daemon</td><td>as fresh as the last tick (def 5 min)</td><td class="y">on disk · <code>sync/&lt;entity&gt;.org</code></td><td class="y">the daemon, never the agent</td><td class="y">org text on disk, only</td><td>last good mirror stays readable</td></tr>
+    <tr><td>specialized connector<br/><i>(Linear/Asana — planned)</i></td><td>per its own design</td><td>either</td><td>host</td><td>its own <code>query/3</code></td><td>per impl</td></tr>
+  </table>
+  <p>The verdict in a sentence: reach for the <b>live read</b> when freshness
+  per query matters and the caller is trusted code that can handle an error
+  inline; reach for the <b>resident mirror</b> when an agent is the reader,
+  because it moves the credential and the network entirely out of the agent's
+  world and leaves it nothing but text. The specialized connectors —
+  Linear, Asana, a cursor-based TaskSync — are authored shape with planned
+  implementations; their contract is the same one callback, refined.</p>
+</section>
+
+<section id="honest">
+  <h2>what FROM does NOT do</h2>
+  <p>Honesty section, because the <code>FROM</code> trick is easy to oversell.
+  Here is exactly what it does and doesn't push.</p>
+  <p><b>No predicate pushdown.</b> The generic HTTP source never reads the SQL.
+  <code>SELECT id FROM x WHERE y = 1</code> and <code>SELECT * FROM x</code> do
+  the identical thing: GET the URL and return every row. The plugin is handed
+  the raw SQL and <em>could</em> parse it — a specialized connector translating
+  to GraphQL does — but the shipped generic source ignores WHERE and projection
+  entirely.</p>
+  <p><b>No cross-source joins.</b> A query goes wholly to a plugin or wholly to
+  the local VFS — the first-<code>FROM</code>-wins regex makes that a hard
+  fork. You cannot join a foreign entity against a local table in one
+  statement.</p>
+  <p><b>The mirror is a point-in-time full replace.</b> Each pull writes one
+  org file with <code>VFS.put</code> — an insert-or-replace of the whole file.
+  The generic <code>pull_once</code> has no cursor and no incremental sync;
+  cursor-based upsert is the specialized TaskSync design, and it's planned.</p>
+  <p><b>Discovery is on-demand, not automatic.</b> As noted above,
+  <code>discover</code> has no boot call site — registration happens when you
+  run it, not when the engine starts.</p>
+  <p><b>Only one implementation ships.</b> <code>Workbooks.DataSource.Http</code>
+  is real and tested; the Linear, Asana, and TaskSync modules do not exist in
+  this repo — and their own manifests say so, admitting the impl is planned.
+  The manifests are fixtures that <code>load_impl</code> skips today, on
+  purpose.</p>
+  <p>And one naming collision to defuse: <code>wbx mirror</code> and
+  <code>wbx federate</code> in the CLI are about <b>git / Radicle repo
+  federation</b> — a completely different construct that happens to share the
+  words. Nothing on this page is that.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Does WHERE filter on the server?</summary>
+    <p>Not with the generic HTTP source. The plugin is handed the raw SQL but
+    the shipped <code>DataSource.Http</code> ignores it — it GETs the URL and
+    returns every row, so <code>WHERE</code> and column projection are applied
+    locally, after the fetch. A specialized connector can translate the SQL
+    into its own API's query language; the generic one does not.</p>
+  </details>
+  <details>
+    <summary>Can the agent see LINEAR_API_KEY?</summary>
+    <p>No — and not by policy. With the mirror face, the daemon holds the key
+    and the agent only ever reads org headlines off the disk; the credential
+    is never on the agent's side of the bridge. Even on the live-read face the
+    key flows through the single <code>Plugin.Auth</code> path, host-side,
+    never as a <code>get_env</code> call in plugin code.</p>
+  </details>
+  <details>
+    <summary>What if a manifest names a module that doesn't exist?</summary>
+    <p>It's skipped, silently, by design. Discovery checks that the module
+    loads and exports <code>query/3</code>; if it doesn't, the source is
+    treated as not-ready, not as an error. That's what lets a toolkit ship its
+    declarative manifest before its implementation lands.</p>
+  </details>
+  <details>
+    <summary>Where does the mirror land?</summary>
+    <p>In the VFS workspace volume by default, at
+    <code>sync/&lt;entity&gt;.org</code> — for example
+    <code>sync/shop-order.org</code>. You can override the path, but the
+    default puts it right where any other workbook file lives, so the agent
+    reads it with no special knowledge.</p>
+  </details>
+  <details>
+    <summary>Is this the <code>wbx federate</code> thing?</summary>
+    <p>No. <code>wbx mirror</code> / <code>wbx federate</code> are git and
+    Radicle repository federation — sharing the word, nothing else. Foreign
+    tables are about <code>FROM &lt;entity&gt;</code> resolving to a data
+    source, live or mirrored.</p>
+  </details>
+  <details>
+    <summary>How fresh is the mirror?</summary>
+    <p>As fresh as its last tick — the default interval is five minutes
+    (<code>300_000</code> ms), and the daemon does not pull at boot, so the
+    very first refresh happens one interval after it starts. Each pull is a
+    full replace of the one org file, not an incremental update.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This deep-dive picks up exactly where the VFS lesson's honesty section
+  left off — the disk ended at the file's edge, and this is the seam past it.</p>
+  <div class="cards">
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>the sealed disk this reaches past</small></div><span class="go">→</span></a>
+    <a href="queries"><span class="sw" style="background:#aee5c2"><img src="icons/org.svg" alt=""></span>
+      <div>Queries<small>the local half of the fall-through</small></div><span class="go">→</span></a>
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="icons/workflows.svg" alt=""></span>
+      <div>Toolkits<small>federation is a toolkit kind</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>the :task: headlines the mirror writes</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under vfs · foreign tables
+  :PROPERTIES:
+  :SLUG:   foreign-tables
+  :KIND:   learn
+  :NN:     09.6
+  :KICKER: under vfs · foreign tables
+  :TITLE1: when from
+  :TITLE2: REACHES
+  :TITLE3: past the file
+  :CHIP:   foreign tables
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/foreign-tables-hero.jpg
+  :END:
+** og
+- an entity name registered to a data-source plugin
+- FROM <entity> resolves past the file — live, or mirrored to disk
+- the daemon holds the key; the agent reads only text
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .36], ["#aee5c2", .24], ["#f3c5a3", .22], ["#f2ddb0", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

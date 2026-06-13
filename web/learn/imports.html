@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en" style="--pc:#f3c5a3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>imports — convert, don't rewrite — Workbooks</title>
+<meta name="description" content="wbx toolkit import is the ecosystem's intake ramp: it sniffs a source's shape across nine formats, mechanically translates its docs to org, scaffolds a real toolkit, and writes the conversion plan it can't finish for you. Parse what's parseable — never a shrug.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="imports — convert, don't rewrite">
+<meta property="og:description" content="The intake ramp for the ecosystem: sniff nine source shapes, translate docs to org, scaffold a real toolkit, and leave a manual — never a shrug. A sub-lesson under toolkit.">
+<meta property="og:url" content="https://workbooks.sh/learn/imports">
+<meta property="og:image" content="https://workbooks.sh/og/imports.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="imports — convert, don't rewrite">
+<meta name="twitter:description" content="The intake ramp for the ecosystem: sniff nine source shapes, translate docs to org, scaffold a real toolkit, and leave a manual — never a shrug. A sub-lesson under toolkit.">
+<meta name="twitter:image" content="https://workbooks.sh/og/imports.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/imports.jpg">
+<link rel="preload" href="img/imports-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * TODO import the old skill folder           :intake:
+  * DOING translate the manual to org          (the honest 90%)
+  * TODO audit the carried scripts             :blocked:python:
+  ** the import never said it ran — it said NOT yet trusted.
+     the plan IS the product. work the TODOs, then push → build → verify.
+  * DONE leave a manual, never a shrug
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 03·1 — <b>under toolkit · imports</b></div>
+    <h1><span class="ln">you already</span><span class="ln bub">BUILT</span><span class="ln">your tools</span></h1>
+    <p class="dek">Your capabilities already exist — as a folder of Claude skills,
+    an <code>.mcp.json</code> you depend on, an OpenAPI spec, an npm CLI. The cost
+    nobody admits to is <b>rewriting all of it</b> as toolkits, and that cost is
+    why new formats die. <b>import</b> is the ramp that refuses the tax: sniff the
+    shape, translate the docs, scaffold a real toolkit — and honestly write the
+    conversion plan it can't finish for you.</p>
+    <div class="meta">
+    <span class="on">imports</span><span>11 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/imports-hero.jpg" alt="A small engineer feeds odd-shaped tools onto a vast luminous conveyor ramp where each one is stamped into the same clean crate — monumental sorting machine glowing green and amber, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../toolkit-icon.svg" alt=""></div><span>imports</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">You already built your tools</a>
+  <a href="#definition">The definition</a>
+  <a href="#shapes">Nine shapes, one sniff</a>
+  <a href="#ramp">Three honest stages</a>
+  <a href="#translator">The honest 90%</a>
+  <a href="#scaffold">What lands on disk</a>
+  <a href="#synth">Manufacturing evidence</a>
+  <a href="#secrets">Names travel, values don't</a>
+  <a href="#guidance">Guidance-only is a landing</a>
+  <a href="#frontier">The honest limits</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>you already built your TOOLS</h2>
+  <p>The <a href="toolkit">parent lesson</a> sold you the unit — a real program
+  in a sandbox, wrapped in a manual that teaches people and agents — and ended on
+  an honest note: the parts bin is early, so convert one tool you love. This page
+  is how you convert it.</p>
+  <p>Because here's the thing the brochure skips: your capabilities don't live in
+  a vacuum waiting to be written. They already exist, in <b>other people's
+  formats</b>. A directory of Claude skills. An <code>.mcp.json</code> three of
+  your projects depend on. An OpenAPI spec a vendor handed you. An npm CLI, a pip
+  CLI, a <code>.cursorrules</code> file, an <code>AGENTS.md</code>. The implied
+  price of any new ecosystem is <em>rewrite everything in the new shape</em> — and
+  that price is exactly why most new formats are born dead. Nobody pays it.</p>
+  <p>So the design goal isn't a converter that's clever. It's a ramp that's
+  <b>honest</b>: convert what's mechanically convertible, do the real work where it
+  can, and where it genuinely can't, leave instructions instead of a shrug. Convert,
+  don't rewrite.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">im·port</span> <span class="pr">/ˈɪm·pɔrt/</span> <span class="pos">verb</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the ecosystem's <b>intake ramp</b>: detect a
+    source's shape, translate its docs to <a href="org">org</a>, scaffold a real
+    toolkit — manifest, skills, carried scripts — and write the
+    <b>conversion plan</b> it can't finish for you.</p>
+  </div>
+  <p>The spec states the philosophy without hedging: <i>parse what's parseable, do
+  the work, and leave a manual — never a shrug.</i> That last clause is the whole
+  ethic. An import that can't fully convert your tool does not fail and does not
+  pretend — it produces a finished toolkit <em>plan</em>, written in the same
+  grammar agents already execute, and hands you the rest of the work as a checklist.
+  Parse-only and local-only at this stage; nothing is built, nothing runs, nothing
+  is trusted yet. A guidance-only toolkit — pure manual, no code — is a valid
+  landing, not a consolation prize.</p>
+</section>
+
+<section id="shapes">
+  <h2>nine shapes, one SNIFF</h2>
+  <p>Detection is not AI and not magic — it's literal shape-sniffing. The
+  <code>import</code> verb knows nine source kinds, and the taxonomy maps each
+  shape to what it becomes. An <code>--as &lt;kind&gt;</code> flag overrides
+  everything; pass a wrong one and you get a clean mapped error, never a panic
+  (the test feeds it <code>--as vsix</code> and asserts the exit code is not a
+  crash).</p>
+  <table class="cmp">
+    <tr><th>kind</th><th>what's detected</th><th>what it becomes</th></tr>
+    <tr><td>claude-skill</td><td><code>SKILL.md</code> + frontmatter</td><td>main skill + a <code>reference-*</code> skill per <code>references/*.md</code>, scripts carried</td></tr>
+    <tr><td>markdown</td><td>a lone <code>.md</code></td><td>a one-skill toolkit, the doc as its manual</td></tr>
+    <tr><td>folder</td><td>a directory of anything</td><td>every top-level <code>.md</code> → a skill; a stub if none</td></tr>
+    <tr><td>mcp-server</td><td><code>.mcp.json</code> / <code>mcp.json</code></td><td>a skill per server + a synthesized launch script</td></tr>
+    <tr><td>openapi</td><td><code>"openapi"</code>/<code>"swagger"</code> in the first 4 KB</td><td>a skill per operation, Dock-brokered HTTP noted</td></tr>
+    <tr><td>npm-cli</td><td><code>package.json</code> with <code>"bin"</code></td><td>scope-stripped id, bins carried, README → manual</td></tr>
+    <tr><td>pip-cli</td><td><code>pyproject.toml</code></td><td>a synthesized stub per console script — for the audit</td></tr>
+    <tr><td>cursor-rules</td><td><code>.cursorrules</code> / <code>.cursor/rules/</code></td><td>a guidance-only toolkit of rule skills</td></tr>
+    <tr><td>agents-md</td><td><code>AGENTS.md</code> / <code>CLAUDE.md</code></td><td>a one-skill guidance toolkit</td></tr>
+  </table>
+  <p>The order of the sniff is the careful part. Identity files win before the
+  generic <code>.md</code> catch-all — a folder with a <code>SKILL.md</code> is a
+  Claude skill, not just a pile of markdown. OpenAPI is matched by
+  <b>content, not extension</b>: any <code>.json</code>/<code>.yaml</code> whose
+  first 4096 characters contain <code>"openapi"</code>, <code>"swagger"</code>, or a
+  line starting <code>openapi:</code> qualifies. And a directory <b>always lands
+  somewhere</b> — if nothing else matches, it imports as a plain folder. The one
+  case that bails is a remote ref, covered under the honest limits below.</p>
+  <p>One stale corner worth naming so you're not misled: the CLI's inline help for
+  <code>--as</code> lists only three kinds. The parser accepts all nine, and its
+  error message is the source of truth — <code>claude-skill, markdown, folder,
+  mcp-server, openapi, npm-cli, pip-cli, cursor-rules, agents-md</code>.</p>
+</section>
+
+<section id="ramp">
+  <h2>three honest STAGES</h2>
+  <p>The spec calls import an intake ramp on purpose — a ramp has stages, and these
+  three are kept distinct so none of them can lie on behalf of another:</p>
+  <ul>
+    <li><b>Stage 1 — parse + scaffold.</b> Detect the shape, translate the docs,
+    write a real toolkit to disk: a <code>manifest.org</code>, a
+    <code>skills/</code> tree, and any carried scripts. Local and parse-only.</li>
+    <li><b>Stage 2 — the dependency audit.</b> This runs <em>automatically</em> at
+    the end of every import. It classifies each carried script against the wasm
+    lanes and writes the findings <b>into the manifest itself</b> — the artifact
+    carries its own audit, not a side report.</li>
+    <li><b>Stage 3 — the fix-up plan.</b> Everything not already sandbox-ready
+    becomes an org TODO checklist with concrete rewrite recipes. This is the
+    agent manual: work the items, prove the toolkit, done.</li>
+  </ul>
+  <p>Here is the whole ramp as the kernel runs it — source on the left, a finished
+  toolkit-with-findings on the right, and the real done-test still ahead of you:</p>
+  <pre class="mermaid">
+flowchart LR
+  src["a source<br/>(skill / mcp / openapi / cli …)"]
+  src --> detect{"detect()<br/>sniff the shape"}
+  detect --> parse["per-kind parser<br/>md → org, collect scripts"]
+  parse --> scaffold["write_scaffold()<br/>manifest.org + skills/ + scripts/"]
+  scaffold --> audit["audit_static()<br/>auto-runs, stage 2"]
+  audit --> man[["manifest.org<br/>carries findings + fix-up plan"]]
+  man -. "still ahead" .-> ship["push → build → verify"]
+  style src fill:#f3c5a3,stroke:#121316
+  style man fill:#f3c5a3,stroke:#121316,stroke-width:2.5px
+  style ship fill:#ffffff,stroke:#121316,stroke-dasharray:4 3
+  </pre>
+  <p>The dotted edge is the honest part of the picture: an import produces an
+  artifact, not a running tool. <b>Imported is not runnable is not trusted.</b> If
+  the audit fails to run at all, the import still succeeds — it degrades to a quiet
+  <code>audit skipped</code> note rather than throwing the conversion away. The
+  manual always lands.</p>
+</section>
+
+<section id="translator">
+  <h2>the honest 90<span style="font-feature-settings:'tnum'">%</span></h2>
+  <p>Depth rung — skippable, but it's where the word <em>honest</em> earns its
+  keep. The doc translator, <code>md_to_org</code>, is mechanical and
+  deterministic. No model, no inference. It walks the markdown and rewrites the
+  constructs it knows, line by line:</p>
+  <table class="cmp">
+    <tr><th>markdown in</th><th>org out</th><th>rule</th></tr>
+    <tr><td><code># Heading</code></td><td><code>* Heading</code></td><td>hashes → stars, same depth</td></tr>
+    <tr><td><code>```bash</code> … <code>```</code></td><td><code>#+begin_src bash</code> … <code>#+end_src</code></td><td>no lang → <code>text</code>; unterminated closed at EOF</td></tr>
+    <tr><td><code>[this](https://x.dev)</code></td><td><code>[[https://x.dev][this]]</code></td><td>link order flips</td></tr>
+    <tr><td><code>**bold**</code></td><td><code>*bold*</code></td><td>double star → single</td></tr>
+    <tr><td><code>`code`</code></td><td><code>=code=</code></td><td>backtick → equals</td></tr>
+  </table>
+  <p>The thesis is one comment in the source: <i>what it can't translate it passes
+  through — org tolerates it.</i> Lists, tables, images: untouched, and they still
+  read, because org is a superset that doesn't choke on stray markdown. That's why
+  90% is the right number to promise and 100% the wrong one — the translator never
+  guesses, so it never mangles. Frontmatter is split off first: a leading
+  <code>---</code> YAML block becomes key/value pairs (folded and multiline values
+  handled), and an unterminated block is simply treated as body, not an error. Ten
+  percent rides through as-is. That's the deal, stated plainly.</p>
+</section>
+
+<section id="scaffold">
+  <h2>what lands on DISK</h2>
+  <p>A scaffold is a real toolkit, not a sketch. The manifest carries a fixed set
+  of keys that mark its provenance — most importantly <code>#+STATUS: imported</code>
+  and <code>#+IMPORTED_FROM: &lt;kind&gt; &lt;source&gt;</code>, so the artifact
+  always remembers where it came from. It refuses to overwrite an existing output
+  directory: <code>{dir} already exists</code>, full stop (the test re-imports into
+  a populated dir and asserts the failure). Walk the claude-skill round trip end to
+  end. The input — a directory with a <code>SKILL.md</code>, a reference doc, and a
+  shell script:</p>
+  <pre class="orgsample">my-skill/
+  SKILL.md          ---
+                    name: demo-skill
+                    description: does demo things
+                    ---
+                    # Demo …
+  references/extra.md
+  scripts/run.sh    #!/bin/sh
+                    echo hi</pre>
+  <p>One command. The id comes from the frontmatter <code>name</code>, the tagline
+  from <code>description</code> (truncated to 220 chars), the body becomes the main
+  skill, and <code>references/extra.md</code> becomes a <code>reference-extra</code>
+  skill. The human-mode output:</p>
+  <pre class="orgsample">$ wbx toolkit import my-skill
+imported claude-skill → demo-skill-toolkit/
+  manifest.org      the toolkit surface
+  skills/           2 skills
+  scripts/          1 carried (unaudited — see the TODO)
+next: review manifest.org, then `wbx toolkit verify demo-skill`
+
+audited 1 script — 1 ready · 0 convertible · 0 blocked
+  run.sh                   ready        (sh)
+findings written into manifest.org</pre>
+  <p>And the manifest that lands carries the trust posture in its own body —
+  verbatim, not a footnote: <i>anything under <code>scripts/</code> is carried
+  verbatim and NOT yet trusted to run in the sandbox.</i> A
+  <code>** TODO dependency audit</code> placeholder is written first, then replaced
+  in-place by stage 2's findings. For an all-shell skill like this one, the fix-up
+  section reads <i>nothing to fix — every script is sandbox-ready.</i> The fence in
+  <code>SKILL.md</code> came across as <code>#+begin_src bash</code>; a link to
+  <code>https://x.dev</code> became <code>[[https://x.dev][this]]</code>. Every claim
+  in this paragraph is a line in the test suite.</p>
+</section>
+
+<section id="synth">
+  <h2>manufacturing EVIDENCE</h2>
+  <p>Depth rung. The cleverest mechanic in the whole verb is this: for two kinds,
+  import <b>synthesizes a script that doesn't exist in the source</b>, specifically
+  so the audit has something honest to judge. The system manufactures the evidence
+  for its own honesty pass.</p>
+  <p>Take an MCP server. Its config never contains a script — it contains a launch
+  command. But <i>the server IS the bin</i>: running it is the capability. So import
+  writes the launcher into <code>scripts/&lt;name&gt;.sh</code>, and now the audit
+  can classify it. Watch one <code>.mcp.json</code> become an auditable verdict:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant J as .mcp.json
+  participant I as import
+  participant A as audit_static
+  participant M as manifest.org
+  J->>I: server gh → command npx -y @x/server
+  I->>I: synthesize scripts/gh.sh<br/>exec npx -y @x/server
+  I->>A: here is a real script to judge
+  A->>A: classify npx → npm lane exists
+  A->>M: gh.sh — convertible<br/>resolve + bundle at build time
+  </pre>
+  <p>The pip CLI uses the same trick toward the opposite verdict. From a
+  <code>pyproject.toml</code> console script, import synthesizes a tiny Python stub
+  containing only the entry-point comment — <i>synthesized for the audit; the real
+  implementation lives in the package.</i> It exists so the audit can say the true
+  thing: <b>blocked — no python lane today</b>, and hand the rewrite recipe to an
+  agent. The stub is a placeholder for honesty, not a working tool. (pip-cli parses
+  the TOML by hand, deliberately taking no toml dependency, to keep the import lane
+  thin.)</p>
+</section>
+
+<section id="secrets">
+  <h2>names travel, values DON'T</h2>
+  <p>An MCP config routinely carries secrets — an API token sitting in an
+  <code>env</code> block. Import documents the env <b>names</b> in the skill and
+  synthesizes the launcher, but the <b>values never leave the source</b>. The skill
+  says, in effect, set these engine-side; the secret is never copied into any output
+  file. Feed it a token and look at what lands:</p>
+  <pre class="orgsample">in   →  {"mcpServers":{"gh":{"command":"npx",
+        "args":["-y","@x/server"],"env":{"TOKEN":"hunter2"}}}}
+
+out  →  scripts/gh.sh
+        #!/bin/sh
+        # the MCP server launch — the server is the toolkit bin
+        exec npx -y @x/server
+
+        skills/gh.org
+        Env (names only; set values engine-side): TOKEN</pre>
+  <p>The string <code>hunter2</code> appears in <b>zero</b> output files — manifest,
+  skill, and script are all checked, and the test asserts it. The name
+  <code>TOKEN</code> is documented so a human knows what to set; the value stays put.
+  Config values may be secrets, so they're treated as secrets by default.</p>
+  <p>The same skill is honest about a second limit: MCP tools are enumerated at
+  runtime, not in the config. So the import documents the <em>launcher</em>, not the
+  tool list, and says so — run the server to list its tools, then write each as its
+  own skill.</p>
+</section>
+
+<section id="guidance">
+  <h2>guidance-only is a LANDING</h2>
+  <p>Not every source has code, and the ramp doesn't punish that. A
+  <code>.cursorrules</code> file, a <code>.cursor/rules/</code> directory, an
+  <code>AGENTS.md</code>, or a bare markdown doc all import into a toolkit that is
+  pure manual — skills and no scripts. The audit, finding nothing to convert, writes
+  the cleanest possible verdict: <i>no carried scripts — guidance-only toolkit,
+  nothing to convert.</i> The test feeds it an <code>AGENTS.md</code> and asserts
+  the import reports <i>nothing to fix</i> — a guidance-only toolkit is a clean
+  landing, not a failure.</p>
+  <p>This is the lowest, most stable rung of the ladder the parent lesson named:
+  <a href="toolkit">the manual is the interface</a>. A toolkit that is only a
+  manual is still a real toolkit — installable, versioned, readable by an agent.
+  Sometimes the most valuable thing you have to convert is know-how, and the ramp
+  carries know-how as a first-class artifact.</p>
+</section>
+
+<section id="frontier">
+  <h2>the honest LIMITS</h2>
+  <p>House rule on these pages: name the edges in the source's own words. The import
+  verb has real ones.</p>
+  <ul>
+    <li><b>Remote refs aren't wired.</b> A skills.sh slug, an
+    <code>owner/repo</code>, an <code>http</code> URL — none import directly. Instead
+    of half-trying, the error teaches the fix: <i>Remote refs (skills.sh, owner-repo)
+    aren't wired yet — clone it locally and import the folder: git clone … &amp;&amp;
+    wbx toolkit import &lt;dir&gt;.</i> Clone first.</li>
+    <li><b>YAML OpenAPI isn't parsed.</b> Only JSON specs parse today, and a YAML
+    spec doesn't get a half-parse — it gets a recipe: <i>convert YAML first: yq
+    -o=json spec.yaml &gt; spec.json &amp;&amp; wbx toolkit import spec.json.</i></li>
+    <li><b>MCP tools are runtime-enumerated.</b> The config has the launcher, not
+    the tool catalog, so the import documents the launcher and tells you to
+    enumerate the rest after first run.</li>
+    <li><b>No python lane today.</b> A python or ruby or perl script audits as
+    <em>blocked</em>. The import is honest about it and hands the rewrite plan.</li>
+    <li><b>Translation is 90%, not 100%.</b> Lists, tables, and images pass through
+    untranslated. They read fine in org; they're just not rewritten.</li>
+    <li><b>Imported ≠ verified.</b> The scaffold is a plan and a candidate, not a
+    shipped tool. Push, build, and <a href="verification">verify</a> are still ahead.</li>
+  </ul>
+  <p>The blocked case deserves the worked detail, because it's the one most likely
+  to read as a failure when it isn't. From a <code>pyproject.toml</code> exposing
+  <code>pycli = "pycli.main:run"</code>, the manifest gains exactly this — an audit
+  finding, and the org checklist an agent works against:</p>
+  <pre class="orgsample">** dependency audit (static, auto)
+*** pycli.py — blocked (python3)
+    - interpreter =python3= :: blocked — no python lane today —
+      rewrite in a covered lane or split the logic
+
+** TODO fix-up plan [0/1]
+   The agent manual: work each item, check it off, then prove the whole
+   toolkit — done when =wbx toolkit push pycli <dir>= · =wbx toolkit build pycli=
+   · =wbx toolkit verify pycli= all pass. With an engine reachable,
+   =wbx toolkit audit <dir> --fix= runs that push→build→verify for you.
+*** TODO pycli.py (blocked — python3)
+    - [ ] rewrite in JS for the quickjs lane — keep the script's CLI contract
+          (same args in, same stdout out) so callers don't change
+    - [ ] or split the logic into org tasks the engine runs natively
+    - [ ] re-run =wbx toolkit audit= — pycli.py must classify ready</pre>
+  <p>The import didn't fail. It produced the instructions — in the same org grammar
+  agents already execute. The sibling lesson <a href="audits">audits</a> owns the
+  depth of how <em>ready</em>, <em>convertible</em>, and <em>blocked</em> get
+  decided; this page hands off cleanly at stage 2.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Does it use an LLM?</summary>
+    <p>No. Detection is filename and content sniffing; translation is a mechanical,
+    deterministic markdown-to-org pass; the audit is a static classifier. Run it
+    twice on the same input and you get the same scaffold. The intelligence is in
+    the structure, not in a model call.</p>
+  </details>
+  <details>
+    <summary>My import says blocked — did it fail?</summary>
+    <p>No — the plan is the product. A blocked script means import couldn't make it
+    sandbox-ready by itself, so it wrote the rewrite recipe instead. An agent works
+    the org checklist, and <code>wbx toolkit audit &lt;dir&gt; --fix</code> proves
+    the result by running push → build → verify. Blocked is a starting line, not a
+    dead end.</p>
+  </details>
+  <details>
+    <summary>Can I import straight from skills.sh or a repo URL?</summary>
+    <p>Not yet. Remote refs aren't wired, and rather than half-try, the error tells
+    you the move: clone the source locally, then import the folder. The intake ramp
+    is local-only at this stage by design.</p>
+  </details>
+  <details>
+    <summary>What happens to my MCP server's tools list?</summary>
+    <p>Tools are enumerated at runtime, not in the config, so import can't read them
+    statically. It documents the launch command — the server is the bin — and tells
+    you to run the server once, list its tools, and write each as its own skill.</p>
+  </details>
+  <details>
+    <summary>Will my scripts run after import?</summary>
+    <p>Not immediately, and the manifest says so verbatim: carried scripts are NOT
+    yet trusted to run in the sandbox. Imported is not runnable is not trusted —
+    push, build, and <a href="verification">verify</a> are the gates between a
+    scaffold and a working tool.</p>
+  </details>
+  <details>
+    <summary>What do agents get instead of the human report?</summary>
+    <p>The same findings, as a JSON envelope — <code>{ok, verb, data}</code> with a
+    scripts array and a summary of ready/convertible/blocked counts. Human mode
+    appends the prose report to the output; agent mode keeps it machine-readable.
+    The manifest carries the findings either way.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Import is stage one of a longer ramp — these lessons carry it the rest of the
+  way to a shipped, trusted tool.</p>
+  <div class="cards">
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>Toolkit<small>the unit you're converting into</small></div><span class="go">→</span></a>
+    <a href="audits"><span class="sw" style="background:#aee5c2"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>Audits<small>ready · convertible · blocked, in depth</small></div><span class="go">→</span></a>
+    <a href="lanes"><span class="sw" style="background:#9fc4e8"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>Lanes<small>why node is ready and python is blocked</small></div><span class="go">→</span></a>
+    <a href="verification"><span class="sw" style="background:#f2ddb0"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>Verification<small>the done-test: push → build → verify</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under toolkit · imports
+  :PROPERTIES:
+  :SLUG:   imports
+  :KIND:   learn
+  :NN:     03.1
+  :KICKER: under toolkit · imports
+  :TITLE1: you already
+  :TITLE2: BUILT
+  :TITLE3: your tools
+  :CHIP:   imports
+  :PC:     #f3c5a3
+  :AC:     #13d943
+  :HERO:   img/imports-hero.jpg
+  :END:
+** og
+- nine source shapes, one literal sniff — no LLM
+- mechanical md → org, the honest 90%
+- the plan is the product — never a shrug
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f3c5a3", .36], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

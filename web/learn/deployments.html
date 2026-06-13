@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deployments — the file that places your engine — Workbooks</title>
+<meta name="description" content="A deployment is an org file of five properties the engine converges to — and the place it runs is one of them. Parsed by a twenty-line property scan, never executed. Local is the same OCI image in a microVM on your mac; cloud is five shell hooks any host can fill. A sub-lesson under nexus.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/deployments-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="deployments — the file that places your engine">
+<meta property="og:description" content="Five closed enums the engine converges to, the place it runs being one of them. Inert by construction — a twenty-line property scan, never executed. Local microVM and cloud recipe converge to the same OCI image.">
+<meta property="og:url" content="https://workbooks.sh/learn/deployments">
+<meta property="og:image" content="https://workbooks.sh/og/deployments.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="deployments — the file that places your engine">
+<meta name="twitter:description" content="Five closed enums the engine converges to, the place it runs being one of them. Inert by construction. Local microVM and cloud recipe converge to the same OCI image.">
+<meta name="twitter:image" content="https://workbooks.sh/og/deployments.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/deployments.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * local                                                     :deployment:
+    :PROPERTIES:
+    :ENGINE_PLACE: local
+    :END:
+  ** the secret in the source
+     This whole file is read by a twenty-line property scan, not an engine.
+     That is the entire trick: declarative is a fact about the parser, not a
+     promise on a billboard. Flip ENGINE_PLACE to cloud and the SAME image
+     boots on a host instead of your desk. Nothing here executes. Nothing
+     hides an exec: key. You could audit the reader on one screen — so we did,
+     and so should you.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02·6 — <b>under nexus · deployments</b></div>
+      <h1><span class="ln">the file</span><span class="ln bub">THAT</span><span class="ln">places your engine</span></h1>
+      <p class="dek">A <b>deployment</b> is an org file of five properties the engine
+      converges to — and <b>the place it runs is one of them</b>. The parent page
+      promised: flip <code>local</code> to <code>cloud</code> and your prototype is the
+      product. This page shows the actual file, the actual verbs, and the actual seams —
+      and stands one up both ways. No diagram needed to trust it; the parser fits on a
+      screen.</p>
+      <div class="meta">
+        <span class="on">deployments</span><span>13 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/deployments-hero.jpg" alt="A small engineer holding a single index card before a monumental engine that exists twice — once as a humming console on a desk, once as a colossus on the horizon — both wired to the same card. Bright, optimistic 1970s sci-fi style.">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>◎</b></div><span>deployments</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The file that deploys you</a>
+  <a href="#definition">The definition</a>
+  <a href="#the-file">Five axes, one screen</a>
+  <a href="#validate">The honesty engine</a>
+  <a href="#local">A cloud on your desk</a>
+  <a href="#cloud">Five hooks and a tempfile</a>
+  <a href="#one-property">The actual diff</a>
+  <a href="#secrets">Names in the file, values nowhere near it</a>
+  <a href="#verbs">Converge, prove, tear down</a>
+  <a href="#limits">Where the seam ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the file that DEPLOYS you</h2>
+  <p>You've been burned by a config file before. It started as ten honest
+  keys — a name, a port, a region — and then someone needed "just one hook,"
+  and a year later it was a Turing-complete YAML pipeline with an
+  <code>exec:</code> key, secret interpolation, and a templating language
+  nobody chose. The word <b>declarative</b> was on the box. The contents
+  were a program you couldn't read.</p>
+  <p>So when the <a href="nexus">parent lesson</a> says "flip
+  <code>local</code> to <code>cloud</code> and your prototype is the
+  product," your reflex is right: that's a brochure line until proven
+  otherwise. Every platform claims declarative deploys. The claim is only
+  worth anything if you can <em>audit it</em> — read the whole reader in one
+  sitting and confirm there's no place a program could hide.</p>
+  <p>That's the bar this page sets, and then clears. A deployment description
+  you can hold in your head. Inert by construction, not by promise. We'll
+  read the parser, watch the validator refuse to let you lie to yourself,
+  and bring the same engine up on a laptop and on a public host — to show
+  the "one property" claim cashes out as a measurable fact, not a vibe.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">de·ploy·ment</span> <span class="pr">/dɪ·ˈplɔɪ·mənt/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> an <b>org file of five properties</b> the engine
+    converges to — engine place, tenancy, storage, database, and auth — where the
+    <b>place it runs is one of them</b>. Inert by construction: read by a property
+    scan, <b>never executed</b>.</p>
+  </div>
+  <p>Two words in that definition carry the whole lesson. <b>Converges</b>:
+  you describe the end state, the tooling makes reality match — no steps, no
+  order, idempotent. <b>Never executed</b>: the file is read by a hand-rolled
+  scan of the <code>:PROPERTIES:</code> drawer, not by the org engine that
+  <a href="org">tangles and runs</a> other workbooks. A deployment file is
+  the one org file in the system that is pure config and nothing else — and
+  that's a property you can verify, not a posture.</p>
+</section>
+
+<section id="the-file">
+  <h2>five axes, one SCREEN</h2>
+  <p>Here is the real local deployment, shipped in the kit, whole. One
+  headline, one drawer, seven lines of properties — this is not a fragment:</p>
+  <pre class="orgsample">* local                                                      :deployment:
+  :PROPERTIES:
+  :ID:            local
+  :ENGINE_PLACE:  local
+  :TENANCY_MODE:  single
+  :STORAGE:       local-fs
+  :DATABASE:      sqlite
+  :AUTH:          trusted
+  :END:</pre>
+  <p>Five of those properties are <b>closed enums</b> — the only axes that
+  exist, each with a fixed set of legal values:</p>
+  <table class="cmp">
+    <tr><th>axis</th><th>legal values</th><th>default</th><th>what it flips</th></tr>
+    <tr><td><code>ENGINE_PLACE</code></td><td><code>local</code> · <code>cloud</code></td><td class="n">— required</td><td>microVM on your mac, or a provider recipe</td></tr>
+    <tr><td><code>TENANCY_MODE</code></td><td><code>single</code> · <code>multi</code></td><td><code>single</code></td><td>one user, or tenants needing identity + isolation</td></tr>
+    <tr><td><code>STORAGE</code></td><td><code>local-fs</code> · <code>s3</code></td><td><code>local-fs</code></td><td>the working dir is the store, or an S3-compatible bucket</td></tr>
+    <tr><td><code>DATABASE</code></td><td><code>sqlite</code> · <code>postgres</code></td><td><code>sqlite</code></td><td>one writer, or many — concurrency under multi-tenancy</td></tr>
+    <tr><td><code>AUTH</code></td><td><code>trusted</code> · <code>betterauth</code> · <code>clerk</code> · <code>oidc</code></td><td><code>trusted</code></td><td>no identity, or a real token issuer</td></tr>
+  </table>
+  <p>Everything else — <code>APP</code>, <code>PROVIDER</code> (defaults to
+  <code>fly</code>), <code>REGION</code>, the storage endpoint and bucket,
+  the auth issuer — is an open property: a string the relevant axis reads
+  when it needs one. There is nothing else. No fifth verb hiding in a sixth
+  key.</p>
+  <p>Now the part that earns the word "inert." The reader is about twenty
+  lines. It walks the file top to bottom, flips a boolean when it sees
+  <code>:PROPERTIES:</code> and flips it back at <code>:END:</code>, and
+  inside the drawer it matches each line against one regular expression:</p>
+  <pre class="orgsample">^:([A-Za-z_]+):\s+(.*\S)\s*$
+        │              └─ the value, trimmed
+        └─ the key, uppercased</pre>
+  <p>A line that matches contributes a key and a value. <b>A line that
+  doesn't match is silently ignored.</b> That's the whole parser. No
+  interpolation, no <code>${}</code>, no hooks, no template language, no
+  branch where a string becomes code. "Declarative" here is a measurable
+  property of a reader you could screenshot — not a marketing adjective. The
+  reason your old config files rotted is that their readers grew teeth. This
+  one can't, because there's nowhere for teeth to go.</p>
+</section>
+
+<section id="validate">
+  <h2>the honesty ENGINE</h2>
+  <p>A linter checks syntax. <code>validate</code> checks <em>truth</em>. It
+  runs with zero deploy — read-only, no machine touched — and its job is to
+  refuse configurations that would lie to you. Its error messages aren't
+  style notes; they're distributed-systems tradeoffs encoded as
+  refusals. Three of them are worth quoting verbatim, because each one is a
+  lesson that would otherwise cost you a 2 a.m. page:</p>
+  <pre class="orgsample"><b>TENANCY_MODE: multi</b> + <b>DATABASE: sqlite</b>  →  rejected:
+  "multi on DATABASE: sqlite serializes every tenant
+   through one writer — set DATABASE: postgres"
+
+<b>TENANCY_MODE: multi</b> + <b>AUTH: trusted</b>  →  rejected:
+  "`trusted` has no identity to isolate tenants by"
+
+<b>STORAGE: s3</b> + missing secrets  →  rejected:
+  "STORAGE: s3 needs WB_S3_KEY + WB_S3_SECRET in your
+   deploy ENV (secrets, not the file)"</pre>
+  <p>Read what those refusals know. Multi-tenant on one SQLite writer
+  doesn't fail — it <em>works</em>, slowly, funneling every tenant through a
+  single lock until the day it doesn't, and the validator would rather you
+  learn that now than in production. <code>trusted</code> auth has no token,
+  no subject, no identity — so there is literally nothing to scope a tenant
+  by, and "multi-tenant with trusted auth" isn't a configuration, it's a
+  contradiction. And <code>s3</code> demands its credentials from the
+  <em>environment</em>, by name, because secrets in the file is the original
+  sin and the validator won't be complicit in it.</p>
+  <p>The full set of checks, as a flow — enum legality first, then the
+  combinations that can't coexist, then the secrets the chosen axes
+  require:</p>
+  <pre class="mermaid">
+flowchart TD
+  cfg[["deployment.org"]] --> enums{"five axes<br/>legal values?"}
+  enums -- no --> bad["invalid — unknown value on an axis"]
+  enums -- yes --> combo{"combinations<br/>coherent?"}
+  combo -- "multi + sqlite" --> bad2["one writer for every tenant"]
+  combo -- "multi + trusted" --> bad3["no identity to isolate by"]
+  combo -- ok --> sec{"required secrets<br/>present in ENV?"}
+  sec -- "s3, no WB_S3_KEY" --> bad4["secrets, not the file"]
+  sec -- "postgres, no WB_DATABASE_URL" --> bad5["the DSN is a secret"]
+  sec -- "real auth, no ISSUER" --> bad6["a token needs an issuer"]
+  sec -- all present --> ok["valid — local · single-tenant<br/>storage=local-fs · db=sqlite"]
+  style cfg fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style ok fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style bad fill:#ffffff,stroke:#121316
+  style bad2 fill:#ffffff,stroke:#121316
+  style bad3 fill:#ffffff,stroke:#121316
+  style bad4 fill:#ffffff,stroke:#121316
+  style bad5 fill:#ffffff,stroke:#121316
+  style bad6 fill:#ffffff,stroke:#121316
+  </pre>
+  <p>On success it prints the shape it understood —
+  <code>valid — local · single-tenant · storage=local-fs · db=sqlite</code>
+  — which is the same summary every verb speaks. Notice the deliberate
+  split: <code>postgres</code> needs <code>WB_DATABASE_URL</code> ("the DSN
+  is a secret"), <code>s3</code> needs its <em>endpoint and bucket in the
+  file</em> but its <em>key and secret in the env</em>, and any real auth
+  needs an <code>ISSUER</code> — the origin a token is checked against. Two
+  separate checks, two separate error strings, because they are two
+  separate kinds of thing. The validator is the part of the system that
+  refuses to let you write a config that would quietly lie.</p>
+</section>
+
+<section id="local">
+  <h2>a cloud on your DESK</h2>
+  <p>Depth rung — skippable, but it's where "local isn't a simulator"
+  becomes a fact you can run. Local place is not a mock. It's the same
+  <code>ghcr.io/workbooks-sh/runtime:latest</code> OCI image cloud uses,
+  booted in a real Linux microVM on your mac via libkrun and
+  <code>krunvm</code>. The microVM is the <a href="nexus#isolation">outer
+  isolation boundary</a> — distinct from, and wrapped around, the wasm
+  sandbox each workbook runs in. krunvm is the mac arm of a cross-platform
+  seam; podman, docker, and WSL2 slot in behind the same
+  ensure→create→run→status→down contract.</p>
+  <p>The bring-up, command by command, is shorter than the explanation:</p>
+  <pre class="orgsample">$ wbx deploy doctor
+created the case-sensitive APFS volume; prereqs OK now
+
+$ wbx deploy apply
+local runtime up — http://127.0.0.1:55123 (survives app quit; `wbx deploy down` to stop)
+
+$ wbx deploy verify
+runtime healthy — http://127.0.0.1:55123/health → 200</pre>
+  <p>Under that calm output is a sequence with two real macOS war stories
+  baked into it. First the one-time prereq: krunvm's OCI store needs a
+  <b>case-sensitive APFS volume</b>, which <code>doctor</code> creates for
+  you with <code>diskutil apfs addVolume &lt;disk&gt; "Case-sensitive APFS"
+  krunvm</code> — no sudo, non-destructive, self-healing. Then the create,
+  with flags that each exist for a reason:</p>
+  <pre class="orgsample">krunvm create ghcr.io/workbooks-sh/runtime:latest \
+  --name workbooks-runtime --cpus 2 --mem 2048 \
+  --workdir /app \              <i>← krunvm won't inherit the image WORKDIR</i>
+  --port 55123:4000 \          <i>← free host port → guest's fixed 4000</i>
+  --volume …/data:/data \      <i>← your data, on the host</i>
+  --volume …/disco:/disco      <i>← the discovery handshake lands here</i></pre>
+  <p>The boot command is the first war story. You'd expect
+  <code>bin/workbooks start</code> — but the release's <code>start</code>
+  runs a foreground console that needs a TTY, and under krunvm's no-TTY
+  guest it blocks at console init <em>before the app ever boots</em>:
+  silent, no discovery, nothing. So the boot is
+  <code>/app/bin/workbooks eval '…ensure_all_started… Process.sleep(:infinity)'</code>
+  — boot the app, then park forever; on failure <code>System.halt(1)</code>
+  so it surfaces in <code>wbx deploy logs</code> instead of hanging.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as wbx (your session)
+  participant K as krunvm
+  participant V as the microVM (the runtime image)
+  participant D as /disco (bind mount)
+  U->>K: doctor — APFS volume ready
+  U->>K: create + start --env WB_DESKTOP=1 …
+  K->>V: boot via `eval` (no TTY needed) → park
+  V->>D: write runtime.json (port, pid, token)
+  U->>D: poll up to 20s for runtime.json
+  D-->>U: found — port + bearer token
+  U->>V: GET http://127.0.0.1:55123/health (bearer)
+  V-->>U: 200 · body contains "ok"
+  </pre>
+  <p>The second war story is why the VM survives you closing the app.
+  libkrun needs the user's GUI session — run under a background LaunchAgent
+  it exits 78 (<code>EX_CONFIG</code>). So the default lifecycle is a direct
+  nohup-detached spawn into your Aqua session, with the pid in a pidfile: it
+  survives the app quitting (reparented), and dies on logout. A LaunchAgent
+  path exists for start-on-login, but it's the path that fights libkrun, so
+  it's opt-in.</p>
+  <p>And the handshake itself: the runtime inside the VM writes
+  <code>/disco/runtime.json</code> — port, pid, and a bearer token — into
+  the bind-mounted directory, and the host reads it straight off the mount.
+  That file <em>is</em> the local control-plane handshake. <code>status</code>
+  and <code>verify</code> read it; <code>verify</code> uses the token to hit
+  <code>/health</code> and expects a 200 with "ok" in the body. When you run
+  <code>down</code>, both lifecycles are removed and the VM is deleted — but
+  <code>/data</code> and the APFS volume are <b>preserved</b>. Your data
+  outlives the machine.</p>
+</section>
+
+<section id="cloud">
+  <h2>five hooks and a TEMPFILE</h2>
+  <p>Cloud isn't magic either. A provider is a directory:
+  <code>cli/deploy-kit/providers/&lt;place&gt;/bootstrap.sh</code>. The
+  place resolves to a backend — <code>local</code> resolves to the built-in
+  Machine module, anything else resolves to that bootstrap script. Adding a
+  provider is dropping a directory; the core never changes. Each recipe
+  fills the same five hooks plus a lifecycle trio:</p>
+  <pre class="orgsample">provider_ensure_app      <i>← create the app if missing</i>
+provider_set_secrets     <i>← stage credentials, out of band</i>
+provider_attach_volume   <i>← a persistent disk for /data</i>
+provider_deploy_image    <i>← run the OCI image</i>
+provider_public_url      <i>← print  url: https://…</i>
+  + provider_down / provider_status / provider_logs</pre>
+  <p>The kit drives the script with an action — <code>up</code> runs those
+  first five in order; <code>down</code>, <code>status</code>,
+  <code>logs</code>, <code>url</code> do the obvious thing. The provider's
+  exit code is honored all the way out to the CLI's exit code, so a failed
+  host failure is a failed command.</p>
+  <pre class="mermaid">
+flowchart TD
+  apply["wbx deploy apply"] --> place{"ENGINE_PLACE?"}
+  place -- local --> machine["built-in Machine<br/>(krunvm microVM)"]
+  place -- cloud --> recipe["resolve providers/&lt;place&gt;/bootstrap.sh"]
+  recipe --> up["WB_RECIPE_ACTION=up"]
+  up --> h1["ensure_app"] --> h2["set_secrets"] --> h3["attach_volume"] --> h4["deploy_image"] --> h5["public_url → url:"]
+  style apply fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style machine fill:#ffffff,stroke:#121316
+  style h5 fill:#13d943,stroke:#121316
+  </pre>
+  <p>Fly is the one bundled recipe — and the comment at the top of it says so
+  plainly: Fly is our personal preference, not a privileged target, just one
+  recipe behind the provider-neutral spine. Here's what makes it concrete.
+  On <code>apply</code>, the Fly recipe creates the app if missing
+  ("converge, don't complain"), stages secrets, creates a 1 GB volume
+  <code>wbdata</code> if absent — then <b>synthesizes a minimal
+  fly.toml in a tempdir</b>, deploys it, and deletes it:</p>
+  <pre class="orgsample">app = "my-app"
+primary_region = "sjc"
+
+[build]
+  image = "ghcr.io/workbooks-sh/runtime:latest"
+
+[mounts]
+  source = "wbdata"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0</pre>
+  <p>The public URL is <code>https://my-app.fly.dev</code>. And the env every
+  provider forwards is the quiet keystone: <code>WB_WEB=1</code>,
+  <code>PORT=4000</code>, <code>WB_DATA=/data</code>, and crucially
+  <code>WB_REGISTRY=/data/registry.db</code>. The registry defaults to
+  <code>:memory:</code> in the engine — pointing it at the volume is exactly
+  what makes deployed workbooks survive a restart or a scale-to-zero, with
+  litestream replicating that SQLite db. Those
+  <code>auto_stop_machines</code> / <code>min_machines_running = 0</code>
+  lines are scale-to-zero; the volume + registry pointer is what keeps it
+  safe.</p>
+  <p>The punchline is the contract's smallness. A Hetzner, Render, or AWS
+  recipe is the same ~90 lines with different commands, because the engine
+  asks the host for only four things: run my container, attach a volume,
+  deliver my secrets, expose a port. Everything a PaaS does beyond that is
+  the PaaS's business, not the engine's.</p>
+</section>
+
+<section id="one-property">
+  <h2>the actual DIFF</h2>
+  <p>Now the parent's claim, made literal. Moving from local to cloud is
+  editing <code>ENGINE_PLACE</code> — and then adding exactly the properties
+  the validator <em>forces</em> you to add. Here is the diff against the
+  shipped cloud SaaS deployment:</p>
+  <pre class="orgsample">  * local                                  →  * cloud-saas              :deployment:
+    :PROPERTIES:                                :PROPERTIES:
+-   :ENGINE_PLACE:  local                  +   :ENGINE_PLACE:     cloud
++                                          +   :PROVIDER:         fly
++                                          +   :APP:              my-app
+    :TENANCY_MODE:  single                 +   :TENANCY_MODE:     multi
+-   :STORAGE:       local-fs               +   :STORAGE:          s3
++                                          +   :STORAGE_ENDPOINT: https://s3.us-east-1.amazonaws.com
++                                          +   :STORAGE_BUCKET:   my-bucket
++                                          +   :STORAGE_REGION:   us-east-1
+-   :DATABASE:      sqlite                 +   :DATABASE:         postgres
+-   :AUTH:          trusted                +   :AUTH:             clerk
++                                          +   :ISSUER:           https://my-tenant.clerk.accounts.dev
++                                          +   :REGION:           iad
+    :END:                                      :END:</pre>
+  <p>None of those additions are decoration — each one is the validator
+  refusing a half-edit. Try to go to <code>multi</code> tenancy while still
+  on <code>sqlite</code> and <code>trusted</code>, with <code>s3</code> but
+  no credentials, and validate stops you cold:</p>
+  <pre class="orgsample">$ wbx deploy validate cloud-saas.org
+invalid deployment:
+  - TENANCY_MODE: multi on DATABASE: sqlite serializes every tenant
+    through one writer — set DATABASE: postgres
+  - STORAGE: s3 needs WB_S3_KEY + WB_S3_SECRET in your deploy ENV
+    (secrets, not the file)</pre>
+  <p>So you don't add <code>postgres</code> because a guide told you to — you
+  add it because <code>multi</code> demanded it. The same translation runs in
+  both directions, and it's one function — <code>Config.to_env/1</code> — that
+  turns the five axes into the engine's environment. Same keys, sourced
+  differently per place:</p>
+  <table class="cmp">
+    <tr><th>engine env</th><th>sourced from</th><th>local</th><th>cloud (SaaS)</th></tr>
+    <tr><td><code>WB_STORAGE</code></td><td>the file's <code>STORAGE</code> axis</td><td><code>local</code></td><td><code>s3</code></td></tr>
+    <tr><td><code>WB_TENANCY_MODE</code></td><td>the file's <code>TENANCY_MODE</code></td><td><code>single</code></td><td><code>multi</code></td></tr>
+    <tr><td><code>WB_S3_BUCKET</code> / <code>_ENDPOINT</code></td><td>the file (not secret)</td><td class="n">—</td><td class="y">from the drawer</td></tr>
+    <tr><td><code>WB_S3_KEY</code> / <code>_SECRET</code></td><td>your deploy ENV (secret)</td><td class="n">—</td><td class="y">forwarded, never echoed</td></tr>
+    <tr><td><code>WB_DATABASE_URL</code></td><td>your deploy ENV (secret)</td><td class="n">—</td><td class="y">forwarded</td></tr>
+    <tr><td><code>WB_AUTH_ISSUER</code> / <code>WB_JWKS_URL</code></td><td>the file's <code>ISSUER</code>, JWKS derived</td><td class="n">—</td><td class="y">issuer + a provider-specific path</td></tr>
+    <tr><td><code>WB_IMAGE</code></td><td>generated — same image both ways</td><td class="y"><code>runtime:latest</code></td><td class="y"><code>runtime:latest</code></td></tr>
+  </table>
+  <p>The verdict of that table is the whole "one property" claim in one row:
+  <code>WB_IMAGE</code> is identical on both sides. Same image, same
+  env-assembly function, two delivery mechanisms. The JWKS path is the one
+  bit of cleverness — BetterAuth's is non-standard
+  (<code>issuer + /api/auth/jwks</code>), anything OIDC-ish is the
+  well-known path (<code>issuer + /.well-known/jwks.json</code>), and an
+  explicit <code>JWKS_URL</code> property overrides both. Beyond that, the
+  diff is the deploy.</p>
+</section>
+
+<section id="secrets">
+  <h2>names in the file, values NOWHERE near it</h2>
+  <p>Depth rung — skippable, but it's the discipline that lets the file stay
+  inert and public. The doctrine is stated in the header of the file users
+  read first: <b>secrets are not in this file.</b> Axes live in the drawer;
+  credentials live in your deploy environment. The validator enforces it from
+  the other side, and the translator forwards secret values from the env
+  without ever echoing them.</p>
+  <p>The richer flow, in the Rust kit: you declare secrets <em>by name</em>
+  in the file with <code>#+DEPLOY_SECRETS: KEY …</code>, set values with
+  <code>wbx deploy secrets set KEY=VALUE</code> (stored mode-0600 in
+  <code>secrets.env</code> under the app dir), and list them by name only —
+  <code>secrets list</code> never prints a value. Locally they're delivered
+  as <code>--env-file</code>; in the cloud they're staged through the
+  provider's <code>set_secrets</code> hook. Values never enter
+  <code>deployment.org</code> or any image. And <code>apply</code> refuses to
+  deploy with a declared secret unset — it tells you which one and how to set
+  it.</p>
+  <pre class="mermaid">
+flowchart LR
+  v["a secret's value"] --> store["env  /  secrets.env (0600)"]
+  store --> recipe["recipe env (in memory)"]
+  recipe --> stage["fly secrets set --stage"]
+  stage --> ctr["container env"]
+  org[["deployment.org<br/>(declares the NAME only)"]] -. "never touched" .-> ctr
+  style org fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style ctr fill:#13d943,stroke:#121316
+  </pre>
+  <p>The graph's point is the dotted line: the value travels env → recipe →
+  staged secret → container, and <code>deployment.org</code> sits off to the
+  side, naming the key and touching the value never.</p>
+  <p>Two secrets earn special handling because they <em>are</em> your
+  engine's identity. On the first cloud <code>apply</code>, the kit generates
+  <code>WB_PUBLIC_BEARER</code> — 32 random bytes, hex — exactly <b>once</b>,
+  persists it, and never rotates it. Rotating it would 401 every live client
+  and break the tenant's stable identity; the kit prints
+  <code>control-plane locked — export WB_ENGINE_TOKEN=&lt;token&gt;</code>
+  and means it. And <code>WB_SIGNING_KEY</code> — a 32-byte Ed25519 seed —
+  is the engine's DID: set it once (generate with one line of Elixir) and
+  your engine's identity survives every redeploy. Skip it and the DID
+  regenerates on each deploy, and every prior signature and ledger entry
+  stops verifying. Tenant scoping, finally, is enforced <em>above</em> the
+  storage backend on purpose — so swapping S3 for R2 can't widen access.</p>
+</section>
+
+<section id="verbs">
+  <h2>converge, prove, TEAR down</h2>
+  <p>The verbs are built for agents as much as humans: every one is
+  non-interactive, idempotent, takes <code>--json</code>, and exits non-zero
+  on failure. The arc is <code>init → validate → apply → status|verify|logs
+  → down</code>, with two shortcuts: <code>wbx deploy local</code> for the
+  zero-config bring-up (think <code>docker run</code>) and
+  <code>wbx deploy doctor</code> to check and self-heal prereqs.</p>
+  <table class="cmp">
+    <tr><th>verb</th><th>what it does</th><th>what it reads</th><th>proves success by</th></tr>
+    <tr><td><code>init [local|cloud]</code></td><td>writes a starter <code>deployment.org</code></td><td>a template (won't clobber without <code>--force</code>)</td><td>file exists, validates</td></tr>
+    <tr><td><code>validate</code></td><td>checks truth, deploys nothing</td><td>the file + your env</td><td>prints the summary shape</td></tr>
+    <tr><td><code>apply</code></td><td>converges reality to the file</td><td>file + env → engine env</td><td>idempotent — re-run is a no-op</td></tr>
+    <tr><td><code>verify</code></td><td>proves the <b>live</b> runtime</td><td>local: discovery + bearer · cloud: provider url</td><td><code>GET /health</code> → 200</td></tr>
+    <tr><td><code>status</code></td><td>reports presence + endpoint</td><td>discovery / provider status</td><td>"runtime up — http://… (pid …)"</td></tr>
+    <tr><td><code>down</code></td><td>tears down, keeps your data</td><td>pidfile / provider down</td><td>"data + APFS volume preserved"</td></tr>
+    <tr><td><code>doctor</code></td><td>checks + self-heals prereqs</td><td>tools, recipes, the APFS volume</td><td>"prereqs OK now"</td></tr>
+  </table>
+  <p>Two rows carry the weight. <code>verify</code> doesn't trust the deploy
+  log — it proves the <em>live</em> engine: locally it reads the discovery
+  file and hits <code>http://127.0.0.1:&lt;port&gt;/health</code> with the
+  discovery bearer token, expecting a 200 with "ok"; in the cloud it asks
+  the provider recipe for its URL, then hits <code>&lt;url&gt;/health</code>.
+  And <code>doctor</code> doesn't just diagnose — if the APFS volume is
+  missing it <em>creates</em> it and reports the system is now ready. The
+  contract — non-zero exit on failure, JSON on request — is what lets a
+  workflow run the whole arc unattended and a human run it by hand, from the
+  same surface.</p>
+</section>
+
+<section id="limits">
+  <h2>where the seam ENDS</h2>
+  <p>Honesty section. The macOS path carries real, un-pretty engineering.
+  The TTY boot hack and the <code>EX_CONFIG</code>/Aqua-session requirement
+  aren't elegance — they're scars, the direct-spawn VM dies on logout, and
+  the LaunchAgent path that would survive login conflicts with libkrun. The
+  default lifecycle is the one that works, not the one that's tidy.</p>
+  <p>The cloud side ships exactly one recipe: Fly. The seam is provider-neutral
+  by design and any host fits the five hooks, but "any host" is a promise
+  about the contract, not a directory of pre-written recipes — today you'd
+  write the Hetzner one yourself. The Rust kit's krunvm lane also can't
+  deliver the kit's secrets env yet, so if you stage kit secrets locally it
+  tells you to use docker or podman instead.</p>
+  <p>There is no fleet story. One <code>deployment.org</code> is one machine.
+  No regions array, no blue-green, no rolling orchestration — convergence is
+  per-file, and scale beyond a single machine is out of this lesson's scope
+  and out of the tooling's current scope. We'd rather say that than imply a
+  control plane that isn't there.</p>
+  <p>And there are, in transition, two CLI dialects: the
+  <code>:PROPERTIES:</code> drawer with <code>ENGINE_PLACE</code> (taught
+  here, used by the shipped examples and the parent lesson) and an older
+  <code>#+DEPLOY_*</code> keyword form the Rust binary's templates still
+  emit. Teach yourself the drawer form — it's the canon — and treat the
+  other as drift to be normalized, not a second thing to learn.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Do I need Docker?</summary>
+    <p>On a mac, no — local runs in a krunvm microVM, prereqs installed by
+    <code>wbx deploy doctor</code>. The Rust kit also speaks docker and
+    podman if you'd rather, picked in automation-friendliness order. Cloud
+    needs nothing local but the provider's CLI.</p>
+  </details>
+  <details>
+    <summary>Is local really identical to cloud?</summary>
+    <p>It's the same OCI image — <code>ghcr.io/workbooks-sh/runtime:latest</code>
+    — booted from the same env-assembly function. What differs is the
+    isolation <em>mechanism</em> (a microVM on your desk, a provider's
+    machine in the cloud) and the storage/database axes you chose, not the
+    engine. The image is the constant; the place is one property.</p>
+  </details>
+  <details>
+    <summary>Can I add AWS, Hetzner, or Render?</summary>
+    <p>Yes — drop a directory with a <code>bootstrap.sh</code> that fills the
+    five hooks and the lifecycle trio. It's about ninety lines with different
+    commands; the engine asks the host for only run-my-container, a volume,
+    secrets, and a port. The core never changes.</p>
+  </details>
+  <details>
+    <summary>Where do my secrets actually end up?</summary>
+    <p>Never in the file or the image. Values live in your deploy env or a
+    mode-0600 <code>secrets.env</code>, are forwarded into the recipe's
+    memory, staged through the provider, and land in the container's
+    environment. <code>deployment.org</code> names the key and touches the
+    value never.</p>
+  </details>
+  <details>
+    <summary>Where does my data live locally, and does <code>down</code> delete it?</summary>
+    <p>It lives in a host directory bind-mounted to <code>/data</code> (under
+    Application Support by default). <code>down</code> removes the VM and the
+    lifecycles but <b>preserves</b> both your data and the APFS volume — it
+    says so when it finishes. Your data outlives the machine.</p>
+  </details>
+  <details>
+    <summary>What if I just edit <code>deployment.org</code> by hand?</summary>
+    <p>That's the intended interface. Edit it, <code>validate</code>,
+    <code>apply</code> — and <code>apply</code> is idempotent, so re-running
+    on an unchanged file is a no-op and re-running after an edit converges
+    the difference. The file is the source; the verbs make reality match it.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This sub-lesson is the "how" under the parent's "why" — and it leans on
+  two formats and a CLI, each with its own lesson.</p>
+  <div class="cards">
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><b>◎</b></span>
+      <div>Nexus<small>the why — dev is prod, position not kind</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>the format that stays inert here</small></div><span class="go">→</span></a>
+    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
+      <div>wbx<small>the CLI carrying the verbs</small></div><span class="go">→</span></a>
+    <a href="bundles"><span class="sw" style="background:#f3c5a3"><b>⊟</b></span>
+      <div>Bundles<small>nothing proprietary in the container</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under nexus · deployments
+  :PROPERTIES:
+  :SLUG:   deployments
+  :KIND:   learn
+  :NN:     02.6
+  :KICKER: under nexus · deployments
+  :TITLE1: the file
+  :TITLE2: THAT
+  :TITLE3: places your engine
+  :CHIP:   deployments
+  :PC:     #aee5c2
+  :AC:     #13d943
+  :HERO:   img/deployments-hero.jpg
+  :END:
+** og
+- five closed enums the engine converges to — the place is one of them
+- inert by construction: a twenty-line property scan, never executed
+- local microVM and cloud recipe converge to the SAME OCI image
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .36], ["#9fc4e8", .24], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

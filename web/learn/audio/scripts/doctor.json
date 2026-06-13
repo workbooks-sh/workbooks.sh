@@ -1,0 +1,71 @@
+{
+ "slug": "doctor",
+ "title": "doctor — under wbx",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "A report, not a judge",
+   "text": "Lesson seven point three — doctor. This one is a sub-lesson, under wbx… the command line. A report, not a judge. Here's the whole idea in one breath. wbx doctor tells you your environment and engine health… and then refuses to fail you for it. It always exits zero. A dead engine is a fact about your setup… not a fault in the tool reporting it. [curious] And the same function is bare wbx — so typing nothing at all gets you a health check, plus your next three moves. Agents get the same picture as one JSON object. Let's take it apart."
+  },
+  {
+   "id": "problem",
+   "title": "Debug the tool before the tool",
+   "text": "First — you debug the tool before you get to use the tool. Every ecosystem charges this tax up front. Before you can use the thing, you have to prove the thing is installed right. Is the binary on your PATH. Is anything listening. Why does this command work on your laptop and fail in continuous integration. [sighs] The classic answer is a doctor command — brew doctor, flutter doctor — and they mean well. But they judge you. A wall of red X marks… and worse, a nonzero exit code. That exit code is a small disaster. It breaks the script that ran the check… and it panics an agent, which reads any nonzero status as stop, something is wrong. A diagnostic that fails the caller for diagnosing… is a diagnostic you cannot put in a pipeline."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. doctor is environment and engine health — reported, not judged. Four real probes… classified into a report that always exits zero… rendered two ways. Prose for you, one JSON object for an agent. It belongs to the everyday family — the handful of verbs where the tool looks after itself, and you. [curious] One sentence each. doctor diagnoses without failing. status, and bare wbx, are the same checkup wearing a welcome mat. open launches a file in your operating system's opener. upgrade self-updates, and first checks who installed it. And completions prints shell completions from the same definition as the help text."
+  },
+  {
+   "id": "probes",
+   "title": "The four checks",
+   "text": "The four checks. Doctor runs exactly four probes… all real measurements of your machine. No scoring, no grades. First… version — the binary telling you which binary it is. wbx zero point thirteen point zero. Second… binary and PATH. It reports two lines — where this executable lives, and what a PATH scan finds for the name wbx. And here's an honest nuance — it shows you both and lets you read them. It does not compare them and declare a mismatch. Third… engine. One network call to the runtime's well-known endpoint, classified three ways and never thrown. Fourth… workspace. It just asks whether the three org files that mark a project — workbook dot org, deployment dot org, publish dot org — live in this folder. [curious] And here's the signature move. Every unhealthy line carries its own fix, inline. Not see the docs… the literal next command. Not on PATH — add the install dir. The engine is unreachable — wbx deploy local stands one up. No org files here — start with wbx init. Never a bare error… where a default plus a note would do."
+  },
+  {
+   "id": "discovery",
+   "title": "What engine actually means",
+   "text": "Now, a depth rung — what engine actually means. This is the only check that reaches off your machine, so it's worth knowing exactly where doctor looks. Picture a decision flowing top to bottom. First question — is an environment override set? WBX engine URL, or its WB fallback. If yes, that URL is the engine, full stop, and we go straight to the probe. If no… second question — is there a discovery file? A little runtime dot json, in the sh dot workbooks disco folder under your operating system's app directory. If it's there, it holds a scheme, a port, and a token… and the call goes to one twenty-seven dot zero dot zero dot one, with a bearer token. If neither exists, the call has nowhere to go — and that becomes unreachable. Either way, we reach the probe — a single GET to the well-known runtime endpoint — and whatever comes back is classified into one of three states. Reachable… the body, trimmed. Auth-rejected… when the error mentions unauthorized or four-oh-one. Or unreachable… the error, trimmed. Three states. Never an exception. [curious] One honest wrinkle — the docs say WBX, but every variable takes WBX first and the bare WB form as a fallback. Both work. Cosmetic… but worth knowing."
+  },
+  {
+   "id": "landing",
+   "title": "Bare wbx is doctor in a welcome mat",
+   "text": "Bare wbx is doctor in a welcome mat. This is where the report-not-judge posture pays its biggest dividend. Bare wbx, with no subcommand — and wbx status, the same function — is not a usage dump. It's the where-am-I landing. Doctor's whole report… plus orientation. You get the prose health check, followed by a four-line footer of next moves. Start here… the engine… the parts… everything. Type nothing, learn where you stand. [excited] And an agent? An agent gets doctor's JSON, with one extra key merged in — verbs. The entire verb tree. Picture the exchange. A cold agent runs bare wbx with the JSON flag. Because the output is piped, the tool flips to its structured form on its own — no flag needed to be machine-friendly when no human is watching. wbx probes the engine, classifies whatever comes back, and answers with one object — the health report, and the full verb tree, together. The agent reads it once… and now knows both the state of the world, and every move available in it. So its next call is a real verb, with real flags — not a guess. One round trip, and a cold agent is oriented. And because that tree is generated from one definition, the landing, the help text, and completions… can never disagree."
+  },
+  {
+   "id": "exit-zero",
+   "title": "Exit zero, by contrast",
+   "text": "Exit zero — by contrast. Here's the contract, stated as sharply as the code states it. Run the doctor against a dead engine, and ask the shell what happened. The report comes back — wbx zero point thirteen, the binary path, engine unreachable with its detail and the deploy-local nudge, no org files here. And then… echo dollar question-mark… returns zero. Reported, not judged. Now run a verb that actually needs the engine — wbx library — on the very same dead engine. Connection refused. No engine reachable — start one. And echo dollar question-mark returns three. Same dead engine… two different exit codes. And that difference is the whole idea. [curious] doctor exits zero, because the broken engine is doctor's subject — reporting it is success. library exits three, because that verb needed the engine to do its job… and its job genuinely failed. A diagnostic describes the world, so any state it can describe is a job done. A working verb acts, so a state that blocks the action is a real failure that earns a real code. Code three is the engine code… it's retryable… and its hint literally names the command that fixes it. The full map, and the envelope, belong to the modes lesson. One honest caveat — a genuine typo, like doctor dash dash bogus, still exits two, because the argument parser owns that before doctor ever runs."
+  },
+  {
+   "id": "completions",
+   "title": "The tree that cannot drift",
+   "text": "A quick depth rung — the tree that cannot drift. wbx completions, followed by a shell name, prints shell-completion scripts — for bash, zsh, fish, elvish, and powershell. Here's the detail that matters. Those completions are generated from the same command definition as the help text, and as wbx help with the JSON flag. One source of truth… three renderings. A verb cannot appear in help and go missing from completions — because there is no second list to fall out of sync. They are the same tree, printed differently. To wire them up, you source the output the way your shell expects. For zsh, you add an eval of wbx completions zsh to your shell config. For bash or fish, you redirect the output into the completions directory. Standard recipes… offered as convention. The tool prints the script — where you source it from is your shell's business, not something the tool prescribes."
+  },
+  {
+   "id": "upgrade",
+   "title": "Self-update that knows who installed it",
+   "text": "Self-update… that knows who installed it. wbx upgrade updates the binary in place — but its first move is to check how the binary got there. Because the right way to upgrade depends on who owns the install. It's a three-way branch. First exit — is the running executable sitting under a node-modules folder? If so, the npm launcher owns this install… and self-swapping under it would desync the package. So upgrade returns cleanly — not an error — with the right command. Installed via npm — upgrade with npm update dash g. A note… not an error. [chuckles] Never an error, where a note will do. Second exit — not under npm. So it fetches the GitHub releases, takes the first tag matching wbx dash v — skipping the desktop tags that share the repo — and if that's already your version, it says already current, and stops. Third exit — you're behind. So it downloads the asset for your operating system and architecture, writes it to wbx dot new, marks it executable, and atomically renames it over the running binary. Upgraded… wbx zero point twelve… to zero point thirteen."
+  },
+  {
+   "id": "small",
+   "title": "The small verbs",
+   "text": "The small verbs — one more depth rung. wbx open, followed by a file, rounds out the family. It bails if the path doesn't exist, canonicalizes it, and hands it to your operating system's opener — open on macOS, start on Windows, x-d-g-open on Linux — then checks the opener's exit status, so a failure to launch is a real failure, not a silent shrug. And none of these verbs are decoration. The spec records why they exist. doctor and completions were priority one — the first ten minutes, launch-blocking. open, status, and upgrade were priority two — daily ergonomics. They're all shipped now… and they share one directive the spec names outright. Human mode is dumb simple. The tool does the work. The learning curve is a bug. [excited] Bare wbx orients you. upgrade detects npm and redirects. doctor diagnoses without failing. Every success teaches the next verb. The family is that sentence… implemented."
+  },
+  {
+   "id": "honest",
+   "title": "What doctor will not do",
+   "text": "Now the honest part — what doctor will not do. The everyday family is small on purpose, and its limits are real. First — doctor reports, it doesn't fix. There is no fix flag. It tells you what's wrong, and the command that fixes it. Running that command is on you. Second — the PATH and binary lines are shown, not judged. It prints where the executable lives and what a PATH scan finds. It does not compare them, or flag a mismatch. You read the two lines, and draw the conclusion. Third — engine detail is truncated. A reachable body is cut to a hundred and twenty characters, an unreachable error to a hundred and sixty. Enough to orient… not the full payload. Fourth — upgrade trusts the transport. No checksum or signature on the downloaded binary, beyond GitHub's encryption. No version pinning — latest only. And the in-place swap is unix-shaped — renaming over a running executable is a known sharp edge on Windows, where the file is locked. [sighs] And last — the wasm build bails honestly. Compile wbx to WebAssembly, and upgrade, open, and the PATH scan have nothing to act on. They say… needs the native binary… rather than pretend. Why a native tool can't fully be itself in the sandbox… is the seam."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Why doesn't doctor exit nonzero when the engine is down? Because the down engine is doctor's subject… not its failure. A diagnostic that reports a broken state did its job. Failing the caller breaks scripts and panics agents — the exact problem doctor exists to avoid. doctor says unreachable — now what? Two paths, both in the report. Stand one up with wbx deploy local… or point at an existing engine with WBX engine URL. I installed via npm and upgrade refuses — bug? No, that's the design. The npm launcher owns the install, so upgrade hands you back the npm command. A note, not an error. Where does doctor look for the engine? The env override first… then the discovery file… then unreachable. And — can agents rely on the JSON field names? Yes. That's their whole point. version, binary, on-path, engine, workspace — wrapped in the standard envelope, with the full verb tree added on the bare landing. Branch on the fields… not on scraped prose."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the command line",
+   "text": "So that's doctor. A report, not a judge. Four probes, always exit zero, the same checkup that greets you when you type nothing — and one JSON object that orients a cold agent in a single round trip. The posture is the lesson — the tool checks itself, and a broken environment is a fact to report… not a failure to punish. [curious] The way back up is short. This is a sub-lesson, under wbx — lesson seven — the command line, and every verb family it holds. From there, the modes lesson carries the full exit-code contract, and the deploy-kit lesson shows what wbx deploy local actually stands up. Go meet the parent."
+  }
+ ]
+}

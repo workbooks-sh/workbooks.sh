@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claims — honesty as a state machine — Workbooks</title>
+<meta name="description" content="A claim is a load-bearing spoken assertion extracted as an org TODO item whose state is its honesty — terminal only with cited evidence. Audit a transcript and the gap between what you said and what you shipped becomes the backlog.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/claims-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="claims — honesty as a state machine">
+<meta property="og:description" content="Extract every spoken assertion as an org TODO whose state is its honesty. Terminal only with cited evidence. The gap between the talk and the build is the backlog.">
+<meta property="og:url" content="https://workbooks.sh/learn/claims">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * CLAIMED this comment is honest
+  ** VALIDATING you are reading the source to check
+  ** KEPT the page told you a transcript is a source, not a document
+     Quote: the working document is the ledger you derive from it.
+     Evidence: the eight words of the #+TODO: line, a few sections down.
+  ** UNKEPT you, auditing your own last pitch, tonight
+     Reality: nothing built yet. one text file fixes that.
+
+  every terminal status must cite evidence. so must yours.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 04·8 — <b>under org · claims</b></div>
+      <h1><span class="ln">honesty as a</span><span class="ln bub">STATE</span><span class="ln">machine</span></h1>
+      <p class="dek">A <b>claim</b> is a load-bearing thing you said, pulled out of a
+      transcript and written as an org TODO whose state <b>is its honesty</b> —
+      CLAIMED, then KEPT or PARTIAL or UNKEPT, and never terminal without cited
+      evidence. The gap between what you said and what you shipped stops being
+      embarrassing and starts being a backlog.</p>
+      <div class="meta">
+        <span class="on">claims</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/claims-hero.jpg" alt="A small auditor on a high gantry facing a monumental wall of glowing verdict-stamps — rows of carved KEPT, PARTIAL, UNKEPT panels rising into light, each tethered to a hanging evidence card — 1970s sci-fi style, bright and cathedral-scaled">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/org.svg" alt=""></div><span>claims</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The talk outruns the build</a>
+  <a href="#definition">The definition</a>
+  <a href="#ladder">Seven words of state machine</a>
+  <a href="#anatomy">Quote, then evidence</a>
+  <a href="#verdicts">The five verdicts</a>
+  <a href="#pipeline">Audio in, ledger out</a>
+  <a href="#backlog">The gap is the backlog</a>
+  <a href="#queries">A ledger you can grep</a>
+  <a href="#beyond">More than a checklist</a>
+  <a href="#limits">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the talk outruns the BUILD</h2>
+  <p>Founder speech is the densest spec a company ever produces. The 91-minute
+  voice memo on the drive home, the pitch run-up paced around the kitchen, the
+  meeting where the whole architecture finally clicked out loud — that is the
+  product, described by the one person who holds all of it at once. And it all
+  rots, identically, in a notes app, as a transcript nobody re-reads.</p>
+  <p>Worse than rot: the talk always outruns the build. Every founder ships
+  sentences before they ship systems — you describe the thing you mean to make
+  in the present tense long before it exists, because that is how you think it
+  through. Which is fine, until nobody tracks <em>which sentences are still
+  fiction</em>. The gap between the spoken system and the shipped system is
+  invisible — right up until a buyer, or a security review, finds it for you
+  and names it in the room.</p>
+  <p>The usual fix is to talk less, or to caveat everything into mush. Both are
+  losses. The better move is to treat the talk as raw material and build a
+  discipline that knows, line by line, which claims are load-bearing and which
+  are air.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">claim</span> <span class="pr">/kleɪm/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a load-bearing spoken assertion, extracted
+    from an untouched source as an <a href="org">org</a> TODO item whose
+    <b>state is its honesty</b> — moving from CLAIMED toward a verdict, and
+    reaching a terminal state <b>only with cited evidence</b>: a file, an
+    epic, a test, or a live run.</p>
+  </div>
+  <p>The move hiding in that definition is the whole lesson: a transcript is a
+  <b>source</b>, not a document. The working document is the ledger you derive
+  from it. And because <a href="org">org</a> lets you declare your own TODO
+  keyword ladder in a single line, the derived document can make honesty
+  itself into a state machine — the same <code>TODO → DONE</code> you already
+  trust, but with a conscience bolted on.</p>
+</section>
+
+<section id="ladder">
+  <h2>seven words of STATE machine</h2>
+  <p>Here is the entire mechanism. One line, at the top of the audit file,
+  declares a custom keyword ladder — this is real org grammar, the same
+  <code>#+TODO:</code> line a <a href="workflows">workflow</a> uses to name its
+  states:</p>
+  <pre class="orgsample">#+TODO: CLAIMED(c) VALIDATING(v) | KEPT(k) PARTIAL(p) UNKEPT(u) FUTURE(f) RETRACTED(r)</pre>
+  <p>The <code>|</code> is the spine. Left of it are the two <b>working</b>
+  states — a claim still in flight. Right of it are the five <b>verdicts</b> —
+  terminal, and each forbidden without a citation. The letters in parentheses
+  are Emacs fast-selection keys; you press <kbd>c</kbd> to stamp a headline
+  CLAIMED. Read the line left to right and it is a life: a sentence gets pulled
+  from the recording — <b>CLAIMED</b> — gets checked against the actual repo —
+  <b>VALIDATING</b> — and lands on exactly one truth.</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> CLAIMED: extracted from the source
+  CLAIMED --> VALIDATING: checking against the repo
+  VALIDATING --> KEPT: it's true
+  VALIDATING --> PARTIAL: half true
+  VALIDATING --> UNKEPT: said, not built
+  VALIDATING --> FUTURE: not yet, on purpose
+  VALIDATING --> RETRACTED: the claim was wrong
+  note right of VALIDATING: every terminal edge needs<br/>a cited file, epic,<br/>test, or live run
+  </pre>
+  <p>Walk that picture once. A claim enters at CLAIMED and can only leave for
+  VALIDATING. From VALIDATING there are five exits — KEPT for what is true,
+  PARTIAL for what is half true, UNKEPT for what was said but not built, FUTURE
+  for what you deliberately have not built yet, and RETRACTED for a claim that
+  turned out plain wrong. The note on the side is the rule that gives the whole
+  diagram its weight: no claim crosses into a verdict without dragging evidence
+  across with it. The seven words are the same shape as <code>TODO → DONE</code>
+  — only here, reaching DONE means you proved something.</p>
+</section>
+
+<section id="anatomy">
+  <h2>quote, then EVIDENCE</h2>
+  <p>A claim entry has a fixed anatomy, and the discipline lives in keeping its
+  two halves in two different voices. The headline carries the status and the
+  claim as one sentence. The body carries a <code>Quote:</code> — the verbatim
+  words from the source, never paraphrased — and then an
+  <code>Evidence:</code> or <code>Reality:</code> line: what is actually true
+  in the repo. One voice is what was <em>said</em>; the other is what
+  <em>is</em>. Here is a real KEPT entry from the one live audit:</p>
+  <pre class="orgsample">** KEPT a workbook is an HTML file: CSS + JS + WebAssembly + SQLite, gzip-packed
+   Quote: "if you looked at a workbook, you would at first glance see an HTML
+   file… natively zipped… a SQLite binary file."
+   Evidence: the workbooks-authoring surface ships single-file .html
+   mini-apps bundling a WASM runtime + SQLite + their own source.</pre>
+  <p>The quote is the founder, word for word. The evidence is the repo,
+  answering. They are allowed to disagree — that disagreement is the entire
+  point of the document — so they must never be written by the same hand in the
+  same breath. The fields and who fills them:</p>
+  <table class="cmp">
+    <tr><th>field</th><th>whose voice</th><th>what it must cite</th></tr>
+    <tr><td><b>headline</b> — status + claim</td><td>the auditor</td><td>one verdict word from the ladder</td></tr>
+    <tr><td><b>Quote:</b></td><td>the source, verbatim</td><td>the untouched transcript — nothing invented</td></tr>
+    <tr><td><b>Evidence: / Reality:</b></td><td>the repo</td><td class="y">a file, an epic, a test, or a live run</td></tr>
+  </table>
+  <p>The verbatim rule is not pedantry. The moment you paraphrase the quote,
+  you have quietly edited the claim toward the version you can defend — and the
+  audit becomes a record of what you wish you had said. The source stays
+  untouched precisely so the gap can stay honest.</p>
+</section>
+
+<section id="verdicts">
+  <h2>the five VERDICTS</h2>
+  <p>Depth rung — skippable. The ladder earns its keep on the right-hand side,
+  so here is one real specimen of each terminal verdict, pulled straight from
+  the audit of the 91-minute memo. Each pairs the claim with the evidence its
+  verdict is allowed to cite:</p>
+  <table class="cmp">
+    <tr><th>verdict</th><th>a real claim</th><th>its cited reality</th></tr>
+    <tr><td class="y"><b>KEPT</b></td><td>compilers run inside the sandbox — C, Zig, Rust, Go, JS/TS</td><td>epic wb-zyl done; the compilers ghcr package; recipes under runtime/compilers/</td></tr>
+    <tr><td><b>PARTIAL</b></td><td>bash is emulated in WebAssembly, no native exec anywhere</td><td>the posix shape and the no-native-exec invariant exist — but a hardened interim real-exec tool still does too (epic wb-9ja removes it)</td></tr>
+    <tr><td class="n"><b>UNKEPT</b></td><td>most of Python compiles and runs in the sandbox</td><td>there is no Python lane in the compiler set — clang / mrustc / zig / go-yaegi / quickjs. Build it or stop saying it</td></tr>
+    <tr><td><b>FUTURE</b></td><td>a non-LLM, state-space model trained on runtime telemetry diffuses changes into the engine</td><td>deliberately unbuilt — named, scoped, and parked as direction, not pretended as shipped</td></tr>
+    <tr><td class="n"><b>RETRACTED</b></td><td>Erlang gives nine-9s fault tolerance — 99.999999999%</td><td>folklore from one Ericsson anecdote, widely contested — recommend dropping the number, keeping the true supervision-tree story</td></tr>
+  </table>
+  <p>The UNKEPT and the RETRACTED are the ones that earn the discipline. The
+  Python claim is the kind of sentence that sounds true because the sentence
+  next to it is true — and an audit is the only thing that catches it before a
+  customer does. The nine-9s line is sharper still: not half-built, but
+  <em>wrong</em> — and the verdict's job is to say keep the story, drop the
+  number, rather than quietly defend an indefensible statistic.</p>
+</section>
+
+<section id="pipeline">
+  <h2>audio in, ledger OUT</h2>
+  <p>The ledger is the end of a pipeline, and every step of it is
+  agent-runnable — which is exactly why the whole method is a candidate
+  <a href="toolkit">toolkit</a>: audio goes in, a claims ledger comes out. The
+  real path that produced the one live audit:</p>
+  <pre class="mermaid">
+flowchart LR
+  rec["91-min voice memo<br/>5454.4 sec"] --> stt["ElevenLabs<br/>scribe_v1"]
+  stt --> src
+  subgraph src["sources/ — untouched, append-only"]
+    v["verbatim.txt<br/>8,578 words"]
+    w["words.json<br/>per-word timing + logprobs"]
+  end
+  src --> audit["audits/spoken-thesis.org<br/>claims, evidence-checked"]
+  audit --> back["backlog<br/>every UNKEPT / PARTIAL"]
+  audit -. "#+SOURCE: points back" .-> src
+  style src fill:#fbfaf6,stroke:#121316
+  style audit fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style back fill:#13d943,stroke:#121316
+  </pre>
+  <p>Read the flow left to right. A 91-minute memo — 5,454 seconds — goes
+  through ElevenLabs scribe_v1 and lands as two untouched files in a dated
+  source directory: <code>verbatim.txt</code>, exactly 8,578 words, and
+  <code>words.json</code>, which carries every word with its start time, end
+  time, and the model's log-probability — the transcript knows not just what
+  was said but <em>when</em>, and how sure it was. From those sources the audit
+  is derived, and its <code>#+SOURCE:</code> line points back at them — the
+  dotted arrow. The sources are never edited; the audit is the only thing that
+  changes. And the output edge on the right is the payoff: every UNKEPT and
+  every PARTIAL falls straight into a backlog.</p>
+  <p>The append-only rule on <code>sources/</code> is what makes the whole
+  thing trustworthy over time. You can re-audit the same memo a year from now
+  and the words you are checking against have not drifted. The document moves;
+  the truth it was built from does not.</p>
+</section>
+
+<section id="backlog">
+  <h2>the gap is the BACKLOG</h2>
+  <p>This is the thesis the audit states about itself, verbatim: <i>the gap
+  between the spoken system and the shipped system is the backlog.</i> An
+  UNKEPT is not a confession — it is a ticket. The method does not stop at
+  judging; it dispatches. Here is the loop that actually runs on this project,
+  from a claim to filed work:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant F as founder
+  participant G as groundskeeper agent
+  participant A as author model (mercury-2)
+  participant W as workflow run
+  participant L as the ledger
+  F->>G: on a live call — name a weak claim
+  G->>G: capture to sources/captures/<date>.org
+  G->>A: dispatch a research goal
+  A->>W: author an org TODO outline (:done-when: gates)
+  W->>L: results land on TASKS.org
+  L->>F: next call picks up where this one left off
+  </pre>
+  <p>Trace that exchange. On a live call the founder names a claim that worries
+  him — in the real capture file, <i>workbook-as-container</i> is flagged as
+  the weakest pitch line. The <a href="agents">groundskeeper</a> agent saves
+  the thought to a dated capture file and dispatches a research goal. An author
+  model — <code>inception/mercury-2</code> — writes that goal up as an org TODO
+  outline, where each leaf carries a <code>:done-when:</code> shell gate that
+  must pass for the step to count as done. The run executes, and its results
+  land on <code>TASKS.org</code>, the task ledger generated from the runtime
+  and never hand-edited. The next call picks up from there.</p>
+  <p>The loop closes most sharply on the scariest CLAIMED in the whole audit —
+  <i>thousands of agents per server, insanely high concurrency</i>, whose cited
+  reality is brutal: the first live co-tenant run overloaded a four-agent box.
+  On a real archived call the founder converted that worry into work by voice,
+  in one sentence — file an issue titled <i>load benchmark for concurrent
+  agents</i>, description: we claim thousands of agents per server with no
+  proof, build a benchmark. The agent's reply: issue filed. One claim, one
+  verdict still pending, one benchmark now on the backlog — the method, end to
+  end, by talking.</p>
+</section>
+
+<section id="queries">
+  <h2>a ledger you can GREP</h2>
+  <p>Depth rung — skippable. Because every status is a headline keyword in a
+  plain text file, the health of your pitch is one shell command away. You do
+  not need a dashboard; you need <code>grep</code>:</p>
+  <pre class="orgsample">$ grep -c '^\*\* UNKEPT'  audits/spoken-thesis.org   <i># 1  — said, not built</i>
+$ grep -c '^\*\* CLAIMED' audits/spoken-thesis.org   <i># 6  — still unchecked</i>
+$ grep '^\*\* ' audits/spoken-thesis.org | awk '{print $2}' | sort | uniq -c
+   <i># KEPT 7  ·  PARTIAL 3  ·  CLAIMED 6  ·  UNKEPT 1  ·  FUTURE 1</i></pre>
+  <p>Those are the real counts from the one live ledger. They tell you
+  something the prose can't: this audit is <b>ahead of its own data</b>. The
+  ladder declares RETRACTED and VALIDATING, yet neither has a single live
+  instance — six claims still sit unchecked at CLAIMED, and the recommended
+  retraction of the nine-9s line has not been stamped RETRACTED yet, only
+  argued for. That is honest, and grep is what makes it visible. Pitch health
+  becomes arithmetic: count the UNKEPTs, list every claim still missing
+  evidence, diff this week's audit against last week's. The discipline is
+  legible to a human, an agent, and a one-line script at the same time.</p>
+</section>
+
+<section id="beyond">
+  <h2>more than a CHECKLIST</h2>
+  <p>Depth rung — skippable. A claims audit is not just a column of verdicts.
+  The same pass over a single 91-minute ramble extracts a full working
+  document. From the one real audit:</p>
+  <table class="cmp">
+    <tr><th>also extracted</th><th>what it captures</th></tr>
+    <tr><td><b>the argument skeleton</b></td><td>the pitch rebuilt as a numbered structure — the spine the claims hang on</td></tr>
+    <tr><td><b>the audiences</b></td><td>who each part of the talk is actually for</td></tr>
+    <tr><td><b>the contrast objects</b></td><td>named competitors and foils — E2B, Daytona, Firecracker, StackBlitz, Letta, Tauri</td></tr>
+    <tr><td><b>the open questions</b></td><td>the dangling threads the founder left unresolved out loud</td></tr>
+  </table>
+  <p>One unscripted ramble, run through this method, yields a checked claims
+  ledger, a positioning map, a competitor list, and a question backlog — a
+  working document, not a checklist. The transcript was never the deliverable.
+  The audit is.</p>
+</section>
+
+<section id="limits">
+  <h2>where it BITES</h2>
+  <p>Honesty section — and a claims lesson that hid its own UNKEPTs would be a
+  bad joke. Four places this bites.</p>
+  <p>First, <b>status is judgment, not proof</b>. Someone — a human or an agent
+  — reads the repo and decides KEPT or PARTIAL. The evidence rule constrains
+  that judgment but does not automate it; a generous auditor can still stamp
+  KEPT on a half-truth. The discipline raises the cost of self-deception; it
+  does not abolish it.</p>
+  <p>Second, <b>KEPT rots</b>. Evidence ages. A claim that was true against last
+  quarter's repo can quietly go stale, and a verdict carries no expiry date. A
+  KEPT is a snapshot, not a guarantee — which is why re-auditing is part of the
+  method, not a failure of it.</p>
+  <p>Third — and this one is precise — <b>the runtime can't execute this exact
+  ladder yet</b>. The <a href="workflows">workflow</a> engine reads a file's
+  own <code>#+TODO:</code> line, but its parser does not strip the Emacs
+  fast-selection keys: it reads <code>KEPT(k)</code> as one token, so a
+  headline stamped <code>** KEPT</code> does not match and parses as no state at
+  all. Emacs org-mode itself strips the <code>(k)</code>; our runtime parser
+  doesn't. So today the claims ladder is fully readable by humans, agents, and
+  grep — but it is <em>not</em> executable workflow state in the engine. That
+  is a real gap, named here because the method demands it.</p>
+  <p>Fourth, <b>n equals one</b>. One 91-minute memo has been audited this way.
+  And the drift validator the method implies — a general checker that reads an
+  org claims file and flags a verdict without evidence — does not exist yet.
+  <code>wb content check</code> validates a CMS content tree, and
+  <code>:done-when:</code> gates are unit tests for org workflows, but a generic
+  claims-drift linter is itself on the backlog this method generated. The
+  method's sharpest promise is one of its own UNKEPT items. We would rather tell
+  you that than imply otherwise.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Isn't this just fact-checking the pitch?</summary>
+    <p>No — fact-checking ends at a verdict column. This doesn't. VALIDATING and
+    the verdicts feed a backlog: an UNKEPT is a ticket, not a scarlet letter,
+    and the loop dispatches research that closes it. The output isn't a grade,
+    it's work.</p>
+  </details>
+  <details>
+    <summary>Who assigns the status?</summary>
+    <p>Whoever can cite evidence — a human or an agent, it doesn't matter. The
+    rule isn't about authority, it's about the citation: no terminal status
+    crosses into the file without a file, an epic, a test, or a live run behind
+    it.</p>
+  </details>
+  <details>
+    <summary>Why org and not a spreadsheet?</summary>
+    <p>Because the ladder lives in the same grammar as the
+    <a href="workflows">workflows</a> it spawns. A claim is an org TODO; the
+    research that closes it is an org TODO; the task ledger is org. A
+    spreadsheet would make the audit a fifth system of record — the exact
+    fragmentation org is here to end.</p>
+  </details>
+  <details>
+    <summary>Can I retract a KEPT?</summary>
+    <p>Yes, and you should when evidence ages. A verdict is a snapshot of a
+    moment, not a permanent ruling. Re-audit; if the repo moved out from under a
+    KEPT, move the claim back to VALIDATING and check it again.</p>
+  </details>
+  <details>
+    <summary>Do I need the runtime to do this?</summary>
+    <p>No. The whole method runs on a transcript and a text file. The eight-word
+    <code>#+TODO:</code> line, the quote-then-evidence anatomy, and the
+    evidence-or-no-verdict rule are a discipline, not a product — you can audit
+    your own last pitch tonight in any editor.</p>
+  </details>
+  <details>
+    <summary>Where does an UNKEPT claim actually go?</summary>
+    <p>Into the backlog seam the <a href="autopoet">autopoet</a> reads — the
+    same <code>file_issue</code> lane a working agent uses to flag its own
+    gaps. An UNKEPT spoken in a pitch and a bug filed by an agent mid-task land
+    in the same place: work, in the declarative layer.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Claims are the sharpest argument the grammar makes — here is where it
+  comes from and what it feeds.</p>
+  <div class="cards">
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>why a plan, or a pitch, can be checked at all</small></div><span class="go">→</span></a>
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the org TODO outlines that close a claim into research</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the groundskeeper that captures claims mid-call</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#aee5c2"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>the backlog seam an UNKEPT claim feeds</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under org · claims
+  :PROPERTIES:
+  :SLUG:   claims
+  :KIND:   learn
+  :NN:     04.8
+  :KICKER: under org · claims
+  :TITLE1: honesty as a
+  :TITLE2: STATE
+  :TITLE3: machine
+  :CHIP:   claims
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/claims-hero.jpg
+  :END:
+** og
+- every load-bearing claim is an org TODO whose state is its honesty
+- terminal only with cited evidence — file, epic, test, or live run
+- the gap between the talk and the build IS the backlog
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .36], ["#aee5c2", .24], ["#a8d4f0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

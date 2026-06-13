@@ -1,0 +1,76 @@
+{
+ "slug": "fleets",
+ "title": "fleets — under agents",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "One worker, then a team",
+   "text": "Lesson 05 point 11 — fleets. This one is a sub-lesson, under agents… and the placement is the first thing it teaches. One agent is a worker. A team is a protocol. You already have one standing agent working — the agents lesson built the keeper, and orchestration walked its tick. Now you want a team. A researcher feeding a writer… feeding an editor… each on its own beat. [curious] And here's the strange part. A fleet is not a new construct. It's the same keeper engine… instantiated many times… from one org manifest. The runtime adds exactly two things on top — a stagger, and a gate — and then deliberately does nothing else."
+  },
+  {
+   "id": "problem",
+   "title": "What a team actually needs",
+   "text": "First — what a team actually needs. Every multi-agent framework you've seen answers the word team with a heavyweight orchestrator. A message bus. A role graph. A supervisor model deciding who speaks next. [sarcastic] And you suspect, correctly, that most of that is machinery for problems you don't have. So strip it down. What does a team actually need? Three things. First… N workers. Second… a budget ceiling, so they don't all hammer the model at once. And third… a way for them not to collide on the same task. That is the whole list. This lesson is those three things — plus a careful account of the one thing the runtime refuses to do for you."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A fleet is a multi-agent keeper, declared in one org manifest. One keeper worker per member… each with its own def… its own lifecycle… and its own namespaced state. To which the runtime adds a stagger, and a gate — and deliberately nothing else. [curious] Read the negative space there. No orchestrator. No scheduler. No supervisor model. The fleet machinery is two source files — the crew supervisor, and the gate — totalling around two hundred and seventy lines. The intelligence isn't in the runtime. It's in the defs… and on the board… which is exactly where the agent's reasoning already lives."
+  },
+  {
+   "id": "manifest",
+   "title": "One file, one heading per agent",
+   "text": "So — one file, one heading per agent. You turn a fleet on by pointing one variable, crew def, at one org file — the manifest. Each top-level heading is an agent's name. Its properties drawer is its config. Picture the real bit dot M-L newsroom manifest. Four agents in one file. First… desk, running desk dot org, every forty-five minutes. Second… moss, the researcher, every fifteen. Third… wren, the writer, every fifteen. And fourth… hale, the editor, every twenty. Three properties do all the work, and only one is required. The required one is def — the agent definition to run each tick. A member without a def is simply dropped and logged… it never becomes a worker. The two optional ones are lifecycle — a state machine, for agents whose cadence has phases — and interval, the cadence between ticks, which defaults to one hour. And one rule matters most. The manifest and the lone keeper are mutually exclusive. A fleet replaces the singleton… it never runs beside it."
+  },
+  {
+   "id": "workers",
+   "title": "N copies of one engine",
+   "text": "[excited] Now the move that keeps the whole thing small. N copies of one engine. A fleet member is not a new kind of agent. It is the singleton keeper's tick engine… lifted out verbatim… and parameterized. One implementation. Two callers. The singleton is one instance of it. Each fleet member is another. The exec shell, the workdir on the git repo, the sixty-step ceiling — all identical, because it's literally the same code. Picture the supervisor's family tree. At the top… the crew supervisor. Its very first child is the gate — the green box — a counting semaphore capped at two. Then four worker boxes hang off it side by side. desk, pointed at desk dot org, on forty-five minutes, writing a file called keeper-last-run-desk. moss, on fifteen, writing keeper-last-run-moss. wren, on fifteen. hale, on twenty. Four independent keepers… each on its own clock… each writing its own state file… and every one of them reaching back with a dotted line to that single gate. The supervisor doesn't sequence them. It just starts them, and restarts any that crash."
+  },
+  {
+   "id": "stagger",
+   "title": "Booting without the herd",
+   "text": "Next — booting without the herd. [curious] If four workers all boot and tick at the same instant, they fire four model calls at once — a thundering herd at the worst possible moment, startup. So the supervisor staggers them. The i-th worker delays its first tick by its index, times the stagger — thirty seconds by default — on top of a sixty-second boot grace floor. Walk the four first-ticks. desk, index zero, fires at sixty seconds. moss, index one, at ninety. wren, index two, at one hundred and twenty. And hale, index three, at one hundred and fifty. After that first tick, each runs on its own interval. And here's the quiet part — the cadence clock is persisted, not reset on restart. Each worker writes its last-run time to a file… so a worker that was due doesn't wait a fresh full interval after a reboot. It picks up where its clock left off. Stagger smooths the boot. Persistence keeps the beat honest."
+  },
+  {
+   "id": "gate",
+   "title": "The gate — a 66-line semaphore",
+   "text": "The gate — a sixty-six-line semaphore. This is the entire concurrency story, and it's a tiny process — a counting semaphore, default maximum of two. Every worker wraps its run in acquire… try… and release in an after. Three details make it correct. First — acquire blocks. A free slot returns okay immediately. Otherwise the caller is parked in a first-in-first-out queue, held, no reply, until a slot frees. First-in-first-out means no worker starves. Second — release hands off directly. When a run ends, if someone's waiting, the slot is transferred straight to the head of the queue. The freed count never even touches the pool… so it can't be stolen by a newcomer. Third — release runs in an after. So a crashed run, or one killed at the fifteen-minute wall-clock ceiling, still returns its slot. A wedged worker can never deadlock the fleet. [curious] Now picture three workers, two slots. wren acquires — slot one. moss acquires — slot two. hale acquires… and there's no slot, so hale is parked in the queue, a blocked call waiting forever if it must. Then wren's run ends, and release fires from its after. The gate hands the slot straight to hale — free count never touches the pool, order preserved. And the lone singleton keeper? It doesn't use the gate at all. Its acquire and release are no-ops. Nobody to contend with… nothing to count."
+  },
+  {
+   "id": "namespaces",
+   "title": "Why two agents never share a clock",
+   "text": "Why two agents never share a clock. Two keepers off the same engine could clobber each other's files… if nothing kept them apart. What keeps them apart is a key suffix — dash, then the name — threaded through every piece of state. The singleton's files are plain. Each worker's are tagged. Take wren. Where the singleton writes keeper-last-run, wren writes keeper-last-run-wren. Where the singleton writes lifecycle-pos, wren writes lifecycle-pos-wren. Its status key and its registered name carry the name too. So because each worker owns its own last-run file and its own lifecycle position… two agents never share a cadence clock. wren advancing through its states can't nudge moss's. [excited] And the tests prove exactly that — two workers write their own files and status keys, two agents advance positions without interfering, and the singleton stays unsuffixed. One more deliberate choice. Status is read from a term in memory… never through a blocking call. Because ticks run synchronously, a status call would block for the whole length of a run — up to fifteen minutes. Reading a term is instant. That's what lets the public feed enumerate a busy fleet without ever waiting on a worker."
+  },
+  {
+   "id": "claims",
+   "title": "Claims are a protocol, not a lock",
+   "text": "This is the core of the lesson. Claims are a protocol… not a lock. The runtime gives you isolation — per-worker workdir and state — and throttling, the gate. It does not coordinate the agents. No lock on the board. No central allocator handing out tasks. Claiming is the agents' own protocol — a board state change, plus an agent property, that the claiming agent commits to git before doing the work… visible to its peers. Let me make it concrete, as git commits. A task sits on the board, state ASSIGNED, unclaimed — hello world, one story through the whole pipeline. moss ticks. It finds the first task in its state with no agent property… and claims it before touching the work — it sets agent to moss, and commits, research colon claim hello-world. Then it works… writes the research skeleton… advances the task to WRITING… clears the agent property… appends a log line… and commits again. [curious] Now follow the sequence and watch the last actor. moss reads, claims, works, advances and clears. Then wren's next tick reads the board, sees the task is now WRITING and unclaimed, and picks it up. A task carrying another agent's name is simply invisible to you. The runtime never read that board. The agents did. Why put correctness here, instead of in a lock? Because this is where the agent's judgment already is. The same file that holds its reasoning holds its claiming discipline — so you can read it, edit it, and watch it fail… in plain text, in the git log."
+  },
+  {
+   "id": "newsroom",
+   "title": "A real fleet — the newsroom",
+   "text": "A real fleet — the newsroom. The bit dot M-L newsroom is the worked example. Four agents, none with a lifecycle — all plain interval workers. desk, assignment only, never writes, forty-five minutes. moss, the researcher, fifteen. wren, the writer, fifteen. hale, the editor, twenty. Every member reads one shared laws file first. Picture the pipeline as a single line, left to right. A task starts ASSIGNED. moss claims it into RESEARCH. moss advances it to WRITING. wren writes it into EDIT. hale approves it into PUBLISHED — the green terminal. And there's one dotted line bending backward — hale can bounce a story from EDIT back to WRITING. Off to the side, desk feeds the start, opening two to six assignments — leads, not facts. The hand-off chain is the pipeline. No agent reaches into another's state. Each advances, and clears, and the next role finds the task waiting. And the public record is the git log itself, with typed commit prefixes — desk, research, write, edit, publish — so the whole newsroom reads as a changelog. When an agent finds nothing in its state, it ends with done text beginning no-work… and the worker stretches its next tick, idle-backing-off from minutes toward a thirty-minute cap until there's work again. Honest caveat — the bit dot M-L repo is a scaffold. The machinery and its tests are real and shipped… but there's no live URL to point at yet."
+  },
+  {
+   "id": "wire",
+   "title": "Watching a fleet",
+   "text": "Watching a fleet. A fleet's activity is public and read-only, at slash underscore activity. For a fleet it returns three keys. First… agents — a list, one entry per member, each with a running flag, a lifecycle, its last few steps, and its current thought. Picture moss in there — running true, one step that says it fetched an arxiv page, thought reading the primary source. And wren beside it — running false, no steps, no thought. Second… wire — the last ten steps across everyone, merged and tagged by agent. And third… agent, singular — a courtesy block for older frontends, the busiest running agent. [excited] And here's the elegant part. It all comes from one shared steps file in the repo. Every event carries an agent tag, and the feed just filters by it. The fleet doesn't keep four logs. It keeps one… agent-stamped… which is the same ledger the ledger lesson seals."
+  },
+  {
+   "id": "boundaries",
+   "title": "What the runtime won't do for you",
+   "text": "Now the honest part — what the runtime won't do for you. The fleet is deliberately thin, and the thinness has edges. First — the gate throttles, it doesn't schedule. No priorities. No fairness beyond first-in-first-out. Second — claims are advisory. A misbehaving def can grab a task another agent claimed. The defence isn't a lock — it's the def, and the git record. Third — there's a race window. Inside a single staggered tick, two agents could both read the board and both try to claim the same task… and commit order decides the winner. Claiming first shrinks the window. It doesn't close it. Fourth — adding a member means a restart. The supervisor's child list is fixed when it starts. Fifth — no-work honesty is def-level. Idle backoff only quiets an agent that admits it's idle. An agent whose def invents busywork will burn budget happily. [curious] And the values line, because it's the whole posture. This is never a newsroom that runs itself. Humans set the board's objectives — the leads, the assignments, the direction. The agents work the pipeline. A fleet makes the working cheap and legible. It doesn't make the judgment go away."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Can two agents grab the same task? Usually no — claiming before working, plus first-in-first-out state discipline, makes a claimed task invisible to peers. But it's a protocol, not a lock — there's a narrow race inside one tick, and commit order decides it. Why doesn't the runtime just lock the board? Because correctness belongs in the same layer as the agent's reasoning — the def — where you can read, edit, and review it. How do I add a fifth agent? Add a heading with a def to the manifest… and restart the crew. Does the singleton keeper change? You don't run both — they're mutually exclusive at boot, and the fleet worker is the singleton's own engine, parameterized. And what does a fleet cost? The gate is your budget ceiling — at most two runs at once, default, no matter how many members. [chuckles] And idle agents back off toward a thirty-minute tick, so a quiet fleet stops paying for itself until work arrives."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to agents",
+   "text": "So that's a fleet. Not a new construct… the agents lesson, multiplied. The same keeper engine, instantiated N times from one manifest — with a stagger, a gate, and the deliberate refusal to do anything more. The coordination lives where the reasoning lives… on the board, in git, in plain text. [curious] If any of it felt unfamiliar, the way back up is short. The parent is agents — lesson five — the keeper a fleet copies. From there, orchestration walks the single tick this generalizes… and the ledger holds the steps the wire reads. Everything a fleet does… is built from the one worker you already knew."
+  }
+ ]
+}

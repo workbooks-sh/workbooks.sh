@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>git — the project that is a repo — Workbooks</title>
+<meta name="description" content="A single-file artifact looks like a binary, but the format never leaves text and the running project is literally a git repo: every deploy is a commit, identity is the author, and you can clone, diff, and mirror history to the forge you already have.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/git-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="git — the project that is a repo — Workbooks">
+<meta property="og:description" content="The artifact never leaves text, and the running project is literally a git repo. Every deploy is a commit you can clone, diff, and mirror to your own forge.">
+<meta property="og:url" content="https://workbooks.sh/learn/git">
+<meta property="og:image" content="https://workbooks.sh/og/git.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="git — the project that is a repo — Workbooks">
+<meta name="twitter:description" content="The artifact never leaves text, and the running project is literally a git repo. Every deploy is a commit you can clone, diff, and mirror.">
+<meta name="twitter:image" content="https://workbooks.sh/og/git.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/git.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    commit 9f3c2ab  (HEAD -> main)
+    Author: dev <dev@workbooks.local>
+
+        the secret of this page is in its own log —
+        the artifact you ship looks like a binary,
+        but the project behind it is a repo you can clone.
+        `git log` is the changelog. `git diff HEAD~1 HEAD`
+        is the last deploy. nothing here is locked in.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 01·5 — <b>under workbook · git</b></div>
+      <h1><span class="ln">the project</span><span class="ln">that is a</span><span class="ln bub">REPO</span></h1>
+      <p class="dek">A single file <em>looks</em> like a binary — so where did your
+      version control go? It didn't go anywhere. The <b>source rides inside the
+      artifact</b> as plain text, and the running project is <b>literally a git
+      repo</b>: every deploy is a commit, the author is who you are, and the whole
+      history clones to the forge you already have.</p>
+      <div class="meta">
+        <span class="on">the repo</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/git-hero.jpg" alt="A small archivist standing before a towering wall of identical luminous green ledger-spines that recede into the distance, each spine stamped with a short glowing hash, a single thread of light linking one volume to the next — 1970s sci-fi style, bright and monumental">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/git.svg" alt=""></div><span>git</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Where did the history go?</a>
+  <a href="#definition">The definition</a>
+  <a href="#diff-surface">What actually diffs</a>
+  <a href="#deploy-commit">Every deploy is a commit</a>
+  <a href="#author">Who is the author</a>
+  <a href="#agent-commits">The agent's git hand</a>
+  <a href="#ignore">The .gitignore nobody writes</a>
+  <a href="#oplog">A second ledger: jj</a>
+  <a href="#mirror">The repo you already have</a>
+  <a href="#changelog">History as a public surface</a>
+  <a href="#limits">Where this is honest</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>where did the HISTORY go?</h2>
+  <p>Your project's history is already scattered, and you've stopped noticing.
+  Code lives in git. Content lives in a CMS. Application data lives in a SaaS.
+  And the record of <em>what got deployed when</em> lives in a dashboard's audit
+  log — a list you can read but can't clone, can't <code>git log</code>, can't
+  take with you. Four histories, four homes, none of them the same shape.</p>
+  <p>Now make the whole app one HTML file, and the worry sharpens: a single-file
+  artifact <em>smells like a binary</em>. If the app is one <code>.html</code>,
+  did you just lose version control entirely? Where do diffs live? Is your
+  history now locked inside someone's platform? That fear is the right fear to
+  have — and the answer is better than "don't worry about it." The answer is
+  that nothing about this format ever stopped being text, and the project
+  running it was a repo the whole time.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">git</span> <span class="pr">/ɡɪt/</span> <span class="pos">here, a property of the project — not a tool you bolt on</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the workbook's history layer: the
+    <b>source rides inside the artifact</b> as plain text, and the running
+    project's data root is a real <b>git repo</b> — so history, diff, and
+    rollback come <b>for free</b>, and you can clone any of it.</p>
+  </div>
+  <p>That phrase isn't ours by accident. The engine's own git module says it
+  plainly — a <i>git-backed Workbook store, the versioned source of truth;
+  making the per-tenant data root a git repo buys history, diff, and rollback
+  for free.</i> It's a thin wrapper over the <code>git</code> CLI you already
+  run. Not "integrates with git." <em>Is</em> a git repo — one per tenant, at
+  <code>$WB_DATA/&lt;tenant&gt;</code>, <code>git init</code>'d the moment the
+  project starts living.</p>
+</section>
+
+<section id="diff-surface">
+  <h2>what actually DIFFS</h2>
+  <p>Here's the honest framing the whole page hangs on: <b>git the source, ship
+  the artifact, and the artifact carries the source back out.</b> A workbook is
+  three forms at once, and they diff differently — so it's worth being exact
+  about which layer you read when you read history.</p>
+  <table class="cmp">
+    <tr><th>layer</th><th>form</th><th><code>git diff</code> verdict</th><th>the move when it doesn't</th></tr>
+    <tr><td>the <a href="org">org spec</a></td><td>plain text, in a <code>script type=text/org</code> block</td><td class="y">clean line diffs — the designed diff surface</td><td>—</td></tr>
+    <tr><td>the <code>.html</code> artifact</td><td>text, end to end</td><td>diffable in principle — it's text, not a blob</td><td>read the org source for the legible diff</td></tr>
+    <tr><td>the <a href="vfs">vfs.sqlite</a> disk</td><td>binary database file</td><td class="n">stored, but git can't line-diff it</td><td><code>wbx unbundle</code> recovers a source tree; the legible-SQL projection is design intent (see honesty)</td></tr>
+  </table>
+  <p>Two things follow. First, the source is never trapped: a workbook ships as
+  a <code>.wbundle</code> — a plain zip carrying <code>workbook.html</code> and
+  <code>workbook.org</code> side by side, on purpose, so a recipient can
+  <code>wbx unbundle</code> it back into a diffable tree and re-author. The
+  comment in the bundler says it outright: <i>source travels with the artifact —
+  recipients can unbundle and re-author.</i> Second, the one binary layer —
+  SQLite — is the one place to be careful, and we come back to it honestly
+  rather than pretend it diffs.</p>
+</section>
+
+<section id="deploy-commit">
+  <h2>every deploy is a COMMIT</h2>
+  <p>This is the load-bearing fact. When you deploy, the runtime does two things
+  in one breath: it writes the fast SQLite index your app reads from, <em>and</em>
+  it commits your <code>.org</code> source into the tenant repo. One deploy, one
+  commit, with a real message and a real author.</p>
+  <pre class="orgsample">$ wbx workbook deploy lander ./lander.org
+
+   <i>→ runtime runs Workbooks.deploy("lander", org, "dev")</i>
+   <i>→ writes the SQLite index  +  Git.save commits &lt;name&gt;.org</i>
+   <i>→ commit "deploy lander"  authored  dev &lt;dev@workbooks.local&gt;</i>
+   <i>→ returns the sha, or :nochange if nothing moved</i></pre>
+  <p>Picture it as a sequence. You hand the CLI a name and an org file; the
+  runtime fans it into two stores — the index it serves from, and the git repo
+  that remembers — and a short sha comes back to you as the receipt:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as you (wbx)
+  participant R as runtime (Workbooks.deploy)
+  participant I as SQLite index
+  participant G as git repo
+  U->>R: deploy lander ./lander.org
+  R->>I: write fast index
+  R->>G: Git.save commit deploy lander
+  G-->>R: 9f3c2ab
+  R-->>U: sha (your receipt)
+  Note over G: history answers<br/>what changed last deploy
+  </pre>
+  <p>And because it's a real repo, the history comes straight back out with the
+  commands you already know:</p>
+  <pre class="orgsample">Workbooks.Git.log("dev")    <i>→ ["9f3c2ab deploy lander", "4d1e0c7 deploy report", …]</i>
+Workbooks.Git.diff("dev")   <i>→ literally `git diff HEAD~1 HEAD` — the last deploy, as a unified diff</i></pre>
+  <p>So "what did that deploy change?" stops being a dashboard question with a
+  vendor-shaped answer. It's <code>git diff HEAD~1 HEAD</code> — the same answer
+  you'd get for any repo on your machine.</p>
+</section>
+
+<section id="author">
+  <h2>who is the AUTHOR</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the identity bridge, for the curious</span></p>
+  <p>A commit needs an author, and here the author isn't a config field you
+  forgot to set — it's <em>who you are</em>. The engine bridges auth's WHO
+  directly into git's attribution: the author name defaults to the tenant, the
+  email is <code>&lt;tenant&gt;@workbooks.local</code>, and every commit sets
+  <code>GIT_AUTHOR_NAME/EMAIL</code> and <code>GIT_COMMITTER_NAME/EMAIL</code>
+  from that one identity. The module's own words: <i>git's attribution is auth's
+  WHO.</i></p>
+  <p>Underneath that name sits real cryptographic identity. Each tenant gets a
+  per-tenant Ed25519 keypair, kept under <code>.workbooks/&lt;tenant&gt;.ed25519</code>
+  and <b>never committed</b>. From its public key the engine derives a
+  <code>did:key:z6Mk…</code> — a genuine W3C decentralized identifier, the same
+  shape Radicle uses, so the author is portable beyond this platform. And the
+  identity is stable across redeploys: the primary tenant's key is restored
+  deterministically from <code>WB_SIGNING_KEY</code>, a 32-byte seed held as a
+  secret — so your DID survives a fresh box.</p>
+  <pre class="mermaid">
+flowchart LR
+  auth["auth identity — the WHO"]
+  env["GIT_AUTHOR + COMMITTER<br/>name and tenant email"]
+  did["Ed25519 keypair<br/>did:key:z6Mk…"]
+  commit["the commit<br/>authored, attributable"]
+  ledger["run ledger<br/>anchored in git"]
+  auth --> env --> commit
+  auth --> did --> commit
+  commit --> ledger
+  style commit fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style ledger fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>The last arrow matters. An agent run leaves a hash-chained
+  <a href="the-ledger">ledger</a> — a sha256 fold over its steps from a genesis
+  hash — and its head gets <em>committed</em> to git as a
+  <code>ledger-&lt;run&gt;</code> commit, <i>so the head is witnessed by git's
+  own content-addressing.</i> The chain proves the steps; git proves when the
+  chain's head existed. Two independent witnesses, one repo.</p>
+</section>
+
+<section id="agent-commits">
+  <h2>the agent's git HAND</h2>
+  <p>Agents commit too — but they don't get a shell. The hand is host-brokered:
+  the agent supplies <b>only a commit message</b>, and the host decides every
+  word of the command line. There is no native-bash hatch here; the one that
+  used to exist was deleted on purpose. The agent says <i>what</i>; the engine
+  does <i>how</i>.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as agent
+  participant H as host (git tool)
+  A->>H: commit_and_push add tuesday post
+  H->>H: write .gitignore from Workbooks.Private
+  H->>H: git add -A
+  H->>H: commit (hooks off, author email set)
+  H->>H: push origin if a remote exists
+  H->>H: SitePublish.publish content and blog
+  H-->>A: 9f3c2ab (pushed) (published 3)
+  </pre>
+  <p>Read the return string — those shapes are verbatim. You get
+  <code>"9f3c2ab (pushed)"</code> when a remote took it,
+  <code>"9f3c2ab (committed; no origin remote to push)"</code> when there's
+  nowhere to push yet, and a trailing <code>(push failed: …)</code> capped at
+  120 characters when the remote refuses. Honest receipts, not silent success.</p>
+  <p>The last step is the one that earns its place: <b>commit implies publish,
+  atomically.</b> After the commit lands, <code>SitePublish.publish</code>
+  mirrors <code>content/**</code> and <code>blog/**</code> to the live site —
+  <i>so committed always implies live.</i> This wasn't a flourish; it was a fix.
+  A lander once shipped blog posts that were committed to the repo but served
+  404, because the run died before a separate publish step ever ran. Now there
+  is no separate step to die before. Commit, and it's live.</p>
+</section>
+
+<section id="ignore">
+  <h2>the .gitignore nobody WRITES</h2>
+  <p>A brokered <code>git add -A</code> is a sharp tool: a bulk add can sweep in
+  anything in the tree — including a signing key. So the danger is defused
+  before it can happen. Every tenant repo gets a <code>.gitignore</code> written
+  from <b>one boundary module</b>, <code>Workbooks.Private</code>, and the same
+  module is consulted by Git, by the bundler, and by the Library — <i>so the
+  line can't drift.</i> One definition of "private," three enforcers.</p>
+  <table class="cmp">
+    <tr><th>ignored</th><th>what it protects</th></tr>
+    <tr><td><code>.workbooks/</code></td><td>the Ed25519 signing key — the one that must never leave</td></tr>
+    <tr><td><code>memory/</code></td><td>an agent's working memory — the session, not the work</td></tr>
+    <tr><td><code>.beads/ .claude/</code></td><td>task data and assistant scratch — born from a real leak</td></tr>
+    <tr><td><code>scratch/ tmp/</code></td><td>transient working space, nobody's history</td></tr>
+    <tr><td><code>_*.jsonl _*.json _*.db</code></td><td>run sidecars: <code>_steps.jsonl</code>, <code>_status.json</code>, <code>_trace.jsonl</code>, <code>_telemetry.db</code>, <code>_ledger.json</code></td></tr>
+  </table>
+  <p>The doctrine behind that list is one sentence, and it's worth keeping:
+  <b>sharing exposes WORK, never the session that produced it.</b> It's a
+  scarred rule — it exists because beads task data once got pushed to GitHub,
+  and the boundary module is the repair. The most elegant part: the Library
+  reuses git's <em>own</em> matcher, <code>git check-ignore</code>, to decide
+  what ships when you share — so <i>the agent's native git instinct IS the
+  don't-share marker.</i> The thing that keeps bytes out of a push is the same
+  thing that keeps bytes out of a share. You only have to be right once.</p>
+</section>
+
+<section id="oplog">
+  <h2>a second ledger: JJ</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the op-log layer, for the curious</span></p>
+  <p>On top of the same repo sits an optional second record. <code>Workbooks.JJ</code>
+  colocates Jujutsu directly onto the git repo —
+  <code>jj git init --colocate</code> — which means the <em>same commits</em>,
+  plus an <b>operation log</b>: <i>every change to the repo state is itself a
+  recorded, addressable, undoable operation.</i> Git records the commits; jj
+  records the moves between them.</p>
+  <pre class="mermaid">
+flowchart TD
+  repo["one repo — same commits"]
+  repo --> g["git commits<br/>content-addressed history"]
+  repo --> j["jj op-log<br/>replayable state changes"]
+  g --> ev["tamper-evident<br/>from two directions"]
+  j --> ev
+  style ev fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Two reasons it's there. It <b>corroborates the signed ledger</b> from the
+  author section — the run history becomes tamper-evident from two independent
+  directions at once. And it's the substrate for concurrent sub-agents: jj
+  auto-rebases text changes, while org validations arbitrate meaning. It's a
+  no-op if <code>jj</code> isn't on PATH, so it costs nothing where it isn't
+  wanted; jj's own identity is <code>workbooks-agent</code> at the same tenant
+  email, the same WHO, kept consistent.</p>
+</section>
+
+<section id="mirror">
+  <h2>the repo you already HAVE</h2>
+  <p>Here's the antidote to "locked in your platform": one verb pushes your whole
+  history to <em>your</em> forge. It's plain <code>git push</code> underneath, so
+  it works with GitHub, GitLab, Gitea, or anything self-hosted — the forge CLIs
+  only exist to provision a remote the first time.</p>
+  <pre class="mermaid">
+flowchart LR
+  repo["tenant repo"]
+  url["explicit URL"]
+  forge["forge name"]
+  rad["radicle"]
+  repo --> url --> push1["plain git push<br/>no forge CLI needed"]
+  repo --> forge --> push2["gh / glab / tea<br/>provision and push"]
+  repo --> rad --> push3["P2P by DID<br/>RID rad:…"]
+  style repo fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>The common case is one line:</p>
+  <pre class="orgsample">$ wbx mirror github
+   <i>→ POST /api/mirror/dev {"forge":"github"}</i>
+   <i>→ no origin yet, so: gh repo create wb-dev --source . --private --push --remote origin</i>
+   <i>→ {"ok":true, "url":"https://github.com/you/wb-dev.git"}</i></pre>
+  <p>If you already have the remote, skip the forge CLI entirely — hand
+  <code>mirror</code> a URL (anything containing <code>://</code> or starting
+  <code>git@</code>) and it's a bare <code>git push</code>, zero tooling
+  required: <code>wbx mirror git@github.com:you/site.git</code>. And when nothing
+  is installed, the engine doesn't fail quietly — it tells you the truth:
+  <code>"no forge CLI (gh/glab/tea) on PATH — create the remote yourself and use
+  mirror/3."</code> For the peer-to-peer crowd, <code>wbx federate</code> runs
+  <code>rad init --public</code> and hands back a Radicle RID
+  (<code>rad:…</code>), with delegates addressed by DID — the same
+  <code>did:key</code> from the author section, doing real work.</p>
+</section>
+
+<section id="changelog">
+  <h2>history as a public SURFACE</h2>
+  <p>Because the project is a repo, its changelog can be its <em>actual</em> log
+  — not a marketing timeline somebody curated. A deployed app serves
+  <code>GET /_changes</code> on its public plane: anonymous, read-only, the real
+  git log, newest-first, capped at thirty entries, paired with the keeper's
+  status. The JSON is the diagram:</p>
+  <pre class="orgsample">GET /_changes
+
+{
+  changes: [
+    { sha: 9f3c2ab, ts: 1749600000, author: dev, msg: deploy lander },
+    { sha: 4d1e0c7, ts: 1749513600, author: dev, msg: deploy report }
+  ],
+  agent: { … keeper status … }
+}</pre>
+  <p>The authed sibling <code>GET /rcp/changes</code> carries the same idea, and
+  its comment states the point: <i>the changelog is verifiable history, not
+  marketing.</i> Anyone can read it; anyone can clone the repo and check it. The
+  page narrates its own construction from facts it can't fake.</p>
+  <p>That's the outbound direction. The <em>inbound</em> direction — a push to
+  your forge reconciling back into the live project, the push-to-update loop —
+  is real but lives next door: <code>Git.pull</code> snapshots a dirty tree as
+  <i>wip: snapshot before reconcile</i> first, aborts cleanly on conflict rather
+  than clobbering agent data, and rides a keeper trigger. That whole reconcile
+  loop is its own lesson; this page owns the artifact-and-history side. See
+  <a href="gitops">gitops</a> for when the loop reverses.</p>
+</section>
+
+<section id="limits">
+  <h2>where this is HONEST</h2>
+  <p>None of the hard edges are hidden — they're in the code's own comments, so
+  here they are plainly.</p>
+  <ul>
+    <li><b>SQLite is binary.</b> Git stores <code>vfs.sqlite</code> but can't
+    line-diff it. The plan is a legible projection — an unpacked tree where the
+    SQLite shows up as readable SQL dumps GitHub can render. That's <em>design
+    direction, not shipped behavior</em>: there's no SQL-dump emitter today.
+    Treat the legible-diff story as a roadmap, not a feature.</li>
+    <li><b>Radicle needs peers.</b> A clone requires at least two nodes online,
+    and rad's keys are per-device with no external-key import — an upstream
+    limitation, not missing code on our side. It's a deployment-topology fact.</li>
+    <li><b>Inbound app builds still ride CI.</b> The reconcile loop integrates
+    upstream changes, but rebuilding the app from them leans on a CI bridge for
+    now. Multi-tenant GitHub-App integration is plan-status.</li>
+    <li><b>Auto-provision needs a forge CLI.</b> No <code>gh</code>/<code>glab</code>/<code>tea</code>
+    on PATH means you create the remote yourself and mirror to an explicit URL —
+    the plain-push rail always works regardless.</li>
+    <li><b>Running git in a container is real ops.</b> Every git op passes
+    <code>-c safe.directory=*</code> for a reason: on deployed boxes the
+    <code>/data</code> volume's uid differs from the runtime's, and git's
+    dubious-ownership guard <i>refuses every command — silently blocking commit
+    and publish.</i> That bit a set of agents who wrote stories to disk for days
+    that never shipped. The flag is the scar.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can I just <code>git init</code> my workbook source directory?</summary>
+    <p>Yes — that's the native mode, not a workaround. The source is org text;
+    nothing about the format fights git. The running project simply does the
+    same thing for you automatically, one repo per tenant.</p>
+  </details>
+  <details>
+    <summary>Is my history locked inside the runtime?</summary>
+    <p>No. It's plain git. <code>wbx mirror &lt;url&gt;</code> pushes the whole
+    history to your forge with a bare <code>git push</code> — no platform CLI
+    required when you bring the URL. Clone it anywhere and it's yours.</p>
+  </details>
+  <details>
+    <summary>What diffs badly?</summary>
+    <p><code>vfs.sqlite</code> — it's a binary database. Git stores it but won't
+    line-diff it. Your <em>source</em> (org) and the unpacked tree are the
+    legible diff surface; the readable-SQL projection of the disk is design
+    intent, not shipped yet.</p>
+  </details>
+  <details>
+    <summary>Do agent commits pollute my history?</summary>
+    <p>They're authored — every agent commit carries a real
+    <code>&lt;tenant&gt;@workbooks.local</code> author and a message — and the
+    reconcile convention separates code paths from data paths, so agent activity
+    lands in its own lane rather than smearing across your source.</p>
+  </details>
+  <details>
+    <summary>Does this replace GitHub?</summary>
+    <p>No — it pushes <em>to</em> it. The runtime hosts a git repo; GitHub (or
+    GitLab, or Gitea, or your own server) stays your forge. <code>wbx mirror
+    github</code> wires them together; you keep your existing workflow.</p>
+  </details>
+  <details>
+    <summary>How do I get a diffable tree out of a workbook someone sent me?</summary>
+    <p><code>wbx unbundle &lt;file&gt;</code>. A <code>.wbundle</code> carries
+    <code>workbook.org</code> alongside the artifact specifically so you can
+    extract the source and re-author it. The source travels with the artifact.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This deep dive lives under <a href="workbook">the workbook</a> — it assumes
+  that page's anatomy and shows what version control looks like when the unit is
+  a file that is also a repo.</p>
+  <div class="cards">
+    <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="icons/workbook.svg" alt=""></span>
+      <div>Workbook<small>the unit this page versions</small></div><span class="go">→</span></a>
+    <a href="gitops"><span class="sw" style="background:#9fc4e8"><img src="icons/gitops.svg" alt=""></span>
+      <div>GitOps<small>when the loop reverses — push to update</small></div><span class="go">→</span></a>
+    <a href="bundles"><span class="sw" style="background:#aee5c2"><img src="icons/bundles.svg" alt=""></span>
+      <div>Bundles<small>the zip that carries source out</small></div><span class="go">→</span></a>
+    <a href="the-ledger"><span class="sw" style="background:#f2ddb0"><img src="icons/the-ledger.svg" alt=""></span>
+      <div>The Ledger<small>the hash-chain git anchors</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workbook · git
+  :PROPERTIES:
+  :SLUG:   git
+  :KIND:   learn
+  :NN:     01.5
+  :KICKER: under workbook · git
+  :TITLE1: the project
+  :TITLE2: that is a
+  :TITLE3: REPO
+  :CHIP:   the repo
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/git-hero.jpg
+  :END:
+** og
+- the source rides inside the artifact as plain text
+- the running project is literally a git repo — deploy = commit
+- clone, diff, and mirror history to the forge you already have
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .38], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f2ddb0", .16]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script type="module" src="learn-mermaid.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+ "slug": "drawers",
+ "title": "drawers — under org",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Where does config go",
+   "text": "Lesson 04 point 3 — drawers. A sub-lesson, under org… the grammar. The parent lesson made its case — org holds prose and structure in one parseable file. But here's the thing nobody quite answered yet. Where does config go? [curious] Every system that grows up grows a second format for fields. A YAML file describes the package. A JSON blob holds the agent settings. A database table carries the task metadata. The document is one thing… and the configuration that drives it always lives somewhere adjacent. [sighs] Org refuses that split. When a heading needs to be more than a title — when it needs a model name, a binary, a deploy target — it gets those fields inline. Same tree… same kernel. This lesson is the mechanism that makes that true… and the honest catalog of where it bends."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A drawer is a properties block, directly under a headline, that turns it into a typed record. Key-value pairs, parsed by the kernel into a deterministic map. The word is borrowed straight from org-mode, where a drawer is any fold-away block. The one that matters here is the properties drawer… because that's the one the kernel reads into structured fields. A headline without one is a title. [curious] A headline with one… is a row."
+  },
+  {
+   "id": "anatomy",
+   "title": "The four lines",
+   "text": "The four lines. The whole grammar is four lines… and you've already written it if you've ever filled out a form. Picture a headline — Data Analyst, tagged agent. Then a keyword opens the block — properties. Underneath it, three pairs, each between colons. First… I-D, analyst. Second… Type, a-i. Third… model, xiaomi mimo. And a keyword closes it — end. That's a record. Two rules decide whether the kernel sees it… and both are strict. First, the drawer must be the first thing in the section. A planning line is allowed to sit above it — but a single line of prose before the block, and the kernel silently returns nothing. Second, every key gets a value. Keys are uppercased on the way in… and values are trimmed. So the authored Type… comes back as capital T-Y-P-E. And a value padded with spaces comes back with the padding gone. That normalization isn't cosmetic. It means the consumer reading a drawer never has to guess at casing or whitespace — the kernel decides it, not the author."
+  },
+  {
+   "id": "one-parser",
+   "title": "One parser, three doors",
+   "text": "One parser… three doors. There is exactly one piece of code that turns a drawer into a record. A function called headline-of, in the kernel. It reads each property pair and inserts it into a sorted map — key uppercased, value trimmed. Sorted matters. The map is a B-tree, so keys come out alphabetically… deterministically… the same bytes every time. Picture the flow as a small river. A dot-org file flows into headline-of, which uppercases and trims. Out of it comes one sorted map. And from that single map, four streams branch off. One feeds the agent parser, which pulls model and toolkits. Two feeds the toolkit view, which pulls binary and status. Three feeds the workspace, which pulls identity and scope. And four feeds the scheduler, which turns a schedule key into a cron. One map… read four ways. And that one function reaches you through three doors that are the same code compiled three ways. It ships as a native library inside the wbx command line. It ships as a wasm component embedded in the runtime. And it ships as a browser build… running in your tab right now. A toolkit, an agent file, and this page get parsed by the same logic — at a terminal, on a server, or reading the docs. [excited] The map you get back is the same map everywhere."
+  },
+  {
+   "id": "promoted-keys",
+   "title": "Keys the kernel promotes",
+   "text": "Keys the kernel promotes. Most keys are inert to the kernel — it copies them into the map and lets each consumer decide what they mean. But two keys… the kernel treats specially. It promotes them out of the property bag into structured fields of their own. First… the I-D key. The kernel lifts it to a top-level identity field, right beside the title and the tags — so every consumer that needs to know which thing this is can find it without digging. Second… the schedule key. The kernel turns it into a cron object inside the build plan. And here's the subtlety — if a headline carries both a schedule key and a planning timestamp, the schedule key wins. [curious] One honest caveat on that second one. The kernel carries the schedule… but it does not fire it. There is no cron daemon hiding in the kernel. Execution cadence is the keeper's job. The kernel's role is to make the schedule a parseable fact… not to run a clock."
+  },
+  {
+   "id": "the-records",
+   "title": "The bestiary",
+   "text": "Now the payoff — the bestiary. Every record here is a real headline with a real drawer, parsed by the one kernel, consumed by a different part of the system. Walk them with me. A toolkit manifest carries an I-D, a binary name, a status, and a skill directory — and the toolkit view reads the binary to find the command on your path. An agent definition carries an I-D, a model, a list of toolkits, and a tagline — and the agent parser splits that toolkit list on whitespace into a skill index. A fleet member carries a required def — pointing at an agent file — plus a lifecycle and an interval, which sets its beat. A lifecycle state carries a kind, a next, a repeat, and a minimum interval. A workspace member carries a decentralized identity, a path, and a scope that defaults to read. A workflow task carries a done-when gate that runs in the sandbox, fail-closed. And a deployment config carries an engine place, a tenancy mode, storage, database, and auth. [excited] Here's the thing worth sitting with. These are not seven config formats with a family resemblance. They are seven uses of the same four lines of grammar. They don't share a schema — they share a parser. [chuckles] Which is why a person who can read one drawer… can read all of them. One exception to flag — the deployment config is parsed by a deliberately hand-rolled scan, not the kernel, precisely because a deployment file should be inert. Read as data… never run."
+  },
+  {
+   "id": "agent-boot",
+   "title": "From drawer to running agent",
+   "text": "From drawer to running agent. A depth rung — skippable, but it's where a drawer stops being a data structure and becomes a live worker. Take that analyst file and trace it all the way to a running agent. Read it as a story. The file hands its drawer to the kernel, which returns the sorted map. The agent parser reads identity and model straight off that map — no extra step. It splits the toolkits list on whitespace, and for each declared toolkit, that toolkit's skill manual gets auto-injected into the system prompt. So an agent that declares sandbox in its drawer… [curious] wakes up already knowing how to use it. And then the one thing that is not in the drawer. The system prompt itself comes from a heading in the body — a heading literally titled System prompt — not from a property. So the division is clean. The drawer says who the agent is… and what it has. The prose says what it should do. Fields in the drawer… briefing in the heading. That's the whole authoring shape."
+  },
+  {
+   "id": "machines-write",
+   "title": "Machines write drawers too",
+   "text": "Machines write drawers too. So far the drawer has been something a person authors. But the same grammar flows the other way — the system writes drawers as readily as it reads them. Because a record a machine can emit… is a record a human and another machine can both read back. The clearest case is an agent's own event log. Every tool call an agent makes writes one headline — tagged event — with a single property: the arguments, captured as J-S-O-N. Nobody types that. It's emitted by the runtime, one headline per call. Which means an agent's entire run is a parseable org file you can later query with the same command that reads a hand-written manifest. The run is fully observable… because it was recorded in the one grammar everything else speaks. Same story for the task ledger a keeper renders — a tasks file with an I-D, a file path, a started time, and a finished time per task, generated from a ledger and never hand-edited. And there's a quieter convention worth naming. A board claim. An agent that takes a task can write an agent property and commit it to git — telling the other agents, this one is mine. [curious] But that's a protocol… not a lock. The system honors it by convention, not by enforcement. And the keepers lesson is honest about exactly that line."
+  },
+  {
+   "id": "this-page",
+   "title": "This page is a record",
+   "text": "This page is a record. The recursive kicker… and the easiest one to verify. [mischievously] The page being narrated to you right now… is itself a drawer. Near the bottom of its source sits a script block tagged workbook-spec, and its drawer drives the chrome. The kicker, the three-line title, the chip, the colors, the hero image. Picture it as a single source feeding two readers, neither of which touches the HTML around it. The page's own script reads the spec and paints the live chrome — change the second title line in the drawer, and the headline changes with it. And the social-card generator reads the same spec — only the spec, never the surrounding markup — to draw the image that shows up when this link is shared. Edit the record… the page follows. One honest footnote. The workbook artifact spec uses a J-S-O-N dialect under that same marker, while these learn pages use the org dialect. Two dialects… one marker. Whether they converge is unsettled — so treat them as distinct, and so should you."
+  },
+  {
+   "id": "honest",
+   "title": "The seams",
+   "text": "Now the honest part — the seams. Drawers are unforgiving in ways worth knowing before they bite you. Four seams, named plainly. First — placement fails silently. The drawer must be the first thing under the headline. Put a line of prose above it… and the kernel returns an empty map. No warning. No error. Just nothing. [exhales] It's the single most common way a drawer disappears. Second — a valueless line can void the whole drawer. A property line with nothing after it can make the parser drop every sibling key, not just the empty one. The exact rule is uncertain… but the behavior is demonstrable. One bad line, and the record is gone. The fix for both is mechanical — drawer first, every key gets a value. Third — values are stringly typed. A drawer has no schema and no types. Every value is a string. So there's no kernel-level guarantee that a model key names a real model. Each consumer validates its own keys. The kernel gives you a faithful map… meaning is everyone's own responsibility. And fourth — there are two parser families. The strict kernel is one. But for inert deployment config there's a hand-rolled scan that never executes. And for agent-written task files there's a lenient merge that also honors bare key lines anywhere in the body — because agents write sloppy org, and the system would rather read it than reject it. On a conflict… the drawer wins. That leniency is a choice, not an accident. The same file can be parsed strictly in one place… and loosely in another."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Is a drawer a database row? No. A drawer is a handful of fields on a headline. Heavy data — anything you want to index or join at scale — goes in the SQLite disk, not in properties. Why are the keys uppercase? Because the kernel uppercases every key on the way in, so the consumer never has to guess at casing. Normalization that buys determinism. Can I invent my own keys? Yes. The kernel copies every key into the map, and consumers simply ignore the ones they don't recognize. Unknown keys are inert… not errors. Drawer, or a file-level keyword? Different altitudes. A keyword is file-wide metadata. A drawer is headline-level, scoped to one record. And does the schedule key mean the kernel runs my cron? No. The kernel carries the schedule as a fact… it does not fire it. Running it on time is a separate engine's job."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the grammar",
+   "text": "[excited] So that's the drawer. Four lines that turn a headline into a typed record — one kernel, deterministic map, the same grammar carrying a toolkit, an agent, a deployment, and this very page. The ecosystem has no config format… because headlines are the config format. [curious] The way back up is short. This is a sub-lesson under org — the grammar — so start there if any of it felt unfamiliar. And three neighbors sit right beside it. Syntax, for the whole grammar in one sitting. Timestamps, for the full time grammar behind that schedule key. And the kernel, for the one parser and all three of its doors. Everything a drawer does… is built from those."
+  }
+ ]
+}

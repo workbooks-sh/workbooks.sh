@@ -33,7 +33,13 @@ const scripts = readdirSync(join(HERE, "scripts"))
   .map((f) => JSON.parse(readFileSync(join(HERE, "scripts", f), "utf8")))
   .filter((s) => !only.length || only.includes(s.slug));
 
-const ORDER = ["workbook", "bundles", "nesting", "nexus", "toolkit", "org", "agents", "autopoet", "wbx", "workflows", "vfs"];
+// catalog order: tiers → lessons → sublessons (the single source of truth)
+const ORDER = [];
+for (const tier of JSON.parse(readFileSync(join(HERE, "..", "lessons.json"), "utf8")).tiers)
+  for (const l of tier.lessons) {
+    ORDER.push(l.slug);
+    for (const s of l.sublessons || []) ORDER.push(s.slug);
+  }
 scripts.sort((a, b) => ORDER.indexOf(a.slug) - ORDER.indexOf(b.slug));
 
 // ── the shape ────────────────────────────────────────────────────────────────
@@ -69,7 +75,14 @@ let made = 0;
 
 for (const page of scripts) {
   const out = join(HERE, "episodes", `${page.slug}.mp3`);
-  const turns = new Set(TURNS[page.slug] || []);
+  // hand-tuned turns, else derived: definition → a mid-episode lift → the faq
+  const ids = page.tracks.map((t) => t.id);
+  const derived = [
+    ids.includes("definition") ? "definition" : ids[1],
+    ids[Math.floor(ids.length / 2)],
+    ids.includes("faq") ? "faq" : ids[ids.length - 2],
+  ];
+  const turns = new Set(TURNS[page.slug] || derived);
   const cue = (k) => join(HERE, "cues", `${page.slug}-${k}.mp3`);
   if (!["intro", "turn1", "turn2", "turn3", "outro"].every((k) => existsSync(cue(k)))) {
     console.error(`${page.slug}: cues missing — run cues.mjs ${page.slug}`);

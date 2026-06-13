@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>orchestration — cadence for agents — Workbooks</title>
+<meta name="description" content="Orchestration is the deterministic skeleton around non-deterministic work: a tick engine that owns when an agent runs, a lifecycle declared in org that owns what kind of work each tick does, and a claims protocol agents commit to git. A deep dive under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/orchestration-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="orchestration — cadence for agents — Workbooks">
+<meta property="og:description" content="The deterministic skeleton around non-deterministic work — a tick engine, a lifecycle in org, a claims protocol. A deep dive under agents.">
+<meta property="og:url" content="https://workbooks.sh/learn/orchestration">
+<meta property="og:image" content="https://workbooks.sh/og/orchestration.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="orchestration — cadence for agents — Workbooks">
+<meta name="twitter:description" content="The deterministic skeleton around non-deterministic work — a tick engine, a lifecycle in org, a claims protocol. A deep dive under agents.">
+<meta name="twitter:image" content="https://workbooks.sh/og/orchestration.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/orchestration.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+   the lesson, hidden where a source-reader will find it:
+
+   a naive loop is cron calling a model. it dies when the run crashes,
+   forgets its place on redeploy, and pays for every idle poll. the fix is
+   almost no AI at all — a small tick engine owns WHEN, a state machine
+   declared in org owns WHAT-KIND, and the model only owns WHAT, inside one
+   state. the position lives in three tiny files on disk, so a redeploy
+   resumes on the 2nd of 3 adds. nobody locks anything: agents commit their
+   claim to git before they work, the way a person grabs a ticket. determinism
+   on the outside, intelligence on the inside. that's the whole idea.
+
+   * DONE separate WHEN from WHAT                          :substrate:
+   * DONE make a crash hold its place, never lose it
+   * TODO you — reading the spec, predicting the next six ticks
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·5 — <b>under agents · orchestration</b></div>
+      <h1><span class="ln">cadence</span><span class="ln bub">BEHIND</span><span class="ln">the standing agent</span></h1>
+      <p class="dek">The <a href="agents">agents lesson</a> sold you a model on a
+      schedule. <b>Orchestration</b> is the machinery of the schedule — a tick
+      engine that owns <b>when</b>, a lifecycle declared in <a href="org">org</a>
+      that owns <b>what kind</b>, and a claims protocol agents commit to git. The
+      surprise: almost none of it is AI. It's a small loop and a state machine
+      you can read.</p>
+      <div class="meta">
+        <span class="on">orchestration</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/orchestration-hero.jpg" alt="A single small figure standing before a monumental brass orrery of slowly turning rings and dials, gears the size of cathedral doors clicking one notch at a time, warm amber light — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>orchestration</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#sublesson">The machinery of the schedule</a>
+  <a href="#problem">Cron is not a colleague</a>
+  <a href="#definition">The definition</a>
+  <a href="#tick">Anatomy of a tick</a>
+  <a href="#lifecycle">A day declared in org</a>
+  <a href="#outcomes">Four outcomes, one rule each</a>
+  <a href="#survival">Cadence that survives the machine</a>
+  <a href="#backoff">The price of idleness</a>
+  <a href="#crew">Many workers, one box</a>
+  <a href="#claims">Claims, not locks</a>
+  <a href="#honest">Where the edges are</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="sublesson">
+  <h2>the machinery of the SCHEDULE</h2>
+  <p>This is a deep dive under <a href="agents">Agents</a>, and it picks up
+  exactly one thread the parent left dangling. The agents lesson defined a
+  standing agent as a worker that needs four things — files, tools, memory, and
+  <b>time</b>. It spent its pages on the first three and handed you the fourth
+  as a single word: a model <em>on a schedule</em>.</p>
+  <p>That word hides an engine. A schedule that's worth trusting has to survive
+  crashes, redeploys, idle stretches, and the moment you run a second agent
+  beside the first. This page is that engine — about four hundred lines of tick
+  loop plus a state machine you declare in <a href="org">the grammar</a>. If the
+  parent lesson is new to you, read it first; everything here is the
+  <em>when</em> around the <em>what</em> it already taught.</p>
+</section>
+
+<section id="problem">
+  <h2>cron is not a COLLEAGUE</h2>
+  <p>The naive version is one line: a cron job that calls a model. It works in
+  the demo and fails in production, in five specific ways you've either hit or
+  will:</p>
+  <ul>
+    <li><b>The schedule dies with the run.</b> The model call throws, the
+    process that scheduled it goes down, and your standing agent is now a
+    stopped agent — discovered hours later.</li>
+    <li><b>A redeploy resets the clock.</b> You push a fix at 2pm; the hourly
+    agent that was due at 2:05 now fires a fresh hour later. Every deploy
+    silently skips a beat.</li>
+    <li><b>You pay for idle polls.</b> Nothing to do at this tick, but the model
+    still gets called to discover that — a full LLM bill every poll, forever,
+    to be told <em>nothing</em>.</li>
+    <li><b>The days have no shape.</b> The agent does "stuff" every tick with no
+    structure — no sense that mornings add work, afternoons audit it, and there
+    should be a quiet stretch in between.</li>
+    <li><b>Two of them grab the same task.</b> The instant you run a second
+    agent on the same board, both reach for the top ticket and you've paid twice
+    for one result.</li>
+  </ul>
+  <p>Orchestration is the answer to all five. And the thing worth sitting with:
+  almost none of the answer is intelligence. It's a careful loop, a few files on
+  disk, and a state machine in plain text.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">or·ches·tra·tion</span> <span class="pr">/ˌɔr·kə·ˈstreɪ·ʃən/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the <b>deterministic skeleton</b> around
+    non-deterministic work — a tick engine that owns <b>when</b> an agent runs, a
+    <b>lifecycle</b> declared in org that owns <b>what kind</b> of work each tick
+    does, and a <b>claims protocol</b> that says <b>who</b> took which task. One
+    worker is one agent is one cadence.</p>
+  </div>
+  <p>The whole design is a split, and it's written into the code as a comment:
+  <em>org owns the spec; this module just interprets and steps it</em>. The
+  runtime is rigid on purpose — it decides timing, position, gates, and retries,
+  and it never improvises. The intelligence lives <b>inside</b> a state, where
+  the agent decides what the work actually is. Determinism on the outside,
+  judgment on the inside. Everything below is consequences of that one line.</p>
+</section>
+
+<section id="tick">
+  <h2>anatomy of a TICK</h2>
+  <p>Start with one heartbeat. A worker — one per agent — gets a
+  <code>:tick</code> message and runs a fixed sequence. It records the time so a
+  restart can do the arithmetic later; optionally pulls the tenant's git origin
+  so a push from anywhere becomes live within one tick; consults the lifecycle
+  for which state it's in; then runs the agent definition <b>inside a killable
+  task under a fifteen-minute wall clock</b>. Whatever comes back maps to one of
+  four outcomes, and that outcome decides the next delay.</p>
+  <pre class="mermaid">
+flowchart TD
+  t([":tick"]) --> rec["record last-run time"]
+  rec --> git{"WB_GITOPS?"}
+  git -- yes --> pull["pull tenant origin · best-effort"]
+  git -- no --> lc
+  pull --> lc["consult lifecycle — which state?"]
+  lc --> gate{"state gated?<br/>(MIN-INTERVAL)"}
+  gate -- "not elapsed" --> hold["no-op · hold position"]
+  gate -- "open" --> run["run def in Task.async<br/>wall clock 15 min"]
+  run --> out{"outcome"}
+  out -- ":done" --> adv["advance position"]
+  out -- ":no_work" --> ff["fast-forward repeats"]
+  out -- ":failed / :killed" --> keep["hold same state · retry"]
+  out -- ":no_work streak" --> back["exponential backoff"]
+  adv --> sched["Process.send_after(next)"]
+  ff --> sched
+  keep --> sched
+  hold --> sched
+  back --> sched
+  style t fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style run fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style sched fill:#f2ddb0,stroke:#121316
+  </pre>
+  <p>Two safety properties are doing quiet work in that picture. The run executes
+  in a <em>linked task</em> the worker can <code>yield</code> on or
+  <code>shutdown</code> with a brutal kill — so a run that hangs is bounded at
+  fifteen minutes, and a run that crashes <b>never takes the worker down with
+  it</b>. The schedule outlives the run, which is failure mode number one,
+  solved. And the run is the same call path as the public <code>/api/run</code>
+  endpoint — the standing agent and a one-off request execute identically, which
+  is why a once-correct run is a forever-correct run.</p>
+</section>
+
+<section id="lifecycle">
+  <h2>a day declared in ORG</h2>
+  <p>A schedule that just fires every hour has no shape. The lifecycle gives the
+  day a shape — and it's a <b>deterministic state machine declared in org,
+  executed one transition per tick</b>. The headings are states; the property
+  drawers — the same <a href="drawers">drawer convention</a> the
+  <a href="workflows">workflow layer</a> uses — carry the edges and gates:</p>
+  <pre class="orgsample">#+START: wake_add
+* wake_add
+:PROPERTIES:
+:KIND: wake
+:REPEAT: 3
+:NEXT: wake_audit
+:END:
+* wake_audit
+:PROPERTIES:
+:KIND: wake
+:NEXT: rem
+:END:
+* rem
+:PROPERTIES:
+:KIND: rem
+:NEXT: wake_plan
+:MIN-INTERVAL: 10m
+:END:
+* wake_plan
+:PROPERTIES:
+:KIND: wake
+:NEXT: wake_add
+:END:</pre>
+  <p>Read it as a loop. <code>#+START:</code> names the entry state.
+  <code>:KIND: wake</code> runs the agent definition; <code>:KIND: rem</code> is
+  a quiet beat — it hands off to the <a href="dreaming">dream phase</a> and never
+  calls the model. <code>:REPEAT: 3</code> means do <code>wake_add</code> three
+  successful ticks before taking its <code>:NEXT:</code> edge.
+  <code>:MIN-INTERVAL: 10m</code> on <code>rem</code> is a time gate — that state
+  refuses to run until ten minutes have passed since it last did. The canonical
+  loop is: add three times, audit once, rest, plan, and back to adding.</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> wake_add
+  wake_add --> wake_add: done (hits &lt; 3)
+  wake_add --> wake_audit: 3rd success
+  wake_audit --> rem: done
+  rem --> wake_plan: done · gated 10m
+  wake_plan --> wake_add: done
+  note right of rem
+    KIND rem = dream, no model
+    MIN-INTERVAL 10m time gate
+  end note
+  </pre>
+  <p>The state machine is the deterministic skeleton; what the agent <em>does</em>
+  inside <code>wake_add</code> stays non-deterministic — that's the definition's
+  job, not the engine's. And the spec file is re-read <b>every tick</b>, kept
+  deliberately dumb, so a spec you hot-edit is picked up next beat. You can change
+  the shape of a live agent's day without restarting it. This is distinct from a
+  <a href="workflows">workflow's</a> <code>plan.org</code> — that's the ongoing
+  task DAG that never "completes"; the lifecycle is the recurring skeleton the
+  agent walks while it works that plan.</p>
+</section>
+
+<section id="outcomes">
+  <h2>four outcomes, one rule EACH</h2>
+  <p>Every tick ends in exactly one of four outcomes, and each one does a single,
+  predictable thing to the agent's position — the pair <code>{state, hits}</code>.
+  Learn these four rules and you can predict the next six ticks of any
+  lifecycle.</p>
+  <table class="cmp">
+    <tr><th>outcome</th><th>what it means</th><th>effect on position</th><th>next delay</th></tr>
+    <tr><td><b>:done</b></td><td>real work happened</td><td class="y">hits + 1; at <code>:REPEAT:</code> take <code>:NEXT:</code>, reset hits</td><td>hot cadence — base interval</td></tr>
+    <tr><td><b>:no_work</b></td><td>result began with <code>NO-WORK</code></td><td>collapse remaining repeats, take <code>:NEXT:</code> now</td><td>backoff (see below)</td></tr>
+    <tr><td><b>:failed</b></td><td>the run errored</td><td class="n">hold — retry the <em>same</em> state next tick</td><td>base interval</td></tr>
+    <tr><td><b>:killed</b></td><td>blew the 15-min wall clock</td><td class="n">hold — retry the <em>same</em> state next tick</td><td>base interval</td></tr>
+  </table>
+  <p>The headline is the bottom two rows. A crash or a timeout <b>holds
+  position</b> — the cadence clock is never lost, the agent retries the same
+  state on its next beat. Your place in the day is durable against the worst
+  thing a run can do.</p>
+  <p>The <code>:no_work</code> rule has a subtlety worth stating precisely: it's
+  a <b>fast-forward of repeats, never a skip of states</b>. If there's genuinely
+  nothing to add, <code>wake_add</code> collapses its remaining repeats and moves
+  on immediately — but every state in the declared order <em>still runs</em>. The
+  audit still happens, the rest still happens. The engine speeds through empty
+  repeats without ever letting a state get skipped, so cadenced work like audits
+  and dreams keeps its rhythm.</p>
+</section>
+
+<section id="survival">
+  <h2>cadence that survives the MACHINE</h2>
+  <p>Depth rung — skippable, but it's where "a model on a schedule" becomes
+  trustworthy. The agent's whole sense of time lives in three tiny files on
+  disk, which is what makes a redeploy resume <em>mid-cadence</em> instead of
+  starting over.</p>
+  <table class="cmp">
+    <tr><th>file</th><th>contents</th><th>what it preserves</th></tr>
+    <tr><td><code>keeper-last-run</code></td><td>unix time of the last tick</td><td>catch-up math across a restart</td></tr>
+    <tr><td><code>lifecycle-pos</code></td><td>literally <code>wake_add 2</code></td><td>your place — the 2nd of 3 adds</td></tr>
+    <tr><td><code>lifecycle-ran-&lt;state&gt;</code></td><td>last time a gated state ran</td><td>the <code>MIN-INTERVAL</code> clock</td></tr>
+  </table>
+  <p>The catch-up arithmetic is one expression: on restart the next delay is
+  <code>max(60s, interval − elapsed)</code>. If an hourly agent was forty minutes
+  into its hour when you redeployed, it waits the remaining twenty — not a fresh
+  hour. The sixty-second floor is a boot grace so a restart loop can't hammer the
+  model. Failure mode number two — the reset clock — solved by reading a file.</p>
+  <p>Two more details earn their keep. The current state is mirrored into
+  process-memory so the public plane can read "where is this agent in its day"
+  <b>without a blocking call</b> — and that matters because a tick runs
+  synchronously, so asking a busy worker directly would make you wait the whole
+  run. And a never-run gated state reads as <em>infinitely</em> elapsed, so its
+  gate starts open. The position is a fact on disk, not a fact in a fragile
+  process.</p>
+</section>
+
+<section id="backoff">
+  <h2>the price of IDLENESS</h2>
+  <p>Depth rung. Failure mode number three — paying for idle polls — gets its own
+  mechanism, because it's the one that costs real money. The convention is blunt:
+  an agent with nothing to do ends its run with output that <b>begins with the
+  literal word</b> <code>NO-WORK</code>. The engine reads that and, instead of
+  running the next tick at full cadence, backs off exponentially.</p>
+  <p>The next delay on a NO-WORK streak is
+  <code>max(base, 1&nbsp;min · 2^(streak−1))</code>, capped at thirty minutes.
+  For a continuous worker on the default 45-second breather, the schedule reads:</p>
+  <table class="cmp">
+    <tr><th>NO-WORK streak</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6+</th></tr>
+    <tr><td>next delay</td><td>45s</td><td>1m</td><td>2m</td><td>4m</td><td>8m</td><td>16m</td><td>30m (cap)</td></tr>
+  </table>
+  <p>The verdict of that row: an idle agent quiets itself from roughly eighty
+  model calls an hour down to two. And the recovery is instant — a single
+  <code>:done</code> resets the streak and snaps the agent straight back to hot
+  cadence. It sleeps deeper the longer it's idle and wakes fully the moment there's
+  work. This is the engine's answer to the fair question <em>doesn't a standing
+  agent cost a fortune doing nothing</em> — no, because doing nothing is the one
+  thing it gets cheap at.</p>
+</section>
+
+<section id="crew">
+  <h2>many workers, one BOX</h2>
+  <p>Failure mode number five appears the instant you run two agents. The engine
+  runs a set of them from one manifest — headings are agent names, each with a
+  <code>:DEF:</code> (its definition), an optional <code>:LIFECYCLE:</code>, and
+  an <code>:INTERVAL:</code> fallback cadence. The full manifest grammar belongs
+  to the <a href="fleets">fleets</a> deep dive; here's the shape:</p>
+  <pre class="orgsample">* wren
+:PROPERTIES:
+:DEF: defs/writer.org
+:LIFECYCLE: lifecycle.org
+:INTERVAL: 10m
+:END:
+* moss
+:PROPERTIES:
+:DEF: defs/editor.org
+:INTERVAL: 20m
+:END:</pre>
+  <p>Each member gets a <b>full, independent worker</b> — its own definition, its
+  own lifecycle, its persistence namespaced by name. N agents tick in parallel
+  with no shared cadence state. Two things keep that from becoming chaos. First,
+  a <b>stagger</b>: the i-th worker's first tick is delayed by thirty seconds
+  times its index, so they don't all hit the model at boot. Second, a
+  <b>concurrency gate</b> — a counting semaphore, default max two — that every run
+  must pass through.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as worker wren
+  participant G as the Gate (max 2)
+  participant B as worker moss
+  A->>G: acquire — slot free, granted
+  Note over A: run (holds a slot)
+  B->>G: acquire — slots full, parks FIFO
+  Note over A: run blows the 15-min wall clock
+  A-->>G: release (after-clause, even on timeout)
+  G-->>B: slot handed to queue head
+  Note over B: run begins
+  </pre>
+  <p>The gate's important property is in that last exchange. The worker wraps its
+  run so the slot is released in an <code>after</code> clause — which means a run
+  that crashes <em>or</em> blows its wall clock still returns its slot. A wedged
+  worker can never deadlock the others. The cap protects the box from a thundering
+  herd of model calls; it is not a fairness algorithm beyond first-in-first-out.</p>
+</section>
+
+<section id="claims">
+  <h2>claims, not LOCKS</h2>
+  <p>Now the subtle one. Two agents share a board — what stops them grabbing the
+  same task? The deliberate answer: <b>the runtime locks nothing</b>. Claiming is
+  a <em>definition-level protocol</em>, not a runtime-enforced mutex. An agent
+  claims a task by changing its <a href="boards">board</a> state and writing an
+  <code>:AGENT:</code> property — then <b>committing that to git before it does
+  the work</b>, where every peer can see it.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant W as wren
+  participant Git as the board (git)
+  participant M as moss
+  W->>Git: read board — task-7 is NEXT
+  W->>Git: commit: task-7 → DOING · :AGENT: wren
+  Note over W: now does the work
+  M->>Git: tick — pull first
+  Git-->>M: task-7 is DOING, claimed by wren
+  Note over M: takes task-8 instead
+  </pre>
+  <p>The runtime's job is narrower and stronger than locking: it <b>isolates</b>
+  runs — each worker has its own workdir and state — and it <b>throttles</b> them
+  through the gate. Coordination <em>correctness</em> lives in the definition and
+  the board, which is exactly where the non-deterministic interior of a state
+  already lives. The git commit makes the claim visible, auditable, and revertible
+  — a social protocol, the way a person grabs a ticket off the wall before
+  starting, not a database row-lock. It narrows the race; it does not, by itself,
+  eliminate it (more on that next).</p>
+</section>
+
+<section id="honest">
+  <h2>where the EDGES are</h2>
+  <p>Honesty section. This engine is small and rigid, and its limits come from
+  exactly that.</p>
+  <ul>
+    <li><b>Claims are unenforced.</b> A badly written definition that works before
+    it pulls, or skips the commit-first discipline, <em>can</em> double-grab a
+    task. The protocol makes a collision visible and auditable — it doesn't make
+    it impossible. Correctness is culture here, carried by the definition.</li>
+    <li><b>Failed states retry forever.</b> A state that keeps erroring holds
+    position and retries on every beat. There's no poison-state escape hatch
+    beyond the backoff slowing it down — a permanently broken state is a
+    permanently stuck cadence until a human looks.</li>
+    <li><b>The gate caps the box, not fairness.</b> It bounds how many runs hit
+    the model at once and serves its queue first-in-first-out. It makes no
+    per-agent fairness guarantee beyond that order.</li>
+    <li><b>Min-interval is elapsed time, not a calendar.</b> A gated state fires
+    when enough wall-clock has passed since it last ran — it is not "every weekday
+    at nine." For calendar scheduling you want the <a href="workflows">workflow</a>
+    layer's timestamps, not a lifecycle gate.</li>
+    <li><b>One box, no distributed keeper.</b> The workers run on a single engine.
+    There is no cross-machine cadence coordination — scaling past one box is not
+    this design.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is this just cron?</summary>
+    <p>No — three differences that matter. Cron fires on the clock and forgets
+    everything else. This engine is outcome-aware (a crash holds your place, real
+    work advances it), position-preserving across restarts (catch-up math from a
+    file on disk), and cost-backed-off (an idle agent quiets itself instead of
+    paying for every poll). Cron can't lose its place because it never had one.</p>
+  </details>
+  <details>
+    <summary>Can I change a live agent's lifecycle?</summary>
+    <p>Yes. The spec file is re-read every single tick, deliberately. Hot-edit the
+    state machine and the next beat picks it up — no restart, no redeploy. The
+    agent keeps its current position unless you removed the state it was standing
+    in, in which case it resets to the spec's start.</p>
+  </details>
+  <details>
+    <summary>What if two agents claim the same task?</summary>
+    <p>The git commit makes the race visible and auditable rather than silent —
+    you can see both claims in history. The definition's discipline of pulling
+    before it claims narrows the window hard. The runtime itself does not lock,
+    by design; coordination correctness lives in the definition layer, beside the
+    rest of the agent's judgment.</p>
+  </details>
+  <details>
+    <summary>How do I see where an agent is in its day?</summary>
+    <p>The public plane exposes per-agent status — whether it's running, when it
+    last ran, when it runs next, and its current lifecycle position. It reads from
+    process memory, so it answers instantly even while a tick is mid-run. When an
+    agent "isn't running," that status plus the on-disk position files are your
+    two debugging tools.</p>
+  </details>
+  <details>
+    <summary>What triggers a run right now?</summary>
+    <p>A single watched manual tick — it sends the worker the same
+    <code>:tick</code> message the timer would, immediately, for validation. It's
+    the one-off you reach for when you want to see a run with your own eyes rather
+    than wait for the cadence.</p>
+  </details>
+  <details>
+    <summary>Where does a rest beat actually go?</summary>
+    <p>A <code>rem</code> state hands off to the <a href="dreaming">dream
+    phase</a> — a consolidation step that runs without the model. The
+    <code>MIN-INTERVAL</code> on the state is what keeps that phase on a humane
+    rhythm rather than every beat.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This deep dive is the <em>when</em> around the agent's <em>what</em> — the
+  parent and its neighbors fill in the rest.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the parent — the model this schedules</small></div><span class="go">→</span></a>
+    <a href="fleets"><span class="sw" style="background:#a8d4f0"><b>⛬</b></span>
+      <div>Fleets<small>the agent manifest in full</small></div><span class="go">→</span></a>
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the plan a cadence walks</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>a standing agent on this exact machinery</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · orchestration
+  :PROPERTIES:
+  :SLUG:   orchestration
+  :KIND:   learn
+  :NN:     05.5
+  :KICKER: under agents · orchestration
+  :TITLE1: cadence
+  :TITLE2: BEHIND
+  :TITLE3: the standing agent
+  :CHIP:   orchestration
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/orchestration-hero.jpg
+  :END:
+** og
+- a tick engine owns WHEN; a lifecycle in org owns WHAT-KIND
+- crashes hold position; redeploys resume mid-cadence; idle backs off
+- claims are committed to git, not locked by the runtime
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .36], ["#a8d4f0", .24], ["#aee5c2", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

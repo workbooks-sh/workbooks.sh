@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>worlds — the graph nobody wrote — Workbooks</title>
+<meta name="description" content="A world is the build plan tangle_plan emits from a workflow — components, inferred edges, computed imports and exports, nested sub-worlds, a schedule. The interface isn't declared; it's the residue of the dataflow. A deep dive under workflows.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/worlds-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="worlds — the graph nobody wrote">
+<meta property="og:description" content="The edges, imports, and exports of a deployable world aren't written by hand — they're computed from the plan in about thirty lines of set arithmetic. A deep dive under workflows.">
+<meta property="og:url" content="https://workbooks.sh/learn/worlds">
+<meta property="og:image" content="https://workbooks.sh/og/worlds.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="worlds — the graph nobody wrote">
+<meta name="twitter:description" content="Exports are the outputs nobody consumed. Imports are the union of capabilities. The interface is the residue of the dataflow — and the shape is a confession that worlds are WIT.">
+<meta name="twitter:image" content="https://workbooks.sh/og/worlds.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/worlds.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  the lesson, hidden where only a source-reader will find it:
+
+  * Nightly digest                          :workflow:
+  ** Fetch  :component:   :out events:list
+  ** Sum    :component:   :in events:list  :out summary:string
+  ** Send   :component:   :in summary:string
+
+  you wrote three blocks. you never wrote a single edge.
+  the kernel matched out→in and drew them. then it asked a
+  quieter question: which output did NOBODY consume? none.
+  so this world exports nothing — it is pure effect, the email.
+  exports are not declared. they are the leftovers. that one
+  inversion is the whole page. ~30 lines of set arithmetic you
+  can run in your head. read the rest with that in your pocket.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 08·6 — <b>under workflows · worlds</b></div>
+      <h1><span class="ln">the graph</span><span class="ln bub">NOBODY</span><span class="ln">wrote</span></h1>
+      <p class="dek">A <b>world</b> is what the kernel compiles a
+      <a href="workflows">workflow</a> into — components, inferred edges,
+      computed imports and exports, nested sub-worlds, a schedule. You never
+      write the graph and you never declare the interface, because both are
+      <b>computed from the plan</b> in about thirty lines of set arithmetic.
+      The interface is the residue of the dataflow.</p>
+      <div class="meta">
+        <span class="on">worlds</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/worlds-hero.jpg" alt="A small figure standing before a vast self-assembling orrery of glowing rings — components clicking into orbit, bright wiring threading between them with no hand drawing the lines — monumental machine, tiny human, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/workflows.svg" alt=""></div><span>worlds</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The graph nobody wrote</a>
+  <a href="#definition">The world</a>
+  <a href="#anatomy">Six words on a begin_src line</a>
+  <a href="#edges">Matching out to in</a>
+  <a href="#exports">The surface is the residue</a>
+  <a href="#worlds-in-worlds">Worlds inside worlds</a>
+  <a href="#persist-and-dir">The two flags the diagram skips</a>
+  <a href="#why-wit">The shape is a confession</a>
+  <a href="#downstream">Who reads a world</a>
+  <a href="#honest">Dumb on purpose</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the graph nobody WROTE</h2>
+  <p>The <a href="workflows#compile">parent lesson</a> ends on a single
+  diagram: a workflow with two components compiles into a world that
+  <code>exports: site</code>. It's true, and it's one breath — render and
+  publish go in, a deployable unit comes out. But it has the smell of a
+  marketing claim. <em>Compiles how?</em> Nobody wrote the wire between
+  render and publish. Nobody declared an interface. Yet the engine somehow
+  gets a typed-looking, deployable thing with a public surface. Either
+  there's a real algorithm under that arrow, or there's a demo-ware trick.</p>
+  <p>Every other orchestrator makes you author the graph by hand. Airflow has
+  you write the DAG in Python. GitHub Actions makes you spell out
+  <code>needs:</code> on each job. Bazel wants explicit <code>deps</code>.
+  And separately — in a second artifact that drifts from the first — you
+  write the interface: a WIT world, a protobuf, an OpenAPI spec. Two graphs
+  to keep honest, and an agent reviewing your plan can't read either when one
+  lives in a UI and the other in a sidecar file.</p>
+  <table class="cmp">
+    <tr><th></th><th>you write the graph?</th><th>you write the interface?</th></tr>
+    <tr><td>Airflow / Actions / Bazel</td><td class="n">yes — by hand, separately</td><td class="n">yes — a second artifact</td></tr>
+    <tr><td><b>a world</b></td><td class="y">no — edges are matched</td><td class="y">no — the surface is computed</td></tr>
+  </table>
+  <p>The whole of this page is the question that table sets up: what if both
+  were <b>computed</b> from the plan you already wrote — and the computation
+  were small enough to run in your head?</p>
+</section>
+
+<section id="definition">
+  <h2>the WORLD</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">world</span> <span class="pr">/wɜrld/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the build plan the kernel's
+    <b>tangle_plan</b> emits from a <a href="workflows"><b>workflow</b></a> —
+    components, <b>inferred</b> data-flow edges, <b>computed</b> imports and
+    exports, nested sub-worlds, and a schedule — one JSON object per
+    <code>:workflow:</code> headline, deliberately shaped like a WIT world.</p>
+  </div>
+  <p>One <code>:workflow:</code> headline in, one world out. The shape is
+  fixed — seven keys, no more:</p>
+  <pre class="orgsample">{ name, schedule, imports, exports, components, edges, workflows }</pre>
+  <p><code>components</code> are the tasks you wrote. <code>edges</code>,
+  <code>imports</code>, and <code>exports</code> are the three things you
+  <em>didn't</em> — the kernel works them out. <code>workflows</code> holds
+  nested sub-worlds (a world contains worlds). <code>schedule</code> rides
+  along from an org timestamp. The kernel that emits this is about 550 lines
+  of pure Rust — no host calls, the same wasm in every surface — and
+  <code>tangle_plan</code> is one of its six exports. This page is that one
+  export, told properly. The crate itself has <a href="the-kernel">its own
+  lesson</a>.</p>
+</section>
+
+<section id="anatomy">
+  <h2>six words on a begin_src LINE</h2>
+  <p>A component's whole interface is the header args on its first source
+  block. There are six, and that's the entire authoring surface — the
+  grammar for writing them lives in <a href="tangling">tangling</a>; here's
+  what each one becomes in the world:</p>
+  <figure class="diag" aria-label="header args mapped to world fields">
+    <div class="d-file">
+      <span class="ftag">#+begin_src — the component's interface, in six tokens</span>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">:deps</span><span class="sub">comma-split list — <code>tokio@1.35,serde@1</code> — what gets compiled in-sandbox</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#9fc4e8">:uses</span><span class="sub"><b>repeatable</b> — a capability the component needs; many declares, many caps</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">:out</span><span class="sub">at most <b>one</b> — the named value this component produces</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">:in</span><span class="sub">at most <b>one</b> — the named value it consumes (no fan-in, on purpose)</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">:persist</span><span class="sub">a bare flag, no value — opt in to durable state across runs</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">:dir</span><span class="sub">point at a real project directory instead of the inline block</span></div>
+    </div>
+    <figcaption class="dcap">unknown tokens are silently ignored — <b>the lens is small on purpose</b></figcaption>
+  </figure>
+  <p>Two of those carry weight the parent never mentioned. <code>:in</code>
+  and <code>:out</code> are each <b>single</b> — a component declares at most
+  one input and one output. That's not an oversight; it's the shape that
+  makes the edge inference a clean name-match, and it's a real limit we'll be
+  honest about later. <code>:uses</code> is the opposite — repeatable, so one
+  component can declare several capabilities. The component's name is just
+  the headline title with the trailing tags stripped.</p>
+</section>
+
+<section id="edges">
+  <h2>matching out to IN</h2>
+  <p>Here is the first half of the inference, and it is almost embarrassingly
+  small. Build a map from each <code>:out</code> name to the component that
+  produces it. Then for every component with an <code>:in</code>, look up a
+  producer of <em>that exact name</em>. If one exists, emit an edge
+  <code>{from: producer, to: consumer}</code>. That's it.</p>
+  <p>Take the real Nightly digest workflow — three components, three
+  languages, written without a single arrow between them:</p>
+  <pre class="orgsample">* Nightly digest                          :workflow:
+  SCHEDULED: &lt;2026-06-06 Sat 06:00 +1d&gt;
+** Fetch events                           :component:
+   #+begin_src rust :deps tokio@1.35,serde@1 :uses workbook:vfs/query :out events:list
+** Summarize                              :component:
+   #+begin_src js :in events:list :uses workbook:llm/complete :out summary:string
+** Send                                   :component:
+   #+begin_src go :in summary:string :uses workbook:net/email</pre>
+  <p>Fetch produces <code>events:list</code>; Summarize consumes a name
+  spelled exactly <code>events:list</code> — edge. Summarize produces
+  <code>summary:string</code>; Send consumes <code>summary:string</code> —
+  edge. The graph draws itself:</p>
+  <pre class="mermaid">
+flowchart LR
+  fetch["Fetch events<br/>:out events:list"]
+  sum["Summarize<br/>:in events:list · :out summary:string"]
+  send["Send<br/>:in summary:string"]
+  fetch -- "events:list" --> sum -- "summary:string" --> send
+  style fetch fill:#f2ddb0,stroke:#121316
+  style sum fill:#a8d4f0,stroke:#121316
+  style send fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>The match is <b>whole-string equality on the name</b>. The
+  <code>:string</code> half of <code>summary:string</code> is a convention
+  living inside the name, not a parsed type — the matcher sees one opaque
+  string and compares it to another. Fan-out works: one producer feeds many
+  consumers, each gets its own edge. Fan-in does not — a single
+  <code>:in</code> means a component can never join two upstreams. That
+  asymmetry is load-bearing, and we'll come back to it.</p>
+</section>
+
+<section id="exports">
+  <h2>the surface is the RESIDUE</h2>
+  <p>Now the inversion — the moment the whole page turns on. You have the
+  edges. So ask the producer map a single question: which outputs did
+  <em>nobody</em> consume? Those leftover outputs are, by definition, the
+  world's public surface. <b>Exports are not declared. They're computed as
+  the unconsumed outputs.</b> Imports are just as cheap: the sorted union of
+  every component's <code>:uses</code>.</p>
+  <p>You never write the interface because the interface is the dataflow's
+  residue. Run that rule against the digest and something striking falls
+  out:</p>
+  <pre class="orgsample">imports : [ workbook:llm/complete, workbook:net/email, workbook:vfs/query ]
+edges   : [ Fetch events → Summarize,  Summarize → Send ]
+exports : [ ]
+schedule: { at: 2026-06-06T06:00, repeat: +1d, active: true }</pre>
+  <p>Exports is empty — and that emptiness is <b>information</b>. Every output
+  this workflow produces is consumed inside it; the digest is a closed
+  pipeline whose only effect on the world is the email capability it imports.
+  The plan is telling you, mechanically: this world has no API, only effects.
+  Leave one output loose — wire nothing to it — and <em>that</em> becomes
+  your export, your public surface, without you ever typing the word.</p>
+  <p>Contrast it with a pipeline that leaves a value dangling. The
+  <code>Transform</code> sub-world below ends on a <code>Score</code>
+  component whose <code>score:f64</code> nobody downstream consumes:</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph A["Nightly digest"]
+    direction LR
+    a1["Fetch"] --> a2["Summarize"] --> a3["Send"]
+    ax["exports: [ ]"]
+  end
+  subgraph B["Transform"]
+    direction LR
+    b1["Clean"] -- "clean:json" --> b2["Score"]
+    bx["exports: [ score:f64 ]"]
+  end
+  style ax fill:#d9dbd3,stroke:#121316
+  style bx fill:#13d943,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Same algorithm, two verdicts. The digest consumes everything, so its
+  surface is empty — pure effect. Transform leaves <code>score:f64</code>
+  unconsumed, so its surface is exactly that one value. The author chose
+  neither; the dataflow decided.</p>
+</section>
+
+<section id="worlds-in-worlds">
+  <h2>worlds inside WORLDS</h2>
+  <p>Depth rung. The compiler walks the headline tree, and a
+  <code>:workflow:</code> headline nested inside another isn't a component —
+  it's a <b>sub-world</b>, compiled by the same recursion, its subtree
+  skipped at the parent level. A <code>:component:</code> child joins this
+  world's component list; anything else is skipped. The whole tree becomes
+  one nested DAG.</p>
+  <p>Here is the real nested example — a Pipeline whose middle task is itself
+  a workflow:</p>
+  <pre class="orgsample">* Pipeline                                :workflow:
+** Ingest                                 :component:   :out raw:bytes
+** Transform                              :workflow:
+*** Clean                                 :component:   :in raw:bytes :out clean:json
+*** Score                                 :component:   :in clean:json :out score:f64
+** Publish                                :component:   :in raw:bytes</pre>
+  <pre class="mermaid">
+flowchart TD
+  subgraph P["Pipeline  (parent world)"]
+    direction LR
+    ing["Ingest<br/>:out raw:bytes"]
+    pub["Publish<br/>:in raw:bytes"]
+    ing -- "raw:bytes" --> pub
+    subgraph T["Transform  (sub-world)"]
+      direction LR
+      cl["Clean<br/>:in raw:bytes"] -- "clean:json" --> sc["Score"]
+      tx["exports: [ score:f64 ]"]
+    end
+  end
+  px["Pipeline exports: [ ]"]
+  style P fill:#fbfaf6,stroke:#121316
+  style T fill:#ffffff,stroke:#121316
+  style tx fill:#13d943,stroke:#121316
+  style px fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>The verified output: the parent Pipeline has components
+  <code>[Ingest, Publish]</code>, one edge <code>Ingest → Publish</code> on
+  <code>raw:bytes</code>, and <code>exports: []</code>. The nested Transform
+  has <code>[Clean, Score]</code>, edge <code>Clean → Score</code> on
+  <code>clean:json</code>, and <code>exports: [score:f64]</code> — the
+  unconsumed value surfaces on the <em>inner</em> world only, because
+  inference is scoped per nesting level.</p>
+  <p>And the honest seam: Clean declares <code>:in raw:bytes</code>, but no
+  producer of <code>raw:bytes</code> exists <em>inside</em> Transform — so
+  Clean gets <b>no edge</b>. At run time a sub-workflow receives the original
+  workflow input, not the parent's intermediate value; cross-boundary
+  dataflow isn't edge-wired. This page owns the <em>algorithm</em>; the story
+  of <em>combining</em> workbooks — grafting, surfaces, the flat forest — is
+  <a href="nesting">nesting</a>'s.</p>
+</section>
+
+<section id="persist-and-dir">
+  <h2>the two flags the diagram SKIPS</h2>
+  <p>The parent diagram never mentions the two header args that change what a
+  component <em>is</em> rather than how it wires. Both deserve a plain
+  account, because both are easy to imagine wrongly.</p>
+  <p><b><code>:persist</code></b> is a bare flag — Motoko-style orthogonal
+  persistence. Mark a component <code>:persist</code> and it opts into durable
+  state across runs. The Agent workflow below declares it on
+  <code>Remember</code>:</p>
+  <pre class="orgsample">* Agent                                   :workflow:
+** Remember                               :component:   :persist :out memory:json
+** Act                                    :component:   :in memory:json</pre>
+  <p>Ask the engine which components survive a redeploy and it answers with a
+  one-item list — verified: <code>durable_components(tangle_plan(...))</code>
+  returns <code>["Remember"]</code>. But here is the part worth stating
+  plainly, because the intuition is wrong: <code>:persist</code> is
+  <em>not</em> a snapshot of Wasm linear memory. Components are stateless
+  between <code>run</code> calls. <code>:persist</code> is the <b>contract
+  that a component checkpoints its state to the VFS</b> — and the VFS is the
+  orthogonal-persistence layer, where freeze/resume copies it and Litestream
+  replicates it. The durable thing is a file, not a frozen heap. Where that
+  state actually lives is <a href="vfs">vfs</a> and <a href="sync">sync</a>.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as a component
+  participant V as the VFS (durable)
+  Note over C: run 1
+  C->>V: checkpoint state  (only if :persist)
+  Note over C: process exits — memory gone either way
+  Note over C: run 2 (after redeploy)
+  V-->>C: state restored  (only if :persist)
+  Note over C: without :persist — starts clean
+  </pre>
+  <p><b><code>:dir</code></b> is the escape hatch. Instead of an inline source
+  block, point the component at a real project directory with its own
+  Cargo.toml or package.json. That's <b>Mode 2</b> — a full project compiled
+  entirely in-sandbox (for Rust, mrustc.wasm hands off to clang.wasm; native
+  cargo is never invoked). The inline path is <b>Mode 1</b> — a
+  content-addressed cache, each block keyed by a sha to a built
+  <code>.wasm</code>, with <code>:deps</code> fetched and compiled in the
+  sandbox too. Both lanes are the in-sandbox compilers behind
+  <a href="toolkit">toolkit</a> and <a href="lanes">lanes</a>; the plan just
+  records which one a component uses.</p>
+</section>
+
+<section id="why-wit">
+  <h2>the shape is a CONFESSION</h2>
+  <p>Why these exact seven keys? Why <code>imports</code> and
+  <code>exports</code> and nested <code>workflows</code> — the vocabulary of a
+  WIT world? Because the kernel that emits worlds <em>is itself</em> a WIT
+  world, and it eats its own constraint.</p>
+  <figure class="diag" aria-label="world.wit beside a world JSON">
+    <div class="d-file">
+      <span class="ftag">world.wit — the kernel's own boundary</span>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">world oql</span><span class="sub">six exports, all <code>string → string</code></span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">no imports</span><span class="sub">zero host calls — instantiates with no WASI context</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">a fault traps</span><span class="sub">inside Wasmtime — pure in, pure out</span></div>
+    </div>
+    <figcaption class="dcap">the kernel rides the same Component Model it <b>imposes on user code</b></figcaption>
+  </figure>
+  <p>Six string-to-string exports, no imports, no <code>unsafe</code>, no
+  hand-rolled pointer ABI — bindings generated by cargo-component. The same
+  Rust functions link two ways: a native rlib into the <code>wb</code> CLI,
+  and the wasm Component the BEAM embeds and calls. There is no separate
+  "wasm version" of the kernel logic.</p>
+  <p>So the plan is WIT-shaped because worlds are meant to <em>be</em> WIT
+  worlds. Two proofs that the shape isn't decoration. First: the conformance
+  demo runs the kernel itself against the <code>workbooks:engine</code>
+  contract and the kernel is <b>rejected</b> — it has no <code>run</code>
+  export, so it is correctly not an engine. Worlds are distinct contracts,
+  enforced. Second: the kernel keeps a <code>comp_out</code> map — each
+  component's name and output — so the upgrade gate can notice when an output
+  <em>type</em> changed. That's the moment the <code>:type</code> suffix in
+  <code>summary:string</code> stops being decoration and becomes
+  load-bearing. It's invisible to the edge matcher and decisive at upgrade
+  time — covered in <a href="upgrades">upgrades</a>.</p>
+</section>
+
+<section id="downstream">
+  <h2>who reads a WORLD</h2>
+  <p>One plan, many readers — that's the payoff. The same JSON is build
+  instructions, an execution graph, a capability manifest, and an upgrade
+  contract, and each consumer takes the field it needs:</p>
+  <pre class="mermaid">
+flowchart TD
+  w[["a world (JSON)"]]
+  w --> pm["PackageManager<br/>builds the components"]
+  w --> wv["waves<br/>runs them in topological order"]
+  w --> dk["the Dock<br/>grants from imports"]
+  w --> up["check_upgrade<br/>diffs two worlds"]
+  w --> va["validate<br/>pre-flights the plan"]
+  w --> sc["schedule field<br/>rides along"]
+  style w fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style wv fill:#13d943,stroke:#121316
+  </pre>
+  <p>The edges-become-pipes story is two real lines. The runner builds a
+  consumer-to-producer map from the world's edges, then a node's stdin is
+  either its producer's stdout or — if it has no edge — the workflow input:</p>
+  <pre class="orgsample">producer = Map.new(world["edges"], fn e -> {e["to"], e["from"]} end)
+in_data  = if from = producer[name], do: acc[from], else: input</pre>
+  <p>From there: components run in topological <b>waves</b> — each wave is the
+  set of steps whose predecessors are done — parallel within a wave, up to
+  eight at once, a long per-step timeout. Depth on that belongs to
+  <a href="waves">waves</a>. A component whose language is <code>agent</code>
+  runs the agent loop instead: its source block is the system prompt, its
+  piped input is the task. The <code>imports</code> field becomes the
+  capability grants the <a href="the-dock">Dock</a> hands out —
+  <code>workbook:vfs/query</code>, <code>workbook:llm/complete</code>,
+  <code>workbook:net/email</code> are WIT-style <code>namespace:interface/func</code>
+  paths, covered in <a href="capabilities">capabilities</a>.
+  <code>check_upgrade</code> diffs two worlds (<a href="upgrades">upgrades</a>);
+  <code>validate</code> pre-flights one (<a href="validations">validations</a>);
+  the <code>schedule</code> record is read by <a href="schedules">schedules</a>
+  and rendered onto <a href="boards">boards</a>. The org headline IS the DAG —
+  no DSL, no board model, the runtime just executes the plan.</p>
+</section>
+
+<section id="honest">
+  <h2>dumb on PURPOSE</h2>
+  <p>Honesty section, and the honesty is the design argument. The inference is
+  deliberately small, and small means it has sharp edges you should know
+  before they bite.</p>
+  <ul>
+    <li><b>One input per component — no fan-in.</b> A component can't join two
+    upstreams; there's a single <code>:in</code>. Need to merge two
+    producers? Restructure so something upstream emits the combined value.
+    Joins are a real gap, not a bug.</li>
+    <li><b>Duplicate <code>:out</code> is silently last-wins.</b> Two
+    components producing the same name — the producer map keeps the last one,
+    no warning. Name your outputs apart, or a consumer will quietly wire to a
+    producer you didn't mean. (Whether that silence is intentional is
+    uncertain; that it happens is verified.)</li>
+    <li><b>Names are not types — until upgrade.</b> The matcher sees
+    <code>events:list</code> as one opaque string. The <code>:type</code>
+    suffix only bites when <code>check_upgrade</code> compares the recorded
+    outputs of two worlds. Between then it's pure convention.</li>
+    <li><b>Sub-world boundaries aren't dataflow-wired.</b> A sub-world's
+    component consuming a parent name gets no edge and, at run time, the
+    workflow's original input. The flat validator won't flag it either.</li>
+    <li><b>Execution is host-piped today, not WIT-composed.</b> The runner
+    composes stdin/stdout filters without WIT — and is honest about its tier:
+    typed in-WASM composition (wac plug) is the declared upgrade, and it
+    needs WIT-declared components. The WIT <em>shape</em> is ahead of the WIT
+    <em>plumbing</em>, on purpose.</li>
+  </ul>
+  <p>None of this is a hedge. Thirty lines of set arithmetic you can predict
+  by hand beat a planner you can't — that trade is the point. A surface you
+  can compute in your head is a surface you can trust.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is the type suffix in events:list checked?</summary>
+    <p>Not by the edge matcher — it compares whole names as opaque strings,
+    so <code>events:list</code> only matches <code>events:list</code>. The
+    suffix becomes load-bearing exactly once: when <code>check_upgrade</code>
+    diffs two worlds and notices a component's output type changed. Convention
+    everywhere else, a gate at upgrade time.</p>
+  </details>
+  <details>
+    <summary>Can two components produce the same output name?</summary>
+    <p>They can, and the last one silently wins — the producer map just keeps
+    the most recent insert. No error. Name them apart, because a consumer of
+    that name will wire to whichever producer landed last, and that's rarely
+    what you meant.</p>
+  </details>
+  <details>
+    <summary>Can a component take two inputs?</summary>
+    <p>No — a single <code>:in</code>, so no fan-in or joins. Restructure so
+    something upstream emits the combined value, then consume that. Fan-out
+    is fine: one producer can feed many consumers.</p>
+  </details>
+  <details>
+    <summary>Do I ever write a world by hand?</summary>
+    <p>Never. A world is compiled output — the org workflow is the source, and
+    <code>tangle_plan</code> emits the JSON. You write headlines and six
+    header args; the kernel computes the edges, imports, and exports. Editing
+    the world directly would be editing the build artifact, not the build.</p>
+  </details>
+  <details>
+    <summary>Where does the schedule go?</summary>
+    <p>Into the world record — a <code>:SCHEDULE:</code> property becomes a
+    cron field, else an org <code>SCHEDULED:</code> timestamp becomes
+    <code>{at, repeat, active}</code>, else null. The schedule <em>rides in</em>
+    the world; firing it is the engine's job, covered in
+    <a href="schedules">schedules</a>.</p>
+  </details>
+  <details>
+    <summary>Is this the same world as WIT's world?</summary>
+    <p>Same idea, same shape — imports, exports, nested worlds — at the plan
+    level rather than the bytes level, for now. The kernel itself ships as a
+    real WIT world, and the plan is shaped to match so worlds can someday be
+    wac-plugged without changing the format. The shape is ahead of the
+    plumbing, deliberately.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Worlds are one export of the kernel and the input to everything that
+  runs — these four are the natural next reads.</p>
+  <div class="cards">
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the one-diagram version this page unpacks</small></div><span class="go">→</span></a>
+    <a href="tangling"><span class="sw" style="background:#f2ddb0"><b>✳</b></span>
+      <div>Tangling<small>authoring the header args by hand</small></div><span class="go">→</span></a>
+    <a href="waves"><span class="sw" style="background:#aee5c2"><img src="icons/workflows.svg" alt=""></span>
+      <div>Waves<small>how the compiled world actually runs</small></div><span class="go">→</span></a>
+    <a href="nesting"><span class="sw" style="background:#9fc4e8"><img src="icons/workflows.svg" alt=""></span>
+      <div>Nesting<small>combining workbooks — the grafting story</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workflows · worlds
+  :PROPERTIES:
+  :SLUG:   worlds
+  :KIND:   learn
+  :NN:     08.6
+  :KICKER: under workflows · worlds
+  :TITLE1: the graph
+  :TITLE2: NOBODY
+  :TITLE3: wrote
+  :CHIP:   worlds
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/worlds-hero.jpg
+  :END:
+** og
+- a world is the build plan tangle_plan emits from a workflow
+- edges are matched, imports + exports computed — the interface is the residue
+- WIT-shaped on purpose; ~30 lines of set arithmetic you can predict
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .36], ["#aee5c2", .24], ["#a8d4f0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

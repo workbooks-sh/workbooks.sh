@@ -1,0 +1,71 @@
+{
+ "slug": "validations",
+ "title": "validations — under workflows",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Who says DONE is true",
+   "text": "Lesson eight point two — validations. This one is a sub-lesson, under workflows. And it answers the dread that follows every agent everywhere. An agent just wrote DONE… says who? [curious] By default… says the agent. The same collaborator who hallucinates a filename… declares victory on a half-built thing… and writes confident prose over an empty folder — that collaborator is the one editing your state. Every claim in a plan — this input exists… this task finished… this artifact fits — is, by default, an assertion by the least-trustworthy writer in the system. A validation is what turns a claim into a fact. This page is how."
+  },
+  {
+   "id": "problem",
+   "title": "DONE is a claim",
+   "text": "First — DONE is a claim. The parent lesson sold you the good part. The plan is the state… agents work the ready list… the file is the meeting. But three different lies hide under that one word. First… the plan can be incoherent — a task consumes an input that nothing produces. Second… a task can be unfinished — the work isn't done, but the headline says it is. And third… the artifact can be malformed — it compiled, but it doesn't fit the slot it has to dock into. One word, DONE, covers all three. [sighs] The rest of this lesson is how each one stops being a claim… and becomes a checkable fact."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A validation is a check that converts a claim in the plan into a named diagnostic — and is fail-closed. Anything it cannot positively confirm reads as a failure… never as probably fine. And it isn't one checker. It's a ladder of three rungs, keyed to time. First rung… plan validation — it fires before anything runs, and it asks… does the plan even cohere? Second rung… acceptance — it fires after each task, and it asks… is DONE actually earned? Third rung… conformance — it fires before anything docks, and it asks… does the artifact fit the world? The shared trick across all three is the diagnostic. It carries a scope — the named thing that's wrong — and a message — what's wrong with it. That single shape is the whole difference between drift-as-a-shrug… and drift-as-a-bug-report."
+  },
+  {
+   "id": "plan",
+   "title": "Rung one — validating the plan",
+   "text": "Rung one — validating the plan. This one runs before a single task executes, and it lives in the OQL kernel — the same pure function that ships both inside the command-line tool and as a wasm component. One logic, run everywhere. Here's how it thinks. Picture org text coming in. The headlines get parsed… and anything not tagged as a workflow falls out the side, ignored. What remains is the components. The kernel gathers everything they produce — every declared output — into one set. Then it asks each component just two questions. First… does it have a source block, so it can actually run? Second… does every input it names appear in that produced-set, so something upstream actually makes it? A no to either becomes a diagnostic. That is the whole of rung one — two checks, no more. A small, fast net… not a theorem prover. [curious] It catches the two structural lies that make a plan un-buildable."
+  },
+  {
+   "id": "diagnostic",
+   "title": "The shape of a finding",
+   "text": "Next — the shape of a finding. Let me read you a broken plan and the verdict it earns. Picture a workflow with two components. The first is called Summarize — it has a source block, and it declares an input named events-list. The second is called Orphan task — and it has no source block at all. Run the linter, and you get back two errors. The first… input events-list has no upstream producer… scope, Summarize. The second… component has no source block or language… scope, Orphan task. Two errors, each with a scope — and the scope is the name. [curious] Now, the parent lesson promised drift would get a name and a line number. The code is precise about the first half… and honest about the second. Drift is named by scope — the component's name — not addressed by line. A name is enough to act on. And we'd rather tell you it's a name… than imply a cursor that isn't there. That same diagnostic comes through four doors — the lint command, the bundle gate, a socket call, and an HTTP call. The one that bites is the bundle gate. Bundling is where the plan becomes a shippable workbook… and it flatly refuses to assemble a source that doesn't lint clean. Fix it first."
+  },
+  {
+   "id": "acceptance",
+   "title": "Rung two — DONE has a price",
+   "text": "Rung two — DONE has a price. Rung one proved the plan could run. Rung two proves a task actually did. Its own docs name the idea perfectly… unit tests for org mode. A task can carry its own acceptance criterion, and the runner honors a strict order. First… a done-when property — a shell command that must exit clean. Second, failing that… the first check block in the body. Third, failing both… simply true — no check means the agent's own completion stands. Here's a real gate, from a workflow a model actually wrote. A task to gather pricing information says… download the page, save it to scratch slash e2b underscore pricing dot html. And then one line… done-when… test dash s scratch slash e2b underscore pricing dot html. Test dash s means… the file exists and is not empty. Now walk the exchange. The agent says it's finished. The runner does not take its word — it runs that check in a sandboxed shell, appends a secret sentinel, and watches the output. Sentinel comes back… the task's record becomes DONE. File missing, command errored, or command unknown to the shell… the record becomes FAILED. [excited] The verdict is written into the headline itself, so the file carries the truth."
+  },
+  {
+   "id": "failclosed",
+   "title": "The shell the check runs in",
+   "text": "Now a deeper rung — the shell the check runs in. This is where the word fail-closed gets earned. A check command is author-supplied. That makes it a potential exec vector… so it must never touch a native shell. Every check runs inside the in-wasm shell, over a registry of allowed commands — never native. The mechanism is a sentinel trick. The runner doesn't ask the shell whether it succeeded. It appends… and-and echo… a secret marker… and then checks whether that exact string came back in the output. Shell rules do the rest — the marker only prints if the command before it exited zero. Follow every path. The author's command gets the sentinel bolted on, runs in a shell with only the working directory opened up, and the output either contains the marker… or it doesn't. Contains it… pass. Doesn't… fail. And the side branch matters as much as the main one — an error, a raised exception, or a command the registry doesn't even carry… all collapse to the same FAILED. [excited] There is no path where uncertainty becomes a pass. The honest cost… a correct check that uses a command the wasm shell can't run does not pass. The task stays un-done… rather than escaping to native shell. Fail-closed cuts both ways… on purpose."
+  },
+  {
+   "id": "record",
+   "title": "What a run leaves behind",
+   "text": "Another depth rung — what a run leaves behind. Acceptance isn't only a gate at the moment of finishing. It leaves an audit trail. A run produces three durable things. First… the headline's state in the file — DONE, FAILED, or PARTIAL — that's the live answer, the current truth. Second… a telemetry database, with a task-events table — run id, task id, title, state, output, timestamp. That's the searchable history… so did this check ever pass is a query in SQL, not a memory. Third… a sealed step log, hash-chained and signed — that's the tamper-evident receipt. Telemetry is always on. The seal is best-effort, and never blocks a run. And two execution facts fall out of the same machinery. Already-done tasks get skipped on a re-run… so runs are resumable — re-run a half-finished plan and it picks up exactly where it failed. And a composite parent is done only when all its children are… otherwise it reads PARTIAL."
+  },
+  {
+   "id": "author",
+   "title": "Validation closes the loop",
+   "text": "Now — validation closes the loop. So far it's been a gate at the exit. But the most interesting place it shows up is at the entrance — when an agent writes the plan itself. The groundskeeper's author model emits an outline… and before that outline is allowed to run, the validator asks one question — is there at least one real task heading here? Picture the exchange. A goal comes in. The author model writes an outline. The validator checks for an active task heading. If there's none… the validator's own error text is handed straight back to the model as the retry instruction — your previous outline was invalid, emit a corrected one only. One retry… then it runs. [curious] The error isn't just a rejection — it is the teaching signal. And the same posture runs downstream. The default worker is told… if a task needs acceptance criteria, write them as a check block in scratch and run it yourself before finishing. Validation isn't a thing done to the agents from outside. [chuckles] It's a discipline the agents are taught to author into their own work."
+  },
+  {
+   "id": "conformance",
+   "title": "Rung three — does it dock",
+   "text": "Rung three — does it dock? The plan cohered. The task earned its DONE. One claim remains — the compiled artifact actually fits the slot it has to dock into. The question is narrow and exact — does this built component match the engine world? It pulls the component's interface out with a tool, then makes two checks. First… the component must export a function called run. Second… every function it imports must be one of three engine capabilities — session-info, vfs-query, run-command — with the standard system imports always allowed. Now the teaching moment, two verdicts from the real demo. Ask it about the engine probe… and it answers… ok. Exports run… imports only the Dock functions. Then ask it about the kernel itself — perfectly valid wasm — and it answers… error, missing required export run. [curious] The kernel is rejected… because it's a different world. It has no run export. That's the whole point. Conformance isn't asking… is this good wasm? It's asking… is this this world's wasm? A thing can be flawless… and still not fit the slot."
+  },
+  {
+   "id": "honest",
+   "title": "Where it bites",
+   "text": "Now the honest part — where it bites. Validation is real… but it is not omniscient, and a few edges are load-bearing for your judgment. First… no check means trust. Acceptance is opt-in. A task with no gate at all reaches DONE on the agent's word — exactly the claim we started by distrusting. Second… fail-closed produces false negatives. Correct work whose check uses a command the wasm shell can't run will fail honestly. We chose that over a check that silently escapes to native shell — but the cost is real. Third… diagnostics carry scope, not line numbers. A name and a message… not a cursor. Fourth… the kernel validates two things, not twenty. No cycle detection. [curious] And that one is by design — the execution model is a tree, so a cycle can't even be expressed. Where the structure can't hold a bug… there's nothing to detect. Fifth… conformance is a demoed seam, exercised end-to-end, with universal wiring still ahead of it. And last… one command-line tool's lint is a stub today — use the Rust one, w-b-x lint, for the real diagnostics."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] What if I write no check at all? The task reaches DONE on the agent's word. The check is the difference between a claim and a fact — no check… just a claim. Can a check run arbitrary commands? Only ones the wasm shell carries. Author strings never touch native shell — the sandbox is the safety. Why did my task FAIL when the work looks done? Almost always fail-closed in action — the command isn't one the shell knows, or it errored, or it didn't print its success marker. Does validation catch dependency cycles? No — and it doesn't need to. The model is a tree… a cycle can't be expressed. Correctness by construction. Is the bundle command failing on diagnostics a bug? No — that's the gate. [chuckles] It's the feature working. And where do FAILED results go? Two places — the headline's state in the file… and a row in the telemetry table. So did this ever pass is a query, not an archaeology project."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the parents",
+   "text": "So that's validations. Not magic… just a claim turned into a named diagnostic, fail-closed, in three rungs keyed to time. Before anything runs… after each task… before anything docks. [curious] If any of it felt unfamiliar, the way back up is short. This is a sub-lesson under workflows — lesson eight — the plan that runs. And it stands on agents — lesson five — the worker whose every DONE these gates make true. Everything here is just those two ideas… learning to keep each other honest."
+  }
+ ]
+}

@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vectors — search the workbook by meaning — Workbooks</title>
+<meta name="description" content="A tenant-scoped semantic index that rides the same database as everything else: find files by meaning, not just by word. Embed at store time, brute-force cosine on SQLite or pgvector ANN on Postgres — one interface, callers never branch. A sub-lesson under vfs.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/vectors-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="vectors — search the workbook by meaning">
+<meta property="og:description" content="A tenant-scoped semantic index riding the same database as everything else. Embed at store time; SQLite cosine or pgvector ANN behind one interface. Query, not Memory.">
+<meta property="og:url" content="https://workbooks.sh/learn/vectors">
+<meta property="og:image" content="https://workbooks.sh/og/vectors.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="vectors — search the workbook by meaning">
+<meta name="twitter:description" content="A tenant-scoped semantic index riding the same database as everything else. Embed at store time; SQLite cosine or pgvector ANN behind one interface. Query, not Memory.">
+<meta name="twitter:image" content="https://workbooks.sh/og/vectors.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/vectors.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    SELECT path FROM files WHERE text LIKE '%retry backoff%';
+       → 0 rows.   the note actually says "wait longer between attempts".
+
+    grep finds the WORD. this page is about finding the MEANING.
+    the trick: an embedding model needn't be a model RUNTIME.
+    tokenize → look up each token in a matrix → average → normalize.
+    ~200 lines of elixir, ~30MB of floats, no GPU, no API. dog↔puppy = 0.70.
+
+    and you embed at WRITE time, not read time — so every query is just a lookup.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 09·7 — <b>under vfs · vectors</b></div>
+      <h1><span class="ln">find it by</span><span class="ln bub">MEANING</span><span class="ln">not by word</span></h1>
+      <p class="dek">The parent lesson sold you a <a href="vfs">disk that speaks SQL</a> —
+      but SQL finds <em>words</em>, not meaning. Ask for the bit about retry backoff and
+      it misses the note that says <em>wait longer between attempts</em>. <b>Vectors</b>
+      are the fix: a tenant-scoped semantic index riding the same database as everything
+      else, costing nothing to turn on. This is <b>Query, not Memory</b>.</p>
+      <div class="meta">
+        <span class="on">the index</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/vectors-hero.jpg" alt="A lone figure standing before a vast luminous starfield where every point of light is a word, lines of meaning drawing nearby stars into a single bright constellation — monumental hall, small figure, bright 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/vectors.svg" alt=""></div><span>vectors</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Search finds words, not meaning</a>
+  <a href="#definition">The definition</a>
+  <a href="#ladder">Four rungs of embedder</a>
+  <a href="#model2vec">A model that is just a matrix</a>
+  <a href="#storetime">Embed on write, not on read</a>
+  <a href="#backends">One interface, two engines</a>
+  <a href="#tiers">The machine probe</a>
+  <a href="#hybrid">Semantic, and literal</a>
+  <a href="#recall">The files are the memory</a>
+  <a href="#honest">Where the index ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>search finds words, not MEANING</h2>
+  <p>The <a href="vfs">disk lesson</a> ended on a magic trick: your file system is a
+  database, so a listing is a query and "every file the agent touched this week" is one
+  <code>SELECT</code>. True — and not enough. SQL, and its rougher cousin grep, match
+  <em>characters</em>. Ask the disk for the bit about retry backoff and if the note
+  actually says <em>wait longer between attempts</em>, you get zero rows. The words
+  didn't match. The meaning was right there.</p>
+  <p>The industry's standard fix is heavy. Stand up a vector database — a whole new
+  service. Call an embedding API for every query — a per-call cost, your text leaving
+  the box, a key to manage. Glue the two together and keep them in sync. For a disk that
+  rides inside a single file, that's absurd overhead. And the obvious cheap alternative —
+  just grep harder — is the exact thing that already failed.</p>
+  <p>So the missing piece isn't a bigger database or a smarter API key. It's a second
+  way to ask the disk a question — by meaning — that's light enough to ride in the same
+  file, and free enough to leave on. That's what this lesson is about. It's the
+  <em>semantic</em> twin of the <a href="queries">literal-query lesson</a>: same disk,
+  same store, a different way to reach the bytes.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">vec·tors</span> <span class="pr">/ˈvek·tərz/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a tenant-scoped <b>semantic index</b> riding the same
+    database as the rest of the workbook — text and files turned into vectors at store
+    time, so a query can <b>find by meaning</b>, not just by word. One query modality of
+    a queryable workbook — <b>Query, not Memory</b>.</p>
+  </div>
+  <p>The framing matters more than it looks. Vector search here is one
+  <em>modality</em> — the literal SQL of the <a href="queries">queries lesson</a> is
+  done, semantic is this page, a graph modality is future work. An agent's "memory" is
+  one <em>consumer</em> of it, not its definition. So the construct is called
+  <code>Query</code>, not <code>Memory</code> — and embeddings are pluggable and not
+  required. Literal queries need no model at all; turn the embedder off and the disk is
+  still fully queryable, just with one fewer way to ask.</p>
+</section>
+
+<section id="ladder">
+  <h2>four rungs of EMBEDDER</h2>
+  <p>An <em>embedder</em> is the thing that turns text into a vector — a list of numbers
+  where closeness means similar meaning. One environment variable, <code>WB_EMBED</code>,
+  picks which one runs, and the rungs climb from zero-dependency to anything-you-want.
+  The default is deliberately the cheapest one that needs no download:</p>
+  <table class="cmp">
+    <tr><th>rung</th><th>WB_EMBED</th><th>dim</th><th>quality</th><th>cost</th><th>where it runs</th></tr>
+    <tr><td><b>hash</b></td><td><code>hash</code> <em>(default)</em></td><td>256</td><td class="n">lexical only — not semantic</td><td class="y">zero — no model</td><td>pure Elixir, in-process</td></tr>
+    <tr><td><b>local</b></td><td><code>local</code></td><td>256</td><td class="y">real semantics — dog↔puppy 0.70</td><td class="y">free after one ~30MB download</td><td>pure Elixir, in-process</td></tr>
+    <tr><td><b>openrouter</b></td><td><code>openrouter</code></td><td>1536</td><td class="y">transformer quality</td><td class="n">per-call API — text leaves the box</td><td>OpenRouter, over the network</td></tr>
+    <tr><td><b>http / clip</b></td><td><code>http:&lt;url&gt;</code></td><td>any</td><td class="y">anything, any modality</td><td class="n">your endpoint, your bill</td><td>Modal / Replicate / your sidecar / opt-in CLIP build</td></tr>
+  </table>
+  <p>The honest read of that table: <b>hash</b> is the zero-config baseline — it hashes
+  character three-grams and word tokens into signed buckets, so it's a smarter grep, but
+  it is lexically driven, not semantic. The moment you want real meaning, you flip
+  <code>WB_EMBED=local</code> and get <b>Model2Vec</b> — genuine paraphrase matching, no
+  GPU, no API, no recurring cost. Above that, <b>openrouter</b> reuses your
+  <code>OPENROUTER_API_KEY</code> for transformer-grade quality at a per-call price; and
+  the top rung, <b>http</b>, posts to any endpoint you name — your own GPU sidecar, a
+  hosted model, or the opt-in CLIP build for images. Every rung answers the identical
+  <code>search</code> call; nothing downstream knows which one ran. The next two sections
+  open the two most interesting rungs.</p>
+</section>
+
+<section id="model2vec">
+  <h2>a model that is just a MATRIX</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — how the free semantic rung works</span></p>
+  <p>Here's the aha that makes free semantic search possible: an embedding model
+  doesn't have to be a model <em>runtime</em>. The <b>local</b> rung is Model2Vec, and a
+  Model2Vec "model" is two files — a vocabulary and a precomputed matrix of vectors,
+  roughly <span class="nowrap">8 to 30 MB</span> of 32-bit floats. There is no transformer
+  forward pass, no GPU, no native code. "Inference" is four steps of arithmetic:
+  tokenize the text, look up each token's row in the matrix, average them, and normalize
+  the result to length one. The whole thing is about two hundred lines of pure Elixir.</p>
+  <pre class="mermaid">
+flowchart LR
+  q["retry backoff"]
+  subgraph tok["pure-Elixir WordPiece"]
+    direction TB
+    t1["retry"]
+    t2["backoff"]
+  end
+  subgraph ids["token ids — line number in vocab.txt"]
+    direction TB
+    i1["id 8431"]
+    i2["id 12907"]
+  end
+  subgraph mat["the matrix — one refc binary, ~30MB"]
+    direction TB
+    o1["offset 8431·256·4 → 256 floats"]
+    o2["offset 12907·256·4 → 256 floats"]
+  end
+  avg["average the rows<br/>÷ L2 norm"]
+  vec["the query vector<br/>256 numbers"]
+  q --> tok --> ids --> mat --> avg --> vec
+  style q fill:#ffffff,stroke:#121316
+  style tok fill:#fbfaf6,stroke:#121316
+  style ids fill:#fbfaf6,stroke:#121316
+  style mat fill:#fbfaf6,stroke:#121316
+  style avg fill:#aee5c2,stroke:#121316
+  style vec fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Walk that graph as the words <code>retry backoff</code>: the pure-Elixir WordPiece
+  tokenizer downcases and splits into <code>retry</code> and <code>backoff</code> by
+  longest-prefix matching against the vocabulary — an unmatchable word becomes
+  <code>[UNK]</code>. Each token's id is simply its line number in <code>vocab.txt</code>.
+  That id is the only address you need: the token's vector is a byte slice of the matrix,
+  <code>offset = id · 256 · 4</code> bytes in, decoded as 256 little-endian floats.
+  Average the two rows, divide by the L2 norm, and that's the entire inference.</p>
+  <p>Two design choices keep it cheap. The matrix loads <b>once</b> into
+  <code>:persistent_term</code> and one resident copy serves <em>every</em> tenant —
+  shared compute, never shared data, the same isolation rule the disk follows. And it
+  stays a single reference-counted binary with by-offset lookup rather than a map of
+  float-lists, which would balloon inside the BEAM. The model file itself is a
+  safetensors blob whose data section <em>is</em> the matrix — the parser is six lines:
+  read the header length, read the JSON header, and the rest of the file is the numbers.</p>
+  <p>Does it actually work? The receipt: dog and puppy land at cosine 0.70 — synonym and
+  paraphrase matching the lexical hash baseline simply cannot do. Configuration is one
+  variable each: <code>WB_EMBED=local</code> turns it on; the default model is
+  <code>minishlab/potion-base-8M</code>, fetched once from HuggingFace to
+  <code>&lt;WB_DATA&gt;/_models/</code> (or pre-baked into the image at
+  <code>/opt/models</code> for zero download); <code>WB_EMBED_MODEL</code> swaps the
+  potion variant.</p>
+</section>
+
+<section id="storetime">
+  <h2>embed on WRITE, not on read</h2>
+  <p>Here's the load-bearing decision that makes <em>any</em> embedder — local or paid —
+  affordable: <b>you embed at store time, not query time</b>. Writes are rare; reads are
+  hot. So the embedder is hit when a file is saved, once, and never again on the way out.
+  A query becomes a pure lookup against vectors that already exist. Even a network
+  embedder you pay per call only costs you on writes — and a query against a thousand
+  stored vectors costs nothing.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant W as a write — store/3
+  participant I as index — chunk + embed
+  participant E as the embedder
+  participant V as the vector store
+  participant Q as a query — search
+  rect rgb(251,250,246)
+  Note over W,V: the heavy path — runs on WRITES (rare)
+  W->>I: Vector.forget · then re-index
+  I->>I: chunk — org by headline, code by 20-line windows
+  I->>E: batch embed every chunk
+  E-->>I: vectors
+  I->>V: upsert each chunk + its source metadata
+  end
+  rect rgb(232,243,250)
+  Note over Q,V: the skinny path — runs on READS (hot)
+  Q->>E: embed the query string once
+  Q->>V: nearest-neighbour lookup — no model touched per row
+  V-->>Q: ranked hits, highest score first
+  end
+  </pre>
+  <p>Read the diagram as two paths of very different weight. The top half is the write
+  path inside <code>Library.store</code>: it forgets any old index for the member so a
+  re-index is always clean, chunks the content, batch-embeds every chunk, and upserts
+  each one — carrying its source workbook, path, and headline so a hit can point back to
+  where it came from. An embed failure returns a clean error and never crashes the store.
+  The bottom half is the read path: embed the query string once, then a nearest-neighbour
+  lookup that touches no model per row. Heavy work, done rarely; light work, done
+  constantly.</p>
+  <p>Chunking falls straight out of <a href="org">the grammar</a>. An <code>.org</code>
+  file splits into one chunk per heading section, headline extracted; everything else —
+  code, markdown, plain text across a generous allowlist — splits into 20-line windows
+  labelled <code>lines 1–20</code> and so on. And a member referenced across workbooks by
+  its identity (DID) is resolved and indexed too, so a query can reach into a federated
+  document, not just the local tree.</p>
+</section>
+
+<section id="backends">
+  <h2>one interface, two ENGINES</h2>
+  <p>The cleverest part of the store is the part you never see. There is one
+  <code>Vector.search(tenant, query_vec, k: 5)</code> call, and it runs against one of
+  two completely different engines depending on a single fact about your environment —
+  and <b>no caller anywhere branches on which</b>.</p>
+  <table class="cmp">
+    <tr><th></th><th>SQLite — the default</th><th>pgvector — set WB_DATABASE_URL</th></tr>
+    <tr><td>storage</td><td>vectors as JSON text in a column</td><td class="y">a real <code>vector(dim)</code> column</td></tr>
+    <tr><td>ranking</td><td>brute-force cosine, in Elixir</td><td class="y">ANN in the DB via the <code>&lt;=&gt;</code> operator</td></tr>
+    <tr><td>complexity</td><td class="n">O(n) per query — every row scanned</td><td class="y">sub-linear, indexable</td></tr>
+    <tr><td>scope filter</td><td>filtered in Elixir, after the scan</td><td class="y"><code>workbook = ANY(...)</code> pushed into SQL</td></tr>
+    <tr><td>when</td><td class="y">live-tested default; fine to tens of thousands</td><td>built and shape-tested; the answer at scale</td></tr>
+  </table>
+  <p>The verdict of that table: you chose your vector database when you chose your
+  database. With no <code>WB_DATABASE_URL</code>, you're on SQLite — vectors stored as
+  JSON, cosine computed in Elixir over every row, sorted, top-k taken. It's O(n), and it
+  is honest about being O(n). Set <code>WB_DATABASE_URL</code> and the same calls become
+  real pgvector: the store auto-runs <code>CREATE EXTENSION IF NOT EXISTS vector</code>,
+  sizes the column from the active embedder's dimension, and ranks in-database with
+  <code>ORDER BY vec &lt;=&gt; q LIMIT k</code> — indexable and sub-linear. Flipping that
+  one variable is the entire migration.</p>
+  <pre class="orgsample"><i>-- SQLite: brute-force, honest about the cost</i>
+SELECT … FROM vectors WHERE tenant = ?1
+   <i>→ cosine in Elixir over every row → sort → take k.  O(n).</i>
+
+<i>-- Postgres: the database does the ranking</i>
+SELECT id, workbook, path, headline,
+       1 - (vec &lt;=&gt; $q::vector) AS score, text
+  FROM vectors WHERE tenant = $1
+ ORDER BY vec &lt;=&gt; $q::vector LIMIT 5;
+   <i>→ sub-linear, indexable.  same call, no caller changed.</i></pre>
+  <p>And the O(n) cost on SQLite is made <em>visible</em> rather than hidden. Past 25,000
+  vectors, the store logs exactly once: <i>brute-force search over N vectors on SQLite
+  (O(n) per query) — for sub-linear ANN at scale, set WB_DATABASE_URL → pgvector</i>. The
+  design reasoning is deliberate: a worker pool would only buy a constant-factor speedup
+  (your core count), while the real fix at scale is sub-linear ANN. So instead of hiding
+  the linear cost behind threads, the store tells you when you've outgrown the cheap
+  default and points at the door.</p>
+</section>
+
+<section id="tiers">
+  <h2>the machine PROBE</h2>
+  <p>How does the system know which rung your hardware can actually run? It probes. At
+  boot, a pure-detection capability check reads the OS, core count, RAM, and accelerator —
+  CUDA if <code>nvidia-smi</code> is on the PATH, Metal on Apple silicon, otherwise none —
+  and runs a <code>cond</code> ladder to a recommended tier. No inference happens; it's
+  detection only.</p>
+  <pre class="mermaid">
+flowchart TD
+  start["probe: os · cores · ram · accelerator"]
+  q1{"accelerator ≠ none<br/>AND ram ≥ 16 GB?"}
+  q2{"cores ≥ 4<br/>AND ram ≥ 4 GB?"}
+  big["big_multimodal<br/>a 7B VLM, run locally"]
+  clip["clip<br/>image + text, joint space"]
+  m2v["model2vec<br/>text only — always works"]
+  start --> q1
+  q1 -- yes --> big
+  q1 -- no --> q2
+  q2 -- yes --> clip
+  q2 -- no --> m2v
+  style start fill:#ffffff,stroke:#121316
+  style q1 fill:#fbfaf6,stroke:#121316
+  style q2 fill:#fbfaf6,stroke:#121316
+  style big fill:#f3c5a3,stroke:#121316
+  style clip fill:#a8d4f0,stroke:#121316
+  style m2v fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Walk the ladder top to bottom. If there's a real accelerator and at least 16 GB of
+  RAM, it recommends <b>big_multimodal</b> — the class that runs a 7B vision-language
+  model locally. Failing that, if you have at least four cores and 4 GB, it recommends
+  <b>clip</b> — image and text in one joint space. And if neither holds, it lands on
+  <b>model2vec</b>: text only, and the one that always works on any machine. One honest
+  caveat: this recommendation is <em>advisory</em>. It's printed in the boot line —
+  <i>search config — embed: &lt;adapter&gt;, vectors: &lt;backend&gt;, machine recommends:
+  &lt;tier&gt;</i> — but it does not auto-switch your embedder. <code>WB_EMBED</code> stays
+  the operator's call; the probe only tells you what your box could handle.</p>
+</section>
+
+<section id="hybrid">
+  <h2>semantic, AND literal</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — how the default search fuses two rankings</span></p>
+  <p>Pure semantic search has a blind spot: ask for an exact error code or a function
+  name and meaning-similarity can drift right past the literal string you typed. Pure
+  literal search has the opposite blind spot — it's the grep we started by rejecting. So
+  the default search mode is <b>hybrid</b>: it runs both and fuses them.</p>
+  <pre class="mermaid">
+flowchart TD
+  query["the query"]
+  sem["semantic pool<br/>vector search, top 50"]
+  lit["literal pass<br/>count query terms in each chunk"]
+  rrf["reciprocal-rank fusion<br/>score = Σ 1 / (60 + rank)<br/>absent ranking → rank 1000"]
+  out["one ranked list<br/>highest score first"]
+  query --> sem --> rrf
+  query --> lit --> rrf --> out
+  style query fill:#ffffff,stroke:#121316
+  style sem fill:#a8d4f0,stroke:#121316
+  style lit fill:#f2ddb0,stroke:#121316
+  style rrf fill:#aee5c2,stroke:#121316
+  style out fill:#13d943,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Read the graph as two scouts reporting to one judge. The first scout, semantic,
+  pulls a pool of fifty meaning-matches from the vector store. The second, literal, scores
+  each chunk by how many of your query terms it literally contains. The judge combines
+  them with reciprocal-rank fusion — each chunk's score is the sum of one over sixty plus
+  its rank in each list, and a chunk absent from a ranking is penalised as if it placed
+  one-thousandth. The result is one list where a chunk has to do well in <em>at least one</em>
+  scout's eyes to surface, and a chunk strong in <em>both</em> rockets to the top. When you
+  want only one scout, <code>--semantic</code> and <code>--literal</code> are the escape
+  hatches — but fusion is the right default, because semantic finds the meaning and literal
+  pins the exact terms, and most real questions need both.</p>
+</section>
+
+<section id="recall">
+  <h2>the files ARE the memory</h2>
+  <p>This is where the "Query, not Memory" framing pays off concretely. An
+  <a href="agents">agent</a> here has a <code>search</code> tool described as <i>recall by
+  meaning</i> — and crucially, there is no separate memory store behind it. The tool calls
+  a <em>stateless</em> recall over the agent's working directory: it chunks, embeds, and
+  ranks the actual files on the fly, with no stored index to drift out of sync. To
+  "remember" something, the agent writes an org file with <code>vfs_write</code>; it
+  becomes searchable automatically, because searching reads the real
+  <a href="org">org and code context</a>, not a summary of it. This is the retrieval half
+  of the <a href="agents#needs">memory-is-a-workbook-of-plain-files</a> claim.</p>
+  <p>And the same recall is available without an agent at all. A <a href="workflows">workflow</a>
+  task can carry a retrieve block that runs as a non-LLM step — semantic recall, zero model
+  reasoning, dropping ranked chunks into <code>scratch/</code> for the next task to read:</p>
+  <pre class="orgsample">#+begin_src retrieve :k 5
+how do we handle auth headers
+#+end_src
+   <i>→ runs Library.search_dir, ranks the real org/code,</i>
+   <i>  writes the top 5 chunks to scratch/ — no LLM call.</i></pre>
+  <p>That's the deeper identity of this whole page. Vector search isn't an AI feature
+  bolted onto a disk; it's a query modality, and an agent is just one of its consumers.
+  The same surface answers a shell command, a cron job, and an agent alike — none of them
+  assumes a model is in the loop.</p>
+</section>
+
+<section id="honest">
+  <h2>where the index ENDS</h2>
+  <p>Honesty section. This index has real ceilings, and naming them is the point.</p>
+  <ul>
+    <li><b>The SQLite path is O(n).</b> It scans every vector per query. It stays pleasant
+    into the tens of thousands and then tells you, once, to move to pgvector. That's a
+    designed ceiling with a clear door, not a silent cliff.</li>
+    <li><b>Static embeddings trade quality for size.</b> Model2Vec is genuinely semantic,
+    but a real transformer embedder beats it on hard paraphrase. The rungs above —
+    OpenRouter, your own <code>http:</code> endpoint, CLIP — exist for exactly when you've
+    outgrown it.</li>
+    <li><b>The default isn't semantic.</b> <code>hash</code> ships on so the construct works
+    with zero download — but it's lexical. Real meaning starts at
+    <code>WB_EMBED=local</code>, and that line is the single most important flip on this
+    page.</li>
+    <li><b>Separate models mean separate spaces.</b> A text embedder and an image embedder
+    that aren't the same model can't find each other — text-finds-text, image-finds-image.
+    Cross-modal search (a text query finding an image) needs <em>one shared space</em>: the
+    CLIP build or a single multimodal endpoint via <code>WB_EMBED_MULTIMODAL=http:&lt;url&gt;</code>.</li>
+    <li><b>Images are opt-in.</b> In-BEAM CLIP lives behind a <code>WB_CLIP=1</code> build
+    (~170 MB of models and runtime); the lean default carries zero native ML and gives an
+    honest error if you ask for CLIP without building it. <b>Audio isn't covered</b> at
+    all — video is handled as keyframes embedded like images, but there's no audio model.</li>
+    <li><b>The faster SQLite ANN isn't built.</b> <code>sqlite-vec</code> is named as the
+    future upgrade for when the extension is loadable — it isn't wired today. And the
+    ~30 MB local model downloads once from HuggingFace unless you bake it into the image.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Does my text leave the machine?</summary>
+    <p>Only if you choose a rung that sends it. On <code>hash</code> and
+    <code>WB_EMBED=local</code> nothing leaves — the embedder runs in-process, pure Elixir.
+    The <code>openrouter</code> and <code>http:</code> rungs do call out by design, because
+    that's the trade you opted into for higher quality. The default keeps your text in the
+    box.</p>
+  </details>
+  <details>
+    <summary>Do tenants share the model?</summary>
+    <p>Shared compute, never shared data. The local matrix loads once into
+    <code>:persistent_term</code> and one resident copy serves every tenant — but a tenant
+    is the first argument of every store and search call, and one tenant's vectors are never
+    visible to another. The same scoping rule as the disk itself.</p>
+  </details>
+  <details>
+    <summary>What happens if the embedder is down?</summary>
+    <p>Nothing crashes. An embed failure on write returns a clean
+    <code>{:error, "embed failed: …"}</code>; an unavailable embedder on read returns an
+    empty result, not an exception. Indexing is best-effort by design — a flaky embedder
+    degrades search, it doesn't break the workbook.</p>
+  </details>
+  <details>
+    <summary>Can a text query find images?</summary>
+    <p>Only when text and images live in <em>one shared space</em>. That means the CLIP
+    build or a single multimodal endpoint, where a text query is embedded in the image
+    model's space — for CLIP, that's the CLIP-text tower. Wire up a separate image model and
+    a separate text model and they each only find their own kind; cross-modal needs the one
+    joint space.</p>
+  </details>
+  <details>
+    <summary>Why not just use a real vector database?</summary>
+    <p>You can — that's what <code>WB_DATABASE_URL</code> does, turning the store into real
+    pgvector with ANN. The point is you don't <em>have</em> to stand one up to get useful
+    semantic search on a project-sized disk. The default rides in the same database as
+    everything else, and you graduate to a dedicated engine the day your scale asks for it,
+    by changing one variable.</p>
+  </details>
+  <details>
+    <summary>Why is the default hash and not local?</summary>
+    <p>So the construct works the instant you turn it on, with no download and no model
+    file — a zero-dependency baseline that's a smarter grep. It is not semantic, and the
+    page is loud about that. The first thing most people should do is set
+    <code>WB_EMBED=local</code> for real meaning at no recurring cost.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This index makes the disk findable-by-meaning — but it sits among neighbours, and it
+  reads best once you've met them.</p>
+  <div class="cards">
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>the disk this index makes findable by meaning</small></div><span class="go">→</span></a>
+    <a href="queries"><span class="sw" style="background:#aee5c2"><img src="icons/queries.svg" alt=""></span>
+      <div>Queries<small>the literal SQL twin of this page</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the consumer with the recall tool</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>where chunking comes from — one chunk per headline</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under vfs · vectors
+  :PROPERTIES:
+  :SLUG:   vectors
+  :KIND:   learn
+  :NN:     09.7
+  :KICKER: under vfs · vectors
+  :TITLE1: find it by
+  :TITLE2: MEANING
+  :TITLE3: not by word
+  :CHIP:   the index
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/vectors-hero.jpg
+  :END:
+** og
+- a tenant-scoped semantic index riding the same database as everything else
+- embed at store time; SQLite cosine or pgvector ANN, callers never branch
+- Query, not Memory — search the real files, no second store to drift
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .36], ["#aee5c2", .24], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

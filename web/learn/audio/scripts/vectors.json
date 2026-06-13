@@ -1,0 +1,71 @@
+{
+ "slug": "vectors",
+ "title": "vectors — under vfs",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "Search finds words, not meaning",
+   "text": "Lesson 09 point 7 — vectors. This one is a sub-lesson, under the disk lesson, vfs. And it opens on a problem the parent lesson left for it. Search finds words… not meaning. The disk lesson ended on a magic trick — your file system is a database, so a listing is just a query. True. But not enough. Because SQL, and its rougher cousin grep, match characters. [curious] Ask the disk for the bit about retry backoff… and if the note actually says, wait longer between attempts… you get zero rows. The words didn't match. The meaning was right there. This lesson is the second way to ask the disk a question. By meaning. And it's the semantic twin of the literal-query lesson — same disk, same store… a different way to reach the bytes."
+  },
+  {
+   "id": "problem",
+   "title": "Why the standard fix doesn't fit",
+   "text": "First — why the usual fix doesn't fit here. The industry's standard answer is heavy. [sighs] Stand up a vector database — a whole new service. Call an embedding API for every query — a per-call cost, your text leaving the box, a key to manage. Then glue the two together, and keep them in sync. For a disk that rides inside a single file… that is absurd overhead. And the obvious cheap alternative — just grep harder — is the exact thing that already failed. So the missing piece isn't a bigger database. And it isn't a smarter API key. It's a second way to ask… by meaning… light enough to ride in the same file, and free enough to leave on."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. Vectors are a tenant-scoped semantic index, riding the same database as the rest of the workbook. Text and files turned into vectors at store time… so a query can find by meaning, not just by word. And here's the framing that matters more than it looks. [curious] Vector search is one modality — the literal SQL is done, semantic is this page, a graph modality is future work. An agent's memory is one consumer of it… not its definition. So the construct is called Query… not Memory. And embeddings are pluggable, and not required. Turn the embedder off entirely, and the disk is still fully queryable — just with one fewer way to ask."
+  },
+  {
+   "id": "ladder",
+   "title": "Four rungs of embedder",
+   "text": "Four rungs of embedder. An embedder is the thing that turns text into a vector — a list of numbers where closeness means similar meaning. One environment variable picks which one runs, and the rungs climb from zero-dependency to anything you want. Let me walk the four. First rung — hash. The default. Zero cost, no model, runs in pure Elixir right in the process. But it's lexical — a smarter grep, not real meaning. Second rung — local. Still pure Elixir, still in-process, free after one small download… but now it's genuinely semantic. Dog and puppy land at zero point seven zero. Third rung — openrouter. Transformer quality, over the network, at a per-call price… and your text leaves the box. And the fourth rung — http. Post to any endpoint you name. Your own GPU sidecar, a hosted model, or the opt-in image build. The verdict across all four — every rung answers the identical search call. Nothing downstream knows, or cares, which one ran. [curious] And the single most important move on this whole page is flipping that default from hash to local."
+  },
+  {
+   "id": "model2vec",
+   "title": "A model that is just a matrix",
+   "text": "A model that is just a matrix. Here's the aha that makes free semantic search possible. [excited] An embedding model doesn't have to be a model runtime. The local rung is Model2Vec — and a Model2Vec model is two files. A vocabulary… and a precomputed matrix of vectors. Roughly eight to thirty megabytes of floating-point numbers. No transformer, no GPU, no native code. Let me walk what inference actually is — picture it as a short assembly line. The words go in — retry backoff. First station, the tokenizer, splits them into two pieces — retry… and backoff. Second station turns each piece into an id — which is simply its line number in the vocabulary file. Third station uses that id as an address — the token's vector is a slice of the big matrix, so many bytes in, decoded as two hundred and fifty-six numbers. Fourth station averages the rows… and divides by their length. And out the end comes the query vector. That is the entire model. [curious] Two tricks keep it cheap. The matrix loads once, and one copy serves every tenant — shared compute, never shared data. And it stays a single binary you slice by offset, not a sprawling map that would balloon inside the runtime. Does it work? The receipt — dog and puppy at zero point seven zero. Synonym and paraphrase matching the lexical baseline simply cannot do. And the config is one line — set the embedder to local."
+  },
+  {
+   "id": "storetime",
+   "title": "Embed on write, not on read",
+   "text": "Now the load-bearing decision. Embed on write… not on read. Writes are rare. Reads are hot. So you hit the embedder when a file is saved — once — and never again on the way out. A query becomes a pure lookup against vectors that already exist. Picture two paths of very different weight. The heavy path runs on writes. When a file is stored, the system first forgets any old index, then chunks the content, then batch-embeds every chunk, then saves each one — carrying its source workbook, path, and headline, so a hit can point back to where it came from. That's the slow lane, and it runs rarely. The skinny path runs on reads. Embed the query string once… then a nearest-neighbour lookup that touches no model per row. Heavy work done rarely… light work done constantly. That's the trick that makes even a paid embedder affordable — you only pay on the rare writes. And the chunking falls straight out of the grammar. An org file splits into one chunk per heading section. Everything else — code, text — splits into twenty-line windows. [curious] One more thing. If an embed fails, it returns a clean error and never crashes the store."
+  },
+  {
+   "id": "backends",
+   "title": "One interface, two engines",
+   "text": "One interface… two engines. The cleverest part of the store is the part you never see. There is one search call. And it runs against one of two completely different engines — and no caller anywhere branches on which. Here's the difference in a sentence. On SQLite — the default — vectors are stored as text, and the cosine math runs in Elixir over every single row. That's order-n. Every row scanned, every query. On Postgres — which you get by setting one database variable — vectors live in a real vector column, and the database itself does the ranking, sub-linear and indexable. The verdict — you chose your vector database… when you chose your database. And flipping that one variable is the entire migration. No caller changes. [curious] Now, the order-n cost on SQLite — it's made visible, not hidden. Past twenty-five thousand vectors, the store logs, exactly once — brute-force search over so many vectors on SQLite… for sub-linear search at scale, point the database variable at Postgres. The reasoning is deliberate. A pool of worker threads would only buy you a constant factor — your core count. The real fix at scale is a better algorithm. So instead of hiding the linear cost behind threads… the store tells you when you've outgrown the cheap default… and points at the door."
+  },
+  {
+   "id": "tiers",
+   "title": "The machine probe",
+   "text": "The machine probe. How does the system know which rung your hardware can run? It probes. At boot, a pure-detection check reads the operating system, the core count, the memory, and the accelerator — CUDA if the Nvidia tool is present, Metal on Apple silicon, otherwise none. No inference happens — detection only. Then it walks a little ladder. First question — is there a real accelerator, and at least sixteen gigabytes of memory? If yes — the big multimodal tier, which runs a seven-billion-parameter vision model locally. If no, second question — at least four cores and four gigabytes? If yes — CLIP, image and text in one shared space. And if neither holds, it lands on Model2Vec — text only… and the one that always works on any machine. One honest caveat. [curious] This recommendation is advisory. It's printed in the boot line… but it does not auto-switch your embedder. The environment variable stays the operator's call. The probe only tells you what your box could handle."
+  },
+  {
+   "id": "hybrid",
+   "title": "Semantic, and literal",
+   "text": "Semantic… and literal. Pure semantic search has a blind spot — ask for an exact error code or a function name, and meaning-similarity can drift right past the literal string you typed. Pure literal search has the opposite blind spot — it's the grep we started by rejecting. So the default mode is hybrid. It runs both, and fuses them. Picture two scouts reporting to one judge. The first scout — semantic — pulls a pool of fifty meaning-matches from the vector store. The second scout — literal — scores each chunk by how many of your query terms it literally contains. Then the judge combines them with reciprocal-rank fusion — each chunk's score is the sum of one over sixty-plus-its-rank in each list… and a chunk missing from one ranking is penalised as if it placed one-thousandth. [excited] The result — a chunk has to do well in at least one scout's eyes to surface… and a chunk strong in both rockets to the top. Semantic finds the meaning… literal pins the exact terms. And most real questions need both."
+  },
+  {
+   "id": "recall",
+   "title": "The files are the memory",
+   "text": "The files are the memory. This is where Query, not Memory, pays off. An agent here has a search tool — recall by meaning. And crucially, there is no separate memory store behind it. The tool runs a stateless recall over the agent's working directory — it chunks, embeds, and ranks the actual files on the fly, with no stored index to drift out of sync. To remember something, the agent just writes an org file. It becomes searchable automatically… because searching reads the real org and code context, not a summary of it. And the same recall works without an agent at all. Picture a workflow task carrying a small retrieve block. It reads — begin source, retrieve, k equals five… then the question — how do we handle auth headers… then end source. That block runs as a non-LLM step — semantic recall, zero model reasoning — and drops the top five chunks into a scratch folder for the next task to read. [curious] That's the deeper identity of this whole page. Vector search isn't an AI feature bolted onto a disk. It's a query modality… and an agent is just one of its consumers. A shell command, a cron job, and an agent all call the same surface. None of them assumes a model is in the loop."
+  },
+  {
+   "id": "honest",
+   "title": "Where the index ends",
+   "text": "Where the index ends — the honest part. This index has real ceilings, and naming them is the point. First — the SQLite path is order-n. It scans every vector per query, stays pleasant into the tens of thousands, then tells you, once, to move up. A designed ceiling with a clear door, not a silent cliff. Second — static embeddings trade quality for size. Model2Vec is genuinely semantic, but a real transformer beats it on hard paraphrase. The rungs above exist for exactly that. Third — the default isn't semantic. Hash ships on so it works with zero download… but it's lexical. Real meaning starts when you set the embedder to local. Fourth — separate models mean separate spaces. A text model and an image model that aren't the same model can't find each other. Cross-modal needs one shared space — CLIP, or a single multimodal endpoint. Fifth — images are opt-in, behind a build flag, and audio isn't covered at all… though video is handled as keyframes embedded like images. [curious] And last — the faster on-disk algorithm isn't wired yet, and the local model downloads once unless you bake it into the image. None of these are surprises. They're the shape of the thing, told straight."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Does my text leave the machine? Only if you choose a rung that sends it. On hash and on local, nothing leaves — the embedder runs in-process. The network rungs do call out… by design. The default keeps your text in the box. Do tenants share the model? Shared compute… never shared data. One matrix serves every tenant, but a tenant is the first argument of every call, and one tenant's vectors are never visible to another. What if the embedder is down? Nothing crashes. A failure on write returns a clean error… an unavailable embedder on read returns an empty result. Indexing is best-effort by design. Can a text query find images? Only when text and images live in one shared space — CLIP, or a single multimodal endpoint. And why not just use a real vector database? You can — that's what the database variable does. The point is you don't have to stand one up to get useful semantic search on a project-sized disk."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the disk",
+   "text": "So that's vectors. A second way to ask the disk a question — by meaning — light enough to ride in the same file, and free enough to leave on. An embedding model that's just a matrix… embedding done on writes so reads stay cheap… and one search call that quietly becomes brute-force cosine or real Postgres ranking, with no caller the wiser. Query, not Memory. [curious] The way back up is short. This is a sub-lesson under the disk — lesson 09, vfs — the disk this index makes findable by meaning. And its literal twin, the queries lesson, is the other half of the same store. Read either one next… and the whole disk speaks both ways."
+  }
+ ]
+}

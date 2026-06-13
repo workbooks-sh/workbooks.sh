@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en" style="--pc:#f3c5a3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>verification — two gates a toolkit must pass — Workbooks</title>
+<meta name="description" content="A toolkit ships with two gates: verify checks the contract is satisfiable; eval runs the thing and a judge scores the result. The author proves the claim; a consumer reruns the same files before trusting it. A sub-lesson under toolkit.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/verification-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="verification — two gates a toolkit must pass">
+<meta property="og:description" content="Verify checks the contract is satisfiable; eval runs the thing and a judge scores the result. The author proves the claim; a consumer reruns the same files. A sub-lesson under toolkit.">
+<meta property="og:url" content="https://workbooks.sh/learn/verification">
+<meta property="og:image" content="https://workbooks.sh/og/verification.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="verification — two gates a toolkit must pass">
+<meta name="twitter:description" content="Verify checks the contract is satisfiable; eval runs the thing and a judge scores the result. The author proves the claim; a consumer reruns the same files.">
+<meta name="twitter:image" content="https://workbooks.sh/og/verification.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    $ wbx toolkit verify this-page
+    ✓ manifest.org present
+    ✓ skills/overview.org present
+    ✓ exec: none declared (discovery-only toolkit)
+    ✓ caps declared, all grantable: curiosity
+    ✓ granted by profile(s): reader
+    ✓ pre checks DISABLED — we don't run bash you can't see
+
+    the trick the whole page teaches: a stranger's toolkit is
+    safe to RUN long before it's proven to WORK. those are two
+    questions, so there are two gates. verify reads the manifest;
+    eval runs an agent that has only the manual and lets a judge
+    score what it did. the test suite travels inside the toolkit.
+    you didn't write it to trust it — you reran it.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 03·6 — <b>under toolkit · verification</b></div>
+      <h1><span class="ln">two gates</span><span class="ln bub">EVERY</span><span class="ln">toolkit passes</span></h1>
+      <p class="dek">A <b>toolkit</b> ships with its own exam. <b>Verify</b> asks whether the
+      contract is satisfiable — files present, exec mode real, declared capabilities
+      grantable, signature valid. <b>Eval</b> asks whether the thing actually works —
+      it runs an agent that has only the manual, and a judge scores the result. The
+      author proves the claim; <b>a consumer reruns the same files</b> before trusting it.</p>
+      <div class="meta">
+        <span class="on">the gates</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/verification-hero.jpg" alt="A small inspector at the foot of two towering luminous gateways set in sequence — the first stamped with a checklist of glowing marks, the second a great judging eye over an arena where a tiny figure performs a task — 1970s sci-fi style, bright and monumental against the lone figure">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/toolkit.svg" alt=""></div><span>verification</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Works on my manifest</a>
+  <a href="#definition">Two gates</a>
+  <a href="#verify">The structural board</a>
+  <a href="#caps">Grantable, and grantable together</a>
+  <a href="#provenance">The signature line</a>
+  <a href="#evals">The toolkit ships its own exam</a>
+  <a href="#tier2">Agent and judge</a>
+  <a href="#judge">What the judge sees</a>
+  <a href="#forge">The authoring done-bar</a>
+  <a href="#honest">The disabled tier</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>works on my MANIFEST</h2>
+  <p>You just built a toolkit, or imported a stranger's. The
+  <a href="toolkit">parent lesson</a> told you a stranger's toolkit is safe
+  to install — sandboxed, capability-gated, signed. That answers exactly one
+  question: <em>can this hurt me?</em> It does not answer <em>does it
+  work</em>, and it certainly doesn't answer the question that actually
+  decides a toolkit's worth — <em>can an agent use it from the manual
+  alone?</em></p>
+  <p>Classic software answers all of this with a test suite that travels in
+  the repo and runs in CI. But a toolkit's consumer has no CI, and isn't a
+  programmer who reads your test code. Worse, a toolkit's primary user isn't
+  a person at all — it's an <a href="agents">agent</a> reading prose. The
+  manual <em>is</em> the interface. So a passing unit test of the binary
+  proves the wrong thing: it proves the muscle works, not that the
+  instructions teach an agent to flex it.</p>
+  <p>The missing piece is a quality check shaped like the thing it's
+  checking — one that travels inside the toolkit, runs without a build
+  server, and tests the manual as hard as the machine. That's what this
+  lesson is about.</p>
+</section>
+
+<section id="definition">
+  <h2>two GATES</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">ver·i·fi·ca·tion</span> <span class="pr">/ˌver·ə·fə·ˈkeɪ·ʃən/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the two gates a <b>toolkit</b> must pass:
+    <b>verify</b> — a structural check that the manifest's promises are
+    satisfiable right now; and <b>eval</b> — a behavioral check that runs the
+    toolkit and judges the outcome. Both gates travel <b>inside the toolkit
+    directory</b>, so the author proves them and any consumer can rerun
+    them.</p>
+  </div>
+  <p>Quality is two different questions, so there are two commands.
+  <code>wbx toolkit verify</code> asks <em>is the contract satisfiable</em> —
+  does it load. <code>wbx toolkit eval</code> asks <em>does it do the right
+  thing</em>. The split is canon: eval is the third leg beside the skills and
+  the CLI — the author proves the toolkit does what its skills claim, and a
+  consumer reruns those same proofs against their own runtime before trusting
+  it.</p>
+  <table class="cmp">
+    <tr><th></th><th>question asked</th><th>command</th><th>what runs</th><th>what can fail</th></tr>
+    <tr><td><b>verify</b></td><td>is the contract satisfiable?</td><td><code>wbx toolkit verify &lt;id&gt;</code></td><td>a ✓/✗ board, one line per check — no agent, no model</td><td>missing files · unbuildable exec · ungrantable caps · bad signature</td></tr>
+    <tr><td><b>eval</b></td><td>does it do the right thing?</td><td><code>wbx toolkit eval &lt;id&gt;</code></td><td>one case per <code>evals/*.org</code> — an agent runs, a judge scores</td><td>no LLM key · wrong result · misleading manual · no task and no eval block</td></tr>
+  </table>
+</section>
+
+<section id="verify">
+  <h2>the structural BOARD</h2>
+  <p>Verify reads the toolkit's <code>manifest.org</code>, parses the
+  descriptor out of its <code>#+</code> keywords, and runs four families of
+  check against it: files present, the exec mode, the declared capabilities,
+  and — for third-party toolkits — the signature. The output is a literal
+  board, one ✓ or ✗ per line. Here's a real one:</p>
+  <pre class="orgsample">$ wbx toolkit verify glyphs
+✓ manifest.org present
+✓ skills/overview.org present
+✓ exec: command — glyphs not yet registered, build descriptor present (run `wb toolkit build`)
+✓ caps declared, all grantable: vfs net
+✓ granted by profile(s): network, posix
+✓ pre checks DISABLED (2 block(s); native :role bash execution removed — wb-9ja)</pre>
+  <p>Read it top to bottom. The first two lines are presence: a toolkit with
+  no manifest and no <code>skills/overview.org</code> isn't a toolkit, it's a
+  folder. The third is the <b>exec check</b>, and it branches on what the
+  manifest declares its EXEC mode to be — and this is where most red lines
+  come from.</p>
+  <pre class="mermaid">
+flowchart TD
+  m["manifest.org<br/>#+EXEC · #+CAPS · #+BUILD_SRC · #+TRUST"]
+  m --> files{"files present?"}
+  files -->|no| xf["✗ manifest / overview missing"]
+  files -->|yes| exec{"exec mode?"}
+  exec -->|command| cmd{"CLI_BIN registered<br/>or BUILD_SRC buildable?"}
+  exec -->|posix| px{"bin on PATH?"}
+  exec -->|none| disc["✓ discovery-only toolkit"]
+  cmd -->|yes| okc["✓ runnable / build-ready"]
+  cmd -->|no| xc["✗ not registered, no buildable source"]
+  px -->|yes| okp["✓ found on PATH"]
+  px -->|no| xp["✗ not on PATH"]
+  exec --> caps{"every cap grantable<br/>AND one profile grants all?"}
+  caps -->|yes| okcap["✓ granted by profile(s)"]
+  caps -->|no| xcap["✗ caps not grantable / no profile covers the set"]
+  caps --> trust{"#+TRUST: third-party?"}
+  trust -->|first-party| fp["✓ location-trust — skip provenance"]
+  trust -->|third-party| sig{"AUTHOR_DID + valid SIGNATURE?"}
+  sig -->|yes| oks["✓ provenance verified"]
+  sig -->|no| xs["✗ no_signature / bad_signature"]
+  style m fill:#f3c5a3,stroke:#121316,stroke-width:2.5px
+  style okc fill:#13d943,stroke:#121316
+  style okp fill:#13d943,stroke:#121316
+  style okcap fill:#13d943,stroke:#121316
+  style oks fill:#13d943,stroke:#121316
+  style disc fill:#13d943,stroke:#121316
+  style fp fill:#13d943,stroke:#121316
+  style xf fill:#f3c5a3,stroke:#121316
+  style xc fill:#f3c5a3,stroke:#121316
+  style xp fill:#f3c5a3,stroke:#121316
+  style xcap fill:#f3c5a3,stroke:#121316
+  style xs fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>Walk the exec branch, because the manual reads it line by line. A
+  toolkit with <b>no EXEC</b> is discovery-only — it ships skills, not a
+  command — and verify says so and passes. A <b>command</b> toolkit passes if
+  its <code>CLI_BIN</code> is already in the command registry, <em>or</em> if
+  it isn't yet but its <code>#+BUILD_SRC</code> is buildable (a crate or a
+  path the build lane can compile) — in which case the line tells you the
+  fix: <code>run `wb toolkit build`</code>. A <b>posix</b> toolkit just
+  checks the binary is on PATH. The failures are verbatim and self-correcting:</p>
+  <pre class="orgsample">✗ exec: command — &lt;bin&gt; not registered and no buildable #+BUILD_SRC
+✗ caps NOT grantable by any profile: …
+✗ no single Policy profile grants all declared caps (…)
+✗ third-party provenance: no_signature (sign with `wb toolkit sign &lt;id&gt;`)</pre>
+  <p>The last board line is the honest one, and it gets its own section
+  later: <code>pre checks DISABLED</code>. A toolkit may carry <code>:role
+  pre</code> setup blocks; verify <em>counts</em> them but never runs them,
+  because native bash execution was removed from the whole runtime. It says
+  so out loud rather than printing a green check it didn't earn.</p>
+</section>
+
+<section id="caps">
+  <h2>grantable, and grantable TOGETHER</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the capability cross-check</span></p>
+  <p>The cap check is stricter than it looks, and the strictness is the
+  point. It isn't enough that every capability a toolkit declares is
+  <em>known</em> — it must be <b>grantable</b>, and the whole declared set
+  must be grantable <b>by a single profile</b>. A toolkit is instantiated
+  under one <a href="nexus">Policy profile</a>; if no single profile grants
+  every capability it imports, the toolkit can never start — it would reach
+  for a capability no profile provides. Verify catches that at the contract
+  stage instead of at a confusing runtime crash, and on success it names the
+  profile or profiles that cover the set.</p>
+  <p>There are four real profiles, and they're a ladder of memory, time, and
+  reach:</p>
+  <table class="cmp">
+    <tr><th>profile</th><th>memory</th><th>wall clock</th><th>capabilities granted</th></tr>
+    <tr><td><b>minimal</b></td><td>64 MiB</td><td>5 s</td><td>vfs commands exec kv secrets queue tcp udp tls</td></tr>
+    <tr><td><b>network</b></td><td>128 MiB</td><td>30 s</td><td>…minimal + net llm browse</td></tr>
+    <tr><td><b>posix</b></td><td>256 MiB</td><td>60 s</td><td>…network + posix parallel</td></tr>
+    <tr><td><b>compute</b></td><td>64 MiB</td><td>5 s</td><td>vfs only</td></tr>
+  </table>
+  <p>Read the table as nested reach, not four arbitrary buckets. A toolkit
+  that declares <code>vfs net</code> can't run under <code>minimal</code> —
+  no network there — but <code>network</code> and <code>posix</code> both
+  grant the whole set, which is exactly what the green
+  <code>granted by profile(s): network, posix</code> line reported above. A
+  toolkit declaring a capability no profile lists fails the
+  <em>grantable</em> half; one declaring two capabilities that no single
+  profile holds together fails the <em>grantable together</em> half. Both are
+  caught before a single instruction runs.</p>
+</section>
+
+<section id="provenance">
+  <h2>the signature LINE</h2>
+  <p>For a <b>first-party</b> toolkit — one living in your own repo — verify
+  skips provenance entirely: location-trust is fine for code you control. The
+  moment a manifest declares <code>#+TRUST: third-party</code>, the rules
+  change. It must carry an <code>#+AUTHOR_DID</code> and an
+  <code>#+SIGNATURE</code>: an Ed25519 signature over the manifest with its
+  signature lines stripped and trimmed. Verify recomputes that canonical body
+  and checks the signature against the author's key, reporting any of
+  <code>no_author_did</code>, <code>no_signature</code>,
+  <code>bad_signature</code>, or <code>bad_signature_encoding</code>.</p>
+  <p>But provenance isn't only a verify line — it's a <b>build gate</b>. The
+  build command refuses outright to build an unsigned or tampered third-party
+  toolkit: <code>REFUSED — third-party toolkit with invalid provenance</code>.
+  The supply-chain boundary is real here: the toolkits root is an
+  unauthenticated, writable directory, so a toolkit dropped into it is
+  untrusted input until its signature proves who wrote it.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as author
+  participant T as the toolkit dir
+  participant C as consumer
+  A->>T: wb toolkit sign — appends AUTHOR_DID + SIGNATURE
+  Note over T: manifest now carries Ed25519 over its own body
+  C->>T: wbx toolkit verify — recompute canonical body, check sig
+  alt signature valid
+    C->>T: wb toolkit build — proceeds
+  else missing / tampered
+    C--xT: REFUSED — invalid provenance
+  end
+  </pre>
+  <p>Read the exchange as a chain of custody. The author signs once; the
+  consumer verifies the same bytes and only then is allowed to build. Tamper
+  with one character of the manifest and the canonical body no longer matches
+  the signature, so the build refuses — not by policy you could toggle, but
+  by arithmetic. The full signature story lives in the planned
+  <a href="trust">trust</a> sibling; here it's enough that verify reports it
+  and build enforces it.</p>
+</section>
+
+<section id="evals">
+  <h2>the toolkit ships its own EXAM</h2>
+  <p>Verify proves the contract is satisfiable. It says nothing about whether
+  the toolkit <em>does</em> anything. That's eval — and the shape of an eval
+  is the whole idea. Each case is a single org file under
+  <code>evals/*.org</code> in the toolkit directory, glob-sorted, with
+  symlink escapes filtered out. One file, one case. No suite means a plain
+  message — <code>no eval suite (add evals/*.org)</code> — not a false
+  pass.</p>
+  <p>The loop this enables is the point of the lesson. The <b>author</b>
+  writes the cases and proves them green. The <b>consumer</b> reruns the
+  exact same files against their own runtime before trusting the toolkit. The
+  exam travels with the artifact, the way a test suite should — except this
+  one doesn't need you to read code, because the cases are data, not code.</p>
+  <p>The git toolkit ships the real exemplar suite — two cases, one of each
+  tier. The deterministic one is honestly switched off today (more on that in
+  the honesty section); the agent-and-judge one is live. Here's the live
+  case, whole — this is the actual shipped file:</p>
+  <pre class="orgsample">#+TITLE: git toolkit — agent explains git status (Tier 2: agent + judge)
+
+* the agent explains what git status shows                          :eval:
+  :PROPERTIES:
+  :TASK:    In one sentence, explain what the command `git status` shows.
+  :RUBRIC:  The answer says git status reports the state of the working tree
+            — mentioning at least staged/unstaged changes and/or untracked files.
+  :MAX_STEPS: 2
+  :END:</pre>
+  <p>That's the entire test. A headline tagged <code>:eval:</code>, a
+  <code>:TASK:</code> the agent must complete, a <code>:RUBRIC:</code> the
+  judge scores against, and a step budget. No assertions, no harness code —
+  the case dispatches on what it carries: a <code>:TASK:</code> makes it a
+  Tier 2 agent-and-judge case; a <code>:role eval</code> block instead makes
+  it Tier 1 deterministic; neither, and it fails with <code>no :role eval
+  block and no :TASK:</code>.</p>
+</section>
+
+<section id="tier2">
+  <h2>agent and JUDGE</h2>
+  <p>Here is the centerpiece. The behavioral test for a toolkit whose
+  interface is its manual is not a unit test of the binary — it's <b>an agent
+  that has only the manual</b>. When eval runs a Tier 2 case, it spawns a
+  fresh agent, and the first thing it does is inject the toolkit's own
+  <code>skills/overview.org</code> onto the agent's system prompt. The agent
+  is told, in effect: <em>use this toolkit to complete the task; state your
+  final result clearly.</em> Then it hands over the <code>:TASK:</code> and
+  lets the agent run.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant H as eval harness
+  participant A as a fresh agent
+  participant Tk as toolkit tools
+  participant J as judge model
+  H->>A: system = default + injected overview.org
+  H->>A: task = the case's :TASK:  (max_steps default 6)
+  A->>Tk: reaches for the toolkit's verbs
+  Tk-->>A: outputs · exit codes · errors
+  A->>A: done(result) — the only escape hatch
+  Note over H: harvest telemetry — steps, uniq tools, error count
+  H->>J: TASK · RUBRIC · TELEMETRY · result (first 4000 chars)
+  J-->>H: verdict — first line PASS or FAIL · one line reason
+  Note over H: ✓ name [steps:N tools:a,b errs:N] — reason
+  </pre>
+  <p>Follow the run as a story. The agent gets the task and the injected
+  manual, and nothing else — its only way to finish is to call
+  <code>done(result)</code>. Its step budget defaults to <b>6</b> (the case
+  can override with <code>:MAX_STEPS:</code>), and its model comes from
+  <code>WB_EVAL_MODEL</code>. As it works, the harness records every step:
+  which tools it touched, and how many steps errored. That becomes the
+  <b>telemetry</b> — <code>steps</code>, the unique <code>tools</code> used,
+  and an <code>errors</code> count — and it's handed to the judge alongside
+  the result, so the judge factors <em>execution</em>, not just text. An
+  agent that produced the right sentence but thrashed through six failed tool
+  calls reads differently to the judge than one that answered cleanly.</p>
+  <p>The toolkit ships its own exam, and the exam tests the
+  <em>manual</em> as much as the muscle. A toolkit whose
+  <code>overview.org</code> misleads the agent — names a verb that doesn't
+  exist, omits the one that does — fails its own evals, because the only
+  thing the agent knows about the toolkit is what that manual told it. That's
+  the property no unit test has: it grades your documentation.</p>
+</section>
+
+<section id="judge">
+  <h2>what the judge SEES</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the judge's exact view, so you can write rubrics that work</span></p>
+  <p>The judge is a second model with one job. Its system prompt is verbatim:
+  <em>You are a strict evaluator. Given a TASK, a RUBRIC, and an agent's
+  RESULT, decide if the result satisfies the rubric. Respond with a verdict
+  whose FIRST line is exactly PASS or FAIL, then one short line of
+  reasoning.</em> The user message it receives is a fixed template — and
+  seeing it is what lets you write rubrics that actually hold:</p>
+  <pre class="orgsample">TASK:
+&lt;the case's :TASK:&gt;
+
+RUBRIC:
+&lt;the case's :RUBRIC:&gt;
+
+AGENT TELEMETRY: steps=1, tools=[done], errors=0
+
+AGENT RESULT:
+&lt;the agent's result, first 4000 chars&gt;</pre>
+  <p>The parse is deliberately blunt: the verdict's first line, upcased, must
+  start with <code>PASS</code> — anything else is a fail. The reason is the
+  next line, truncated to 200 characters. If the judge model errors in
+  transport, the case fails closed. The full property reference for a case:</p>
+  <table class="cmp">
+    <tr><th>property</th><th>default</th><th>effect</th></tr>
+    <tr><td><code>:TASK:</code></td><td>— (required)</td><td>the instruction the agent must complete; its presence makes the case Tier 2</td></tr>
+    <tr><td><code>:RUBRIC:</code></td><td>"The result correctly and completely satisfies the task."</td><td>the checkable sentence the judge scores against</td></tr>
+    <tr><td><code>:MAX_STEPS:</code></td><td>6</td><td>the agent's step budget for this case</td></tr>
+    <tr><td><code>:EXEC:</code></td><td>false</td><td><code>true</code>/<code>yes</code>/<code>1</code> grants host-brokered tools (git, publish) — never native exec</td></tr>
+    <tr><td><code>:SYSTEM:</code></td><td>the default eval prompt</td><td>an optional system-prompt override</td></tr>
+  </table>
+  <p>The rubric-writing rule falls straight out of that template. A rubric is
+  a <b>checkable sentence about the result and the trace</b>, not a vibe.
+  Because the telemetry line lists the tools the agent actually used, a rubric
+  that names the verbs the agent should reach for is enforceable — the judge
+  reads the tool names right there in <code>AGENT TELEMETRY</code>. Write
+  <em>mentions staged and untracked state</em> and the judge can check it;
+  write <em>is a good answer</em> and you've asked a model for a coin
+  flip.</p>
+</section>
+
+<section id="forge">
+  <h2>the authoring DONE-bar</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the check you run while writing, before the runtime gate</span></p>
+  <p>Verify and eval are the <em>runtime</em> gates. There's an earlier,
+  authoring-time done-bar too — the toolkit-forge's verify-toolkit skill, the
+  last phase of building a toolkit. It's discipline, not a model, and it
+  checks the things a runtime can't: that every org source block is balanced
+  (each <code>#+begin_src</code> has its end, with comma-escaped examples not
+  miscounted), that every <code>[[file:…]]</code> see-also link resolves,
+  that the manifest indexes every skill exactly once with an
+  <code>overview.org</code> present, that the drawer's
+  <code>:ID:</code>/<code>:CLI_BIN:</code>/<code>:STATUS:</code> match the
+  <code>#+</code> keywords, and that no file exceeds <b>800 lines</b> — an
+  over-budget skill splits into a thick <code>SKILL.org</code> plus
+  <code>references/</code>.</p>
+  <p>The forge's governing rule is the one this whole page is built on:
+  <b>don't claim verification you didn't do</b>. A recipe that can only be
+  tested where the binary actually installs gets marked
+  <code>#+STATUS: experimental</code> rather than asserted as verified. And
+  its companion pitfall — <em>fixing nothing, reporting everything</em> —
+  says cheap fixes get fixed in place, not logged as findings. Honesty over a
+  clean-looking report, at authoring time exactly as at runtime.</p>
+</section>
+
+<section id="honest">
+  <h2>the disabled TIER</h2>
+  <p>Honesty section — and on this page it's the differentiator, so it leads
+  rather than hides. There are <b>two tiers</b> of eval, and one of them is
+  switched <b>off on purpose</b>.</p>
+  <p><b>Tier 1</b> is the deterministic tier: a case with a <code>:role
+  eval</code> bash block and an <code>#+EXPECT:</code> string, which would
+  pass on exit 0 with the expected substring in stdout. It is disabled.
+  Native bash execution was removed from the entire runtime, so a Tier 1 case
+  reports as skipped — <code>DISABLED (native :role bash eval removed —
+  wb-9ja)</code> — and verify's <code>pre checks DISABLED</code> line is the
+  same removal showing its face on the structural side. The shipped git
+  toolkit's <code>version.org</code> case is exactly this: a real, correct
+  test that today prints a skipped dot rather than a fabricated green. The
+  lane returns as sandboxed <a href="commands">WASM commands</a>, not native
+  bash — that's the honest future, and the code is the truth, not the older
+  docs that still describe Tier 1 as live.</p>
+  <p>So a full run today looks like this — one tier skipped by design, one
+  tier doing the real work:</p>
+  <pre class="orgsample">$ wbx toolkit eval git
+git evals: 1/1 passed (1 skipped)
+  · evals/version.org: DISABLED (native :role bash eval removed — wb-9ja)
+  ✓ evals/explain.org [steps:1 tools:done errs:0] — PASS — names staged/unstaged and untracked state.</pre>
+  <p>The other honest limits. <b>Tier 2 judging is probabilistic</b> — a
+  strict prompt, a PASS/FAIL-first-line protocol, and telemetry grounding
+  reduce judge flakiness but don't eliminate it; a borderline result can swing.
+  It needs an <b>LLM key</b> — no <code>OPENROUTER_API_KEY</code> (or
+  <code>WB_LLM_KEY</code>) and the case skips rather than lying. The default
+  models are cheap — agent and judge fall through to
+  <code>xiaomi/mimo-v2.5</code> unless you set <code>WB_EVAL_MODEL</code> or
+  <code>WB_LLM_MODEL</code>. And the parts bin is young: the shipped exemplar
+  suite is the git toolkit's two cases. None of that is hidden behind a green
+  check — the gate would rather say DISABLED or SKIPPED out loud than
+  green-wash a result it didn't earn.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Do evals run automatically when I install a toolkit?</summary>
+    <p>No — they're a command you run, <code>wbx toolkit eval &lt;id&gt;</code>
+    (or <code>wb dev eval</code>). That's deliberate: the eval is yours to
+    rerun against your own runtime, on your own key, when you're deciding
+    whether to trust the toolkit. The author proved it; you re-administer the
+    same files.</p>
+  </details>
+  <details>
+    <summary>Who pays for the judge tokens, and which model?</summary>
+    <p>You do — eval runs on your LLM key, so no key means the Tier 2 cases
+    skip rather than run. Agent and judge default to
+    <code>xiaomi/mimo-v2.5</code>, chosen to be cheap; set
+    <code>WB_EVAL_MODEL</code> for the agent or <code>WB_LLM_MODEL</code> for
+    both. A handful of one-sentence tasks costs almost nothing.</p>
+  </details>
+  <details>
+    <summary>Can I eval someone else's toolkit?</summary>
+    <p>Yes — that's the entire point. The cases ship inside the toolkit
+    directory, so you rerun the author's own exam against your runtime before
+    you trust it. A toolkit you can't independently re-verify is a toolkit you
+    have to take on faith, and this design refuses to make you.</p>
+  </details>
+  <details>
+    <summary>What if my toolkit actually needs to run commands?</summary>
+    <p>Set <code>:EXEC: true</code> on the case and the agent is granted
+    host-brokered tools — git, publish, and the like. What it never gets is
+    native OS exec: that escape hatch was removed runtime-wide. The agent's
+    only way out is still <code>done(result)</code>, and the host brokers
+    everything else.</p>
+  </details>
+  <details>
+    <summary>Why did my case fail with "no :role eval block and no :TASK:"?</summary>
+    <p>Because the case carries neither trigger. A case needs a
+    <code>:TASK:</code> to be a Tier 2 agent-and-judge case, or a <code>:role
+    eval</code> block to be a Tier 1 deterministic one. With neither, the
+    harness can't tell what you're testing, so it fails the case rather than
+    guessing.</p>
+  </details>
+  <details>
+    <summary>Is a PASS from the judge actually trustworthy?</summary>
+    <p>Trustworthy enough to gate on, not infallible. The strict system
+    prompt, the first-line PASS/FAIL protocol, and the telemetry the judge
+    reads alongside the result all narrow the room for a sloppy verdict — and
+    because the cases are plain text you can read, you can audit a surprising
+    PASS by reading the rubric and tightening it. It's a strong probabilistic
+    check, presented as exactly that.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Verification is the gate on all three toolkit layers — start with the
+  parent, then the siblings it leans on.</p>
+  <div class="cards">
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="icons/toolkit.svg" alt=""></span>
+      <div>Toolkit<small>the three layers this gate guards</small></div><span class="go">→</span></a>
+    <a href="commands"><span class="sw" style="background:#a8d4f0"><img src="icons/toolkit.svg" alt=""></span>
+      <div>Commands<small>the WASM lane Tier 1 returns on</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the run loop telemetry comes from</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>the drawers and keywords carrying it all</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under toolkit · verification
+  :PROPERTIES:
+  :SLUG:   verification
+  :KIND:   learn
+  :NN:     03.6
+  :KICKER: under toolkit · verification
+  :TITLE1: two gates
+  :TITLE2: EVERY
+  :TITLE3: toolkit passes
+  :CHIP:   the gates
+  :PC:     #f3c5a3
+  :AC:     #13d943
+  :HERO:   img/verification-hero.jpg
+  :END:
+** og
+- verify: is the contract satisfiable — files, exec, caps, signature
+- eval: an agent with only the manual runs; a judge scores the result
+- author proves it; a consumer reruns the same files before trusting it
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f3c5a3", .36], ["#aee5c2", .24], ["#a8d4f0", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

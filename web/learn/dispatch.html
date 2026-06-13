@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dispatch — handing a goal across a seam — Workbooks</title>
+<meta name="description" content="Dispatch is the seam that lets a conversational agent kick off a long background job and hear back later: an authored workflow per request, a supervised time-bounded run on a task ledger, completions queued as feedback, a git-visible rendering. A sub-lesson under workflows.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="dispatch — handing a goal across a seam — Workbooks">
+<meta property="og:description" content="The seam that lets a conversational agent kick off a long background job and hear back later — authored workflow per request, supervised run on a ledger, completions queued as feedback, a git-visible rendering. A sub-lesson under workflows.">
+<meta property="og:url" content="https://workbooks.sh/learn/dispatch">
+<meta property="og:image" content="https://workbooks.sh/og/dispatch.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="dispatch — handing a goal across a seam — Workbooks">
+<meta name="twitter:description" content="A conversational agent's only verb for background work: dispatch a goal, get a task id in milliseconds, hear back on the next turn. A sub-lesson under workflows.">
+<meta name="twitter:image" content="https://workbooks.sh/og/dispatch.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/dispatch.jpg">
+<link rel="preload" href="img/dispatch-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    the seam, in one breath:
+    the conversation never blocks on the run.
+    a goal goes over the wall in milliseconds — a second
+    model writes the plan, a supervisor runs it on a kill
+    switch, and the answer comes back as a NOTE the agent
+    drains on its next natural turn. no callback, no freeze,
+    no promise it forgets. and the ledger is a file you can
+    read in git — even when a restart orphans a run, the
+    file is rewritten to say BLOCKED so it never lies about
+    what's alive. you found the note. good — now you know
+    the whole trick: hand-off, not hold.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 08·8 — <b>under workflows · dispatch</b></div>
+      <h1><span class="ln">hand the goal</span><span class="ln bub">OVER</span><span class="ln">the wall</span></h1>
+      <p class="dek"><b>Dispatch</b> is the one verb a conversational
+      <a href="agents">agent</a> needs for long work: it hands a <b>goal</b>
+      across a seam and gets a task id back in milliseconds. A second model
+      writes the plan, a supervisor runs it on a kill switch, and the answer
+      returns as a note the agent drains on its next turn. No frozen turn, no
+      forgotten promise — and a ledger you can read in git.</p>
+      <div class="meta">
+        <span class="on">dispatch</span><span>10 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/dispatch-hero.jpg" alt="A small figure at a control console hands a glowing capsule into a vast pneumatic tube that arcs up into a monumental sorting hall of brass canisters and ledger boards — the capsule sails away while the figure turns calmly back to a conversation — bright, sunlit, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/workflows.svg" alt=""></div><span>dispatch</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The agent that can't let go</a>
+  <a href="#definition">The definition</a>
+  <a href="#pipeline">One goal, end to end</a>
+  <a href="#author">The agent doesn't write the plan</a>
+  <a href="#ledger">Four states, no fifth</a>
+  <a href="#feedback">Hearing back: the drain</a>
+  <a href="#tasksorg">A ledger you can read in git</a>
+  <a href="#orphan">The orphan rewrite</a>
+  <a href="#leaves">What a run leaves behind</a>
+  <a href="#honest">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the agent that CAN'T let go</h2>
+  <p>Ask a conversational agent — voice, chat — for a twenty-minute research
+  job, and you hit one of two failure modes. Either the turn <em>freezes</em>
+  while it works, and you sit there listening to silence on a phone call. Or
+  it cheerfully promises to "look into that" and then forgets, because the
+  promise lived in a context window that ended. There is no hand-off seam, no
+  ledger, no way for the work to reach back and say it's done.</p>
+  <p>And if the agent <em>does</em> spawn background work, that work is
+  usually invisible. It isn't in git, it isn't reviewable, and when it dies it
+  dies silently — no record that it ran, crashed, or timed out. The most
+  plan-hungry collaborators we've ever had arrived, and we let them start
+  errands nobody could see, audit, or hear back from.</p>
+  <p>This sub-lesson is the seam that fixes both halves. It sits under
+  <a href="workflows">workflows</a> — that parent lesson taught the
+  <em>grammar</em> a plan is written in. This one teaches who calls the runner,
+  how a goal becomes a plan without the agent writing it, and exactly how the
+  answer finds its way back into the conversation.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">dis·patch</span> <span class="pr">/dɪˈspætʃ/</span> <span class="pos">noun · verb</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> handing a <b>goal</b> across a seam so the
+    conversation never blocks: a second model <b>authors a workflow</b> per
+    request, a supervisor runs it <b>time-bounded on a task ledger</b>,
+    every terminal state queues as <b>feedback</b>, and the whole ledger
+    renders to a <b>git-visible file</b>.</p>
+  </div>
+  <p>The word is borrowed from a mail room, on purpose. You don't carry the
+  parcel to its destination — you hand it to a system that takes it from
+  there, gives you a tracking number, and lets you walk away. Everything in
+  this lesson is one of those four clauses made concrete, and every clause is
+  proven by a single real run we'll follow the whole way down.</p>
+</section>
+
+<section id="pipeline">
+  <h2>one goal, END to end</h2>
+  <p>Here is the keystone — the full life of one dispatched goal, from a
+  voice agent's request to a task id, with no human waiting on any of it. The
+  voice agent says one thing — <code>dispatch(goal)</code> — and the call
+  returns before the work has even started. Read the lanes left to right:
+  the agent hands a goal to the <a href="nexus">/gk router</a>; the router
+  asks a cheap author model to turn that goal into an org plan; the plan is
+  validated and persisted; a task lands on the ledger; the runner starts in
+  the background; and the router returns a task id <em>immediately</em>:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as conversational agent
+  participant R as /gk router
+  participant M as author model (Mercury)
+  participant L as task ledger
+  participant T as Workflow.Todo runner
+  A->>R: dispatch(goal)
+  R->>M: turn this goal into an org TODO outline
+  M-->>R: a #+TITLE header, then TODO headlines
+  Note over R: validate — at least one TODO headline
+  R->>R: persist to workflows/the-slug.org
+  R->>L: add task — gk-201 — queued then doing
+  L->>T: spawn_monitor — run the plan in runs/gk-201/
+  R-->>A: dispatched true, task gk-201, the workflow path
+  Note over A,R: returns in milliseconds — the conversation continues
+  Note over T: minutes later, the run finishes,<br/>queued as feedback for the next turn
+  </pre>
+  <p>The single most important arrow is second from the bottom: the router
+  answers the agent <em>before</em> the runner has done any real work.
+  Dispatch is fire-and-record, not fire-and-wait. The run executes on its own
+  time, and the agent finds out how it went later — which is the next three
+  sections.</p>
+</section>
+
+<section id="author">
+  <h2>the agent doesn't WRITE the plan</h2>
+  <p>Notice who wrote the org outline in that diagram: not the agent. This
+  indirection is deliberate. The voice agent never authors a workflow — it
+  hands a <b>goal string</b> and nothing more. A separate, cheap author model
+  turns that goal into a plan. The spawn lane is the self-authoring demo: a
+  goal in one model's voice becomes a reviewable plan in another's.</p>
+  <p>The author model is set by <code>WB_GK_AUTHOR_MODEL</code>, defaulting to
+  <code>inception/mercury-2</code> — called at temperature <code>0.2</code>,
+  because plan-writing wants to be boring and repeatable, not creative. It
+  gets exactly one retry: if the output isn't a valid org plan, the
+  validation error is fed back as a user message — <i>your previous outline
+  was invalid; emit a corrected org outline only</i> — and it tries again.
+  Markdown code fences the model might wrap around the org are stripped before
+  validation even runs.</p>
+  <p>The validation gate is one line of intent: the output must contain at
+  least one heading matching a TODO-family keyword followed by real text
+  (<code>TODO</code>, <code>NEXT</code>, <code>WAITING</code>,
+  <code>DOING</code>, <code>STARTED</code>, <code>BLOCKED</code>), or it's
+  rejected as <code>no_todo_headings</code>. A plan with no tasks is not a
+  plan.</p>
+  <p>The prompt the author receives is the workflow grammar verbatim — the
+  same contract the parent lesson teaches. We won't re-teach it here; the
+  whole point of dispatch is that it reuses that grammar rather than inventing
+  a job format. Here is what Mercury actually wrote for our run — a real
+  artifact, six leaves, every leaf ordered and gated:</p>
+  <pre class="orgsample">#+TITLE: Research E2B and Daytona Pricing
+
+* TODO Gather E2B Pricing Information
+  :PROPERTIES:
+  :ORDERED: t
+  :END:
+  - Use `curl` to download the official E2B pricing page …
+  :done-when: test -s scratch/e2b_pricing.html
+
+* TODO Extract Pricing Details from E2B Page
+  :PROPERTIES:
+  :ORDERED: t
+  :END:
+  - Parse `scratch/e2b_pricing.html` … write to `scratch/e2b_pricing.org`.
+  :done-when: test -s scratch/e2b_pricing.org
+
+* TODO Consolidate Findings into Report
+  :PROPERTIES:
+  :ORDERED: t
+  :END:
+  - Combine the per-source files into `scratch/REPORT.org` …
+  :done-when: test -s scratch/REPORT.org</pre>
+  <p>Every leaf carries <code>:ORDERED: t</code> (run in sequence) and a
+  <code>:done-when:</code> shell gate that must exit zero before the task can
+  be DONE. The final leaf consolidates everything into
+  <code>scratch/REPORT.org</code> — the contract asks for three-to-seven
+  leaves ending in a report. And because the plan is a file before it's a
+  process, you can read it, review it, and keep it: dispatched workflows
+  persist into a growing library under <code>workflows/</code>, each filed
+  under a slug derived from the goal.</p>
+  <p>One detail worth flagging now, because the honesty section turns on it:
+  Mercury wrote <code>curl</code> into that plan. The sandbox has no
+  <code>curl</code>. The author is fallible — and that fallibility is
+  <em>exactly</em> why writing the plan to a reviewable file is the right
+  move. Hold that thought.</p>
+</section>
+
+<section id="ledger">
+  <h2>four states, no FIFTH</h2>
+  <p>The ledger is a small in-memory process — a GenServer holding tasks,
+  feedback, and monitors. Every task is a record with an id, the goal, the
+  plan file, a status, timestamps, and a result. The ids look like
+  <code>gk-201</code>. And the status moves through exactly four values, no
+  more. Picture the graph: a task is born <b>queued</b>, becomes
+  <b>doing</b> the instant the run is spawned, and from there it can only
+  reach two terminals — <b>done</b> if the run finishes, or <b>blocked</b> if
+  it crashes or runs out of time. There is no "stuck" and no "unknown":</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> queued: dispatch
+  queued --> doing: spawn_monitor
+  doing --> done: run finished, summarized
+  doing --> blocked: crashed — abnormal DOWN
+  doing --> blocked: timed out after 35m
+  done --> [*]
+  blocked --> [*]
+  </pre>
+  <p>The two blocked edges are the whole reason this is trustworthy. When the
+  run is launched, the ledger does a <code>spawn_monitor</code> and wraps the
+  work in a try/catch, so a clean finish sends itself back as a result. But it
+  also arms a kill switch: a <code>Process.send_after</code> timer set to
+  <b>35 minutes</b>. If that timer fires and the task is still doing, the
+  process is killed, the status becomes blocked, and the result reads
+  <code>timed out after 35m</code>. And if the worker dies without reporting —
+  an abnormal monitor signal while doing — the task becomes blocked with the
+  crash reason captured. A crash or timeout becomes <b>status blocked with the
+  reason, never a stuck doing</b>. That invariant is the difference between a
+  ledger you can trust and a board full of zombies.</p>
+  <p>When a run does finish cleanly, the ledger summarizes it rather than
+  storing the raw output. A finished workflow reports its tally —
+  <code>workflow finished: %{"DONE" =&gt; 4, "FAILED" =&gt; 2}</code> — the
+  frequency of each leaf's final state. Other results are inspected and sliced
+  to 300 characters; errors are sliced the same way and mark the task blocked.
+  The ledger keeps a verdict, not a transcript.</p>
+</section>
+
+<section id="feedback">
+  <h2>hearing back: the DRAIN</h2>
+  <p>So the run finishes minutes after the agent moved on. How does the answer
+  get back into a conversation that's already three turns ahead? Not with a
+  callback that interrupts mid-sentence — with a <b>queue the agent drains on
+  its own schedule</b>. When a task reaches a terminal state, a feedback note
+  is prepended to a list: the task id, the final status, a short summary, and
+  the original goal. It just sits there until the agent asks.</p>
+  <p>The agent asks by calling <code>tasks</code> — a natural thing to do at
+  the top of a turn. That call returns both the current task list and a
+  <em>drain</em> of the feedback queue, oldest-first, and the drain
+  <b>clears the queue</b>. Read-once. Picture the timeline: the run finishes
+  while you and the agent are talking about something else; a note slips onto
+  the queue; on the agent's next turn it drains the note and relays it to you
+  in plain language. The loop closes at conversation speed, not interrupt
+  speed:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as you
+  participant A as the agent
+  participant L as the ledger
+  participant T as the run
+  U->>A: ask about something else
+  T->>L: gk-201 finished — note queued
+  Note over L: feedback: [gk-201 done]
+  U->>A: next turn — anything at all
+  A->>L: tasks
+  L-->>A: tasks + drain(feedback) — and the queue clears
+  A->>U: by the way, that E2B research is done
+  </pre>
+  <p>That is the entire loop back into the conversation. No push, no ringing
+  phone mid-thought — the feedback waits for a natural beat. The cost of that
+  calm is the read-once rule: the second <code>tasks</code> call returns an
+  empty feedback list, because the first one already took it. Drain it, relay
+  it, or it's gone.</p>
+</section>
+
+<section id="tasksorg">
+  <h2>a ledger you can read in GIT</h2>
+  <p>Depth rung. The ledger lives in memory — but it also renders itself to a
+  file, <code>TASKS.org</code>, on <em>every</em> change. This is the same
+  one-way discipline the <a href="workflows">workflows</a> lesson drew: the
+  file is generated <b>from</b> the ledger and never hand-edited. There is no
+  two-way sync, because there is only one direction. Each ledger field maps to
+  a piece of the rendering:</p>
+  <table class="cmp">
+    <tr><th>ledger field</th><th>how it renders in TASKS.org</th></tr>
+    <tr><td>status</td><td class="y">a TODO keyword on the headline — queued→TODO, doing→DOING, done→DONE, blocked→BLOCKED</td></tr>
+    <tr><td>goal</td><td>the headline text after the keyword</td></tr>
+    <tr><td>id · file · started · finished</td><td>a <code>:PROPERTIES:</code> drawer under the headline</td></tr>
+    <tr><td>result</td><td>a plain line below the drawer — the summary or the failure reason</td></tr>
+    <tr><td>(order)</td><td>entries sorted newest-first</td></tr>
+  </table>
+  <p>The verdict of that table in one sentence: the rendered file carries
+  every fact the ledger knows, in org's own grammar, so the whole task history
+  is greppable, diffable, and reviewable in version control. The file even
+  declares its own keyword set with a <code>#+TODO:</code> line, so any org
+  reader colours the columns correctly. This is the same move
+  <code>BOARD.org</code> makes — regenerated from the issue tracker,
+  one-direction, never hand-edited. Generated files, owned by the generator.</p>
+</section>
+
+<section id="orphan">
+  <h2>the orphan REWRITE</h2>
+  <p>Here is the honest edge that makes the whole thing trustworthy, and it's
+  the best detail on the page. The ledger is in-memory. So when the engine
+  restarts, every task that was <code>doing</code> is gone from the
+  GenServer — but the last rendered <code>TASKS.org</code> on disk still says
+  <code>DOING</code>. The file would be <em>lying</em> about what's alive:
+  claiming a run is in progress when no process exists.</p>
+  <p>The fix is a render correction, not a sync. On boot, before serving
+  anything, the renderer rewrites the file in place: any headline that's still
+  in an active state — <code>DOING</code> or <code>TODO</code> — is rewritten
+  to <code>BLOCKED</code>, and a comment is injected at the top to say why.
+  It's not pretending the work resumed; it's refusing to let a generated file
+  lie. We own that file, so we correct it. This is our real
+  <code>TASKS.org</code> after the restart that orphaned our run — note the
+  comment on line two, and the headline that now reads BLOCKED:</p>
+  <pre class="orgsample">#+TITLE: groundskeeper — dispatched tasks
+# orphaned actives marked BLOCKED on boot
+#+TODO: TODO DOING BLOCKED | DONE
+
+* BLOCKED Research E2B (e2b.dev) and Daytona (daytona.io) pricing: …
+  :PROPERTIES:
+  :ID: gk-201
+  :FILE: workflows/research-e2b-e2b-dev-and-daytona-daytona-3.org
+  :STARTED: [2026-06-11 04:58:28]
+  :END:</pre>
+  <p>This is the full lifecycle in one screenshot, including the unglamorous
+  ending. <code>gk-201</code> wasn't a failure — it was orphaned on restart,
+  and the file says so plainly rather than leaving a stale DOING to mislead
+  the next reader. The boundary is exact: the file never claims a liveness it
+  can't back. That's the same lesson the <a href="autopoet">autopoet</a>
+  taught about supervised, time-bounded work — blocked-not-stuck, the reason
+  always recorded.</p>
+</section>
+
+<section id="leaves">
+  <h2>what a run LEAVES behind</h2>
+  <p>Depth rung. Underneath the ledger, the actual execution is the
+  <a href="workflows">workflow runner</a> from the parent lesson — native org
+  as the state machine, ordered leaves as a pipeline, parallel leaves via
+  bounded concurrency, <code>:done-when:</code> as the acceptance gate. Each
+  dispatched run gets its own working directory, <code>runs/&lt;id&gt;/</code>,
+  and leaves a durable trail in it:</p>
+  <ul>
+    <li><b>scratch/</b> — a persistent shared workspace the leaves read and
+    write across the run. For our run it holds the real extracted pricing —
+    <code>scratch/e2b_pricing.org</code> has per-second numbers, down to
+    fractions of a cent per vCPU-second.</li>
+    <li><b>_steps.jsonl</b> — every tool call the leaf <a href="agents">agent</a>
+    made, hash-chained and signed when the run is sealed, so the trail can't be
+    quietly edited after the fact.</li>
+    <li><b>_telemetry.db</b> — the run's telemetry, written alongside.</li>
+  </ul>
+  <p>One rule governs the acceptance checks, and it's load-bearing: the
+  <code>:done-when:</code> commands run in the <b>in-sandbox WASM shell</b>,
+  never on the host. An author-supplied check is untrusted input, so it must
+  not become a native-execution vector. The consequence is that the checks
+  <b>fail closed</b> — if a check command isn't one the WASM shell knows, the
+  task simply doesn't reach DONE. A plan can't talk its way to success by
+  naming a command the sandbox refuses to run.</p>
+</section>
+
+<section id="honest">
+  <h2>where it BITES</h2>
+  <p>Honesty section. The most vivid limit is the one we flagged earlier.
+  Mercury wrote a plan full of <code>curl</code> and <code>mkdir</code>; the
+  WASM shell has neither. Here are two real lines from our run's
+  <code>_steps.jsonl</code> — the sandbox biting the author:</p>
+  <pre class="orgsample">{"error":"{:unknown_command, \"mkdir\"}","tool":"shell","step":1,
+ "args":{"pipeline":"mkdir -p scratch &amp;&amp; curl -sL -o scratch/daytona_pricing.html …"}}
+{"error":"{:unknown_command, \"curl\"}","tool":"shell","step":0,
+ "args":{"pipeline":"curl -sL -o scratch/e2b_pricing.html https://e2b.dev/pricing"}}</pre>
+  <p>The plan named the wrong toolchain. But watch what happened next: the leaf
+  agent adapted — it reached for its <code>fetch</code> tool instead, pulled
+  the pages, and still produced <code>scratch/e2b_pricing.org</code> with real
+  per-second pricing. The run <em>partially</em> succeeded despite the wrong
+  instructions, and the gates that couldn't pass simply left their leaves
+  un-DONE. The plan is reviewable precisely because the author is fallible, and
+  the <code>:done-when:</code> gates fail closed instead of pretending.</p>
+  <p>The rest of the bites are quieter, and all real:</p>
+  <ul>
+    <li><b>The ledger is in-memory.</b> A restart orphans active tasks (the
+    BLOCKED rewrite mitigates the lie, but the run itself is gone) — and it
+    also drops any feedback that hadn't been drained yet. Undrained feedback
+    dies with the BEAM. The rewrite saves the file's honesty, not the work.</li>
+    <li><b>Feedback is read-once and global.</b> One queue, drained whole, with
+    no per-conversation routing. If two conversations share a ledger, whoever
+    drains first gets the notes.</li>
+    <li><b>Summaries truncate to 300 characters.</b> The ledger keeps a
+    verdict, not a transcript — for the full story you read the run's
+    <code>scratch/</code> and <code>_steps.jsonl</code>.</li>
+    <li><b>35 minutes is a wall, not a suggestion.</b> A run that needs longer
+    is killed and marked blocked. Dispatch is for errands, not marathons.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Why doesn't the agent author its own workflows?</summary>
+    <p>Deliberate indirection. The conversational agent hands a goal; a
+    separate author model turns it into a reviewable org plan. That keeps the
+    conversational model focused on talking, makes the plan a file you can
+    inspect before it runs, and is the self-authoring demo — a goal in one
+    voice becoming a plan in another.</p>
+  </details>
+  <details>
+    <summary>What happens at minute thirty-six?</summary>
+    <p>The kill switch. A 35-minute timer is armed when the run starts; if it
+    fires while the task is still doing, the process is killed, the status
+    becomes blocked, and the result records "timed out after 35m". There's no
+    grace period — the bound is a wall by design.</p>
+  </details>
+  <details>
+    <summary>Can I hand-edit TASKS.org?</summary>
+    <p>You can, but the next ledger change clobbers it — the file is rendered
+    from the in-memory ledger on every change, one direction only. It's a
+    generated view, like a board rendered from a plan. Edit the work, not the
+    rendering.</p>
+  </details>
+  <details>
+    <summary>Why org instead of a job queue?</summary>
+    <p>Because the plan reuses the <a href="workflows">workflow grammar</a> you
+    already have — ordered leaves, dependencies, done-when gates — so a
+    dispatched job is a reviewable, diffable file before it's a process. A
+    job-queue row is none of those things.</p>
+  </details>
+  <details>
+    <summary>Does feedback survive a restart?</summary>
+    <p>No. Both the ledger and its feedback queue are in-memory. A restart
+    orphans active tasks (rewritten to BLOCKED in the file so it doesn't lie)
+    and drops any feedback that wasn't drained first. Persistence is an honest
+    gap, stated plainly.</p>
+  </details>
+  <details>
+    <summary>Is this the same as the Autopoet?</summary>
+    <p>No — and the contrast is clean. The <a href="autopoet">autopoet</a> grows
+    the system, editing its declarative layer over time. Dispatch runs your
+    errands, one bounded job at a time. They share the same supervision lesson —
+    time-bounded, blocked-not-stuck, the reason always recorded — but their
+    subjects are opposite.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Dispatch is a seam on top of constructs you've met — start with the
+  parent, then the worker it runs.</p>
+  <div class="cards">
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the grammar dispatch authors and runs</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the leaf worker, bash-only, in its sandbox</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>same supervision, opposite subject</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#a8d4f0"><img src="icons/nexus.svg" alt=""></span>
+      <div>Nexus<small>the /gk control plane, fail-closed</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workflows · dispatch
+  :PROPERTIES:
+  :SLUG:   dispatch
+  :KIND:   learn
+  :NN:     08.8
+  :KICKER: under workflows · dispatch
+  :TITLE1: hand the goal
+  :TITLE2: OVER
+  :TITLE3: the wall
+  :CHIP:   dispatch
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/dispatch-hero.jpg
+  :END:
+** og
+- hand a goal across a seam — task id back in milliseconds
+- a second model authors the plan; a supervisor runs it on a 35m kill switch
+- completions queue as feedback; the ledger renders to a git-visible file
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .36], ["#a8d4f0", .24], ["#aee5c2", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

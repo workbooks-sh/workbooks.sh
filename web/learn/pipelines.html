@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en" style="--pc:#d9dbd3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pipelines — org in, JSON out — Workbooks</title>
+<meta name="description" content="The kernel verbs — query, tangle, lint — accept '-' for stdin and emit JSON, so wbx | jq | wbx is a real composition surface. Generated org never touches a temp file, and the kernel doing the work is the same one the engine runs.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/pipelines-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="pipelines — org in, JSON out">
+<meta property="og:description" content="query, tangle, and lint take stdin and emit JSON. wbx | jq | wbx composes — generated org never touches disk, and your pipe runs the same kernel the engine does.">
+<meta property="og:url" content="https://workbooks.sh/learn/pipelines">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * the pipe, hidden in the page about pipes
+  #+begin_src sh :in org :out json
+  printf '* you are reading the source :curious:\n' | wbx query - | jq '.[].title'
+  #+end_src
+  no temp file was harmed. the dash is the file; JSON is the medium;
+  the kernel is the function. that is the whole lesson — keep going.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 07·2 — <b>under wbx · pipelines</b></div>
+      <h1><span class="ln">org goes in</span><span class="ln bub">JSON</span><span class="ln">comes out</span></h1>
+      <p class="dek">Three kernel verbs — <b>query</b>, <b>tangle</b>, <b>lint</b> — take
+      <code>-</code> for stdin and emit JSON. So <code>wbx | jq | wbx</code> is a real
+      composition surface, not a trick: generated org <b>never touches a temp file</b>,
+      and the kernel doing the work is the literal same one the engine runs.</p>
+      <div class="meta">
+        <span class="on">pipelines</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/pipelines-hero.jpg" alt="A small figure feeding a paper scroll into the mouth of a monumental sorting machine; bright typed cards stream out the far end into labelled bins, no waste bin anywhere — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>pipelines</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The temp-file tax</a>
+  <a href="#definition">The definition</a>
+  <a href="#verbs">Three pure functions</a>
+  <a href="#shapes">What comes out</a>
+  <a href="#derived">The plan is computed</a>
+  <a href="#compose">jq is the other half</a>
+  <a href="#gate">A gate that actually fails</a>
+  <a href="#envelope">--json without double-wrapping</a>
+  <a href="#samekernel">Your pipe is the engine's parser</a>
+  <a href="#limits">Where the pipe ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the temp-file TAX</h2>
+  <p>You are generating org. A model emits a workflow; a script assembles
+  headlines from an API; a Makefile wants a structure check before it ships.
+  And the moment you reach for a normal CLI, the same sad loop assembles
+  itself: write the org to a temp file, run the tool, scrape its human-shaped
+  stdout back into structure, delete the file — and hope nothing crashed
+  between step two and step four and left that file behind.</p>
+  <p>Every hop in that loop loses something. The temp file is a race and a
+  cleanup liability. The prose output was built for eyes, so parsing it back
+  into data is brittle guesswork. Most tools force this on you because their
+  output was never meant to be a pipe's input — it was meant to be read.</p>
+  <p>Agents feel this most. An <a href="agents">agent</a> that has to mint a
+  temp path, shell out, and regex the result burns turns on filesystem
+  ceremony that has nothing to do with the work. The thing it actually wanted
+  was simple — <em>here is some org, tell me what's in it</em> — and the
+  tooling made it a four-step errand.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">pipe·line</span> <span class="pr">/ˈpaɪp·laɪn/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a composition of kernel verbs over
+    <b>stdin and stdout</b>: <code>-</code> is the file, <b>JSON</b> is the
+    medium, and the <b>OQL kernel</b> is the function — org flows in one end,
+    a typed build plan or a diagnostics array comes out the other, and nothing
+    is written to disk.</p>
+  </div>
+  <p>Three facts hide in that one sentence, and the rest of the page is just
+  them unpacked. <code>-</code> means <em>read from the pipe, not the
+  filesystem</em>. JSON means the output is already structure, so the next
+  stage doesn't parse prose. And "the kernel is the function" is the load
+  -bearing one: these verbs are pure functions exposed as processes, which is
+  exactly what makes them safe to chain.</p>
+</section>
+
+<section id="verbs">
+  <h2>three pure functions in a TRENCH COAT</h2>
+  <p>There are exactly three local kernel verbs that take a pipe:
+  <code>query</code>, <code>tangle</code>, and <code>lint</code>. They sound
+  like three tools. They're closer to one — the whole dispatch lives in a
+  37-line file (<code>cli/src/kernel.rs</code>), and all three funnel through
+  one helper, <code>read_org</code>. That helper is where <code>-</code> earns
+  its keep: when the argument is a single dash it reads stdin to a string;
+  otherwise it goes through the I/O seam. Same code path on a native binary
+  and the in-sandbox wasm build — for these three verbs only.</p>
+  <pre class="mermaid">
+flowchart LR
+  in["stdin (-)  ·  or a path"]
+  ro["read_org()"]
+  q["oql::parse_headlines()"]
+  t["oql::tangle_plan()"]
+  l["oql::validate()"]
+  out["JSON on stdout"]
+  in --> ro
+  ro --> q --> out
+  ro --> t --> out
+  ro --> l --> out
+  style in fill:#d9dbd3,stroke:#121316
+  style ro fill:#ffffff,stroke:#121316,stroke-width:2.5px
+  style out fill:#13d943,stroke:#121316
+  </pre>
+  <p>After <code>read_org</code> the three verbs split for one line each:
+  <code>query</code> calls <code>parse_headlines</code>, <code>tangle</code>
+  calls <code>tangle_plan</code>, <code>lint</code> calls <code>validate</code>.
+  Each returns a JSON string and prints it — pure output, no rendering layer,
+  nothing that wants a terminal. That is the entire surface, and its smallness
+  is the point: there is almost no machinery between the org you pipe in and
+  the JSON you pipe out.</p>
+  <p>One honest nuance the source forces. The CLI's <code>lint</code> calls
+  the kernel's <code>validate</code> — <em>not</em> the kernel's own
+  <code>lint</code> export, which is currently a stub that returns an empty
+  array. The two are separate functions in the kernel's interface; the
+  diagnostics you get from <code>wbx lint</code> come from <code>validate</code>.
+  Don't picture <code>lint</code> calling <code>lint</code>.</p>
+</section>
+
+<section id="shapes">
+  <h2>what comes OUT</h2>
+  <p>Three verbs, three JSON shapes. Knowing them by heart is what turns a
+  pipe from a guess into a contract.</p>
+  <table class="cmp">
+    <tr><th>verb</th><th>kernel fn</th><th>shape</th><th>one row per…</th></tr>
+    <tr><td><b>query</b></td><td>parse_headlines</td><td>array of headline objects</td><td>headline in the tree</td></tr>
+    <tr><td><b>tangle</b></td><td>tangle_plan</td><td><code>{worlds: […]}</code></td><td>compiled world</td></tr>
+    <tr><td><b>lint</b></td><td>validate</td><td>array of diagnostics</td><td>problem found</td></tr>
+  </table>
+  <p>A <code>query</code> row is a full lens on a headline:
+  <code>level · title · state · id · tags · props · scheduled · deadline</code>.
+  Timestamps don't come back as strings to re-parse — they come pre-cracked
+  into <code>{at, repeat, active}</code>. Here's a real one, verified against
+  <code>wbx 0.13.0</code>:</p>
+  <pre class="orgsample">$ printf '* hello :tag1:\n** TODO child\nSCHEDULED: &lt;2026-06-15 +1w&gt;\n' | wbx query -
+[{"level":1,"title":"hello","tags":["tag1"],…},
+ {"level":2,"state":"TODO",
+  "scheduled":{"active":true,"at":"2026-06-15","repeat":"+1w"},…}]</pre>
+  <p>A <code>tangle</code> plan is the compile of a workflow: each world
+  carries its <code>name</code>, <code>schedule</code>, <code>imports</code>,
+  <code>exports</code>, a list of <code>components</code> (name, lang, deps,
+  uses, in, out, persist, src, dir), the <code>edges</code> between them, and
+  a <code>workflows</code> sub-array for any nested plans. A <code>lint</code>
+  diagnostic is the smallest of the three — just <code>{level, scope,
+  message}</code> — because a problem only needs to say how bad it is, where
+  it is, and what it is.</p>
+</section>
+
+<section id="derived">
+  <h2>the plan is COMPUTED, not declared</h2>
+  <p>Depth rung — skippable, but it's where <code>tangle</code> stops looking
+  like a formatter and starts looking like a compiler. You never write an
+  edge. You never list imports or exports. You write components with
+  <code>:in</code>, <code>:out</code>, and <code>:uses</code> header args, and
+  the kernel <em>derives</em> the wiring by matching producers to consumers.</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph plan["daily digest  :workflow:  (SCHEDULE 0 7 * * *)"]
+    f["fetch  :component:<br/>uses: http · out: raw"]
+    s["summarize  :component:<br/>in: raw · out: digest"]
+  end
+  http(["import: http"]) -. uses .-> f
+  f -- "edge: out raw → in raw" --> s
+  s --> dig(["export: digest"])
+  style plan fill:#fbfaf6,stroke:#121316
+  style http fill:#ffffff,stroke:#121316
+  style dig fill:#13d943,stroke:#121316
+  </pre>
+  <p>Read the graph as a derivation. <code>fetch</code> declares
+  <code>:out raw</code>; <code>summarize</code> declares <code>:in raw</code> —
+  so an <b>edge</b> from fetch to summarize falls out of that match, nobody
+  drew it. <code>digest</code> is produced by summarize and consumed by no
+  one, so it's an <b>export</b>. <code>http</code> appears in a
+  <code>:uses</code> and nothing produces it, so it's an <b>import</b>. The
+  schedule comes from the <code>:SCHEDULE:</code> property as cron (or from a
+  <code>SCHEDULED</code> timestamp). The whole topology of the plan is a
+  function of the header args — change a name on one side and the edge
+  appears or vanishes.</p>
+  <p>And because headlines nest, so do plans: a <code>:workflow:</code>
+  heading inside another becomes an entry in the parent's
+  <code>workflows</code> sub-array, and the whole tree compiles into one
+  nested DAG. That recursion is the <a href="nesting">nesting lesson's</a>
+  compile story — <code>tangle</code> is where you watch it happen.</p>
+</section>
+
+<section id="compose">
+  <h2>jq is the OTHER half</h2>
+  <p>The verbs emit JSON precisely so the next stage can be <code>jq</code>.
+  That's the composition surface: org in one end, a sentence of structure out
+  the other, with no file in between. Here's the no-temp-file tangle — a whole
+  workflow piped in, a one-line summary piped out:</p>
+  <pre class="orgsample">printf '* daily digest :workflow:
+  :PROPERTIES:
+  :SCHEDULE: 0 7 * * *
+  :END:
+** fetch :component:
+#+begin_src js :uses http :out raw
+export async function run() { return fetch_feed(); }
+#+end_src
+** summarize :component:
+#+begin_src js :in raw :out digest
+export function run(raw) { return summarize(raw); }
+#+end_src
+' | wbx tangle - | jq -r '.worlds[] | "\(.name): \(.components|length) components, exports \(.exports|join(","))"'</pre>
+  <p>→ <code>daily digest: 2 components, exports digest</code>. The full plan
+  carries the derived parts the summary skipped:
+  <code>"edges":[{"from":"fetch","to":"summarize"}]</code>,
+  <code>"imports":["http"]</code>, <code>"exports":["digest"]</code>,
+  <code>"schedule":{"cron":"0 7 * * *"}</code> — none of it written by hand.</p>
+  <p>Or treat org as a database. Extract every open task by state:</p>
+  <pre class="orgsample">$ printf '* plan\n** TODO write the fetch step\n** DONE wire the schedule\n** TODO add lint gate :ci:\n' \
+  | wbx query - | jq -r '.[] | select(.state=="TODO") | .title'
+write the fetch step
+add lint gate</pre>
+  <p>TODO state, tags, and SCHEDULED all survive the pipe — because org is a
+  language, not formatting. The sequence has no filesystem in it, and that
+  absence is the whole feature:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as agent / script
+  participant K as wbx tangle -
+  participant J as jq
+  A->>K: pipe generated org (stdin)
+  K->>J: JSON plan (stdout)
+  J->>A: one line of structure
+  Note over A,J: no temp file · no cleanup · no disk
+  </pre>
+</section>
+
+<section id="gate">
+  <h2>a gate that actually FAILS</h2>
+  <p>Here is the gotcha, stated plainly so it never bites you in CI:
+  <b><code>wbx lint</code> exits 0 even when its diagnostics contain
+  errors.</b> Diagnostics are <em>data</em>, not a process failure — the lint
+  run succeeded; it found problems. Verified:</p>
+  <pre class="orgsample">$ printf '* pipe :workflow:\n** step :component:\n#+begin_src js :in nonexistent :out result\nexport function run(x){return x}\n#+end_src\n' | wbx lint -
+[{"level":"error","message":"input `nonexistent` has no upstream producer","scope":"step"}]
+$ echo $?
+0        # diagnostics are data — the run succeeded</pre>
+  <p>So a naive <code>wbx lint file && deploy</code> never blocks a broken
+  plan. The fix is to let <code>jq</code> turn the data into the exit code —
+  <code>jq -e</code> exits non-zero when its result is false:</p>
+  <pre class="orgsample">wbx lint workbook.org | jq -e 'map(select(.level=="error")) | length == 0'</pre>
+  <p>That exits 1 when any error exists and 0 when the array is clean — a gate
+  that actually fails the build. Contrast it with a <em>real</em> failure: a
+  missing file is an I/O problem, and those do set an exit code.</p>
+  <table class="cmp">
+    <tr><th>what went wrong</th><th>exit</th><th>who catches it</th></tr>
+    <tr><td>org has a diagnostic (bad :in, no source)</td><td class="n">0 — data, not failure</td><td><code>jq -e</code></td></tr>
+    <tr><td>file not found / can't read</td><td class="y">4 — not found</td><td>the shell (<code>&amp;&amp;</code>)</td></tr>
+    <tr><td>clap usage error</td><td>2 — usage</td><td>the shell</td></tr>
+  </table>
+  <p>The verdict: <code>lint</code>'s exit code reports whether the
+  <em>tool</em> ran, not whether your plan is healthy. The shell catches I/O;
+  <code>jq</code> catches content. Wire both.</p>
+</section>
+
+<section id="envelope">
+  <h2>--json without DOUBLE-WRAPPING</h2>
+  <p>Depth rung. Add <code>--json</code> and the raw output gets lifted into
+  an envelope — <code>{ok, verb, data}</code> on success — but the clever part
+  is what <em>doesn't</em> happen: the already-JSON output is embedded
+  <em>structurally</em>, not stuffed in as an escaped string.
+  <code>data</code> is the parsed array, so a downstream <code>jq</code> walks
+  it directly. Verified:</p>
+  <pre class="orgsample">$ printf '* hello :tag1:\n' | wbx query - --json
+{"data":[{"deadline":null,"id":null,"level":1,"props":{},
+  "scheduled":null,"state":null,"tags":["tag1"],"title":"hello"}],
+ "ok":true,"verb":"query"}</pre>
+  <p>You rarely need to type <code>--json</code> mid-pipeline, though. Mode is
+  auto-detected: when stdout isn't a terminal, <code>wbx</code> assumes a
+  machine is reading and switches to agent mode on its own — so every middle
+  command in a pipe is already structured. The forcing knobs exist for the
+  edges: <code>--json</code> and <code>--agent</code> are global flags that
+  work on any verb in any position, and <code>WBX_AGENT=1</code> pins it from
+  the environment. The full mode model — the exit-code map, the failure
+  envelope, the TTY rules — is its own page; this lesson only needs that the
+  pipe stays structured by default. See <a href="wbx">the parent lesson</a>
+  for the whole contract.</p>
+</section>
+
+<section id="samekernel">
+  <h2>your pipe is the engine's PARSER</h2>
+  <p>This is the payoff that makes a shell pipeline more than convenient. The
+  kernel doing the work in <code>wbx query</code> is the <em>same Rust
+  crate</em> — package <code>oql</code>, <code>runtime/kernel</code> — that
+  compiles to the wasm Component the engine and desktop embed. The CLI links
+  it as a native rlib; the engine loads it as <code>oql.wasm</code>. One
+  logic, every surface.</p>
+  <pre class="mermaid">
+flowchart TD
+  crate[["oql — one Rust crate<br/>parse_headlines · tangle_plan · validate"]]
+  crate --> native["native rlib"]
+  crate --> wasm["oql.wasm Component<br/>(WIT world: workbooks:oql)"]
+  native --> cli["wbx — your laptop"]
+  wasm --> engine["the engine — server"]
+  wasm --> desk["desktop · in-browser"]
+  style crate fill:#d9dbd3,stroke:#121316,stroke-width:2.5px
+  style wasm fill:#ffffff,stroke:#121316
+  style cli fill:#13d943,stroke:#121316
+  </pre>
+  <p>The WIT world is deliberately austere — pure string-to-string, no host
+  imports, no WASI context. The kernel can't read your disk or hit the
+  network; faults trap inside the wasm engine. Which means there's no place
+  for the two builds to diverge: <code>wbx tangle -</code> on your laptop and
+  the engine's compile of the same file reach byte-identical conclusions,
+  because they're running the identical function. A pipeline on your machine
+  isn't an approximation of what the engine will do — it's a dry run of the
+  exact same logic.</p>
+</section>
+
+<section id="limits">
+  <h2>where the pipe surface ENDS</h2>
+  <p>Honesty section. The pipe is narrow on purpose, and it's worth knowing
+  exactly where it stops today.</p>
+  <p><b>Only three verbs take <code>-</code>.</b> <code>query</code>,
+  <code>tangle</code>, and <code>lint</code> special-case stdin; nothing else
+  does. The author and trust verbs — <code>sign</code>, <code>bundle</code>,
+  <code>verify</code>, <code>workflow run</code>, <code>workbook deploy</code>
+  — want real paths. Pipe into one and it fails honestly:</p>
+  <pre class="orgsample">$ printf '* x\n' | wbx sign -
+wbx: read -: No such file or directory     (exit 4)</pre>
+  <p>The SPEC names "stdin pipelines across author/trust verbs" as un-shipped
+  reach work — it's a known frontier, not an accident.</p>
+  <p><b>Lint's exit code doesn't reflect severity</b> — the
+  <a href="#gate">gate section</a> exists because of it; reach for
+  <code>jq -e</code>, not <code>&amp;&amp;</code>.</p>
+  <p><b>Exit-code classification is a text heuristic today.</b> Under the
+  hood, codes are currently inferred from error text — the source says so
+  outright. The <em>contract</em> is the code (4 means not-found, whatever the
+  message says); the text is not. Branch on the number.</p>
+  <p><b>Two kernel exports have no CLI verb.</b> <code>check_upgrade</code>
+  (the upgrade gate) and <code>render</code> live in the kernel but are
+  engine and desktop surfaces — there is no <code>wbx render</code>, and
+  <code>wbx upgrade</code> is self-update of the binary, a different thing
+  entirely. Don't reach for verbs that aren't there.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Why does lint exit 0 when there are errors?</summary>
+    <p>Because diagnostics are data, not a crash — the lint run succeeded and
+    reported problems. The tool worked; your plan didn't. To fail a build on
+    errors, pipe to <code>jq -e 'map(select(.level=="error")) | length ==
+    0'</code>, which returns a non-zero exit when any error is present.</p>
+  </details>
+  <details>
+    <summary>Can I pipe into sign or bundle?</summary>
+    <p>Not yet. Only <code>query</code>, <code>tangle</code>, and
+    <code>lint</code> special-case <code>-</code>. Sign, bundle, verify,
+    workflow run, and workbook deploy take real file paths, and piping into
+    them fails with a not-found error. The SPEC lists stdin across the
+    author and trust verbs as named frontier work.</p>
+  </details>
+  <details>
+    <summary>Is the output stable enough to script against?</summary>
+    <p>The JSON shape is the contract — headline rows, the worlds plan, the
+    diagnostic triple — and <code>--json</code> adds the envelope
+    (<code>verb</code>, <code>ok</code>, and on failure a typed
+    <code>code</code>). Branch on the structure and the code, not on prose;
+    the text inside a message may change, the shape is what you build on.</p>
+  </details>
+  <details>
+    <summary>Do I need an engine running for this?</summary>
+    <p>No. All three verbs are local — they link the kernel as a native rlib
+    and read stdin directly. No server, no network, no auth. The engine runs
+    the same logic, but your pipe doesn't call it.</p>
+  </details>
+  <details>
+    <summary>What's the difference between lint and validate?</summary>
+    <p>The CLI's <code>lint</code> calls the kernel's <code>validate</code>
+    function. The kernel exposes a separate <code>lint</code> export too, but
+    it's currently a stub that returns an empty array — reserved. So your
+    diagnostics come from <code>validate</code>; <code>lint</code> is just
+    the verb name you type.</p>
+  </details>
+  <details>
+    <summary>Will my generated org ever hit disk?</summary>
+    <p>Not in a pipeline. <code>-</code> reads stdin straight into memory and
+    the output is JSON on stdout. The whole reason the surface exists is to
+    delete the write-temp / run / parse / cleanup loop — there's no file to
+    race on and nothing to clean up.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Pipelines are one verb-set on a bigger command, feeding a bigger machine.</p>
+  <div class="cards">
+    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
+      <div>wbx<small>the command, and the full mode model</small></div><span class="go">→</span></a>
+    <a href="nesting"><span class="sw" style="background:#a8d4f0"><img src="icons/wbx.svg" alt=""></span>
+      <div>Nesting<small>tangle's workflows sub-array, compiled</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>the grammar the pipes consume</small></div><span class="go">→</span></a>
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>what the engine does with the plan</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under wbx · pipelines
+  :PROPERTIES:
+  :SLUG:   pipelines
+  :KIND:   learn
+  :NN:     07.2
+  :KICKER: under wbx · pipelines
+  :TITLE1: org goes in
+  :TITLE2: JSON
+  :TITLE3: comes out
+  :CHIP:   pipelines
+  :PC:     #d9dbd3
+  :AC:     #13d943
+  :HERO:   img/pipelines-hero.jpg
+  :END:
+** og
+- query · tangle · lint take stdin, emit JSON
+- wbx | jq | wbx composes — no temp file
+- your pipe runs the same kernel the engine does
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#d9dbd3", .34], ["#a8d4f0", .24], ["#aee5c2", .22], ["#f3c5a3", .20]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

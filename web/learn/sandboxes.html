@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sandboxes — suspension is a file operation — Workbooks</title>
+<meta name="description" content="A docked workbook's whole lifecycle is five explicit states and a six-line transition map — and the heaviest operation in it is a file copy. Freeze is cp to cold storage; resume is cp back. A sub-lesson under the Nexus.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/sandboxes-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="sandboxes — suspension is a file operation">
+<meta property="og:description" content="Five states, one six-line transition map, and the heaviest operation in the machine is a file copy. No VM snapshot — by contract, not by omission.">
+<meta property="og:url" content="https://workbooks.sh/learn/sandboxes">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    $ ls cold/
+    sess-841.sqlite          <- a "frozen sandbox". that's all of it.
+    $ cp cold/sess-841.sqlite live/        # and this is "resume"
+
+    somewhere, a hypervisor is metering someone for these two commands.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02·3 — <b>under nexus · sandboxes</b></div>
+      <h1><span class="ln">suspension is</span><span class="ln bub">A FILE</span><span class="ln">operation</span></h1>
+      <p class="dek">The <a href="nexus">Nexus lesson</a> said isolation is software,
+      not a subscription. This page is the same inversion for <b>state</b>. A docked
+      workbook's whole life is five explicit states in a six-line map — and because
+      its entire durable state is <b>one SQLite file</b>, the heaviest operation in
+      the machine is a file copy. No VM snapshot. On purpose.</p>
+      <div class="meta">
+        <span class="on">sandboxes</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/sandboxes-hero.jpg" alt="A small archivist sliding one glowing card into a monumental bright wall of cold-storage drawers rising into a skylit vault, each drawer neatly labeled, one drawer open and warm — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>❄</b></div><span>sandboxes</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Pausing is supposed to be hard</a>
+  <a href="#definition">The five states</a>
+  <a href="#warm-cold">Warm and cold</a>
+  <a href="#freeze">Stop the process, keep the file</a>
+  <a href="#idle-ladder">The demotion ladder</a>
+  <a href="#registry">One table runs the building</a>
+  <a href="#volumes">What survives the winter</a>
+  <a href="#clone">One template, many tenants</a>
+  <a href="#durability">Two clocks of durability</a>
+  <a href="#limits">What this isn't</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>pausing a computer is supposed to be HARD</h2>
+  <p>Everyone selling agent infrastructure sells the same expensive miracle:
+  <em>we can freeze your microVM</em>. Snapshot the guest memory, track the
+  dirty pages, ship gigabytes to object storage, meter the hibernation, and
+  charge for the thaw. The pitch works because the assumption underneath it
+  feels like physics — if an agent's computer is a rented virtual machine,
+  then pausing it really is a heavyweight systems operation, and resuming it
+  really is slow, and somebody really does have to bill you for both.</p>
+  <p>You've probably internalized that assumption without noticing. <em>Pause
+  a running sandbox</em> sounds like a hard problem the way <em>isolate
+  untrusted code</em> sounds like a hard problem — and the
+  <a href="nexus">Nexus lesson</a> already dismantled the second one:
+  isolation here is construction, not a rented perimeter. This page runs the
+  identical move on state. If the thing you're pausing isn't a machine — if
+  its entire durable state is one file and the process holding it is
+  disposable by contract — then suspension stops being a systems feat and
+  becomes what it always should have been. A filing decision.</p>
+</section>
+
+<section id="definition">
+  <h2>the five STATES</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">sand·box</span> <span class="pr">/ˈsænd·bɑks/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the running shape of a docked workbook —
+    one WebAssembly instance under one supervised process, whose entire
+    durable state is <b>one SQLite file</b>, and whose whole life is five
+    explicit states: <b>created → active → suspended → frozen →
+    archived</b>, with <b>deleted</b> as the only exit.</p>
+  </div>
+  <p>Two facts before the diagram. First, the state lives in a <b>registry
+  row</b>, not in the process — a sandbox can be deep in cold storage and
+  still be a first-class citizen of the system, because being a citizen
+  costs one row. Second, transitions are <b>explicit</b>. The engine's
+  <code>transition/2</code> validates every hop against a map and answers
+  <code>{:ok, to}</code> or <code>{:error, :invalid}</code> — there are no
+  implicit shortcuts. Here is the entire state machine, as shipped, from
+  <code>runtime/host/lifecycle.ex</code>:</p>
+  <pre class="orgsample">@transitions %{
+  created:   [:active],
+  active:    [:suspended, :archived],
+  suspended: [:active, :frozen],
+  frozen:    [:active, :archived],
+  archived:  [:active, :deleted]
+}</pre>
+  <p>Six lines. That's the lifecycle product, in full. Drawn out:</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> created : registered
+  created --> active : docked
+  active --> suspended : goes idle
+  active --> archived : filed away
+  suspended --> active : a request lands
+  suspended --> frozen : stays idle
+  frozen --> active : thaws — straight back
+  frozen --> archived : filed away
+  archived --> active : revived
+  archived --> deleted : the only exit
+  deleted --> [*]
+  </pre>
+  <p>Two edges in that map are the ones people get wrong, and both are
+  deliberate. An active sandbox <b>cannot freeze directly</b> — there is no
+  <code>active → frozen</code> hop. Freezing is earned by neglect, not
+  commanded: a sandbox idles into suspended first, and only a suspended
+  sandbox can go cold. And a frozen sandbox <b>thaws straight to
+  active</b> — <code>frozen: [:active, :archived]</code> — no re-warming
+  ladder, no passing back through suspended. Going cold is gradual; coming
+  back is one step. Even <code>archived</code> is revivable —
+  <code>archived → active</code> is in the map. The only state you can't
+  leave is <code>deleted</code>.</p>
+</section>
+
+<section id="warm-cold">
+  <h2>warm and COLD</h2>
+  <p>Underneath the five names there is really only one distinction, and the
+  engine's own vocabulary admits it. A session is <b>warm</b> when its
+  Instance is live in the BEAM — checking costs one Registry lookup. It is
+  <b>cold</b> when only its VFS file persists. Every state below active is
+  just <em>cold, filed in a different drawer</em>:</p>
+  <table class="cmp">
+    <tr><th>state</th><th>a live process?</th><th>where the file is</th><th>back to active by</th></tr>
+    <tr><td>created</td><td class="n">no — a registry row only</td><td>wherever it was registered</td><td>first resume</td></tr>
+    <tr><td><b>active</b></td><td class="y">yes — a supervised GenServer</td><td>open, in the live dir</td><td>already there</td></tr>
+    <tr><td>suspended</td><td class="n">no</td><td>the live dir — the warm cache</td><td>one resume — the file is local</td></tr>
+    <tr><td>frozen</td><td class="n">no</td><td>cold storage — <code>cold/&lt;id&gt;.sqlite</code></td><td>copy back, clear tmp, start</td></tr>
+    <tr><td>archived</td><td class="n">no</td><td>cold storage</td><td>revive — the map allows it</td></tr>
+  </table>
+  <p><code>Sessions.resume/3</code> reconciles the two readings in one
+  function: warm → <code>{:warm, :already_active}</code>, reuse the running
+  Instance and touch nothing. Cold → resolve the VFS, start the Instance
+  under the supervisor, flip the registry row to <code>active</code>, return
+  <code>{:cold, vfs_path}</code>. The VFS resolution is a three-rung
+  cascade: a local file is the warm cache and wins; a <code>frozen</code>
+  row with a cold dir restores from cold storage; otherwise the session
+  starts fresh.</p>
+  <p>Here's the whole machine in one demo, end to end — this is the real
+  shape of <code>demo_resume</code> in
+  <code>runtime/host/demos/runtime.ex</code>. Register a session for tenant
+  acme; resume it twice:</p>
+  <pre class="orgsample">ControlPlane.register("sess-841", "acme", ":memory:")
+   <i>→ row: (sess-841, acme, 'created', :memory:)</i>
+
+Sessions.resume("sess-841", bytes, policy: :minimal)
+   <i>→ {:cold, ":memory:"}     — VFS resolved · Instance started · state → "active"</i>
+
+Sessions.resume("sess-841", bytes, policy: :minimal)
+   <i>→ {:warm, :already_active} — the live Instance reused, nothing touched</i>
+
+Sessions.warm?("sess-841")            <i>→ true</i>
+ControlPlane.get("sess-841").state    <i>→ "active"</i></pre>
+  <p>One more verb worth knowing: <code>prefetch/2</code>. Prefetch-on-auth
+  pulls a session's VFS local — restoring from cold storage if needed —
+  <em>without</em> starting the Instance. The login warms the cache, so the
+  first real request lands on a local file instead of a cold fetch. The
+  <code>policy:</code> option, incidentally, is the
+  <a href="capabilities">capability profile</a> the Instance starts under —
+  that's its own lesson; here it's just a keyword.</p>
+</section>
+
+<section id="freeze">
+  <h2>stop the process, KEEP the file</h2>
+  <p>Now the trick itself. Elsewhere, freezing a sandbox is a memory-snapshot
+  API call you pay for — guest RAM serialized, device state captured,
+  restore measured in seconds and cents. Here is the shipped implementation
+  of <code>freeze/3</code>, essentially verbatim:</p>
+  <pre class="orgsample">def freeze(session_id, vfs_path, cold_dir) do
+  File.mkdir_p!(cold_dir)
+  frozen = Path.join(cold_dir, "#{session_id}.sqlite")
+  with :ok &lt;- File.cp(vfs_path, frozen), do: {:ok, frozen}
+end</pre>
+  <p>Make a directory. Copy a file. The moduledoc states the philosophy
+  outright: <em>the SQLite file IS the durable state — freeze is stop the
+  process, keep the file, no VM snapshot</em>. Resume is the same trick
+  reversed, plus one act of hygiene — copy the file back to the live dir,
+  open it, clear the <code>tmp</code> volume, close it:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant H as the host
+  participant I as the Instance — a BEAM process
+  participant L as live/sess-841.sqlite
+  participant C as cold/sess-841.sqlite
+  rect rgb(251,250,246)
+  Note over H,C: freeze — stop the process, keep the file
+  H->>I: terminate — the process is disposable
+  H->>C: File.cp live → cold
+  Note over C: this file is the entire snapshot
+  end
+  rect rgb(232,245,236)
+  Note over H,C: resume — the same trick, reversed
+  H->>L: File.cp cold → live
+  H->>L: clear the tmp volume — scratch dies here
+  H->>I: start_instance — registry row → active
+  end
+  </pre>
+  <p>The obvious objection: <em>what about everything in memory?</em> The
+  answer is the contract that makes the whole page possible. Components
+  here are <b>stateless between calls</b> — re-instantiated at every
+  Instance start — so there is no precious linear memory to capture. A
+  component that wants durable state declares <code>:persist</code>, which
+  is a promise to checkpoint that state to the VFS, where the runtime
+  actually guarantees durability. The engine's
+  <code>durable_components/1</code> walks the recursive plan — worlds and
+  <a href="nesting">nested sub-workflows</a> alike — and returns exactly the
+  components that opted in. In the engine's own words: <b>the VFS is the
+  orthogonal-persistence layer</b>. A raw-memory snapshot isn't missing.
+  It doesn't fit a stateless component, and it isn't exposed — a non-goal,
+  not a gap.</p>
+</section>
+
+<section id="idle-ladder">
+  <h2>the demotion LADDER</h2>
+  <p>Who decides when a sandbox goes cold? Policy, written as two constants
+  and one pure function. Fifteen minutes idle demotes active to suspended.
+  Twenty-four hours suspended demotes to frozen. Frozen never auto-archives —
+  archiving is a decision, not a decay:</p>
+  <pre class="mermaid">
+flowchart LR
+  a["active<br/>someone — or some schedule — is here"]
+  s["suspended<br/>process gone · file still local"]
+  f["frozen<br/>file copied to cold storage"]
+  ar["archived"]
+  a -- "idle ≥ 15 min" --> s
+  s -- "idle ≥ 24 h" --> f
+  f -. "never automatic — a decision" .-> ar
+  style a fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style s fill:#aee5c2,stroke:#121316
+  style f fill:#a8d4f0,stroke:#121316
+  style ar fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>The implementation is small enough to quote whole — and its demo output
+  is the spec in miniature:</p>
+  <pre class="orgsample">@idle_to_suspend 15 * 60
+@idle_to_freeze  24 * 3600
+
+def auto_next(:active, idle)    when idle >= @idle_to_suspend, do: :suspended
+def auto_next(:suspended, idle) when idle >= @idle_to_freeze,  do: :frozen
+def auto_next(_state, _idle), do: nil
+
+demo_auto_transitions()
+   <i>→ %{active_idle_16m: :suspended,  active_fresh: nil,
+        suspended_idle_2d: :frozen,   frozen_stays: nil}</i></pre>
+  <p>What the ladder buys is the economics of the whole model: a thousand
+  docked workbooks can exist while only a handful are warm, because an idle
+  sandbox costs a registry row and a file, not a running VM. And note what
+  counts as activity — a request landing, a schedule firing, an
+  <a href="agents">agent</a> doing its rounds. Anything that touches the
+  sandbox resets its idle clock.</p>
+  <p>One honest precision: <code>auto_next/2</code> is a <b>pure policy
+  function</b>. The source says it plainly — the thresholds are the policy;
+  the driver that applies them on a tick is the session registry's job. The
+  constants are real, shipped, and demo-proven; the periodic ticker that
+  walks idle sessions through them is the registry's responsibility, not a
+  clock this page can promise is already running against your sessions. The
+  honest framing: demotion is what the system is <em>built to do</em>, at
+  exactly these thresholds.</p>
+</section>
+
+<section id="registry">
+  <h2>one table runs the BUILDING</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the control plane, for the curious</span></p>
+  <p>Something has to remember ten thousand sandboxes' states while most of
+  them are cold. The engine's answer is in the control plane's first line
+  of documentation: <em>SQLite is the control plane; the data plane is each
+  Instance's VFS. Postgres is only needed if we go multi-machine.</em> The
+  schema, verbatim:</p>
+  <pre class="orgsample">CREATE TABLE instances (
+  id TEXT PRIMARY KEY,   -- the session
+  tenant TEXT,           -- whose it is
+  state TEXT,            -- created · active · suspended · frozen · archived
+  vfs_path TEXT,         -- where the disk lives
+  updated INTEGER        -- epoch seconds — the idle clock reads this
+)
+   <i>one row: (sess-841, acme, 'active', '/live/sess-841.sqlite', 1765500000)</i></pre>
+  <p>That row is the whole lifecycle bureaucracy for one sandbox.
+  <code>register/3</code> inserts it at <code>'created'</code>;
+  <code>set_state/2</code> flips the state and stamps <code>updated</code>;
+  <code>get/1</code> and <code>list/0</code> read it back — and
+  <code>GET /instances</code> on the control-plane web serves the list as
+  JSON. A second table, <code>workbooks</code>, stores each workbook's org
+  source — the deployable artifact itself. The registry is a GenServer in
+  the root supervision tree, next to the Instance registry and the Instance
+  supervisor.</p>
+  <p>Two honest notes. The registry's database path comes from the
+  <code>WB_REGISTRY</code> environment variable and defaults to
+  <code>:memory:</code> — out of the box the bookkeeping itself is
+  in-memory, and a durable registry is one env var away. And this is the
+  single-machine story by design: going multi-machine swaps the SQLite
+  registry for Postgres — the same flow, a different registry — which is an
+  engine-config concern, the <a href="wbx">CLI and deploy</a> layer's
+  territory, not this page's.</p>
+</section>
+
+<section id="volumes">
+  <h2>what survives the WINTER</h2>
+  <p>The file being frozen is the <a href="vfs">VFS</a> — one SQLite store,
+  three named volumes, each with its own survival contract.
+  <b>workspace</b> is the working tree. <b>memory</b> is
+  <a href="agents">agent</a> long-term memory. <b>tmp</b> is scratch — and
+  resume clears it, by name, every time:</p>
+  <table class="cmp">
+    <tr><th>volume</th><th>freeze → resume</th><th>share / egress</th><th>what it holds</th></tr>
+    <tr><td><b>workspace</b></td><td class="y">survives</td><td class="y">ships — the one public volume</td><td>the working tree — the work itself</td></tr>
+    <tr><td><b>memory</b></td><td class="y">survives</td><td class="n">stripped</td><td>what the agent learned</td></tr>
+    <tr><td><b>tmp</b></td><td class="n">cleared on resume</td><td class="n">never ships</td><td>scratch — disposable by definition</td></tr>
+  </table>
+  <p>The proof is a round trip you can run. <code>demo_volumes</code> writes
+  the same path into all three volumes, freezes, resumes, reads back:</p>
+  <pre class="orgsample">put workspace /note "the workbook files"
+put memory    /note "what the agent learned"
+put tmp       /note "scratch"
+freeze → resume
+
+   <i>→ workspace:        {:ok, "the workbook files"}</i>
+   <i>→ memory:           {:ok, "what the agent learned"}</i>
+   <i>→ tmp_after_resume: :error</i></pre>
+  <p>Tmp dying is not a bug — <code>Lifecycle.resume</code> literally calls
+  <code>VFS.clear(conn, "tmp")</code> on restore. Scratch that survived
+  hibernation wouldn't be scratch. And notice the second column of the
+  table: freeze keeps <b>more</b> than sharing does. Cold storage is
+  <em>yours</em>, so the agent's memory rides along; egress is for
+  <em>others</em>, so only the workspace ships —
+  <code>public_volumes()</code> is exactly <code>["workspace"]</code>.
+  Freezing and <a href="bundles">sharing</a> both move the same file, with
+  different strip rules, because they answer to different audiences.</p>
+</section>
+
+<section id="clone">
+  <h2>one template, many TENANTS</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the base-image model, for the curious</span></p>
+  <p>Once state-is-a-file has paid for freeze, it keeps paying. Multi-tenant
+  provisioning — elsewhere a golden-image pipeline — is the same file copy
+  pointed forwards. <code>clone_for/3</code> copies a read-only base VFS, a
+  seeded Blueprint, into a fresh writable per-tenant file:</p>
+  <pre class="mermaid">
+flowchart TD
+  base["base.sqlite — the seeded template<br/>read-only · never mutated"]
+  a["tenant-acme-512.sqlite"]
+  b["tenant-globex-513.sqlite"]
+  base -- "File.cp" --> a
+  base -- "File.cp" --> b
+  style base fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style a fill:#aee5c2,stroke:#121316
+  style b fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>The demo seeds a base with <code>/seed</code>, clones it for tenants
+  acme and globex, and lets each write its own <code>/own</code>. The
+  checks come back exactly as isolation demands: both tenants inherit the
+  seed; neither sees the other's write; the base is untouched. Freeze is
+  <code>cp</code> pointed backwards — current state into cold storage.
+  Clone is <code>cp</code> pointed forwards — template into a tenant's
+  future. One primitive, both directions.</p>
+</section>
+
+<section id="durability">
+  <h2>two clocks of DURABILITY</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — backups vs filing, for the curious</span></p>
+  <p>Freeze is a filing decision, not a backup — it captures the file at a
+  lifecycle moment, and between moments a crash would still cost you the
+  gap. So durability here runs on two clocks at once:</p>
+  <figure class="diag" aria-label="two clocks of durability">
+    <div class="d-file">
+      <span class="ftag">one VFS file · two durability mechanisms</span>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">freeze</span><span class="sub"><b>point-in-time</b> — a lifecycle event copies the file to cold storage; lifecycle-driven</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#a8d4f0">litestream</span><span class="sub"><b>continuous</b> — WAL changes stream to a replica as they happen; lifecycle-independent</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">the replica URL</span><span class="sub"><code>file://…</code> local · <code>s3://bucket/path</code> prod — <b>the same command</b>, only the URL and creds differ</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">restore</span><span class="sub">a one-shot command back to a fresh file — the disaster path is one verb</span></div>
+    </div>
+    <figcaption class="dcap">freeze decides <b>where the file is filed</b> · litestream makes sure <b>it can't be lost</b></figcaption>
+  </figure>
+  <p>Mechanically: the database runs in WAL mode — required, one pragma —
+  and an external <code>litestream</code> binary holds a long-lived port
+  per replicated database, streaming write-ahead-log changes to the replica
+  out of band. The engine never blocks on it, and the replication doesn't
+  care what lifecycle state the sandbox is in — a suspended sandbox's last
+  writes are as replicated as an active one's. Restore is a single one-shot
+  command from replica to file. Two clocks, one file, and neither mechanism
+  needed to know about the other.</p>
+</section>
+
+<section id="limits">
+  <h2>what this ISN'T</h2>
+  <p>Honesty section. <b>There is no linear-memory snapshot</b> — and not as
+  a missing feature. A component that keeps state in WebAssembly memory and
+  never declares <code>:persist</code> loses that state at suspend. That's
+  the contract: durable state belongs in the VFS, and the system is honest
+  enough to make the alternative impossible rather than unreliable.</p>
+  <p><b>The idle tick is policy-complete, driver-pending.</b> The thresholds
+  are shipped constants and <code>auto_next/2</code> is demo-proven, but
+  applying them on a schedule is the session registry's job — don't read
+  this page as a promise that a ticker is demoting your sessions tonight.</p>
+  <p><b>The registry defaults to memory.</b> <code>WB_REGISTRY</code> unset
+  means the control plane's own bookkeeping is in-memory — durable
+  registry is one env var, but it's <em>your</em> env var.</p>
+  <p><b>This is the single-machine flow.</b> Multi-machine swaps the SQLite
+  registry for Postgres — same flow, different registry — and isn't covered
+  here. <b>archived</b> has a place in the map and the registry, and no
+  dedicated machinery beyond them — no <code>archive/2</code> helper exists
+  yet. And none of this applies to an undocked
+  <a href="workbook">workbook</a> file at all: a file sitting in your
+  repo has no lifecycle to manage, because there is no process to stop.
+  The state machine begins at docking.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>If I close my laptop, is my agent's work gone?</summary>
+    <p>Your laptop was never the question — a docked sandbox lives on the
+    engine. If it idles, the policy's worst case is demotion down the
+    ladder: suspended, then frozen. Both are just the file in a different
+    drawer; workspace and memory ride along intact, and resume brings it
+    straight back to active.</p>
+  </details>
+  <details>
+    <summary>What's actually different between suspended and frozen?</summary>
+    <p>In both, the process is gone and only the file remains. Suspended
+    keeps the file in the live directory — the warm cache, so resume is
+    immediate. Frozen has copied it to cold storage, so resume is one copy
+    back plus a tmp clear. That copy is the entire mechanical difference
+    the code shows.</p>
+  </details>
+  <details>
+    <summary>Does resume lose anything?</summary>
+    <p>Exactly one thing, on purpose: the tmp volume, cleared by name on
+    every restore. Workspace and memory survive — the demo proves the round
+    trip. And anything a component kept in raw memory without declaring
+    <code>:persist</code> was never durable to begin with — that's the
+    contract, not a casualty.</p>
+  </details>
+  <details>
+    <summary>Is freeze a backup?</summary>
+    <p>No — freeze is a filing decision, a point-in-time copy made at a
+    lifecycle moment. The backup is litestream: continuous WAL streaming to
+    a replica, running independently of lifecycle state, restorable in one
+    command. Two clocks, deliberately separate.</p>
+  </details>
+  <details>
+    <summary>Can an archived sandbox come back?</summary>
+    <p>Yes — <code>archived → active</code> is in the transition map.
+    Archive is a long-term drawer, not a grave. The only terminal state is
+    deleted, and you have to ask for it explicitly: nothing in the map or
+    the idle policy ever deletes on its own.</p>
+  </details>
+  <details>
+    <summary>Why can't I freeze an active sandbox directly?</summary>
+    <p>Because the map says no — <code>active</code> can go to suspended or
+    archived, never straight to frozen. Freezing is earned by neglect:
+    fifteen idle minutes to suspend, twenty-four suspended hours to freeze.
+    The thaw, though, is one step — frozen goes directly back to active.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This page is the Nexus's stateful promise, run through time. Its
+  neighbors fill in the rest.</p>
+  <div class="cards">
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>the parent — isolated, stateful, agentic</small></div><span class="go">→</span></a>
+    <a href="capabilities"><span class="sw" style="background:#aee5c2"><b>⚿</b></span>
+      <div>Capabilities<small>what an active sandbox may reach</small></div><span class="go">→</span></a>
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>the file this whole page copies</small></div><span class="go">→</span></a>
+    <a href="bundles"><span class="sw" style="background:#f2ddb0"><b>⧉</b></span>
+      <div>Bundles<small>the same file, leaving home</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under nexus · sandboxes
+  :PROPERTIES:
+  :SLUG:   sandboxes
+  :KIND:   learn
+  :NN:     02.3
+  :KICKER: under nexus · sandboxes
+  :TITLE1: suspension is
+  :TITLE2: A FILE
+  :TITLE3: operation
+  :CHIP:   sandboxes
+  :PC:     #aee5c2
+  :AC:     #13d943
+  :HERO:   img/sandboxes-hero.jpg
+  :END:
+** og
+- five states · one six-line transition map
+- freeze = cp to cold storage · resume = cp back + clear tmp
+- no VM snapshot — by contract, not omission
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .36], ["#a8d4f0", .24], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

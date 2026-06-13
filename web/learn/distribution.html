@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en" style="--pc:#d9dbd3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>distribution — one release, every door — Workbooks</title>
+<meta name="description" content="Every way to install wbx — curl, npm, self-upgrade, the runtime image — is a courier for one artifact: a GitHub Release tagged wbx-v* holding five native binaries and a wasm module. Same bytes, different doors. A sub-lesson under wbx.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/distribution-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="distribution — one release, every door">
+<meta property="og:description" content="curl, npm, self-upgrade, the runtime image — every install lane is a courier for one GitHub Release. Same bytes, different doors.">
+<meta property="og:url" content="https://workbooks.sh/learn/distribution">
+<meta property="og:image" content="https://workbooks.sh/og/distribution.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="distribution — one release, every door">
+<meta name="twitter:description" content="curl, npm, self-upgrade, the runtime image — every install lane is a courier for one GitHub Release. Same bytes, different doors.">
+<meta name="twitter:image" content="https://workbooks.sh/og/distribution.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/distribution.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * one artifact, four couriers          :distribution:
+  ** TODO tag wbx-v0.13.0
+  ** DONE CI builds five binaries + one wasm module
+  ** DONE curl reads the release
+  ** DONE npm's postinstall reads the SAME release, version-locked to the tag
+  ** DONE `wbx upgrade` reads it too — and refuses to fight npm over file ownership
+     CLOSED: there is no second build. nothing can drift.
+     if you are reading this in the source: that is the whole lesson.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 07·7 — <b>under wbx · distribution</b></div>
+    <h1><span class="ln">one release,</span><span class="ln bub">EVERY</span><span class="ln">door</span></h1>
+    <p class="dek"><b>Distribution</b> is the part where most tools fork into a dozen
+    packaging pipelines that quietly disagree. Here there is exactly one — a
+    <a href="wbx">GitHub Release</a> tagged <code>wbx-v*</code>, holding five native
+    binaries and one wasm module. <b>curl</b>, <b>npm</b>, <b>self-upgrade</b>, and the
+    <a href="nexus">runtime image</a> are all just couriers for the same bytes.</p>
+    <div class="meta">
+    <span class="on">distribution</span><span>12 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/distribution-hero.jpg" alt="A single monumental glowing vault of identical golden ingots, with four small couriers each carrying one ingot out through four different doors into the dawn — bright, monumental vault dwarfing the figures, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>distribution</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Three installs, three tools</a>
+  <a href="#definition">The definition</a>
+  <a href="#release">Anatomy of a release</a>
+  <a href="#curl">The curl lane</a>
+  <a href="#npm">The npm lane</a>
+  <a href="#shadow">The shadow check</a>
+  <a href="#loud">Failing loud, exiting zero</a>
+  <a href="#upgrade">The binary replaces itself</a>
+  <a href="#wasm">The fourth asset</a>
+  <a href="#honesty">What this doesn't solve</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>three installs, three TOOLS</h2>
+  <p>Every tool ecosystem hands you an install ritual, and the rituals
+  disagree with each other. The Homebrew formula is three versions behind
+  because a volunteer maintains it on weekends. The npm package wraps a
+  native binary in a download step that fails <em>silently</em> — you find
+  out at runtime, weeks later, when the command finally errors. The
+  <code>curl | sh</code> one-liner works but feels like trusting a stranger
+  with <code>sudo</code>. And six months on you have three copies of the
+  same tool fighting over your <code>PATH</code>, and no honest answer to
+  the only question that matters: <em>which one does <code>which wbx</code>
+  actually find?</em></p>
+  <p>The deeper problem is that each lane is usually its <b>own build</b> —
+  its own pipeline, its own packaging, its own version cadence. Three
+  pipelines is three things that can drift apart, and they do. The version
+  brew ships, the version npm ships, and the version you'd get from source
+  are three different numbers, and reconciling them is somebody's afternoon.</p>
+  <p>This lesson opens the hood on how wbx ships instead. The
+  <a href="wbx">parent lesson</a> gave you the install one-liners; this one
+  is why there's only one set of bytes behind all of them.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">dis·tri·bu·tion</span> <span class="pr">/ˌdɪs·trɪ·ˈbjuː·ʃən/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> one <b>GitHub Release</b> tagged
+    <code>wbx-v*</code> that every install lane — <b>curl</b>, <b>npm</b>,
+    <b>self-upgrade</b>, and the <b>runtime image</b> — is a courier for.
+    Same bytes, different doors.</p>
+  </div>
+  <p>The word usually names a sprawl: registries, mirrors, package formats,
+  channels. Here it names a single artifact. A tag triggers one CI workflow;
+  that workflow builds the binaries once and attaches them to a Release; and
+  every door into the tool reads from that Release. There is no second
+  build, no parallel packaging job, nothing that can drift — because there
+  is only one thing to keep honest, and CI keeps it.</p>
+</section>
+
+<section id="release">
+  <h2>anatomy of a RELEASE</h2>
+  <p>A push of a tag like <code>wbx-v0.13.0</code> is the whole trigger. The
+  workflow strips the prefix to get the version, fans out across a
+  five-target build matrix, runs one more job for the wasm module, and
+  attaches all six files to a Release named for the tag:</p>
+  <pre class="mermaid">
+flowchart TD
+  tag["git tag wbx-v0.13.0"]
+  tag --> ci["cli-release.yml<br/>v = 0.13.0"]
+  ci --> matrix["native matrix — 5 targets"]
+  ci --> wasmjob["wasm job — wasm32-wasip1"]
+  matrix --> rel[["Release wbx-v0.13.0<br/>5 binaries + wbx.wasm"]]
+  wasmjob --> rel
+  rel --> curl["curl lane"]
+  rel --> npm["npm lane"]
+  rel --> upgrade["wbx upgrade"]
+  style tag fill:#d9dbd3,stroke:#121316
+  style rel fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style curl fill:#ffffff,stroke:#121316
+  style npm fill:#ffffff,stroke:#121316
+  style upgrade fill:#ffffff,stroke:#121316
+  </pre>
+  <p>That graph is the entire mental model. One tag in; one Release out; the
+  three install lanes fan from that single node. The matrix builds five
+  binaries — Apple Silicon and Intel macOS, x64 and arm64 Linux, and an MSVC
+  Windows <code>.exe</code>. The Intel mac binary is the one worth noting:
+  it's <b>cross-compiled on the Apple Silicon runner</b>, because the Intel
+  macOS runners are being retired and can queue indefinitely. The wasm job
+  builds separately and drops a sixth asset, <code>wbx.wasm</code>.</p>
+  <p>Here is an actual release, laid bare, with each asset's door marked:</p>
+  <pre class="orgsample">wbx-v0.13.0 — "wbx v0.13.0"
+├── wbx-darwin-arm64        <i>← curl (Apple Silicon) · npm postinstall</i>
+├── wbx-darwin-x64          <i>← cross-compiled ON the arm64 runner</i>
+├── wbx-linux-x64
+├── wbx-linux-arm64
+├── wbx-windows-x64.exe     <i>← npm lane only (curl says: Windows via WSL)</i>
+└── wbx.wasm                <i>← wasm32-wasip1, for in-sandbox agents</i></pre>
+  <p>Publishing the Release is deliberately idempotent. The job runs
+  <code>gh release create … || gh release upload … --clobber</code> — create
+  it if it's new, otherwise overwrite the assets in place. Re-running a
+  release never errors and never half-publishes; you can rerun the workflow
+  and get the same end state.</p>
+</section>
+
+<section id="curl">
+  <h2>the curl LANE</h2>
+  <p><code>curl -fsSL https://workbooks.sh/cli.sh | sh</code> is the first
+  door, and it is a plain POSIX script — about sixty lines, served as a
+  static file. (The spec still mentions a Cloudflare worker; that's stale —
+  there's no worker logic, just a file you can read.) It does four things in
+  order, and each is auditable.</p>
+  <p>First it discovers the latest tag: it asks the GitHub API for the
+  repo's releases and greps the first <code>tag_name</code> that starts with
+  <code>wbx-v</code>. Second it maps your machine to an asset name —
+  <code>uname</code> gives the OS and arch, which become
+  <code>darwin</code> or <code>linux</code> and <code>arm64</code> or
+  <code>x64</code>, matching the asset names exactly. Third it downloads to a
+  temp file, makes it executable, and moves it into place. Fourth it runs
+  <code>wbx --version</code> as a smoke check, so a broken download fails
+  right there instead of next Tuesday.</p>
+  <p>The install directory has a fallback built in: it uses
+  <code>/usr/local/bin</code> if that's writable, otherwise
+  <code>~/.local/bin</code> — and if the chosen directory isn't on your
+  <code>PATH</code>, it warns you. Three environment knobs steer the whole
+  script:</p>
+  <table class="cmp">
+    <tr><th>env var</th><th>what it does</th><th>default</th></tr>
+    <tr><td><code>WBX_VERSION</code></td><td>pin a specific release instead of latest</td><td>latest <code>wbx-v*</code> tag</td></tr>
+    <tr><td><code>WBX_INSTALL_DIR</code></td><td>where the binary lands</td><td><code>/usr/local/bin</code>, else <code>~/.local/bin</code></td></tr>
+    <tr><td><code>WBX_REPO</code></td><td>which repo's releases to read</td><td><code>workbooks-sh/workbooks.sh</code></td></tr>
+  </table>
+  <p>One honest limit lives in the OS map: it's macOS and Linux only. An
+  unrecognized OS exits with <em>unsupported OS — macOS and Linux today;
+  Windows via WSL</em>. Windows users take the npm lane, or run the script
+  inside WSL.</p>
+</section>
+
+<section id="npm">
+  <h2>the npm LANE</h2>
+  <p>The npm package is a thin launcher, not a copy of the binary. It ships
+  exactly three files — <code>bin/wbx.js</code>, <code>install.js</code>, and
+  a README — and a <code>postinstall</code> hook that downloads the right
+  native binary the moment you <code>npm install</code> it. The clever part
+  is how it finds the binary with no metadata service at all:</p>
+  <p>The CI workflow stamps the package's version straight from the tag. So
+  the package that calls itself <code>0.13.0</code> can compute its own
+  download URL —
+  <code>github.com/…/releases/download/wbx-v0.13.0/wbx-darwin-arm64</code> —
+  from nothing but its own <code>package.json</code> version and your
+  platform. <b>The npm version and the release tag are lockstep by
+  construction.</b> There's no version endpoint, no manifest, no API call to
+  resolve "latest" — the package already knows which Release it belongs to,
+  because the tag is what minted it.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as npm install
+  participant I as install.js (postinstall)
+  participant G as GitHub Release
+  participant C as storage CDN
+  participant L as bin/wbx.js
+  U->>I: run postinstall
+  I->>I: asset = platform + arch
+  I->>G: GET …/wbx-v0.13.0/wbx-darwin-arm64
+  G-->>I: 302 redirect
+  I->>C: follow redirect (up to 10)
+  C-->>I: binary bytes
+  I->>I: write + chmod 0755
+  I->>L: shadow check on PATH
+  </pre>
+  <p>Read that exchange as a story. The install runs the postinstall; the
+  postinstall computes the asset name from your platform and architecture;
+  it requests that asset from the Release. GitHub answers not with bytes but
+  with a 302 redirect to its storage backend — so the installer follows
+  redirects by hand, up to ten hops, with a recognizable user agent. The
+  bytes arrive, it writes them and sets the executable bit, and then it runs
+  one last safety check we'll come back to: the shadow check.</p>
+  <p>The launcher itself, <code>bin/wbx.js</code>, is thirty-seven lines. It
+  checks that the binary exists, then separately that it's executable — two
+  distinct failure messages, because <em>the postinstall download likely
+  failed</em> and <em>the binary exists but is not executable</em> are
+  different problems with different fixes. If all is well it
+  <code>spawn</code>s the native binary, inherits your terminal, and
+  forwards the child's exit code back out. The Node process is a pass-through;
+  the real wbx is the binary it launches.</p>
+</section>
+
+<section id="shadow">
+  <h2>the shadow CHECK</h2>
+  <p>Depth rung. Here's the scenario the npm lane is built to survive: you
+  <code>curl</code>-installed wbx months ago into
+  <code>/usr/local/bin</code>, and today you run
+  <code>npm i -g @work.books/cli</code>. Now there are two binaries on your
+  <code>PATH</code>, and the one that wins is whichever directory comes
+  first. The npm one you just installed might be invisible.</p>
+  <p>So <code>findShadow</code> walks every directory on your
+  <code>PATH</code>, in order, looking for a file named <code>wbx</code>. If
+  the first one it finds resolves to a <em>different</em> file than the one
+  it just installed, that earlier path is shadowing the new install — and it
+  says so, by name:</p>
+  <pre class="orgsample">[wb] downloading wbx-darwin-arm64 (v0.13.0)…
+[wb] installed.
+
+╔══════════════════════════════════════════════════════════════╗
+║  wb PATH SHADOW WARNING                                      ║
+╚══════════════════════════════════════════════════════════════╝
+  Another wb binary was found earlier on your PATH:
+    /usr/local/bin/wbx
+  It will shadow the npm-installed wb. To fix, either:
+    • Remove or rename the old binary:  rm /usr/local/bin/wbx
+    • Or adjust PATH so npm's bin dir comes first.</pre>
+  <p>The predicate is the whole insight: <b>the first <code>wbx</code> on
+  <code>PATH</code> that isn't the one we just wrote</b> is, by definition,
+  the one that shadows it — because shells resolve left to right and stop at
+  the first hit. Walking in <code>PATH</code> order and comparing resolved
+  paths is exactly what the shell will do at call time.</p>
+  <table class="cmp">
+    <tr><th>PATH dir (in order)</th><th>has <code>wbx</code>?</th><th>verdict</th></tr>
+    <tr><td>/usr/local/bin</td><td class="y">yes — the old curl one</td><td class="n">shadows the new install</td></tr>
+    <tr><td>~/.npm-global/bin</td><td class="y">yes — just installed</td><td>too late, never reached</td></tr>
+    <tr><td><i>(if the first hit IS ours)</i></td><td class="y">ours</td><td class="y">no shadow — returns null</td></tr>
+  </table>
+  <p>When the first hit <em>is</em> the freshly-installed binary,
+  <code>findShadow</code> returns null and prints nothing. No shadow, no
+  noise.</p>
+</section>
+
+<section id="loud">
+  <h2>failing LOUD, exiting zero</h2>
+  <p>Depth rung. The npm lane has a design stance about failure that's worth
+  naming, because it's the opposite of how most postinstalls behave. A
+  postinstall download <b>must never brick <code>npm install</code></b> — if
+  it exits non-zero, it takes the whole dependency install down with it,
+  which is a terrible thing to do to someone who just wanted a CLI. But it
+  also <b>must never fail silently</b> — the silent postinstall is exactly
+  the failure mode that makes people distrust npm-wrapped binaries.</p>
+  <p>The resolution: on any download error, print a loud boxed banner, then
+  <code>process.exit(0)</code>. The banner is the signal; the zero keeps the
+  install alive. And the banner is careful to tell you which of two
+  situations you're in:</p>
+  <pre class="orgsample">╔══════════════════════════════════════════════════════════════╗
+║  wb install FAILED                                           ║
+╚══════════════════════════════════════════════════════════════╝
+  The wb binary was NOT downloaded. Running `wb` will fail.
+  (Or: a previous binary is still present and may work.)
+
+  To recover, either:
+    • curl -fsSL https://workbooks.sh/cli.sh | sh
+    • npm rebuild @work.books/cli</pre>
+  <p><em>A previous binary is still present and may work</em> is a very
+  different message than <em>the wb binary was NOT downloaded; running wb
+  will fail</em> — and the installer knows which to say. It hands you both
+  recovery commands right there: the curl lane as an escape hatch, and
+  <code>npm rebuild</code> to retry the postinstall.</p>
+  <p>And the launcher is the backstop for anything that slips past the
+  installer. If you run <code>wbx</code> and the binary is missing or not
+  executable, <code>bin/wbx.js</code> prints its own fatal banner — with the
+  same two fix options — and exits 1. Loud at install time, loud at run
+  time, never silent at either.</p>
+</section>
+
+<section id="upgrade">
+  <h2>the binary replaces ITSELF</h2>
+  <p>The third lane is <code>wbx upgrade</code> — the tool swapping itself
+  for a newer copy. It locates its own executable on disk, then does the
+  most important thing first: it checks whether it lives inside a
+  <code>node_modules</code> directory. If any component of its path is
+  <code>node_modules</code>, it stops and tells you to use npm instead:</p>
+  <pre class="orgsample">$ wbx upgrade                       <i># curl-installed at /usr/local/bin/wbx</i>
+upgraded: wbx 0.12.0 → 0.13.0       <i># wrote wbx.new, chmod 755, atomic rename</i>
+
+$ wbx upgrade                       <i># npm-installed (path has node_modules)</i>
+installed via npm — upgrade with: npm update -g @work.books/cli</pre>
+  <p>That refusal is a feature, not a gap. File ownership inside
+  <code>node_modules</code> belongs to the package manager; a binary that
+  rewrites itself there would be fighting npm over which copy is real. So it
+  declines, and points you at the command that respects the package
+  manager's bookkeeping.</p>
+  <p>For a curl-installed binary, it discovers the latest release the same
+  way <code>cli.sh</code> does — reads the GitHub API, takes the first
+  <code>wbx-v</code> tag — and compares it to its own compiled-in version. If
+  they match, it says <em>already current</em> and stops. Otherwise it picks
+  the asset for its platform (decided at compile time) and performs an atomic
+  swap:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant X as wbx (running)
+  participant A as api.github.com/releases
+  participant R as the Release
+  participant F as filesystem
+  X->>A: GET releases — first wbx-v* tag
+  A-->>X: wbx-v0.13.0
+  X->>X: compare to CARGO_PKG_VERSION
+  X->>R: download asset for this platform
+  R-->>X: bytes
+  X->>F: write /usr/local/bin/wbx.new
+  X->>F: chmod 0755
+  X->>F: rename wbx.new → wbx (atomic)
+  </pre>
+  <p>Follow the swap as a story. The running wbx asks the API for the latest
+  tag, gets <code>wbx-v0.13.0</code>, and compares it to the version baked
+  into itself at compile time. They differ, so it downloads the new bytes
+  and writes them to a sibling file — <code>wbx.new</code>, right next to
+  itself. It marks that new file executable. Then the one move that makes
+  this safe: it <b>renames</b> <code>wbx.new</code> over <code>wbx</code>.
+  Rename is atomic on the same filesystem, so there is never a moment where
+  <code>PATH</code> holds a half-written binary. The running process keeps
+  executing the old inode it already loaded; the <em>next</em> invocation is
+  the new version; and a crash mid-download leaves the old binary untouched.</p>
+  <p>The curl lane's counterpart to all this is pinning — to install an
+  exact version instead of upgrading, you set the version knob:
+  <code>WBX_VERSION=0.12.0 sh -c "$(curl -fsSL https://workbooks.sh/cli.sh)"</code>.</p>
+</section>
+
+<section id="wasm">
+  <h2>the fourth ASSET</h2>
+  <p>Depth rung. The sixth file in every release is <code>wbx.wasm</code>,
+  built for the <code>wasm32-wasip1</code> target. It ships in the same
+  Release as the native binaries because wbx is one crate compiled to two
+  kinds of target — the reason a wasm asset exists at all is the
+  <a href="the-seam">one-crate-two-targets</a> story. This is the lane for
+  the sandboxed future: a wasm module wbx that can run <em>inside</em> the
+  engine's sandbox alongside the workbooks it operates on.</p>
+  <p>Two honest notes belong here. First, the wasm build of
+  <code>upgrade</code> (and <code>open</code>) deliberately bails with
+  <em>wbx upgrade needs the native binary</em> — a module running inside a
+  sandbox cannot rewrite its own file, and pretending otherwise would be a
+  lie. Second, the consumption side: the artifact ships, and it's the
+  spec'd path for in-sandbox agents, but the runtime-side wiring that
+  <em>fetches</em> that published wasm isn't visible in the code yet. It's
+  the lane that exists for where this is going, stated plainly as that.</p>
+  <p>Meanwhile, the <a href="nexus">runtime image</a> doesn't download wbx
+  from a release at all. Its Dockerfile <b>compiles wbx from source</b> in a
+  build stage and copies the stripped binary to
+  <code>/usr/local/bin/wbx</code>. So the agents working inside the engine
+  get a native wbx pinned to the image's exact commit — not a downloaded
+  one, not a wasm one. Same source, a different door again: built in place,
+  at a known SHA.</p>
+</section>
+
+<section id="honesty">
+  <h2>what this doesn't SOLVE</h2>
+  <p>Honesty section. The one-artifact design buys a lot, but it has real
+  edges, and naming them is the point.</p>
+  <p>The npm lane's postinstall dies under <code>npm install
+  --ignore-scripts</code> — no postinstall runs, no binary downloads. The
+  spec actually describes a different shape (esbuild-style per-platform
+  <code>optionalDependencies</code>) that <em>would</em> survive
+  <code>--ignore-scripts</code>, because the platform binary arrives as a
+  real dependency rather than a download step. The shipped implementation
+  chose the single-package postinstall instead: one package to publish and
+  maintain, against five-plus registry packages. That's a deliberate trade,
+  not an oversight — and if you run <code>--ignore-scripts</code>, the curl
+  lane is your way in.</p>
+  <p>The other edges, briefly. There's no Homebrew, apt, or winget — the
+  lanes are curl, npm, and self-upgrade. The curl lane skips Windows
+  entirely (npm or WSL). The atomic rename in <code>upgrade</code> is only
+  atomic on the same filesystem, and needs write permission to the install
+  directory. And the "static binary, no runtime deps" claim is precise about
+  what it means: wbx is built with rustls instead of OpenSSL, so there's no
+  interpreter and no VM to install — but the Linux builds target
+  <code>-gnu</code>, not musl, so "no runtime deps" means <em>no
+  interpreter</em>, not <em>zero dynamic libraries</em>.</p>
+  <table class="cmp">
+    <tr><th>lane</th><th>what breaks it</th><th>escape hatch</th></tr>
+    <tr><td>curl</td><td class="n">Windows; no PATH-writable dir</td><td>npm lane, or WSL</td></tr>
+    <tr><td>npm</td><td class="n"><code>--ignore-scripts</code></td><td>curl lane, or <code>npm rebuild</code></td></tr>
+    <tr><td>upgrade</td><td class="n">cross-filesystem; no write perm</td><td>reinstall via curl</td></tr>
+    <tr><td>wasm</td><td class="n">consumption wiring still landing</td><td>native binary today</td></tr>
+  </table>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is <code>curl | sh</code> safe here?</summary>
+    <p>It's about sixty lines of POSIX shell, served as a static file you can
+    read before you run it — open <code>workbooks.sh/cli.sh</code> in a tab
+    first. It discovers a tag, downloads a release asset over HTTPS, moves it
+    into place, and runs <code>--version</code>. No worker logic, no hidden
+    steps. Auditable beats trusted.</p>
+  </details>
+  <details>
+    <summary>How do I pin a specific version?</summary>
+    <p>On the curl lane, set <code>WBX_VERSION=0.12.0</code> before running
+    the script. On npm, ask for the version directly:
+    <code>npm i @work.books/cli@0.12.0</code> — and because the package
+    version and the release tag are lockstep, that pins the binary too.</p>
+  </details>
+  <details>
+    <summary>I installed both curl and npm — which one wins?</summary>
+    <p>Whichever directory comes first on your <code>PATH</code>. That's also
+    exactly what the shadow banner told you at npm install time — it named
+    the earlier binary and gave you both fixes:
+    <code>rm</code> the old one, or reorder <code>PATH</code> so npm's bin
+    directory leads.</p>
+  </details>
+  <details>
+    <summary>Why is the npm package <code>@work.books/cli</code>, not <code>wbx</code>?</summary>
+    <p>The bare name <code>wbx</code> was already taken on the registry, so
+    the package is scoped. The <a href="wbx">parent lesson</a> covers the
+    naming; here it's just a label on the same bytes.</p>
+  </details>
+  <details>
+    <summary>How do agents inside the engine get wbx?</summary>
+    <p>They don't download it. The <a href="nexus">runtime image</a> compiles
+    wbx from source during its build and bakes the binary into
+    <code>/usr/local/bin/wbx</code>, pinned to the image's commit. Same
+    source as every other lane, built in place.</p>
+  </details>
+  <details>
+    <summary>Why publish to two npm registries?</summary>
+    <p>The release publishes to npmjs as <code>@work.books/cli</code> and
+    mirrors to GitHub Packages as <code>@workbooks-sh/cli</code> — the same
+    launcher, two homes. The publisher sets a skip-download flag on itself so
+    it doesn't fetch a binary onto the build runner while stamping the
+    package.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Distribution is one chapter under the command line — the parent has the
+  rest, and the neighbors explain why the lanes are shaped this way.</p>
+  <div class="cards">
+    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
+      <div>wbx, the command<small>the verbs the installed binary runs</small></div><span class="go">→</span></a>
+    <a href="the-seam"><span class="sw" style="background:#aee5c2"><b>⊣</b></span>
+      <div>The seam<small>one crate, two targets — why wbx.wasm exists</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
+      <div>Nexus<small>the runtime image that bakes wbx in</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under wbx · distribution
+  :PROPERTIES:
+  :SLUG:   distribution
+  :KIND:   learn
+  :NN:     07.7
+  :KICKER: under wbx · distribution
+  :TITLE1: one release,
+  :TITLE2: EVERY
+  :TITLE3: door
+  :CHIP:   distribution
+  :PC:     #d9dbd3
+  :AC:     #13d943
+  :HERO:   img/distribution-hero.jpg
+  :END:
+** og
+- one GitHub Release tagged wbx-v* — five binaries + one wasm module
+- curl, npm, self-upgrade, runtime image — couriers for the same bytes
+- no second build, nothing to drift
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#d9dbd3", .38], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f3c5a3", .16]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

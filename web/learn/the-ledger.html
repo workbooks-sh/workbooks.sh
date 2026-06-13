@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>the ledger — a record nobody can rewrite — Workbooks</title>
+<meta name="description" content="An agent's tool calls are logged at the loop chokepoint, then sealed: each raw line folded into a hash chain whose head is signed by the tenant's did:key. Tamper-evident and attributable — a record neither agent nor user can quietly rewrite. A sub-lesson under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/the-ledger-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="the ledger — a record nobody can rewrite">
+<meta property="og:description" content="An agent's tool calls, sealed into a signed hash chain — tamper-evident and attributable. A sub-lesson under agents.">
+<meta property="og:url" content="https://workbooks.sh/learn/the-ledger">
+<meta property="og:image" content="https://workbooks.sh/og/the-ledger.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="the ledger — a record nobody can rewrite">
+<meta name="twitter:description" content="An agent's tool calls, sealed into a signed hash chain — tamper-evident and attributable. A sub-lesson under agents.">
+<meta name="twitter:image" content="https://workbooks.sh/og/the-ledger.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    Every line below is in the chain. Change one byte of this comment's
+    neighbours in _steps.jsonl and the 64-char head no longer matches the
+    signature — that's the whole trick. A hash chain is just a fold:
+
+        h(0) = sha256("workbooks-ledger-v1")
+        h(i) = sha256( h(i-1)  ++  raw_line_i )
+
+    The head is one number standing in for the entire night. Sign that one
+    number and you've bound the run to an identity. No blockchain. No CA.
+    Tamper-EVIDENCE, not tamper-prevention — it can't stop a rewrite,
+    it can only make one impossible to hide.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·10 — <b>under agents · the ledger</b></div>
+      <h1><span class="ln">a record</span><span class="ln bub">NOBODY</span><span class="ln">can rewrite</span></h1>
+      <p class="dek">An <a href="agents">agent</a> works all night and leaves a log of
+      every move. But a log is just text — the agent could edit it, a second agent could,
+      <b>you</b> could. The <b>ledger</b> seals that log: each raw line folded into a
+      hash chain whose single head is <b>signed by the tenant's identity</b>. Two
+      properties fall out — <b>tamper-evident</b> and <b>attributable</b> — and neither
+      the agent nor you can quietly rewrite the past.</p>
+      <div class="meta">
+        <span class="on">the ledger</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/the-ledger-hero.jpg" alt="A lone figure standing beneath an immense glowing wall of chained tablets, each tablet sealed with a single bright stamp that links to the next, rising into a skylight — monumental ledger-wall dwarfing the small human, warm amber and signal-green light, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>ledger</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">A log anyone can rewrite</a>
+  <a href="#definition">The definition</a>
+  <a href="#chokepoint">What gets logged — the chokepoint</a>
+  <a href="#chain">The chain — one head for the night</a>
+  <a href="#signature">The signature — whose run was it</a>
+  <a href="#verify">Verifying a run</a>
+  <a href="#key">Where identity lives</a>
+  <a href="#rails">One key, two rails</a>
+  <a href="#anchor">Private by default, public by anchor</a>
+  <a href="#honest">What the seal does not do</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>a log anyone can REWRITE</h2>
+  <p>You hired an <a href="agents">agent</a> for the long run — that was the
+  whole pitch of the parent lesson. It worked all night. This morning there's
+  a file, <code>_steps.jsonl</code>, with a line for every tool call it made:
+  the command, the arguments, the output, the timestamp. It reads like a
+  perfect record of the night.</p>
+  <p>Now the uncomfortable question. Did it actually do what the log says?
+  Because <code>_steps.jsonl</code> is plain text. The agent could rewrite it.
+  A second agent sharing the workspace could rewrite it. <em>You</em> could
+  rewrite it. And after the one moment you'd ever need an honest record — a
+  prompt injection, a bad deploy, a step that shouldn't have run — the thing
+  you reach for is exactly the thing anyone with file access can forge.</p>
+  <p>Logs answer <em>what happened</em> only if nobody touched them, and
+  nothing about a text file enforces that. Post-incident forensics on an
+  editable record is theater. The ledger is the part that makes the record
+  worth trusting.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">led·ger</span> <span class="pr">/ˈle·jər/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a <b>seal over the run log</b>, not a second
+    log: the raw bytes of <code>_steps.jsonl</code> folded into a SHA-256
+    <b>hash chain</b> whose single head is <b>signed by the tenant's
+    did:key</b> — yielding two checkable properties,
+    <code>tamper_evident</code> (the log is intact) and
+    <code>attributable</code> (it's intact <em>and</em> bound to a named
+    identity).</p>
+  </div>
+  <p>Those two words are not marketing — they're the exact field names the
+  verifier returns. A ledger doesn't store anything new about the run; it
+  stores one number and one signature that, together, make the existing log
+  impossible to alter without anyone noticing. The rest of this lesson is how
+  ~30 lines of code buy you that.</p>
+</section>
+
+<section id="chokepoint">
+  <h2>what gets logged — the CHOKEPOINT</h2>
+  <p>A record you can trust starts before any sealing: it starts with where
+  the writing happens. In this system the log is written by the agent
+  <b>loop</b>, not by the agent. Every tool call passes through one place —
+  the chokepoint — and that place appends the line, always, regardless of
+  whether any caller wired up a callback. The agent cannot opt a step out of
+  the record, because it never holds the pen. Nothing escapes by
+  construction.</p>
+  <p>Every step is also wall-clock bounded — a tool that wedges is killed at
+  150 seconds and recorded as a logged error, never a silent stall. The event
+  shape is the same everywhere it's written:</p>
+  <pre class="orgsample">{ step, agent, tool, args, output, exit_code, error, dur_ms, ts }
+   <i>step    — the call's index in this run</i>
+   <i>agent   — nil for a solo agent; the member's name in a fleet</i>
+   <i>tool    — what was invoked  ·  args / output — the call + its result</i>
+   <i>dur_ms  — monotonic-clock duration  ·  ts — unix seconds</i></pre>
+  <p>Three different writers produce that one shape into that one file: the
+  native agent loop, command calls made from inside a WebAssembly component
+  through the Dock, and instrumentation spans bridged out of WASM. They use
+  different prefixes on the <code>tool</code> field — a bare name, a
+  <code>command:</code> name, a <code>wasm:</code> name — but every line lands
+  in the same <code>_steps.jsonl</code>, so the seal covers all of them at
+  once.</p>
+  <pre class="mermaid">
+flowchart LR
+  loop["the agent loop<br/>tool = git, fetch, …"]
+  dock["WASM components<br/>via the Dock<br/>tool = command:&lt;name&gt;"]
+  span["WASM spans<br/>instrument-enter/exit<br/>tool = wasm:&lt;name&gt;"]
+  file[("_steps.jsonl<br/>one file · one shape<br/>appended lock-free")]
+  loop -- "appends" --> file
+  dock -- "appends" --> file
+  span -- "appends" --> file
+  style file fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style loop fill:#ffffff,stroke:#121316
+  style dock fill:#ffffff,stroke:#121316
+  style span fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Read the picture as three lanes draining into one basin. The loop writes
+  the agent's own moves; the Dock lane writes what sandboxed components do on
+  the agent's behalf; the span lane writes timing from inside WASM. None of
+  the three can choose to stay dry. One honest note: the span bridge is built
+  and unit-tested, but the guest-side wiring that feeds it is still an open
+  to-do — so today the first two lanes carry the run, and the third is plumbed
+  ahead of its source.</p>
+</section>
+
+<section id="chain">
+  <h2>the chain — one head for the NIGHT</h2>
+  <p>Here's the first half of the trick, and it's transferable to anything you
+  ever build. You don't need a blockchain or an audit service. You fold every
+  raw log line into a running SHA-256 and the entire history collapses into
+  one 64-character number — the <b>head</b>.</p>
+  <pre class="orgsample">h(0) = sha256("workbooks-ledger-v1")          <i>the genesis constant</i>
+h(i) = sha256( h(i-1)  ++  raw_line_i )        <i>fold each line in</i>
+head = h(n)                                     <i>one number for the whole run</i></pre>
+  <p>Three details make it strong. First, the bytes hashed are the
+  <em>raw line</em> — the file exactly as written, not a re-parse and
+  re-encode — so there's no canonicalization step to disagree about and no
+  re-serialization bug to hide a change in. Second, because each hash feeds
+  the next, altering, inserting, dropping, or reordering <em>any</em> line
+  changes that line's hash and every hash after it, all the way to the head.
+  Third, the sealed count is checked separately, so even a change that somehow
+  preserved the head couldn't preserve the line count.</p>
+  <p>Walk one real fold. Suppose step three of the night was a commit:</p>
+  <pre class="orgsample">{"step":3,"agent":"waldo","tool":"git","args":{"cmd":"commit"},
+ "output":"[main 4f2c1d9] post: morning links (pushed)",
+ "exit_code":0,"error":null,"dur_ms":812,"ts":1765540210}
+
+   h(3) = sha256( h(2)  ++  the raw bytes of that line )</pre>
+  <p>Nothing is parsed. The line is hashed as the literal text on disk, byte
+  for byte. Do that for all 47 lines and you have one head. Picture the chain
+  — and picture what an edit does to it:</p>
+  <pre class="mermaid">
+flowchart LR
+  g["genesis<br/>workbooks-ledger-v1"] --> h1["h1"] --> h2["h2"] --> h3["h3"] --> hn["head<br/>9b3c…"]
+  e2["edit line 2"] -. "changes h2" .-> x2["h2′"]
+  x2 -. "and h3" .-> x3["h3′"]
+  x3 -. "and the head" .-> xn["head′ ≠ 9b3c…"]
+  style g fill:#aee5c2,stroke:#121316
+  style hn fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style e2 fill:#f3c5a3,stroke:#121316
+  style x2 fill:#f3c5a3,stroke:#121316
+  style x3 fill:#f3c5a3,stroke:#121316
+  style xn fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>The top row is the honest chain: genesis seeds h1, each link folds the
+  next line in, and the run ends on a head of <code>9b3c…</code>. The bottom
+  branch is a tamperer touching line two — its hash becomes h2-prime, which
+  forces h3-prime, which forces a different head entirely. There is no edit
+  that moves a line without moving the head. That's tamper-<em>evidence</em>,
+  and it cost about thirty lines of code.</p>
+</section>
+
+<section id="signature">
+  <h2>the signature — whose run was IT</h2>
+  <p>A hash proves the log is <em>intact</em>. It does not prove <em>whose</em>
+  it is — anyone could compute a head over any file. The second half of the
+  trick is a signature: sign the head with the tenant's Ed25519
+  <code>did:key</code> and the run is bound to an identity that's
+  self-certifying.</p>
+  <p>A <code>did:key</code> looks like
+  <code>did:key:z6Mk…</code>. The part after <code>z6Mk</code> is just the
+  Ed25519 public key, multibase-encoded with a two-byte codec prefix — the
+  W3C-interoperable form, not a bespoke hex string. Self-certifying means the
+  verifier reads the public key straight out of the DID and checks the
+  signature with it: no certificate authority, no registry lookup, no
+  third party to ask whether this identity is real. The string <em>is</em> the
+  credential.</p>
+  <p>Seal the run and you get one small file, <code>_ledger.json</code>:</p>
+  <pre class="orgsample">{"v":1,
+ "did":"did:key:z6MkpTHzv6frd3xkS9hvSDXYNS6JLkPGfDDM1jx6cAYy3eUR",
+ "count":47,
+ "head":"9b3c2e51… 64 hex chars …",
+ "sig":"a41f… 128 hex chars …",
+ "ts":1765540233}</pre>
+  <table class="cmp">
+    <tr><th>field</th><th>what it is</th><th>who checks it</th></tr>
+    <tr><td><b>v</b></td><td>ledger format version (1)</td><td>the reader, for compatibility</td></tr>
+    <tr><td><b>did</b></td><td>the tenant identity that sealed it</td><td>anyone — it carries its own pubkey</td></tr>
+    <tr><td><b>count</b></td><td>how many lines were sealed</td><td class="y">verify — caught even if the head matched</td></tr>
+    <tr><td><b>head</b></td><td>the chain's final hash</td><td class="y">verify — recompute and compare</td></tr>
+    <tr><td><b>sig</b></td><td>Ed25519 signature over the head</td><td class="y">verify — check under the DID's pubkey</td></tr>
+    <tr><td><b>ts</b></td><td>when the seal happened, unix seconds</td><td>the reader, for ordering</td></tr>
+  </table>
+  <p>The verdict of that table in one sentence: <code>did</code> and
+  <code>head</code> say <em>who</em> and <em>what</em>, while <code>sig</code>
+  and <code>count</code> are what verification actually recomputes. And the two
+  properties stack in a deliberate order — <code>attributable</code> is
+  defined as <code>tamper_evident AND the signature verifies</code>. A broken
+  chain can never be attributable, because there's no point asking whose a log
+  is once you know it's been altered. Intact first, then named.</p>
+</section>
+
+<section id="verify">
+  <h2>verifying a RUN</h2>
+  <p>Verification recomputes the chain over the <em>current</em>
+  <code>_steps.jsonl</code> and reports two booleans against the sealed file.
+  There are two surfaces. From the CLI:</p>
+  <pre class="orgsample">$ wb ledger morning-links
+tamper-evident=ok attributable=ok count=47 did=did:key:z6Mkp…</pre>
+  <p>Now edit one byte of step twelve's output in <code>_steps.jsonl</code> and
+  run it again:</p>
+  <pre class="orgsample">$ wb ledger morning-links
+tamper-evident=FAIL attributable=FAIL count=47 did=did:key:z6Mkp…</pre>
+  <p>Both fall together, and that's the design: <code>attributable</code> is
+  <code>tamper_evident</code> <em>and</em> the signature — so the instant the
+  chain breaks, attributability goes with it. The HTTP twin returns the same
+  verdict as JSON:</p>
+  <pre class="orgsample">$ curl https://&lt;nexus&gt;/api/ledger/morning-links
+{"tamper_evident":true,"attributable":true,
+ "did":"did:key:z6Mkp…","head":"9b3c…","count":47}</pre>
+  <p>And if a run crashed before its end-of-run seal, or someone deleted both
+  files, there is simply nothing to check:</p>
+  <pre class="orgsample">{"error":"no ledger for this run"}</pre>
+  <p>Read that last one carefully: it is not the same as a passing check. It
+  means absence — and absence is the tell. There are four outcomes worth
+  knowing by sight:</p>
+  <table class="cmp">
+    <tr><th>outcome</th><th>tamper-evident</th><th>attributable</th><th>what happened</th></tr>
+    <tr><td>both ok</td><td class="y">ok</td><td class="y">ok</td><td>log intact and bound to the sealing identity</td></tr>
+    <tr><td>chain ok, sig fails</td><td class="y">ok</td><td class="n">FAIL</td><td>log intact, but the key doesn't match the DID — wrong / rotated identity</td></tr>
+    <tr><td>chain fails</td><td class="n">FAIL</td><td class="n">FAIL</td><td>a line changed, was inserted, dropped, or reordered</td></tr>
+    <tr><td>no ledger</td><td colspan="2" class="n">error</td><td>never sealed (crash) or the seal was deleted — absence, not proof</td></tr>
+  </table>
+  <p>The honest read of that matrix: only the top row is a clean bill of
+  health. Everything below it is a question you now know to ask, which is the
+  entire value — the record stopped being something you have to take on
+  faith.</p>
+</section>
+
+<section id="key">
+  <h2>where identity LIVES</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the key, and how it survives a redeploy</span></p>
+  <p>The signature is only as durable as the key behind it. Each tenant gets an
+  Ed25519 keypair, minted once at repo init and stored under
+  <code>.workbooks/&lt;tenant&gt;.ed25519</code>. The private half never enters
+  version control — <code>.workbooks/</code> is in the auto-generated
+  <code>.gitignore</code>, owned by one boundary so the rule can't drift
+  between the git, bundle, and library egress paths. A bulk
+  <code>git add -A</code> is safe precisely because of this: the sweep
+  physically cannot pick up the signing key or the telemetry database.</p>
+  <p>Now the failure mode the deploy model forces you to confront. Containers
+  are wiped on every redeploy. Without a persisted seed, a redeploy would mint
+  a <em>brand-new</em> DID — and every prior signature, every sealed run,
+  would suddenly be attributed to a key nobody holds. So the primary tenant's
+  keypair is restored deterministically from a 32-byte seed kept as a
+  deployment secret:</p>
+  <pre class="orgsample">$ fly secrets set WB_SIGNING_KEY=$(head -c 32 /dev/urandom | base64)
+  # WB_PRIMARY_TENANT defaults to "dev"</pre>
+  <pre class="mermaid">
+sequenceDiagram
+  participant B as boot
+  participant E as env
+  participant K as keystore
+  B->>E: WB_SIGNING_KEY present?
+  alt seed persisted
+    E-->>B: yes — 32-byte seed
+    B->>K: restore the same keypair
+    Note over K: same DID as last month —<br/>old ledgers still verify
+  else no seed
+    B->>K: mint a fresh keypair
+    Note over K: new DID — prior signatures<br/>orphaned (chain still checks)
+  end
+  </pre>
+  <p>Read the sequence as a fork at boot. Boot asks the environment whether the
+  seed is set. If it is, the keystore restores the exact keypair from before —
+  same DID this month as last, so a run sealed weeks ago still verifies under
+  today's key. If the seed is missing, boot mints a fresh keypair: the old
+  ledgers stay <em>tamper-evident</em> — the chain is self-contained and still
+  checks — but <code>attributable</code> now binds them to a key no one holds.
+  Set the secret and the whole history stays signed by one continuous
+  identity. One caveat stated plainly: only the primary tenant is restored
+  this way; other tenants regenerate on redeploy until bring-your-own-key
+  storage lands, which is fine in the single-tenant case but worth knowing.</p>
+</section>
+
+<section id="rails">
+  <h2>one key, two RAILS</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the same identity, signing two different things</span></p>
+  <p>The <code>did:key</code> that signs runs is not single-purpose. The very
+  same key signs published <em>artifacts</em>: a manifest over the canonical
+  JSON of a workbook, embedded in the published HTML, verifiable with
+  <code>wb verify &lt;file&gt;</code>. One identity, two rails — run provenance
+  and artifact provenance — and a third power waiting in the wings.</p>
+  <table class="cmp">
+    <tr><th>rail</th><th>what gets signed</th><th>travels with the bytes?</th></tr>
+    <tr><td><b>ledger</b></td><td>the head over a run's <code>_steps.jsonl</code></td><td class="n">no — verify needs the workdir</td></tr>
+    <tr><td><b>manifest</b></td><td>a canonical-JSON manifest in published HTML</td><td class="y">yes — embedded in the file</td></tr>
+    <tr><td><b>x25519</b></td><td>(receives) wrapped content keys for sealed bundles</td><td class="y">the wrap travels; release is escrow-only</td></tr>
+  </table>
+  <p>The verdict of that table: the manifest rail is the portable one — a
+  signed workbook carries its proof inside itself and <code>wb verify</code>
+  checks it anywhere. The ledger rail is not yet portable; verifying a run
+  still needs filesystem access to the workdir. And the same identity has a
+  third power — mapped to an X25519 key so encrypted content keys can be
+  wrapped to a DID — but that map is not yet checked against the reference
+  vectors, so key release stays escrow-only for now. One keypair, three powers:
+  sign runs, sign artifacts, receive encrypted keys.</p>
+</section>
+
+<section id="anchor">
+  <h2>private by default, public by ANCHOR</h2>
+  <p>By default the ledger never leaves home. <code>_steps.jsonl</code>,
+  the status and trace files, the telemetry database, <em>and
+  <code>_ledger.json</code> itself</em> are session-private — never committed,
+  bundled, or shipped. The rule the whole system holds: sharing exposes the
+  <em>work</em>, never the session that produced it. So the seal exists, and
+  proves the run, without anyone outside ever seeing it.</p>
+  <p>Making the head public is a separate, explicit act: <b>anchor</b>. It
+  commits <code>_ledger.json</code> into the tenant's git repo, authored by a
+  fixed ledger identity, so the head is witnessed by git's own
+  content-addressing — outside the workdir, where the agent can't reach it.</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph wd["the workdir — private by default"]
+    steps["_steps.jsonl"]
+    led["_ledger.json"]
+  end
+  subgraph repo["the tenant git repo — witnessed"]
+    commit["ledger-&lt;slug&gt; commit<br/>head content-addressed"]
+  end
+  led -- "anchor (explicit opt-in)" --> commit
+  style wd fill:#fbfaf6,stroke:#121316
+  style repo fill:#fbfaf6,stroke:#121316
+  style led fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style commit fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>Read the flow as a deliberate door. On the left, the workdir holds the
+  steps and the sealed ledger, both private. The single arrow is anchoring —
+  an opt-in act that copies the head into the repo on the right, where git's
+  hashing witnesses it from outside. One honest caveat: anchoring beyond git —
+  to an ATproto record or an external op-log — is the planned next leg, and the
+  anchor step is not yet wired to run automatically on every run. The seal is
+  automatic; making it externally witnessed is still a choice you make.</p>
+</section>
+
+<section id="honest">
+  <h2>what the seal does NOT do</h2>
+  <p>Honesty section, because the failure modes are part of understanding the
+  guarantee.</p>
+  <ul>
+    <li><b>Evidence, not prevention.</b> The chain catches a rewrite; it does
+    not stop one. Anyone with file access can still edit
+    <code>_steps.jsonl</code> — they just can't do it <em>and</em> keep the
+    head matching the signature. The value is that tampering becomes
+    impossible to hide, not impossible to attempt.</li>
+    <li><b>Seal is end-of-run and best-effort.</b> It happens once, at the
+    close of a workflow run, and never blocks the result. A run that crashes
+    before it seals has no ledger — verify returns <em>no ledger for this
+    run</em>, which is honest about the gap rather than papering over it.</li>
+    <li><b>Anchoring is the unfinished leg.</b> External verifiability is
+    opt-in and partially built, as the last section said. Don't read the
+    ledger as automatically witnessed off-host today.</li>
+    <li><b>Verification needs the workdir.</b> Checking a run is a runtime or
+    CLI operation against the files, not yet a portable offline artifact check.
+    Contrast <code>wb verify</code> on a signed workbook, which <em>is</em>
+    portable — that gap is real.</li>
+    <li><b>Provenance of actions, not a transcript.</b> The chained line
+    carries only the first 200 characters of each tool's output. The ledger
+    proves what was done; it is not a full recording of every byte produced.</li>
+    <li><b>The trust root is the chokepoint.</b> The chain proves the log
+    wasn't changed <em>since sealing</em>. It cannot prove the steps were
+    logged honestly <em>during</em> the run — that guarantee comes from logging
+    living at the loop, where nothing escapes by construction, which is exactly
+    why the writing was never put in the agent's hands.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can the agent just delete the log <em>and</em> the ledger?</summary>
+    <p>It can — and then verify returns <em>no ledger for this run</em>, which
+    is not a pass. Absence is the tell: a missing ledger is itself a signal
+    something is wrong. And anchoring exists for exactly this — once the head
+    is committed into git, deleting the workdir copy doesn't unwitness it.</p>
+  </details>
+  <details>
+    <summary>Why not a blockchain?</summary>
+    <p>Because you don't need consensus to get the property you want. A hash
+    chain gives you tamper-evidence and one signature gives you attribution —
+    that's the whole guarantee, in about thirty lines. Consensus is for
+    agreeing with strangers who don't trust each other; this is one tenant
+    signing their own runs.</p>
+  </details>
+  <details>
+    <summary>What if I edit my own steps file?</summary>
+    <p>Verify FAILs — and that's the point, not a bug. The design goal is that
+    neither the agent <em>nor</em> the user can rewrite the record. You holding
+    the key lets you <em>sign</em> runs; it doesn't let you alter a sealed one
+    without the head and signature disagreeing.</p>
+  </details>
+  <details>
+    <summary>Does verifying cost anything?</summary>
+    <p>One file read and N hashes — recompute the chain over the current
+    <code>_steps.jsonl</code> and compare to the sealed head and count. It's an
+    index-speed operation, not a service call.</p>
+  </details>
+  <details>
+    <summary>Is <code>args</code> in the chain?</summary>
+    <p>Yes — the whole raw line is hashed, byte for byte, and
+    <code>args</code> is part of that line. Nothing in a step is folded in
+    selectively; if it's in the log, it's in the chain.</p>
+  </details>
+  <details>
+    <summary>Whose identity signs it — and does it survive a redeploy?</summary>
+    <p>The tenant's <code>did:key</code>, restored from a persisted 32-byte
+    seed for the primary tenant so the DID is stable across redeploys. Skip the
+    seed and the next boot mints a new identity — old ledgers stay
+    tamper-evident but lose attribution to a key nobody holds.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>The ledger is one of the real edges around an agent — follow the others.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the worker whose runs this makes verifiable</small></div><span class="go">→</span></a>
+    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
+      <div>wbx<small>the CLI that runs ledger, sign, and verify</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>the standing agent you'd most want attributable</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · the ledger
+  :PROPERTIES:
+  :SLUG:   the-ledger
+  :KIND:   learn
+  :NN:     05.10
+  :KICKER: under agents · the ledger
+  :TITLE1: a record
+  :TITLE2: NOBODY
+  :TITLE3: can rewrite
+  :CHIP:   the ledger
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/the-ledger-hero.jpg
+  :END:
+** og
+- every tool call logged at the loop chokepoint — nothing escapes
+- raw lines folded into a hash chain, head signed by the tenant did:key
+- tamper-evident + attributable — neither agent nor user can rewrite the past
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .38], ["#aee5c2", .24], ["#f2ddb0", .20], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

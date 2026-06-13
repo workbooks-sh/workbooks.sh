@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>timestamps — when, written on the same line as what — Workbooks</title>
+<meta name="description" content="An org timestamp is a date a machine can act on, written one line under the work it schedules. An 18-line kernel parser turns &lt;2026-06-06 Sat 06:00 +1d&gt; into {at, repeat, active} that rides through every plan and run record. A deep dive under org.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/timestamps-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="timestamps — when, written on the line with what">
+<meta property="og:description" content="A date a machine can act on, written one line under the work it schedules — and the 18-line parser that turns it into {at, repeat, active}.">
+<meta property="og:url" content="https://workbooks.sh/learn/timestamps">
+<meta property="og:image" content="https://workbooks.sh/og/timestamps.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="timestamps — when, written on the line with what">
+<meta name="twitter:description" content="A date a machine can act on, written one line under the work it schedules — and the 18-line parser that turns it into {at, repeat, active}.">
+<meta name="twitter:image" content="https://workbooks.sh/og/timestamps.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/timestamps.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    the secret this page keeps: WHEN belongs on the line with WHAT.
+    most systems file the schedule somewhere else — a crontab on a box,
+    a yaml in CI, a dashboard nobody reviews — and the two copies drift.
+    org writes the appointment one line under the task it schedules:
+
+        * Nightly digest                    :workflow:
+          SCHEDULED: <2026-06-06 Sat 06:00 +1d>
+
+    an 18-line parser reads the first char for the active bit, then
+    classifies each token by shape: ten chars with a dash at index four
+    is a date; a colon makes it a time; a leading + makes it a repeater.
+    everything else — the day name — is tolerated and dropped.
+    the kernel has no clock. it can carry time, not feel it.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 04·4 — <b>under org · timestamps</b></div>
+      <h1><span class="ln">when, on the</span><span class="ln bub">SAME</span><span class="ln">line as what</span></h1>
+      <p class="dek">An org <b>timestamp</b> is a date a machine can act on, written one
+      line under the work it schedules. <code>&lt;2026-06-06 Sat 06:00 +1d&gt;</code> sits
+      on the same headline as the code that runs — and an <b>eighteen-line parser</b>
+      turns it into <code>{at, repeat, active}</code> that rides through every plan and
+      every run record. This page is the grammar, and the honest path that data takes.</p>
+      <div class="meta">
+        <span class="on">timestamps</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/timestamps-hero.jpg" alt="A small figure standing beneath a colossal bright wall-clock built into the spine of an open book, its single hand a beam of light marking one luminous line of text — 1970s sci-fi style, monumental and warm">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/org.svg" alt=""></div><span>timestamps</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The crontab nobody reads</a>
+  <a href="#definition">The definition</a>
+  <a href="#grammar">The token classifier</a>
+  <a href="#active-inactive">One bracket, one bit</a>
+  <a href="#scheduled-deadline">Trigger vs fact</a>
+  <a href="#repeaters">The three repeaters</a>
+  <a href="#cron-hatch">The cron escape hatch</a>
+  <a href="#through-the-plan">Through the plan</a>
+  <a href="#checking">Checking what it extracted</a>
+  <a href="#honest">The kernel has no clock</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the crontab nobody READS</h2>
+  <p>Every system keeps "when" somewhere, and that somewhere is almost always
+  unreadable. A crontab on a box no one logs into. A scheduler dashboard
+  behind a console. A block of CI yaml with a five-field incantation at the
+  top. The plan, meanwhile, says "every morning" in prose — in a doc, a
+  ticket, a README — and the machine's copy of that same fact lives in a
+  different universe entirely.</p>
+  <p>So they drift. The prose says daily; the cron says weekly; the person
+  who knew which was right left in March. The cost isn't the syntax — five
+  star-fields are learnable. The cost is the <em>distance</em>: the schedule
+  and the thing it schedules are two artifacts, in two formats, reviewed by
+  two different nobody.</p>
+  <p>Org closes the distance by refusing to move the schedule out of the
+  plan. The "when" sits one line under the "what" — on the same headline, in
+  the same parseable tree as the code that runs. The timestamp isn't metadata
+  <em>about</em> the plan. It's a fact <em>in</em> the plan.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">time·stamp</span> <span class="pr">/ˈtaɪm·stamp/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a date a machine can act on, written inline
+    on the headline it belongs to. <code>&lt;…&gt;</code> is an
+    <b>appointment</b> — something to fire; <code>[…]</code> is a
+    <b>note</b> — something recorded. On a planning line it parses into
+    <code>{at, repeat, active}</code> and rides into every plan and run
+    record the kernel emits.</p>
+  </div>
+  <p>It's a construct of <a href="org">the grammar</a> — the same tree that
+  holds headlines, tags, TODO states, and <a href="drawers">drawers</a>. The
+  parser for it is small enough to read in a sitting, and most of this lesson
+  is walking those eighteen lines and the data path they open. The sibling
+  deep-dive <a href="schedules">schedules</a> owns the engine that
+  <em>fires</em> these; this page owns the grammar and the data, and hands
+  off the clock explicitly.</p>
+</section>
+
+<section id="grammar">
+  <h2>the token CLASSIFIER</h2>
+  <p>The whole timestamp parser is about eighteen lines of Rust in the
+  <a href="the-kernel">kernel</a> crate. It does two things. First, it reads
+  the very first character to decide whether the timestamp is active. Then it
+  splits the inside on whitespace and classifies each token in one pass by
+  its <em>shape</em> — first match wins, per token. Here is that classifier
+  walking left to right over the canonical line:</p>
+  <pre class="orgsample">SCHEDULED: &lt;2026-06-06 Sat 06:00 +1d&gt;
+           │ └──────────┘ └─┘ └───┘ └──┘
+           │   date       day  time  repeat
+           └─ the bracket → the active bit</pre>
+  <pre class="mermaid">
+flowchart TD
+  start["a token from inside the brackets"]
+  d{"length 10<br/>and a dash at index 4?"}
+  t{"contains a colon?"}
+  r{"starts with + / ++ / .+ ?"}
+  date["it's the DATE<br/>2026-06-06"]
+  time["it's the TIME<br/>06:00"]
+  rep["it's the REPEAT<br/>+1d"]
+  drop["ignored — tolerated, never validated<br/>(the day name Sat lands here)"]
+  start --> d
+  d -- yes, and no date yet --> date
+  d -- no --> t
+  t -- yes --> time
+  t -- no --> r
+  r -- yes --> rep
+  r -- no --> drop
+  style date fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style time fill:#aee5c2,stroke:#121316
+  style rep fill:#9fc4e8,stroke:#121316
+  style drop fill:#d9dbd3,stroke:#121316
+  style start fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Read the diagram as a single funnel each token falls through. A
+  <b>date</b> is the first token of exactly ten characters with a dash at
+  byte four — that's how <code>2026-06-06</code> is recognized, and it's also
+  why <code>2026-6-6</code> is silently rejected: nine characters, no match,
+  and because a date is <em>required</em>, the whole timestamp evaporates. A
+  <b>time</b> is any token containing a colon. A <b>repeater</b> is any token
+  starting with <code>+</code>, <code>++</code>, or <code>.+</code>. And
+  <b>everything else is ignored</b> — the day name <code>Sat</code> falls
+  straight to the floor, tolerated and discarded, never once checked against
+  the date. A <code>Sat</code> written on a Wednesday parses without
+  complaint.</p>
+  <p>What comes out is exactly this, and nothing more — date and time joined
+  with a <code>T</code>, the repeater verbatim, the active bit:</p>
+  <pre class="orgsample">{ "at": "2026-06-06T06:00", "repeat": "+1d", "active": true }</pre>
+  <p>That is the entire contract. The kernel does not interpret the
+  repeater, does not resolve the day name, does not know what "now" is. It
+  reads shape, emits structure, and stops.</p>
+</section>
+
+<section id="active-inactive">
+  <h2>one bracket, one BIT</h2>
+  <p>Active versus inactive is the first character and nothing else.
+  Angle brackets mean active; square brackets mean inactive; the shapes
+  inside are identical. Mismatched brackets — an open angle closed with a
+  square — match no arm and parse to nothing at all.</p>
+  <table class="cmp">
+    <tr><th>written</th><th><code>active</code></th><th>org's meaning</th><th>what a consumer should do</th></tr>
+    <tr><td><code>&lt;2026-08-01 Sat 10:00&gt;</code></td><td class="y">true</td><td>an appointment</td><td>treat as armed — eligible to fire</td></tr>
+    <tr><td><code>[2026-08-01 Sat 10:00]</code></td><td class="n">false</td><td>a recorded note</td><td>surface it, but don't fire on it</td></tr>
+    <tr><td><code>&lt;2026-08-01 Sat 10:00]</code></td><td>—</td><td>nothing — no match</td><td>no timestamp parses at all</td></tr>
+  </table>
+  <p>Here's the part worth internalizing: an <em>inactive</em>
+  <code>SCHEDULED:</code> still flows all the way through. Write
+  <code>SCHEDULED: [2026-08-01 Sat 10:00]</code> on a planning line and the
+  plan carries <code>"active": false</code> — recorded, not armed.
+  <code>schedule_of</code> does not filter on the active bit; it surfaces the
+  fact and leaves the decision to whoever consumes it. The kernel records;
+  the consumer decides. That separation is deliberate — the kernel's job is
+  to never lose information, not to enforce policy.</p>
+</section>
+
+<section id="scheduled-deadline">
+  <h2>trigger vs FACT</h2>
+  <p>Two planning keywords carry timestamps, and they are not symmetric. Only
+  <code>SCHEDULED</code> feeds the workflow schedule. <code>DEADLINE</code> is
+  parsed, surfaced, and carried — but it never becomes a trigger. A workflow
+  with only a <code>DEADLINE</code> resolves to <code>"schedule": null</code>
+  in its plan, verified. A deadline is a fact you do arithmetic on — overdue
+  is <code>now &gt; at</code> — not a clock that wakes anything up.</p>
+  <table class="cmp">
+    <tr><th></th><th>shows in <code>wb query</code>?</th><th>in the tangle plan's <code>schedule</code>?</th><th>fires anything?</th></tr>
+    <tr><td><b><code>SCHEDULED</code></b></td><td class="y">yes — as <code>scheduled</code></td><td class="y">yes — feeds <code>schedule_of</code></td><td class="y">it's the trigger</td></tr>
+    <tr><td><b><code>DEADLINE</code></b></td><td class="y">yes — as <code>deadline</code></td><td class="n">no — always <code>null</code> from a deadline</td><td class="n">never — it's a fact, not a clock</td></tr>
+  </table>
+  <p>The verdict of that table in one line: both keywords are read and
+  surfaced, but only <code>SCHEDULED</code> can wake work. This is also the
+  single most common misconception about org time — people write a
+  <code>DEADLINE</code> and wonder why nothing ran. Nothing ran because a
+  deadline was never a trigger. It's a date the validator can measure against,
+  the same way a passed deadline on a <a href="todos">TODO</a> becomes an
+  overdue flag, not a notification.</p>
+  <p>One more asymmetry worth stating: a timestamp written in body prose —
+  a bare <code>[2026-06-12 Fri 11:30]</code> sitting in a paragraph — is
+  <em>not</em> picked up as a schedule. Only the planning line feeds
+  <code>scheduled</code> and <code>deadline</code>;
+  <code>headline_of</code> reads them off <code>hl.planning()</code> and
+  nowhere else. A date in prose is documentation; a date on the planning
+  line is structure.</p>
+</section>
+
+<section id="repeaters">
+  <h2>the three REPEATERS</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the repeater conventions, for the curious</span></p>
+  <p>A repeater is a token like <code>+1d</code> that says "and again, on an
+  interval." Org has three prefixes, and they mean three different things.
+  The crucial fact about the kernel is that it carries all three
+  <em>verbatim</em> as opaque strings — it preserves the distinction without
+  ever computing the next fire. The meaning rides in the string; the
+  scheduler reads it later.</p>
+  <table class="cmp">
+    <tr><th>prefix</th><th>org convention</th><th>if you miss it by three days…</th></tr>
+    <tr><td><code>+1d</code></td><td>shift from the <b>old</b> date by the interval</td><td>next fire is tomorrow, then the day after — the schedule keeps its original cadence regardless of when you acted</td></tr>
+    <tr><td><code>++1d</code></td><td>shift <b>until in the future</b> by the interval</td><td>it jumps forward repeatedly past today, landing on the next still-future slot — no pile-up of missed fires</td></tr>
+    <tr><td><code>.+1d</code></td><td>shift from the <b>completion</b> date</td><td>the clock restarts from when you actually finished — three days late means the next one is three days later too</td></tr>
+  </table>
+  <p>The verdict of that table: <code>+</code> is fixed cadence,
+  <code>++</code> is catch-up-to-now, and <code>.+</code> is
+  measured-from-done. Each is a different answer to "what counts as the
+  anchor." The kernel doesn't pick — it captures the prefix exactly so the
+  scheduler can. If two repeaters somehow appear in one timestamp, the last
+  one wins by plain overwrite; there's no error, just the final value.</p>
+</section>
+
+<section id="cron-hatch">
+  <h2>the cron escape HATCH</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — when a timestamp isn't enough</span></p>
+  <p>Some schedules aren't calendar-shaped. "Every weekday at 6" or "the 1st
+  and 15th" want cron's five fields, not a single appointment with a
+  repeater. For those, drop a <code>:SCHEDULE:</code> key into a
+  <a href="drawers">properties drawer</a> and write plain cron. Drawer keys
+  are uppercased on parse, so <code>:schedule:</code> in lowercase works
+  exactly the same.</p>
+  <p>When both are present, the drawer wins. <code>schedule_of</code> checks
+  the <code>SCHEDULE</code> property <em>first</em>; only if it's absent does
+  it fall back to the <code>SCHEDULED</code> timestamp. Here is that dual
+  clock probed against the real surfaces:</p>
+  <pre class="orgsample">* Cron wins                          :workflow:
+  SCHEDULED: &lt;2026-07-01 Wed 09:00 ++1w&gt;
+  :PROPERTIES:
+  :SCHEDULE: 0 6 * * *
+  :END:</pre>
+  <p><code>wb query</code> still reports the timestamp in full —
+  <code>"scheduled": {"at": "2026-07-01T09:00", "repeat": "++1w",
+  "active": true}</code>, with the property visible as
+  <code>{"SCHEDULE": "0 6 * * *"}</code>. But <code>wb tangle</code>
+  resolves the world's <code>schedule</code> to
+  <code>{"cron": "0 6 * * *"}</code> — the drawer overrode the timestamp,
+  and the timestamp is still on record. One snippet teaches two things at
+  once: who wins, and that <em>query shows what was written</em> while
+  <em>tangle shows what was resolved</em>.</p>
+  <p>The rule of thumb is simple. Calendar-shaped time — "every morning,"
+  "this Friday," an appointment a human would write on a wall — wants a
+  timestamp. Machine-shaped time — odd cadences, multiple fixed minutes,
+  anything a human would reach for cron to express — wants
+  <code>:SCHEDULE:</code>.</p>
+</section>
+
+<section id="through-the-plan">
+  <h2>through the PLAN</h2>
+  <p>Follow one line from text to run record. The journey is short and every
+  hop is a named function in the kernel, so there's no magic to take on
+  faith:</p>
+  <pre class="mermaid">
+flowchart LR
+  org["SCHEDULED: &lt;…06:00 +1d&gt;<br/>on a :workflow: headline"]
+  ho["headline_of<br/>reads the planning line"]
+  so["schedule_of<br/>:SCHEDULE: prop, else SCHEDULED"]
+  bw["build_world<br/>schedule on EVERY world"]
+  run["Workflow.run<br/>schedule in EVERY run record"]
+  who["the keeper · external cron · POST /api/workflow<br/>— something with a clock wakes it"]
+  org --> ho --> so --> bw --> run --> who
+  style org fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  style ho fill:#ffffff,stroke:#121316
+  style so fill:#aee5c2,stroke:#121316
+  style bw fill:#9fc4e8,stroke:#121316
+  style run fill:#f3c5a3,stroke:#121316
+  style who fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>Read it as a relay. The planning line is read by
+  <code>headline_of</code>. <code>schedule_of</code> resolves it — drawer
+  first, then the timestamp — into the <code>schedule</code> field.
+  <code>build_world</code> attaches that field to <em>every</em> world it
+  builds, and it builds them recursively — which is the quietly important
+  part. Because each world carries its own <code>schedule</code>, a monthly
+  parent workflow can hold an hourly child, each on its own clock. The
+  <a href="nesting">nesting</a> lesson states this in a sentence; here is
+  the mechanism: per-level schedules, because <code>build_world</code>
+  recurses and <code>schedule_of</code> runs at every level.</p>
+  <p>Finally, <code>Workflow.run</code> puts the schedule into every run
+  record and every summary, recursively through sub-workflows. So the answer
+  to "what does this run think its schedule is?" is always in the record,
+  never reconstructed. And you can read the whole plan <em>without running
+  it</em>: <code>POST /api/workflow</code> with <code>?plan=1</code> returns
+  the schedule and plan and runs nothing.</p>
+</section>
+
+<section id="checking">
+  <h2>checking what it EXTRACTED</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the three ways to see the parse</span></p>
+  <p>You never have to guess what the machine read off your line. Three
+  surfaces show it. <code>wb query &lt;file&gt;</code> shows the raw parse —
+  the <code>scheduled</code> and <code>deadline</code> objects per headline.
+  <code>wb tangle &lt;file&gt;</code> shows the resolved plan — the
+  <code>schedule</code> on each world, after the drawer-vs-timestamp
+  precedence runs. And <code>POST /api/workflow?plan=1</code> returns that
+  same plan over HTTP without executing anything.</p>
+  <p>The canonical example is <code>nightly-digest.org</code> — a
+  <code>:workflow:</code> headline scheduled
+  <code>&lt;2026-06-06 Sat 06:00 +1d&gt;</code> over a rust → js → go pipeline.
+  Its two surfaces line up exactly:</p>
+  <pre class="orgsample"><i>wb query  →</i> "scheduled": { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }
+<i>wb tangle →</i> "worlds"[0]["schedule"]: { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }</pre>
+  <p>And the DEADLINE-only case, the one that catches everyone, settled in
+  eight lines of real output:</p>
+  <pre class="orgsample">* Deadline only                      :workflow:
+  DEADLINE: &lt;2026-07-04 Sat&gt;
+
+<i>wb query  →</i> "deadline": { "at": "2026-07-04", "repeat": null, "active": true }
+<i>wb tangle →</i> "schedule": null</pre>
+  <p>The deadline parsed perfectly — it's right there in the query — and the
+  plan's schedule is still <code>null</code>, because a deadline was never a
+  trigger. If you expected a fire and got silence, this is the check that
+  explains it in one read.</p>
+</section>
+
+<section id="honest">
+  <h2>the kernel has no CLOCK</h2>
+  <p>Honesty section, because the grammar makes a promise the kernel
+  deliberately does not keep. <b>The kernel is pure in, pure out — no host
+  calls, no clock.</b> It cannot know what "now" is. It can carry time as
+  data; it cannot feel time pass. Every fact above is about reading and
+  surfacing a date, never about acting on one.</p>
+  <p>So what actually wakes a workflow? Today, something outside the kernel
+  with a clock of its own. The only callers of <code>Workflow.run</code> in
+  the host are the HTTP endpoint and the demos — there is no daemon walking
+  org timestamps on a timer. The runtime's native clock is the
+  <a href="keepers">keeper</a>, but it ticks <em>agent definitions</em> on
+  an interval set by <code>WB_KEEPER_INTERVAL_MS</code> — not org
+  timestamps. So the live path is: the timestamp is parsed, surfaced in the
+  plan and the run record, and then an external trigger —
+  cron, CI, or a <code>machine exec</code> hitting
+  <code>POST /api/workflow</code> — or the keeper-by-interval does the
+  waking. The parent <a href="workflows#schedules">workflows</a> lesson says
+  "the engine fires these"; this deep dive is more precise than its parent,
+  on purpose: the engine <em>can</em> fire these, and the firing engine is
+  the sibling lesson <a href="schedules">schedules</a>, not this one.</p>
+  <p>A few smaller honest edges, all by construction:</p>
+  <ul>
+    <li><b>Repeater math is the consumer's job.</b> <code>+1d</code> rides
+    through as the string <code>"+1d"</code>. The kernel never computes the
+    next fire; it preserves the distinction so the scheduler can.</li>
+    <li><b>Time ranges survive as non-ISO strings.</b> A token like
+    <code>06:00-07:30</code> contains a colon, so it's kept whole as the
+    time — yielding <code>"at": "2026-06-20T06:00-07:30"</code>, which is not
+    valid ISO. An honest quirk: the classifier matches on shape, not on
+    validity.</li>
+    <li><b>No timezones, anywhere.</b> The grammar has no timezone field. All
+    time is engine-local. If you need zone-correct firing, that lives in the
+    engine that runs the plan, not in the timestamp.</li>
+    <li><b>Org warning cookies are dropped.</b> A <code>-2d</code> warning on
+    a deadline matches no arm and is silently discarded — surfaced data only,
+    never a behavior.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Why didn't my DEADLINE run anything?</summary>
+    <p>Because a deadline was never a trigger. <code>schedule_of</code> only
+    consults <code>SCHEDULED</code> (and the <code>:SCHEDULE:</code>
+    property); a <code>DEADLINE</code>-only workflow resolves to
+    <code>"schedule": null</code>, verified. A deadline is a date you measure
+    against — overdue is <code>now &gt; at</code> — not a clock. Move it to
+    <code>SCHEDULED</code> if you want it to fire.</p>
+  </details>
+  <details>
+    <summary>Do I need the day name, like Sat?</summary>
+    <p>No. The day name is decorative. The classifier matches no arm for it,
+    so it's tolerated and dropped, and it's <em>never</em> validated against
+    the date — a <code>Sat</code> on a Wednesday parses cleanly. Write it for
+    human readability or omit it; the parse is identical either way.</p>
+  </details>
+  <details>
+    <summary>What happens with 2026-6-6?</summary>
+    <p>No timestamp at all. The date rule is exactly ten characters with a
+    dash at byte four; <code>2026-6-6</code> is nine characters and matches
+    nothing. Because a date is required, the whole timestamp silently drops.
+    Always zero-pad: <code>2026-06-06</code>.</p>
+  </details>
+  <details>
+    <summary>Which wins — :SCHEDULE: or SCHEDULED?</summary>
+    <p>The <code>:SCHEDULE:</code> drawer property wins.
+    <code>schedule_of</code> checks the property first and only falls back to
+    the timestamp if it's absent. The plan resolves to
+    <code>{"cron": …}</code> while <code>wb query</code> still shows the
+    timestamp — overridden, but not erased.</p>
+  </details>
+  <details>
+    <summary>Where are timezones?</summary>
+    <p>Nowhere in the grammar. There's no zone field; all time is
+    engine-local. Zone-correct firing is a property of the engine that runs
+    the plan — the kernel only ever carries the wall-clock string you
+    wrote.</p>
+  </details>
+  <details>
+    <summary>Can I put a timestamp in body text instead of the planning line?</summary>
+    <p>You can write one, but it won't schedule anything. Only the planning
+    line feeds <code>scheduled</code> and <code>deadline</code>; a bare
+    <code>[…]</code> in prose parses as a date but is never picked up as a
+    schedule. Put it on the planning line under the headline.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This page is the grammar and the data path; its neighbors hold the
+  engine and the rest of the tree.</p>
+  <div class="cards">
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>the parent — the whole file this zooms into</small></div><span class="go">→</span></a>
+    <a href="schedules"><span class="sw" style="background:#aee5c2"><b>⏱</b></span>
+      <div>Schedules<small>the keeper — the engine that fires these</small></div><span class="go">→</span></a>
+    <a href="tangling"><span class="sw" style="background:#9fc4e8"><b>✳</b></span>
+      <div>Tangling<small>where the plan JSON comes from</small></div><span class="go">→</span></a>
+    <a href="drawers"><span class="sw" style="background:#f3c5a3"><b>▤</b></span>
+      <div>Drawers<small>the mechanism :SCHEDULE: rides on</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under org · timestamps
+  :PROPERTIES:
+  :SLUG:   timestamps
+  :KIND:   learn
+  :NN:     04.4
+  :KICKER: under org · timestamps
+  :TITLE1: when, on the
+  :TITLE2: SAME
+  :TITLE3: line as what
+  :CHIP:   timestamps
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/timestamps-hero.jpg
+  :END:
+** og
+- a date a machine can act on, written on the line with the work
+- 18 lines parse <…06:00 +1d> into {at, repeat, active}
+- the kernel carries time as data — it has no clock
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .38], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f3c5a3", .16]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

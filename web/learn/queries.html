@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queries — one SQL string against your own disk — Workbooks</title>
+<meta name="description" content="The whole disk is one four-column table. A component reaches it through a single Policy-gated Dock import — vfs-query — that returns rows as JSON, or a caught error, never a crash. And one statement can sweep a whole library. A sub-lesson under vfs.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="Queries — one SQL string against your own disk — Workbooks">
+<meta property="og:description" content="The whole disk is one four-column table, reached through one Policy-gated Dock import that returns JSON — rows or a caught error, never a crash. A sub-lesson under vfs.">
+<meta property="og:url" content="https://workbooks.sh/learn/queries">
+<meta property="og:image" content="https://workbooks.sh/og/queries.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Queries — one SQL string against your own disk — Workbooks">
+<meta name="twitter:description" content="One four-column table, one Policy-gated import, JSON back — rows or a caught error, never a crash. A sub-lesson under vfs.">
+<meta name="twitter:image" content="https://workbooks.sh/og/queries.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/queries.jpg">
+<link rel="preload" href="img/queries-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    -- the parent page promised your disk speaks SQL.
+    -- here is the whole grammar, all of it:
+    CREATE TABLE vfs (
+      volume  TEXT NOT NULL,
+      path    TEXT NOT NULL,
+      content BLOB,
+      mtime   INTEGER,
+      PRIMARY KEY (volume, path)
+    );
+    -- four columns. one import. one envelope for errors:
+    --   {"error": "near \"SELEC\": syntax error"}
+    -- a bad query is a value, not a crash. that's the whole trick.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 09·1 — <b>under vfs · queries</b></div>
+      <h1><span class="ln">one question,</span><span class="ln bub">ONE</span><span class="ln">four-column table</span></h1>
+      <p class="dek">The parent lesson promised your disk <a href="vfs">speaks SQL</a>.
+      This page is the contract. The whole disk is <b>one table — four columns</b>.
+      A component reaches it through a single <a href="capabilities">Policy</a>-gated
+      <a href="the-dock">Dock</a> import — <code>vfs-query</code> — that returns rows as
+      JSON, or a caught error, <b>never a crash</b>. And one statement can sweep a whole
+      <a href="bundles">library</a>.</p>
+      <div class="meta">
+        <span class="on">queries</span><span>10 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/queries-hero.jpg" alt="A small figure standing before a single colossal four-column stone tablet glowing with rows of light, an enormous bright reading hall rising around it, one slot where a question is posted and rows of light return — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/vfs.svg" alt=""></div><span>queries</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The disk speaks SQL. Say what, exactly?</a>
+  <a href="#definition">The definition</a>
+  <a href="#schema">The whole schema, all of it</a>
+  <a href="#import">One import, granted or absent</a>
+  <a href="#call">The round trip</a>
+  <a href="#errors">Error as a value</a>
+  <a href="#profiles">Who holds the cap</a>
+  <a href="#library">One statement, a whole shelf</a>
+  <a href="#federation">When FROM isn't a file</a>
+  <a href="#honest">Where the query ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the disk speaks SQL. say WHAT, exactly?</h2>
+  <p>The <a href="vfs">parent lesson</a> showed three dreamy queries and a line —
+  your disk speaks SQL — and left it there. That was the poetry. This is the
+  contract. If you're going to hand a SQL string to a component an LLM wrote,
+  you want the answers underneath the slogan: what table, what columns, what
+  exactly do I call, what comes back, and what happens when I get the query
+  wrong.</p>
+  <p>The reassuring part is how small the truth is. There is no query API with a
+  dozen methods. There is one table, one import, and one error shape — and once
+  you've seen them, you've seen all of it. The parent page even drew the table
+  a little stylized, with columns that don't exist; this page reconciles the
+  illustration with the real four columns, then shows you the one statement that
+  can ask a question of fifty workbooks at once.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">vfs·query</span> <span class="pr">/ˈviː·ef·es ˈkwɪə·ri/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the single <a href="capabilities">Policy</a>-gated
+    <a href="the-dock">Dock</a> import that runs <b>one SQL string</b> against the
+    Instance's own disk and returns JSON — rows, or a caught error, and
+    <b>never a host crash</b>.</p>
+  </div>
+  <p>It is the working half of the <a href="vfs">VFS</a>: that lesson described a
+  disk you can query; this names the exact seam through which the query passes.
+  One function, one string in, one string out — and the entire safety story
+  rides on that narrow shape.</p>
+</section>
+
+<section id="schema">
+  <h2>the whole SCHEMA, all of it</h2>
+  <p>Here is the disk, in full. Not an inode graph, not a manifest plus a blob
+  store — one SQLite table, four columns, one file per Instance. The
+  <code>CREATE TABLE</code> the engine actually runs is this:</p>
+  <pre class="orgsample">CREATE TABLE IF NOT EXISTS vfs (
+  volume  TEXT NOT NULL,
+  path    TEXT NOT NULL,
+  content BLOB,
+  mtime   INTEGER,
+  PRIMARY KEY (volume, path)
+);</pre>
+  <p>That is one hundred percent of the schema. The composite primary key
+  <code>(volume, path)</code> is the whole namespace: a path is unique
+  <em>within a volume</em>, and the <code>volume</code> column is the switch
+  between the three regions — <code>workspace</code>, <code>memory</code>, and
+  <code>tmp</code>, with <code>workspace</code> the default. That column is
+  deliberately visible to raw SQL so a component can scope a query to any one of
+  them. Column by column:</p>
+  <table class="cmp">
+    <tr><th>column</th><th>type</th><th>what it means</th><th>example</th></tr>
+    <tr><td><code>volume</code></td><td>TEXT</td><td>the region — workspace · memory · tmp</td><td><code>workspace</code></td></tr>
+    <tr><td><code>path</code></td><td>TEXT</td><td>the file name within that volume</td><td><code>/reports/week-24.org</code></td></tr>
+    <tr><td><code>content</code></td><td>BLOB</td><td>the bytes themselves, one row per file</td><td><i>18,234 bytes</i></td></tr>
+    <tr><td><code>mtime</code></td><td>INTEGER</td><td>unix <b>seconds</b>, written on every put</td><td><code>1749600000</code></td></tr>
+  </table>
+  <p>Now the reconciliation the parent lesson owes you. It drew queries against
+  a <code>files</code> table with <code>size</code>, <code>dir</code>, and
+  <code>writer</code> columns. None of those columns exist. Size is
+  <code>length(content)</code>; a directory is a string operation on
+  <code>path</code>; and writer-attribution simply isn't in the schema at all —
+  there is no column that records who wrote a row. So the parent's
+  <code>SELECT path FROM files WHERE mtime &gt; '2026-06-09'</code> becomes, told
+  truthfully — note <code>mtime</code> is unix seconds, so the date has to be
+  converted, and the table is <code>vfs</code>:</p>
+  <pre class="orgsample">SELECT path, length(content) AS bytes
+FROM vfs
+WHERE volume = 'workspace'
+  AND mtime &gt; strftime('%s', '2026-06-09');
+   <i>→ [["/reports/week-24.org", 18234], ["/notes/june.org", 4101]]</i></pre>
+  <p>Two things to carry out of that result. First, rows come back as
+  <b>arrays of arrays</b> — <code>[[value, value], …]</code> — not objects with
+  named keys; the host returns the raw row order, not a dictionary. Second, the
+  size you wanted was derived, not stored, and the <code>volume = 'workspace'</code>
+  clause is how you stay inside one region. Four columns is the whole grammar.
+  Everything else is SQL you already know.</p>
+</section>
+
+<section id="import">
+  <h2>one import, granted or ABSENT</h2>
+  <p>There is exactly one way in. The engine's interface declares it as a single
+  typed function in the <a href="the-dock">Dock</a> contract:</p>
+  <pre class="orgsample">// world engine — package workbooks:engine
+import vfs-query: func(sql: string) -&gt; string</pre>
+  <p>A string in, a string out. But a component doesn't <em>always</em> have
+  that import — it has it only if its <a href="capabilities">Policy</a> profile
+  grants the <code>vfs</code> capability. When the host assembles a component's
+  imports, granting <code>vfs</code> adds precisely one entry to the map:
+  <code>vfs-query</code>, bound to a closure over <em>this Instance's own</em>
+  database connection. No grant, no entry.</p>
+  <p>And here is the part that makes the gating airtight: it is gating <b>by
+  construction</b>, not by a runtime check. The host provides only the imports
+  the Policy grants. A component that imports <code>vfs-query</code> without the
+  grant doesn't get an error when it calls — it <b>fails to instantiate</b>,
+  because the import it asks for isn't there to link against. The malformed case
+  is caught even earlier, at <code>wb build</code>, where conformance extracts
+  the component's WIT and allows only the three engine-level imports
+  (<code>session-info</code>, <code>vfs-query</code>, <code>run-command</code>).
+  An unauthorized capability is a wire that was never run.</p>
+  <pre class="mermaid">
+flowchart TD
+  prof["a Policy profile<br/>compute · minimal · network · posix"]
+  caps["its caps list<br/>vfs is the floor — every profile has it"]
+  imp["the imports map<br/>granting vfs adds one entry: vfs-query"]
+  ok["component instantiates<br/>the import links to this Instance's disk"]
+  no["component fails to instantiate<br/>imported a cap it was never granted"]
+  prof --> caps
+  caps -- "vfs granted" --> imp --> ok
+  caps -- "vfs absent" --> no
+  style prof fill:#ffffff,stroke:#121316
+  style caps fill:#fbfaf6,stroke:#121316
+  style imp fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style ok fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style no fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>Read that graph top to bottom as a single sentence. A profile names a caps
+  list; the caps list either contains <code>vfs</code> or it doesn't; if it
+  does, one import — <code>vfs-query</code> — appears in the map and the
+  component links cleanly to its own disk; if it doesn't, the component asking
+  for that import never finishes loading. Two endpoints, and which one you reach
+  was decided before a line of the component ran.</p>
+</section>
+
+<section id="call">
+  <h2>the round TRIP</h2>
+  <p>Now follow one call. The component speaks the SDK's ergonomic surface — in
+  Rust, <code>vfs::query::&lt;T&gt;(sql)</code> after a one-line
+  <code>dock::bind!(bindings, vfs)</code>; in JS, <code>dock.vfs.query(sql)</code>
+  after <code>bind(imports)</code>. That call crosses the typed boundary into the
+  host closure, which hands the SQL to <code>VFS.query_json</code>, which prepares
+  and runs it against SQLite and encodes the result as a JSON string — back across
+  the same boundary, parsed by the SDK into rows.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as component
+  participant D as Dock import — vfs-query
+  participant V as VFS.query_json
+  participant S as SQLite — this Instance's disk
+  C->>D: query("SELECT path FROM vfs WHERE volume='memory'")
+  D->>V: sql string
+  V->>S: prepare + fetch_all
+  S-->>V: rows as lists
+  V-->>D: Jason.encode! → JSON string
+  D-->>C: parsed rows — [[…],[…]]
+  </pre>
+  <p>Walk it as a story. The component asks for every path in its memory volume.
+  The Dock import passes the raw string through to <code>query_json</code> on the
+  host; the host prepares the statement and fetches every row from the single
+  SQLite file that <em>is</em> this Instance's disk; the rows come back as plain
+  lists, get encoded into one JSON string, and ride that one
+  <code>-&gt; string</code> wire home, where the SDK parses them into the
+  array-of-arrays the component reads. One string out, one string back. The
+  boundary never carries anything richer than text — which is exactly what makes
+  the next section possible.</p>
+</section>
+
+<section id="errors">
+  <h2>error as a VALUE, crash as an impossibility</h2>
+  <p>Hand SQL to a component an LLM wrote and it <em>will</em> get a query wrong
+  — a typo, a missing table, a malformed clause. The host treats your SQL as
+  untrusted by default, and the design line is blunt: the Instance must not be
+  able to take down its engine. So <code>query_json</code> wraps the prepare and
+  fetch in a <code>with</code>, and on failure it doesn't trap — it returns an
+  error envelope down the very same string channel as the rows:</p>
+  <pre class="orgsample">// the good case — a JSON array of row arrays:
+[["/notes/june.org", 1749600000]]
+
+// the bad case — one key, exactly:
+{"error": "near \"SELEC\": syntax error"}</pre>
+  <p>That envelope is precisely one key, <code>error</code>, mapping to a string.
+  Both SDKs sniff for exactly that shape and raise it as a typed error: the JS
+  <code>checkError</code> throws a <code>DockError</code> only when the parsed
+  result has one key and that key is <code>error</code>; Rust's
+  <code>check_error</code> does the same inside <code>rows()</code> and
+  <code>query_raw()</code>. So a broken query surfaces in the component as a
+  catchable exception, while the engine keeps running, unbothered.</p>
+  <pre class="mermaid">
+flowchart LR
+  q["prepare + fetch_all"]
+  ok{"ok?"}
+  rows["rows JSON<br/>[[v,v],…]"]
+  err["error JSON<br/>{error: …}"]
+  out["one -> string wire<br/>back to the component"]
+  q --> ok
+  ok -- "yes" --> rows --> out
+  ok -- "no" --> err --> out
+  style q fill:#ffffff,stroke:#121316
+  style ok fill:#fbfaf6,stroke:#121316
+  style rows fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style err fill:#f3c5a3,stroke:#121316,stroke-width:2.5px
+  style out fill:#a8d4f0,stroke:#121316
+  </pre>
+  <p>Both outcomes leave by the same door. Whether the statement succeeded or
+  failed, the host produces a JSON string and sends it down the one
+  <code>-&gt; string</code> wire; the component decides which it got by looking
+  at the shape. There is no second channel for errors, no exception that crosses
+  the boundary, no way for a query to reach the engine's own stack.</p>
+  <p>One honest nuance, because it matters. The design <em>describes</em> this as
+  a read query, but nothing mechanically rejects a write — <code>prepare</code>
+  plus <code>fetch_all</code> will happily execute an <code>INSERT</code> or a
+  <code>DELETE</code>. The guarantee is not statement-kind; it is <b>scope</b>.
+  The only bytes that SQL can touch are this Instance's own disk. The blast
+  radius of the worst query you can write is one project-sized file — which is
+  the same containment the <a href="vfs">VFS lesson</a> built, said in SQL.</p>
+</section>
+
+<section id="profiles">
+  <h2>who holds the CAP</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the four profiles, for the curious</span></p>
+  <p>The <code>vfs</code> capability is the <b>floor</b>. Every Policy profile
+  grants it; the only thing that changes profile to profile is what else comes
+  with it, and how much memory and wall-clock time the component gets. The
+  <code>compute</code> profile is the true sandbox — it grants
+  <em>only</em> <code>vfs</code>, nothing more — which makes it the right shape
+  for handing untrusted SQL to a component that should touch nothing but its own
+  disk.</p>
+  <table class="cmp">
+    <tr><th>profile</th><th>caps</th><th>memory</th><th>timeout</th></tr>
+    <tr><td><b>compute</b></td><td>vfs only — the true sandbox</td><td>64 MiB</td><td>5,000 ms</td></tr>
+    <tr><td>minimal</td><td>vfs + local caps + raw sockets</td><td>64 MiB</td><td>5,000 ms</td></tr>
+    <tr><td>network</td><td>vfs + net</td><td>128 MiB</td><td>30,000 ms</td></tr>
+    <tr><td>posix</td><td>vfs + more</td><td>256 MiB</td><td>60,000 ms</td></tr>
+  </table>
+  <p>The verdict of that table in one line: <code>vfs</code> is in every row, so
+  the query surface is always available, but it is the <em>floor</em>, never the
+  ceiling. And the fail-safe is pointed the right way — a typo'd or unknown
+  profile <b>fails closed to <code>compute</code></b>, the vfs-only sandbox,
+  never up to something more permissive. Memory is capped by the store limits and
+  CPU by the per-profile timeout, so a runaway query ends as a clean
+  <code>{:error, :cpu_timeout}</code>, not a hung engine.</p>
+</section>
+
+<section id="library">
+  <h2>one statement, a whole SHELF</h2>
+  <p>Here is the payoff of one-table-per-disk. Because every workbook's disk is
+  the same four-column SQLite file, asking a question of your whole library needs
+  no new query engine at all. <code>Library.query</code> takes one SQL statement
+  and runs it across every member that is a <code>.wbundle</code> — and a
+  <code>.wbundle</code> is just a plain zip of <code>workbook.html</code>,
+  <code>vfs.sqlite</code>, and a manifest, so its disk is right there to read.</p>
+  <p>The mechanism is deliberately dumb, in the good way. For each member it
+  extracts that <code>vfs.sqlite</code> part, writes it to a <b>throwaway temp
+  copy</b>, opens it with the same <code>VFS.open</code>, runs your statement with
+  the same <code>VFS.query_json</code>, tags the rows with the member's id and
+  workspace, and deletes the temp file. The stored bundle is never mutated. A
+  member with no VFS — a plain HTML workbook, an unresolved reference — lands in
+  <code>skipped</code>, never silently dropped. A per-member failure becomes an
+  error for that member only.</p>
+  <pre class="mermaid">
+flowchart TD
+  sql["one SQL statement"]
+  m1["member: weekly-orders<br/>is a .wbundle"]
+  m2["member: wulu<br/>is a .wbundle"]
+  m3["member: press-kit<br/>html only — no vfs"]
+  t1["temp copy of its vfs.sqlite<br/>query → tag {member, workspace}"]
+  t2["temp copy of its vfs.sqlite<br/>query → tag {member, workspace}"]
+  merge["rows: tagged + merged"]
+  skip["skipped: [press-kit]"]
+  sql --> m1 --> t1 --> merge
+  sql --> m2 --> t2 --> merge
+  sql --> m3 --> skip
+  style sql fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style m1 fill:#fbfaf6,stroke:#121316
+  style m2 fill:#fbfaf6,stroke:#121316
+  style m3 fill:#d9dbd3,stroke:#121316
+  style t1 fill:#ffffff,stroke:#121316
+  style t2 fill:#ffffff,stroke:#121316
+  style merge fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style skip fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>Read the fan-out as a story. One statement goes out to three members.
+  <code>weekly-orders</code> and <code>wulu</code> are both bundles, so each gets
+  its <code>vfs.sqlite</code> restored to its own temp copy, the statement runs,
+  and the rows come back tagged with which member and which workspace they came
+  from — then merge into one result. <code>press-kit</code> is HTML only, has no
+  disk to query, and so it takes the one branch to the side and is reported in
+  <code>skipped</code> — listed, never lost. The query is real, end to end:</p>
+  <pre class="orgsample">$ wbx library query "SELECT path FROM vfs
+    WHERE volume='workspace' AND path LIKE '/reports/%'"
+
+{
+  "rows": [
+    {"member": "weekly-orders", "workspace": "ops",
+     "rows": [["/reports/week-24.org"]]},
+    {"member": "wulu", "workspace": "sites", "rows": []}
+  ],
+  "skipped": ["press-kit"]
+}</pre>
+  <p><code>weekly-orders</code> is a bundle with a matching report, so it returns
+  a tagged row; <code>wulu</code> is a bundle with none, so its <code>rows</code>
+  is empty but it still answered; <code>press-kit</code> is HTML-only, so it
+  shows up in <code>skipped</code> rather than vanishing. The same query is
+  reachable over HTTP as <code>POST /api/library/:tenant/query</code> with body
+  <code>{"sql": "…"}</code> — the surface is the CLI, the API, or the host
+  directly; the engine underneath is the one you already learned.</p>
+</section>
+
+<section id="federation">
+  <h2>when FROM isn't a FILE</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — routing in front of the sweep</span></p>
+  <p>One thing sits in front of the library sweep. Before fanning a statement
+  out over members' disks, <code>Library.query</code> checks whether the table
+  named in <code>FROM</code> is a registered data source. If it is, federation
+  answers the query through a plugin instead, and the result is tagged
+  <code>federated</code>. If it isn't — <code>:not_federated</code> — the query
+  falls through to the per-member VFS sweep you just saw. So the same entry point
+  serves both a question about your files and a question about a foreign table,
+  and the routing decides which without you choosing a different verb. The depth
+  of that — what a data source is, how a plugin answers — belongs to the
+  <a href="foreign-tables">foreign-tables</a> lesson; here it's enough to know
+  the fork exists and which branch the file-sweep is.</p>
+</section>
+
+<section id="honest">
+  <h2>where the query ENDS</h2>
+  <p>Honesty section. Five edges worth naming plainly.</p>
+  <p><b>Rows are arrays, not named objects.</b> The host returns
+  <code>[[v, v], …]</code> in column order, not <code>[{name: v}, …]</code>. If
+  you saw an object-shaped fixture in a test, that was a stub, not host output —
+  bind your results positionally.</p>
+  <p><b>There is no writer column.</b> Who wrote a file is not recorded anywhere
+  in the schema. The parent lesson's <code>writer = 'agent'</code> query was
+  illustrative; you cannot run it, because the fact it queries doesn't exist.</p>
+  <p><b>Read-query is intent, not mechanism.</b> Nothing rejects an
+  <code>INSERT</code> or <code>DELETE</code>. The guarantee is scope — your own
+  disk — not statement-kind. Don't rely on the query surface to be read-only;
+  rely on it to be contained.</p>
+  <p><b>vfs-query isn't in the step log.</b> The <a href="the-dock">Dock</a>
+  logs <code>run-command</code> calls into a steps file; <code>vfs-query</code>
+  calls are not logged the same way. It's an honest asymmetry in the telemetry,
+  not a hidden audit trail.</p>
+  <p><b>The library sweep is linear.</b> <code>Library.query</code> restores and
+  scans each member's <code>vfs.sqlite</code> in turn — it's O(members) restore-
+  and-scan, not a merged cross-bundle index. Lovely for a shelf; not a search
+  engine for ten thousand bundles.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can a bad query crash the engine?</summary>
+    <p>No. A syntax error, a missing table, a malformed clause — all come back as
+    <code>{"error": "…"}</code>, the same string channel as rows. The Instance
+    cannot trap its host with a query; that's the explicit design line, and both
+    SDKs raise the one-key envelope as a typed error.</p>
+  </details>
+  <details>
+    <summary>Can the SQL write, not just read?</summary>
+    <p>Yes — and that's the point, not a leak. An <code>INSERT</code> or
+    <code>DELETE</code> will run, but the only disk it can touch is this
+    Instance's own VFS. The containment is scope, not statement-kind: the worst a
+    write can do is rearrange one project-sized file.</p>
+  </details>
+  <details>
+    <summary>Why arrays instead of named objects?</summary>
+    <p>Because the host returns rows as plain lists from <code>fetch_all</code>
+    and encodes them straight to JSON — <code>[[v, v], …]</code>. It's the raw
+    row order, no per-row key dictionary. Bind your columns by position.</p>
+  </details>
+  <details>
+    <summary>Can I query another workbook's memory volume?</summary>
+    <p>No. When a bundle ships, only the public volume goes with it — the
+    <code>memory</code> and <code>tmp</code> volumes are stripped on egress. So a
+    library sweep over a shared bundle sees its <code>workspace</code> and
+    nothing private. See <a href="privacy">privacy</a> for why.</p>
+  </details>
+  <details>
+    <summary>Is there a query budget?</summary>
+    <p>Yes — the profile's wall-clock timeout. A component call is bounded by its
+    profile (5 seconds on <code>compute</code>, more on the others), so a runaway
+    query ends as a clean <code>:cpu_timeout</code>, not a hung engine. Memory is
+    capped the same way by the store limits.</p>
+  </details>
+  <details>
+    <summary>How is this different from semantic search?</summary>
+    <p>This is literal SQL — exact paths, exact predicates. The other query
+    surface is embedding recall, <code>Library.search</code>, which finds by
+    meaning rather than match. Same shelf, two ways to ask; see
+    <a href="vectors">vectors</a> for the recall side.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This sub-lesson is the contract under one promise — the neighbors fill in
+  the disk it queries and the membrane it passes through.</p>
+  <div class="cards">
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>the disk this queries</small></div><span class="go">→</span></a>
+    <a href="volumes"><span class="sw" style="background:#9fc4e8"><img src="icons/vfs.svg" alt=""></span>
+      <div>Volumes<small>the three regions the column names</small></div><span class="go">→</span></a>
+    <a href="vectors"><span class="sw" style="background:#aee5c2"><img src="icons/vfs.svg" alt=""></span>
+      <div>Vectors<small>the other query surface — recall, not match</small></div><span class="go">→</span></a>
+    <a href="foreign-tables"><span class="sw" style="background:#f2ddb0"><img src="icons/vfs.svg" alt=""></span>
+      <div>Foreign tables<small>when FROM isn't a file</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under vfs · queries
+  :PROPERTIES:
+  :SLUG:   queries
+  :KIND:   learn
+  :NN:     09.1
+  :KICKER: under vfs · queries
+  :TITLE1: one question,
+  :TITLE2: ONE
+  :TITLE3: four-column table
+  :CHIP:   queries
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/queries-hero.jpg
+  :END:
+** og
+- the whole disk is one four-column table
+- one Policy-gated import — vfs-query — JSON back, never a crash
+- one statement can sweep a whole library
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .36], ["#aee5c2", .24], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

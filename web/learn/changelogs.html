@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>changelogs — the page that tells its own history — Workbooks</title>
+<meta name="description" content="A published app serves its own history: an anonymous, read-only /_changes feed — the real git log plus the keeper's live status — that the page itself consumes, classifying who made each commit and narrating the work honestly. A sub-lesson under nexus.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/changelogs-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="changelogs — the page that tells its own history">
+<meta property="og:description" content="An anonymous, read-only /_changes feed — the real git log plus the keeper's live status — that the page itself consumes. The changelog isn't written; it's the repo, told live.">
+<meta property="og:url" content="https://workbooks.sh/learn/changelogs">
+<meta property="og:image" content="https://workbooks.sh/og/changelogs.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="changelogs — the page that tells its own history">
+<meta name="twitter:description" content="An anonymous, read-only /_changes feed — the real git log plus the keeper's live status — that the page itself consumes. Verifiable history, not marketing.">
+<meta name="twitter:image" content="https://workbooks.sh/og/changelogs.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/changelogs.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    the whole point is that the changelog is verifiable history,
+    not marketing. this page is served by the same anonymous,
+    read-only content plane it describes — GET only, no auth, no
+    writes. every sha below links to the public mirror, so you can
+    check us. a page that can't be checked is just a press release.
+
+    $ curl -s https://<this-host>/_changes | head
+    {"changes":[ ... ],"agent":{ ... }}
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02·15 — <b>under nexus · changelogs</b></div>
+      <h1><span class="ln">the page that</span><span class="ln bub">TELLS</span><span class="ln">its own history</span></h1>
+      <p class="dek">Most changelogs are marketing — hand-curated, lagging, written by
+      whoever remembered. A published <a href="nexus">Nexus</a> app has a better one
+      already: its own <b>git log</b>, served back out through the anonymous public plane
+      as <code>/_changes</code>, and <b>consumed by the page it describes</b>. The
+      changelog isn't a page someone writes — it's the repo, told live, and every commit
+      links to the mirror where you can check it.</p>
+      <div class="meta">
+        <span class="on">changelogs</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/changelogs-hero.jpg" alt="A monumental wall-sized ledger printing its own history in glowing green type, a tiny figure at its base reading a freshly-stamped line as the page above writes itself — bright 1970s sci-fi paperback style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../nexus-icon.svg" alt=""></div><span>changelogs</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Changelogs are marketing</a>
+  <a href="#definition">The history endpoint</a>
+  <a href="#plane">Anonymous and read-only</a>
+  <a href="#entry">What one change is</a>
+  <a href="#atomicity">Committed means live</a>
+  <a href="#classify">Who made this commit</a>
+  <a href="#collapse">Quiet humans, loud agents</a>
+  <a href="#live">Narrating the run</a>
+  <a href="#honesty-machine">Thinking, honestly</a>
+  <a href="#limits">What it isn't</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>changelogs are MARKETING</h2>
+  <p>Every product has a changelog page, and almost every changelog is marketing.
+  It's hand-curated, it lags the actual work by days or weeks, and it's written by
+  whoever happened to remember — which means it flatters, and it omits. Nobody can
+  check it against anything, because there's nothing underneath it to check against.</p>
+  <p>The moment <a href="agents">agents</a> start committing to your site, that
+  hygiene problem sharpens into a trust problem. The question is no longer "is the
+  changelog tidy" — it's <b>who changed this page, when, and can I verify it?</b> A
+  visitor landing on an agent-tended site has every right to suspect theater. This
+  lesson is the answer to that suspicion: not a nicer changelog, but a changelog you
+  can't fake, because it's the same git history that built the page.</p>
+</section>
+
+<section id="definition">
+  <h2>the history ENDPOINT</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">/_changes</span> <span class="pr">/slash·un·der·score·chan·jiz/</span> <span class="pos">endpoint</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> an app's <b>real git log</b> plus its agent's
+    <b>live status</b>, served anonymously by the app itself over the public content
+    plane, and consumed by the very page it describes — verifiable history, not
+    marketing.</p>
+  </div>
+  <p>The response is one JSON blob with two halves, and each half comes from somewhere
+  honest. The <code>changes</code> half is the literal git log; the <code>agent</code>
+  half is the keeper's current heartbeat. Neither is composed by hand — both are read
+  off the running engine at request time.</p>
+  <table class="cmp">
+    <tr><th>half</th><th>what it is</th><th>where it comes from</th></tr>
+    <tr><td><code>changes</code></td><td>last 30 commits, newest first — <code>{sha, ts, author, msg}</code> each</td><td class="y"><code>Workbooks.Git.log_entries</code></td></tr>
+    <tr><td><code>agent</code></td><td>the <a href="keepers">keeper's</a> live status — active, running, last run, next run, lifecycle</td><td class="y"><code>Workbooks.Keeper.status</code></td></tr>
+  </table>
+  <p>That's the whole contract. A 30-commit cap, a status object, one anonymous GET.
+  The page on top turns it into a live, classified, narrated feed — but the source of
+  truth is this, and nothing more.</p>
+</section>
+
+<section id="plane">
+  <h2>anonymous and READ-ONLY</h2>
+  <p>This feed doesn't live on the same HTTP surface as your dashboard. A Nexus runs
+  <b>two separate planes</b> — and <code>/_changes</code> is firmly on the
+  <a href="planes">public content plane</a>, which inherits a short list of refusals.
+  No <code>Workbooks.Auth</code> plug. GET only. No <a href="nexus#docking">Dock</a>,
+  so no <code>call</code>, no commands, no build, no agents, no secret access. And the
+  pages it serves carry no call-home script. The feed can be read by anyone and written
+  by no one.</p>
+  <p>Every response on this plane self-identifies, so you always know who's talking: a
+  header <code>x-served-by: workbooks-runtime</code>, and HTML bodies get a marker
+  comment injected before <code>&lt;/head&gt;</code>. The underscore prefix on
+  <code>/_changes</code> and <code>/_activity</code> is deliberate too — it keeps these
+  engine endpoints from colliding with your own workbook paths.</p>
+  <p>App resolution is by host. The engine asks <code>Workbooks.Domains.resolve</code>
+  which app this request is for: a registered custom host wins, otherwise it falls back
+  to the leftmost DNS label — so <code>demo.apps.example</code> resolves to the workbook
+  named <code>demo</code>. An unknown host is a flat 404, <code>no app for host</code>.</p>
+  <pre class="mermaid">
+flowchart LR
+  b["browser"] -->|"GET /_changes<br/>(Host: demo.apps.example)"| h["public plane"]
+  h --> r{"Domains.resolve<br/>(host)"}
+  r -->|"known host or<br/>leftmost label"| repo["the app's git repo"]
+  r -->|"unknown"| x["404 — no app for host"]
+  repo --> j["JSON: changes + agent"]
+  style repo fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style x fill:#ffffff,stroke:#121316
+  style j fill:#13d943,stroke:#121316
+  </pre>
+  <p>There is an authed twin. The control plane exposes <code>/rcp/changes</code> for
+  the inspector's agent tab — same data, but it resolves the app from your authenticated
+  tenant instead of the request host. Its source comment is the canon for this whole
+  lesson: the whole point is that the changelog is verifiable history, not marketing.</p>
+</section>
+
+<section id="entry">
+  <h2>what one change LITERALLY is</h2>
+  <p>There is no changelog database. A change entry is one line of <code>git log</code>,
+  parsed. The engine runs a single formatted log command and splits each line on tabs
+  into a four-field map — short sha, a unix-seconds integer timestamp, the author name,
+  and the commit subject — newest first, capped at 30:</p>
+  <pre class="orgsample">git log --format=%h%x09%ct%x09%an%x09%s
+        │     │     │     └─ %s  subject  → msg
+        │     │     └─ %an  author name   → author
+        │     └─ %ct  commit time (unix)  → ts
+        └─ %h  short sha                   → sha</pre>
+  <table class="cmp">
+    <tr><th>token</th><th>field</th><th>what the page does with it</th></tr>
+    <tr><td><code>%h</code></td><td><code>sha</code></td><td>links to the public mirror — the proof you can click</td></tr>
+    <tr><td><code>%ct</code></td><td><code>ts</code></td><td>renders relative time — Ns / Nm / Nh / Nd ago</td></tr>
+    <tr><td><code>%an</code></td><td><code>author</code></td><td>fallback attribution when the message has no tag</td></tr>
+    <tr><td><code>%s</code></td><td><code>msg</code></td><td>classified by its leading <code>tag:</code> prefix</td></tr>
+  </table>
+  <p>Attribution is real because <b>commit identity is auth identity</b>. The tenant
+  repo lives at <code>WB_DATA/&lt;tenant&gt;</code>, and every commit's author name and
+  email are set from the authenticated tenant — the email is
+  <code>&lt;tenant&gt;@workbooks.local</code>. You can't forge an author by typing a
+  different name into a field; the engine stamps it.</p>
+  <p>And agents never run git natively — there is <a href="nexus#isolation">no bash
+  outside the sandbox</a>. An agent calls a <code>git</code> tool with <b>only a commit
+  message</b>; the host does the rest on its behalf: <code>add -A</code>, then commit
+  with hooks disabled, then push. The agent supplies intent; the engine supplies
+  identity and mechanics. That's why the author column can be trusted.</p>
+</section>
+
+<section id="atomicity">
+  <h2>committed means LIVE</h2>
+  <p>Depth rung — skippable, but it's the line that makes the feed honest in practice.
+  When the host commits on an agent's behalf, a successful commit <b>immediately
+  publishes</b>: inside the same call, the engine mirrors <code>content/**</code> and
+  <code>blog/**</code> into the live site directory before it even pushes. So in this
+  ecosystem, the word <em>committed</em> always implies <em>live</em>.</p>
+  <p>This wasn't always true, and the bug that forced it is instructive. The lander once
+  shipped blog posts that were committed but returned 404 — because the run died after
+  the commit but before a separate publish step ran. Folding publish into commit closed
+  that gap: a commit that exists in the log is a commit whose content is on the page.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as agent
+  participant T as git tool
+  participant H as host
+  participant F as /_changes feed
+  A->>T: commit(message)
+  T->>H: add -A → commit (hooks off)
+  H->>H: mirror content/** + blog/** → site dir
+  H->>H: push origin HEAD
+  Note over H: sha gets a suffix:<br/>(pushed) / (push failed: …) / (no origin remote)
+  H-->>F: next poll shows the new commit
+  </pre>
+  <p>The push outcome is appended to the returned sha as a literal suffix —
+  <code>(pushed)</code>, <code>(push failed: …)</code> sliced to 120 chars, or
+  <code>(committed; no origin remote to push)</code> — so the caller always learns what
+  actually happened to the remote. Two guards keep this safe: an auto-generated
+  <code>.gitignore</code> means <code>add -A</code> can never sweep in a signing key or
+  session data, and <code>safe.directory=*</code> is set on every git op — without it,
+  a uid mismatch on the deployed data volume once made git refuse everything, and agents
+  wrote to disk for days that never shipped. The <a href="gitops">gitops</a> lesson
+  covers the inbound rail — how a human's pushed code merges in without clobbering agent
+  data.</p>
+</section>
+
+<section id="classify">
+  <h2>who made this COMMIT</h2>
+  <p>Everything so far is the engine side. Now the page eats its own feed. The
+  living-lander's frontend pulls <code>/_changes</code> and classifies every commit by
+  one rule: <b>a commit's type is its message tag</b>. A message shaped
+  <code>tag: …</code> is matched against a small table, and a known tag means an agent
+  did it — with a name, a color, and a pill. The tag table is the diagram here:</p>
+  <table class="cmp">
+    <tr><th>tag</th><th>who</th><th>color</th></tr>
+    <tr><td><code>add</code></td><td>agent</td><td>live green</td></tr>
+    <tr><td><code>rem</code></td><td>agent</td><td>#b48cff</td></tr>
+    <tr><td><code>compose</code></td><td>agent</td><td>#4dd6c4</td></tr>
+    <tr><td><code>strategy</code></td><td>agent</td><td>#ff9e7a</td></tr>
+    <tr><td><code>blog</code> · <code>tweet</code></td><td>agent</td><td>#5aa7ff</td></tr>
+    <tr><td><code>audit</code></td><td>agent</td><td>amber</td></tr>
+    <tr><td><code>plan</code> · <code>planning</code> · <code>keeper</code></td><td>agent</td><td>faint</td></tr>
+  </table>
+  <p>The matcher runs a regex for a leading <code>tag:</code> on the message. If the tag
+  is in the table, it's that agent, that color. If there's no known tag but the
+  <em>author</em> lowercases to the agent's name, it's still the agent, with a fallback
+  tag of <code>work</code>. Everything else is a human. And the displayed message has
+  its tag prefix stripped — <code>msg.replace(/^[a-z]+:\s*/i,'')</code> — so the pill
+  carries the type and the text stays clean.</p>
+  <p>Three real commits, classified. <code>blog: notes from tending the pricing
+  section</code> — <code>blog</code> is in the table, so: agent, blue pill reading
+  <code>blog</code>. <code>polish the footer</code> by author <code>waldo</code> — no
+  known tag, but the author matches the agent, so: agent, fallback tag
+  <code>work</code>. <code>tighten hero copy</code> by author <code>shane</code> — no
+  tag, no agent author: human. Because classification is page-side, you extend it for
+  your own agents by adding rows to that map — it's a convention, not a constant. (Worth
+  saying plainly: a human who types <code>blog: …</code> will render as the agent. The
+  honesty section returns to this.)</p>
+</section>
+
+<section id="collapse">
+  <h2>quiet humans, loud AGENTS</h2>
+  <p>The timeline is opinionated about volume. Consecutive human or system commits
+  <b>collapse</b> into one foldaway <code>&lt;details&gt;</code> whose summary reads
+  <i>N updates by the team</i> — so a flurry of human housekeeping doesn't drown the
+  feed. A single human commit renders inline. But <b>agent commits always render
+  individually</b>, each with its tag pill and its short sha linked to the public
+  commit on the mirror. The design choice is deliberate: agents narrate loudly because
+  their work is the thing under scrutiny; humans stay quiet by default.</p>
+  <p>So those three commits from above, if <code>shane</code>'s two follow-ups are also
+  human, fold together: the <code>blog</code> commit stands alone as an agent line, and
+  the three human commits become one summary, <i>3 updates by the team</i>. Relative
+  time is computed the obvious way — under a minute is <code>Ns ago</code>, under an
+  hour <code>Nm ago</code>, under a day <code>Nh ago</code>, else <code>Nd ago</code> —
+  and the countdown to the next keeper run reads <i>any moment</i> once it's due.</p>
+  <p>One discipline keeps the readouts honest: there is <b>one poller</b>. The page's
+  hero build-ticker doesn't open a second connection — it subscribes to the same feed
+  via <code>onFeed</code>, and a late-mounting subscriber immediately gets the last
+  snapshot. The ticker even reuses the engine's own <code>classify()</code> through a
+  shared <code>describeCommit</code> "so the ticker can't drift from the panel." Two
+  readouts, one truth.</p>
+  <pre class="mermaid">
+flowchart TD
+  feed["/_changes — one poller"] --> seen{"new sha?<br/>(seen Set)"}
+  seen -->|"yes, agent commit"| line["render individually<br/>tag pill + sha → mirror"]
+  seen -->|"yes, human/system"| grp["fold into<br/>N updates by the team"]
+  feed --> onfeed["onFeed subscribers"]
+  onfeed --> ticker["hero ticker<br/>(same classify, no 2nd poll)"]
+  style feed fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style line fill:#13d943,stroke:#121316
+  style grp fill:#ffffff,stroke:#121316
+  </pre>
+  <p>A fresh <code>add:</code> commit does a little extra: the page re-fetches its
+  section manifest and DOM-diffs it, typing new sections in character by character and
+  green-washing changed blocks. The source is explicit that this is cosmetic streaming
+  over a plain swap — it is <b>not</b> a real CRDT — the canonical state is still the
+  committed file.</p>
+</section>
+
+<section id="live">
+  <h2>narrating the RUN</h2>
+  <p>Depth rung — skippable. <code>/_changes</code> tells you what already happened.
+  Its sibling <code>/_activity</code> narrates what's happening <em>right now</em>, on
+  the same public plane with the same refusals. It returns the keeper's status plus the
+  tail of <code>_steps.jsonl</code> — the agent's step <a href="telemetry">telemetry</a>
+  in the tenant repo — plus a cosmetic narration line.</p>
+  <p>Steps get slimmed for the public. Each event becomes
+  <code>{tool, ts, agent, target}</code>, where <code>target</code> is whichever of
+  <code>path</code>, <code>cmd</code>, <code>pipeline</code>, <code>query</code>, or
+  <code>url</code> the step had — sliced to 120 chars. There are two shapes: a
+  <b>singleton</b> feed <code>{agent, steps, thought}</code>, and — when more than
+  one agent is configured — a <b>multi-agent</b> shape <code>{agents, wire, agent}</code> with per-agent
+  status, a merged wire of the last ten steps tagged by agent, and a legacy
+  <code>agent</code> block for the busiest one so an unaware frontend still renders.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant P as the page
+  participant A as /_activity
+  participant K as keeper
+  participant S as _steps.jsonl
+  participant T as Thoughts.current
+  P->>A: GET /_activity
+  A->>K: status()  (from :persistent_term)
+  A->>S: tail — slim to {tool, ts, agent, target≤120}
+  A->>T: a ≤8-word caption (only if someone's watching)
+  A-->>P: {agent, steps, thought}
+  Note over T: idle → newest daydream from rem/daydreams.json
+  </pre>
+  <p>The <code>thought</code> is a tiny side model captioning the step feed in eight
+  words or fewer. It is purely cosmetic and fully decoupled from the agent runtime —
+  lazy and debounced on a 20-second TTL, generated only when someone is actually
+  watching, cached per agent, and degrading to the last cached line on failure. When
+  the agent is idle, the thought falls back to the newest entry from
+  <code>rem/daydreams.json</code> — the <a href="dreaming">daydream</a> the keeper left
+  behind. It is a caption, not chain-of-thought, and the page never pretends otherwise.</p>
+</section>
+
+<section id="honesty-machine">
+  <h2>thinking, HONESTLY</h2>
+  <p>This is the section that earns the lesson. A live "watch the agent work" feed is
+  exactly where products lie — they animate a fake cursor and call it transparency. This
+  one refuses to, by deriving its claims from the data instead of performing them.</p>
+  <p>The keystone is a freshness window. The follow-mode loop polls
+  <code>/_activity</code> every 2.5 seconds, and <code>STEP_FRESH_MS</code> is 25,000.
+  A step older than 25 seconds means the page says <b>thinking</b> — because that's
+  what the model is actually doing between tool calls. The source comment is the design
+  thesis: the model generating between tool calls <em>is</em> most of an agent's wall
+  time, and ~90% real beats 100% theatrical. It's one three-place state machine —
+  on-page, off-page, or thinking — and nothing else.</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> onpage: fresh step, target on this page
+  onpage --> offpage: fresh step, target elsewhere
+  offpage --> onpage: fresh step returns here
+  onpage --> thinking: no step for 25s
+  offpage --> thinking: no step for 25s
+  thinking --> onpage: a fresh step lands
+  note right of thinking
+    honest by derivation —
+    the model really is
+    generating between calls
+  end note
+  </pre>
+  <p>Privacy is enforced on the same feed. A step's target is never shown raw if it's a
+  private or external API — it's mapped to a label. Search providers like
+  <code>dataforseo</code> become <i>checking search data</i>; model hosts like
+  <code>openrouter</code> / <code>anthropic</code> / <code>openai</code> become
+  <i>thinking</i>; <code>api.x.com</code> becomes <i>posting an update</i>; GitHub APIs
+  become <i>reading the repo</i>; and a catch-all regex labels any other
+  <code>api.*</code> host as <i>working</i>. So a step whose target is
+  <code>https://openrouter.ai/api/v1/...</code> renders only the word <i>thinking</i> —
+  never the URL, never the args, never the response.</p>
+  <p>And the file previews on the page come from the public mirror — the viewer shows
+  the last <em>committed</em> bytes, "the same source you'd see on github." An
+  uncommitted write 404s and renders as <i>draft, not yet committed</i>, rather than
+  leaking working-tree state. The visitor is never hijacked either: the embed card is a
+  link, jumping is always the visitor's click, and the page never scrolls itself under
+  them.</p>
+  <p>One worked window, end to end. A real step on disk:</p>
+  <pre class="orgsample">{"tool":"vfs_write","ts":1765490012,"agent":"waldo",
+ "args":{"path":"content/sections/07-pricing.html"}}</pre>
+  <p><code>/_activity</code> slims it to
+  <code>{"tool":"vfs_write","ts":1765490012,"agent":"waldo","target":"content/sections/07-pricing.html"}</code>.
+  The page resolves that path to the <code>[data-grown="07-pricing"]</code> element and
+  parks the cursor in a typing descent. Twenty-five seconds later with no fresh step, the
+  portal flips to <i>thinking</i> — true, not theatrical. That's the whole machine.</p>
+</section>
+
+<section id="limits">
+  <h2>what it ISN'T</h2>
+  <p>Honesty section. The good version of this feature is the one that tells you its
+  own edges, so here they are, plainly.</p>
+  <ul>
+    <li><b>Thirty commits.</b> The feed is hard-capped at 30 — it's a recent-history
+    window, not a full archive. For the whole story, you read the repo.</li>
+    <li><b>Polling, not push.</b> The page refreshes the changelog every 15–20 seconds
+    (and follow-mode every 2.5s). There are no websockets here; "live" means "polled
+    often," not "instant."</li>
+    <li><b>Classification is convention.</b> Who-did-what is inferred from a message tag
+    and an author name — not signed, not cryptographic. A human who types
+    <code>blog: …</code> renders as the agent. The author column is trustworthy; the
+    type pill is a helpful guess.</li>
+    <li><b>The thought is cosmetic.</b> It's a side model's caption, debounced and
+    decoupled — not the agent's real reasoning. Treat it as a label, not a transcript.</li>
+    <li><b><code>_steps.jsonl</code> is editable today.</b> The step log is plain JSONL
+    in the repo — readable and, for now, editable. Tamper-evident provenance is the
+    frontier the <a href="the-ledger">ledger</a> lesson takes up; this page doesn't claim
+    signing it doesn't have.</li>
+    <li><b>It needs a keeper.</b> The <code>agent</code> half of the feed is the
+    <a href="keepers">keeper's</a> status — no keeper running, no agent block. The
+    <code>changes</code> half still works; the live-narration half goes quiet.</li>
+  </ul>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Do I get this for free when I publish?</summary>
+    <p>Yes. It's the public plane plus your repo — there's nothing to build. Publish an
+    app on a Nexus and <code>/_changes</code> already answers on its host, returning your
+    real git log and (if a keeper is running) its status.</p>
+  </details>
+  <details>
+    <summary>Can visitors write anything through this?</summary>
+    <p>No. The feed is on the anonymous content plane: GET only, no auth, no Dock — so no
+    commands, no build, no agents, no secret access. It can be read by anyone and written
+    by no one.</p>
+  </details>
+  <details>
+    <summary>Can I change the tags and colors?</summary>
+    <p>Yes — classification is page-side. The type map lives in the frontend, so you add
+    rows for your own agents' tags and pick their colors. The engine just serves commits;
+    the page decides how to read them.</p>
+  </details>
+  <details>
+    <summary>Why does my human teammate show as the agent?</summary>
+    <p>Because they used an agent tag. A commit shaped <code>blog: …</code> matches the
+    type table and renders as agent work regardless of author. Classification is a
+    convention, not cryptography — drop the tag prefix and the human renders as a human.</p>
+  </details>
+  <details>
+    <summary>Where's the proof a commit is real?</summary>
+    <p>The sha. Every agent commit links to the public mirror, where you can read the
+    diff yourself — the same bytes the page previews. The write/sync rail behind it is
+    the <a href="gitops">gitops</a> lesson; commit identity is auth identity, stamped by
+    the host, not typed by the committer.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This is the read side of a published app's history. The parent and three siblings
+  cover the surfaces it stands on.</p>
+  <div class="cards">
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Nexus<small>the engine that serves this feed</small></div><span class="go">→</span></a>
+    <a href="planes"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Planes<small>the two HTTP surfaces it lives on</small></div><span class="go">→</span></a>
+    <a href="gitops"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Gitops<small>the write rail — commit, publish, pull</small></div><span class="go">→</span></a>
+    <a href="keepers"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Keepers<small>where the agent block comes from</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under nexus · changelogs
+  :PROPERTIES:
+  :SLUG:   changelogs
+  :KIND:   learn
+  :NN:     02.15
+  :KICKER: under nexus · changelogs
+  :TITLE1: the page that
+  :TITLE2: TELLS
+  :TITLE3: its own history
+  :CHIP:   changelogs
+  :PC:     #aee5c2
+  :AC:     #13d943
+  :HERO:   img/changelogs-hero.jpg
+  :END:
+** og
+- an app serves its own git log over an anonymous /_changes feed
+- the page consumes its own history — classified, collapsed, narrated
+- verifiable history, not marketing
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .38], ["#5aa7ff", .22], ["#b48cff", .2], ["#4dd6c4", .2]],
+  story: [],
+};
+</script>
+<script type="module" src="learn-mermaid.js"></script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>

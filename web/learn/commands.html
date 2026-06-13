@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en" style="--pc:#f3c5a3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>commands — the string that never runs — Workbooks</title>
+<meta name="description" content="A command is a CLI converted to a sandboxed WASM module — stdin in, stdout out, invoked by name through the Dock. The runnable half of a toolkit, where the shell-injection class becomes unrepresentable. A deep-dive under toolkit.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/commands-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="commands — the string that never runs">
+<meta property="og:description" content="A CLI converted to sandboxed WASM — stdin in, stdout out, invoked by name. The runnable half of a toolkit, where shell injection becomes unrepresentable.">
+<meta property="og:url" content="https://workbooks.sh/learn/commands">
+<meta property="og:image" content="https://workbooks.sh/og/commands.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="commands — the string that never runs">
+<meta name="twitter:description" content="A CLI converted to sandboxed WASM — stdin in, stdout out, invoked by name. Where shell injection becomes unrepresentable.">
+<meta name="twitter:image" content="https://workbooks.sh/og/commands.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    $ grep "ada; rm -rf /" < users.txt
+    wire: [4]grep  [12]ada; rm -rf /  [N]<stdin…>     length-prefixed, little-endian
+
+    the semicolon never met a shell. it arrived as argument bytes.
+    there is no command line here — only a list. injection isn't blocked;
+    it's unrepresentable. the spec is at the bottom of this source.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 03·7 — <b>under toolkit · commands</b></div>
+      <h1><span class="ln">the string</span><span class="ln bub">THAT NEVER</span><span class="ln">runs</span></h1>
+      <p class="dek">A <b>command</b> is a CLI converted to a sandboxed WASM module —
+      stdin in, stdout out, invoked by name through the Dock. It's the
+      <b>runnable half of a <a href="toolkit">toolkit</a></b>: where the manual was
+      the interface, the command is the muscle. And it's where the oldest exploit in
+      the book — concatenating untrusted text into a shell string — stops being a
+      thing you defend against and starts being a thing you can't even write down.</p>
+      <div class="meta">
+        <span class="on">the muscle</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/commands-hero.jpg" alt="A small technician feeds a single punched paper tape into the slot of an enormous monolithic machine that has no keyboard and no command line — the tape is the only way in, glowing green conduits carry discrete tokens deep into the structure — bright, monumental, 1970s sci-fi paperback style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../toolkit-icon.svg" alt=""></div><span>commands</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The string that runs</a>
+  <a href="#definition">The definition</a>
+  <a href="#path">A PATH with no operating system</a>
+  <a href="#run">What one invocation costs</a>
+  <a href="#broker">The six no's</a>
+  <a href="#argv">argv is a list, not a sentence</a>
+  <a href="#shell">The shell that isn't one</a>
+  <a href="#catalog">Sixty-some programs, each a row of data</a>
+  <a href="#integrity">Bytes that prove themselves</a>
+  <a href="#selfauthor">Commands that write commands</a>
+  <a href="#honesty">The honest edges</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the string that RUNS</h2>
+  <p>Every agent stack eventually arrives at the same dirty moment. The model
+  decided to run <code>jq</code>, then <code>grep</code>, then something with the
+  user's filename in it — and somewhere underneath, all of that gets glued into a
+  single string and handed to a shell. The shell is the most powerful interpreter
+  on the machine, and you just let a language model write programs for it out of
+  text it read on the internet.</p>
+  <p>The industry's answer has been the blocklist: scan the string for
+  <code>;</code>, for <code>&amp;&amp;</code>, for <code>rm&nbsp;-rf</code>, for
+  backticks, and refuse the ones that look dangerous. This is an apology, not a
+  defense. A regex over a shell grammar is a regex over a grammar built to be
+  re-quoted, base64'd, <code>$IFS</code>-smuggled and nested twelve ways. You're
+  not winning that fight; you're announcing which round you lost.</p>
+  <p>So this page asks a different question. Not <em>how do we sanitize the command
+  line</em> — but <b>what if the command line were never a string at all?</b></p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">com·mand</span> <span class="pr">/kə·ˈmand/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a CLI converted to a runnable <b>WASM module</b>
+    — stdin in, stdout out — that a workbook or <a href="agents">agent</a> invokes
+    by name through the <code>run-command</code> Dock import. One name, one
+    content-addressed artifact, one argument convention.</p>
+  </div>
+  <p>A <a href="toolkit">toolkit</a> is the whole bundle: a progressive-disclosure
+  skill doc bundled with the CLI it documents. The command is what that CLI
+  <em>becomes</em> — its runnable form. The manual tells an agent which commands
+  exist; the commands are the verbs the manual is teaching. A capability need —
+  network, a directory, more memory — isn't a separate layer underneath; it's a
+  property <em>of the command</em>, declared and granted, nothing more.</p>
+</section>
+
+<section id="path">
+  <h2>a PATH with no operating system</h2>
+  <p>There is no <code>/usr/bin</code> here, and no <code>$PATH</code> to scan.
+  There's a registry — an Elixir module, <code>CommandRegistry</code> — and looking
+  up a name walks two layers. First a dynamic map (everything agents and toolkits
+  have registered this session, kept in <code>:persistent_term</code>). Then the
+  static built-ins, merged <b>last</b> so they always win the lookup.</p>
+  <p>That merge order is a security decision, not an accident. The built-ins —
+  <code>upper</code>, <code>jq</code>, <code>grep</code>, <code>wbox</code> — are
+  <b>reserved and unshadowable</b>. A hostile dynamic registration cannot rebind
+  <code>jq</code> to its own bytes for every Instance on the engine; the trusted
+  name resolves to the trusted artifact, always. It's a supply-chain defense
+  expressed as a sort order.</p>
+  <pre class="mermaid">
+flowchart LR
+  call["run-command jq"]
+  subgraph reg["CommandRegistry — lookup"]
+    direction TB
+    dyn["dynamic map<br/>session registrations<br/>:persistent_term · cap 4096"]
+    bi["built-ins<br/>upper · jq · grep · wbox<br/>RESERVED · merged last"]
+  end
+  art["build/commands/&lt;sha&gt;.wasm<br/>content-addressed artifact"]
+  call --> dyn
+  dyn -- "overlaid by" --> bi
+  bi -- "trusted name wins" --> art
+  style reg fill:#fbfaf6,stroke:#121316
+  style dyn fill:#f3c5a3,stroke:#121316
+  style bi fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style art fill:#f2ddb0,stroke:#121316
+  style call fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Read the graph as one trip. A call for <code>jq</code> hits the dynamic map
+  first, but the built-ins are laid over the top, so the reserved <code>jq</code>
+  is the one that answers — and what it answers with is a path into the
+  content-addressed store, <code>build/commands/&lt;sha&gt;.wasm</code>, where the
+  artifact is named by the hash of its own bytes. A few guardrails ring the
+  registry: names must match <code>^[A-Za-z0-9_.-]+$</code>, the dynamic map is
+  capped at <b>4096 entries</b> so a flood can't exhaust persistent-term memory,
+  and any registered path must canonicalize strictly inside that one store
+  directory — a path that points anywhere else is refused before it can run.</p>
+  <p>And names <b>hot-swap</b>. Re-register a name and the binding is replaced in
+  place — no restart, nothing reboots. Calls already in flight finish on the old
+  bytes (the old sha file is never deleted out from under them); the next call
+  observes the new binding. The registry is a living thing, edited while it runs,
+  which is exactly the property the <a href="autopoet">autopoet</a> needs to fix a
+  tool mid-session.</p>
+</section>
+
+<section id="run">
+  <h2>what one invocation COSTS</h2>
+  <p>Invoking a command is not a function call into a shared process. It is a
+  <b>fresh wasmtime subprocess</b>, born for this one run and gone after it — the
+  <code>:os_process</code> isolation tier, earned by shape, not by a toggle. The
+  envelope it runs inside is fixed and small:</p>
+  <table class="cmp">
+    <tr><th>limit</th><th>constant</th><th>what it stops</th></tr>
+    <tr><td>wall clock</td><td><code>-W timeout=30000</code></td><td>a command that hangs is trapped at 30s, not forever</td></tr>
+    <tr><td>fuel</td><td><code>-W fuel=5_000_000_000</code></td><td>a tight infinite loop burns fuel and traps even if it never blocks</td></tr>
+    <tr><td>stdin size</td><td><code>@max_input_bytes 64MB</code></td><td>an oversized pipe is a clear error, not an OOM</td></tr>
+    <tr><td>argv size</td><td><code>@max_argv_bytes 256KB</code></td><td>used to blow <code>ARG_MAX</code> and fail <em>silently</em> — now a stated error</td></tr>
+    <tr><td>file access</td><td>preopened dirs only (<code>--dir host::guest</code>)</td><td>no path resolves outside what was explicitly handed in</td></tr>
+  </table>
+  <p>The table's verdict in one line: a command can fail, loop, or overflow, and
+  every one of those is a bounded, named outcome instead of a way out. Two of the
+  exit behaviours are worth saying aloud. A <b>non-zero exit</b> is usually just the
+  guest CLI's normal failure — <code>grep</code> found nothing, <code>jq</code>
+  hit a parse error — so the output returns verbatim and the status is preserved,
+  which is what lets a shell <code>&amp;&amp;</code> or <code>||</code> downstream
+  make sense. That's the universal-CLI contract, kept honest. And the run uses a
+  shared wasmtime compile cache, so the second invocation of <code>python</code>
+  doesn't re-pay the JIT.</p>
+</section>
+
+<section id="broker">
+  <h2>the six NO's</h2>
+  <p>Between an agent saying <code>run-command</code> and any wasm starting stands
+  the <b>ExecBroker</b> — and its first principle is the one most stacks skip:
+  there is no real OS exec here. Only <em>registered wasm commands</em> run. Every
+  request walks a deny ladder, in this exact order, and every denial is audited:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant G as guest (the agent)
+  participant B as ExecBroker
+  participant R as CommandRegistry
+  participant W as wasmtime subprocess
+  G->>B: host_exec(name, argv, stdin)
+  Note over B: 1 · revoked?        → :revoked
+  Note over B: 2 · over quota?      → :rate_limited (2k/sec floor)
+  Note over B: 3 · allow == false?  → :denied (DEFAULT-DENY)
+  Note over B: 4 · depth > 8?       → :max_depth
+  Note over B: 5 · in allowlist?    → :command_not_granted
+  B->>R: lookup name
+  Note over R: 6 · registered?      → :unknown_command
+  R-->>B: artifact path
+  B->>W: argv + stdin (structural)
+  W-->>B: stdout · exit status
+  Note over B: output capped at 8MB
+  B-->>G: result (or audited deny)
+  </pre>
+  <p>Walk the ladder as a story. First the principal: if this tenant's been
+  revoked, stop — <code>:revoked</code>. Second the meter: the rate limiter's
+  default floor is two thousand broker calls per second per tenant; past that,
+  <code>:rate_limited</code>. Third the default: <code>allow</code> is
+  <b>false</b> until something grants it — default-deny, <code>:denied</code>.
+  Fourth the depth: a chain deeper than eight is <code>:max_depth</code>. Fifth
+  the allowlist: this Instance was granted a specific set of command names, and a
+  name outside it is <code>:command_not_granted</code>. Sixth and last, after all
+  that, the registry itself: a name nobody ever registered is
+  <code>:unknown_command</code>. Six refusals before bytes execute, each one
+  logged.</p>
+  <p>And one design choice underneath all six: <code>exec</code> is its <b>own
+  capability</b>, distinct from <code>commands</code>, <code>vfs</code>, or
+  networking. A profile can grant durable storage or the network <em>without</em>
+  ever granting the ability to spawn a command — because the ungranted
+  <code>exec</code> import is never even merged into the guest's import table. An
+  un-granted cap isn't un-allowed; it's <b>un-importable</b>, which makes it
+  un-callable.</p>
+</section>
+
+<section id="argv">
+  <h2>argv is a list, not a SENTENCE</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the wire format, byte by byte</span></p>
+  <p>Here is the whole trick, in one diagram. When an agent runs
+  <code>grep "ada; rm -rf /"</code>, the broker never builds a string. It writes a
+  length-prefixed, little-endian structure and the worst the dangerous part can do
+  is fail to match:</p>
+  <pre class="orgsample">agent runs:  grep "ada; rm -rf /" &lt; users.txt
+
+wire bytes:  [name_len:u32][name][argc:u32][(arg_len:u32)(arg)]*[stdin_len:u32][stdin]
+             ─────────────────────────────────────────────────────────────────────
+             [4] g r e p   [1]   [12] a d a ;   r m   - r f   /   [N] &lt;users.txt bytes…&gt;
+              │    │         │      │   └── one argument. the ; is byte 0x3B, not syntax.
+              │    │         │      └── arg_len, little-endian u32
+              │    │         └── argc = 1 argument
+              │    └── the command name
+              └── name_len, little-endian u32</pre>
+  <p>There is no shell to interpret that semicolon. It crosses the boundary as the
+  bytes of <em>one discrete argument</em>; wasmtime receives a clean argv list of
+  exactly two elements (<code>grep</code> and the literal needle); and the most
+  hostile thing <code>ada; rm -rf /</code> can accomplish is to not appear in
+  <code>users.txt</code>. The classic injection class isn't mitigated here. It's
+  <b>unrepresentable</b> — there's no field in this structure where a metacharacter
+  could mean anything but itself. No delimiter, so no delimiter ambiguity.</p>
+  <p>Two argument conventions ride this same wire. Most commands use
+  <code>:argv</code> — real wasmtime argv, the universal CLI ABI. A couple of
+  legacy interpreters (<code>jq</code>, <code>grep</code>) use
+  <code>:stdin1</code>, where the filter or pattern is folded into the <em>first
+  line of stdin</em> rather than passed as argv — an older protocol the registry
+  still honors so those tools behave as their authors expect. Either way, the
+  argument never becomes shell text.</p>
+</section>
+
+<section id="shell">
+  <h2>the shell that ISN'T one</h2>
+  <p>Agents still want to type <code>jq '.users[].name' | grep ada | upper</code>
+  and have it work. They can — and there is still no shell. <code>Workbooks.Shell</code>
+  is an Elixir pipeline evaluator: it parses the line, then runs each stage as a
+  registered WASM command, piping stdout into the next stage's stdin <b>in memory</b>.
+  No OS process, no fork, just wasmtime per stage.</p>
+  <pre class="mermaid">
+flowchart LR
+  src["jq '.users[].name' | grep ada | upper"]
+  s1["jq<br/>:stdin1 — filter on line 1<br/>fresh wasmtime · fuel 5e9 · 30s"]
+  s2["grep ada<br/>:stdin1 — pattern on line 1<br/>fresh wasmtime"]
+  s3["upper<br/>:argv — raw stdin<br/>fresh wasmtime"]
+  out["stdout"]
+  src --> s1
+  s1 -- "bytes piped in memory · trim:false" --> s2
+  s2 -- "byte-exact · no fork" --> s3
+  s3 --> out
+  style s1 fill:#f3c5a3,stroke:#121316
+  style s2 fill:#f2ddb0,stroke:#121316
+  style s3 fill:#aee5c2,stroke:#121316
+  style out fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style src fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Follow that pipeline once, because it's the worked example that proves the
+  whole construct. The shell splits the line quote-aware, so <code>jq</code>'s
+  inner <code>|</code> inside its quoted filter stays inside its stage and never
+  reads as a pipe. Stage one is <code>jq</code> in <code>:stdin1</code> mode, so
+  the filter becomes the first line of stdin ahead of the JSON. It runs in a fresh
+  wasmtime process — fuel five billion, thirty-second wall clock — and its stdout
+  is piped on <b>byte-exact</b>, with trailing newlines untouched, because trimming
+  a <code>\n</code> here would make a downstream <code>wc -l</code> lie. Stage two
+  is <code>grep</code>, pattern on line one. Stage three is <code>upper</code>,
+  argless, raw stdin. Three wasmtime processes, zero shell forks, and the exit
+  status of the last stage is what drives any <code>&amp;&amp;</code> that follows.</p>
+  <p>The shell speaks a deliberate subset: <code>;</code>, <code>&amp;&amp;</code>,
+  <code>||</code> with real short-circuiting on exit status; <code>NAME=value</code>
+  variables with <code>$NAME</code> / <code>${NAME}</code> expansion (an unknown
+  name is left <em>literal</em>, so <code>jq</code>'s own <code>$var</code>
+  survives); and <code>&lt;</code>, <code>&gt;</code>, <code>&gt;&gt;</code>
+  redirection confined to preopened directories — a path outside the sandbox is a
+  clean <code>{:outside_sandbox, file}</code> error. Two tokens are intentional
+  no-ops, not errors: <code>2&gt;/dev/null</code> and <code>2&gt;&amp;1</code> are
+  swallowed silently, because choking on them was once the single biggest source
+  of per-run thrash. And <code>wbox</code> — one multicall binary compiled from C —
+  supplies the everyday vocabulary as applets: <code>cat echo seq head wc nl rev
+  basename dirname tr sort uniq tail true false</code>, dispatched as
+  <code>wbox &lt;applet&gt;</code>. Bash ergonomics, zero forks.</p>
+</section>
+
+<section id="catalog">
+  <h2>sixty-some programs, each a row of DATA</h2>
+  <p>None of this would matter if the command set were a toy. It isn't. Around
+  <b>sixty-four real programs</b> are seeded and live, each one proved by actually
+  running it under wasmtime — and each one is, fundamentally, just <em>data</em>:
+  a name, a URL, a sha256 pin, a wasm path, an arg mode. The lane <em>is</em> the
+  registry mechanism; the tool is the row.</p>
+  <table class="cmp">
+    <tr><th>lane</th><th>trust gate</th><th>examples (a sample of ~64)</th></tr>
+    <tr><td>A — prebuilt fetch</td><td>sha256 pin (inert bytes until run)</td><td><code>python</code> (CPython 3.12), <code>ruby</code>, <code>php</code>, <code>pandoc</code>, <code>openssl</code>, <code>sqlite3</code>, <code>prolog</code>, <code>wabt</code> → 12 tools (wat2wasm, wasm2wat, wasm-validate…)</td></tr>
+    <tr><td>B — C source built in-sandbox</td><td>sha-pinned tarball → clang.wasm</td><td><code>lua</code>, <code>zstd</code>, <code>sodium</code>, <code>pcre2</code>, <code>png</code>, <code>harfbuzz</code>, <code>freetype</code>, <code>qjs</code> (27 names)</td></tr>
+    <tr><td>inline — self-authored</td><td>Instance Policy profile caps</td><td>Rust (<code>wfreq</code>, <code>rgx</code>), Python tools (<code>yaml</code>, <code>tmpl</code>), JS-npm (<code>pdf</code>, <code>arrow</code>, <code>protobuf</code>)</td></tr>
+  </table>
+  <p>The verdict of that table: trust scales with origin, not with effort. A
+  prebuilt is trusted exactly as far as its hash, which is why a sha pin is the
+  whole gate — a <code>.wasm</code> someone hands you is inert until it runs in the
+  sandbox. A C-source tool is trusted by the pinned tarball it was built from,
+  compiled by a wasm clang with no native toolchain anywhere. And an inline
+  command is trusted by the Instance profile that built it — it can hold no
+  capability its Instance didn't already have. Whole interpreters arrive as four
+  lines of data each; the WABT suite arrives as one tarball that fans out into a
+  dozen commands.</p>
+  <p>Here's one real row, verbatim — CPython, in the sandbox, as four lines:</p>
+  <pre class="orgsample">%{name: "python", kind: :wasm,
+  url: "https://github.com/vmware-labs/.../python-3.12.0.wasm",
+  sha: "e5dc5a398b07b54ea8fdb503bf68fb583d533f10ec3f930963e02b9505f7a763",
+  mode: :argv}</pre>
+  <p>Seeding happens at boot, inside a background Task, so fetching the catalog
+  never blocks the engine from starting. By the time an agent asks, the rows are
+  already in the registry.</p>
+</section>
+
+<section id="integrity">
+  <h2>bytes that prove THEMSELVES</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the supply chain, end to end</span></p>
+  <p>A name resolving to bytes is only safe if the bytes can't lie. So every lane
+  funnels through the same content-addressing spine, and the artifact is re-checked
+  at the last possible moment:</p>
+  <pre class="mermaid">
+flowchart LR
+  src["fetch (Erlang TLS, no curl)<br/>or build (clang.wasm)"]
+  pin["sha256 the bytes"]
+  ca["write build/commands/&lt;sha&gt;.wasm<br/>idempotent · same bytes, same path"]
+  reg["register name → path<br/>+ manifest registry.json"]
+  run["RUN: re-hash the file<br/>mismatch → :artifact_integrity"]
+  src --> pin --> ca --> reg --> run
+  run -- "match" --> ok["wasmtime executes"]
+  style pin fill:#f3c5a3,stroke:#121316
+  style ca fill:#f2ddb0,stroke:#121316
+  style run fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style ok fill:#aee5c2,stroke:#121316
+  </pre>
+  <p>Trace the spine. Bytes arrive — fetched over a pure-Erlang TLS GET that
+  verifies against the OS trust store (there is no <code>curl</code> binary
+  anywhere; a prebuilt fetch is Erlang and TLS, full stop), or built in-sandbox by
+  a wasm compiler. They're sha256'd, and that hash <em>is</em> the filename:
+  <code>build/commands/&lt;sha&gt;.wasm</code>. The same bytes always land on the
+  same path, so registration is idempotent. The name-to-path binding is recorded
+  in a manifest, <code>registry.json</code>, so a reboot re-registers everything
+  with no re-fetch and no rebuild. And then the closure that matters: at <b>run
+  time</b>, the content-addressed file is re-hashed and refused on mismatch —
+  <code>{:artifact_integrity, path}</code> — which closes the time-of-check /
+  time-of-use gap that a path-based store would leave wide open.</p>
+  <p>The same posture extends outward. A <a href="bundles">workbook bundle</a>
+  carries its commands as <code>&lt;name&gt;.wasm</code> parts;
+  <code>Library.install</code> sha-pins the bundle and registers each one —
+  installing a bundle never <em>widens</em> capabilities. A third-party toolkit
+  with invalid provenance refuses to build at all. And a toolkit whose declared
+  <code>CLI_BIN</code> collides with a reserved name is rejected <em>before</em>
+  compile, because that name is attacker-controlled data and the reserved set wins
+  there too. The native escape hatches that other stacks lean on —
+  <code>cargo install</code>, <code>go get</code>, native <code>zig cc</code> —
+  return explicit <code>:lane_unavailable</code> errors here rather than shelling
+  out. wasmtime running a <code>.wasm</code> is the architecture. Native binaries
+  are banned.</p>
+</section>
+
+<section id="selfauthor">
+  <h2>commands that write COMMANDS</h2>
+  <p>The catalog isn't a fixed menu — agents extend it mid-session. With
+  <code>wb toolkit build-inline &lt;name&gt; &lt;lang&gt; &lt;file&gt;</code> an
+  agent writes source in <b>Rust, C, Zig, JS, TS, or Go</b>, and the result is a
+  new registered command. The astonishing part is what does the compiling: the
+  compiler is <em>itself wasm</em>. Write → build → content-address → register, all
+  inside the sandbox — no native toolchain, no host escape.</p>
+  <pre class="orgsample">$ wb toolkit build-inline wfreq rust ./wfreq.rs
+built + registered command `wfreq` (rust) → build/commands/&lt;sha&gt;.wasm
+run it via the Dock: run-command wfreq</pre>
+  <p>And self-authoring never widens caps. The command <code>wfreq</code> holds
+  exactly the capabilities its Instance profile granted — nothing more — because it
+  was built by a process that itself held only those caps. The other direction up
+  the ladder is promotion: an inline command that proves useful can be materialized
+  into a real toolkit directory, where Org owns the spec (a
+  <code>#+EXEC: command</code> manifest, a <code>#+TRUST: first-party</code> line,
+  a skill stub) and WASM owns the artifact. Promotion persists the <em>source</em>,
+  not just the compiled bytes — session, to workspace, to registry. This is the
+  <a href="toolkit">toolkit lesson's</a> "toolkits compose," seen from the
+  runnable side.</p>
+</section>
+
+<section id="honesty">
+  <h2>the honest EDGES</h2>
+  <p>Where this construct stops, plainly. The shell is a <b>subset</b>, on
+  purpose: no globbing, no subshells, no command substitution, and stderr isn't
+  real plumbing — <code>2&gt;/dev/null</code> is a swallowed no-op, not a
+  redirection. If you need POSIX shell theatre, this isn't it; if you need a safe
+  way to chain wasm commands, it is.</p>
+  <p>The banned native lanes are a choice, not a gap. <code>cargo install</code>,
+  <code>go get</code>, and native <code>zig cc</code> return
+  <code>:lane_unavailable</code> rather than quietly shelling out to a real
+  toolchain — we'd rather hand you an honest error than a hidden escape. The
+  same honesty applies to depth: the broker's eight-level recursion bound is
+  plumbed and tested (a depth-99 call returns <code>{:error, :max_depth}</code> in
+  the suite), but an ordinary plain-wasmtime command has no <code>host_exec</code>
+  import at all — only Dock-harness artifacts can nest. So we won't claim live deep
+  command chains beyond what actually ships; the bound is real, the nesting it
+  bounds is narrow today.</p>
+  <p>And cold builds are slow. A C-source tool compiled by wasm clang the first
+  time is not instant — but it's content-addressed, so it's a one-time cost; the
+  second run is a hash lookup. Some software, finally, just fights the crossing —
+  not everything that compiles to a native binary compiles cleanly to WASI, and
+  when it doesn't, we say so rather than ship a broken row.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is this bash?</summary>
+    <p>No — and that's the entire point. There's no shell process and no command
+    line; the "shell" is an Elixir pipeline evaluator and each stage is a separate
+    wasmtime subprocess. Arguments cross as a length-prefixed structural list, so
+    a metacharacter is just a byte in an argument. You get pipeline ergonomics
+    without ever building a string a shell could interpret.</p>
+  </details>
+  <details>
+    <summary>Why did my command not see my file?</summary>
+    <p>A command can only reach <a href="vfs">preopened directories</a>, mapped in
+    as <code>host::guest</code> with <code>--dir</code>. If you didn't preopen the
+    directory the file lives in, there's no path inside the sandbox that resolves
+    to it — by construction, not by a setting. Grant the directory and it appears.</p>
+  </details>
+  <details>
+    <summary>Can a hostile command hijack jq?</summary>
+    <p>No. The built-in names — <code>jq</code>, <code>grep</code>,
+    <code>upper</code>, <code>wbox</code> — are reserved and merged <em>last</em> in
+    the registry, so a dynamic registration can never shadow them. A toolkit that
+    even declares a <code>CLI_BIN</code> colliding with a reserved name is refused
+    before it compiles.</p>
+  </details>
+  <details>
+    <summary>What if it infinite-loops?</summary>
+    <p>Two independent traps catch it. A wall-clock timeout of 30 seconds, and a
+    fuel budget of five billion instructions — so a loop that never yields still
+    runs out of fuel and traps. There's no version of "spins forever" that
+    survives both.</p>
+  </details>
+  <details>
+    <summary>Can I run my favorite CLI?</summary>
+    <p>Probably — in order of effort: if there's a prebuilt WASI build, pin its
+    sha and it's four lines of data. If it's C source, point the C-source lane at
+    a pinned tarball and wasm clang builds it in-sandbox. If neither, write a small
+    command yourself with <code>build-inline</code>. What you can't do is shell out
+    to a native binary — that lane returns <code>:lane_unavailable</code> on
+    purpose.</p>
+  </details>
+  <details>
+    <summary>What's the difference between the commands and exec caps?</summary>
+    <p><code>commands</code> is the broad ability to work with the command surface;
+    <code>exec</code> is a dedicated, least-privilege cap that specifically governs
+    spawning a command. They're separate so a profile can grant storage or
+    networking <em>without</em> granting the power to run commands — and when
+    <code>exec</code> isn't granted, its import isn't even bound into the guest, so
+    it's not a permission to refuse, it's a call that can't be made.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Commands are the muscle of a toolkit — the layers around them are where they
+  get their reach and their limits.</p>
+  <div class="cards">
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>What is a toolkit<small>the bundle this is the runnable half of</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>the sandbox floor a command can't fall through</small></div><span class="go">→</span></a>
+    <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
+      <div>The VFS<small>preopens, and where command files live</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the one tool agents have is this shell</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under toolkit · commands
+  :PROPERTIES:
+  :SLUG:   commands
+  :KIND:   learn
+  :NN:     03.7
+  :KICKER: under toolkit · commands
+  :TITLE1: the string
+  :TITLE2: THAT NEVER
+  :TITLE3: runs
+  :CHIP:   the muscle
+  :PC:     #f3c5a3
+  :AC:     #13d943
+  :HERO:   img/commands-hero.jpg
+  :END:
+** og
+- a CLI converted to sandboxed WASM — stdin in, stdout out, invoked by name
+- argv crosses as a length-prefixed list, so shell injection is unrepresentable
+- ~64 real programs, each just a row of data; agents author more in-sandbox
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f3c5a3", .36], ["#f2ddb0", .24], ["#aee5c2", .22], ["#9fc4e8", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

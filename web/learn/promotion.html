@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en" style="--pc:#f3c5a3; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>promotion — session to registry — Workbooks</title>
+<meta name="description" content="The lifecycle ladder: session → workspace → registry. One source file climbs three rungs of durability — build-inline registers it live, promote materializes a source-owned toolkit, store and install ship it elsewhere. Org owns the spec; wasm owns the artifact; self-authoring never widens granted capabilities. A sub-lesson under toolkit.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/promotion-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="promotion — session to registry">
+<meta property="og:description" content="One source file climbs three rungs of durability: build-inline → promote → store/install. Org owns the spec, wasm owns the artifact, and authoring a tool never grants it anything.">
+<meta property="og:url" content="https://workbooks.sh/learn/promotion">
+<meta property="og:image" content="https://workbooks.sh/og/promotion.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="promotion — session to registry">
+<meta name="twitter:description" content="One source file climbs three rungs of durability: build-inline → promote → store/install. Org owns the spec, wasm owns the artifact.">
+<meta name="twitter:image" content="https://workbooks.sh/og/promotion.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    * the lifecycle ladder           :promotion:
+    ** DONE write slug.js in a session
+    ** DONE build-inline slug js slug.js   — live, callable, ephemeral binding
+    ** DONE promote slug js slug.js        — source-owned dir, rebuildable forever
+    ** TODO store → install on a friend's Nexus
+       :PROPERTIES:
+       :NOTE: org owns the spec — wasm owns the artifact
+       :CAP:  authoring a tool never grants the tool anything
+       :END:
+    the script you wrote once stops dying in a scratch dir. that's the whole lesson.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 03·4 — <b>under toolkit · promotion</b></div>
+      <h1><span class="ln">one source file</span><span class="ln bub">CLIMBS</span><span class="ln">three rungs</span></h1>
+      <p class="dek">A script that worked once normally dies in a scratch dir. <b>Promotion</b>
+      is the ladder out — <b>session → workspace → registry</b>, two commands and a few
+      generated files. <a href="toolkit">Org owns the spec</a>, wasm owns the artifact, and
+      the one invariant underneath it all: authoring a tool <b>never grants the tool anything</b>.</p>
+      <div class="meta">
+        <span class="on">promotion</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/promotion-hero.jpg" alt="A small figure on a monumental three-tier terraced ziggurat under a bright orange sky, a single glowing seed rising step by step from a workbench at the base to a vast vaulted archive at the summit — 1970s sci-fi style, saturated, geometric">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../toolkit-icon.svg" alt=""></div><span>promotion</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The graveyard of session scripts</a>
+  <a href="#definition">The ladder</a>
+  <a href="#rung-one">Rung one — no manifest ceremony</a>
+  <a href="#ephemeral">What &ldquo;session&rdquo; means</a>
+  <a href="#rung-two">Rung two — promote</a>
+  <a href="#spec-vs-artifact">Org owns the spec</a>
+  <a href="#layouts">Per-language layouts</a>
+  <a href="#rung-three">Rung three — a toolkit IS a workbook</a>
+  <a href="#never-wider">The capability ceiling</a>
+  <a href="#honesty">Scaffold, not a publish button</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the graveyard of session SCRIPTS</h2>
+  <p>An <a href="agents">agent</a> — or you — writes a useful little program mid-session.
+  A slug-maker, a CSV cleaner, a parser that finally tames some ragged scraper output.
+  It works. And then, in nearly every stack ever built, that's where it dies: a file in a
+  scratch directory, copy-pasted into the next project, drifting out of true a little more
+  each time someone touches it.</p>
+  <p>The gap between <em>code that worked once here</em> and <em>tool everyone can install</em>
+  is normally enormous. A repo. A build pipeline. A package-registry account. A manifest, a
+  version, a release. An afternoon — and that's on a good day, for a human who already knows
+  the ritual. The honest reason most one-off tools never make the climb isn't laziness. It's
+  that the climb is a cliff.</p>
+  <p>Promotion turns that cliff into a ladder with three rungs and two commands. Same source
+  file the whole way up; what changes at each rung is only <b>how durable</b> the tool is and
+  <b>how far</b> it can travel.</p>
+</section>
+
+<section id="definition">
+  <h2>the LADDER</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">pro·mo·tion</span> <span class="pr">/prə·ˈmoʊ·ʃən/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the <b>lifecycle ladder</b> a tool climbs —
+    <b>session → workspace → registry</b> — from a source file built live in the
+    sandbox, to a source-owned toolkit directory on disk, to a stored workbook
+    installable on another <a href="nexus">Nexus</a>.</p>
+  </div>
+  <p>The three rungs are named verbatim in the engine. Rung one is the
+  <b>session</b>: <code>build-inline</code> compiles your source in the sandbox and registers
+  it as a live command — no manifest, no project. Rung two is the <b>workspace</b>:
+  <code>promote</code> writes a real toolkit directory, source plus a generated manifest, that
+  rebuilds deterministically forever. Rung three is the <b>registry</b>: the toolkit is just a
+  workbook, so <code>Library.store</code> publishes it and <code>Library.install</code>
+  registers its commands somewhere else.</p>
+  <figure class="diag" aria-label="the three-rung lifecycle ladder">
+    <div class="d-file">
+      <span class="ftag">the lifecycle ladder — one source file, three rungs of durability</span>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">session</span><span class="sub"><b>build-inline</b> — built in the sandbox, registered live; the binding is ephemeral</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">workspace</span><span class="sub"><b>promote</b> — a source-owned toolkit dir on disk; rebuildable, packable, discoverable</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">registry</span><span class="sub"><b>store</b> + <b>install</b> — packed into a workbook, shipped, registered on another Nexus</span></div>
+    </div>
+    <figcaption class="dcap">same source the whole way up — <b>only durability and reach change</b></figcaption>
+  </figure>
+</section>
+
+<section id="rung-one">
+  <h2>rung one — no manifest CEREMONY</h2>
+  <p>One command turns a source file into a live, callable command:</p>
+  <pre class="orgsample">$ wbx toolkit build-inline slug js slug.js
+built + registered command `slug` (js) &rarr; build/commands/9f2c&hellip;e1.wasm
+run it via the Dock: run-command slug</pre>
+  <p>That output is verbatim from the engine; only the hash is illustrative. There is no
+  project to scaffold and no manifest to write — the pipeline is named exactly four stages:
+  <b>write → build-in-sandbox → content-address → register</b>. Six languages have an inline
+  lane — <code>rust</code>, <code>c</code>, <code>zig</code>, <code>js</code>, <code>ts</code>,
+  <code>go</code> — and the build runs <em>entirely in the wasm sandbox</em>: no native
+  toolchain, no host escape, because <a href="toolkit#wasm">the compiler is itself wasm</a>.</p>
+  <pre class="mermaid">
+flowchart LR
+  src["slug.js<br/>(source an agent just wrote)"]
+  build["build in the sandbox<br/>(the compiler is wasm)"]
+  addr["content-address<br/>sha256(wasm bytes)"]
+  reg["register the binding<br/>(:persistent_term)"]
+  land[["build/commands/&lt;sha&gt;.wasm"]]
+  src --> build --> addr --> reg
+  addr --> land
+  style src fill:#ffffff,stroke:#121316
+  style build fill:#f3c5a3,stroke:#121316
+  style addr fill:#f2ddb0,stroke:#121316
+  style reg fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style land fill:#fbfaf6,stroke:#121316
+  </pre>
+  <p>The third stage is the load-bearing one. <b>Content-addressing</b> means the wasm bytes
+  are hashed with sha256 and parked at <code>build/commands/&lt;sha&gt;.wasm</code>. Identical
+  source compiles to identical wasm, which produces an identical hash, which lands at the same
+  path — so rebuilds are <b>idempotent</b> by construction. The registry itself is guarded: a
+  built command's path must canonicalize <em>inside</em> <code>build/commands/</code>, the
+  dynamic table is capped at 4,096 entries against denial-of-service, and the four built-ins
+  are merged into lookup <em>last</em> so a poisoned dynamic key can never shadow a real one.</p>
+  <p>Run it through the <a href="nexus">Dock</a> with <code>run-command slug</code> — the same
+  import every other command goes through, which is exactly the seam that makes self-authoring
+  safe. We'll come back to that.</p>
+</section>
+
+<section id="ephemeral">
+  <h2>what &ldquo;session&rdquo; MEANS</h2>
+  <p>Depth rung — skippable. Rung one is called the <em>session</em> rung because the binding
+  is ephemeral, and it's worth being precise about <b>which part</b> dies. The engine's own
+  description: a session command is <em>built into <code>:persistent_term</code>, gone when the
+  Instance dies</em>. But the compiled artifact is content-addressed on disk — those bytes
+  persist. What's ephemeral is the <b>binding</b>: the name-to-artifact mapping, not the
+  artifact.</p>
+  <table class="cmp">
+    <tr><th></th><th>where it lives</th><th>survives the Instance dying?</th></tr>
+    <tr><td>the <b>binding</b> (<code>slug</code> &rarr; this wasm)</td><td>in-memory, <code>:persistent_term</code></td><td class="n">no — gone with the Instance</td></tr>
+    <tr><td>the <b>artifact</b> (the wasm bytes)</td><td>content-addressed on disk</td><td class="y">yes — never deleted</td></tr>
+  </table>
+  <p>The verdict of that table: the work isn't lost, the wiring is. And the engine softens even
+  that — a small <code>registry.json</code> manifest in the commands directory lets a boot-time
+  reload re-register the built commands from their cached artifacts. The bytes were on disk; the
+  manifest just remembers which names pointed where.</p>
+  <p>One more property falls out of never deleting the bytes: <b>hot-swap</b>. Re-registering a
+  name replaces the binding live, no restart. In-flight calls finish on the <em>old</em> bytes
+  because the old content-addressed file still exists; a <code>current</code> read tells you
+  which artifact a name resolves to right now. Replacing a tool never yanks the rug out from
+  under a call already running on it.</p>
+</section>
+
+<section id="rung-two">
+  <h2>rung two — PROMOTE</h2>
+  <p>The second command materializes the session command as a real, source-owned toolkit
+  directory under the toolkits root:</p>
+  <pre class="orgsample">$ wbx toolkit promote slug js slug.js
+promoted session command &rarr; workspace toolkit `slug` at toolkits/slug
+  build it: wb toolkit build slug
+  then it packs into a workbook (Library.store) and installs elsewhere (Library.install)</pre>
+  <p>Verbatim output again. Before it writes anything, <code>promote</code> runs the same
+  guards in order: the name can't be a reserved built-in, it must match
+  <code>^[A-Za-z0-9_.-]+$</code>, the language must be one of the six, and the source file must
+  exist. Trip a guard and you get a clean refusal — the failure rail is honest:</p>
+  <pre class="orgsample">$ wbx toolkit promote grep js slug.js
+cannot promote: "grep" is a reserved built-in command name</pre>
+  <p>On success it doesn't compile anything. <b>Promote scaffolds; it does not build.</b> It
+  writes your source at the per-language layout path, a generated <code>manifest.org</code>, and
+  a <code>skills/overview.org</code> skill stub — then hands you the separate
+  <code>wb toolkit build slug</code> to do the deterministic rebuild. Here's the richest case,
+  rust, on disk after promote:</p>
+  <pre class="orgsample">toolkits/slug/
+├── manifest.org          &larr; generated spec
+├── Cargo.toml            &larr; synthesized: [package] name="slug" version="0.1.0" edition="2021"
+├── src/main.rs           &larr; YOUR source, verbatim
+└── skills/overview.org   &larr; skill stub with a verification checklist</pre>
+  <p>The generated <code>manifest.org</code> carries the keys that make it a real, first-party
+  toolkit — and crucially the keys that drive the rebuild:</p>
+  <pre class="orgsample">#+TITLE: slug
+#+TOOLKIT: slug
+#+VERSION: 0.1.0
+#+STATUS: experimental
+#+TAGLINE: Promoted session command.
+#+EXEC: command
+#+TRUST: first-party
+#+CLI_BIN: slug
+#+BUILD_LANG: rust
+#+BUILD_SRC: path:.
+#+ARG_MODE: argv
+
+* slug :toolkit:
+  :PROPERTIES:
+  :ID:      slug
+  :CLI_BIN: slug
+  :END:
+  Promoted from a session command. Source-owned + rebuildable.</pre>
+  <p>That <code>:toolkit:</code> tag on the headline is not decoration — it's what makes the
+  promoted tool <b>discoverable</b> by the standard <code>(tags :toolkit:)</code> query the same
+  way every other toolkit is found. The skill stub beside it is deliberately small: a
+  <em>when to use this</em>, a one-line workflow (<code>run-command slug</code> — argv plus
+  stdin to stdout), and a two-checkbox verification list. It's a starting point you grow, not a
+  finished manual.</p>
+</section>
+
+<section id="spec-vs-artifact">
+  <h2>org owns the SPEC, wasm owns the ARTIFACT</h2>
+  <p>This is the rung's thesis, and the engine states it plainly: promotion persists the
+  <b>source</b> — rebuildable — not just the compiled bytes. Org owns the spec; wasm owns the
+  artifact. Why that matters: a directory of compiled bytes rots the moment the compiler moves
+  or the platform shifts. A directory of <em>source plus a declarative manifest</em> can be
+  rebuilt forever, on any Nexus, into the identical artifact.</p>
+  <pre class="mermaid">
+flowchart LR
+  man["manifest.org<br/>#+BUILD_LANG: rust<br/>#+BUILD_SRC: path:.<br/>#+CLI_BIN: slug"]
+  dir["build_dir(slug)<br/>src/main.rs + Cargo.toml"]
+  comp["compile in the sandbox"]
+  addr["content-address<br/>sha256(wasm)"]
+  same[["same sha as the session build"]]
+  man --> dir --> comp --> addr --> same
+  style man fill:#f2ddb0,stroke:#121316
+  style dir fill:#ffffff,stroke:#121316
+  style comp fill:#f3c5a3,stroke:#121316
+  style addr fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style same fill:#fbfaf6,stroke:#121316
+  </pre>
+  <p>Read that left to right as a story. The manifest declares the language, the build source
+  path, and the binary name. <code>wb toolkit build</code> reads those keys, assembles the build
+  directory the compiler expects, compiles in the sandbox, and content-addresses the result.
+  Because the source is byte-identical and the compiler is the same wasm compiler, the same
+  source produces the same sha, which lands at the same path — the deterministic rebuild meets
+  the session build at the very same artifact. The manifest is the recipe; the wasm is the dish;
+  the recipe always cooks the same dish.</p>
+  <p>The trust line of that thesis is the part that makes sharing possible: <em>trust stays
+  first-party — yours; a third-party consumer grants its own <code>#+CAPS</code> on install.</em>
+  Your manifest says <code>#+TRUST: first-party</code> because it's yours. When someone else
+  installs it, <em>they</em> decide what it's allowed to touch. Nobody inherits your grants.</p>
+</section>
+
+<section id="layouts">
+  <h2>per-language LAYOUTS</h2>
+  <p>Depth rung — skippable. Why does rust get <code>#+BUILD_SRC: path:.</code> and a synthesized
+  <code>Cargo.toml</code> at the toolkit root, while everyone else gets <code>path:src</code>?
+  Because the rust build directory wants <code>src/main.rs</code> with <code>Cargo.toml</code>
+  sitting beside it at the toolkit dir, whereas the other languages want their entry file
+  directly under the directory handed to the compiler. The layout table is real and small:</p>
+  <table class="cmp">
+    <tr><th>lang</th><th>BUILD_SRC</th><th>entry file</th><th>extra files</th></tr>
+    <tr><td><b>rust</b></td><td><code>path:.</code></td><td><code>src/main.rs</code></td><td class="y">synthesized <code>Cargo.toml</code></td></tr>
+    <tr><td>c</td><td><code>path:src</code></td><td><code>src/main.c</code></td><td>none</td></tr>
+    <tr><td>zig</td><td><code>path:src</code></td><td><code>src/main.zig</code></td><td>none</td></tr>
+    <tr><td>go</td><td><code>path:src</code></td><td><code>src/main.go</code></td><td>none</td></tr>
+    <tr><td>js</td><td><code>path:src</code></td><td><code>src/index.js</code></td><td>none</td></tr>
+    <tr><td>ts</td><td><code>path:src</code></td><td><code>src/index.ts</code></td><td>none</td></tr>
+  </table>
+  <p>The verdict of that table in one line: rust is the exception that needs a manifest file in
+  the build dir, so it gets <code>path:.</code> plus a Cargo.toml; the other five just need their
+  entry file under <code>src/</code>, so they get <code>path:src</code> and nothing extra. The
+  split isn't arbitrary — it's the build directory each compiler expects, encoded once in the
+  layout table instead of remembered five times.</p>
+</section>
+
+<section id="rung-three">
+  <h2>rung three — a toolkit IS a WORKBOOK</h2>
+  <p>The third rung is where the tool leaves your machine. And here's the move that makes it
+  cheap: <b>there is no separate toolkit package format — a toolkit IS a workbook.</b>
+  Everything is reuse. Publishing is <code>store</code>, searching is <code>search</code>,
+  signing is the bundle's ship step, sharing rides the same DID-member path workbooks already
+  use.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as Nexus A (publisher)
+  participant S as storage backend<br/>(local / S3 / R2)
+  participant B as Nexus B (installer)
+  A->>S: Library.store — pack workbook<br/>commands ship as &lt;name&gt;.wasm parts
+  Note over S: workbooks/&lt;slug&gt;.wbundle<br/>tenant-scoped, auto-indexed
+  S->>B: fetch the bundle blob
+  Note over B: gate 1 — sha pin: sha256(blob) must match
+  Note over B: gate 2 — signature (optional, off by default first-party)
+  B->>B: register_artifact each *.wasm — capped by Policy
+  Note over B: {:ok, %{commands: ["slug"]}}
+  </pre>
+  <p>Walk that sequence. Nexus A calls <code>Library.store</code>, which packs the workspace
+  into a <code>.wbundle</code> on whichever backend is configured, tenant-scoped and auto-indexed
+  for semantic search. A workbook packed <em>with build</em> carries each command as a
+  <code>&lt;name&gt;.wasm</code> part. Nexus B fetches the blob and runs two supply-chain gates
+  before <em>anything</em> registers: an optional <code>sha:</code> pin — sha256 of the blob must
+  match first — and an optional <code>require_signature</code> check for a valid embedded bundle
+  signature, which is off by default for first-party local installs. Only then does it unpack and
+  <code>register_artifact</code> each wasm part.</p>
+  <p>And the registered commands land under the same ceiling as everything else, which the engine
+  says in five words: <em>installing never widens caps.</em> That's the bridge into the security
+  section — because the same sentence is true of authoring.</p>
+</section>
+
+<section id="never-wider">
+  <h2>the capability CEILING</h2>
+  <p>Self-authoring sounds like the start of an incident report. Agents writing and running their
+  own tools? The invariant that makes it safe is <b>structural, not policed</b>. The
+  <a href="nexus">Dock</a> imports an Instance can see are built from its Policy capabilities by
+  construction: the host provides only the imports the Policy grants, so a component that tries to
+  import a non-granted capability simply <b>fails to instantiate</b>. <code>run-command</code> is
+  one of those imports — it exists only if the <code>commands</code> cap is granted.</p>
+  <p>So authoring a tool never grants the tool anything. A built command runs through the exact
+  same <code>run-command</code> gate as every other command; an ungranted capability is
+  un-importable, therefore un-callable. The real Policy profiles make this concrete:</p>
+  <table class="cmp">
+    <tr><th>profile</th><th>memory</th><th>timeout</th><th>caps</th></tr>
+    <tr><td><b>minimal</b></td><td>64 MiB</td><td>5,000 ms</td><td>build + run, nothing the profile didn't grant</td></tr>
+    <tr><td>network</td><td>128 MiB</td><td>30,000 ms</td><td>adds network</td></tr>
+    <tr><td>posix</td><td>256 MiB</td><td>60,000 ms</td><td>the widest standard profile</td></tr>
+    <tr><td><b>compute</b></td><td>64 MiB</td><td>5,000 ms</td><td class="n"><code>vfs</code> only — no commands at all</td></tr>
+  </table>
+  <p>The verdict of that table is the whole security story in one example. An Instance on
+  <code>compute</code> has <code>vfs</code> and nothing else — it can't even call a command it
+  authored, because <code>run-command</code> was never imported. An Instance on
+  <code>minimal</code> can build and run <code>slug</code> — but <code>slug</code> gets no
+  network, no model access, nothing <code>minimal</code> didn't already hand it. The tool can
+  never exceed the granted capability set, no matter who wrote it or how.</p>
+  <p>Trust shapes the isolation tier on top of that. <code>#+TRUST</code> is recorded at build,
+  defaulting to <code>first-party</code>; third-party commands run isolated on a separate BEAM VM,
+  with graceful fallback, wired straight into the Dock's <code>run-command</code> path. The build
+  gate refuses third-party toolkits with invalid provenance (the author must sign the toolkit
+  first) and refuses any <code>#+CLI_BIN</code> that would shadow a reserved name. And every
+  <code>run-command</code> call appends a step to <code>_steps.jsonl</code> — the tool name, exit
+  code, duration, timestamp — so the whole episode is on the record.</p>
+</section>
+
+<section id="honesty">
+  <h2>scaffold, not a publish BUTTON</h2>
+  <p>Honesty section. <code>promote</code> is a scaffold, not a publish button. The generated
+  skill stub is deliberately minimal — a when-to-use, a one-line workflow, two checkboxes — and
+  it says so: extend the skill as the toolkit grows. The <a href="toolkit">manual layer the
+  parent lesson celebrates</a> still has to be written by someone. Promotion gives you the
+  skeleton, not the muscle.</p>
+  <p>The lanes have edges, and we'd rather name them. <b>Six languages</b>, not all of them.
+  Inline crates.io dependencies are <b>rust-only</b> on the build-inline lane; the js and ts
+  inline lanes take npm deps via a synthesized package.json, but the dependency story isn't
+  uniform across the six. The session rung is <b>ephemeral by design</b> — the binding is gone
+  when the Instance dies, and while the bytes and a small reload manifest soften that, the rung
+  is a workbench, not a vault. And the <b>reserved names</b> mean you can't call your tool
+  <code>grep</code>, <code>jq</code>, <code>upper</code>, or <code>wbox</code> — the built-ins
+  win those names, always.</p>
+  <p>A toolkit comes out the door marked <code>#+STATUS: experimental</code> by default, because
+  that's honestly what a freshly promoted session command is. None of this is software that runs
+  itself — it's a ladder that makes the climb from <em>worked once</em> to <em>installable
+  everywhere</em> cheap, with a human deciding what's worth climbing.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can my agent really do this unattended?</summary>
+    <p>Yes — and it's capped the whole time. An agent can write a source file, build-inline it
+    into a live command, and promote it to a toolkit without a human in the loop. What it
+    can't do is grant itself anything: the built command runs through the same Dock gate as
+    every command, and an ungranted capability is un-importable. An agent on the
+    <code>minimal</code> profile builds tools that get exactly what <code>minimal</code> grants
+    and not one capability more.</p>
+  </details>
+  <details>
+    <summary>What if I promote the same name twice?</summary>
+    <p>Promote writes into <code>toolkits/&lt;name&gt;</code> — a named directory — so a second
+    promote targets the same path. Treat it as a scaffold you re-run, not an append. If you've
+    grown the manual or added files, copy them aside before re-promoting so a fresh scaffold
+    doesn't clobber work you care about.</p>
+  </details>
+  <details>
+    <summary>Why can't I name it <code>grep</code>?</summary>
+    <p>Because <code>grep</code> is a reserved built-in, along with <code>jq</code>,
+    <code>upper</code>, and <code>wbox</code>. The built-ins are merged into command lookup last
+    precisely so a dynamic name can never shadow them — which is a security property, not an
+    inconvenience. Both build-inline and promote refuse a reserved name up front with a clean
+    error.</p>
+  </details>
+  <details>
+    <summary>Do I have to promote, or can I live on build-inline?</summary>
+    <p>You can live on build-inline. Rung one is a complete, callable tool for the life of the
+    Instance, and the reload manifest brings it back at boot. Promote when you want the tool to
+    be <em>source-owned, rebuildable, packable, and discoverable</em> — the moment it stops being
+    a session convenience and starts being a thing you'd ship.</p>
+  </details>
+  <details>
+    <summary>Does the consumer of my toolkit get my capabilities?</summary>
+    <p>No. Trust stays first-party — yours. A third-party consumer grants its own
+    <code>#+CAPS</code> on install, installing never widens caps, and the registered commands sit
+    under <em>their</em> Policy profile. Your tool can never do more on their Nexus than their
+    profile allows, regardless of what it could do on yours.</p>
+  </details>
+  <details>
+    <summary>Will my rebuilt tool really have the same hash?</summary>
+    <p>By the content-addressing rule it should: the same source compiled by the same wasm
+    compiler hashes to the same sha and lands at the same path, which is exactly what makes
+    rebuilds idempotent. We say <em>should</em> rather than <em>always</em> deliberately — the
+    determinism follows from content-addressing, and that's the design, but it's the principle we
+    stand behind, not a guarantee we'll overstate.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Promotion is the rung after the parent lesson's one sentence about it — here's the way back
+  up, and the pieces it stands on.</p>
+  <div class="cards">
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>Toolkit<small>the parent — anatomy, the manual, the wasm bet</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#9fc4e8"><img src="icons/nexus.svg" alt=""></span>
+      <div>Nexus<small>the engine that holds the registry and the caps</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#aee5c2"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the self-authoring actor — its toolbox grows here</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under toolkit · promotion
+  :PROPERTIES:
+  :SLUG:   promotion
+  :KIND:   learn
+  :NN:     03.4
+  :KICKER: under toolkit · promotion
+  :TITLE1: one source file
+  :TITLE2: CLIMBS
+  :TITLE3: three rungs
+  :CHIP:   promotion
+  :PC:     #f3c5a3
+  :AC:     #13d943
+  :HERO:   img/promotion-hero.jpg
+  :END:
+** og
+- the lifecycle ladder: session → workspace → registry
+- org owns the spec, wasm owns the artifact — rebuildable forever
+- authoring a tool never widens granted capabilities
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f3c5a3", .38], ["#f2ddb0", .24], ["#aee5c2", .22], ["#9fc4e8", .16]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

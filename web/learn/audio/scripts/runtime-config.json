@@ -1,0 +1,71 @@
+{
+ "slug": "runtime-config",
+ "title": "runtime config — under agents",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "The agent is the config",
+   "text": "Lesson five point seven — runtime config. A sub-lesson, under agents. You have met agents… a model on a schedule, with files, tools, and memory. Now you want to change one. Make it tick faster. Swap its model. Give it a colleague. Stop it editing the page. [curious] And your reflex, trained by every other platform you have ever touched, is the same. Find the code. Here is the whole lesson in one breath. There isn't any. The agent is the config."
+  },
+  {
+   "id": "problem",
+   "title": "Where is the agent's code?",
+   "text": "First — where is the agent's code? So you go looking for it. The fear underneath the search is that agent behavior is buried in engine internals — that tuning means forking, that the schedule is hard-wired in some scheduler you don't own. [sighs] It's a reasonable fear. It's just wrong here. There is no agent code to edit. The engine ships primitives — a worker loop, a model client, a set of brokered tools. Everything a person would call this agent's personality and schedule is data the engine reads at runtime… never code it compiles in. Change the data, change the agent. The engine doesn't move."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. Runtime config is the declared layer — environment variables, org manifests, and run options — that fully determines which agents exist, who they are, and what each run may do. Read by the engine… never compiled into it. This is the rule that behavior belongs in the config layer, made concrete. An agent's existence, identity, cadence, budget, and trust are five facts. And all five are config… sitting at three different altitudes."
+  },
+  {
+   "id": "altitudes",
+   "title": "Three altitudes of config",
+   "text": "Three altitudes of config. The first thing to learn isn't a knob — it's the map. Picture three stacked layers, all feeding one worker. First, at the top… environment. It decides whether an agent exists at all. Set the right variable and a worker joins the tree. Leave it unset, and the subsystem simply isn't there. Second, in the middle… manifests. Org files. They decide who the agent is and when it acts — which definition it runs, how often it ticks, what state machine shapes its days. Third, at the bottom… run options. They decide one run's budget and trust — which model, how many steps, whether it may touch the world. Those three layers feed one worker… the worker calls one run. And nothing in that chain is compiled. Every box is the engine reading data."
+  },
+  {
+   "id": "activation",
+   "title": "Unset means absent",
+   "text": "Next — unset means absent. This is the sharpest rule in the whole system, so picture the decision the runtime makes when it boots. It asks one question. Is the crew variable set? If yes… it starts the crew — a worker for every agent in the manifest. If no… it asks a second question. Is the keeper variable set? If yes… it starts one singleton worker. And if neither is set… there is no agent subsystem in the tree at all. Not disabled-but-running. Absent. The crew and the singleton can never both run. And this is one pattern, not a special case. The engine repeats it everywhere. The web plane joins only on its variable. The public plane, only on its own. The Telegram channel, only when a bot token is present. The groundskeeper, only with its secret. The principle never changes — an unset variable doesn't toggle a feature off. It removes the subsystem from the running tree."
+  },
+  {
+   "id": "envcontract",
+   "title": "The singleton's knobs",
+   "text": "Now — the singleton's knobs. Once a keeper exists, environment variables are its full control surface. I won't recite the whole table, but here is what its defaults actually say about it. A keeper ticks hourly. It gives each run fifteen minutes of wall clock before it's killed. It plans, rather than edits. And it writes to the tenant named local — so its commits ARE the public changelog. The one variable it cannot live without is its definition path. Leave that unset and the worker starts… but idles forever, doing nothing. Two of those knobs interact in a subtle way — the interval, and catch-up scheduling. The last-run timestamp is written to disk. So on restart, the first delay is whatever was left on the clock, with a sixty-second grace. [curious] Restarts don't reset the cadence. Redeploy a keeper four hundred times and it still ticks roughly hourly… because the clock lives in the data, not in the process."
+  },
+  {
+   "id": "crew",
+   "title": "One manifest, many workers",
+   "text": "One manifest, many workers. A crew is the singleton's contract, multiplied. One org file lists agents as headlines, each with a properties drawer. Picture the real one — the bit dot M-L newsroom, four agents. First, desk — its definition at desk dot org, interval forty-five minutes. Second, moss — the researcher, fifteen minutes. Third, wren — the writer, fifteen minutes. And fourth, hale — the editor, twenty minutes. Set the crew variable to that file and four workers start. Each drawer carries a definition, which is required… an optional lifecycle… and an interval, default one hour. Want hale every ten minutes? Change one line. No code, no rebuild. Two knobs keep the crew from stampeding the model. First, stagger — worker number i waits i times thirty seconds before its first tick, so the four fire at zero, thirty, sixty, and ninety seconds, fanning in. Second, concurrency — a cap of two, enforced by a first-in-first-out gate. Picture wren and hale. Wren asks the gate for a slot — it's free, wren runs. Hale asks for a slot — both are taken, so hale waits, patiently, forever if it must. Wren finishes and releases its slot… and the gate hands it straight to hale. [curious] The clever part — that release runs in an after clause. So even a crashed or timed-out run always frees its slot. A stuck worker can never starve the crew. And one honest note — claiming a task before working it is a discipline the definitions commit to git. The runtime doesn't enforce it. It only isolates runs and throttles concurrency."
+  },
+  {
+   "id": "lifecycle",
+   "title": "The deterministic skeleton",
+   "text": "The deterministic skeleton — this one's a depth rung, skip it if you like. Plain ticks just say, do your job every N minutes. A lifecycle wraps that loop in a state machine, so an agent's days have shape while its work stays unpredictable. Picture it as a clock face, four states. It starts at wake-add — which runs the agent, and holds for three successful ticks before moving on. Then one wake-audit. Then rem — a dream, with no agent run, gated to fire at most every ten minutes. Then wake-plan… and back to the top. Now the rule that matters most lives in the self-loops. A failed or killed tick does not advance the position. The same state is retried next tick — so cadence is preserved across crashes. And the position itself, the state and how many hits it has, is written to disk. So if it holds the second of three adds and the engine redeploys… it resumes on the second of three adds. The cadence survives the redeploy. One last thing — the state's name is handed to the agent in its task line. So the task it actually receives reads, in three lines… MODE, plan. LIFECYCLE, wake-audit. Perform one keeper run per your loop. The agent picks audit versus add from that label… not from counting prose itself."
+  },
+  {
+   "id": "budget",
+   "title": "Knobs that defend the meter",
+   "text": "Knobs that defend the meter. Several config knobs exist for one reason — every tick can cost a model call, and an idle agent that ticks anyway burns money for nothing. The sharpest is no-work backoff. An agent signals nothing-to-do by beginning its result with the words no-work. And consecutive no-work ticks back off, doubling each time. First streak… sixty seconds. Second… two minutes. Third… four minutes. Then eight, then sixteen… capped at thirty minutes. So the verdict is this — an idle worker quiets itself down toward a thirty-minute heartbeat. And a single real done snaps it straight back to hot cadence. This is the fix that stopped an idle crew from burning a model call every ten seconds, just to report it had nothing to do. The other defenders share the spirit. Continuous mode trades the full interval for a forty-five-second breather. The image tool, when granted, gets a hard budget of two generations per run. And the dreaming model is configured separately from the waking one — a smaller, cheaper model than the agent reasons with. The same discipline shows up as max-steps, which scales with the tenure of the run. A workflow step gets six. A bare run, twelve. An HTTP call or a session, forty. A keeper tick — a worker with standing — sixty. And a long profile conversation, two hundred and fifty. The number isn't arbitrary. It's how much rope the run has earned."
+  },
+  {
+   "id": "exec",
+   "title": "The trust grant",
+   "text": "The trust grant. The most misread knob is exec. The reflex reads exec-true as, let the agent run shell commands. It is the opposite of that. Exec is a trust grant — it adds a fixed set of host-brokered tools, and nothing native. What it adds is exactly three verbs. First, git — the host commits and pushes. The agent names a message… the host runs the commit. Second, publish — the host copies files into the public web root. The agent picks what… the host does the move. Third, image — the host holds the key and the network, and enforces a budget of two generations per run. That's the entire grant. Picture it as a handoff — the agent calls git with a message… the host runs the commit and push… the agent never forks a shell of its own. The native bash hatch was deleted. By construction, an agent cannot choose an arbitrary command line. And because this is a grant, not a default, the HTTP surface guards it hard — it's honored only on the desktop app, or behind one explicit variable, never for arbitrary multi-tenant callers. One cautionary detail lives in that same call — the tenant. Name it local, and the run writes to local. Omit it… and the run quietly defaults to dev, publishing to the wrong directory. [sighs] The lander once shipped four posts that returned not-found for exactly this reason. Config errors here fail quietly into the wrong place… not loudly."
+  },
+  {
+   "id": "boundaries",
+   "title": "Where it bites",
+   "text": "Now the honest part — where it bites. Config is powerful precisely because it isn't enforced everywhere, and you should know the seams. First — some knobs are protocol, not enforcement. The mode variable doesn't gate anything in the runtime. It's text, prepended to the task, and the definition decides whether to honor plan versus edit. Board claims are the same — a discipline committed to git, which the runtime neither checks nor requires. These are agreements. Config expresses them… it doesn't police them. Second — tree shape is fixed at boot. The variables that decide which agents exist are read when the runtime starts. Re-shaping the running supervisor is a restart, not a hot edit. Treat who-exists as a deploy-time decision. Third — failures are quiet. A wrong or missing value doesn't crash. It routes the work somewhere plausible, but wrong. And the deepest limit — config can make an agent well-governed… not good. It sets the cadence, the budget, the trust, and the boundary. It can't supply judgment. The pitch was never software that runs itself. These knobs exist so a person can hand a worker exactly as much rope as it has earned… and no more."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Can I change a model without redeploying? Yes. The model comes from the definition's property, read per run from the file. The engine is untouched. A caller option can override it… but the definition is the default, and editing it is editing data, not code. Can two crew agents grab the same task? The runtime won't stop them. It isolates runs and caps concurrency… but ownership is the definition-level claim, committed to git. What happens when a run hangs? A wall clock catches it — fifteen minutes, then a brutal kill. The outcome is killed, and a lifecycle holds its position. A hung run loses a tick… never the cadence. And is exec safe to grant? It's a fixed set of three brokered verbs — git, publish, image. Not a shell. The native bash hatch is deleted by construction. [chuckles] You can hand out that trust in increments… because the increments are named."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the parent",
+   "text": "So that's runtime config. No agent code to edit — the agent is the sum of declared config, at three altitudes. Environment decides which agents exist. Manifests decide who they are, and when they act. Run options decide what one run may do. And the engine never moves. [curious] If any of it felt unfamiliar, the way back up is short. This is a sub-lesson, and its parent is lesson five — agents — the worker these knobs configure. Read that one… and everything here is just the dials on a machine you already understand."
+  }
+ ]
+}

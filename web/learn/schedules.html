@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>schedules — time the engine honors — Workbooks</title>
+<meta name="description" content="Time in a plan is data before it is behavior: timestamps and a cron property compile to a tiny honest JSON, and a keeper — an engine-side heartbeat — gives agents the ticks to honor it. A sub-lesson under workflows.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/schedules-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="schedules — time the engine honors">
+<meta property="og:description" content="One character decides whether a timestamp means act or merely record. The kernel compiles time into data; a keeper fires agents on a heartbeat, and the agent reads the plan. A sub-lesson under workflows.">
+<meta property="og:url" content="https://workbooks.sh/learn/schedules">
+<meta property="og:image" content="https://workbooks.sh/og/schedules.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="schedules — time the engine honors">
+<meta name="twitter:description" content="The kernel compiles time into data; a keeper fires agents on a heartbeat, and the agent reads the plan. A sub-lesson under workflows.">
+<meta name="twitter:image" content="https://workbooks.sh/og/schedules.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/schedules.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  * TODO publish the changelog
+    SCHEDULED: <2026-06-13 Fri 09:00 +1w>      :keeper:
+    the file says nine a.m. — but a file can't fire itself.
+  * DONE understand the trick
+    the kernel turns this line into data: { at, repeat, active }.
+    no cron daemon reads it. a keeper ticks, an agent wakes,
+    the agent reads the plan and sees what's due. declared time
+    is for the plan; cadence time is for the worker. that split
+    is the whole lesson. now you know it too.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 08·3 — <b>under workflows · schedules</b></div>
+      <h1><span class="ln">time the</span><span class="ln bub">ENGINE</span><span class="ln">honors</span></h1>
+      <p class="dek">A <b>schedule</b> is two halves of one page: declared time in the
+      plan — timestamps and a cron property the <a href="org">kernel</a> compiles into
+      data — and the <b>keeper</b>, an engine-side heartbeat that gives
+      <a href="agents">agents</a> the ticks to honor it. A file can't fire itself.
+      This lesson is what actually wakes up at nine.</p>
+      <div class="meta">
+        <span class="on">schedules</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/schedules-hero.jpg" alt="A small figure standing beneath a monumental brass orrery and pendulum-clock the height of a cathedral, gears turning in bright daylight, a single illuminated dial reading nine — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/workflows.svg" alt=""></div><span>schedules</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Nine a.m., and nobody's home</a>
+  <a href="#definition">The definition</a>
+  <a href="#grammar">One character decides everything</a>
+  <a href="#cron">When a timestamp isn't enough</a>
+  <a href="#keeper">A metronome, not a cron daemon</a>
+  <a href="#tick">Anatomy of a tick</a>
+  <a href="#breather">The breather and the backoff</a>
+  <a href="#crews">One manifest, many workers</a>
+  <a href="#lifecycle">Declaring what a tick is</a>
+  <a href="#honest">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>nine a.m., and nobody's HOME</h2>
+  <p>Here is a line in a plan: <code>SCHEDULED: &lt;2026-06-13 09:00 +1w&gt;</code>.
+  It says, plainly, every Friday at nine. And on Friday at nine the file sits
+  on a disk, a few kilobytes of text, doing exactly what text always does:
+  nothing. A text file cannot fire itself. Something outside it has to wake
+  up, read the line, and decide to act on it.</p>
+  <p>The traditional answer to that is cron — a daemon that reads a table of
+  times and runs scripts. But cron is a <b>fourth unreviewable system</b>,
+  added to the tracker and the pipeline and the code: it lives somewhere
+  else, it's edited by one person, and it can only ever do exactly what its
+  line says, blind to whether the line still makes sense. The
+  <a href="workflows">workflows lesson</a> sold you on time being native to
+  the plan. This page owns the two questions that promise leaves open: what
+  exactly can you <em>write</em> on a headline, and what actually <em>wakes
+  up</em> and runs it.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">sched·ule</span> <span class="pr">/ˈskɛ·dʒuːl/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> <b>declared time</b> in a plan — org
+    timestamps and a <code>:SCHEDULE:</code> property the kernel compiles to
+    data — paired with the <b>keeper</b>: an engine-side heartbeat that
+    runs an <a href="agents">agent</a> on a cadence so the declared time
+    gets honored.</p>
+  </div>
+  <p>Two halves, one idea, and they are deliberately not the same clock.
+  Declared time lives in the plan and is pure data — the kernel parses it,
+  surfaces it, validates the rest of the tree around it, and never fires
+  anything. Cadence time lives in the keeper, the engine that actually
+  ticks. The keeper isn't a cron daemon reading your timestamps; it's a
+  metronome that runs an agent, and the <em>agent</em> reads the plan. Hold
+  that split — the whole lesson hangs on it.</p>
+</section>
+
+<section id="grammar">
+  <h2>one character decides EVERYTHING</h2>
+  <p>Start with what you can write. An org timestamp's first character is
+  its whole meaning. Angle brackets — <code>&lt;…&gt;</code> — make it
+  <b>active</b>: a thing to act on. Square brackets — <code>[…]</code> —
+  make it <b>inactive</b>: a thing merely recorded, an event that happened.
+  Anything else parses to nothing; there are no bare timestamps. That one
+  character is the difference between an appointment and a diary entry.</p>
+  <p>Inside the brackets the kernel doesn't care about order. It splits on
+  whitespace and recognizes each token <b>by shape</b>: a ten-character
+  token with a dash at position four is the date (<code>2026-06-13</code>);
+  a token containing a colon is the time (<code>09:00</code>); a token
+  starting with <code>+</code>, <code>.+</code>, or <code>++</code> is the
+  repeater. Day names like <code>Fri</code> match none of the three shapes,
+  so they fall through and are silently ignored. The result is a tiny,
+  honest JSON: <code>{ at, repeat, active }</code>.</p>
+  <p>Here is exactly what <code>parse_timestamp</code> yields — real input
+  on the left, the kernel's real output on the right:</p>
+  <table class="cmp">
+    <tr><th>what you write</th><th>what the kernel sees</th></tr>
+    <tr><td><code>&lt;2026-06-13 Fri 09:00 +1w&gt;</code></td><td><code>{ at: "2026-06-13T09:00", repeat: "+1w", active: true }</code></td></tr>
+    <tr><td><code>&lt;2026-06-20&gt;</code></td><td><code>{ at: "2026-06-20", repeat: null, active: true }</code></td></tr>
+    <tr><td><code>[2026-06-11 14:30]</code></td><td><code>{ at: "2026-06-11T14:30", repeat: null, active: false }</code></td></tr>
+    <tr><td><code>&lt;2026-06-13 09:00 .+2d&gt;</code></td><td><code>{ at: "2026-06-13T09:00", repeat: ".+2d", active: true }</code></td></tr>
+  </table>
+  <p>Note the third row: the <code>Fri</code> is gone, the time joined the
+  date with a <code>T</code>, and <code>active</code> flipped to
+  <code>false</code> purely because of the square brackets. And note the
+  repeater is carried <b>raw</b> — <code>"+1w"</code> is a string the kernel
+  hands forward verbatim. It recognizes the three prefixes; it does not
+  compute the next occurrence. We'll be honest about that below. Both
+  <code>SCHEDULED:</code> and <code>DEADLINE:</code> go on the planning line
+  directly under the headline, and the parser surfaces both on every
+  headline row as <code>{ at, repeat, active }</code> or null.</p>
+</section>
+
+<section id="cron">
+  <h2>when a timestamp isn't ENOUGH</h2>
+  <p>Depth rung — skippable. A repeating timestamp says
+  &quot;every week from this date.&quot; Sometimes you want the older,
+  denser grammar: a cron expression. For that there's a property,
+  <code>:SCHEDULE:</code>, in the headline's drawer. And it <b>outranks</b>
+  the timestamp. When the kernel asks a headline for its schedule, the
+  precedence is fixed:</p>
+  <pre class="mermaid">
+flowchart TD
+  h["a headline"]
+  h --> q1{":SCHEDULE: property?"}
+  q1 -- yes --> cron["schedule = { cron: raw-string }"]
+  q1 -- no --> q2{"SCHEDULED: timestamp?"}
+  q2 -- yes --> ts["schedule = the timestamp JSON"]
+  q2 -- no --> nul["schedule = null"]
+  style cron fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style ts fill:#f2ddb0,stroke:#121316
+  style nul fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>So <code>:SCHEDULE: 0 6 * * *</code> on a headline becomes
+  <code>{ cron: "0 6 * * *" }</code> and wins even if a
+  <code>SCHEDULED:</code> timestamp sits right beside it — the cron property
+  is the louder voice. One caution worth stating plainly: the kernel does
+  <b>not</b> parse or validate that string. <code>:SCHEDULE: anything at
+  all</code> becomes <code>{ cron: "anything at all" }</code>. It is carried
+  data, not interpreted instruction — no cron parser exists anywhere in the
+  runtime.</p>
+  <p>This schedule rides the compiled <a href="worlds">world</a>: when a
+  workflow tree is built, every workflow and sub-workflow carries its own
+  <code>schedule</code> field next to its name, imports, exports, and edges.
+  And it surfaces in the run records the runtime hands back — every result
+  from running a workflow includes its <code>schedule</code>, and you can
+  ask for the plan alone, no execution, with
+  <code>POST /api/workflow?plan=1</code>. The time you declared is
+  queryable like any other structure in the tree.</p>
+</section>
+
+<section id="keeper">
+  <h2>a METRONOME, not a cron daemon</h2>
+  <p>Now the bigger aha — the one the whole page turns on. The engine that
+  fires schedules is called the <b>keeper</b>, and it is not crond reading
+  your timestamps. It's a metronome. Each beat it does one thing: run an
+  agent definition. Then it records the outcome and schedules the next beat.
+  The agent is what reads the plan, sees what's due, claims it, and does it.</p>
+  <p>Why a metronome and not a daemon that reads the line directly? Because
+  a cron daemon can only do what the line literally says. An agent woken on
+  a tick can read the whole plan in one pass and notice three things at
+  once: a deadline slipped, a dependency just unblocked, <em>and</em> a
+  schedule arrived. Declared time is for the plan; cadence time is for the
+  worker; the worker is smart enough to reconcile them. Here is the beat:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant K as keeper (the heartbeat)
+  participant A as agent definition
+  participant P as the plan file
+  participant G as the tenant's git repo
+  Note over K: tick
+  K->>G: pull origin (if GitOps on)
+  K->>A: run one keeper run — MODE, LIFECYCLE, your loop
+  A->>P: read the plan — what is due, ready, overdue?
+  A->>G: do the work · commit — the commit IS the changelog
+  A-->>K: outcome — done · failed · killed · no-work
+  Note over K: schedule the next tick
+  </pre>
+  <p>Walk it once. The keeper wakes. If GitOps is enabled it first pulls the
+  tenant's git origin, so a push to GitHub becomes live within one tick. It
+  runs the agent definition in that tenant's repository — the same execution
+  path as a manual run. The agent reads the plan, does its work, and
+  commits; because the workdir is the tenant's public repo, the keeper's
+  commits <em>are</em> the changelog. It reports an outcome, and the keeper
+  schedules the next beat. The keeper exists because some control planes are
+  internal-only and a public GitHub-cron can't reach them — so the engine
+  carries its own heartbeat, on-box.</p>
+</section>
+
+<section id="tick">
+  <h2>anatomy of a TICK</h2>
+  <p>Depth rung. A single tick has more rigor than &quot;run a thing on a
+  timer&quot; suggests, because the keeper has to survive restarts, crashes,
+  and runs that hang. Four properties define one beat:</p>
+  <pre class="mermaid">
+flowchart TD
+  boot["restart"] --> grace["catch-up delay = max(60s, interval − elapsed)"]
+  grace --> tick["tick fires"]
+  tick --> pull["GitOps: pull origin before the run"]
+  pull --> run["run agent in a linked Task, wall-clock bounded"]
+  run --> kill{"finished before timeout?"}
+  kill -- no --> killed[":killed — brutal_kill, worker survives"]
+  kill -- yes --> out{"outcome"}
+  out --> done[":done"]
+  out --> failed[":failed"]
+  out --> nowork[":no_work"]
+  style killed fill:#f3c5a3,stroke:#121316
+  style done fill:#aee5c2,stroke:#121316
+  style nowork fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>First, <b>catch-up scheduling</b>. The last-run time is persisted to
+  disk on the engine's data volume. On restart the keeper computes its first
+  delay as <code>max(60s, interval − elapsed)</code> — a sixty-second boot
+  grace, but otherwise it picks up where the cadence clock left off. A
+  restart must not reset the rhythm. Second, the <b>wall-clock kill</b>:
+  every run executes in a linked task with a hard timeout (default fifteen
+  minutes); past it the run is killed outright, and because the worker traps
+  exits, a crashing or hung run never takes the worker down with it. Third,
+  the <b>four outcomes</b> — <code>:done</code>, <code>:failed</code>,
+  <code>:killed</code>, <code>:no_work</code> — which drive what happens
+  next. Fourth, the <b>GitOps pull</b> before each run, where a merge
+  conflict aborts and is left for a human rather than resolved blindly.</p>
+</section>
+
+<section id="breather">
+  <h2>the breather and the BACKOFF</h2>
+  <p>A keeper runs in one of two modes. <b>Interval mode</b> ticks on a
+  fixed cadence — hourly by default. <b>Continuous mode</b> drops the fixed
+  interval and instead takes a short <b>breather</b> between ticks — forty-five
+  seconds by default — so a busy keeper stays hot without a fixed wait. But
+  continuous-by-default has an obvious failure: an idle agent burning an LLM
+  call every forty-five seconds just to report there's nothing to do.</p>
+  <p>The fix is the <b>NO-WORK protocol</b> and an exponential idle backoff.
+  When the agent has nothing its run-kind may do, it begins its final answer
+  with the literal token <code>NO-WORK</code>. The keeper counts consecutive
+  NO-WORK ticks and backs off: <code>max(base, 60s · 2^(streak−1))</code>,
+  capped at thirty minutes. A single real <code>:done</code> snaps it back to
+  the hot cadence. The curve, for a continuous worker with a 45-second
+  breather:</p>
+  <table class="cmp">
+    <tr><th>consecutive NO-WORK ticks</th><th>next tick in</th></tr>
+    <tr><td>0 — did real work</td><td class="y">45s — the breather</td></tr>
+    <tr><td>1</td><td>1m</td></tr>
+    <tr><td>2</td><td>2m</td></tr>
+    <tr><td>3</td><td>4m</td></tr>
+    <tr><td>4</td><td>8m</td></tr>
+    <tr><td>5</td><td>16m</td></tr>
+    <tr><td>6 and beyond</td><td>30m — the cap</td></tr>
+  </table>
+  <p>An idle keeper settles to one wake every half hour; the moment there's
+  real work, the next <code>:done</code> drops it straight back to a
+  45-second beat. This backoff applies in both continuous and interval
+  modes. Turning a keeper on is a handful of environment variables — this is
+  the block you'd actually paste:</p>
+  <pre class="orgsample">WB_KEEPER_DEF=/data/agents/keeper.org   <i># required — no def, no ticks</i>
+WB_KEEPER_INTERVAL_MS=3600000           <i># default: hourly</i>
+WB_KEEPER_CONTINUOUS=1                   <i># breather mode…</i>
+WB_KEEPER_BREATHER_MS=45000             <i># …45s between ticks</i>
+WB_KEEPER_RUN_TIMEOUT_MS=900000         <i># 15min wall-clock kill</i>
+WB_LIFECYCLE_DEF=/data/lifecycle.org    <i># optional cadence state machine</i>
+WB_TENANT=local                         <i># whose repo the commits land in</i></pre>
+  <p>Without <code>WB_KEEPER_DEF</code> the keeper starts and idles forever —
+  no def, no ticks. On a fresh boot the first tick fires after the
+  sixty-second grace, not instantly — and on a restart it picks up the
+  cadence clock with <code>max(60s, interval − elapsed)</code>.</p>
+</section>
+
+<section id="crews">
+  <h2>one manifest, many WORKERS</h2>
+  <p>One keeper runs one agent. To run several agents on their own cadences,
+  you point <code>WB_CREW_DEF</code> at a manifest — an org file where each
+  heading is an agent and its drawer is the config. The two are mutually
+  exclusive: if the crew variable is set it wins; otherwise the single keeper
+  runs; if neither is set, nothing starts. Here's the manifest, verbatim in
+  shape:</p>
+  <pre class="orgsample">* wren
+:PROPERTIES:
+:DEF: /data/agents/writer.org
+:LIFECYCLE: /data/lifecycles/writer.org
+:INTERVAL: 10m
+:END:
+The writer: drafts new sections on its lifecycle.
+
+* moss
+:PROPERTIES:
+:DEF: /data/agents/editor.org
+:INTERVAL: 20m
+:END:</pre>
+  <p>Each heading becomes one supervised worker. <code>:DEF:</code> is
+  required — a member without it is skipped and logged. <code>:LIFECYCLE:</code>
+  is optional; absent, the agent just ticks on its interval.
+  <code>:INTERVAL:</code> accepts <code>10m</code>, <code>2h</code>,
+  <code>90s</code>, or bare milliseconds, defaulting to an hour. Each
+  worker's cadence state is namespaced — <code>keeper-last-run-wren</code>,
+  <code>lifecycle-pos-wren</code> — so the agents tick independently with no
+  shared clock. Two things keep a crew from stampeding the engine at boot
+  and the model under load:</p>
+  <pre class="mermaid">
+flowchart TD
+  sup["crew supervisor"]
+  sup --> gate["the gate · max 2 concurrent"]
+  sup --> w1["wren · first tick +0s"]
+  sup --> w2["moss · first tick +30s — stagger"]
+  sup --> w3["a third worker · +60s"]
+  w1 -- acquire --> gate
+  w2 -- acquire --> gate
+  w3 -. "queued — gate full" .-> gate
+  style gate fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style w3 fill:#d9dbd3,stroke:#121316
+  </pre>
+  <p>First, the <b>stagger</b>: the i-th worker's first tick is delayed by
+  i times thirty seconds, so agents overlap on the wire but don't all wake
+  at once. Second, the <b>concurrency gate</b> — the first supervised child —
+  admits at most two runs (by default) and queues the rest; each worker
+  acquires before its run and releases after, even on a crash, so a wedged
+  worker can never starve the others. One last truth about crews: when two
+  agents could grab the same task, the runtime does <b>not</b> lock it.
+  Claiming is a def-level protocol — a board state change plus an
+  <code>:AGENT:</code> property committed to git <em>before</em> the work.
+  The runtime only isolates runs and throttles concurrency; it does not
+  arbitrate who owns a task.</p>
+</section>
+
+<section id="lifecycle">
+  <h2>declaring what a tick IS</h2>
+  <p>Depth rung. So far a tick has been opaque — &quot;run the agent.&quot;
+  A <b>lifecycle</b> makes the cadence itself declarative: a deterministic
+  state machine, written in native org, that runs one transition per tick.
+  The skeleton is deterministic; what the agent does inside a state stays as
+  open-ended as any agent run. Each heading is a state, and its drawer
+  configures it: <code>:KIND:</code> is <code>wake</code> (run the agent) or
+  <code>rem</code> (dream — no agent); <code>:REPEAT: N</code> holds the
+  state for N successful ticks; <code>:NEXT:</code> names the successor;
+  <code>:MIN-INTERVAL:</code> is a time gate — a tick before the interval is
+  a no-op and the position holds; <code>#+START:</code> picks the first
+  state. Here's the canonical shape as a loop:</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> wake_add
+  wake_add --> wake_add: REPEAT 3
+  wake_add --> wake_audit: after 3 hits
+  wake_audit --> rem
+  rem --> wake_plan: gated — MIN-INTERVAL 10m
+  wake_plan --> wake_add: loop
+  </pre>
+  <p>Read it as a story: the agent wakes to add three times, then wakes once
+  to audit what it added, then enters a rem state to dream — but only after
+  ten minutes have actually passed — then wakes to plan, and loops back to
+  adding. The stepping rules are precise. A <code>:done</code> increments
+  the hit count; at <code>:REPEAT:</code> it takes <code>:NEXT:</code> and
+  resets. A <code>:no_work</code> collapses the remaining repeats and takes
+  <code>:NEXT:</code> now — a fast-forward of repeats only, never a skip:
+  every state in the declared order still runs, so audits and dreams keep
+  their cadence. A <code>:failed</code> or <code>:killed</code> holds the
+  position and retries the same state next tick — the cadence position is
+  never lost. The position survives restarts, written as
+  <code>state hits</code> to the data volume; an unknown persisted state
+  resets to the spec's start. And the spec is re-read every tick, kept
+  deliberately dumb, so a hot edit is picked up on the next beat.</p>
+</section>
+
+<section id="honest">
+  <h2>where it BITES</h2>
+  <p>Honesty section, and this one corrects something. Repeater prefixes are
+  <b>recognized, not computed</b>. The kernel sees that <code>+1w</code>,
+  <code>.+1d</code>, and <code>++1w</code> are repeaters and carries them as
+  strings, but no code in the runtime distinguishes their org-mode
+  semantics — that <code>+</code> shifts by the interval, <code>++</code>
+  shifts to the future, <code>.+</code> measures from the completion date.
+  Those meanings live in the agent's understanding of org, honored at agent
+  level, never in engine code. Likewise the <code>:SCHEDULE:</code> cron
+  string is uninterpreted data — nothing in this runtime parses it.</p>
+  <p>The parent lesson said a passed <code>DEADLINE</code> on a TODO is
+  &quot;a fact the validator reports.&quot; We'll correct that here: the
+  kernel validator checks DAG facts — missing-language components and
+  dangling inputs with no upstream producer — not time facts. Overdue is
+  <b>arithmetic the reader runs</b> on the parsed headlines, not a
+  diagnostic the kernel emits. The structure is checkable; whether a date
+  has passed is something you compute, not something the validator hands you.</p>
+  <p>And keeper time is <b>at-least, never at-most</b>. A
+  <code>+1w</code> at 09:00 does not fire at 09:00 sharp — it fires within a
+  tick of it, when an agent that read the plan next wakes.
+  <code>:MIN-INTERVAL:</code> means &quot;no earlier than,&quot; never
+  &quot;exactly at.&quot; The engine's own duration grammar only knows
+  seconds, minutes, and hours — no days or weeks in keeper intervals, unlike
+  org repeaters, which the kernel happily carries because it never has to do
+  the math. Last: cadence is not autonomy. A keeper makes follow-through
+  cheap; it does not make judgment optional. The pitch is never software
+  that runs itself — direction stays human, and the keeper is just the part
+  that shows up on time.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Will <code>+1w</code> fire at exactly 9:00?</summary>
+    <p>No — within a tick of it. The keeper doesn't read your timestamp and
+    fire at that instant; it wakes an agent on a cadence, and the agent reads
+    the plan and acts on what's due. If the keeper is on an hourly interval,
+    &quot;9:00&quot; means &quot;the first tick at or after 9:00.&quot;
+    Keeper time is at-least, not at-most.</p>
+  </details>
+  <details>
+    <summary>What's the difference between <code>+</code>, <code>.+</code>, and <code>++</code>?</summary>
+    <p>In org convention: <code>+</code> shifts by the interval,
+    <code>++</code> shifts forward until the next future date, and
+    <code>.+</code> measures from the completion date. But the kernel only
+    <em>recognizes</em> the prefix and carries the string verbatim — it
+    doesn't compute the next occurrence. The agent honors the meaning; the
+    kernel just carries it.</p>
+  </details>
+  <details>
+    <summary>SCHEDULED versus DEADLINE?</summary>
+    <p>SCHEDULED is an appointment — when to start. DEADLINE is a due date —
+    when it's owed. The parser surfaces both on every headline, but only
+    SCHEDULED feeds the headline's <code>schedule</code> (after the
+    <code>:SCHEDULE:</code> cron property, which outranks it). DEADLINE is
+    there to be read and reasoned about — overdue is arithmetic you run.</p>
+  </details>
+  <details>
+    <summary>Keeper or external cron — when each?</summary>
+    <p>The keeper exists for internal-only control planes a public cron can't
+    reach — it carries its own heartbeat on-box. When you <em>can</em> reach
+    the HTTP surface, a triggered drain is the leaner shape: any scheduler —
+    cron, a <code>machine exec</code>, CI — hits the endpoint and no
+    always-on poller idles on an empty backlog. The
+    <a href="autopoet">autopoet</a> is the worked example of that triggered
+    shape.</p>
+  </details>
+  <details>
+    <summary>Do crew agents fight over tasks?</summary>
+    <p>The runtime doesn't let them collide — it isolates runs and caps
+    concurrency at the gate — but it does not lock tasks either. Claiming is
+    a def-level protocol: an agent changes the board state and commits an
+    <code>:AGENT:</code> property to git before doing the work. Coordination
+    is a convention the agents follow, enforced by the plan being shared and
+    versioned, not by a runtime lock.</p>
+  </details>
+  <details>
+    <summary>What survives a redeploy?</summary>
+    <p>Two small files on the engine's data volume: the last-run timestamp
+    (so the cadence clock isn't reset — the first tick after restart is
+    <code>max(60s, interval − elapsed)</code>) and, if you run a lifecycle,
+    its position as <code>state hits</code>. A redeploy resumes the rhythm
+    rather than restarting it.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Schedules stand on the plan above them and the engine beneath them —
+  follow either direction.</p>
+  <div class="cards">
+    <a href="workflows"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
+      <div>Workflows<small>the plan that holds the time</small></div><span class="go">→</span></a>
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>who the keeper actually runs</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>Nexus<small>the docked engine that ticks</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>the triggered-drain alternative</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workflows · schedules
+  :PROPERTIES:
+  :SLUG:   schedules
+  :KIND:   learn
+  :NN:     08.3
+  :KICKER: under workflows · schedules
+  :TITLE1: time the
+  :TITLE2: ENGINE
+  :TITLE3: honors
+  :CHIP:   schedules
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/schedules-hero.jpg
+  :END:
+** og
+- declared time compiles to data: { at, repeat, active }
+- a keeper ticks; an agent reads the plan and honors it
+- at-least, never at-most — and never software that runs itself
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .36], ["#aee5c2", .24], ["#9fc4e8", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

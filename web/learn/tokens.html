@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en" style="--pc:#aee5c2; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tokens — three lifetimes, one rule — Workbooks</title>
+<meta name="description" content="A deployed engine mints three different credentials with three deliberately different lifetimes — the desktop token rotates every boot, the cloud bearer is minted once per deployment, the signing seed is minted once per identity. Rotation cost is the design input.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/tokens-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="tokens — three lifetimes, one rule">
+<meta property="og:description" content="Three credentials, three deliberately different lifetimes. The lifetime of a token is the blast radius of rotating it — so the system rotates the cheap one constantly and refuses to rotate the catastrophic one by accident.">
+<meta property="og:url" content="https://workbooks.sh/learn/tokens">
+<meta property="og:image" content="https://workbooks.sh/og/tokens.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="tokens — three lifetimes, one rule">
+<meta name="twitter:description" content="Three credentials, three deliberately different lifetimes. Rotation cost is the design input — rotate the cheap one constantly, never rotate a name.">
+<meta name="twitter:image" content="https://workbooks.sh/og/tokens.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/tokens.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+   * DONE mint the bearer once — never rotate it on apply        :secrets:
+     rotation would 401 every live client at once. that is not hygiene,
+     that is an outage you scheduled for yourself.
+   * NOTE the lifetime of a credential is the blast radius of rotating it.
+     desktop token: rotate every boot (breaks nothing).
+     cloud bearer:  rotate once per deploy (breaks every client).
+     signing seed:  never rotate (it is a name, not a password).
+   * the signing key is not a credential. it is who the engine IS.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 02·14 — <b>under nexus · tokens</b></div>
+      <h1><span class="ln">three lifetimes</span><span class="ln bub">ONE</span><span class="ln">rule</span></h1>
+      <p class="dek">A deployed engine mints three credentials, and the security
+      reflex you were trained on — <b>rotate everything</b> — is wrong for two of
+      them. The lifetime of a token is the <b>blast radius of rotating it</b>. Where
+      rotation is free, it happens every boot. Where it's catastrophic, the system
+      makes generation idempotent so you <b>can't</b> rotate by accident.</p>
+      <div class="meta">
+        <span class="on">tokens</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/tokens-hero.jpg" alt="A small figure standing before three monumental keys floating in a vault of green light — one key dissolving and reforming endlessly, one struck once and locked behind glass, one engraved with a name and set in stone — 1970s sci-fi style, bright, monumental scale against the small figure">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><b>⚷</b></div><span>tokens</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Rotate everything — until it breaks you</a>
+  <a href="#definition">Three tokens, three lifetimes</a>
+  <a href="#first-apply">The once machine</a>
+  <a href="#the-lock">One env var locks the plane</a>
+  <a href="#presenting">The client half</a>
+  <a href="#before-credentials">Reading the rung first</a>
+  <a href="#the-rotating-one">The one that does rotate</a>
+  <a href="#signing-key">The token that is a name</a>
+  <a href="#when-you-must">Rotating anyway</a>
+  <a href="#limits">What this isn't</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>rotate everything — until it BREAKS you</h2>
+  <p>You deployed an engine to your own cloud, and now two anxieties collide.
+  One: it's on the public internet — what's the lock? Two: the hygiene reflex
+  everyone's been trained on — <em>rotate your credentials, regularly, on a
+  schedule</em>. Workbooks does something that looks heretical against that
+  second instinct. It generates the engine's bearer token <b>once</b>, and then
+  refuses to rotate it.</p>
+  <p>Here's what rotating a deployed engine's bearer actually does. Every live
+  client holding the old token — your CLI, your CI job, the script on the cron,
+  the teammate who wired it into their shell — gets a <code>401</code> at the
+  same instant. There is no overlap window. Rotation isn't hygiene here; it's an
+  outage you scheduled for yourself. The code says so in a comment, verbatim:
+  <i>never rotate on subsequent applies — rotation would 401 all live
+  clients</i>.</p>
+  <p>Rotating the signing key is worse. That one doesn't lock anyone out — it
+  <b>un-signs your history</b>. Every artifact and ledger the engine ever
+  produced was attributed to a cryptographic identity derived from that key;
+  regenerate it and every prior signature stops verifying against the engine's
+  new name. The chain survives; the attribution dies. That asymmetry is the most
+  concrete sentence on this page, and we'll earn it below.</p>
+</section>
+
+<section id="definition">
+  <h2>three tokens, three LIFETIMES</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">to·ken</span> <span class="pr">/ˈtoʊ·kən/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a credential an engine mints, whose
+    <b>lifetime is the blast radius of rotating it</b> — minted constantly when
+    rotation costs nothing, minted once when rotation would cost everything.</p>
+  </div>
+  <p>The Nexus mints three, and they are not the same kind of thing wearing
+  three names. Each has different entropy, a different lifetime, and a different
+  consequence if you rotate it. Read the last column first — it explains every
+  other column:</p>
+  <table class="cmp">
+    <tr><th>credential</th><th>minted by</th><th>entropy</th><th>lifetime</th><th>what rotation breaks</th></tr>
+    <tr><td>desktop per-boot token</td><td>the local runtime, each boot</td><td>24 bytes, base64url</td><td class="y">every boot</td><td class="y">nothing — the shell re-reads a file on the same disk</td></tr>
+    <tr><td><b>WB_PUBLIC_BEARER</b></td><td>the deploy kit, on first apply</td><td>32 bytes, hex (256-bit)</td><td>once per deployment</td><td class="n">every live client holding it, at once</td></tr>
+    <tr><td><b>WB_SIGNING_KEY</b></td><td>you, once, ever</td><td>32-byte Ed25519 seed</td><td>once per identity</td><td class="n">every signature and ledger the engine ever produced</td></tr>
+    <tr><td>JWT (the OIDC rung)</td><td>your identity provider</td><td>per-user, signed claims</td><td class="y">constantly, by design</td><td>nothing — short-lived, re-minted on every login</td></tr>
+  </table>
+  <p>Notice the symmetry at the two ends of that table. The desktop token and
+  the JWT rotate maximally — and rotation breaks nothing for either, because
+  neither has to be distributed to clients who'd be caught holding a stale copy.
+  The two in the middle are the dangerous ones, and they're the two the system
+  mints exactly once. <b>Lifetime tracks blast radius.</b> That's the whole
+  lesson; everything below is mechanism.</p>
+</section>
+
+<section id="first-apply">
+  <h2>the ONCE machine</h2>
+  <p>The cloud bearer is born on your first <code>wbx deploy apply</code> to any
+  non-local target — before the provider recipe ever runs <code>up</code>. The
+  function is <code>ensure_cloud_bearer</code>, and the word <em>ensure</em> is
+  load-bearing: it doesn't generate, it <b>guarantees one exists</b>. Run it a
+  hundred times and you get exactly one token.</p>
+  <p>The logic is a single fork. If <code>secrets.env</code> already holds a
+  <code>WB_PUBLIC_BEARER</code> key, it returns an empty string — no notice, no
+  change, silence. Otherwise it fills 32 bytes from <code>OsRng</code>,
+  hex-encodes them to a 64-character lowercase string, saves it to
+  <code>secrets.env</code>, and prints a one-time human notice. The "no" branch
+  loops back to reuse and says nothing:</p>
+  <pre class="mermaid">
+flowchart TD
+  apply["wbx deploy apply<br/>(non-local target)"] --> check{"WB_PUBLIC_BEARER<br/>already in secrets.env?"}
+  check -- "yes" --> reuse["return empty string<br/>— reuse, say nothing"]
+  check -- "no" --> mint["OsRng → 32 bytes → 64 hex chars"]
+  mint --> save["secrets_save → secrets.env<br/>chmod 0600"]
+  save --> notice["print the one-time notice<br/>export WB_ENGINE_TOKEN=…"]
+  reuse --> up["provider recipe runs 'up'"]
+  notice --> up
+  style apply fill:#aee5c2,stroke:#121316,stroke-width:2.5px
+  style mint fill:#13d943,stroke:#121316
+  style reuse fill:#d9dbd3,stroke:#121316
+  style notice fill:#ffffff,stroke:#121316
+  </pre>
+  <p>The 32 bytes come from <code>OsRng.fill_bytes</code> — 256 bits of operating
+  system entropy, the same source you'd seed a private key from. There's no
+  structure to it: no header, no claims, no expiry baked in. It's a pure shared
+  secret, and that simplicity is deliberate — we'll come back to why hex beats a
+  JWT here. The file it lands in lives in the <code>wbx</code> app dir, not your
+  project dir, and it's chmod'd <code>0600</code> the moment it's written.</p>
+  <p>The notice text is the only time you'll ever see the token printed, and the
+  writer of that text was careful to make a promise in it. Here's the first
+  apply, and then the same command run again:</p>
+  <pre class="orgsample">$ wbx deploy apply
+==&gt; [fly] deploying my-workbooks-engine (ghcr.io/workbooks-sh/runtime:latest)
+url: https://my-workbooks-engine.fly.dev
+
+control-plane locked — bearer token generated and persisted in secrets.env.
+To talk to your engine locally, set:
+  export WB_ENGINE_TOKEN=9f2c61a8…e4b7   <i>← 64 hex chars, 256 bits, OsRng</i>
+(stored in ~/…/secrets.env — will NOT be regenerated on future applies)
+
+$ wbx deploy apply        <i># run it again</i>
+==&gt; [fly] deploying my-workbooks-engine (…)
+url: https://my-workbooks-engine.fly.dev
+                          <i># no notice. same token. idempotent.</i></pre>
+  <p>That second run is the whole point of the machine. <b>Will NOT be
+  regenerated</b> is not a hope — it's the silent reuse branch of the fork above,
+  executing. You cannot rotate this token by re-deploying, because the system was
+  built so that the most natural thing you'd do — apply again — leaves it
+  untouched.</p>
+</section>
+
+<section id="the-lock">
+  <h2>one env var locks the PLANE</h2>
+  <p>Persisting the token isn't enough on its own — it gets forwarded into the
+  engine's environment as <code>WB_PUBLIC_BEARER</code> (Fly stages it; the
+  deploy releases it). And the instant that variable is set and non-empty, the
+  engine's auth posture changes. There's no separate "enable auth" switch.
+  <b>The presence of the env var is the lock.</b> One knob.</p>
+  <p>Inside the engine, every request runs a five-rung ladder, first match wins.
+  Picture a request arriving and falling down it. Rung one: is the path on the
+  public allowlist — <code>/health</code>, the two well-known docs? Then it's
+  open, always. Rung two: is this the desktop app presenting its per-boot token?
+  Rung three: is the plane locked, and does the bearer match? Rung four: is there
+  a valid OIDC JWT? Rung five — and only when the plane is <em>not</em> locked
+  and <em>not</em> multi-tenant — the dev <code>x-tenant</code> header:</p>
+  <pre class="mermaid">
+flowchart TD
+  req["incoming request"] --> r1{"path on public<br/>allowlist?"}
+  r1 -- "yes" --> open["200 — always open<br/>(/health, well-known docs)"]
+  r1 -- "no" --> r2{"desktop per-boot<br/>token? (WB_DESKTOP=1)"}
+  r2 -- "match" --> okdesk["200 — desktop"]
+  r2 -- "no" --> r3{"locked? AND<br/>bearer matches?"}
+  r3 -- "no bearer, locked" --> deny401["401 authentication required<br/>— NO dev fallback"]
+  r3 -- "wrong bearer" --> deny["401 unauthorized"]
+  r3 -- "match" --> oktenant["200 — tenant = WB_TENANT"]
+  r3 -- "not locked" --> r4{"valid OIDC JWT?"}
+  r4 -- "yes" --> okjwt["200 — per-user"]
+  r4 -- "no" --> r5["dev x-tenant fallback<br/>(only when unlocked + single-tenant)"]
+  style open fill:#d9dbd3,stroke:#121316
+  style oktenant fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style deny401 fill:#f3c5a3,stroke:#121316
+  style deny fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>The bearer comparison is <code>secure_compare</code> — constant-time, so a
+  wrong guess leaks no timing about how many leading characters were right. On a
+  match, the request's tenant becomes <code>WB_TENANT</code> (default
+  <code>local</code>); any other bearer is a flat <code>401 unauthorized</code>.
+  And the line that matters most for your mental model: the moment the lock
+  exists, <b>the dev <code>x-tenant</code> fallback dies</b>. A locked engine
+  with no bearer presented returns <code>401 authentication required</code> with
+  no fallback whatsoever. Setting the env var didn't add a layer on top of dev
+  mode — it ended dev mode.</p>
+  <p>You can watch the whole ladder with three curls against a locked engine:</p>
+  <pre class="orgsample">$ curl https://my-workbooks-engine.fly.dev/health                  <i># public allowlist</i>
+ok
+$ curl https://my-workbooks-engine.fly.dev/api/library             <i># no bearer</i>
+401 {"error":"authentication required"}                            <i># locked ⇒ no dev fallback</i>
+$ curl -H "Authorization: Bearer wrong" …/api/library
+401 {"error":"unauthorized"}                                       <i># secure_compare failed</i>
+$ curl -H "Authorization: Bearer $WB_ENGINE_TOKEN" …/api/library
+200 …                                                              <i># tenant = WB_TENANT</i></pre>
+  <p>The <code>/gk/*</code> paths sit outside this ladder entirely — the
+  groundskeeper router enforces its own credential and fails closed — but for
+  every ordinary capability, that ladder is the law.</p>
+</section>
+
+<section id="presenting">
+  <h2>the client HALF</h2>
+  <p>The engine reads the secret as <code>WB_PUBLIC_BEARER</code>. Clients
+  present the very same secret under a different name: <code>WB_ENGINE_TOKEN</code>.
+  Same 64 hex characters, two roles — one is the lock's combination, the other is
+  you dialing it. Both ride the standard <code>Authorization: Bearer &lt;token&gt;</code>
+  header.</p>
+  <p>The CLI resolves where to talk and what to present in one step. If
+  <code>WB_ENGINE_URL</code> is set, it uses that endpoint and your
+  <code>WB_ENGINE_TOKEN</code> as the bearer. Otherwise it reads the local
+  discovery file and uses the token written there. The handshake is identical
+  either way — the difference is only <em>which</em> engine and <em>which</em>
+  token:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as wbx (client)
+  participant E as engine (locked)
+  Note over C: WB_ENGINE_URL + WB_ENGINE_TOKEN set
+  C->>E: GET /api/library  (no Authorization)
+  E-->>C: 401 authentication required
+  Note over C: attach Authorization: Bearer $WB_ENGINE_TOKEN
+  C->>E: GET /api/library  (Bearer …e4b7)
+  E->>E: secure_compare(token, WB_PUBLIC_BEARER)
+  E-->>C: 200  (tenant = WB_TENANT)
+  </pre>
+  <p>When the token is wrong or missing, the CLI doesn't bury the failure. It
+  exits with a dedicated auth code whose message tells you the two ways out:
+  <i>the engine rejected your credentials — set WB_ENGINE_TOKEN, or re-run wbx
+  deploy local to refresh discovery</i>. If you got a <code>401</code> wiring a
+  script into CI, that's the sentence to read — either the token's stale, or
+  you're pointed at a cloud engine without exporting it.</p>
+  <p>There's a small piece of dogfooding worth naming: when an apply carries a
+  <code>#+DEPLOY_TOOLKITS:</code> push, the kit sets <code>WB_ENGINE_URL</code>
+  for itself mid-apply and talks to the engine it just locked — eating its own
+  token, the same way any client would.</p>
+</section>
+
+<section id="before-credentials">
+  <h2>reading the rung FIRST</h2>
+  <p>Depth rung — skippable. There's a chicken-and-egg buried in the ladder: a
+  client needs to know <em>which</em> credential an engine wants before it can
+  present one. The allowlist solves it. Three paths are always open, regardless
+  of lock state, and one of them is the capabilities doc at
+  <code>/.well-known/workbooks-runtime</code>. A client reads it with zero
+  credentials to learn the rung it must satisfy <em>before</em> it has one.</p>
+  <p>The doc is plain JSON. The <code>auth.rung</code> field tells you the
+  posture — <code>trusted</code> for a shared-bearer engine, <code>oidc-jwt</code>
+  for one fronted by an identity provider — and an <code>issuer</code> is only
+  advertised when a verifier is actually configured:</p>
+  <pre class="orgsample">$ curl https://my-workbooks-engine.fly.dev/.well-known/workbooks-runtime
+{ "auth": { "rung": "trusted" },
+  "tenancy": "single",
+  "transports": { "http": …, "ws": … },
+  "capabilities": ["oql","workflow","instances","workbook",
+                   "agent","library","search","publish","browse","telemetry"] }</pre>
+  <p>The JSON is the diagram. A client that reads it knows, before risking a
+  single guarded request, that this engine speaks the trusted rung — so it had
+  better have a bearer ready — and exactly which capabilities it can ask for once
+  it's in.</p>
+</section>
+
+<section id="the-rotating-one">
+  <h2>the one that DOES rotate</h2>
+  <p>Depth rung — skippable, but it's the contrast that proves the whole thesis.
+  The desktop app's runtime mints a fresh token <b>every single boot</b>: 24
+  bytes from <code>strong_rand_bytes</code>, base64url, memoized in memory for
+  the life of the process. New every time the app starts. By the hygiene reflex,
+  this is the model citizen — maximal rotation.</p>
+  <p>But ask why it can rotate so freely. The token is written to a discovery
+  file — <code>runtime.json</code> — on the same local disk the Tauri shell reads
+  from. There's no client across a network holding a stale copy. When the token
+  changes, the shell simply re-reads the file. <b>Rotation has no distribution
+  problem here, so it has no rotation problem.</b> The desktop token rotates
+  maximally for exactly the reason the cloud bearer can't: nobody is downstream
+  of it but a sibling process on the same machine. (It's accepted only when
+  <code>WB_DESKTOP=1</code> — rung two of the ladder — so it can never be
+  confused for the cloud bearer.)</p>
+  <p>Put the two side by side and the design principle is undeniable. Same idea —
+  a random token a runtime mints — two opposite rotation policies, and the only
+  variable that flipped is whether anyone has to be told the token changed.</p>
+</section>
+
+<section id="signing-key">
+  <h2>the token that is a NAME</h2>
+  <p>The third credential isn't a password at all. <code>WB_SIGNING_KEY</code> is
+  a 32-byte Ed25519 seed, and from it the engine deterministically regrows the
+  same keypair on every redeploy. That keypair <em>is</em> the engine's identity
+  — its <code>did:key:z6Mk…</code>, the same decentralized-identifier form
+  Radicle and the W3C DID spec use. Rotate it and you haven't changed a lock,
+  you've become a different person.</p>
+  <p>Here's why it matters, mechanically. The keystore lives on the container
+  filesystem, which is <b>wiped on every redeploy</b>. Without a persisted seed,
+  each redeploy mints a brand-new keypair — a new DID. And every run your engine
+  has ever sealed records the DID it was signed under. A run's step log is hashed
+  into a hash-chained ledger whose head is signed; verification checks two
+  separate properties — <code>tamper_evident</code> (is the chain intact?) and
+  <code>attributable</code> (does the signature match the recorded DID?). Walk
+  the fork:</p>
+  <pre class="mermaid">
+flowchart TD
+  redeploy["redeploy<br/>(container fs wiped)"] --> seed{"WB_SIGNING_KEY<br/>persisted?"}
+  seed -- "yes" --> regrow["deterministically regrow<br/>same keypair from seed"]
+  regrow --> same["did:key:z6Mk… UNCHANGED"]
+  same --> verify1["old _ledger.json:<br/>tamper_evident ✓  attributable ✓"]
+  seed -- "no" --> mint["mint a fresh keypair"]
+  mint --> diff["did:key changes"]
+  diff --> verify2["old _ledger.json:<br/>tamper_evident ✓  attributable ✗"]
+  style same fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style diff fill:#f3c5a3,stroke:#121316
+  style verify1 fill:#aee5c2,stroke:#121316
+  style verify2 fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>Read the two leaves. With the seed, the DID is unchanged and every prior
+  ledger still verifies on both counts. Without it, the chain is <em>still
+  intact</em> — <code>tamper_evident</code> passes, nobody touched the data — but
+  <code>attributable</code> fails for every prior ledger, because the recorded
+  DID no longer matches the engine's key. One redeploy, all history orphaned. The
+  chain survives; the attribution dies. That's the asymmetry from the top of the
+  page, made literal.</p>
+  <p>The same key wears two DID forms over one identity. The
+  <code>did:web</code> document served at <code>/.well-known/did.json</code> lifts
+  the <code>publicKeyMultibase</code> straight from the <code>did:key</code> and
+  lists the <code>did:key</code> under <code>alsoKnownAs</code> — a signature
+  verifies under either. You pin the seed once, before anything signs, and the
+  identity holds across every redeploy after:</p>
+  <pre class="orgsample">$ elixir -e 'IO.puts(Base.encode64(:crypto.strong_rand_bytes(32)))'
+nq3K…0Yw=
+$ wbx deploy secrets set WB_SIGNING_KEY=nq3K…0Yw=
+staged 1 secret(s) — applied on next `wbx deploy apply`
+$ curl https://my-workbooks-engine.fly.dev/.well-known/did.json
+{ "id":"did:web:my-workbooks-engine.fly.dev",
+  "verificationMethod":[{"type":"Ed25519VerificationKey2020","publicKeyMultibase":"z6Mk…"}],
+  "alsoKnownAs":["did:key:z6Mk…"], … }</pre>
+  <p>One honest caveat lives here: today only the <b>primary tenant's</b> key is
+  seed-pinned (<code>WB_PRIMARY_TENANT</code>, default <code>dev</code>). Other
+  tenants' keys still regenerate on redeploy — an acknowledged gap, with
+  bring-your-own-storage as the next focus. If you're single-tenant, the seed
+  covers you completely.</p>
+</section>
+
+<section id="when-you-must">
+  <h2>rotating ANYWAY</h2>
+  <p>Sometimes you genuinely must rotate the bearer — it leaked, someone left,
+  the laptop with <code>secrets.env</code> on it walked off. There is, very
+  deliberately, <b>no <code>rotate</code> verb</b>. The absence is the design,
+  not an omission. You do it by hand, and the manual steps make you feel the
+  blast radius the system is protecting you from:</p>
+  <table class="cmp">
+    <tr><th></th><th>bearer rotation (possible, manual)</th><th>signing-key &ldquo;rotation&rdquo; (don't)</th></tr>
+    <tr><td>step 1</td><td><code>wbx deploy secrets unset WB_PUBLIC_BEARER</code></td><td class="n">there is no step — you don't rotate a name</td></tr>
+    <tr><td>step 2</td><td><code>wbx deploy apply</code> → ensure_cloud_bearer mints a new one</td><td class="n">a new seed is a new engine, identity-wise</td></tr>
+    <tr><td>step 3</td><td>redistribute <code>WB_ENGINE_TOKEN</code> to every client</td><td class="n">every prior ledger goes un-attributable</td></tr>
+    <tr><td>cost</td><td class="n">every client 401s until updated — no overlap window</td><td class="n">you don't become secure, you become someone else</td></tr>
+  </table>
+  <p>The bearer path works because <code>unset</code> removes the key, so the
+  next apply's <code>ensure_cloud_bearer</code> sees no token and mints a fresh
+  one — the only way to deliberately get a new bearer. There's no automatic
+  overlap: old clients are rejected the moment the new secret takes effect, and
+  the exact sequencing of when Fly's staged secret releases is Fly's, not the
+  kit's — so don't assume atomicity. Plan the redistribution before you unset.</p>
+  <p>The signing key has no equivalent column on purpose. You don't rotate a
+  name. If you regenerate the seed, you haven't refreshed a credential — you've
+  disowned every signature the engine ever made. The right move is to <em>keep</em>
+  it, persisted and backed up, for the life of the identity.</p>
+</section>
+
+<section id="limits">
+  <h2>what this ISN'T</h2>
+  <p>Honesty section. The bearer is a <b>shared secret, not an identity</b>.
+  Everyone who presents it is the same tenant — <code>WB_TENANT</code>. There is
+  no per-user attribution under this rung; if you need to know <em>who</em> did
+  something, that's the JWT rung (rung four), with a real identity provider
+  behind it. Multi-tenant deployments require that rung — the shared bearer is a
+  single-tenant lock.</p>
+  <p>The token has <b>no scopes and no TTL</b>. It doesn't expire, it doesn't
+  carry permissions, it can't be narrowed to one capability. It's 256 bits of
+  randomness compared in constant time, full stop. That's a feature for what it's
+  for — there's nothing to parse, nothing to expire, nothing to get subtly wrong
+  — and a limit you should know: a leaked bearer is total access until you do the
+  manual rotation above.</p>
+  <p>And <code>secrets.env</code> is <b>plaintext on disk</b>, protected by
+  <code>0600</code> file permissions and nothing more. No encryption at rest
+  beyond the mode bits. Treat the file as the secret it contains: don't sync it to
+  a shared drive, don't commit it, and if the machine holding it is compromised,
+  rotate. These aren't bugs — they're the honest shape of a shared secret, and
+  knowing the shape is how you defend the design in a security review.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Where's my token? I lost the first-apply notice.</summary>
+    <p>It's in <code>secrets.env</code>, in the <code>wbx</code> app dir — the
+    notice prints the path. The file is plain <code>KEY=VALUE</code> lines.
+    <code>wbx deploy secrets list</code> shows key <em>names</em> only, never
+    values, so to read the actual token you open the file (it's yours, mode
+    0600). The notice is one-time; the file is forever.</p>
+  </details>
+  <details>
+    <summary>Do I set WB_SIGNING_KEY before first apply?</summary>
+    <p>Yes — before anything signs. The seed pins your DID; if the engine signs
+    its first ledger under an auto-generated key and you set the seed later, that
+    early history is attributed to the old, now-orphaned identity. Generate it
+    with <code>elixir -e 'IO.puts(Base.encode64(:crypto.strong_rand_bytes(32)))'</code>,
+    stage it, and apply.</p>
+  </details>
+  <details>
+    <summary>Is the bearer per-user?</summary>
+    <p>No. Everyone presenting it is tenant <code>WB_TENANT</code> — one shared
+    secret, one identity. Per-user means the JWT rung, with an identity provider
+    behind it. If your security model needs to attribute actions to people, the
+    bearer alone won't do it.</p>
+  </details>
+  <details>
+    <summary>What if secrets.env leaks?</summary>
+    <p>Rotate, manually: <code>wbx deploy secrets unset WB_PUBLIC_BEARER</code>,
+    then <code>wbx deploy apply</code> to mint a new one, then push the new
+    <code>WB_ENGINE_TOKEN</code> to every client. There's no overlap window, so
+    line up the redistribution first. If the signing seed leaked, that's a harder
+    conversation — you can't rotate a name without orphaning history.</p>
+  </details>
+  <details>
+    <summary>Why a hex string and not a JWT?</summary>
+    <p>Because there's nothing to expire and nothing to parse. A JWT carries
+    claims, a signature, and an expiry to verify on every request; this token
+    carries none of that because it doesn't need to — it's a constant-time
+    comparison against one env var. The simplicity is the security surface: fewer
+    moving parts, fewer ways to get it subtly wrong. When you outgrow a shared
+    secret, you don't add scopes to it — you move to the JWT rung.</p>
+  </details>
+  <details>
+    <summary>Can I rotate the bearer without taking clients down?</summary>
+    <p>Not cleanly. There's no overlap window and no <code>rotate</code> verb by
+    design — the manual <code>unset</code> + <code>apply</code> + redistribute
+    path means every client 401s until it's updated. Schedule the redistribution,
+    or front the engine with the JWT rung if you need rolling credentials.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Tokens are the credential mechanics under the Nexus — the lock on the plane
+  you deployed. Up one level, and out to what these tokens guard.</p>
+  <div class="cards">
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><b>◆</b></span>
+      <div>The Nexus<small>the engine these tokens lock — secrets stay inside it</small></div><span class="go">→</span></a>
+    <a href="secrets"><span class="sw" style="background:#f3c5a3"><b>🔑</b></span>
+      <div>Secrets<small>by-reference workload secrets — these were infrastructure ones</small></div><span class="go">→</span></a>
+    <a href="the-ledger"><span class="sw" style="background:#a8d4f0"><b>⛓</b></span>
+      <div>The Ledger<small>the hash-chained record the signing key keeps attributable</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under nexus · tokens
+  :PROPERTIES:
+  :SLUG:   tokens
+  :KIND:   learn
+  :NN:     02.14
+  :KICKER: under nexus · tokens
+  :TITLE1: three lifetimes
+  :TITLE2: ONE
+  :TITLE3: rule
+  :CHIP:   tokens
+  :PC:     #aee5c2
+  :AC:     #13d943
+  :HERO:   img/tokens-hero.jpg
+  :END:
+** og
+- three credentials, three deliberately different lifetimes
+- lifetime = blast radius of rotation; mint the cheap one constantly, never rotate a name
+- the cloud bearer locks the plane; the signing seed pins the DID
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#aee5c2", .36], ["#a8d4f0", .24], ["#f3c5a3", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

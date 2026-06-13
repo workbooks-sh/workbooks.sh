@@ -1,0 +1,71 @@
+{
+ "slug": "timestamps",
+ "title": "timestamps — under org",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "When, on the same line as what",
+   "text": "Lesson 04 point 4 — timestamps. A deep dive under org, the grammar. Here's the whole idea, up front. An org timestamp is a date a machine can act on… written one line under the work it schedules. Picture the canonical line — schedule, colon, angle bracket, two-thousand-twenty-six dash oh-six dash oh-six, the word Sat, oh-six hundred, plus-one-d, close bracket. That sits on the same headline as the code that runs. [curious] And an eighteen-line parser turns it into three fields — at, repeat, and active — that ride through every plan and every run record. This lesson is the grammar… and the honest path that data takes."
+  },
+  {
+   "id": "problem",
+   "title": "The crontab nobody reads",
+   "text": "First — the crontab nobody reads. Every system keeps when somewhere, and that somewhere is almost always unreadable. A crontab on a box no one logs into. A scheduler dashboard behind a console. A block of CI yaml with a five-field incantation at the top. And the plan, meanwhile, says every morning… in prose, in a doc or a ticket. So the machine's copy of that fact, and the human's copy, live in two different universes. [sighs] And they drift. The prose says daily, the cron says weekly, and the person who knew which was right left in March. The cost was never the syntax — five star-fields are learnable. The cost is the distance. Org closes the distance by refusing to move the schedule out of the plan. The when sits one line under the what. The timestamp isn't metadata about the plan… it's a fact in the plan."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. A timestamp is a date a machine can act on, written inline on the headline it belongs to. Angle brackets mean an appointment — something to fire. Square brackets mean a note — something recorded. And on a planning line it parses into three fields — at, repeat, active — and rides into every plan the kernel emits. It's a construct of the grammar, the same tree that holds headlines and tags and drawers. One thing to hold onto for later — a sibling lesson called schedules owns the engine that actually fires these. This page owns the grammar… and the data path. We'll hand off the clock at the end."
+  },
+  {
+   "id": "grammar",
+   "title": "The token classifier",
+   "text": "Now — the token classifier. The whole parser is about eighteen lines of Rust, and it does two things. It reads the first character to decide if the timestamp is active. Then it splits the inside on whitespace and sorts each token by its shape, first match wins. Picture each token falling through a funnel of three questions. First question — is it exactly ten characters with a dash at position four? If yes, it's the date — two-thousand-twenty-six dash oh-six dash oh-six. If no… second question — does it contain a colon? If yes, it's the time — oh-six hundred. If no… third question — does it start with a plus, a double-plus, or a dot-plus? If yes, it's the repeater — plus-one-d. And if a token answers no to all three… it's ignored. Tolerated, and dropped. That's where the day name, Sat, lands — and here's the quiet part. Sat is never checked against the date. A Sat written on a Wednesday parses without one word of complaint. [chuckles] Two consequences fall out of that ten-character rule. Two-thousand-twenty-six dash six dash six, with single digits, is only nine characters — so it matches nothing, and because a date is required, the whole timestamp silently evaporates. Always zero-pad. And what comes out the other end is exactly this and nothing more — at, two-thousand-twenty-six dash oh-six dash oh-six, T, oh-six hundred… repeat, plus-one-d… active, true. [exhales] The kernel reads shape, emits structure, and stops."
+  },
+  {
+   "id": "active-inactive",
+   "title": "One bracket, one bit",
+   "text": "One bracket, one bit. Active versus inactive is the first character, and nothing else. Angle brackets, active. Square brackets, inactive. The shapes inside are identical — only the door changed. And mismatched brackets, an angle opened and a square closed, match no arm and parse to nothing at all. Here's the line of the table that matters most. An inactive scheduled still flows all the way through. Write scheduled, colon, square-bracket two-thousand-twenty-six dash oh-eight dash oh-one, ten hundred, close-square — and the plan carries active, false. [curious] Recorded… not armed. The scheduling function does not filter on the active bit. It surfaces the fact and leaves the decision to whoever consumes it. The kernel records… the consumer decides. That's deliberate — the kernel's job is to never lose information, not to enforce policy."
+  },
+  {
+   "id": "scheduled-deadline",
+   "title": "Trigger versus fact",
+   "text": "Trigger versus fact. Two planning keywords carry timestamps, and they are not symmetric. Picture a small table with two rows. Row one — scheduled. It shows in query, it feeds the plan's schedule, and it is the trigger. Row two — deadline. It shows in query, but in the plan its schedule is always null, and it fires… nothing. The verdict in one line — both keywords are read and surfaced, but only scheduled can wake work. [curious] This is the single most common misconception about org time. People write a deadline and wonder why nothing ran. Nothing ran because a deadline was never a trigger. It's a date the validator measures against — overdue is simply now, greater-than, the deadline. And one more asymmetry — a timestamp written in body prose, just sitting in a paragraph, is not picked up as a schedule. Only the planning line, directly under the headline, feeds scheduled and deadline. A date in prose is documentation. A date on the planning line is structure."
+  },
+  {
+   "id": "repeaters",
+   "title": "The three repeaters",
+   "text": "Next — the three repeaters. This one's a depth rung, skip it if you like. A repeater is a token like plus-one-d that says — and again, on an interval. Org has three prefixes, and they mean three different things. Picture three rows. First… plus — shift from the old date by the interval. Miss it by three days, and the next fire is still tomorrow — fixed cadence, regardless of when you acted. Second… double-plus — shift until in the future. Miss it, and it jumps forward repeatedly past today, landing on the next still-future slot — no pile-up of missed fires. Third… dot-plus — shift from the completion date. Finish three days late, and the next one is three days later too — the clock restarts from when you actually finished. So the verdict — plus is fixed cadence, double-plus is catch-up-to-now, dot-plus is measured-from-done. And here is the crucial fact about the kernel. It carries all three verbatim, as opaque strings. [excited] It preserves the distinction… without ever computing the next fire. The meaning rides in the string — the scheduler reads it later."
+  },
+  {
+   "id": "cron-hatch",
+   "title": "The cron escape hatch",
+   "text": "The cron escape hatch. Another depth rung. Some schedules aren't calendar-shaped. Every weekday at six, or the first and the fifteenth — those want cron's five fields, not a single appointment with a repeater. For those, drop a schedule key into a properties drawer and write plain cron. Now picture a workflow that carries both — a scheduled timestamp of two-thousand-twenty-six dash oh-seven dash oh-one, nine hundred, double-plus-one-w… and in its drawer, a schedule property of zero six star star star. When both are present, the drawer wins. Query still reports the timestamp in full. But tangle resolves the world's schedule to cron, zero six star star star. [mischievously] One snippet, two lessons — who wins, and the difference between the two surfaces. Query shows what was written. Tangle shows what was resolved. The rule of thumb — calendar-shaped time, every morning, this Friday, wants a timestamp. Machine-shaped time, odd cadences a human would reach for cron to express, wants the schedule property."
+  },
+  {
+   "id": "through-the-plan",
+   "title": "Through the plan",
+   "text": "Through the plan. Let's follow one line from text to run record, and every hop is a named function — no magic to take on faith. Picture a relay of five handoffs. It starts at the scheduled line on a workflow headline. First hop — headline-of reads the planning line. Second — schedule-of resolves it, drawer first, then the timestamp, into the schedule field. Third — build-world attaches that field to every world it builds… and it builds them recursively. That third hop is the quietly important one. Because each world carries its own schedule, a monthly parent workflow can hold an hourly child, each on its own clock. The nesting lesson says that in a sentence — here's the mechanism, per-level schedules, because build-world recurses. Fourth hop — the run function puts the schedule into every run record and every summary, recursively through sub-workflows. So what a run thinks its schedule is… is always in the record, never reconstructed. And the fifth hop — you can read the whole plan without running it. Post to the workflow endpoint with plan equals one, and it returns the schedule and plan, and runs nothing."
+  },
+  {
+   "id": "checking",
+   "title": "Checking what it extracted",
+   "text": "Checking what it extracted. A depth rung — and a useful one, because you never have to guess what the machine read off your line. Three surfaces show it. Query shows the raw parse — the scheduled and deadline objects per headline. Tangle shows the resolved plan — the schedule on each world, after the drawer-versus-timestamp precedence runs. And the workflow endpoint with plan equals one returns that same plan over HTTP, without executing anything. Take the canonical example — nightly digest, a workflow scheduled two-thousand-twenty-six dash oh-six dash oh-six, oh-six hundred, plus-one-d, over a rust-to-js-to-go pipeline. Its two surfaces line up exactly — query reports scheduled, with active true, at the timestamp, repeat plus-one-d. Tangle reports the very same object, sitting under the first world's schedule. Now the case that catches everyone — a workflow with only a deadline of two-thousand-twenty-six dash oh-seven dash oh-four. Query shows the deadline parsed perfectly — it's right there. But tangle shows schedule… null. The deadline parsed fine, and the plan still won't fire, because a deadline was never a trigger. [sarcastic] If you expected a fire and got silence… that's the check that explains it in one read."
+  },
+  {
+   "id": "honest",
+   "title": "The kernel has no clock",
+   "text": "Now the honest part — the kernel has no clock. The grammar makes a promise the kernel deliberately does not keep. The kernel is pure in, pure out. No host calls. No clock. It cannot know what now is. [sighs] It can carry time as data… it cannot feel time pass. So what actually wakes a workflow? Today, something outside the kernel, with a clock of its own. The only callers of the run function in the host are the HTTP endpoint and the demos — there is no daemon walking org timestamps on a timer. The runtime's native clock is the keeper, but it ticks agent definitions on an interval, not org timestamps. So the live path is — the timestamp is parsed, surfaced in the plan and the run record, and then an external trigger does the waking. Cron, CI, or a machine exec hitting the workflow endpoint… or the keeper, by its interval. The parent workflows lesson says the engine fires these. This deep dive is more precise than its parent, on purpose — the engine can fire these, and the firing engine is the sibling lesson, schedules, not this one. A few smaller honest edges, all by construction. First — repeater math is the consumer's job. Plus-one-d rides through as a string. The kernel never computes the next fire. Second — time ranges survive as non-ISO strings. A token like oh-six hundred dash oh-seven thirty contains a colon, so it's kept whole as the time, even though that isn't valid ISO. The classifier matches on shape, not on validity. Third — no timezones, anywhere. The grammar has no timezone field. All time is engine-local. And fourth — org warning cookies, like minus-two-d on a deadline, match no arm and are silently dropped. Surfaced data only, never a behavior."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Why didn't my deadline run anything? Because a deadline was never a trigger. A deadline-only workflow resolves to schedule null. It's a date you measure against, not a clock. Move it to scheduled if you want it to fire. Do I need the day name, like Sat? No. It's decorative — tolerated, dropped, never validated against the date. A Sat on a Wednesday parses cleanly. What happens with single-digit dates, two-thousand-twenty-six dash six dash six? No timestamp at all. The rule is exactly ten characters with a dash at position four — nine characters matches nothing, and the whole timestamp silently drops. Always zero-pad. Which wins, the schedule property or scheduled? The drawer property wins — it's checked first, and falls back to the timestamp only if absent. And where are timezones? Nowhere in the grammar. All time is engine-local — zone-correct firing is a property of the engine that runs the plan, not of the timestamp."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to org",
+   "text": "So that's timestamps. A date a machine can act on, written on the line with the work — eighteen lines that read shape and emit structure, and a kernel that carries time without ever feeling it pass. [curious] The way back up is short. This is a deep dive under org, the grammar — go there for the whole file this one zooms into. And when you want the other half — the engine that actually fires these — that's the sibling lesson, schedules. This page held the grammar… that one holds the clock."
+  }
+ ]
+}

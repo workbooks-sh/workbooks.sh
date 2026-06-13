@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en" style="--pc:#a8d4f0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>publishing — shipping without deploying — Workbooks</title>
+<meta name="description" content="Publishing puts an already-assembled workbook on a surface — a static host, a git branch, your own engine. Distribution only: one config file, three verbs, three doors, and a hard rule about what may never touch a public host. A sub-lesson under workbook.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/publishing-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="publishing — shipping without deploying">
+<meta property="og:description" content="The artifact is already finished software, so publishing is just putting bytes where a URL points. publish.org, three verbs, three targets — and the anti-leak rule.">
+<meta property="og:url" content="https://workbooks.sh/learn/publishing">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    $ wbx publish apply this-page.org
+    error: publish ships ASSEMBLED workbooks — run `wb bundle this-page.org` first
+
+    assembly happens before the doorstep. publish IS the doorstep:
+    one finished file, renamed index.html, put where a URL points.
+    no build ran on the server that handed you this page. the file
+    was smart enough that the surface could be dumb.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 01·8 — <b>under workbook · publishing</b></div>
+      <h1><span class="ln">put the file</span><span class="ln bub">WHERE A URL</span><span class="ln">points</span></h1>
+      <p class="dek">You built a <a href="workbook">workbook</a>. Now you want a link to
+      send. Every habit from modern web development calls that <em>deployment</em> — CI,
+      an account, a build pipeline — and there's even a <code>wb deploy</code> nearby to
+      confuse you. <b>Publish is none of that.</b> Because the artifact is already finished
+      software, publishing is just putting bytes where a URL points: one config file, three
+      verbs, three doors — and one hard rule about what may never touch a public host.</p>
+      <div class="meta">
+        <span class="on">the doorstep</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/publishing-hero.jpg" alt="A small figure on a bright launch apron sliding one glowing finished panel into the single open slot of a monumental signpost tower, whose three arms point off to a static billboard, a git branch flag, and a distant lit engine — a custom-domain banner unfurling above — 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../wb-file-icon.svg" alt=""></div><span>publishing</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Which command makes it a URL?</a>
+  <a href="#definition">The definition</a>
+  <a href="#declare">publish.org — the declared surface</a>
+  <a href="#converge">init · validate · apply</a>
+  <a href="#bundle-first">Why .org is refused</a>
+  <a href="#targets">Three doors, one motion</a>
+  <a href="#self-hosted">Publishing into your engine</a>
+  <a href="#anti-leak">What may never go on a static host</a>
+  <a href="#limits">Where publish ends</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>which command makes it a URL?</h2>
+  <p>The <a href="workbook">parent lesson</a> ended with a complete, self-contained
+  <code>shop.html</code> — the document <em>is</em> the deployment. You can double-click
+  it. So now there's one obvious next move: get it a public link. And here every reflex
+  you trained on twenty years of web development fires at once. A platform account. A CI
+  pipeline. A build step on the host. Environment variables. The whole apparatus of
+  <em>deployment</em>.</p>
+  <p>Then the vocabulary trips you. Workbooks has a <code>wb deploy</code> too. So which
+  one do you run to get a URL — <code>publish</code> or <code>deploy</code>? This page
+  exists to kill that confusion in the first screen, because the answer reframes the
+  whole task. The reason publishing needs none of that apparatus is that the apparatus
+  was for turning source into a running app on someone else's machine — and you don't
+  have source to build. You have a finished file. The build already happened, in your
+  hand, before any of this.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">pub·lish</span> <span class="pr">/ˈpʌb·lɪʃ/</span> <span class="pos">verb</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> to put an <b>already-assembled</b> workbook on a
+    surface — a website or host. <b>Distribution only.</b> Distinct from
+    <b>deploy</b>, which converges the runtime <a href="nexus">engine</a>:
+    publish acts on the <b>workbook</b>, deploy acts on the <b>engine</b>.</p>
+  </div>
+  <p>The split is by <em>object</em>, and the CLI's taxonomy enforces it deliberately,
+  because the two verbs once collided. The old <code>publish apply</code> both
+  <em>rendered</em> org into HTML <em>and</em> shipped it; that was resolved so that
+  <a href="bundles">bundle</a> renders and assembles, and publish only ships. Publish and
+  deploy were then kept on separate axes, by object: workbook to web is one thing,
+  engine to infrastructure is another, and they never became the same verb.</p>
+  <p>The two axes are orthogonal — publishing runs along the spine of a workbook's life,
+  while deploy points sideways at the machine that would run it:</p>
+  <pre class="mermaid">
+flowchart LR
+  author["author"] --> build["build"] --> bundle["bundle"] --> run["run"] --> publish["publish"]
+  publish --> url(["a URL — the file on a surface"])
+  engine{{"the engine"}}
+  deploy["deploy"] -. "a different axis — converge the runtime" .-> engine
+  run -. "needs an engine?" .-> deploy
+  style publish fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style url fill:#aee5c2,stroke:#121316
+  style deploy fill:#f3c5a3,stroke:#121316
+  style engine fill:#f2ddb0,stroke:#121316
+  style author fill:#ffffff,stroke:#121316
+  style build fill:#ffffff,stroke:#121316
+  style bundle fill:#ffffff,stroke:#121316
+  style run fill:#ffffff,stroke:#121316
+  </pre>
+  <p>Read the spine left to right: author, build, bundle, run, publish — five beats in
+  one workbook's life, ending at a URL. Deploy hangs off to the side on a dotted line,
+  pointed not at the workbook but at the engine: it's about the machine, not the
+  document. You reach for it only when running the thing needs a live runtime at all.
+  Most published workbooks never do.</p>
+</section>
+
+<section id="declare">
+  <h2>publish.org — the declared SURFACE</h2>
+  <p>Publishing is declared, not configured by flags. You write one file —
+  <code>publish.org</code> — that names where the workbook should land, and then the CLI
+  <em>converges</em> on that declaration. It's the same declare-then-converge motion the
+  deploy kit uses, so both halves of the system feel like one idea. Here is the scaffold
+  the CLI writes for you, verbatim:</p>
+  <pre class="orgsample">#+TITLE: Workbooks publish config
+#+PUBLISH_TARGET: cloudflare-pages
+#+PUBLISH_PROJECT: my-workbook
+<i># PUBLISH_TARGET: cloudflare-pages | gh-pages | self-hosted</i>
+<i># PUBLISH_PROJECT: CF Pages project name, GitHub repo (org/name), or runtime URL</i>
+<i># PUBLISH_DOMAIN: optional custom domain (for the printed URL)</i>
+<i>#</i>
+<i># `wbx publish apply &lt;workbook.html|.wbundle&gt;` ships the ASSEMBLED workbook —</i>
+<i># run `wb bundle` first. Publish is distribution only.</i></pre>
+  <p>Now the part that matters about that file: it is <b>inert</b>. It is read by a
+  lenient keyword scanner, not by the OQL kernel that runs your workbook's logic. The
+  reader simply collects every <code>#+KEY: value</code> keyword line and every
+  <code>:KEY: value</code> drawer line into one upper-cased table — and that's all. The
+  runtime's counterpart says the same in its own source: a publish file is parsed with a
+  hand-rolled scan, not the org parser, so it's inert config. Your publish file cannot
+  execute anything. It is a label describing a destination, nothing more.</p>
+  <p>Three properties carry the whole declaration, plus a couple the runtime lane reads:</p>
+  <table class="cmp">
+    <tr><th>property</th><th>what it means</th><th>per target</th></tr>
+    <tr><td><code>PUBLISH_TARGET</code></td><td>which door — one of three</td><td><code>cloudflare-pages</code> · <code>gh-pages</code> · <code>self-hosted</code></td></tr>
+    <tr><td><code>PUBLISH_PROJECT</code></td><td>the address at that door</td><td>CF project name · <code>org/name</code> repo · runtime base URL</td></tr>
+    <tr><td><code>PUBLISH_DOMAIN</code></td><td>custom domain — <b>print-time only</b></td><td>changes the URL the CLI reports, on every target</td></tr>
+    <tr><td><code>TITLE</code></td><td>a human label for the config</td><td>cosmetic; the scaffold sets it</td></tr>
+  </table>
+  <p>The verdict of that table in one line: <code>TARGET</code> picks the door,
+  <code>PROJECT</code> is the address, and <code>DOMAIN</code> only changes what the CLI
+  prints — never where the bytes actually go. Hold on to that last fact; it answers a
+  question people ask later.</p>
+</section>
+
+<section id="converge">
+  <h2>init · validate · apply</h2>
+  <p>Three verbs, one motion: <b>declare, check, converge</b>. The exact strings matter
+  here, because they're what you'll actually see in your terminal, and exactness is this
+  page's whole register.</p>
+  <p><b>init</b> writes the scaffold. Run it once; if a <code>publish.org</code> already
+  exists it refuses rather than clobber your config — <i>publish.org already exists</i> —
+  and on success it tells you the next move:</p>
+  <pre class="orgsample">$ wbx publish init
+wrote publish.org — edit it, then `wbx publish apply &lt;workbook&gt;`</pre>
+  <p><b>validate</b> is a coherence check with <em>no side effects</em>. It confirms
+  <code>PUBLISH_TARGET</code> is one of the three known doors and that
+  <code>PUBLISH_PROJECT</code> isn't empty — nothing more, nothing shipped. The errors
+  are literal: <i>PUBLISH_TARGET must be cloudflare-pages | gh-pages | self-hosted</i>
+  if the door is unknown, and <i>PUBLISH_PROJECT is required</i> if the address is blank.
+  Clean, it prints what it read back to you:</p>
+  <pre class="orgsample">$ wbx publish validate
+ok — publish.org (target=cloudflare-pages project=shop)</pre>
+  <p><b>apply</b> is the convergence — the only verb that touches a surface. It takes the
+  workbook to ship, defaulting to <code>workbook.html</code> if you don't name one, and
+  ends with a single line: <i>published &lt;workbook&gt; → &lt;url&gt;</i>. If there's no
+  config at all, it stops you early — <i>no publish.org — run `wbx publish init`</i>.</p>
+  <p>Under apply, the mechanics are humble. The artifact is written as
+  <code>index.html</code> into a throwaway temp directory named
+  <code>wb-publish-&lt;timestamp&gt;</code>, that staging directory is handed to the
+  right door, the URL is printed, and the temp dir is removed. One workbook becomes one
+  <code>index.html</code> becomes one URL. The whole flow, including the ways it stops:</p>
+  <pre class="mermaid">
+flowchart TD
+  init["wbx publish init"] --> edit["edit publish.org<br/>target · project · domain"]
+  edit --> val["wbx publish validate"]
+  val -- "unknown target" --> e1["error: must be<br/>cloudflare-pages | gh-pages | self-hosted"]
+  val -- "empty project" --> e2["error: PUBLISH_PROJECT is required"]
+  val -- "ok" --> apply["wbx publish apply &lt;workbook&gt;"]
+  apply -- "no publish.org" --> e3["error: run `wbx publish init`"]
+  apply -- "staged as index.html<br/>in a temp dir" --> door["the door — wrangler | git | HTTP PUT"]
+  door --> printed(["published &lt;wb&gt; → &lt;url&gt;"])
+  style init fill:#ffffff,stroke:#121316
+  style edit fill:#f2ddb0,stroke:#121316
+  style val fill:#ffffff,stroke:#121316
+  style apply fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style door fill:#ffffff,stroke:#121316
+  style printed fill:#aee5c2,stroke:#121316
+  style e1 fill:#f3c5a3,stroke:#121316
+  style e2 fill:#f3c5a3,stroke:#121316
+  style e3 fill:#f3c5a3,stroke:#121316
+  </pre>
+  <p>Walk that graph as a story: init lays down the file; you edit it; validate is the
+  fork where two failures can send you back — an unknown target, an empty project — and
+  the clean path leads to apply. Apply has its own early exit if no config exists;
+  otherwise the staged <code>index.html</code> goes to whichever door you named, and the
+  URL is printed. Every failure edge is a copy-paste of the real error string. Nothing
+  here guesses.</p>
+</section>
+
+<section id="bundle-first">
+  <h2>why .org is REFUSED</h2>
+  <p>Here's the error a reader will actually hit, and it's worth hitting on purpose,
+  because it's where the whole lesson lands. Hand publish a raw <code>.org</code> file
+  and it refuses, flatly:</p>
+  <pre class="orgsample">$ wbx publish apply shop.org
+error: publish ships ASSEMBLED workbooks — run `wb bundle shop.org` first</pre>
+  <p>This is the resolved collision made visible. Publish does <em>not</em> render. That
+  job belongs to <a href="bundles">bundle</a>, which lints and assembles your org source
+  into a runnable <code>workbook.html</code>. Publish is distribution only — it ships
+  what's already finished. So the fix is one step earlier in the spine:</p>
+  <pre class="orgsample">$ wbx bundle shop.org &amp;&amp; wbx publish apply shop.wbundle
+published shop.wbundle → https://shop.pages.dev</pre>
+  <p>Notice publish happily took a <code>.wbundle</code>. It opens it as the plain zip it
+  is, pulls <code>workbook.html</code> out by name, and ships that — and if the bundle
+  somehow lacks one, it says so: <i>bundle has no workbook.html</i>. A bare
+  <code>.html</code> ships as-is. The full input rule is three rows wide:</p>
+  <table class="cmp">
+    <tr><th>you hand it</th><th>what happens</th></tr>
+    <tr><td><code>workbook.html</code></td><td class="y">ships as-is — it's already assembled</td></tr>
+    <tr><td><code>shop.wbundle</code></td><td class="y">unzipped in memory; the inner <code>workbook.html</code> ships</td></tr>
+    <tr><td><code>shop.org</code></td><td class="n">refused — <i>run `wb bundle` first</i></td></tr>
+  </table>
+  <p>The verdict of those three rows is the whole thesis: assembly happens before the
+  doorstep, never on it. The <code>.html</code> and the <code>.wbundle</code> are
+  finished; the <code>.org</code> isn't, so it's turned away. <b>Publish is distribution,
+  bundle is assembly</b> — and the guard exists so the two can never quietly merge back
+  into one verb again.</p>
+</section>
+
+<section id="targets">
+  <h2>three doors, one MOTION</h2>
+  <p>This is the centerpiece. Three targets, the same declare-then-converge motion behind
+  all of them, and they're <em>dumb on purpose</em> — because the file is smart. A static
+  host, a git branch, and a raw HTTP PUT can all accept the same workbook because the
+  workbook needs nothing from them but a place to sit. Watch the same apply fan out:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as wbx publish apply
+  participant S as temp stage (index.html)
+  participant D as the door
+  U->>S: write artifact as index.html
+  alt cloudflare-pages
+    S->>D: wrangler pages deploy --project-name shop
+    D-->>U: https://shop.pages.dev
+  else gh-pages
+    S->>D: git init -b gh-pages · commit · push -f
+    D-->>U: https://acme.github.io/shop/
+  else self-hosted
+    S->>D: PUT {base}/w/shop  (bearer from PUBLISH_TOKEN)
+    D-->>U: https://nexus.example.com/w/shop
+  end
+</pre>
+  <p>Read it as a branching story. The CLI always does the same first move: stage the
+  workbook as <code>index.html</code>. Then, depending on the target, one of three doors
+  opens — and each prints back a different shape of URL. Each lane, in detail:</p>
+
+  <p><b>cloudflare-pages.</b> The CLI shells out to wrangler:
+  <code>wrangler pages deploy &lt;stage&gt; --project-name &lt;project&gt;
+  --commit-dirty=true</code>, where <code>&lt;stage&gt;</code> is that temp dir holding
+  your file as <code>index.html</code>. The printed URL is
+  <code>https://&lt;project&gt;.pages.dev</code> — unless you set
+  <code>PUBLISH_DOMAIN</code>, in which case it prints <code>https://&lt;domain&gt;</code>
+  instead.</p>
+
+  <p><b>gh-pages.</b> Your <code>PUBLISH_PROJECT</code> can be an <code>org/name</code>
+  shorthand (expanded to a GitHub HTTPS URL), a full URL, or an SSH remote. The mechanics
+  are blunt and worth knowing before you lean on them: the CLI makes a <em>fresh</em> git
+  repo in the stage dir on a <code>gh-pages</code> branch, stages everything, commits as
+  <code>wb &lt;wb@workbooks.sh&gt;</code> with the message <i>wbx publish</i>, and then
+  <b>force-pushes</b> that single-commit branch. The URL is
+  <code>https://&lt;org&gt;.github.io/&lt;repo&gt;/</code>, or your
+  <code>PUBLISH_DOMAIN</code> if set. Read the force-push honestly: the
+  <code>gh-pages</code> branch is treated as an <em>artifact surface</em>, not a place to
+  keep history. Each publish overwrites it.</p>
+
+  <p><b>self-hosted.</b> Your <code>PUBLISH_PROJECT</code> is a runtime base URL, and the
+  CLI issues a single <code>PUT &lt;base&gt;/w/&lt;slug&gt;</code> — where the slug is the
+  workbook's filename stem — carrying the artifact bytes, with an optional bearer token
+  read from the <code>PUBLISH_TOKEN</code> environment variable. The printed URL is
+  <code>&lt;base&gt;/w/&lt;slug&gt;</code>: the same path the engine serves it at. This is
+  the door that's <em>not</em> dumb — it's an <a href="nexus">engine</a> — and it gets its
+  own section next.</p>
+</section>
+
+<section id="self-hosted">
+  <h2>publishing INTO your engine</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — the lane where publish touches the engine</span></p>
+  <p>The first two doors are storage: a static host, a git branch. They hold bytes and
+  hand them back. The self-hosted door is different in kind — the surface is a
+  <a href="nexus">Nexus</a>, a live engine — and this is the one case where the words
+  "publish" and "the engine" touch without becoming the same verb. Publish still only
+  ships a finished artifact; it just ships it to something that can do more than serve it
+  flat.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as wbx (PUBLISH_TOKEN in env)
+  participant E as your Nexus
+  C->>E: PUT /w/shop  · artifact bytes · Bearer
+  E-->>C: 201 stored
+  Note over C: prints {base}/w/shop
+  participant V as a visitor
+  V->>E: GET /w/shop
+  E-->>V: serves the workbook — gated per request
+</pre>
+  <p>The story: with your token in the environment, the CLI PUTs the artifact to
+  <code>/w/shop</code>; the engine stores it and answers <i>201 stored</i>; the CLI prints
+  the URL. Later a visitor does a GET on the same path and the engine serves the workbook
+  back — and because it's a live engine answering each request, it can gate that request,
+  hold the auth, run live state. Safe phrasing for what you can rely on today: you PUT the
+  artifact to the engine's <code>/w/&lt;slug&gt;</code> and it serves it at the same path.
+  The bearer you present in <code>PUBLISH_TOKEN</code> is simply the token your engine
+  accepts — if you stood that engine up yourself, it's the bearer your deploy minted for
+  it; the <a href="nexus">tokens material</a> covers where that comes from.</p>
+  <p>That's the whole reason this lane exists. A static-hosted workbook is exactly as
+  alive as the file — which is to say, not. If you want per-request gating, schedules,
+  agents, or multiplayer, you don't publish onto a dumb surface; you publish <em>into</em>
+  an engine. Same three verbs, same finished artifact — a smarter doorstep.</p>
+</section>
+
+<section id="anti-leak">
+  <h2>what may never go on a static HOST</h2>
+  <p>This is the question that actually keeps people up: <em>is my data safe on a public
+  host?</em> The honest answer is a flat no — unless the workbook's posture is public. A
+  static host ships the whole file to anyone who asks. Any gating drawn on top of inlined
+  data is decoration, not security.</p>
+  <p>Every workbook route carries one of three access <a href="postures">postures</a>,
+  and only one of them is safe to bake into a public static file:</p>
+  <table class="cmp">
+    <tr><th>posture</th><th>cloudflare-pages / gh-pages</th><th>self-hosted</th></tr>
+    <tr><td><code>public</code></td><td class="y">allowed — nothing to leak</td><td class="y">allowed</td></tr>
+    <tr><td><code>gated_data</code></td><td class="n">refused — would ship the data to everyone</td><td class="y">allowed — engine gates per request</td></tr>
+    <tr><td><code>gated_route</code></td><td class="n">refused — client-side gating is theater</td><td class="y">allowed — engine gates per request</td></tr>
+  </table>
+  <p>The verdict of that grid: a gated workbook may only go through the self-hosted door,
+  where a live engine can refuse each request. The runtime's own validator enforces this,
+  and says it in words: a gated workbook cannot publish to cloudflare-pages or gh-pages,
+  because a public static host ships the whole workbook to anyone — client-side gating is
+  theater. Use self-hosted, where the runtime gates per request, or a local desktop
+  shell. The check that decides this is named exactly for the job — it asks whether a
+  workbook of a given posture can be safely baked into a <em>public static artifact</em>,
+  and answers yes only for <code>public</code>.</p>
+  <p>There's a smaller hygiene guard too. Validate warns if a property key looks like a
+  secret — anything ending in <code>TOKEN</code>, <code>KEY</code>, <code>SECRET</code>,
+  <code>ACCOUNT</code>, <code>PASSWORD</code>, or <code>CREDENTIAL</code> — or if a value
+  looks like a long hex ID, telling you to use an environment variable instead of storing
+  it in <code>publish.org</code>. That's why the self-hosted bearer comes from
+  <code>PUBLISH_TOKEN</code> in the environment and never from the config file. The file
+  is inert <em>and</em> public-adjacent; secrets don't belong in it.</p>
+  <p>One honest seam: today this posture-and-secret enforcement lives on the runtime side.
+  The Rust <code>wbx</code> lane validates only the target and project — it does not yet
+  run the posture or secret checks itself. So the anti-leak guarantee is real, but it's
+  the engine that holds it; treat a gated workbook as self-hosted-only regardless of which
+  lane you reach for.</p>
+</section>
+
+<section id="limits">
+  <h2>where publish ENDS</h2>
+  <p>Honesty section. Five edges worth knowing before you lean on them.</p>
+  <p><b>gh-pages is a force-push.</b> Each publish writes a fresh single-commit branch and
+  force-pushes it, destroying whatever history was on <code>gh-pages</code>. That's fine
+  for an artifact surface — the branch is a place the rendered file lives, not a log of
+  how it got there — but don't keep anything on that branch you'd miss.</p>
+  <p><b>One file, one URL.</b> Publish maps one workbook to one <code>index.html</code> to
+  one URL. Multi-page sites are a different mode entirely — a runtime-side
+  <code>site.org</code> manifest that renders a list of pages with a shared sidebar into a
+  flat directory. That's a separate tool, not a flag on publish.</p>
+  <p><b>A published static workbook is inert.</b> It is exactly as alive as the file.
+  No schedules, no agents, no live state — that's what docking into an
+  <a href="nexus">engine</a> is for. If your workbook needs to keep doing things with
+  nobody watching, the self-hosted door is the one you want, not a static host.</p>
+  <p><b>PUBLISH_DOMAIN doesn't configure DNS.</b> It changes only the URL the CLI prints,
+  on every target. The actual custom-domain wiring happens at the host — the Cloudflare
+  Pages dashboard, a GitHub Pages CNAME. Setting it makes the printed link match where
+  your DNS already points; it does not point your DNS.</p>
+  <p><b>Two publish surfaces exist, and ships-only is the canon.</b> The Rust
+  <code>wbx</code> lane ships only — it's the resolved design. An older Elixir
+  <code>wb publish</code> still <em>renders</em> org into HTML before shipping, and adds a
+  fourth target — <code>desktop-app</code> — that scaffolds a Tauri app. That render step
+  predates the collision fix and is exactly the behavior the taxonomy resolved away. When
+  these pages say publish ships and bundle renders, they mean the canon: <code>wbx</code>.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Do viewers need anything installed?</summary>
+    <p>No. A published workbook is a static HTML file. Anyone with a browser opens the URL
+    and the workbook runs — the runtime it needs is bound inside the file. There's no
+    server process to provision, no account to make, nothing on the host that builds.</p>
+  </details>
+  <details>
+    <summary>Can I publish straight from workbook.org?</summary>
+    <p>No — bundle first. Hand publish a <code>.org</code> and it refuses with
+    <i>publish ships ASSEMBLED workbooks — run `wb bundle` first</i>. Publish is
+    distribution; rendering org into a runnable file is <a href="bundles">bundle's</a>
+    job. Run <code>wbx bundle</code>, then apply the <code>.wbundle</code> or the
+    <code>.html</code>.</p>
+  </details>
+  <details>
+    <summary>How do I update a published workbook?</summary>
+    <p>Re-run <code>wbx publish apply</code>. It's idempotent convergence to the same
+    declaration: same target, same project, same URL. On Cloudflare Pages the new
+    deploy supersedes the old; on gh-pages the branch is force-pushed afresh; on a Nexus
+    the PUT overwrites <code>/w/&lt;slug&gt;</code>. You don't tear down and recreate —
+    you re-converge.</p>
+  </details>
+  <details>
+    <summary>Where do I set up my custom domain?</summary>
+    <p>At the host — the Cloudflare Pages dashboard or a GitHub Pages CNAME.
+    <code>PUBLISH_DOMAIN</code> only changes the URL the CLI prints back to you; it does
+    no DNS wiring. Set it so the link you're handed matches where your domain already
+    points.</p>
+  </details>
+  <details>
+    <summary>Can I password-protect a published workbook?</summary>
+    <p>Not on a static host — and that's not a missing feature, it's the truth about
+    static hosting. The file is the whole workbook; anyone who can fetch the URL has every
+    byte. To actually gate, the workbook's <a href="postures">posture</a> must be gated
+    and it must go through the self-hosted door, where a live engine refuses each
+    unauthorized request.</p>
+  </details>
+  <details>
+    <summary>Publish vs deploy, one more time?</summary>
+    <p>Publish puts a finished <em>workbook</em> on a surface. Deploy converges an
+    <em>engine</em> on infrastructure. Different objects, different axes — you publish a
+    document, you deploy a machine.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Publishing sits at the end of one workbook's life — next to the thing it ships, the
+  precondition it depends on, and the engine that makes the live door possible.</p>
+  <div class="cards">
+    <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>the artifact this verb ships</small></div><span class="go">→</span></a>
+    <a href="bundles"><span class="sw" style="background:#a8d4f0"><img src="icons/bundles.svg" alt=""></span>
+      <div>Bundles<small>assembly — the step publish refuses to do</small></div><span class="go">→</span></a>
+    <a href="postures"><span class="sw" style="background:#aee5c2"><b>⚿</b></span>
+      <div>Postures<small>which workbooks may touch a static host</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>The Nexus<small>the engine behind the self-hosted door</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under workbook · publishing
+  :PROPERTIES:
+  :SLUG:   publishing
+  :KIND:   learn
+  :NN:     01.8
+  :KICKER: under workbook · publishing
+  :TITLE1: put the file
+  :TITLE2: WHERE A URL
+  :TITLE3: points
+  :CHIP:   the doorstep
+  :PC:     #a8d4f0
+  :AC:     #13d943
+  :HERO:   img/publishing-hero.jpg
+  :END:
+** og
+- publish ships an already-assembled workbook — distribution only
+- one config file, three verbs, three doors; bundle first
+- gated workbooks may never touch a public static host
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#a8d4f0", .38], ["#aee5c2", .24], ["#f2ddb0", .20], ["#f3c5a3", .18]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

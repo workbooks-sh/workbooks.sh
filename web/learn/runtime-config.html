@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>runtime config — the agent is the config — Workbooks</title>
+<meta name="description" content="There is no agent code to edit. An agent is the sum of declared config at three altitudes — env decides which agents exist, org manifests decide who they are and when they act, run-time opts decide what one run may do. The engine never moves. A sub-lesson under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/runtime-config-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="runtime config — the agent is the config">
+<meta property="og:description" content="No agent code to edit — an agent is declared config at three altitudes: env decides existence, org manifests decide identity and cadence, run-time opts decide one run's budget and trust. The engine never moves.">
+<meta property="og:url" content="https://workbooks.sh/learn/runtime-config">
+<meta property="og:image" content="https://workbooks.sh/og/runtime-config.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="runtime config — the agent is the config">
+<meta name="twitter:description" content="No agent code to edit — an agent is declared config at three altitudes. The engine never moves.">
+<meta name="twitter:image" content="https://workbooks.sh/og/runtime-config.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+  there is no agent.ex you can edit to make this one tick faster.
+  the agent IS the config. three altitudes, all declarative:
+    * env       decides which agents EXIST       (unset → absent from the tree)
+    * manifests decide who they are + WHEN they act
+    * run opts  decide what ONE run may DO        (model, max_steps, exec)
+  the engine ships primitives. personality + schedule are data.
+  you are reading a config file dressed as a web page.        :groundskeeper:
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·7 — <b>under agents · runtime config</b></div>
+      <h1><span class="ln">the agent</span><span class="ln bub">IS THE</span><span class="ln">config</span></h1>
+      <p class="dek">You want to change an <a href="agents">agent</a> — tick it faster,
+      swap its model, give it a colleague, stop it editing the page. Your reflex says
+      <b>find the code</b>. There isn't any. An agent is the sum of declared config at
+      <b>three altitudes</b> — and the engine never moves. This page is the complete
+      knob table, the mental model of <em>where</em> a change lives, and the honest
+      limits of config you can't compile around.</p>
+      <div class="meta">
+        <span class="on">runtime config</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/runtime-config-hero.jpg" alt="A lone operator before a monumental wall of analog dials, labeled levers and patch cables — three glowing terraced rows rising overhead — turning one knob; the machinery dwarfs the figure, bright primary colors, 1970s sci-fi mission-control style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>runtime config</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Where is the agent's code?</a>
+  <a href="#definition">The definition</a>
+  <a href="#altitudes">Three altitudes of config</a>
+  <a href="#activation">Unset means absent</a>
+  <a href="#envcontract">The singleton's knobs</a>
+  <a href="#crew">One manifest, many workers</a>
+  <a href="#lifecycle">The deterministic skeleton</a>
+  <a href="#budget">Knobs that defend the meter</a>
+  <a href="#exec">The trust grant</a>
+  <a href="#boundaries">Where it bites</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>where is the agent's CODE?</h2>
+  <p>You've met agents — a model on a schedule, with files, tools, and memory,
+  hired for outcomes. Now you want to <em>change</em> one. Make it tick every
+  ten minutes instead of every hour. Swap it onto a cheaper model. Give it a
+  colleague that runs alongside it. Forbid it from touching the live page.
+  And your reflex, trained by every other platform you've used, is the same:
+  open the source, find the class, edit the behavior.</p>
+  <p>So you go looking for the agent's code. The fear underneath the search is
+  that agent behavior is buried in engine internals — that tuning means
+  forking, that the schedule is hard-wired somewhere in a scheduler you don't
+  own. It's a reasonable fear. It's just wrong here, and the way it's wrong is
+  the whole lesson.</p>
+  <p>There is no agent code to edit. The engine ships <b>primitives</b> — a
+  worker loop, a model client, a set of brokered tools. Everything a person
+  would call "this agent's personality and schedule" is <b>data the engine
+  reads at runtime</b>, never code it compiles in. Change the data, change the
+  agent. The engine doesn't move.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">run·time con·fig</span> <span class="pr">/ˈrʌn·taɪm kən·ˈfɪg/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the declared layer — <b>env vars</b>,
+    <b>org manifests</b>, and <b>run opts</b> — that fully determines which
+    agents exist, who they are, and what each run may do; <b>read by the
+    engine, never compiled into it</b>.</p>
+  </div>
+  <p>This is the "behavior belongs in the config layer" rule made concrete.
+  The <a href="agents#boundaries">agents lesson</a> drew the trust framing in
+  the abstract; this page is where you turn the knobs. An agent's existence,
+  identity, cadence, budget, and trust are five facts — and all five are
+  config, sitting at three different altitudes.</p>
+</section>
+
+<section id="altitudes">
+  <h2>three ALTITUDES of config</h2>
+  <p>The first thing to learn isn't a knob — it's the map. A given change
+  lives at exactly one of three altitudes, and knowing which one tells you
+  <em>where</em> to make it and <em>when</em> it takes effect:</p>
+  <pre class="mermaid">
+flowchart TD
+  subgraph A1["① env — does this agent EXIST?"]
+    e["WB_CREW_DEF · WB_KEEPER_DEF · WB_AUTOPOET · WB_WEB …"]
+  end
+  subgraph A2["② manifests — WHO is it, and WHEN?"]
+    m["crew.org · lifecycle.org · the agent def (:MODEL: :TOOLKITS:)"]
+  end
+  subgraph A3["③ run opts — what may ONE run do?"]
+    o["model · max_steps · exec · tenant · workdir"]
+  end
+  A1 --> W["Worker (the tick loop)"]
+  A2 --> W
+  W --> R["AgentDef.run"]
+  A3 --> R
+  R --> G["Agent.run — one bounded run"]
+  style A1 fill:#9fc4e8,stroke:#121316,stroke-width:2px
+  style A2 fill:#aee5c2,stroke:#121316,stroke-width:2px
+  style A3 fill:#f2ddb0,stroke:#121316,stroke-width:2px
+  style W fill:#fbfaf6,stroke:#121316
+  style G fill:#13d943,stroke:#121316
+  </pre>
+  <p>Read the picture top to bottom. <b>Env</b> decides existence — set the
+  right variable and a worker joins the supervision tree; leave it unset and
+  the subsystem isn't there at all. <b>Manifests</b> — org files — decide
+  identity and cadence: which def an agent runs, how often it ticks, what
+  state machine shapes its days. <b>Run opts</b> decide one run's budget and
+  trust: which model, how many steps, whether it may touch the world. Three
+  layers feed one worker, which calls one run. Nothing in that chain is
+  compiled — every box is the engine reading data.</p>
+</section>
+
+<section id="activation">
+  <h2>unset means ABSENT</h2>
+  <p>Start at the top altitude, because it has the sharpest rule in the whole
+  system. When the runtime boots, it asks one question to decide which agent
+  it runs — and the answer is a cascade of env vars:</p>
+  <pre class="mermaid">
+flowchart TD
+  boot([runtime boots]) --> q1{WB_CREW_DEF set?}
+  q1 -- yes --> crew["start Keeper.Crew<br/>(N workers from the manifest)"]
+  q1 -- no --> q2{WB_KEEPER_DEF set?}
+  q2 -- yes --> single["start Keeper<br/>(one singleton worker)"]
+  q2 -- no --> none["NO agent subsystem<br/>in the supervision tree"]
+  crew -. "crew + singleton<br/>never both run" .- single
+  style crew fill:#aee5c2,stroke:#121316,stroke-width:2px
+  style single fill:#9fc4e8,stroke:#121316,stroke-width:2px
+  style none fill:#e8d3d3,stroke:#121316
+  </pre>
+  <p>The crew takes precedence: if <code>WB_CREW_DEF</code> is set you get the
+  crew, and the singleton never starts. If only <code>WB_KEEPER_DEF</code> is
+  set you get the lone keeper. If <b>neither</b> is set, the agent subsystem is
+  <em>not started at all</em> — it isn't disabled-but-running, it's excluded
+  from the tree. The crew and the singleton can never both run.</p>
+  <p>This is one pattern, not a special case, and the engine repeats it
+  everywhere. The web control plane joins only on <code>WB_WEB=1</code> (port
+  <code>PORT</code>, default 4000); the public plane only on
+  <code>WB_PUBLIC=1</code> (default 4001); TLS only on
+  <code>WB_PUBLIC_TLS=1</code> (4443). The Telegram channel joins only when
+  <code>TELEGRAM_BOT_TOKEN</code> is present; the
+  <a href="agents">groundskeeper</a> only when <code>WB_GK_SECRET</code> is.
+  The <a href="autopoet">autopoet</a> is a peer worker behind
+  <code>WB_AUTOPOET=1</code> plus a def. The principle is constant: <b>an unset
+  variable doesn't toggle a feature off — it removes the subsystem from the
+  running tree.</b> Configuration here shapes what exists, not just how it
+  behaves.</p>
+</section>
+
+<section id="envcontract">
+  <h2>the singleton's KNOBS</h2>
+  <p>Once a keeper exists, env vars are its full control surface. Every knob
+  has a real default; the def is required to even leave idle. Here is the
+  complete singleton contract, with the numbers the engine actually uses:</p>
+  <table class="cmp">
+    <tr><th>env var</th><th>what it controls</th><th>default</th></tr>
+    <tr><td><code>WB_KEEPER_DEF</code></td><td>path to the agent def — <b>required to activate</b>; unset and the worker starts but idles forever</td><td class="n">none → idle</td></tr>
+    <tr><td><code>WB_KEEPER_INTERVAL_MS</code></td><td>tick interval; the keeper never fires <em>at</em> boot — a fresh one waits a 60s grace, a restart waits whatever's left on the clock (see catch-up below)</td><td>3 600 000 (1h)</td></tr>
+    <tr><td><code>WB_KEEPER_RUN_TIMEOUT_MS</code></td><td>wall-clock bound per run; exceeded → brutal kill, outcome <code>:killed</code></td><td>900 000 (15m)</td></tr>
+    <tr><td><code>WB_KEEPER_MODE</code></td><td><code>plan</code> or <code>edit</code> — prepended to the task line; the <em>def</em> enforces it, not the runtime</td><td>plan</td></tr>
+    <tr><td><code>WB_TENANT</code></td><td>the run's workdir is this tenant's git repo, so its commits ARE the public changelog</td><td>local</td></tr>
+    <tr><td><code>WB_KEEPER_CONTINUOUS</code></td><td><code>1</code>/<code>true</code> → a short breather between ticks instead of the full interval</td><td>off</td></tr>
+    <tr><td><code>WB_KEEPER_BREATHER_MS</code></td><td>breather length in continuous mode</td><td>45 000 (45s)</td></tr>
+    <tr><td><code>WB_LIFECYCLE_DEF</code></td><td>optional state-machine spec; unset or unparseable → plain interval ticks, zero regression</td><td class="n">none</td></tr>
+    <tr><td><code>WB_GITOPS</code></td><td><code>1</code> → pull human/CI pushes before each tick and integrate live; conflict → abort, left for a human</td><td>off</td></tr>
+  </table>
+  <p>The defaults tell a story: a keeper ticks <b>hourly</b>, gives each run
+  <b>fifteen minutes</b> of wall clock, plans rather than edits, and writes to
+  the <code>local</code> tenant. Two of those — interval and timeout — are the
+  cadence and the safety valve, and they interact through catch-up
+  scheduling.</p>
+  <p>That scheduling is the subtle part. The last-run timestamp is persisted to
+  disk (<code>WB_DATA/keeper-last-run</code>). On restart the first delay is
+  <code>max(60s, interval − elapsed)</code> — a sixty-second boot grace, then
+  the rest of whatever was left on the clock. <b>Restarts don't reset the
+  cadence.</b> Redeploy a keeper four hundred times and it still ticks roughly
+  hourly, because the clock lives in the data, not in the process.</p>
+</section>
+
+<section id="crew">
+  <h2>one manifest, many WORKERS</h2>
+  <p>A crew is the singleton's contract, multiplied. One org file — the
+  manifest — lists agents as headlines, each with a properties drawer. Here is
+  a real one: the bit.ml newsroom, four agents, verbatim:</p>
+  <pre class="orgsample">#+TITLE: crew — the bit.ml newsroom manifest
+* desk
+:PROPERTIES:
+:DEF: /data/agents/desk.org
+:INTERVAL: 45m
+:END:
+* moss
+:PROPERTIES:
+:DEF: /data/agents/researcher.org
+:INTERVAL: 15m
+:END:
+* wren
+:PROPERTIES:
+:DEF: /data/agents/writer.org
+:INTERVAL: 15m
+:END:
+* hale
+:PROPERTIES:
+:DEF: /data/agents/editor.org
+:INTERVAL: 20m
+:END:</pre>
+  <p>Set <code>WB_CREW_DEF</code> to that file and four workers start. Each
+  drawer carries <code>:DEF:</code> (required — a member with no def is skipped
+  and logged), <code>:LIFECYCLE:</code> (optional — absent means plain interval
+  ticks), and <code>:INTERVAL:</code> (default 1h). The interval grammar is
+  small and shared: <code>10m</code>, <code>2h</code>, <code>90s</code>, or a
+  bare number of milliseconds. Want hale to run every ten minutes? Change one
+  line to <code>:INTERVAL: 10m</code>. No code, no rebuild — the manifest is
+  re-read from disk.</p>
+  <p>Two knobs keep a crew from stampeding the model. <b>Stagger</b>
+  (<code>WB_CREW_STAGGER_MS</code>, default 30s) delays worker <em>i</em>'s
+  first tick by <em>i</em> × stagger — so the four above first fire at 0s, 30s,
+  60s, 90s, fanning in rather than thundering. <b>Concurrency</b>
+  (<code>WB_CREW_MAX_CONCURRENT</code>, default 2) caps how many run at once
+  through a FIFO counting semaphore — the Gate:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant W1 as wren
+  participant G as the Gate (cap 2)
+  participant W2 as hale
+  W1->>G: acquire (slot free)
+  Note over W1: runs — slot held
+  W2->>G: acquire (queued, waits ∞)
+  Note over W2: blocked, FIFO
+  W1->>G: release (in an after — even on crash/timeout)
+  G-->>W2: slot handed off
+  Note over W2: runs now
+  </pre>
+  <p>The release runs in an <code>after</code> clause, so a crashed or
+  timed-out run <em>always</em> frees its slot — a stuck worker can never
+  starve the crew. And every worker namespaces its own state by name: wren's
+  files are <code>keeper-last-run-wren</code> and <code>lifecycle-pos-wren</code>,
+  its status key is tagged <code>"wren"</code>. N agents tick with <b>zero
+  shared cadence state</b> — the singleton is just this same worker with a
+  no-op gate and no suffix.</p>
+  <p>One honest note on the manifest: the def's board-claim protocol — an agent
+  marking a task as its own before working it — is a <em>convention committed
+  to git</em>, not something the runtime enforces. The runtime only isolates
+  each run and throttles concurrency. It will not stop two agents from grabbing
+  the same task; the claim discipline lives in the defs.</p>
+</section>
+
+<section id="lifecycle">
+  <h2>the deterministic SKELETON</h2>
+  <p>Depth rung — skippable. Plain interval ticks are "do your job every N
+  minutes." A <b>lifecycle</b> wraps that loop in a deterministic state machine
+  so an agent's <em>days</em> have shape while its work stays
+  non-deterministic. It's an org file too: <code>#+START:</code> names the
+  first state, headlines are states, and per-state properties draw the edges.
+  Here is the canonical loop:</p>
+  <pre class="orgsample">#+START: wake_add
+* wake_add
+:PROPERTIES:
+:KIND: wake
+:REPEAT: 3
+:NEXT: wake_audit
+:END:
+* wake_audit
+:PROPERTIES:
+:KIND: wake
+:NEXT: rem
+:END:
+* rem
+:PROPERTIES:
+:KIND: rem
+:MIN-INTERVAL: 10m
+:NEXT: wake_plan
+:END:
+* wake_plan
+:PROPERTIES:
+:KIND: wake
+:NEXT: wake_add
+:END:</pre>
+  <p>Read it as a clock face. <code>wake_add</code> runs the agent def
+  (<code>:KIND: wake</code>) and holds for three successful ticks
+  (<code>:REPEAT: 3</code>) before advancing. Then one <code>wake_audit</code>.
+  Then <code>rem</code> — a <em>dream</em> (<code>:KIND: rem</code>, no agent
+  run) gated to fire at most every ten minutes. Then <code>wake_plan</code>,
+  and back to the top:</p>
+  <pre class="mermaid">
+stateDiagram-v2
+  [*] --> wake_add
+  wake_add --> wake_add: hit < 3
+  wake_add --> wake_audit: hit = 3
+  wake_audit --> rem
+  rem --> wake_plan: gate elapsed (10m)
+  wake_plan --> wake_add
+  wake_add --> wake_add: failed / killed (hold)
+  wake_audit --> wake_audit: failed / killed (hold)
+  </pre>
+  <p>The self-loops carry the rule that matters most. A <code>:failed:</code>
+  or <code>:killed:</code> tick <b>does not advance position</b> — the same
+  state is retried next tick, so cadence is preserved across crashes. The
+  position itself, <code>{state, hits}</code>, is persisted to
+  <code>WB_DATA/lifecycle-pos</code>. If that file holds <code>{wake_add, 2}</code>
+  and the engine redeploys, it resumes on the <em>second of three adds</em> —
+  the cadence survives the redeploy. And the wake state's name is prepended to
+  the task line, so the def picks "add" versus "audit" from the label, not from
+  counting prose itself. The actual task line an agent receives reads:</p>
+  <pre class="orgsample">MODE: plan
+LIFECYCLE: wake_audit
+Perform one keeper run per your loop. …</pre>
+  <p>Worth flagging honestly: the example file marks a per-state
+  <code>:INTERVAL-MS:</code> override as "advisory," and we won't claim it
+  changes cadence — the load-bearing time gate is <code>:MIN-INTERVAL:</code>,
+  which holds position when it hasn't elapsed.</p>
+</section>
+
+<section id="budget">
+  <h2>knobs that defend the METER</h2>
+  <p>Several config knobs exist for one reason: every tick can cost an LLM
+  call, and an idle agent that ticks anyway burns money for nothing. The
+  sharpest is <b>NO-WORK backoff</b>. An agent signals "nothing to do" by
+  beginning its result with <code>NO-WORK</code>. Consecutive NO-WORK ticks
+  back off geometrically — <code>max(base, 60s · 2^(streak−1))</code>, capped
+  at thirty minutes:</p>
+  <table class="cmp">
+    <tr><th>NO-WORK streak</th><th>next tick after</th></tr>
+    <tr><td>1</td><td>60s</td></tr>
+    <tr><td>2</td><td>2m</td></tr>
+    <tr><td>3</td><td>4m</td></tr>
+    <tr><td>4</td><td>8m</td></tr>
+    <tr><td>…</td><td>doubling</td></tr>
+    <tr><td>capped</td><td>30m</td></tr>
+  </table>
+  <p>The verdict of that table: an idle worker quiets itself down toward a
+  thirty-minute heartbeat — and a single real <code>:done</code> snaps it
+  straight back to hot cadence. This is the fix that stopped an idle crew from
+  burning an LLM call every ten seconds to report it had nothing to do.</p>
+  <p>The other meter-defenders all share the spirit. Continuous mode trades the
+  full interval for a 45-second <b>breather</b>. The lifecycle's
+  <code>:MIN-INTERVAL:</code> gates a dream so it can't run hot. The
+  <code>image</code> tool — when granted — has a hard budget of two
+  generations per run. And the dreaming model is configured <em>separately</em>
+  from the waking one: <code>WB_DREAM_MODEL</code> defaults to a smaller,
+  cheaper model (<code>inception/mercury-2</code>) than the agent reasons with —
+  config splits the expensive waking model from the cheap dreaming one.</p>
+  <p>The same budget discipline shows up as <code>max_steps</code>, which
+  scales with the tenure of the run. A workflow step gets 6. A bare agent run
+  defaults to 12. An HTTP <code>/api/run</code> or an interactive session gets
+  40. A keeper tick — a worker with standing — gets 60. A long profile
+  conversation gets 250. The number isn't arbitrary; it's how much rope the run
+  has earned.</p>
+</section>
+
+<section id="exec">
+  <h2>the trust GRANT</h2>
+  <p>The most misread knob is <code>exec</code>. The reflex reads
+  <code>exec: true</code> as "let the agent run shell commands." It is the
+  opposite of that. <code>exec</code> is a <b>trust grant</b> — it adds a fixed
+  set of <em>host-brokered</em> tools and nothing native. Here is the keeper's
+  actual run call, with a def whose head declares
+  <code>:MODEL: xiaomi/mimo-v2.5</code> and <code>:TOOLKITS: shell wb sandbox</code>:</p>
+  <pre class="orgsample">Workbooks.AgentDef.run(org,
+  "MODE: plan\nPerform one keeper run per your loop. …",
+  exec: true, workdir: repo, tenant: "local", agent: "wren", max_steps: 60)</pre>
+  <p>What <code>exec: true</code> adds is exactly three brokered verbs:</p>
+  <ul>
+    <li><b><code>git</code></b> — the <em>host</em> commits and pushes. The
+    agent names a message; the host runs the commit.</li>
+    <li><b><code>publish</code></b> — the host copies files into the public web
+    root. The agent picks what; the host does the move.</li>
+    <li><b><code>image</code></b> — the host holds the key and the network, and
+    enforces a budget of two generations per run.</li>
+  </ul>
+  <p>That's the entire grant. The native <code>run</code> bash hatch was
+  <em>deleted</em> — by construction, an agent cannot choose an arbitrary
+  native command line. Every agent already has a base toolset (an in-WASM
+  shell, search, fetch, web search, file-issue, vfs read/write, done);
+  <code>exec</code> only opens the three verbs that touch the world, and it
+  re-roots the run at the workdir.</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant A as the agent
+  participant H as the host
+  participant G as git origin
+  A->>H: git(message: "rem: night audit")
+  Note over H: host runs commit + push<br/>(agent never forks a shell)
+  H->>G: push
+  G-->>H: ok
+  H-->>A: committed
+  </pre>
+  <p>Because this is a grant and not a default, the HTTP surface guards it
+  hard: <code>POST /api/run</code> honors <code>exec: true</code> only on the
+  desktop app or with <code>WB_AGENT_EXEC=1</code> — never for arbitrary,
+  multi-tenant callers. Trust is something you hand out in increments, and the
+  increments are these named verbs.</p>
+  <p>One cautionary detail lives in that same call: <code>tenant: "local"</code>.
+  Omit <code>tenant:</code> and a run defaults to <code>"dev"</code>, so its
+  <code>publish</code> writes to <code>build/public/dev</code>. The lander once
+  shipped four posts that 404'd for exactly this reason — an untenanted run
+  published to the wrong directory. Config errors here fail <em>quietly</em>
+  into the wrong place, not loudly.</p>
+</section>
+
+<section id="boundaries">
+  <h2>where it BITES</h2>
+  <p>Honesty section — config is powerful precisely because it's not enforced
+  everywhere, and you should know the seams.</p>
+  <p><b>Some knobs are protocol, not enforcement.</b>
+  <code>WB_KEEPER_MODE</code> doesn't gate anything in the runtime — it's text
+  prepended to the task, and the def decides whether to honor "plan" versus
+  "edit." Board claims are the same: a def-level discipline committed to git,
+  which the runtime neither checks nor requires. If a def ignores its mode or
+  skips its claim, the engine won't stop it. These are agreements, and config
+  expresses them — it doesn't police them.</p>
+  <p><b>Tree shape is fixed at boot.</b> The env cascade that decides which
+  agents exist is read when the runtime starts. Editing a manifest updates the
+  data the public plane reads, but re-shaping the running supervisor — adding
+  or removing workers — is a restart, not a hot edit. Treat "who exists" as a
+  deploy-time decision.</p>
+  <p><b>Failures are quiet.</b> The tenant-default story above is the pattern:
+  a wrong or missing value doesn't crash, it routes the work somewhere
+  plausible-but-wrong. There's a stale doc edge here too — an env reference
+  still describes <code>WB_AGENT_EXEC</code> as granting a real-CLI escape
+  hatch, which the code no longer does (it only gates honoring
+  <code>exec</code> on HTTP). Read the behavior from the running engine, not
+  the doc.</p>
+  <p>And the deepest limit: config can make an agent <em>well-governed</em>,
+  not <em>good</em>. It sets the cadence, the budget, the trust, and the
+  boundary. It can't supply judgment, and the pitch was never software that
+  runs itself — these knobs exist so a person can hand a worker exactly as much
+  rope as it has earned, and no more.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can I change an agent's model without redeploying?</summary>
+    <p>Yes. The model comes from the def's <code>:MODEL:</code> property, read
+    per run from the def file — the engine is untouched. A caller opt can
+    override it (the run's <code>model:</code> wins over the def's default), but
+    the def is the default, and editing it is editing data, not code.</p>
+  </details>
+  <details>
+    <summary>Can two crew agents grab the same task?</summary>
+    <p>The runtime won't stop them — it isolates runs and caps concurrency, but
+    task ownership is the def-level claim protocol, committed to git before
+    work. If you need exclusivity, it lives in the defs, not in a runtime lock.</p>
+  </details>
+  <details>
+    <summary>What happens when a run hangs?</summary>
+    <p>A wall clock catches it: <code>WB_KEEPER_RUN_TIMEOUT_MS</code>, default
+    fifteen minutes. Exceeded, the run is brutally killed, the tick outcome is
+    <code>:killed</code>, and a lifecycle <b>holds its position</b> — the same
+    state retries next tick. A hung run loses a tick, never the cadence.</p>
+  </details>
+  <details>
+    <summary>Is <code>exec</code> safe to grant?</summary>
+    <p>It's a fixed brokered verb set — <code>git</code>, <code>publish</code>,
+    <code>image</code> — not a shell. The native bash hatch is deleted by
+    construction, so the agent can't choose an arbitrary command line. On HTTP
+    it's honored only on desktop or with <code>WB_AGENT_EXEC=1</code>, never for
+    multi-tenant callers.</p>
+  </details>
+  <details>
+    <summary>Does restarting reset the schedule?</summary>
+    <p>No. The last-run timestamp and the lifecycle position both persist to
+    <code>WB_DATA</code>. On restart the keeper resumes mid-cadence — "second of
+    three adds," the rest of the hour still on the clock. The schedule lives in
+    the data, not the process.</p>
+  </details>
+  <details>
+    <summary>Where do I actually set these env vars?</summary>
+    <p>On the engine you deploy — see <a href="nexus">the nexus lesson</a>, and
+    <a href="nexus#security">nexus#security</a> for the trust surface. Manifests
+    and defs are <a href="org">org files</a> on disk; <code>:TOOLKITS:</code>
+    declarations are covered in <a href="toolkit">the toolkit lesson</a>.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This sub-lesson tunes the agent you already met — the parent comes first.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the worker these knobs configure</small></div><span class="go">→</span></a>
+    <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/autopoet.svg" alt=""></span>
+      <div>The Autopoet<small>config is the only layer agents may self-edit</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><b>◆</b></span>
+      <div>Nexus<small>the engine where these vars are set</small></div><span class="go">→</span></a>
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org<small>the grammar of every manifest and def</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · runtime config
+  :PROPERTIES:
+  :SLUG:   runtime-config
+  :KIND:   learn
+  :NN:     05.7
+  :KICKER: under agents · runtime config
+  :TITLE1: the agent
+  :TITLE2: IS THE
+  :TITLE3: config
+  :CHIP:   runtime config
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/runtime-config-hero.jpg
+  :END:
+** og
+- no agent code to edit — the agent IS the config
+- three altitudes: env (exists), manifests (who + when), run opts (one run)
+- the engine ships primitives; personality + schedule are data
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .36], ["#aee5c2", .24], ["#f2ddb0", .22], ["#f3c5a3", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

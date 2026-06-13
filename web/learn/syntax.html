@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en" style="--pc:#f2ddb0; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>syntax — the subset of org the kernel surfaces — Workbooks</title>
+<meta name="description" content="Org-mode has twenty years of features; the kernel honors a small, opinionated subset. Learn the whole grammar in one sitting by drilling every construct against the parser's actual JSON output — eight fields per headline, machine-verified. A deep dive under org.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/syntax-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="syntax — the subset of org the kernel surfaces">
+<meta property="og:description" content="Eight fields per headline, every one machine-verified against the kernel's parse output. The grammar is small because the kernel is a lens, not all of org-mode. A deep dive under org.">
+<meta property="og:url" content="https://workbooks.sh/learn/syntax">
+<meta property="og:image" content="https://workbooks.sh/og/syntax.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="syntax — the subset of org the kernel surfaces">
+<meta name="twitter:description" content="Eight fields per headline, every one machine-verified. The grammar is small because the kernel is a lens, not all of org-mode.">
+<meta name="twitter:image" content="https://workbooks.sh/og/syntax.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    you are reading the source, the honest way.
+    this page argues a single idea: a grammar is not learned from a spec —
+    it is learned from a parser. write a line, see the row.
+
+    * TODO try this line yourself                                  :you:reader:
+      :PROPERTIES:
+      :HOW: save it and run  wbx query you.org
+      :END:
+
+    everything a human can read in a comment, the machine reads too —
+    but ONLY the parts the lens surfaces. the rest is just prose.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 04·1 — <b>under org · syntax</b></div>
+      <h1><span class="ln">write a line</span><span class="ln bub">SEE</span><span class="ln">the row</span></h1>
+      <p class="dek">You read the <a href="org">parent lesson</a> and nodded — org is
+      the written layer, and markdown can't see structure. Fine. But you still
+      can't <b>write</b> org with confidence, and you don't know which lines of its
+      twenty-year-old grammar this ecosystem actually honors. This page is the
+      receipt: every construct, drilled against the kernel's real output. Eight
+      fields per headline — that's the whole contract.</p>
+      <div class="meta">
+        <span class="on">syntax</span><span>12 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/syntax-hero.jpg" alt="A small figure standing before a monumental brass-and-glass parsing machine, a single typed line of text feeding in one side and a glowing lattice of eight labelled crystal cells emerging out the other, the rest of a vast scrollwork of unread ornament left dark behind it — bright, optimistic 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/org.svg" alt=""></div><span>syntax</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Folklore vs grammar</a>
+  <a href="#definition">The definition</a>
+  <a href="#drill">The drill loop</a>
+  <a href="#headline">Anatomy of one line</a>
+  <a href="#planning">The one-line rule</a>
+  <a href="#drawers">Headline as record</a>
+  <a href="#timestamps">The clock glyphs</a>
+  <a href="#src">Blocks that compile</a>
+  <a href="#markdown">The autopsy</a>
+  <a href="#egg">Dissect the easter egg</a>
+  <a href="#limits">Where the lens stops</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>folklore vs GRAMMAR</h2>
+  <p>Org-mode the Emacs thing is twenty years deep. Agenda views, footnotes,
+  clock tables, capture templates, link abbreviations, column views — a folklore
+  so large that no two org users have ever met who used the same tenth of it.
+  Read its manual and you will learn a hundred constructs. Read this ecosystem's
+  parser and you will learn that it honors maybe a dozen.</p>
+  <p>That gap is the whole problem this page exists to close. A spec tells you
+  what a feature is <em>supposed</em> to do; specs are aspirational, and they lie
+  by omission about what a given implementation actually reads. The
+  <a href="org">kernel</a> here is not org-mode — it's an <b>opinionated lens</b>
+  pointed at org text, and it surfaces exactly the lines that carry meaning to
+  the rest of the system. Every other line is rendered as prose and otherwise
+  ignored.</p>
+  <p>So we won't learn grammar from a spec. We'll learn it from the parser
+  itself: write a line, run it through the kernel, read the JSON it hands back.
+  A construct that produces a field is grammar here. A construct that vanishes is
+  folklore. The parser is the only authority that never lies, because it's the
+  thing the system actually runs.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">syn·tax</span> <span class="pr">/ˈsɪn·tæks/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> the subset of org-mode the <b>kernel</b>
+    surfaces as <b>structure</b> — exactly <b>eight fields</b> per headline, plus
+    a handful of section-level constructs. Everything else in the file is prose:
+    rendered, never parsed into meaning.</p>
+  </div>
+  <p>The headline is the unit. Parse any org file and the kernel returns one row
+  per headline, and every row has exactly these eight keys — no more, no fewer:</p>
+  <table class="cmp">
+    <tr><th>field</th><th>comes from</th><th>example value</th></tr>
+    <tr><td><code>level</code></td><td>the run of leading stars</td><td><code>1</code></td></tr>
+    <tr><td><code>title</code></td><td>the headline text, tags stripped</td><td><code>rotate signing key</code></td></tr>
+    <tr><td><code>state</code></td><td>a leading <code>TODO</code> / <code>DONE</code> keyword</td><td><code>TODO</code> · else <code>null</code></td></tr>
+    <tr><td><code>tags</code></td><td>the trailing <code>:a:b:</code> run</td><td><code>["ops","security"]</code></td></tr>
+    <tr><td><code>props</code></td><td>the <code>:PROPERTIES:</code> drawer, keys uppercased</td><td><code>{"OWNER":"shane"}</code></td></tr>
+    <tr><td><code>id</code></td><td>sugar — <code>props["ID"]</code> lifted to the top</td><td><code>rotate-key</code></td></tr>
+    <tr><td><code>scheduled</code></td><td>the <code>SCHEDULED:</code> timestamp</td><td><code>{at,repeat,active}</code></td></tr>
+    <tr><td><code>deadline</code></td><td>the <code>DEADLINE:</code> timestamp</td><td><code>{at,repeat,active}</code></td></tr>
+  </table>
+  <p>Eight fields. That's the entire contract for a headline, and it's small
+  enough to hold in your head precisely <em>because</em> the kernel is
+  opinionated. The grammar isn't small by accident — it's small by design, so
+  that what one human writes, another human and every agent read the same way.</p>
+</section>
+
+<section id="drill">
+  <h2>the DRILL loop</h2>
+  <p>Here's the method for the whole page, and the method you'll keep after it.
+  Pipe org text into the kernel through the CLI and read the rows it returns:</p>
+  <pre class="orgsample">printf '* TODO water the plants  :home:\n' > task.org
+wbx query task.org</pre>
+  <p>Point <code>wbx query</code> at any <code>.org</code> file and it calls the
+  kernel's <code>parse_headlines</code> and prints the JSON array. There's no
+  project, no config, no setup — the kernel is a pure function from text to rows.
+  The same text, the same row, every time, on any of the kernel's surfaces. The
+  flow is exactly this:</p>
+  <pre class="mermaid">
+flowchart LR
+  org["org text<br/>(one line or a whole file)"]
+  subgraph kernel["the OQL kernel — one pure function"]
+    parse["orgize parse"] --> lens["the lens<br/>(keep 8 fields, drop the rest)"]
+  end
+  org --> kernel
+  kernel --> rows["JSON rows<br/>[{level,title,state,…}]"]
+  style kernel fill:#fbfaf6,stroke:#121316
+  style rows fill:#f2ddb0,stroke:#121316,stroke-width:2.5px
+  </pre>
+  <p>Two stages, and the second is the one that matters. First the parser
+  (orgize, an off-the-shelf Rust library) reads the org tree. Then the
+  <b>lens</b> walks that tree and keeps only what the system cares about — the
+  eight headline fields, source blocks, the workflow tags — and lets everything
+  else fall through as prose. Every example below this line is real output from
+  that function. Nothing is illustrative; each cell was machine-verified. You can
+  reproduce any of them by saving the org and running <code>wbx query</code> on it.</p>
+</section>
+
+<section id="headline">
+  <h2>anatomy of one LINE</h2>
+  <p>A headline is positional. Read left to right, each region is a different
+  field. Here is the most a single headline can carry, annotated:</p>
+  <pre class="orgsample"><b>*</b>      <i>← stars → level (here: 1)</i>
+<b>TODO</b>   <i>← state keyword (TODO or DONE only)</i>
+<b>[#A]</b>  <i>← priority cookie — silently swallowed, no field</i>
+<b>rotate signing key</b>   <i>← title</i>
+<b>:ops:security:</b>       <i>← trailing tag run → tags</i></pre>
+  <p>All on one line, that's <code>* TODO [#A] rotate signing key :ops:security:</code>,
+  and it parses to a row where <code>level</code> is <code>1</code>,
+  <code>state</code> is <code>"TODO"</code>, <code>title</code> is
+  <code>"rotate signing key"</code> — clean, cookie gone — and <code>tags</code>
+  is <code>["ops","security"]</code>. The tags are stripped off the end of the
+  title for you; the title comes back without them.</p>
+  <p>The edges are where confidence is won or lost, so drill them. These are all
+  verified:</p>
+  <ul>
+    <li><b>A headline needs a star at column zero and a space after it.</b>
+    <code>*no space</code> is not a headline — it vanishes from the rows
+    entirely. An indented <code>&nbsp;* star</code> is not a headline either —
+    also gone. Column zero, then a space. Nothing else counts.</li>
+    <li><b>Tags can't contain spaces.</b> <code>:ops:security:</code> is two
+    tags. <code>:a b:</code> is <em>not</em> a tag at all — it stays in the
+    title as literal text, because the tag scanner only accepts a colon-run with
+    no internal spaces.</li>
+    <li><b>The priority cookie has no field.</b> <code>[#A]</code> is real
+    org-mode syntax and orgize swallows it cleanly — the title comes back
+    without it — but the kernel exposes <b>no priority key</b> anywhere on the
+    row. If you lean on priorities, the lens does not see them. Honest limit.</li>
+  </ul>
+</section>
+
+<section id="planning">
+  <h2>the ONE-line rule</h2>
+  <p>This is the single gotcha most likely to bite you, so it gets its own
+  section. The planning line — the <code>SCHEDULED:</code> and
+  <code>DEADLINE:</code> stamps — must sit on the <b>one line directly under the
+  headline</b>, together. Split them across two lines and the parse quietly falls
+  apart, and not just for the planning fields.</p>
+  <p>Here is the broken form and the fixed form, same content, side by side. The
+  difference is one newline:</p>
+  <table class="cmp">
+    <tr><th></th><th>what you wrote</th><th>what the kernel returns</th></tr>
+    <tr>
+      <td><b>broken</b></td>
+      <td><code>SCHEDULED:</code> and <code>DEADLINE:</code> on <em>separate</em>
+      lines, drawer below</td>
+      <td class="n">only <code>scheduled</code> parses; <code>deadline</code> is
+      <code>null</code> — <b>and</b> the <code>:PROPERTIES:</code> drawer right
+      below silently stops being recognized: <code>props:{}</code></td>
+    </tr>
+    <tr>
+      <td><b>fixed</b></td>
+      <td>both stamps on <em>one</em> line, drawer below</td>
+      <td class="y">both <code>scheduled</code> and <code>deadline</code> parse;
+      the drawer parses; <code>id</code> lifts. Everything works.</td>
+    </tr>
+  </table>
+  <p>The failure cascades — the second planning line poisons the drawer that
+  comes after it. So your owner property, your ID, your whole record evaporates
+  to <code>{}</code> because of a stray newline two lines up. There's no error;
+  the row just comes back hollow. When a drawer mysteriously parses to nothing,
+  this is the first place to look. One line. Always one line.</p>
+</section>
+
+<section id="drawers">
+  <h2>headline as RECORD</h2>
+  <p>A <code>:PROPERTIES:</code> drawer turns a headline into a typed record.
+  Two rules carry most of the surprises, both verified:</p>
+  <table class="cmp">
+    <tr><th>written form</th><th>row field</th></tr>
+    <tr><td><code>:owner: shane</code></td><td><code>props["OWNER"] = "shane"</code> — keys are <b>uppercased</b>, values trimmed</td></tr>
+    <tr><td><code>:ID: rotate-key</code></td><td><code>props["ID"] = "rotate-key"</code> <em>and</em> <code>id = "rotate-key"</code> — ID is lifted to the top level as sugar</td></tr>
+  </table>
+  <p>So <code>:owner:</code> becomes <code>OWNER</code> — the key you read in the
+  JSON is never the key you typed, casing-wise. And <code>:ID:</code> appears
+  twice: once inside <code>props</code> like every property, and once promoted to
+  the top-level <code>id</code> field, because the system asks "what is this
+  headline's identity?" often enough to earn the shortcut. This section is
+  deliberately short — the <a href="drawers">drawers deep dive</a> takes the
+  property mechanism all the way down to toolkit manifests and agent identities.</p>
+</section>
+
+<section id="timestamps">
+  <h2>the CLOCK glyphs</h2>
+  <p>Depth rung — skippable, and the <a href="timestamps">timestamps deep dive</a>
+  goes the whole distance. But the shape is worth seeing once. The brackets
+  decide whether a timestamp is active:</p>
+  <table class="cmp">
+    <tr><th>written</th><th>parses to</th></tr>
+    <tr><td><code>&lt;2026-06-20 Sat 09:00 +1w&gt;</code></td><td><code>{"at":"2026-06-20T09:00","repeat":"+1w","active":true}</code></td></tr>
+    <tr><td><code>[2026-06-20 Sat 09:00]</code></td><td><code>{"at":"2026-06-20T09:00","repeat":null,"active":false}</code></td></tr>
+  </table>
+  <p>Angle brackets mean <code>active:true</code> — this is a thing the engine
+  should act on. Square brackets mean <code>active:false</code> — a record of
+  when something happened, inert. The parser is loose by design: the date is just
+  whichever token is ten characters long with a dash at position four; the time
+  is the first token with a colon; the repeater is a token starting <code>+</code>,
+  <code>.+</code>, or <code>++</code>. Day names like <code>Sat</code> are
+  skipped, never validated — write <code>Xyz</code> and it shrugs.</p>
+  <p>One honest leak to know now: a time <em>range</em> passes through raw.
+  <code>&lt;2026-06-20 Sat 09:00-10:30&gt;</code> yields
+  <code>"at":"2026-06-20T09:00-10:30"</code> — the whole range token lands in the
+  time slot. The lens doesn't split it; it just hands you the string. Useful to
+  know before you parse <code>at</code> as a single time downstream.</p>
+</section>
+
+<section id="src">
+  <h2>blocks that COMPILE</h2>
+  <p>Depth rung — the <a href="tangling">tangling deep dive</a> is where this
+  becomes a build system. The mechanic: a headline's section can carry a source
+  block, and the kernel captures the <b>first one only</b> — its language, its
+  header args, and its body. The header-arg grammar is six keys:
+  <code>:deps</code> (comma-split list), <code>:uses</code>, <code>:in</code>,
+  <code>:out</code>, <code>:persist</code> (a bare flag), and <code>:dir</code>.
+  Anything else is silently ignored.</p>
+  <p>The interesting part is what happens when you tag two headlines as workflow
+  and components. The kernel infers the data-flow edge by matching one
+  component's <code>:out</code> to another's <code>:in</code>. Watch a two-step
+  plan become a running world:</p>
+  <pre class="orgsample">* etl                       :workflow:
+  :PROPERTIES:
+  :SCHEDULE: 0 6 * * *
+  :END:
+** fetch                    :component:
+   #+begin_src js :uses http :out prices.json
+   export async function run() { return fetch_prices(); }
+   #+end_src
+** report                   :component:
+   #+begin_src python :deps pandas :in prices.json :out report.html :persist
+   build_report()
+   #+end_src</pre>
+  <p>Run that through <code>wbx tangle</code> and the kernel computes — nobody
+  draws — this:</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph plan["etl  :workflow:  · schedule 0 6 * * *"]
+    fetch["fetch  :component:<br/>uses: http · out: prices.json"]
+    report["report  :component:<br/>in: prices.json · out: report.html · persist"]
+  end
+  plan -- "kernel: tangle_plan()" --> world
+  subgraph world["the compiled world"]
+    f2["fetch"] -- "prices.json" --> r2["report"]
+    imp["imports: http"]
+    exp["exports: report.html"]
+  end
+  style plan fill:#fbfaf6,stroke:#121316
+  style world fill:#fbfaf6,stroke:#121316
+  style exp fill:#13d943,stroke:#121316
+  </pre>
+  <p>The output carries <code>"edges":[{"from":"fetch","to":"report"}]</code> —
+  inferred purely because fetch's <code>:out prices.json</code> matched report's
+  <code>:in prices.json</code>. <code>imports</code> is <code>["http"]</code>
+  (the deduped <code>:uses</code>), <code>exports</code> is
+  <code>["report.html"]</code> (the out nobody consumed), report carries
+  <code>"persist":true</code>, and the <code>:SCHEDULE:</code> property surfaces
+  as <code>{"cron":"0 6 * * *"}</code>. Two tagged headlines, and you have a
+  scheduled, capability-aware build graph.</p>
+  <p>Now delete <code>fetch</code> and run <code>wbx lint</code>:</p>
+  <pre class="orgsample">[{"level":"error","scope":"report",
+  "message":"input `prices.json` has no upstream producer"}]</pre>
+  <p>The validator flags exactly two kinds of error — a component with no source
+  block or language, and an <code>:in</code> with no upstream producer. That's a
+  <em>syntax</em> error that is also a <em>plan</em> error: report wants an input
+  that nothing makes. This is the bridge to the workflows lessons — the same
+  grammar that lists your to-dos also type-checks your build.</p>
+</section>
+
+<section id="markdown">
+  <h2>the AUTOPSY</h2>
+  <p>The parent lesson argued that markdown can't see structure. Here's the
+  receipt. Take that same rotate-key task and write it the way a careful person
+  writes markdown — heading, bold labels, a sentence of metadata:</p>
+  <pre class="orgsample"># TODO rotate signing key
+**Scheduled:** 2026-06-20, repeat weekly. Tags: ops, security.</pre>
+  <p>Run it through the very same kernel and you get:</p>
+  <pre class="orgsample">[]</pre>
+  <p>Zero rows. Not a degraded parse — <b>nothing</b>. Every fact a human reads
+  in that markdown — it's a task, it's a TODO, it's scheduled, it repeats weekly,
+  it's tagged ops and security — is invisible to the machine. A <code>#</code>
+  heading is not a <code>*</code> headline; bold text is not a state keyword; a
+  prose sentence is not a property drawer. The information is all <em>there</em>,
+  perfectly legible to you, and the parser sees an empty array.</p>
+  <table class="cmp">
+    <tr><th></th><th>org</th><th>markdown</th></tr>
+    <tr><td>structure seen</td><td class="y">one full row, eight fields</td><td class="n">nothing — <code>[]</code></td></tr>
+    <tr><td>state / tags / schedule</td><td class="y">parsed into typed fields</td><td class="n">readable to humans, invisible to code</td></tr>
+  </table>
+  <p>That's the whole why-not-markdown argument compressed into one command.
+  Markdown is a format for documents you render. Org, through this lens, is a
+  format for structure you compute on. Same characters on the page; one of them
+  the kernel can answer questions about.</p>
+</section>
+
+<section id="egg">
+  <h2>dissect the EASTER egg</h2>
+  <p>The <a href="org">parent page</a> hides a comment in its own HTML source —
+  a note for whoever views the page the honest way. It isn't decoration; it's
+  valid org, and it parses to a real row. Here's the row the kernel returns for
+  it:</p>
+  <pre class="orgsample">{"title":"you found the written layer",
+ "tags":["easter","egg"],
+ "props":{"DISCOVERED":"by viewing source, the honest way"},
+ "level":1, "state":null, "id":null,
+ "scheduled":null, "deadline":null}</pre>
+  <p>The title is clean, the trailing <code>:easter:egg:</code> became
+  <code>tags</code>, and a <code>:DISCOVERED:</code> property became
+  <code>DISCOVERED</code> in <code>props</code> — the same uppercasing rule from
+  the drawers section, proving itself on a comment nobody was supposed to find.
+  The lesson inside the lesson: org lives anywhere plain text lives. View-source
+  on the parent is itself the drill — paste that comment into
+  <code>wbx query</code> and you'll get exactly the row above. (This page hides
+  one too. Go look.)</p>
+</section>
+
+<section id="limits">
+  <h2>where the lens STOPS</h2>
+  <p>Honesty section. The kernel is a lens, not org-mode, and a lens has edges.
+  Knowing them is the difference between trusting the grammar and being surprised
+  by it:</p>
+  <table class="cmp">
+    <tr><th>construct</th><th>what the kernel does</th></tr>
+    <tr><td>custom TODO keywords (<code>WAIT</code>, <code>KILLED</code>…)</td><td class="n">not recognized. Only <code>TODO</code> / <code>DONE</code>. A <code>#+TODO:</code> config line is ignored; <code>* WAIT foo</code> → <code>state:null</code>, "WAIT" stays in the title</td></tr>
+    <tr><td>priority cookie <code>[#A]</code></td><td class="n">swallowed from the title, exposed as no field — there is no priority on the row</td></tr>
+    <tr><td>time ranges <code>09:00-10:30</code></td><td class="n">pass through raw into <code>at</code> as a single string — not split</td></tr>
+    <tr><td>split planning line</td><td class="n">only the first stamp parses, and it kills the drawer below — the one-line rule is load-bearing</td></tr>
+    <tr><td>a second source block in one section</td><td class="n">ignored — only the first is captured</td></tr>
+    <tr><td><code>lint</code> (the kernel export)</td><td class="n">a stub returning <code>[]</code>. The CLI's <code>wbx lint</code> actually calls <code>validate</code> — different function, real output</td></tr>
+    <tr><td>agenda, links, footnotes, tables-as-data, clock tables…</td><td class="n">rendered as HTML by <code>render()</code>, never surfaced as structure</td></tr>
+  </table>
+  <p>That last row is the honest summary of the whole page. Most of org-mode's
+  enormous surface still <em>renders</em> — the kernel's <code>render()</code> is
+  just orgize's <code>to_html()</code>, so footnotes and tables and links all
+  come out as fine HTML. They just don't become <em>structure</em> the system
+  computes on. The lens surfaces what the ecosystem needs to be machine-readable,
+  and renders the rest as the document it is. That's not a missing feature; it's
+  the line between structure and prose, drawn on purpose.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Can I add custom TODO keywords like WAIT or BLOCKED?</summary>
+    <p>No — verified. The kernel recognizes only <code>TODO</code> and
+    <code>DONE</code>. A <code>#+TODO: TODO WAIT | DONE KILLED</code> config line
+    is ignored, and <code>* WAIT foo</code> parses to <code>state:null</code>
+    with "WAIT" left sitting in the title. If you need more states, they live in
+    properties or tags, not in the keyword slot.</p>
+  </details>
+  <details>
+    <summary>Where did my [#A] priority go?</summary>
+    <p>Orgize swallowed it cleanly — your title comes back without it — but the
+    kernel exposes no priority field anywhere on the row. The cookie is valid org
+    syntax that this lens simply doesn't surface. If priority matters to your
+    plan, put it in a property (<code>:PRIORITY: A</code>) where it'll show up
+    in <code>props</code>.</p>
+  </details>
+  <details>
+    <summary>Is this all of org-mode?</summary>
+    <p>No — and that's the point. This is a lens over org, not the twenty-year
+    Emacs feature set. A dozen-ish constructs carry structural meaning; the rest
+    renders as prose. The grammar is small on purpose, so that what one person
+    writes, every person and every agent reads identically.</p>
+  </details>
+  <details>
+    <summary>How do I check my own file?</summary>
+    <p>Run it through the kernel: <code>wbx query plan.org</code>. You'll get the
+    JSON rows back. If a
+    field is missing or a drawer came back empty, you've found a syntax issue —
+    most often the one-line planning rule. The parser is the spec.</p>
+  </details>
+  <details>
+    <summary>Does this run live in the browser?</summary>
+    <p>The machinery exists — the kernel ships a browser build with a raw
+    ptr/len ABI exporting four functions (<code>parse_headlines</code>,
+    <code>tangle_plan</code>, <code>validate</code>, <code>render</code>), built
+    for exactly this kind of in-page drill. An earlier in-page notebook shipped
+    and was then retired the same day, so today this page prints
+    machine-verified static output rather than running the wasm in your tab.
+    Every JSON snippet here is real <code>wbx</code> output; the live in-page
+    version is a wiring decision, not a missing capability.</p>
+  </details>
+  <details>
+    <summary>Why is wbx lint not the same as the kernel's lint?</summary>
+    <p>A fun honest wrinkle. The kernel exports a <code>lint</code> function that
+    is currently a stub — it returns <code>[]</code>. The CLI's
+    <code>wbx lint</code> doesn't call it; it calls the kernel's
+    <code>validate</code>, which is real and flags missing producers and
+    source-less components. So <code>wbx lint</code> works — it just routes
+    around the stub.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>This page is the receipt for the parent's argument. Each construct it
+  drilled has a deep dive that takes it the whole way down.</p>
+  <div class="cards">
+    <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Org, the grammar<small>the parent — why a written layer at all</small></div><span class="go">→</span></a>
+    <a href="tangling"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Tangling<small>header args + the build plan, all the way down</small></div><span class="go">→</span></a>
+    <a href="drawers"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Drawers<small>the property record mechanism in full</small></div><span class="go">→</span></a>
+    <a href="timestamps"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>Timestamps<small>the complete date grammar</small></div><span class="go">→</span></a>
+    <a href="the-kernel"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
+      <div>The kernel<small>one crate, three surfaces</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under org · syntax
+  :PROPERTIES:
+  :SLUG:   syntax
+  :KIND:   learn
+  :NN:     04.1
+  :KICKER: under org · syntax
+  :TITLE1: write a line
+  :TITLE2: SEE
+  :TITLE3: the row
+  :CHIP:   syntax
+  :PC:     #f2ddb0
+  :AC:     #13d943
+  :HERO:   img/syntax-hero.jpg
+  :END:
+** og
+- the subset of org the kernel surfaces as structure
+- eight fields per headline — every one machine-verified
+- a lens, not all of org-mode; the parser is the spec
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#f2ddb0", .38], ["#aee5c2", .24], ["#a8d4f0", .22], ["#f3c5a3", .16]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+<script type="module" src="learn-mermaid.js"></script>
+</body>
+</html>

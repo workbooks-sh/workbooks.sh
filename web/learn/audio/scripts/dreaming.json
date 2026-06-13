@@ -1,0 +1,71 @@
+{
+ "slug": "dreaming",
+ "title": "dreaming — under agents",
+ "tracks": [
+  {
+   "id": "intro",
+   "title": "A sleep phase between the runs",
+   "text": "Lesson 05 point 8 — dreaming. A deep-dive, under agents. The parent lesson gave a worker the one sense most automation lacks… time. A scheduled agent wakes on a beat, does work, and sleeps until the next beat. But here's the catch this lesson is about. A worker that wakes on a schedule wakes up amnesiac. [curious] Dreaming is the fix. A separate, cheaper model runs between the runs… digesting what the tools did, what got committed, and what's on the board… into one structured journal entry. Its verdicts move the board. Its carry resumes the next run. And the agent never writes it… the sleep process does."
+  },
+  {
+   "id": "problem",
+   "title": "The amnesia tax",
+   "text": "First — the amnesia tax. Every run wakes up amnesiac. It re-reads the board, re-reads the repo, re-reads its own history… just to remember where it was… before it does any actual work. [sighs] And under a wall-clock kill — the living lander's runs die at a twelve-minute ceiling — that orientation cost is the product cost. Minutes spent re-reading are minutes not spent shipping. The naive fixes don't help. A longer context window preserves text, not judgment. Just summarize the chat hands the next run a transcript… not a decision. And there's a second, quieter problem. If the same model that does the work also grades the work mid-run and decides what's next… its priorities drift, run over run. Models flatter their own output. You want the deciding done by something that isn't in the middle of the doing."
+  },
+  {
+   "id": "definition",
+   "title": "The definition",
+   "text": "The definition. Dreaming is a sleep phase between agent runs. A separate, small model digests the cycle's telemetry, commits, and backlog into one structured journal entry… whose verdicts steer the board… and whose carry resumes the next waking run. Written to the repo… never by the agent itself. The metaphor is borrowed straight from biology. R-E-M — the sleep phase where a day's experience is consolidated into memory. Here it's literal plumbing. A module that runs after a cycle ends, reads what happened, and leaves behind a small file the next run reads first. The agent reads its newest dream at orient time. It never writes one."
+  },
+  {
+   "id": "cycle",
+   "title": "Sleep has a slot",
+   "text": "Next — sleep has a slot. Dreaming isn't a daemon that fires whenever. It's a declared state in the agent's lifecycle. Picture the cadence as a chain. First, three add runs in a row. Then an audit run. Then — and this one is different in kind — a sleep node, called rem, where no agent runs at all. Then a plan run. And then it loops back to the start. That rem node skips the agent entirely. The keeper calls the dream process directly… instead of waking the model. Three rules govern it, and all three protect the cadence. First… it's gated — at most one full dream per audit cycle, roughly every fifty minutes. Hit it too soon and it's a no-op tick that just holds position. Second… it holds on failure — a killed dream retries the same state next tick, so cadence position is never lost, even across redeploys. Third… it never blocks a run — on the simple path it's fired and forgotten, so a slow dream can never touch the loop. And the spec is just org. Here's the real rem state, read aloud. A heading… star rem. Then properties. Kind… rem. Next… wake plan. Min-interval… ten minutes. And a one-line note. Dream — consolidate the cycle's telemetry into a rem entry. Headings are states. Properties are the edges and the gates."
+  },
+  {
+   "id": "gather",
+   "title": "What the sleeper sees",
+   "text": "[curious] What does the sleeper actually see? A dream is only as honest as its inputs… so the gather step is deliberately factual. No chat transcript. No model self-report. Just four hard sources about what really happened. First… recent commits — the last twelve, one line each, from the tenant repo. Second… the backlog — the first four thousand characters of the plan file. Third… tool telemetry — the last twenty-five steps, each compressed to a single line. And fourth… the last dream — the first twenty-five hundred characters of the previous entry. That telemetry line is the interesting one. Every tool call is appended to a steps file, lock-free, by construction — nothing the agent does escapes the record. And each row gets squeezed to one line. The tool name… the path, truncated to eighty characters… and the exit code. So the dream reads twenty-five lines that look like this, read aloud — edit… src slash sections slash grown slash Weave dot svelte… exit zero. Tool, what it touched, did it succeed. And because the gather pulls the previous dream in too… dreams chain. Each entry is written with the last one in view, so the journal carries a thread… session over session."
+  },
+  {
+   "id": "anatomy",
+   "title": "Six headings, two load-bearing",
+   "text": "Six headings — two of them load-bearing. The dream model is small and cheap, a diffusion model, temperature nought point eight. It's handed the gathered facts and a prompt that demands exactly six headings, in order. A response missing any one of them is discarded as malformed — no retry, no salvage. [curious] A skipped dream is better than a broken one. Let me walk the six. First… tale — max a hundred and twenty words, plain past tense, naming real files and real commits, never inventing events. A log, not a story. Second… goals — three to five concrete near-term lines, drawn from the backlog and the tale. Third… blue sky — two or three bigger ideas, grounded in what the site actually is. Fourth… fears — two or three honest risks. Repetition. Quality drift. Breaking the page. Saying things that aren't true. This heading exists precisely because models flatter themselves — it's a forced look at the failure modes. Fifth… verdicts — the first load-bearing one, the board moves. And sixth… carry — the second, the resume state. The next two sections are those last two headings… because they're the reason the whole mechanism earns its place."
+  },
+  {
+   "id": "verdicts",
+   "title": "Verdicts move the board",
+   "text": "Verdicts move the board. The verdicts heading is not advice the agent weighs. It's a set of instructions the agent applies mechanically — no judgment at apply time — and that's the whole point. Each verdict names a board task by its exact heading text, and prescribes one of four moves. First… pick up — a task moves from TODO to NEXT, so it's done first. Second… put down — a task moves back from NEXT or DOING to TODO, deprioritized but kept. Third… cancel — the task becomes CANCELLED, with its reason, closed but never deleted. And fourth… keep course — no change, the board order stands. The agent's board protocol, step one of every run, is — apply the newest dream's verdicts, then pick the first NEXT, else the top TODO, and mark it DOING. State changes are the workflow. Tasks are never deleted, only moved. So why mechanical? [excited] Because the deciding already happened — at sleep time, by a model that wasn't mid-task. Applying it at wake time is pure bookkeeping. No judgment at apply time means no drift at apply time. The run that does the work doesn't get to re-litigate its own priorities. That's the cure for the self-grading drift… made structural."
+  },
+  {
+   "id": "carry",
+   "title": "Carry is the resume state",
+   "text": "Carry is the resume state — this is the rung that pays the amnesia tax down. Carry is the handoff note to the next waking run, written so that run does not re-read the world. It holds the task currently DOING… the exact next action… any file mid-flight… and anything verified this cycle that need not be re-verified. The agent's orientation budget is brutal on purpose. At most three reads before the twelve-minute wall closes. First the plan file. Second the newest dream's carry. Third the one file it's about to change. And the instruction on the carry is blunt — trust it, do not re-verify what it already checked. Picture the handoff as a relay between three runs. Run N works the task and leaves it DOING, mid-flight… and writes nothing about itself. The cycle ends, and sleep takes the telemetry, the commits, and the board… and consolidates them into a carry. Then run N plus one wakes, reads that carry — the DOING task, the next action, what's already verified — skips re-orientation entirely, and goes straight to work. The only thing crossing the gap between runs… is the carry. [curious] And the trade is explicit. Carry is trusted unverified, by design — speed over safety. The safety net isn't re-checking. It's the next audit state, which re-grounds the agent against reality on a known cadence. Between audits, the agent moves fast on faith. That's the bargain that buys back the minutes."
+  },
+  {
+   "id": "daydreams",
+   "title": "The in-between tier",
+   "text": "The in-between tier. Not every gap between runs earns a full dream — the gate sees to that. But the runtime fills the smaller gaps with a second, lighter tier… daydreams. Ephemeral musings — at most forty words, lowercase, present tense, a little wistful — written only to the public site, and never committed. The reason is precise. So the public timeline carries no dream noise… and the agent never looks like it's burning cycles narrating itself. The two tiers split cleanly. A full dream fires after an audit commit, gated to fifty minutes, committed as a rem commit, six headings, temperature nought point eight. A daydream fires on any other run, gated to twelve minutes, never committed, site-only, forty words, temperature one. The full dream is judgment… validated and committed. The daydream is mood… thrown away. Here's a real one, genuinely captured from a dev box. [whispers] i watch the pages load like sunrise, hoping each click finds a quiet corner where users linger, while my code hums softly in the background, dreaming of smoother paths. It does no work. It moves no board. It's the texture of a thing that's awake between its jobs… and it costs almost nothing."
+  },
+  {
+   "id": "public",
+   "title": "The journal is public",
+   "text": "The journal is public. Every full dream is committed as a rem commit and pushed to main. The public timeline badges those commits, and a journal page renders them live — fetching the manifest every sixty seconds. The agent on the lander has a name. Waldo — the Workbook Autonomous Live Document Operator. And its commit tags are a small type system. Add… blog… audit… and rem. [excited] And here's the transparency move that matters. The raw telemetry stays private. Files like the steps log carry an underscore prefix that marks them private — they never leave the tenant. What's public is the distillation… not the firehose. You can read what the agent thinks it did, and where it thinks it's going, in plain language… without exposing every truncated tool argument it ever logged. Transparency by digest."
+  },
+  {
+   "id": "honest",
+   "title": "Where dreaming breaks",
+   "text": "Now the honest part — where dreaming breaks. This is a young mechanism, and it has real edges. First… a bad dream mis-steers a run. Verdicts are applied mechanically and carry is trusted unverified — so if the dream decides wrong, the next run faithfully executes the wrong thing. The bound is the next audit, not anything tighter. Second… the twenty-five-step slice can miss the story. The dream sees the last twenty-five tool calls with eighty-character arguments. A long cycle, or a subtlety in a truncated path, simply isn't in view. Third… malformed dreams vanish silently. Miss a heading, and the entry is discarded with a log warning — no dream that cycle. Correct behaviour… but the journal can have gaps you won't notice. And fourth… one journal per tenant. Dreams are written per repo, not per agent. Whether each member of a multi-agent fleet should dream individually… is not yet built. And the boundary that keeps all this safe to adopt — the Dreams engine is host code, it ships in the runtime, fixed. But the verdict protocol is convention. It lives in the tenant's editable agent definition. The runtime gives you the sleep stage. How your agent consumes a dream… is yours to shape."
+  },
+  {
+   "id": "faq",
+   "title": "Questions people actually ask",
+   "text": "Quick fire. [curious] Does it cost much? Roughly one small-model call per audit cycle — gated to once every fifty minutes — plus the cheap, throwaway daydreams. It's a rounding error against the runs it makes faster. Can I change the dream model? Yes — one environment variable sets it. The interval and the lifecycle placement are config too. Can the agent fake its own dreams? No. It never writes the rem folder. The sleep process does, from telemetry and commits, while the agent isn't running. The separation is the integrity. Why org headings, not J-SON? Because the entry has two readers. The agent parses the fixed headings to move the board — and a human reads the journal, and the next dream reads the previous one as prose. Org is parseable as a schema… and readable as writing. And — do multiple agents share dreams? Today, yes — one journal per tenant. Per-agent dreaming isn't built yet. [chuckles] We'd rather mark that honestly than imply it works."
+  },
+  {
+   "id": "outro",
+   "title": "Back up to the parent",
+   "text": "So that's dreaming. A scheduled worker wakes amnesiac — so it never reads itself. A separate, cheaper model sleeps between the runs, and leaves two things behind. Verdicts that move the board. And a carry the next run trusts… instead of re-reading the world. If any of it felt unfamiliar, the way back up is short. The parent is agents — lesson five — the worker that sleeps. From there, orchestration holds the lifecycle the rem state lives in… and loops holds the single run whose telemetry feeds the dream. [curious] Go back up to agents. Everything here is built on it."
+  }
+ ]
+}

@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spawning — the run that outlives the request — Workbooks</title>
+<meta name="description" content="Spawning is starting a run as a supervised, named process: one call returns an id in milliseconds; the run works for minutes under a supervisor, addressable by that id from anywhere — including from itself. A sub-lesson under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/spawning-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="spawning — the run that outlives the request — Workbooks">
+<meta property="og:description" content="One supervised process per run, named by id, started with a call that returns in milliseconds. The caller dies; the run doesn't care. A sub-lesson under agents.">
+<meta property="og:url" content="https://workbooks.sh/learn/spawning">
+<meta property="og:image" content="https://workbooks.sh/og/spawning.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="spawning — the run that outlives the request — Workbooks">
+<meta name="twitter:description" content="One supervised process per run, named by id, started with a call that returns in milliseconds. The caller dies; the run doesn't care.">
+<meta name="twitter:image" content="https://workbooks.sh/og/spawning.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/spawning.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+   * TODO POST /api/run            :spawn:
+     a small process answers the phone in milliseconds
+   * DOING the actual ten-minute job
+     a second, unnamed process does the loop — your socket can hang up
+   * DONE  poll or stream by id
+     both are just a registry lookup against a process already keeping every step
+   the caller is disposable. the run is not. that's the whole lesson.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·4 — <b>under agents · spawning</b></div>
+      <h1><span class="ln">the run that</span><span class="ln bub">OUTLIVES</span><span class="ln">the request</span></h1>
+      <p class="dek">Every agent demo dies with its HTTP request. <b>Spawning</b> is the
+      fix, and it's one idea: start a run as a <b>supervised, named process</b>.
+      One call returns an id in milliseconds; the run works for minutes under a
+      supervisor; you reach it by that id from anywhere — including from
+      <b>itself</b>. The caller is disposable. The run is not.</p>
+      <div class="meta">
+        <span class="on">spawning</span><span>11 min read</span>
+      </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/spawning-hero.jpg" alt="A small operator at a glowing console hands a numbered token to a towering autonomous machine that walks off to work alone down a vast hall of identical numbered bays — the operator turns to leave, the machine keeps working — bright, monumental, 1970s sci-fi style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>spawning</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The run that outlives the request</a>
+  <a href="#definition">The definition</a>
+  <a href="#one-call">One call, an id, a 202</a>
+  <a href="#receptionist">The receptionist and the worker</a>
+  <a href="#fanout">Every step, three sinks</a>
+  <a href="#watching">Poll or stream</a>
+  <a href="#self-address">The run that knows its name</a>
+  <a href="#standing">The other spawner: born at boot</a>
+  <a href="#clocks">Bounded at every layer</a>
+  <a href="#honesty">What dies, what survives</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the run that outlives the REQUEST</h2>
+  <p>Here is where every agent demo breaks. You ask for something that takes
+  ten minutes — audit a repo, rewrite a directory, work a long plan — and the
+  request/response model has no answer for you. The HTTP connection times out
+  somewhere around thirty seconds. So you hold the socket open and pray the
+  proxy, the load balancer, and the laptop lid all cooperate for ten straight
+  minutes. They don't.</p>
+  <p>The escape hatch everyone reaches for is the same one: a job queue, a
+  worker pool, a status table, a websocket relay. You rebuild Sidekiq around
+  every agent — the identical plumbing, every project, just to answer the
+  question <em>did it finish yet?</em> The parent lesson sold agents as workers
+  <a href="agents">hired for the long run</a>. This page answers the unglamorous
+  operational question underneath that pitch: <b>what process, exactly, is the
+  agent — and who keeps it alive after you hang up?</b></p>
+</section>
+
+<section id="definition">
+  <h2>spawning, DEFINED</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">spawn·ing</span> <span class="pr">/ˈspɔːn·ɪŋ/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> starting a run as a <b>supervised, named
+    process</b>: one call returns an <b>id</b> in milliseconds; the run works
+    for minutes under a supervisor, <b>addressable by that id</b> from anywhere
+    — including from itself.</p>
+  </div>
+  <p>Nothing here is a job framework bolted on. The supervisor, the named
+  registry, the process-per-run — these are the BEAM's own primitives, the
+  same ones that have run phone networks for thirty years. An agent run isn't
+  a row in a queue table. It's a process with a supervisor watching it.</p>
+</section>
+
+<section id="one-call">
+  <h2>one call, an id, a 202</h2>
+  <p>You start a run with one HTTP call. <code>POST /api/run</code> takes a
+  body, mints an id, and returns <b>before the run does any work</b>:</p>
+  <pre class="orgsample">$ curl -s -X POST $WB_RUNTIME_URL/api/run \
+    -d '{"system":"You are a careful, capable agent.",
+         "task":"audit blog/ for dead links and write report.org",
+         "max_steps":40}'
+{"id":"run-1742","status":"running"}            <i>← HTTP 202, milliseconds later</i></pre>
+  <p>The id is <code>run-&lt;integer&gt;</code> — minted from a process-unique
+  counter, not a UUID. The <b>202</b> is the whole point: it means
+  <em>accepted, working on it</em>, not <em>done</em>. Your caller is free the
+  instant it has the id. Three knobs ride in the body:</p>
+  <ul>
+    <li><b><code>max_steps</code></b> — the loop's ceiling. At this seam the
+    default is <b>40</b>. The raw agent default underneath is <b>12</b>; standing
+    workers tick at <b>60</b>. Different front doors, different budgets.</li>
+    <li><b><code>model</code></b> — which model drives the loop. Optional;
+    falls through to the engine default.</li>
+    <li><b><code>exec</code></b> — not a parameter so much as a <b>trust
+    grant</b>. It unlocks host-brokered git, publish, image, and OS-workdir
+    tools — never raw bash; that hatch was deleted on purpose. It's honored
+    only when the desktop says so or <code>WB_AGENT_EXEC=1</code> is set in the
+    environment. Ask for it without the grant and you simply don't get those
+    tools.</li>
+  </ul>
+  <p>The CLI is the same call wearing a friendlier face:
+  <code>wbx agent run "audit blog/ for dead links" --model openrouter/…</code>
+  posts to this endpoint and prints the id. There is no second code path — the
+  CLI is a client of <code>/api/run</code>, exactly like your curl.</p>
+  <figure class="diag" aria-label="POST /api/run returns 202 before the run starts">
+  <pre class="mermaid">
+sequenceDiagram
+  participant C as caller (curl / wbx)
+  participant W as web.ex
+  participant S as AgentSession.Sup<br/>(DynamicSupervisor)
+  participant R as the session process
+  C->>W: POST /api/run {system, task, max_steps}
+  W->>W: mint id run-1742
+  W->>S: start_child(session for run-1742)
+  S->>R: spawn + register by id
+  W-->>C: 202 {"id":"run-1742","status":"running"}
+  Note over R: the run hasn't started yet —<br/>the 202 is already on its way back
+  R->>R: NOW the work begins
+  </pre>
+  <figcaption class="dcap">the reply leaves <b>before</b> the work begins — milliseconds, not minutes</figcaption>
+  </figure>
+</section>
+
+<section id="receptionist">
+  <h2>the receptionist and the WORKER</h2>
+  <p>Here is the load-bearing trick. A run is not one process — it's two, and
+  the split is what makes everything else trivial.</p>
+  <p>The first process is a supervised <b>GenServer</b>, the
+  <code>AgentSession</code>. Think of it as a receptionist. It's started under
+  a <code>DynamicSupervisor</code>, registered by its id in a registry, and its
+  entire job is to <em>stay responsive</em>. It answers <em>what's your
+  status?</em>, <em>subscribe me to updates</em>, <em>here's a human review</em>
+  — instantly, always, because it never does the slow work itself.</p>
+  <p>The slow work belongs to a <b>second, unnamed process</b>. When the
+  session boots, its <code>handle_continue</code> spawns a plain child process
+  that calls <code>Agent.run</code> and grinds through the model-and-tools loop
+  for however many minutes it takes. The receptionist holds a handle to it and
+  keeps taking calls. That's why <code>GET /api/run/:id</code> never blocks
+  waiting on the model: you're talking to the receptionist, not the worker. The
+  worker could be ten seconds into a slow tool call and the status answer still
+  returns instantly.</p>
+  <p>Lookup is by registry. Hand any of these APIs an id that isn't registered
+  and you get a clean <code>:not_found</code> back — no crash, no guessing. And
+  both the registry and the supervisor are permanent children of the
+  application's supervision tree, so the spawning machinery is up and waiting
+  <em>before any HTTP listener accepts a connection</em>.</p>
+  <figure class="diag" aria-label="the supervision tree for a run">
+  <pre class="mermaid">
+flowchart TD
+  app[["Application supervisor"]]
+  app --> reg["AgentSession.Registry<br/>id → pid"]
+  app --> sup["AgentSession.Sup<br/>DynamicSupervisor"]
+  sup --> s1["session run-1742<br/>(receptionist · GenServer)"]
+  sup --> s2["session run-1743<br/>(receptionist · GenServer)"]
+  s1 -. "spawn (unlinked)" .-> w1["worker — Agent.run loop<br/>(does the minutes of work)"]
+  s2 -. "spawn (unlinked)" .-> w2["worker — Agent.run loop"]
+  style app fill:#9fc4e8,stroke:#121316,stroke-width:2.5px
+  style s1 fill:#13d943,stroke:#121316,stroke-width:2px
+  style w1 fill:#ffffff,stroke:#121316
+  </pre>
+  <figcaption class="dcap">one session per run, registered by id; the worker hangs off it, doing the loop</figcaption>
+  </figure>
+  <p>When the worker finishes, it sends the session a done message. The
+  session's status flips from <code>:running</code> to <code>:done</code> and
+  every subscriber gets the result. Until then, the session's state carries
+  everything anyone could ask for: its id, status, the run, the live event
+  list, its subscribers, and any pending reviews.</p>
+</section>
+
+<section id="fanout">
+  <h2>every step, three SINKS</h2>
+  <p>Each time the loop calls a tool, it produces a <b>step event</b> — one
+  consistent shape, the same one the whole engine speaks:</p>
+  <pre class="orgsample">%{step, agent, tool, args, output, exit_code, error, dur_ms, ts}</pre>
+  <p>That single event fans out to three different places, each with its own
+  job and its own truncation budget. The truncation isn't sloppiness — it's a
+  deliberate gradient, generous where the data is durable and tight where it's
+  ephemeral:</p>
+  <table class="cmp">
+    <tr><th>sink</th><th>what it's for</th><th>output limit</th><th>survives engine restart?</th></tr>
+    <tr><td><b>on_step → WebSocket</b></td><td>live UI fanout to every subscriber</td><td>500 chars / frame</td><td class="n">no — dies with the socket</td></tr>
+    <tr><td><b><code>_steps.jsonl</code></b></td><td>the append-only ledger, written regardless of any caller</td><td>200 chars / line</td><td class="y">yes — it's a file</td></tr>
+    <tr><td><b><code>events.org</code></b></td><td>the readable run transcript, rendered on finish</td><td>300 chars / step</td><td>only if the VFS was file-backed</td></tr>
+  </table>
+  <p>The middle row is the important one. <code>_steps.jsonl</code> is written
+  on every step <em>regardless of any caller-supplied on_step</em> — so nothing
+  escapes by construction. You can ignore the websocket entirely and the
+  provenance trail still exists on disk. The full event holds up to 4000 chars
+  of output; what each sink keeps is a deliberate slice of that. Generous at the
+  source, tight at the edges.</p>
+  <p>One more guard lives at this layer: every tool call is wall-clock bounded
+  at <b>150 seconds</b>. A tool that wedges gets shut down and becomes a
+  <em>tool error the model sees</em> — never a stalled run. The loop keeps
+  going; the model decides what to do about the failure.</p>
+</section>
+
+<section id="watching">
+  <h2>poll or STREAM</h2>
+  <p>Because the receptionist was accumulating every step all along, watching a
+  run is just a registry lookup. Two ways to do it.</p>
+  <p><b>Poll</b> with <code>GET /api/run/:id</code>. Mid-run you get a running
+  snapshot; minutes later, a finished one:</p>
+  <pre class="orgsample">$ curl -s $WB_RUNTIME_URL/api/run/run-1742      <i>← mid-run</i>
+{"status":"running","steps":7,"live":[…],"reviews":[]}
+
+$ curl -s $WB_RUNTIME_URL/api/run/run-1742      <i>← minutes later</i>
+{"status":"done","steps":12,"result":"…",
+ "tools":["shell","fetch","vfs_write","done"],
+ "events_org":"* Agent run  :session:\n** step 0: shell  :tool_call:…",
+ "reviews":[]}</pre>
+  <p>The done payload carries the distinct tool names used, the result, and the
+  whole <code>events.org</code> transcript inline. One honest quirk to script
+  around: an <em>unknown</em> id here returns HTTP <b>200</b> with
+  <code>{"error":"no such run"}</code> — not a 404. Check the body, not just the
+  status code.</p>
+  <p><b>Stream</b> with <code>GET /api/run/:id/stream</code>, a WebSocket
+  upgrade with a 10-minute idle timeout. On connect it subscribes you, then
+  pushes a frame per step, then a final done frame:</p>
+  <pre class="orgsample">{"type":"subscribed","id":"run-1742"}
+{"type":"step","step":0,"tool":"shell","output":"blog/2026-05-01.org\nblog/…"}
+{"type":"step","step":1,"tool":"fetch","output":"fetch failed: HTTP 404"}
+{"type":"done","result":"3 dead links found; report.org written"}</pre>
+  <p>Those <code>output</code> values are sliced to 500 chars per frame — enough
+  to watch the run think, not the full payload. A bad id over the socket gets
+  <code>{"type":"error","error":"no such run"}</code>.</p>
+  <figure class="diag" aria-label="a WebSocket client across a three-step run">
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as UI (WS client)
+  participant A as AgentStream
+  participant S as session run-1742
+  U->>A: GET /api/run/run-1742/stream (upgrade)
+  A->>S: subscribe
+  A-->>U: {"type":"subscribed","id":"run-1742"}
+  S-->>A: step 0 (shell)
+  A-->>U: {"type":"step","step":0,"tool":"shell", …}
+  S-->>A: step 1 (fetch)
+  A-->>U: {"type":"step","step":1,"tool":"fetch", …}
+  S-->>A: run done
+  A-->>U: {"type":"done","result":"3 dead links found …"}
+  </pre>
+  <figcaption class="dcap">scripts poll; UIs stream — both read the same accumulating session</figcaption>
+  </figure>
+  <p>The rule of thumb: a script that wants a final answer polls; a UI that
+  wants to show the run thinking streams. Same data, two doors.</p>
+</section>
+
+<section id="self-address">
+  <h2>the run that knows its NAME</h2>
+  <p>Here's the move that turns spawning into a building block instead of a
+  convenience. When the runtime spawns a run, it injects <code>WB_RUN=&lt;run
+  id&gt;</code> into the agent's environment. The run knows its own name.</p>
+  <p>That sounds small until you see what it enables: a run can build a URL that
+  routes <em>back into its own mailbox</em>. A connect URL like
+  <code>…/api/ctk/commit?run=$WB_RUN</code> lets the run hand a human a place to
+  send a decision, then call <code>wb ctk await $WB_RUN</code> and block until
+  it arrives. The review lands via <code>POST /api/ctk/commit?run=&lt;id&gt;</code>,
+  gets pushed live to subscribers and queued FIFO, and the agent polls for it —
+  a 204 when there's nothing yet. Reviews even persist to a per-run JSONL file,
+  so the decision record survives the process. This is the primitive under
+  human-in-the-loop, and it has its own deep dive.</p>
+  <p><i>→ The full review loop is the <a href="human-in-the-loop">human-in-the-loop</a>
+  lesson. This is just the seam it stands on: a run that can address itself.</i></p>
+</section>
+
+<section id="standing">
+  <h2>the other spawner: born at BOOT</h2>
+  <p>Everything so far described runs born <em>on demand</em> — one
+  <code>POST /api/run</code>, one process under the DynamicSupervisor. There's a
+  second spawner with the same engine inside. Standing agents are born at boot
+  from a declared manifest, under a <b>static</b> supervisor.</p>
+  <p>You declare them in a small org manifest. Headings are agent names;
+  properties point at definitions and tune cadence:</p>
+  <pre class="orgsample">#+TITLE: crew
+* wren
+  :PROPERTIES:
+  :DEF: /data/agents/writer.org
+  :LIFECYCLE: /data/lifecycles/writer.org
+  :INTERVAL: 10m
+  :END:
+* moss
+  :PROPERTIES:
+  :DEF: /data/agents/editor.org
+  :END:</pre>
+  <p>Point <code>WB_CREW_DEF</code> at that file and the supervisor starts one
+  worker per heading. Walk the math the manifest implies: <b>wren</b> first
+  ticks at boot-grace plus zero; <b>moss</b> starts staggered by
+  <code>i × WB_CREW_STAGGER_MS</code> — 30 seconds later by default — so two
+  agents don't slam the engine in the same instant. Wren has a 10-minute
+  interval; moss declared none, so it defaults to once an hour. Both runs queue
+  on a global <b>Gate</b> that caps concurrency at <b>2</b>; a worker acquires
+  before its run and releases in an <code>after</code> block, so a wedged run
+  can't starve its peers. Each run executes in a linked task killed at
+  <b>15 minutes</b> wall clock. And cadence survives restarts: a
+  <code>keeper-last-run-wren</code> file under <code>WB_DATA</code> means a
+  reboot doesn't reset the clock to zero.</p>
+  <figure class="diag" aria-label="ad-hoc spawner versus standing spawner">
+  <table class="cmp">
+    <tr><th></th><th>ad-hoc run</th><th>standing agent</th></tr>
+    <tr><td>spawner</td><td>DynamicSupervisor</td><td>static Supervisor (one per member)</td></tr>
+    <tr><td>born</td><td class="y">on demand — a POST</td><td>at boot, staggered (i × 30s)</td></tr>
+    <tr><td>trigger</td><td><code>POST /api/run</code> / <code>wbx agent run</code></td><td>interval cadence from the manifest</td></tr>
+    <tr><td>concurrency</td><td>unbounded by design</td><td>Gate — max 2 at once</td></tr>
+    <tr><td>per-run clock</td><td>max_steps + 150s/tool</td><td>15-minute wall clock per tick</td></tr>
+    <tr><td>interior</td><td class="y" colspan="2">the same <code>Agent.run</code> loop, either way</td></tr>
+  </table>
+  <figcaption class="dcap">two front doors, <b>one engine</b> — the standing agent reaches the same loop your curl did</figcaption>
+  </figure>
+  <p>The punchline is the last row. The keeper tick goes through the same path
+  as <code>/api/run</code> — same loop, same event shape, same gates — just with
+  its workdir set to a tenant repo and the exec grant on. Idle agents back off
+  too: a streak of no-work runs grows the gap exponentially, capped at 30
+  minutes, and a single completed run snaps it back. The <a href="orchestration">orchestration</a>
+  and <a href="fleets">fleets</a> lessons live in this manifest in full; this is
+  the trailhead.</p>
+</section>
+
+<section id="clocks">
+  <h2>bounded at every LAYER</h2>
+  <p>A run could hang in a dozen places — a tool that never returns, a loop that
+  never converges, a socket nobody closes. The design's answer is a ladder of
+  time bounds, each one converting a hang into a signal the next layer up can
+  act on:</p>
+  <table class="cmp">
+    <tr><th>bound</th><th>value</th><th>who enforces it</th><th>what a hang becomes</th></tr>
+    <tr><td>tool call</td><td>150 s</td><td>the agent loop</td><td>a tool error the model sees</td></tr>
+    <tr><td>loop length</td><td>max_steps (40 / 12 / 60)</td><td>the run itself</td><td>a clean finish, not an infinite loop</td></tr>
+    <tr><td>keeper tick</td><td>15 min</td><td>the standing worker</td><td>a killed task, peers freed</td></tr>
+    <tr><td>WS idle</td><td>10 min</td><td>the stream socket</td><td>a closed connection, run untouched</td></tr>
+    <tr><td>no-work backoff</td><td>→ 30 min cap</td><td>the standing worker</td><td>an idle agent that stops burning calls</td></tr>
+  </table>
+  <p>Read the table's verdict in one line: <b>every bound turns a stall into a
+  fact something else can handle.</b> A wedged tool doesn't stall the run — it
+  becomes an error the model routes around. A streamed socket going idle
+  doesn't keep the run hostage — it just closes, and the run, which never cared
+  about your socket, keeps working. These aren't safety nets bolted on after the
+  fact. They're the shape of the thing.</p>
+</section>
+
+<section id="honesty">
+  <h2>what dies, what SURVIVES</h2>
+  <p>The honest limits, stated plainly, because they decide how you script
+  against this.</p>
+  <p><b>By default a run leaves nothing behind.</b> The spawned loop opens its
+  own VFS, and the default is <code>:memory:</code>. The moduledoc's promise of
+  a resumable, replicable run is true <em>only</em> when the caller passes a
+  durable <code>:vfs</code> path. No path, no residue from the VFS.</p>
+  <p><b>Engine restart kills every in-flight run.</b> Sessions are supervised
+  children, not persisted across a BEAM restart. What survives a restart is the
+  durable residue: <code>_steps.jsonl</code>, the per-run review JSONL, and
+  <code>events.org</code> if the VFS was file-backed. The live sessions
+  themselves are gone.</p>
+  <p><b>A hard-crashed worker leaves a zombie.</b> The worker process is a plain
+  spawn — unlinked, unmonitored. If it crashes outright (as opposed to an LLM
+  error, which the loop converts into a clean <code>error: …</code> finish), the
+  session never hears the done message and shows <code>status: running</code>
+  indefinitely. We didn't find a sweeper that reaps these, so treat a run stuck
+  on running past your timeout budget as suspect, not as still-working.</p>
+  <p><b>A session crash re-runs, it doesn't resume.</b> The session GenServer
+  uses OTP's default permanent restart. If the <em>session</em> itself crashes,
+  the supervisor restarts it with the same id and task — and
+  <code>handle_continue</code> runs the whole task again from step zero.
+  Subscribers and live history are lost. This is inferred from the OTP defaults,
+  not an explicit choice in the code, but it's the behavior to expect.</p>
+  <p>None of this is hidden. The truncation tiers are real, the
+  200-not-404 quirk is real, and the durable trail is exactly three files. Build
+  on what's durable; don't assume the live process is.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Does the run survive my laptop closing?</summary>
+    <p>Yes — if the engine is somewhere else (your deployed runtime on Fly, say).
+    The <em>caller</em> is disposable by design; closing your laptop just drops
+    the client that held the id. Reconnect later and poll the id. If the engine
+    <em>is</em> your laptop, then closing it stops the engine, and the run with
+    it.</p>
+  </details>
+  <details>
+    <summary>Can I cancel a run?</summary>
+    <p>Honestly: we found no kill endpoint in the surface this lesson covers. The
+    brakes are <code>max_steps</code> and the time bounds — 150s per tool, the
+    loop ceiling, the 15-minute keeper clock. If you need a hard cancel, verify
+    the current API before relying on one; don't assume it exists because it
+    feels like it should.</p>
+  </details>
+  <details>
+    <summary>How many runs can go at once?</summary>
+    <p>Ad-hoc runs are unbounded by design — each <code>POST /api/run</code> is
+    its own supervised process, and the DynamicSupervisor doesn't cap them.
+    Standing agents are different: the Gate caps them at 2 concurrent by default
+    (<code>WB_CREW_MAX_CONCURRENT</code>), precisely so a fleet of them doesn't
+    overwhelm the engine.</p>
+  </details>
+  <details>
+    <summary>Why did my run say running forever?</summary>
+    <p>Almost certainly the zombie case: the unlinked worker crashed hard, so the
+    session never got its done message. An LLM error wouldn't do this — those get
+    converted to a clean finish. A genuine process crash leaves the status stuck.
+    Past your timeout budget, treat running as suspect.</p>
+  </details>
+  <details>
+    <summary>Should I poll or stream?</summary>
+    <p>Poll from a script that wants the final answer — one
+    <code>GET /api/run/:id</code> when you expect it's done, and read the result
+    and tools off the payload. Stream from a UI that wants to show the run
+    thinking, frame by frame. Both read the same session; the choice is about
+    your client, not the run.</p>
+  </details>
+  <details>
+    <summary>Is this a job queue under the hood?</summary>
+    <p>No — and the distinction matters. There's no queue table, no worker pool
+    you provision, no relay you stand up. It's a supervised process per run, named
+    in a registry, on the BEAM. The thing that runs phone networks runs your
+    agent.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Spawning is the mechanics under the parent lesson. From here, go inward to
+  what the process actually does, or outward to who calls spawn on a cadence.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the parent — what a run is for</small></div><span class="go">→</span></a>
+    <a href="loops"><span class="sw" style="background:#13d943"><b>↻</b></span>
+      <div>Loops<small>inside the spawned process</small></div><span class="go">→</span></a>
+    <a href="orchestration"><span class="sw" style="background:#9fc4e8"><b>⊹</b></span>
+      <div>Orchestration<small>who calls spawn on a cadence</small></div><span class="go">→</span></a>
+    <a href="human-in-the-loop"><span class="sw" style="background:#f2ddb0"><b>⮐</b></span>
+      <div>Human-in-the-loop<small>the run that awaits you</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · spawning
+  :PROPERTIES:
+  :SLUG:   spawning
+  :KIND:   learn
+  :NN:     05.4
+  :KICKER: under agents · spawning
+  :TITLE1: the run that
+  :TITLE2: OUTLIVES
+  :TITLE3: the request
+  :CHIP:   spawning
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/spawning-hero.jpg
+  :END:
+** og
+- one supervised process per run, named by id
+- one call returns a 202 in milliseconds; the run works for minutes
+- the caller is disposable; the run is not
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .38], ["#13d943", .22], ["#aee5c2", .22], ["#f2ddb0", .18]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script type="module" src="learn-mermaid.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>

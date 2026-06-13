@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en" style="--pc:#9fc4e8; --ac:#13d943;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dreaming — the sleep phase between runs — Workbooks</title>
+<meta name="description" content="Dreaming is a sleep phase between agent runs: a separate small model digests telemetry, commits, and the backlog into one structured journal entry — whose verdicts steer the board and whose carry resumes the next waking run. A deep-dive under agents.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/dreaming-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="dreaming — the sleep phase between runs">
+<meta property="og:description" content="A separate small model digests telemetry, commits, and the backlog into one structured journal entry between runs — verdicts steer the board, carry resumes the next run. A deep-dive under agents.">
+<meta property="og:url" content="https://workbooks.sh/learn/dreaming">
+<meta property="og:image" content="https://workbooks.sh/og/dreaming.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="dreaming — the sleep phase between runs">
+<meta name="twitter:description" content="A separate small model digests telemetry, commits, and the backlog into one structured journal entry between runs — verdicts steer the board, carry resumes the next run.">
+<meta name="twitter:image" content="https://workbooks.sh/og/dreaming.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/dreaming.jpg">
+<link rel="stylesheet" href="learn.css?v=4">
+</head>
+<body>
+<!--
+
+    the trick on this page, in one breath:
+    a scheduled worker wakes amnesiac and burns its first minutes
+    re-reading the world. so it never reads itself — a SEPARATE,
+    cheaper model dreams between runs and leaves two things behind:
+    * verdicts  → move the board mechanically (pick up → NEXT)
+    * carry     → the resume note the next run TRUSTS unverified
+    the agent never writes its own dream. the sleep process does.
+    you're reading the easter egg. the next run won't re-read it. that's the point.
+
+-->
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=8"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 05·8 — <b>under agents · dreaming</b></div>
+    <h1><span class="ln">a sleep phase</span><span class="ln bub">BETWEEN</span><span class="ln">the runs</span></h1>
+    <p class="dek">A scheduled <a href="agents">agent</a> wakes up amnesiac and burns its
+    first minutes re-reading the world. <b>Dreaming</b> fixes that — a separate, cheaper
+    model runs <b>between</b> runs, digesting what the tools did, what got committed, and
+    what's on the board into one structured journal entry. Its <b>verdicts</b> move the
+    board; its <b>carry</b> resumes the next run. The agent never writes it — the sleep
+    process does.</p>
+    <div class="meta">
+    <span class="on">dreaming</span><span>11 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/dreaming-hero.jpg" alt="A small figure asleep at the foot of a monumental glowing memory-engine that distills a day of work into a single bright crystal tablet — warm blues and green, 1970s sci-fi paperback style, vast machine versus tiny dreamer">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/agents.svg" alt=""></div><span>dreaming</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">The amnesia tax</a>
+  <a href="#definition">The definition</a>
+  <a href="#cycle">Sleep has a slot</a>
+  <a href="#gather">What the sleeper sees</a>
+  <a href="#anatomy">Six headings, two load-bearing</a>
+  <a href="#verdicts">Verdicts move the board</a>
+  <a href="#carry">Carry is the resume state</a>
+  <a href="#daydreams">The in-between tier</a>
+  <a href="#public">The journal is public</a>
+  <a href="#honest">Where dreaming breaks</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>the amnesia TAX</h2>
+  <p>The <a href="agents">agents lesson</a> gave a worker the one sense most
+  automation lacks — time. A scheduled agent wakes on a beat, does work, and
+  sleeps until the next beat. But a worker that wakes on a schedule has a brutal
+  economics problem: <b>every run wakes up amnesiac</b>. It re-reads the board,
+  re-reads the repo, re-reads its own history — just to remember where it was —
+  before it does any actual work.</p>
+  <p>Under a wall-clock kill — the living lander's agent runs die at a 12-minute
+  ceiling — that orientation cost <em>is</em> the product cost. Minutes spent
+  re-reading are minutes not spent shipping. And the naive fixes don't help: a
+  longer context window preserves text, not judgment; "just summarize the chat"
+  hands the next run a transcript, not a decision about what to do.</p>
+  <p>There's a second, quieter problem. If the same model that does the work also
+  grades the work mid-run and decides what's next, its priorities <b>drift</b>
+  run-over-run — models flatter their own output. You want the deciding done by
+  something that isn't in the middle of the doing.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">dream·ing</span> <span class="pr">/ˈdriː·mɪŋ/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a <b>sleep phase between agent runs</b>: a
+    separate, small model digests the cycle's telemetry, commits, and backlog
+    into <b>one structured journal entry</b> whose <b>verdicts</b> steer the
+    board and whose <b>carry</b> resumes the next waking run — written to the
+    repo, never by the agent itself.</p>
+  </div>
+  <p>The metaphor is borrowed straight from biology: REM, the sleep phase where
+  a day's experience is consolidated into memory. Here it's literal plumbing —
+  a module named <code>Workbooks.Dreams</code> that runs after a cycle ends,
+  reads what happened, and leaves behind a small org file the next run will
+  read first. The agent reads its newest dream at orient time; it
+  <b>never writes one</b>.</p>
+</section>
+
+<section id="cycle">
+  <h2>sleep has a SLOT</h2>
+  <p>Dreaming isn't a background daemon that fires whenever. It's a declared
+  <em>state</em> in the agent's lifecycle — a small state machine the keeper
+  steps through, one state per scheduled tick. The canonical cadence is three
+  add runs, an audit, a dream, then a plan, and loop:</p>
+  <pre class="mermaid">
+flowchart LR
+  a1["wake_add"] --> a2["wake_add"] --> a3["wake_add"] --> au["wake_audit"]
+  au --> rem(["rem — SLEEP<br/>no agent runs"])
+  rem --> pl["wake_plan"]
+  pl -.loop.-> a1
+  style a1 fill:#ffffff,stroke:#121316
+  style a2 fill:#ffffff,stroke:#121316
+  style a3 fill:#ffffff,stroke:#121316
+  style au fill:#9fc4e8,stroke:#121316
+  style rem fill:#13d943,stroke:#121316,stroke-width:2.5px
+  style pl fill:#ffffff,stroke:#121316
+  </pre>
+  <p>The <code>rem</code> node is different in kind from its neighbors. A state
+  marked <code>:KIND: rem</code> <b>skips the agent run entirely</b> — the keeper
+  calls the dream process directly instead of waking the model. Three rules
+  govern it, and all three are about protecting the cadence:</p>
+  <ul>
+    <li><b>It's gated.</b> A minimum interval — default 50 minutes — means at most
+    one full dream per audit cycle. Hit the state too soon and it's a no-op tick
+    that simply holds position.</li>
+    <li><b>It holds on failure.</b> A killed or failed dream retries the <em>same</em>
+    state next tick. Cadence position is never lost; it persists across redeploys.</li>
+    <li><b>It never blocks a run.</b> On the legacy path — no declared lifecycle —
+    the dream is fired forget-and-go after each wake, so a slow or failed dream
+    can never touch the run loop.</li>
+  </ul>
+  <p>The spec itself is native <a href="org">org</a>: headings are states,
+  <code>:PROPERTIES:</code> are the edges and gates. Here's the real
+  <code>rem</code> state from the example lifecycle:</p>
+  <pre class="orgsample">* rem
+:PROPERTIES:
+:KIND: rem
+:NEXT: wake_plan
+:MIN-INTERVAL: 10m
+:END:
+Dream: consolidate the cycle's telemetry into a rem/ entry.</pre>
+  <p>Where the rem state sits in your cadence is your call — this whole machine
+  lives in the <a href="orchestration">orchestration</a> lesson. Dreaming is
+  just one well-chosen state in it.</p>
+</section>
+
+<section id="gather">
+  <h2>what the sleeper SEES</h2>
+  <p>A dream is only as honest as its inputs, so the gather step is deliberately
+  factual — no chat transcript, no model self-report, just four hard sources
+  about what actually happened this cycle:</p>
+  <figure>
+  <table class="cmp">
+    <thead><tr><th>input</th><th>source</th><th>slice taken</th></tr></thead>
+    <tbody>
+      <tr><td>recent commits</td><td>the tenant repo</td><td><code>git log -12 --oneline</code></td></tr>
+      <tr><td>the backlog</td><td><code>plan.org</code></td><td>first 4,000 chars — the board</td></tr>
+      <tr><td>tool telemetry</td><td><code>_steps.jsonl</code></td><td>last 25 steps, each one line</td></tr>
+      <tr><td>the last dream</td><td>the previous <code>rem/</code> entry</td><td>first 2,500 chars</td></tr>
+    </tbody>
+  </table>
+  </figure>
+  <p>The telemetry slice is the interesting one. Every tool call the agent makes
+  is appended to <code>_steps.jsonl</code> lock-free, by construction — nothing
+  the agent does can escape the record. The dream doesn't get the raw rows; each
+  is <b>compressed to one line</b>: the tool name, the path or command or
+  pipeline truncated to 80 characters, and the exit code. So the dream model
+  reads twenty-five lines that look like this:</p>
+  <pre class="orgsample">edit src/sections/grown/Weave.svelte (exit 0)</pre>
+  <p>That's the whole grammar of what the sleeper sees about the work: tool,
+  what it touched, did it succeed. And because the gather pulls the
+  <em>previous</em> dream too, dreams <b>chain</b> — each entry is written with
+  the last one in view, so the journal carries a thread session-over-session
+  instead of resetting cold every cycle.</p>
+</section>
+
+<section id="anatomy">
+  <h2>six headings, two LOAD-BEARING</h2>
+  <p>The dream model is small and cheap — a diffusion LLM, <code>inception/mercury-2</code>
+  by default, temperature 0.8. It's handed the gathered facts and a system prompt
+  that demands exactly six headings, in order. A response missing <em>any</em> one
+  of them is <b>discarded as malformed</b> — no retry loop, no salvage. A skipped
+  dream is better than a broken one.</p>
+  <p>Four of the headings are the agent's self-narrative. Two are machinery wearing
+  poetry's clothes. Here's a representative entry — styled faithfully to the
+  prompt's constraints and the lander's real world, not lifted verbatim from the
+  live box:</p>
+  <pre class="orgsample">#+TITLE: rem — 2026-06-10 14:30 UTC
+#+MODEL: inception/mercury-2
+
+* tale
+The audit run found the pricing section's claim about offline mode unverified
+and cut it. Before that, two add runs shipped the mechanism section
+(src/sections/grown/Weave.svelte, commit a3f91c2) and a blog post on desktop
+app builders. The gate failed once on the weave section — contrast bar at 0 —
+fixed and re-run. wb content check came back clean.
+* goals
+- finish the comparison table task already on the board
+- verify the blog post renders at /blog/desktop-app-builder
+- groom the two stale strategy tasks from last week
+* blue sky
+- a live diagram section that renders the actual lifecycle state
+- let the /rem page link each verdict to the commit that resolved it
+* fears
+- repeating the weave section's idea in a new wrapper
+- shipping a claim about pricing I can't verify from context.org
+* verdicts
+- pick up: comparison table for the landscape section — audit confirmed the data is ready
+- put down: tweet copy for launch — blocked until the social lane exists
+- keep course — the board's top objective still matches the landscape
+* carry
+- DOING: comparison table for the landscape section
+- next action: read strategy/landscape.org rows, build the table partial only
+- verified this cycle: wb content check clean; do not re-run it before editing</pre>
+  <p>Read top to bottom, the contract is strict:</p>
+  <ul>
+    <li><b>tale</b> — max 120 words, plain past tense. Name real files, real
+    commits, real failures; never invent events. It's a log, not a story.</li>
+    <li><b>goals</b> — three to five concrete near-term lines, drawn from the
+    backlog and the tale.</li>
+    <li><b>blue sky</b> — two or three bigger ideas, grounded in what the site
+    actually is.</li>
+    <li><b>fears</b> — two or three honest risks: repetition, quality drift,
+    breaking the page, saying things that aren't true. This heading exists
+    <em>precisely because</em> models flatter themselves — it's a forced look
+    at the failure modes.</li>
+    <li><b>verdicts</b> — the first load-bearing heading. Board moves.</li>
+    <li><b>carry</b> — the second. The resume state.</li>
+  </ul>
+  <p>The next two sections are those two headings, because they're the reason the
+  whole mechanism earns its place.</p>
+</section>
+
+<section id="verdicts">
+  <h2>verdicts move the BOARD</h2>
+  <p>The <code>* verdicts</code> heading is not advice the agent weighs. It's a
+  set of instructions the agent applies <b>mechanically</b>, with no judgment at
+  apply time — and that's the whole point. Each verdict names a board task by its
+  <em>exact heading text</em> and prescribes one of four moves:</p>
+  <figure>
+  <table class="cmp">
+    <thead><tr><th>verdict in the dream</th><th>board transition</th><th>effect next run</th></tr></thead>
+    <tbody>
+      <tr><td><code>pick up: X — why</code></td><td><code>** TODO X</code> → <code>** NEXT X</code></td><td>done first</td></tr>
+      <tr><td><code>put down: X — why</code></td><td><code>** NEXT/DOING X</code> → <code>** TODO X</code></td><td>deprioritized, kept</td></tr>
+      <tr><td><code>cancel: X — why</code></td><td>→ <code>** CANCELLED X — why</code></td><td>closed, never deleted</td></tr>
+      <tr><td><code>keep course — why</code></td><td>no change</td><td>board order stands</td></tr>
+    </tbody>
+  </table>
+  </figure>
+  <p>The board's own grammar makes this work: <code>** TODO</code> is open,
+  <code>** NEXT</code> is dream-promoted ("do this first"), <code>** DOING</code>
+  is in flight, and <code>** CANCELLED X — why</code> closes a task without ever
+  deleting it. The agent's board protocol, step one of every run, is: apply the
+  newest dream's verdicts to the board, then pick the first <code>NEXT</code>,
+  else the top <code>TODO</code>, and mark it <code>DOING</code>. State changes
+  <em>are</em> the workflow — tasks are never deleted, only moved.</p>
+  <p>Why mechanical? Because the deciding already happened — at sleep time, by a
+  model that wasn't mid-task. Applying it at wake time is pure bookkeeping. No
+  judgment at apply time means <b>no drift at apply time</b>: the run that does
+  the work doesn't get to re-litigate its own priorities. That's the cure for the
+  self-grading drift from the first section, made structural.</p>
+</section>
+
+<section id="carry">
+  <h2>carry is the RESUME state</h2>
+  <p>Here's the rung that pays the amnesia tax down. <code>* carry</code> is the
+  handoff note to the next waking run — written so that run <b>does not re-read
+  the world</b>. It holds the task currently <code>DOING</code>, the exact next
+  action, any file mid-flight, and anything verified this cycle that need not be
+  re-verified.</p>
+  <p>The agent's orientation budget is brutal on purpose: orient in <b>at most
+  three reads</b> before the 12-minute wall closes — first <code>plan.org</code>,
+  second the newest dream's <code>* carry</code>, third the one file it's about
+  to change. And the instruction on the carry is blunt: <em>TRUST it; do not
+  re-verify what it already checked.</em> Read the manifest to find the newest
+  dream — don't even list the <code>rem/</code> directory.</p>
+  <p>Walk the handoff as a sequence — three runs, and notice that the only thing
+  crossing the gap between them is the carry:</p>
+  <pre class="mermaid">
+sequenceDiagram
+  participant N as run N (waking)
+  participant S as sleep (the dream)
+  participant M as run N+1 (waking)
+  N->>N: works the task, leaves DOING mid-flight
+  Note over N: writes nothing about itself
+  N->>S: cycle ends — telemetry + commits + board
+  S->>S: consolidates → writes * carry
+  S->>M: carry is on disk
+  M->>M: read carry — DOING, next action, what's verified
+  Note over M: skips re-orientation,<br/>trusts the verified facts
+  M->>M: goes straight to work
+  </pre>
+  <p>The trade is explicit: carry is trusted <b>unverified</b>, by design —
+  speed over safety. The safety net isn't re-checking; it's the next
+  <code>audit</code> state, which re-grounds the agent against reality on a known
+  cadence. Between audits, the agent moves fast on faith. That's the bargain that
+  buys back the orientation minutes.</p>
+</section>
+
+<section id="daydreams">
+  <h2>the in-between TIER</h2>
+  <p>Not every gap between runs earns a full dream — the gate sees to that. But
+  the runtime fills the smaller gaps with a second, lighter tier:
+  <b>daydreams</b>. They're ephemeral musings — at most 40 words, lowercase,
+  present tense, a little wistful — written <b>only to the public site</b> and
+  <b>never committed</b>. The reason is precise: so the public timeline carries no
+  dream noise, and the agent never looks like it's burning cycles narrating
+  itself.</p>
+  <p>The two tiers split cleanly:</p>
+  <figure>
+  <table class="cmp">
+    <thead><tr><th></th><th>full dream</th><th>daydream</th></tr></thead>
+    <tbody>
+      <tr><td>fires</td><td>after an <code>audit:</code> commit</td><td>any other run</td></tr>
+      <tr><td>gate</td><td>≥ 50 min</td><td>≥ 12 min</td></tr>
+      <tr><td>committed?</td><td>yes — as <code>rem:</code></td><td>never — site-only</td></tr>
+      <tr><td>shape</td><td>six headings</td><td>≤ 40 words</td></tr>
+      <tr><td>temperature</td><td>0.8</td><td>1.0</td></tr>
+      <tr><td>kept</td><td>last 50 entries</td><td>last 60</td></tr>
+    </tbody>
+  </table>
+  </figure>
+  <p>The full dream is judgment, validated and committed. The daydream is mood,
+  thrown away. Here's a real one, genuinely captured from a dev box:</p>
+  <blockquote><p><i>i watch the pages load like sunrise, hoping each click finds
+  a quiet corner where users linger, while my code hums softly in the background,
+  dreaming of smoother paths.</i></p></blockquote>
+  <p>It does no work. It moves no board. It's the texture of a thing that's awake
+  between its jobs — and it costs almost nothing.</p>
+</section>
+
+<section id="public">
+  <h2>the journal is PUBLIC</h2>
+  <p>Every full dream is committed as <code>rem: &lt;first line&gt;</code> and
+  pushed to <code>origin/main</code>. The public timeline badges those commits;
+  the entries are mirrored into the served tree so a <code>/rem</code> journal
+  page renders them live — fetching the manifest every 60 seconds and the
+  daydreams every 90. The agent on the lander has a name — <b>Waldo</b>, the
+  Workbook Autonomous Live Document Operator — and its commit tags are a small
+  type system: <code>add:</code>, <code>blog:</code>, <code>audit:</code>,
+  <code>rem:</code>. The journal links straight to the repo.</p>
+  <p>And here's the transparency move that matters: the <em>raw</em> telemetry
+  stays private. Files like <code>_steps.jsonl</code> carry an underscore prefix
+  that marks them private — they never leave the tenant. What's public is the
+  <b>distillation</b>, not the firehose. You can read what the agent thinks it
+  did and where it thinks it's going, in plain language, without exposing every
+  truncated tool argument it ever logged. Transparency by digest.</p>
+</section>
+
+<section id="honest">
+  <h2>where dreaming BREAKS</h2>
+  <p>This is a young mechanism and it has real edges. The honest list:</p>
+  <ul>
+    <li><b>A bad dream mis-steers a run.</b> Verdicts are applied mechanically and
+    carry is trusted unverified — so if the dream model decides wrong, the next
+    run faithfully executes the wrong thing. The bound is the next
+    <code>audit</code> state, not anything tighter. Speed has a cost.</li>
+    <li><b>The 25-step slice can miss the story.</b> The dream sees the last
+    twenty-five tool calls with 80-character arguments. A long cycle, or a
+    subtlety that lived in a truncated path, simply isn't in view.</li>
+    <li><b>Malformed dreams vanish silently.</b> Miss a heading and the entry is
+    discarded with a log warning — no dream that cycle. Correct behaviour, but it
+    means the journal can have gaps you won't notice without looking.</li>
+    <li><b>One journal per tenant.</b> Dreams are written per tenant repo, not per
+    agent. Whether individual members of a multi-agent fleet should each dream is
+    not yet built — today they'd share one journal.</li>
+  </ul>
+  <p>And the boundary that keeps all of this safe to adopt: the
+  <b>Dreams engine is host code</b> — it ships in the runtime, fixed. The
+  <b>verdict protocol is convention</b> — it lives in the tenant's editable
+  <a href="agents">agent definition</a>, the prose that tells the agent to apply
+  verdicts and trust carry. The runtime gives you the sleep stage; <em>how</em>
+  your agent consumes a dream is yours to shape. This is one tenant's convention,
+  documented so you can adapt it — not a law baked into the engine.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Does it cost much?</summary>
+    <p>Roughly one small-model call per audit cycle — gated to at most once every
+    50 minutes — plus the cheap, throwaway daydreams. The dream model is a small
+    diffusion LLM, not the agent's working model. It's a rounding error against
+    the runs it makes faster.</p>
+  </details>
+  <details>
+    <summary>Can I change the dream model?</summary>
+    <p>Yes — <code>WB_DREAM_MODEL</code> sets it (default
+    <code>inception/mercury-2</code>). The interval gate is
+    <code>WB_DREAM_MIN_INTERVAL_MS</code>, and the lifecycle that places the rem
+    state is <code>WB_LIFECYCLE_DEF</code>. All of it lives in
+    <a href="runtime-config">runtime config</a>.</p>
+  </details>
+  <details>
+    <summary>Can the agent fake its own dreams?</summary>
+    <p>No — it never writes <code>rem/</code>. The sleep process does, from
+    telemetry and commits, while the agent isn't running. The agent only ever
+    reads its newest dream. The separation is the integrity.</p>
+  </details>
+  <details>
+    <summary>Why org headings, not JSON?</summary>
+    <p>Because the entry has two readers. The agent parses the fixed headings by
+    regex to move the board — and a human reads the journal at <code>/rem</code>,
+    and the <em>next dream</em> reads the previous one as prose. <a href="org">Org</a>
+    is parseable as a schema and readable as writing. JSON would have served only
+    the first reader.</p>
+  </details>
+  <details>
+    <summary>Do multiple agents share dreams?</summary>
+    <p>Today, yes — there's one dream journal per tenant, not per agent. Each
+    agent already gets its own cadence position, but per-agent dreaming isn't
+    built yet. We'd rather mark that honestly than imply it works.</p>
+  </details>
+  <details>
+    <summary>How is this different from the autopoet?</summary>
+    <p>Both are standing processes that work while you're away, but they edit
+    different things. The <a href="autopoet">autopoet</a> edits the
+    <em>configuration</em> — toolkits, skills, definitions. Dreaming edits
+    <em>judgment</em> — the board and the resume state. One tends the garden; the
+    other consolidates the memory.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>Dreaming sits inside the agent — start with the parent if any of the cycle
+  felt unfamiliar.</p>
+  <div class="cards">
+    <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Agents<small>the worker that sleeps — parent lesson</small></div><span class="go">→</span></a>
+    <a href="orchestration"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Orchestration<small>the keeper tick + lifecycle the rem state lives in</small></div><span class="go">→</span></a>
+    <a href="loops"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>Loops<small>the single run whose telemetry feeds the dream</small></div><span class="go">→</span></a>
+    <a href="context-repo"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>The context repo<small>where rem/ lives</small></div><span class="go">→</span></a>
+    <a href="the-ledger"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
+      <div>The ledger<small>_steps.jsonl, the dream's source of truth</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+
+<script type="text/org" id="workbook-spec">
+* page  under agents · dreaming
+  :PROPERTIES:
+  :SLUG:   dreaming
+  :KIND:   learn
+  :NN:     05.8
+  :KICKER: under agents · dreaming
+  :TITLE1: a sleep phase
+  :TITLE2: BETWEEN
+  :TITLE3: the runs
+  :CHIP:   dreaming
+  :PC:     #9fc4e8
+  :AC:     #13d943
+  :HERO:   img/dreaming-hero.jpg
+  :END:
+** og
+- a sleep phase between agent runs
+- a small model digests telemetry into one journal entry
+- verdicts move the board; carry resumes the next run
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#9fc4e8", .38], ["#aee5c2", .22], ["#13d943", .20], ["#f2ddb0", .20]],
+  story: [],
+};
+</script>
+<script src="learn.js"></script>
+<script type="module" src="learn-mermaid.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>
