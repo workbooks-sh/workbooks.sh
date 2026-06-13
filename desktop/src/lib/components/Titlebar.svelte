@@ -784,8 +784,10 @@
     flex-shrink: 0;
     cursor: pointer;
     user-select: none;
+    line-height: 0;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
+  .engine :global(svg) { display: block; }
   .engine:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
   .engine-ok { color: var(--color-ok); }
   .engine-pending { color: var(--color-warn); animation: engine-pulse 1.4s ease-in-out infinite; }

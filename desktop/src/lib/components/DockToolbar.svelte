@@ -49,6 +49,7 @@
   .dock-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     height: 26px;
     padding: 0 10px;
@@ -60,9 +61,11 @@
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.02em;
+    line-height: 0; /* kill the inline baseline gap below the svg mark */
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
   }
+  .dock-btn :global(svg) { display: block; }
   .dock-btn:hover {
     background: color-mix(in srgb, var(--color-fg) 6%, transparent);
     color: var(--color-fg);
