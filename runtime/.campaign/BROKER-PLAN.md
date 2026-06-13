@@ -2070,3 +2070,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   works now). Native-ext stays permanently blocked (no dlopen). Real _ssl absent -> HTTPS via broker shim (fine).
   NEXT: flip the 11 reachable PY tools (httpie/conda/pdm/datasette/yt-dlp/...) now that heavy imports work; JS
   broker-surfacing (expose host_exec/tcp/udp/POST to JS in harness_dock.c — already wired host-side).
+- 2026-06-13 (iter 154 cont): **PY reachable items — EMPIRICALLY flipped what genuinely works + honestly tagged
+  the rest.** With heavy-Python unblocked (fuel+/tmp) + an `ssl` stub (PEP-562 __getattr__ synthesizes the SSL
+  API so import-time TLS probing passes; real TLS still brokered) + a 120s install budget, probed all 11
+  reachable PY items. RESULT (test/brokered_pkg_install_test.exs, 4 green): LIBRARY-LIVE (install+import proven)
+  = httpie, yt-dlp, pip, rich (+ requests/click/markdown-it from before). Heavy CLIs are perf-limited under wasm
+  CPython (httpie's full CLI > the wall-clock cap) — library-live, not CLI-live. HONEST BLOCKERS recorded:
+  datasette/jupyter = native deps (MarkupSafe/PyYAML/pyzmq) + long-running servers (need the serve-flip);
+  poetry/pdm/conda = heavy trees that time out installing over the serial broker; mamba = C++ (libmamba); pixi =
+  MIS-TAGGED (it's a Rust binary, not a Python pkg); buildout = zc namespace-package fails under zipimport. So
+  the real win is the CAPABILITY "heavy pure-Python library ecosystem installs+imports live" (live_capabilities.
+  python_libraries), proven + regression-guarded — not a blanket "11 tools live". NEXT: persist installed wheels
+  (install-once) so heavy CLIs don't re-download per run + get under the perf budget; re-tag mis-classified.

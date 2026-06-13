@@ -93,12 +93,18 @@ defmodule Workbooks.PyNet do
     stdin = Keyword.get(opts, :stdin, "")
     argv = Keyword.get(opts, :argv, [])
     fuel = Keyword.get(opts, :fuel, @python_fuel)
+    # heavy package installs (many wheels fetched serially over the broker + heavy import bytecode) exceed the
+    # 30s default; give brokered Python a 2-min wall-clock cap (still the real DoS bound), overridable.
+    timeout_ms = Keyword.get(opts, :timeout_ms, 120_000)
 
     with_broker(opts, fn dirs ->
       # `python -c <script> <argv...>` exposes argv to the tool as sys.argv[1:]; stdin is the tool's input.
       # run_status preserves the guest's EXIT CODE — a tool that errors (e.g. SSRF-denied request -> URLError ->
       # sys.exit(1)) must report non-zero, not be flattened to success.
-      case Workbooks.CommandRegistry.run_status("python", stdin, ["-c", script | argv], dirs, fuel: fuel) do
+      case Workbooks.CommandRegistry.run_status("python", stdin, ["-c", script | argv], dirs,
+             fuel: fuel,
+             timeout_ms: timeout_ms
+           ) do
         {:ok, body, status} when is_binary(body) -> {:ok, body, status}
         {:ok, body} when is_binary(body) -> {:ok, body, 0}
         body when is_binary(body) -> {:ok, body, 0}
@@ -237,6 +243,41 @@ defmodule Workbooks.PyNet do
     _wbrequests.delete = lambda url, **k: _wb_rrequest("DELETE", url, **k)
     _wbrequests.head = lambda url, **k: _wb_rrequest("HEAD", url, **k)
     _wbsys.modules["requests"] = _wbrequests
+
+    # `ssl` stub — this CPython has no _ssl (no OpenSSL linked), so a package that merely `import ssl` at import
+    # time (yt-dlp, many HTTP clients) fails with ModuleNotFoundError even though its actual I/O goes through the
+    # urllib/requests broker shim (which doesn't touch ssl). Register a minimal stub satisfying the common import
+    # surface; real in-guest TLS (wrap_socket) raises — by design, networking is brokered.
+    if "ssl" not in _wbsys.modules:
+        _wbssl = _wbtypes.ModuleType("ssl")
+        _wbssl.CERT_NONE = 0; _wbssl.CERT_OPTIONAL = 1; _wbssl.CERT_REQUIRED = 2
+        _wbssl.PROTOCOL_TLS = 2; _wbssl.PROTOCOL_TLS_CLIENT = 16; _wbssl.PROTOCOL_TLS_SERVER = 17
+        _wbssl.OP_NO_SSLv2 = 0; _wbssl.OP_NO_SSLv3 = 0; _wbssl.HAS_SNI = True; _wbssl.HAS_TLSv1_3 = True
+        class _WBSSLError(OSError): pass
+        _wbssl.SSLError = _WBSSLError; _wbssl.SSLCertVerificationError = _WBSSLError; _wbssl.CertificateError = _WBSSLError
+        class _WBSSLContext:
+            def __init__(self, *a, **k): self.check_hostname = False; self.verify_mode = 0
+            def load_default_certs(self, *a, **k): pass
+            def load_verify_locations(self, *a, **k): pass
+            def set_ciphers(self, *a, **k): pass
+            def set_alpn_protocols(self, *a, **k): pass
+            def wrap_socket(self, *a, **k): raise _WBSSLError("no in-guest TLS; use the brokered http/urllib path")
+        _wbssl.SSLContext = _WBSSLContext
+        def _wb_default_ctx(*a, **k): return _WBSSLContext()
+        _wbssl.create_default_context = _wb_default_ctx
+        _wbssl._create_unverified_context = _wb_default_ctx
+        _wbssl._create_default_https_context = _wb_default_ctx
+        # PEP 562 module __getattr__: synthesize any other ssl name a package probes (the full SSL*Error
+        # hierarchy, OP_/PROTOCOL_/CERT_/VERIFY_ constants) so deep import-time probing doesn't fail. Real TLS
+        # still can't happen in-guest (wrap_socket raises); networking is brokered.
+        def _wb_ssl_getattr(name):
+            if name.endswith(("Error", "Warning")):
+                return type(name, (_WBSSLError,), {})
+            if name.startswith(("OP_", "PROTOCOL_", "CERT_", "VERIFY_", "HAS_", "SSL_", "TLSVersion", "ALERT_")):
+                return 0
+            raise AttributeError("module 'ssl' has no attribute %r (brokered stub)" % name)
+        _wbssl.__getattr__ = _wb_ssl_getattr
+        _wbsys.modules["ssl"] = _wbssl
 
     # subprocess shim — wasip1 has no fork/exec, so route subprocess.run/check_output through the brokered exec
     # (host runs a REGISTERED wasm command via ExecBroker; default-deny + no shell/injection). A Python tool can
