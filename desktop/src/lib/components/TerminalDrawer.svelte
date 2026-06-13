@@ -348,8 +348,6 @@
         {@const m = activeMeta()!}
         {#if m.kind === "install"}
           <Download weight="fill" size={13} />
-        {:else if m.kind === "sidecar"}
-          <Pin weight="fill" size={13} />
         {:else}
           <TerminalIcon weight="fill" size={13} />
         {/if}

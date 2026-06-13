@@ -26,7 +26,7 @@ const SNAPSHOT_KEY = "snapshot";
 
 /** Lazily-opened plugin-store. autoSave off — we persist explicitly
  *  after each apply so a reload always reads a settled file. */
-const store = new LazyStore(STORE_FILE, { autoSave: false });
+const store = new LazyStore(STORE_FILE, { autoSave: false, defaults: {} });
 
 class TabsStore {
   tabs = $state<Tab[]>([]);

@@ -62,7 +62,7 @@ const ACTIVE_KEY = "active_id";
 
 /** Lazily-opened plugin-store. `autoSave` off — we persist explicitly after
  *  each mutation so a refresh always reads a settled file. */
-const store = new LazyStore(STORE_FILE, { autoSave: false });
+const store = new LazyStore(STORE_FILE, { autoSave: false, defaults: {} });
 
 async function readFile(): Promise<WorkspacesFile> {
   const [list, activeId] = await Promise.all([

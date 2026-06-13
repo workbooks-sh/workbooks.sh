@@ -23,7 +23,12 @@
 // so chat-tab telemetry streams without the round-trip through the
 // global topic.
 
-import { Socket, Channel } from "phoenix";
+// Type-only import (erased at build) + a lazy value import in #connect, so
+// phoenix is dropped from the entry/release chunk (wb-aakl.13). The Phoenix
+// telemetry bridge is the dead control-plane path (the runtime has no
+// Phoenix); it's kept but code-split until the transport re-point. `Channel`
+// is type-only already — sock.channel() returns it; there is no `new Channel`.
+import type { Socket as PhoenixSocket, Channel } from "phoenix";
 import { workgate, type WorkgateRequest, type WorkgatePermitDecision } from "$lib/workgate/store.svelte";
 import {
   envRequests,
@@ -213,7 +218,7 @@ class WsBridgeStore {
   connected = $state(false);
   lastError = $state<string | null>(null);
 
-  #socket: Socket | null = null;
+  #socket: PhoenixSocket | null = null;
   #channels = new Map<string, Channel>();
   #handlers = new Set<Handler>();
   #initStarted = false;
@@ -228,7 +233,7 @@ class WsBridgeStore {
       $effect(() => {
         const { state, url, token } = daemon.status;
         if (state === "ready" && url && url !== this.#lastUrl) {
-          this.#connect(url, token);
+          void this.#connect(url, token);
         } else if (state === "stopped" || state === "unhealthy") {
           this.#disconnect();
         }
@@ -431,10 +436,13 @@ class WsBridgeStore {
 
   // ── internals ──
 
-  #connect(httpUrl: string, token: string | null) {
+  async #connect(httpUrl: string, token: string | null) {
     this.#disconnect();
     this.#lastUrl = httpUrl;
     const wsUrl = httpUrl.replace(/^http/, "ws") + "/socket";
+    // Lazy-load phoenix only when actually connecting — keeps it out of the
+    // entry chunk (wb-aakl.13).
+    const { Socket } = await import("phoenix");
     const sock = new Socket(wsUrl, {
       // Per-boot bearer token from discovery — UserSocket.connect/3
       // authenticates the socket from these params.
