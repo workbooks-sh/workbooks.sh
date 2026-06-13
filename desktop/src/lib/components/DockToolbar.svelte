@@ -4,14 +4,27 @@
    *
    * One button per registered dock panel; clicking toggles that panel in
    * the right dock. The engine status chip stays separate (it sits beside
-   * this). Empty until something registers — the shipped browser registers
-   * the agent panel only when WB_FF_AGENTS is on; toolkits (Browser SDK,
-   * wb-aakl.15) register here too.
+   * this). Empty until something registers — toolkits (Browser SDK,
+   * wb-aakl.15) register here.
+   *
+   * Two clusters share this component via `kind`:
+   *   bench — custom-toolkit shortcuts (everything that isn't the resident
+   *           agent); sits left of the search badge.
+   *   agent — the resident agent (Waldo) only; its own badge, far right.
    */
   import { dock } from "$lib/bridge/dock.svelte";
+
+  // Panel ids that are agents, not bench toolkits.
+  const AGENT_IDS = ["waldo", "agent"];
+  let { kind = "bench" }: { kind?: "bench" | "agent" } = $props();
+  const panels = $derived(
+    dock.panels.filter((p) =>
+      kind === "agent" ? AGENT_IDS.includes(p.id) : !AGENT_IDS.includes(p.id),
+    ),
+  );
 </script>
 
-{#each dock.panels as p (p.id)}
+{#each panels as p (p.id)}
   <button
     type="button"
     class="dock-btn"

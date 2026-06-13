@@ -279,9 +279,24 @@
     lastActiveId = cur;
   });
 
+  // Demo packages shown ONLY during onboarding, so the freshly-revealed
+  // sidebar is populated (the tour runs before any runtime/workspaces exist,
+  // so the real list is empty). Folder names drive the jewel-tone variety.
+  const DEMO_RAIL_PACKAGES: RailPackage[] = [
+    { id: "Reading", name: "Reading", isActive: false, icon: "", kind: "folder" },
+    { id: "Design", name: "Design", isActive: false, icon: "", kind: "folder" },
+    { id: "Clients", name: "Clients", isActive: false, icon: "", kind: "folder" },
+    { id: "Finance", name: "Finance", isActive: false, icon: "", kind: "folder" },
+    { id: "Research", name: "Research", isActive: false, icon: "", kind: "folder" },
+    { id: "Brand", name: "Brand", isActive: false, icon: "", kind: "folder" },
+    { id: "Roadmap", name: "Roadmap", isActive: false, icon: "", kind: "app" },
+    { id: "Notes", name: "Notes", isActive: false, icon: "", kind: "app" },
+  ];
+
   // Filter the package list by the active workspace.
   const railPackages = $derived<RailPackage[]>(
     (() => {
+      if (onboarding.active) return DEMO_RAIL_PACKAGES;
       const ws_ = workspaces.active;
       if (!ws_) return [];
       // Order follows the workspace's package_names (the rail order the user

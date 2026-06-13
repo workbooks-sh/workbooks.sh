@@ -8,12 +8,13 @@
 // from a tracked $effect — that read+write-same-state pattern is what froze
 // the app last time (effect_update_depth_exceeded).
 
-type Part = "titlebar" | "sidebar" | "canvas" | "agent";
+type Part = "titlebar" | "bench" | "sidebar" | "canvas" | "agent";
 
 class Onboarding {
   active = $state(false);
   #revealed = $state<Record<Part, boolean>>({
     titlebar: false,
+    bench: false,
     sidebar: false,
     canvas: false,
     agent: false,

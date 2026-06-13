@@ -11,12 +11,15 @@
    * lands near the end. Never a gate.
    */
   import { onMount } from "svelte";
-  import { ArrowRight, CheckCircle, Copy } from "phosphor-svelte";
+  import { ArrowRight, CheckCircle, Copy, Palette, Translate, Cards } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { applyThemeMode } from "$lib/onboarding/prefs";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { nav } from "$lib/bridge/nav.svelte";
+  import { dock } from "$lib/bridge/dock.svelte";
+  import { chrome } from "$lib/ui/chrome.svelte";
+  import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
@@ -32,27 +35,57 @@
 
   type Prefs = {
     theme: "system" | "dark" | "light";
-    titlebar: "slim" | "bench" | "helm";
     sidebar: "rail" | "library";
     search: { ai: "summary" | "first" | "off" };
   };
-  let prefs = $state<Prefs>({ theme: "system", titlebar: nav.titlebar, sidebar: nav.layout, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, search: { ai: "summary" } });
 
-  onMount(() => onboarding.start());
+  // Demo bench toolkits — registered only for the tour so the bench has real,
+  // toggleable shortcuts to showcase the "build your own toolkit" concept.
+  // Unregistered when the flow unmounts (finish).
+  const DEMO_TOOLKITS = [
+    { id: "demo-palette", title: "Palette", icon: Palette },
+    { id: "demo-translate", title: "Translate", icon: Translate },
+    { id: "demo-snippets", title: "Snippets", icon: Cards },
+  ];
 
-  // Reveal the real shell pieces cumulatively. Driven IMPERATIVELY (called
-  // from the nav handlers below), NOT a $effect — a tracked effect that both
-  // reads and writes onboarding state is what froze the app before.
+  onMount(() => {
+    onboarding.start();
+    for (const t of DEMO_TOOLKITS)
+      dock.register({ id: t.id, title: t.title, icon: t.icon, component: DemoToolkitPanel, props: { title: t.title } });
+    return () => {
+      for (const t of DEMO_TOOLKITS) dock.unregister(t.id);
+      chrome.closeLeft();
+      dock.close();
+    };
+  });
+
+  // Reveal the real shell pieces cumulatively, then spotlight this step's
+  // surface (closing whatever the last step opened). Driven IMPERATIVELY,
+  // NOT a $effect — a tracked effect that reads+writes onboarding state froze
+  // the app before.
   function go(s: Step) {
     step = s;
     const i = STEPS.indexOf(s);
-    if (i >= 1) onboarding.reveal("titlebar");
+    if (i >= 1) onboarding.reveal("titlebar", "bench");
     if (i >= 2) onboarding.reveal("sidebar", "canvas");
     if (i >= 5) onboarding.reveal("agent");
+    spotlight(s);
+  }
+
+  // One thing open at a time. Every step first closes the transient surfaces
+  // (left panel, right dock, popovers), then opens its own focus — so moving
+  // between coach slides never leaves stale panels around.
+  function spotlight(s: Step) {
+    chrome.closeLeft();
+    dock.close();
+    chrome.bookmarksOpen = false;
+    chrome.nexusOpen = false;
+    if (s === "search") chrome.openSearch();
+    else if (s === "agent") dock.open("waldo");
   }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
-  function pickTitlebar(t: Prefs["titlebar"]) { prefs.titlebar = t; nav.setTitlebar(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
 
   const CMD_SKILLS = "npx skills add workbooks-sh/workbooks.sh";
@@ -118,14 +151,9 @@
 
           {:else if step === "titlebar"}
             <div class="text">
-              <span class="kicker">The titlebar</span>
-              <h1>This is your top bar</h1>
-              <p>Tabs always live here. Pick how the rest of the bar fills in — it changes live, look up.</p>
-            </div>
-            <div class="opts">
-              <button type="button" class="opt" class:sel={prefs.titlebar === "slim"} onclick={() => pickTitlebar("slim")}>Slim</button>
-              <button type="button" class="opt" class:sel={prefs.titlebar === "bench"} onclick={() => pickTitlebar("bench")}>Bench</button>
-              <button type="button" class="opt" class:sel={prefs.titlebar === "helm"} onclick={() => pickTitlebar("helm")}>Helm</button>
+              <span class="kicker">The bench</span>
+              <h1>Toolkit shortcuts, up top</h1>
+              <p>Those icons (look up) are your bench — each opens a panel on the right; click again to close. They're custom toolkits you can build. Search is a default one — its own badge, summon it anywhere with ⌘K.</p>
             </div>
 
           {:else if step === "sidebar"}
@@ -141,9 +169,9 @@
 
           {:else if step === "search"}
             <div class="text">
-              <span class="kicker">Search</span>
+              <span class="kicker">Search · a default toolkit</span>
               <h1>How should search answer?</h1>
-              <p>It lives above your bookmarks. Web, files + bookmarks are in; add Exa later.</p>
+              <p>⌘K from anywhere; results open here. Web, files + bookmarks are in; add Exa later. How should it lead?</p>
             </div>
             <div class="opts">
               {#each [["summary", "AI on top"], ["first", "AI only"], ["off", "Links only"]] as [id, label] (id)}
