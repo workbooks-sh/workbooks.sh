@@ -2082,3 +2082,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   the real win is the CAPABILITY "heavy pure-Python library ecosystem installs+imports live" (live_capabilities.
   python_libraries), proven + regression-guarded — not a blanket "11 tools live". NEXT: persist installed wheels
   (install-once) so heavy CLIs don't re-download per run + get under the perf budget; re-tag mis-classified.
+- 2026-06-13 (iter 154 final): **SESSION SYNTHESIS — gaps closed + verification wired.** (1) JS/TS lane reached
+  brokered PARITY with Python (sub-agent): harness_dock.c now surfaces Javy.Exec.run / Javy.Net.tcp/udp/tls /
+  Javy.Net.post (host side was already wired); + child_process/net/dgram/os/stream/zlib shims; 16 js_broker
+  tests green (exec+red-team, tcp live+SSRF-denied, POST live+cap-denied). zlib is API-presence-only (real
+  DEFLATE via npm pako). (2) Python heavy-pure-Python ecosystem UNBLOCKED + library-live (httpie/yt-dlp/pip/rich
+  proven, test/brokered_pkg_install_test.exs) via fuel+/tmp+ssl-stub. (3) App-host PLATFORM productized
+  (BrokeredApp: many apps, one router, persisted+isolated+scoped; brokered_app_test). (4) Re-tagged 5 mis-
+  classified reachable->impossible (native-threads-as-purpose: txiki.js/Rspack/InfluxDB/RethinkDB/TerminusDB);
+  netcat/dig marked capability-live (tcp-send/dns deliver them). Tally now 32 live / 56 reachable / 267
+  impossible. ALL wired into empirical tests (js_broker, brokered_pkg_install, brokered_app, brokered_tools,
+  py_exec/py_net) so each capability stays proven going forward. Remaining reachable are mostly L-effort wasip2
+  compiles (curl/wget/RE2/DBs) or heavy-CLI/server perf limits (persist-installed-wheels would help heavy CLIs).

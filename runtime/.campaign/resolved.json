@@ -568,11 +568,12 @@
    "extent": "off-the-table (verified)"
   },
   "txiki.js": {
-   "verdict": "reachable",
+   "verdict": "impossible",
    "lane": "none",
    "blocker": "libuv platform layer: native event loop, sockets/network, fork-exec (child_process), and curl HTTP \u2014 none available under jitless wasm32-wasi/wasmtime. The JS engine value (QuickJS-ng) is already cove",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reason": " | RE-TAGGED iter154 (was reachable): libuv event loop = fork-exec + sockets + threads; removing the network blocker alone leaves the core intact. Native-async-as-purpose."
   },
   "LLRT": {
    "verdict": "impossible",
@@ -749,7 +750,8 @@
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
    "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top.",
-   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live)."
+   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live).",
+   "capability_live_net": "tcp-send command (live, test/brokered_tools_test.exs) IS the netcat raw-TCP capability \u2014 SSRF-pinned, scopable. The nc binary is not ported; the capability ships."
   },
   "dig / bind-tools": {
    "verdict": "reachable",
@@ -757,7 +759,8 @@
    "blocker": "Network-purpose tool: dig's entire function is sending DNS packets over the network. wasip1 has no UDP and no outbound socket creation, so there is no transport for raw DNS. Per ru",
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
-   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live)."
+   "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live).",
+   "capability_live_net": "dns command (live, test/brokered_tools_test.exs) delivers DNS-over-UDP A-record resolution. The bind binary is not ported; the capability ships."
   },
   "make": {
    "verdict": "impossible",
@@ -881,11 +884,12 @@
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "Rspack": {
-   "verdict": "reachable",
+   "verdict": "impossible",
    "lane": "none",
    "blocker": "Native threading as the core architecture (rayon + parallel module graph) requires wasm32-wasip1-threads, plus napi-rs/emnapi N-API bindings and a JS/Web-Worker host (Atomics.wait,",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reason": " | RE-TAGGED iter154 (was reachable): rayon native work-stealing threads ARE the product; wasip1 has no threads and wasip1-threads is not in our wasmtime. Native-threads-as-purpose."
   },
   "Rolldown": {
    "verdict": "impossible",
@@ -1065,11 +1069,12 @@
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "InfluxDB": {
-   "verdict": "reachable",
+   "verdict": "impossible",
    "lane": "none",
    "blocker": "network-as-purpose: InfluxDB is a server daemon whose reason to exist is listening on a TCP socket (HTTP + Arrow Flight/gRPC). Compounded by native-threads (tokio reactor",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reason": " | RE-TAGGED iter154 (was reachable): tokio multi-threaded async runtime is load-bearing; single-thread wasip1 cannot deliver it. Native-threads-as-purpose."
   },
   "Dgraph": {
    "verdict": "impossible",
@@ -1572,11 +1577,12 @@
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "RethinkDB": {
-   "verdict": "reachable",
+   "verdict": "impossible",
    "lane": "none",
    "blocker": "Network-as-purpose: core value is a long-lived TCP changefeed/push server. Also requires native threads (thread-per-core + custom context-switch asm) and a custom storage",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reason": " | RE-TAGGED iter154 (was reachable): multi-threaded async server core; single-thread wasip1 cannot deliver it. Native-threads-as-purpose."
   },
   "ArangoDB": {
    "verdict": "impossible",
@@ -1592,11 +1598,12 @@
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
   },
   "TerminusDB": {
-   "verdict": "reachable",
+   "verdict": "impossible",
    "lane": "none",
    "blocker": "Database logic/query layer is SWI-Prolog, a large C runtime whose only wasm port is Emscripten/browser-targeted (needs JS glue + browser/Node VM), not standalone wasm32-w",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live."
+   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reason": " | RE-TAGGED iter154 (was reachable): tokio multi-threaded async core; single-thread wasip1 cannot deliver it. Native-threads-as-purpose."
   },
   "Aerospike": {
    "verdict": "impossible",
