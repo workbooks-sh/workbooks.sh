@@ -19,12 +19,16 @@ defmodule Workbooks.QueueBroker do
   # ever tripping (each topic stays under @max_depth). Bound a tenant's TOTAL queued messages across topics.
   @max_tenant_msgs 50_000
 
-  def start_link(_ \\ []), do: Agent.start_link(fn -> %{} end, name: __MODULE__)
+  # State: %{q: %{{tenant, topic} => :queue}, c: %{tenant => total_msgs}}. The per-tenant running count `c`
+  # makes the tenant-total quota check O(1) (incremented on publish, decremented on poll) — the earlier
+  # full-state scan was O(total topics) PER PUBLISH under the Agent lock, a self-inflicted DoS (wb self-audit).
+  def start_link(_ \\ []), do: Agent.start_link(fn -> %{q: %{}, c: %{}} end, name: __MODULE__)
 
   @doc "Enqueue `msg` on (`tenant`, `topic`). :ok | {:error, :revoked | :message_too_large | :rate_limited | :queue_full | :tenant_full}."
   def publish(tenant, topic, msg, opts \\ [])
       when is_binary(tenant) and is_binary(topic) and is_binary(msg) do
     max = Keyword.get(opts, :max_depth, @max_depth)
+    max_tenant = Keyword.get(opts, :max_tenant_msgs, @max_tenant_msgs)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
 
     cond do
@@ -41,21 +45,24 @@ defmodule Workbooks.QueueBroker do
         {:error, :rate_limited}
 
       true ->
-        Agent.get_and_update(agent(), fn state ->
+        Agent.get_and_update(agent(), fn %{q: queues, c: counts} = state ->
           key = {tenant, topic}
-          q = Map.get(state, key, :queue.new())
+          q = Map.get(queues, key, :queue.new())
 
           cond do
             :queue.len(q) >= max ->
               Workbooks.BrokerAudit.record(:queue, :deny, :queue_full)
               {{:error, :queue_full}, state}
 
-            tenant_total(state, tenant) >= @max_tenant_msgs ->
+            # O(1): the per-tenant running count, not a full-state scan
+            Map.get(counts, tenant, 0) >= max_tenant ->
               Workbooks.BrokerAudit.record(:queue, :deny, :tenant_full)
               {{:error, :tenant_full}, state}
 
             true ->
-              {:ok, Map.put(state, key, :queue.in(msg, q))}
+              queues = Map.put(queues, key, :queue.in(msg, q))
+              counts = Map.update(counts, tenant, 1, &(&1 + 1))
+              {:ok, %{state | q: queues, c: counts}}
           end
         end)
     end
@@ -75,12 +82,23 @@ defmodule Workbooks.QueueBroker do
         {:error, :rate_limited}
 
       true ->
-        Agent.get_and_update(agent(), fn state ->
+        Agent.get_and_update(agent(), fn %{q: queues, c: counts} = state ->
           key = {tenant, topic}
 
-          case :queue.out(Map.get(state, key, :queue.new())) do
-            {{:value, msg}, q2} -> {{:ok, msg}, Map.put(state, key, q2)}
-            {:empty, _} -> {:empty, state}
+          case :queue.out(Map.get(queues, key, :queue.new())) do
+            {{:value, msg}, q2} ->
+              queues = Map.put(queues, key, q2)
+              # decrement the per-tenant count (drop to clamp at 0; prune the entry at 0)
+              counts =
+                case Map.get(counts, tenant, 0) - 1 do
+                  n when n <= 0 -> Map.delete(counts, tenant)
+                  n -> Map.put(counts, tenant, n)
+                end
+
+              {{:ok, msg}, %{state | q: queues, c: counts}}
+
+            {:empty, _} ->
+              {:empty, state}
           end
         end)
     end
@@ -88,19 +106,11 @@ defmodule Workbooks.QueueBroker do
 
   @doc "Current depth of (`tenant`, `topic`)."
   def depth(tenant, topic) when is_binary(tenant) and is_binary(topic) do
-    Agent.get(agent(), fn s -> :queue.len(Map.get(s, {tenant, topic}, :queue.new())) end)
+    Agent.get(agent(), fn %{q: queues} -> :queue.len(Map.get(queues, {tenant, topic}, :queue.new())) end)
   end
 
   defp rate_denied?(tenant, {max, window}),
     do: Workbooks.RateLimiter.check(tenant, max, window) == {:error, :rate_limited}
-
-  # total messages queued for `tenant` across ALL its topics (counted under the Agent lock)
-  defp tenant_total(state, tenant) do
-    Enum.reduce(state, 0, fn
-      {{^tenant, _topic}, q}, acc -> acc + :queue.len(q)
-      _, acc -> acc
-    end)
-  end
 
   defp agent do
     case Process.whereis(__MODULE__) do

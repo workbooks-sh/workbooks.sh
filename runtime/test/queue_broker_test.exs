@@ -66,4 +66,20 @@ defmodule Workbooks.QueueBrokerTest do
     assert :empty = QueueBroker.poll(t2, "topic", rate: {1, 60_000})
     assert {:error, :rate_limited} = QueueBroker.poll(t2, "topic", rate: {1, 60_000})
   end
+
+  test "self-audit: per-tenant total cap via O(1) running count — enforced AND decremented on poll" do
+    t = "q-#{System.unique_integer([:positive])}"
+    big_rate = {1_000_000, 60_000}
+    # fill the tenant total across MANY topics up to a small cap, spread so no single topic hits :queue_full
+    for i <- 1..4,
+        do: assert(:ok = QueueBroker.publish(t, "topic#{i}", "m", max_tenant_msgs: 4, rate: big_rate))
+
+    # the tenant total (4) is now at the cap — a publish to ANY topic (new or existing) is rejected
+    assert {:error, :tenant_full} = QueueBroker.publish(t, "topic5", "m", max_tenant_msgs: 4, rate: big_rate)
+    assert {:error, :tenant_full} = QueueBroker.publish(t, "topic1", "m", max_tenant_msgs: 4, rate: big_rate)
+
+    # polling one message decrements the per-tenant count -> a new publish fits again
+    assert {:ok, "m"} = QueueBroker.poll(t, "topic1", rate: big_rate)
+    assert :ok = QueueBroker.publish(t, "topic5", "m", max_tenant_msgs: 4, rate: big_rate)
+  end
 end

@@ -1430,3 +1430,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   CONSOLIDATED: every named red-team vector is closed AND tested. The ONLY open item is wb-ltum (a minimal-caps
   DESIGN decision escalated to the owner — not a bug). The brokered-networking keystone is secure, working,
   manageable, DoS-hardened, observable, load-validated, adversarially-audited, and fully remediated.
+- 2026-06-12 (iter 106): **SELF-AUDIT of the remediation code — fixed a DoS I introduced in the queue fix.**
+  New code = new attack surface, so began adversarially reviewing MY OWN audit fixes. FOUND: the iter-95
+  per-tenant queue cap used tenant_total(state, tenant) — a full-state scan (O(total topics across ALL
+  tenants)) on EVERY publish, under the serializing Agent lock. That's a self-inflicted DoS: filling the queue
+  is O(N^2), and one tenant's many topics slow EVERY tenant's publishes (cross-tenant perf coupling) — ironic
+  for an anti-DoS cap. FIX: restructured the Agent state to %{q: queues, c: %{tenant => count}} with an O(1)
+  running count (incremented on publish, decremented + pruned on poll). Bonus: the tenant cap is now tunable
+  via :max_tenant_msgs (was hardcoded). 8 queue tests green incl new self-audit test (cap enforced across
+  topics via the O(1) count + decremented on poll). LESSON: remediation code itself needs adversarial review.
+  NEXT self-audit targets: pinned-https worker-task lifecycle/leak, tenant ephemeral collision, rate-limiter
+  window-boundary, pipe write_vectored partial path.
