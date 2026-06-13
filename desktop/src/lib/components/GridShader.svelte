@@ -135,11 +135,18 @@
 
     let raf = 0;
     let last = -1e9;
+    let ticks = 0;
     const interval = 1000 / 30; // ~30fps cap
     function frame(now: number) {
       raf = requestAnimationFrame(frame);
       if (document.hidden || now - last < interval) return;
       last = now;
+      // Self-heal the theme colours every ~0.5s. The data-mode observer can
+      // miss a flip when the canvas reveals mid-onboarding (it mounts hidden,
+      // then the theme beat both reveals it AND changes the mode), which left
+      // u_bg on its dark default → a pure-black backdrop in light mode. A
+      // cheap periodic re-read guarantees the backdrop always tracks the theme.
+      if (ticks++ % 15 === 0) readColors();
       gl!.uniform1f(U.time, now * 0.001);
       gl!.drawArrays(gl!.TRIANGLES, 0, 3);
     }
