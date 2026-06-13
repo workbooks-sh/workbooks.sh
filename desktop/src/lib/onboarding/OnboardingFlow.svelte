@@ -186,27 +186,31 @@
     {/if}
 
     <div class="coach" class:learn-active={isLearn && lessonIdx >= 0}>
-      <div class="dots" role="presentation">
-        {#each STEPS as s, i (s)}
-          <button type="button" class="dot" class:on={i === stepIdx} class:past={i < stepIdx}
-            aria-label={s} onclick={() => { if (i <= stepIdx) go(s); }}></button>
-        {/each}
-      </div>
-
-      <!-- Learn-more: a node-port + arrows. The port emits an edge to the
-           highlighted DOM target for the active lesson; arrows cycle lessons. -->
-      {#if isLearn}
-        <div class="learn-bar">
-          <button type="button" class="larrow" aria-label="Previous tip" onclick={prevLesson} disabled={lessonIdx < 0}>
-            <CaretLeft size={12} weight="bold" />
-          </button>
-          <span class="port" bind:this={portEl} class:emitting={lessonIdx >= 0}></span>
-          <span class="lcount">{lessonIdx < 0 ? "Learn" : `${lessonIdx + 1}/${lessons.length}`}</span>
-          <button type="button" class="larrow" aria-label="Next tip" onclick={nextLesson} disabled={lessonIdx >= lessons.length - 1}>
-            <CaretRight size={12} weight="bold" />
-          </button>
+      <!-- Top row: carousel dots pinned LEFT, learn-more arrows + port pinned
+           RIGHT — clearly separate, not stacked/grouped. -->
+      <div class="coach-top">
+        <div class="dots" role="presentation">
+          {#each STEPS as s, i (s)}
+            <button type="button" class="dot" class:on={i === stepIdx} class:past={i < stepIdx}
+              aria-label={s} onclick={() => { if (i <= stepIdx) go(s); }}></button>
+          {/each}
         </div>
-      {/if}
+
+        <!-- The port emits an edge to the highlighted DOM target for the
+             active lesson; arrows cycle lessons. -->
+        {#if isLearn}
+          <div class="learn-bar">
+            <button type="button" class="larrow" aria-label="Previous tip" onclick={prevLesson} disabled={lessonIdx < 0}>
+              <CaretLeft size={12} weight="bold" />
+            </button>
+            <span class="port" bind:this={portEl} class:emitting={lessonIdx >= 0}></span>
+            <span class="lcount">{lessonIdx < 0 ? "Learn" : `${lessonIdx + 1}/${lessons.length}`}</span>
+            <button type="button" class="larrow" aria-label="Next tip" onclick={nextLesson} disabled={lessonIdx >= lessons.length - 1}>
+              <CaretRight size={12} weight="bold" />
+            </button>
+          </div>
+        {/if}
+      </div>
 
       {#key step}
         <div class="body" in:fly={{ x: 14, duration: 180, easing: cubicOut }}>
@@ -415,7 +419,14 @@
     border-radius: 16px;
     box-shadow: var(--shadow-pop);
   }
-  .dots { display: flex; justify-content: center; gap: 6px; }
+  .coach-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 26px;
+  }
+  .dots { display: flex; justify-content: flex-start; gap: 6px; }
   .dot {
     width: 6px; height: 6px; border-radius: 50%; border: 0; padding: 0;
     background: var(--color-border-strong);
@@ -488,9 +499,8 @@
   .learn-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
-    margin-bottom: 2px;
+    flex-shrink: 0;
   }
   .larrow {
     display: inline-flex;
