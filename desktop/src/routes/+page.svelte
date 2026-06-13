@@ -52,6 +52,7 @@
   import { applyBootPrefs } from "$lib/onboarding/prefs";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { DEMO_PACKAGES, DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
+  import { nav } from "$lib/bridge/nav.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
   import {
     MagnifyingGlass as SearchCmdIcon,
@@ -124,6 +125,25 @@
   // Switcher popover state — anchor element + open flag.
   let switcherAnchor = $state<HTMLElement | null>(null);
   let switcherOpen = $state(false);
+
+  // Sidebar resize — drag the right edge; nav stores width per layout and the
+  // canvas (.main, flex:1) reflows automatically. `resizing` kills the width
+  // transition so the drag tracks the pointer 1:1.
+  let resizing = $state(false);
+  function startResize(e: PointerEvent) {
+    e.preventDefault();
+    resizing = true;
+    const startX = e.clientX;
+    const startW = nav.sidebarWidth;
+    const onMove = (m: PointerEvent) => nav.setSidebarWidth(startW + (m.clientX - startX));
+    const onUp = () => {
+      resizing = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   // Context-menu state. Two distinct menus (workspace + package) share
   // the same primitive; only one is open at a time.
@@ -561,8 +581,10 @@
     <div
       class="sidebar-host"
       class:closed={!chrome.sidebarOpen}
+      class:resizing
       class:ob-hide={!onboarding.shows("sidebar")}
       inert={!chrome.sidebarOpen}
+      style={chrome.sidebarOpen ? `width:${nav.sidebarWidth}px` : ""}
     >
       <Sidebar
         bottomTabs={bottomRailTabs}
@@ -585,6 +607,17 @@
         onPackageContext={onPackageContext}
       />
     </div>
+
+    {#if chrome.sidebarOpen}
+      <!-- Sidebar resize handle — drag to set this layout's width; the canvas
+           reflows. (wb-aakl.16) -->
+      <button
+        type="button"
+        class="resize-handle"
+        aria-label="Resize sidebar"
+        onpointerdown={startResize}
+      ></button>
+    {/if}
 
     {#if chrome.leftPanel === "files"}
       <PackageTreeDrawer />
@@ -767,6 +800,34 @@
   }
   .sidebar-host.closed {
     width: 0;
+  }
+  /* While dragging the handle, track the pointer 1:1 (no width easing). */
+  .sidebar-host.resizing {
+    transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Resize handle — a slim hit area straddling the sidebar/canvas seam. */
+  .resize-handle {
+    flex: 0 0 auto;
+    width: 6px;
+    margin: 0 -3px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    z-index: 110;
+    position: relative;
+  }
+  .resize-handle::after {
+    content: "";
+    position: absolute;
+    inset: 0 2px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .resize-handle:hover::after,
+  .sidebar-host.resizing + .resize-handle::after {
+    background: var(--color-border-strong);
   }
   /* Onboarding build-up: reveal the real sidebar with a slide-in. */
   .sidebar-host.ob-hide {

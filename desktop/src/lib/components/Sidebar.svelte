@@ -534,7 +534,12 @@
   {/if}
 
   <div class="sb-body">
-  <!-- Workspace header -->
+  <!-- Workspace header. In Hub the icon-rail IS the switcher, so the header
+       is a plain (non-dropdown) label for the active workspace; Shelf/Map use
+       the clickable switcher dropdown. -->
+  {#if nav.layout === "hub"}
+    <div class="ws-label-hub">{workspaceName || "Workspace"}</div>
+  {:else}
   <button
     type="button"
     class="ws-header"
@@ -558,13 +563,17 @@
     <span class="ws-name">{workspaceName || "Workspace"}</span>
     <CaretUpDown size={13} weight="bold" class="ws-caret" aria-hidden="true" />
   </button>
+  {/if}
 
   <!-- Bookmarks — Arc-style tile grid. Holds ONLY what was explicitly
        dragged in (apps or workbooks — every tile is a reference to a
        real file in a real folder; nothing is created here). Drop
        between tiles to insert. Max 3 rows of 4. Empty state is a
        persistent dashed slot with a bookmark glyph — always there to
-       drag onto, no words. -->
+       drag onto, no words.
+       Shelf + Hub are bookmark-forward (grid shows); Map is tree-forward
+       (grid hidden — the nested library is the focus). -->
+  {#if nav.layout !== "map"}
   {#if orderedBookmarks.length === 0}
     <div
       class="bm-empty"
@@ -630,6 +639,7 @@
         <span class="pin-slot" aria-hidden="true"></span>
       {/if}
     </div>
+  {/if}
   {/if}
 
   <!-- Main nav rows -->
@@ -1268,10 +1278,32 @@
    * chips + labels — rail just trims the rhythm. (A future icon-only rail
    * is a further preset.) */
   /* Shelf — compact, bookmark-forward density. */
+  /* Shelf — compact, bookmark-forward density. */
   .layout-shelf .row { height: 30px; gap: 8px; }
   .layout-shelf .row-icon { width: 22px; height: 22px; border-radius: 6px; }
   .layout-shelf .row-label { font-size: 10px; letter-spacing: 0.07em; }
   .layout-shelf .ws-header { padding-top: 6px; padding-bottom: 6px; }
+
+  /* Map — tree-forward: roomier rows, indent guide lines on nested children
+   * so it reads as a real page tree (the bookmark grid is hidden in markup). */
+  .layout-map .row { height: 34px; }
+  .layout-map .folder-children {
+    padding-left: 14px;
+    margin-left: 12px;
+    border-left: 1px solid var(--color-border);
+  }
+  .layout-map .row.child { height: 30px; }
+
+  /* Hub — plain (non-dropdown) workspace label; the rail is the switcher. */
+  .ws-label-hub {
+    padding: 8px 8px 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+  }
 
   .row {
     display: flex;

@@ -29,14 +29,55 @@ function initialLayout(): NavLayout {
   return coerce(loadPrefs().sidebar) ?? "shelf";
 }
 
+// Per-layout sidebar width (resizable). Each layout remembers its own width —
+// Hub is wider by default for the workspace rail. Clamped on read + write.
+const W_KEY = "wb.nav.widths";
+export const SIDEBAR_MIN = 180;
+export const SIDEBAR_MAX = 480;
+const DEFAULT_WIDTHS: Record<NavLayout, number> = { shelf: 232, hub: 300, map: 264 };
+
+function initialWidths(): Record<NavLayout, number> {
+  const out = { ...DEFAULT_WIDTHS };
+  if (typeof localStorage !== "undefined") {
+    try {
+      const saved = JSON.parse(localStorage.getItem(W_KEY) ?? "{}");
+      for (const k of ["shelf", "hub", "map"] as NavLayout[]) {
+        const v = Number(saved?.[k]);
+        if (Number.isFinite(v) && v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) out[k] = v;
+      }
+    } catch {
+      /* defaults */
+    }
+  }
+  return out;
+}
+
 class NavStore {
   layout = $state<NavLayout>(initialLayout());
+  widths = $state<Record<NavLayout, number>>(initialWidths());
+
+  /** Current layout's sidebar width in px. */
+  get sidebarWidth(): number {
+    return this.widths[this.layout];
+  }
 
   setLayout(l: NavLayout): void {
     this.layout = l;
     if (typeof localStorage !== "undefined") {
       try {
         localStorage.setItem(KEY, l);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
+  setSidebarWidth(px: number): void {
+    const w = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(px)));
+    this.widths = { ...this.widths, [this.layout]: w };
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(W_KEY, JSON.stringify(this.widths));
       } catch {
         /* best-effort */
       }
