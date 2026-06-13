@@ -32,8 +32,18 @@
 {/each}
 
 <style>
+  /* Badge button — a bordered chip matching the nexus status badge to its
+   * left, holding just the wordmark. */
   .dock-btn.icon-only {
-    padding: 0 9px;
+    height: 26px;
+    padding: 0 11px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+  }
+  .dock-btn.icon-only:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-soft);
     color: var(--color-fg);
   }
   .dock-btn {

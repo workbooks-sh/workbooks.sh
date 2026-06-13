@@ -37,6 +37,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { chrome } from "$lib/ui/chrome.svelte";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
+  import NexusMark from "$lib/components/NexusMark.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
   import { docIcons } from "$lib/ui/docIcon.svelte";
@@ -427,6 +428,7 @@
   <button
     type="button"
     class="engine engine-{engine.cls}"
+    class:alive={engine.cls === "ok"}
     data-tauri-drag-region="false"
     title={engine.title}
     aria-label={engine.title}
@@ -437,7 +439,7 @@
       chrome.nexusOpen = !chrome.nexusOpen;
     }}
   >
-    <span class="engine-dot" class:alive={engine.cls === "ok"}></span>
+    <NexusMark size={15} />
   </button>
 
   <!-- Extension dock toolbar (wb-aakl.14) — one icon per registered dock
@@ -766,40 +768,33 @@
     white-space: nowrap;
   }
 
-  /* Compact engine status icon — a colored dot reflecting engine state.
-   * Click opens the engine setup/manage wizard. */
+  /* Nexus status badge — the canonical nexus mark, colored by engine state.
+   * Click opens the nexus switcher/info popover. */
   .engine {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     align-self: center;
-    height: 24px;
-    width: 24px;
-    border: 1px solid transparent;
+    height: 26px;
+    width: 26px;
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    background: transparent;
+    background: var(--color-surface-soft);
+    color: var(--color-fg-subtle);
     flex-shrink: 0;
     cursor: pointer;
     user-select: none;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
-  .engine:hover { border-color: var(--color-border); background: var(--color-page); }
-  .engine-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-fg-subtle);
-  }
-  .engine-ok .engine-dot { background: var(--color-ok); }
-  .engine-pending .engine-dot {
-    background: var(--color-warn);
-    animation: engine-pulse 1.4s ease-in-out infinite;
-  }
-  .engine-off .engine-dot { background: var(--color-fg-subtle); }
+  .engine:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
+  .engine-ok { color: var(--color-ok); }
+  .engine-pending { color: var(--color-warn); animation: engine-pulse 1.4s ease-in-out infinite; }
+  .engine-off { color: var(--color-fg-subtle); }
   @keyframes engine-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
+    50% { opacity: 0.45; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .engine-pending .engine-dot { animation: none; }
+    .engine-pending { animation: none; }
   }
 </style>
