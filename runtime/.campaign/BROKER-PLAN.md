@@ -2059,3 +2059,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   egress (the one composition not previously shown; serve+KV + serve+exec already proven), completing Stone 5:
   inbound + outbound + storage + exec all compose in one sandboxed guest. resolved.json: live_capabilities.
   app_host. NEXT: NTP over wb_udp; a deployable app-host definition (productionize the guest + Bandit wiring).
+- 2026-06-13 (iter 154): **HEAVY PURE-PYTHON UNBLOCKED — the requests-class "abort" was a FUEL bug, not a
+  ceiling (sub-agent finding).** A background investigation proved exit-134 on `import requests` was wasmtime
+  FUEL EXHAUSTION (@default_fuel 5e9 too low for the heavy import bytecode of requests+urllib3+certifi+idna+
+  charset-normalizer), NOT a real abort/missing module. Fix: PyNet runs python with elevated fuel (50e9,
+  overridable; wall-clock -W timeout remains the DoS cap) + a preopened writable /tmp (real packages call
+  tempfile at import -> Errno 44 without it). Verified: pip-run requests -c "import requests; print(version)" ->
+  REQ 2.34.2, exit 0 (was 134). 41 Python-lane tests green incl a heavy-requests regression guard. This unblocks
+  the ENTIRE heavy-pure-Python ecosystem (the iter-150 "requests-class low value" conclusion was WRONG — it
+  works now). Native-ext stays permanently blocked (no dlopen). Real _ssl absent -> HTTPS via broker shim (fine).
+  NEXT: flip the 11 reachable PY tools (httpie/conda/pdm/datasette/yt-dlp/...) now that heavy imports work; JS
+  broker-surfacing (expose host_exec/tcp/udp/POST to JS in harness_dock.c — already wired host-side).

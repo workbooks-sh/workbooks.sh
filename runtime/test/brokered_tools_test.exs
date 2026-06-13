@@ -117,6 +117,24 @@ defmodule Workbooks.BrokeredToolsTest do
 
   @tag :netdeps
   @tag timeout: 300_000
+  test "REGRESSION — a HEAVY real package (requests + full dep tree) imports (fuel + /tmp, not SIGABRT)" do
+    # requests + urllib3/certifi/idna/charset-normalizer USED to exit 134 — wasmtime fuel exhaustion during the
+    # heavy import, plus tempfile needing a writable /tmp. With elevated python fuel + a preopened /tmp it
+    # imports cleanly. Guards against the fuel budget silently regressing (which re-breaks the whole heavy-
+    # pure-Python ecosystem). Networking still routes through the broker shim (real _ssl is absent — fine).
+    assert {:ok, out, 0} =
+             CommandRegistry.run_status("pip-run", "", [
+               "requests",
+               "-c",
+               "import requests; print('REQ', requests.__version__)"
+             ])
+
+    assert out =~ ~r/REQ \d+\.\d+/
+    assert out =~ "urllib3" and out =~ "certifi"
+  end
+
+  @tag :netdeps
+  @tag timeout: 300_000
   test "LIVE — pip-run resolves + installs a TRANSITIVE dependency tree (markdown-it-py -> mdurl)" do
     # markdown-it-py (import name markdown_it) requires mdurl — both pure-Python + import-clean. pip-run
     # recursively resolves requires_dist, downloads every wheel, zipimports the lot; markdown_it's import only

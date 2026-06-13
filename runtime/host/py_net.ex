@@ -47,11 +47,16 @@ defmodule Workbooks.PyNet do
     bdir = Path.join(System.tmp_dir!(), "wbroker_#{System.unique_integer([:positive])}")
     File.mkdir_p!(bdir)
 
+    # a writable /tmp: real packages (requests/urllib3/...) call tempfile at import and ERROR with
+    # "[Errno 44] No usable temporary directory" if none of /tmp,/var/tmp,/usr/tmp is preopened + writable.
+    tdir = Path.join(bdir, "tmp")
+    File.mkdir_p!(tdir)
+
     parent = self()
     stop = make_ref()
     max_req = Keyword.get(opts, :max_requests, @default_max_requests)
     watcher = spawn_link(fn -> watch_loop(bdir, opts, parent, stop, max_req) end)
-    dirs = ["#{bdir}::#{mount}" | Keyword.get(opts, :dirs, [])]
+    dirs = ["#{bdir}::#{mount}", "#{tdir}::/tmp" | Keyword.get(opts, :dirs, [])]
 
     try do
       run_fn.(dirs)
@@ -77,15 +82,23 @@ defmodule Workbooks.PyNet do
   end
 
   @doc "Run CPython `script` (`-c`) with the brokered transport mounted at `/b`. `{:ok, out, status}`."
+  # The default per-run fuel (PackageManager @default_fuel = 5e9) is fine for small scripts but is EXHAUSTED by
+  # the bytecode of a heavy third-party import tree (e.g. `import requests` + urllib3/certifi/idna/charset-
+  # normalizer traps "all fuel consumed" -> exit 134, which previously looked like a hard abort). CPython is an
+  # interpreter, so its runs legitimately need a much higher CPU budget; wall-clock `-W timeout` remains the real
+  # DoS cap. Raise it for every brokered Python run (overridable via opts[:fuel]).
+  @python_fuel 50_000_000_000
+
   def run_python(script, opts \\ []) when is_binary(script) do
     stdin = Keyword.get(opts, :stdin, "")
     argv = Keyword.get(opts, :argv, [])
+    fuel = Keyword.get(opts, :fuel, @python_fuel)
 
     with_broker(opts, fn dirs ->
       # `python -c <script> <argv...>` exposes argv to the tool as sys.argv[1:]; stdin is the tool's input.
       # run_status preserves the guest's EXIT CODE — a tool that errors (e.g. SSRF-denied request -> URLError ->
       # sys.exit(1)) must report non-zero, not be flattened to success.
-      case Workbooks.CommandRegistry.run_status("python", stdin, ["-c", script | argv], dirs) do
+      case Workbooks.CommandRegistry.run_status("python", stdin, ["-c", script | argv], dirs, fuel: fuel) do
         {:ok, body, status} when is_binary(body) -> {:ok, body, status}
         {:ok, body} when is_binary(body) -> {:ok, body, 0}
         body when is_binary(body) -> {:ok, body, 0}
