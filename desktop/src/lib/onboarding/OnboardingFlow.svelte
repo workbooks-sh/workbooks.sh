@@ -11,7 +11,7 @@
    * lands near the end. Never a gate.
    */
   import { onMount } from "svelte";
-  import { ArrowRight, CheckCircle, Copy, Palette, Translate, Cards } from "phosphor-svelte";
+  import { ArrowRight, CheckCircle, Palette, Translate, Cards } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { applyThemeMode } from "$lib/onboarding/prefs";
@@ -20,10 +20,12 @@
   import { dock } from "$lib/bridge/dock.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
+  import OnboardingAgents from "$lib/onboarding/OnboardingAgents.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
-  const STEPS = ["welcome", "titlebar", "sidebar", "search", "theme", "agent"] as const;
+  const STEPS = ["welcome", "titlebar", "sidebar", "search", "theme", "connect", "waldo"] as const;
   type Step = (typeof STEPS)[number];
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
@@ -89,22 +91,22 @@
     // "search" focuses the sidebar's own file-search bar (inline, shown by
     // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
     if (s === "sidebar" || s === "search") chrome.sidebarOpen = true;
-    else if (s === "agent") dock.open("waldo");
+    else if (s === "waldo") dock.open("waldo");
+    // "connect" shows the agents page above the coach — nothing to open.
   }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
   function pickSidebarTop(b: Prefs["sidebarTop"]) { prefs.sidebarTop = b; nav.setSidebarTop(b); }
 
-  const CMD_SKILLS = "npx skills add workbooks-sh/workbooks.sh";
-  const CMD_MCP = "claude mcp add workbooks -- wb desktop mcp";
-  let copied = $state<string | null>(null);
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = text;
-      setTimeout(() => (copied = null), 1600);
-    } catch { /* selectable */ }
+  // OpenRouter connect (SCAFFOLD). Waldo runs on OpenRouter — one key, every
+  // model. The real flow is an OAuth PKCE handshake that returns a key we
+  // store in the OS keychain; that's a Tauri/Rust follow-up. For now this
+  // tracks the connected state so the step reads correctly.
+  let orConnected = $state(false);
+  function connectOpenRouter() {
+    // TODO(wb-aakl): start OpenRouter OAuth PKCE → store key in keychain.
+    orConnected = true;
   }
 
   function next() {
@@ -128,6 +130,15 @@
 <div class="screen">
   {#if !started}
     <div class="grid" aria-hidden="true" transition:fly={{ duration: 200 }}></div>
+  {/if}
+
+  <!-- Page-above-the-coach: rich content rendered in the canvas area, centered
+       and lifted so it never overlaps the docked coach. The connect step uses
+       it for the agent-integration cards. -->
+  {#if step === "connect"}
+    <div class="ob-page" transition:fly={{ y: 16, duration: 260, easing: cubicOut }}>
+      <OnboardingAgents />
+    </div>
   {/if}
 
   <div class="dock" class:centered={centered}>
@@ -200,22 +211,24 @@
               {/each}
             </div>
 
+          {:else if step === "connect"}
+            <div class="text">
+              <span class="kicker">Your agents</span>
+              <h1>Bring your own</h1>
+              <p>Workbooks plugs into the agents you already run — check the ones above and we'll set them up for you, no copy-paste.</p>
+            </div>
+
           {:else}
             <div class="text">
-              <span class="kicker">Your agent</span>
+              <span class="kicker">Your resident agent</span>
               <h1>Meet Waldo</h1>
-              <p>Top-right. Give your agent the keys and ask for the rest — it's all plain config.</p>
+              <p>Top-right, always here. Waldo runs on OpenRouter — one key, every model. Connect to add yours; it's stored in your keychain.</p>
             </div>
-            <div class="cmds">
-              <button type="button" class="cmd" onclick={() => void copy(CMD_SKILLS)}>
-                <code>{CMD_SKILLS}</code>
-                {#if copied === CMD_SKILLS}<CheckCircle size={13} weight="fill" class="ok" />{:else}<Copy size={13} weight="fill" />{/if}
-              </button>
-              <button type="button" class="cmd" onclick={() => void copy(CMD_MCP)}>
-                <code>{CMD_MCP}</code>
-                {#if copied === CMD_MCP}<CheckCircle size={13} weight="fill" class="ok" />{:else}<Copy size={13} weight="fill" />{/if}
-              </button>
-            </div>
+            <button type="button" class="connect-or" class:done={orConnected} onclick={connectOpenRouter}>
+              <Icon value="lobe:openrouter" name="OpenRouter" size={16} />
+              {orConnected ? "OpenRouter connected" : "Connect OpenRouter"}
+              {#if orConnected}<CheckCircle size={14} weight="fill" />{/if}
+            </button>
           {/if}
         </div>
       {/key}
@@ -224,7 +237,7 @@
         <div class="nav">
           <button type="button" class="ghost" onclick={back}>Back</button>
           <button type="button" class="primary" onclick={next}>
-            {step === "agent" ? "Open the browser" : "Continue"}
+            {step === "waldo" ? "Open the browser" : "Continue"}
             <ArrowRight size={14} weight="bold" />
           </button>
         </div>
@@ -244,6 +257,42 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
+  }
+  /* Page-above-the-coach — fills the space above the docked coach and centers
+   * its content (lifted a touch so it never crowds the dock). */
+  .ob-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vh 24px 8px;
+    pointer-events: none; /* the inner card re-enables it */
+  }
+  /* Connect-OpenRouter button in the Waldo coach. */
+  .connect-or {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 8px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 550;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .connect-or :global(img) { display: block; }
+  .connect-or:hover { border-color: var(--color-border-strong); }
+  .connect-or.done {
+    border-color: var(--color-brand);
+    background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
+    color: var(--color-brand);
   }
   .grid {
     position: absolute;
@@ -334,25 +383,6 @@
     background: color-mix(in srgb, var(--color-chip-green) 16%, var(--color-surface));
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chip-green) 45%, transparent);
   }
-  .cmds { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-  .cmd {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 11px;
-    border: 1px solid var(--color-border);
-    border-radius: 9px;
-    background: var(--color-page);
-    color: var(--color-fg-muted);
-    cursor: pointer; text-align: left;
-  }
-  .cmd:hover { border-color: var(--color-border-strong); }
-  .cmd code {
-    flex: 1;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--color-fg);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .cmd :global(.ok) { color: var(--color-ok); }
   .nav { display: flex; justify-content: space-between; align-items: center; }
   .primary {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
