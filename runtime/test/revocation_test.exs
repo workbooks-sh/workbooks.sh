@@ -36,4 +36,22 @@ defmodule Workbooks.RevocationTest do
     assert Enum.all?(ps, &Revocation.revoked?/1)
     Enum.each(ps, &Revocation.unrevoke/1)
   end
+
+  test "INTEGRATION: a revocation made from a TRANSIENT task is honored at the BROKER boundary (fail-closed)" do
+    t = "rev-broker-#{System.unique_integer([:positive])}"
+
+    # set the revocation inside a Task that then exits — exactly the transient-owner scenario from the bug
+    Task.async(fn -> Revocation.revoke(t) end) |> Task.await()
+
+    # the brokers must DENY the revoked principal even though the revocation came from a now-dead process —
+    # spanning the egress (NetGuard), durable storage, and queue brokers (all consult Revocation per call).
+    assert {:error, :revoked} = Workbooks.NetGuard.get("http://example.com/", principal: t)
+    {:ok, conn} = Workbooks.StorageBroker.open(":memory:")
+    assert {:error, :revoked} = Workbooks.StorageBroker.put(conn, t, "k", "v")
+    assert {:error, :revoked} = Workbooks.QueueBroker.publish(t, "topic", "m")
+
+    # unrevoke restores access (also durable across the transient revoke)
+    :ok = Revocation.unrevoke(t)
+    assert :ok = Workbooks.QueueBroker.publish(t, "topic", "m")
+  end
 end

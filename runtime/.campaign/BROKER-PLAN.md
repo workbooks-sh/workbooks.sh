@@ -1467,3 +1467,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   Escrow + Domains already did it right (GenServer-owned) — left untouched. FOUR self-audit fires, THREE
   classes of real bug found IN THE REMEDIATION + adjacent code (queue O(N) DoS, ETS-ownership crash, and now
   the revocation fail-open). The fixes are now as adversarially-tested as the original surface.
+- 2026-06-12 (iter 109): **Revocation fail-closed fix verified at the BROKER BOUNDARY (integration).** The
+  iter-108 fix was tested on Revocation directly; added an integration test proving it holds where it matters:
+  a revocation set INSIDE a transient Task (the exact bug scenario) is honored by the actual brokers — NetGuard
+  egress, StorageBroker, and QueueBroker all return {:error, :revoked} for the principal even though the
+  revoking process is dead; unrevoke restores access. 4 revocation tests green (round-trip, transient
+  durability, 200-concurrent, broker-boundary integration). The self-audit security fix is now proven
+  end-to-end across the broker surface. SELF-AUDIT COMPLETE: 4 fires found 3 real bug-classes in the
+  remediation/adjacent code (queue O(N) DoS, ETS-ownership crash, revocation fail-open) — all fixed + tested;
+  the remaining new-code paths (pinned-https worker lifecycle, pipe write_vectored partial) reviewed correct.
+  The networking keystone is now secure + audited + self-audited + verified end-to-end. The remaining frontier
+  is the compiler/WASM build lanes (262 build-blocked items) — a deliberate NEW campaign per the owner's steer.
