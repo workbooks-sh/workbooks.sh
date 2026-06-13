@@ -2,6 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Outer matte floor: paint the document root from the first byte
+         (before app.css loads) so the canvas is never a system default /
+         warm flash. Theme-aware to match canon; themes still color the body
+         via tokens. -->
+    <style>
+      html { background: #f7f6f1; }
+      @media (prefers-color-scheme: dark) { html { background: #121316; } }
+    </style>
     <link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Workbooks</title>
