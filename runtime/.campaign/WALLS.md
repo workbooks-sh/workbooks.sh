@@ -69,6 +69,23 @@ grep '(import'`) — the decision gate: easy/medium env surface → EmscriptenDo
 stays roadmap. (2) Wire the already-built sqlite.wasm (Forge). (3) Build EmscriptenDock (M) only for
 audit-confirmed-tractable targets. Precedent file to clone: `host/js_dock.ex`.
 
+**AUDIT RESULT 2026-06-13 (empirical, wasm-binary level) — the Bridge is even narrower; lean FORGE:**
+NONE of the three residue libs is EmscriptenDock-able as shipped — all carry browser-bound imports no
+build flag removes:
+- **DuckDB-wasm** (best `-eh` build): emscripten `MAIN_MODULE` dynamic-linking (268 `GOT.*` + dylink
+  section), `EM_ASM` inline-JS (`emscripten_asm_const_*`), 14 `embind`/`emval` live-JS marshalling, 17
+  JS-implemented `duckdb_web_fs_*`. → roadmap as a prebuilt; **Forge it: compile DuckDB C++ source →
+  wasm32-wasi (needs C++ EXCEPTIONS — gated on that Forge build).**
+- **esbuild-wasm**: it's a **Go→WASM** binary (`syscall/js`), not emscripten/wasi at all. → **Forge it:
+  rebuild `GOOS=wasip1 GOARCH=wasm` (clean wasi). Needs a Go→wasip1 toolchain in the lane (Forge gap).**
+- **ONNX-web 1.26**: ships only threaded builds (shared memory + Web-Worker spawn); no standalone. →
+  honest roadmap until upstream publishes a wasi/single-threaded artifact.
+
+**Consequence:** the Bridge/EmscriptenDock is a NARROW auxiliary — valid only for *self-compiled*
+`-sSTANDALONE_WASM -fwasm-exceptions` modules, NOT the vendor CDN ecosystem (it's too browser-coupled).
+**FORGE is the workhorse.** C++ exceptions is the KEYSTONE (unblocks C++-from-source incl. DuckDB); a
+Go→wasip1 toolchain unblocks esbuild + the Go ecosystem. Don't build EmscriptenDock as a headline bet.
+
 ## 🔨 THE FORGE — toolchain completeness
 Our own in-sandbox compilers can't yet *produce* certain wasm. Not a wall — each is a build, and
 it's our home turf (where effort reliably converts to live capability).
