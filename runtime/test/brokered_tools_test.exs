@@ -104,6 +104,21 @@ defmodule Workbooks.BrokeredToolsTest do
     assert out =~ "PY3 True"
   end
 
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "LIVE — pip-run handles a MULTI-MODULE package dir (zipimport on a package tree, not just single-file)" do
+    # click is a pure-Python PACKAGE (click/ dir, no runtime deps) — confirms zipimport loads a package tree
+    # from the wheel, so the reclaim isn't limited to single-file modules like six.
+    assert {:ok, out, 0} =
+             CommandRegistry.run_status("pip-run", "", [
+               "click",
+               "-c",
+               "import click; print('CLICK', hasattr(click, 'command'))"
+             ])
+
+    assert out =~ "CLICK True"
+  end
+
   test "tcp-send is registered + prints usage on missing args" do
     assert "tcp-send" in CommandRegistry.list()
     assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "", ["example.com"])
