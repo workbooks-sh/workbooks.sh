@@ -605,8 +605,9 @@
        persistent dashed slot with a bookmark glyph — always there to
        drag onto, no words.
        Shelf + Hub are bookmark-forward (grid shows); Map is tree-forward
-       (grid hidden — the nested library is the focus). -->
-  {#if nav.layout !== "map"}
+       (grid hidden). The grid also hides when bookmarks are "search" mode —
+       you recall them through search instead of pinning them. -->
+  {#if nav.layout !== "map" && nav.bookmarks === "pinned"}
   {#if orderedBookmarks.length === 0}
     <div
       class="bm-empty"

@@ -10,7 +10,13 @@ import { loadPrefs } from "$lib/onboarding/prefs";
 
 export type NavLayout = "shelf" | "hub" | "map";
 
+// Bookmarks surface (wb-aakl.16/.19): "pinned" = a pinned bookmark grid in the
+// sidebar alongside search; "search" = no pinned grid, you recall things
+// through search instead.
+export type BookmarksMode = "pinned" | "search";
+
 const KEY = "wb.nav.layout";
+const BM_KEY = "wb.nav.bookmarks";
 
 // Migrate the old two-preset values to the new named set.
 function coerce(v: string | null | undefined): NavLayout | null {
@@ -27,6 +33,14 @@ function initialLayout(): NavLayout {
   }
   // Fall back to the onboarding choice, else the shelf default.
   return coerce(loadPrefs().sidebar) ?? "shelf";
+}
+
+function initialBookmarks(): BookmarksMode {
+  if (typeof localStorage !== "undefined") {
+    const saved = localStorage.getItem(BM_KEY);
+    if (saved === "pinned" || saved === "search") return saved;
+  }
+  return loadPrefs().bookmarks === "search" ? "search" : "pinned";
 }
 
 // Per-layout sidebar width (resizable). Each layout remembers its own width —
@@ -55,6 +69,7 @@ function initialWidths(): Record<NavLayout, number> {
 class NavStore {
   layout = $state<NavLayout>(initialLayout());
   widths = $state<Record<NavLayout, number>>(initialWidths());
+  bookmarks = $state<BookmarksMode>(initialBookmarks());
 
   /** Current layout's sidebar width in px. */
   get sidebarWidth(): number {
@@ -66,6 +81,17 @@ class NavStore {
     if (typeof localStorage !== "undefined") {
       try {
         localStorage.setItem(KEY, l);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
+  setBookmarks(m: BookmarksMode): void {
+    this.bookmarks = m;
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(BM_KEY, m);
       } catch {
         /* best-effort */
       }

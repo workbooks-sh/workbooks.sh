@@ -36,9 +36,10 @@
   type Prefs = {
     theme: "system" | "dark" | "light";
     sidebar: "shelf" | "hub" | "map";
+    bookmarks: "pinned" | "search";
     search: { ai: "summary" | "first" | "off" };
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, bookmarks: nav.bookmarks, search: { ai: "summary" } });
 
   // Demo bench toolkits — registered only for the tour so the bench has real,
   // toggleable shortcuts to showcase the "build your own toolkit" concept.
@@ -92,6 +93,7 @@
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
+  function pickBookmarks(b: Prefs["bookmarks"]) { prefs.bookmarks = b; nav.setBookmarks(b); }
 
   const CMD_SKILLS = "npx skills add workbooks-sh/workbooks.sh";
   const CMD_MCP = "claude mcp add workbooks -- wb desktop mcp";
@@ -176,13 +178,12 @@
           {:else if step === "search"}
             <div class="text">
               <span class="kicker">Search · a default toolkit</span>
-              <h1>How should search answer?</h1>
-              <p>⌘K from anywhere; results open here. Web, files + bookmarks are in; add Exa later. How should it lead?</p>
+              <h1>Bookmarks, or just search?</h1>
+              <p>⌘K from anywhere; results open here. Pin a bookmark grid in the sidebar too, or keep it lean and recall everything through search.</p>
             </div>
             <div class="opts">
-              {#each [["summary", "AI on top"], ["first", "AI only"], ["off", "Links only"]] as [id, label] (id)}
-                <button type="button" class="opt" class:sel={prefs.search.ai === id} onclick={() => (prefs.search.ai = id as Prefs["search"]["ai"])}>{label}</button>
-              {/each}
+              <button type="button" class="opt" class:sel={prefs.bookmarks === "pinned"} onclick={() => pickBookmarks("pinned")}>Search + bookmarks</button>
+              <button type="button" class="opt" class:sel={prefs.bookmarks === "search"} onclick={() => pickBookmarks("search")}>Search only</button>
             </div>
 
           {:else if step === "theme"}
