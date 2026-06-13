@@ -50,6 +50,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* the titlebar is align-items:stretch; without this a fixed-height
+       button falls to the top, leaving space below it. */
+    align-self: center;
     gap: 6px;
     height: 26px;
     padding: 0 10px;
