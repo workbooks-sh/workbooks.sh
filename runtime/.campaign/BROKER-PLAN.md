@@ -1995,3 +1995,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   netcat/Redis/Valkey/curl(raw) + live_capabilities.raw_tcp (DB-client/line-protocol transport live; a specific
   RESP/PG codec is a thin tool on top). NEXT Phase-4: a real Redis/PG client tool over tcp-send; the install half
   of pkg-fetch (stage a fetched pure-Python wheel as a runnable tool).
+- 2026-06-13 (iter 148): **PHASE-4 KEYSTONE — pip-run: pip's INSTALL half reclaimed (pure-Python wheels).**
+  `pip-run PACKAGE [-c CODE]` fetches the pure-Python wheel over brokered HTTPS, downloads the wheel BYTES
+  (requests.content -> binary through the transport), and zipimports it (a wheel IS a zip -> straight onto
+  sys.path via /b/pkg.whl, no unpack), then imports the module or runs `-c CODE` against it. So pip INSTALL+USE
+  is LIVE for the no-native-extension subset, fully sandboxed + SSRF-mediated. 17 brokered_tools tests green
+  incl: pip-run registered+usage; LIVE pip-run six -> "installed six 1.17.0" (brokered download + zipimport);
+  LIVE pip-run six -c "import six; print('PY3', six.PY3)" -> PY3 True. This goes BEYOND pip-fetch (metadata) to
+  actually installing + running a package. resolved.json: capability_live (install) on pip/Poetry/pdm/Buildout
+  + live_capabilities.pip_install. Native-extension wheels still need the in-sandbox build lane to compile the
+  C/Rust ext (separate). NEXT: a wheel with a sub-package dir (requests-class, multi-module) to confirm
+  zipimport handles package trees; transitive deps (resolve + zipimport a small dep chain).

@@ -81,6 +81,29 @@ defmodule Workbooks.BrokeredToolsTest do
     assert out =~ "tarball:" and out =~ "registry.npmjs.org"
   end
 
+  test "pip-run is registered + prints usage on no arg" do
+    assert "pip-run" in CommandRegistry.list()
+    assert {:ok, _out, status} = CommandRegistry.run_status("pip-run", "", [])
+    assert status != 0
+  end
+
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "LIVE — pip-run INSTALLS a pure-Python wheel (brokered download + zipimport) and imports it" do
+    # the install half of pip: fetch the wheel over brokered HTTPS, download the bytes, zipimport it -> usable.
+    assert {:ok, out, 0} = CommandRegistry.run_status("pip-run", "", ["six"])
+    assert out =~ "installed six"
+  end
+
+  @tag :netdeps
+  @tag timeout: 180_000
+  test "LIVE — pip-run -c runs code against the freshly installed package" do
+    assert {:ok, out, 0} =
+             CommandRegistry.run_status("pip-run", "", ["six", "-c", "import six; print('PY3', six.PY3)"])
+
+    assert out =~ "PY3 True"
+  end
+
   test "tcp-send is registered + prints usage on missing args" do
     assert "tcp-send" in CommandRegistry.list()
     assert {:ok, _out, status} = CommandRegistry.run_status("tcp-send", "", ["example.com"])

@@ -115,11 +115,51 @@ defmodule Workbooks.BrokeredTools do
       sys.stderr.write("error: %s\n" % e); sys.exit(1)
   """
 
+  # `pip-run` — the INSTALL half of pip for pure-Python packages, reclaimed: fetch the package's pure-Python
+  # wheel over brokered HTTPS, download the wheel BYTES, and import it via zipimport (a wheel IS a zip → it goes
+  # straight onto sys.path, no unpack). Then import the module (or run `-c CODE` against it). This is "pip
+  # install + use" for the no-native-extension subset, entirely sandboxed + SSRF-mediated. Usage:
+  #   pip-run PACKAGE [-c CODE]
+  @pip_run ~S"""
+  import sys, json
+  args = sys.argv[1:]
+  if not args:
+      sys.stderr.write("usage: pip-run PACKAGE [-c CODE]\n"); sys.exit(2)
+  pkg = args[0]
+  code = args[2] if len(args) >= 3 and args[1] == "-c" else None
+  import requests, urllib.error
+  try:
+      r = requests.get("https://pypi.org/pypi/%s/json" % pkg)
+      if r.status_code != 200:
+          sys.stderr.write("not found: %s (%d)\n" % (pkg, r.status_code)); sys.exit(1)
+      data = r.json(); ver = data["info"]["version"]
+      wheel = None
+      for f in data.get("releases", {}).get(ver, []):
+          if f.get("packagetype") == "bdist_wheel" and "none-any" in f.get("filename", ""):
+              wheel = f["url"]; break
+      if not wheel:
+          sys.stderr.write("no pure-python wheel for %s %s (has native code)\n" % (pkg, ver)); sys.exit(3)
+      blob = requests.get(wheel).content
+      open("/b/pkg.whl", "wb").write(blob)
+      sys.path.insert(0, "/b/pkg.whl")
+      if code:
+          exec(code)
+      else:
+          mod = __import__(pkg.replace("-", "_"))
+          print("installed %s %s" % (pkg, getattr(mod, "__version__", ver)))
+      sys.exit(0)
+  except urllib.error.URLError as e:
+      sys.stderr.write("error: %s\n" % e.reason); sys.exit(1)
+  except Exception as e:
+      sys.stderr.write("error: %s\n" % e); sys.exit(1)
+  """
+
   @doc "Register all canonical brokered tools. Returns `%{name => :ok | {:error, reason}}`. Idempotent."
   def register_all do
     %{
       "http" => register_http(),
       "pip-fetch" => Workbooks.CommandRegistry.register_pynet("pip-fetch", @pip_fetch, :argv, %{}),
+      "pip-run" => Workbooks.CommandRegistry.register_pynet("pip-run", @pip_run, :argv, %{}),
       "npm-fetch" => Workbooks.CommandRegistry.register_pynet("npm-fetch", @npm_fetch, :argv, %{}),
       # raw TCP is a broader grant than http -> explicit :tcp_allow on this tool only.
       "tcp-send" =>

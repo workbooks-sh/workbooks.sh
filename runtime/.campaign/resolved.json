@@ -277,7 +277,7 @@
    "extent": "off-the-table (verified)",
    "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
-   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
+   "capability_live": "pip-run command (host/brokered_tools.ex) \u2014 the INSTALL half: fetch a pure-Python wheel over brokered HTTPS, download the bytes, and zipimport it (a wheel IS a zip -> straight onto sys.path), then import/run it. pip INSTALL+USE is LIVE for the no-native-extension subset, fully sandboxed + SSRF-mediated. Proof: pip-run six -> installed six 1.17.0; pip-run six -c (use it) works. The native-extension subset (C/Rust ext modules) still needs the in-sandbox build lane to compile the extension (separate)."
   },
   "Buildout": {
    "verdict": "reachable",
@@ -286,7 +286,7 @@
    "extent": "off-the-table (verified)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
-   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
+   "capability_live": "pip-run command (host/brokered_tools.ex) \u2014 the INSTALL half: fetch a pure-Python wheel over brokered HTTPS, download the bytes, and zipimport it (a wheel IS a zip -> straight onto sys.path), then import/run it. pip INSTALL+USE is LIVE for the no-native-extension subset, fully sandboxed + SSRF-mediated. Proof: pip-run six -> installed six 1.17.0; pip-run six -c (use it) works. The native-extension subset (C/Rust ext modules) still needs the in-sandbox build lane to compile the extension (separate)."
   },
   "grep": {
    "verdict": "live",
@@ -420,7 +420,7 @@
    "extent": "off-the-table (verified)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
-   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
+   "capability_live": "pip-run command (host/brokered_tools.ex) \u2014 the INSTALL half: fetch a pure-Python wheel over brokered HTTPS, download the bytes, and zipimport it (a wheel IS a zip -> straight onto sys.path), then import/run it. pip INSTALL+USE is LIVE for the no-native-extension subset, fully sandboxed + SSRF-mediated. Proof: pip-run six -> installed six 1.17.0; pip-run six -c (use it) works. The native-extension subset (C/Rust ext modules) still needs the in-sandbox build lane to compile the extension (separate)."
   },
   "Pipenv": {
    "verdict": "impossible",
@@ -1894,7 +1894,7 @@
    "extent": "off-the-table (final triage: fundamental-blocker / per-tool-host-prep / redundant)",
    "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
-   "capability_live": "pip-fetch command (host/brokered_tools.ex) \u2014 retrieves a package metadata + wheel/sdist URLs from the PyPI JSON API over the FULL brokered HTTPS stack (NetGuard pin+verify_peer). pip/poetry/pdm NETWORK-FETCH half is reclaimed live (the network-as-purpose blocker is gone); the full install (download wheel + unpack + build native exts) is the separate remaining step."
+   "capability_live": "pip-run command (host/brokered_tools.ex) \u2014 the INSTALL half: fetch a pure-Python wheel over brokered HTTPS, download the bytes, and zipimport it (a wheel IS a zip -> straight onto sys.path), then import/run it. pip INSTALL+USE is LIVE for the no-native-extension subset, fully sandboxed + SSRF-mediated. Proof: pip-run six -> installed six 1.17.0; pip-run six -c (use it) works. The native-extension subset (C/Rust ext modules) still needs the in-sandbox build lane to compile the extension (separate)."
   },
   "RubyGems (gem)": {
    "verdict": "impossible",
@@ -2294,6 +2294,13 @@
    "class": "DB-client / line-protocol (Redis RESP, HTTP/1, wire protocols)",
    "gated": "tcp_allow default-deny",
    "since": "iter147"
+  },
+  "pip_install": {
+   "command": "pip-run",
+   "delivers": "pip install+use for pure-Python wheels",
+   "recipe": "brokered HTTPS download + zipimport",
+   "excludes": "native-extension wheels (need in-sandbox compile)",
+   "since": "iter148"
   }
  }
 }
