@@ -31,11 +31,13 @@
     Hash,
     Cube as Box,
     SidebarSimple,
+    MagnifyingGlass,
   } from "phosphor-svelte";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { nav } from "$lib/bridge/nav.svelte";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import NexusMark from "$lib/components/NexusMark.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
@@ -424,7 +426,44 @@
     </button>
   </div>
 
+  <!-- Titlebar layout: Helm surfaces a command/search field in the bar
+       (wb-aakl.16). Tabs above are always present; the layout only changes
+       the surrounding chrome. -->
+  {#if nav.titlebar === "helm"}
+    <button
+      type="button"
+      class="bar-search"
+      data-tauri-drag-region="false"
+      title="Search or jump to… (⌘K)"
+      aria-label="Search"
+      onclick={() => chrome.openSearch()}
+    >
+      <MagnifyingGlass size={13} weight="bold" />
+      <span class="bar-search-label">Search or jump to…</span>
+      <kbd>⌘K</kbd>
+    </button>
+  {/if}
+
   <span class="spacer" data-tauri-drag-region></span>
+
+  <!-- Bench layout: the ⌄-menu actions (Search / Bookmarks / Terminal) are
+       surfaced as visible bar buttons. Reads the same command registry the
+       menu does — one source of truth. -->
+  {#if nav.titlebar === "bench"}
+    <div class="bar-tools" data-tauri-drag-region="false">
+      {#each commands.byGroup("menu") as cmd (cmd.id)}
+        <button
+          type="button"
+          class="bar-tool"
+          title={cmd.shortcut ? `${cmd.label} (${cmd.shortcut})` : cmd.label}
+          aria-label={cmd.label}
+          onclick={() => cmd.run()}
+        >
+          {#if cmd.icon}{@const Icon = cmd.icon}<Icon size={15} weight="regular" />{/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   <button
     type="button"
@@ -807,5 +846,73 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .engine-pending { animation: none; }
+  }
+
+  /* Bench layout — action cluster (Search / Bookmarks / Terminal) as bar
+   * buttons, matching the nexus badge idiom. */
+  .bar-tools {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 2px;
+    margin-right: 2px;
+  }
+  .bar-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    width: 26px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+    line-height: 0;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .bar-tool :global(svg) { display: block; }
+  .bar-tool:hover {
+    background: var(--color-surface-soft);
+    border-color: var(--color-border);
+    color: var(--color-fg);
+  }
+
+  /* Helm layout — a click-to-open search/command field in the bar. */
+  .bar-search {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 7px;
+    height: 26px;
+    max-width: 260px;
+    padding: 0 8px 0 9px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg-subtle);
+    cursor: text;
+    font: inherit;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .bar-search:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-fg);
+  }
+  .bar-search :global(svg) { display: block; flex-shrink: 0; }
+  .bar-search-label {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-search kbd {
+    font-size: 0.66rem;
+    font-family: var(--font-mono, monospace);
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--color-page);
+    border: 1px solid var(--color-border);
+    color: var(--color-fg-subtle);
   }
 </style>

@@ -32,10 +32,11 @@
 
   type Prefs = {
     theme: "system" | "dark" | "light";
+    titlebar: "slim" | "bench" | "helm";
     sidebar: "rail" | "library";
     search: { ai: "summary" | "first" | "off" };
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", titlebar: nav.titlebar, sidebar: nav.layout, search: { ai: "summary" } });
 
   onMount(() => onboarding.start());
 
@@ -51,6 +52,7 @@
   }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
+  function pickTitlebar(t: Prefs["titlebar"]) { prefs.titlebar = t; nav.setTitlebar(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
 
   const CMD_SKILLS = "npx skills add workbooks-sh/workbooks.sh";
@@ -118,7 +120,12 @@
             <div class="text">
               <span class="kicker">The titlebar</span>
               <h1>This is your top bar</h1>
-              <p>Tabs live here, with your nexus status and the Waldo agent on the right. It stays put while everything else is yours to arrange.</p>
+              <p>Tabs always live here. Pick how the rest of the bar fills in — it changes live, look up.</p>
+            </div>
+            <div class="opts">
+              <button type="button" class="opt" class:sel={prefs.titlebar === "slim"} onclick={() => pickTitlebar("slim")}>Slim</button>
+              <button type="button" class="opt" class:sel={prefs.titlebar === "bench"} onclick={() => pickTitlebar("bench")}>Bench</button>
+              <button type="button" class="opt" class:sel={prefs.titlebar === "helm"} onclick={() => pickTitlebar("helm")}>Helm</button>
             </div>
 
           {:else if step === "sidebar"}
