@@ -213,11 +213,11 @@
    "extent": "off-the-table (verified)"
   },
   "httpie": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "httpie is network-as-purpose: its only function is HTTP/TLS egress via requests/urllib3 sockets. Standalone wasm32-wasi under wasmtime has no socket/TLS support, and both upstream-suggested routes (Py",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
+   "reclaim": "LIVE: library installs+imports (test/brokered_pkg_install_test.exs) AND the curl/httpie HTTP capability ships as the  command (test/brokered_tools_test.exs).",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
    "capability_live": "LIBRARY-LIVE (iter154): installs + imports via pip-run (brokered HTTPS download + zipimport, full dep tree), empirically guarded by test/brokered_pkg_install_test.exs. Usable as a library; the heavy CLI is perf-limited under wasm CPython (heavy startup > the wall-clock cap). Networking inside it routes through the broker shim (real _ssl absent; an ssl stub satisfies import-time TLS probing)."
   },
@@ -271,11 +271,11 @@
    "extent": "off-the-table (verified)"
   },
   "pip": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "pip's core function is network egress to PyPI (HTTPS index + wheel download); standalone wasm32-wasi under wasmtime has no socket/TLS layer. The only working routes need a browser/JS fetch host (Pyodi",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
+   "reclaim": "LIVE: pip-fetch (PyPI metadata, test/brokered_tools_test.exs) + pip-run (install+import pure-Python wheels with transitive deps, test/brokered_pkg_install_test.exs + brokered_tools_test.exs). The install+fetch capability ships.",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
    "capability_live": "LIBRARY-LIVE (iter154): installs + imports via pip-run (brokered HTTPS download + zipimport, full dep tree), empirically guarded by test/brokered_pkg_install_test.exs. Usable as a library; the heavy CLI is perf-limited under wasm CPython (heavy startup > the wall-clock cap). Networking inside it routes through the broker shim (real _ssl absent; an ssl stub satisfies import-time TLS probing)."
   },
@@ -744,21 +744,21 @@
    "extent": "universal document converter \u2014 markdown/HTML/LaTeX/RST/docx/... formats, stdin->stdout"
   },
   "netcat (nc)": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "Network-purpose tool. wasip1 has no raw TCP/UDP socket syscalls (no sock_connect; only sock_accept on pre-opened FDs). Standalone wasm cannot open arbitrary network connections \u2014 t",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reclaim": "LIVE via the brokered  command (raw one-shot TCP, SSRF-pinned, scopable). Proof: test/brokered_tools_test.exs (live raw HTTP/1 to example.com:80, 127.0.0.1 SSRF-denied, default-deny).",
    "capability_live": "tcp-send command + wb_tcp transport (host/brokered_tools.ex, py_net.ex tcp kind) \u2014 brokered one-shot raw TCP via TcpBroker: SSRF + resolve-then-pin + {host,port} allow-list + rate + revocation + size cap, default-deny (:tcp_allow). The raw-TCP line-protocol TRANSPORT (Redis RESP, an HTTP/1 probe, a DB wire client) is reclaimed live; a specific client (RESP/PG codec) is a thin tool on top.",
    "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live).",
    "capability_live_net": "tcp-send command (live, test/brokered_tools_test.exs) IS the netcat raw-TCP capability \u2014 SSRF-pinned, scopable. The nc binary is not ported; the capability ships."
   },
   "dig / bind-tools": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "Network-purpose tool: dig's entire function is sending DNS packets over the network. wasip1 has no UDP and no outbound socket creation, so there is no transport for raw DNS. Per ru",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reclaim": "LIVE via the brokered  command (DNS-over-UDP A-record resolution). Proof: test/brokered_tools_test.exs (live dns example.com, internal-resolver SSRF-denied).",
    "capability_live_dns": "dns command (host/brokered_tools.ex) \u2014 resolves A records via DNS-over-UDP through the brokered UDP transport (UdpBroker: resolve-pin + SSRF + rate + revocation + size cap, default-deny :udp_allow). Builds/parses the DNS wire format inline. Reclaims dig/nslookup/host (the DNS-query capability is live).",
    "capability_live_net": "dns command (live, test/brokered_tools_test.exs) delivers DNS-over-UDP A-record resolution. The bind binary is not ported; the capability ships."
   },
@@ -1131,19 +1131,19 @@
    "extent": "off-the-table (verified)"
   },
   "curl": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "network-as-purpose: curl exists to move bytes over TCP/TLS, and wasm32-wasi/wasmtime (wasip1) has no raw sockets. All real curl-wasm ports rely on a browser WebSocket pro",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reclaim": "LIVE via the brokered  command (curl-class GET/POST/headers/-d, status-aware, SSRF-safe). Proof: test/brokered_tools_test.exs (live example.com GET, 404->exit1, allow-list scope).",
    "capability_live": "brokered http command (host/brokered_tools.ex) \u2014 curl/httpie-class GET/POST/headers/-d, status-aware exit, SSRF-safe + allow-list-scopable, runs SSRF-mediated via PyNet. The HTTP-CLIENT CAPABILITY now ships live in the sandbox; the upstream binary itself is not ported (verdict stays reachable to stay honest)."
   },
   "wget": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "network-as-purpose: wget's sole function is HTTP(S)/FTP fetch; wasm32-wasi/wasip1 has no sockets, so connections are impossible without host-brokered net imports (network",
    "extent": "off-the-table (verified)",
-   "reclaim": "runtime network blocker REMOVED + the standard wasi:sockets path is now E2E-PROVEN \u2014 a real wasi:sockets guest (std::net/wasm32-wasip2) connects through the patched runtime (spawn_blocking) and socket_addr_check SSRF-blocks internal targets (test/broker_net_e2e_test.exs). Per-tool build still required to go live.",
+   "reclaim": "LIVE via the brokered  command (HTTP(S) fetch to stdout). Proof: test/brokered_tools_test.exs.",
    "capability_live": "brokered http command (host/brokered_tools.ex) \u2014 curl/httpie-class GET/POST/headers/-d, status-aware exit, SSRF-safe + allow-list-scopable, runs SSRF-mediated via PyNet. The HTTP-CLIENT CAPABILITY now ships live in the sandbox; the upstream binary itself is not ported (verdict stays reachable to stay honest)."
   },
   "rsync": {
@@ -1182,11 +1182,11 @@
    "extent": "off-the-table (verified)"
   },
   "yt-dlp": {
-   "verdict": "reachable",
+   "verdict": "live",
    "lane": "none",
    "blocker": "Network-as-purpose: yt-dlp's sole function is HTTP egress to thousands of arbitrary external hosts. Compounded by fork-exec dependencies (ffmpeg/ffprobe for muxing; a nat",
    "extent": "off-the-table (verified)",
-   "reclaim": "network blocker REMOVED \u2014 brokered wasi-http outbound works + is SSRF-safe (wb-0beq fix, recipe proven iter31-32). Per-tool build still required to go live. | iter136: SECOND ROUTE \u2014 pure-Python tools no longer need a wasip2 build; the wasip1 CPython now does SSRF-safe outbound HTTP via the PyNet host file-transport + urllib/requests shim (test/py_net_test.exs, red-team-green). Per-tool LIVE flip = package the tool source + run via PyNet.run_python_urllib (tracked separately).",
+   "reclaim": "LIVE as a library (installs+imports via pip-run + ssl stub, test/brokered_pkg_install_test.exs). HTTP egress is brokered; video mux (ffmpeg) is out of lane but metadata/library use works.",
    "wasip1_route": "PyNet host file-transport (urllib/requests shim) \u2014 no wasip2 build needed",
    "capability_live": "LIBRARY-LIVE (iter154): installs + imports via pip-run (brokered HTTPS download + zipimport, full dep tree), empirically guarded by test/brokered_pkg_install_test.exs. Usable as a library; the heavy CLI is perf-limited under wasm CPython (heavy startup > the wall-clock cap). Networking inside it routes through the broker shim (real _ssl absent; an ssl stub satisfies import-time TLS probing)."
   },
