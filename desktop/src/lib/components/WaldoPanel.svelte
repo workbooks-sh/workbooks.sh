@@ -11,14 +11,27 @@
    *
    * Pitch guard: a communicator you summon, never a self-running manager.
    */
-  import { PaperPlaneRight, Sparkle } from "phosphor-svelte";
+  import { PaperPlaneRight, Sparkle, MagnifyingGlass, Wrench, Compass } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
 
   const WALDO_SLUG = "waldo";
 
+  // Quick-starts for the empty state — click to drop into the composer.
+  const SUGGESTIONS = [
+    { icon: MagnifyingGlass, label: "Search my files", text: "Search my files for " },
+    { icon: Wrench, label: "Set up my agents", text: "Help me connect Claude Code to this workspace" },
+    { icon: Compass, label: "What can you do?", text: "What can you do in this browser?" },
+  ];
+
   let prompt = $state("");
   let sending = $state(false);
+  let composerEl = $state<HTMLTextAreaElement | null>(null);
+  function useSuggestion(text: string) {
+    prompt = text;
+    composerEl?.focus();
+  }
   // Local echo of the user's lines (chatSession.blocks holds the agent's
   // response stream; the prompt is shown here so the thread reads as a chat).
   let myLines = $state<{ text: string; ts: number }[]>([]);
@@ -73,17 +86,30 @@
 
 <div class="waldo">
   <div class="intro" class:hide={transcript.length > 0}>
-    <div class="hero alive"><Sparkle size={22} weight="fill" /></div>
-    <h2>Waldo</h2>
+    <div class="hero" class:alive={ready}><Sparkle size={26} weight="fill" /></div>
+    <h2>Meet Waldo</h2>
     <p>
-      The browser's resident agent. Ask a question, search, open tabs, or have
-      it debug the system with you — by text or voice. Waldo finds issues and
-      works them; it never runs off on its own.
+      Your resident agent — ask, search, open tabs, or debug the system with
+      you, by text or voice. It works issues with you; never runs off on its own.
     </p>
-    {#if !ready}
+    <span class="powered">
+      <Icon value="lobe:openrouter" name="OpenRouter" size={13} />
+      Runs on OpenRouter — every model, one key
+    </span>
+    {#if ready}
+      <div class="suggestions">
+        {#each SUGGESTIONS as s (s.label)}
+          {@const SIcon = s.icon}
+          <button type="button" class="chip" onclick={() => useSuggestion(s.text)}>
+            <SIcon size={13} weight="bold" />
+            {s.label}
+          </button>
+        {/each}
+      </div>
+    {:else}
       <p class="hint">
-        Connect a nexus (engine chip, top-right) and add an OpenRouter key or
-        Gemini voice to wake Waldo.
+        Connect a nexus (engine chip, top-right) and add your OpenRouter key to
+        wake Waldo.
       </p>
     {/if}
   </div>
@@ -101,6 +127,7 @@
 
   <form class="composer" onsubmit={(e) => { e.preventDefault(); void send(); }}>
     <textarea
+      bind:this={composerEl}
       bind:value={prompt}
       onkeydown={onKey}
       placeholder={ready ? "Ask Waldo…" : "Connect a nexus first"}
@@ -163,6 +190,55 @@
     font-family: var(--font-mono);
     font-size: 0.72rem;
     color: var(--color-fg-subtle);
+    max-width: 32ch;
+  }
+  .hero { transition: background 0.3s, color 0.3s; }
+  .hero.alive { animation: hero-pulse 2.4s ease-in-out infinite; }
+  @keyframes hero-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 22%, transparent); }
+    50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-brand) 0%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) { .hero.alive { animation: none; } }
+
+  /* OpenRouter badge — Waldo's model lane. */
+  .powered {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-soft);
+    font-size: 0.7rem;
+    color: var(--color-fg-muted);
+  }
+  .powered :global(img) { display: block; }
+
+  /* Quick-start chips. */
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: border-color 0.14s, color 0.14s, background 0.14s;
+  }
+  .chip:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-fg);
+    background: var(--color-surface);
   }
   .thread {
     flex: 1;
