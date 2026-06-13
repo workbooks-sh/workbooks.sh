@@ -1797,3 +1797,17 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   urllib/requests adapter writes a request, the host services it SSRF-safe via this) AND (b) a general
   full-HTTP brokered capability. NEXT for the Python lane: the request/response TRANSPORT between wasip1
   CPython (file I/O in a preopened dir) and this host client, + a Python urllib adapter -> flips httpie/pip.
+- 2026-06-13 (iter 135): **PYTHON BROKERED-TRANSPORT SHIPPED (PyNet) — wasip1 CPython now has SSRF-safe
+  outbound HTTP though it has NO outbound socket.** Path B realized. Mechanism: guest + host share a preopened
+  dir (verified CPython can WRITE to a writable preopen); they speak a req/resp FILE protocol (the only IPC a
+  wasip1 runtime has — fd_read/fd_write). Guest writes req.json + req.ready; a CONCURRENT host watcher (spawned
+  alongside the blocking CPython run) services it via NetGuard.request/3 — the SAME SSRF + resolve-then-pin +
+  allow-list + rate/revocation cadence as every egress — writes resp.json + resp.ready; guest polls + reads.
+  The host is the ONLY thing that touches the network, fully mediated; a malicious guest can at most write
+  garbage request files and still can't reach an internal target (host RE-VALIDATES every URL). The guest may
+  NOT widen scope — the host's :allow is authoritative, a guest-supplied allow is ignored. 4 PyNet tests green:
+  (a) CPython asks for cloud-metadata -> DENIED inside the guest; (b) off-allow-list public host -> denied;
+  (c) live: CPython retrieves example.com (200) via the host with no guest socket; (d) allow-list permits the
+  named host. NEXT: a Python urllib/requests transport adapter (monkeypatch urlopen -> the file protocol) so
+  UNMODIFIED Python net tools (httpie etc.) run brokered; then wrap the reclaimed tools as commands. Same
+  transport generalizes to QuickJS (also wasip1-no-connect).
