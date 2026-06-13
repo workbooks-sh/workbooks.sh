@@ -1044,6 +1044,9 @@ defmodule Workbooks.CommandRegistry do
       # granted :exec_allow; :commands scopes WHICH commands. Both default to off/none (no ambient exec).
       |> maybe_put(:exec_allow, Map.get(opts, :exec_allow))
       |> maybe_put(:commands, Map.get(opts, :commands))
+      # propagate the inbound exec DEPTH (set by ExecBroker when this :pynet cmd was itself brokered) so a
+      # chain of orchestrators advances toward @max_depth — the fork-bomb depth bound spans the PyNet hop.
+      |> maybe_put(:depth, Keyword.get(ropts, :depth))
 
     case Workbooks.PyNet.run_tool(script, stdin, args, tool_opts) do
       {:ok, out, status} -> {:ok, maybe_trim(out, ropts), status}

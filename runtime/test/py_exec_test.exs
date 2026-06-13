@@ -56,6 +56,35 @@ defmodule Workbooks.PyExecTest do
     assert out =~ "RC 1"
   end
 
+  test "FORK-BOMB DEPTH — a :pynet orchestrator that execs ITSELF is bounded by @max_depth (not infinite)" do
+    # the tool reads its depth from argv and re-execs itself one deeper. ExecBroker's @max_depth (8) must stop
+    # the chain — proving the depth bound spans the PyNet file-exec hop (else this recurses until OOM/timeout).
+    recur = ~S"""
+    import subprocess, sys
+    depth = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+    print("DEPTH", depth)
+    if depth < 50:
+        cp = subprocess.run(["recurse-self", str(depth + 1)], text=True)
+        sys.stdout.write(cp.stdout)  # surface the nested chain so the bound is observable
+        print("CHILD_RC", depth, cp.returncode)
+    """
+
+    :ok =
+      Workbooks.CommandRegistry.register_pynet("recurse-self", recur, :argv, %{
+        exec_allow: true,
+        commands: ["recurse-self"]
+      })
+
+    # TERMINATES (the bound holds), the chain reaches the @max_depth frontier and is then DENIED — the recursion
+    # is cut off well before the script's own limit of 50.
+    assert {:ok, out, 0} = Workbooks.CommandRegistry.run_status("recurse-self", "", [])
+    assert out =~ "DEPTH 0"
+    # the depth bound stopped it: a deep frame's child exec was denied (rc 1), and the script's limit (50) and
+    # even DEPTH 20 were never reached.
+    assert out =~ ~r/CHILD_RC \d+ 1/, "expected a depth-bound denial (CHILD_RC N 1) in:\n#{out}"
+    refute out =~ "DEPTH 20"
+  end
+
   test "NO SHELL ESCAPE — an unregistered/arbitrary binary name is refused even when exec is granted" do
     script = ~S"""
     import subprocess

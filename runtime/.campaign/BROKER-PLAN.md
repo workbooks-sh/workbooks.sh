@@ -1913,3 +1913,12 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   orch scope -> jq denied when only grep granted. This closes the Python-lane exec-dispatch loop (the build-
   driver/pipx orchestrator class registers + runs end-to-end). NEXT: generalize exec-dispatch to the C/clang
   build lane (libc spawn-shim -> host_exec) so Make/Ninja built in-sandbox drive brokered compiles.
+- 2026-06-13 (iter 141 cont): **FORK-BOMB DEPTH bound spans the PyNet exec hop (security fix on the new exec
+  channel).** Found a gap: the PyNet exec branch passed depth as-is (nil->0) and never incremented, so a chain
+  of :pynet orchestrators that exec each other (or one that execs ITSELF) never advanced toward ExecBroker's
+  @max_depth (8) -> unbounded recursion via the file-exec channel. Fix: (a) :pynet dispatch propagates the
+  inbound exec depth (ExecBroker sets it when the :pynet cmd was itself brokered) into PyNet's opts; (b) the
+  exec branch always passes depth=(opts.depth||0)+1, so each PyNet->exec hop is one level deeper. Red-team
+  test: a register_pynet("recurse-self") tool that execs itself with depth+1 TERMINATES, cut off by @max_depth
+  (CHILD_RC N 1 denial in the chain), never reaching its own limit of 50 / DEPTH 20. 11 tests green (py_exec +
+  pynet_command). The exec-dispatch channel now has BOTH width (ExecBroker concurrent cap) + depth defense.

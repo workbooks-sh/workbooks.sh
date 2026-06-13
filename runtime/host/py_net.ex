@@ -318,11 +318,13 @@ defmodule Workbooks.PyNet do
     argv = for a <- req["argv"] || [], do: to_string(a)
     stdin = case req["stdin_b64"] do nil -> ""; b64 -> Base.decode64!(b64) end
 
+    # FORK-BOMB DEPTH: each PyNet->exec hop is one level DEEPER than the tool that issued it. Always increment
+    # (default base 0) so a chain of orchestrators that exec each other (or one that execs itself) advances
+    # toward ExecBroker's @max_depth and is bounded — never an unbounded recursion via the file-exec channel.
     call_opts =
-      [allow: Keyword.get(opts, :exec_allow, false)]
+      [allow: Keyword.get(opts, :exec_allow, false), depth: (Keyword.get(opts, :depth) || 0) + 1]
       |> put_if(:commands, Keyword.get(opts, :commands))
       |> put_if(:principal, Keyword.get(opts, :principal))
-      |> put_if(:depth, Keyword.get(opts, :depth))
 
     case Workbooks.ExecBroker.exec(name, argv, stdin, call_opts) do
       {:ok, out} -> %{"ok" => true, "stdout_b64" => Base.encode64(out), "status" => 0}
