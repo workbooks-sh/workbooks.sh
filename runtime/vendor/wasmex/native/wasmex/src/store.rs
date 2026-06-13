@@ -939,14 +939,30 @@ pub fn component_store_new_wasi(
             .inherit_network()
             // DNS-exfil: an IP-only-scoped guest gets NO name lookup (it can't leak via DNS queries).
             .allow_ip_name_lookup(wb_dns_needed(&options.net_allow))
-            .socket_addr_check(move |addr, _use| {
-                let ok = wb_conn_rate_ok(
-                    &conn_meter,
-                    std::time::Instant::now(),
-                    std::time::Duration::from_secs(10),
-                    50_000,
-                ) && wb_addr_allowed(addr)
-                    && wb_addr_in_scope(addr, &net_allow_for_sockets);
+            .socket_addr_check(move |addr, use_| {
+                use wasmtime_wasi::sockets::SocketAddrUse;
+                // Only EGRESS (connect / outbound datagram) gets the SSRF + scope + rate check. BIND is a
+                // LOCAL op (e.g. UdpSocket::bind to 0.0.0.0:0 for an ephemeral source port) — applying the
+                // SSRF deny to it wrongly blocked all UDP, since 0.0.0.0 is (correctly) an internal/non-
+                // routable EGRESS target but a valid LOCAL bind address. (wb-8w8x: found by the UDP proof.)
+                let egress = matches!(
+                    use_,
+                    SocketAddrUse::TcpConnect
+                        | SocketAddrUse::UdpConnect
+                        | SocketAddrUse::UdpOutgoingDatagram
+                );
+                let ok = if egress {
+                    wb_conn_rate_ok(
+                        &conn_meter,
+                        std::time::Instant::now(),
+                        std::time::Duration::from_secs(10),
+                        50_000,
+                    ) && wb_addr_allowed(addr)
+                        && wb_addr_in_scope(addr, &net_allow_for_sockets)
+                } else {
+                    // local bind / other non-egress uses
+                    true
+                };
                 Box::pin(async move { ok })
             });
     }

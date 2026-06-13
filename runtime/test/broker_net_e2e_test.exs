@@ -398,6 +398,13 @@ defmodule Workbooks.BrokerNetE2ETest do
     # DNS-EXFIL defense: an IP-only-scoped guest has NO name lookup — it can't even resolve a hostname,
     # so it can't leak data via DNS queries.
     assert sp.("example.com:80") =~ "ERR"
+
+    # STANDARD wasi:sockets UDP path (keystone goal 2, now also generalized for UDP): a real std::net::
+    # UdpSocket DNS query to a PUBLIC resolver works through the broker, and socket_addr_check SSRF-blocks an
+    # INTERNAL UDP target — the sibling of the raw-TCP proof, never adversarially tested until now.
+    assert probe.("udp:1.1.1.1:53") =~ ~r/OK dns ancount=[1-9]/
+    assert probe.("udp:127.0.0.1:53") =~ "ERR"
+    assert probe.("udp:169.254.169.254:53") =~ "ERR"
   end
 
   @tag :build

@@ -1491,3 +1491,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   BEAM system-concurrency + brokered data-parallelism is the chosen model. The ONLY remaining frontiers are
   NEW campaigns: compiler/WASM build-lanes (262 build-blocked items) per the owner's steer, + wb-ltum (a
   policy design decision). No manufactured networking grind remains.
+- 2026-06-12 (iter 111): **GENERALIZED THE SEAM TO STANDARD wasi:sockets UDP (keystone goal 2) — found + fixed
+  a real over-restriction bug.** Per the directive's "flip the network-bound items live", the TCP std::net
+  path was e2e-proven but the STANDARD wasi:sockets UDP path was NEVER adversarially tested (only the hand-
+  written host_udp broker). Built a real std::net::UdpSocket DNS-query guest (extended the sockets reactor;
+  std UdpSocket compiles on wasm32-wasip2) — and it FAILED: "Permission denied" on UdpSocket::bind(0.0.0.0:0).
+  ROOT CAUSE: socket_addr_check applied the SSRF deny to ALL socket uses incl. local BIND; 0.0.0.0 is
+  correctly an internal/non-routable EGRESS target but a VALID local bind address, so the SSRF floor wrongly
+  blocked ALL UDP (and TCP listen). FIX: match the SocketAddrUse arg — only EGRESS (TcpConnect/UdpConnect/
+  UdpOutgoingDatagram) gets the SSRF+scope+rate check; BIND is allowed (local). PROVEN: a real UdpSocket DNS
+  query to 1.1.1.1:53 returns answers (ancount>=1) through the broker; internal UDP (127.0.0.1:53,
+  169.254.169.254:53) SSRF-blocked. So the standard wasi:sockets UDP class (DNS/NTP/STUN/QUIC clients) is now
+  LIVE + adversarially proven, alongside TCP. Real capability + a bug fix, not grind.
