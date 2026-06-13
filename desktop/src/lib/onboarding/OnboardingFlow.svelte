@@ -15,15 +15,13 @@
     ArrowRight,
     CheckCircle,
     Copy,
-    Globe,
     MagnifyingGlass,
     PaintBrushBroad,
     SidebarSimple,
-    TerminalWindow,
   } from "phosphor-svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import AsciiShader from "$lib/ui/AsciiShader.svelte";
+  import WaldoMark from "$lib/components/WaldoMark.svelte";
   import { applyThemeMode } from "$lib/onboarding/prefs";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
@@ -103,12 +101,11 @@
 </script>
 
 <div class="screen">
-  <AsciiShader />
-  <div class="fade" aria-hidden="true"></div>
+  <div class="grid" aria-hidden="true"></div>
 
   <button type="button" class="skip" onclick={finish}>Skip — use defaults</button>
 
-  <div class="card glass">
+  <div class="card">
     <div class="dots" role="presentation">
       {#each STEPS as s, i (s)}
         <button
@@ -127,7 +124,14 @@
     {#key step}
       <div class="body" in:fly={{ x: 16, duration: 200, easing: cubicOut }}>
         {#if step === "welcome"}
-          <div class="hero alive"><Globe size={30} weight="fill" /></div>
+          <div class="hero brand">
+            <svg viewBox="0 0 280 206" width="30" height="22" aria-hidden="true" style="display:block">
+              <path
+                d="M0 206V0.00231123H69.1194V76L126.393 0L168.946 0.00231123V76L223.295 0L280 0.00231147L223.295 88L248.626 176.683C252.823 191.375 241.791 206 226.511 206H116.27L112.626 140.5L41.5 206H0Z"
+                fill="currentColor"
+              />
+            </svg>
+          </div>
           <h1>The workbooks browser</h1>
           <p class="sub">
             Tabs, bookmarks, your files — and every surface of it is a
@@ -241,7 +245,7 @@
           </p>
 
         {:else}
-          <div class="hero alive"><TerminalWindow size={30} weight="fill" /></div>
+          <div class="hero waldo"><WaldoMark size={26} /></div>
           <h1>Wire up your agent</h1>
           <p class="sub">
             Everything you just picked — and everything you didn't — is
@@ -304,12 +308,19 @@
     background: var(--color-page);
     overflow: hidden;
   }
-  .fade {
+  /* Faint canon grid texture — replaces the old green ASCII shader so the
+   * onboarding reads like the clean app, not the lander hero. */
+  .grid {
     position: absolute;
-    inset: auto 0 0 0;
-    height: 40%;
-    background: linear-gradient(transparent, var(--color-page));
+    inset: 0;
     pointer-events: none;
+    background-image:
+      linear-gradient(var(--color-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    /* fade the grid out toward the center so the card sits on calm space */
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, transparent 30%, #000 100%);
+    mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, transparent 30%, #000 100%);
   }
   .skip {
     position: absolute;
@@ -331,9 +342,11 @@
     position: relative;
     width: 100%;
     max-width: 520px;
-    border-radius: 18px;
+    border-radius: 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     box-shadow: var(--shadow-pop);
-    padding: 1.5rem 2rem 1.5rem;
+    padding: 1.75rem 2rem 1.5rem;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -381,6 +394,18 @@
     border-radius: 16px;
     background: var(--color-brand-soft);
     color: var(--color-brand);
+  }
+  /* Welcome: the workbooks W mark on ink (the brand chip). */
+  .hero.brand {
+    background: var(--color-fg);
+    color: var(--color-page);
+    box-shadow: var(--shadow-pop);
+  }
+  /* Agent: the Waldo wordmark, ink on paper-ish chip. */
+  .hero.waldo {
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
   }
   h1 {
     margin: 0;
@@ -588,14 +613,17 @@
     font-family: var(--font-mono);
     font-size: 0.82rem;
     font-weight: 500;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.02em;
     cursor: pointer;
+    box-shadow: 0 10px 26px rgba(18, 19, 22, 0.22);
     transition:
       filter 0.12s,
+      box-shadow 0.12s,
       transform 0.12s;
   }
   .primary:hover {
     filter: brightness(1.08);
+    box-shadow: 0 12px 30px rgba(18, 19, 22, 0.3);
     transform: translateY(-1px);
   }
   .primary:active {
