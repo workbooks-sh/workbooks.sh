@@ -472,6 +472,28 @@
     needsWorkspace = workspaces.workspaces.length === 0;
   }
 
+  // First-run workspace (wb-2s09.9): once the nexus (local sidecar) is ready,
+  // auto-create a default "Personal" workspace — no name form. The connect
+  // screen (WorkspaceOnboarding) only shows while the nexus is unavailable.
+  let autoWsTried = $state(false);
+  $effect(() => {
+    if (
+      initialized &&
+      needsWorkspace &&
+      !autoWsTried &&
+      sidecar.status.state === "ready"
+    ) {
+      autoWsTried = true;
+      void workspaces
+        .create("Personal", "✨")
+        .then(onOnboardingComplete)
+        .catch((e) => {
+          console.warn("[workspace] auto-create failed", e);
+          autoWsTried = false; // allow the connect screen / retry
+        });
+    }
+  });
+
   onMount(() => {
     // No in-app engine wizard auto-open — the CLI installs the runtime
     // before the browser is ever opened (wb-aakl.5).
