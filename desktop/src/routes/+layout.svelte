@@ -19,6 +19,7 @@
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { features } from "$lib/bridge/features";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
+  import GridShader from "$lib/components/GridShader.svelte";
 
   let SetupWizard =
     $state<typeof import("$lib/setup/SetupWizard.svelte").default | null>(null);
@@ -58,6 +59,9 @@
 </script>
 
 <div class="shell">
+  <!-- Animated graph-paper backdrop (crisp centre, warped edges). Sits above
+       the shell's CSS-grid fallback, below all content. -->
+  <GridShader />
   <div class="tb-host" class:ob-hide={!onboarding.shows("titlebar")} inert={onboarding.active}>
     <Titlebar />
   </div>
@@ -118,18 +122,22 @@
     pointer-events: none;
   }
   .shell {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    /* Canonical graph-paper backdrop — shows behind everything (gaps around
-     * the floating canvas, and the whole screen during onboarding). The
-     * sidebar/titlebar paint their chrome on top; the canvas its own grid. */
+    /* Canonical graph-paper backdrop. The static CSS grid is the FALLBACK;
+     * GridShader paints the animated version on top of it (below content).
+     * Shows behind everything (gaps around the canvas, whole screen during
+     * onboarding); sidebar/titlebar paint their chrome on top. */
     background-color: var(--color-chrome);
     background-image: var(--grid-image);
     background-size: var(--grid-size) var(--grid-size);
   }
   .body {
+    position: relative;
+    z-index: 1; /* above the GridShader canvas (z-0) */
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
