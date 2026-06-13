@@ -57,6 +57,15 @@ class ThemesStore {
       this.#mql = window.matchMedia("(prefers-color-scheme: dark)");
       this.#mql.addEventListener("change", () => this.applyActive());
     }
+    // Re-apply when the user forces a mode (data-mode flips via the
+    // onboarding/settings theme pick) so the inline tokens track the same
+    // light/dark decision as app.css instead of drifting to the OS.
+    if (typeof document !== "undefined") {
+      new MutationObserver(() => this.applyActive()).observe(
+        document.documentElement,
+        { attributes: true, attributeFilter: ["data-mode"] },
+      );
+    }
     this.applyActive();
   }
 
@@ -167,6 +176,21 @@ class ThemesStore {
     ];
   }
 
+  /** Effective dark/light decision. The user's forced mode (data-mode on
+   *  :root, set by the onboarding/settings theme pick) is the source of
+   *  truth; only "system" (no data-mode) falls back to the OS preference.
+   *  Without this, the inline theme tokens (which beat app.css) followed the
+   *  OS while app.css's cascade followed data-mode — so picking Light on a
+   *  dark OS left the two systems disagreeing and the UI looked broken. */
+  #isDark(): boolean {
+    if (typeof document !== "undefined") {
+      const mode = document.documentElement.getAttribute("data-mode");
+      if (mode === "dark") return true;
+      if (mode === "light") return false;
+    }
+    return this.#mql?.matches ?? false;
+  }
+
   /** Apply the active theme's tokens to :root. Drops any previously-
    *  applied custom property that the new theme doesn't define. */
   applyActive() {
@@ -177,8 +201,7 @@ class ThemesStore {
       this.#applied.clear();
       return;
     }
-    const prefersDark = this.#mql?.matches ?? false;
-    const tokens = prefersDark ? t.dark_tokens : t.light_tokens;
+    const tokens = this.#isDark() ? t.dark_tokens : t.light_tokens;
     const nextKeys = new Set(Object.keys(tokens));
 
     // Remove stale props from the previous theme.
