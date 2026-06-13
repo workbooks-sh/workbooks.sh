@@ -18,6 +18,7 @@ defmodule Workbooks.CLI.Desktop do
       ["help" | _] -> {usage(), false}
       ["install" | opts] -> install(opts)
       [v | rest2] when v in ["open", "launch", "run"] -> open(rest2)
+      ["mcp" | opts] -> mcp(opts)
       other -> {"unknown verb: wb desktop #{Enum.join(other, " ")}\n\n#{usage()}", true}
     end
   end
@@ -61,6 +62,42 @@ defmodule Workbooks.CLI.Desktop do
 
       {:error, reason} ->
         {"could not queue open intent: #{reason}", true}
+    end
+  end
+
+  # `wb desktop mcp` — the MCP on-ramp (wb-aakl.11; server impl wb-aakl.23).
+  # No args: print the connection config + the one-line `claude mcp add`.
+  # `--stdio`: act as the stdio↔UDS relay Claude Code runs (impl wb-aakl.23).
+  @mcp_default_sock "/tmp/workbooks-mcp.sock"
+  defp mcp(opts) do
+    sock = System.get_env("WB_MCP_SOCK") || @mcp_default_sock
+
+    if "--stdio" in opts do
+      # The relay (stdin↔socket) is implemented with the Rust server in
+      # wb-aakl.23 — it needs the live browser's UDS. Fail clearly until then.
+      {"wb desktop mcp --stdio: relay not implemented yet (wb-aakl.23). " <>
+         "Socket: #{sock}", true}
+    else
+      running? = File.exists?(sock)
+
+      msg = """
+      Workbooks browser — MCP connection
+
+        socket   #{sock}#{if running?, do: " (browser running)", else: " (browser not running — start it first)"}
+        enable   set WB_MCP=1 before launching the browser (off by default)
+
+      Add it to Claude Code (one line):
+
+        claude mcp add workbooks -- wb desktop mcp --stdio
+
+      The browser exposes workbooks-native tools (tabs, bookmarks, the
+      workspace tree, open_workbook, weave/validate via oql.wasm) plus
+      generic webview tools (screenshot, dom_read, eval_js, click/type) and
+      the Waldo agent bridge. Local Unix socket only — no network listener.
+      See desktop/docs/mcp.md.
+      """
+
+      {msg, false}
     end
   end
 
@@ -146,6 +183,7 @@ defmodule Workbooks.CLI.Desktop do
       wb desktop install --open         install, then launch
       wb desktop open                   launch the installed browser
       wb desktop open <path|url>        open a workbook/page in the browser
+      wb desktop mcp                    print the MCP config + claude mcp add line
 
     The installer downloads the browser from GitHub Releases. The runtime is
     installed separately by the CLI; `open <path>` drops an open-intent the
