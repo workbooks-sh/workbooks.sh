@@ -28,9 +28,30 @@ A huge ecosystem ships wasm built by **Emscripten / wasm-bindgen** that imports 
 those imports, so that wasm won't instantiate.
 
 Escape: **build a headless Emscripten/JS host on the BEAM** — implement the emscripten `env` /
-JS-glue imports host-side (broker pattern). Buildable. Biggest locked-up value in one place.
+JS-glue imports host-side (broker pattern). Buildable.
 
-Members: NumPy, OpenCV, ONNX/TFLite, Skia, DuckDB-wasm, most JS bundlers (Biome/Rollup/esbuild-wasm).
+**SCOPED 2026-06-13 — the Bridge is NARROWER than it looks; most of it is FORGE in disguise:**
+- A trivial C program → `wasm32-wasi` imports only `wasi_snapshot_preview1` (fully satisfied today).
+- We already ship a clean-wasi `sqlite.wasm` (imports only `wasi_unstable`) — Forge-done, just needs
+  wiring as a CommandRegistry `command`. SQLite was never a Bridge problem.
+- `emcc -sSTANDALONE_WASM -fwasm-exceptions` collapses the emscripten `env` surface to ~5 trivial
+  shims (memory, abort, __assert_fail, emscripten_resize_heap, indirect_function_table) + wasi. The
+  HARD imports (DOM/WebGL/Web-Workers, `EM_ASM` inline-JS via `emscripten_asm_const_*`) appear only
+  in libs that touch the browser — headless compute libs (NumPy core, DuckDB engine, sqlite) don't.
+- The broker mechanism ALREADY EXISTS: `host/js_dock.ex` instantiates a guest under Wasmex with a
+  custom Policy-gated `env` import table. An **`EmscriptenDock`** is a sibling clone (~15 `env.*`
+  shims + wasi passthrough). Hooks into `package_manager.ex` run/route by import detection (~L987).
+- **Genuine emscripten-only residue (true Bridge): DuckDB-wasm, esbuild-wasm, ONNX-web.** Everything
+  else — SQLite (done), NumPy/OpenCV *core*, general C/C++ — is a **Forge** from-source wasi rebuild
+  on the clang lane.
+- **wasm-bindgen is a SEPARATE, harder problem** (per-crate generated JS shim holding a live JsValue
+  heap — needs a real JS engine). Its answer is also Forge: rebuild the Rust crate to wasm32-wasip1
+  WITHOUT wasm-bindgen (target the non-web feature set).
+
+**Order of attack:** (1) import-audit the prebuilt DuckDB/esbuild/OpenCV binaries (`wasm-tools print |
+grep '(import'`) — the decision gate: easy/medium env surface → EmscriptenDock; DOM/Worker/asm_const →
+stays roadmap. (2) Wire the already-built sqlite.wasm (Forge). (3) Build EmscriptenDock (M) only for
+audit-confirmed-tractable targets. Precedent file to clone: `host/js_dock.ex`.
 
 ## 🔨 THE FORGE — toolchain completeness
 Our own in-sandbox compilers can't yet *produce* certain wasm. Not a wall — each is a build, and
