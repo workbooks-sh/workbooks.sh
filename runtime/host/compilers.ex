@@ -200,15 +200,30 @@ defmodule Workbooks.Compilers do
   @cpp_eh_abi "#{@clang_lib_c}/libc++abi-eh.a"
   @cpp_eh_unwind "#{@clang_lib_c}/libunwind-eh.a"
 
+  @doc """
+  Whether the from-source C++ EH runtime (`libc++abi-eh.a`) is staged in the wasm32-wasip1 sysroot. When
+  true, C++ can link the standardized wasm-exceptions runtime; when false, only the no-exceptions subset
+  links. (`@clang_lib_c` is the GUEST path /usr/lib/…; this checks the HOST sysroot under `root`.)
+  """
+  def cpp_eh_staged?(root \\ default_root()) do
+    File.regular?(Path.join([root, "clang", "clang-root", "sysroot", "lib", "wasm32-wasip1", "libc++abi-eh.a"]))
+  end
+
+  @doc """
+  C++ EH link config `{compile_flags, link_libs}` for the NEW standardized wasm EH (`try_table`/`exnref` —
+  the only kind wasmtime 45 `-W exceptions=y` runs), linking the from-source EH `libc++abi-eh.a` +
+  `libunwind-eh.a` instead of the no-EH `-lc++abi`. ONE home, shared by `compile_cpp` and
+  `PackageManager.build_c_dir`, so the exceptions wiring never drifts between the single-file and dir lanes.
+  """
+  def cpp_eh_args, do: {["-fwasm-exceptions", "-mllvm", "-wasm-use-legacy-eh=false"], ["-lc++", @cpp_eh_abi, @cpp_eh_unwind]}
+
   def compile_cpp(source_path, opts \\ [], root \\ default_root()) do
     std = Keyword.get(opts, :std, "c++17")
     exceptions? = Keyword.get(opts, :exceptions, false)
 
     {eh_argv, eh_libs} =
       if exceptions? do
-        # NEW standardized wasm EH (matches the EH archives + the `.run` `-W exceptions=y` support); link the
-        # EH-enabled libc++abi + libunwind instead of the no-EH `-lc++abi`.
-        {["-fwasm-exceptions", "-mllvm", "-wasm-use-legacy-eh=false"], ["-lc++", @cpp_eh_abi, @cpp_eh_unwind]}
+        cpp_eh_args()
       else
         {["-fno-exceptions"], ["-lc++", "-lc++abi"]}
       end

@@ -665,8 +665,17 @@ defmodule Workbooks.PackageManager do
     # clang picks C++ per-file by extension (and its default std is c++17), so passing -std=c++17
     # globally is wrong — it errors on the .c shims. Just link libc++/libc++abi when any C++ source is present.
     cpp? = Enum.any?([main | rest], &(Path.extname(&1) in ~w(.cpp .cc .cxx)))
-    cpp_argv = []
-    cpp_libs = if cpp?, do: ["-lc++", "-lc++abi"], else: []
+
+    # C++ exceptions in dir-builds: when the from-source EH runtime is staged, build C++ with the
+    # standardized wasm EH and link the EH libc++abi/libunwind — unlocks exception-USING C++ tools
+    # (binaryen/DuckDB-class). The no-EH `-lc++abi` only links NON-throwing C++. Shared with compile_cpp
+    # via Compilers.cpp_eh_args (one home). Falls back byte-identically to the no-EH path when unstaged.
+    {cpp_argv, cpp_libs} =
+      cond do
+        not cpp? -> {[], []}
+        Workbooks.Compilers.cpp_eh_staged?() -> Workbooks.Compilers.cpp_eh_args()
+        true -> {[], ["-lc++", "-lc++abi"]}
+      end
 
     opts = [
       extra_csrc: rest ++ [@mmap_shim, @posix_stub],

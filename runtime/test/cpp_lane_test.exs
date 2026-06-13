@@ -95,4 +95,48 @@ defmodule Workbooks.CppLaneTest do
       assert :binary.match(out, "CAUGHT=boom") < :binary.match(out, "AFTER=ok")
     end
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "build_c_dir — C++ exceptions ACROSS FILES (the multi-file lane real C++ tools use)" do
+    # The dir-build lane (binaryen/DuckDB-class) must also link the EH runtime — not just single-file compile_cpp.
+    if not Compilers.cpp_eh_staged?() do
+      IO.puts("\n[skip] C++ EH archives not staged (run compilers/clang/build.sh) — skipping dir-build exceptions test")
+    else
+      d = Path.join(System.tmp_dir!(), "cppdir_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(d)
+      on_exit(fn -> File.rm_rf(d) end)
+
+      File.write!(Path.join(d, "lib.h"), "void risky(int);\n")
+
+      File.write!(Path.join(d, "lib.cpp"), ~S"""
+      #include <stdexcept>
+      #include "lib.h"
+      void risky(int x){ if (x < 0) throw std::out_of_range("neg"); }
+      """)
+
+      File.write!(Path.join(d, "main.cpp"), ~S"""
+      #include <cstdio>
+      #include <stdexcept>
+      #include "lib.h"
+      struct Guard { ~Guard(){ printf("DTOR\n"); } };
+      int main(){
+        try { Guard g; risky(-5); printf("UNREACHABLE\n"); }      // throw originates in a DIFFERENT translation unit
+        catch (const std::out_of_range& e) { printf("CAUGHT=%s\n", e.what()); }
+        printf("AFTER\n");
+        return 0;
+      }
+      """)
+
+      assert {:ok, wasm, _} = PackageManager.build_c_dir(d, [])
+      on_exit(fn -> File.rm(wasm) end)
+
+      out = PackageManager.run(wasm, "", [])
+      out = if is_tuple(out), do: elem(out, 0), else: out
+      assert out =~ "CAUGHT=neg"          # cross-file throw caught
+      assert out =~ "DTOR"                # RAII destructor ran during unwind
+      assert out =~ "AFTER"
+      refute out =~ "UNREACHABLE"
+    end
+  end
 end
