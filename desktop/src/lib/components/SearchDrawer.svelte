@@ -141,16 +141,6 @@
     mode === "ai" ? "Ask anything, then press Enter…" : mode === "internal" ? "Search your files…" : "Search files, bookmarks, the web…",
   );
 
-  // Index of a result within the flat list, for keyboard highlight.
-  function flatIndex(g: ProviderResults, i: number): number {
-    let n = 0;
-    for (const grp of groups) {
-      if (grp === g) return n + i;
-      n += grp.results.length;
-    }
-    return n + i;
-  }
-
   // Search SDK — expose this host's surface so any search UI (and toolkits)
   // can consume the same contract (parallel to the sidebar SDK).
   const api: SearchApi = {
@@ -226,72 +216,51 @@
         {/if}
       </div>
     {:else}
-    <div class="results" role="listbox" aria-label="Search results">
-      {#if groups.length === 0}
+    <!-- One cohesive feed. Internal = your files only; Browse = files + web
+         blended into a single result list (no provider group headers) —
+         file matches as compact rows, web as rich cards. -->
+    <div class="results" class:browse={mode === "web"} role="listbox" aria-label="Search results">
+      {#if flat.length === 0}
         <div class="empty">
-          {busy ? "Searching…" : query ? "No matches." : mode === "internal" ? "Search across your files + workbooks." : "Search across files, bookmarks, tabs and the web."}
+          {busy ? "Searching…" : query ? "No matches." : mode === "internal" ? "Search your files + runtime." : "Search your files + the open web."}
         </div>
       {:else}
-        {#each groups as g (g.provider.id)}
-          <div class="group-head">
-            {#if g.provider.icon}{@const Icon = g.provider.icon}<Icon weight="fill" size={11} />{/if}
-            <span>{g.provider.label}</span>
-            {#if g.error}<span class="g-err">unavailable</span>{/if}
-          </div>
-
-          {#if g.provider.id === "web"}
-            <!-- Web — a richer, search-engine-style group: an image strip +
-                 cards with thumbnail, source host and snippet. -->
-            {@const imgs = g.results.filter((r) => r.image)}
-            {#if imgs.length}
-              <div class="web-strip">
-                {#each imgs as r, i (i)}
-                  <button type="button" class="web-img" onclick={() => open(r)} title={r.title}>
-                    <img src={r.image} alt="" />
-                  </button>
-                {/each}
-              </div>
-            {/if}
-            {#each g.results as r, i (g.provider.id + (r.url ?? "") + i)}
-              {@const fi = flatIndex(g, i)}
-              <button
-                type="button"
-                class="web-card"
-                class:active={fi === highlighted}
-                role="option"
-                aria-selected={fi === highlighted}
-                onmouseenter={() => (highlighted = fi)}
-                onclick={() => open(r)}
-                title={r.url ?? r.title}
-              >
-                {#if r.image}<img class="web-thumb" src={r.image} alt="" />{/if}
-                <span class="web-tx">
-                  <span class="web-host">{r.host ?? r.url}</span>
-                  <span class="web-title">{r.title}</span>
-                  {#if r.subtitle}<span class="web-snip">{r.subtitle}</span>{/if}
-                </span>
-              </button>
-            {/each}
+        {#each flat as r, i (i)}
+          {#if r.kind === "web"}
+            <button
+              type="button"
+              class="web-card"
+              class:active={i === highlighted}
+              role="option"
+              aria-selected={i === highlighted}
+              onmouseenter={() => (highlighted = i)}
+              onclick={() => open(r)}
+              title={r.url ?? r.title}
+            >
+              {#if r.image}<img class="web-thumb" src={r.image} alt="" />{/if}
+              <span class="web-tx">
+                <span class="web-host">{r.host ?? r.url}</span>
+                <span class="web-title">{r.title}</span>
+                {#if r.subtitle}<span class="web-snip">{r.subtitle}</span>{/if}
+              </span>
+            </button>
           {:else}
-            {#each g.results as r, i (g.provider.id + (r.path ?? r.url ?? "") + i)}
-              {@const fi = flatIndex(g, i)}
-              <button
-                type="button"
-                class="result"
-                class:active={fi === highlighted}
-                role="option"
-                aria-selected={fi === highlighted}
-                draggable="true"
-                ondragstart={(e) => onDragStart(e, r)}
-                onmouseenter={() => (highlighted = fi)}
-                onclick={() => open(r)}
-                title={r.path ?? r.url ?? r.title}
-              >
-                <span class="kind kind-{r.kind}" aria-hidden="true"></span>
-                <span class="name">{r.title}</span>
-                {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
-              </button>
-            {/each}
+            <button
+              type="button"
+              class="result"
+              class:active={i === highlighted}
+              role="option"
+              aria-selected={i === highlighted}
+              draggable="true"
+              ondragstart={(e) => onDragStart(e, r)}
+              onmouseenter={() => (highlighted = i)}
+              onclick={() => open(r)}
+              title={r.path ?? r.url ?? r.title}
+            >
+              <span class="kind kind-{r.kind}" aria-hidden="true"></span>
+              <span class="name">{r.title}</span>
+              {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
+            </button>
           {/if}
         {/each}
       {/if}
@@ -419,19 +388,6 @@
     flex-shrink: 0;
   }
 
-  .group-head {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 8px 3px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--color-fg-subtle);
-  }
-  .group-head .g-err { margin-left: auto; color: var(--color-warn); text-transform: none; letter-spacing: 0; }
   /* kind dot — a quiet color cue per result kind */
   .kind {
     width: 7px;
@@ -510,29 +466,7 @@
   }
   .ai-q:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface-soft); }
 
-  /* Web — search-engine-style: image strip + thumbnail cards. */
-  .web-strip {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 2px 12px 8px;
-    scrollbar-width: none;
-  }
-  .web-strip::-webkit-scrollbar { display: none; }
-  .web-img {
-    flex: 0 0 auto;
-    width: 84px;
-    height: 60px;
-    padding: 0;
-    border: 1px solid var(--color-border);
-    border-radius: 9px;
-    overflow: hidden;
-    background: var(--color-surface-soft);
-    cursor: pointer;
-    transition: border-color 0.14s, transform 0.14s;
-  }
-  .web-img:hover { border-color: var(--color-border-strong); transform: translateY(-1px); }
-  .web-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Web — search-engine-style cards (thumbnail + host + snippet). */
   .web-card {
     display: flex;
     gap: 10px;
