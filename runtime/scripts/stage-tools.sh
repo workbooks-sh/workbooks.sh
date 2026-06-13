@@ -48,6 +48,11 @@ take rust/manifest.org
 # --- clang: the LLVM-for-wasi driver + sysroot (mounted as /usr in the guest) -------------------
 take clang/clang-root/llvm.core.wasm
 take clang/clang-root/sysroot
+# C++ EXCEPTIONS archives (new-EH libc++abi + libunwind) — gitignored build artifacts produced by
+# clang/build.sh, staged INTO the sysroot. `take sysroot` above already copies them, but name them
+# explicitly so a partial/manual stage still ships them (this is how artifacts ship — wb release canon).
+take clang/clang-root/sysroot/lib/wasm32-wasip1/libc++abi-eh.a
+take clang/clang-root/sysroot/lib/wasm32-wasip1/libunwind-eh.a
 take clang/manifest.org
 
 # --- zig: stage1 compiler + std lib (the lane resolves paths under zig-root) --------------------

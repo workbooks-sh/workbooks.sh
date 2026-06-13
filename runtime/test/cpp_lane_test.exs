@@ -49,15 +49,50 @@ defmodule Workbooks.CppLaneTest do
 
   @tag :build
   @tag timeout: 300_000
-  test "compile_cpp — exceptions are honestly gated (try/throw fails to link until an EH sysroot is staged)" do
-    src = Path.join(System.tmp_dir!(), "cppeh_#{System.unique_integer([:positive])}.cpp")
-    File.write!(src, ~S"""
-    #include <stdexcept>
-    int main(){ try { throw std::runtime_error("x"); } catch(...) { return 0; } return 1; }
-    """)
+  test "compile_cpp(exceptions: true) — try/throw/catch + RAII destructor-during-unwind run in-sandbox" do
+    # Skip-guard: the EH archives are GITIGNORED build artifacts staged by compilers/clang/build.sh — mirror the
+    # threads test's File.dir? guard so a tree that hasn't built them doesn't spuriously fail.
+    ehdir =
+      Path.expand(
+        Path.join([Compilers.default_root(), "clang", "clang-root", "sysroot", "lib", "wasm32-wasip1"])
+      )
 
-    on_exit(fn -> File.rm(src) end)
-    # default no-exceptions build: throwing code must NOT silently "work" — it fails at link (honest boundary).
-    assert {:error, _} = Compilers.compile_cpp(src, exceptions: true)
+    if not File.regular?(Path.join(ehdir, "libc++abi-eh.a")) do
+      IO.puts("\n[skip] C++ EH archives not staged (run compilers/clang/build.sh) — skipping exceptions test")
+    else
+      src = Path.join(System.tmp_dir!(), "cppeh_#{System.unique_integer([:positive])}.cpp")
+
+      File.write!(src, ~S"""
+      #include <cstdio>
+      #include <stdexcept>
+      // RAII guard whose destructor MUST fire during stack unwinding as the throw propagates.
+      struct Guard { const char* n; ~Guard(){ printf("DTOR=%s\n", n); } };
+      int main(){
+        try {
+          Guard g{"unwound"};
+          throw std::runtime_error("boom");
+        } catch (const std::exception& e) {
+          printf("CAUGHT=%s\n", e.what());
+        }
+        printf("AFTER=ok\n");
+        return 0;
+      }
+      """)
+
+      on_exit(fn -> File.rm(src) end)
+
+      assert {:ok, wasm, _} = Compilers.compile_cpp(src, exceptions: true)
+      on_exit(fn -> File.rm(wasm) end)
+
+      out = PackageManager.run(wasm, "", [])
+      out = if is_tuple(out), do: elem(out, 0), else: out
+      # RAII destructor ran during unwind, BEFORE the catch handler printed.
+      assert out =~ "DTOR=unwound"
+      assert out =~ "CAUGHT=boom"
+      assert out =~ "AFTER=ok"
+      # ordering: destructor (unwind) precedes the catch, which precedes resumption.
+      assert :binary.match(out, "DTOR=unwound") < :binary.match(out, "CAUGHT=boom")
+      assert :binary.match(out, "CAUGHT=boom") < :binary.match(out, "AFTER=ok")
+    end
   end
 end

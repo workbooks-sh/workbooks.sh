@@ -187,17 +187,34 @@ defmodule Workbooks.Compilers do
   libc++ + libc++abi (wasm32-wasip1); this wires them in (`-x c++`, `-std=<std>`, `-lc++ -lc++abi`) so the full
   STL + RTTI (dynamic_cast/typeid) + virtual dispatch + new/delete work in-sandbox.
 
-  NOTE — exceptions: the vendored libc++abi is the wasi-sdk NO-EXCEPTIONS build, so this defaults to
-  `-fno-exceptions`. Code using try/throw/catch fails at link (`__cxa_throw`/`_Unwind_*` undefined) until an
-  EH-enabled libc++/libunwind sysroot is staged (tracked separately). Pass `exceptions: true` only once that
-  lands. opts: `:std` (default "c++17"), plus everything `compile_c/2` accepts (`:argv`, `:link_libs`,
-  `:includes`, `:aux_files`, …).
+  NOTE — exceptions: the DEFAULT build is `-fno-exceptions` against the vendored NO-EXCEPTIONS libc++abi.
+  Pass `exceptions: true` to compile + link with the new STANDARDIZED wasm EH (`try_table`/`exnref`, the only
+  kind wasmtime 45 `-W exceptions=y` runs): the source builds `-fwasm-exceptions -mllvm -wasm-use-legacy-eh=false`
+  and links the EH-enabled archives `libc++abi-eh.a` + `libunwind-eh.a` (staged into the sysroot by
+  `compilers/clang/build.sh`) instead of the no-EH `-lc++abi`. try/throw/catch + RAII unwinding work. This lane is
+  SINGLE-THREADED (wasm32-wasip1/no-threads); the wasm32-wasi-threads lane would need its own EH archive.
+  opts: `:std` (default "c++17"), `:exceptions` (default false), plus everything `compile_c/2` accepts
+  (`:argv`, `:link_libs`, `:includes`, `:aux_files`, …).
   """
+  # EH archives live in the libc/crt dir of the wasm32-wasip1 sysroot (guest path), staged by build.sh.
+  @cpp_eh_abi "#{@clang_lib_c}/libc++abi-eh.a"
+  @cpp_eh_unwind "#{@clang_lib_c}/libunwind-eh.a"
+
   def compile_cpp(source_path, opts \\ [], root \\ default_root()) do
     std = Keyword.get(opts, :std, "c++17")
-    eh = if Keyword.get(opts, :exceptions, false), do: "-fexceptions", else: "-fno-exceptions"
-    cxx_argv = ["-x", "c++", "-std=#{std}", eh] ++ Keyword.get(opts, :argv, [])
-    cxx_libs = ["-lc++", "-lc++abi"] ++ Keyword.get(opts, :link_libs, [])
+    exceptions? = Keyword.get(opts, :exceptions, false)
+
+    {eh_argv, eh_libs} =
+      if exceptions? do
+        # NEW standardized wasm EH (matches the EH archives + the `.run` `-W exceptions=y` support); link the
+        # EH-enabled libc++abi + libunwind instead of the no-EH `-lc++abi`.
+        {["-fwasm-exceptions", "-mllvm", "-wasm-use-legacy-eh=false"], ["-lc++", @cpp_eh_abi, @cpp_eh_unwind]}
+      else
+        {["-fno-exceptions"], ["-lc++", "-lc++abi"]}
+      end
+
+    cxx_argv = ["-x", "c++", "-std=#{std}"] ++ eh_argv ++ Keyword.get(opts, :argv, [])
+    cxx_libs = eh_libs ++ Keyword.get(opts, :link_libs, [])
 
     compile_c(source_path, Keyword.merge(opts, argv: cxx_argv, link_libs: cxx_libs), root)
   end
