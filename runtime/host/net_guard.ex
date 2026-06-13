@@ -68,6 +68,7 @@ defmodule Workbooks.NetGuard do
     headers = Keyword.get(opts, :headers, [])
     body = Keyword.get(opts, :body, nil)
     ctype = Keyword.get(opts, :content_type, "application/octet-stream")
+    max_bytes = Keyword.get(opts, :max_bytes, 32 * 1024 * 1024)
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
@@ -79,7 +80,7 @@ defmodule Workbooks.NetGuard do
         {:error, :rate_limited}
 
       true ->
-        case do_request(method, url, headers, body, ctype, timeout, allow) do
+        case do_request(method, url, headers, body, ctype, timeout, allow, max_bytes) do
           {:ok, _} = ok ->
             Workbooks.BrokerAudit.record(:net, :allow)
             ok
@@ -90,7 +91,7 @@ defmodule Workbooks.NetGuard do
     end
   end
 
-  defp do_request(method, url, headers, body, ctype, timeout, allow) do
+  defp do_request(method, url, headers, body, ctype, timeout, allow, max_bytes) do
     cond do
       not allowed?(url) ->
         Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
@@ -116,7 +117,16 @@ defmodule Workbooks.NetGuard do
 
         case :httpc.request(method, req, http_opts, body_format: :binary) do
           {:ok, {{_, status, _}, resp_hdrs, resp_body}} ->
-            {:ok, %{status: status, headers: resp_hdrs, body: resp_body}}
+            # RESPONSE BYTE CAP — a malicious-but-allowed host returning a giant body can't be forwarded
+            # wholesale (it would fill disk via the PyNet file transport, or balloon a guest's memory). Truncate
+            # to max_bytes and flag it. NOTE: :httpc buffers the full body in BEAM memory before this point — the
+            # cap bounds what we STORE/FORWARD, not peak receive RAM (streaming cap tracked in wb-j3n8/follow-up).
+            {capped, truncated} =
+              if byte_size(resp_body) > max_bytes,
+                do: {binary_part(resp_body, 0, max_bytes), true},
+                else: {resp_body, false}
+
+            {:ok, %{status: status, headers: resp_hdrs, body: capped, truncated: truncated}}
 
           _ ->
             {:error, :request_failed}

@@ -229,6 +229,7 @@ defmodule Workbooks.PyNet do
       |> put_if(:allow, Keyword.get(opts, :allow))
       |> put_if(:principal, Keyword.get(opts, :principal))
       |> put_if(:rate, Keyword.get(opts, :rate))
+      |> put_if(:max_bytes, Keyword.get(opts, :max_bytes))
 
     case Workbooks.NetGuard.request(method, url, call_opts) do
       {:ok, %{status: status, body: rbody}} ->

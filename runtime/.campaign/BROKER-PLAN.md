@@ -1819,3 +1819,10 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   fetches example.com (200) brokered; urlopen to cloud-metadata raises URLError (SSRF enforced THROUGH the
   adapter, not just the raw client). NEXT: wrap reclaimed Python net tools as commands using this lane; a
   `requests`-shim (requests.get/post -> urlopen) widens coverage; QuickJS gets the same transport.
+- 2026-06-13 (iter 135 cont): **RESPONSE BYTE-CAP on the brokered transport (DoS floor).** request/3 takes
+  :max_bytes (default 32MB); an oversized response is truncated + flagged {truncated: true} BEFORE it's
+  forwarded/stored, so a malicious-but-allowed host can't fill disk via the PyNet file protocol or balloon a
+  guest. PyNet threads :max_bytes through. 24 tests green (18 net_guard incl the cap + 6 py_net regression).
+  Honest limit (wb-4had, low-pri): :httpc buffers the full body in BEAM memory before truncation, so peak RECEIVE
+  RAM isn't bounded — a true streaming cap (stream:self + abort-at-cap, reusing CappedHttp) is the follow-up;
+  the realistic threat is a compromised ALLOW-LISTED host and the stored/forwarded cap already stops disk-fill.

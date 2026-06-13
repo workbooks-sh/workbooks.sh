@@ -172,4 +172,14 @@ defmodule Workbooks.NetGuardTest do
     assert body =~ "Example Domain"
     assert is_list(hdrs)
   end
+
+  @tag :netdeps
+  test "request/3 — RESPONSE BYTE CAP truncates an oversized body (DoS floor for the brokered transport)" do
+    # a tiny max_bytes forces truncation even on example.com; proves the cap bounds what we forward/store so a
+    # malicious-but-allowed host can't fill disk via the PyNet file transport or balloon a guest.
+    assert {:ok, %{body: body, truncated: true}} =
+             NetGuard.request(:get, "http://example.com/", max_bytes: 64)
+
+    assert byte_size(body) == 64
+  end
 end
