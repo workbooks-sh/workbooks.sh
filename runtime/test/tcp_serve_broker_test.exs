@@ -109,6 +109,31 @@ defmodule Workbooks.TcpServeBrokerTest do
     assert Enum.count(results, &(&1 == "")) >= 3
   end
 
+  test "PER-CLIENT CONCURRENCY CAP — one IP can't monopolize the pool (DoS fairness, global has room)" do
+    # global cap 10 (plenty of room) but per-client cap 2 -> one client (127.0.0.1) is bounded to 2 concurrent
+    # even though the global pool isn't full. Proves fairness comes from the per-CLIENT sub-cap, not the global.
+    {:ok, lsock} =
+      TcpServeBroker.start(
+        handler: fn r -> Process.sleep(1_500); r end,
+        max_concurrent: 10,
+        max_per_client: 2,
+        rate: {1_000, 60_000}
+      )
+
+    port = TcpServeBroker.port(lsock)
+    on_exit(fn -> TcpServeBroker.stop(lsock) end)
+
+    results =
+      1..5
+      |> Task.async_stream(fn _ -> connect_send_recv(port, "c") end, max_concurrency: 5, timeout: 10_000)
+      |> Enum.map(fn {:ok, r} -> r end)
+
+    served = Enum.count(results, &(&1 == "c"))
+    # at most the per-client cap is in flight at once -> the rest refused (the global cap 10 didn't bind)
+    assert served <= 2
+    assert Enum.count(results, &(&1 == "")) >= 3
+  end
+
   @tag :build
   @tag timeout: 300_000
   test "GUEST-BACKED — a real SANDBOXED wasm command serves the TCP request/response (full brokered model)" do

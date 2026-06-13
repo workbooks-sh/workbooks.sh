@@ -1680,3 +1680,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   principal is refused at spawn with live_count 0 (no slot reserved), unrevoke restores. 6 ProcessBroker tests
   green. Mid-flight revocation now takes effect at the spawn boundary for the fork-exec model, matching the
   net/exec/storage/queue/serve/tcp_serve brokers.
+- 2026-06-12 (iter 127): **RAW-TCP INBOUND — per-client concurrency cap (DoS FAIRNESS, the last 'many conns'
+  gap).** Adversarial review of TcpServeBroker: the GLOBAL concurrency cap bounds TOTAL connections, but one
+  remote IP could hold up to that whole pool (256) and STARVE all other clients — the per-client RATE limits
+  connection FREQUENCY, not concurrent HOLDS. FIX: a per-client concurrent-connection sub-cap (:max_per_client,
+  default ~1/4 of the global pool, min 4), keyed by {serve-instance, client IP} in a long-lived BrokerTables
+  ETS counter (inc at accept, dec on connection end, row pruned at 0). One IP can no longer monopolize the
+  listener. Test green: global cap 10 (room) + per-client cap 2 -> one client opening 5 concurrent gets <=2
+  served, >=3 refused (the per-CLIENT sub-cap binds, not the global). 8 TcpServeBroker tests green. So the
+  raw-TCP server's DoS cadence is now COMPLETE: huge-bodies (byte cap) + many-conns (per-client RATE + GLOBAL
+  concurrency + PER-CLIENT concurrency) + slowloris (absolute deadline) + revocation + audit — every DoS vector
+  the directive names, on the inbound TCP path.

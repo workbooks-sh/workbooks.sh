@@ -38,6 +38,10 @@ defmodule Workbooks.TcpServeBroker do
     # GLOBAL concurrent-connection cap (across ALL clients) — bounds total handler processes against a
     # distributed flood (many IPs each under the per-client rate). An atomics counter (lock-free).
     max_concurrent = Keyword.get(opts, :max_concurrent, 256)
+    # PER-CLIENT concurrent-connection sub-cap (DoS fairness) — default ~1/4 of the global pool (min 4) so no
+    # single remote IP can monopolize the listener.
+    max_per_client = Keyword.get(opts, :max_per_client, max(4, div(max_concurrent, 4)))
+    serve_token = System.unique_integer([:positive])
     conns = :atomics.new(1, signed: false)
     ip = Keyword.get(opts, :ip, {127, 0, 0, 1})
     port = Keyword.get(opts, :port, 0)
@@ -51,6 +55,8 @@ defmodule Workbooks.TcpServeBroker do
           max_req_ms: max_req_ms,
           rate: rate,
           max_concurrent: max_concurrent,
+          max_per_client: max_per_client,
+          serve_token: serve_token,
           conns: conns
         }
         # unlinked acceptor so it survives the caller; it exits when the listen socket is closed
@@ -97,21 +103,33 @@ defmodule Workbooks.TcpServeBroker do
   defp accept_loop(lsock, %{conns: conns, max_concurrent: max_conc} = cfg) do
     case :gen_tcp.accept(lsock) do
       {:ok, conn} ->
-        # GLOBAL concurrency gate: reserve a slot atomically; refuse (close) if over the cap so the total
-        # handler-process count is bounded regardless of how many distinct clients connect (distributed flood).
-        if :atomics.add_get(conns, 1, 1) > max_conc do
-          :atomics.sub(conns, 1, 1)
-          Workbooks.BrokerAudit.record(:tcp_serve, :deny, :max_concurrent, nil)
-          :gen_tcp.close(conn)
-        else
-          # handle each connection in its own process; release the slot when it finishes
-          spawn(fn ->
-            try do
-              serve_conn(conn, cfg)
-            after
-              :atomics.sub(conns, 1, 1)
-            end
-          end)
+        client_ip = peer_ip(conn)
+
+        cond do
+          # GLOBAL concurrency gate: bounds total handler processes vs a distributed flood (many IPs).
+          :atomics.add_get(conns, 1, 1) > max_conc ->
+            :atomics.sub(conns, 1, 1)
+            Workbooks.BrokerAudit.record(:tcp_serve, :deny, :max_concurrent, nil)
+            :gen_tcp.close(conn)
+
+          # PER-CLIENT concurrency gate (DoS FAIRNESS): one IP can't hold more than its share of the global
+          # pool and starve everyone else — bounds concurrent connections per remote IP, not just total.
+          client_conn_count(cfg, client_ip) >= cfg.max_per_client ->
+            :atomics.sub(conns, 1, 1)
+            Workbooks.BrokerAudit.record(:tcp_serve, :deny, :max_per_client, client_ip)
+            :gen_tcp.close(conn)
+
+          true ->
+            client_conn_inc(cfg, client_ip)
+
+            spawn(fn ->
+              try do
+                serve_conn(conn, cfg, client_ip)
+              after
+                :atomics.sub(conns, 1, 1)
+                client_conn_dec(cfg, client_ip)
+              end
+            end)
         end
 
         accept_loop(lsock, cfg)
@@ -124,13 +142,7 @@ defmodule Workbooks.TcpServeBroker do
     end
   end
 
-  defp serve_conn(conn, %{handler: handler, serve_id: serve_id, max_req: max_req, max_req_ms: max_req_ms, rate: rate}) do
-    client_ip =
-      case :inet.peername(conn) do
-        {:ok, {addr, _port}} -> addr |> :inet.ntoa() |> to_string()
-        _ -> "unknown"
-      end
-
+  defp serve_conn(conn, %{handler: handler, serve_id: serve_id, max_req: max_req, max_req_ms: max_req_ms, rate: rate}, client_ip) do
     cond do
       # mid-flight revocation: the host keeps listening, but this hosted service refuses new connections
       Workbooks.Revocation.revoked?(serve_id) ->
@@ -195,4 +207,27 @@ defmodule Workbooks.TcpServeBroker do
 
   defp rate_denied?(key, {max, window}),
     do: Workbooks.RateLimiter.check(key, max, window) == {:error, :rate_limited}
+
+  defp peer_ip(conn) do
+    case :inet.peername(conn) do
+      {:ok, {addr, _port}} -> addr |> :inet.ntoa() |> to_string()
+      _ -> "unknown"
+    end
+  end
+
+  # per-client live-connection count, keyed by {serve instance, client IP} in the long-lived BrokerTables ETS.
+  defp client_conn_count(cfg, ip),
+    do: :ets.update_counter(client_table(), {cfg.serve_token, ip}, {2, 0}, {{cfg.serve_token, ip}, 0})
+
+  defp client_conn_inc(cfg, ip),
+    do: :ets.update_counter(client_table(), {cfg.serve_token, ip}, {2, 1}, {{cfg.serve_token, ip}, 0})
+
+  defp client_conn_dec(cfg, ip) do
+    n = :ets.update_counter(client_table(), {cfg.serve_token, ip}, {2, -1}, {{cfg.serve_token, ip}, 0})
+    # prune the row at 0 so an idle client's key doesn't linger (table doesn't grow per distinct IP forever)
+    if n <= 0, do: :ets.delete(client_table(), {cfg.serve_token, ip})
+    :ok
+  end
+
+  defp client_table, do: Workbooks.BrokerTables.ensure(:wb_tcpserve_clients, [:named_table, :public, :set])
 end
