@@ -7,7 +7,7 @@ column). Generates from lms.json + content/<slug>.html:
                         course controls (audio, position, prev/next, complete).
 Progress lives in the browser (localStorage). Re-run after edits.
 """
-import json, os, html
+import json, os, html, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 lms = json.load(open(os.path.join(HERE, "lms.json")))
@@ -33,6 +33,23 @@ for t in cat["tiers"]:
             doc_title[s["slug"]] = s.get("title", s["slug"])
 
 def esc(s): return html.escape(s or "")
+
+def bub_accent(text):
+    """Groothan renders uppercase letters as BUBBLE glyphs. Lowercase the header
+    (all grotesque) and bubble a couple of INNER letters — never the first letter
+    of the header (brand rule). Skips strings containing inline markup."""
+    if "<" in text:
+        return text
+    low = [c.lower() if c.isalpha() else c for c in text]
+    pos = [i for i, c in enumerate(low) if c.isalpha()]
+    if len(pos) < 3:
+        return "".join(low)
+    inner = pos[1:]  # never the header's first letter
+    n = 3 if len(inner) > 15 else 2
+    picks = {inner[int((k + 1) / (n + 1) * len(inner))] for k in range(n)}
+    for i in picks:
+        low[i] = low[i].upper()
+    return "".join(low)
 
 WORDMARK = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true">'
   '<path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43'
@@ -300,6 +317,9 @@ def lesson_page(l):
     crumb = "Unit %d · %s" % (l["unit"], esc(l["unit_title"]))
     if live:
         body = open(os.path.join(HERE, "content", l["slug"] + ".html")).read()
+        # Groothan headers: bubble a couple inner letters, never the first letter
+        body = re.sub(r"(<h2>)(.*?)(</h2>)", lambda m: m.group(1) + bub_accent(m.group(2)) + m.group(3), body, flags=re.S)
+        body = re.sub(r'(<p class="big">)(.*?)(</p>)', lambda m: m.group(1) + bub_accent(m.group(2)) + m.group(3), body, flags=re.S)
         reading = ('<div class="crumb">%s</div><h1>%s</h1>%s<article>%s</article>%s'
                    % (crumb, esc(l["title"]),
                       '<p class="promise">%s</p>' % esc(l["promise"]) if l.get("promise") else "",
