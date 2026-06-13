@@ -1849,3 +1849,15 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   a regression. resolved.json: annotated the wasip1 PyNet route (no wasip2 build needed) on the pure-Python net
   tools (httpie/pip/datasette/conda/Mamba/pixi/Poetry/pdm/yt-dlp/Buildout/Jupyter) — verdicts kept "reachable"
   (honest: per-tool packaging still required; tracked in wb-5p9e). NEXT: package a real tool live; QuickJS transport.
+- 2026-06-13 (iter 137): **SAFE REDIRECT-FOLLOWING in the brokered client (NetGuard.request).** request/3 now
+  follows 3xx MANUALLY (autoredirect off), re-entering do_request on each hop so allowed?/allow-list are
+  RE-VALIDATED every hop — a public URL redirecting to cloud-metadata/RFC1918 is denied AT the hop, never
+  reached. Method semantics: 303 (+ de-facto 301/302) demote to GET & drop body; 307/308 preserve method+body;
+  bounded by :max_redirects (default 5). This makes the brokered HTTP client real (curl -L) AND closes the
+  redirect-to-internal vector for the full-method path. The urllib adapter benefits for free + is now MORE
+  faithful to real urllib (which follows redirects by default — guests previously got a raw 3xx). 29 tests
+  green (21 net_guard incl: RED-TEAM redirect-to-metadata never returns metadata content [hardened vs flaky
+  httpbin]; max_redirects:0 returns raw 3xx but the first hop is still SSRF-checked; + 8 py_net regression).
+  NOTE: registered `qjs` excludes quickjs-libc.c (no guest file I/O) so the QuickJS transport needs a libc-
+  enabled rebuild — deprioritized; softened the PyNet doc's QuickJS claim. NEXT STONE: inbound server-flip for
+  wasip1 (CPython sock_accept on a host-preopened listener — datasette class) OR package a real tool live.

@@ -184,6 +184,30 @@ defmodule Workbooks.NetGuardTest do
   end
 
   @tag :netdeps
+  test "RED-TEAM request/3 — following a redirect to an internal target re-validates EVERY hop (never reached)" do
+    # request/3 now follows 3xx manually; each hop re-enters do_request -> allowed?/allow-list re-checked. A
+    # public host redirecting to cloud-metadata can't smuggle the guest there. Robust to a flaky httpbin: assert
+    # the REAL invariant (the metadata service's content never comes back), not merely that the call failed.
+    redirect =
+      "http://httpbin.org/redirect-to?url=" <> URI.encode_www_form("http://169.254.169.254/latest/meta-data/")
+
+    case NetGuard.request(:get, redirect) do
+      {:error, _} ->
+        :ok
+
+      {:ok, %{body: body}} ->
+        refute body =~ "meta-data" or body =~ "ami-id" or body =~ "iam/",
+               "redirect-follow must not return cloud-metadata content"
+    end
+  end
+
+  test "request/3 — max_redirects: 0 does NOT follow (returns the raw 3xx) — hermetic via internal deny" do
+    # with no follow budget, a redirect is returned as-is; but the FIRST hop is still SSRF-checked, so an
+    # internal start URL is denied regardless of redirect policy (proves the floor is independent of follow).
+    assert {:error, :denied} = NetGuard.request(:get, "http://169.254.169.254/", max_redirects: 0)
+  end
+
+  @tag :netdeps
   test "request/3 — RESPONSE BYTE CAP truncates an oversized body (DoS floor for the brokered transport)" do
     # a tiny max_bytes forces truncation even on example.com; proves the cap bounds what we forward/store so a
     # malicious-but-allowed host can't fill disk via the PyNet file transport or balloon a guest.

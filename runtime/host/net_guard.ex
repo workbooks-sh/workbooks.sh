@@ -69,6 +69,7 @@ defmodule Workbooks.NetGuard do
     body = Keyword.get(opts, :body, nil)
     ctype = Keyword.get(opts, :content_type, "application/octet-stream")
     max_bytes = Keyword.get(opts, :max_bytes, 32 * 1024 * 1024)
+    max_redirects = Keyword.get(opts, :max_redirects, 5)
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
@@ -80,7 +81,7 @@ defmodule Workbooks.NetGuard do
         {:error, :rate_limited}
 
       true ->
-        case do_request(method, url, headers, body, ctype, timeout, allow, max_bytes) do
+        case do_request(method, url, headers, body, ctype, timeout, allow, max_bytes, max_redirects) do
           {:ok, _} = ok ->
             Workbooks.BrokerAudit.record(:net, :allow)
             ok
@@ -91,7 +92,10 @@ defmodule Workbooks.NetGuard do
     end
   end
 
-  defp do_request(method, url, headers, body, ctype, timeout, allow, max_bytes) do
+  defp do_request(_m, _u, _h, _b, _c, _t, _a, _mb, hops) when hops < 0,
+    do: {:error, :too_many_redirects}
+
+  defp do_request(method, url, headers, body, ctype, timeout, allow, max_bytes, hops) do
     cond do
       not allowed?(url) ->
         Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
@@ -116,22 +120,47 @@ defmodule Workbooks.NetGuard do
             else: {req_url, hdrs, to_charlist(ctype), body}
 
         case :httpc.request(method, req, http_opts, body_format: :binary) do
-          {:ok, {{_, status, _}, resp_hdrs, resp_body}} ->
-            # RESPONSE BYTE CAP — a malicious-but-allowed host returning a giant body can't be forwarded
-            # wholesale (it would fill disk via the PyNet file transport, or balloon a guest's memory). Truncate
-            # to max_bytes and flag it. NOTE: :httpc buffers the full body in BEAM memory before this point — the
-            # cap bounds what we STORE/FORWARD, not peak receive RAM (streaming cap tracked in wb-j3n8/follow-up).
-            {capped, truncated} =
-              if byte_size(resp_body) > max_bytes,
-                do: {binary_part(resp_body, 0, max_bytes), true},
-                else: {resp_body, false}
+          # REDIRECT-FOLLOWING — autoredirect is off, so :httpc never auto-follows a 3xx into an internal host.
+          # We follow MANUALLY: each hop re-enters do_request, which RE-VALIDATES allowed? + the allow-list at
+          # the top — so a public URL redirecting to cloud-metadata/RFC1918 is denied at the hop, never reached.
+          # Method semantics: 303 (and the de-facto 301/302) demote to GET + drop the body; 307/308 preserve.
+          {:ok, {{_, status, _}, resp_hdrs, rbody}} when status in 300..399 and hops > 0 ->
+            case redirect_target(url, resp_hdrs) do
+              nil ->
+                finish(status, resp_hdrs, rbody, max_bytes)
 
-            {:ok, %{status: status, headers: resp_hdrs, body: capped, truncated: truncated}}
+              next ->
+                {nmethod, nbody} = redirect_method(status, method, body)
+                do_request(nmethod, next, headers, nbody, ctype, timeout, allow, max_bytes, hops - 1)
+            end
+
+          {:ok, {{_, status, _}, resp_hdrs, resp_body}} ->
+            finish(status, resp_hdrs, resp_body, max_bytes)
 
           _ ->
             {:error, :request_failed}
         end
     end
+  end
+
+  # 303 always → GET; 301/302 are de-facto demoted to GET by browsers/curl for non-GET (we follow suit, dropping
+  # the body); 307/308 preserve the original method AND body. Anything else: keep method, drop body.
+  defp redirect_method(303, _method, _body), do: {:get, nil}
+  defp redirect_method(s, _method, _body) when s in [301, 302], do: {:get, nil}
+  defp redirect_method(s, method, body) when s in [307, 308], do: {method, body}
+  defp redirect_method(_s, _method, _body), do: {:get, nil}
+
+  defp finish(status, resp_hdrs, resp_body, max_bytes) do
+    # RESPONSE BYTE CAP — a malicious-but-allowed host returning a giant body can't be forwarded wholesale (it
+    # would fill disk via the PyNet file transport, or balloon a guest's memory). Truncate to max_bytes + flag.
+    # NOTE: :httpc buffers the full body in BEAM memory before this point — the cap bounds what we STORE/FORWARD,
+    # not peak receive RAM (streaming cap tracked in wb-4had).
+    {capped, truncated} =
+      if byte_size(resp_body) > max_bytes,
+        do: {binary_part(resp_body, 0, max_bytes), true},
+        else: {resp_body, false}
+
+    {:ok, %{status: status, headers: resp_hdrs, body: capped, truncated: truncated}}
   end
 
   defp rate_denied?(principal, {max, window}),

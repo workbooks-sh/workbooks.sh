@@ -1,6 +1,6 @@
 defmodule Workbooks.PyNet do
   @moduledoc """
-  wb-broker PYTHON BROKERED-TRANSPORT — gives a wasip1 runtime (CPython 3.12, QuickJS, …) SSRF-safe outbound
+  wb-broker PYTHON BROKERED-TRANSPORT — gives a wasip1 runtime (CPython 3.12 today; any wasip1 runtime with file I/O) SSRF-safe outbound
   HTTP even though it has NO outbound socket of its own.
 
   The wall (iter134): the provisioned CPython is a wasip1 CORE module whose only wasi socket imports are
