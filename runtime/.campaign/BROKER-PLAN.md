@@ -1786,3 +1786,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   transport adapter. RECOMMEND (B): reuses the built SSRF-safe brokers, no new runtime build. This is the
   GENERAL wasip1 wall — only wasip2/wasi:sockets builds get brokered net; the reachable runtime tools need a
   wasip2 runtime OR the brokered-transport shim. Pure-Python (no-net) tools remain DONE via Lane D.
+- 2026-06-13 (iter 134 cont): **HOST-SIDE BROKERED HTTP CLIENT (NetGuard.request/3) — the Python-transport
+  shim's foundation (path B).** Since a wasip1 runtime can't connect outbound itself, the brokered-transport
+  approach has the HOST do the HTTP. Generalized NetGuard's GET-only egress to a FULL client: request(method,
+  url, opts) supports POST/PUT/DELETE + headers + body + content_type, returning {:ok, %{status, headers,
+  body}}, reusing the SAME proven SSRF + resolve-then-pin (http+https cert-verified) + allow-list + revocation
+  + rate cadence — so the red-team-green GET path is untouched and the SSRF guard applies to EVERY method. 17
+  net_guard tests green incl new: POST/PUT/DELETE to internal -> SSRF-denied, off-allow-list POST denied,
+  public GET -> status+headers+body. This is (a) the host half of the Python brokered-transport shim (a Python
+  urllib/requests adapter writes a request, the host services it SSRF-safe via this) AND (b) a general
+  full-HTTP brokered capability. NEXT for the Python lane: the request/response TRANSPORT between wasip1
+  CPython (file I/O in a preopened dir) and this host client, + a Python urllib adapter -> flips httpie/pip.

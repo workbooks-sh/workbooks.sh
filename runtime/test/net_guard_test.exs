@@ -154,4 +154,22 @@ defmodule Workbooks.NetGuardTest do
     assert body =~ "Example Domain"
     assert {:error, :denied} = NetGuard.get("http://169.254.169.254/")
   end
+
+  test "request/3 — full-method brokered client keeps SSRF on EVERY method (hermetic)" do
+    # POST/PUT/DELETE to internal targets must be SSRF-denied just like GET — before any socket opens.
+    assert {:error, :denied} = NetGuard.request(:post, "http://127.0.0.1/", body: "x")
+    assert {:error, :denied} = NetGuard.request(:put, "http://169.254.169.254/latest/", body: "y")
+    assert {:error, :denied} = NetGuard.request(:delete, "http://10.0.0.1/")
+    # off-allow-list public host denied for a POST too
+    assert {:error, :denied} = NetGuard.request(:post, "http://8.8.8.8/", body: "x", allow: ["example.com"])
+  end
+
+  @tag :netdeps
+  test "request/3 — a GET to a public host returns status + headers + body" do
+    assert {:ok, %{status: 200, body: body, headers: hdrs}} =
+             NetGuard.request(:get, "http://example.com/")
+
+    assert body =~ "Example Domain"
+    assert is_list(hdrs)
+  end
 end

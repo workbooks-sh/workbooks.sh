@@ -51,6 +51,79 @@ defmodule Workbooks.NetGuard do
     end
   end
 
+  @doc """
+  Brokered HTTP request with an arbitrary METHOD + headers + body — the full-client generalization of `get/2`,
+  for tools that need POST/PUT/etc. (and the host half of the Python brokered-transport shim, since a wasip1
+  runtime can't connect outbound itself). Same SSRF + resolve-then-pin + allow-list + revocation/rate cadence
+  as `get/2` applies to EVERY method. Returns `{:ok, %{status, headers, body}}` | `{:error, reason}`.
+
+  opts: `:headers` ([{k,v} strings]), `:body`, `:content_type` (default "application/octet-stream"),
+  `:allow`, `:principal`, `:rate`, `:timeout`.
+  """
+  def request(method, url, opts \\ []) when is_atom(method) and is_binary(url) do
+    timeout = Keyword.get(opts, :timeout, 10_000)
+    allow = Keyword.get(opts, :allow, nil)
+    principal = Keyword.get(opts, :principal)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    headers = Keyword.get(opts, :headers, [])
+    body = Keyword.get(opts, :body, nil)
+    ctype = Keyword.get(opts, :content_type, "application/octet-stream")
+
+    cond do
+      principal && Workbooks.Revocation.revoked?(principal) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :revoked, url)
+        {:error, :revoked}
+
+      principal && rate && rate_denied?(principal, rate) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :rate_limited, url)
+        {:error, :rate_limited}
+
+      true ->
+        case do_request(method, url, headers, body, ctype, timeout, allow) do
+          {:ok, _} = ok ->
+            Workbooks.BrokerAudit.record(:net, :allow)
+            ok
+
+          other ->
+            other
+        end
+    end
+  end
+
+  defp do_request(method, url, headers, body, ctype, timeout, allow) do
+    cond do
+      not allowed?(url) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :ssrf, url)
+        Logger.warning("wb-broker: DENY egress #{inspect(url)} (#{method}) — SSRF")
+        {:error, :denied}
+
+      not host_allowed_by_list?(url, allow) ->
+        Workbooks.BrokerAudit.record(:net, :deny, :allowlist, url)
+        {:error, :denied}
+
+      true ->
+        _ = Application.ensure_all_started(:inets)
+        _ = Application.ensure_all_started(:ssl)
+        {req_url, req_headers, extra_opts} = pin_for_http(url)
+        http_opts = [{:timeout, timeout}, {:autoredirect, false}] ++ extra_opts
+        hdrs = req_headers ++ Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
+
+        # :httpc request tuple: {url, headers} for body-less methods, {url, headers, content_type, body} else.
+        req =
+          if body in [nil, ""],
+            do: {req_url, hdrs},
+            else: {req_url, hdrs, to_charlist(ctype), body}
+
+        case :httpc.request(method, req, http_opts, body_format: :binary) do
+          {:ok, {{_, status, _}, resp_hdrs, resp_body}} ->
+            {:ok, %{status: status, headers: resp_hdrs, body: resp_body}}
+
+          _ ->
+            {:error, :request_failed}
+        end
+    end
+  end
+
   defp rate_denied?(principal, {max, window}),
     do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
 
