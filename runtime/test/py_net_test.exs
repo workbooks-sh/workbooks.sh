@@ -13,6 +13,32 @@ defmodule Workbooks.PyNetTest do
     :ok
   end
 
+  test "RED-TEAM — every obfuscated/smuggled internal target is DENIED through the guest transport (hermetic)" do
+    # the transport is a NEW attack surface; prove the SSRF floor still applies END-TO-END through CPython (not
+    # just at NetGuard) for the full obfuscation set — IP literals, decimal/hex/octal, short-form, userinfo@,
+    # IPv6 loopback + v4-mapped. A red-team guest writing ANY of these to the request file still can't reach it.
+    targets = [
+      "http://127.0.0.1/",
+      "http://2130706433/",
+      "http://0x7f000001/",
+      "http://0177.0.0.1/",
+      "http://127.1/",
+      "http://trusted.example.com@127.0.0.1/",
+      "http://google.com@169.254.169.254/latest/",
+      "http://[::1]/",
+      "http://[::ffff:127.0.0.1]/",
+      "http://[::ffff:a9fe:a9fe]/",
+      "http://10.0.0.1/",
+      "http://172.16.0.1/",
+      "http://192.168.1.1/",
+      "http://100.64.0.1/"
+    ]
+
+    for t <- targets do
+      assert {:error, "denied"} = PyNet.fetch(:get, t), "RED-TEAM bypass not blocked through guest: #{t}"
+    end
+  end
+
   test "SSRF — a brokered request to an internal target is DENIED inside CPython (hermetic)" do
     # CPython asks the host to fetch cloud metadata; the host's NetGuard re-validates and refuses. The guest
     # cannot reach it no matter what it writes to the request file.
@@ -56,6 +82,36 @@ defmodule Workbooks.PyNetTest do
     assert {:ok, out} = PyNet.run_python_urllib(script)
     assert out =~ "CODE 200"
     assert out =~ "HASTITLE True"
+  end
+
+  @tag :netdeps
+  @tag timeout: 120_000
+  test "REQUESTS SHIM — `import requests; requests.get(...)` works brokered (no requests package needed)" do
+    script = ~S"""
+    import requests
+    r = requests.get("http://example.com/")
+    print("CODE", r.status_code)
+    print("HASTITLE", "Example Domain" in r.text)
+    """
+
+    assert {:ok, out} = PyNet.run_python_urllib(script)
+    assert out =~ "CODE 200"
+    assert out =~ "HASTITLE True"
+  end
+
+  test "REQUESTS SHIM — SSRF enforced (requests.get to metadata is denied)" do
+    script = ~S"""
+    import requests, urllib.error
+    try:
+        requests.get("http://169.254.169.254/latest/")
+        print("REACHED")
+    except urllib.error.URLError as e:
+        print("BLOCKED", e.reason)
+    """
+
+    assert {:ok, out} = PyNet.run_python_urllib(script)
+    assert out =~ "BLOCKED"
+    refute out =~ "REACHED"
   end
 
   test "URLLIB ADAPTER — SSRF still enforced through the adapter (urlopen to metadata raises)" do

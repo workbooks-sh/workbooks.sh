@@ -155,6 +155,41 @@ defmodule Workbooks.PyNet do
         return r
 
     _wbreq.urlopen = _wb_urlopen
+
+    # `requests` shim — this CPython has no `requests` package, so register a minimal one built on the brokered
+    # urlopen. Covers the common get/post/put/delete + Response.status_code/.text/.json()/.content the bulk of
+    # net tools use. Everything flows through _wb_urlopen, so the full SSRF/allow-list cadence applies.
+    import sys as _wbsys, types as _wbtypes
+    _wbrequests = _wbtypes.ModuleType("requests")
+
+    class _WBRResp:
+        def __init__(self, status, body, url):
+            self.status_code = status; self.content = body; self.url = url
+            self.text = body.decode("utf-8", "replace"); self.headers = {}
+        def json(self): return _wbj.loads(self.text)
+        def raise_for_status(self):
+            if self.status_code and self.status_code >= 400:
+                raise Exception("HTTP %d" % self.status_code)
+
+    def _wb_rrequest(method, url, data=None, json=None, headers=None, params=None, **k):
+        if params:
+            from urllib.parse import urlencode as _ue
+            url = url + ("&" if "?" in url else "?") + _ue(params)
+        if json is not None:
+            data = _wbj.dumps(json).encode()
+            headers = dict(headers or {}); headers.setdefault("Content-Type", "application/json")
+        if isinstance(data, str): data = data.encode()
+        req = _wbreq.Request(url, data=data, method=method.upper(), headers=headers or {})
+        r = _wb_urlopen(req)
+        return _WBRResp(r.status, r.read(), url)
+
+    _wbrequests.request = _wb_rrequest
+    _wbrequests.get = lambda url, **k: _wb_rrequest("GET", url, **k)
+    _wbrequests.post = lambda url, **k: _wb_rrequest("POST", url, **k)
+    _wbrequests.put = lambda url, **k: _wb_rrequest("PUT", url, **k)
+    _wbrequests.delete = lambda url, **k: _wb_rrequest("DELETE", url, **k)
+    _wbrequests.head = lambda url, **k: _wb_rrequest("HEAD", url, **k)
+    _wbsys.modules["requests"] = _wbrequests
     """
   end
 

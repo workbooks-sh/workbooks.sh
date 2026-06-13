@@ -1826,3 +1826,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   Honest limit (wb-4had, low-pri): :httpc buffers the full body in BEAM memory before truncation, so peak RECEIVE
   RAM isn't bounded — a true streaming cap (stream:self + abort-at-cap, reusing CappedHttp) is the follow-up;
   the realistic threat is a compromised ALLOW-LISTED host and the stored/forwarded cap already stops disk-fill.
+- 2026-06-13 (iter 136): **RED-TEAM the transport END-TO-END + REQUESTS SHIM.** (1) The file-protocol transport
+  is a new attack surface — proved the SSRF floor holds THROUGH CPython (not just at NetGuard) for the full
+  obfuscation set: 127.0.0.1, decimal(2130706433)/hex(0x7f000001)/octal(0177.0.0.1)/short(127.1), userinfo@
+  (trusted@127.0.0.1, google.com@169.254.169.254), IPv6 ::1 + v4-mapped (::ffff:127.0.0.1, ::ffff:a9fe:a9fe),
+  RFC1918 (10/172.16/192.168) + CGNAT (100.64). A red-team guest writing ANY of these to the request file is
+  denied — the host re-validates every URL. (2) REQUESTS SHIM: the prelude registers a minimal `requests`
+  module (get/post/put/delete/head + Response.status_code/.text/.json()/.content) built on the brokered
+  urlopen, so `import requests; requests.get(...)` works SSRF-safe with no requests package present. 9 PyNet
+  tests green (14-target red-team loop + requests live fetch + requests-SSRF-denied + urllib + transport).
+  Python net lane is now red-team-green end-to-end. NEXT: wrap a reclaimed Python net tool as a real command;
+  generalize the transport to QuickJS (wasip1-no-connect); then re-run feasibility to flip reclaimed items.
