@@ -60,8 +60,11 @@ export const filesProvider: SearchProvider = {
     const q = query.trim().toLowerCase();
     const hits = fileIndex.entries;
     // Preview: no real index yet → show stand-in files so the UI populates.
+    // Show matches if any, otherwise the full set (so a demo query that
+    // doesn't literally match still demonstrates results).
     if (hits.length === 0) {
-      return PREVIEW_FILES.filter((p) => !q || p.toLowerCase().includes(q))
+      const matched = PREVIEW_FILES.filter((p) => p.toLowerCase().includes(q));
+      return (q && matched.length ? matched : PREVIEW_FILES)
         .slice(0, 8)
         .map((p, i) => ({
           kind: WORKBOOK_EXT.test(p) ? "workbook" : "file",

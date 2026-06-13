@@ -20,6 +20,7 @@
   import { dock } from "$lib/bridge/dock.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { search } from "$lib/search/registry.svelte";
+  import { SEARCH_MODES, SEARCH_MODE_ORDER } from "$lib/search/modes";
   import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
   import OnboardingAgents from "$lib/onboarding/OnboardingAgents.svelte";
   import LessonOverlay from "$lib/onboarding/LessonOverlay.svelte";
@@ -281,13 +282,13 @@
           {:else if step === "search"}
             <div class="text">
               <span class="kicker">Search · ⌘K</span>
-              <h1>How should search work?</h1>
-              <p>Internal finds your files + runtime. Web adds openable web results. AI answers your prompt with sources + follow-ups. Pick one — it previews on the right.</p>
+              <h1>Pick a search type</h1>
+              <p>Each is a composite — pick one to preview it on the right; the card explains what it does.</p>
             </div>
             <div class="opts">
-              <button type="button" class="opt" class:sel={prefs.searchMode === "internal"} onclick={() => pickSearchMode("internal")}>Internal</button>
-              <button type="button" class="opt" class:sel={prefs.searchMode === "web"} onclick={() => pickSearchMode("web")}>Web</button>
-              <button type="button" class="opt" class:sel={prefs.searchMode === "ai"} onclick={() => pickSearchMode("ai")}>AI</button>
+              {#each SEARCH_MODE_ORDER as m (m)}
+                <button type="button" class="opt" class:sel={prefs.searchMode === m} onclick={() => pickSearchMode(m)}>{SEARCH_MODES[m].label}</button>
+              {/each}
             </div>
 
           {:else if step === "theme"}

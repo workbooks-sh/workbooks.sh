@@ -29,6 +29,7 @@
   import EditIconModal from "$lib/workspace/EditIconModal.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import SearchDrawer from "$lib/components/SearchDrawer.svelte";
+  import SearchExplainer from "$lib/components/SearchExplainer.svelte";
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
   import NexusPopover from "$lib/components/NexusPopover.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
@@ -641,7 +642,11 @@
     </main>
 
     <!-- Search drawer — opens from the RIGHT (the browser "everything"
-         search). Sits right of the canvas, beside the dock. -->
+         search). Sits right of the canvas, beside the dock. During the tour
+         an explainer card sits to its left describing the active search type. -->
+    {#if chrome.leftPanel === "search" && onboarding.active}
+      <SearchExplainer />
+    {/if}
     {#if chrome.leftPanel === "search"}
       <SearchDrawer onclose={() => chrome.closeLeft()} />
     {/if}
