@@ -2526,6 +2526,15 @@
    "proof": "vectorizable saxpy loop: baseline 0 v128 ops -> simd:true 12 v128 ops, correct result (sum=33546240); test rust_simd_test.exs green",
    "recipe": "rust_compile_to_wasm(simd: true) appends -msimd128 -O2 to the user-code clang compile (autovec is OFF at -O1). NOT a --cfg win: mrustc lowers Rust SIMD intrinsics to scalar C, so clang autovectorization is the only path to real v128. Composes orthogonally with the threads lane.",
    "since": "iter160"
+  },
+  "rayon": {
+   "capability": "data-parallel Rust (rayon-core work-stealing) in-sandbox",
+   "status": "proven",
+   "proof": "rayon-core 1.12.1 + full dep tree (crossbeam-utils/epoch/deque, either) compile through the threads lane + link to a runnable wasm with real wasi:thread-spawn + shared memory (NOT serial fallback)",
+   "blocker": "ONE codegen gap: mrustc C backend does not lower wasm futex intrinsics llvm.wasm.memory.atomic.wait32/notify (codegen_c.cpp:2842 catch-all aborts) -> rayon Condvar/LockLatch worker-park traps at runtime",
+   "fix": "~6-line codegen_c.cpp patch lowering wait32/notify(/wait64) to __builtin_wasm_memory_atomic_* (clang compiles them, verified) + rebuild mrustc + re-run threads-libstd prebuild + wire deps into compile_rust_threads. SAME patch site unblocks the ~40 llvm.wasm.* SIMD intrinsics. CROSSES the no-mrustc-fork stance (first true mrustc-binary patch).",
+   "caveat": "top-level rayon par_iter sugar does NOT compile (mrustc trait-resolution ceiling); productize against rayon-core join/scope/ThreadPool API",
+   "since": "iter160"
   }
  },
  "verdict_ladder": {
