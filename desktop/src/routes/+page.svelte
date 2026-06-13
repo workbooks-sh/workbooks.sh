@@ -629,7 +629,11 @@
     {/if}
 
     <main class="main" inert={onboarding.active}>
-      <div class="main-content" class:ob-hide={!onboarding.shows("canvas")}>
+      <div
+        class="main-content"
+        class:ob-hide={!onboarding.shows("canvas")}
+        class:bare={chrome.mode === "app" && active === "home"}
+      >
         <DropOverlay />
         {#if chrome.mode === "doc"}
           <DocViewer />
@@ -888,6 +892,14 @@
       0 1px 2px rgba(15, 15, 15, 0.05),
       0 4px 16px rgba(15, 15, 15, 0.04);
     transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* The create/home surface has NO card chrome — it shows the graph-paper
+   * shader backdrop through, with its composer floating on top. */
+  .main-content.bare {
+    background-color: transparent;
+    background-image: none;
+    border-color: transparent;
+    box-shadow: none;
   }
   /* Onboarding build-up: reveal the real canvas (with demo content). */
   .main-content.ob-hide {

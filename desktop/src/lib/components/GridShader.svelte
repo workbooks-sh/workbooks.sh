@@ -111,8 +111,11 @@
     let scale = 1;
     function readColors() {
       const cs = getComputedStyle(document.documentElement);
-      const bg = rgba(cs.getPropertyValue("--color-chrome") || "#f7f6f1");
-      const line = rgba(cs.getPropertyValue("--color-grid-line") || "rgba(18,19,22,0.05)");
+      // Use concrete tokens — --color-chrome is a color-mix() expression that
+      // getPropertyValue returns UNRESOLVED, so it can't be parsed (it fell
+      // back to black, which is why the backdrop stayed dark in light mode).
+      const bg = rgba(cs.getPropertyValue("--color-page") || "#f7f6f1");
+      const line = rgba(cs.getPropertyValue("--color-grid-line") || "rgba(18,19,22,0.07)");
       const cellCss = parseFloat(cs.getPropertyValue("--grid-size")) || 22;
       gl!.uniform3f(U.bg, bg[0], bg[1], bg[2]);
       gl!.uniform4f(U.line, line[0], line[1], line[2], line[3]);

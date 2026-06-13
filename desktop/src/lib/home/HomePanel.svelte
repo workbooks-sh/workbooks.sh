@@ -621,7 +621,9 @@
   .home {
     flex: 1 1 auto;
     overflow: auto;
-    background: var(--color-page);
+    /* No surface of its own — the create page shows the graph-paper shader
+     * backdrop, with the composer + chips floating on top. */
+    background: transparent;
     display: flex;
     justify-content: center;
     align-items: center;
