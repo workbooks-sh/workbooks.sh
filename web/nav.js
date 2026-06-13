@@ -67,11 +67,45 @@
     '.nav a.gh { display: inline-flex; align-items: center; color: var(--ink, #121316); }',
     '.nav a.gh svg { width: 19px; height: 19px; display: block; }',
     '.nav a.gh:hover { color: var(--bloom, #13d943); }',
+    /* hamburger — hidden on desktop, the only control on mobile */
+    '.nav .burger { display: none; width: 28px; height: 20px; flex-direction: column;',
+    '  justify-content: center; gap: 5px; background: none; border: 0; padding: 0; cursor: pointer; margin-left: auto; }',
+    '.nav .burger span { display: block; height: 2.5px; border-radius: 2px; background: var(--ink, #121316);',
+    '  transition: transform .22s ease, opacity .18s ease; }',
+    '.nav.menu-open .burger span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }',
+    '.nav.menu-open .burger span:nth-child(2) { opacity: 0; }',
+    '.nav.menu-open .burger span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }',
+    /* ── MOBILE: the pill becomes a bar (logo + burger); tapping the burger drops
+       a full-width stacked sheet. Dropdowns become tap-accordions; the hover-only
+       deep-dives drilldown is replaced by a flat, always-visible list. ── */
     '@media (max-width: 820px) {',
-    '  .nav { gap: 14px; padding: 8px 12px; top: 12px; max-width: 94vw; }',
-    '  .nav .drop .panel { flex-direction: column; max-height: 70vh; overflow: auto; min-width: 0; width: 88vw; left: 50%; }',
-    '  .nav .drop .panel .vsep { width: auto; height: 2px; margin: 8px 6px;',
-    '    background-image: repeating-linear-gradient(90deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
+    '  .nav { left: 12px; right: 12px; transform: none; max-width: none; width: auto; top: 12px;',
+    '    flex-wrap: wrap; align-items: center; gap: 0 12px; padding: 11px 15px; }',
+    '  .nav .mark { width: 26px; }',
+    '  .nav .burger { display: flex; }',
+    '  .nav > .drop, .nav > a.gh, .nav > a.dl { display: none; }',
+    '  .nav.menu-open { row-gap: 2px; max-height: calc(100dvh - 24px); overflow-y: auto; -webkit-overflow-scrolling: touch; }',
+    '  .nav.menu-open > .drop { display: block; width: 100%; border-top: 2px solid rgba(18,19,22,.10); margin-top: 8px; padding-top: 2px; }',
+    '  .nav.menu-open > a.gh { display: inline-flex; width: 100%; padding: 14px 4px 4px; }',
+    '  .nav.menu-open > a.dl { display: inline-flex; width: 100%; justify-content: center; margin-top: 10px; }',
+    '  .nav .drop { position: static; }',
+    '  .nav .drop > a { width: 100%; box-sizing: border-box; justify-content: space-between;',
+    '    padding: 14px 4px; font-size: 13px; }',
+    '  .nav .drop > a::after { margin-left: 0; transition: transform .2s; }',
+    '  .nav .drop.open > a::after { transform: rotate(225deg) translate(-2px, -2px); }',
+    '  .nav .drop .panel { position: static; transform: none; left: auto; top: auto; display: none;',
+    '    width: 100%; min-width: 0; border: 0; border-radius: 0; box-shadow: none; background: none;',
+    '    padding: 0 0 10px; max-height: none; overflow: visible; }',
+    '  .nav .drop.open .panel { display: flex; flex-direction: column; }',
+    '  .nav .drop .panel::before { display: none; }',
+    '  .nav .drop .panel .vsep { display: none; }',
+    '  .nav .drop .panel .col, .nav .drop .panel [data-subpanel] { min-width: 0; width: 100%; }',
+    '  .nav .drop .panel a { padding: 13px 10px; font-size: 12.5px; }',
+    '  .nav .drop .panel a .sw { width: 26px; height: 26px; }',
+    '  .nav .drop .panel [data-lessons] a.on { margin-right: 0; padding-right: 10px; background: none; }',
+    '  .nav .drop .panel [data-lessons] a.on::after { display: none; }',
+    '  .nav .drop .panel .subbody { overflow: visible; }',
+    '  .nav .drop .panel .colhead { padding-top: 12px; }',
     '}',
   ].join("\n");
 
@@ -118,7 +152,8 @@
     '<div class="drop"><a href="#">Learn</a><div class="panel">' + lessonsCol + '<div class="vsep" aria-hidden="true"></div>' + subPanel + '</div></div>' +
     '<div class="drop"><a href="#">Docs</a><div class="panel">' + docsCol + '</div></div>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
-    (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '');
+    (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '') +
+    '<button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>';
 
   var style = document.createElement("style");
   style.textContent = css;
@@ -207,4 +242,91 @@
     });
   });
 
+  // mobile: the burger opens the stacked sheet
+  var burger = nav.querySelector(".burger");
+  if (burger) burger.addEventListener("click", function () {
+    var open = nav.classList.toggle("menu-open");
+    burger.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) nav.querySelectorAll(".drop.open").forEach(function (o) { o.classList.remove("open"); });
+  });
+  // tapping outside the open menu closes it
+  document.addEventListener("click", function (e) {
+    if (nav.classList.contains("menu-open") && !nav.contains(e.target)) {
+      nav.classList.remove("menu-open");
+      if (burger) burger.setAttribute("aria-expanded", "false");
+    }
+  });
+
+})();
+
+/* ── THE bubble — Groothan's display word, rendered as real SVG outline ───────
+   The duo lockup's middle line wears a thick ink ring around a solid fill.
+   CSS -webkit-text-stroke + a text-shadow ring approximated this but broke on
+   Safari/iOS (stroke renders centered-and-clipped, the shadow ring leaks). An
+   SVG <text> with paint-order:stroke draws a TRUE outline that is pixel-identical
+   across browsers and scales with the glyph (fixed stroke-to-letter ratio) — so
+   the ring never breaks and never drifts with the viewport. One enhancer, every
+   page (nav.js is the universal include); zero per-page markup. */
+(function () {
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var S = 100; // internal user-unit font size; the SVG is then sized in em so it
+  //            renders the word at EXACTLY the element's real (clamp) font-size.
+  function enhance(el) {
+    if (el.getAttribute("data-bubbled")) return;
+    var word = (el.textContent || "").trim();
+    if (!word) return;
+    var cs = getComputedStyle(el);
+    if (cs.textTransform === "uppercase") word = word.toUpperCase();
+    else if (cs.textTransform === "lowercase") word = word.toLowerCase();
+    var fill = (cs.getPropertyValue("--bub-fill") || cs.color || "#fff").trim();
+    var ink = (cs.getPropertyValue("--ink") || "#121316").trim();
+    var ratio = parseFloat(cs.getPropertyValue("--bub-stroke")) || 5.4; // outer ring, % of em
+    var ls = parseFloat(cs.letterSpacing);
+    var fs = parseFloat(cs.fontSize) || S;
+
+    var svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    var txt = document.createElementNS(SVGNS, "text");
+    txt.setAttribute("x", "0"); txt.setAttribute("y", "0");
+    txt.setAttribute("dominant-baseline", "alphabetic");
+    txt.style.cssText = "font-family:" + cs.fontFamily + ";font-weight:" + cs.fontWeight +
+      ";font-style:" + cs.fontStyle + ";font-size:" + S + "px;letter-spacing:" +
+      (ls ? (ls / fs * S) + "px" : "normal");
+    txt.setAttribute("fill", fill);
+    txt.setAttribute("stroke", ink);
+    txt.setAttribute("stroke-width", (ratio / 100 * S * 2).toFixed(2)); // *2: paint-order shows the outer half
+    txt.setAttribute("stroke-linejoin", "round");
+    txt.setAttribute("paint-order", "stroke");
+    txt.textContent = word;
+    svg.appendChild(txt);
+
+    svg.style.cssText = "display:block;visibility:hidden;position:absolute;overflow:visible";
+    el.appendChild(svg);
+    var bb; try { bb = txt.getBBox(); } catch (e) { el.removeChild(svg); return; }
+    var pad = ratio / 100 * S; // keep the ring inside the box
+    var vbw = bb.width + pad * 2, vbh = bb.height + pad * 2;
+    svg.setAttribute("viewBox", (bb.x - pad) + " " + (bb.y - pad) + " " + vbw + " " + vbh);
+    // em sizing → 1 user unit = (fs/S)px, so the glyphs land at the real font size
+    var centered = cs.textAlign === "center";
+    svg.style.cssText = "display:block;overflow:visible;width:" + (vbw / S).toFixed(3) +
+      "em;height:" + (vbh / S).toFixed(3) + "em;margin:" + (centered ? "0 auto" : "0");
+    // swap the live text for the SVG, but keep the word for a11y + copy
+    el.setAttribute("aria-label", word);
+    el.setAttribute("role", "text");
+    var sr = document.createElement("span");
+    sr.textContent = word;
+    sr.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap";
+    el.childNodes.forEach && Array.prototype.slice.call(el.childNodes).forEach(function (n) {
+      if (n !== svg) el.removeChild(n);
+    });
+    el.insertBefore(sr, svg);
+    el.setAttribute("data-bubbled", "1");
+  }
+  function run() {
+    document.querySelectorAll(".lhero h1 .bub, .lockup .jl.bub, [data-bub]").forEach(enhance);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+  else if (document.readyState !== "loading") run();
+  else document.addEventListener("DOMContentLoaded", run);
 })();

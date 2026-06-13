@@ -63,14 +63,15 @@ html { scrollbar-width: thin; scrollbar-color: #565b54 transparent; }
   font-size: clamp(46px, 6.4vw, 92px); line-height: .84; max-width: 14ch;
   display: flex; flex-direction: column; align-items: flex-start;
 }
-.lhero h1 .ln { display: block; }
-/* the bubble line — Groothan's UPPERCASE glyphs, white fill + ink outline,
-   overlapping the grotesque lines above and below (the duo lockup) */
+/* the grotesque lines — tight between consecutive normal lines; the bubble line
+   carries its own overlap. Extra normal lines stack at this same tight rhythm. */
+.lhero h1 .ln { display: block; line-height: .9; }
+/* the bubble line — Groothan's UPPERCASE glyphs as a real SVG outline (nav.js
+   swaps the text for paint-order:stroke SVG, fixed scale, Safari-safe). The fill
+   is the page's category color (--pc); the ring weight is --bub-stroke. */
 .lhero h1 .bub {
-  position: relative; z-index: 2; margin: -.26em 0 -.24em;
-  /* the bubble word wears its page's category color (each page sets --pc) */
-  color: var(--pc, #fff); -webkit-text-stroke: 1px var(--ink);
-  text-shadow: 2.5px 0.0px 0 var(--ink), 2.3px 1.0px 0 var(--ink), 1.8px 1.8px 0 var(--ink), 1.0px 2.3px 0 var(--ink), 0.0px 2.5px 0 var(--ink), -1.0px 2.3px 0 var(--ink), -1.8px 1.8px 0 var(--ink), -2.3px 1.0px 0 var(--ink), -2.5px 0.0px 0 var(--ink), -2.3px -1.0px 0 var(--ink), -1.8px -1.8px 0 var(--ink), -1.0px -2.3px 0 var(--ink), -0.0px -2.5px 0 var(--ink), 1.0px -2.3px 0 var(--ink), 1.8px -1.8px 0 var(--ink), 2.3px -1.0px 0 var(--ink);
+  position: relative; z-index: 2; margin: -.20em 0 -.16em; line-height: 1;
+  color: var(--pc, #fff); --bub-stroke: 5.2;
 }
 .lhero h1 em, .lhero h1 i {
   font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
@@ -375,7 +376,7 @@ pre.orgsample i { color: var(--dim); font-style: normal; }
 @media (max-width: 820px) {
   .lhero { padding-top: 120px; }
   .lhero h1 { font-size: clamp(40px, 11.5vw, 54px); line-height: 1; }
-  .lhero h1 .bub { margin: -.2em 0 -.18em; text-shadow: 2.5px 0.0px 0 var(--ink), 2.3px 1.0px 0 var(--ink), 1.8px 1.8px 0 var(--ink), 1.0px 2.3px 0 var(--ink), 0.0px 2.5px 0 var(--ink), -1.0px 2.3px 0 var(--ink), -1.8px 1.8px 0 var(--ink), -2.3px 1.0px 0 var(--ink), -2.5px 0.0px 0 var(--ink), -2.3px -1.0px 0 var(--ink), -1.8px -1.8px 0 var(--ink), -1.0px -2.3px 0 var(--ink), -0.0px -2.5px 0 var(--ink), 1.0px -2.3px 0 var(--ink), 1.8px -1.8px 0 var(--ink), 2.3px -1.0px 0 var(--ink); }
+  .lhero h1 .bub { margin: -.16em 0 -.13em; }
   .d-row { flex-wrap: wrap; row-gap: 6px; }
   .cmp-wrap, .faq, article section { min-width: 0; }
   .cmp { display: block; overflow-x: auto; }

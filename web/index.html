@@ -98,29 +98,15 @@ const WB_FLAGS = { desktopDownload: false };</script>
      density as Anton, a smidge of tracking, sized to Anton's cap height */
   /* the counterpoint line, duo system: Groothan's bubble glyphs in white
      with a thick ink outline, overlapping the grotesque lines around it */
-  .lockup .jl:nth-child(2) {
+  /* the counterpoint line (2026-06-12): solid white fill + a thick ink ring,
+     rendered as a real SVG outline by nav.js (paint-order:stroke) — fixed scale,
+     identical on Safari/iOS where -webkit-text-stroke broke. */
+  .lockup .jl.bub {
     font-family: var(--accent); font-weight: 400; font-synthesis: none;
-    text-transform: uppercase;
-    letter-spacing: 0;
-    font-size: clamp(48px, 8.6vw, 116px); line-height: .9; text-align: center;
-    /* the home hero exception (2026-06-12): mostly-white fill with soft
-       pastel light leaking in at the top and bottom edges, oscillating
-       slowly through the palette — the word breathes its own colors */
-    color: transparent; -webkit-text-fill-color: transparent;
-    background-image:
-      radial-gradient(120% 62% at 28% -4%, rgba(168,212,240,.95), transparent 60%),
-      radial-gradient(120% 62% at 74% 104%, rgba(174,229,194,.95), transparent 60%),
-      radial-gradient(100% 55% at 64% -4%, rgba(242,221,176,.85), transparent 56%),
-      radial-gradient(100% 55% at 20% 104%, rgba(243,197,163,.8), transparent 56%),
-      linear-gradient(#fff, #fff);
-    background-size: 220% 100%, 220% 100%, 220% 100%, 220% 100%, 100% 100%;
-    background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0;
-    -webkit-background-clip: text; background-clip: text;
-    animation: bub-breathe 16s ease-in-out infinite;
-    /* the ring is a centered stroke here — a shadow ring would show through
-       the clipped (transparent) fill and paint the word solid ink */
-    -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill;
-    position: relative; z-index: 2; margin: -.42em 0 -.38em;
+    text-transform: uppercase; letter-spacing: 0;
+    font-size: clamp(48px, 8.6vw, 116px); line-height: 1; text-align: center;
+    color: #fff; --bub-stroke: 6;
+    position: relative; z-index: 2; margin: -.30em 0 -.26em;
   }
 
   @keyframes bub-breathe {
@@ -341,9 +327,8 @@ const WB_FLAGS = { desktopDownload: false };</script>
     .btn { padding: 12px 16px; }
     .lockup { width: 84vw; }
     .lockup .jl { font-size: clamp(42px, 13.5vw, 56px); line-height: 1; }
-    .lockup .jl:nth-child(2) {
-      font-size: clamp(33px, 10.6vw, 46px); line-height: 1;
-      margin: -.3em 0 -.26em; text-shadow: 2.5px 0.0px 0 var(--ink), 2.3px 1.0px 0 var(--ink), 1.8px 1.8px 0 var(--ink), 1.0px 2.3px 0 var(--ink), 0.0px 2.5px 0 var(--ink), -1.0px 2.3px 0 var(--ink), -1.8px 1.8px 0 var(--ink), -2.3px 1.0px 0 var(--ink), -2.5px 0.0px 0 var(--ink), -2.3px -1.0px 0 var(--ink), -1.8px -1.8px 0 var(--ink), -1.0px -2.3px 0 var(--ink), -0.0px -2.5px 0 var(--ink), 1.0px -2.3px 0 var(--ink), 1.8px -1.8px 0 var(--ink), 2.3px -1.0px 0 var(--ink);
+    .lockup .jl.bub {
+      font-size: clamp(33px, 10.6vw, 46px); line-height: 1; margin: -.22em 0 -.18em;
     }
   }
 </style>
@@ -353,7 +338,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <canvas id="lattice" aria-hidden="true"></canvas>
 
 <div id="site-nav"></div>
-<script src="nav.js?v=8"></script>
+<script src="nav.js?v=9"></script>
 
 
 <main class="hero">
@@ -368,7 +353,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 
   <h1 class="lockup" aria-label="living breathing software">
     <span class="jl">living</span>
-    <span class="jl">breathing</span>
+    <span class="jl bub">breathing</span>
     <span class="jl">software</span>
   </h1>
 
