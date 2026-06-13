@@ -9,11 +9,16 @@ if [ -d /data/src/.git ]; then
   git reset -q --hard origin/main
 else
   rm -rf /data/src
-  git clone -q --depth 1 --filter=blob:none --sparse \
+  # NOTE: no --filter=blob:none. Lazy blob fetch fails silently on a tight
+  # volume (leaves files empty at the right commit); a full sparse clone pulls
+  # all needed blobs in one pack. Volume is 3GB — the web/ tree fits.
+  git clone -q --depth 1 --sparse \
     https://github.com/workbooks-sh/workbooks.sh /data/src
   cd /data/src
   git sparse-checkout set web desktop/scripts
 fi
+# guard: a complete checkout MUST have the learn dashboard — fail loud if not
+[ -s /data/src/web/learn/index.html ] || { echo "FATAL: incomplete checkout (web/learn/index.html missing/empty)"; exit 1; }
 NEW=/data/build/public/wb-site.new
 LIVE=/data/build/public/wb-site
 rm -rf "$NEW"

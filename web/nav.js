@@ -134,9 +134,22 @@
     return '<a href="' + href + '"><span class="sw" style="background:#d9dbd3"><b>¶</b></span> ' + name + ' <small>' + small + '</small></a>';
   }
 
+  // Learn — the Learning Center + the concept pages (workbook / nexus / toolkit
+  // / browser). The old per-lesson deep-dives drilldown is gone.
+  var learnCol =
+    '<div class="col">' +
+    '<a class="viewall" href="' + root + 'learn/index.html">Learning Center → <small>the full course</small></a>' +
+    '<div class="sep" aria-hidden="true"></div>' +
+    '<div class="colhead">the concepts</div>' +
+    item('learn/workbook', ['#a8d4f0', '<b>◆</b>'], 'What is a workbook?', 'the unit') +
+    item('learn/nexus', ['#aee5c2', '<b>✦</b>'], 'What is the Nexus?', 'the engine') +
+    item('learn/toolkit', ['#f3c5a3', '<b>⬢</b>'], 'What is a toolkit?', 'the parts') +
+    item('learn/browser', ['#d9c5f0', '<b>▦</b>'], 'What is the Browser?', 'the surface') +
+    '</div>';
+
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
-    '<a class="lnk" href="' + root + 'learn/index.html">Learn</a>' +
+    '<div class="drop"><a href="' + root + 'learn/index.html">Learn</a><div class="panel">' + learnCol + '</div></div>' +
     '<div class="drop"><a href="#">Docs</a><div class="panel">' + docsCol + '</div></div>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
     (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '') +

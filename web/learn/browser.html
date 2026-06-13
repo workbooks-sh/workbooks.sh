@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en" style="--pc:#d9c5f0; --ac:#b79be0; --deep:#6b3fb0;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is the Workbooks Browser? — Workbooks</title>
+<meta name="description" content="The Workbooks Browser is a desktop app whose own interface is built out of workbooks — tabs, bookmarks, a file tree, a live engine connection, and a right-hand dock where any toolkit can mount its own panel.">
+<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="What is the Workbooks Browser? — Workbooks">
+<meta property="og:description" content="A desktop app whose own interface is built out of workbooks — and a right-hand dock where any toolkit, written on the spot by an agent, mounts its own panel.">
+<meta property="og:url" content="https://workbooks.sh/learn/browser">
+<meta property="og:image" content="https://workbooks.sh/og/browser.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What is the Workbooks Browser? — Workbooks">
+<meta name="twitter:description" content="A desktop app whose own interface is built out of workbooks — and a right-hand dock where any toolkit mounts its own panel.">
+<meta name="twitter:image" content="https://workbooks.sh/og/browser.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/browser.jpg">
+<link rel="preload" href="img/browser-hero.jpg" as="image" fetchpriority="high">
+<link rel="stylesheet" href="learn.css?v=5">
+</head>
+<body>
+
+<div id="site-nav"></div>
+<script src="../nav.js?v=9"></script>
+
+<header class="lhero">
+  <div class="row">
+    <div class="lcol">
+      <div class="kicker">learn / 04 — <b>what is the browser?</b></div>
+    <h1><span class="ln">the app is</span><span class="ln bub">ALSO</span><span class="ln">a workbook</span></h1>
+    <p class="dek">The Workbooks Browser is <b>a desktop app whose own interface is built out of workbooks</b>.
+  The thing you use to open, weave, and run workbooks is made of the same stuff — and any toolkit can
+  add a panel to it without anyone shipping an update.</p>
+    <div class="meta">
+    <span class="on">the surface</span><span>11 min read</span>
+  </div>
+    </div>
+    <figure class="heroart">
+      <div class="plate">
+        <img fetchpriority="high" src="img/browser-hero.jpg" alt="A lone figure on an alien plain standing before an enormous living browser window whose tabs open onto different worlds, a dock of glowing tool panels along its right edge — 1970s sci-fi paperback style">
+        <div class="dnaMini" data-dna></div>
+      </div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="../wb-file-icon.svg" alt=""></div><span>workbooks</span></div>
+    </figure>
+  </div>
+</header>
+
+<div class="lwrap">
+<aside class="ltoc" aria-label="On this page">
+  <div class="t">on this page</div>
+  <a href="#problem">Where do you use them?</a>
+  <a href="#definition">The definition</a>
+  <a href="#anatomy">What it's made of</a>
+  <a href="#dock">The dock</a>
+  <a href="#sdk">Toolkits drive the browser</a>
+  <a href="#waldo">The agent that lives here</a>
+  <a href="#ships">How you get it</a>
+  <a href="#recursive">Why this is the last turn</a>
+  <a href="#faq">FAQ</a>
+  <a href="#next">Keep going</a>
+</aside>
+
+<article>
+
+<section id="problem">
+  <h2>so where do you actually <em>U</em>se a workbook?</h2>
+  <p>You've met the workbook — one file that is whole software. You've met the
+  Nexus — the engine that brings it alive. But there's a plain question
+  underneath both: when you sit down to work, <b>what's the window in front of
+  you?</b> A normal browser can open a workbook as a page, but it doesn't know
+  what a workbook is — it can't weave one, dock one into your engine, or keep
+  your workspace of them.</p>
+  <p>Every application you use has a front door. For email it's the inbox; for
+  the web it's the browser — tabs across the top, a back button, a place to type
+  an address. You don't think of the browser as "an app." You think of it as
+  <b>the place the other apps live</b>.</p>
+  <p>Workbooks has a front door too. And here's the quietly radical part: the
+  front door is itself a workbook.</p>
+</section>
+
+<section id="definition">
+  <h2>the DEFINITION</h2>
+  <div class="defcard">
+    <div class="head"><span class="hw">brows·er</span> <span class="pr">/ˈbraʊ·zər/</span> <span class="pos">noun</span></div>
+    <div class="rule"></div>
+    <p><span class="num">1.</span> a desktop application — for Mac, Windows, and
+    Linux — whose own interface is <b>built out of workbooks</b>: it opens,
+    weaves, and runs them, holds your workspace of them, connects to an engine,
+    and lets any toolkit mount its own piece of interface inside it.</p>
+  </div>
+  <p>The shape is familiar on purpose. Tabs, bookmarks, a file tree, an address
+  you can share — the muscle memory of a web browser, pointed at workbooks
+  instead of web pages. What's new is everything behind the right edge.</p>
+  <p>That's the whole idea. Everything below is unpacking it.</p>
+</section>
+
+<section id="anatomy">
+  <h2>what it's M<em>A</em>de of</h2>
+  <p>Strip the Browser to its frame and it's a small, familiar set of parts —
+  nothing exotic. The exotic part is the right-hand side, and it gets
+  <a href="#dock">its own section</a>.</p>
+  <figure class="diag" aria-label="The Browser's parts">
+    <div class="d-file">
+      <span class="ftag">the workbooks browser — one window, made of workbooks</span>
+      <div class="d-row"><span class="d-chip" style="background:#d9c5f0">tabs &amp; bookmarks</span><span class="sub">open many workbooks at once; keep the ones you return to</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#c7b3e8">file tree</span><span class="sub">your workspace on the left — the documents and disks you're working with</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#aee5c2">the viewer</span><span class="sub">opens a workbook and shows its screen, running live, right there</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f3c5a3">engine connection</span><span class="sub">plug into a Nexus and the workbooks in your tabs become living services</span></div>
+      <div class="d-row"><span class="d-chip" style="background:#f2ddb0">theming</span><span class="sub">the whole surface takes on a look — down to the colour of a single tab</span></div>
+    </div>
+    <figcaption class="dcap">a browser frame — <b>but the frame is a workbook too</b></figcaption>
+  </figure>
+  <p>That last line is the move. In normal software there are two worlds: the
+  <b>app</b>, which only its makers can change, and your <b>stuff</b>, which
+  lives inside the app's walls. You can rearrange your stuff; you cannot
+  rearrange the walls. The Browser erases that wall — the walls are made of the
+  same material as the stuff, so the same moves that reshape a workbook reshape
+  the app around it.</p>
+</section>
+
+<section id="dock">
+  <h2>the DOCK — where the app grows new limbs</h2>
+  <p>Along the right edge is a <b>dock</b>: an open strip where any toolkit can
+  mount its own panel. Remember what a <a href="toolkit">toolkit</a> is — a safe
+  bundle of real abilities you hand to a workbook. Here a toolkit can also bring
+  <b>its own piece of interface</b> and hang it in the dock, themed to match
+  everything around it.</p>
+  <p>The consequence is strange and wonderful: the way you add a feature to the
+  Browser is to <b>write a toolkit</b>. An agent — Claude Code, say — can pick
+  an icon, write a small toolkit, and a new panel simply appears in the
+  top-right corner of your app. No app store, no update, no waiting for the
+  makers. The application grows a new limb because you (or the agent working
+  with you) decided it should.</p>
+  <div class="note">
+    <p><b>Extensible to its core.</b> Most apps offer "extensions" as a
+    fenced-off sandbox bolted onto a frozen core. Here the core and the
+    extensions are the same kind of thing — workbooks and toolkits — mounted in
+    the same dock, drawn with the same theme.</p>
+  </div>
+  <p>The left navigation works the same way: it's composable, built from
+  presets you can rearrange, not a fixed menu someone shipped.</p>
+</section>
+
+<section id="sdk">
+  <h2>toolkits drive the BR<em>O</em>wser</h2>
+  <p><span class="skip">depth rung · <b>skippable</b> — skip to <a href="#waldo">the resident agent</a> if you just want the gist</span></p>
+  <p>For the dock to be more than decoration, a panel needs to actually
+  <b>do</b> browser things — open a tab, drop a bookmark, read what's in the
+  viewer, react when you switch documents. The <b>browser SDK</b> is the small
+  set of controls the Browser hands to its toolkits: tabs, bookmarks, viewer
+  state, events.</p>
+  <p>So a toolkit isn't just painting a panel; it can drive the surface it lives
+  in. A research toolkit can open three tabs and arrange them. A reading toolkit
+  can watch which workbook you're viewing and follow along. In effect, an agent
+  can build <b>you your own desktop app</b> out of these parts — and because
+  it's all workbooks and toolkits, it's the same craft you've already learned,
+  pointed at the app itself.</p>
+  <p>There's a matching seam underneath: an embedded control channel lets an
+  assistant like Claude Code drive the Browser directly — open things, arrange
+  panels, watch what happened — so the app can be operated by an agent, not just
+  by a cursor.</p>
+</section>
+
+<section id="waldo">
+  <h2>the agent that LIVES here</h2>
+  <p>Because everything you learned about <a href="agents">agents</a> is true
+  here too, the Browser comes with one already living inside it — a resident
+  agent you can talk to about the thing in front of you. It isn't a separate
+  chatbot in a corner; it's wired into the same dock, the same SDK, the same
+  engine connection. It can open things, weave things, and file work for itself
+  when it notices something that should change.</p>
+  <p>The agent and the app are not two products glued together. The agent is
+  just another thing mounted in the same surface — the most active resident of a
+  building made of workbooks.</p>
+</section>
+
+<section id="ships">
+  <h2>how you G<em>E</em>t it</h2>
+  <p>The Browser ships <b>with the command-line tool</b>. There's no separate
+  download dance and no in-app setup wizard to click through — the one command
+  you met on the <a href="wbx">CLI page</a> installs and opens it. The CLI owns
+  setup; the Browser owns the work.</p>
+  <p>And because an agent can drive the whole surface through the SDK, an
+  assistant can install it, open it, and start arranging it for you — set your
+  theme, lay out your panels, pick your starting tabs — before you've touched
+  the keyboard.</p>
+</section>
+
+<section id="recursive">
+  <h2>why this is the last T<em>U</em>rn</h2>
+  <p>It's fitting that the Browser comes near the end of the path, because it
+  only lands once everything before it is in place. A workbook is one file. It
+  speaks one plain language. It gets abilities through toolkits. It comes alive
+  on an engine. Agents work inside it. Plans run themselves.</p>
+  <p>Take all of that and point it at the application itself, and you get the
+  final, almost recursive idea: <b>the tool you use to build with workbooks is
+  built out of workbooks.</b> There is no privileged layer, no frozen core
+  you're forbidden to touch. The front door is made of the same material as
+  every room behind it — which means the moment you understand a workbook, you
+  already understand the thing you're using to hold one.</p>
+  <p>(Worth keeping straight: this is the <b>Browser</b>, the app you work in.
+  It's a different thing from <a href="browsing">browsing</a> — the sandboxed
+  ability a workbook has to fetch a web page from inside the engine. Same word,
+  two ideas.)</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>questions people actually ASK</h2>
+  <details>
+    <summary>Is this just a wrapper around Chrome?</summary>
+    <p>No. It's a desktop app built for workbooks — its interface is itself
+    assembled from workbooks, and its job is opening, weaving, running, and
+    organising them, with a live connection to an engine you own. A normal
+    browser can render a workbook as a page; it can't do any of that.</p>
+  </details>
+  <details>
+    <summary>Do I need the Browser to open a workbook?</summary>
+    <p>No — a workbook still opens in any ordinary browser, for anyone, forever.
+    The Workbooks Browser is for <b>building, organising, and running</b>
+    workbooks as a daily workspace; it's never a gate on simply viewing one.</p>
+  </details>
+  <details>
+    <summary>How do I add a feature to it?</summary>
+    <p>You write a <a href="toolkit">toolkit</a> — or you ask an agent to. A
+    toolkit can bring its own panel, themed to match, and mount it in the dock
+    through the browser SDK. That's the whole extension model: no app store, no
+    update cycle, no privileged plugin API separate from how everything else is
+    built.</p>
+  </details>
+  <details>
+    <summary>What's the dock, exactly?</summary>
+    <p>The open strip along the right edge where toolkit panels mount. Each
+    panel can read and drive browser state — tabs, bookmarks, the viewer, events
+    — so a panel is a real participant in the app, not a static widget.</p>
+  </details>
+  <details>
+    <summary>Is it finished?</summary>
+    <p>It's active, fast-moving work — the core (tabs, viewer, file tree,
+    bookmarks, engine connection, theming, the dock, the resident agent) is the
+    spine, and the surface is deliberately the part that keeps growing, because
+    growing it is the point.</p>
+  </details>
+</section>
+
+<section id="next" class="lnext">
+  <h2>keep GOING</h2>
+  <p>You've seen the surface. Here's the unit it holds, the engine behind it,
+  and the parts it builds with.</p>
+  <div class="cards">
+    <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
+      <div>What is a workbook<small>the unit</small></div><span class="go">→</span></a>
+    <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
+      <div>What is the Nexus<small>the engine you own</small></div><span class="go">→</span></a>
+    <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
+      <div>What is a toolkit<small>the parts</small></div><span class="go">→</span></a>
+    <a href="../learn/"><span class="sw" style="background:#d9c5f0"><b>▦</b></span>
+      <div>The Learning Center<small>the full course</small></div><span class="go">→</span></a>
+  </div>
+</section>
+
+</article>
+</div>
+
+<footer class="lfoot">
+  <div class="strip" data-dna aria-hidden="true"></div>
+  <div class="row">
+    <span>workbooks — living breathing software</span>
+    <a href="../">← back to the big picture</a>
+  </div>
+</footer>
+
+<script type="text/org" id="workbook-spec">
+* page  what is the workbooks browser
+  :PROPERTIES:
+  :SLUG:   browser
+  :KIND:   learn
+  :NN:     04
+  :KICKER: what is the browser?
+  :TITLE1: the app is
+  :TITLE2: ALSO
+  :TITLE3: a workbook
+  :CHIP:   the surface
+  :PC:     #d9c5f0
+  :AC:     #b79be0
+  :HERO:   img/browser-hero.jpg
+  :END:
+** og
+- a desktop app made of workbooks
+- a dock where any toolkit mounts a panel
+- an agent lives inside it
+</script>
+
+<script>
+window.LEARN = {
+  mix: [["#c7b3e8", .34], ["#aee5c2", .24], ["#f3c5a3", .22], ["#f2ddb0", .20]],
+  story: [
+    ["cmd", "wbx desktop open"],
+    ["ok", "workbooks browser — connected to your nexus"],
+    ["dim", "  tabs · bookmarks · file tree · viewer"],
+    ["cmd", "# ask the resident agent for a panel"],
+    ["out", "writing toolkit: pricing-watch → mounting in the dock…"],
+    ["ok", "panel live, top-right — themed to match"],
+    ["cmd", "# it drives the surface through the browser SDK"],
+    ["out", "opened 2 tabs · pinned a bookmark · watching the viewer"],
+    ["dim", "  the app you work in is itself a workbook —"],
+    ["dim", "  so you reshape it the way you reshape anything else."]],
+};
+</script>
+<script src="learn.js"></script>
+<script src="audio.js" defer></script>
+</body>
+</html>
