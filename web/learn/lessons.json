@@ -53,8 +53,8 @@
        "sub": "mechanics",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How a workbook identifies and describes itself from the inside \u2014 the inline org spec and embedded source markers that make the format filename-independent and self-explaining."
       },
@@ -64,8 +64,8 @@
        "sub": "mechanics",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The artifact is version control native: one file, real diffs, the whole project's history in the repo you already have."
       },
@@ -75,8 +75,8 @@
        "sub": "concept",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Hand a workbook to anyone with cryptographic identity attached: did:key signatures, single authentication, and what the recipient can verify without an account."
       },
@@ -86,8 +86,8 @@
        "sub": "concept",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Every workbook route has a security stance \u2014 public, gated_data, or gated_route \u2014 and the anti-leak invariant that decides what may be baked into a static file versus served only behind the auth ladder."
       },
@@ -97,8 +97,8 @@
        "sub": "mechanics",
        "color": "#a8d4f0",
        "icon": "../wb-file-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Publish is distribution, not deploy: publish.org declares a surface (cloudflare-pages, gh-pages, self-hosted) with init/validate/apply convergence, ships only ASSEMBLED workbooks (bundle first), prints custom-domain URLs via PUBLISH_DOMAIN, and stays a separate axis from standing up the engine."
       }
@@ -130,8 +130,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The reader can read and reason about a Policy profile: the four standard profiles, how each maps to a memory ceiling, a wall-clock CPU trap, and a capability list \u2014 and why a minimal profile literally has no network stack."
       },
@@ -141,8 +141,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The reader can trace a docked workbook through its whole state machine \u2014 created \u2192 active \u2192 suspended \u2192 frozen \u2192 archived \u2014 and sees why 'freeze' is just 'stop the process, keep the SQLite file', no VM snapshot needed."
       },
@@ -152,8 +152,8 @@
        "sub": "concept",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The reader learns how a workbook keeps working with nobody watching: keeper workers ticking agent defs on intervals, singleton vs crew scheduling, lifecycle specs that decide what each tick is, and schedules declared in the org source."
       },
@@ -163,8 +163,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The reader understands why one Nexus runs two separate HTTP surfaces \u2014 an authed control plane and an anonymous GET-only content plane \u2014 and how a single BEAM node serves many custom domains via an ETS-backed SNI registry, no reverse proxy."
       },
@@ -174,8 +174,8 @@
        "sub": "setup",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The reader stands up a Nexus both ways \u2014 a cloud-identical krunvm microVM on their laptop and a Fly deploy \u2014 and understands deployment.org as inert declarative config where moving to the cloud is editing one property."
       },
@@ -196,8 +196,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The engine syncs to git: tenant repos, commits as the public changelog, and push-to-live publishing."
       },
@@ -207,8 +207,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Loaded artifacts replace themselves live \u2014 a git change lands, the new toolkit/def swaps in, nothing reboots."
       },
@@ -218,8 +218,8 @@
        "sub": "mechanics",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "No ambient network, ever: how brokered TCP/UDP/TLS and engine-held HTTP give workbooks exactly the connections they were granted."
       },
@@ -229,8 +229,8 @@
        "sub": "implementation",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Messaging channels as runtime capabilities: credentials live host-side, adapters self-configure off env, and unknown senders are parked behind a pairing-code allowlist before anything reaches the inbox."
       },
@@ -251,8 +251,8 @@
        "sub": "implementation",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The runtime's web capability: a free native browser by default, with fetch/crawl/search each routable to a swappable provider (Firecrawl, Exa, proxies) via config \u2014 no caller ever changes."
       },
@@ -273,8 +273,10 @@
        "sub": "implementation",
        "color": "#aee5c2",
        "icon": "../nexus-icon.svg",
-       "status": "planned",
-       "dek": "Published apps serve their own history: an anonymous read-only /_changes feed (git log + agent status, public-plane rules) that the page itself consumes \u2014 classifying who made each commit, collapsing quiet human groups, and narrating the work live so visitors watch people and agents build together."
+       "status": "live",
+       "dek": "Published apps serve their own history: an anonymous read-only /_changes feed (git log + agent status, public-plane rules) that the page itself consumes \u2014 classifying who made each commit, collapsing quiet human groups, and narrating the work live so visitors watch people and agents build together.",
+       "audio": true,
+       "added": "2026-06-12"
       }
      ]
     },
@@ -293,8 +295,8 @@
        "sub": "implementation",
        "color": "#f3c5a3",
        "icon": "../toolkit-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Anything \u2192 toolkit: how wbx toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md\u2026), mechanically translates docs to org, and scaffolds a real manifest + skill tree \u2014 with carried scripts honestly flagged as untrusted."
       },
@@ -304,8 +306,8 @@
        "sub": "mechanics",
        "color": "#f3c5a3",
        "icon": "../toolkit-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Ready, convertible, or blocked: how the static dependency audit classifies every carried script against the wasm lanes, writes findings INTO the toolkit's own manifest, and emits a checkbox fix-up plan an agent can work through to done \u2014 with --fix closing the loop as push \u2192 build \u2192 verify."
       },
@@ -315,8 +317,8 @@
        "sub": "concept",
        "color": "#f3c5a3",
        "icon": "../toolkit-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The crux bet of the toolkit layer: C, Rust, Zig, Go, and JS compilers that are themselves compiled to WebAssembly, so untrusted source is built entirely inside the sandbox \u2014 c4, mrustc-to-C, zig1's C backend, yaegi interpretation, and QuickJS embedding, each a different trick to dodge native execution."
       },
@@ -326,8 +328,8 @@
        "sub": "implementation",
        "color": "#f3c5a3",
        "icon": "../toolkit-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Session \u2192 workspace \u2192 registry: an agent writes a source file, build-inline registers it as a command in one step, and promote materializes it as a real source-owned toolkit \u2014 org owns the spec, wasm owns the artifact, and self-authoring never widens granted capabilities."
       },
@@ -359,8 +361,8 @@
        "sub": "mechanics",
        "color": "#f3c5a3",
        "icon": "../toolkit-icon.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "A command is a CLI converted to sandboxed WASM \u2014 stdin in, stdout out, invoked by name through the Dock \u2014 and guests exec each other's commands only through a default-deny broker with structural argv and bounded nesting."
       }
@@ -387,8 +389,8 @@
        "sub": "concept",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Learn the whole grammar in one sitting \u2014 headlines, tags, TODO states, drawers, timestamps, source blocks \u2014 by drilling each construct against the kernel's actual parse output, with side-by-side markdown comparisons showing exactly what structure markdown throws away."
       },
@@ -409,8 +411,8 @@
        "sub": "mechanics",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How :PROPERTIES: drawers turn a headline into a typed record \u2014 the key-value mechanism behind toolkit manifests, agent identities, and the spec block inside every learn page."
       },
@@ -420,8 +422,8 @@
        "sub": "mechanics",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The full date grammar \u2014 active <\u2026> vs inactive [\u2026], SCHEDULED vs DEADLINE, +1d/.+/++ repeaters, and the :SCHEDULE: cron escape hatch \u2014 and how a timestamp on a headline becomes a workflow that actually runs every morning."
       },
@@ -464,8 +466,8 @@
        "sub": "concept",
        "color": "#f2ddb0",
        "icon": "icons/org.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Turn raw founder talk into an auditable working document: every load-bearing claim extracted as an org TODO item with an honesty status (CLAIMED \u2192 VALIDATING \u2192 KEPT/PARTIAL/UNKEPT/FUTURE/RETRACTED), every terminal status citing evidence \u2014 the gap between the spoken system and the shipped system becomes the backlog."
       }
@@ -486,8 +488,10 @@
        "sub": "mechanics",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "status": "planned",
-       "dek": "What a single agent run actually is \u2014 the model\u2192tools\u2192append cycle, why every tool call is wall-clock bounded, and how a run leaves a fully readable trace."
+       "status": "live",
+       "dek": "What a single agent run actually is \u2014 the model\u2192tools\u2192append cycle, why every tool call is wall-clock bounded, and how a run leaves a fully readable trace.",
+       "audio": true,
+       "added": "2026-06-12"
       },
       {
        "slug": "authoring",
@@ -495,8 +499,8 @@
        "sub": "implementation",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Write a complete agent definition in plain org \u2014 the :agent: node, the system-prompt heading, declared toolkits \u2014 and understand exactly how the runtime parses and runs it."
       },
@@ -506,8 +510,8 @@
        "sub": "concept",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "An agent's memory is a workbook \u2014 a git repo of plain files it reads, writes, and commits \u2014 not a vector store bolted on the side; the board, the canon, and the logs all live in one place anyone can diff."
       },
@@ -528,8 +532,8 @@
        "sub": "mechanics",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How standing agents keep a cadence \u2014 the keeper's tick, a lifecycle state machine declared in org, and a crew of workers sharing one board with claims as protocol, not locks."
       },
@@ -539,8 +543,8 @@
        "sub": "implementation",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Insert a real human checkpoint into a live run \u2014 a review canvas the agent opens, a commit the human makes, and a FIFO the agent polls mid-loop to pick the verdict up."
       },
@@ -550,8 +554,8 @@
        "sub": "setup",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Every knob that shapes an agent without touching engine code \u2014 the env contract, org manifests, model and toolkit props, intervals, and the exec trust grant."
       },
@@ -561,8 +565,8 @@
        "sub": "concept",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "What an agent does between runs \u2014 a sleep phase that digests telemetry, commits, and the backlog into a dream journal whose verdicts mechanically steer the next waking run."
       },
@@ -572,8 +576,8 @@
        "sub": "implementation",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Judge agent output systematically: briefs in, judged runs out \u2014 the evaluation bench as a standing practice."
       },
@@ -594,8 +598,8 @@
        "sub": "implementation",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Run a multi-agent keeper from one declared org manifest: a worker per member with its own def, lifecycle, and namespaced state \u2014 staggered boots, a global concurrency gate that queues runs, and board claims as a def-level protocol the runtime deliberately does not enforce."
       },
@@ -605,8 +609,8 @@
        "sub": "mechanics",
        "color": "#9fc4e8",
        "icon": "icons/agents.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Self-demos for agents whose last hop can't be CI: drive the real persona and real tools through the production bridge with scripted human lines and no external service, writing a transcript that proves the whole conversation layer end-to-end."
       }
@@ -627,8 +631,8 @@
        "sub": "concept",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How one binary serves two audiences \u2014 TTY detection, the --agent/--json switches, the {ok, verb, data, error} envelope, and the stable exit-code map an agent can branch on without parsing prose."
       },
@@ -638,8 +642,8 @@
        "sub": "implementation",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Build real pipelines with the kernel verbs \u2014 query, tangle, and lint accept '-' for stdin, emit JSON, and compose with --json and jq so generated org never touches a temp file."
       },
@@ -649,8 +653,8 @@
        "sub": "setup",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Wire wbx into your shell and let it check itself \u2014 doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-wbx where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update."
       },
@@ -660,8 +664,10 @@
        "sub": "setup",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "status": "planned",
-       "dek": "Stand up an engine with the deploy-kit \u2014 scaffold deployment.org with init, validate, apply, and watch one verb set converge a local container or a cloud provider, with secrets declared by name and never written into the artifact."
+       "status": "live",
+       "dek": "Stand up an engine with the deploy-kit \u2014 scaffold deployment.org with init, validate, apply, and watch one verb set converge a local container or a cloud provider, with secrets declared by name and never written into the artifact.",
+       "audio": true,
+       "added": "2026-06-12"
       },
       {
        "slug": "the-seam",
@@ -678,8 +684,8 @@
        "sub": "implementation",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Bring-your-own-cloud without a recompile: a provider is a bootstrap.sh that sources the neutral recipe spine and fills five hooks (ensure_app, set_secrets, attach_volume, deploy_image, public_url) plus the lifecycle trio; recipes resolve from WB_PROVIDERS_DIR, the repo, or copies embedded in the binary \u2014 fly is just the bundled one."
       },
@@ -689,8 +695,8 @@
        "sub": "setup",
        "color": "#d9dbd3",
        "icon": "icons/wbx.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "One static binary, three install lanes: a GitHub Release tagged wbx-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and wbx upgrade self-swaps the binary in place \u2014 plus a wb.wasm target published for in-sandbox agents."
       }
@@ -732,8 +738,8 @@
        "sub": "mechanics",
        "color": "#f2ddb0",
        "icon": "icons/workflows.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The full grammar of time in a plan \u2014 active vs inactive timestamps, +1w/.+/++ repeaters, the :SCHEDULE: cron property \u2014 and the keeper, the engine that actually fires them: workers, crews, lifecycle specs, and the breather between ticks."
       },
@@ -743,8 +749,10 @@
        "sub": "concept",
        "color": "#f2ddb0",
        "icon": "icons/workflows.svg",
-       "status": "planned",
-       "dek": "Why there is no board model anywhere in the runtime \u2014 a board is the kernel's render() over the plan file plus a write path back into it, and any surface (kanban, status page, an agent's ready list) is the same one-file two-way binding."
+       "status": "live",
+       "dek": "Why there is no board model anywhere in the runtime \u2014 a board is the kernel's render() over the plan file plus a write path back into it, and any surface (kanban, status page, an agent's ready list) is the same one-file two-way binding.",
+       "audio": true,
+       "added": "2026-06-12"
       },
       {
        "slug": "waves",
@@ -785,8 +793,8 @@
        "sub": "implementation",
        "color": "#f2ddb0",
        "icon": "icons/workflows.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "A conversational agent that hands work to background workflows and hears back: an authored org workflow per request, a supervised time-bounded run bound to a task ledger, completions queued as feedback the agent drains on its next turn, and a git-visible TASKS.org rendered from the runtime \u2014 never hand-edited."
       }
@@ -807,8 +815,8 @@
        "sub": "implementation",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How to actually query the disk: the vfs table's real schema, the Policy-gated vfs-query Dock import your component calls, error-as-JSON safety so a bad query can never crash the engine, and one SQL statement run across a whole library of workbooks."
       },
@@ -829,8 +837,8 @@
        "sub": "mechanics",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "What 'the disk gets a heartbeat' actually means: the instance lifecycle state machine, freeze/resume as a file copy instead of a VM snapshot, WAL-mode streaming to off-box replicas, and clone-per-tenant so a thousand users each get their own copy of one template disk."
       },
@@ -840,8 +848,8 @@
        "sub": "concept",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Sharing exposes the work, never the session that produced it \u2014 one boundary module decides what leaves on every egress path (bundle, git, library), so agent memory, scratch files, and telemetry stay home unless the owner explicitly opts in."
       },
@@ -851,8 +859,8 @@
        "sub": "mechanics",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "How part of a shipped disk can be ciphertext to everyone and plaintext to the right person: AES-256-GCM envelopes whose content keys never ride in the bundle \u2014 they're escrowed at the runtime, released only after a posture check, and optionally wrapped to a recipient's DID so there's no plaintext-key honeypot anywhere."
       },
@@ -862,8 +870,8 @@
        "sub": "implementation",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Make FROM reach past the file: register a data-source plugin and a query against its entity routes to a live API instead of the local store \u2014 or run the sync daemon and keep a resident, queryable, agent-airgapped mirror of the outside world inside the disk."
       },
@@ -884,8 +892,8 @@
        "sub": "concept",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "The deploy-kit one-screen config: identical runtime code, swappable storage \u2014 blob store as local filesystem or any S3/R2 endpoint, structured data as SQLite or any Postgres URL (which also flips vector search from brute-force to pgvector ANN), with every operation tenant-scoped above the backend so swapping can never widen access."
       },
@@ -895,8 +903,8 @@
        "sub": "concept",
        "color": "#a8d4f0",
        "icon": "icons/vfs.svg",
-       "audio": false,
-       "status": "planned",
+       "audio": true,
+       "status": "live",
        "added": "2026-06-12",
        "dek": "Gated bundle bytes are noise without a key release: content keys are escrowed runtime-side behind posture checks, or sealed-box wrapped to recipient X25519 identities so no plaintext-key honeypot ever exists."
       }

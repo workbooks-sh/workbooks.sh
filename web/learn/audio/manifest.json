@@ -195,6 +195,351 @@
    ]
   },
   {
+   "slug": "specs",
+   "title": "specs — under workbook",
+   "src": "audio/episodes/specs.mp3?v=1108",
+   "dur": 1108,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The rename test",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 76
+    },
+    {
+     "id": "marker",
+     "title": "Anatomy of the marker",
+     "t": 126
+    },
+    {
+     "id": "readers",
+     "title": "Twenty-four lines, two languages",
+     "t": 208
+    },
+    {
+     "id": "scan",
+     "title": "How a folder becomes a library",
+     "t": 331
+    },
+    {
+     "id": "dialects",
+     "title": "One marker, two dialects",
+     "t": 419
+    },
+    {
+     "id": "self-cms",
+     "title": "This page runs on its own spec",
+     "t": 495
+    },
+    {
+     "id": "source",
+     "title": "The file carries its own making",
+     "t": 640
+    },
+    {
+     "id": "identity",
+     "title": "Specs under signature",
+     "t": 785
+    },
+    {
+     "id": "limits",
+     "title": "Where the spec stops",
+     "t": 869
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 981
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the workbook",
+     "t": 1056
+    }
+   ]
+  },
+  {
+   "slug": "git",
+   "title": "git — under workbook",
+   "src": "audio/episodes/git.mp3?v=1049",
+   "dur": 1049,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Where did the history go",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 72
+    },
+    {
+     "id": "diff-surface",
+     "title": "What actually diffs",
+     "t": 113
+    },
+    {
+     "id": "deploy-commit",
+     "title": "Every deploy is a commit",
+     "t": 200
+    },
+    {
+     "id": "author",
+     "title": "Who is the author",
+     "t": 283
+    },
+    {
+     "id": "agent-commits",
+     "title": "The agent's git hand",
+     "t": 386
+    },
+    {
+     "id": "ignore",
+     "title": "The gitignore nobody writes",
+     "t": 498
+    },
+    {
+     "id": "oplog",
+     "title": "A second ledger, jj",
+     "t": 610
+    },
+    {
+     "id": "mirror",
+     "title": "The repo you already have",
+     "t": 684
+    },
+    {
+     "id": "changelog",
+     "title": "History as a public surface",
+     "t": 772
+    },
+    {
+     "id": "limits",
+     "title": "Where this is honest",
+     "t": 864
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 959
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the workbook",
+     "t": 1016
+    }
+   ]
+  },
+  {
+   "slug": "sharing",
+   "title": "sharing — under workbook",
+   "src": "audio/episodes/sharing.mp3?v=1220",
+   "dur": 1220,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Proof that travels with the file",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "From: you, unverified",
+     "t": 45
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 123
+    },
+    {
+     "id": "one-key",
+     "title": "One key, every claim",
+     "t": 163
+    },
+    {
+     "id": "handshake",
+     "title": "What happens at the handoff",
+     "t": 299
+    },
+    {
+     "id": "single-check",
+     "title": "Single authentication",
+     "t": 455
+    },
+    {
+     "id": "no-account",
+     "title": "Verify with nothing installed",
+     "t": 539
+    },
+    {
+     "id": "egress",
+     "title": "Signed on every way out",
+     "t": 661
+    },
+    {
+     "id": "two-rails",
+     "title": "The two rails",
+     "t": 729
+    },
+    {
+     "id": "by-reference",
+     "title": "Share by identity, not bytes",
+     "t": 809
+    },
+    {
+     "id": "limits",
+     "title": "What a signature doesn't promise",
+     "t": 932
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1059
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1153
+    }
+   ]
+  },
+  {
+   "slug": "postures",
+   "title": "postures — under workbook",
+   "src": "audio/episodes/postures.mp3?v=1234",
+   "dur": 1234,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A login screen drawn over a leak",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "A stance, not a feature",
+     "t": 86
+    },
+    {
+     "id": "invariant",
+     "title": "The anti-leak rule",
+     "t": 186
+    },
+    {
+     "id": "two-guards",
+     "title": "Enforced twice, at build time",
+     "t": 297
+    },
+    {
+     "id": "enforce",
+     "title": "The twelve-line judge",
+     "t": 432
+    },
+    {
+     "id": "ladder",
+     "title": "Five rungs to an identity",
+     "t": 528
+    },
+    {
+     "id": "live-gate",
+     "title": "Watch the gate hold",
+     "t": 660
+    },
+    {
+     "id": "choosing",
+     "title": "Which posture is yours",
+     "t": 796
+    },
+    {
+     "id": "default",
+     "title": "Why the default is public",
+     "t": 885
+    },
+    {
+     "id": "limits",
+     "title": "Where the wiring ends",
+     "t": 980
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1080
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1182
+    }
+   ]
+  },
+  {
+   "slug": "publishing",
+   "title": "publishing — under workbook",
+   "src": "audio/episodes/publishing.mp3?v=1029",
+   "dur": 1029,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Which command makes it a URL?",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 74
+    },
+    {
+     "id": "declare",
+     "title": "The declared surface",
+     "t": 146
+    },
+    {
+     "id": "converge",
+     "title": "Init, validate, apply",
+     "t": 262
+    },
+    {
+     "id": "bundle-first",
+     "title": "Why org is refused",
+     "t": 383
+    },
+    {
+     "id": "targets",
+     "title": "Three doors, one motion",
+     "t": 482
+    },
+    {
+     "id": "self-hosted",
+     "title": "Publishing into your engine",
+     "t": 587
+    },
+    {
+     "id": "anti-leak",
+     "title": "What may never go on a static host",
+     "t": 682
+    },
+    {
+     "id": "limits",
+     "title": "Where publish ends",
+     "t": 798
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 906
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 990
+    }
+   ]
+  },
+  {
    "slug": "nexus",
    "title": "Nexus — the engine",
    "src": "audio/episodes/nexus.mp3?v=703",
@@ -263,6 +608,779 @@
    ]
   },
   {
+   "slug": "capabilities",
+   "title": "capabilities — under nexus",
+   "src": "audio/episodes/capabilities.mp3?v=1105",
+   "dur": 1105,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The worst-case question",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "A profile is three walls",
+     "t": 67
+    },
+    {
+     "id": "construction",
+     "title": "Granted means linked",
+     "t": 190
+    },
+    {
+     "id": "memory",
+     "title": "The wall, not the meter",
+     "t": 289
+    },
+    {
+     "id": "cpu",
+     "title": "The runaway trap",
+     "t": 360
+    },
+    {
+     "id": "network",
+     "title": "The one network switch",
+     "t": 459
+    },
+    {
+     "id": "lanes",
+     "title": "Three docks, two gating styles",
+     "t": 607
+    },
+    {
+     "id": "capwords",
+     "title": "What each word buys",
+     "t": 689
+    },
+    {
+     "id": "choosing",
+     "title": "Profiles in the wild",
+     "t": 772
+    },
+    {
+     "id": "honest",
+     "title": "Honesty",
+     "t": 866
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 968
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the Nexus",
+     "t": 1040
+    }
+   ]
+  },
+  {
+   "slug": "sandboxes",
+   "title": "sandboxes — under nexus",
+   "src": "audio/episodes/sandboxes.mp3?v=1212",
+   "dur": 1212,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Pausing a computer is supposed to be hard",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The five states",
+     "t": 89
+    },
+    {
+     "id": "warm-cold",
+     "title": "Warm and cold",
+     "t": 218
+    },
+    {
+     "id": "freeze",
+     "title": "Stop the process, keep the file",
+     "t": 341
+    },
+    {
+     "id": "idle-ladder",
+     "title": "The demotion ladder",
+     "t": 472
+    },
+    {
+     "id": "registry",
+     "title": "One table runs the building",
+     "t": 583
+    },
+    {
+     "id": "volumes",
+     "title": "What survives the winter",
+     "t": 693
+    },
+    {
+     "id": "clone",
+     "title": "One template, many tenants",
+     "t": 799
+    },
+    {
+     "id": "durability",
+     "title": "Two clocks of durability",
+     "t": 864
+    },
+    {
+     "id": "limits",
+     "title": "What this isn't",
+     "t": 952
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1047
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the Nexus",
+     "t": 1142
+    }
+   ]
+  },
+  {
+   "slug": "keepers",
+   "title": "keepers — under nexus",
+   "src": "audio/episodes/keepers.mp3?v=1111",
+   "dur": 1111,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Who is awake at 3am?",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 90
+    },
+    {
+     "id": "tick",
+     "title": "Anatomy of a tick",
+     "t": 154
+    },
+    {
+     "id": "cadence",
+     "title": "Time that survives restarts",
+     "t": 248
+    },
+    {
+     "id": "lifecycle",
+     "title": "What each tick is",
+     "t": 333
+    },
+    {
+     "id": "no-work",
+     "title": "The economics of doing nothing",
+     "t": 515
+    },
+    {
+     "id": "crew",
+     "title": "From one keeper to a newsroom",
+     "t": 597
+    },
+    {
+     "id": "gate",
+     "title": "The gate and the claim",
+     "t": 712
+    },
+    {
+     "id": "watching",
+     "title": "Watching it work",
+     "t": 810
+    },
+    {
+     "id": "schedules",
+     "title": "Schedules in the source",
+     "t": 922
+    },
+    {
+     "id": "limits",
+     "title": "What keepers aren't",
+     "t": 992
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the nexus",
+     "t": 1066
+    }
+   ]
+  },
+  {
+   "slug": "planes",
+   "title": "planes — under nexus",
+   "src": "audio/episodes/planes.mp3?v=936",
+   "dur": 936,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "One machine, two audiences",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "Two planes, one node",
+     "t": 59
+    },
+    {
+     "id": "absence",
+     "title": "Security by routes that don't exist",
+     "t": 119
+    },
+    {
+     "id": "boot",
+     "title": "How the planes come up",
+     "t": 199
+    },
+    {
+     "id": "host",
+     "title": "The host is the address",
+     "t": 268
+    },
+    {
+     "id": "marker",
+     "title": "An honest surface",
+     "t": 346
+    },
+    {
+     "id": "sni",
+     "title": "One node, many domains",
+     "t": 430
+    },
+    {
+     "id": "gate",
+     "title": "The handshake is the bouncer",
+     "t": 522
+    },
+    {
+     "id": "deployed",
+     "title": "The shape in production",
+     "t": 621
+    },
+    {
+     "id": "limits",
+     "title": "What isn't built",
+     "t": 721
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 813
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 896
+    }
+   ]
+  },
+  {
+   "slug": "deployments",
+   "title": "deployments — under nexus",
+   "src": "audio/episodes/deployments.mp3?v=1342",
+   "dur": 1342,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The file that deploys you",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 65
+    },
+    {
+     "id": "the-file",
+     "title": "Five axes, one screen",
+     "t": 117
+    },
+    {
+     "id": "validate",
+     "title": "The honesty engine",
+     "t": 255
+    },
+    {
+     "id": "local",
+     "title": "A cloud on your desk",
+     "t": 391
+    },
+    {
+     "id": "cloud",
+     "title": "Five hooks and a tempfile",
+     "t": 588
+    },
+    {
+     "id": "one-property",
+     "title": "The actual diff",
+     "t": 756
+    },
+    {
+     "id": "secrets",
+     "title": "Names in the file, values nowhere near it",
+     "t": 902
+    },
+    {
+     "id": "verbs",
+     "title": "Converge, prove, tear down",
+     "t": 1016
+    },
+    {
+     "id": "limits",
+     "title": "Where the seam ends",
+     "t": 1118
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1211
+    },
+    {
+     "id": "outro",
+     "title": "Back up to nexus",
+     "t": 1293
+    }
+   ]
+  },
+  {
+   "slug": "gitops",
+   "title": "gitops — under nexus",
+   "src": "audio/episodes/gitops.mp3?v=1062",
+   "dur": 1062,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Deployed software you can't diff",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 83
+    },
+    {
+     "id": "every-deploy-a-commit",
+     "title": "Every deploy is a commit",
+     "t": 154
+    },
+    {
+     "id": "changelog",
+     "title": "Commits are the changelog",
+     "t": 230
+    },
+    {
+     "id": "outbound",
+     "title": "Commit, publish, push — atomically",
+     "t": 315
+    },
+    {
+     "id": "inbound",
+     "title": "Push to live",
+     "t": 407
+    },
+    {
+     "id": "no-clobber",
+     "title": "Why merge, not overwrite",
+     "t": 481
+    },
+    {
+     "id": "privacy",
+     "title": "What never enters the repo",
+     "t": 589
+    },
+    {
+     "id": "identity",
+     "title": "The repo carries a DID",
+     "t": 666
+    },
+    {
+     "id": "mirror",
+     "title": "Any forge, or none",
+     "t": 745
+    },
+    {
+     "id": "honest",
+     "title": "Where it bites",
+     "t": 826
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 937
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the nexus",
+     "t": 1021
+    }
+   ]
+  },
+  {
+   "slug": "hot-swap",
+   "title": "hot swap — under nexus",
+   "src": "audio/episodes/hot-swap.mp3?v=1016",
+   "dur": 1016,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Change it while it's running",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The deploy train versus living software",
+     "t": 44
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 107
+    },
+    {
+     "id": "the-binding",
+     "title": "The binding is the whole trick",
+     "t": 153
+    },
+    {
+     "id": "immutable-bytes",
+     "title": "Why the swap is safe",
+     "t": 243
+    },
+    {
+     "id": "vehicle-agent",
+     "title": "Swap by self-authoring",
+     "t": 332
+    },
+    {
+     "id": "vehicle-git",
+     "title": "Swap by push",
+     "t": 442
+    },
+    {
+     "id": "vehicle-def",
+     "title": "The zero-mechanism swap",
+     "t": 562
+    },
+    {
+     "id": "guardrails",
+     "title": "The guardrails",
+     "t": 628
+    },
+    {
+     "id": "same-pattern",
+     "title": "The same pattern elsewhere",
+     "t": 722
+    },
+    {
+     "id": "limits",
+     "title": "Where it stops",
+     "t": 785
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 892
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 973
+    }
+   ]
+  },
+  {
+   "slug": "networking",
+   "title": "networking — under nexus",
+   "src": "audio/episodes/networking.mp3?v=1245",
+   "dur": 1245,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The network is a service, not a permission",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The boolean lie",
+     "t": 58
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 114
+    },
+    {
+     "id": "two-lanes",
+     "title": "The two egress lanes",
+     "t": 169
+    },
+    {
+     "id": "floor",
+     "title": "The SSRF floor",
+     "t": 277
+    },
+    {
+     "id": "pin",
+     "title": "Resolve-then-pin",
+     "t": 403
+    },
+    {
+     "id": "brokers",
+     "title": "TCP, UDP, TLS without a socket",
+     "t": 477
+    },
+    {
+     "id": "scoping",
+     "title": "Allow-lists and the DNS-off trick",
+     "t": 630
+    },
+    {
+     "id": "held-http",
+     "title": "The engine holds the credentials",
+     "t": 742
+    },
+    {
+     "id": "inbound",
+     "title": "The server flip",
+     "t": 826
+    },
+    {
+     "id": "ops",
+     "title": "Revoke, rate, audit",
+     "t": 913
+    },
+    {
+     "id": "limits",
+     "title": "What it isn't",
+     "t": 1028
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1124
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the nexus",
+     "t": 1204
+    }
+   ]
+  },
+  {
+   "slug": "channels",
+   "title": "channels — under nexus",
+   "src": "audio/episodes/channels.mp3?v=1038",
+   "dur": 1038,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A bot is a public address",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 74
+    },
+    {
+     "id": "capability",
+     "title": "Why it lives host-side",
+     "t": 129
+    },
+    {
+     "id": "gating",
+     "title": "Config is topology",
+     "t": 205
+    },
+    {
+     "id": "pairing",
+     "title": "The pairing ceremony",
+     "t": 310
+    },
+    {
+     "id": "state",
+     "title": "Two files on disk",
+     "t": 411
+    },
+    {
+     "id": "adapter",
+     "title": "Inside the poller",
+     "t": 531
+    },
+    {
+     "id": "surface",
+     "title": "Driving it",
+     "t": 696
+    },
+    {
+     "id": "honest",
+     "title": "Where the slice ends",
+     "t": 802
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 906
+    },
+    {
+     "id": "outro",
+     "title": "Back up to nexus",
+     "t": 987
+    }
+   ]
+  },
+  {
+   "slug": "browsing",
+   "title": "browsing — under nexus",
+   "src": "audio/episodes/browsing.mp3?v=1070",
+   "dur": 1070,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The web, from inside a sandbox",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The three bad answers",
+     "t": 51
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 121
+    },
+    {
+     "id": "dispatch",
+     "title": "One slot, three verbs",
+     "t": 169
+    },
+    {
+     "id": "native",
+     "title": "The free browser",
+     "t": 232
+    },
+    {
+     "id": "fingerprint",
+     "title": "Dressing like a browser",
+     "t": 310
+    },
+    {
+     "id": "org",
+     "title": "Pages come back as org",
+     "t": 404
+    },
+    {
+     "id": "crawl",
+     "title": "BFS on the BEAM",
+     "t": 511
+    },
+    {
+     "id": "search",
+     "title": "Search and the datacenter wall",
+     "t": 569
+    },
+    {
+     "id": "providers",
+     "title": "Swapping the engine of the engine",
+     "t": 658
+    },
+    {
+     "id": "surfaces",
+     "title": "Who gets to browse",
+     "t": 756
+    },
+    {
+     "id": "limits",
+     "title": "What the free browser isn't",
+     "t": 852
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 938
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the Nexus",
+     "t": 1015
+    }
+   ]
+  },
+  {
+   "slug": "changelogs",
+   "title": "changelogs — under nexus",
+   "src": "audio/episodes/changelogs.mp3?v=1065",
+   "dur": 1065,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Changelogs are marketing",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The history endpoint",
+     "t": 63
+    },
+    {
+     "id": "plane",
+     "title": "Anonymous and read-only",
+     "t": 131
+    },
+    {
+     "id": "entry",
+     "title": "What one change literally is",
+     "t": 228
+    },
+    {
+     "id": "atomicity",
+     "title": "Committed means live",
+     "t": 314
+    },
+    {
+     "id": "classify",
+     "title": "Who made this commit",
+     "t": 407
+    },
+    {
+     "id": "collapse",
+     "title": "Quiet humans, loud agents",
+     "t": 518
+    },
+    {
+     "id": "live",
+     "title": "Narrating the run",
+     "t": 620
+    },
+    {
+     "id": "honesty-machine",
+     "title": "Thinking, honestly",
+     "t": 709
+    },
+    {
+     "id": "limits",
+     "title": "What it isn't",
+     "t": 862
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 946
+    },
+    {
+     "id": "outro",
+     "title": "Back up to nexus",
+     "t": 1016
+    }
+   ]
+  },
+  {
    "slug": "toolkit",
    "title": "Toolkits — the parts",
    "src": "audio/episodes/toolkit.mp3?v=643",
@@ -326,6 +1444,366 @@
    ]
   },
   {
+   "slug": "imports",
+   "title": "imports — under toolkit",
+   "src": "audio/episodes/imports.mp3?v=1052",
+   "dur": 1052,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "You already built your tools",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 68
+    },
+    {
+     "id": "shapes",
+     "title": "Nine shapes, one sniff",
+     "t": 126
+    },
+    {
+     "id": "ramp",
+     "title": "Three honest stages",
+     "t": 221
+    },
+    {
+     "id": "translator",
+     "title": "The honest ninety percent",
+     "t": 344
+    },
+    {
+     "id": "scaffold",
+     "title": "What lands on disk",
+     "t": 419
+    },
+    {
+     "id": "synth",
+     "title": "Manufacturing evidence",
+     "t": 531
+    },
+    {
+     "id": "secrets",
+     "title": "Names travel, values don't",
+     "t": 634
+    },
+    {
+     "id": "guidance",
+     "title": "Guidance-only is a landing",
+     "t": 714
+    },
+    {
+     "id": "frontier",
+     "title": "The honest limits",
+     "t": 778
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 929
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the toolkit",
+     "t": 1003
+    }
+   ]
+  },
+  {
+   "slug": "audits",
+   "title": "audits — under toolkit",
+   "src": "audio/episodes/audits.mp3?v=1125",
+   "dur": 1125,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Will it cross?",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Will it cross?",
+     "t": 46
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 111
+    },
+    {
+     "id": "stages",
+     "title": "Stage two of three",
+     "t": 162
+    },
+    {
+     "id": "verdicts",
+     "title": "Three words",
+     "t": 263
+    },
+    {
+     "id": "scan",
+     "title": "How it looks without running",
+     "t": 390
+    },
+    {
+     "id": "rollup",
+     "title": "Worst-of wins",
+     "t": 475
+    },
+    {
+     "id": "manifest",
+     "title": "The artifact carries its own audit",
+     "t": 545
+    },
+    {
+     "id": "plan",
+     "title": "The agent manual",
+     "t": 653
+    },
+    {
+     "id": "fix",
+     "title": "Closing the loop",
+     "t": 776
+    },
+    {
+     "id": "limits",
+     "title": "What the audit will not tell you",
+     "t": 911
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 992
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1083
+    }
+   ]
+  },
+  {
+   "slug": "lanes",
+   "title": "lanes — under toolkit",
+   "src": "audio/episodes/lanes.mp3?v=1313",
+   "dur": 1313,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The compiler runs in the sandbox",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The compiler is the attack surface",
+     "t": 46
+    },
+    {
+     "id": "definition",
+     "title": "What a lane is",
+     "t": 116
+    },
+    {
+     "id": "map",
+     "title": "Six lanes, three tricks",
+     "t": 216
+    },
+    {
+     "id": "clang",
+     "title": "The keystone — a linker that can't be spawned",
+     "t": 305
+    },
+    {
+     "id": "rust",
+     "title": "Rust without rustc",
+     "t": 453
+    },
+    {
+     "id": "crates",
+     "title": "The dependency frontier",
+     "t": 588
+    },
+    {
+     "id": "zig",
+     "title": "The bootstrap compiler that only speaks C",
+     "t": 745
+    },
+    {
+     "id": "go",
+     "title": "Don't compile it at all",
+     "t": 850
+    },
+    {
+     "id": "js",
+     "title": "Embed the interpreter per program",
+     "t": 938
+    },
+    {
+     "id": "honesty",
+     "title": "The honest ledger",
+     "t": 1056
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1178
+    },
+    {
+     "id": "outro",
+     "title": "Back up to toolkit",
+     "t": 1265
+    }
+   ]
+  },
+  {
+   "slug": "promotion",
+   "title": "promotion — under toolkit",
+   "src": "audio/episodes/promotion.mp3?v=1142",
+   "dur": 1142,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The graveyard of session scripts",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The ladder",
+     "t": 68
+    },
+    {
+     "id": "rung-one",
+     "title": "Rung one — no manifest ceremony",
+     "t": 123
+    },
+    {
+     "id": "ephemeral",
+     "title": "What session means",
+     "t": 254
+    },
+    {
+     "id": "rung-two",
+     "title": "Rung two — promote",
+     "t": 358
+    },
+    {
+     "id": "spec-vs-artifact",
+     "title": "Org owns the spec, wasm owns the artifact",
+     "t": 483
+    },
+    {
+     "id": "layouts",
+     "title": "Per-language layouts",
+     "t": 578
+    },
+    {
+     "id": "rung-three",
+     "title": "Rung three — a toolkit is a workbook",
+     "t": 672
+    },
+    {
+     "id": "never-wider",
+     "title": "The capability ceiling",
+     "t": 766
+    },
+    {
+     "id": "honesty",
+     "title": "Scaffold, not a publish button",
+     "t": 904
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 996
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the toolkit",
+     "t": 1092
+    }
+   ]
+  },
+  {
+   "slug": "commands",
+   "title": "commands — under toolkit",
+   "src": "audio/episodes/commands.mp3?v=1331",
+   "dur": 1331,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The string that never runs",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The string that runs",
+     "t": 72
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 143
+    },
+    {
+     "id": "path",
+     "title": "A PATH with no operating system",
+     "t": 202
+    },
+    {
+     "id": "run",
+     "title": "What one invocation costs",
+     "t": 300
+    },
+    {
+     "id": "broker",
+     "title": "The six no's",
+     "t": 395
+    },
+    {
+     "id": "argv",
+     "title": "argv is a list, not a sentence",
+     "t": 499
+    },
+    {
+     "id": "shell",
+     "title": "The shell that isn't one",
+     "t": 602
+    },
+    {
+     "id": "catalog",
+     "title": "Sixty-some programs, each a row of data",
+     "t": 747
+    },
+    {
+     "id": "integrity",
+     "title": "Bytes that prove themselves",
+     "t": 867
+    },
+    {
+     "id": "selfauthor",
+     "title": "Commands that write commands",
+     "t": 983
+    },
+    {
+     "id": "honesty",
+     "title": "The honest edges",
+     "t": 1074
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1176
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the toolkit",
+     "t": 1277
+    }
+   ]
+  },
+  {
    "slug": "org",
    "title": "Org — the grammar",
    "src": "audio/episodes/org.mp3?v=454",
@@ -384,6 +1862,293 @@
    ]
   },
   {
+   "slug": "syntax",
+   "title": "syntax — under org",
+   "src": "audio/episodes/syntax.mp3?v=1177",
+   "dur": 1177,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Write a line, see the row",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Folklore versus grammar",
+     "t": 45
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 116
+    },
+    {
+     "id": "drill",
+     "title": "The drill loop",
+     "t": 203
+    },
+    {
+     "id": "headline",
+     "title": "Anatomy of one line",
+     "t": 277
+    },
+    {
+     "id": "planning",
+     "title": "The one-line rule",
+     "t": 388
+    },
+    {
+     "id": "drawers",
+     "title": "Headline as record",
+     "t": 480
+    },
+    {
+     "id": "timestamps",
+     "title": "The clock glyphs",
+     "t": 541
+    },
+    {
+     "id": "src",
+     "title": "Blocks that compile",
+     "t": 623
+    },
+    {
+     "id": "markdown",
+     "title": "The autopsy",
+     "t": 774
+    },
+    {
+     "id": "egg",
+     "title": "Dissect the easter egg",
+     "t": 857
+    },
+    {
+     "id": "limits",
+     "title": "Where the lens stops",
+     "t": 915
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1031
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1130
+    }
+   ]
+  },
+  {
+   "slug": "drawers",
+   "title": "drawers — under org",
+   "src": "audio/episodes/drawers.mp3?v=902",
+   "dur": 902,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Where does config go",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 69
+    },
+    {
+     "id": "anatomy",
+     "title": "The four lines",
+     "t": 100
+    },
+    {
+     "id": "one-parser",
+     "title": "One parser, three doors",
+     "t": 177
+    },
+    {
+     "id": "promoted-keys",
+     "title": "Keys the kernel promotes",
+     "t": 276
+    },
+    {
+     "id": "the-records",
+     "title": "The bestiary",
+     "t": 340
+    },
+    {
+     "id": "agent-boot",
+     "title": "From drawer to running agent",
+     "t": 449
+    },
+    {
+     "id": "machines-write",
+     "title": "Machines write drawers too",
+     "t": 514
+    },
+    {
+     "id": "this-page",
+     "title": "This page is a record",
+     "t": 608
+    },
+    {
+     "id": "honest",
+     "title": "The seams",
+     "t": 683
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 794
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the grammar",
+     "t": 855
+    }
+   ]
+  },
+  {
+   "slug": "timestamps",
+   "title": "timestamps — under org",
+   "src": "audio/episodes/timestamps.mp3?v=983",
+   "dur": 983,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "When, on the same line as what",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The crontab nobody reads",
+     "t": 57
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 118
+    },
+    {
+     "id": "grammar",
+     "title": "The token classifier",
+     "t": 163
+    },
+    {
+     "id": "active-inactive",
+     "title": "One bracket, one bit",
+     "t": 279
+    },
+    {
+     "id": "scheduled-deadline",
+     "title": "Trigger versus fact",
+     "t": 344
+    },
+    {
+     "id": "repeaters",
+     "title": "The three repeaters",
+     "t": 413
+    },
+    {
+     "id": "cron-hatch",
+     "title": "The cron escape hatch",
+     "t": 492
+    },
+    {
+     "id": "through-the-plan",
+     "title": "Through the plan",
+     "t": 565
+    },
+    {
+     "id": "checking",
+     "title": "Checking what it extracted",
+     "t": 647
+    },
+    {
+     "id": "honest",
+     "title": "The kernel has no clock",
+     "t": 742
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 880
+    },
+    {
+     "id": "outro",
+     "title": "Back up to org",
+     "t": 946
+    }
+   ]
+  },
+  {
+   "slug": "claims",
+   "title": "claims — under org",
+   "src": "audio/episodes/claims.mp3?v=931",
+   "dur": 931,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The talk outruns the build",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 81
+    },
+    {
+     "id": "ladder",
+     "title": "Seven words of state machine",
+     "t": 133
+    },
+    {
+     "id": "anatomy",
+     "title": "Quote, then evidence",
+     "t": 222
+    },
+    {
+     "id": "verdicts",
+     "title": "The five verdicts",
+     "t": 307
+    },
+    {
+     "id": "pipeline",
+     "title": "Audio in, ledger out",
+     "t": 408
+    },
+    {
+     "id": "backlog",
+     "title": "The gap is the backlog",
+     "t": 496
+    },
+    {
+     "id": "queries",
+     "title": "A ledger you can grep",
+     "t": 609
+    },
+    {
+     "id": "beyond",
+     "title": "More than a checklist",
+     "t": 674
+    },
+    {
+     "id": "limits",
+     "title": "Where it bites",
+     "t": 728
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 830
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the grammar",
+     "t": 890
+    }
+   ]
+  },
+  {
    "slug": "agents",
    "title": "Agents — the workers",
    "src": "audio/episodes/agents.mp3?v=351",
@@ -437,55 +2202,697 @@
    ]
   },
   {
-   "slug": "autopoet",
-   "title": "Autopoet — the gardener",
-   "src": "audio/episodes/autopoet.mp3?v=504",
-   "dur": 504,
+   "slug": "loops",
+   "title": "loops — under agents",
+   "src": "audio/episodes/loops.mp3?v=1120",
+   "dur": 1120,
    "chapters": [
     {
      "id": "intro",
-     "title": "Two constructs, pointed inward",
+     "title": "One shift, under the cover",
      "t": 2
     },
     {
-     "id": "problem",
-     "title": "Software rots by default",
-     "t": 47
-    },
-    {
      "id": "definition",
-     "title": "The definition",
-     "t": 105
+     "title": "The run, defined",
+     "t": 52
     },
     {
-     "id": "safe",
-     "title": "Why this is safe to want",
-     "t": 137
+     "id": "cycle",
+     "title": "One trip around the loop",
+     "t": 102
     },
     {
-     "id": "does",
-     "title": "What it actually does",
-     "t": 225
+     "id": "turn",
+     "title": "What the model actually sees",
+     "t": 210
     },
     {
-     "id": "homogeneity",
-     "title": "You can't learn from noise",
-     "t": 317
+     "id": "bounds",
+     "title": "Nothing waits forever",
+     "t": 305
     },
     {
-     "id": "honest",
-     "title": "The youngest idea here",
-     "t": 356
+     "id": "surface",
+     "title": "Nine tools, and three you earn",
+     "t": 441
+    },
+    {
+     "id": "trust",
+     "title": "Brokered, not bestowed",
+     "t": 531
+    },
+    {
+     "id": "trace",
+     "title": "The run narrates itself, three ways",
+     "t": 639
+    },
+    {
+     "id": "failure",
+     "title": "Every failure becomes text",
+     "t": 788
+    },
+    {
+     "id": "boundaries",
+     "title": "Honesty",
+     "t": 873
     },
     {
      "id": "faq",
      "title": "Questions people actually ask",
-     "t": 405
+     "t": 979
     },
     {
      "id": "outro",
-     "title": "Back up to the parents",
-     "t": 461
+     "title": "Back up to the parent",
+     "t": 1070
+    }
+   ]
+  },
+  {
+   "slug": "authoring",
+   "title": "authoring — under agents",
+   "src": "audio/episodes/authoring.mp3?v=1047",
+   "dur": 1047,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Your agent is a config file in someones framework",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 67
+    },
+    {
+     "id": "parse",
+     "title": "What the runtime actually reads",
+     "t": 154
+    },
+    {
+     "id": "prompt-heading",
+     "title": "The System prompt rule",
+     "t": 243
+    },
+    {
+     "id": "injection",
+     "title": "Toolkits become a prompt index",
+     "t": 385
+    },
+    {
+     "id": "run",
+     "title": "From parse to a live loop",
+     "t": 505
+    },
+    {
+     "id": "callers",
+     "title": "One def, four doors",
+     "t": 632
+    },
+    {
+     "id": "anatomy",
+     "title": "Reading a real def — Waldo",
+     "t": 712
+    },
+    {
+     "id": "boundaries",
+     "title": "The honest limits",
+     "t": 836
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 927
+    },
+    {
+     "id": "outro",
+     "title": "Keep going",
+     "t": 990
+    }
+   ]
+  },
+  {
+   "slug": "context-repo",
+   "title": "context repo — under agents",
+   "src": "audio/episodes/context-repo.mp3?v=1144",
+   "dur": 1144,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Memory is always a second system",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 71
+    },
+    {
+     "id": "tree",
+     "title": "One tree, five writers",
+     "t": 119
+    },
+    {
+     "id": "board",
+     "title": "The board: plan dot org",
+     "t": 228
+    },
+    {
+     "id": "recall",
+     "title": "Recall without a store",
+     "t": 355
+    },
+    {
+     "id": "commit",
+     "title": "Commit means live",
+     "t": 472
+    },
+    {
+     "id": "dreams",
+     "title": "The dream journal: rem",
+     "t": 573
+    },
+    {
+     "id": "canon",
+     "title": "The canon shelf",
+     "t": 690
+    },
+    {
+     "id": "gitops",
+     "title": "Two-way street: GitOps",
+     "t": 799
+    },
+    {
+     "id": "honest",
+     "title": "Where it bites",
+     "t": 892
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 995
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 1082
+    }
+   ]
+  },
+  {
+   "slug": "orchestration",
+   "title": "orchestration — under agents",
+   "src": "audio/episodes/orchestration.mp3?v=972",
+   "dur": 972,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The machinery of the schedule",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Cron is not a colleague",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 126
+    },
+    {
+     "id": "tick",
+     "title": "Anatomy of a tick",
+     "t": 183
+    },
+    {
+     "id": "lifecycle",
+     "title": "A day declared in org",
+     "t": 275
+    },
+    {
+     "id": "outcomes",
+     "title": "Four outcomes, one rule each",
+     "t": 410
+    },
+    {
+     "id": "survival",
+     "title": "Cadence that survives the machine",
+     "t": 504
+    },
+    {
+     "id": "backoff",
+     "title": "The price of idleness",
+     "t": 594
+    },
+    {
+     "id": "crew",
+     "title": "Many workers, one box",
+     "t": 679
+    },
+    {
+     "id": "claims",
+     "title": "Claims, not locks",
+     "t": 784
+    },
+    {
+     "id": "honest",
+     "title": "Where the edges are",
+     "t": 856
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 930
+    }
+   ]
+  },
+  {
+   "slug": "human-in-the-loop",
+   "title": "human in the loop — under agents",
+   "src": "audio/episodes/human-in-the-loop.mp3?v=1145",
+   "dur": 1145,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A run that waits for a person",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 61
+    },
+    {
+     "id": "identity",
+     "title": "A run with an address",
+     "t": 124
+    },
+    {
+     "id": "canvas",
+     "title": "The review canvas",
+     "t": 197
+    },
+    {
+     "id": "commit",
+     "title": "One event, two transports",
+     "t": 317
+    },
+    {
+     "id": "mailbox",
+     "title": "The run's mailbox",
+     "t": 462
+    },
+    {
+     "id": "await",
+     "title": "The blocking command",
+     "t": 557
+    },
+    {
+     "id": "fullloop",
+     "title": "The whole loop, once",
+     "t": 673
+    },
+    {
+     "id": "drive",
+     "title": "When the agent moves the sliders",
+     "t": 791
+    },
+    {
+     "id": "honest",
+     "title": "Where the loop is thin",
+     "t": 901
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1021
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 1109
+    }
+   ]
+  },
+  {
+   "slug": "runtime-config",
+   "title": "runtime config — under agents",
+   "src": "audio/episodes/runtime-config.mp3?v=918",
+   "dur": 918,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The agent is the config",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Where is the agent's code?",
+     "t": 41
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 86
+    },
+    {
+     "id": "altitudes",
+     "title": "Three altitudes of config",
+     "t": 120
+    },
+    {
+     "id": "activation",
+     "title": "Unset means absent",
+     "t": 177
+    },
+    {
+     "id": "envcontract",
+     "title": "The singleton's knobs",
+     "t": 249
+    },
+    {
+     "id": "crew",
+     "title": "One manifest, many workers",
+     "t": 313
+    },
+    {
+     "id": "lifecycle",
+     "title": "The deterministic skeleton",
+     "t": 434
+    },
+    {
+     "id": "budget",
+     "title": "Knobs that defend the meter",
+     "t": 522
+    },
+    {
+     "id": "exec",
+     "title": "The trust grant",
+     "t": 629
+    },
+    {
+     "id": "boundaries",
+     "title": "Where it bites",
+     "t": 731
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 818
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 880
+    }
+   ]
+  },
+  {
+   "slug": "dreaming",
+   "title": "dreaming — under agents",
+   "src": "audio/episodes/dreaming.mp3?v=947",
+   "dur": 947,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A sleep phase between the runs",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The amnesia tax",
+     "t": 50
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 110
+    },
+    {
+     "id": "cycle",
+     "title": "Sleep has a slot",
+     "t": 156
+    },
+    {
+     "id": "gather",
+     "title": "What the sleeper sees",
+     "t": 250
+    },
+    {
+     "id": "anatomy",
+     "title": "Six headings, two load-bearing",
+     "t": 336
+    },
+    {
+     "id": "verdicts",
+     "title": "Verdicts move the board",
+     "t": 423
+    },
+    {
+     "id": "carry",
+     "title": "Carry is the resume state",
+     "t": 511
+    },
+    {
+     "id": "daydreams",
+     "title": "The in-between tier",
+     "t": 615
+    },
+    {
+     "id": "public",
+     "title": "The journal is public",
+     "t": 702
+    },
+    {
+     "id": "honest",
+     "title": "Where dreaming breaks",
+     "t": 758
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 842
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 908
+    }
+   ]
+  },
+  {
+   "slug": "evals",
+   "title": "evals — under agents",
+   "src": "audio/episodes/evals.mp3?v=1010",
+   "dur": 1010,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Graded on vibes",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 72
+    },
+    {
+     "id": "twotiers",
+     "title": "Deterministic or judged",
+     "t": 138
+    },
+    {
+     "id": "pipeline",
+     "title": "Anatomy of a judged run",
+     "t": 219
+    },
+    {
+     "id": "telemetry",
+     "title": "The judge reads the trace",
+     "t": 296
+    },
+    {
+     "id": "rubrics",
+     "title": "Write traps, not checklists",
+     "t": 381
+    },
+    {
+     "id": "models",
+     "title": "Split the meters",
+     "t": 503
+    },
+    {
+     "id": "bench",
+     "title": "The suite travels with the artifact",
+     "t": 574
+    },
+    {
+     "id": "spectrum",
+     "title": "Not everything needs a judge",
+     "t": 662
+    },
+    {
+     "id": "boundaries",
+     "title": "Where it bites",
+     "t": 753
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 851
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 963
+    }
+   ]
+  },
+  {
+   "slug": "fleets",
+   "title": "fleets — under agents",
+   "src": "audio/episodes/fleets.mp3?v=1020",
+   "dur": 1020,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "One worker, then a team",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "What a team actually needs",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 103
+    },
+    {
+     "id": "manifest",
+     "title": "One file, one heading per agent",
+     "t": 146
+    },
+    {
+     "id": "workers",
+     "title": "N copies of one engine",
+     "t": 224
+    },
+    {
+     "id": "stagger",
+     "title": "Booting without the herd",
+     "t": 308
+    },
+    {
+     "id": "gate",
+     "title": "The gate — a 66-line semaphore",
+     "t": 376
+    },
+    {
+     "id": "namespaces",
+     "title": "Why two agents never share a clock",
+     "t": 470
+    },
+    {
+     "id": "claims",
+     "title": "Claims are a protocol, not a lock",
+     "t": 555
+    },
+    {
+     "id": "newsroom",
+     "title": "A real fleet — the newsroom",
+     "t": 657
+    },
+    {
+     "id": "wire",
+     "title": "Watching a fleet",
+     "t": 759
+    },
+    {
+     "id": "boundaries",
+     "title": "What the runtime won't do for you",
+     "t": 828
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 912
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 976
+    }
+   ]
+  },
+  {
+   "slug": "rehearsals",
+   "title": "rehearsals — under agents",
+   "src": "audio/episodes/rehearsals.mp3?v=928",
+   "dur": 928,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Prove the call without the phone",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The last hop can't be CI",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 118
+    },
+    {
+     "id": "seam",
+     "title": "Cut at the last seam",
+     "t": 168
+    },
+    {
+     "id": "loop",
+     "title": "One line, six rounds",
+     "t": 236
+    },
+    {
+     "id": "realrouter",
+     "title": "Through the real router",
+     "t": 321
+    },
+    {
+     "id": "persona",
+     "title": "One def, two consumers",
+     "t": 435
+    },
+    {
+     "id": "transcript",
+     "title": "The transcript is the artifact",
+     "t": 496
+    },
+    {
+     "id": "ladder",
+     "title": "Where it sits on the ladder",
+     "t": 637
+    },
+    {
+     "id": "boundaries",
+     "title": "What a green rehearsal doesn't prove",
+     "t": 729
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 822
+    },
+    {
+     "id": "outro",
+     "title": "Back up to agents",
+     "t": 887
     }
    ]
   },
@@ -554,6 +2961,439 @@
      "id": "outro",
      "title": "Wrapping up",
      "t": 643
+    }
+   ]
+  },
+  {
+   "slug": "modes",
+   "title": "modes — under wbx",
+   "src": "audio/episodes/modes.mp3?v=1276",
+   "dur": 1276,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "One binary knows who's listening",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The tool that hangs in CI",
+     "t": 55
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 123
+    },
+    {
+     "id": "detection",
+     "title": "Eleven lines that decide",
+     "t": 168
+    },
+    {
+     "id": "one-channel",
+     "title": "One channel, rendered once",
+     "t": 296
+    },
+    {
+     "id": "envelope",
+     "title": "One shape for every outcome",
+     "t": 431
+    },
+    {
+     "id": "codes",
+     "title": "Classify, the honest heuristic",
+     "t": 561
+    },
+    {
+     "id": "agent-vs-json",
+     "title": "Manners versus format",
+     "t": 696
+    },
+    {
+     "id": "human-luxuries",
+     "title": "What only humans get",
+     "t": 802
+    },
+    {
+     "id": "tested",
+     "title": "The contract is a test suite",
+     "t": 941
+    },
+    {
+     "id": "limits",
+     "title": "Where the seam is honest",
+     "t": 1068
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1153
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1236
+    }
+   ]
+  },
+  {
+   "slug": "pipelines",
+   "title": "pipelines — under wbx",
+   "src": "audio/episodes/pipelines.mp3?v=1109",
+   "dur": 1109,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Org goes in, JSON comes out",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The temp-file tax",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 121
+    },
+    {
+     "id": "verbs",
+     "title": "Three pure functions in a trench coat",
+     "t": 174
+    },
+    {
+     "id": "shapes",
+     "title": "What comes out",
+     "t": 262
+    },
+    {
+     "id": "derived",
+     "title": "The plan is computed, not declared",
+     "t": 373
+    },
+    {
+     "id": "compose",
+     "title": "jq is the other half",
+     "t": 475
+    },
+    {
+     "id": "gate",
+     "title": "A gate that actually fails",
+     "t": 598
+    },
+    {
+     "id": "envelope",
+     "title": "JSON without double-wrapping",
+     "t": 704
+    },
+    {
+     "id": "samekernel",
+     "title": "Your pipe is the engine's parser",
+     "t": 790
+    },
+    {
+     "id": "limits",
+     "title": "Where the pipe surface ends",
+     "t": 888
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 996
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the command",
+     "t": 1066
+    }
+   ]
+  },
+  {
+   "slug": "doctor",
+   "title": "doctor — under wbx",
+   "src": "audio/episodes/doctor.mp3?v=968",
+   "dur": 968,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A report, not a judge",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Debug the tool before the tool",
+     "t": 53
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 113
+    },
+    {
+     "id": "probes",
+     "title": "The four checks",
+     "t": 166
+    },
+    {
+     "id": "discovery",
+     "title": "What engine actually means",
+     "t": 253
+    },
+    {
+     "id": "landing",
+     "title": "Bare wbx is doctor in a welcome mat",
+     "t": 342
+    },
+    {
+     "id": "exit-zero",
+     "title": "Exit zero, by contrast",
+     "t": 436
+    },
+    {
+     "id": "completions",
+     "title": "The tree that cannot drift",
+     "t": 543
+    },
+    {
+     "id": "upgrade",
+     "title": "Self-update that knows who installed it",
+     "t": 607
+    },
+    {
+     "id": "small",
+     "title": "The small verbs",
+     "t": 686
+    },
+    {
+     "id": "honest",
+     "title": "What doctor will not do",
+     "t": 756
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 847
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the command line",
+     "t": 921
+    }
+   ]
+  },
+  {
+   "slug": "deploy-kit",
+   "title": "deploy kit — under wbx",
+   "src": "audio/episodes/deploy-kit.mp3?v=1120",
+   "dur": 1120,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The engine needs a midwife",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 74
+    },
+    {
+     "id": "file",
+     "title": "The whole config, annotated",
+     "t": 124
+    },
+    {
+     "id": "verbs",
+     "title": "The converge loop",
+     "t": 207
+    },
+    {
+     "id": "local",
+     "title": "Local, step by step",
+     "t": 330
+    },
+    {
+     "id": "secrets",
+     "title": "Names in the file, values in the vault",
+     "t": 436
+    },
+    {
+     "id": "cloud",
+     "title": "Same file, different value",
+     "t": 583
+    },
+    {
+     "id": "seam",
+     "title": "Five hooks and a spine",
+     "t": 695
+    },
+    {
+     "id": "doctor",
+     "title": "When it doesn't converge",
+     "t": 808
+    },
+    {
+     "id": "honesty",
+     "title": "Edges, named",
+     "t": 893
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 990
+    },
+    {
+     "id": "outro",
+     "title": "Back up to wbx",
+     "t": 1072
+    }
+   ]
+  },
+  {
+   "slug": "recipes",
+   "title": "recipes — under wbx",
+   "src": "audio/episodes/recipes.mp3?v=1088",
+   "dur": 1088,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The blessed-vendor trap",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 64
+    },
+    {
+     "id": "spine",
+     "title": "Six actions, one case statement",
+     "t": 115
+    },
+    {
+     "id": "hooks",
+     "title": "Five hooks and the trio",
+     "t": 199
+    },
+    {
+     "id": "env",
+     "title": "What the engine is told",
+     "t": 292
+    },
+    {
+     "id": "resolve",
+     "title": "Three rungs to find a recipe",
+     "t": 386
+    },
+    {
+     "id": "hermetic",
+     "title": "The sealed spawn",
+     "t": 474
+    },
+    {
+     "id": "fly",
+     "title": "The bundled recipe, read whole",
+     "t": 572
+    },
+    {
+     "id": "yours",
+     "title": "Write a provider this afternoon",
+     "t": 698
+    },
+    {
+     "id": "drivers",
+     "title": "One seam, three drivers",
+     "t": 808
+    },
+    {
+     "id": "limits",
+     "title": "Where the recipe ends",
+     "t": 867
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 956
+    },
+    {
+     "id": "outro",
+     "title": "Back up to wbx",
+     "t": 1042
+    }
+   ]
+  },
+  {
+   "slug": "distribution",
+   "title": "distribution — under wbx",
+   "src": "audio/episodes/distribution.mp3?v=1204",
+   "dur": 1204,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "One release, every door",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Three installs, three tools",
+     "t": 50
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 107
+    },
+    {
+     "id": "release",
+     "title": "Anatomy of a release",
+     "t": 151
+    },
+    {
+     "id": "curl",
+     "title": "The curl lane",
+     "t": 274
+    },
+    {
+     "id": "npm",
+     "title": "The npm lane",
+     "t": 370
+    },
+    {
+     "id": "shadow",
+     "title": "The shadow check",
+     "t": 492
+    },
+    {
+     "id": "loud",
+     "title": "Failing loud, exiting zero",
+     "t": 603
+    },
+    {
+     "id": "upgrade",
+     "title": "The binary replaces itself",
+     "t": 700
+    },
+    {
+     "id": "wasm",
+     "title": "The fourth asset",
+     "t": 851
+    },
+    {
+     "id": "honesty",
+     "title": "What this doesn't solve",
+     "t": 957
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1074
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the command line",
+     "t": 1160
     }
    ]
   },
@@ -636,6 +3476,263 @@
    ]
   },
   {
+   "slug": "autopoet",
+   "title": "Autopoet — the gardener",
+   "src": "audio/episodes/autopoet.mp3?v=504",
+   "dur": 504,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Two constructs, pointed inward",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Software rots by default",
+     "t": 47
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 105
+    },
+    {
+     "id": "safe",
+     "title": "Why this is safe to want",
+     "t": 137
+    },
+    {
+     "id": "does",
+     "title": "What it actually does",
+     "t": 225
+    },
+    {
+     "id": "homogeneity",
+     "title": "You can't learn from noise",
+     "t": 317
+    },
+    {
+     "id": "honest",
+     "title": "The youngest idea here",
+     "t": 356
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 405
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parents",
+     "t": 461
+    }
+   ]
+  },
+  {
+   "slug": "schedules",
+   "title": "schedules — under workflows",
+   "src": "audio/episodes/schedules.mp3?v=1009",
+   "dur": 1009,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Nine a.m., and nobody's home",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 73
+    },
+    {
+     "id": "grammar",
+     "title": "One character decides everything",
+     "t": 123
+    },
+    {
+     "id": "cron",
+     "title": "When a timestamp isn't enough",
+     "t": 231
+    },
+    {
+     "id": "keeper",
+     "title": "A metronome, not a cron daemon",
+     "t": 310
+    },
+    {
+     "id": "tick",
+     "title": "Anatomy of a tick",
+     "t": 399
+    },
+    {
+     "id": "breather",
+     "title": "The breather and the backoff",
+     "t": 469
+    },
+    {
+     "id": "crews",
+     "title": "One manifest, many workers",
+     "t": 569
+    },
+    {
+     "id": "lifecycle",
+     "title": "Declaring what a tick is",
+     "t": 674
+    },
+    {
+     "id": "honest",
+     "title": "Where it bites",
+     "t": 769
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 876
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parents",
+     "t": 972
+    }
+   ]
+  },
+  {
+   "slug": "boards",
+   "title": "boards — under workflows",
+   "src": "audio/episodes/boards.mp3?v=1170",
+   "dur": 1170,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Where's the Board table?",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "A board, decomposed",
+     "t": 67
+    },
+    {
+     "id": "grep",
+     "title": "The one-line denial",
+     "t": 164
+    },
+    {
+     "id": "render",
+     "title": "One line of Rust, three surfaces",
+     "t": 243
+    },
+    {
+     "id": "callhome",
+     "title": "The page that talks back",
+     "t": 343
+    },
+    {
+     "id": "planview",
+     "title": "The board is the runner, paused",
+     "t": 451
+    },
+    {
+     "id": "liveboard",
+     "title": "A status page that is two file reads",
+     "t": 562
+    },
+    {
+     "id": "readylist",
+     "title": "The agent is a board consumer",
+     "t": 710
+    },
+    {
+     "id": "wild",
+     "title": "Boards running in production",
+     "t": 813
+    },
+    {
+     "id": "honest",
+     "title": "Where it bites",
+     "t": 937
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1048
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1126
+    }
+   ]
+  },
+  {
+   "slug": "dispatch",
+   "title": "dispatch — under workflows",
+   "src": "audio/episodes/dispatch.mp3?v=1000",
+   "dur": 1000,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The agent that can't let go",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 82
+    },
+    {
+     "id": "pipeline",
+     "title": "One goal, end to end",
+     "t": 130
+    },
+    {
+     "id": "author",
+     "title": "The agent doesn't write the plan",
+     "t": 223
+    },
+    {
+     "id": "ledger",
+     "title": "Four states, no fifth",
+     "t": 339
+    },
+    {
+     "id": "feedback",
+     "title": "Hearing back: the drain",
+     "t": 434
+    },
+    {
+     "id": "tasksorg",
+     "title": "A ledger you can read in git",
+     "t": 520
+    },
+    {
+     "id": "orphan",
+     "title": "The orphan rewrite",
+     "t": 591
+    },
+    {
+     "id": "leaves",
+     "title": "What a run leaves behind",
+     "t": 690
+    },
+    {
+     "id": "honest",
+     "title": "Where it bites",
+     "t": 774
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 880
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 963
+    }
+   ]
+  },
+  {
    "slug": "vfs",
    "title": "VFS — the disk",
    "src": "audio/episodes/vfs.mp3?v=774",
@@ -705,6 +3802,507 @@
      "id": "outro",
      "title": "Wrapping up",
      "t": 747
+    }
+   ]
+  },
+  {
+   "slug": "queries",
+   "title": "queries — under vfs",
+   "src": "audio/episodes/queries.mp3?v=981",
+   "dur": 981,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The disk speaks SQL. Say what, exactly?",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 60
+    },
+    {
+     "id": "schema",
+     "title": "The whole schema, all of it",
+     "t": 96
+    },
+    {
+     "id": "import",
+     "title": "One import, granted or absent",
+     "t": 233
+    },
+    {
+     "id": "call",
+     "title": "The round trip",
+     "t": 333
+    },
+    {
+     "id": "errors",
+     "title": "Error as a value",
+     "t": 405
+    },
+    {
+     "id": "profiles",
+     "title": "Who holds the cap",
+     "t": 530
+    },
+    {
+     "id": "library",
+     "title": "One statement, a whole shelf",
+     "t": 612
+    },
+    {
+     "id": "federation",
+     "title": "When FROM isn't a file",
+     "t": 748
+    },
+    {
+     "id": "honest",
+     "title": "Where the query ends",
+     "t": 804
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 883
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the VFS",
+     "t": 949
+    }
+   ]
+  },
+  {
+   "slug": "sync",
+   "title": "sync — under vfs",
+   "src": "audio/episodes/sync.mp3?v=1210",
+   "dur": 1210,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A thousand disks, one machine",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 84
+    },
+    {
+     "id": "machine",
+     "title": "Five states, one file",
+     "t": 134
+    },
+    {
+     "id": "ladder",
+     "title": "The idle ladder",
+     "t": 215
+    },
+    {
+     "id": "freeze",
+     "title": "Freeze is a copy",
+     "t": 325
+    },
+    {
+     "id": "wake",
+     "title": "Warm, cold, and prefetch",
+     "t": 429
+    },
+    {
+     "id": "volumes-across",
+     "title": "What survives",
+     "t": 534
+    },
+    {
+     "id": "stream",
+     "title": "The WAL heartbeat",
+     "t": 631
+    },
+    {
+     "id": "clone",
+     "title": "One template, a thousand tenants",
+     "t": 781
+    },
+    {
+     "id": "plane",
+     "title": "Who keeps the ledger",
+     "t": 900
+    },
+    {
+     "id": "honest",
+     "title": "Where the heartbeat ends",
+     "t": 972
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1077
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the VFS",
+     "t": 1171
+    }
+   ]
+  },
+  {
+   "slug": "privacy",
+   "title": "privacy — under vfs",
+   "src": "audio/episodes/privacy.mp3?v=1036",
+   "dur": 1036,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The file that knows too much",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The file that knows too much",
+     "t": 52
+    },
+    {
+     "id": "definition",
+     "title": "The boundary",
+     "t": 128
+    },
+    {
+     "id": "doors",
+     "title": "Three doors, one bouncer",
+     "t": 182
+    },
+    {
+     "id": "what-stays",
+     "title": "What stays home, exactly",
+     "t": 258
+    },
+    {
+     "id": "two-forms",
+     "title": "One boundary, both forms",
+     "t": 364
+    },
+    {
+     "id": "vacuum",
+     "title": "Strip, then VACUUM",
+     "t": 445
+    },
+    {
+     "id": "git-door",
+     "title": "Why add dash A is safe",
+     "t": 547
+    },
+    {
+     "id": "your-line",
+     "title": "Your gitignore is the boundary",
+     "t": 635
+    },
+    {
+     "id": "opt-in",
+     "title": "Saying yes on purpose",
+     "t": 717
+    },
+    {
+     "id": "honest",
+     "title": "Where the boundary ends",
+     "t": 806
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 904
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the disk",
+     "t": 979
+    }
+   ]
+  },
+  {
+   "slug": "sealed-sections",
+   "title": "sealed sections — under vfs",
+   "src": "audio/episodes/sealed-sections.mp3?v=1085",
+   "dur": 1085,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Sharing shares contents",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 86
+    },
+    {
+     "id": "welded",
+     "title": "A key welded to its section",
+     "t": 136
+    },
+    {
+     "id": "release",
+     "title": "The release",
+     "t": 241
+    },
+    {
+     "id": "deadman",
+     "title": "The dead-man switch",
+     "t": 378
+    },
+    {
+     "id": "honeypot",
+     "title": "Removing the honeypot",
+     "t": 458
+    },
+    {
+     "id": "did",
+     "title": "One identity, two curves",
+     "t": 555
+    },
+    {
+     "id": "attack",
+     "title": "The attack transcript",
+     "t": 685
+    },
+    {
+     "id": "vfs",
+     "title": "Sealing the disk itself",
+     "t": 782
+    },
+    {
+     "id": "honest",
+     "title": "Where the seal ends",
+     "t": 878
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 964
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the disk",
+     "t": 1045
+    }
+   ]
+  },
+  {
+   "slug": "foreign-tables",
+   "title": "foreign tables — under vfs",
+   "src": "audio/episodes/foreign-tables.mp3?v=1096",
+   "dur": 1096,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "When FROM reaches past the file",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The disk ends at the file's edge",
+     "t": 50
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 104
+    },
+    {
+     "id": "routing",
+     "title": "One FROM, two destinations",
+     "t": 148
+    },
+    {
+     "id": "contract",
+     "title": "The whole contract is one callback",
+     "t": 225
+    },
+    {
+     "id": "discovery",
+     "title": "Plugins announce themselves in org",
+     "t": 322
+    },
+    {
+     "id": "zero-code",
+     "title": "Any JSON API in six lines",
+     "t": 407
+    },
+    {
+     "id": "credentials",
+     "title": "One audited path for the key",
+     "t": 526
+    },
+    {
+     "id": "mirror",
+     "title": "The second face — a resident mirror",
+     "t": 596
+    },
+    {
+     "id": "airgap",
+     "title": "Why the mirror is the safe face",
+     "t": 716
+    },
+    {
+     "id": "faces",
+     "title": "Pick your face",
+     "t": 801
+    },
+    {
+     "id": "honest",
+     "title": "What FROM does not do",
+     "t": 873
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 976
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the VFS",
+     "t": 1048
+    }
+   ]
+  },
+  {
+   "slug": "backends",
+   "title": "backends — under vfs",
+   "src": "audio/episodes/backends.mp3?v=1191",
+   "dur": 1191,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The question every engine inherits",
+     "t": 2
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 68
+    },
+    {
+     "id": "screen",
+     "title": "One screen of config",
+     "t": 129
+    },
+    {
+     "id": "seams",
+     "title": "Two seams, four verbs",
+     "t": 211
+    },
+    {
+     "id": "tenant",
+     "title": "Isolation lives above the backend",
+     "t": 312
+    },
+    {
+     "id": "blobs",
+     "title": "One adapter, every bucket",
+     "t": 474
+    },
+    {
+     "id": "database",
+     "title": "Postgres is just a URL",
+     "t": 587
+    },
+    {
+     "id": "vectors",
+     "title": "The flip you get for free",
+     "t": 689
+    },
+    {
+     "id": "postures",
+     "title": "Three real postures",
+     "t": 815
+    },
+    {
+     "id": "identity",
+     "title": "The knob that isn't storage",
+     "t": 894
+    },
+    {
+     "id": "honest",
+     "title": "Where the seam ends today",
+     "t": 949
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 1060
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 1153
+    }
+   ]
+  },
+  {
+   "slug": "escrow",
+   "title": "escrow — under vfs",
+   "src": "audio/episodes/escrow.mp3?v=873",
+   "dur": 873,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Who holds the key",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Who holds the key",
+     "t": 54
+    },
+    {
+     "id": "definition",
+     "title": "The definition",
+     "t": 104
+    },
+    {
+     "id": "release",
+     "title": "The release path",
+     "t": 152
+    },
+    {
+     "id": "store",
+     "title": "What the store actually is",
+     "t": 241
+    },
+    {
+     "id": "onekey",
+     "title": "One key opens one door",
+     "t": 326
+    },
+    {
+     "id": "wrap",
+     "title": "Sealing the key itself",
+     "t": 406
+    },
+    {
+     "id": "did",
+     "title": "One identity, two curves",
+     "t": 498
+    },
+    {
+     "id": "breach",
+     "title": "What an attacker gets",
+     "t": 584
+    },
+    {
+     "id": "honest",
+     "title": "Where escrow ends",
+     "t": 657
+    },
+    {
+     "id": "faq",
+     "title": "Questions people actually ask",
+     "t": 766
+    },
+    {
+     "id": "outro",
+     "title": "Back up to the parent",
+     "t": 835
     }
    ]
   }
