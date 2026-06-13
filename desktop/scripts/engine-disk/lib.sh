@@ -19,50 +19,60 @@ MKE2FS="${MKE2FS:-$(command -v mke2fs || echo /opt/homebrew/opt/e2fsprogs/sbin/m
 # The netboot initramfs lacks ext4.ko (it lives in the modloop), so we pull
 # the matching linux-virt apk and append ext4 + deps as a second cpio.gz.
 fetch_kernel_initramfs() {
+  # Kernel, initramfs AND modules all come from the SAME netboot release, so
+  # they can never drift. (The earlier apk approach pulled the kernel from the
+  # rolling main/ apk — 6.18.35 — while the base initramfs stayed at the netboot
+  # version — 6.18.22 — and the mismatch left virtio unloadable: root-mount
+  # failed into an emergency shell. The ext4/net/fuse modules the init wrapper
+  # needs live in the modloop squashfs, version-matched to this very kernel.)
+  [ -f vmlinuz-virt ]   || curl -fsSLO "$ALPINE_MIRROR/releases/aarch64/netboot/vmlinuz-virt"
   [ -f initramfs-virt ] || curl -fsSLO "$ALPINE_MIRROR/releases/aarch64/netboot/initramfs-virt"
+  [ -f modloop-virt ]   || curl -fsSLO "$ALPINE_MIRROR/releases/aarch64/netboot/modloop-virt"
 
-  # Kernel + modules MUST be the same version, so pull BOTH from the one
-  # linux-virt apk. The netboot release kernel drifts out of sync with the
-  # rolling main/ apk (a frozen 6.18.22 netboot vs a 6.18.35 apk), so the old
-  # "guess the apk filename from the netboot KVER" 404'd. Discover the apk that
-  # ACTUALLY exists on the mirror (same trick the busybox fetch below uses).
-  if [ ! -f linux-virt.apk ]; then
-    local LV_APK
-    LV_APK=$(curl -fsSL "$ALPINE_MIRROR/main/aarch64/" | grep -o 'linux-virt-[0-9][^"]*\.apk' | head -1)
-    [ -n "$LV_APK" ] || { echo "no linux-virt apk at $ALPINE_MIRROR/main/aarch64/"; return 1; }
-    curl -fsSL -o linux-virt.apk "$ALPINE_MIRROR/main/aarch64/$LV_APK"
-  fi
-  mkdir -p apk-x && tar -xzf linux-virt.apk -C apk-x 2>/dev/null || true
-  local KVER
-  KVER=$(ls apk-x/lib/modules)                    # e.g. 6.18.35-0-virt — matches the apk kernel
-
-  # kernel-image from the apk's own vmlinuz-virt (so it matches the modules).
   if [ ! -f kernel-image ]; then
-    local VMLINUZ=apk-x/boot/vmlinuz-virt
-    if [ "$(xxd -p -s 4 -l 4 "$VMLINUZ")" = "7a696d67" ]; then   # "zimg"
+    if [ "$(xxd -p -s 4 -l 4 vmlinuz-virt)" = "7a696d67" ]; then   # "zimg"
       local OFF LEN
-      OFF=$((0x$(xxd -p -s 8  -l 4 "$VMLINUZ" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
-      LEN=$((0x$(xxd -p -s 12 -l 4 "$VMLINUZ" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
-      dd if="$VMLINUZ" bs=1 skip="$OFF" count="$LEN" 2>/dev/null | gunzip > kernel-image
+      OFF=$((0x$(xxd -p -s 8  -l 4 vmlinuz-virt | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
+      LEN=$((0x$(xxd -p -s 12 -l 4 vmlinuz-virt | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')))
+      dd if=vmlinuz-virt bs=1 skip="$OFF" count="$LEN" 2>/dev/null | gunzip > kernel-image
     else
-      cp -f "$VMLINUZ" kernel-image
+      cp -f vmlinuz-virt kernel-image
     fi
   fi
 
   if [ ! -f initramfs-wb ]; then
-    rm -rf initramfs-x addon
+    rm -rf initramfs-x addon modloop-x
     mkdir -p initramfs-x
     (cd initramfs-x && gunzip -c ../initramfs-virt | cpio -idm --quiet)
+    local KVER
+    KVER=$(ls initramfs-x/lib/modules)            # netboot version, e.g. 6.18.35-0-virt
+
+    # The netboot initramfs ships only a minimal module set; ext4 + the net/fuse
+    # stack the wrapper loads live in the modloop (squashfs). Unpack it and stage
+    # them — version-matched to the netboot kernel, so insmod always succeeds.
+    unsquashfs -q -f -d modloop-x modloop-virt >/dev/null 2>&1 \
+      || { echo "unsquashfs modloop-virt failed — need squashfs-tools"; return 1; }
+    local MODBASE
+    MODBASE=$(dirname "$(find modloop-x -type d -name "$KVER" -path '*modules*' | head -1)")
+    [ -n "$MODBASE" ] && [ -d "$MODBASE/$KVER" ] || { echo "modloop has no modules/$KVER"; return 1; }
 
     # NB: in the alpine initramfs /lib is a symlink -> usr/lib. The kernel's
     # cpio unpacker REPLACES an existing symlink with a directory entry, which
     # would orphan /lib/ld-musl-* and break every exec ("/init error -2").
     # Stage the addon under usr/lib so the symlink survives.
     local MODDIR="addon/usr/lib/modules/$KVER"
-    local m
-    for m in fs/ext4/ext4 fs/jbd2/jbd2 fs/mbcache lib/crc/crc16; do
+    local m src
+    for m in fs/ext4/ext4 fs/jbd2/jbd2 fs/mbcache lib/crc/crc16 \
+             net/packet/af_packet net/core/failover drivers/net/net_failover \
+             drivers/net/virtio_net fs/fuse/fuse fs/fuse/virtiofs; do
+      src="$MODBASE/$KVER/kernel/$m"
       mkdir -p "$MODDIR/kernel/$(dirname "$m")"
-      gunzip -c "apk-x/lib/modules/$KVER/kernel/$m.ko.gz" > "$MODDIR/kernel/$m.ko"
+      if   [ -f "$src.ko.gz" ]; then gunzip -c "$src.ko.gz" > "$MODDIR/kernel/$m.ko"
+      elif [ -f "$src.ko" ];    then cp -f    "$src.ko"      "$MODDIR/kernel/$m.ko"
+      # ext4 chain is mandatory (the rootfs is ext4); net/fuse are best-effort.
+      elif printf '%s' "$m" | grep -q '^fs/ext4\|^fs/jbd2\|^fs/mbcache\|^lib/crc'; then
+        echo "required module missing in modloop: $m"; return 1
+      fi
     done
     # The initramfs' modprobe is kmod, which only consults the modules.dep.bin
     # index — we can't regenerate that off-target. Instead shadow /init with a

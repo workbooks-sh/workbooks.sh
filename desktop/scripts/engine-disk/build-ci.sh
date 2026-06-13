@@ -19,6 +19,10 @@ DISK_SIZE="${DISK_SIZE:-3G}"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$HERE/lib.sh"
 
+# fetch_kernel_initramfs unpacks the Alpine modloop (squashfs) for the
+# version-matched ext4/virtio modules — ensure unsquashfs is present.
+command -v unsquashfs >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y squashfs-tools; }
+
 mkdir -p "$WORK"
 cd "$WORK"
 
