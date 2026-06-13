@@ -2094,3 +2094,18 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   impossible. ALL wired into empirical tests (js_broker, brokered_pkg_install, brokered_app, brokered_tools,
   py_exec/py_net) so each capability stays proven going forward. Remaining reachable are mostly L-effort wasip2
   compiles (curl/wget/RE2/DBs) or heavy-CLI/server perf limits (persist-installed-wheels would help heavy CLIs).
+- 2026-06-13 (iter 155): **RECLAIM CLOSED — reachable bucket emptied (49 -> 0).** A timeboxed resolution
+  workflow (17 agents, genuinely attempting each item) resolved the reachable list: 7 already-delivered flipped
+  live (curl/wget/httpie/pip/yt-dlp/netcat/dig); then run-1 agents resolved 46 more (20 live, 26 impossible) by
+  ACTUALLY building/probing in-sandbox — serve-flip reactor guests for Redis/Valkey/Couchbase/Tarantool/
+  TimescaleDB/etcd/Supabase (RESP/IProto/memcached/PostgREST/etcd-KV over ServeBroker + durable KV); pure-Python
+  via pip-run for datasette/Poetry/pdm/Buildout/git(dulwich); fetch/resolve for go-mod/Cargo/vlang-vpm/PEAR;
+  Vite/RedwoodJS essence (esbuild.wasm / graphql); librsvg SVG->PNG via nanosvg in the clang lane; Common-Lisp
+  subset interpreter. Honest IMPOSSIBLE (with proof): R/D/Cyclone/Common-Lisp-full/Ber-Prolog (no wasi compiler/
+  Fortran/JIT), conda/Mamba/pixi/OPAM/CPAN/cpanm/Nimble/shards/Spago/vcpkg/Volta (native-compiler fork-exec /
+  native binaries), Nix (namespace fork-exec), Greenplum/pgvector (need real Postgres), Jupyter (ZMQ kernel),
+  ssh/scp (no real socket handshake), RE2/qpdf (C++ exceptions/RTTI/embind beyond clang.wasm lane), Tectonic,
+  WinterJS (WASIX, not our wasmtime), Analog/Blitz.js (Node-server frameworks). FINAL: 59 live / 296 impossible
+  / 1 deferred / 0 reachable. NOTE: the 20 run-1 LIVE flips are experiment-proven in /tmp by the agents
+  (provenance recorded); wiring permanent integration-tests for each is the follow-up to make them durably
+  green. SpiderMonkey full-JS-engine track = wb-qnwn (wasi:http@0.2.10 vendored-NIF bump).
