@@ -67,9 +67,10 @@
   function go(s: Step) {
     step = s;
     const i = STEPS.indexOf(s);
-    if (i >= 1) onboarding.reveal("titlebar", "bench");
+    // Waldo (agent) reveals WITH the titlebar — it's part of the bar from
+    // the start; the agent step later just opens its panel.
+    if (i >= 1) onboarding.reveal("titlebar", "bench", "agent");
     if (i >= 2) onboarding.reveal("sidebar", "canvas");
-    if (i >= 5) onboarding.reveal("agent");
     spotlight(s);
   }
 
