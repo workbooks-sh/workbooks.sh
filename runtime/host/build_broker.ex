@@ -34,6 +34,15 @@ defmodule Workbooks.BuildBroker do
   static const char WB__B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   static int wb__b64val(char c){ const char *p = c ? strchr(WB__B64, c) : 0; return p ? (int)(p - WB__B64) : -1; }
 
+  /* encode `in` (inlen bytes) to base64 in `out` (cap bytes incl NUL); returns length or -1 on overflow. */
+  static int wb__b64enc(const unsigned char *in, int inlen, char *out, int cap){
+    int n=0;
+    for(int i=0;i<inlen;i+=3){ int b0=in[i],b1=(i+1<inlen)?in[i+1]:0,b2=(i+2<inlen)?in[i+2]:0;
+      if(n+4>=cap) return -1;
+      out[n++]=WB__B64[b0>>2]; out[n++]=WB__B64[((b0&3)<<4)|(b1>>4)];
+      out[n++]=(i+1<inlen)?WB__B64[((b1&15)<<2)|(b2>>6)]:'='; out[n++]=(i+2<inlen)?WB__B64[b2&63]:'='; }
+    out[n]=0; return n;
+  }
   /* decode base64 `in` (inlen chars) into `out` (cap bytes); returns decoded length or -1 on overflow. */
   static int wb__b64dec(const char *in, int inlen, unsigned char *out, int cap){
     int acc=0, bits=0, n=0;
@@ -65,11 +74,18 @@ defmodule Workbooks.BuildBroker do
     int bl=wb__json_str(resp,"\"body_b64\":\"",b64,sizeof(b64)); if(bl<=0) return 0;
     return wb__b64dec(b64,bl,out,cap);
   }
-  /* brokered command exec. `argv_json` is a JSON array literal e.g. "[\"-c\",\".\"]" (or "[]").
-     writes the command's stdout into out (cap); returns length, 0 (ran, empty), or -1 (denied/unknown). */
-  static int wb_exec(const char *name, const char *argv_json, unsigned char *out, int cap){
-    char req[4096]; static char resp[65536], b64[65536];
-    snprintf(req,sizeof(req),"{\"kind\":\"exec\",\"name\":\"%s\",\"argv\":%s}",name,argv_json?argv_json:"[]");
+  /* brokered command exec. `argv_json` is a JSON array literal e.g. "[\"-c\",\".\"]" (or "[]"); `stdin_str` is
+     the command's input (pass "" / NULL for none). writes the command's stdout into out (cap); returns length,
+     0 (ran, empty), or -1 (denied/unknown). */
+  static int wb_exec(const char *name, const char *argv_json, const char *stdin_str, unsigned char *out, int cap){
+    char req[8192]; static char resp[65536], b64[65536], sb64[65536];
+    if(stdin_str && *stdin_str){
+      if(wb__b64enc((const unsigned char*)stdin_str, (int)strlen(stdin_str), sb64, sizeof(sb64))<0) return -1;
+      snprintf(req,sizeof(req),"{\"kind\":\"exec\",\"name\":\"%s\",\"argv\":%s,\"stdin_b64\":\"%s\"}",
+               name, argv_json?argv_json:"[]", sb64);
+    } else {
+      snprintf(req,sizeof(req),"{\"kind\":\"exec\",\"name\":\"%s\",\"argv\":%s}",name,argv_json?argv_json:"[]");
+    }
     if(wb__roundtrip(req,resp,sizeof(resp))<0) return -1;
     if(!strstr(resp,"\"ok\":true")) return -1;
     int bl=wb__json_str(resp,"\"stdout_b64\":\"",b64,sizeof(b64)); if(bl<0) return -1;

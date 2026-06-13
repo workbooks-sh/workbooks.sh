@@ -1946,3 +1946,13 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   net+exec matching the Python lane — the build-driver/orchestrator class is writable in C, zero native
   toolchain, no per-tool host code. NEXT: stdin for wb_exec (base64-encode); a Rust shim (wb_broker.rs); reclaim
   a concrete fork-exec orchestrator (e.g. a make-lite driver) as a brokered tool.
+- 2026-06-13 (iter 144): **wb_exec STDIN + cross-language brokered ORCHESTRATION proven.** Added base64-ENCODE
+  to wb_broker.h and a stdin param to wb_exec(name, argv_json, stdin_str, out, cap) — the orchestrator can now
+  pipe input into the brokered command. CAPSTONE proof: a compiled C build-driver execs a registered :pynet
+  "wb-upper" command with stdin "hello world" -> the input flows wb_exec stdin -> base64 -> host -> CPython
+  stdin -> transform -> stdout_b64 -> back to C -> RESULT[HELLO WORLD]. So a NATIVE-style orchestrator (C,
+  no fork/exec of its own) drives a brokered tool in ANOTHER language (Python), all sandboxed, depth-bounded,
+  default-deny + command-scoped. This is the Make/Ninja/build-driver reclaim class realized end-to-end across
+  languages. 3 shim tests green (brokered HTTP public/internal + exec deny/grant + cross-lang orchestration).
+  NEXT: a Rust shim (wb_broker.rs); reclaim a concrete multi-step build (a C driver that compiles+runs a tool
+  via brokered commands); wire :broker into the toolkit authoring surface so authored tools opt in.
