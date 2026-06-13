@@ -1534,3 +1534,14 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   allow-list scope, UDP client (DNS ok/internal blocked), ephemeral-bind-ok/listener-bind-denied. Three fires
   (111-114) of running real standard tools closed every socket vector + found 2 real bugs (UDP over-block,
   listener under-restrict). The standard-tool generalization (keystone goal 2) is exhaustively red-team-green.
+- 2026-06-12 (iter 115): **Obfuscated/encoded IP forms now red-team-proven on the wasi:http path too.** The
+  holistic wasi:http red-team covered loopback/metadata/RFC1918/CGNAT/IPv6/userinfo@ but NOT the encoded forms
+  the directive explicitly names (decimal/octal/hex). Those were tested on the NetGuard host_http_get path but
+  never on the standard wasi:http path (send_request). Added them to the holistic test: a real wasi:http guest
+  fetching http://2130706433/ (decimal=127.0.0.1), 0x7f000001 (hex), 0177.0.0.1 (octal), 127.1 (short),
+  [::ffff:127.0.0.1] (v4-mapped), [::ffff:a9fe:a9fe] (v4-mapped metadata), [64:ff9b::a9fe:a9fe] (NAT64 ->
+  metadata) — ALL come back BLOCKED (resolve-then-deny or fail-resolve). Green. So BOTH egress paths (NetGuard
+  + wasi:http) now block EVERY obfuscated/encoded internal target the directive names. NETWORKING RED-TEAM IS
+  EXHAUSTIVE ON BOTH PATHS: SSRF (IPv4+IPv6 literal, decimal/hex/octal/short, v4-mapped, NAT64/6to4/Teredo),
+  DNS-rebinding (resolve-then-pin, http+https), DNS-exfil, userinfo@, redirect-to-internal, allow-list scope,
+  rate/conn/byte DoS, revocation — all closed + tested on host-mediated AND standard-tool paths.

@@ -290,7 +290,16 @@ defmodule Workbooks.BrokerNetE2ETest do
       "http://100.64.0.1/",         # CGNAT
       "http://[::1]/",              # IPv6 loopback
       "http://[fd00::1]/",          # IPv6 ULA
-      "http://user:pass@127.0.0.1/" # userinfo@ trick
+      "http://user:pass@127.0.0.1/", # userinfo@ trick
+      # encoded/obfuscated IP forms (named by the directive: decimal/octal/hex) — tested on the NetGuard path,
+      # now also on the wasi:http path (send_request): each must resolve-then-deny OR fail-resolve -> BLOCKED.
+      "http://2130706433/",         # decimal int = 127.0.0.1
+      "http://0x7f000001/",         # hex = 127.0.0.1
+      "http://0177.0.0.1/",         # octal octet = 127.0.0.1
+      "http://127.1/",              # short form = 127.0.0.1
+      "http://[::ffff:127.0.0.1]/", # IPv4-mapped IPv6 loopback
+      "http://[::ffff:a9fe:a9fe]/", # IPv4-mapped IPv6 metadata (169.254.169.254)
+      "http://[64:ff9b::a9fe:a9fe]/" # NAT64 well-known prefix -> 169.254.169.254 (metadata)
     ]
 
     for url <- targets do
