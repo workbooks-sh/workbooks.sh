@@ -3,6 +3,22 @@
 Every roadmap capability collapses into one of three foundational blockers. Use these names
 (not "Wall 1/2/3") so we stop re-deriving the same root causes every session.
 
+## STRUCTURE: 1 boundary + 2 solution services (don't conflate their kinds)
+- **BEDROCK is the BOUNDARY**, not a service. It's the non-negotiable seal everything runs inside:
+  the guest is sandboxed wasm, in-process (BEAM-as-microVM via embedded wasmtime), NO native, NO JIT,
+  no OS process per guest. It doesn't solve anything — it's the constraint the two services respect.
+- **FORGE and BRIDGE are the two SOLUTION SERVICES** — real machinery that delivers a capability
+  WITHOUT crossing Bedrock. Forge PRODUCES the artifact (compile source→wasi); Bridge ADAPTS the
+  runtime to an artifact we didn't produce (broker a prebuilt wasm's env imports).
+
+## ROUTING: pick the service by what you start with
+1. Have source? → **FORGE** (compile to wasi).
+2. Have only a prebuilt emscripten wasm? → **BRIDGE** (broker its env imports).
+3. Neither — a dynamic engine / JIT-shaped thing? → **FORGE the engine itself** into the sandbox,
+   jitless (the SpiderMonkey path; the jitless toll IS Bedrock).
+4. Native-only (arbitrary user binary / a JIT that must emit native)? → **past Bedrock = out** (the
+   only escape was the OS microVM, permanently refused). Honest roadmap, stop re-attempting in-guest.
+
 ## 🪨 BEDROCK — no native execution in the sandbox
 The **guest** (untrusted code in the wasm sandbox) can never generate or run native code at
 runtime (W^X / no JIT). That seal IS the security boundary — it's a hard wasm invariant, not a
