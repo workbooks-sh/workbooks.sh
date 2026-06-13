@@ -91,6 +91,8 @@ HEAD = """<!doctype html>
 """
 
 CSS = """
+@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
+  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
 :root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0;
   --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
@@ -140,7 +142,7 @@ a{ color:inherit; text-decoration:none; }
 .dcard{ flex:0 0 340px; max-width:100%; border:2px solid var(--ink); border-radius:18px; background:var(--card);
   box-shadow:5px 5px 0 var(--ink); padding:24px; display:flex; flex-direction:column; justify-content:space-between; gap:18px; }
 .dcard .cu{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
-.dcard .nl{ font-family:var(--display); font-size:25px; line-height:1.08; margin:8px 0 0; }
+.dcard .nl{ font-family:var(--read); font-weight:600; font-size:25px; line-height:1.12; margin:8px 0 0; }
 .dcard .nd{ font-family:var(--read); font-size:15px; line-height:1.45; color:var(--dim); margin:8px 0 0; }
 .dcard .pwrap{ }
 .dcard .pbar{ height:9px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; background:#fff; }
@@ -160,7 +162,7 @@ a{ color:inherit; text-decoration:none; }
   -webkit-text-stroke:1px var(--ink); flex:0 0 auto; }
 .ucard .uch .ut{ min-width:0; }
 .ucard .uch .un{ font:700 9px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
-.ucard .uch h2{ font-family:var(--display); font-weight:400; font-size:22px; line-height:1; margin:5px 0 0; }
+.ucard .uch h2{ font-family:var(--display); font-weight:400; font-size:23px; line-height:1; margin:5px 0 0; text-transform:lowercase; }
 .ucard .uch p{ font-size:14px; line-height:1.4; color:var(--dim); margin:6px 0 0; }
 .ucard .umeta{ margin-left:auto; flex:0 0 auto; font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); text-align:right; }
 .ll{ display:flex; align-items:center; gap:11px; padding:11px 8px; border-radius:9px; }
@@ -180,7 +182,7 @@ a{ color:inherit; text-decoration:none; }
 .pane{ display:grid; grid-template-columns:minmax(0,1fr) 326px; gap:0; }
 .reading{ min-width:0; max-width:760px; margin:0 auto; padding:60px 56px 80px; justify-self:center; width:100%; }
 .crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
-.reading h1{ font-family:var(--display); font-weight:400; font-size:clamp(34px,4vw,52px); line-height:1.04; margin:14px 0 0; letter-spacing:-.005em; }
+.reading h1{ font-family:var(--read); font-weight:600; font-size:clamp(34px,4vw,52px); line-height:1.08; margin:15px 0 0; letter-spacing:-.012em; }
 .promise{ font-size:clamp(19px,2.2vw,23px); line-height:1.5; color:#34372f; margin:18px 0 0; font-style:italic; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
@@ -202,9 +204,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .soon-pane p{ font-size:20px; line-height:1.6; margin:22px 0; color:#34372f; }
 
 /* right pane — course controls */
-.rail{ border-left:2px solid var(--ink); padding:60px 26px; position:sticky; top:0; align-self:start; min-height:100vh; }
+.rail{ border-left:1px solid var(--line); padding:62px 30px; position:sticky; top:0; align-self:start; min-height:100vh; }
 .rail .pos{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
-.rail .audio{ margin:16px 0 0; }
+.rail .audio{ margin:18px 0 0; }
 .play{ display:flex; align-items:center; gap:13px; padding:12px 16px; border:2px solid var(--ink); border-radius:999px;
   background:var(--card); box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none; }
 .play .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; }
@@ -217,12 +219,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   border:2px solid var(--ink); border-radius:12px; padding:15px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--bloomd); }
 .rail .cont:hover{ background:var(--bloomd); border-color:var(--bloomd); box-shadow:3px 3px 0 var(--ink); }
 .rail .cont.done{ background:var(--bloom); color:var(--ink); border-color:var(--bloomd); }
-.rail .nav{ margin:14px 0 0; display:flex; flex-direction:column; gap:8px; }
-.rail .nav a{ font:700 11px var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--dim);
-  border:1.5px solid var(--line); border-radius:9px; padding:11px 13px; }
-.rail .nav a:hover{ border-color:var(--ink); color:var(--ink); }
-.rail .nav a small{ display:block; font-weight:400; letter-spacing:0; text-transform:none; font-family:var(--read);
-  font-size:13px; color:var(--ink); margin-top:3px; }
+.rail .nav{ margin:24px 0 0; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:18px; }
+.rail .nav a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:9px 0; }
+.rail .nav a:hover{ color:var(--ink); }
 
 /* topbar (mobile) */
 .topbar{ display:none; }
@@ -331,9 +330,9 @@ def lesson_page(l):
                  % (esc(l["audio"]), esc(l.get("mins", ""))))
     nav = ""
     if l["prev"]:
-        nav += '<a href="/learn/%s">← Previous<small>%s</small></a>' % (esc(l["prev"]["slug"]), esc(l["prev"]["title"]))
+        nav += '<a href="/learn/%s">← Previous</a>' % esc(l["prev"]["slug"])
     if l["next"]:
-        nav += '<a href="/learn/%s">Next →<small>%s</small></a>' % (esc(l["next"]["slug"]), esc(l["next"]["title"]))
+        nav += '<a href="/learn/%s">Next →</a>' % esc(l["next"]["slug"])
     nxt = l["next"]["slug"] if l["next"] else ""
     cclabel = "Complete & continue" if l["next"] else "Complete & finish"
     rail = ('<aside class="rail"><div class="pos">Lesson %d of %d</div>%s'
@@ -370,14 +369,14 @@ def dashboard():
                   '<span class="umeta">%d<br>lessons</span></div>%s</div>'
                   % (u["n"], u["n"], esc(u["title"]), esc(u["dek"]), len(u["lessons"]), lessons))
     band = ('<div class="dband"><div class="dintro"><div class="kick">learn workbooks from zero</div>'
-            '<h1><span>Learning</span> <span class="bub">CENTER</span></h1>'
+            '<h1><span>learning</span> <span class="bub">CENTER</span></h1>'
             '<p class="dek">No technical background needed — %d deep, plain-language lessons in order. '
             'Each teaches one big idea, with the technical docs one click away.</p></div>'
-            '<div class="dcard"><div><div class="cu" id="cuptext">Begin the course</div>'
-            '<div class="nl" id="nextlesson">%s</div><div class="nd" id="nextdek">%s</div></div>'
+            '<div class="dcard"><div class="cu" id="cuptext">Begin the course</div>'
+            '<div class="nl" id="nextlesson">%s</div>'
             '<div class="pwrap"><div class="pbar"><i id="dpbar"></i></div><div class="pn" id="dpn">%d lessons</div></div>'
             '<a class="start" id="startbtn" data-first="%s" href="/learn/%s"><span>Start the course</span> →</a></div></div>'
-            % (TOTAL, esc(nxt_meta["title"]), esc(nxt_meta.get("teaches", "")), TOTAL, esc(first), esc(first)))
+            % (TOTAL, esc(nxt_meta["title"]), TOTAL, esc(first), esc(first)))
     main = band + '<div class="dunits">' + cards + '</div>'
     return HEAD.format(
         title="Learning Center — Workbooks",
