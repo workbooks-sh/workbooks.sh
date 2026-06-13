@@ -67,10 +67,13 @@
   function go(s: Step) {
     step = s;
     const i = STEPS.indexOf(s);
-    // Waldo (agent) reveals WITH the titlebar — it's part of the bar from
-    // the start; the agent step later just opens its panel.
+    // Reveal one surface per beat. Waldo (agent) reveals WITH the titlebar —
+    // it's part of the bar from the start; the agent step just opens its
+    // panel. The canvas (create screen) holds back until the theme beat, so
+    // the sidebar step is purely about the sidebar — no create screen yet.
     if (i >= 1) onboarding.reveal("titlebar", "bench", "agent");
-    if (i >= 2) onboarding.reveal("sidebar", "canvas");
+    if (i >= 2) onboarding.reveal("sidebar");
+    if (i >= 4) onboarding.reveal("canvas");
     spotlight(s);
   }
 
@@ -82,7 +85,8 @@
     dock.close();
     chrome.bookmarksOpen = false;
     chrome.nexusOpen = false;
-    if (s === "search") chrome.openSearch();
+    if (s === "sidebar") chrome.sidebarOpen = true; // make sure it's expanded
+    else if (s === "search") chrome.openSearch();
     else if (s === "agent") dock.open("waldo");
   }
 
@@ -160,7 +164,7 @@
           {:else if step === "sidebar"}
             <div class="text">
               <span class="kicker">Your sidebar</span>
-              <h1>Pick a left side</h1>
+              <h1>Pick a sidebar</h1>
               <p>Shelf is compact + bookmark-forward. Hub adds a workspace rail for many spaces. Map is a roomy page tree. Restyles live — look left.</p>
             </div>
             <div class="opts">
