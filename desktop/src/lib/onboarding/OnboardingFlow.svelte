@@ -19,6 +19,7 @@
   import { nav } from "$lib/bridge/nav.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { search } from "$lib/search/registry.svelte";
   import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
   import OnboardingAgents from "$lib/onboarding/OnboardingAgents.svelte";
   import LessonOverlay from "$lib/onboarding/LessonOverlay.svelte";
@@ -78,9 +79,9 @@
     sidebar: "shelf" | "hub" | "map";
     sidebarTop: "bookmarks" | "search" | "both";
     glyphs: "icon" | "emoji";
-    search: { ai: "summary" | "first" | "off" };
+    searchMode: "internal" | "web" | "ai";
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, glyphs: nav.glyphs, search: { ai: "summary" } });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, glyphs: nav.glyphs, searchMode: search.mode });
 
   // Demo bench toolkits — registered only for the tour so the bench has real,
   // toggleable shortcuts to showcase the "build your own toolkit" concept.
@@ -131,8 +132,13 @@
     chrome.nexusOpen = false;
     // "search" focuses the sidebar's own file-search bar (inline, shown by
     // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
-    if (s === "sidebar" || s === "sidebar-tour" || s === "search" || s === "glyph") chrome.sidebarOpen = true;
+    if (s === "sidebar" || s === "sidebar-tour" || s === "glyph") chrome.sidebarOpen = true;
     else if (s === "waldo") dock.open("waldo");
+    // "search" previews the everything-search drawer (right) in the current mode.
+    if (s === "search") {
+      search.demoQuery = "data pipelines";
+      chrome.openSearch();
+    }
     // "connect" shows the agents page above the coach — nothing to open.
     // The glyph step expands every folder so the emoji↔icon flip is visible
     // at the file level too.
@@ -141,7 +147,15 @@
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
-  function pickSidebarTop(b: Prefs["sidebarTop"]) { prefs.sidebarTop = b; nav.setSidebarTop(b); }
+  // Pick a search kind and preview it live: set the mode, seed a demo query,
+  // and (re)open the search drawer so it remounts in that mode.
+  function pickSearchMode(m: Prefs["searchMode"]) {
+    prefs.searchMode = m;
+    search.setMode(m);
+    search.demoQuery = "data pipelines";
+    chrome.closeLeft();
+    queueMicrotask(() => chrome.openSearch());
+  }
   function pickGlyphs(g: Prefs["glyphs"]) { prefs.glyphs = g; nav.setGlyphs(g); }
 
   // OpenRouter connect (SCAFFOLD). Waldo runs on OpenRouter — one key, every
@@ -266,14 +280,14 @@
 
           {:else if step === "search"}
             <div class="text">
-              <span class="kicker">Find · top of the sidebar</span>
-              <h1>How do you find files?</h1>
-              <p>A file-search bar (searches your local files, separate from the ⌘K bar up top), a pinned bookmark grid, or both. Look left — it changes live.</p>
+              <span class="kicker">Search · ⌘K</span>
+              <h1>How should search work?</h1>
+              <p>Internal finds your files + runtime. Web adds openable web results. AI answers your prompt with sources + follow-ups. Pick one — it previews on the right.</p>
             </div>
             <div class="opts">
-              <button type="button" class="opt" class:sel={prefs.sidebarTop === "bookmarks"} onclick={() => pickSidebarTop("bookmarks")}>Bookmarks</button>
-              <button type="button" class="opt" class:sel={prefs.sidebarTop === "search"} onclick={() => pickSidebarTop("search")}>File search</button>
-              <button type="button" class="opt" class:sel={prefs.sidebarTop === "both"} onclick={() => pickSidebarTop("both")}>Both</button>
+              <button type="button" class="opt" class:sel={prefs.searchMode === "internal"} onclick={() => pickSearchMode("internal")}>Internal</button>
+              <button type="button" class="opt" class:sel={prefs.searchMode === "web"} onclick={() => pickSearchMode("web")}>Web</button>
+              <button type="button" class="opt" class:sel={prefs.searchMode === "ai"} onclick={() => pickSearchMode("ai")}>AI</button>
             </div>
 
           {:else if step === "theme"}

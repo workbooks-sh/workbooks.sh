@@ -8,6 +8,19 @@
 import type { SearchProvider, SearchResult } from "./types";
 
 const PREFS_KEY = "wb.search.prefs.v1";
+const MODE_KEY = "wb.search.mode";
+
+// The three search kinds:
+//   internal — fuzzy local/runtime results only (no web)
+//   web      — web results (open pages) + internal
+//   ai       — prompt → synthesized answer page (answer, sources, follow-ups)
+export type SearchMode = "internal" | "web" | "ai";
+
+function loadMode(): SearchMode {
+  if (typeof localStorage === "undefined") return "web";
+  const m = localStorage.getItem(MODE_KEY);
+  return m === "internal" || m === "web" || m === "ai" ? m : "web";
+}
 
 interface Prefs {
   disabled: string[]; // provider ids the user turned off
@@ -38,6 +51,15 @@ export interface ProviderResults {
 class SearchRegistry {
   providers = $state<SearchProvider[]>([]);
   #prefs = $state<Prefs>(loadPrefs());
+
+  /** Active search kind (internal / web / ai). */
+  mode = $state<SearchMode>(loadMode());
+  /** A query the drawer seeds itself with when opened for a preview. */
+  demoQuery = $state<string>("");
+  setMode(m: SearchMode): void {
+    this.mode = m;
+    try { localStorage.setItem(MODE_KEY, m); } catch { /* non-fatal */ }
+  }
 
   register(p: SearchProvider): void {
     if (this.providers.some((x) => x.id === p.id)) return;

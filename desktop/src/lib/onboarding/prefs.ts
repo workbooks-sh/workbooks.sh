@@ -11,7 +11,7 @@ export interface BrowserPrefs {
   sidebar: "shelf" | "hub" | "map";
   sidebarTop: "bookmarks" | "search" | "both";
   glyphs: "icon" | "emoji";
-  search: { ai: "summary" | "first" | "off" };
+  searchMode: "internal" | "web" | "ai";
 }
 
 const KEY = "wb.browser.prefs";

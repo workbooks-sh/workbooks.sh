@@ -8,11 +8,17 @@
    * result opens its URL in a tab (the readability path). Toolkits add
    * providers via the Browser SDK — they appear here as peers.
    */
-  import { MagnifyingGlass as Search, X } from "phosphor-svelte";
+  import { MagnifyingGlass as Search, X, Sparkle, FileText, Globe, ArrowUpRight } from "phosphor-svelte";
+  import { onMount } from "svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import { search, type ProviderResults } from "$lib/search/registry.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { aiAnswer, type AiAnswer } from "$lib/search/aiPreview";
+  import { setSearch, type SearchApi } from "$lib/search/context";
   import type { SearchResult } from "$lib/search/types";
+
+  const mode = $derived(search.mode);
+  let aiResult = $state<AiAnswer | null>(null);
 
   let { onclose }: { onclose?: () => void } = $props();
 
@@ -41,17 +47,30 @@
   let groups = $state<ProviderResults[]>([]);
   let busy = $state(false);
 
-  // Run all providers on query change (debounced). The empty query shows
-  // each provider's default set (recent files etc.).
+  // Seed a preview query when one was set (e.g. onboarding previewing a mode).
+  onMount(() => {
+    if (search.demoQuery) {
+      query = search.demoQuery;
+      if (search.mode === "ai") aiResult = aiAnswer(query);
+      search.demoQuery = "";
+    }
+  });
+
+  // Run providers on query change (debounced). AI mode is a submit flow (no
+  // live providers); internal mode drops the web group.
   let runToken = 0;
   $effect(() => {
     const q = query;
+    const m = mode;
+    if (m === "ai") { groups = []; busy = false; return; }
     const token = ++runToken;
     busy = true;
     const t = setTimeout(() => {
       void search.searchAll(q).then((g) => {
         if (token !== runToken) return; // a newer query superseded this
-        groups = g.filter((x) => x.results.length > 0 || x.error);
+        let gg = g.filter((x) => x.results.length > 0 || x.error);
+        if (m === "internal") gg = gg.filter((x) => x.provider.id !== "web");
+        groups = gg;
         busy = false;
       });
     }, 120);
@@ -93,6 +112,10 @@
       highlighted = Math.max(highlighted - 1, 0);
     } else if (e.key === "Enter") {
       e.preventDefault();
+      if (mode === "ai") {
+        aiResult = query.trim() ? aiAnswer(query) : null;
+        return;
+      }
       const r = flat[highlighted];
       if (r) void open(r);
     }
@@ -107,6 +130,17 @@
     if (r.path) e.dataTransfer.setData("application/x-workbooks-file-path", r.path);
   }
 
+  function openSource(s: { url?: string; path?: string }) {
+    void tabsStore.open(s.url ?? s.path ?? "").catch(() => {});
+  }
+  function askRelated(q: string) {
+    query = q;
+    aiResult = aiAnswer(q);
+  }
+  const placeholder = $derived(
+    mode === "ai" ? "Ask anything, then press Enter…" : mode === "internal" ? "Search your files…" : "Search files, bookmarks, the web…",
+  );
+
   // Index of a result within the flat list, for keyboard highlight.
   function flatIndex(g: ProviderResults, i: number): number {
     let n = 0;
@@ -116,6 +150,26 @@
     }
     return n + i;
   }
+
+  // Search SDK — expose this host's surface so any search UI (and toolkits)
+  // can consume the same contract (parallel to the sidebar SDK).
+  const api: SearchApi = {
+    get mode() { return search.mode; },
+    setMode: (m) => search.setMode(m),
+    get query() { return query; },
+    setQuery: (q) => { query = q; },
+    get busy() { return busy; },
+    get groups() { return groups; },
+    get flat() { return flat; },
+    get highlighted() { return highlighted; },
+    setHighlighted: (i) => { highlighted = i; },
+    get ai() { return aiResult; },
+    ask: (q) => { const v = (q ?? query).trim(); aiResult = v ? aiAnswer(v) : null; },
+    open: (r) => void open(r),
+    openTarget: (t) => openSource(t),
+    close: () => onclose?.(),
+  };
+  setSearch(api);
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -128,27 +182,54 @@
       aria-label="Resize search"
       onpointerdown={startResize}
     ></button>
-    <div class="search-row">
-      <Search weight="bold" size={13} />
+    <div class="search-row" class:ai={mode === "ai"}>
+      {#if mode === "ai"}<Sparkle weight="fill" size={13} />{:else}<Search weight="bold" size={13} />{/if}
       <input
         bind:this={inputEl}
         bind:value={query}
         type="text"
-        placeholder="Search files, bookmarks, the web…"
+        placeholder={placeholder}
         spellcheck="false"
         autocomplete="off"
       />
       {#if query}
-        <button type="button" class="clear" aria-label="Clear search" onclick={() => (query = "")}>
+        <button type="button" class="clear" aria-label="Clear search" onclick={() => { query = ""; aiResult = null; }}>
           <X weight="bold" size={11} />
         </button>
       {/if}
     </div>
 
+    {#if mode === "ai"}
+      <!-- AI search — prompt → synthesised answer + sources + follow-ups. -->
+      <div class="results ai-results">
+        {#if !aiResult}
+          <div class="empty">Ask anything and press Enter — I'll answer from your files and the web, with sources.</div>
+        {:else}
+          <div class="ai-answer">{aiResult.answer.replace(/\*\*/g, "")}</div>
+          <div class="ai-h">Sources</div>
+          {#each aiResult.sources as s, i (i)}
+            <button type="button" class="ai-src" onclick={() => openSource(s)} title={s.url ?? s.path}>
+              <span class="ai-src-ic">{#if s.url}<Globe size={12} weight="fill" />{:else}<FileText size={12} weight="fill" />{/if}</span>
+              <span class="ai-src-tx">
+                <span class="ai-src-t">{s.title}</span>
+                <span class="ai-src-s">{s.snippet}</span>
+              </span>
+              <ArrowUpRight size={12} weight="bold" class="ai-src-go" />
+            </button>
+          {/each}
+          <div class="ai-h">Related</div>
+          <div class="ai-rel">
+            {#each aiResult.related as r, i (i)}
+              <button type="button" class="ai-q" onclick={() => askRelated(r)}>{r}</button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {:else}
     <div class="results" role="listbox" aria-label="Search results">
       {#if groups.length === 0}
         <div class="empty">
-          {busy ? "Searching…" : query ? "No matches." : "Search across files, bookmarks, tabs and the web."}
+          {busy ? "Searching…" : query ? "No matches." : mode === "internal" ? "Search across your files + workbooks." : "Search across files, bookmarks, tabs and the web."}
         </div>
       {:else}
         {#each groups as g (g.provider.id)}
@@ -179,6 +260,7 @@
         {/each}
       {/if}
     </div>
+    {/if}
 </aside>
 
 <style>
@@ -338,4 +420,57 @@
     flex: 1 1 auto;
     font-family: var(--font-mono);
   }
+
+  /* AI mode — prompt → answer + sources + follow-ups. */
+  .search-row.ai { color: var(--color-brand); }
+  .ai-results { padding: 10px 12px 14px; }
+  .ai-answer {
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: var(--color-fg);
+    margin-bottom: 14px;
+  }
+  .ai-h {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+    margin: 12px 0 6px;
+  }
+  .ai-src {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    text-align: left;
+    cursor: pointer;
+    margin-bottom: 5px;
+    transition: border-color 0.14s, background 0.14s;
+  }
+  .ai-src:hover { border-color: var(--color-border-strong); }
+  .ai-src-ic { flex-shrink: 0; margin-top: 1px; color: var(--color-fg-subtle); }
+  .ai-src-tx { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+  .ai-src-t { font-size: 0.8rem; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-src-s { font-size: 0.72rem; color: var(--color-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-src :global(.ai-src-go) { flex-shrink: 0; color: var(--color-fg-subtle); margin-top: 2px; }
+  .ai-rel { display: flex; flex-direction: column; gap: 5px; }
+  .ai-q {
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.14s, color 0.14s, background 0.14s;
+  }
+  .ai-q:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface-soft); }
 </style>
