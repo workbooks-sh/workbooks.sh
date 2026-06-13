@@ -35,12 +35,16 @@
 
   onMount(() => onboarding.start());
 
-  // Reveal the real shell pieces cumulatively as the coach advances.
-  $effect(() => {
-    if (stepIdx >= 1) onboarding.reveal("titlebar");
-    if (stepIdx >= 2) onboarding.reveal("sidebar", "canvas");
-    if (stepIdx >= 5) onboarding.reveal("agent");
-  });
+  // Reveal the real shell pieces cumulatively. Driven IMPERATIVELY (called
+  // from the nav handlers below), NOT a $effect — a tracked effect that both
+  // reads and writes onboarding state is what froze the app before.
+  function go(s: Step) {
+    step = s;
+    const i = STEPS.indexOf(s);
+    if (i >= 1) onboarding.reveal("titlebar");
+    if (i >= 2) onboarding.reveal("sidebar", "canvas");
+    if (i >= 5) onboarding.reveal("agent");
+  }
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
@@ -58,12 +62,12 @@
 
   function next() {
     const i = STEPS.indexOf(step);
-    if (i < STEPS.length - 1) step = STEPS[i + 1];
+    if (i < STEPS.length - 1) go(STEPS[i + 1]);
     else finish();
   }
   function back() {
     const i = STEPS.indexOf(step);
-    if (i > 0) step = STEPS[i - 1];
+    if (i > 0) go(STEPS[i - 1]);
   }
   function finish() {
     try {
@@ -88,7 +92,7 @@
       <div class="dots" role="presentation">
         {#each STEPS as s, i (s)}
           <button type="button" class="dot" class:on={i === stepIdx} class:past={i < stepIdx}
-            aria-label={s} onclick={() => { if (i <= stepIdx) step = s; }}></button>
+            aria-label={s} onclick={() => { if (i <= stepIdx) go(s); }}></button>
         {/each}
       </div>
 
