@@ -45,7 +45,7 @@
   import { openIntent } from "$lib/bridge/openIntent";
   import { dock } from "$lib/bridge/dock.svelte";
   import DockHost from "$lib/components/DockHost.svelte";
-  import { ChatCircle as MessageCircle } from "phosphor-svelte";
+  import { ChatCircle as MessageCircle, Sparkle as WaldoIcon } from "phosphor-svelte";
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
   import { applyBootPrefs } from "$lib/onboarding/prefs";
@@ -438,8 +438,17 @@
     // Composable search (wb-aakl.19): register the built-in providers
     // (files/workbooks, bookmarks, tabs, nexus web). Toolkits add more.
     for (const p of BUILTIN_PROVIDERS) search.register(p);
-    // Register the agent panel into the extension dock (wb-aakl.14) — only
-    // under WB_FF_AGENTS, lazily loaded so a flags-off build excludes it.
+    // Waldo (wb-aakl.21) — the ONE resident agent, a first-party dock panel
+    // registered ALWAYS (not flag-gated; it replaces the multi-agent chrome
+    // with a single voice). Lazy-loaded like any dock panel.
+    dock.register({
+      id: "waldo",
+      title: "Waldo",
+      icon: WaldoIcon,
+      load: () => import("$lib/components/WaldoPanel.svelte"),
+    });
+    // The multi-agent chat panel is dev-only (WB_FF_AGENTS); it coexists
+    // with Waldo when on, and is excluded from the shipped browser.
     if (features.agents) {
       dock.register({
         id: "agent",
