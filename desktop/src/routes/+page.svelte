@@ -540,9 +540,8 @@
        packages have somewhere to live. Not a setup gate. -->
   <WorkspaceOnboarding oncomplete={onOnboardingComplete} />
 {:else if !firstRunDone}
-  <!-- Personalization onboarding (wb-aakl.20) — choices, never a gate.
-       The old runtime/key gate (FirstRunOnboarding) is retired: the CLI
-       owns setup before the browser is ever opened. -->
+  <!-- Personalization onboarding (wb-aakl.20) — owns the view, builds the
+       UI up one concept at a time (non-interactive preview), never a gate. -->
   <OnboardingFlow oncomplete={() => (firstRunDone = true)} />
 {:else}
   <div class="app">
