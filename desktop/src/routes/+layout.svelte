@@ -18,7 +18,6 @@
   import { auth } from "$lib/auth/store.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { features } from "$lib/bridge/features";
-  import { onboarding } from "$lib/onboarding/onboarding.svelte";
 
   let SetupWizard =
     $state<typeof import("$lib/setup/SetupWizard.svelte").default | null>(null);
@@ -58,9 +57,7 @@
 </script>
 
 <div class="shell">
-  <div class="tb-host" class:ob-hide={!onboarding.shows("titlebar")}>
-    <Titlebar />
-  </div>
+  <Titlebar />
   <div class="body">
     {@render children()}
   </div>
@@ -106,16 +103,6 @@
   :global(body) {
     height: 100%;
     overflow: hidden;
-  }
-  /* Onboarding reveal: the real titlebar drops in as its own beat. */
-  .tb-host {
-    flex-shrink: 0;
-    transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .tb-host.ob-hide {
-    opacity: 0;
-    transform: translateY(-12px);
-    pointer-events: none;
   }
   .shell {
     display: flex;
