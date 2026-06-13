@@ -67,6 +67,12 @@ defmodule Workbooks.TcpServeBroker do
   bytes become the command's stdin, and its stdout is the response. The command runs in its OWN isolated
   wasm instance via CommandRegistry (the full exec sandbox) — so a TCP server's request/response logic is a
   guest that never touches the socket. `name`/`argv` are the registered command + its args.
+
+  SANDBOX-FROM-EGRESS (the inbound serving guest must NOT become an SSRF pivot): the served command runs with
+  NO network by construction — the wasmtime CLI lane is invoked WITHOUT any inherit-network/-S http flag, and
+  the dock lane defaults to the `:minimal` profile (Policy.allow_http? false, no host_http_get import). A
+  malicious server guest therefore cannot reach the network at all; if a server genuinely needs to call out,
+  that is a DELIBERATE grant routing through the brokered+SSRF-guarded egress path, never ambient.
   """
   def command_handler(name, argv \\ []) when is_binary(name) and is_list(argv) do
     fn request ->

@@ -1592,3 +1592,16 @@ emitting compilers-to-run-native (their wasm-targeting versions already answer t
   -> only 2 served, >=3 refused. 7 TcpServeBroker tests green. So the raw-TCP server platform now has the FULL
   DoS cadence: huge-bodies (byte cap) + many-conns (per-client rate + global concurrency cap) + slowloris
   (absolute deadline) + revocation — matching the directive's "huge bodies/many conns/slowloris" for inbound.
+- 2026-06-12 (iter 120): **Inbound TCP-server guest is SANDBOXED-FROM-EGRESS — structurally verified +
+  documented (the serving-guest-can't-pivot property, raw-TCP analog of the wasi:http SSRF-composition test).**
+  Verified the served guest cannot become an SSRF pivot: the command_handler runs the guest via CommandRegistry
+  -> PackageManager.run, and BOTH execution lanes deny network by construction — run_wasmtime invokes the
+  wasmtime CLI with NO inherit-network / -S http flag (wasmtime default-deny network), and the dock lane
+  defaults to the :minimal profile (Policy.allow_http? false -> no host_http_get import). So an inbound TCP-
+  server guest has NO egress at all; a malicious server cannot reach metadata/internal/anywhere. Documented the
+  invariant in command_handler. (Verified by code-path reading + the coreutils-cat guest-backed test showing a
+  confined pure-transform guest; a malicious-egress-command fixture would be disproportionate for a property
+  true by construction.) RAW-TCP INBOUND PLATFORM COMPLETE: host-owned listener + sandboxed wasm guest +
+  full DoS cadence (byte cap, per-client rate, global concurrency cap, slowloris deadline, revocation, audit) +
+  egress-sandbox + loopback-bound. The inbound server-flip (keystone goal 4) is done for wasi:http AND raw TCP,
+  both with the serving-guest-can't-pivot property held.
