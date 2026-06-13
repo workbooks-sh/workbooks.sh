@@ -546,6 +546,14 @@ defmodule Workbooks.Compilers do
                        -fwasm-exceptions -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=false
                        -Xclang -disable-llvm-verifier)
 
+  # SHARED-MEMORY THREADS variant of @rust_clang_flags (compile_rust_threads): wasm32-wasi-threads
+  # target + -pthread -matomics -mbulk-memory so the std .o and user .o carry atomics codegen and link
+  # against the threads sysroot's shared-memory libc (must match the threads libstd's own .o).
+  @rust_threads_clang_flags ~w(--target=wasm32-wasi-threads --sysroot=/usr -pthread -matomics
+                       -mbulk-memory -O1 -fno-strict-aliasing -w
+                       -fwasm-exceptions -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=false
+                       -Xclang -disable-llvm-verifier)
+
   @doc """
   Compile untrusted Rust (full std) → a runnable wasm ARTIFACT entirely in the sandbox:
   mrustc.wasm (.rs → C) → clang.wasm (C → .o) → wasm-ld (link against the libstd that was
@@ -746,6 +754,130 @@ defmodule Workbooks.Compilers do
         File.rm(Path.join(o, "lib#{name}.rlib"))
         result
     end
+  end
+
+  # ── Rust SHARED-MEMORY THREADS lane (multithreaded Rust → wasm32-wasi-threads) ──────────────
+  @threads_o "output-wasi-174-threads"
+
+  @doc """
+  Compile untrusted MULTITHREADED Rust (real `std::thread` + atomics) → a shared-memory wasm
+  entirely in the sandbox. Mirrors `rust_compile_to_wasm/3` but onto the THREADS toolchain:
+
+    * transpile with mrustc.wasm + `--cfg target_feature=atomics` (the no-fork bypass: mrustc's
+      cfg.cpp checks CLI --cfg FIRST, so cfg(target_feature="atomics") → true and the hardcoded
+      `target.cpp:746 return false` is never reached — target.cpp untouched, base lane unaffected);
+    * compile the emitted C with `@rust_threads_clang_flags` (wasm32-wasi-threads + atomics);
+    * link mirroring `compile_threads/3` (the C threads lane): shared imported/exported memory,
+      `-lpthread`, the threads sysroot crt + libc, routing the `wasi:thread-spawn` import;
+    * link against the THREADS libstd (`output-wasi-174-threads/`) — its `.rlib.hir` (used by mrustc
+      above) and its `.o` come from the same atomics override build, so monomorph hashes agree (a
+      base-vs-threads HIR mismatch yields undefined `spawn_unchecked` hash symbols at link).
+
+  Run the result via `PackageManager.run(wasm, …, threads: true)` (shared-memory + thread-spawn).
+  Requires the threads libstd prebuild (compilers/rust/std/prebuild-libstd-threads-174.sh). Absent →
+  `{:error, {:libstd_threads_not_prebuilt, dir}}`. Single-crate (no crates.io deps) — the proven
+  parallel-compute shape. Returns `{:ok, wasm_path, log} | {:error, reason}`.
+
+  opts: `:max_memory` (bytes, default 1 GiB).
+  """
+  def compile_rust_threads(source_path, opts \\ [], root \\ default_root()) do
+    rd = Path.join(root, "rust")
+    mrdir = Path.expand(Path.join(rd, "mrustc-root/mrustc"))
+    mrwasm = Path.expand(Path.join(rd, "mrustc-root/mrustc_std.wasm"))
+    clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
+    csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
+    o = Path.join(mrdir, @threads_o)
+
+    cond do
+      not File.regular?(mrwasm) -> {:error, {:mrustc_not_built, mrwasm}}
+      not File.regular?(clang) -> {:error, {:clang_not_built, clang}}
+      not File.regular?(Path.join(o, "libstd.rlib.o")) -> {:error, {:libstd_threads_not_prebuilt, o}}
+      true -> do_rust_threads_compile(source_path, mrdir, mrwasm, clang, csys, o, opts)
+    end
+  end
+
+  defp do_rust_threads_compile(source_path, mrdir, mrwasm, clang, csys, o, opts) do
+    id = Integer.to_string(:erlang.unique_integer([:positive]))
+    name = "wbrt#{id}"
+    max_mem = Keyword.get(opts, :max_memory, 1024 * 1024 * 1024)
+    rd = Path.dirname(Path.dirname(mrdir))
+    shim_src = Path.expand(Path.join([Path.dirname(rd), "zig", "wasi_shim.c"]))
+    ustub_src = Path.expand(Path.join([rd, "std", "ustub.c"]))
+    File.mkdir_p!(Path.join(mrdir, ".mrtmp"))
+    File.mkdir_p!(Path.join(mrdir, ".cctmp"))
+    File.cp!(Path.expand(source_path), Path.join(o, "#{name}.rs"))
+
+    mr = fn args ->
+      wasmtime(
+        ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728",
+         "--env", "MRUSTC_TARGET_VER=1.74", "--env", "STD_ENV_ARCH=wasm32", "--env", "TMPDIR=/tmp",
+         "--dir", "#{mrdir}::.", "--dir", "#{mrdir}/.mrtmp::/tmp", mrwasm | args]
+      )
+    end
+
+    cl = fn args ->
+      wasmtime(
+        ["-W", "exceptions=y", "--dir", "#{csys}::/usr", "--dir", "#{mrdir}::/work",
+         "--dir", "#{mrdir}/.cctmp::/tmp", "--env", "TMPDIR=/tmp", clang | args]
+      )
+    end
+
+    # transpile .rs → C against the THREADS libstd, with the atomics-cfg bypass so mrustc emits
+    # shared-memory-aware code paths (and selects the threads std cfg the HIR was built with).
+    user_args =
+      ["#{@threads_o}/#{name}.rs", "--crate-name", name, "--crate-type", "bin",
+       "-L", @threads_o, "--out-dir", @threads_o, "--target", "wasm32-wasi",
+       "--edition", "2021", "--cfg", "target_feature=atomics"]
+
+    log1 = mr.(user_args)
+
+    # shared shim + unwind-stub objects, built for the THREADS target (wasm32-wasi-threads) so they
+    # link against the same shared-memory libc. ustub.o supplies the _Unwind_Resume stub (panic=abort).
+    ensure_rust_threads_obj(o, "wasi_shim", shim_src, cl)
+    ensure_rust_threads_obj(o, "ustub", ustub_src, cl)
+
+    result =
+      if File.regular?(Path.join(o, "#{name}.c")) do
+        cl.(["clang"] ++ @rust_threads_clang_flags ++
+              ["-c", "/work/#{@threads_o}/#{name}.c", "-o", "/work/#{@threads_o}/#{name}.o"])
+
+        if File.regular?(Path.join(o, "#{name}.o")) do
+          libstd = Path.wildcard(Path.join(o, "*.rlib.o")) |> Enum.map(&"/work/#{@threads_o}/#{Path.basename(&1)}")
+
+          # Link mirrors the C threads lane (compile_threads): shared imported/exported memory +
+          # -lpthread against the wasm32-wasi-threads sysroot. crt1.o (the threads crt provides the
+          # thread-spawn-aware _start + TLS init), threads libc, builtins from wasm32-unknown-wasip1.
+          ld =
+            ["wasm-ld", "-m", "wasm32",
+             "--shared-memory", "--import-memory", "--export-memory", "--max-memory=#{max_mem}",
+             "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasi-threads",
+             "/usr/lib/wasm32-wasi-threads/crt1.o", "/work/#{@threads_o}/#{name}.o"] ++
+              libstd ++
+              ["/work/#{@threads_o}/wasi_shim.o", "/work/#{@threads_o}/ustub.o",
+               "-lc", "-lpthread", "-lsetjmp",
+               "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
+               "-o", "/work/#{@threads_o}/#{name}.wasm"]
+
+          log2 = cl.(ld)
+          outw = Path.join(o, "#{name}.wasm")
+
+          if File.regular?(outw) do
+            dest = Path.join(System.tmp_dir!(), "wbrust-threads-#{id}.wasm")
+            File.cp!(outw, dest)
+            {:ok, dest, {log1, log2}}
+          else
+            {:error, {:link_failed, log2}}
+          end
+        else
+          {:error, {:cc_failed, log1}}
+        end
+      else
+        {:error, {:rustc_failed, log1}}
+      end
+
+    for ext <- ~w(rs c o hir wasm), do: File.rm(Path.join(o, "#{name}.#{ext}"))
+    File.rm(Path.join(o, "lib#{name}.rlib"))
+    result
   end
 
   # ── crates.io dependency support (wb-3s8 / wb-6lh) ──────────────────────────
@@ -1473,6 +1605,19 @@ defmodule Workbooks.Compilers do
       File.cp!(src, Path.join(o, "#{name}.c"))
       cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w",
            "-c", "/work/output-wasi-174/#{name}.c", "-o", "/work/output-wasi-174/#{name}.o"])
+    end
+  end
+
+  # Threads variant of ensure_rust_obj — compile the shim/ustub for wasm32-wasi-threads (shared-memory
+  # atomics) so they link against the threads libc. Built once into output-wasi-174-threads/.
+  defp ensure_rust_threads_obj(o, name, src, cl) do
+    obj = Path.join(o, "#{name}.o")
+
+    unless File.regular?(obj) do
+      File.cp!(src, Path.join(o, "#{name}.c"))
+      cl.(["clang", "--target=wasm32-wasi-threads", "--sysroot=/usr", "-pthread", "-matomics",
+           "-mbulk-memory", "-O1", "-w",
+           "-c", "/work/#{@threads_o}/#{name}.c", "-o", "/work/#{@threads_o}/#{name}.o"])
     end
   end
 

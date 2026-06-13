@@ -42,4 +42,11 @@ if [ ! -f "$MR/output-wasi-174/libstd.rlib.o" ]; then
   say "prebuilding 1.74 libstd via mrustc.wasm (long)"; bash "$SD/std/prebuild-libstd-174.sh" >&2
 else say "1.74 libstd prebuilt — skip"; fi
 
+# 4. SHARED-MEMORY THREADS libstd → output-wasi-174-threads/ (multithreaded Rust: Compilers.compile_rust_threads).
+#    Applies the std threads patch + builds with --cfg target_feature=atomics (the no-fork mrustc bypass).
+#    Same mrustc.wasm as the base lane, so the threads libstd's HIR/monomorph hashes are self-consistent.
+if [ ! -f "$MR/output-wasi-174-threads/libstd.rlib.o" ]; then
+  say "prebuilding 1.74 THREADS libstd via mrustc.wasm (long)"; bash "$SD/std/prebuild-libstd-threads-174.sh" >&2
+else say "1.74 threads libstd prebuilt — skip"; fi
+
 say "1.74 inputs staged (src + macos overrides). Next: native libstd build + wasm replay."

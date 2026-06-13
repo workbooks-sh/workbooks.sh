@@ -41,6 +41,7 @@ take rust/mrustc-root/mrustc_std.wasm
 take rust/mrustc-root/mrustc_pm.wasm
 take rust/mrustc-root/mrustc.wasm
 take rust/mrustc-root/mrustc/output-wasi-174        # prebuilt libstd (.o/.rlib/.hir) the linker needs
+take rust/mrustc-root/mrustc/output-wasi-174-threads # SHARED-MEMORY THREADS libstd (.o/.rlib/.hir) — compile_rust_threads links against these
 take rust/std                                        # setjmp-stub.h + cc/mrustc wrapper templates the pipeline copies
 take rust/wb                                         # the BEAM-runtime crate (auto-provided as `use wb;`)
 take rust/manifest.org
