@@ -82,5 +82,10 @@ take c/manifest.org
 # --- wasm-tools recipe (the wasm-tools.wasm itself ships under build/, already in the image) ----
 take wasm-tools/build.sh
 
+# esbuild.wasm is gitignored (20MB) — produce it on-demand via its build.sh (needs native Go, ~8s;
+# no-op when already built, or in a Go-less tree where it must already be present), then stage. (wb-feto)
+[ -f "$SRC/esbuild/esbuild.wasm" ] || bash "$SRC/esbuild/build.sh" >/dev/null 2>&1 || true
+take esbuild/esbuild.wasm      # AOT bundler (wasip1) — the fast lane, replaces QuickJS bundlejob for JS/TS/JSX
+take esbuild/build.sh          # the recipe, so the dist slice can self-heal/rebuild it too
+
 echo "stage-tools: done — $(du -sh "$DST" | cut -f1) total" >&2
-take esbuild/esbuild.wasm      # AOT bundler (wasip1) — the fast lane, replaces QuickJS bundlejob for JS/TS/JSX (wb-feto)

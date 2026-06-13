@@ -1703,7 +1703,7 @@ defmodule Workbooks.Compilers do
   · `:minify` (bool) · `:extra` (raw esbuild flag list). Returns {:ok, js} | {:error, _}.
   """
   def esbuild_bundle_dir(project_dir, entry_rel, opts \\ [], root \\ default_root()) do
-    wasm = Path.expand(Path.join([root, "esbuild", "esbuild.wasm"]))
+    wasm = ensure_esbuild(Path.expand(Path.join([root, "esbuild", "esbuild.wasm"])))
     abs = Path.expand(project_dir)
     out_rel = "__wb_esbuild_out.js"
     out_abs = Path.join(abs, out_rel)
@@ -1736,6 +1736,18 @@ defmodule Workbooks.Compilers do
         File.rm(out_abs)
       end
     end
+  end
+
+  # Self-heal: esbuild.wasm is a gitignored build artifact (20MB). Build it via its build.sh (native
+  # Go, ~8s) if absent — mirrors the JS lane's wasmtime_build_js self-heal. No-ops gracefully when Go
+  # isn't available (build.sh exits non-zero), leaving the {:esbuild_missing,…} + QuickJS fallback.
+  defp ensure_esbuild(wasm) do
+    unless File.regular?(wasm) do
+      bsh = Path.join(Path.dirname(wasm), "build.sh")
+      if File.regular?(bsh), do: System.cmd("bash", [Path.expand(bsh)], stderr_to_stdout: true)
+    end
+
+    wasm
   end
 
   defp esbuild_opts(opts) do
