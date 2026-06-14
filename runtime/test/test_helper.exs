@@ -1,4 +1,12 @@
-ExUnit.start()
+# Exclude the heavy / external-resource tags by DEFAULT so plain `mix test`
+# (and `wb dev test`) is a fast, deterministic gate that never hangs. These
+# tags need a wasm toolchain (:build, :pallet, :serde, :simd, :rayon, :threads,
+# :node) or live network (:netdeps) — without that environment they stall or
+# fail. Run them explicitly: `mix test --include build` (or several --include
+# flags) in a provisioned env. (:skip is the manual one-off opt-out.)
+ExUnit.start(
+  exclude: [:skip, :build, :netdeps, :pallet, :node, :threads, :serde, :simd, :rayon]
+)
 
 # NOTE: We deliberately do NOT start the full OTP application here.
 # `Workbooks.Application` binds network ports (Bandit/control-plane), which
