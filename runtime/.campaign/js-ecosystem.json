@@ -397,7 +397,8 @@
             "searchParams",
             "URLSearchParams"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "URL/URLSearchParams/Headers/Request = StarlingMonkey globals"
         },
         {
           "id": "fetch",
@@ -407,8 +408,8 @@
             "Request/Response/Headers",
             "SSRF guard"
           ],
-          "verdict": "pending",
-          "note": "wasi:http route exists; needs e2e proof"
+          "verdict": "live",
+          "note": "brokered fetch -> wasi:http -> NetGuard (SSRF-safe); run_program instruments in-flight fetch for the idle-drain; example.com 200 proven"
         },
         {
           "id": "streams-web",
@@ -503,7 +504,8 @@
             "ky",
             "node-fetch"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "ky (fetch-based) end-to-end LIVE; axios/got use node:http (separate broker surface)"
         },
         {
           "id": "lib-template",
