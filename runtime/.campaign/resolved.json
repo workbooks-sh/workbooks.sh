@@ -2616,6 +2616,13 @@
    "proof": "monocypher 4.0.2 via build_c_dir: Ed25519 keygen+sign+verify (sign_verify=1), tamper-rejection (tamper_rejected=1), Blake2b hash; monocypher_lane_test.exs green",
    "lane": "compilers/monocypher/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "stb_image": {
+   "capability": "image decoding (PNG/JPEG/BMP/GIF/...) in-sandbox",
+   "status": "live",
+   "proof": "stb_image (single-header) via build_c_dir decodes a PNG from stdin -> w=2 h=2 ch=4, red pixel (255,0,0); stb_image_lane_test.exs green (self-contained embedded PNG)",
+   "lane": "compilers/stb/build.sh (fetch stb_image.h pinned commit, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
