@@ -564,6 +564,25 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, Workbooks.Toolkits.sign_text(conn.params["id"], conn.assigns.tenant))
   end
 
+  # Versioned releases (wbx-verbs): list versions, show the live pin, roll back.
+  get "/rcp/toolkit/versions" do
+    send_resp(conn, 200, Workbooks.Toolkits.versions_text(conn.params["id"]))
+  end
+
+  get "/rcp/toolkit/live" do
+    out =
+      case conn.params["id"] do
+        id when id in [nil, ""] -> Workbooks.Toolkits.live_text()
+        id -> Workbooks.Toolkits.live_text(id, Workbooks.Toolkits.default_root())
+      end
+
+    send_resp(conn, 200, out)
+  end
+
+  post "/rcp/toolkit/rollback" do
+    send_resp(conn, 200, Workbooks.Toolkits.rollback_text(conn.params["id"], conn.params["version"]))
+  end
+
   # Run a registered KERNEL (bytes → bytes) over RCP — the seam that makes
   # kernel-shape toolkits reachable from ANY client (desktop renderer, CLI,
   # scripts) without embedding wasmtime themselves. One-shot open/call/close;
@@ -837,7 +856,16 @@ defmodule Workbooks.Web do
     default =
       "You are Waldo, the user's resident assistant inside Workbooks. Be concise, warm, and helpful. " <>
         "Help them navigate and operate their workspace — answer questions, search, open things — by voice or text. " <>
-        "You work problems WITH the user; you never run off on your own."
+        "You work problems WITH the user; you never run off on your own.\n\n" <>
+        "REPLY STYLE: answer the user DIRECTLY in prose — just write your response. " <>
+        "Only call a tool when you genuinely need to act (search, open a tab, run something); " <>
+        "do NOT wrap a plain answer in a tool call. Your text streams to the user as you write it.\n\n" <>
+        "RICH REPLIES (optional): when a structured or visual answer helps, begin your message with " <>
+        "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline component " <>
+        "blocks the chat renders as cards:\n" <>
+        "  #+begin_src component :type callout :tone ok :title Done\n  short body text\n  #+end_src\n" <>
+        "  #+begin_src component :type kv :title Stats\n  key: value\n  other: value\n  #+end_src\n" <>
+        "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it."
 
     with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
          dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
