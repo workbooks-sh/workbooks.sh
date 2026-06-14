@@ -20,9 +20,12 @@ defmodule Workbooks.ExecLoopback do
   use Plug.Router
   require Logger
 
-  alias Workbooks.{ExecBroker, HarnessCreds, OAuthLoopback}
+  alias Workbooks.{ExecBroker, HarnessCreds, HarnessProc, OAuthLoopback}
 
   @grants :wb_exec_loopback_grants
+  # streaming children (wb-b9xv.11): handle -> {token, principal, proc_pid}. A spawned HarnessProc is keyed
+  # here so /__wb/stream + /__wb/stdin reach it, and so revoke/1 can KILL every in-flight child of a token.
+  @procs :wb_exec_loopback_procs
   # the fixed internal sentinel host the Rust WasiHttpView pins to this listener (mirrored in store.rs).
   @sentinel_host "wb-exec.internal"
 
@@ -145,8 +148,46 @@ defmodule Workbooks.ExecLoopback do
     :ok
   end
 
-  @doc "Revoke a minted token (run finished)."
-  def revoke(token) when is_binary(token), do: :ets.delete(grants(), token)
+  @doc """
+  Revoke a minted token (run/session finished OR principal revoked). Removes the grant AND KILLS every
+  in-flight streaming child spawned under it — a revoked principal's live streams die mid-flight, not just
+  on its next request (the streaming kill-switch the feasibility doc requires).
+  """
+  def revoke(token) when is_binary(token) do
+    kill_procs_for_token(token)
+    :ets.delete(grants(), token)
+  end
+
+  # ── streaming child registry (handle -> proc) ──────────────────────────────────────────────────
+
+  defp procs, do: Workbooks.BrokerTables.ensure(@procs, [:named_table, :public, :set])
+
+  defp register_proc(token, principal, proc_pid) do
+    handle = Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false)
+    :ets.insert(procs(), {handle, token, principal, proc_pid})
+    handle
+  end
+
+  defp lookup_proc(handle, token) when is_binary(handle) and is_binary(token) do
+    case :ets.lookup(procs(), handle) do
+      # a handle is bound to the token that spawned it — another token can never drain/write/kill it.
+      [{^handle, ^token, _principal, pid}] -> {:ok, pid}
+      _ -> :error
+    end
+  end
+
+  defp lookup_proc(_, _), do: :error
+
+  defp drop_proc(handle), do: :ets.delete(procs(), handle)
+
+  # kill every live child spawned under `token` (revocation / session end).
+  defp kill_procs_for_token(token) do
+    :ets.match_object(procs(), {:_, token, :_, :_})
+    |> Enum.each(fn {handle, _t, _p, pid} ->
+      if Process.alive?(pid), do: Workbooks.HarnessProc.kill(pid)
+      drop_proc(handle)
+    end)
+  end
 
   defp lookup(token) when is_binary(token) do
     case :ets.lookup(grants(), token) do
@@ -220,6 +261,105 @@ defmodule Workbooks.ExecLoopback do
         |> put_resp_content_type("text/plain")
         |> send_resp(403, "exec denied: no/invalid grant token")
     end
+  end
+
+  # ── STREAMING child_process (wb-b9xv.11) ───────────────────────────────────────────────────────
+  #
+  # A LONG-LIVED child held across tool round-trips, with INCREMENTAL stdout, a writable stdin, and exit
+  # propagation. Same token gate + principal gate + broker spine as /__wb/exec; the only difference is the
+  # work is a streaming HarnessProc instead of a buffered one-shot. Three routes:
+  #   POST /__wb/spawn        body {name, argv}  -> {handle}     (gated; starts the child)
+  #   POST /__wb/stream/<h>                      -> one chunk    (long-poll; x-wb-exit header on the last)
+  #   POST /__wb/stdin/<h>    body {data}        -> {ok}         (writes the child's stdin)
+  # A handle is bound to its spawning token; another token can't touch it. revoke(token) kills the child.
+
+  # POST /__wb/spawn  body {name, argv}  header x-wb-exec: <token>
+  post "/__wb/spawn" do
+    token = get_req_header(conn, "x-wb-exec") |> List.first()
+    name = conn.body_params["name"]
+    argv = conn.body_params["argv"] || []
+
+    with {:ok, grant} <- lookup(token),
+         true <- is_binary(name) and is_list(argv),
+         :ok <- principal_gate(grant) do
+      case ExecBroker.spawn_stream(name, Enum.map(argv, &to_string/1),
+             allow: Map.get(grant, :allow, false),
+             commands: Map.get(grant, :commands, :all),
+             principal: Map.get(grant, :principal),
+             depth: Map.get(grant, :depth, 0) + 1
+           ) do
+        {:ok, proc} ->
+          handle = register_proc(token, Map.get(grant, :principal), proc)
+          send_json(conn, 200, %{"handle" => handle})
+
+        {:error, reason} ->
+          send_resp(conn, 403, "spawn denied: #{inspect(reason)}")
+      end
+    else
+      _ -> send_resp(conn, 403, "spawn denied: no/invalid grant token")
+    end
+  end
+
+  # POST /__wb/stream/<handle>  header x-wb-exec: <token>
+  # Long-poll ONE incremental chunk. Body = the bytes produced since the last drain (may be empty if the
+  # child hasn't flushed yet — the poller loops). On the child's exit the response carries x-wb-exit: <code>
+  # and x-wb-done: 1 so the consumer's spawn() can emit 'end' + 'exit'.
+  post "/__wb/stream/:handle" do
+    token = get_req_header(conn, "x-wb-exec") |> List.first()
+
+    with {:ok, _grant} <- lookup(token),
+         {:ok, pid} <- lookup_proc(conn.params["handle"], token) do
+      case safe_drain(pid) do
+        {:ok, chunk, :open} ->
+          conn
+          |> put_resp_content_type("application/octet-stream")
+          |> put_resp_header("x-wb-done", "0")
+          |> send_resp(200, chunk)
+
+        {:ok, chunk, {:exited, code}} ->
+          drop_proc(conn.params["handle"])
+
+          conn
+          |> put_resp_content_type("application/octet-stream")
+          |> put_resp_header("x-wb-exit", to_string(code || 0))
+          |> put_resp_header("x-wb-done", "1")
+          |> send_resp(200, chunk)
+
+        :dead ->
+          drop_proc(conn.params["handle"])
+
+          conn
+          |> put_resp_header("x-wb-exit", "137")
+          |> put_resp_header("x-wb-done", "1")
+          |> send_resp(200, "")
+      end
+    else
+      _ -> send_resp(conn, 403, "stream denied: no/invalid grant or handle")
+    end
+  end
+
+  # POST /__wb/stdin/<handle>  body {data}  header x-wb-exec: <token>
+  post "/__wb/stdin/:handle" do
+    token = get_req_header(conn, "x-wb-exec") |> List.first()
+    data = conn.body_params["data"] || ""
+
+    with {:ok, _grant} <- lookup(token),
+         {:ok, pid} <- lookup_proc(conn.params["handle"], token),
+         :ok <- HarnessProc.write_stdin(pid, to_string(data)) do
+      send_json(conn, 200, %{"ok" => true})
+    else
+      _ -> send_resp(conn, 403, "stdin denied: no/invalid grant, handle, or closed child")
+    end
+  end
+
+  # A killed/exited HarnessProc may already be down; treat a dead pid as terminal rather than crashing the
+  # route (revocation races a drain).
+  defp safe_drain(pid) do
+    if Process.alive?(pid), do: HarnessProc.drain(pid), else: :dead
+  rescue
+    _ -> :dead
+  catch
+    :exit, _ -> :dead
   end
 
   # POST /__wb/llm  body {messages, tools}  header x-wb-exec: <token>
