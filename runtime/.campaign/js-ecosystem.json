@@ -288,7 +288,8 @@
             "scrypt/pbkdf2",
             "subtle vs node API"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "crypto-browserify polyfill (in node_polyfills map): createHash/createHmac/randomBytes/pbkdf2Sync proven"
         },
         {
           "id": "node-fs",
@@ -539,7 +540,8 @@
             "jose",
             "tweetnacl"
           ],
-          "verdict": "pending"
+          "verdict": "probing",
+          "note": "crypto-js LIVE (SHA256); bcryptjs/jsonwebtoken deeper (jwt dep instanceof issue) \u2014 follow-up"
         },
         {
           "id": "lib-reactive",
