@@ -107,17 +107,26 @@ defmodule Workbooks.Web do
   end
 
   # Web search for the desktop browser's composable-search "Web" provider
-  # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
-  # Browse.Search (keyless ddg/brave/bing — no SERP keys, no paid API)
-  # and returns [{title,url,snippet}]. GET so the browser's fetch is trivial.
+  # (wb-aakl.19). The browser sends no SERP keys; the nexus resolves the
+  # tenant's configured provider from Settings (Vars: wb.search.provider + its
+  # keyed secret) — falling back to keyless ddg/brave/bing when none is set —
+  # and returns [{title,url,snippet}]. An explicit ?provider= overrides for a
+  # one-off. GET so the browser's fetch is trivial.
   get "/api/browse/search" do
-    q = conn.params["q"] || ""
-    limit = String.to_integer(conn.params["limit"] || "8")
+    conn = fetch_query_params(conn)
+    q = conn.query_params["q"] || ""
+    limit = String.to_integer(conn.query_params["limit"] || "8")
+
+    opts = [limit: limit, tenant: conn.assigns[:tenant]]
+    opts = case conn.query_params["provider"] do
+      p when is_binary(p) and p != "" -> [{:provider, p} | opts]
+      _ -> opts
+    end
 
     results =
       case String.trim(q) do
         "" -> []
-        query -> Workbooks.Browse.Search.query(query, limit: limit)
+        query -> Workbooks.Browse.Search.query(query, opts)
       end
 
     json = Jason.encode!(%{results: results})
