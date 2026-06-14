@@ -646,11 +646,26 @@ defmodule Workbooks.Web do
   # Poll a brand-book run — the stage + published deck URL (BrandBook writes
   # _status.json into the workdir as each stage starts/finishes).
   get "/api/brand-book/:slug" do
-    path = "/tmp/bb/#{conn.params["slug"]}/_status.json"
-    body = case File.read(path) do
-      {:ok, j} -> j
-      _ -> Jason.encode!(%{error: "no such run", slug: conn.params["slug"]})
-    end
+    slug = conn.params["slug"]
+    wd = "/tmp/bb/#{slug}"
+
+    # Tenant-gate + path-safe (wb-g1yo.9): a slug can't escape /tmp/bb, and you
+    # can't poll another tenant's brand-book run by its slug.
+    body =
+      cond do
+        String.contains?(slug, "/") or String.contains?(slug, "..") ->
+          Jason.encode!(%{error: "bad slug"})
+
+        not Workbooks.Workflow.Telemetry.run_visible?(wd, conn.assigns[:tenant]) ->
+          Jason.encode!(%{error: "no such run", slug: slug})
+
+        true ->
+          case File.read(Path.join(wd, "_status.json")) do
+            {:ok, j} -> j
+            _ -> Jason.encode!(%{error: "no such run", slug: slug})
+          end
+      end
+
     conn |> put_resp_content_type("application/json") |> send_resp(200, body)
   end
 
@@ -1106,7 +1121,16 @@ defmodule Workbooks.Web do
   # absolute path the desktop already resolved from its own workspace folder).
   defp read_workspace_org(path) when is_binary(path) and path != "" do
     abs = Path.expand(path)
-    if File.regular?(abs), do: File.read(abs), else: {:error, :enoent}
+
+    cond do
+      # Reject traversal + non-org targets (wb-g1yo.10): the only legit use is
+      # parsing an Org workbook, so this blocks the arbitrary host-file read
+      # (/etc/*, secrets, dotfiles) that an unconfined ?path= otherwise allowed.
+      String.contains?(path, "..") -> {:error, :badpath}
+      Path.extname(abs) != ".org" -> {:error, :badpath}
+      File.regular?(abs) -> File.read(abs)
+      true -> {:error, :enoent}
+    end
   rescue
     _ -> {:error, :badpath}
   end
