@@ -225,7 +225,8 @@
             "TC39 stage-3 decorators",
             "metadata reflect"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "legacy experimentalDecorators (Angular/NestJS/TypeORM dominant) + emitDecoratorMetadata/reflect-metadata proven (js_decorators_test). TC39 stage-3 = partial (vendored esbuild passthrough, not transformed)."
         },
         {
           "id": "regex-unicode",
