@@ -1,306 +1,189 @@
 #+TITLE: Ship a workbook to iOS (Simulator → direct install / TestFlight)
-#+CAPTION: Wrap a built workbook .html as a native iOS app with Capacitor — run it in the Simulator, direct-install on your own device, or upload to TestFlight (native .p8 upload or Fastlane) on the user's own Apple account.
+#+CAPTION: Wrap a built workbook .html as a native iOS app with Capacitor — run it in the Simulator, build + sign it in Xcode, and upload to TestFlight on the user's own Apple account. Uses the real npx cap + Xcode toolchain (no wb-forge wrapper).
 
 * When to use
 
 The user wants their workbook as a real iOS app — to try it in the Simulator,
-to install a build on their device, or to distribute it to testers via
-TestFlight. The workbook is already a single self-contained =dist/<slug>.html=;
-Capacitor wraps that HTML in a native WebView app. Decision is locked on
-Capacitor (not Tauri-mobile).
+install a build on their device, or distribute it to testers via TestFlight. The
+workbook is already a single self-contained =dist/<slug>.html=; Capacitor wraps
+that HTML in a native WebView app. Decision is locked on Capacitor (not
+Tauri-mobile).
 
-This needs a *Mac with full Xcode*. The Simulator path needs no Apple account;
-device/TestFlight builds need an Apple Developer Program membership and an App
-Store Connect API key. Lead the user through that setup (below) — most of it is
-one-time.
+This needs a *Mac with full Xcode* and runs the real Apple toolchain — it is a
+host-side workflow, NOT something the sandbox runs. The Simulator path needs no
+Apple account; device/TestFlight builds need an Apple Developer Program
+membership and an App Store Connect API key. Lead the user through that setup
+(below) — most of it is one-time.
 
-* Workflow
+NOTE: there is no =wb forge mobile= command (the Rust =wb= that provided it was
+removed 2026-06-09). Use =npx cap= + Xcode directly, as below. ~npx cap --help~
+is authoritative for Capacitor; Xcode's Organizer drives archive/distribute.
 
-Always start with doctor — it tells you, per capability, what's ready and what's
-missing, with the exact fix for each gap.
+* Workflow — scaffold, run, then archive in Xcode
 
 #+begin_src bash
-# 0. check the toolchain + signing readiness (dev / build / testflight)
-wb forge mobile doctor
-
 # 1. build the workbook if you haven't (emits dist/<slug>.html)
 wb build
 
-# 2. run it in the iOS Simulator — NO Apple account needed
-wb forge mobile dev dist/<slug>.html
+# 2. one-time: create a Capacitor app next to the workbook, point its web dir at
+#    a staged www/, and add the iOS platform.
+npm init -y
+npm i @capacitor/core @capacitor/cli @capacitor/ios
+npx cap init "Your App" com.you.app --web-dir www
 
-# 3. build a signed .ipa → ./dist/mobile/<slug>.ipa
-#    --export-method development (default; sideloadable, for direct install)
-#    --export-method app-store  (distribution, for upload / TestFlight)
-wb forge mobile build dist/<slug>.html --app-id com.you.app
+# 3. stage the workbook as the app's web root, then add + sync iOS
+mkdir -p www && cp dist/<slug>.html www/index.html
+npx cap add ios
+npx cap sync ios
 
-# 4a. NATIVE upload to TestFlight — no Fastlane, just the .p8 (the app record
-#     must already exist; runs preflight first)
-wb forge mobile build dist/<slug>.html --app-id com.you.app --export-method app-store
-wb forge mobile upload dist/mobile/<slug>.ipa --app-id com.you.app
+# 4. run it in the iOS Simulator — NO Apple account needed
+npx cap run ios
 
-# 4b. OR the Fastlane path — build + upload + release in one shot
-wb forge mobile testflight dist/<slug>.html --app-id com.you.app
+# 5. open the native project in Xcode to archive + sign + distribute
+npx cap open ios
 #+end_src
 
-Each command scaffolds a real Capacitor project into =.wb-forge/mobile/= in the
-workbook's cwd (cached across runs), copies the HTML into =www/=, and runs the
-Capacitor toolchain. You can open =.wb-forge/mobile/ios/App/App.xcodeproj= in
-Xcode at any time.
+After step 2 the Capacitor project lives in the cwd (=ios/=, =www/=,
+=capacitor.config.json=); re-run =cp … www/index.html && npx cap copy ios= to
+refresh the app whenever you rebuild the workbook. A single =.html= is staged as
+=www/index.html= so it loads at the WebView root; a directory artifact must
+contain an =index.html=.
 
-* The two upload paths
+* Build, sign, and upload — in Xcode
 
-There are TWO ways to get a distribution build onto TestFlight — pick by taste,
-they hit the same App Store Connect.
+Capacitor's job ends at the native project; signing + distribution are Xcode/Apple.
 
-** =upload= — native, no Fastlane (preferred)
+** Run on the Simulator
+=npx cap run ios= (or open in Xcode and ▶). No Apple account, no signing.
 
-=wb forge mobile build --export-method app-store= produces a distribution =.ipa=;
-=wb forge mobile upload <ipa> --app-id <bundle>= ships it via the *native App
-Store Connect Build Upload API* (WWDC25). No Fastlane, no Transporter — *only the
-=.p8=*. It reads the version/build from the =.ipa= (override with
-=--version= / =--build=), runs =preflight.sh= first, then uploads. VERIFIED end
-to end (processing state COMPLETE → VALID). The app record must already exist
-(see create-app).
+** Direct install on your own device
+In Xcode: select your device, set a Team under Signing & Capabilities (automatic
+signing), and ▶. For a sharable build, Product → Archive → Distribute App →
+*Debugging* (development) gives a sideloadable =.ipa= you can drag onto a tethered
+device in *Apple Configurator* or Xcode → Window → Devices & Simulators.
 
-** =testflight= — Fastlane
+** TestFlight
+Product → Archive → Distribute App → *App Store Connect* → Upload. Or export the
+archive (=xcodebuild -exportArchive -exportOptionsPlist …=) and upload the =.ipa=
+with the *Transporter* app or =xcrun altool --upload-app -f <ipa> --apiKey <KEYID>
+--apiIssuer <issuer>=. The App Store Connect app record must already exist (see
+setup). Apple processes the build (minutes to ~an hour), then it appears under
+App Store Connect → TestFlight.
 
-=wb forge mobile testflight <workbook> --app-id <bundle>= does build + upload +
-release in one command via Fastlane =pilot= over the same =.p8=. Use it on an
-interactive Mac or a macOS CI runner when you'd rather have one step than two.
-
-* Direct install on your own device (no TestFlight)
-
-The fastest way to put a workbook on a device you control: a *development*
-export. =wb forge mobile build dist/<slug>.html --app-id com.you.app= (the
-default =--export-method development=) emits a *sideloadable* =./dist/mobile/<slug>.ipa=.
-Drag it onto the tethered device in *Apple Configurator* (or Xcode → Window →
-Devices & Simulators → drag into Installed Apps). No App Store Connect record, no
-processing wait, no testers — just your registered device.
+Automatic signing (a Team in Xcode, or the App Store Connect API key for
+=altool=) mints the cert + provisioning profile on the fly — no manual
+cert/profile clicking.
 
 * Apple developer setup — the one-time, mostly-manual part
 
-These steps are gated behind Apple's portal and CANNOT be scripted. Do them once;
-after that the recipes run unattended.
+These steps are gated behind Apple's portal and CANNOT be scripted. Do them once.
 
 ** 1. Apple Developer Program ($99/yr)
-
 Enroll at https://developer.apple.com/programs/ with the user's Apple ID. This is
 what unlocks code signing, device installs, and App Store Connect. Without it you
 get the Simulator only.
 
 ** 2. Accept agreements
-
 App Store Connect → Business / Agreements, Tax, and Banking → accept all pending
 agreements. TestFlight processing silently stalls if an agreement is unsigned.
 
 ** 3. Create the app record
+App Store Connect → Apps → ＋ → New App. The *Bundle ID must match* the
+=com.you.app= you init'd with (Xcode signing registers the identifier, so you
+usually just pick it in the New App dropdown). *Use a distinct app name* — a
+generic display name (Notes, Calendar, …) collides with Apple's global namespace
+and is rejected post-upload with error 90129 (see pitfalls). This is the one step
+the API key cannot do (Apple returns 403 on app-record CREATE) — it is UI-only.
 
-The app record is the ONLY step the API key can't do (Apple returns 403 "apps
-does not allow CREATE") and the first TestFlight build can't process without it.
-=wb forge mobile create-app= offers three drivers — pick by DX:
-
-- =--driver playwright= (DEFAULT): opens a real, logged-in browser to the New
-  App page (persistent profile — sign in once, incl. 2FA), best-effort fills the
-  form, and POLLS the App Store Connect API until the record exists — so it
-  succeeds whether the automation completes the form or you click Create. Needs
-  the ASC API key set (to detect the new record). Durable: it sidesteps the
-  spaceship web-auth Apple keeps 403-blocking. Uses your installed Chrome.
-- =--driver produce=: Fastlane =produce= over a =FASTLANE_SESSION= (mint once
-  with =fastlane spaceauth -u <apple-id>=). Non-interactive, but Apple
-  increasingly blocks spaceship with "Access forbidden".
-- =--driver manual=: prints the exact steps and opens the New App page for you.
-
-#+begin_src bash :role example
-wb forge mobile create-app --app-id com.you.app --app-name "Your App"   # playwright (default)
-#+end_src
-
-Either way the *Bundle ID must match* the =--app-id= you build/upload with;
-signing already registers the identifier, so you usually just pick it in the New
-App dropdown. *Use a distinct =--app-name=* — a generic display name (Notes,
-Calendar, …) collides with Apple's global namespace and is rejected post-upload
-with error 90129 (see Common pitfalls).
-
-** 4. App Store Connect API key (the =.p8=)
-
-This is an *account-wide* key — make it ONCE, reuse it for every app you ever
-ship. *One key covers everything*: iOS signing + upload, =feedback=,
-=webhooks=, AND desktop notarization (=wb forge desktop= maps the same key into
-Tauri). It is what makes =build= / =upload= / =testflight= do *automatic
-signing* (Apple mints the cert + provisioning profile on the fly — no manual
-cert/profile clicking). Direct link (after signing in):
+** 4. App Store Connect API key (the =.p8=) — for altool/Transporter uploads
+An *account-wide* key, made ONCE and reused. Direct link (after signing in):
 
   https://appstoreconnect.apple.com/access/integrations/api
 
-Step by step:
-1. Open that URL (signed in). It lands on Integrations → *Team Keys*.
-2. Click *＋* (Generate API Key). Name it (e.g. "workbooks-forge"), role
-   *App Manager*, → *Generate*.
+1. Open that URL (signed in) → Integrations → *Team Keys*.
+2. ＋ (Generate API Key). Name it, role *App Manager* → *Generate*.
 3. *Download* the =.p8= — Apple lets you do this ONCE only.
-4. Note two values on that page: the *Key ID* (next to the new key) and the
-   *Issuer ID* (a UUID at the top of the keys list).
-5. Install + export them so the recipes find them:
+4. Note the *Key ID* (next to the key) and the *Issuer ID* (UUID at the top).
+5. Install it where altool/Transporter look:
 
 #+begin_src bash :role example
 mkdir -p ~/.appstoreconnect/private_keys
 mv ~/Downloads/AuthKey_<KEYID>.p8 ~/.appstoreconnect/private_keys/
-export APP_STORE_CONNECT_API_KEY_ID=<KEYID>            # the Key ID
-export APP_STORE_CONNECT_API_ISSUER_ID=<issuer-uuid>   # the Issuer ID at the top
+# then: xcrun altool --upload-app -f <ipa> --apiKey <KEYID> --apiIssuer <issuer>
 #+end_src
 
-=wb forge mobile doctor= prints these same steps (and on an interactive macOS
-shell offers to open the page for you) whenever the key is missing.
-
-NOTE (agent automation, future): the manual key-download + app-record steps are
-the obvious place for a guided Playwright/Puppeteer flow — drive the signed-in
-=appstoreconnect.apple.com= session to generate the key and create the app
-record, then hand the =.p8= to the recipes. Apple's own API can't create either
-(key creation + app-record creation are UI-only), so browser automation is the
-only way to fully remove the manual step. Tracked as a follow-up.
+(Uploading via the Xcode Organizer / Transporter app needs no =.p8= — it uses
+your signed-in Apple ID. The key is for command-line / CI uploads.)
 
 ** What TestFlight is
+Apple's beta-distribution service. You upload a build; Apple processes it; you add
+testers (internal: your team, instant; external: a light Beta App Review). Testers
+install the free TestFlight app and get your build — no App Store submission. It's
+the fastest way to put a workbook on real devices.
 
-TestFlight is Apple's beta-distribution service. You upload a build; Apple
-processes it (a few minutes to ~an hour); then you add testers (internal: people
-on your team, instant; external: needs a light Beta App Review). Testers install
-the free TestFlight app and get your build — no App Store submission required.
-It's the fastest way to put a workbook on real devices.
+* Make it feel native (apply to the staged www/index.html)
 
-* Automate it — CI TestFlight via release-init
+A desktop-authored workbook feels nicer wrapped if you add, in the =<head>=:
 
-Once the one-time Apple setup is done, you don't have to run =testflight= by hand
-on a Mac every time. =wb forge mobile release-init= generates
-=.github/workflows/wb-ios-testflight.yml= into the user's repo:
-
-#+begin_src bash :role example
-wb forge mobile release-init        # writes the workflow into ./ (cwd)
-git add .github/workflows/wb-ios-testflight.yml && git commit -m "ci: ios testflight"
-git tag ios-v0.1.0 && git push --tags   # builds + uploads to TestFlight
+#+begin_src html :role example
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<style>
+  html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  body { touch-action: manipulation; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  input, textarea, a, .wb-selectable { -webkit-user-select: text; user-select: text; }
+</style>
 #+end_src
 
-The workflow runs on =macos-14=, triggers on =ios-v*= tags (+ manual dispatch),
-and drives the SAME deploy-kit recipe (Fastlane =pilot=) as
-=wb forge mobile testflight=. It writes the App Store Connect =.p8= from a secret
-into =~/.appstoreconnect/private_keys/= and uploads. Required GitHub secrets:
-
-- =APP_STORE_CONNECT_API_KEY_ID= — the Key ID
-- =APP_STORE_CONNECT_API_ISSUER_ID= — the issuer UUID
-- =APP_STORE_CONNECT_API_KEY_CONTENT= — the FULL contents of the =.p8=
-
-It refuses to overwrite an existing workflow unless =WB_FORGE_FORCE=1=, and the
-SAME one-time Apple steps above (program, agreements, app record, API key) still
-apply — CI doesn't remove them, it just removes the manual upload each release.
-
-* Preflight + the 90129 gotcha
-
-=upload= auto-runs =deploy-kit/mobile/preflight.sh= against the =.ipa= before it
-ships (skip with =WB_FORGE_NO_PREFLIGHT=1=). It unpacks the binary with =unzip= +
-=PlistBuddy= and hard-checks =CFBundleIdentifier=, =CFBundleShortVersionString=,
-=CFBundleVersion=, =ITSAppUsesNonExemptEncryption=, a usable app icon
-(CFBundleIcons / AppIcon / Assets.car), and a valid =embedded.mobileprovision=.
-It also *warns* when the display name is a common reserved-ish name (Notes,
-Calendar, Mail, …).
-
-*Error 90129 = "display name already taken."* Apple returns it with a NULL
-message, so it reads like a mysterious checksum/upload failure — it is NOT. The
-native uploader is proven; 90129 means Apple's *global namespace* already owns
-that display name. Fix it by re-building with a distinct =--app-name= (and
-matching the create-app record's name). Preflight's warning is the early
-heads-up; it can't query Apple's namespace, only flag the obvious collisions.
-
-* Feedback + webhooks
-
-#+begin_src bash :role example
-# pull TestFlight tester crash reports + screenshot feedback (read-only, ASC API)
-wb forge mobile feedback --app-id com.you.app --kind all   # crashes | screenshots | all
-
-# real-time push of build/review/feedback state changes to a public sink you control
-wb forge mobile webhooks list   --app-id com.you.app
-wb forge mobile webhooks create --app-id com.you.app --url https://sink.you.dev/asc \
-  --events BUILD_UPLOAD_STATE_UPDATED,BETA_FEEDBACK_CRASH_SUBMISSION_CREATED \
-  --secret <shared-secret>
-wb forge mobile webhooks delete <id>
-#+end_src
-
-Both use the same single =.p8=. Webhooks need a *public sink URL* you control;
-Apple HMAC-signs each delivery with =--secret=.
-
-* Mobile QoL (automatic)
-
-=deploy-kit/mobile/lib.sh wb_mobile_normalize= rewrites the staged
-=www/index.html= so a desktop-authored workbook feels native — automatic on
-every dev/build/upload, opt-out with =WB_FORGE_NO_MOBILE_NORMALIZE=1=. It is
-idempotent (marker =wb-forge-mobile-normalize=) and needs =perl=. It applies:
-
-- *No-zoom, notch-safe viewport*: =maximum-scale=1, user-scalable=no,
-  viewport-fit=cover= (replaces an existing viewport meta or injects one).
-- *Native touch chrome*: no tap-highlight, =touch-action:manipulation=, no
-  rubber-band (=overscroll-behavior:none=), momentum scroll, callout/selection
-  off on chrome — but re-enabled on inputs/textareas/links/=.wb-selectable=.
-- *Smart safe-area*: pads the body with =env(safe-area-inset-*)= ONLY when the
-  workbook doesn't already use =safe-area-inset= itself (no double-insetting).
-- *Status bar*: sets the StatusBar style on launch.
-- *Splash*: composites the icon over the app bg (=@capacitor/assets=) so launch
-  shows branded art, not a white flash; hidden ~150ms after DOM ready.
-
-Plugins pulled in: =@capacitor/status-bar=, =@capacitor/splash-screen=,
-=@capacitor/push-notifications=.
+For a status-bar style + a branded splash instead of a white flash, add the
+=@capacitor/status-bar= and =@capacitor/splash-screen= plugins (=npm i= them, then
+=npx cap sync=) and configure them in =capacitor.config.json=.
 
 * Push notifications
 
-=WB_FORGE_PUSH=1= turns on the push capability: =build.sh= writes the
-=aps-environment= entitlement (development for sideload exports, production for
-app-store/ad-hoc/enterprise) + =UIBackgroundModes: remote-notification=, and
-automatic signing adds the Push capability to the app id; normalize injects the
-register + token-log JS. *That gets registration + the device token only.* To
-actually SEND a notification you still need:
-
+Push needs the =@capacitor/push-notifications= plugin, the *Push Notifications*
+capability added to the app id (Xcode → Signing & Capabilities → ＋ Capability),
+and the =aps-environment= entitlement + =UIBackgroundModes: remote-notification=.
+That gets registration + the device token only. To actually SEND a notification
+you also need:
 - an *APNs auth key* — a SEPARATE =.p8= from Keys → "Apple Push Notifications
   service" (NOT the App Store Connect key); and
 - a *sender* — Apple's Push Notifications Console for one-off tests, or your own
-  Worker/server endpoint hitting APNs.
-
-There is no =wb forge= push-send command yet.
+  Worker/server hitting APNs.
 
 * Common pitfalls
 
 - *CommandLineTools is not enough.* Archiving + signing need full *Xcode.app*.
   If =xcode-select -p= points at =.../CommandLineTools=, install Xcode from the
   Mac App Store, then: =sudo xcode-select -s /Applications/Xcode.app/Contents/Developer=
-  and =sudo xcodebuild -license accept=. doctor flags this and hard-fails.
+  and =sudo xcodebuild -license accept=.
 - *CocoaPods.* OPTIONAL with Capacitor 8+ (it uses Swift Package Manager).
   Install only if a pods-based plugin needs it: =brew install cocoapods=.
-- *Bundle id mismatch.* =WB_FORGE_APP_ID= must equal the App Store Connect app
-  record's bundle id, exactly. A typo gives a confusing "no app found" on upload.
+- *Bundle id mismatch.* The =com.you.app= you init'd with must equal the App Store
+  Connect app record's bundle id, exactly. A typo gives a confusing "no app found"
+  on upload.
 - *Agreements unsigned.* Uploads succeed but the build never appears in
   TestFlight — check Business/Agreements.
-- *=.p8= placement.* altool + Fastlane look in =~/.appstoreconnect/private_keys/=
-  for =AuthKey_<KEYID>.p8=. Wrong name or dir → "API key not found".
+- *Error 90129 = "display name already taken."* Apple returns it with a NULL
+  message, so it reads like a mysterious upload failure — it is NOT. It means
+  Apple's *global namespace* already owns that display name. Fix by using a
+  distinct app name (matching the create-app record's name).
 - *Single file vs dir.* A lone =.html= is staged as =www/index.html= so it loads
   at the WebView root; a directory artifact must contain an =index.html=.
-- *First scaffold is slow.* =npm install= + SPM package resolution run once; the
-  =.wb-forge/mobile/= cache makes later runs fast.
+- *First scaffold is slow.* =npm install= + SPM package resolution run once.
 
 * Verification checklist
 
-- =wb forge mobile doctor= shows the capability you need as ready (dev /
-  build / testflight).
-- *dev*: the Simulator boots and the workbook renders + its WASM runtime works.
-- *build* (development): =./dist/mobile/<slug>.ipa= exists and installs on a
-  registered device via Apple Configurator.
-- *upload* (app-store): preflight passes, then ASC processing goes COMPLETE →
-  VALID and the build appears under App Store Connect → TestFlight.
-- *testflight*: same, via the Fastlane path; an internal tester can install it.
+- *dev*: =npx cap run ios= → the Simulator boots and the workbook renders + its
+  WASM runtime works.
+- *device*: an archive distributed as Debugging installs on a registered device
+  via Apple Configurator.
+- *TestFlight*: Xcode Organizer / Transporter / altool upload → ASC processing
+  goes COMPLETE → VALID and the build appears under App Store Connect → TestFlight;
+  an internal tester can install it.
 
 * See also
 
-- =deploy-kit/mobile/doctor.sh= — readiness report (run this first).
-- =deploy-kit/mobile/lib.sh= — shared scaffold + =wb_mobile_normalize= (QoL).
-- =deploy-kit/mobile/build.sh= — archive + export (=--export-method=, push).
-- =deploy-kit/mobile/upload.sh= + =upload.mjs= — native ASC Build Upload API.
-- =deploy-kit/mobile/preflight.sh= — pre-upload binary checks (90129 guard).
-- =deploy-kit/mobile/testflight.sh= — the Fastlane path.
-- =deploy-kit/mobile/create-app.sh= — the three create-app drivers.
-- =deploy-kit/mobile/{feedback,webhooks}.{sh,mjs}= — ASC feedback + webhooks.
-- =deploy-kit/mobile/template/= — the Capacitor project template.
 - ~npx cap --help~ — authoritative Capacitor command reference.
+- Xcode → Window → Organizer — archive, validate, distribute, upload.
+- https://capacitorjs.com/docs/ios — the Capacitor iOS guide.
+- https://developer.apple.com/testflight/ — TestFlight + App Store Connect.

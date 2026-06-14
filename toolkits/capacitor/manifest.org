@@ -1,62 +1,50 @@
 #+TITLE: capacitor toolkit
 #+TOOLKIT: capacitor
-#+VERSION: 0.1.0
+#+VERSION: 0.2.0
 #+CLI_BIN: cap
 #+CLI_VERSION_RANGE: >=6.0
 #+STATUS: experimental
-#+TAGLINE: Capacitor — wrap a forged workbook as a native iOS app and ship it to TestFlight.
+#+TAGLINE: Capacitor — wrap a forged workbook as a native iOS app, run it, and ship it to TestFlight.
 #+REQUIRES: node>=18, xcode (full), capacitor>=8 (cocoapods optional — Cap 8 uses SPM)
 #+SKILL_DIR: skills/
 
 * capacitor — native iOS wrapper for workbooks                   :toolkit:
   :PROPERTIES:
   :ID:        capacitor
-  :VERSION:        0.1.0
+  :VERSION:        0.2.0
   :CLI_BIN:   cap
   :STATUS:    experimental
   :SKILL_DIR: skills/
   :END:
 
-  Wrapper around Capacitor (invoked as ~npx cap~ — no global install needed).
-  The Workbooks use case: take a built workbook (=dist/<slug>.html=) and wrap
-  it as a native iOS app, then run it in the Simulator, build a signed =.ipa=,
-  upload it to TestFlight, and manage the App Store Connect side. It drives
-  this through the recipes in =deploy-kit/mobile/=.
+  Wrapper around Capacitor, invoked as ~npx cap~ (no global install needed). The
+  Workbooks use case: take a built workbook (=dist/<slug>.html=) and wrap it as a
+  native iOS app — run it in the Simulator, build + sign an =.ipa= in Xcode,
+  upload it to TestFlight, and manage the App Store Connect side.
 
-  Command surface (~wb forge mobile <cmd>~ — see ~wb forge mobile --help~):
-  - =doctor=     — check the iOS toolchain (Xcode.app, Node/Capacitor CLI,
-                   CocoaPods) and signing readiness (identity + ASC API key).
-  - =dev=        — open the app in the iOS Simulator or a tethered device.
-  - =build=      — archive + export a signed =.ipa=. =--export-method
-                   development= (default; sideloadable) or =app-store=
-                   (distribution, for upload/testflight).
-  - =upload=     — upload a distribution =.ipa= to TestFlight via the NATIVE
-                   App Store Connect Build Upload API — just the =.p8=, no
-                   Fastlane/Transporter. Runs preflight first.
-  - =testflight= — Fastlane path: build + upload + release (interactive Mac /
-                   macOS CI). Alternative to =build= + =upload=.
-  - =create-app= — create the ASC app record for a bundle id (the one step the
-                   API key can't do). =--driver playwright= (default) =|
-                   produce | manual=.
-  - =feedback=   — pull TestFlight tester crash + screenshot feedback (ASC
-                   API, read-only).
-  - =webhooks=   — list/create/delete ASC webhooks (needs a public sink URL).
-  - =release-init= — generate an optional GitHub Actions workflow that ships
-                   to TestFlight on an =ios-v*= tag.
+  This is a *host-side* workflow: it needs a Mac with full *Xcode.app* and runs
+  the real Apple toolchain (=npx cap=, =xcodebuild=, Xcode Organizer / Transporter).
+  It is NOT an in-sandbox capability — walk the user through it, or drive it on a
+  Mac that has Xcode.
 
-  Knobs (env):
-  - =WB_FORGE_PUSH=1= — add the =aps-environment= entitlement +
-    =UIBackgroundModes= and register for push (token logged). Delivery still
-    needs a separate APNs auth key + a sender.
-  - =WB_FORGE_NO_MOBILE_NORMALIZE=1= — opt out of the automatic QoL pass
-    (=deploy-kit/mobile/lib.sh wb_mobile_normalize=): no-pinch/notch-safe
-    viewport, touch-control tuning, smart safe-area, status-bar style, and
-    splash compositing. On by default.
+  NOTE — drift correction (wb-2qy2): earlier versions documented a
+  =wb forge mobile <cmd>= command surface backed by =cli/deploy-kit/mobile/=
+  recipes. That lane was removed with the Rust =wb= (2026-06-09) and the recipes
+  no longer exist. This toolkit is now grounded on the *real, present* tools:
+  =npx cap= for the project + sync, and Xcode / standard Apple tooling for sign +
+  upload. Do NOT invoke =wb forge mobile= — it is not a command.
 
-  The decision is locked on *Capacitor* (not Tauri-mobile). Each recipe
-  scaffolds a real Capacitor 8.x project from =deploy-kit/mobile/template/=,
-  copies the workbook HTML into its =www/= web dir, and syncs the native iOS
-  project so Xcode can archive it.
+  Command surface (the real tools — ~npx cap --help~ is authoritative):
+  - =npx cap add ios=        — scaffold the native iOS project (once).
+  - =npx cap copy=           — copy the workbook HTML (staged in =www/=) in.
+  - =npx cap sync=           — copy + update native deps/plugins.
+  - =npx cap open ios=       — open the project in Xcode (archive, sign, run).
+  - =npx cap run ios=        — build + launch in the iOS Simulator / a device.
+  Sign + distribute happen in *Xcode* (Product → Archive → Distribute App) or via
+  =xcodebuild -exportArchive=; upload to TestFlight via the Xcode Organizer, the
+  *Transporter* app, or =xcrun altool --upload-app= with your App Store Connect
+  =.p8=. The ship-a-workbook-to-ios skill walks the whole path, including the
+  one-time Apple Developer / App Store Connect setup.
 
   Signing + upload use the *user's own* Apple Developer account and an App Store
   Connect API key (a =.p8= under =~/.appstoreconnect/private_keys/=) — Workbooks
@@ -64,13 +52,11 @@
   (Apple Developer Program enrollment, agreements, the App Store Connect app
   record); the ship-a-workbook-to-ios skill walks the user through all of it.
 
-  Requires full *Xcode.app* (CommandLineTools cannot archive or sign), Node 18+,
-  and CocoaPods. ~wb forge mobile doctor~ reports readiness per capability
-  (dev / build / testflight). ~npx cap --help~ is authoritative for per-command
-  detail.
+  Requires full *Xcode.app* (CommandLineTools cannot archive or sign), Node 18+;
+  CocoaPods is optional on Capacitor 8+ (it uses Swift Package Manager).
 
   Skill index (read on demand):
 
   | Skill                    | Use when                                          |
   |--------------------------+---------------------------------------------------|
-  | =ship-a-workbook-to-ios= | Wrap a built =dist/<slug>.html= as a native iOS app and ship it to TestFlight (doctor → dev → build → upload, signing + ASC setup) |
+  | =ship-a-workbook-to-ios= | Wrap a built =dist/<slug>.html= as a native iOS app and ship it to TestFlight (npx cap → Xcode archive/sign → upload, with the one-time signing + ASC setup) |
