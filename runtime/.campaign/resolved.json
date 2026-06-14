@@ -2694,6 +2694,13 @@
    "proof": "libgit2 xdiff via build_c_dir produces a unified diff: alpha/beta/gamma vs alpha/BETA/gamma -> @@ -1,3 +1,3 @@ / -beta / +BETA; xdiff_lane_test.exs green. Needed a minimal git-xdiff.h shim (xdl_malloc->malloc, XDL_UNUSED, ctype, funcname-regex stubbed)",
    "lane": "compilers/xdiff/build.sh (fetch libgit2 v1.8.1 deps/xdiff + shim, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "xxhash": {
+   "capability": "fast non-cryptographic hashing (XXH32/64/XXH3) in-sandbox",
+   "status": "live",
+   "proof": "xxHash 0.8.2 (single-header) via build_c_dir computes deterministic digests: xxh64=fda087eddf672be9, xxh32=b6e02b92, xxh3=248a66b67c86cb78; xxhash_lane_test.exs green. Distinct from monocypher crypto-hash (speed for content-addressing/dedup). Promoted from c_leaf_libs proven.",
+   "lane": "compilers/xxhash/build.sh (fetch single-header pinned v0.8.2, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
