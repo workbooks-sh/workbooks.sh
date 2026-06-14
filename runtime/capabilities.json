@@ -2,9 +2,9 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 714,
+    "tests": 755,
     "failures": 0,
-    "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
+    "verified": "2026-06-14 (seeds 12345 + 999 both green, 365 heavy-tagged excluded; flaky agent_prompt + browse_dock fixed)"
   },
   "note": "Canonical, agent-maintained ledger. The /capabilities dashboard reads it LIVE (re-poll). `units` = ACTUAL test-case count of each capability's dedicated test file(s) (no file is shared across two rows, so the sum is real, not double-counted). `suite.tests` is the authoritative full deterministic suite total. status: done | wip | gated | planned.",
   "areas": [
@@ -38,11 +38,11 @@
           "failure_modes": []
         },
         {
-          "name": "Agent fetch SSRF (delegates to shared NetGuard floor)",
+          "name": "Agent fetch + native crawl SSRF (NetGuard floor on every egress path)",
           "status": "done",
           "tests": "fetch_ssrf_test",
-          "units": 1,
-          "proof": "live: 127.0.0.1 blocked",
+          "units": 2,
+          "proof": "live: agent fetch blocks 127.0.0.1; the native fetch/crawl path (Browse.Fetch.get, what /api/browse crawl uses) now ALSO checks NetGuard per-hop — metadata/RFC1918 blocked in <8ms (was an unfloored 15s hang). Loopback exempted in :test builds only (compile-time).",
           "failure_modes": []
         },
         {
@@ -135,13 +135,13 @@
           "failure_modes": []
         },
         {
-          "name": "web_search \u2014 keyless, provider rotation, honest empty",
+          "name": "web_search \u2014 prefers OpenRouter (reliable), tenant/env override, keyless fallback",
           "status": "done",
           "tests": "web_search_format_test, search_rotation_test",
           "units": 4,
-          "proof": "DataForSEO removed; engines ROTATED per query (spread load, avoid hammering one into 429); 429/anomaly \u2192 honest 'may be unavailable' + file_issue nudge; proxy rotation = future cloud add-on",
+          "proof": "ROOT-CAUSE FIX: /api/browse/search never read q (missing fetch_query_params) \u2192 always empty for every request; fixed + now tenant-aware + ?provider= override. post_json 15s\u219245s (LLM web plugin was timing out). Agent web_search prefers openrouter (the agent's own LLM key is present, so the reliable web plugin works) \u2014 a tenant/env choice still wins; keyless is the last-resort fallback. DataForSEO removed.",
           "failure_modes": [
-            "all keyless engines anomaly/429 from datacenter or rate-limited IPs \u2014 real fix is a headless browser tier (wb-70mi), not a SERP API"
+            "keyless scrape is best-effort only (DDG IP-challenges, Brave/Bing nested-markup parsers stale) \u2014 wb-46yi; keyed providers (openrouter/exa/brave/perplexity) are the reliable path"
           ]
         },
         {
@@ -160,10 +160,8 @@
           "status": "done",
           "tests": "live integration proof",
           "units": 0,
-          "proof": "LIVE: agent researched 'what is Elixir' via web_search + fetch and returned a correct 2-sentence cited answer (Jose Valim, 2012, BEAM; elixir-lang.org)",
-          "failure_modes": [
-            "converges but can be step-heavy (16 steps observed for a simple query) - efficiency, not correctness; observe don't tune"
-          ]
+          "proof": "LIVE (run-167, after the search fixes): agent got the prompt → called web_search → returned a correct, cited answer (elixir-lang.org) in 1 step. Now efficient because web_search returns real results immediately instead of flailing on empty keyless (was 16 steps).",
+          "failure_modes": []
         },
         {
           "name": "Pluggable search providers (keyless/openrouter-web/exa/brave/perplexity)",
