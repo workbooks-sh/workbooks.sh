@@ -409,6 +409,13 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
+  # IDOR guard (wb-g1yo.9): a `:tenant` PATH param must equal the authenticated
+  # caller's tenant. A nil caller (admin/internal/dev-unset) is grandfathered.
+  defp path_tenant_ok?(conn) do
+    caller = conn.assigns[:tenant]
+    is_nil(caller) or caller == conn.params["tenant"]
+  end
+
   defp wb_exec(argv, tenant) do
     Workbooks.CLI.call(argv, tenant)
   rescue
@@ -662,16 +669,27 @@ defmodule Workbooks.Web do
 
   # Library (Phase 3) — the tenant's access graph: workspaces + their members.
   get "/api/library/:tenant" do
-    wss = Workbooks.Library.workspaces(conn.params["tenant"])
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{workspaces: wss}))
+    # IDOR guard (wb-g1yo.9): the path tenant must be the CALLER's tenant — you
+    # can't read another tenant's library by changing the URL.
+    if path_tenant_ok?(conn) do
+      wss = Workbooks.Library.workspaces(conn.params["tenant"])
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{workspaces: wss}))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
+    end
   end
 
   # Cross-workbook OQL query-through across a Library's members. {"sql": "..."}
   post "/api/library/:tenant/query" do
     {:ok, body, conn} = read_body(conn)
-    sql = Jason.decode!(body)["sql"] || ""
-    result = Workbooks.Library.query(conn.params["tenant"], sql)
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+
+    if path_tenant_ok?(conn) do
+      sql = Jason.decode!(body)["sql"] || ""
+      result = Workbooks.Library.query(conn.params["tenant"], sql)
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
+    end
   end
 
   # ── RCP engine verbs for the `wb` CLI (token → tenant; see cli/TAXONOMY.md) ──
