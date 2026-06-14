@@ -199,9 +199,21 @@ defmodule Workbooks.PublicWeb do
         dir = site_dir(app)
 
         cond do
-          File.dir?(dir) -> serve_static(conn, dir)
-          (org = Workbooks.ControlPlane.get_workbook(app)) -> serve_html(conn, static_page(app, org))
-          true -> send_resp(conn, 404, "no app for host")
+          File.dir?(dir) ->
+            serve_static(conn, dir)
+
+          (org = Workbooks.ControlPlane.get_workbook(app)) ->
+            # A complete author document is served sandboxed (its scripts run in an
+            # opaque origin); host-rendered org gets the nonce-gated shell.
+            if complete_html?(org) do
+              serve_sandboxed(conn, org)
+            else
+              nonce = gen_nonce()
+              serve_html(conn, nonce, static_doc(app, Workbooks.OQL.render(org), nonce))
+            end
+
+          true ->
+            send_resp(conn, 404, "no app for host")
         end
     end
   end
@@ -221,8 +233,23 @@ defmodule Workbooks.PublicWeb do
         String.ends_with?(rel, ".html") and File.regular?(path) ->
           redirect(conn, clean_url(conn))
 
+        # Every published HTML page from disk — a TRUSTED host-built site page (the
+        # docs/learn shelf from `site_page`/`static_doc`) OR an UNTRUSTED author
+        # one-file workbook — is served inside a sandboxed iframe WITHOUT
+        # `allow-same-origin`, so its scripts run in an OPAQUE origin and can never
+        # reach the serving origin's cookies / session. That trust boundary is
+        # uniform and unforgeable (an author can't escape it by smuggling a marker).
+        #
+        # The only difference is the carrier's CSP, which the srcdoc iframe inherits:
+        # a host-built docs page (detected by the baked-in `@marker`) needs its own
+        # first-party inline scripts (copy-as-markdown, sidebar) and the mermaid ESM
+        # module from jsdelivr to run — so the docs carrier relaxes `script-src` to
+        # `'unsafe-inline'` + jsdelivr. This is SAFE precisely because the iframe is
+        # opaque-origin: inline script there owns only the throwaway sandbox, not the
+        # serving origin. Author workbooks keep the tight `'self' 'nonce-…'` policy.
         String.starts_with?(MIME.from_path(path), "text/html") ->
-          serve_html(conn, inject_marker(File.read!(path)))
+          html = File.read!(path)
+          serve_sandboxed(conn, html, docs: host_built?(html))
 
         true ->
           conn |> put_resp_content_type(MIME.from_path(path)) |> send_file(200, path)
@@ -261,28 +288,97 @@ defmodule Workbooks.PublicWeb do
     |> send_resp(301, "moved: " <> to)
   end
 
-  defp serve_html(conn, body),
-    do: conn |> put_resp_content_type("text/html") |> csp() |> send_resp(200, inject_marker(body))
+  # Serve a HOST-AUTHORED carrier shell (`static_doc` / `site_page`): the only
+  # inline scripts are ours, stamped with `nonce`, so `script-src` drops
+  # `'unsafe-inline'` and a hostile inline `<script>` injected into the rendered
+  # body cannot run with the serving origin's privileges (wb-mv3d).
+  defp serve_html(conn, nonce, body),
+    do: conn |> put_resp_content_type("text/html") |> csp(nonce) |> send_resp(200, inject_marker(body))
+
+  # A page is a TRUSTED host build iff it carries the host carrier marker, which
+  # `site_page`/`static_doc` bake in at generation time. Author one-file workbooks
+  # never contain it. This only widens the CSP a sandboxed page inherits — it never
+  # lifts the opaque-origin isolation — so a forged marker buys an attacker nothing.
+  defp host_built?(html), do: String.contains?(html, @marker)
+
+  # Serve VERBATIM author HTML (the self-contained "one file" workbook): the whole
+  # document is the author's — we can't nonce-distinguish their legit scripts from
+  # a hostile one, and they must run for the workbook to work. So we ISOLATE the
+  # whole page in a sandboxed iframe on the carrier origin: `sandbox` WITHOUT
+  # `allow-same-origin` puts the author's scripts in an OPAQUE origin — no access
+  # to the serving origin's cookies, same-origin fetch, or control-plane session
+  # (the exact privilege-escalation the review flagged). The author still gets
+  # script + forms + same-origin-less navigation. Residual: author scripts run
+  # (their own page) but in a NULL origin, neutered against the serving origin.
+  defp serve_sandboxed(conn, body, opts \\ []) do
+    nonce = gen_nonce()
+    srcdoc = escape_attr(inject_marker(body))
+
+    page =
+      ~s(<!doctype html><html><head><meta charset="utf-8">) <>
+        ~s(<meta name="viewport" content="width=device-width,initial-scale=1">) <>
+        ~s(<style nonce="#{nonce}">html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100vh;display:block}</style>) <>
+        ~s(</head><body>) <>
+        ~s(<iframe sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads" srcdoc="#{srcdoc}"></iframe>) <>
+        ~s(</body></html>)
+
+    csp_opts = [frame_self?: true] ++ if(opts[:docs], do: [docs: true], else: [])
+    conn |> put_resp_content_type("text/html") |> csp(nonce, csp_opts) |> send_resp(200, page)
+  end
+
+  # A per-response CSP nonce: 16 random bytes, base64. Cheap, unguessable.
+  defp gen_nonce, do: :crypto.strong_rand_bytes(16) |> Base.encode64()
 
   # CSP on served Workbooks: a self-contained `.html` hydrates an in-page VFS from
   # its embedded `wb-bundle` zip. Those entries are DATA, not scripts — the runtime
   # treats hydrated HTML/JS/.wasm as inert until it EXPLICITLY evaluates them. The
   # header is a defense-in-depth floor so a hostile bundle's embedded markup can't
   # auto-execute with the serving origin's privileges (cookies / same-origin fetch /
-  # control-plane session). `'unsafe-inline'` covers the page's own inline styles +
-  # the wb-bundle-loader; `object-src 'none'`/`base-uri 'self'` close the obvious
-  # injection vectors. The `wb-bundle` block itself is `type=application/zip`
-  # (non-executable by type) — CSP is the belt to that suspenders.
-  defp csp(conn) do
+  # control-plane session). `script-src` is NONCE-gated (no `'unsafe-inline'`): only
+  # the host's own inline scripts (the wb-bundle-loader, the shell's copy-md/mermaid
+  # boot) carry the nonce and run; a hostile bundle's injected inline markup does not.
+  # `style-src` still allows inline (CSS can't escalate to the serving origin's
+  # session the way script can — nonce-gating every style attr/tag is high-churn for
+  # negligible gain); `object-src 'none'`/`base-uri 'self'` close the obvious vectors.
+  # `frame-src` is opened to `'self'` only when this page wraps a sandboxed-iframe
+  # workbook (the verbatim-author path).
+  defp csp(conn, nonce, opts \\ []) do
+    frame_src = if opts[:frame_self?], do: " frame-src 'self';", else: ""
+
+    # `script-src`:
+    #  • default (author workbook / host org shell): `'self' 'nonce-…'` — NO
+    #    `'unsafe-inline'`; only host-stamped inline scripts run.
+    #  • docs (`docs: true`, the trusted host docs/learn shelf inside a sandboxed
+    #    OPAQUE-ORIGIN iframe): the page's own first-party inline scripts (copy-md,
+    #    sidebar) plus the mermaid ESM module from jsdelivr must run. A CSP3 nonce
+    #    makes browsers IGNORE `'unsafe-inline'`, so the docs policy drops the nonce
+    #    and allows `'unsafe-inline'` + jsdelivr. This only loosens the THROWAWAY
+    #    sandbox origin — never the serving origin — so it can't escalate to the
+    #    control-plane session.
+    script_src =
+      if opts[:docs],
+        do: "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        else: "script-src 'self' 'nonce-#{nonce}'"
+
+    connect_src = if opts[:docs], do: "connect-src 'self' https://cdn.jsdelivr.net", else: "connect-src 'self'"
+
     policy =
       "default-src 'self'; " <>
-        "script-src 'self' 'unsafe-inline'; " <>
+        script_src <> "; " <>
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
-        "font-src 'self' https://fonts.gstatic.com; " <>
+        "font-src 'self' https://fonts.gstatic.com https://workbooks.sh; " <>
         "img-src 'self' data: blob:; " <>
-        "connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+        connect_src <> "; object-src 'none'; base-uri 'self';#{frame_src} frame-ancestors 'self'"
 
     put_resp_header(conn, "content-security-policy", policy)
+  end
+
+  # Minimal HTML-attribute escape for an iframe `srcdoc` payload (the author's full
+  # document goes in a double-quoted attribute).
+  defp escape_attr(html) do
+    html
+    |> String.replace("&", "&amp;")
+    |> String.replace("\"", "&quot;")
   end
 
   # Published static trees live under the durable data dir (WB_DATA → the volume)
@@ -341,9 +437,9 @@ defmodule Workbooks.PublicWeb do
   end
 
   @doc false
-  def static_doc(id, rendered) do
+  def static_doc(id, rendered, nonce \\ nil) do
     """
-    <!doctype html><html lang="en"><head><meta charset="utf-8">
+    <!doctype html><html lang="en"><head><meta charset="utf-8">#{@marker}
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>#{escape(id)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -382,7 +478,7 @@ defmodule Workbooks.PublicWeb do
     #{rendered}
     <footer>Rendered by the Workbooks OQL kernel · <a href="https://github.com/workbooks-sh/workbooks.sh">workbooks-sh/workbooks.sh</a></footer>
     </main>
-    #{Workbooks.Bundle.loader_block()}
+    #{Workbooks.Bundle.loader_block(nonce: nonce)}
     </body></html>
     """
   end
@@ -394,7 +490,7 @@ defmodule Workbooks.PublicWeb do
   """
   def site_page(title, body_html, nav_html, current_url, site_title) do
     """
-    <!doctype html><html lang="en"><head><meta charset="utf-8">
+    <!doctype html><html lang="en"><head><meta charset="utf-8">#{@marker}
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f3f5f9'/%3E%3Cstop offset='.46' stop-color='%23c9d0db'/%3E%3Cstop offset='1' stop-color='%232f6fe0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3C/svg%3E">
     <title>#{escape(title)} — #{escape(site_title)}</title>
