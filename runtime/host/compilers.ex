@@ -1997,9 +1997,18 @@ defmodule Workbooks.Compilers do
                  "globalThis.process=globalThis.process||{env:{},argv:[\"node\",\"script\"]," <>
                  "platform:\"wasi\",arch:\"wasm32\",version:\"v18.0.0\",versions:{node:\"18.0.0\"}," <>
                  "cwd:function(){return \"/\"},browser:false," <>
-                 "nextTick:function(f){var a=[].slice.call(arguments,1);queueMicrotask(function(){f.apply(null,a)})}};"
+                 "nextTick:function(f){var a=[].slice.call(arguments,1);queueMicrotask(function(){f.apply(null,a)})}};" <>
+                 # StarlingMonkey has setTimeout/queueMicrotask but not setImmediate — node libs (streams) need it.
+                 "globalThis.setImmediate=globalThis.setImmediate||function(f){var a=[].slice.call(arguments,1);" <>
+                 "return setTimeout(function(){f.apply(null,a)},0)};" <>
+                 "globalThis.clearImmediate=globalThis.clearImmediate||function(id){return clearTimeout(id)};"
 
-  defp node_polyfill_extra(abs, root, opts) do
+  # Inject `Buffer` as a GLOBAL (libraries use the bare global, not `import {Buffer} from 'buffer'`).
+  # esbuild `--inject` rewrites free `Buffer` references to this shim's export of the aliased buffer polyfill.
+  @node_inject_shim "export {Buffer} from \"buffer\";\n"
+  @node_inject_rel "__wb_node_inject.js"
+
+  defp node_polyfill_extra(abs, _root, opts) do
     if Keyword.get(opts, :node_polyfills, false) do
       # install any polyfill package not already present in the project's node_modules (cached after first)
       specs =
@@ -2008,11 +2017,11 @@ defmodule Workbooks.Compilers do
             do: %{name: pkg, req: "*", pin: nil}
 
       if specs != [], do: Workbooks.Npm.install_tree(specs, abs)
-      _ = root
+      File.write!(Path.join(abs, @node_inject_rel), @node_inject_shim)
 
       aliases = for {b, pkg} <- @node_polyfills, do: "--alias:#{b}=#{pkg}"
       node_aliases = for {b, pkg} <- @node_polyfills, do: "--alias:node:#{b}=#{pkg}"
-      aliases ++ node_aliases ++ ["--banner:js=#{@node_banner}"]
+      aliases ++ node_aliases ++ ["--inject:/#{@node_inject_rel}", "--banner:js=#{@node_banner}"]
     else
       []
     end

@@ -231,6 +231,19 @@
           ],
           "verdict": "live",
           "note": "\\p{} via QJS fallback; rest on SM"
+        },
+        {
+          "id": "async-eventloop",
+          "item": "async / event-loop in the eval host",
+          "surfaces": [
+            "await a Promise result",
+            "Promise.then/microtask drain",
+            "setTimeout/setInterval (clocks)",
+            "setImmediate",
+            "async streams"
+          ],
+          "verdict": "pending",
+          "note": "BLOCKER. Empirical: JsEngine eval host returns String(promise)=>\"{}\" (never awaited); .then never fires; setTimeout traps because componentize disableFeatures includes clocks/random. Many async libs (http clients, streams, I/O) gated. FIX (forge): async @bootstrap (await eval result + microtask drain), drop clocks/random from disableFeatures, rebuild eval-host (build_host), async-aware console_capture (run bundle in async IIFE, await, drain, return buffer). Rebuild is a trusted build-time node step (~10-30s), not machine-heavy."
         }
       ]
     },
@@ -262,7 +275,7 @@
             "stream (Readable/Writable/Transform)"
           ],
           "verdict": "probing",
-          "note": "events+util LIVE; stream partial (Readable.from needs event-loop); buffer-global pending"
+          "note": "events/util/Buffer(global via --inject + base64/concat) LIVE; stream blocked on async event-loop (see async-eventloop)"
         },
         {
           "id": "node-crypto",

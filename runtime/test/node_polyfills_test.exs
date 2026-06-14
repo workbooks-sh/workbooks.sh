@@ -57,4 +57,16 @@ defmodule Workbooks.NodePolyfillsTest do
       assert run("process", ~s|console.log(process.platform+"/"+typeof process.nextTick)|, ready?) == "wasi/function"
     end
   end
+
+  @tag :build
+  @tag timeout: 300_000
+  test "Buffer is available as a global (auto-injected) — hex/base64/concat", %{ready?: ready?} do
+    if not ready? do
+      IO.puts("\n[skip] JS engines/esbuild not built or registry unreachable")
+    else
+      # Libraries use the bare `Buffer` global, not `import {Buffer} from 'buffer'`. The preset --injects it.
+      assert run("buf-hex", ~s/console.log(Buffer.from("hi").toString("hex")+"|"+Buffer.from("AQID","base64").length)/, ready?) =~ "6869|3"
+      assert run("buf-concat", ~s|console.log(Buffer.concat([Buffer.from("ab"),Buffer.from("cd")]).toString())|, ready?) == "abcd"
+    end
+  end
 end
