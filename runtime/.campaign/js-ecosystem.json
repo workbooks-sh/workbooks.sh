@@ -325,7 +325,9 @@
             "net.Socket (raw TCP)",
             "dns"
           ],
-          "verdict": "pending"
+          "verdict": "deferred",
+          "wall": "bedrock",
+          "note": "Raw TCP/UDP (net/dgram) unresolvable \u2014 no socket syscall in the eval-host guest; only fetch (HTTP) is brokered. Escape: host-brokered socket (js_dock-style, like fetch). No pure-JS alternative (TCP needs a socket)."
         },
         {
           "id": "node-process",
@@ -368,7 +370,9 @@
             "MessageChannel",
             "SharedArrayBuffer"
           ],
-          "verdict": "pending"
+          "verdict": "deferred",
+          "wall": "bedrock",
+          "note": "worker_threads unresolvable \u2014 no OS thread spawn in the single-threaded eval-host. Escape: host-brokered parallelism (fresh BEAM-process wasm instances = toolkit-isolation model). Sync compute works; true parallelism does not."
         },
         {
           "id": "node-childproc",
@@ -376,7 +380,9 @@
           "surfaces": [
             "spawn/exec native subprocess"
           ],
-          "verdict": "pending"
+          "verdict": "deferred",
+          "wall": "bedrock",
+          "note": "child_process unresolvable \u2014 no native exec in the wasm guest (the BEDROCK seal). Escape: trusted host-service broker; arbitrary native = rejected microVM tier."
         }
       ]
     },
@@ -662,8 +668,9 @@
             "bcrypt(native)",
             "node-gyp builds"
           ],
-          "verdict": "pending",
-          "note": "expect deferred (bedrock); look for pure-JS/wasm alt or host broker"
+          "verdict": "deferred",
+          "note": "native .node addons (sharp/better-sqlite3/native-bcrypt) cannot load in wasm. Escape: per-capability pure-JS/wasm alternative (better-sqlite3 -> in-tree sqlite.wasm; native bcrypt -> bcryptjs; many have JS equivalents). The native PACKAGE is terminal-deferred; the CAPABILITY often has an alternative.",
+          "wall": "bedrock"
         },
         {
           "id": "wasm-npm",
@@ -684,8 +691,9 @@
             "host-brokered node service idea",
             "vm module"
           ],
-          "verdict": "pending",
-          "note": "LAST roadmap item; bedrock \u2014 explore trusted-host-service escape only"
+          "verdict": "deferred",
+          "note": "real Node/V8 process \u2014 V8 JIT cannot run in the wasm guest (W^X). THE last roadmap item. Escape (the place that could help): a trusted host-side Node service brokered to the guest (run native Node on the host, broker calls across the Dock) \u2014 same pattern as fetch/exec brokers, trust the impl not the input.",
+          "wall": "bedrock"
         }
       ]
     }

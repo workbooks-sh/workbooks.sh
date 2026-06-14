@@ -72,6 +72,17 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
   sqlite.wasm). FORGE/BEDROCK boundary.
 - **Intl** (i18n number/date format): absent on BOTH StarlingMonkey AND QuickJS (ICU stripped). Escape:
   rebuild SM with ICU, or inject a `@formatjs` polyfill (bulky). See js-ecosystem.json.
+- **node:net / dgram** (raw TCP/UDP): no socket syscall in the guest; only brokered fetch (HTTP). Escape:
+  host-brokered socket (js_dock-style). BEDROCK.
+- **node:worker_threads** (true parallelism): no OS thread spawn in the eval-host. Escape: host-brokered
+  parallelism via fresh BEAM-process wasm instances (toolkit-isolation). Sync compute works. BEDROCK.
+- **node:child_process** (spawn native): no native exec in the guest (the seal). Escape: trusted host-service
+  broker. BEDROCK.
+- **native .node addons** (sharp/better-sqlite3): native binaries can't load in wasm. Escape: pure-JS/wasm
+  alternative per capability (better-sqlite3 → in-tree sqlite.wasm; native bcrypt → bcryptjs). BEDROCK.
+- **real Node/V8 process** (the last roadmap item): V8 JIT can't run in wasm. Escape: a trusted host-side
+  Node service brokered to the guest (run native Node on the host, broker calls — trust the impl, not the
+  input). BEDROCK.
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
