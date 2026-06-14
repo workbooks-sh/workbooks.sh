@@ -31,6 +31,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **Lib breadth** (data/reactive/DOM/schema/text) | esbuild bundle + run_program | js_lib_breadth_test — mathjs/decimal/immutable/rxjs/node-html-parser/graphql/picocolors |
 | **Module system** (dynamic import/interop/JSON/circular/TLA) | esbuild bundle + run_program | js_modules_test — await import(), CJS↔ESM, JSON loader, circular deps, top-level await |
 | **node:zlib + timers** | `node_polyfills` zlib→browserify-zlib; banner timer shims | js_zlib_test (gzip/deflate) + js_async_test (setTimeout/setImmediate/nextTick) |
+| **node:fs** (in-memory) | `node_polyfills` fs→memfs (+ fs/promises shim) | js_fs_test — sync/named/promises; in-memory FS (host-FS access = separate broker) |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |

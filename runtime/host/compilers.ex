@@ -1992,7 +1992,11 @@ defmodule Workbooks.Compilers do
     "buffer" => "buffer",
     "os" => "os-browserify",
     "crypto" => "crypto-browserify",
-    "zlib" => "browserify-zlib"
+    "zlib" => "browserify-zlib",
+    # node:fs → memfs in-memory filesystem. Makes the fs API available (writeFileSync/readFileSync/mkdir/
+    # readdir/promises) so node-authored libs that read/write a virtual or temp FS run unchanged. NOTE: this
+    # is an in-memory FS (fresh per run, no host file access) — real host-FS reads are a separate broker concern.
+    "fs" => "memfs"
   }
 
   @node_banner "globalThis.global=globalThis.global||globalThis;" <>
@@ -2017,6 +2021,9 @@ defmodule Workbooks.Compilers do
   # esbuild `--inject` rewrites free `Buffer` references to this shim's export of the aliased buffer polyfill.
   @node_inject_shim "export {Buffer} from \"buffer\";\n"
   @node_inject_rel "__wb_node_inject.js"
+  # `fs/promises` subpath → memfs's promises API (the map only aliases the bare `fs` specifier).
+  @node_fsp_shim "module.exports = require(\"memfs\").fs.promises;\n"
+  @node_fsp_rel "__wb_fs_promises.cjs"
 
   defp node_polyfill_extra(abs, _root, opts) do
     if Keyword.get(opts, :node_polyfills, false) do
@@ -2028,10 +2035,12 @@ defmodule Workbooks.Compilers do
 
       if specs != [], do: Workbooks.Npm.install_tree(specs, abs)
       File.write!(Path.join(abs, @node_inject_rel), @node_inject_shim)
+      File.write!(Path.join(abs, @node_fsp_rel), @node_fsp_shim)
 
       aliases = for {b, pkg} <- @node_polyfills, do: "--alias:#{b}=#{pkg}"
       node_aliases = for {b, pkg} <- @node_polyfills, do: "--alias:node:#{b}=#{pkg}"
-      aliases ++ node_aliases ++ ["--inject:/#{@node_inject_rel}", "--banner:js=#{@node_banner}"]
+      fs_promises = ["--alias:fs/promises=/#{@node_fsp_rel}", "--alias:node:fs/promises=/#{@node_fsp_rel}"]
+      aliases ++ node_aliases ++ fs_promises ++ ["--inject:/#{@node_inject_rel}", "--banner:js=#{@node_banner}"]
     else
       []
     end

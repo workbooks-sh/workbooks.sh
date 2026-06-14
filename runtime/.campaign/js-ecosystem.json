@@ -307,7 +307,8 @@
             "readdir/stat",
             "brokered via js_dock"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "fs->memfs in node_polyfills map (IN-MEMORY fs): sync API + named imports + fs/promises (async) proven (js_fs_test). Host-FS access = separate broker concern (note)."
         },
         {
           "id": "node-net",
