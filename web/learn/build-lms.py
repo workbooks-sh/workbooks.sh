@@ -287,7 +287,7 @@ a{ color:inherit; text-decoration:none; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
 .brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
-  color:var(--ink); text-transform:uppercase; }
+  color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
   border:2px solid var(--stroke); border-radius:9px; background:var(--card); color:var(--ink); cursor:pointer;

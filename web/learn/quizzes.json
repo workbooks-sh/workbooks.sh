@@ -57,63 +57,6 @@
         "explain": "The idea is that a piece of work, its screen, data, and history can travel as one thing you hand off, explaining itself on arrival."
       }
     ],
-    "why-you-can-build-now": [
-      {
-        "q": "The lesson says the wall to building software is gone primarily because of what change?",
-        "options": [
-          "Coding languages became dramatically simpler to learn",
-          "The job changed: you describe and an agent does the building",
-          "Hiring an engineer is now far cheaper than it used to be",
-          "Computers got fast enough to write their own programs alone"
-        ],
-        "answer": 1,
-        "explain": "It states the wall is gone because the job changed: you describe what you want and an agent builds it, not because coding got easier."
-      },
-      {
-        "q": "In the tip-calculator example, what did the user notably leave out of the prompt?",
-        "options": [
-          "Who the tool was for and what feeling it should have",
-          "The exact tip percentages the calculator should offer",
-          "How it should be built and which technology to use",
-          "Any request that the numbers be easy to read on a phone"
-        ],
-        "answer": 2,
-        "explain": "The lesson highlights that the prompt described the outcome and audience but never said how, or named a single piece of technology."
-      },
-      {
-        "q": "How does the lesson say a non-coder can direct something they can't read?",
-        "options": [
-          "By learning to skim the code for obvious errors first",
-          "By trusting the agent's own description of what it built",
-          "By giving the agent extremely detailed technical instructions",
-          "By judging the result, the way an editor judges a writer"
-        ],
-        "answer": 3,
-        "explain": "You direct by judging the result, not the method, the way an editor directs a writer or a client directs a designer."
-      },
-      {
-        "q": "According to the lesson, what makes the sandbox the part 'that makes this sane'?",
-        "options": [
-          "The agent can't reach the rest of your machine from it",
-          "The agent promises not to touch your files or passwords",
-          "It backs up your real computer before the agent runs",
-          "It scans the agent's work for dangerous commands first"
-        ],
-        "answer": 0,
-        "explain": "Safety comes from the shape of the room: a sealed workspace the agent can't reach out of, so there's nothing of yours to break."
-      },
-      {
-        "q": "What is the lesson's honest framing of what Workbooks is?",
-        "options": [
-          "A tool that runs itself once you set it up correctly",
-          "Software built in workbooks, by people and agents together",
-          "An app you log into where agents work without supervision",
-          "A way to finally make the human director optional"
-        ],
-        "answer": 1,
-        "explain": "The lesson insists it is software built in workbooks by people and agents together, not software that runs itself while you walk away."
-      }
-    ],
     "tell-it-what-you-want": [
       {
         "q": "The lesson says the most important skill for a first request is what?",
