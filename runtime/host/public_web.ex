@@ -411,6 +411,11 @@ defmodule Workbooks.PublicWeb do
       #13d943 41% 47%,#6a7064 47% 60%,#9ba095 60% 66%,#149157 66% 80%,#8b9085 80% 87%,#13d943 87% 100%)}
     /* ── sidebar ── */
     .sidebar{width:var(--sidebar-w);flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px)}
+    /* DNA strip — top of the left panel, full width, brand pastels, gentle breathe */
+    .dnastrip{display:flex;width:100%;height:8px;overflow:hidden;flex:0 0 auto}
+    .dnastrip i{display:block;height:100%;transform-origin:center bottom;animation:dnab 6s ease-in-out infinite}
+    @keyframes dnab{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.5)}}
+    @media(prefers-reduced-motion:reduce){.dnastrip i{animation:none}}
     .sidebar-head{padding:1.5rem 1.4rem 1.1rem;display:flex;align-items:center;gap:.6rem}
     .brand-mark{width:26px;height:26px;border-radius:7px;background:url("https://workbooks.sh/favicon.svg") center/contain no-repeat;flex:0 0 auto}
     .sidebar-sub{color:var(--ink-faint);font-weight:400;font-family:var(--mono);font-size:.86rem}

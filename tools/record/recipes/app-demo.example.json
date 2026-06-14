@@ -1,0 +1,14 @@
+{
+  "name": "Workbooks Browser — open a workbook (app/MCP)",
+  "target": "app",
+  "verifyFrames": 6,
+  "_note": "Drives the REAL Tauri app via the embedded MCP (wb-aakl.11/.23). Requires the browser running with WB_MCP=1 (the socket /tmp/workbooks-mcp.sock must be live). The native/Linux screen recorder (record.sh, Phase 1) should place out/<take>.mp4 for the verifier; otherwise the harness builds a still-strip video from screenshots.",
+  "steps": [
+    { "intent": "eval_js", "code": "location.href", "label": "read current location (bridge sanity)" },
+    { "intent": "screenshot", "name": "start", "checkpoint": "app shell + dock visible", "label": "capture start state" },
+    { "intent": "navigate", "workbook": "examples/living-lander/app/index.html", "label": "open a workbook by path" },
+    { "intent": "wait", "ms": 1500, "label": "let the workbook render" },
+    { "intent": "screenshot", "name": "opened", "checkpoint": "workbook content rendered in a tab", "label": "capture opened workbook" },
+    { "intent": "dom_read", "selector": "body", "label": "snapshot DOM for the verifier" }
+  ]
+}

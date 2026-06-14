@@ -423,8 +423,7 @@
             class="btn primary"
             disabled={!canSend}
           >
-            {sending ? "…" : ""}
-            <ArrowUp weight="fill" size={16} color="var(--color-page)" />
+            {#if sending}…{:else}<ArrowUp weight="fill" size={16} />{/if}
           </button>
         </div>
       </form>

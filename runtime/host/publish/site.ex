@@ -172,8 +172,17 @@ defmodule Workbooks.Publish.Site do
         "#{label}<ul>#{links}</ul>"
       end)
 
+    dna =
+      [3, 5, 2, 6, 4, 3, 7, 2, 5, 4, 6, 3, 2, 5, 4, 7, 3, 5, 2, 6]
+      |> Enum.with_index()
+      |> Enum.map_join("", fn {w, i} ->
+        c = Enum.at(~w(#a8d4f0 #aee5c2 #f3c5a3 #f2ddb0 #d9c5f0 #f0b8b8 #b8e0e8), rem(i, 7))
+        ~s(<i style="flex:#{w};background:#{c};animation-delay:#{Float.round(i * 0.35, 2)}s"></i>)
+      end)
+
     """
     <nav class="sidebar" id="sidebar">
+      <div class="dnastrip" aria-hidden="true">#{dna}</div>
       <div class="sidebar-head">
         <span class="brand-mark"></span>
         <a href="/" class="sidebar-title" title="Back to workbooks.sh">workbooks</a>

@@ -115,5 +115,25 @@ Waldo answers or acts. Wired once Waldo lands (wb-aakl.21).
 
 - ✅ `wb desktop mcp` CLI entry (prints config + `claude mcp add` line).
 - ✅ Architecture + toolset locked (this doc).
-- ⏳ Rust server + stdio relay + JS bridge → **wb-aakl.23** (needs the Tauri
-  build-test loop + on-device MCP verification).
+- ✅ Rust server (`src-tauri/src/mcp.rs`): UDS listener (`/tmp/workbooks-mcp.sock`,
+  `WB_MCP_SOCK` override, `0600`), thread-per-conn, newline-delimited JSON-RPC 2.0
+  (`initialize` / `tools/list` / `tools/call` / `ping`), started from `setup()`
+  gated by `WB_MCP=1`. Compiles clean; unit tests green.
+- ✅ Native tools dispatch 1:1 onto existing command bodies (`tabs_*`,
+  `bookmark_*`, `workspace_tree`, `open_workbook`, `weave`/`validate`/`outline`,
+  `viewer_state`, `list_windows`).
+- ✅ **JS bridge (the keystone):** `eval_js` / `dom_read` / `click` / `type` /
+  `hover` via Tauri 2.11 `WebviewWindow::eval_with_callback` — caller JS is
+  wrapped in an async IIFE (top-level `await` supported), run on the main thread,
+  and the worker blocks on a oneshot channel (15s timeout) for the JSON envelope.
+- ✅ stdio↔UDS relay: `wb desktop mcp --stdio` (Elixir, `runtime/host/cli/desktop.ex`)
+  connects via the `:local` address family and pumps stdin↔socket both ways.
+- ⏳ `screenshot`: pixel capture is the host/Linux capture tier (SCK on mac,
+  x11grab/wf-recorder on Linux — see `docs/.plan/RECORDING-SYSTEM-FINDINGS.md`),
+  not the JS bridge; the tool returns guidance pointing there. `dom_read` covers
+  structural assertions today.
+- ⏳ `waldo_ask` / `waldo_do`: wired once Waldo lands (wb-aakl.21).
+- ⏳ **On-device verification:** connect Claude Code to a running `WB_MCP=1`
+  browser and exercise `tabs_list` / `eval_js` / `dom_read` against the live
+  WKWebView/WebKitGTK — not runnable in a headless build env (needs a GUI
+  session). This is the last hop before closing wb-aakl.23.

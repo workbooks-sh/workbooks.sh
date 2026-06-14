@@ -73,10 +73,11 @@ defmodule Workbooks.CLI.Desktop do
     sock = System.get_env("WB_MCP_SOCK") || @mcp_default_sock
 
     if "--stdio" in opts do
-      # The relay (stdin↔socket) is implemented with the Rust server in
-      # wb-aakl.23 — it needs the live browser's UDS. Fail clearly until then.
-      {"wb desktop mcp --stdio: relay not implemented yet (wb-aakl.23). " <>
-         "Socket: #{sock}", true}
+      # The stdio↔UDS relay Claude Code runs (`claude mcp add workbooks -- wb
+      # desktop mcp --stdio`). Connect to the live browser's Unix socket and
+      # pump bytes both ways: stdin → socket, socket → stdout. Blocks until
+      # either side closes; returns "" so no chatter pollutes the MCP stream.
+      stdio_relay(sock)
     else
       running? = File.exists?(sock)
 
@@ -98,6 +99,69 @@ defmodule Workbooks.CLI.Desktop do
       """
 
       {msg, false}
+    end
+  end
+
+  # stdin ↔ UDS pump. Claude Code speaks MCP over stdio; the browser listens on
+  # a Unix socket. We connect with the `:local` address family (OTP 19+), then
+  # run two copy loops: a spawned task drains the socket to stdout, the main
+  # process drains stdin to the socket. Either EOF/close tears the relay down.
+  defp stdio_relay(sock) do
+    unless File.exists?(sock) do
+      throw_relay("browser not running (no socket at #{sock}). Start it with WB_MCP=1, e.g. `WB_MCP=1 wb desktop open`.")
+    end
+
+    case :gen_tcp.connect({:local, to_charlist(sock)}, 0, [:binary, active: false, packet: 0]) do
+      {:ok, socket} ->
+        # Stdin must be raw binary, unbuffered, so JSON-RPC lines flow promptly.
+        :ok = :io.setopts(:standard_io, [:binary])
+
+        reader =
+          spawn_link(fn ->
+            socket_to_stdout(socket)
+          end)
+
+        stdin_to_socket(socket, reader)
+        {"", false}
+
+      {:error, reason} ->
+        {"wb desktop mcp --stdio: could not connect to #{sock}: #{inspect(reason)}", true}
+    end
+  catch
+    {:relay_error, msg} -> {msg, true}
+  end
+
+  defp throw_relay(msg), do: throw({:relay_error, msg})
+
+  # socket → stdout, until the browser closes the connection.
+  defp socket_to_stdout(socket) do
+    case :gen_tcp.recv(socket, 0) do
+      {:ok, data} ->
+        IO.binwrite(:standard_io, data)
+        socket_to_stdout(socket)
+
+      {:error, _} ->
+        :ok
+    end
+  end
+
+  # stdin → socket, until Claude Code closes stdin (EOF).
+  defp stdin_to_socket(socket, reader) do
+    case IO.binread(:standard_io, 4096) do
+      :eof ->
+        :gen_tcp.close(socket)
+        Process.exit(reader, :kill)
+        :ok
+
+      {:error, _} ->
+        :gen_tcp.close(socket)
+        :ok
+
+      data ->
+        case :gen_tcp.send(socket, data) do
+          :ok -> stdin_to_socket(socket, reader)
+          {:error, _} -> :ok
+        end
     end
   end
 

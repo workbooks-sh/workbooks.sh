@@ -52,6 +52,10 @@ defmodule Workbooks.CLI.Runtime do
   def toolkit(["build", id], req), do: do_request(:post, "/rcp/toolkit/build?id=#{enc(id)}", "", req)
   def toolkit(["build", id, which], req), do: do_request(:post, "/rcp/toolkit/build?id=#{enc(id)}&which=#{enc(which)}", "", req)
   def toolkit(["sign", id], req), do: do_request(:post, "/rcp/toolkit/sign?id=#{enc(id)}", "", req)
+  def toolkit(["versions", id], req), do: do_request(:get, "/rcp/toolkit/versions?id=#{enc(id)}", nil, req)
+  def toolkit(["live"], req), do: do_request(:get, "/rcp/toolkit/live", nil, req)
+  def toolkit(["live", id], req), do: do_request(:get, "/rcp/toolkit/live?id=#{enc(id)}", nil, req)
+  def toolkit(["rollback", id, version], req), do: do_request(:post, "/rcp/toolkit/rollback?id=#{enc(id)}&version=#{enc(version)}", "", req)
   def toolkit(_, _), do: {toolkit_usage(), true}
 
   @doc """
@@ -83,6 +87,7 @@ defmodule Workbooks.CLI.Runtime do
   defp toolkit_usage do
     """
     wb toolkit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
+                | versions <id> | live [<id>] | rollback <id> <version>
 
     Runs against the connected runtime (toolkit verbs execute server-side; the
     escript can't load the NIFs). Target: WB_RUNTIME_URL (+ WB_TOKEN) or discovery.

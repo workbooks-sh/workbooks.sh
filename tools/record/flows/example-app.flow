@@ -1,0 +1,29 @@
+# tools/record/flows/example-app.flow
+# Example flow: record the Workbooks Browser (Tauri/WebKitGTK Linux build).
+# Run inside the Linux substrate:  tools/record/record record-flow tools/record/flows/example-app.flow
+#
+# Grammar (one verb per line):
+#   app   -- CMD...   launch app on the virtual display
+#   wait  <seconds>   pause
+#   step  <shell>     run a driver step (xdotool / MCP client / curl) on $DISPLAY
+#   shot  <out.png>   mid-flow still
+#   note  <text>      log marker
+
+note  launching the Workbooks Browser Linux build
+# Replace with the real AppImage / deb-installed binary path inside the container:
+app   -- /opt/workbooks/workbooks-browser
+wait  3
+shot  ./.rec/01-boot.png
+
+note  open a workbook (synthetic events are invisible; prefer the embedded MCP)
+# Native pointer driving (visible cursor) via xdotool:
+step  xdotool mousemove 720 450 click 1
+wait  1
+shot  ./.rec/02-clicked.png
+
+note  type into the focused field
+step  xdotool type --delay 80 "hello workbooks"
+wait  2
+shot  ./.rec/03-typed.png
+
+note  flow done — record stop + gif happen automatically

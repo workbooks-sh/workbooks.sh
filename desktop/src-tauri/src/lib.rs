@@ -23,6 +23,7 @@ mod fs_ops;
 mod kernel;
 mod keychain;
 mod machine;
+mod mcp;
 mod network;
 mod orgprops;
 mod packages;
@@ -253,6 +254,13 @@ pub fn run() {
             });
             // Live daemon-state poll (discovery + /health), emits `daemon-state`.
             daemon::spawn_state_poll(app.handle().clone());
+
+            // Embedded MCP server (wb-aakl.23) — Claude Code drives the browser.
+            // Off by default; `wb desktop mcp` sets WB_MCP=1 before launch. UDS
+            // only, local-user, no network listener. See desktop/docs/mcp.md.
+            if std::env::var("WB_MCP").as_deref() == Ok("1") {
+                mcp::start(app.handle());
+            }
             Ok(())
         })
         // Closing the window HIDES it — the daemon (and tray) keep running. Quit

@@ -127,12 +127,19 @@ defmodule Workbooks.JsEngine do
   # Set on globalThis BEFORE the bundle runs; the trailing expression is what `run`'s eval returns.
   # Format-robust for a self-contained esbuild bundle (no top-level import/export after bundling).
   defp console_capture(body) do
-    # Run the bundle inside an async IIFE so its awaits settle, then drain a few macrotask turns (timers/
-    # streams flush now that clocks are enabled) before returning the buffer. The async bootstrap awaits this.
-    "globalThis.__wbout=[];{const __p=(...a)=>globalThis.__wbout.push(a.map(String).join(\" \"));" <>
-      "globalThis.console={log:__p,error:__p,warn:__p,info:__p,debug:__p};}\n" <>
+    # Capture console.* into a buffer, then IDLE-DRAIN the event loop before returning it. Two signals decide
+    # "done": (1) in-flight fetch() count back to zero (instrumented below) — so we don't exit during the quiet
+    # gap while a network request is pending, and (2) console output stable for several turns. A fixed turn
+    # count is too short for real async (a fetch resolves after tens of ms). The async bootstrap awaits this.
+    "globalThis.__wbout=[];globalThis.__pend=0;" <>
+      "{const __p=(...a)=>globalThis.__wbout.push(a.map(String).join(\" \"));" <>
+      "globalThis.console={log:__p,error:__p,warn:__p,info:__p,debug:__p};" <>
+      "if(typeof fetch===\"function\"){const __of=fetch;globalThis.fetch=function(){globalThis.__pend++;" <>
+      "const __r=__of.apply(this,arguments);Promise.resolve(__r).then(x=>x).catch(()=>{}).finally(()=>{globalThis.__pend--});return __r;};}}\n" <>
       "(async()=>{\n" <> body <> "\n" <>
-      "for(let __i=0;__i<5;__i++){await new Promise(r=>setTimeout(r,0));}\n" <>
+      "let __l=-1,__s=0,__t=Date.now();\n" <>
+      "while((globalThis.__pend>0||__s<6)&&(Date.now()-__t)<12000){await new Promise(r=>setTimeout(r,10));" <>
+      "if(globalThis.__wbout.length===__l){__s++}else{__l=globalThis.__wbout.length;__s=0}}\n" <>
       "return globalThis.__wbout.join(\"\\n\");})()"
   end
 

@@ -1,0 +1,262 @@
+#!/usr/bin/env sh
+# tools/record/pipeline — THE single `wb record <recipe>` pipeline.
+#
+# One command that, for a recipe, runs the whole proof-looped recording flow:
+#
+#   seed the demo env  ->  bring up a Linux display + launch the app  ->
+#   START screen capture (real MP4)  ->  DRIVE the flow (record.mjs intents,
+#   stills) ->  STOP capture (finalize MP4)  ->  VERIFY the real MP4 (Gemini ->
+#   MiniMax cascade)  ->  PASS publishes / FAIL retries, bounded by TIMEOUT_MS.
+#
+# It is the COORDINATOR the Foundations pieces were missing: `record` (Linux
+# capture) and `record.mjs` (drive+verify) ran independently; nothing started
+# capture *around* a drive and gated the real MP4. This does.
+#
+# WHERE IT RUNS (canon): on Linux — the substrate the app + runtime live in
+# (krunvm locally, cloud Linux). The Mac host only TRIGGERS it via
+# trigger-from-mac.sh (which shells `wb record …` here inside the container).
+# It is a HOST-side trusted service: it owns the display + encoder + app; a
+# wasm guest never drives a display. The future Nexus path (Workbooks.Browse)
+# brokers the SAME intents to this rig — see RUNBOOK.md "Next milestone".
+#
+# Usage:
+#   pipeline <recipe.json> [opts]
+# Opts (env-overridable shown in []):
+#   --backend mcp|playwright|auto   driver tier            [WB_REC_DRIVER=auto]
+#   --retries N                     re-takes on verify fail [WB_REC_RETRIES=1]
+#   --timeout-ms MS                 wall-clock budget       [WB_REC_TIMEOUT_MS=900000]
+#   --no-seed                       skip `wb demo seed` (use current state)
+#   --seed-args "..."               args for `wb demo seed` [WB_REC_SEED_ARGS=--no-build]
+#   --app "CMD..."                  app launch cmd on the display [WB_REC_APP]
+#   --no-verify                     skip the proof gate (drive+capture only)
+#   --out DIR                       artifact dir            [tools/record/out/<slug>]
+#
+# A recipe with "target":"web" needs NO display/app/capture here — record.mjs
+# (Playwright) records its own WebM + runs verify; the pipeline just delegates.
+# A recipe with "target":"app" is the coordinated path above.
+#
+# Output: prints the final manifest JSON (publishable / artifacts / verdict) on
+# stdout and writes it to <out>/pipeline.json. Exit 0 = publishable, 1 = not.
+# POSIX sh, no bashisms.
+
+set -eu
+HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$HERE/lib/common.sh"
+REPO_ROOT=$(CDPATH= cd -- "$HERE/../.." && pwd)
+
+# ---- node/bun runner for the .mjs driver + verifier ---------------------------
+JS=""
+if have node; then JS=node
+elif have bun; then JS=bun
+else die "need node or bun on PATH to run the driver (record.mjs)"; fi
+
+# ---- defaults (env-overridable) ----------------------------------------------
+backend="${WB_REC_DRIVER:-auto}"
+retries="${WB_REC_RETRIES:-1}"
+timeout_ms="${WB_REC_TIMEOUT_MS:-900000}"
+seed=1
+seed_args="${WB_REC_SEED_ARGS:---no-build}"
+app_cmd="${WB_REC_APP:-}"
+verify=1
+out=""
+recipe=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --backend)    backend="$2"; shift 2;;
+    --retries)    retries="$2"; shift 2;;
+    --timeout-ms) timeout_ms="$2"; shift 2;;
+    --no-seed)    seed=0; shift;;
+    --seed-args)  seed_args="$2"; shift 2;;
+    --app)        app_cmd="$2"; shift 2;;
+    --no-verify)  verify=0; shift;;
+    --out)        out="$2"; shift 2;;
+    -h|--help)    sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    --*)          die "unknown opt: $1";;
+    *)            recipe="$1"; shift;;
+  esac
+done
+[ -n "$recipe" ] || die "usage: pipeline <recipe.json> [opts]  (try --help)"
+[ -f "$recipe" ] || die "recipe not found: $recipe"
+
+# ---- recipe introspection (no jq dep) ----------------------------------------
+# target + slug, read by the JS runtime (single source of truth = intents/JSON).
+recipe_field() {
+  "$JS" -e '
+    const fs=require("fs");
+    const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+    const k=process.argv[2];
+    if(k==="slug"){process.stdout.write((r.name||"take").replace(/[^a-z0-9]+/gi,"-").toLowerCase());}
+    else process.stdout.write(String(r[k]??""));
+  ' "$recipe" "$1"
+}
+target=$(recipe_field target); [ -n "$target" ] || target=app
+slug=$(recipe_field slug)
+[ -n "$out" ] || out="$HERE/out/$slug"
+mkdir -p "$out"
+
+log "pipeline: recipe=$(basename "$recipe") target=$target backend=$backend out=$out"
+
+# ---- 1. seed the demo environment --------------------------------------------
+# Reproducible rich state so every take plays against identical workspaces /
+# toolkits / agents / dock (recording-system findings §3). Skipped for `web`
+# recipes (they hit a real URL, not the seeded local app) and with --no-seed.
+seed_env_file="$out/seed.env"
+: > "$seed_env_file"
+if [ "$seed" = 1 ] && [ "$target" = app ]; then
+  if [ -d "$REPO_ROOT/runtime" ]; then
+    log "seeding demo env: wb demo seed $seed_args"
+    # Prefer the built escript; fall back to mix run in a source checkout.
+    if have wb; then
+      ( cd "$REPO_ROOT/runtime" && wb demo seed $seed_args ) || err "seed failed (continuing with existing state)"
+    elif have mix; then
+      ( cd "$REPO_ROOT/runtime" && mix run -e "Workbooks.CLI.Demo.run([\"seed\"$(printf ',%s' $seed_args | sed 's/,/,"/g;s/$/"/' )])" ) 2>/dev/null \
+        || ( cd "$REPO_ROOT/runtime" && mix run -e 'Workbooks.CLI.Demo.run(["seed","--no-build"])' ) \
+        || err "seed via mix failed (continuing with existing state)"
+    else
+      err "no wb/mix on PATH — cannot seed; using existing demo state"
+    fi
+  else
+    err "runtime/ not found at $REPO_ROOT — skipping seed"
+  fi
+else
+  log "seed: skipped (target=$target seed=$seed)"
+fi
+
+# ---- WEB target: delegate to record.mjs (Playwright owns capture+verify) ------
+if [ "$target" = web ]; then
+  log "web target -> record.mjs (Playwright self-captures WebM + verifies)"
+  vflag=""; [ "$verify" = 0 ] && vflag="--no-verify"
+  # record.mjs already writes <out>/manifest.json; capture its real exit (the
+  # publishable signal) without a pipe masking it.
+  set +e
+  "$JS" "$HERE/record.mjs" "$recipe" --backend playwright \
+      --retries "$retries" --timeout-ms "$timeout_ms" --out "$out" $vflag
+  rc=$?
+  set -e
+  [ -f "$out/manifest.json" ] && cp -f "$out/manifest.json" "$out/pipeline.json"
+  cat "$out/pipeline.json" 2>/dev/null || true
+  exit "$rc"
+fi
+
+# ============================================================================
+# APP target: the coordinated capture loop. Each take is one full pass.
+# ============================================================================
+
+if ! is_linux; then
+  err "app capture is LINUX-only (canon: the app/runtime run in the Linux kernel)."
+  err "Trigger from the Mac host via: tools/record/trigger-from-mac.sh record \"$recipe\""
+  err "Doing a DRY validation of the driver instead (no display/capture)."
+  # Still useful on a Mac dev box: prove the recipe + driver load and the MCP
+  # socket probe, without a Linux display. Honest, non-publishable.
+  "$JS" "$HERE/record.mjs" "$recipe" --backend "$backend" --no-verify --out "$out" \
+      --retries 0 --timeout-ms "$timeout_ms" || true
+  printf '{ "publishable": false, "reason": "app capture requires Linux substrate", "target": "app", "out": "%s" }\n' "$out" \
+    | tee "$out/pipeline.json"
+  exit 1
+fi
+
+"$HERE/lib/deps.sh" check >&2 || die "missing capture deps — run: tools/record/lib/deps.sh install"
+
+# Bring the virtual display up once (idempotent), launch the app once.
+"$HERE/record" display-up >&2 || die "could not bring the virtual display up"
+app_pid=""
+if [ -n "$app_cmd" ]; then
+  log "launching app on $WB_REC_DISPLAY: $app_cmd"
+  # shellcheck disable=SC2086
+  "$HERE/record" run -- $app_cmd >&2 || err "app launch reported nonzero"
+  app_pid=$(state_file_get_any "${WB_REC_STATE}.app" app_pid || true)
+  sleep 3
+else
+  log "no --app given; assuming the Workbooks Browser is already on $WB_REC_DISPLAY"
+fi
+
+deadline=$(( $(date +%s) + timeout_ms / 1000 ))
+attempt=0
+publishable=0
+final_verdict="none"
+final_video=""
+
+while [ "$attempt" -le "$retries" ]; do
+  now=$(date +%s); [ "$now" -lt "$deadline" ] || { err "TIMEOUT_MS budget exhausted"; break; }
+  attempt=$((attempt+1))
+  take="${slug}-take${attempt}"
+  video="$out/$take.mp4"
+  log "=== take $attempt -> $video ==="
+
+  # 1) START capture (backgrounded ffmpeg writing the real MP4).
+  WB_REC_OUT="$out" "$HERE/record" start "$video" >&2 || { err "capture start failed"; continue; }
+  sleep 1   # lead-in so the app has painted before the first intent
+
+  # 2) DRIVE the flow (no verify here — we gate the REAL MP4 below). Emits the
+  #    expected-steps + signals context for the external verifier. record.mjs
+  #    names its take "<slug>-take1"; we drive a single attempt per capture.
+  drive_ok=1
+  "$JS" "$HERE/record.mjs" "$recipe" --backend "$backend" --no-verify \
+      --emit-context --retries 0 --out "$out" --timeout-ms "$timeout_ms" >&2 \
+      || drive_ok=0
+
+  # 3) STOP capture (finalize moov atom -> playable MP4).
+  WB_REC_OUT="$out" "$HERE/record" stop >&2 || err "capture stop reported nonzero"
+
+  if [ "$drive_ok" = 0 ]; then
+    err "drive failed on take $attempt — retrying"; final_verdict="drive-error"; continue
+  fi
+  [ -s "$video" ] || { err "no MP4 produced (empty $video) — retrying"; final_verdict="no-video"; continue; }
+
+  # 4) GIF companion (best-effort) for landing/blog/docs use.
+  "$HERE/record" gif "$video" "$out/$take.gif" >&2 2>/dev/null || true
+
+  if [ "$verify" = 0 ]; then
+    log "verify skipped (--no-verify) — publishing take $attempt unverified"
+    publishable=1; final_verdict="skipped"; final_video="$video"; break
+  fi
+
+  # 5) VERIFY the real MP4 with the SAME cascade (record.mjs emitted the driver's
+  #    expected/signals for take1; reuse them).
+  expected_f="$out/${slug}-take1.expected.txt"
+  signals_f="$out/${slug}-take1.signals.json"
+  vframes=$(recipe_field verifyFrames); [ -n "$vframes" ] || vframes=8
+  log "verifying real MP4 ($video) ..."
+  set +e
+  verdict_json=$("$JS" "$HERE/lib/verify-only.mjs" --video "$video" \
+      --expected-file "$expected_f" --signals-file "$signals_f" --frames "$vframes")
+  vrc=$?
+  set -e
+  printf '%s\n' "$verdict_json" > "$out/$take.verdict.json"
+  log "verdict rc=$vrc"
+
+  if [ "$vrc" = 0 ]; then
+    publishable=1; final_verdict="pass"; final_video="$video"; break
+  fi
+  final_verdict="fail"; final_video="$video"
+  err "take $attempt FAILED verify — retrying"
+done
+
+# ---- teardown ----------------------------------------------------------------
+[ -n "$app_pid" ] && kill "$app_pid" 2>/dev/null || true
+# Leave the display up (idempotent reuse across runs); callers can `record display-down`.
+
+# ---- emit the pipeline manifest ----------------------------------------------
+stills=$(ls "$out"/*.png 2>/dev/null | tr '\n' ' ' || true)
+gif="$out/${slug}-take${attempt}.gif"; [ -f "$gif" ] || gif=""
+manifest="$out/pipeline.json"
+"$JS" -e '
+  const fs=require("fs");
+  const [out,recipe,target,backend,attempts,publishable,verdict,video,gif,stills]=process.argv.slice(1);
+  const m={
+    recipe, target, backend,
+    attempts:Number(attempts),
+    publishable: publishable==="1",
+    verdict,
+    video: video||null,
+    gif: gif||null,
+    stills: stills.trim()?stills.trim().split(/\s+/):[],
+    outDir: out,
+    at: new Date().toISOString(),
+  };
+  fs.writeFileSync(out+"/pipeline.json", JSON.stringify(m,null,2));
+  process.stdout.write(JSON.stringify(m,null,2)+"\n");
+' "$out" "$(basename "$recipe")" "$target" "$backend" "$attempt" "$publishable" "$final_verdict" "$final_video" "$gif" "$stills"
+
+[ "$publishable" = 1 ] && exit 0 || exit 1

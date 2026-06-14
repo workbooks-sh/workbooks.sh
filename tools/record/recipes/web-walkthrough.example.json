@@ -1,0 +1,16 @@
+{
+  "name": "Workbooks landing — hero walkthrough",
+  "target": "web",
+  "viewport": { "width": 1440, "height": 900 },
+  "headless": false,
+  "verifyFrames": 8,
+  "steps": [
+    { "intent": "navigate", "url": "https://workbooks.sh", "waitUntil": "domcontentloaded", "label": "open the landing page" },
+    { "intent": "wait", "ms": 1200, "label": "let the hero animate in" },
+    { "intent": "screenshot", "name": "hero", "checkpoint": "hero headline + primary CTA visible", "label": "capture hero" },
+    { "intent": "hover", "selector": "a, button", "label": "hover the primary CTA" },
+    { "intent": "wait", "ms": 600 },
+    { "intent": "eval_js", "code": "document.title", "label": "read the page title" },
+    { "intent": "screenshot", "name": "after-hover", "checkpoint": "no error overlay; page intact", "label": "capture after interaction" }
+  ]
+}

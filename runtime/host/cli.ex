@@ -80,6 +80,15 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `wb demo seed …` — materialize the reproducible demo environment from the
+      # git-backed Org fixture tree (recording-system findings §3). --dry-run
+      # describes the plan with NO disk writes + NO app boot; a real run needs the
+      # app (the build lane uses the wasmex NIF), so it boots first.
+      ["demo" | rest] ->
+        {out, failed?} = Workbooks.CLI.Demo.run(rest)
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       _ ->
         {:ok, _} = Application.ensure_all_started(:workbooks)
         IO.puts(call(argv))

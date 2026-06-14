@@ -21,7 +21,6 @@
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { sessionHistory, type SavedSession } from "$lib/chat/session_history.svelte";
-  import Icon from "$lib/ui/Icon.svelte";
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
 
   const WALDO_SLUG = "waldo";
@@ -136,29 +135,26 @@
     return `${Math.floor(s / 86400)}d ago`;
   }
 
-  const showBar = $derived(view === "history" || !!viewing || transcript.length > 0);
 </script>
 
 <div class="waldo">
-  {#if showBar}
-    <div class="bar">
-      {#if view === "history" || viewing}
-        <button type="button" class="bar-btn" onclick={() => { view = "chat"; viewing = null; }}>
-          <CaretLeft size={13} weight="bold" /> Back
-        </button>
-      {:else}
-        <button type="button" class="bar-btn" onclick={openHistory}>
-          <ClockCounterClockwise size={13} weight="bold" /> History
-        </button>
-      {/if}
-      <span class="spacer"></span>
-      {#if view === "chat" && !viewing && (transcript.length > 0 || sending)}
-        <button type="button" class="bar-btn" onclick={newChat} title="New chat">
-          <Plus size={13} weight="bold" /> New
-        </button>
-      {/if}
-    </div>
-  {/if}
+  <div class="bar">
+    {#if view === "history" || viewing}
+      <button type="button" class="bar-btn" onclick={() => { view = "chat"; viewing = null; }}>
+        <CaretLeft size={13} weight="bold" /> Back
+      </button>
+    {:else}
+      <button type="button" class="bar-btn" onclick={openHistory} title="Past chats">
+        <ClockCounterClockwise size={13} weight="bold" /> Chats
+      </button>
+    {/if}
+    <span class="spacer"></span>
+    {#if view === "chat" && !viewing && (transcript.length > 0 || sending)}
+      <button type="button" class="bar-btn" onclick={newChat} title="New chat">
+        <Plus size={13} weight="bold" /> New
+      </button>
+    {/if}
+  </div>
 
   {#if view === "history"}
     <div class="history">
@@ -206,16 +202,6 @@
     </div>
   {:else}
     <div class="intro">
-      <div class="aura" aria-hidden="true"></div>
-      <h2>Meet Waldo</h2>
-      <p>
-        Your resident agent — ask, search, open tabs, or set things up with you,
-        by text or voice. It works problems with you; never runs off alone.
-      </p>
-      <span class="powered">
-        <Icon value="lobe:openrouter" name="OpenRouter" size={13} />
-        Runs on OpenRouter — every model, one key
-      </span>
       {#if ready}
         <div class="suggestions">
           {#each SUGGESTIONS as s (s.label)}
@@ -227,7 +213,7 @@
           {/each}
         </div>
       {:else}
-        <p class="hint">Connect a nexus (engine chip, top-right) and add your OpenRouter key to wake Waldo.</p>
+        <p class="hint">Connect a nexus and add your OpenRouter key to wake Waldo.</p>
       {/if}
     </div>
   {/if}
