@@ -2576,6 +2576,13 @@
    "proof": "yq v4.53.3 (Go->wasip1) processes YAML from stdin through PackageManager.run: .name->workbooks, .tags[1]->wasm; yq_lane_test.exs green",
    "lane": "compilers/yq/build.sh (native GOOS=wasip1 go build, pinned, -trimpath, gitignored 24MB wasm) \u2014 same provision path as esbuild",
    "since": "iter162"
+  },
+  "gojq": {
+   "capability": "gojq (jq for JSON) in-sandbox",
+   "status": "live",
+   "proof": "gojq v0.12.19 (Go->wasip1) evaluates jq filters over stdin JSON through PackageManager.run: .name->workbooks, .n*2->42, -r .tags[0]->forge; gojq_lane_test.exs green",
+   "lane": "compilers/gojq/build.sh (native GOOS=wasip1, pinned, gitignored)",
+   "since": "iter162"
   }
  },
  "verdict_ladder": {
