@@ -30,12 +30,18 @@ defmodule Workbooks.DesktopControl do
   channel join_ref so future pushes address the right channel instance. Called
   by PhoenixSocket when the desktop joins `desktop:control`.
   """
-  def register(join_ref) do
+  def register(join_ref, tenant \\ nil) do
     # Idempotent per join_ref: drop any prior entry for this pid so a rejoin
-    # doesn't leave a stale join_ref that pushes to a dead channel.
+    # doesn't leave a stale join_ref that pushes to a dead channel. The tenant is
+    # stored so app-control pushes (theme/tab/…) reach only that tenant's shell
+    # (wb-g1yo) — not every connected desktop on a shared nexus.
     Registry.unregister(@registry, @key)
-    Registry.register(@registry, @key, join_ref)
+    Registry.register(@registry, @key, {tenant, join_ref})
   end
+
+  # Same grandfather rule as the rest of wb-g1yo: nil on either side passes.
+  defp tenant_visible?(socket_tenant, req_tenant),
+    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
 
   @doc "How many desktop shells are currently listening (diagnostics / no-op guard)."
   def listeners do
@@ -49,14 +55,13 @@ defmodule Workbooks.DesktopControl do
   the Phoenix event name (e.g. `"tab_command"`), `payload` a JSON-able map.
   Returns `{:ok, n}` with the number of shells reached.
   """
-  def push(event, payload) when is_binary(event) and is_map(payload) do
-    n =
-      Registry.dispatch(@registry, @key, fn entries ->
-        for {pid, join_ref} <- entries do
-          send(pid, {:channel_push, join_ref, @topic, event, payload})
-        end
-      end)
-      |> then(fn _ -> listeners() end)
+  def push(event, payload, tenant \\ nil) when is_binary(event) and is_map(payload) do
+    entries = Registry.lookup(@registry, @key)
+    n = Enum.count(entries, fn {_pid, {st, _jr}} -> tenant_visible?(st, tenant) end)
+
+    for {pid, {st, join_ref}} <- entries, tenant_visible?(st, tenant) do
+      send(pid, {:channel_push, join_ref, @topic, event, payload})
+    end
 
     {:ok, n}
   rescue
@@ -67,17 +72,18 @@ defmodule Workbooks.DesktopControl do
 
   # ── Convenience emitters (the verbs Waldo's toolkit speaks) ────────────────
 
-  @doc "Open/close/focus a tab by path in the connected shell."
-  def tab(action, path, session_id \\ nil) when action in ["open", "close", "focus"] do
-    push("tab_command", %{"action" => action, "path" => path, "session_id" => session_id})
+  @doc "Open/close/focus a tab by path in `tenant`'s connected shell."
+  def tab(action, path, session_id \\ nil, tenant \\ nil) when action in ["open", "close", "focus"] do
+    push("tab_command", %{"action" => action, "path" => path, "session_id" => session_id}, tenant)
   end
 
   @doc """
   Drive a non-tab app capability — theme switch, bookmark add, workspace create.
   The shell's app_command handler dispatches on `action`. Generic so new
   capabilities are one CLI verb + one desktop case, no new channel event.
+  Scoped to `tenant`'s shell (wb-g1yo).
   """
-  def command(action, args) when is_binary(action) and is_map(args) do
-    push("app_command", Map.put(args, "action", action))
+  def command(action, args, tenant \\ nil) when is_binary(action) and is_map(args) do
+    push("app_command", Map.put(args, "action", action), tenant)
   end
 end

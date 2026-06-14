@@ -119,7 +119,7 @@ defmodule Workbooks.PhoenixSocket do
 
     cond do
       topic == "desktop:control" ->
-        Workbooks.DesktopControl.register(join_ref)
+        Workbooks.DesktopControl.register(join_ref, state[:tenant])
         state
 
       topic == "engine:env_prompt" ->
