@@ -1,52 +1,77 @@
 <script lang="ts">
   /**
-   * Env-request approval modal — desktop surface for `wb env request`.
+   * Env-request modal — the desktop surface for `wb env request`.
    *
-   * Renders when the env-request store has a pending request. One
-   * modal at a time, by construction: the store advances only after
-   * the user clicks Provide or Cancel.
-   *
-   * The agent never sees the value the user types — it goes directly
-   * from this modal to the engine over the `engine:env_prompt`
-   * channel as the `env:fulfill` event, which writes to the
-   * workspace's dedicated keychain. The original `wb env request`
-   * call returns with `status: "fulfilled"` once the write lands.
-   *
-   * Mirror of WorkgateModal — same chrome conventions per docs/
-   * desktop/agent-sandbox.md §5.4 so users build one mental model
-   * for "agent is asking the desktop for something."
+   * Deliberately minimal: a logo of the source (resolved from the var name via
+   * the icon library), one plain sentence, the field, and two buttons. The
+   * value never reaches the agent — it goes straight to the engine over
+   * `engine:env_prompt` as `env:fulfill`. Stored locked by default (the secure
+   * choice); we don't make the user reason about that.
    */
   import { envRequests } from "./store.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
+  import { Key } from "phosphor-svelte";
 
   let value = $state("");
-  let locked = $state(true);
   let acting = $state(false);
-  let saved = $state<{ name: string; workspace: string } | null>(null);
 
   const req = $derived(envRequests.current);
 
-  // When the request changes (queue advanced), reset the form.
-  $effect(() => {
-    if (req) {
-      value = "";
-      locked = req.locked;
-      saved = null;
-    }
+  // Resolve the var name → a friendly service label + a brand icon. AI/dev
+  // providers map to LobeHub marks; unknowns get a humanized label + a key glyph.
+  const KNOWN: Record<string, { slug: string; label: string }> = {
+    openai: { slug: "openai", label: "OpenAI" },
+    openrouter: { slug: "openrouter", label: "OpenRouter" },
+    anthropic: { slug: "anthropic", label: "Anthropic" },
+    claude: { slug: "claude", label: "Claude" },
+    gemini: { slug: "gemini-color", label: "Gemini" },
+    google: { slug: "gemini-color", label: "Google" },
+    groq: { slug: "groq", label: "Groq" },
+    mistral: { slug: "mistral", label: "Mistral" },
+    cohere: { slug: "cohere", label: "Cohere" },
+    perplexity: { slug: "perplexity", label: "Perplexity" },
+    replicate: { slug: "replicate", label: "Replicate" },
+    huggingface: { slug: "huggingface", label: "Hugging Face" },
+    hf: { slug: "huggingface", label: "Hugging Face" },
+    elevenlabs: { slug: "elevenlabs", label: "ElevenLabs" },
+    deepgram: { slug: "deepgram", label: "Deepgram" },
+    xai: { slug: "grok", label: "xAI" },
+    grok: { slug: "grok", label: "Grok" },
+    deepseek: { slug: "deepseek", label: "DeepSeek" },
+    minimax: { slug: "minimax", label: "MiniMax" },
+    stripe: { slug: "stripe", label: "Stripe" },
+    github: { slug: "github", label: "GitHub" },
+    cloudflare: { slug: "cloudflare", label: "Cloudflare" },
+    fly: { slug: "flyio", label: "Fly.io" },
+    recraft: { slug: "recraft", label: "Recraft" },
+    dataforseo: { slug: "", label: "DataForSEO" },
+  };
+
+  function humanize(s: string): string {
+    return s
+      .split(/[_\- ]+/)
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  const source = $derived.by(() => {
+    const name = req?.name ?? "";
+    const base = name
+      .toLowerCase()
+      .replace(/_?(api[_-]?)?(key|token|secret|password)s?$/, "")
+      .replace(/[_-]+$/, "");
+    const hit = KNOWN[base];
+    if (hit) return { label: hit.label, icon: hit.slug ? `lobe:${hit.slug}` : null };
+    return { label: base ? humanize(base) : name, icon: null };
   });
 
   async function onProvide() {
-    if (!req || acting) return;
-    if (value.length === 0) return;
+    if (!req || acting || value.length === 0) return;
     acting = true;
-    const stash = { name: req.name, workspace: req.workspace };
     try {
-      await envRequests.fulfill(value, locked);
-      saved = stash;
+      await envRequests.fulfill(value, true); // stored locked — the secure default
       value = "";
-      // Brief confirmation; auto-clear after a tick.
-      setTimeout(() => {
-        saved = null;
-      }, 1200);
     } finally {
       acting = false;
     }
@@ -62,77 +87,42 @@
       acting = false;
     }
   }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === "Enter") void onProvide();
+    if (e.key === "Escape") void onCancel();
+  }
 </script>
 
 {#if req}
   <div class="overlay" data-testid="env-request-overlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="env-title">
-      <header>
-        <span class="badge">Env</span>
-        <h2 id="env-title">Agent needs an environment variable</h2>
-      </header>
-
-      <div class="row">
-        <div class="label">Name</div>
-        <code class="value mono">{req.name}</code>
+      <div class="logo" aria-hidden="true">
+        {#if source.icon}
+          <Icon value={source.icon} name={source.label} size={28} />
+        {:else}
+          <Key weight="fill" size={24} />
+        {/if}
       </div>
 
-      <div class="row">
-        <div class="label">Workspace</div>
-        <code class="value mono">{req.workspace}</code>
-      </div>
+      <h2 id="env-title">Enter your {source.label} key</h2>
+      <p class="sub">{req.reason ?? `Waldo needs it to keep going. It's stored on this device only.`}</p>
 
-      {#if req.reason}
-        <p class="reason">{req.reason}</p>
-      {/if}
-
-      {#if req.hint}
-        <div class="row">
-          <div class="label">Hint</div>
-          <code class="value mono">{req.hint}</code>
-        </div>
-      {/if}
-
-      <div class="field">
-        <label for="env-value">Value</label>
-        <input
-          id="env-value"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          bind:value
-          disabled={acting}
-          data-testid="env-request-value"
-          placeholder={req.hint ?? "Paste the value here"}
-        />
-      </div>
-
-      <div class="field row-inline">
-        <input
-          id="env-locked"
-          type="checkbox"
-          bind:checked={locked}
-          disabled={acting}
-        />
-        <label for="env-locked">Store as locked (redact in <code>wb env get</code>)</label>
-      </div>
-
-      {#if saved}
-        <div class="saved">Saved to workspace <code>{saved.workspace}</code></div>
-      {/if}
-
-      <div class="meta">
-        <span>id: <code>{req.id}</code></span>
-      </div>
+      <input
+        id="env-value"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        bind:value
+        disabled={acting}
+        onkeydown={onKey}
+        data-testid="env-request-value"
+        placeholder={req.hint ?? `Paste your ${source.label} key`}
+      />
 
       <div class="actions">
-        <button
-          class="btn cancel"
-          onclick={onCancel}
-          disabled={acting}
-          data-testid="env-request-cancel"
-        >
-          Cancel
+        <button class="btn cancel" onclick={onCancel} disabled={acting} data-testid="env-request-cancel">
+          Not now
         </button>
         <button
           class="btn provide"
@@ -140,7 +130,7 @@
           disabled={acting || value.length === 0}
           data-testid="env-request-provide"
         >
-          Provide
+          Save key
         </button>
       </div>
     </div>
@@ -151,167 +141,101 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1rem;
   }
-
   .modal {
-    background: var(--color-surface, #fff);
-    color: var(--color-fg, #111);
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 12px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
-    padding: 1.25rem 1.25rem 1rem;
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    padding: 1.6rem 1.5rem 1.25rem;
     width: 100%;
-    max-width: 460px;
+    max-width: 360px;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  header {
-    display: flex;
     align-items: center;
+    text-align: center;
     gap: 0.5rem;
   }
-
-  .badge {
-    background: var(--color-fg, #111);
-    color: var(--color-page, #fff);
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.15rem 0.45rem;
-    border-radius: 999px;
+  .logo {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    color: var(--color-fg);
+    margin-bottom: 0.15rem;
   }
-
   h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
   }
-
-  .row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-  }
-  .row-inline {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-fg-muted, #555);
-    min-width: 70px;
-  }
-
-  .value,
-  code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 0.82rem;
-  }
-  .mono {
-    background: var(--color-surface-soft, #f5f5f5);
-    border: 1px solid var(--color-border, #e0e0e0);
-    border-radius: 4px;
-    padding: 0.1rem 0.35rem;
-  }
-
-  .reason {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: var(--color-fg, #111);
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-  .field label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-fg-muted, #555);
-  }
-  .field input[type="password"] {
-    padding: 0.45rem 0.55rem;
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 6px;
-    background: var(--color-surface-soft, #f5f5f5);
-    color: var(--color-fg, #111);
+  .sub {
+    margin: 0 0 0.5rem;
     font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--color-fg-muted);
+    max-width: 30ch;
+  }
+  input[type="password"] {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    font-size: 0.9rem;
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    text-align: center;
   }
-  .field input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
+  input[type="password"]:focus {
+    outline: none;
+    border-color: var(--color-brand, var(--color-fg-subtle));
   }
-  .row-inline label {
-    font-size: 0.78rem;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--color-fg, #111);
-    font-weight: 400;
-  }
-
-  .saved {
-    font-size: 0.8rem;
-    color: rgb(16, 185, 129);
-  }
-
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.9rem;
-    font-size: 0.7rem;
-    color: var(--color-fg-muted, #777);
-  }
-
   .actions {
     display: flex;
     gap: 0.5rem;
-    justify-content: flex-end;
-    margin-top: 0.25rem;
+    width: 100%;
+    margin-top: 0.6rem;
   }
   .btn {
-    height: 34px;
-    padding: 0 0.85rem;
-    border-radius: 7px;
-    font-size: 0.85rem;
-    font-weight: 500;
+    flex: 1;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 550;
     font-family: inherit;
     cursor: pointer;
-    border: 1px solid var(--color-border, #ddd);
-    background: var(--color-surface-soft, #f5f5f5);
-    color: var(--color-fg, #111);
-    transition: opacity 0.12s, background 0.12s;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    transition: opacity 0.12s, filter 0.12s;
   }
   .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: default;
   }
   .btn.provide {
-    background: var(--color-fg, #111);
-    color: var(--color-page, #fff);
-    border-color: var(--color-fg, #111);
+    background: var(--color-brand, var(--color-fg));
+    color: #fff;
+    border-color: transparent;
   }
-  .btn.cancel:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.12);
-    border-color: rgba(239, 68, 68, 0.4);
+  .btn.provide:not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+  .btn.cancel:not(:disabled):hover {
+    background: var(--color-surface);
   }
 </style>
