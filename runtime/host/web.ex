@@ -274,6 +274,38 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
 
+  # Desktop chat entry (wb-2s09): the desktop's ws.sendUserInput POSTs here with
+  # {agent_slug, prompt, workdir?, skills?}. We resolve the SLUG to its system
+  # prompt, start a session (whose events the PhoenixSocket bridge streams to the
+  # joined session:<id> channel), and return {session_id}. Mirrors /api/run but
+  # slug-resolving — without it the desktop got a 404 and Waldo never replied.
+  post "/api/agent/run" do
+    {:ok, body, conn} = read_body(conn)
+    params = Jason.decode!(body)
+    slug = params["agent_slug"] || "workhorse"
+    prompt = params["prompt"] || ""
+
+    system =
+      case params["skills"] do
+        skills when is_list(skills) and skills != [] ->
+          agent_system_prompt(slug) <> "\n\nAttached skills (read with `wb toolkit show`): " <> Enum.join(skills, ", ")
+
+        _ ->
+          agent_system_prompt(slug)
+      end
+
+    id = "run-#{System.unique_integer([:positive])}"
+    exec? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
+
+    opts =
+      [tenant: conn.assigns.tenant, max_steps: 40, exec: exec?]
+      |> then(&if params["workdir"], do: [{:workdir, params["workdir"]} | &1], else: &1)
+
+    {:ok, _} = Workbooks.AgentSession.start(id, system, prompt, opts)
+    json = Jason.encode!(%{session_id: id, status: "running"})
+    conn |> put_resp_content_type("application/json") |> send_resp(202, json)
+  end
+
   # Live agent telemetry — each tool step streamed as it happens (brandnana-style).
   get "/api/run/:id/stream" do
     conn

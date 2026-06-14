@@ -96,6 +96,12 @@ defmodule Workbooks.AgentSession do
 
   @impl true
   def handle_call({:subscribe, pid}, _from, state) do
+    # Replay accumulated state to a LATE subscriber — the desktop joins
+    # session:<id> just after POSTing the run, which may already have produced
+    # steps (or finished). Without replay a fast run completes before the join
+    # and the chat shows nothing. Past steps first, then the final result.
+    Enum.each(state.live, &send(pid, {:agent_step, &1}))
+    if state.run, do: send(pid, {:agent_done, state.run.result})
     {:reply, :ok, %{state | subs: [pid | state.subs]}}
   end
 
