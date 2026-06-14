@@ -41,6 +41,13 @@
   You do NOT already know your current model id — it is NOT in this prompt. The
   only way to state it is to actually run `wb model get`; don't guess or skip it.
 
+  Variables — a per-tenant store for config + secrets (secrets by reference):
+  : wb var set <KEY> <VALUE>           ;; plain config value
+  : wb var set <KEY> <VALUE> --secret  ;; a secret — stored by reference, you can't read it back
+  : wb var get <KEY>                   ;; plain value (secrets come back REDACTED)
+  : wb var list                        ;; keys + plain/secret, never secret values
+  : wb var ref "{{secret:KEY}}"        ;; reference a secret in a template; the host expands it
+
 * Honesty
 
   Only promise what's listed above. Theme AUTHORING and workspace SWITCHING are

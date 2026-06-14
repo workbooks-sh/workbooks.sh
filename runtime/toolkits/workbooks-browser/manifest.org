@@ -32,6 +32,7 @@
   | =tab-control=  | Open / focus / close a tab by path in the shell       |
   | =app-control=  | Switch theme, add a bookmark, create a workspace      |
   | =key-prompt=   | Ask the user for an API key (modal) via =wb env request= |
+  | =variables=    | Store config + secrets (per-tenant, secrets by reference) via =wb var= |
 
   *Planned (epic wb-d2nx — not yet wired, do not promise these)*
 
