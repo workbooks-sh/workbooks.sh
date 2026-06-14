@@ -898,7 +898,10 @@ defmodule Workbooks.Web do
   # execution gated by the runtime's WB_TOOLKIT_EXEC). The thin CLI hits this.
   post "/rcp/toolkit/eval" do
     conn = fetch_query_params(conn)
-    send_resp(conn, 200, Workbooks.Toolkits.eval_text(conn.query_params["id"]))
+    # ?case=<substring> runs just ONE eval case — cheap iteration on a single
+    # LLM-driven eval instead of the whole suite.
+    out = Workbooks.Toolkits.eval_text(conn.query_params["id"], Workbooks.Toolkits.default_root(), conn.query_params["case"])
+    send_resp(conn, 200, out)
   end
 
   post "/rcp/toolkit/build" do
