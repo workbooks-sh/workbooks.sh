@@ -50,4 +50,32 @@ defmodule Workbooks.SearchProviderTest do
     assert Search.tenant_secret_for_test("spk-unset-#{System.unique_integer([:positive])}", "EXA_API_KEY") == nil
     assert Search.tenant_secret_for_test(nil, "EXA_API_KEY") == nil
   end
+
+  # Regression: the /api/browse/search endpoint once read conn.params["q"]
+  # WITHOUT fetch_query_params, so q was always nil → "" → every search returned
+  # [] silently. parse_request/2 is the pure, pinned param-handling.
+  test "parse_request reads q (trimmed), threads tenant, honors a provider override" do
+    {q, opts} = Search.parse_request(%{"q" => "  elixir lang  ", "limit" => "5", "provider" => "exa"}, "tnt1")
+    assert q == "elixir lang"
+    assert opts[:limit] == 5
+    assert opts[:tenant] == "tnt1"
+    assert opts[:provider] == "exa"
+  end
+
+  test "parse_request: missing q → \"\", non-numeric/over-cap limit → safe default 8 (never crashes)" do
+    assert {"", opts} = Search.parse_request(%{}, nil)
+    assert opts[:limit] == 8
+    assert opts[:tenant] == nil
+    assert {"x", o2} = Search.parse_request(%{"q" => "x", "limit" => "abc"}, nil)
+    assert o2[:limit] == 8
+    assert {"x", o3} = Search.parse_request(%{"q" => "x", "limit" => "9999"}, nil)
+    assert o3[:limit] == 8
+  end
+
+  test "parse_request: no provider param → no :provider opt (tenant/env/keyless decides)" do
+    {_q, opts} = Search.parse_request(%{"q" => "x"}, "t")
+    refute Keyword.has_key?(opts, :provider)
+    {_q2, opts2} = Search.parse_request(%{"q" => "x", "provider" => ""}, "t")
+    refute Keyword.has_key?(opts2, :provider)
+  end
 end

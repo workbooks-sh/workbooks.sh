@@ -42,6 +42,34 @@ defmodule Workbooks.Browse.Search do
     end
   end
 
+  @doc """
+  Parse the desktop `/api/browse/search` query params into `{trimmed_query, opts}`.
+
+  Pure + testable on purpose: this pins that the endpoint actually READS `q`
+  (a missing `fetch_query_params` once silently dropped it → every search was
+  empty), parses `limit` safely (no 500 on non-numeric input), threads the
+  tenant (so a Settings-configured provider/key is honored), and accepts an
+  explicit `provider` override.
+  """
+  @spec parse_request(map(), String.t() | nil) :: {String.t(), keyword()}
+  def parse_request(query_params, tenant) when is_map(query_params) do
+    limit =
+      case Integer.parse(to_string(query_params["limit"] || "")) do
+        {n, _} when n > 0 and n <= 50 -> n
+        _ -> 8
+      end
+
+    opts = [limit: limit, tenant: tenant]
+
+    opts =
+      case query_params["provider"] do
+        p when is_binary(p) and p != "" -> [{:provider, p} | opts]
+        _ -> opts
+      end
+
+    {String.trim(to_string(query_params["q"] || "")), opts}
+  end
+
   @doc false
   def provider_for_test(opts), do: provider(opts)
 

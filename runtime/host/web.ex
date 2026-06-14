@@ -114,20 +114,9 @@ defmodule Workbooks.Web do
   # one-off. GET so the browser's fetch is trivial.
   get "/api/browse/search" do
     conn = fetch_query_params(conn)
-    q = conn.query_params["q"] || ""
-    limit = String.to_integer(conn.query_params["limit"] || "8")
+    {q, opts} = Workbooks.Browse.Search.parse_request(conn.query_params, conn.assigns[:tenant])
 
-    opts = [limit: limit, tenant: conn.assigns[:tenant]]
-    opts = case conn.query_params["provider"] do
-      p when is_binary(p) and p != "" -> [{:provider, p} | opts]
-      _ -> opts
-    end
-
-    results =
-      case String.trim(q) do
-        "" -> []
-        query -> Workbooks.Browse.Search.query(query, opts)
-      end
+    results = if q == "", do: [], else: Workbooks.Browse.Search.query(q, opts)
 
     json = Jason.encode!(%{results: results})
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
