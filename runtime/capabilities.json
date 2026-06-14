@@ -115,7 +115,7 @@
           "status": "done",
           "tests": "autopoet_test",
           "units": 9,
-          "proof": "tool path pinned",
+          "proof": "tool path pinned + LOOP CLOSED live: agents filed 6 real walls to the backlog; triaged via Autopoet.set_status \u2014 2 toolkit-run issues RESOLVED (the overview fix works, verified run-5), 2 marked wontfix/by-design (SSRF floor, exec-gating), 1 deduped, 1 real feature (theme authoring) kept open.",
           "failure_modes": []
         },
         {
@@ -183,7 +183,7 @@
           "status": "done",
           "tests": "toolkit_injection_test",
           "units": 8,
-          "proof": "live: agent runs wb deploy status directly",
+          "proof": "live (run-5, exec): agent read the skill, ran `wb deploy status` DIRECTLY (no `wb toolkit run`, errs:0), and reported the concrete state \u2014 up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
           "failure_modes": []
         },
         {
