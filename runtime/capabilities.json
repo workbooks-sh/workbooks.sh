@@ -125,13 +125,13 @@
           "failure_modes": []
         },
         {
-          "name": "web_search \u2014 keyless (ddg/brave/bing), honest empty",
+          "name": "web_search \u2014 keyless (Brave-first), honest empty",
           "status": "done",
           "tests": "web_search_format_test",
           "units": 2,
-          "proof": "DataForSEO removed (security/cost; was Brandnana's); empty result signals possible backend-unavailable + nudges file_issue",
+          "proof": "DataForSEO removed; Brave-first (the engine that serves real results); DDG/Bing fall-through; 429/anomaly \u2192 honest 'may be unavailable' + file_issue nudge",
           "failure_modes": [
-            "keyless scrape returns empty from datacenter IPs \u2014 real fix is a headless browser tier (kernel-browser-infra), not a SERP API"
+            "all keyless engines anomaly/429 from datacenter or rate-limited IPs \u2014 real fix is a headless browser tier (wb-70mi), not a SERP API"
           ]
         }
       ]

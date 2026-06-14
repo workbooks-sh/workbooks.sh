@@ -3,15 +3,20 @@ defmodule Workbooks.Browse.Search do
   Keyless web search for the free in-engine browser — the 3w-style SERP adapters.
   Instead of only fetching URLs you already know, this QUERIES a search engine and
   parses the results page, so `Workbooks.Browse.search/2` works with zero keys and
-  zero external service. DuckDuckGo's HTML endpoint is the primary (most
-  scrape-stable); Brave and Bing are fallbacks if it returns nothing.
+  zero external service.
+
+  Engine order is BRAVE first: empirically (2026-06-14) it's the one that serves a
+  real results page to a headed GET, while DuckDuckGo (html + lite) and Bing return
+  a 202/anomaly bot-detection page (no results) from flagged/datacenter IPs — so
+  they're kept only as fall-throughs. A real headless browser tier (wb-70mi) is the
+  durable answer; this is the lightweight keyless tier.
 
   Returns `[%{title, url, snippet}]`. Built on `Browse.Fetch` (so it inherits the
   TLS-fingerprinted, browser-headed GET) + lightweight HTML parsing.
   """
   alias Workbooks.Browse.{Extract, Fetch}
 
-  @engines [:duckduckgo, :brave, :bing]
+  @engines [:brave, :duckduckgo, :bing]
 
   @doc "Search `query` across engines (first non-empty wins). Opts: `:limit`, `:engine`."
   @spec query(String.t(), keyword()) :: [%{title: String.t(), url: String.t(), snippet: String.t() | nil}]
