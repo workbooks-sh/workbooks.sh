@@ -2,37 +2,43 @@
 
 * What this toolkit is
 
-  You are an agent running in a Workbooks runtime that a desktop shell
-  (the "browser") is connected to. This toolkit lets you *drive that
-  shell* — the live UI the user sees — through one command surface:
-
-  : wb app <verb> [args]
-
-  Each verb pushes a control event the shell already knows how to act
-  on. You are not asked to manage a hidden API; you speak the same
-  =desktop:control= channel the app listens on.
+  You are an agent in a Workbooks runtime that a desktop shell (the "browser")
+  is connected to. This toolkit drives that shell — the live UI the user sees —
+  plus a few host capabilities, all through `wb` commands. There is no separate
+  API to manage; you speak the same `desktop:control` channel the app listens on.
 
 * The golden rule: probe first
 
-  A shell may or may not be connected (the user could be headless, or
-  the app closed). ALWAYS check before assuming a command landed:
+  A shell may or may not be connected. Check before assuming:
 
-  : wb app status
-  ;; → "1 desktop shell connected"   (good)
-  ;; → "(no desktop shell connected)"  (your command would no-op)
+  : wb app status        ;; "1 desktop shell connected" | "(no desktop shell connected)"
 
-  Every verb is a *safe no-op* when nothing is connected — it tells you
-  so rather than erroring — so you can act optimistically and report
-  honestly what happened.
+  Every drive command is a SAFE NO-OP when nothing is connected — it says so
+  rather than erroring — so you can act optimistically and report honestly.
 
-* What's live
+* Command quick-reference (the live verbs)
 
-  - =tab-control= — open, focus, and close tabs by path. See
-    =wb toolkit show workbooks-browser tab-control=.
+  Tabs (paths are WORKSPACE-RELATIVE, never absolute OS paths):
+  : wb app open-tab  <path>
+  : wb app focus-tab <path>
+  : wb app close-tab <path>
 
-* What's coming (epic wb-d2nx)
+  App surfaces:
+  : wb app theme     <id>            ;; switch to an EXISTING theme id (can't author new ones yet)
+  : wb app bookmark  <path> [title]  ;; add a bookmark
+  : wb app workspace <name> [icon]   ;; create a workspace (icon = an emoji)
 
-  Theme switching, bookmarks, workspace + folder management, and an
-  agent-triggered "add an API key" modal are designed but NOT wired
-  yet. Do not tell the user you can do these until the skills appear
-  here. If a user asks for one, say it's coming and offer what IS live.
+  Ask the user for a secret (pops a modal, blocks until answered):
+  : wb env request   <NAME> [reason] ;; you NEVER see the raw value — stored by reference
+
+  Models (discover + switch your own):
+  : wb models list   [query]         ;; query matches id/name/modality, e.g. `wb models list image`
+  : wb model get
+  : wb model set     <id>            ;; switch the model you run on (this session)
+
+* Honesty
+
+  Only promise what's listed above. Theme AUTHORING and workspace SWITCHING are
+  not wired yet — say so rather than inventing a command. Read a skill for detail:
+  `wb toolkit show workbooks-browser <skill>` (tab-control, app-control,
+  key-prompt, models).
