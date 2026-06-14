@@ -1,123 +1,53 @@
-<p>Here is a small mercy you’ve probably stopped expecting from
-software: there is exactly one tool to learn.</p>
-<p>Not a toolbelt. Not a scaffolder and a builder and a deploy script
-and a signing wrapper and a daemon’s client, each with its own flags and
-its own config file and its own way of being slightly out of date. Most
-ecosystems hand you that pile and call it a starter kit, and you spend
-your first week not learning the work but <em>negotiating with the
-tools</em> — which one to run before which other one, which flag the
-build tool grew last month that the deploy tool hasn’t heard about yet,
-which thing to type when the thing won’t start.</p>
-<p>Workbooks makes a different bet. If a workbook is one artifact, and
-the way you describe it is one grammar, then the way you drive it ought
-to be one tool. So there is one. It’s called <code>wbx</code>, and the
-genuinely surprising part of this lesson is how little of it you need to
-hold in your head.</p>
-<h2 id="one-handle-on-the-whole-thing">one handle on the whole
-thing</h2>
-<p>The honest way to describe <code>wbx</code> is that it’s a handle,
-not a brain. It’s a single program that authors, builds, signs, ships,
-and runs workbooks — but it owns almost none of the cleverness itself.
-It parses what you asked for, does the light local work directly, and
-hands everything heavy to the system behind it. The intelligence lives
-in the ecosystem; the command is the grip you hold it by.</p>
-<p>That’s why you won’t need it to understand most of the rest of this
-Learning Center. The deep ideas — what a workbook <em>is</em>, what an
-agent does inside one, how a plan compiles, how provenance travels —
-live in the artifact and the system, not in the tool. <code>wbx</code>
-is the consistent way you reach all of them. Learn the handle once; it
-works the same on every door.</p>
-<p>There are around thirty things it can do, which sounds like a lot
-until you notice they fall into a few plain families: one for
-<em>authoring</em> (starting a workbook, previewing it live, shaping its
-contents), one for <em>making</em> (turning your work into one finished
-file), one for <em>trust</em> (signing a file so its origin travels with
-it), one for the <em>parts</em> you add (toolkits, workflows, agents),
-one for the <em>engine</em> when you want a workbook to keep living on a
-server, and a handful of everyday ones that just look after you and the
-tool itself.</p>
-<p>You don’t memorize the thirty. You learn that the families share the
-same manners — you start a thing, you check a thing, you do a thing —
-and once you’ve used one family, you’ve basically used them all. Better
-still, every time a command succeeds, it tells you the command you
-probably want next. The tool teaches its own shape as you go, so the
-manual is something you almost never have to open.</p>
-<h2 id="the-gentlest-possible-tool">the gentlest possible tool</h2>
-<p>Most command-line tools treat a missing answer as your fault. You
-forgot a flag; here’s an error; go read the docs. <code>wbx</code> was
-built on the opposite instinct — that a learning curve is a
-<em>bug</em>, and the tool, not the human, should be doing the work.</p>
-<p>So when you leave out something with an obvious answer, it picks the
-obvious answer and tells you what it picked. When the choice is
-genuinely yours, it offers a tiny menu rather than a wall of text. Type
-the command with nothing after it and, instead of scolding you, it
-answers the only question a newcomer actually has — <em>where am I, and
-what can I do next</em> — telling you which version you’re running,
-whether the engine is reachable, and the moves available from here.</p>
-<p>There’s even a command whose whole job is to check that everything is
-set up correctly, and it’s deliberately the gentlest one of all. It runs
-a few honest probes (is the tool installed where it should be, is
-anything listening, are you standing in a workbook), reports what it
-finds in plain language, and — the quietly radical part — it <em>never
-fails because it found a problem</em>. A health check that found
-something wrong still did its job. It reports; it doesn’t judge. Every
-unwelcome finding comes with the literal next command that fixes it, not
-a generic “see documentation.”</p>
-<p>That posture runs through the whole tool — the difference between
-software that makes you prove yourself worthy of it and software that’s
-just trying to help you get where you’re going.</p>
-<h2 id="two-minutes-to-your-first-one">two minutes to your first
-one</h2>
-<p>Here’s the entire shape of getting started, and notice what isn’t in
-it: no account, no server, no setup ceremony. You install the one tool,
-and that’s the whole prerequisite.</p>
-<p>You ask the tool to start a new workbook, and it makes you a folder
-with a single source file inside. You ask it to preview that workbook
-live, and it opens a page in your browser that reloads every time you
-save — source on one side, the living page on the other, following along
-as you type. That loop <em>is</em> the authoring experience: edit, save,
-watch it change.</p>
-<p>When the thing is worth keeping, you ask the tool to bundle it, and
-it packs everything — the page, its source, its data — into one
-self-contained file you can mail like an attachment. Ask it to sign that
-file, and it stamps your origin into the artifact so anyone receiving it
-can prove where it came from.</p>
-<p>No server was involved in any of that. The engine only enters the
-story later, when you want a workbook to <em>keep running</em> after you
-close your laptop — and even then, standing one up is one more command.
-The everyday work of making something lives on your own machine, in
-plain files, with one tool.</p>
-<h2 id="the-same-tool-the-agents-use">the same tool the agents use</h2>
-<p>Now the part that elevates <code>wbx</code> from a convenience into
-something closer to a principle. The tool knows it has two kinds of
-users, and it changes its manners for each without changing what it
-does. When <em>you</em> are at a terminal, it’s warm and helpful —
-picking defaults, offering menus, suggesting the next step. The moment
-its output is being read by a program instead of a person — piped into a
-script, or driven by an AI agent — it quietly drops the friendliness: no
-menus to hang on, no colors a log can’t read, just clean, predictable
-output a machine can trust. Same work underneath; only the manners
-change, decided once, at the very end.</p>
-<p>This matters more than it sounds. The usual industry answer is two
-separate things — a tool for humans and an interface for machines — and
-they always drift apart, until the two quietly disagree about what the
-software even does. <code>wbx</code> refuses that fork: one program with
-good manners, not two programs that fall out of sync.</p>
-<p>And it goes further than most people expect. The very same tool runs
-<em>inside</em> the system, in the sandbox where Workbooks’ own AI
-agents do their work. So when an agent’s log says it ran a particular
-command, you can run the identical command on your own machine and see
-the identical thing. There’s no translation layer between what an agent
-does and what you’d do — no secret interface the machines use that you
-can’t.</p>
-<p>That’s what makes “people and AI build together” more than a slogan.
-It has to be true at the level of the tool itself, or it isn’t true
-anywhere. When you and the agent reach for the exact same handle, with
-the same words and the same behavior, you’re genuinely working in the
-same place — not watching a machine operate controls you can’t
-touch.</p>
-<p>So that’s the whole of it. One tool, a few families with shared
-manners, gentle with humans and trustworthy with machines, the same on
-your laptop and inside the engine. You learn the handle once — and
-everything else in this Learning Center is what’s on the other side of
-the door it opens.</p>
+<p class="lead">You've spent this unit learning how your agent gets real tools to work with. Here's the thing that ties them together — and the first surprise is that it isn't yours to operate. It's a reference card for a tool your <em>agent</em> drives, so you can recognize it when it shows up in a session log and know what it's doing.</p>
+
+    <p>Most of what you do here, you do by talking. You describe what you want; the agent does the work. But underneath the conversation, the agent isn't waving a magic wand — it's running a real command-line tool, over and over, the way a builder reaches for the same trusted handle a hundred times a day. That tool is called <code>wbx</code>, and this lesson is the short version of what it is and why you'll see its name go by.</p>
+
+    <h2>One handle, mostly held by the agent</h2>
+
+    <p>The honest way to describe <code>wbx</code> is that it's a handle, not a brain. It's a single program that authors, builds, signs, ships, and runs workbooks — but it owns almost none of the cleverness itself. It parses what it was asked for, does the light local work directly, and hands everything heavy to the engine behind it. The intelligence lives in the system; the command is the grip you hold it by.</p>
+
+    <p>And in your case, you mostly <em>don't</em> hold it. When you ask your agent to scaffold a workbook, wire in a toolkit, or ship the thing, the agent is the one typing <code>wbx</code> commands. You'll see them scroll past in the session — <code>wbx init</code>, <code>wbx toolkit push</code>, <code>wbx bundle</code> — like a worker's hands moving across a bench. You're directing; it's operating.</p>
+
+    <div class="aside">This is the correction worth keeping from the older version of this page: it used to read like a getting-started tutorial — "you install the tool, you run two minutes of commands, you get your first workbook." For a builder who works by talking to an agent, that's the wrong picture. You don't have to install <code>wbx</code> or memorize a single verb. Your agent does the driving. This page exists so the driving isn't a black box.</div>
+
+    <h2>Why you'd want to recognize it anyway</h2>
+
+    <p>If the agent does the typing, why learn the tool at all? Because recognizing what it's doing is how you tell whether it did the right thing. When a session log says the agent ran a build, then a bundle, then a sign, you can read that as a sentence: it compiled the work, packed it into one file, and stamped your origin onto it. You don't need to run those commands to know that's the right order — and to notice if a step is missing.</p>
+
+    <p>The verbs aren't random, which makes them easy to read. There are thirty-odd of them, but they fall into a few plain families:</p>
+
+    <ul>
+      <li><b>Author</b> — starting a workbook, previewing it live, shaping its contents. This is the agent setting up its workspace.</li>
+      <li><b>Make</b> — turning the work into one finished file: build, bundle, run.</li>
+      <li><b>Trust</b> — signing a file so its origin travels with it, and verifying one someone hands you.</li>
+      <li><b>Parts</b> — the toolkits, workflows, and agents from the rest of this unit: discovering, building, importing, and pushing them.</li>
+      <li><b>Engine</b> — the commands that stand up a server and ship a workbook to it, for when you want it to keep running after you close the laptop.</li>
+    </ul>
+
+    <p>You don't memorize the thirty. You learn that the families share the same manners — you start a thing, you check a thing, you do a thing — so once you've seen one family go by, the others read the same way.</p>
+
+    <h2>It speaks to people and to machines, on purpose</h2>
+
+    <p>Here's the design choice that makes <code>wbx</code> safe for an agent to drive. The tool knows it has two kinds of users, and it changes its manners for each <em>without</em> changing what it does.</p>
+
+    <p>When a person is at a terminal, it's warm: it picks sensible defaults, offers a small menu when the choice is genuinely yours, and ends each success by suggesting the next step. The moment its output is being read by a program instead of a person — piped into a script, or driven by an agent — it drops the friendliness. No menus to hang on, no colors a log can't read, just clean, predictable output a machine can trust, and a stable code for every outcome so the agent can tell success from "the engine isn't running" from "that wasn't found." Same work underneath; only the manners change.</p>
+
+    <p>This matters more than it sounds. The usual industry answer is two separate things — a tool for humans and an interface for machines — and they always drift apart until they quietly disagree about what the software even does. <code>wbx</code> refuses that fork: one program with good manners, not two programs that fall out of sync.</p>
+
+    <h2>The same tool, inside the engine</h2>
+
+    <p>And it goes one step further than most people expect. The very same tool runs <em>inside</em> the system, in the sandbox where the engine's own agents do their work. So when an agent's log says it ran a particular command, that's not a stand-in or a translation — it's literally <code>wbx</code>, the same one a person would install on a laptop.</p>
+
+    <p>That's what makes "people and AI build together" more than a slogan. It has to be true at the level of the tool itself, or it isn't true anywhere. When you and the agent are reaching for the exact same handle, with the same words and the same behavior, you're genuinely working in the same place — not watching a machine operate controls you can never touch.</p>
+
+    <div class="aside">One small piece of self-care worth knowing about: there's a verb called <code>doctor</code> whose whole job is to check that everything is set up correctly — is the tool installed, is the engine reachable, are you standing in a workbook. It runs honest probes and reports what it finds in plain language. The quietly thoughtful part: it never fails the shell just because it found a problem. A health check that found something wrong still did its job. If you ever do open a terminal yourself, that's the one command that tells you where you stand.</div>
+
+    <h2>Where this is today, and where it's going</h2>
+
+    <p>What's real today: <code>wbx</code> ships as one compiled tool for Mac, Linux, and Windows, and the same source also runs inside the engine's sandbox — so the claim that you and the agents hold the identical tool is literally true, not a metaphor. The verb families, the human-versus-machine manners, the stable outcome codes, and the never-fail health check are all built and tested.</p>
+
+    <p>The honest edge: this page is a reference, not a tutorial. We've deliberately not walked you through running commands yourself, because for a builder who works by directing an agent, that's not the job. If you ever want to drive <code>wbx</code> by hand — and plenty of people do, once they're curious — the deeper pages are where to go, and the tool is built to teach its own shape as you use it.</p>
+
+    <hr>
+
+    <p>So that's the one command, named accurately for how you'll actually meet it. It's a single handle that authors, builds, signs, ships, and runs workbooks; it has good manners for people and trustworthy manners for machines; and it's the same tool on a laptop and inside the engine. You won't usually be the one holding it — your agent will. But now, when its name scrolls past in a session, you'll know exactly what your collaborator just reached for, and whether it reached for the right thing.</p>

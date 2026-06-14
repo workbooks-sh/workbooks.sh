@@ -1,0 +1,61 @@
+<p class="lead">The thing nobody tells you about building software by talking to an agent: the first version is supposed to be a little wrong.</p>
+
+    <p>If you came in expecting to write one perfect sentence and receive finished software back, the first reply is going to feel like a letdown. The buttons are in odd places. It guessed at something you never said. It built the wrong half of what you meant. And the temptation, right there, is to conclude you're bad at this — that real builders just know the magic words.</p>
+
+    <p>They don't. There are no magic words. What experienced people have is not a better first prompt; it's a <em>loop</em> they trust. They say what they want, they look hard at what came back, and they say the next thing. Over and over, until it's right. That loop is the whole skill. Once you're running it on purpose instead of stumbling through it, you're building software — even if you've never written a line of code.</p>
+
+    <h2>One prompt is a wish. A loop is a method.</h2>
+
+    <p>Here's the trap. A single prompt asks the agent to read your mind. You're holding a full picture in your head — the feel of the thing, who it's for, what matters and what doesn't — and you're trying to squeeze all of it through one paragraph. No human colleague could build the right thing from that paragraph either. They'd build <em>a</em> thing, show it to you, and ask "like this?"</p>
+
+    <p>That question — <em>like this?</em> — is the loop. It has three beats, and you run them in order:</p>
+
+    <ul>
+      <li><b>Prompt.</b> Say what you want, plainly. Don't agonize over getting it perfect — you're starting a conversation, not casting a spell.</li>
+      <li><b>Look.</b> Actually examine what the agent built or proposed. Not "does it sound right" — <em>is</em> it right. This is the beat people skip, and skipping it is where projects quietly go wrong.</li>
+      <li><b>Redirect.</b> Tell it what's off and which way to go. Specific, concrete, one or two things at a time. Then you're back at the top.</li>
+    </ul>
+
+    <p>The work isn't front-loaded into one heroic prompt. It's spread across the turns. That's not a workaround for the agent being dumb — it's how building has always worked, finally made fast enough that you can do a full lap in a minute instead of a week.</p>
+
+    <h2>A real lap, start to finish</h2>
+
+    <p>Let's watch one. Say you want a little page where people sign up for a workshop. Here's a perfectly good opening prompt — note how unfussy it is:</p>
+
+    <div class="aside">Build a signup page for a weekend pottery workshop. Name, email, and which of three time slots they want. Keep it warm and simple.</div>
+
+    <p>The agent goes off and builds something, and shows it to you. It's a clean form. Three time slots. It even picked a soft clay-colored background, which is a nice touch you didn't ask for. But when you <b>look</b>, you notice two things: there's no way for someone to leave a note (a few people always want to ask about materials), and the three slots are just plain text, so two people could pick the same full slot.</p>
+
+    <p>That's your redirect. You don't start over. You don't re-explain the whole thing. You name exactly what you saw:</p>
+
+    <div class="aside">Good start. Two changes: add an optional &ldquo;questions or notes&rdquo; box at the bottom, and make the time slots show how many spots are left so a full one can't be picked.</div>
+
+    <p>The agent already knows what it built — it has the whole prior context — so it adjusts just those two things and shows you again. Now there's a notes box, and the slots read &ldquo;Saturday morning — 3 of 8 left.&rdquo; You <b>look</b> again. Maybe it's right and you're done. Maybe you realize the &ldquo;3 of 8&rdquo; should turn red when it's nearly full, and around you go one more time. Each lap is small. Each lap is cheap. That's the point.</p>
+
+    <p>Notice what made the redirects work: each one was about <em>the result you saw</em>, not a vague vibe. &ldquo;Make it better&rdquo; gives the agent nothing to aim at. &ldquo;Add a notes box and show remaining spots&rdquo; gives it a target. The clearer your look, the sharper your redirect.</p>
+
+    <h2>You are still the one who decides</h2>
+
+    <p>It's easy to read &ldquo;the agent builds it&rdquo; as &ldquo;the agent is in charge.&rdquo; It isn't, and that distinction is the most important thing in this whole lesson. Handing the labor to an agent is not handing over the judgment. Delegation is not abdication.</p>
+
+    <p>Think about how a good editor works with a writer, or a client with a contractor. The contractor does the building. The client still walks the site, says &ldquo;that wall's in the wrong place,&rdquo; and signs off on what's right. Nobody thinks the client became a bricklayer, and nobody thinks the client stopped being in charge. You're the client. The agent is doing real work, fast, but <em>you</em> are the one who looks at each result and decides whether it's good enough or needs another lap.</p>
+
+    <p>That &ldquo;look&rdquo; beat is not optional, and it's not busywork. It's the entire reason the thing comes out right. An agent will happily build something confident and wrong. It doesn't know your taste, your customers, or the thing you didn't think to say out loud — until you tell it. The loop is how you tell it, one observation at a time.</p>
+
+    <div class="aside">A quick starter you can steal. Fill in the blanks and run a deliberate lap:<br><br><b>Prompt:</b> &ldquo;Build _______ for _______. It needs to _______. Keep it _______.&rdquo;<br><b>Look:</b> ask yourself — what's missing, what's wrong, what surprised me?<br><b>Redirect:</b> &ldquo;Two changes: _______ and _______.&rdquo;</div>
+
+    <h2>Why this is safe to do fast</h2>
+
+    <p>Running a tight loop only feels reckless if you're afraid a wrong turn is permanent. It isn't. Because of how a workbook keeps its own history — every change recorded, with a way back — an agent working this way leaves a trail you can read and undo. You can try a bold redirect, look at it, hate it, and go back. The cost of a bad lap is one more lap. That's what makes &ldquo;just try it and see&rdquo; a real strategy here and not a gamble.</p>
+
+    <p>It also means you never have to guess what the agent did between your check-ins. The work records itself — what it changed, and why. So &ldquo;catch me up&rdquo; is an answerable question, and your <b>look</b> beat has something concrete to look at, even on work that happened while you were away.</p>
+
+    <h2>Where this is honest, and where it's headed</h2>
+
+    <p>One straight thing: the loop you just learned is the part that works today. You really can prompt, look, redirect, and watch software take shape in front of you, with the human — you — staying in the driver's seat the whole time. That's not a promise about the future; it's the everyday motion of building here.</p>
+
+    <p>The longer arc — the one this Learning Center keeps pointing at — is that the same homogeneous, self-recording system that makes your loop legible can eventually let parts of the work tend themselves: an agent that notices it lacks a capability and files that gap for later, software that improves between your visits. That's the north star, and it's genuinely aspirational, not a thing you flip on tomorrow. But it grows out of exactly this loop. The pitch was never &ldquo;software that runs itself.&rdquo; It's software <em>built in workbooks</em> — by people and agents, together, one honest lap at a time.</p>
+
+    <hr>
+
+    <p>So that's the move that turns &ldquo;I can't code&rdquo; into &ldquo;I can build.&rdquo; Not a perfect prompt — a loop you run on purpose. Say what you want. Look hard at what came back. Redirect toward what's right. You stay the reviewer; the agent stays the builder; and the thing gets better every time around.</p>

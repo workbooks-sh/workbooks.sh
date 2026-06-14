@@ -1,0 +1,63 @@
+<p class="lead">You've climbed a long way. You directed an agent, you watched a plan turn into running work, and your software started carrying its own story. This last lesson is the summit — and the most honest thing in the Learning Center. It's about software that helps make itself better between your sessions. It's also the youngest idea here, so we're going to be careful to tell you exactly where the real ends and the bet begins.</p>
+
+<p>Here's the stake. Every piece of software you've ever owned started dying the day it shipped — quietly. A dependency drifts. A help doc describes a button that got renamed. The clever workaround becomes the thing everyone's afraid to touch. Fixing any of it means a human reopens the project, remembers how it worked, and burns an afternoon. So most small fixes never happen. The rot wins by default, because improvement is a heroic act and nobody has time to be a hero every day.</p>
+
+<p>The point of working with an agent was never that it types faster than you. It's that <strong>improvement can become a standing process instead of a heroic act</strong>. That's the summit. Let's name it accurately.</p>
+
+<h2>The thing has a name — the autopoet</h2>
+
+<p>The agent that tends the system is called the <em>autopoet</em>. The word comes from <em>autopoiesis</em>, the biologists' term for systems that maintain themselves — a cell rebuilding its own walls, a body healing a cut. It sounds exotic, but here it's nothing new. You already met both of its parts.</p>
+
+<ul>
+  <li>An <strong>agent</strong> is a long-running worker — a model on a schedule, with files, memory, and the ability to do real work while you're away.</li>
+  <li>A <strong>plan</strong> (a workflow) is a list of tasks and their states, written in plain text, that an agent works through one at a time.</li>
+</ul>
+
+<p>The autopoet is just those two things pointed <em>inward</em>. A standing agent, working a maintenance plan, whose subject happens to be the system itself. Not a new kind of magic — the same constructs you already directed, aimed at keeping your software from rotting. If you understood the last two lessons, you already understand this one.</p>
+
+<h2>Why "software that edits itself" isn't terrifying here</h2>
+
+<p>The phrase "software that edits itself" usually reads like the opening line of an incident report. The reason it's safe here comes down to one boundary the whole system is built around — and it's worth slowing down on, because it's the thing that lets you sleep at night.</p>
+
+<p>There are two layers. The <strong>engine</strong> — the deep machinery that runs everything — is fixed. It never edits itself. Then there's the <strong>declarative layer</strong> — the written, changeable stuff: the agent's tools, its skills, its help docs, its own job description. All of it is plain text. Parseable, versioned, testable.</p>
+
+<div class="aside">Think of it as a gardener and a greenhouse. The autopoet tends the <em>garden</em> — it waters the plants, prunes the dead branches, fixes a mislabeled row. It never touches the <em>ground</em> the greenhouse is built on. Every change it makes is the safest kind software can receive: a reviewable edit to a text file, not a mutation to a running engine.</div>
+
+<p>So when the autopoet "improves the system," what it does is propose a diff to a text file. You can read it. You can revert it in one move. It runs through the same checks — build, test, sandbox-run — any change you made by hand would face. Being the system's own gardener buys zero exemptions. That's not a policy you have to trust; it's how the thing is shaped.</p>
+
+<h2>What it actually does — a loop, on purpose humble</h2>
+
+<p>The autopoet runs a small, boring loop. Boring is the achievement here:</p>
+
+<ul>
+  <li><strong>Listen.</strong> Your working agents, while they do their jobs, notice when their own tools fall short — "my toolkit has no way to do X," "this manual sent me the wrong way." They file a ticket about their own equipment. The autopoet reads those tickets.</li>
+  <li><strong>Tend.</strong> It edits the declarative layer and nowhere else — extends a tool, corrects a doc, tunes an agent's job description. Always a diff to something written in plain text.</li>
+  <li><strong>Verify.</strong> The change runs the same gates as any change: build, test, sandbox-run.</li>
+  <li><strong>Swap.</strong> If it passes, the new version slots in. Nothing reboots, nothing redeploys — because the engine was never touched.</li>
+</ul>
+
+<p>And the loop isn't a vibe living in some chat window. It's a plan file, exactly like the ones you've been reading — TODO, DOING, DONE — except the subject is the system. A ticket arrives as a TODO. The autopoet picks it up when it's ready, works it, and writes DONE back with a note about what changed and why. You can read its backlog the way you read any board.</p>
+
+<div class="aside"><b>So you can tell if it did it right:</b> after the autopoet works a ticket, open its plan file and look for four things in plain text — the ticket, the plan entry, a reviewable diff, and a note explaining the change. If those exist and the gates passed, it did its job. If you can't find the diff or the reasoning, something's wrong — the whole value is that the episode is legible and revertible.</div>
+
+<h2>One ticket, start to finish</h2>
+
+<p>Concretely. A research agent keeps hitting the same wall: its toolkit can fetch sources but has no way to remove duplicates, so it wastes half its run re-reading the same page. Instead of suffering quietly, it files the ticket: <em>my toolkit lacks a dedupe verb</em>.</p>
+
+<p>That lands as a TODO in the autopoet's plan. On its next beat, the task is ready, so the autopoet picks it up. It edits the toolkit — adds the missing capability and the one line of documentation that teaches it. The change runs the verify gates. They pass. The new toolkit slots in. The autopoet writes DONE, with a note.</p>
+
+<p>Next time the research agent runs, the capability is just <em>there</em>. No human reopened the project. No afternoon was spent. But notice what also exists now: a ticket, a plan entry, a diff, and a note — all in plain text, all in the history. You can read the whole episode tomorrow, and undo it in one move if the gardener planted the wrong thing.</p>
+
+<h2>The honest part — this is the youngest idea here</h2>
+
+<p>Now the part we owe you, because over-promising here would poison everything else you learned.</p>
+
+<p>The autopoet is the most frontier thing on these pages. Today it is exactly what this lesson describes and <strong>no more</strong>: an agent working a plan file, landing fixes to the declarative layer behind gates. That much is real — this project's own landing-site agents file tickets about their tools, and the autopoet lands the fixes. Phase 1, the issue backlog, is built and running.</p>
+
+<p>What is <em>not</em> finished is the bigger bet: a system that reads its own live performance data and proposes improvements the way a forecaster reads weather, with little prompting. That's a direction being built, not a guarantee you can lean on today. When you hear self-improving software described as a done thing, that's the bet, not the build.</p>
+
+<div class="aside">And one thing the autopoet will <em>never</em> be, at any maturity: a pitch about software that runs itself. That phrase is banned here on purpose. The whole shape of this system is <strong>people and AI building together</strong>. The autopoet isn't a replacement for you — it's the part that keeps what <em>you</em> built getting a little better between your sessions. You're still the one who decides what's worth building.</div>
+
+<h2>What you can do now</h2>
+
+<p>You don't need to wire up an autopoet to walk away with the right picture. What you should be able to do now is hold the north star without believing it's already shipped — to tell "an agent lands reviewable fixes to config behind gates" (real, today) from "the software improves itself with no one watching" (the bet, being built). That distinction is the whole gift of an honest summit. Everything before this points at it: a portable file, a legible plan, an agent you direct, a story that travels — and now, a system that helps keep all of it alive, in plain text you can read and revert, with you still holding the wheel.</p>

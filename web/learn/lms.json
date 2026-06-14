@@ -1,61 +1,181 @@
 {
- "comment": "The Learning Center curriculum — net-new, deep CONCEPTUAL lessons for people with no technical foundation (managers, marketers, vibe-coders, people building with Claude). NOT the docs. Each lesson teaches one big idea thoroughly, jargon-light, and links out to the deep doc pages (web/learn/<doc>.html) for the literals. Depth = understanding, not brevity. Order is the learning path.",
+ "comment": "The Learning Center curriculum — a graduated path for NON-TECHNICAL people to direct an AI agent to build real software, safely. Ecosystem-first (not file-first); the agent appears in Unit 1; runtime/sandbox before toolkits; honest about ships-today vs north-star. Rebuilt 2026-06-13 from audit+consultation workflows.",
  "units": [
   {
    "n": 1,
-   "title": "Foundations",
-   "dek": "What the whole thing is made of — before any of the moving parts.",
+   "title": "Build by talking to your agent",
+   "dek": "Why you can build real software now — and how to do it by describing what you want to an agent that does the building.",
    "lessons": [
     {
-     "slug": "the-one-file",
-     "title": "A workbook is one file you can hold",
+     "slug": "why-you-can-build-now",
+     "title": "Why you can build software now",
      "status": "live",
-     "teaches": "The core idea: a whole piece of software — its screen, its logic, its data, its history — living inside a single file you can email, the way you'd email a photo.",
+     "teaches": "The job-to-be-done framing: you don't want 'a workbook', you want software shipped. Workbooks is an ecosystem where you describe outcomes in plain English and an agent builds them in a safe sandbox. This is the activation 'why' that replaces the file-format opener.",
      "docs": [
       "workbook",
-      "bundles",
-      "nesting"
+      "agents"
      ],
-     "promise": "A whole piece of software — its screen, its logic, its data, even its memory — living inside a single file you could email to a friend, the way you'd email a photo.",
-     "audio": "audio/episodes/workbook.mp3",
+     "mins": "8 min"
+    },
+    {
+     "slug": "tell-it-what-you-want",
+     "title": "Telling your agent what you want",
+     "status": "live",
+     "teaches": "Level 1->2 of the maturity ladder: describe the outcome, not the implementation; give complete, consistent context; specificity is the single biggest factor in output quality. Includes 3 editable starter-prompt cards (madlibs: 'Build me a [tool] that [does X] from [my data]').",
+     "docs": [
+      "agents",
+      "authoring"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "the-loop-prompt-look-redirect",
+     "title": "The loop: prompt, look, redirect",
+     "status": "live",
+     "teaches": "Level 2: iteration is a loop, not one perfect prompt. Prompt -> evaluate -> refine -> redirect. When to add context vs. start over. Delegation is not abdication — you stay the reviewer and keep the publish button.",
+     "docs": [
+      "loops",
+      "human-in-the-loop"
+     ],
+     "mins": "9 min"
+    },
+    {
+     "slug": "reading-what-it-did",
+     "title": "Reading what your agent did",
+     "status": "live",
+     "teaches": "Level 2->3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real wb toolkit eval surface.",
+     "docs": [
+      "the-ledger",
+      "evals"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "first-workbook-end-to-end",
+     "title": "Your first workbook, start to finish",
+     "status": "live",
+     "teaches": "The single worked narrative every analog front-loads and we have zero of: a marketer ships a small tool — prompt -> agent builds -> you review -> ship — told as one continuous story threading the L1->2->3 ladder. The felt first win.",
+     "docs": [
+      "workbook",
+      "going-live"
+     ],
      "mins": "12 min"
-    },
-    {
-     "slug": "carries-its-story",
-     "title": "The file that remembers how it was made",
-     "status": "live",
-     "teaches": "How one file can carry its own source, its own identity, and a complete record of every change — so it explains itself and proves where it came from.",
-     "docs": [
-      "specs",
-      "git"
-     ]
-    },
-    {
-     "slug": "the-one-language",
-     "title": "The plain language underneath everything",
-     "status": "live",
-     "teaches": "Why everything in a workbook — text, structure, tasks, dates, data — is written in one simple, human-readable format you could read over someone's shoulder.",
-     "docs": [
-      "org",
-      "syntax",
-      "tags",
-      "drawers",
-      "timestamps",
-      "todos"
-     ]
     }
    ]
   },
   {
    "n": 2,
-   "title": "Making things",
-   "dek": "How a workbook gets real abilities, and how you drive it.",
+   "title": "The whole thing",
+   "dek": "Now that you've built something, here's what you were standing on — the ecosystem, and the one file you walk away holding.",
+   "lessons": [
+    {
+     "slug": "the-one-file",
+     "title": "The file you end up holding",
+     "status": "live",
+     "teaches": "Reframed from 'Foundations = the file' to 'the core unit of an ecosystem.' Fixes the three false claims (no-server, history-in-file, one-HTML->bundle): the portable unit is a bundle that stands on a runtime; the file is the thing you hold, not the whole system.",
+     "docs": [
+      "workbook",
+      "bundles",
+      "nesting"
+     ],
+     "mins": "10 min",
+     "promise": "A whole working tool — its screen, its data, its history — as one file you can hold and hand to anyone, standing on an engine you own."
+    },
+    {
+     "slug": "carries-its-story",
+     "title": "The file that remembers how it was made",
+     "status": "live",
+     "teaches": "How one artifact carries its own source, identity, and change history so it explains itself and proves where it came from. Soften machine-wipe portability and per-author attribution to match git.ex reality.",
+     "docs": [
+      "specs",
+      "git"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "the-one-language",
+     "title": "The plain language underneath everything",
+     "status": "live",
+     "teaches": "Everything in a workbook is written in one human-readable format you could read over someone's shoulder. Soften the unrun 'models already know org' benchmark claim. Deep syntax mechanics moved to optional/linked, not front-loaded for novices.",
+     "docs": [
+      "org",
+      "syntax",
+      "tags",
+      "timestamps",
+      "todos"
+     ],
+     "mins": "10 min"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "title": "The engine & the sandbox",
+   "dek": "Why it's safe to hand an agent real power — the runtime you stand on, and the sandbox that means your secrets never touch the OS.",
+   "lessons": [
+    {
+     "slug": "coming-alive",
+     "title": "Where a workbook comes alive",
+     "status": "live",
+     "teaches": "The runtime as the load-bearing pillar: a workbook on your laptop is a document; plugged into the engine it answers requests, runs on a schedule, serves people. Soften 'thousands = resting state'; reconcile the Nexus/Dock/seam vocabulary so they don't read as four things.",
+     "docs": [
+      "nexus",
+      "the-dock",
+      "sandboxes",
+      "keepers"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "why-a-sandbox",
+     "title": "Why a sandbox, not a Mac mini",
+     "status": "live",
+     "teaches": "The isolation/threat-model story — ~40% of the thesis, currently homeless. Prompt injection, data sovereignty, espionage, why-not-micro-VMs — framed as a benefit ('the agent runs in a sandbox; your secrets never touch the OS'), the most shareable, founder-original asset. Placed BEFORE toolkits because it's the motivation for handing over power.",
+     "docs": [
+      "sandboxes",
+      "capabilities"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "safe-powers",
+     "title": "Giving software powers, safely",
+     "status": "live",
+     "teaches": "How a workbook gets dangerous-sounding powers (internet, secrets, sending messages) with every power handed over deliberately and revocable. Fix the lowest-rung 'no secrets' claim (minimal still grants secrets + brokered sockets per policy.ex). Frame as 'you hand over powers deliberately.'",
+     "docs": [
+      "capabilities",
+      "networking",
+      "secrets",
+      "channels",
+      "tokens"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "going-live",
+     "title": "Putting it on the internet",
+     "status": "live",
+     "teaches": "What deploying actually means and why here it's one push. Fix the public-history claim (/rcp/changes returns 401 on locked/multi-tenant deploys). Maturity-marked toward the instant-push north star.",
+     "docs": [
+      "deployments",
+      "deploy-kit",
+      "planes",
+      "hot-swap"
+     ],
+     "mins": "10 min"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "title": "Giving it abilities",
+   "dek": "How your agent gets real tools to work with — now that you know the engine that runs them safely.",
    "lessons": [
     {
      "slug": "giving-it-abilities",
      "title": "Giving a workbook real abilities",
      "status": "live",
-     "teaches": "What a toolkit is: taking existing tools and code and safely handing them to a workbook, so it can actually DO things — without ever touching your computer.",
+     "teaches": "What a toolkit is: existing tools and code safely handed to a workbook so it can DO things without touching your computer. Cut the unprovable app-store boast; add the maturity hedge (toolkits = least-mature prong). Now correctly placed AFTER the engine that runs them.",
      "docs": [
       "toolkit",
       "commands",
@@ -63,263 +183,208 @@
       "audits",
       "lanes",
       "promotion"
-     ]
+     ],
+     "mins": "10 min"
     },
     {
      "slug": "code-in-the-document",
      "title": "When the writing and the program are the same thing",
      "status": "live",
-     "teaches": "How a document can BE the program — the same words a person reads are the instructions the machine runs — and why that makes software you can actually trust.",
+     "teaches": "How a document can BE the program — the words a person reads are the instructions the machine runs — and why that makes software you can trust. Gated behind the file/language lessons.",
      "docs": [
       "tangling",
       "claims"
-     ]
+     ],
+     "mins": "10 min"
     },
     {
      "slug": "the-one-command",
-     "title": "The one command you type",
+     "title": "The one command (reference)",
      "status": "live",
-     "teaches": "Meet wbx, the single tool you talk to — what it does for you, and why you mostly won't need it to understand any of the rest.",
+     "teaches": "Demoted to a reference card: the AGENT runs wbx, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane).",
      "docs": [
       "wbx",
       "modes",
-      "pipelines",
       "doctor"
-     ]
-    }
-   ]
-  },
-  {
-   "n": 3,
-   "title": "The engine",
-   "dek": "Where a workbook stops being a file and starts being a living service.",
-   "lessons": [
-    {
-     "slug": "coming-alive",
-     "title": "Where a workbook comes alive",
-     "status": "live",
-     "teaches": "The Nexus: a workbook on your laptop is a document; plug it into an engine and it becomes a living thing that answers requests, runs on a schedule, and serves other people.",
-     "docs": [
-      "nexus",
-      "the-dock",
-      "sandboxes",
-      "keepers"
-     ]
-    },
-    {
-     "slug": "safe-powers",
-     "title": "Giving software powers, safely",
-     "status": "live",
-     "teaches": "How a workbook gets dangerous-sounding powers — the internet, your secrets, sending messages — without any of the danger: every power is handed over deliberately and can be taken back.",
-     "docs": [
-      "capabilities",
-      "networking",
-      "secrets",
-      "channels",
-      "browsing",
-      "tokens"
-     ]
-    },
-    {
-     "slug": "going-live",
-     "title": "Putting it on the internet",
-     "status": "live",
-     "teaches": "What 'deploying' actually means, why it's usually terrifying, and how here it's one push — plus how the live thing keeps a public history anyone can read.",
-     "docs": [
-      "deployments",
-      "deploy-kit",
-      "planes",
-      "recipes",
-      "distribution",
-      "hot-swap",
-      "gitops",
-      "changelogs",
-      "telemetry"
-     ]
-    }
-   ]
-  },
-  {
-   "n": 4,
-   "title": "Agents",
-   "dek": "Software that does work on its own — what that really means, and how to keep it honest.",
-   "lessons": [
-    {
-     "slug": "what-an-agent-is",
-     "title": "What an agent really is",
-     "status": "live",
-     "teaches": "Strip away the hype: an agent is a loop — it reads, it acts, it looks at what happened, it goes again. Understand that one loop and the rest stops being magic.",
-     "docs": [
-      "agents",
-      "loops",
-      "authoring"
-     ]
-    },
-    {
-     "slug": "agents-that-persist",
-     "title": "Agents that keep working when you're not watching",
-     "status": "live",
-     "teaches": "How an agent goes from a thing you chat with to a thing that runs on its own — standing watch, taking shifts, resting between runs, and pausing to ask you when it should.",
-     "docs": [
-      "spawning",
-      "orchestration",
-      "fleets",
-      "dreaming",
-      "human-in-the-loop",
-      "runtime-config",
-      "rehearsals",
-      "context-repo"
-     ]
-    },
-    {
-     "slug": "did-it-do-well",
-     "title": "Knowing whether the agent actually did well",
-     "status": "live",
-     "teaches": "The hard part of trusting software that thinks: how you measure whether it did a good job, catch it when it drifts, and keep a record you can't fake.",
-     "docs": [
-      "evals",
-      "the-ledger"
-     ]
+     ],
+     "mins": "10 min"
     }
    ]
   },
   {
    "n": 5,
-   "title": "Automation",
-   "dek": "Plans that aren't just notes about the work — they ARE the work.",
+   "title": "Agents that work on their own",
+   "dek": "Once you trust the agent for one task, here's how it works when you're not watching — and how you keep it honest.",
    "lessons": [
     {
-     "slug": "plans-that-run",
-     "title": "Plans that run themselves",
+     "slug": "what-an-agent-is",
+     "title": "What an agent really is",
      "status": "live",
-     "teaches": "Why your to-do list, your calendar, and your project board are all the same thing here — one plain plan that a person reads and a machine carries out, with no copy to keep in sync.",
+     "teaches": "Strip the hype: an agent is a loop — read, act, look at what happened, go again. Understand the loop and the rest stops being magic. Note tools are host-brokered. (Moved far earlier overall; the foundational concept now anchors the agent-depth unit.)",
      "docs": [
-      "workflows",
-      "schedules",
-      "boards",
-      "validations",
-      "autopoet",
-      "dispatch"
-     ]
+      "agents",
+      "loops",
+      "authoring"
+     ],
+     "mins": "10 min"
     },
     {
-     "slug": "compiled-plans",
-     "title": "When a plan becomes a program",
+     "slug": "agents-that-persist",
+     "title": "Agents that keep working when you're not watching",
      "status": "live",
-     "teaches": "The deeper idea: the same plan that organizes your week can, with no new tools, become an actual running system — and how it changes safely while it's live.",
+     "teaches": "How an agent goes from a thing you chat with to a thing that runs on its own — standing watch, taking shifts, resting, and pausing to ask you. Trim ~15% lyrical filler; orient the non-technical reader.",
      "docs": [
-      "waves",
-      "worlds",
-      "upgrades"
-     ]
+      "spawning",
+      "orchestration",
+      "fleets",
+      "human-in-the-loop",
+      "rehearsals",
+      "context-repo"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "did-it-do-well",
+     "title": "Knowing whether the agent did well",
+     "status": "live",
+     "teaches": "The deeper review craft: measuring a good job, catching drift, and the record you can't fake. Ground in the real wb toolkit eval surface; soften the cost/speed figure. Complements the Unit 1 builder-facing review lesson with the mechanism.",
+     "docs": [
+      "evals",
+      "the-ledger"
+     ],
+     "mins": "10 min"
     }
    ]
   },
   {
    "n": 6,
-   "title": "The disk",
-   "dek": "Where the work lives — a place to keep things that travels with the project.",
+   "title": "Plans that run & the system that improves itself",
+   "dek": "Your plans become the running work — and the climax: a system that helps improve itself.",
    "lessons": [
     {
-     "slug": "a-disk-that-travels",
-     "title": "A place to keep things that travels with the work",
+     "slug": "plans-that-run",
+     "title": "Plans that run themselves",
      "status": "live",
-     "teaches": "Every project needs somewhere to keep files. Here that somewhere lives INSIDE the workbook, travels when you send it, and can be asked questions like a spreadsheet.",
+     "teaches": "Why your to-do list, calendar, and project board are one plain plan a person reads and a machine carries out. Fix the two-way kanban claim (board.ex is one-way regen) and the self-running schedule (needs a keeper). CUT the autopoet doc-link from here.",
      "docs": [
-      "vfs",
-      "queries",
-      "volumes",
-      "sync"
-     ]
+      "workflows",
+      "schedules",
+      "boards",
+      "validations",
+      "dispatch"
+     ],
+     "mins": "10 min"
     },
     {
-     "slug": "the-disk-grows",
-     "title": "When the work outgrows one file",
+     "slug": "compiled-plans",
+     "title": "When a plan becomes a program",
      "status": "live",
-     "teaches": "What happens when a project gets big — reaching out to outside data, remembering things by meaning, and swapping in real storage — without changing how any of it works.",
+     "teaches": "The same plan that organizes your week can become a running system with no new tools, and how it changes safely while live. Maturity-marked.",
      "docs": [
-      "foreign-tables",
-      "vectors",
-      "backends"
-     ]
+      "waves",
+      "worlds",
+      "upgrades"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "the-system-improves-itself",
+     "title": "The system that improves itself",
+     "status": "live",
+     "teaches": "The honest Level-3 summit and the thesis's emotional peak, relocated here from a stray doc-link. The autopoet edits the declarative config layer (toolkits/skills/defs), never host code — Phase-1 reality, brand-canon framed: 'software built in workbooks', NOT 'sites that run themselves.'",
+     "docs": [
+      "autopoet",
+      "dreaming"
+     ],
+     "mins": "9 min"
     }
    ]
   },
   {
    "n": 7,
-   "title": "Trust & sharing",
-   "dek": "How something you can copy infinitely stays trustworthy and safe to share.",
+   "title": "Trust, sharing & the disk",
+   "dek": "How something you can copy infinitely stays trustworthy, private, and useful when you hand it out.",
    "lessons": [
     {
      "slug": "proving-origin",
      "title": "Proving where it came from",
      "status": "live",
-     "teaches": "If anyone can copy a file, how do you know a workbook is really from who it claims? The idea of a signature that travels with the bytes and can't be faked.",
+     "teaches": "If anyone can copy a file, how do you know a workbook is really from who it claims? A signature that travels with the bytes and can't be faked. Best-in-set; optionally name did:key/SHA-256 once for the deep-doc bridge.",
      "docs": [
       "signatures",
       "trust",
       "verification"
-     ]
+     ],
+     "mins": "10 min"
     },
     {
      "slug": "who-sees-what",
      "title": "Sharing without oversharing",
      "status": "live",
-     "teaches": "A file you send is a file you've given away completely — so how do you share the app without handing over the private data inside it? The line between the public shell and the protected core.",
+     "teaches": "A file you send is a file you've given away completely — so how do you share the app without handing over the private data? The public shell vs. the protected core. Trim the seal recap (overlaps proving-origin); disambiguate 'seal.'",
      "docs": [
       "sharing",
       "postures",
       "publishing",
       "privacy"
-     ]
+     ],
+     "mins": "10 min"
     },
     {
      "slug": "secrets-in-the-open",
      "title": "Keeping a secret inside a file you hand out",
      "status": "live",
-     "teaches": "The surprising trick: part of a file you give to everyone can be readable only by the one person holding the right key — locked in the open, opened only on permission.",
+     "teaches": "Part of a file given to everyone can be readable only by the one person holding the right key — locked in the open, opened only on permission. Note the ETS key-store is non-persistent (restart = revoke).",
      "docs": [
       "sealed-sections",
       "escrow"
-     ]
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "a-disk-that-travels",
+     "title": "A place to keep things that travels with the work",
+     "status": "live",
+     "teaches": "Every project needs somewhere to keep files; here it lives inside the workbook, travels when you send it, and can be queried like a spreadsheet. Reconcile the single-HTML claim (egress is a bundle: HTML + separate SQLite). Merged from the dissolved disk unit.",
+     "docs": [
+      "vfs",
+      "queries",
+      "volumes",
+      "sync"
+     ],
+     "mins": "10 min"
+    },
+    {
+     "slug": "the-disk-grows",
+     "title": "When the work outgrows one file",
+     "status": "live",
+     "teaches": "What happens when a project gets big — reaching outside data, remembering by meaning, swapping in real storage — without changing how it works. Soften pull-to-disk + 'memory=files'. Optional/back-half.",
+     "docs": [
+      "foreign-tables",
+      "vectors",
+      "backends"
+     ],
+     "mins": "10 min"
     }
    ]
   },
   {
    "n": 8,
-   "title": "The browser",
-   "dek": "Where you actually work — the app that is itself a workbook, and how everything you've learned shows up in one place.",
-   "lessons": [
-    {
-     "slug": "the-browser",
-     "title": "A desktop made of workbooks",
-     "status": "live",
-     "teaches": "The Workbooks Browser: a desktop app whose own interface is built out of workbooks — so the thing you use to open, weave, and run workbooks is made of the same stuff. Tabs, bookmarks, a file tree, a live connection to an engine, and a right-hand dock where any toolkit can mount its own panel — all of it composable, themeable, and drivable by an agent that lives in the app with you.",
-     "docs": [
-      "workbook",
-      "nexus",
-      "toolkit",
-      "the-dock"
-     ],
-     "promise": "The surprising last turn: the app you use to work with workbooks is itself made of workbooks — so the front door to the whole system is built from the same parts as everything inside it, and you can reshape it the same way you reshape anything else.",
-     "mins": "11 min"
-    }
-   ]
-  },
-  {
-   "n": 9,
    "title": "Under the hood",
-   "dek": "Optional. The why behind the magic, for the curious.",
+   "dek": "Optional, for the curious — the why behind the magic, and the one idea everything is wearing different clothes of.",
    "lessons": [
     {
      "slug": "under-the-hood",
      "title": "Why none of this is magic",
      "status": "live",
-     "teaches": "A tour, no code required, of how the pieces actually fit — the tiny engine at the center, and the single idea that everything in this whole system is really the same idea wearing different clothes.",
+     "teaches": "A no-code tour of how the pieces fit — the tiny engine at the center, and the single idea everything is. The two redundant endings (the-browser + under-the-hood) dissolve into this ONE capstone. Scope no-I/O to lib.rs; one line that the capability boundary lives in the seam.",
      "docs": [
       "the-kernel",
-      "the-seam"
-     ]
+      "the-seam",
+      "workbook",
+      "nexus"
+     ],
+     "mins": "10 min"
     }
    ]
   }

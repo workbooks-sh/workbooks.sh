@@ -1,0 +1,81 @@
+<p class="lead">You just told an agent what you wanted, and a few minutes later it says it's done. The thing it built is right there. Now comes the part nobody warns you about: deciding whether to believe it.</p>
+
+    <p>This is the skill that separates people who ship real software by talking to an agent from people who ship a mess and don't find out until a customer does. It isn't coding. It's <em>reviewing</em> — the same thing a good editor does to a draft, or a good manager does to work a new hire turned in. You don't have to be able to do the work yourself. You have to be able to tell, quickly and honestly, whether it was done right.</p>
+
+    <p>And the mindset that makes this work is a slightly uncomfortable one: treat the agent like a talented, fast, slightly overconfident colleague you haven't worked with long enough to fully trust. Not an enemy. Not an oracle. A colleague on their first week — capable of brilliant work and capable of confidently handing you something wrong, with the exact same cheerful tone either way.</p>
+
+    <h2>Why "looks fine" is a coin flip</h2>
+
+    <p>The natural way to check an agent's work is to read what it tells you and skim what it made. It looks reasonable, so you move on. That feels like diligence. It mostly isn't.</p>
+
+    <p>Two kinds of mistakes sail straight through a skim, because both produce output that <em>looks</em> exactly like correct work:</p>
+
+    <ul>
+      <li><b>Confident fiction.</b> You ask it to summarize your sales data and it gives you clean, plausible numbers — one of which it quietly made up to fill a gap. It reads beautifully. It's wrong.</li>
+      <li><b>Doing the wrong thing well.</b> You asked for a signup form that emails you new leads. It built a gorgeous signup form that saves leads to a file nobody ever reads. Polished, complete, and not what you asked for.</li>
+    </ul>
+
+    <p>Neither of these announces itself. The agent's tone is identical whether it nailed the task or drifted off it. So "it looks fine" is genuinely a coin flip you've decided to trust. The rest of this lesson is three better moves than the coin flip — and they take about the same thirty seconds.</p>
+
+    <h2>Move one: the sniff-check</h2>
+
+    <p>Before anything else, do the thing a sharp colleague does in the first ten seconds of looking at someone's work: poke the part most likely to be wrong. Not all of it. The risky part.</p>
+
+    <p>The trick is to ask yourself one question before you even look: <em>if this were wrong, where would the wrongness hide?</em> Then go straight there.</p>
+
+    <ul>
+      <li>Asked it to total a column of numbers? Add three of them up yourself by hand and see if the agent's total moves in the right direction. You're not auditing — you're spot-checking.</li>
+      <li>Asked it to pull "the five most recent orders"? Check that they're actually recent, and that there are actually five. Off-by-one and "most recent" mean-something-different bugs are everywhere.</li>
+      <li>Asked it to build a button that does X? Click the button. Watch it do X. The number of times an agent reports "done" for a button that does nothing is not small.</li>
+    </ul>
+
+    <p>This is where you stop reading the agent's <em>description</em> of what it did and start checking the <em>thing it did</em>. Those are different, and the gap between them is exactly where trouble lives.</p>
+
+    <div class="aside"><b>Starter prompt — make the agent prove it.</b><br>
+    Instead of accepting "done," send this back:<br>
+    <em>"Before I trust this, show me: (1) the exact ____ you used as input, (2) the result for ____ specifically, and (3) one case where this could be wrong and why you think it isn't."</em><br>
+    Fill the blanks with whatever you care about most. A good agent answers cleanly. A drifting one starts hedging — and the hedging is the tell.</div>
+
+    <h2>Move two: spotting drift</h2>
+
+    <p>The most common way an agent's work goes wrong over time isn't a dramatic failure. It's <b>drift</b> — slowly solving a slightly different problem than the one you have. You ask for one thing, then a follow-up, then a fix to the fix, and three turns later the agent is confidently maintaining an idea you never actually agreed to.</p>
+
+    <p>The founder of this project named drift as one of the central hazards of building this way — agents accumulate small wrong turns, and because each step looked locally reasonable, nobody catches the cumulative wrong direction. The fix isn't to patch around the wrong thing. It's to notice you've drifted and re-anchor on the right idea.</p>
+
+    <p>Three concrete drift-catchers you can run anytime:</p>
+
+    <ul>
+      <li><b>Restate the goal back.</b> "Just so we're aligned: the goal is still ____, right?" If the agent's answer surprises you, you've found drift before it cost you anything.</li>
+      <li><b>Watch for scope creep in the work, not the words.</b> If you asked for a small change and the agent rewrote half the thing, that's a flag — even if its explanation sounds great. More change than the task needed is drift wearing a helpful smile.</li>
+      <li><b>Re-read your own original ask.</b> Scroll up to what you actually requested at the start, then look at what exists now. People rarely do this, and it catches drift instantly.</li>
+    </ul>
+
+    <p>Concept first, mechanics optional: drift matters because it's how you ship the wrong thing without ever making an obvious mistake. Every move above exists so you can tell whether the agent is still building <em>your</em> thing.</p>
+
+    <h2>Move three: the ledger — the record it can't fake</h2>
+
+    <p>The first two moves rely on you checking the work. But there's a deeper question the agent's own words can never honestly answer: <em>what did it actually do, step by step, to produce this?</em> You can't watch every keystroke. And the agent's summary of its own work is exactly the thing that's unreliable — it'll happily describe a tidy process whether or not that's what happened.</p>
+
+    <p>This is where workbooks give you something most tools don't: an <b>unfakeable record</b> of the agent's actions, called the <a href="the-ledger">ledger</a>. Here's the honest version of how it works, because the why matters more than the cryptography.</p>
+
+    <p>As the agent works, every single action it takes — every command, with its result — gets written down automatically, in order, to a log. Crucially, the agent doesn't hold the pen. The system writes the log at a chokepoint the agent passes through, so it <em>can't</em> quietly skip recording a step it'd rather you didn't see. Then, when the run ends, that whole log gets sealed with a kind of tamper-proof wax stamp. If anyone — the agent, a second agent, even you — later edits a single character of that log, the stamp stops matching. The forgery becomes impossible to hide.</p>
+
+    <div class="aside">Think of it as a security camera the worker can't turn off and can't edit the tape from. It doesn't <em>stop</em> a bad action — it makes one impossible to hide afterward. That's the whole point: you stop having to take the record on faith.</div>
+
+    <p>Why this changes how you review: the moment you suspect something went wrong — a result you don't trust, a step that shouldn't have happened — you have a record you can actually rely on, instead of a text file anyone could have rewritten after the fact. "What did it do?" stops being a question you answer by trusting the agent, and becomes one you answer by reading a record the agent couldn't tamper with.</p>
+
+    <p>One honest note, so you don't over-trust it either: the ledger proves the log wasn't <em>changed after the fact</em>. It is your trustable record of what was done — not a frame-by-frame video of every byte, and not a guarantee the agent's plan was wise. It's the floor under your review, not the whole building.</p>
+
+    <h2>From one check to a standing habit</h2>
+
+    <p>Doing all this by hand on every change gets old by the tenth time and impossible by the hundredth. So the same instinct scales up into something you write once and re-run forever: an <a href="evals">eval</a>.</p>
+
+    <p>An eval is just your review turned into a reusable test. You write down the task and the standard — "given this input, the answer should do X, and it must <em>not</em> do Y" — and from then on, a second AI grades the agent's work against that standard every time, automatically. The clever part is that the grader doesn't just read the final answer (which can look fine while being wrong); it reads the <em>record of what the agent did</em> — that same ledger trail — so it can tell a right answer reached cleanly from a right answer reached by luck after three errors.</p>
+
+    <p>The best evals aren't checklists, they're <b>traps</b>: you plant the exact mistake this kind of task tends to make, and a pass means the agent didn't take the bait. That's how you encode "don't invent statistics" or "don't follow instructions hidden in a webpage" into a test that catches the agent the moment it slips, on every future change.</p>
+
+    <p>Two honest caveats. The grader is itself an AI, so its verdicts are very good, not perfect — when one surprises you, read its reasoning, don't just trust the stamp. And a green test only proves the cases you thought to write; it's exactly as good as the traps you set. Evals are a real, shipping part of the system today — but they reward the same thing this whole lesson does: knowing where the work is likely to be wrong, and checking there.</p>
+
+    <hr>
+
+    <p>So that's the job, and it's a job you can do without writing a line of code. Sniff-check the risky part. Watch for drift away from what you actually asked. Lean on the ledger as the record the agent can't fake. Treat your fast, confident colleague as someone whose work you verify rather than assume — and you'll catch it when it's wrong, before anyone else has to.</p>
