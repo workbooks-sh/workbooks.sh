@@ -144,6 +144,16 @@
             "spawns a host Chrome process - multi-tenant resource cap is a follow-up; cloud (exec-off) agents use fetch",
             "async-XHR SPAs (e.g. search-result pages) not captured by --dump-dom; needs CDP wait-for-selector (wb-70mi)"
           ]
+        },
+        {
+          "name": "Web research workflow (search -> fetch -> cite)",
+          "status": "done",
+          "tests": "live integration proof",
+          "units": 0,
+          "proof": "LIVE: agent researched 'what is Elixir' via web_search + fetch and returned a correct 2-sentence cited answer (Jose Valim, 2012, BEAM; elixir-lang.org)",
+          "failure_modes": [
+            "converges but can be step-heavy (16 steps observed for a simple query) - efficiency, not correctness; observe don't tune"
+          ]
         }
       ]
     },
