@@ -48,12 +48,12 @@
     '  background-image: repeating-linear-gradient(90deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
     '.nav .drop .panel .col { display: flex; flex-direction: column; min-width: 230px; }',
     /* Docs panel: a Diátaxis grid — several compact columns of section links */
-    '.nav .drop .panel.docs { display: none; min-width: 0; gap: 0; }',
+    '.nav .drop .panel.docs { display: none; min-width: 0; gap: 0; flex-direction: column; padding: 14px; }',
     '.nav .drop:hover .panel.docs, .nav .drop:focus-within .panel.docs, .nav .drop.open .panel.docs { display: flex; }',
-    '.nav .drop .panel.docs .grid { display: grid; grid-template-columns: repeat(3, minmax(186px, 1fr)); gap: 2px 4px; }',
-    '.nav .drop .panel.docs .col { min-width: 0; }',
-    '.nav .drop .panel.docs a { padding: 7px 10px; font-weight: 700; }',
-    '.nav .drop .panel.docs a small { white-space: nowrap; }',
+    '.nav .drop .panel.docs .grid { display: grid; grid-template-columns: repeat(3, max-content); gap: 4px 40px; align-items: start; }',
+    '.nav .drop .panel.docs > .grid > .col { min-width: 0; gap: 10px; }',          /* a grid column may stack 2 groups */
+    '.nav .drop .panel.docs .colhead { padding: 10px 10px 4px; }',
+    '.nav .drop .panel.docs a { padding: 6px 10px; font-weight: 600; white-space: nowrap; }',  /* literal titles, never wrap */
     '.nav .drop .panel.docs .foot { display: flex; align-items: center; gap: 6px; padding: 4px; margin-top: 4px;',
     '  border-top: 2px solid rgba(18,19,22,.10); }',
     '.nav .drop .panel.docs .foot a { flex: 1; justify-content: center; font-size: 10.5px; color: var(--dim, #565b54);',
@@ -167,50 +167,45 @@
   function dcol(head, rows) {
     return '<div class="col"><div class="colhead">' + head + '</div>' + rows.join('') + '</div>';
   }
+  // Deliberate 3-column docs menu: clear literal titles, no subtext, no wrapping.
+  // Toolkits live in their own marketplace (the Toolkits nav link), not here.
   var docsGrid =
     '<div class="grid">' +
-    dcol('Start here', [
-      dlink('start/install', 'Install', 'set up wbx'),
-      dlink('start/your-first-workbook', 'First workbook', 'direct an agent'),
-      dlink('start/first-workbook', 'End to end', 'write it yourself'),
-      dlink('start/first-toolkit', 'First toolkit', 'author one'),
-    ]) +
-    dcol('Concepts', [
-      dlink('concepts/what-is-a-toolkit', 'What is a toolkit'),
-      dlink('concepts/two-surfaces', 'Workbooks & toolkits'),
-      dlink('concepts/exec-shapes', 'The six shapes'),
-      dlink('concepts/the-dock', 'The Dock & caps'),
-      dlink('concepts/isolation', 'Isolation tiers'),
-    ]) +
-    dcol('How-to', [
+    '<div class="col">' +
+      dcol('Get started', [
+        dlink('start/install', 'Install WBX'),
+        dlink('start/your-first-workbook', 'Your first workbook'),
+        dlink('start/first-toolkit', 'Your first toolkit'),
+      ]) +
+      dcol('Concepts', [
+        dlink('concepts/what-is-a-toolkit', 'What is a toolkit'),
+        dlink('concepts/two-surfaces', 'Workbooks & toolkits'),
+        dlink('concepts/exec-shapes', 'The six shapes'),
+        dlink('concepts/the-dock', 'The Dock & capabilities'),
+        dlink('concepts/isolation', 'Isolation tiers'),
+      ]) +
+    '</div>' +
+    dcol('Guides', [
       dlink('build/pick-a-shape', 'Pick a shape'),
-      dlink('build/dock-sdk', 'The Dock SDK'),
+      dlink('build/dock-sdk', 'Use the Dock SDK'),
       dlink('build/languages', 'Language lanes'),
       dlink('run/invoke', 'Invoke a toolkit'),
       dlink('deploy/local', 'Deploy locally'),
-      dlink('deploy/cloud', 'Deploy to cloud'),
+      dlink('deploy/cloud', 'Deploy to the cloud'),
     ]) +
-    dcol('Reference', [
-      dlink('reference/cli', 'wbx CLI'),
-      dlink('reference/runtime', 'Runtime RCP API'),
-      dlink('reference/manifest', 'Manifest fields'),
-      dlink('reference/exec-shapes', '#+EXEC shapes'),
-      dlink('reference/caps', 'Dock capabilities'),
-      dlink('reference/sdk', 'Dock SDK API'),
-    ]) +
-    dcol('Toolkits', [
-      dlink('toolkits/index', 'Toolkits hub'),
-      dlink('toolkits/fly', 'Workbooks + Fly.io'),
-      dlink('toolkits/github', 'Workbooks + GitHub'),
-      dlink('toolkits/slack', 'Workbooks + Slack'),
-      dlink('reference/toolkits', 'Catalog & status'),
-    ]) +
-    dcol('Maturity', [
-      dlink('maturity/index', 'Capability matrix', 'what works'),
-      dlink('distribute/package', 'Package & sign'),
-      dlink('distribute/federation', 'Federation'),
-      dlink('deploy/release-layers', 'Release layers'),
-    ]) +
+    '<div class="col">' +
+      dcol('Reference', [
+        dlink('reference/cli', 'wbx CLI'),
+        dlink('reference/runtime', 'Runtime API'),
+        dlink('reference/manifest', 'Manifest fields'),
+        dlink('reference/caps', 'Dock capabilities'),
+        dlink('reference/sdk', 'Dock SDK'),
+      ]) +
+      dcol('Status', [
+        dlink('maturity/index', 'Capability matrix'),
+        dlink('deploy/release-layers', 'Release layers'),
+      ]) +
+    '</div>' +
     '</div>' +
     '<div class="foot">' +
     '<a href="' + DOCS + '">All docs →</a>' +
