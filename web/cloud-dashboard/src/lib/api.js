@@ -34,7 +34,7 @@ const MOCK_DETAIL = {
     region: 'sfo · San Francisco',
     plan: 'Starter · 1 GB',
     scaleToZero: 'on · 5 min idle',
-    storage: 'R2 · 2.1 GB',
+    storage: '2.1 GB',
     database: 'none',
     created: '2026-06-02'
   },
@@ -42,7 +42,7 @@ const MOCK_DETAIL = {
     activeCompute: '6.4 hrs',
     sleeping: '11.6 days',
     storage: '2.1 GB-mo',
-    egress: '0 GB · via R2',
+    egress: '0 GB',
     subtotal: '$11.40'
   },
   metrics: { cpu: 18, memMb: 412, memCapGb: 1, reqMin: 37, costMonth: '11.40' }
@@ -94,7 +94,7 @@ export async function nexusUsage() {
   });
 }
 
-/** Object-storage buckets (R2) for the org. MOCK. */
+/** Object-storage buckets for the org. MOCK. */
 export async function listBuckets() {
   // MOCK — swap for fetch('/api/platform/storage') when the PCP API lands
   return structuredClone({

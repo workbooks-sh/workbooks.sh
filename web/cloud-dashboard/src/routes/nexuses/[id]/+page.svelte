@@ -27,8 +27,8 @@
     ['a', '⚙ compiling rust toolkit (shared build)…'],
     ['g', '✓ toolkit ready · cached'],
     ['', 'POST /agent/run  202'],
-    ['', 'litestream → R2 checkpoint ok'],
-    ['', 'GET /assets/hero.png  200  (R2, 0 egress)']
+    ['', 'snapshot saved ok'],
+    ['', 'GET /assets/hero.png  200  (cached, 0 egress)']
   ];
   let logs = $state([]);
   let li = 0;

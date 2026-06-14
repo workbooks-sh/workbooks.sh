@@ -14,7 +14,7 @@
   <div class="stats">
     <div class="stat"><div class="k">Month to date</div><div class="v">${s.monthToDate}</div><div class="d dim">{s.nexusCount} nexuses</div></div>
     <div class="stat"><div class="k">Compute</div><div class="v">${s.compute}</div><div class="d dim">{s.activeHrs} active hrs</div></div>
-    <div class="stat"><div class="k">Storage</div><div class="v">${s.storage}</div><div class="d dim">R2 · zero egress</div></div>
+    <div class="stat"><div class="k">Storage</div><div class="v">${s.storage}</div><div class="d dim">zero egress</div></div>
     <div class="stat"><div class="k">Database</div><div class="v">${s.database}</div><div class="d dim">1 Postgres addon</div></div>
   </div>
 

@@ -16,7 +16,7 @@
   <div class="sechead">
     <div>
       <h2>Storage</h2>
-      <p>Object storage for your nexuses — images &amp; files. Served zero-egress via Cloudflare R2.</p>
+      <p>Object storage for your nexuses — images &amp; files, served with zero egress.</p>
     </div>
     <button class="btn sm" onclick={newBucket}>New bucket</button>
   </div>
@@ -40,5 +40,5 @@
     </table>
   </div>
 
-  <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served from R2, not the compute host.</div>
+  <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served directly, so reads are free.</div>
 </section>

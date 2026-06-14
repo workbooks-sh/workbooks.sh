@@ -73,7 +73,7 @@
 
       <div class="lab">Addons</div>
       <div class="addon">
-        <div class="info"><b>Object storage</b><p>Zero-egress R2 bucket for images &amp; files</p></div>
+        <div class="info"><b>Object storage</b><p>Zero-egress storage for images &amp; files</p></div>
         <div class="pr">$0.015/GB</div>
         <div class="tog" class:on={storageOn} onclick={() => (storageOn = !storageOn)}><i></i></div>
       </div>
