@@ -378,16 +378,18 @@ defmodule Workbooks.PublicWeb do
     <title>#{escape(title)} — #{escape(site_title)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
     <style>
+    @font-face{font-family:"Groothan";src:url("https://workbooks.sh/fonts/GroothanMixed-Regular.woff2") format("woff2");font-weight:400;font-display:block}
     :root{
-      --ink:#232a36;--ink-soft:#3a4453;--ink-faint:#6b7585;
-      --blue:#2f6fe0;--blue-soft:#5a8bea;--blue-faint:#e7eefc;
-      --bg:#f4f6f9;--bg-warm:#eef1f6;--panel:#fff;
-      --silver:#d6dbe3;--silver-light:#e9edf2;--line:#dfe4ec;
-      --green:#1f9d6b;--amber:#d98b1f;
-      --sans:"Geist",system-ui,-apple-system,sans-serif;
-      --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+      --ink:#1a1b1e;--ink-soft:#34372f;--ink-faint:#6a6f68;
+      --blue:#149157;--blue-soft:#3fe081;--blue-faint:#e3f6ea;
+      --bg:#f7f6f1;--bg-warm:#f1f0e8;--panel:#fff;
+      --silver:#d9d6c8;--silver-light:#eceadf;--line:#e7e5db;
+      --green:#13d943;--amber:#d98b1f;
+      --sans:"EB Garamond",Georgia,serif;
+      --display:"Groothan","Anton",sans-serif;
+      --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
       --sidebar-w:284px;
       --shadow:0 1px 2px rgba(35,42,54,.04),0 10px 28px rgba(35,42,54,.06);
       --shadow-lg:0 2px 6px rgba(35,42,54,.06),0 22px 56px rgba(35,42,54,.10);
@@ -424,7 +426,15 @@ defmodule Workbooks.PublicWeb do
     .page-header{padding:3rem 3.2rem 1.6rem;position:relative}
     .page-header .metal{position:absolute;top:0;left:0;width:64px;margin:0}
     .page-eyebrow{font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.7rem}
-    .page-title{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:600;line-height:1.08;letter-spacing:-.03em;color:var(--ink)}
+    .page-title{font-family:var(--display);font-size:clamp(2rem,4.4vw,2.9rem);font-weight:400;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
+    /* cross-site links + copy-as-markdown button in the header */
+    .page-cross{display:flex;align-items:center;gap:1.1rem;margin-bottom:1rem}
+    .page-cross a{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none}
+    .page-cross a:hover{color:var(--blue)}
+    .copy-md{margin-left:auto;display:inline-flex;align-items:center;gap:.45rem;font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.04em;color:var(--ink);background:var(--panel);border:1.5px solid var(--ink);border-radius:8px;padding:.45rem .7rem;cursor:pointer;box-shadow:2px 2px 0 var(--ink);transition:transform .12s,box-shadow .12s}
+    .copy-md:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+    .copy-md:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+    .copy-md.done{background:var(--blue-faint);border-color:var(--blue);color:var(--blue)}
     .page-body{padding:2.2rem 3.2rem 6rem;max-width:792px}
     /* ── typography (body) ── */
     .page-body h2{font-size:1.32rem;font-weight:600;letter-spacing:-.02em;color:var(--ink);margin:clamp(2.6rem,5vh,3.2rem) 0 .8rem;padding-top:clamp(1.8rem,4vh,2.4rem);border-top:1px solid var(--line)}
@@ -481,6 +491,13 @@ defmodule Workbooks.PublicWeb do
     <div class="page-wrap">
       <div class="page-header">
         <div class="metal"></div>
+        <div class="page-cross">
+          <a href="https://workbooks.sh/learn">Learn</a>
+          <a href="https://workbooks.sh/blog">Blog</a>
+          <a href="https://workbooks.sh/toolkits">Toolkits</a>
+          <a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a>
+          <button class="copy-md" id="copyMd" type="button" title="Copy this page as Markdown">⧉ Copy as Markdown</button>
+        </div>
         <p class="page-eyebrow">#{escape(site_title)}</p>
         <h1 class="page-title">#{escape(title)}</h1>
       </div>
@@ -497,6 +514,59 @@ defmodule Workbooks.PublicWeb do
     })();
     function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');}
     document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('sidebar').classList.remove('open')});
+    // ── Copy as Markdown — convert the rendered page body to GFM, clipboard it ──
+    (function(){
+      var btn=document.getElementById('copyMd'); if(!btn) return;
+      function md(el){
+        var out=[];
+        el.childNodes.forEach(function(n){
+          if(n.nodeType===3){ var t=n.textContent.trim(); if(t) out.push(t); return; }
+          if(n.nodeType!==1) return;
+          var tag=n.tagName.toLowerCase(), tx=n.textContent.trim();
+          if(tag==='h1') out.push('# '+tx);
+          else if(tag==='h2') out.push('\\n## '+tx);
+          else if(tag==='h3') out.push('\\n### '+tx);
+          else if(tag==='h4') out.push('\\n#### '+tx);
+          else if(tag==='p') out.push(inline(n));
+          else if(tag==='pre') out.push('\\n```\\n'+tx+'\\n```');
+          else if(tag==='ul') n.querySelectorAll(':scope>li').forEach(function(li){out.push('- '+inline(li))});
+          else if(tag==='ol'){var i=1;n.querySelectorAll(':scope>li').forEach(function(li){out.push((i++)+'. '+inline(li))})}
+          else if(tag==='blockquote') out.push('> '+tx);
+          else if(tag==='table') out.push(table(n));
+          else if(n.querySelector) out.push(md(n));
+        });
+        return out.filter(Boolean).join('\\n');
+      }
+      function inline(n){
+        var s='';
+        n.childNodes.forEach(function(c){
+          if(c.nodeType===3) s+=c.textContent;
+          else if(c.tagName){var t=c.tagName.toLowerCase(),x=c.textContent;
+            if(t==='code') s+='`'+x+'`'; else if(t==='strong'||t==='b') s+='**'+x+'**';
+            else if(t==='em'||t==='i') s+='*'+x+'*';
+            else if(t==='a') s+='['+x+']('+(c.getAttribute('href')||'')+')'; else s+=x;}
+        });
+        return s.trim();
+      }
+      function table(t){
+        var rows=[].slice.call(t.querySelectorAll('tr')), out=[];
+        rows.forEach(function(r,i){
+          var cells=[].slice.call(r.querySelectorAll('th,td')).map(function(c){return c.textContent.trim()});
+          out.push('| '+cells.join(' | ')+' |');
+          if(i===0) out.push('| '+cells.map(function(){return '---'}).join(' | ')+' |');
+        });
+        return '\\n'+out.join('\\n');
+      }
+      btn.addEventListener('click',function(){
+        var body=document.querySelector('.page-body');
+        var title=document.querySelector('.page-title');
+        var text=(title?'# '+title.textContent.trim()+'\\n\\n':'')+md(body);
+        navigator.clipboard.writeText(text).then(function(){
+          btn.classList.add('done'); var o=btn.textContent; btn.textContent='✓ Copied';
+          setTimeout(function(){btn.classList.remove('done');btn.textContent=o},1600);
+        });
+      });
+    })();
     </script>
     <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
