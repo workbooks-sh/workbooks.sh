@@ -527,7 +527,8 @@
     // with a single voice). Lazy-loaded like any dock panel.
     dock.register({
       id: "waldo",
-      title: "Waldo",
+      // No header label — the panel's own toolbar (Chats / New) is the chrome.
+      title: "",
       icon: WaldoMark,
       iconOnly: true,
       load: () => import("$lib/components/WaldoPanel.svelte"),

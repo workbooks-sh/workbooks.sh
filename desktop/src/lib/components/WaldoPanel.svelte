@@ -287,62 +287,12 @@
     text-align: center;
     overflow: hidden;
   }
-  /* A subtle, slow, viscous aura — ambient movement, never abrasive. Brand-tinted
-     blurred blob that morphs + drifts behind the copy. */
-  .aura {
-    position: absolute;
-    top: 28%;
-    width: 200px;
-    height: 200px;
-    border-radius: 42% 58% 56% 44%;
-    background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-brand, var(--color-fg)) 24%, transparent), transparent 68%);
-    filter: blur(30px);
-    opacity: 0.55;
-    pointer-events: none;
-    animation: aura-drift 16s ease-in-out infinite;
-  }
-  @keyframes aura-drift {
-    0%, 100% { border-radius: 42% 58% 56% 44%; transform: translate(-8px, -6px) scale(1) rotate(0deg); }
-    33% { border-radius: 62% 38% 44% 56%; transform: translate(10px, 6px) scale(1.12) rotate(40deg); }
-    66% { border-radius: 45% 55% 62% 38%; transform: translate(-4px, 10px) scale(0.95) rotate(-30deg); }
-  }
-  @media (prefers-reduced-motion: reduce) { .aura { animation: none; } }
-
-  .intro h2 {
-    position: relative;
-    margin: 0;
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--color-fg);
-  }
-  .intro p {
-    position: relative;
-    margin: 0;
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: var(--color-fg-muted);
-    max-width: 32ch;
-  }
   .intro .hint {
     font-family: var(--font-mono);
     font-size: 0.72rem;
     color: var(--color-fg-subtle);
     max-width: 32ch;
   }
-  .powered {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: var(--color-surface-soft);
-    font-size: 0.7rem;
-    color: var(--color-fg-muted);
-  }
-  .powered :global(img) { display: block; }
   .suggestions {
     position: relative;
     display: flex;
