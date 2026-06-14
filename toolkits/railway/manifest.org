@@ -19,9 +19,10 @@
 
   Wrapper around the standard =railway= binary. The Workbooks use case:
   publish a built workbook (=dist/<slug>.html=) as a static site on the
-  *user's own* Railway account. ~wb forge web --to railway~ drives this CLI
-  through =deploy-kit/web/railway.sh=, which stages the artifact behind a
-  generated Caddy image (listens on Railway's =$PORT=) and runs ~railway up~.
+  *user's own* Railway account. Stage the artifact behind a small Caddy image
+  (binds Railway's =$PORT=) and run ~railway up~. (There is no =wb forge web=
+  command — that wrapper and its =deploy-kit/web/railway.sh= recipe were removed
+  with the Rust =wb=, 2026-06-09; the skill gives the raw =railway= flow.)
 
   Auth is railway's own browser login (=railway login=) — the token lives in
   =~/.railway=, never anything Workbooks stores.

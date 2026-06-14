@@ -1,6 +1,6 @@
 # railway
 
-A wrapper around the standard `railway` CLI for one job: publish a built workbook (`dist/<slug>.html`) as a static site on the user's own Railway account. `wb forge web --to railway` drives it through the deploy recipe, staging the artifact behind a generated Caddy image that listens on Railway's `$PORT`, then running `railway up`.
+A wrapper around the standard `railway` CLI for one job: publish a built workbook (`dist/<slug>.html`) as a static site on the user's own Railway account. Stage the artifact behind a small Caddy image that listens on Railway's `$PORT`, then `railway up`.
 
 ## When to reach for it
 
@@ -9,8 +9,10 @@ Reach for `railway` when you want to host a forged workbook as a static site on 
 ## Example
 
 ```
-railway login
-wb forge web --to railway       # stage dist/<slug>.html behind Caddy, railway up
+railway login                                   # browser OAuth, once
+railway init --name <slug>                       # link a project
+mkdir -p site && cp dist/<slug>.html site/index.html   # + a Caddy Dockerfile binding $PORT
+railway up                                       # build the image + deploy
 ```
 
 ## What it grants
