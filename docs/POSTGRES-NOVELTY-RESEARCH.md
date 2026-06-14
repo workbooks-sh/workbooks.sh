@@ -122,3 +122,17 @@ Project all sessions/steps/ledger/autopoet across the fleet into Postgres for **
 Then layer **#2 (Neon branching)** as the high-magic follow-on once real state lives in Postgres, and hold **#3 (substrate-as-backend)** as the platform endgame pending the multi-tenant isolation hardening that economics §3/§8 already flags. **#4** ships for free alongside #1.
 
 **One open dependency gates all of these** (and is independently required by economics §5): the **tenant→DSN registry** — today `WB_DATABASE_URL` is a single process-global in `db.ex`. Build that registry first; it's the keystone for every Postgres direction.
+
+---
+
+## Appendix — Cloudflare Hyperdrive evaluated (2026-06-14): not a Neon substitute
+
+Evaluated using Hyperdrive to consolidate onto one provider (Cloudflare). Verdict: **it does not replace Neon, and does not fit the runtime tier.**
+
+- **Hyperdrive is not a database** — it's a connection pooler + edge query cache that accelerates **Cloudflare Workers → an existing Postgres**. It stores no data and *requires* a backing Postgres (Neon/RDS/PlanetScale/…). "Hyperdrive instead of Neon" is a category error; it'd be Hyperdrive *plus* a Postgres.
+- **No native Cloudflare-managed Postgres** as of 2026-06; CF's managed-PG play is a **PlanetScale partnership** (CF-dashboard provisioning, CF-billed). "One provider" = CF-billing-wrapping-PlanetScale, not a single engine.
+- **Doesn't fit our runtime:** the nexus is BEAM/Elixir on Fly using **Postgrex with a long-lived pool over the standard wire protocol** — not a Worker, and already pooled. Hyperdrive solves the serverless connection-storm problem we don't have; inserting it adds a Fly→CF→Neon hop, not a saved provider.
+- **Where it *does* fit:** the **user-app/Workers tier** — when a customer's own app runs on CF Workers (per the Cloudflare-vendoring plan) and needs Postgres, Hyperdrive is the right accelerator for *their* Worker→Postgres path. File it there, not here.
+- **The only true consolidation** (PlanetScale-via-CF instead of Neon) likely **loses scale-to-zero** — the exact feature that made Neon win §5 (idle tenant DB floors to storage-only ~$0.35–0.70/mo vs a fixed always-on charge). For a sleepy multi-tenant fleet that breaks the idle economics; one fewer vendor isn't worth a structurally higher floor. *(PlanetScale scale-to-zero status: verify before any reconsideration.)*
+
+**Decision: Neon stays the nexus DB engine (direct Postgrex from Fly, no Hyperdrive). Hyperdrive is a user-app/Workers-tier tool.**
