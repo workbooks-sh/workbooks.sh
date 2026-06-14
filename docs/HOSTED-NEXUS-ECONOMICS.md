@@ -1,12 +1,21 @@
 # Nexus Economics: Synthesis Report
 
-*Hosted container-per-tenant "nexus" model. Date: 2026-06-14. All host prices as-of the same date; flag where they drift.*
+*Hosted container-per-tenant "nexus" model. Date: 2026-06-14. All host prices as-of the same date; flag where they drift. **Fly pricing re-verified 2026-06-14 against `fly.io/docs/about/pricing`** — shared-cpu-1x $2.02/$3.32/$5.92/$11.11 per mo (256MB/512MB/1GB/2GB), stopped = $0 CPU/RAM + $0.15/GB-mo rootfs, volumes $0.15/GB-mo (billed when stopped), egress $0.02/GB NA·EU — all confirmed accurate.*
 
 ---
 
 ## 1. Nexus sizing & trim plan
 
-### Current size breakdown (uncompressed, on-disk, measured)
+### Measured shipped image (2026-06-14, from the registry manifests)
+
+- **`ghcr.io/workbooks-sh/runtime:latest` — 329 MB compressed** (largest layer ~104 MB = the compiler toolchain). This is the actual hosted-nexus image. Uncompressed rootfs ≈ ~0.85 GB — that is the figure Fly's `$0.15/GB` parked-storage charge bills against; the 329 MB compressed drives registry storage + cold-start pull bandwidth.
+- `bn-engine-agents` (brandnana engine variant already deployed on Fly) — 238 MB compressed.
+
+**Cost reading:** at ~0.85 GB rootfs, parked storage ≈ **~$0.13/tenant/mo** — a rounding error next to the ~$1.30–1.75 compute floor (§2). Image size is far more a **cold-start-speed** lever than a cost lever.
+
+### Local working-tree size breakdown (uncompressed `du` — NOT the shipped image)
+
+> ⚠️ The figures below are on-disk `du` of the dev working tree (accumulated compile caches + the provisioned toolchain scratch). They rank trim *levers* but are **not what ships** — the clean CI image is the 329 MB measured above. An earlier draft's "~1.3–1.5 GB image" / "−766 MB saved" framing conflated this local `du` with the image size; corrected here.
 
 | Component | Size | Per-tenant? | Trimmable? |
 |---|---|---|---|
@@ -27,7 +36,7 @@
 ### Ranked trim levers (biggest first)
 
 1. **Externalize the compiler toolchain → shared build service: −614 MB.** The toolchain is *already* a standalone OCI layer (`ci/Dockerfile.compilers` → `ghcr.io/workbooks-sh/compilers`) but is still `COPY --from=compilers` into the runtime image. Running a compiled `.wasm` needs only **wasmtime**, never the compilers. Pull it out of the per-tenant image and run **one shared compiler/build service per node or per cluster** that emits content-addressed `.wasm` artifacts.
-2. **Stop the build/commands scratch leak: −~421 MB, zero functional change.** `.dockerignore` excludes `build/cache` but not `build/commands`. Add `build/commands/*.wasm` (keep jq/grep) + `build/commands/*.d`; the engine regenerates the store on demand exactly like `build/cache`. **This is free money — do it today.**
+2. **Exclude `build/cache` + `build/commands` scratch from the build context (defensive hygiene). DONE — root `.dockerignore` scope, commit `7e083d80`.** The dev working tree accumulates a big compile cache (~766 MB on this box) and `COPY runtime/ .` + `COPY --from=build /app/build ./build` *would* carry it in if present — but a clean CI build starts with an empty cache, so the **measured 329 MB image was not actually carrying it.** This is leak-prevention (and matters for local deploy-kit builds), **not** a ~400 MB production cut. Keep it; don't overstate it.
 3. **Prune zig lib/libc to wasm32-wasi only: −~120–150 MB** *(medium-confidence; needs a build smoke test — the wasi driver may lazily reference other-target libc).* Only relevant if the toolchain stays node-local rather than fully externalized.
 4. **Audit rust/mrustc build tree: up to −~80 MB** of C++ source/intermediates beyond the libstd link objects the linker needs *(medium-confidence)*.
 5. **Lazy-fetch the potion embedder: −30 MB.** Noted per instruction — small relative to the above. Move to a shared volume only after the big wins land. Heavy CLIP path is already opt-in (`WB_CLIP=1`), correctly excluded.
@@ -47,7 +56,7 @@ The clean seam already exists: `BuildBroker` compiles **entirely in-sandbox, no-
 
 ### Target slimmed size
 
-Drop 614 MB (compilers) + ~421 MB (scratch) from ~1.3–1.5 GB → **~0.7–0.9 GB uncompressed, roughly halved.** This directly raises tenants-per-node and cuts cold-start image page-in. *Compressed registry-pull size (what actually drives cold-start/storage cost) was not measured — see §7.*
+**Measured baseline: 329 MB compressed / ~0.85 GB uncompressed rootfs.** The only large *shipped* lever left is externalizing the compiler toolchain (~104 MB compressed / 614 MB uncompressed) → takes the image to ~225 MB compressed / ~0.24 GB rootfs, cutting Fly parked storage from ~$0.13 to ~$0.04/tenant/mo and roughly halving cold-start page-in. The scratch and embed-model trims are hygiene/marginal against the *measured* image (their GB-scale deltas were local `du`, never in the shipped image). Net: image size is a cold-start-speed win, not a material cost lever — see §2.
 
 ---
 
