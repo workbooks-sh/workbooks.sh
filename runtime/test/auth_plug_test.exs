@@ -144,4 +144,29 @@ defmodule AuthPlugTest do
     conn = conn_for("/api/run", [{"x-tenant", "t-x"}]) |> call()
     assert conn.assigns[:tenant] == "t-x"
   end
+
+  # Multi-tenant WITHOUT a lock: isolation can never rest on a spoofable header,
+  # so a credential-less request 401s rather than falling to the x-tenant dev path.
+  # This is the branch that keeps a multi-tenant deploy (WB_TENANCY_MODE=multi)
+  # safe even if the operator forgot to set WB_PUBLIC_BEARER (wb-oom).
+  test "multi-tenant, no lock: no bearer returns 401 (NO dev fallback)" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.put_env("WB_TENANCY_MODE", "multi")
+
+    conn = conn_for("/api/run") |> call()
+
+    assert conn.status == 401
+    assert conn.halted
+  end
+
+  test "multi-tenant, no lock: x-tenant header alone grants NOTHING (no tokenless impersonation)" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.put_env("WB_TENANCY_MODE", "multi")
+
+    conn = conn_for("/api/run", [{"x-tenant", "victim-org"}]) |> call()
+
+    assert conn.status == 401
+    assert conn.halted
+    refute conn.assigns[:tenant] == "victim-org"
+  end
 end

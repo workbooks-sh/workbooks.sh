@@ -71,6 +71,8 @@ defmodule Workbooks.Deploy.Config do
         "TENANCY_MODE: multi on DATABASE: sqlite serializes every tenant through one writer — set DATABASE: postgres")
       |> add_if(tenancy == "multi" and auth == "trusted",
         "TENANCY_MODE: multi needs real AUTH (betterauth|clerk|oidc) — `trusted` has no identity to isolate tenants by")
+      |> add_if(place == "cloud" and auth == "trusted" and env_blank?("WB_PUBLIC_BEARER"),
+        "ENGINE_PLACE: cloud with AUTH: trusted is an OPEN control plane — anyone could spend (/api/run, /rcp/*) via a spoofable x-tenant header. Lock it: set WB_PUBLIC_BEARER in your deploy ENV (a shared secret), or use a real AUTH (betterauth|clerk|oidc) with TENANCY_MODE: multi")
       |> add_if(auth != "trusted" and blank?(p["ISSUER"]),
         "AUTH: #{auth} needs an ISSUER (the token issuer / JWKS origin)")
       |> add_if(storage == "s3" and (blank?(p["STORAGE_BUCKET"]) or blank?(p["STORAGE_ENDPOINT"])),
