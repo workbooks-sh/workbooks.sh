@@ -20,10 +20,10 @@
   Wrapper around the Tauri v2 CLI (=cargo tauri= or =npx @tauri-apps/cli=).
   The Workbooks use case is a *thin shell*: a Tauri webview pointing at a
   prebuilt single-file workbook (=dist/<slug>.html=) — no engine, no Node at
-  runtime, no IPC commands. ~wb forge desktop~ drives this CLI through the
-  recipes in =deploy-kit/desktop/=, generating a throwaway Tauri project,
-  building it, and discarding the scaffold (nothing is vendored into the
-  workbook).
+  runtime, no IPC commands. Scaffold a Tauri project whose =frontendDist= points
+  at the workbook (as =index.html=), then =cargo tauri build=. (There is no
+  =wb forge desktop= command — that wrapper and its =deploy-kit/desktop/= recipes
+  were removed with the Rust =wb=, 2026-06-09; build with the real Tauri CLI.)
 
   Skills here cover the part agents get wrong: *code signing + notarization*,
   the gate between "builds on my machine" and "I can share it." =cargo tauri

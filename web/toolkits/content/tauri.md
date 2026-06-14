@@ -1,6 +1,6 @@
 # tauri
 
-Wrap a compiled workbook `.html` as a thin-shell native desktop app with Tauri v2. The Workbooks use case is a thin shell: a Tauri webview pointing at a prebuilt single-file workbook (`dist/<slug>.html`) — no engine, no Node at runtime, no IPC commands. `wb forge desktop` drives the CLI through the deploy recipes, scaffolding a throwaway Tauri project, building it, and discarding the scaffold.
+Wrap a compiled workbook `.html` as a thin-shell native desktop app with Tauri v2. The Workbooks use case is a thin shell: a Tauri webview pointing at a prebuilt single-file workbook (`dist/<slug>.html`) — no engine, no Node at runtime, no IPC commands. Scaffold a Tauri project whose `frontendDist` points at the workbook, then `cargo tauri build`.
 
 ## When to reach for it
 
@@ -9,7 +9,8 @@ Reach for `tauri` when a workbook should ship as a native desktop app for macOS 
 ## Example
 
 ```
-wb forge desktop                    # scaffold a thin Tauri shell around dist/<slug>.html
+# scaffold a Tauri project, point frontendDist at dist/<slug>.html, then:
+cargo tauri build                   # native installer in src-tauri/target/release/bundle/
 # then sign + notarize so it's shareable (see the code-signing skill)
 ```
 
