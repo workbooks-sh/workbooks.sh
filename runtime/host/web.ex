@@ -108,7 +108,7 @@ defmodule Workbooks.Web do
 
   # Web search for the desktop browser's composable-search "Web" provider
   # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
-  # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)
+  # Browse.Search (keyless ddg/brave/bing — no SERP keys, no paid API)
   # and returns [{title,url,snippet}]. GET so the browser's fetch is trivial.
   get "/api/browse/search" do
     q = conn.params["q"] || ""

@@ -542,10 +542,10 @@ defmodule Workbooks.Agent do
   def format_search_results_for_test(hits), do: format_search_results(hits)
 
   # An EMPTY result is ambiguous: it can mean "nothing matched" OR "the search
-  # backend was unavailable from this host" (keyless engines are captcha-blocked
-  # from datacenter IPs; only DataForSEO is reliable there). Say so, so the agent
-  # doesn't conclude a topic is empty when search merely failed — the exact
-  # mislabel the file_issue seam exists to catch.
+  # backend was unavailable from this host" (the keyless engines ddg/brave/bing
+  # are captcha-blocked from datacenter IPs, so they can return empty on a cloud
+  # box). Say so, so the agent doesn't conclude a topic is empty when search
+  # merely failed — the exact mislabel the file_issue seam exists to catch.
   defp format_search_results([]) do
     "no results — NOTE: this can mean the search backend was unavailable from this " <>
       "host, not only that nothing matched. Don't conclude the topic is empty; " <>

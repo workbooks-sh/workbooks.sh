@@ -16,23 +16,7 @@ defmodule Workbooks.Browse.Search do
   @doc "Search `query` across engines (first non-empty wins). Opts: `:limit`, `:engine`."
   @spec query(String.t(), keyword()) :: [%{title: String.t(), url: String.t(), snippet: String.t() | nil}]
   def query(q, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 8)
-    engine_opt = Keyword.get(opts, :engine)
-
-    # DataForSEO first when credentialed (and no engine was forced): the keyless
-    # scrape engines (ddg/brave/bing) return EMPTY from datacenter IPs — they
-    # serve captchas to non-residential traffic, so on a fly box `web_search`
-    # silently finds nothing (this stranded the lander even with a strong model).
-    # DataForSEO is a real SERP API that works from a datacenter and $DATAFORSEO_AUTH
-    # is already on the box; it is POST-only (the host does it; the agent's
-    # GET-only fetch could not). Falls through to the scrape engines on absence/error.
-    with nil <- engine_opt,
-         auth when is_binary(auth) and auth != "" <- System.get_env("DATAFORSEO_AUTH"),
-         [_ | _] = hits <- serp_dataforseo(q, auth, limit) do
-      hits
-    else
-      _ -> query_scrape(q, limit, engine_opt)
-    end
+    query_scrape(q, Keyword.get(opts, :limit, 8), Keyword.get(opts, :engine))
   end
 
   defp query_scrape(q, limit, engine_opt) do
@@ -51,43 +35,6 @@ defmodule Workbooks.Browse.Search do
           {:cont, []}
       end
     end)
-  end
-
-  # ── DataForSEO SERP (POST, basic auth; works from datacenter IPs) ────────────
-  # $DATAFORSEO_AUTH is the base64 of "login:password" already → "Basic <auth>".
-  defp serp_dataforseo(q, auth, limit) do
-    body =
-      Jason.encode!([
-        %{keyword: q, location_code: 2840, language_code: "en", depth: max(limit, 10)}
-      ])
-
-    headers = [
-      {~c"authorization", ~c"Basic #{auth}"},
-      {~c"content-type", ~c"application/json"}
-    ]
-
-    url = ~c"https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
-
-    case :httpc.request(:post, {url, headers, ~c"application/json", body}, [timeout: 30_000], body_format: :binary) do
-      {:ok, {{_, 200, _}, _, resp}} -> parse_dataforseo(resp, limit)
-      _ -> []
-    end
-  rescue
-    _ -> []
-  end
-
-  defp parse_dataforseo(resp, limit) do
-    with {:ok, %{"tasks" => [%{"result" => [%{"items" => items} | _]} | _]}} <- Jason.decode(resp) do
-      items
-      |> Enum.filter(&(&1["type"] == "organic"))
-      |> Enum.map(fn it ->
-        %{title: it["title"] || "", url: it["url"] || "", snippet: it["description"]}
-      end)
-      |> Enum.reject(&(&1.url == ""))
-      |> Enum.take(limit)
-    else
-      _ -> []
-    end
   end
 
   # ── SERP fetch ──────────────────────────────────────────────────────────────

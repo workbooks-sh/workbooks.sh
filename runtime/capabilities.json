@@ -125,13 +125,13 @@
           "failure_modes": []
         },
         {
-          "name": "web_search honest empty (failure-vs-empty disambiguation)",
+          "name": "web_search \u2014 keyless (ddg/brave/bing), honest empty",
           "status": "done",
           "tests": "web_search_format_test",
           "units": 2,
-          "proof": "empty result signals possible backend-unavailable + nudges file_issue",
+          "proof": "DataForSEO removed (security/cost; was Brandnana's); empty result signals possible backend-unavailable + nudges file_issue",
           "failure_modes": [
-            "query() still folds DataForSEO-error into empty; richer source signal not yet exposed"
+            "keyless scrape returns empty from datacenter IPs \u2014 real fix is a headless browser tier (kernel-browser-infra), not a SERP API"
           ]
         }
       ]
