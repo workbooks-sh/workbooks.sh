@@ -103,6 +103,24 @@ defmodule Workbooks.AgentLoopTest do
     assert r.result == "recovered after the bad tool"
   end
 
+  test "a tool that RAISES becomes a clean error — the run survives and recovers" do
+    # `wb model "get` makes OptionParser.split raise inside exec_one; the run must
+    # NOT crash via the linked Task — it gets a tool-error and the agent answers.
+    r =
+      run(
+        scripted([
+          {:ok,
+           %{
+             tool_calls: [%{name: "wb", args: %{"args" => ~s(model "get)}, id: "raise1"}],
+             raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+           }},
+          {:ok, %{tool_calls: [], content: "handled the broken command"}}
+        ])
+      )
+
+    assert r.result == "handled the broken command"
+  end
+
   test "a hard dead-stop (empty even after the nudge) degrades to '(no result)', no infinite loop" do
     responses = [
       {:ok,

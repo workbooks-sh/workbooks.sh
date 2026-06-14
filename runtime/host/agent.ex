@@ -257,7 +257,19 @@ defmodule Workbooks.Agent do
   # network, a host-brokered git push — surfaces as a tool error the model can
   # react to, never a stalled run.
   defp exec_bounded(call, st) do
-    task = Task.async(fn -> exec_one(call, st) end)
+    # A tool that RAISES (e.g. `wb model "get` → OptionParser.split unbalanced
+    # quote) must become a clean tool-error the agent can react to — never crash
+    # the whole run via the linked Task. Catch exceptions + non-local exits here.
+    task =
+      Task.async(fn ->
+        try do
+          exec_one(call, st)
+        rescue
+          e -> {"tool error: #{call.name} raised — #{Exception.message(e)}", Map.put(st, :last, %{error: Exception.message(e)}), nil}
+        catch
+          kind, reason -> {"tool error: #{call.name} #{kind} — #{inspect(reason)}", Map.put(st, :last, %{error: inspect(reason)}), nil}
+        end
+      end)
 
     case Task.yield(task, 150_000) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} ->
