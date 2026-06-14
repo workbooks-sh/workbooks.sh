@@ -55,6 +55,115 @@ defmodule Workbooks.Deploy do
     :END:
   """
 
+  # ── CI scaffolds (wb-6ttc) ──────────────────────────────────────────────────
+  # `wb deploy ci <provider>` writes one of these so DeployKit is git-workflow-
+  # native: validate on PRs, apply+verify on main, all from deployment.org.
+  # Secrets stay in the CI provider's secret store, never in the file.
+
+  @ci_github """
+  # .github/workflows/deploy.yml — scaffolded by `wb deploy ci github`.
+  # Reconciles your nexus/runtime from deployment.org: validate on PRs,
+  # apply + verify on push to main. Put secrets in repo Settings → Secrets and
+  # variables → Actions (never in deployment.org).
+  name: deploy
+  on:
+    push:
+      branches: [main]
+    pull_request:
+  concurrency:
+    group: deploy-${{ github.ref }}
+    cancel-in-progress: false
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Install the wb CLI
+          run: curl -fsSL https://workbooks.sh/cli.sh | sh
+        - name: Validate deployment.org
+          run: wb deploy validate
+        - name: Apply + verify (main only)
+          if: github.ref == 'refs/heads/main'
+          env:
+            # Map the secrets your deployment.org references, from GitHub secrets:
+            WB_IMAGE: ${{ secrets.WB_IMAGE }}
+            WB_S3_KEY: ${{ secrets.WB_S3_KEY }}
+            WB_S3_SECRET: ${{ secrets.WB_S3_SECRET }}
+            WB_DATABASE_URL: ${{ secrets.WB_DATABASE_URL }}
+          run: |
+            wb deploy apply
+            wb deploy verify
+  """
+
+  @ci_gitlab """
+  # .gitlab-ci.yml — scaffolded by `wb deploy ci gitlab`.
+  # Secrets live in GitLab → Settings → CI/CD → Variables (never in deployment.org).
+  stages: [validate, deploy]
+  default:
+    image: ubuntu:24.04
+    before_script:
+      - curl -fsSL https://workbooks.sh/cli.sh | sh
+  validate:
+    stage: validate
+    script:
+      - wb deploy validate
+  deploy:
+    stage: deploy
+    rules:
+      - if: $CI_COMMIT_BRANCH == "main"
+    script:
+      - wb deploy apply
+      - wb deploy verify
+  """
+
+  @ci_generic """
+  #!/usr/bin/env sh
+  # deploy-ci.sh — scaffolded by `wb deploy ci generic`. Portable across any CI.
+  # Validates always; applies + verifies on the main branch. Secrets come from
+  # the CI's environment (the same vars your deployment.org references).
+  set -eu
+  command -v wb >/dev/null 2>&1 || curl -fsSL https://workbooks.sh/cli.sh | sh
+  wb deploy validate
+  BRANCH="${CI_COMMIT_BRANCH:-${GITHUB_REF_NAME:-${BRANCH_NAME:-}}}"
+  if [ "$BRANCH" = "main" ]; then
+    wb deploy apply
+    wb deploy verify
+  fi
+  """
+
+  @doc """
+  Scaffold CI that reconciles deployment.org on push — `github` | `gitlab` |
+  `generic`. The DeployKit analogue of a git workflow: commit the file and every
+  push validates (PRs) and applies+verifies (main) your nexus/runtime.
+  """
+  def ci(provider \\ "github", opts \\ []) do
+    force? = Keyword.get(opts, :force, false)
+
+    case ci_spec(provider) do
+      nil ->
+        err("unknown CI provider '#{provider}' — try: github | gitlab | generic", %{providers: ~w(github gitlab generic)})
+
+      {path, body} ->
+        if File.exists?(path) and not force? do
+          err("#{path} already exists — edit it, or `wb deploy ci #{provider} --force` to replace it", %{file: path})
+        else
+          File.mkdir_p!(Path.dirname(path))
+          File.write!(path, body)
+          if provider == "generic", do: File.chmod(path, 0o755)
+
+          ok(
+            "wrote #{path} — commit it. CI now runs `wb deploy validate` on PRs and `apply`+`verify` on main. Set the secrets your deployment.org references in your CI provider.",
+            %{file: path, provider: provider}
+          )
+        end
+    end
+  end
+
+  defp ci_spec("github"), do: {".github/workflows/deploy.yml", @ci_github}
+  defp ci_spec("gitlab"), do: {".gitlab-ci.yml", @ci_gitlab}
+  defp ci_spec("generic"), do: {"deploy-ci.sh", @ci_generic}
+  defp ci_spec(_), do: nil
+
   @doc "Scaffold a deployment.org from a preset (`local` | `cloud`). The starting point."
   def init(preset \\ "local", opts \\ []) do
     file = Keyword.get(opts, :file, @default_file)

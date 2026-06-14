@@ -352,6 +352,8 @@ defmodule Workbooks.CLI do
         # The declarative model: scaffold → edit → validate → apply. The file
         # defaults to ./deployment.org, so most commands take no argument.
         ["init" | rest] -> Workbooks.Deploy.init(preset_arg(rest), force: "--force" in rest)
+        # Scaffold CI that reconciles deployment.org on push (github|gitlab|generic).
+        ["ci" | rest] -> Workbooks.Deploy.ci(ci_provider_arg(rest), force: "--force" in rest)
         ["validate" | rest] -> Workbooks.Deploy.validate(file_arg(rest))
         ["apply" | rest] -> Workbooks.Deploy.apply(file_arg(rest))
         # Quick zero-config local run (no file — like `docker run`).
@@ -444,6 +446,7 @@ defmodule Workbooks.CLI do
 
   # File arg helpers — the deployment.org defaults to ./deployment.org.
   defp preset_arg(rest), do: Enum.find(rest, "local", &(not String.starts_with?(&1, "-")))
+  defp ci_provider_arg(rest), do: Enum.find(rest, "github", &(not String.starts_with?(&1, "-")))
   defp file_arg(rest), do: Enum.find(rest, "deployment.org", &(not String.starts_with?(&1, "-")))
 
   defp file_opt(rest) do
@@ -460,6 +463,7 @@ defmodule Workbooks.CLI do
 
     THE FLOW (declarative — reproducible):
       wbx deploy init [local|cloud]   scaffold ./deployment.org
+      wbx deploy ci [github|gitlab|generic]   scaffold CI that reconciles it on push
       wbx deploy validate             coherence-check it (no deploy)
       wbx deploy apply                deploy it — local microVM OR the cloud provider
       wbx deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.org)
