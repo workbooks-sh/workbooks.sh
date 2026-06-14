@@ -25,6 +25,26 @@
   globalThis.__wbStdout = __stdout; // host reads this back after run
   globalThis.__wbStderr = __stderr;
 
+  // ---- console capture --------------------------------------------------------------------------
+  // SM has stdio DISABLED, so a Node script's console.log/error would otherwise vanish. Route them
+  // into the same buffers process.stdout/stderr use (Node sends log/info/debug→stdout, warn/error→
+  // stderr), each call ending in a newline (Node's behaviour). Args are space-joined, objects JSON'd.
+  function __fmt(a) {
+    return Array.prototype.map.call(a, function (x) {
+      if (typeof x === "string") return x;
+      try { return typeof x === "object" && x !== null ? JSON.stringify(x) : String(x); }
+      catch (_) { return String(x); }
+    }).join(" ");
+  }
+  globalThis.console = {
+    log: function () { __stdout.push(__fmt(arguments) + "\n"); },
+    info: function () { __stdout.push(__fmt(arguments) + "\n"); },
+    debug: function () { __stdout.push(__fmt(arguments) + "\n"); },
+    warn: function () { __stderr.push(__fmt(arguments) + "\n"); },
+    error: function () { __stderr.push(__fmt(arguments) + "\n"); },
+    trace: function () { __stderr.push(__fmt(arguments) + "\n"); }
+  };
+
   // ---- process (host-injectable) ---------------------------------------------------------------
   var process = {
     env: boot.env || {},
@@ -170,6 +190,10 @@
   globalThis.global = globalThis;
   if (typeof globalThis.__filename === "undefined") globalThis.__filename = "/script.js";
   if (typeof globalThis.__dirname === "undefined") globalThis.__dirname = "/";
+
+  // Exec seam (SLICE 1): when the host granted exec, expose { url, token } so the SM-lane child_process
+  // shim can fetch() the ExecLoopback sentinel. Absent => the shim throws "exec capability unavailable".
+  if (boot.exec) globalThis.__wbExec = boot.exec;
 
   // timers shim self-installs setTimeout/queueMicrotask globals when required; SM already has them.
   delete globalThis.__wbNode;

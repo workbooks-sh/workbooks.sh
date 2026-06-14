@@ -359,6 +359,79 @@ fn urldecode(s: &str) -> String {
     String::from_utf8_lossy(&out).to_string()
 }
 
+// ── Harness OAuth loopback (SLICE 3, wb-b9xv.7) ─────────────────────────────────────────────────
+//
+// `dock.oauth.loopback` — the GENERALIZATION of `workos_sign_in` into a provider-agnostic, PKCE-LESS
+// primitive the in-wasm harness drives. The runtime relays the harness's request here over the desktop
+// bridge; this opens the USER'S OWN BROWSER (their session, their IP — the BYO/no-pool core) to the
+// harness-supplied authorize URL, captures the loopback `?code=`, and returns it.
+//
+// REUSED VERBATIM from workos_sign_in: the tiny_http 127.0.0.1:0 bind, the ephemeral-port read, the
+// `open::that(authorize)`, and the single-request `server.recv()` for the redirect.
+// DELETED vs workos_sign_in (the two map-mandated changes):
+//   1. PKCE — no `pkce()` call here. The HARNESS makes the verifier + S256 challenge in WebCrypto and
+//      sends only the CHALLENGE, so the verifier NEVER crosses the membrane. We just substitute the real
+//      redirect_uri and forward the harness's `code_challenge`.
+//   2. TOKEN EXCHANGE — no POST /v1/auth/exchange, no StoredSession parse. We END at returning the code;
+//      the token exchange (and refresh) is the harness's own fetch through NetGuard (path c), so the
+//      bearer is direct user→provider and this command stays provider-neutral.
+#[derive(Deserialize)]
+pub struct HarnessOauthParams {
+    pub authorize_base: String,
+    pub code_challenge: String,
+    pub client_id: Option<String>,
+    pub scope: Option<String>,
+    pub state: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct HarnessOauthResult {
+    pub code: String,
+    pub redirect_uri: String,
+}
+
+#[tauri::command]
+pub fn harness_oauth_loopback(params: HarnessOauthParams) -> Result<HarnessOauthResult, String> {
+    let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = match server.server_addr() {
+        tiny_http::ListenAddr::IP(addr) => addr.port(),
+        _ => return Err("could not bind loopback".into()),
+    };
+    let redirect = format!("http://127.0.0.1:{port}/cb");
+
+    // Build the authorize URL: harness-supplied base + challenge, host-substituted redirect_uri. No PKCE
+    // verifier is generated or held here — only the challenge the harness already computed.
+    let mut authorize = format!(
+        "{}{}response_type=code&redirect_uri={}&code_challenge={}&code_challenge_method=S256",
+        params.authorize_base,
+        if params.authorize_base.contains('?') { "&" } else { "?" },
+        urlencode(&redirect),
+        urlencode(&params.code_challenge),
+    );
+    if let Some(cid) = &params.client_id {
+        authorize.push_str(&format!("&client_id={}", urlencode(cid)));
+    }
+    if let Some(scope) = &params.scope {
+        authorize.push_str(&format!("&scope={}", urlencode(scope)));
+    }
+    if let Some(state) = &params.state {
+        authorize.push_str(&format!("&state={}", urlencode(state)));
+    }
+
+    open::that(&authorize).map_err(|e| e.to_string())?;
+
+    // Block for the single redirect carrying ?code=… (the user's browser hits our loopback).
+    let request = server.recv().map_err(|e| e.to_string())?;
+    let url = request.url().to_string();
+    let code = parse_query(&url, "code").ok_or("no authorization code in callback")?;
+    let _ = request.respond(tiny_http::Response::from_string(
+        "<html><body>You're signed in. You can close this tab.</body></html>",
+    ));
+
+    // END HERE — no token exchange. The harness exchanges `code` (+ its private verifier) itself.
+    Ok(HarnessOauthResult { code, redirect_uri: redirect })
+}
+
 // Silence unused-import warning when no target uses Read directly.
 #[allow(dead_code)]
 fn _touch_read(mut r: impl Read) {

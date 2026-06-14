@@ -643,6 +643,45 @@ impl WasiHttpView for ComponentStoreData {
         let is_https = uri.scheme_str() == Some("https");
         let port = uri.port_u16().unwrap_or(if is_https { 443 } else { 80 });
 
+        // wb-broker EXEC sentinel (SLICE 1, wb-b9xv.9): a SINGLE recognized internal hostname,
+        // "wb-exec.internal", is the privileged loopback route to the in-process ExecLoopback listener
+        // (which bottoms out in ExecBroker — default-deny, registered-only, token-gated). This is the ONE
+        // fixed internal URL the WasiHttpView pins past the public-only SSRF floor — NOT a NetGuard
+        // allow-list hole and NOT a general loopback opening (any OTHER internal/loopback host still
+        // resolves through wb_resolve_pinned below and is denied). Pin straight to 127.0.0.1 on the
+        // configured loopback port; the request is plain HTTP and falls through to the authority rewrite.
+        // FIX 2 (POSTURE GAP — sentinel scope): the sentinel pin must RESPECT the per-instance egress scope.
+        // Previously this early-returned for EVERY instance, BEFORE the net_allow check below — so even a
+        // guest with a restrictive egress allow-list (that did NOT include the exec sentinel) could reach the
+        // privileged loopback. Now the pin resolves ONLY for an instance whose egress scope permits it: an
+        // UNRESTRICTED instance (net_allow None/empty — the harness/exec grant) OR one whose allow-list
+        // explicitly carries "wb-exec.internal". A restrictive-egress guest falls through to wb_resolve_pinned,
+        // where 127.0.0.1 is internal and the SSRF floor denies it. (NOTE: editing the vendored wasmex NIF —
+        // the wasmex Rust NIF must be REBUILT for this to take effect at runtime; the Elixir-side posture gate
+        // in Workbooks.Application holds regardless and is the primary control.)
+        let exec_sentinel_allowed = match &self.net_allow {
+            None => true,
+            Some(list) if list.is_empty() => true,
+            Some(list) => wb_host_in_allowlist("wb-exec.internal", port, list),
+        };
+        if host == "wb-exec.internal" && exec_sentinel_allowed {
+            let pinned = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+            let mut request = request;
+            if let Ok(hv) = hyper::header::HeaderValue::from_str(&format!("{}:{}", host, port)) {
+                request.headers_mut().insert(hyper::header::HOST, hv);
+            }
+            let auth_str = format!("127.0.0.1:{}", port);
+            if let Ok(authority) = auth_str.parse::<hyper::http::uri::Authority>() {
+                let mut parts = request.uri().clone().into_parts();
+                parts.authority = Some(authority);
+                if let Ok(new_uri) = hyper::Uri::from_parts(parts) {
+                    *request.uri_mut() = new_uri;
+                }
+            }
+            let _ = pinned;
+            return Ok(default_send_request(request, config));
+        }
+
         // Resolve ONCE + SSRF floor: deny if unresolvable or any resolved IP is internal; keep the pinned IP.
         let pinned = match wb_resolve_pinned(&host, port) {
             Some(ip) => ip,

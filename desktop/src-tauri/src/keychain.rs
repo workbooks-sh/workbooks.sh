@@ -594,3 +594,46 @@ pub fn connections_delete(id: String) -> Result<(), String> {
 pub fn connections_reveal_api_key(service: String) -> Result<String, String> {
     kc_get(SVC_CONN, &service)
 }
+
+// ── Harness subscription-creds store (SLICE 3, wb-b9xv.7) ──────────────────────────────────────
+//
+// The host half of `dock.creds.{get,put}` for the in-wasm harness. The harness owns its OWN OAuth
+// state machine and writes an opaque creds bundle (e.g. ~/.claude/.credentials.json contents); the SM
+// node-shim intercepts that store read/write and maps it onto these commands, so the harness's own store
+// hits the desktop credential store instead of the KV-VFS.
+//
+// DESKTOP-FIRST + BYO + NO-POOL: the value is the USER'S subscription token. It is stored verbatim
+// (never parsed), scoped per-(user, provider), and lives ONLY in the user's trust domain. It is never
+// pooled/proxied and never registered as one of our platform secrets (that is the separate API-key path).
+// Per-provider service names (`sh.workbooks.harness.<provider>`) parallel SVC_CONN and reduce repeat
+// keychain prompts (risk #6). Backed by the SAME kc_set/kc_get/kc_delete as connections (the 0600 file
+// store today, wb-2s09; a future pass swaps in the OS keychain once it stops prompting on every read).
+const SVC_HARNESS_PREFIX: &str = "sh.workbooks.harness.";
+
+fn harness_service(provider: &str) -> String {
+    format!("{SVC_HARNESS_PREFIX}{provider}")
+}
+
+/// Read the opaque creds blob for (user, provider). Returns the blob string, or
+/// `None` when nothing is stored yet (first sign-in). The runtime calls this over
+/// the desktop bridge; account = the user id so one user's blob is never another's.
+#[tauri::command]
+pub fn harness_creds_get(user: String, provider: String) -> Result<Option<String>, String> {
+    match kc_get(&harness_service(&provider), &user) {
+        Ok(v) => Ok(Some(v)),
+        Err(_) => Ok(None),
+    }
+}
+
+/// Store the opaque creds blob for (user, provider), overwriting any prior. The
+/// blob is written verbatim — never parsed/decoded; it is the user's subscription token.
+#[tauri::command]
+pub fn harness_creds_put(user: String, provider: String, blob: String) -> Result<(), String> {
+    kc_set(&harness_service(&provider), &user, &blob)
+}
+
+/// Delete the blob for (user, provider) (sign-out).
+#[tauri::command]
+pub fn harness_creds_delete(user: String, provider: String) -> Result<(), String> {
+    kc_delete(&harness_service(&provider), &user)
+}
