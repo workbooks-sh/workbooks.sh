@@ -310,7 +310,8 @@ defmodule Workbooks.Web do
   # Session list + navigation (wb-kbq5 / wb-t3mr): the desktop browses past
   # conversations here. ?active=true narrows to running. Empty until a chat runs.
   get "/api/sessions" do
-    active_only? = conn.params["active"] == "true"
+    conn = fetch_query_params(conn)
+    active_only? = conn.query_params["active"] == "true"
     sessions = Workbooks.SessionLedger.list(active_only?)
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{sessions: sessions}))
   end
@@ -327,6 +328,34 @@ defmodule Workbooks.Web do
     }
 
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(about))
+  end
+
+  # Kanban board READ (wb-kbq5). path is an absolute workspace org file (desktop,
+  # trusted). /api/oql/query parses its headlines; /api/oql/board-views maps each
+  # headline of a views file to a BoardView. Mutation (PATCH) is separate.
+  get "/api/oql/query" do
+    conn = fetch_query_params(conn)
+
+    case read_workspace_org(conn.query_params["path"]) do
+      {:ok, org} ->
+        headlines = Workbooks.OQL.parse_headlines(org)
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: headlines, parse_warnings: []}))
+
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: [], parse_warnings: []}))
+    end
+  end
+
+  get "/api/oql/board-views" do
+    conn = fetch_query_params(conn)
+
+    views =
+      case read_workspace_org(conn.query_params["path"]) do
+        {:ok, org} -> Workbooks.OQL.parse_headlines(org) |> Enum.map(&headline_to_view/1)
+        _ -> []
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(views))
   end
 
   # Skill catalog for the @-picker (wb-kbq5). User/project SKILL.md authoring
@@ -366,7 +395,8 @@ defmodule Workbooks.Web do
   # user-scope (WB_PROFILE_DIR/agents/*.org) → the builtin Waldo. The desktop's
   # agents.svelte refreshes this; without it the picker was empty (404).
   get "/api/agents/list" do
-    agents = agent_catalog(conn.params["workdir"])
+    conn = fetch_query_params(conn)
+    agents = agent_catalog(conn.query_params["workdir"])
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{agents: agents}))
   end
 
@@ -943,6 +973,33 @@ defmodule Workbooks.Web do
 
   match _ do
     send_resp(conn, 404, "not found")
+  end
+
+  # Read an absolute workspace org file for the trusted desktop. Guards: must be
+  # an absolute path to an existing regular file (no traversal games — it's an
+  # absolute path the desktop already resolved from its own workspace folder).
+  defp read_workspace_org(path) when is_binary(path) and path != "" do
+    abs = Path.expand(path)
+    if File.regular?(abs), do: File.read(abs), else: {:error, :enoent}
+  rescue
+    _ -> {:error, :badpath}
+  end
+
+  defp read_workspace_org(_), do: {:error, :nopath}
+
+  # Map a parsed headline (a board-views file entry) to a desktop BoardView.
+  defp headline_to_view(h) do
+    props = h["props"] || %{}
+
+    %{
+      id: h["id"] || h["title"],
+      name: props["NAME"] || h["title"],
+      path: props["PATH"] || "",
+      query: props["QUERY"] || "",
+      icon: props["ICON"],
+      tagline: props["DESCRIPTION"],
+      action_label: props["ACTION_LABEL"]
+    }
   end
 
   # Build the agent catalog the desktop picker reads. Project agents (if a
