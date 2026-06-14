@@ -21,76 +21,90 @@
 @font-face{ font-family:"Groothan"; src:url("/fonts/GroothanMixed-Regular.woff2") format("woff2"),
   url("/fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:swap; }
 :root{
-  --paper:#f7f6f1; --card:#fff; --ink:#121316; --bloom:#13d943; --bloomd:#149157;
+  --paper:#f7f6f1; --card:#fff; --ink:#121316;
   --dim:#6a6f68; --line:rgba(18,19,22,.12);
+  --p-blue:#a8d4f0; --p-mint:#aee5c2; --p-peach:#f3c5a3; --p-sand:#f2ddb0;
+  --p-lav:#d9c5f0; --p-rose:#f0b8b8; --p-aqua:#b8e0e8;
   --display:"Groothan","Arial Black",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,monospace;
+  --max:1180px;
 }
 *{ box-sizing:border-box; margin:0; }
 html{ scrollbar-width:thin; scrollbar-color:#565b54 transparent; }
 body{ background:var(--paper); color:var(--ink); font-family:var(--mono); line-height:1.65;
   -webkit-font-smoothing:antialiased; }
 a{ color:inherit; }
-.wrap{ max-width:1280px; margin:0 auto; padding:0 28px; }
+.wrap{ max-width:var(--max); margin:0 auto; padding:0 28px; }
 
 /* ── hero ── */
-.hero{ padding:170px 28px 50px; max-width:1280px; margin:0 auto; }
-.hero .kick{ font:700 11px var(--mono); letter-spacing:.32em; text-transform:uppercase;
-  color:var(--bloomd); margin-bottom:18px; }
-.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,6vw,78px);
-  line-height:.98; letter-spacing:-.01em; }
-.hero h1 em{ font-style:normal; color:var(--bloomd); }
-.hero p{ margin-top:20px; max-width:62ch; font-size:14px; color:var(--dim); line-height:1.8; }
-.hero .stat{ margin-top:24px; display:flex; gap:26px; flex-wrap:wrap;
-  font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.hero .stat b{ color:var(--bloomd); }
+.hero{ max-width:var(--max); margin:0 auto; padding:154px 28px 46px; }
+.hero .kick{ display:inline-flex; align-items:center; gap:9px; font:700 10.5px var(--mono);
+  letter-spacing:.26em; text-transform:uppercase; color:var(--ink); background:var(--p-aqua);
+  border:1.5px solid var(--ink); border-radius:999px; padding:7px 14px; margin-bottom:26px; }
+.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,8.2vw,116px);
+  line-height:.9; letter-spacing:-.02em; max-width:14ch; }
+.hero h1 em{ font-style:normal; background:var(--p-lav); padding:0 .12em;
+  border-radius:.07em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.hero p{ margin-top:26px; max-width:60ch; font-size:14.5px; color:var(--dim); line-height:1.85; }
+.hero code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
+  padding:.5px 6px; font-size:.92em; color:var(--ink); }
+.stat{ margin-top:34px; display:flex; gap:14px; flex-wrap:wrap; }
+.stat .badge{ display:flex; flex-direction:column; gap:2px; min-width:140px;
+  background:var(--p-blue); border:2px solid var(--ink); border-radius:14px;
+  box-shadow:4px 4px 0 var(--ink); padding:16px 20px; }
+.stat .badge b{ font-family:var(--display); font-weight:400; font-size:46px; line-height:.95;
+  color:var(--ink); }
+.stat .badge span{ font:700 10.5px var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink); opacity:.78; }
+.stat .badge:nth-child(2){ background:var(--p-mint); }
+.stat .badge:nth-child(3){ background:var(--p-peach); }
 
 /* ── controls ── */
 .controls{ position:sticky; top:0; z-index:5; background:var(--paper);
   border-bottom:2px solid var(--ink); padding:16px 0; }
 .controls .wrap{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
-.search{ flex:1 1 260px; display:flex; align-items:center; gap:10px; background:var(--card);
+.count{ font:700 11px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim);
+  margin-right:auto; white-space:nowrap; }
+.search{ flex:0 1 380px; display:flex; align-items:center; gap:10px; background:var(--card);
   border:2px solid var(--ink); border-radius:10px; padding:10px 14px; box-shadow:3px 3px 0 var(--ink); }
 .search svg{ width:16px; height:16px; flex:0 0 auto; color:var(--dim); }
 .search input{ border:0; outline:0; background:none; font:500 13px var(--mono); color:var(--ink);
   width:100%; }
 .search input::placeholder{ color:var(--dim); }
-.facets{ display:flex; gap:8px; flex-wrap:wrap; }
-.chip{ font:700 10.5px var(--mono); letter-spacing:.04em; text-transform:uppercase;
-  border:1.5px solid var(--ink); background:var(--card); color:var(--ink); border-radius:999px;
-  padding:7px 13px; cursor:pointer; transition:transform .12s ease, background .12s ease; }
-.chip:hover{ transform:translateY(-1px); }
-.chip.on{ background:var(--bloom); border-color:var(--ink); }
-.facet-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.facet-group .lbl{ font:700 9px var(--mono); letter-spacing:.18em; text-transform:uppercase;
-  color:var(--dim); margin-right:2px; }
+.catsel{ font:700 10.5px var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  border:2px solid var(--ink); background:var(--card); color:var(--ink); border-radius:10px;
+  padding:11px 32px 11px 14px; cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23121316' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; }
 
 /* ── grid ── */
-.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;
-  padding:34px 0 90px; }
-.count{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
-  padding-top:24px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:18px;
+  padding:34px 0 96px; }
 .card{ display:flex; flex-direction:column; background:var(--card); border:2px solid var(--ink);
-  border-radius:14px; padding:20px; text-decoration:none; box-shadow:4px 4px 0 var(--ink);
+  border-radius:16px; padding:22px; text-decoration:none; box-shadow:4px 4px 0 var(--ink);
   transition:transform .14s ease, box-shadow .14s ease; }
-.card:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--bloom); }
-.card .top{ display:flex; align-items:center; gap:13px; margin-bottom:13px; }
-.logo{ width:46px; height:46px; border-radius:11px; flex:0 0 auto; display:flex;
-  align-items:center; justify-content:center; overflow:hidden; border:1.5px solid var(--line);
-  background:var(--paper); }
+.card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 var(--ink); }
+.card .top{ display:flex; align-items:flex-start; gap:14px; margin-bottom:15px; }
+.logo{ width:50px; height:50px; border-radius:13px; flex:0 0 auto; display:flex;
+  align-items:center; justify-content:center; overflow:hidden; border:2px solid var(--ink); }
 .logo img{ width:30px; height:30px; object-fit:contain; }
-.logo .mono{ font-family:var(--display); font-size:22px; color:var(--ink); }
-.card h3{ font-family:var(--display); font-weight:400; font-size:23px; line-height:1; }
-.card .ver{ font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); margin-top:5px; }
-.card .tag{ font-size:12px; color:var(--dim); line-height:1.6; flex:1;
+.logo svg{ width:26px; height:26px; color:var(--ink); display:block; }
+.logo.brand{ background:#fff !important; }
+.card .hd{ min-width:0; }
+.card h3{ font-family:var(--display); font-weight:400; font-size:25px; line-height:1;
+  overflow-wrap:anywhere; }
+.card .ver{ font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); margin-top:6px; }
+.card .tag{ font-size:12.5px; color:var(--dim); line-height:1.65; flex:1;
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.card .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; }
+.card .meta{ display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; align-items:center; }
 .cc{ font:700 9px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
-  background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
-.cc.cat{ background:var(--bloom); border-color:var(--ink); }
+  background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+.cc.cat{ background:var(--p-sand); border:1.5px solid var(--ink); }
 .badge-m{ font:700 9px var(--mono); letter-spacing:.06em; text-transform:uppercase;
-  padding:3px 8px; border-radius:6px; border:1.5px solid var(--ink); }
-.m-stable{ background:#aee5c2; } .m-beta{ background:#a8d4f0; } .m-exp{ background:#f2ddb0; }
+  padding:4px 9px; border-radius:6px; border:1.5px solid var(--ink); margin-left:auto; }
+.m-stable{ background:var(--p-mint); } .m-beta{ background:var(--p-blue); }
+.m-exp{ background:var(--card); color:var(--dim); }
 .empty{ padding:70px 0; text-align:center; color:var(--dim); font-size:13px; }
 
 /* ── detail ── */
@@ -98,26 +112,30 @@ a{ color:inherit; }
 .crumb{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
   margin-bottom:26px; }
 .crumb a{ text-decoration:none; color:var(--dim); }
-.crumb a:hover{ color:var(--bloomd); }
-.dhead{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
-.dhead .logo{ width:78px; height:78px; border-radius:18px; }
-.dhead .logo img{ width:50px; height:50px; }
-.dhead .logo .mono{ font-size:38px; }
-.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(38px,5vw,60px); line-height:.96; }
-.dhead .meta{ display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+.crumb a:hover{ color:var(--ink); }
+.dhead{ display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+.dhead .logo{ width:84px; height:84px; border-radius:20px; }
+.dhead .logo img{ width:52px; height:52px; }
+.dhead .logo svg{ width:44px; height:44px; }
+.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5.5vw,68px); line-height:.94; }
+.dhead .meta{ display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
 .dhead .lede{ margin-top:18px; font-size:15px; line-height:1.8; color:var(--ink); max-width:70ch; }
 .cols{ display:grid; grid-template-columns:1fr 320px; gap:48px; margin-top:48px; align-items:start; }
 .sec{ margin-bottom:42px; }
-.sec h2{ font-family:var(--display); font-weight:400; font-size:28px; margin-bottom:16px; }
+.sec h2{ font-family:var(--display); font-weight:400; font-size:30px; margin-bottom:16px; }
 .sec p{ font-size:14px; line-height:1.85; color:var(--ink); margin-bottom:14px; }
 .sec .dim{ color:var(--dim); }
+.sec code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
+  padding:1px 6px; font-size:.92em; }
 .caplist{ display:flex; gap:9px; flex-wrap:wrap; }
-.caplist .cc{ font-size:11px; padding:7px 11px; }
+.caplist .cc{ font-size:11px; padding:7px 11px; background:var(--p-aqua); border:1.5px solid var(--ink); }
 .install{ background:var(--ink); color:var(--paper); border-radius:12px; padding:18px 20px;
   font:500 13px var(--mono); display:flex; align-items:center; justify-content:space-between; gap:14px; }
-.install code{ color:var(--bloom); }
+.install code{ color:var(--p-mint); background:none; border:0; padding:0; }
 .install button{ font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase;
   background:var(--paper); color:var(--ink); border:0; border-radius:7px; padding:8px 12px; cursor:pointer; }
+.detail a.docs{ color:var(--ink); font-weight:700; text-decoration:underline;
+  text-decoration-thickness:2px; text-underline-offset:3px; text-decoration-color:var(--p-peach); }
 .aside{ position:sticky; top:120px; }
 .box{ background:var(--card); border:2px solid var(--ink); border-radius:14px;
   box-shadow:4px 4px 0 var(--ink); padding:20px; margin-bottom:20px; }
@@ -131,18 +149,22 @@ a{ color:inherit; }
 .related a{ display:flex; align-items:center; gap:11px; text-decoration:none; padding:8px;
   border-radius:9px; }
 .related a:hover{ background:var(--paper); }
-.related .logo{ width:34px; height:34px; border-radius:9px; }
-.related .logo img{ width:22px; height:22px; }
-.related .logo .mono{ font-size:17px; }
+.related .logo{ width:38px; height:38px; border-radius:10px; }
+.related .logo img{ width:24px; height:24px; }
+.related .logo svg{ width:20px; height:20px; }
 .related b{ font:700 12px var(--mono); }
 .related small{ display:block; font:400 10px var(--mono); color:var(--dim); }
 .foot{ border-top:2px solid var(--ink); padding:40px 28px; text-align:center;
   font:500 11px var(--mono); letter-spacing:.04em; color:var(--dim); }
-.foot a{ color:var(--bloomd); text-decoration:none; }
-@media (max-width:860px){
+.foot a{ color:var(--ink); text-decoration:underline; text-underline-offset:3px;
+  text-decoration-color:var(--p-blue); text-decoration-thickness:2px; }
+@media (max-width:760px){
+  .hero h1{ font-size:clamp(42px,12vw,68px); }
   .cols{ grid-template-columns:1fr; }
   .aside{ position:static; }
   .controls{ position:static; }
+  .search{ flex:1 1 100%; order:3; }
+  .count{ order:1; } .catsel{ order:2; }
 }
 
 </style>
@@ -153,7 +175,7 @@ a{ color:inherit; }
   <div class="crumb"><a href="/toolkits/">Marketplace</a> / ffmpeg</div>
 
   <div class="dhead">
-    <span class="logo "><span class="mono">F</span></span>
+    <span class="logo brand " style="background:#d9c5f0"><img src="/toolkits/logos/ffmpeg.svg" alt="ffmpeg logo"></span>
     <div>
       <h1>ffmpeg</h1>
       <div class="meta">
@@ -185,7 +207,7 @@ a{ color:inherit; }
         </div>
         <p class="dim" style="margin-top:14px">Once added, the toolkit is wired into the workbook's Dock —
         the agent reaches its verbs by name, the host brokers any capability it needs.
-        <a href="https://docs.workbooks.sh/toolkits/ffmpeg" style="color:var(--bloomd)">Read the docs →</a></p>
+        <a class="docs" href="https://docs.workbooks.sh/toolkits/ffmpeg">Read the docs →</a></p>
       </div>
 
       <div class="sec">
@@ -204,20 +226,20 @@ a{ color:inherit; }
         <h4>Related toolkits</h4>
         <div class="related">
       <a href="/toolkits/video.html">
-        <span class="logo "><span class="mono">V</span></span>
+        <span class="logo icon " style="background:#aee5c2"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M255.494 117.666C250.42 117.679 245.915 123.002 246.758 127.857C247.523 132.264 251.146 138.332 252.975 142.698C256.703 151.729 259.076 161.265 260.017 170.994C262.941 198.91 254.431 226.819 236.441 248.319C218.911 269.373 193.757 282.582 166.519 285.036C139.163 287.575 111.929 279.085 90.8255 261.443C70.8224 244.823 57.8239 221.229 54.4348 195.401C53.4682 187.996 56.7846 165.626 43.6931 166.928C39.8349 167.312 34.3063 172.804 31.4914 175.813C19.0714 189.097 5.63616 199.732 8.35394 219.793C8.83925 223.606 10.0121 227.302 11.8158 230.693C19.0066 244.072 41.4283 263.568 53.5653 272.878C81.7339 293.389 114.092 307.376 148.303 313.83C230.054 329.768 320.621 306.398 376.413 242.421C379.35 239.054 382.335 235.634 384.585 231.752C386.405 228.633 387.668 225.221 388.318 221.663C391.628 203.884 382.414 193.566 371.006 181.484C341.848 150.605 297.396 125.274 255.494 117.666Z"/><path d="M140.399 52.7404C133.98 52.161 131.591 54.9901 128.516 60.3889C124.479 67.4708 120.724 73.5094 113.383 77.6257C104.327 82.7018 94.8418 79.902 85.2957 81.8355C83.216 82.2584 80.5532 84.4703 79.7866 86.4528C75.8066 96.0025 87.9136 100.061 94.0956 104.115C96.9867 106.039 99.5965 108.349 101.843 110.98C113.384 124.617 101.811 143.238 114.945 148.485C124.663 150.098 126.518 140.572 131.281 134.009C134.27 129.883 137.055 126.567 141.52 124.03C148.395 118.108 164.825 122.076 170.383 119.354C186.943 111.247 167.936 100.496 161.885 97.3807C153.493 92.2724 149.525 85.4935 147.967 76.1856C146.405 66.8198 151.005 56.8644 140.399 52.7404Z"/></svg></span>
         <span><b>video</b><small>Media · v0.1.0</small></span>
       </a>
-      <a href="/toolkits/3w.html">
-        <span class="logo "><span class="mono">3</span></span>
-        <span><b>3w</b><small>Research · v0.1.0</small></span>
-      </a>
       <a href="/toolkits/asana.html">
-        <span class="logo "><span class="mono">A</span></span>
+        <span class="logo brand " style="background:#f0b8b8"><img src="/toolkits/logos/asana.svg" alt="asana logo"></span>
         <span><b>asana</b><small>Integration · v0.1.0</small></span>
       </a>
-      <a href="/toolkits/brandnana.html">
-        <span class="logo "><span class="mono">B</span></span>
-        <span><b>brandnana</b><small>Integration · v0.1.0</small></span>
+      <a href="/toolkits/byod.html">
+        <span class="logo icon " style="background:#f2ddb0"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M372.841 231.087C368.142 237.284 355.136 245.711 348.251 249.221C309.23 269.113 264.188 275.313 220.934 277.441C213.023 277.821 205.101 277.923 197.182 277.744C192.013 277.668 186.474 277.167 181.346 277.864C179.178 278.159 176.991 278.893 175.121 280.031C171.719 282.103 169.261 285.641 168.367 289.51C165.734 300.906 179.191 329.215 185.361 339.025C188.944 344.727 194.128 352.252 201.091 353.77C203.876 354.378 206.469 353.661 208.812 352.12C223.947 342.166 234.753 308.958 238.349 291.689C246.323 291.048 263.054 289.695 270.643 287.942C269.729 293.198 267.974 299.734 266.623 304.959C260.562 327.893 252.352 350.645 236.326 368.569C219.189 387.737 194.325 391.024 174.63 373.048C157.412 357.336 148.795 337.73 141.841 316.012C137.176 301.451 135.586 286.643 122.822 276.504C112.309 267.695 102.588 266.912 89.9585 263.11C70.4228 257.228 50.3411 248.851 35.1557 234.917C26.1974 226.698 19.0139 215.063 18.6391 202.68C18.27 190.483 23.5331 180.649 31.5842 172.022C34.2717 169.25 37.6844 165.73 40.7459 163.376C56.9037 150.944 76.887 143.599 96.3612 138.152C102.405 136.461 109.376 135.161 115.023 133.395C113.587 144.174 112.46 154.995 111.641 165.841C93.757 169.341 65.354 180.045 52.8539 193.738C50.9016 195.84 49.2501 199.263 49.6056 202.262C50.64 210.46 62.2666 218.34 69.6149 222.081C81.3551 227.544 99.2836 236.348 112.4 236.041C129.42 235.642 125.879 213.612 125.71 203.119C125.666 197.012 125.74 190.906 125.93 184.803C127.352 139.839 135.755 75.2879 164.623 38.3603C172.455 28.3383 184.76 18.8599 197.938 18.0096C232.217 15.8014 250.273 52.7129 260.046 79.5054C261.898 84.4889 263.519 89.5551 264.905 94.6869C268.628 108.213 270.336 116.267 281.459 126.161C292.037 135.57 304.17 136.169 316.882 140.335C335.007 146.507 352.686 153.112 367.33 165.921C389.45 185.27 391.976 208.659 372.841 231.087ZM329.666 224.254C336.05 221.325 346.734 214.883 351.108 209.328C357.925 200.625 354.522 194.018 346.048 187.955C333.064 178.668 314.122 169.805 298.372 166.985C275.596 162.907 278.31 184.714 278.552 198.24C278.718 207.042 278.583 215.847 278.145 224.639C266.993 226.928 258.015 227.77 247.306 229.574C247.689 222.519 247.931 215.457 248.029 208.392C248.151 193.15 247.271 181.946 236.538 169.979C228.848 161.406 216.935 155.806 205.466 155.556C195.669 155.342 183.479 155.635 173.685 156.406C174.84 146.05 176.409 135.745 178.387 125.517C187.276 125.117 196.173 124.908 205.071 124.89C208.003 124.896 211.66 124.953 214.55 125.107C246.516 126.811 235.484 100.032 228.763 83.0904C224.865 74.1023 211.374 42.6881 197.309 49.6087C186.291 55.0313 176.875 76.2376 172.918 87.4522C169.376 97.3315 166.505 107.44 164.324 117.709C159.525 140.892 156.9 164.479 156.487 188.163C156.324 194.558 155.999 203.498 156.851 209.67C157.434 213.923 158.689 218.058 160.571 221.919C165.476 232.188 174.408 240.504 185.147 244.434C195.959 248.391 210.581 247.336 222.153 246.748C258.39 244.907 296.458 239.491 329.666 224.254Z"/></svg></span>
+        <span><b>byod</b><small>Deploy · v0.1.0</small></span>
+      </a>
+      <a href="/toolkits/capacitor.html">
+        <span class="logo brand " style="background:#f2ddb0"><img src="/toolkits/logos/capacitor.svg" alt="capacitor logo"></span>
+        <span><b>capacitor</b><small>Deploy · v0.1.0</small></span>
       </a></div>
       </div>
     </aside>

@@ -21,76 +21,90 @@
 @font-face{ font-family:"Groothan"; src:url("/fonts/GroothanMixed-Regular.woff2") format("woff2"),
   url("/fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:swap; }
 :root{
-  --paper:#f7f6f1; --card:#fff; --ink:#121316; --bloom:#13d943; --bloomd:#149157;
+  --paper:#f7f6f1; --card:#fff; --ink:#121316;
   --dim:#6a6f68; --line:rgba(18,19,22,.12);
+  --p-blue:#a8d4f0; --p-mint:#aee5c2; --p-peach:#f3c5a3; --p-sand:#f2ddb0;
+  --p-lav:#d9c5f0; --p-rose:#f0b8b8; --p-aqua:#b8e0e8;
   --display:"Groothan","Arial Black",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,monospace;
+  --max:1180px;
 }
 *{ box-sizing:border-box; margin:0; }
 html{ scrollbar-width:thin; scrollbar-color:#565b54 transparent; }
 body{ background:var(--paper); color:var(--ink); font-family:var(--mono); line-height:1.65;
   -webkit-font-smoothing:antialiased; }
 a{ color:inherit; }
-.wrap{ max-width:1280px; margin:0 auto; padding:0 28px; }
+.wrap{ max-width:var(--max); margin:0 auto; padding:0 28px; }
 
 /* ── hero ── */
-.hero{ padding:170px 28px 50px; max-width:1280px; margin:0 auto; }
-.hero .kick{ font:700 11px var(--mono); letter-spacing:.32em; text-transform:uppercase;
-  color:var(--bloomd); margin-bottom:18px; }
-.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,6vw,78px);
-  line-height:.98; letter-spacing:-.01em; }
-.hero h1 em{ font-style:normal; color:var(--bloomd); }
-.hero p{ margin-top:20px; max-width:62ch; font-size:14px; color:var(--dim); line-height:1.8; }
-.hero .stat{ margin-top:24px; display:flex; gap:26px; flex-wrap:wrap;
-  font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.hero .stat b{ color:var(--bloomd); }
+.hero{ max-width:var(--max); margin:0 auto; padding:154px 28px 46px; }
+.hero .kick{ display:inline-flex; align-items:center; gap:9px; font:700 10.5px var(--mono);
+  letter-spacing:.26em; text-transform:uppercase; color:var(--ink); background:var(--p-aqua);
+  border:1.5px solid var(--ink); border-radius:999px; padding:7px 14px; margin-bottom:26px; }
+.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,8.2vw,116px);
+  line-height:.9; letter-spacing:-.02em; max-width:14ch; }
+.hero h1 em{ font-style:normal; background:var(--p-lav); padding:0 .12em;
+  border-radius:.07em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.hero p{ margin-top:26px; max-width:60ch; font-size:14.5px; color:var(--dim); line-height:1.85; }
+.hero code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
+  padding:.5px 6px; font-size:.92em; color:var(--ink); }
+.stat{ margin-top:34px; display:flex; gap:14px; flex-wrap:wrap; }
+.stat .badge{ display:flex; flex-direction:column; gap:2px; min-width:140px;
+  background:var(--p-blue); border:2px solid var(--ink); border-radius:14px;
+  box-shadow:4px 4px 0 var(--ink); padding:16px 20px; }
+.stat .badge b{ font-family:var(--display); font-weight:400; font-size:46px; line-height:.95;
+  color:var(--ink); }
+.stat .badge span{ font:700 10.5px var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink); opacity:.78; }
+.stat .badge:nth-child(2){ background:var(--p-mint); }
+.stat .badge:nth-child(3){ background:var(--p-peach); }
 
 /* ── controls ── */
 .controls{ position:sticky; top:0; z-index:5; background:var(--paper);
   border-bottom:2px solid var(--ink); padding:16px 0; }
 .controls .wrap{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
-.search{ flex:1 1 260px; display:flex; align-items:center; gap:10px; background:var(--card);
+.count{ font:700 11px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim);
+  margin-right:auto; white-space:nowrap; }
+.search{ flex:0 1 380px; display:flex; align-items:center; gap:10px; background:var(--card);
   border:2px solid var(--ink); border-radius:10px; padding:10px 14px; box-shadow:3px 3px 0 var(--ink); }
 .search svg{ width:16px; height:16px; flex:0 0 auto; color:var(--dim); }
 .search input{ border:0; outline:0; background:none; font:500 13px var(--mono); color:var(--ink);
   width:100%; }
 .search input::placeholder{ color:var(--dim); }
-.facets{ display:flex; gap:8px; flex-wrap:wrap; }
-.chip{ font:700 10.5px var(--mono); letter-spacing:.04em; text-transform:uppercase;
-  border:1.5px solid var(--ink); background:var(--card); color:var(--ink); border-radius:999px;
-  padding:7px 13px; cursor:pointer; transition:transform .12s ease, background .12s ease; }
-.chip:hover{ transform:translateY(-1px); }
-.chip.on{ background:var(--bloom); border-color:var(--ink); }
-.facet-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.facet-group .lbl{ font:700 9px var(--mono); letter-spacing:.18em; text-transform:uppercase;
-  color:var(--dim); margin-right:2px; }
+.catsel{ font:700 10.5px var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  border:2px solid var(--ink); background:var(--card); color:var(--ink); border-radius:10px;
+  padding:11px 32px 11px 14px; cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23121316' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; }
 
 /* ── grid ── */
-.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;
-  padding:34px 0 90px; }
-.count{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
-  padding-top:24px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:18px;
+  padding:34px 0 96px; }
 .card{ display:flex; flex-direction:column; background:var(--card); border:2px solid var(--ink);
-  border-radius:14px; padding:20px; text-decoration:none; box-shadow:4px 4px 0 var(--ink);
+  border-radius:16px; padding:22px; text-decoration:none; box-shadow:4px 4px 0 var(--ink);
   transition:transform .14s ease, box-shadow .14s ease; }
-.card:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--bloom); }
-.card .top{ display:flex; align-items:center; gap:13px; margin-bottom:13px; }
-.logo{ width:46px; height:46px; border-radius:11px; flex:0 0 auto; display:flex;
-  align-items:center; justify-content:center; overflow:hidden; border:1.5px solid var(--line);
-  background:var(--paper); }
+.card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 var(--ink); }
+.card .top{ display:flex; align-items:flex-start; gap:14px; margin-bottom:15px; }
+.logo{ width:50px; height:50px; border-radius:13px; flex:0 0 auto; display:flex;
+  align-items:center; justify-content:center; overflow:hidden; border:2px solid var(--ink); }
 .logo img{ width:30px; height:30px; object-fit:contain; }
-.logo .mono{ font-family:var(--display); font-size:22px; color:var(--ink); }
-.card h3{ font-family:var(--display); font-weight:400; font-size:23px; line-height:1; }
-.card .ver{ font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); margin-top:5px; }
-.card .tag{ font-size:12px; color:var(--dim); line-height:1.6; flex:1;
+.logo svg{ width:26px; height:26px; color:var(--ink); display:block; }
+.logo.brand{ background:#fff !important; }
+.card .hd{ min-width:0; }
+.card h3{ font-family:var(--display); font-weight:400; font-size:25px; line-height:1;
+  overflow-wrap:anywhere; }
+.card .ver{ font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); margin-top:6px; }
+.card .tag{ font-size:12.5px; color:var(--dim); line-height:1.65; flex:1;
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.card .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; }
+.card .meta{ display:flex; gap:7px; flex-wrap:wrap; margin-top:16px; align-items:center; }
 .cc{ font:700 9px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
-  background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
-.cc.cat{ background:var(--bloom); border-color:var(--ink); }
+  background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+.cc.cat{ background:var(--p-sand); border:1.5px solid var(--ink); }
 .badge-m{ font:700 9px var(--mono); letter-spacing:.06em; text-transform:uppercase;
-  padding:3px 8px; border-radius:6px; border:1.5px solid var(--ink); }
-.m-stable{ background:#aee5c2; } .m-beta{ background:#a8d4f0; } .m-exp{ background:#f2ddb0; }
+  padding:4px 9px; border-radius:6px; border:1.5px solid var(--ink); margin-left:auto; }
+.m-stable{ background:var(--p-mint); } .m-beta{ background:var(--p-blue); }
+.m-exp{ background:var(--card); color:var(--dim); }
 .empty{ padding:70px 0; text-align:center; color:var(--dim); font-size:13px; }
 
 /* ── detail ── */
@@ -98,26 +112,30 @@ a{ color:inherit; }
 .crumb{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
   margin-bottom:26px; }
 .crumb a{ text-decoration:none; color:var(--dim); }
-.crumb a:hover{ color:var(--bloomd); }
-.dhead{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
-.dhead .logo{ width:78px; height:78px; border-radius:18px; }
-.dhead .logo img{ width:50px; height:50px; }
-.dhead .logo .mono{ font-size:38px; }
-.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(38px,5vw,60px); line-height:.96; }
-.dhead .meta{ display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+.crumb a:hover{ color:var(--ink); }
+.dhead{ display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+.dhead .logo{ width:84px; height:84px; border-radius:20px; }
+.dhead .logo img{ width:52px; height:52px; }
+.dhead .logo svg{ width:44px; height:44px; }
+.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5.5vw,68px); line-height:.94; }
+.dhead .meta{ display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
 .dhead .lede{ margin-top:18px; font-size:15px; line-height:1.8; color:var(--ink); max-width:70ch; }
 .cols{ display:grid; grid-template-columns:1fr 320px; gap:48px; margin-top:48px; align-items:start; }
 .sec{ margin-bottom:42px; }
-.sec h2{ font-family:var(--display); font-weight:400; font-size:28px; margin-bottom:16px; }
+.sec h2{ font-family:var(--display); font-weight:400; font-size:30px; margin-bottom:16px; }
 .sec p{ font-size:14px; line-height:1.85; color:var(--ink); margin-bottom:14px; }
 .sec .dim{ color:var(--dim); }
+.sec code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
+  padding:1px 6px; font-size:.92em; }
 .caplist{ display:flex; gap:9px; flex-wrap:wrap; }
-.caplist .cc{ font-size:11px; padding:7px 11px; }
+.caplist .cc{ font-size:11px; padding:7px 11px; background:var(--p-aqua); border:1.5px solid var(--ink); }
 .install{ background:var(--ink); color:var(--paper); border-radius:12px; padding:18px 20px;
   font:500 13px var(--mono); display:flex; align-items:center; justify-content:space-between; gap:14px; }
-.install code{ color:var(--bloom); }
+.install code{ color:var(--p-mint); background:none; border:0; padding:0; }
 .install button{ font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase;
   background:var(--paper); color:var(--ink); border:0; border-radius:7px; padding:8px 12px; cursor:pointer; }
+.detail a.docs{ color:var(--ink); font-weight:700; text-decoration:underline;
+  text-decoration-thickness:2px; text-underline-offset:3px; text-decoration-color:var(--p-peach); }
 .aside{ position:sticky; top:120px; }
 .box{ background:var(--card); border:2px solid var(--ink); border-radius:14px;
   box-shadow:4px 4px 0 var(--ink); padding:20px; margin-bottom:20px; }
@@ -131,18 +149,22 @@ a{ color:inherit; }
 .related a{ display:flex; align-items:center; gap:11px; text-decoration:none; padding:8px;
   border-radius:9px; }
 .related a:hover{ background:var(--paper); }
-.related .logo{ width:34px; height:34px; border-radius:9px; }
-.related .logo img{ width:22px; height:22px; }
-.related .logo .mono{ font-size:17px; }
+.related .logo{ width:38px; height:38px; border-radius:10px; }
+.related .logo img{ width:24px; height:24px; }
+.related .logo svg{ width:20px; height:20px; }
 .related b{ font:700 12px var(--mono); }
 .related small{ display:block; font:400 10px var(--mono); color:var(--dim); }
 .foot{ border-top:2px solid var(--ink); padding:40px 28px; text-align:center;
   font:500 11px var(--mono); letter-spacing:.04em; color:var(--dim); }
-.foot a{ color:var(--bloomd); text-decoration:none; }
-@media (max-width:860px){
+.foot a{ color:var(--ink); text-decoration:underline; text-underline-offset:3px;
+  text-decoration-color:var(--p-blue); text-decoration-thickness:2px; }
+@media (max-width:760px){
+  .hero h1{ font-size:clamp(42px,12vw,68px); }
   .cols{ grid-template-columns:1fr; }
   .aside{ position:static; }
   .controls{ position:static; }
+  .search{ flex:1 1 100%; order:3; }
+  .count{ order:1; } .catsel{ order:2; }
 }
 
 </style>
@@ -150,482 +172,400 @@ a{ color:inherit; }
 <body>
 <div id="site-nav"></div><script src="/nav.js?v=13"></script>
 <section class="hero">
-  <div class="kick">the marketplace ■ 28 toolkits</div>
-  <h1>Every capability a workbook<br>can <em>install.</em></h1>
-  <p>Toolkits are the powers a workbook (or its agent) reaches for — sandboxed-WASM
-  capabilities and live service integrations alike. Add one with <code>wbx</code>,
-  and it's wired into the workbook's Dock. Search the catalog, filter by capability
-  or category, open any one for the full write-up.</p>
+  <div class="kick">The Workbooks Marketplace</div>
+  <h1>Powers your workbook can <em>install.</em></h1>
+  <p>Toolkits are the capabilities a workbook — or its agent — reaches for: sandboxed-WASM
+  powers and live service integrations alike. Add one with <code>wbx toolkit add</code>
+  and it's wired straight into the workbook's Dock. Search the catalog, open any one for
+  the full write-up.</p>
   <div class="stat">
-    <span><b>28</b> toolkits</span>
-    <span><b>20</b> capabilities</span>
-    <span><b>8</b> integrations</span>
+    <span class="badge"><b>26</b><span>toolkits</span></span>
+    <span class="badge"><b>20</b><span>capabilities</span></span>
+    <span class="badge"><b>7</b><span>integrations</span></span>
   </div>
 </section>
 
 <div class="controls">
   <div class="wrap">
+    <div class="count" id="count"></div>
+    <select class="catsel" id="cat" aria-label="Filter by category">
+      <option value="">All categories</option>
+      <option value="Assets">Assets</option><option value="Deploy">Deploy</option><option value="Design">Design</option><option value="Dev tools">Dev tools</option><option value="Integration">Integration</option><option value="Media">Media</option><option value="Pipeline">Pipeline</option><option value="System">System</option>
+    </select>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg>
-      <input id="q" type="search" placeholder="Search toolkits, capabilities, integrations…" autocomplete="off">
+      <input id="q" type="search" placeholder="Search toolkits, capabilities…" autocomplete="off">
     </label>
-    <div class="facet-group"><span class="lbl">Category</span><button class="chip" data-fcat="Assets">Assets</button><button class="chip" data-fcat="Deploy">Deploy</button><button class="chip" data-fcat="Design">Design</button><button class="chip" data-fcat="Dev tools">Dev tools</button><button class="chip" data-fcat="Integration">Integration</button><button class="chip" data-fcat="Media">Media</button><button class="chip" data-fcat="Pipeline">Pipeline</button><button class="chip" data-fcat="Research">Research</button><button class="chip" data-fcat="System">System</button></div>
-    <div class="facet-group"><span class="lbl">Capability</span><button class="chip" data-fcap="ai">ai</button><button class="chip" data-fcap="assets">assets</button><button class="chip" data-fcap="audio">audio</button><button class="chip" data-fcap="auth">auth</button><button class="chip" data-fcap="brand">brand</button><button class="chip" data-fcap="database">database</button><button class="chip" data-fcap="deploy">deploy</button><button class="chip" data-fcap="design-tokens">design-tokens</button><button class="chip" data-fcap="desktop">desktop</button><button class="chip" data-fcap="docs">docs</button><button class="chip" data-fcap="fetch">fetch</button><button class="chip" data-fcap="fonts">fonts</button><button class="chip" data-fcap="git">git</button><button class="chip" data-fcap="image">image</button><button class="chip" data-fcap="mobile">mobile</button><button class="chip" data-fcap="sandbox">sandbox</button><button class="chip" data-fcap="slides">slides</button><button class="chip" data-fcap="tasks">tasks</button><button class="chip" data-fcap="video">video</button><button class="chip" data-fcap="web-search">web-search</button></div>
   </div>
 </div>
 
 <div class="wrap">
-  <div class="count" id="count"></div>
   <div class="grid" id="grid">
-    <a class="card" href="/toolkits/3w.html"
-       data-blob="3w 3w local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository. research  web-search fetch deploy sandbox ai"
-       data-cat="Research"
-       data-int=""
-       data-caps="web-search fetch deploy sandbox ai">
-      <div class="top">
-        <span class="logo "><span class="mono">3</span></span>
-        <div>
-          <h3>3w</h3>
-          <div class="ver">v0.1.0</div>
-        </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
-      </div>
-      <div class="tag">Local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository.</div>
-      <div class="chips"><span class="cc cat">Research</span><span class="cc">web-search</span><span class="cc">fetch</span><span class="cc">deploy</span><span class="cc">sandbox</span></div>
-    </a>
     <a class="card" href="/toolkits/asana.html"
        data-blob="asana asana asana task federation — mirror an asana project into org :task: nodes, query + (gated) write-back. integration asana database deploy auth ai tasks"
-       data-cat="Integration"
-       data-int="Asana"
-       data-caps="database deploy auth ai tasks">
+       data-cat="Integration">
       <div class="top">
-        <span class="logo "><span class="mono">A</span></span>
-        <div>
+        <span class="logo brand " style="background:#f0b8b8"><img src="/toolkits/logos/asana.svg" alt="asana logo"></span>
+        <div class="hd">
           <h3>asana</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Asana task federation — mirror an Asana project into org :task: nodes, query + (gated) write-back.</div>
-      <div class="chips"><span class="cc cat">Integration</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">ai</span></div>
-    </a>
-    <a class="card" href="/toolkits/brandnana.html"
-       data-blob="brandnana brandnana ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net. integration brandnana web-search fetch image design-tokens assets deploy auth ai"
-       data-cat="Integration"
-       data-int="Brandnana"
-       data-caps="web-search fetch image design-tokens assets deploy auth ai">
-      <div class="top">
-        <span class="logo "><span class="mono">B</span></span>
-        <div>
-          <h3>brandnana</h3>
-          <div class="ver">v0.1.0</div>
-        </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
-      </div>
-      <div class="tag">Ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net.</div>
-      <div class="chips"><span class="cc cat">Integration</span><span class="cc">web-search</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">design-tokens</span></div>
+      <div class="meta"><span class="cc cat">Integration</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span></div>
     </a>
     <a class="card" href="/toolkits/byod.html"
        data-blob="byod byod turn a forged workbook into a real, multi-tenant app — live db + auth, no engine. deploy postgres + railway database deploy auth ai"
-       data-cat="Deploy"
-       data-int="Postgres + Railway"
-       data-caps="database deploy auth ai">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">B</span></span>
-        <div>
+        <span class="logo icon " style="background:#f2ddb0"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M372.841 231.087C368.142 237.284 355.136 245.711 348.251 249.221C309.23 269.113 264.188 275.313 220.934 277.441C213.023 277.821 205.101 277.923 197.182 277.744C192.013 277.668 186.474 277.167 181.346 277.864C179.178 278.159 176.991 278.893 175.121 280.031C171.719 282.103 169.261 285.641 168.367 289.51C165.734 300.906 179.191 329.215 185.361 339.025C188.944 344.727 194.128 352.252 201.091 353.77C203.876 354.378 206.469 353.661 208.812 352.12C223.947 342.166 234.753 308.958 238.349 291.689C246.323 291.048 263.054 289.695 270.643 287.942C269.729 293.198 267.974 299.734 266.623 304.959C260.562 327.893 252.352 350.645 236.326 368.569C219.189 387.737 194.325 391.024 174.63 373.048C157.412 357.336 148.795 337.73 141.841 316.012C137.176 301.451 135.586 286.643 122.822 276.504C112.309 267.695 102.588 266.912 89.9585 263.11C70.4228 257.228 50.3411 248.851 35.1557 234.917C26.1974 226.698 19.0139 215.063 18.6391 202.68C18.27 190.483 23.5331 180.649 31.5842 172.022C34.2717 169.25 37.6844 165.73 40.7459 163.376C56.9037 150.944 76.887 143.599 96.3612 138.152C102.405 136.461 109.376 135.161 115.023 133.395C113.587 144.174 112.46 154.995 111.641 165.841C93.757 169.341 65.354 180.045 52.8539 193.738C50.9016 195.84 49.2501 199.263 49.6056 202.262C50.64 210.46 62.2666 218.34 69.6149 222.081C81.3551 227.544 99.2836 236.348 112.4 236.041C129.42 235.642 125.879 213.612 125.71 203.119C125.666 197.012 125.74 190.906 125.93 184.803C127.352 139.839 135.755 75.2879 164.623 38.3603C172.455 28.3383 184.76 18.8599 197.938 18.0096C232.217 15.8014 250.273 52.7129 260.046 79.5054C261.898 84.4889 263.519 89.5551 264.905 94.6869C268.628 108.213 270.336 116.267 281.459 126.161C292.037 135.57 304.17 136.169 316.882 140.335C335.007 146.507 352.686 153.112 367.33 165.921C389.45 185.27 391.976 208.659 372.841 231.087ZM329.666 224.254C336.05 221.325 346.734 214.883 351.108 209.328C357.925 200.625 354.522 194.018 346.048 187.955C333.064 178.668 314.122 169.805 298.372 166.985C275.596 162.907 278.31 184.714 278.552 198.24C278.718 207.042 278.583 215.847 278.145 224.639C266.993 226.928 258.015 227.77 247.306 229.574C247.689 222.519 247.931 215.457 248.029 208.392C248.151 193.15 247.271 181.946 236.538 169.979C228.848 161.406 216.935 155.806 205.466 155.556C195.669 155.342 183.479 155.635 173.685 156.406C174.84 146.05 176.409 135.745 178.387 125.517C187.276 125.117 196.173 124.908 205.071 124.89C208.003 124.896 211.66 124.953 214.55 125.107C246.516 126.811 235.484 100.032 228.763 83.0904C224.865 74.1023 211.374 42.6881 197.309 49.6087C186.291 55.0313 176.875 76.2376 172.918 87.4522C169.376 97.3315 166.505 107.44 164.324 117.709C159.525 140.892 156.9 164.479 156.487 188.163C156.324 194.558 155.999 203.498 156.851 209.67C157.434 213.923 158.689 218.058 160.571 221.919C165.476 232.188 174.408 240.504 185.147 244.434C195.959 248.391 210.581 247.336 222.153 246.748C258.39 244.907 296.458 239.491 329.666 224.254Z"/></svg></span>
+        <div class="hd">
           <h3>byod</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">ai</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span></div>
     </a>
     <a class="card" href="/toolkits/capacitor.html"
        data-blob="capacitor capacitor capacitor — wrap a forged workbook as a native ios app and ship it to testflight. deploy capacitor deploy auth desktop mobile tasks"
-       data-cat="Deploy"
-       data-int="Capacitor"
-       data-caps="deploy auth desktop mobile tasks">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">C</span></span>
-        <div>
+        <span class="logo brand " style="background:#f2ddb0"><img src="/toolkits/logos/capacitor.svg" alt="capacitor logo"></span>
+        <div class="hd">
           <h3>capacitor</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Capacitor — wrap a forged workbook as a native iOS app and ship it to TestFlight.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">desktop</span><span class="cc">mobile</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">desktop</span></div>
     </a>
     <a class="card" href="/toolkits/cloudflare.html"
        data-blob="cloudflare cloudflare all-cloudflare backend for a forged workbook — d1 + workers ai + pages, on the user&#x27;s own account. deploy cloudflare database deploy auth ai tasks"
-       data-cat="Deploy"
-       data-int="Cloudflare"
-       data-caps="database deploy auth ai tasks">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">C</span></span>
-        <div>
+        <span class="logo brand " style="background:#a8d4f0"><img src="/toolkits/logos/cloudflare.svg" alt="cloudflare logo"></span>
+        <div class="hd">
           <h3>cloudflare</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">All-Cloudflare backend for a forged workbook — D1 + Workers AI + Pages, on the user&#x27;s own account.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">ai</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span></div>
     </a>
     <a class="card" href="/toolkits/ctk.html"
        data-blob="ctk ctk a human-in-the-loop canvas — render any component with org-tangled controls in one fixed shell; iterate vibes/sizes/states without designing a ui. dev tools  fetch assets git sandbox ai"
-       data-cat="Dev tools"
-       data-int=""
-       data-caps="fetch assets git sandbox ai">
+       data-cat="Dev tools">
       <div class="top">
-        <span class="logo "><span class="mono">C</span></span>
-        <div>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+        <div class="hd">
           <h3>ctk</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">A human-in-the-loop canvas — render any component with Org-tangled controls in one fixed shell; iterate vibes/sizes/states without designing a UI.</div>
-      <div class="chips"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">assets</span><span class="cc">git</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">assets</span><span class="cc">git</span></div>
     </a>
     <a class="card" href="/toolkits/docs.html"
        data-blob="docs docs a reusable, drift-checked documentation pipeline for any workbooks tenant — diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/seo output. point it at your repo, get docs.workbooks.sh&#x27;s exact machinery for free. pipeline  fetch deploy git sandbox ai tasks docs"
-       data-cat="Pipeline"
-       data-int=""
-       data-caps="fetch deploy git sandbox ai tasks docs">
+       data-cat="Pipeline">
       <div class="top">
-        <span class="logo "><span class="mono">D</span></span>
-        <div>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M402.535 170.145C402.928 175.931 402.506 183.894 400.66 189.408C397.139 199.921 392.439 210.441 388.527 220.782L366.162 278.923C360.991 292.03 354.71 307.368 350.03 320.372C340.732 347.609 324.555 368.427 297.902 380.395C278.045 389.315 262.642 388.348 241.505 388.338L198.21 388.32L147.394 388.334C138.954 388.334 127.501 388.66 119.216 388.084C113.711 387.689 108.288 386.532 103.099 384.648C89.8822 379.761 77.8807 367.927 72.0805 355.129C67.4025 344.815 66.4171 331.996 68.3939 320.918C69.8629 312.705 73.1203 306.235 76.1303 298.657L84.6068 276.87L107.29 217.858C111.944 205.904 116.725 193.421 121.523 181.783C132.039 156.281 132.172 131.063 120.551 105.92C118.807 102.146 112.599 91.348 109.768 88.5105C107.836 86.5738 105.485 85.1079 102.894 84.2282C95.2782 81.6552 85.9355 84.715 82.143 91.9987C79.792 96.5109 78.3818 101.292 76.5766 106.031L68.0336 128.133C62.9438 141.608 56.7244 155.836 51.8852 169.381C48.7826 178.666 44.2453 188.504 40.851 198.013C35.2258 213.774 23.6568 231.34 38.4389 246.29C45.6702 253.603 53.8932 254.349 63.4994 254.18C60.0605 264.47 55.8665 274.127 51.9643 284.224C30.5824 281.012 16.552 272.617 6.37929 253.016C-7.3112 226.63 5.28091 205.804 14.7123 181.27L41.0707 113.475C42.5808 109.656 43.7862 105.434 45.4096 101.711C51.8276 86.9725 56.255 70.359 64.8559 56.737C79.4218 33.6687 104.504 17.4868 131.727 14.7312C141.649 13.727 151.42 13.9919 161.373 13.9929L205.293 14.0046L255.73 13.9968C264.163 13.9958 275.78 13.6555 283.879 14.2468C289.12 14.6109 294.289 15.6795 299.246 17.4216C312.898 22.2688 325.031 33.8902 330.88 46.7917C339.41 65.6051 335.862 84.9637 327.331 102.899C325.334 107.099 323.409 113.267 321.763 117.772C344.253 117.304 365.448 115.777 383.182 131.467C394.799 141.744 401.166 154.902 402.535 170.145ZM269.938 346.397C270.947 344.067 271.009 340.566 270.782 337.978C269.826 333.352 267.773 330.846 265.287 326.965C258.322 316.088 249.332 306.637 238.513 299.491C213.043 282.67 190.135 284.609 161.529 284.616L114.231 284.636C110.837 293.323 107.229 301.896 104.072 310.655C100.049 321.452 94.5616 330.905 99.9672 342.601C103.945 351.212 112.817 358.049 122.543 357.977C129.854 358.053 136.989 358.063 144.224 358.066L184.201 358.073L229.139 358.073C236.946 358.073 244.6 357.991 252.63 358.022C261.056 358.06 266.551 354.212 269.938 346.397ZM304.093 78.6941C305.015 75.7078 305.432 72.5881 305.328 69.4646C305.289 68.1075 305.197 66.7526 305.05 65.4031C302.6 54.5516 293.459 45.036 282.108 44.4489C273.879 44.023 265.092 44.2557 256.822 44.2595L209.099 44.2839L168.528 44.2595C160.559 44.2561 151.917 43.7804 144.116 45.0114C140.955 45.5105 135.391 51.0983 133.959 53.9597C129.484 62.908 133.97 69.475 138.648 76.5691C148.278 91.1709 161.187 102.325 177.039 109.682C196.736 118.926 217.847 117.759 238.995 117.742C243.791 117.738 255.496 118.031 259.86 117.462C256.498 123.717 254.563 130.388 252.022 137.006C250.57 140.786 248.856 144.476 247.455 148.236C229.086 147.856 213.761 147.554 196.561 154.993C190.768 157.497 187.713 158.411 182.174 162.208C151.134 182.297 146.322 201.964 133.479 234.579C131.306 240.094 128.431 249.537 125.579 254.294C147.28 253.679 170.467 255.924 191.949 252.073C197.512 251.078 203.096 248.655 208.354 246.616C227.567 238.77 244.092 223.634 254.032 205.465C258.952 196.524 261.792 187.369 265.486 177.976L282.847 133.187C289.429 115.931 298.648 96.069 304.093 78.6941ZM362.464 203.848C366 193.854 372.23 183.598 371.64 172.613C371.092 165.035 369.201 159.966 363.492 154.719C354.622 146.569 343.363 148.067 332.06 148.098L309.604 148.138C306.549 156.794 303.703 163.642 300.456 172.031L287.073 206.999C281.87 220.569 275.885 233.076 274.241 247.958C272.512 263.608 274.724 274.931 279.786 289.486C282.854 297.926 290.445 313.679 298.822 317.519C303.121 319.503 308.053 319.613 312.435 317.818C322.074 313.919 323.265 304.515 326.728 295.718L353.141 227.76C356.246 219.722 359.562 212.051 362.464 203.848Z"/></svg></span>
+        <div class="hd">
           <h3>docs</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Partial</span>
+        <span class="badge-m m-exp">Partial</span>
       </div>
       <div class="tag">A reusable, drift-checked documentation pipeline for any Workbooks tenant — Diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output. Point it at your repo, get docs.workbooks.sh&#x27;s exact machinery for free.</div>
-      <div class="chips"><span class="cc cat">Pipeline</span><span class="cc">fetch</span><span class="cc">deploy</span><span class="cc">git</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Pipeline</span><span class="cc">fetch</span><span class="cc">deploy</span><span class="cc">git</span></div>
     </a>
     <a class="card" href="/toolkits/ffmpeg.html"
        data-blob="ffmpeg ffmpeg image + audio + video at parity — resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video. media  video audio image assets ai"
-       data-cat="Media"
-       data-int=""
-       data-caps="video audio image assets ai">
+       data-cat="Media">
       <div class="top">
-        <span class="logo "><span class="mono">F</span></span>
-        <div>
+        <span class="logo brand " style="background:#d9c5f0"><img src="/toolkits/logos/ffmpeg.svg" alt="ffmpeg logo"></span>
+        <div class="hd">
           <h3>ffmpeg</h3>
           <div class="ver">v0.3.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">Image + audio + video at parity — resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video.</div>
-      <div class="chips"><span class="cc cat">Media</span><span class="cc">video</span><span class="cc">audio</span><span class="cc">image</span><span class="cc">assets</span></div>
+      <div class="meta"><span class="cc cat">Media</span><span class="cc">video</span><span class="cc">audio</span><span class="cc">image</span></div>
     </a>
     <a class="card" href="/toolkits/git.html"
        data-blob="git git distributed version control — recovery, rebase, undo recipes the agent can lift verbatim. dev tools  web-search git ai tasks"
-       data-cat="Dev tools"
-       data-int=""
-       data-caps="web-search git ai tasks">
+       data-cat="Dev tools">
       <div class="top">
-        <span class="logo "><span class="mono">G</span></span>
-        <div>
+        <span class="logo brand " style="background:#a8d4f0"><img src="/toolkits/logos/git.svg" alt="git logo"></span>
+        <div class="hd">
           <h3>git</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">Distributed version control — recovery, rebase, undo recipes the agent can lift verbatim.</div>
-      <div class="chips"><span class="cc cat">Dev tools</span><span class="cc">web-search</span><span class="cc">git</span><span class="cc">ai</span><span class="cc">tasks</span></div>
+      <div class="meta"><span class="cc cat">Dev tools</span><span class="cc">web-search</span><span class="cc">git</span><span class="cc">ai</span></div>
     </a>
     <a class="card" href="/toolkits/glyphs.html"
        data-blob="glyphs glyphs one api resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an svg (or an &lt;img&gt;). curated-local-first, cdn fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphasync(ref) hits the cdn for the long tail. ref is &quot;&lt;kind&gt;:&lt;id&gt;&quot; — brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat. assets  fetch image fonts assets deploy git sandbox ai"
-       data-cat="Assets"
-       data-int=""
-       data-caps="fetch image fonts assets deploy git sandbox ai">
+       data-cat="Assets">
       <div class="top">
-        <span class="logo "><span class="mono">G</span></span>
-        <div>
+        <span class="logo icon " style="background:#a8d4f0"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M72.5,150.63,100.79,128,72.5,105.37a12,12,0,1,1,15-18.74l40,32a12,12,0,0,1,0,18.74l-40,32a12,12,0,0,1-15-18.74ZM144,172h32a12,12,0,0,0,0-24H144a12,12,0,0,0,0,24ZM236,56V200a20,20,0,0,1-20,20H40a20,20,0,0,1-20-20V56A20,20,0,0,1,40,36H216A20,20,0,0,1,236,56Zm-24,4H44V196H212Z"/></svg></span>
+        <div class="hd">
           <h3>glyphs</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">One API resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an SVG (or an &lt;img&gt;). Curated-local-first, CDN fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphAsync(ref) hits the CDN for the long tail. ref is &quot;&lt;kind&gt;:&lt;id&gt;&quot; — brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat.</div>
-      <div class="chips"><span class="cc cat">Assets</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">fonts</span><span class="cc">assets</span></div>
+      <div class="meta"><span class="cc cat">Assets</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">fonts</span></div>
     </a>
     <a class="card" href="/toolkits/icons.html"
        data-blob="icons icons the universal icon library as a cli — one value grammar (mi:&lt;def&gt; · lobe:&lt;slug&gt; · emoji · data: · initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged. assets  web-search fetch assets git desktop sandbox ai tasks"
-       data-cat="Assets"
-       data-int=""
-       data-caps="web-search fetch assets git desktop sandbox ai tasks">
+       data-cat="Assets">
       <div class="top">
-        <span class="logo "><span class="mono">I</span></span>
-        <div>
+        <span class="logo icon " style="background:#aee5c2"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+        <div class="hd">
           <h3>icons</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">The universal icon library as a CLI — one value grammar (mi:&lt;def&gt; · lobe:&lt;slug&gt; · emoji · data: · initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged.</div>
-      <div class="chips"><span class="cc cat">Assets</span><span class="cc">web-search</span><span class="cc">fetch</span><span class="cc">assets</span><span class="cc">git</span></div>
+      <div class="meta"><span class="cc cat">Assets</span><span class="cc">web-search</span><span class="cc">fetch</span><span class="cc">assets</span></div>
     </a>
     <a class="card" href="/toolkits/linear.html"
        data-blob="linear linear linear task federation — mirror a linear project into org :task: nodes, query + (gated) write-back. integration linear database deploy auth ai tasks"
-       data-cat="Integration"
-       data-int="Linear"
-       data-caps="database deploy auth ai tasks">
+       data-cat="Integration">
       <div class="top">
-        <span class="logo "><span class="mono">L</span></span>
-        <div>
+        <span class="logo brand " style="background:#aee5c2"><img src="/toolkits/logos/linear.svg" alt="linear logo"></span>
+        <div class="hd">
           <h3>linear</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Linear task federation — mirror a Linear project into org :task: nodes, query + (gated) write-back.</div>
-      <div class="chips"><span class="cc cat">Integration</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">ai</span></div>
+      <div class="meta"><span class="cc cat">Integration</span><span class="cc">database</span><span class="cc">deploy</span><span class="cc">auth</span></div>
     </a>
     <a class="card" href="/toolkits/mono.html"
        data-blob="mono mono rgba → grayscale, the first deployed kernel-shape toolkit (bytes→bytes hot loop). design  fonts sandbox"
-       data-cat="Design"
-       data-int=""
-       data-caps="fonts sandbox">
+       data-cat="Design">
       <div class="top">
-        <span class="logo "><span class="mono">M</span></span>
-        <div>
+        <span class="logo icon " style="background:#aee5c2"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M402.535 170.145C402.928 175.931 402.506 183.894 400.66 189.408C397.139 199.921 392.439 210.441 388.527 220.782L366.162 278.923C360.991 292.03 354.71 307.368 350.03 320.372C340.732 347.609 324.555 368.427 297.902 380.395C278.045 389.315 262.642 388.348 241.505 388.338L198.21 388.32L147.394 388.334C138.954 388.334 127.501 388.66 119.216 388.084C113.711 387.689 108.288 386.532 103.099 384.648C89.8822 379.761 77.8807 367.927 72.0805 355.129C67.4025 344.815 66.4171 331.996 68.3939 320.918C69.8629 312.705 73.1203 306.235 76.1303 298.657L84.6068 276.87L107.29 217.858C111.944 205.904 116.725 193.421 121.523 181.783C132.039 156.281 132.172 131.063 120.551 105.92C118.807 102.146 112.599 91.348 109.768 88.5105C107.836 86.5738 105.485 85.1079 102.894 84.2282C95.2782 81.6552 85.9355 84.715 82.143 91.9987C79.792 96.5109 78.3818 101.292 76.5766 106.031L68.0336 128.133C62.9438 141.608 56.7244 155.836 51.8852 169.381C48.7826 178.666 44.2453 188.504 40.851 198.013C35.2258 213.774 23.6568 231.34 38.4389 246.29C45.6702 253.603 53.8932 254.349 63.4994 254.18C60.0605 264.47 55.8665 274.127 51.9643 284.224C30.5824 281.012 16.552 272.617 6.37929 253.016C-7.3112 226.63 5.28091 205.804 14.7123 181.27L41.0707 113.475C42.5808 109.656 43.7862 105.434 45.4096 101.711C51.8276 86.9725 56.255 70.359 64.8559 56.737C79.4218 33.6687 104.504 17.4868 131.727 14.7312C141.649 13.727 151.42 13.9919 161.373 13.9929L205.293 14.0046L255.73 13.9968C264.163 13.9958 275.78 13.6555 283.879 14.2468C289.12 14.6109 294.289 15.6795 299.246 17.4216C312.898 22.2688 325.031 33.8902 330.88 46.7917C339.41 65.6051 335.862 84.9637 327.331 102.899C325.334 107.099 323.409 113.267 321.763 117.772C344.253 117.304 365.448 115.777 383.182 131.467C394.799 141.744 401.166 154.902 402.535 170.145ZM269.938 346.397C270.947 344.067 271.009 340.566 270.782 337.978C269.826 333.352 267.773 330.846 265.287 326.965C258.322 316.088 249.332 306.637 238.513 299.491C213.043 282.67 190.135 284.609 161.529 284.616L114.231 284.636C110.837 293.323 107.229 301.896 104.072 310.655C100.049 321.452 94.5616 330.905 99.9672 342.601C103.945 351.212 112.817 358.049 122.543 357.977C129.854 358.053 136.989 358.063 144.224 358.066L184.201 358.073L229.139 358.073C236.946 358.073 244.6 357.991 252.63 358.022C261.056 358.06 266.551 354.212 269.938 346.397ZM304.093 78.6941C305.015 75.7078 305.432 72.5881 305.328 69.4646C305.289 68.1075 305.197 66.7526 305.05 65.4031C302.6 54.5516 293.459 45.036 282.108 44.4489C273.879 44.023 265.092 44.2557 256.822 44.2595L209.099 44.2839L168.528 44.2595C160.559 44.2561 151.917 43.7804 144.116 45.0114C140.955 45.5105 135.391 51.0983 133.959 53.9597C129.484 62.908 133.97 69.475 138.648 76.5691C148.278 91.1709 161.187 102.325 177.039 109.682C196.736 118.926 217.847 117.759 238.995 117.742C243.791 117.738 255.496 118.031 259.86 117.462C256.498 123.717 254.563 130.388 252.022 137.006C250.57 140.786 248.856 144.476 247.455 148.236C229.086 147.856 213.761 147.554 196.561 154.993C190.768 157.497 187.713 158.411 182.174 162.208C151.134 182.297 146.322 201.964 133.479 234.579C131.306 240.094 128.431 249.537 125.579 254.294C147.28 253.679 170.467 255.924 191.949 252.073C197.512 251.078 203.096 248.655 208.354 246.616C227.567 238.77 244.092 223.634 254.032 205.465C258.952 196.524 261.792 187.369 265.486 177.976L282.847 133.187C289.429 115.931 298.648 96.069 304.093 78.6941ZM362.464 203.848C366 193.854 372.23 183.598 371.64 172.613C371.092 165.035 369.201 159.966 363.492 154.719C354.622 146.569 343.363 148.067 332.06 148.098L309.604 148.138C306.549 156.794 303.703 163.642 300.456 172.031L287.073 206.999C281.87 220.569 275.885 233.076 274.241 247.958C272.512 263.608 274.724 274.931 279.786 289.486C282.854 297.926 290.445 313.679 298.822 317.519C303.121 319.503 308.053 319.613 312.435 317.818C322.074 313.919 323.265 304.515 326.728 295.718L353.141 227.76C356.246 219.722 359.562 212.051 362.464 203.848Z"/></svg></span>
+        <div class="hd">
           <h3>mono</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">RGBA → grayscale, the first deployed kernel-shape toolkit (bytes→bytes hot loop).</div>
-      <div class="chips"><span class="cc cat">Design</span><span class="cc">fonts</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Design</span><span class="cc">fonts</span><span class="cc">sandbox</span></div>
     </a>
     <a class="card" href="/toolkits/open-avatars.html"
        data-blob="open-avatars open-avatars many art styles, one dicebear-like api. a zero-dependency, deterministic avatar engine (browser / node / quickjs-wasm): a single avatar(pack, seed, opts) routes by a pack&#x27;s type — assembled (composed atoms), gallery (pick one whole avatar, svg or raster), or procedural (a generator the pack ships). same seed → byte-identical avatar across every style, forever. seven styles ship: open-peeps, transhumans, pixabots, boring, jdenticon, minidenticons, pixitar. assets  fetch image assets sandbox tasks"
-       data-cat="Assets"
-       data-int=""
-       data-caps="fetch image assets sandbox tasks">
+       data-cat="Assets">
       <div class="top">
-        <span class="logo "><span class="mono">O</span></span>
-        <div>
+        <span class="logo icon " style="background:#b8e0e8"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+        <div class="hd">
           <h3>open-avatars</h3>
           <div class="ver">v0.2.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine (browser / Node / QuickJS-wasm): a single avatar(pack, seed, opts) routes by a pack&#x27;s TYPE — assembled (composed atoms), gallery (pick one whole avatar, SVG or raster), or procedural (a generator the pack ships). Same seed → byte-identical avatar across every style, forever. Seven styles ship: open-peeps, transhumans, pixabots, boring, jdenticon, minidenticons, pixitar.</div>
-      <div class="chips"><span class="cc cat">Assets</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">assets</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Assets</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">assets</span></div>
     </a>
     <a class="card" href="/toolkits/orgitorial.html"
        data-blob="orgitorial orgitorial an org-mode blogging/cms toolkit you plug into any site — a zero-dependency org→html renderer (browser / node / quickjs-wasm), a complete editorial css library themed by custom properties, and skills documenting the stable class contract. plain html semantics, no framework. pipeline  fetch design-tokens deploy sandbox tasks docs brand"
-       data-cat="Pipeline"
-       data-int=""
-       data-caps="fetch design-tokens deploy sandbox tasks docs brand">
+       data-cat="Pipeline">
       <div class="top">
-        <span class="logo "><span class="mono">O</span></span>
-        <div>
+        <span class="logo icon " style="background:#f0b8b8"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M218.29,182.17a12,12,0,0,1-16.47,4.12L140,149.19V216a12,12,0,0,1-24,0V149.19l-61.82,37.1a12,12,0,1,1-12.35-20.58L104.68,128,41.83,90.29A12,12,0,1,1,54.18,69.71L116,106.81V40a12,12,0,0,1,24,0v66.81l61.82-37.1a12,12,0,1,1,12.35,20.58L151.32,128l62.85,37.71A12,12,0,0,1,218.29,182.17Z"/></svg></span>
+        <div class="hd">
           <h3>orgitorial</h3>
           <div class="ver">v0.2.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">An org-mode blogging/CMS toolkit you plug into any site — a zero-dependency org→HTML renderer (browser / Node / QuickJS-wasm), a complete editorial CSS library themed by custom properties, and skills documenting the stable class contract. Plain HTML semantics, no framework.</div>
-      <div class="chips"><span class="cc cat">Pipeline</span><span class="cc">fetch</span><span class="cc">design-tokens</span><span class="cc">deploy</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Pipeline</span><span class="cc">fetch</span><span class="cc">design-tokens</span><span class="cc">deploy</span></div>
     </a>
     <a class="card" href="/toolkits/palette.html"
        data-blob="palette palette the wasm build/runtime palette — language runtimes &amp; compilers as pinned, sandboxed commands (one set, not separate packages). design  fetch design-tokens git sandbox"
-       data-cat="Design"
-       data-int=""
-       data-caps="fetch design-tokens git sandbox">
+       data-cat="Design">
       <div class="top">
-        <span class="logo "><span class="mono">P</span></span>
-        <div>
+        <span class="logo icon " style="background:#f0b8b8"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M72.5,150.63,100.79,128,72.5,105.37a12,12,0,1,1,15-18.74l40,32a12,12,0,0,1,0,18.74l-40,32a12,12,0,0,1-15-18.74ZM144,172h32a12,12,0,0,0,0-24H144a12,12,0,0,0,0,24ZM236,56V200a20,20,0,0,1-20,20H40a20,20,0,0,1-20-20V56A20,20,0,0,1,40,36H216A20,20,0,0,1,236,56Zm-24,4H44V196H212Z"/></svg></span>
+        <div class="hd">
           <h3>palette</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">The WASM build/runtime palette — language runtimes &amp; compilers as pinned, sandboxed commands (one set, not separate packages).</div>
-      <div class="chips"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">design-tokens</span><span class="cc">git</span><span class="cc">sandbox</span></div>
+      <div class="meta"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">design-tokens</span><span class="cc">git</span></div>
     </a>
     <a class="card" href="/toolkits/presentation.html"
        data-blob="presentation presentation ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide urls. the capability is &quot;presentation&quot;; the impl is reveal.js, swappable. design  fetch ai brand slides"
-       data-cat="Design"
-       data-int=""
-       data-caps="fetch ai brand slides">
+       data-cat="Design">
       <div class="top">
-        <span class="logo "><span class="mono">P</span></span>
-        <div>
+        <span class="logo icon " style="background:#f0b8b8"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.4811 223.388C22.7054 213.189 25.339 203.02 30.9681 194.48C44.5292 174.34 81.6453 160.649 105.376 155.578C125.934 151.186 169.047 149.096 175.033 177.422C179.393 198.053 139.22 209.571 130.511 224.908C127.02 231.055 124.582 235.376 126.096 242.975C128.362 257.377 143.781 271.299 155.638 279.198C180.628 295.848 220.184 312.519 250.753 308.46C255.483 307.787 262.713 304.992 265.199 300.57C274.28 283.341 260.05 256.087 251.774 240.727C222.942 187.219 177.378 143.241 127.419 109.411C121.535 105.428 114.17 101.383 108.116 97.5287C81.1947 80.3898 65.2134 50.2718 84.2971 20.9C90.7645 10.9951 102.146 4.66043 113.887 2.74142C127.142 0.574174 139.411 3.78208 150.429 11.5822C160.04 19.4254 162.609 26.3686 167.726 37.3581C170.99 44.4336 174.345 51.4667 177.791 58.4548C188.325 79.8451 199.686 100.819 211.848 121.328C242.655 173.271 278.399 222.122 318.585 267.202C333.038 283.459 349.473 300.553 365.094 315.823C404.647 354.006 359.967 418.985 310.353 396.066C299.035 390.838 286.916 379.789 276.388 372.533C255.858 358.254 234.633 345 212.793 332.82C187.74 318.903 161.882 306.489 135.356 295.642C117.781 288.439 99.9256 281.942 81.8325 276.164C68.6132 271.913 51.0906 268.775 40.4348 259.658C29.6611 250.44 24.4564 237.403 23.4811 223.388Z"/><path d="M238.744 122.004C238.485 118.566 239.159 114.312 240.252 111.063C241.564 107.123 243.657 103.487 246.405 100.374C249.127 97.2965 254.174 93.2232 257.468 90.3375C262.991 85.5433 268.342 80.5548 273.512 75.3816C278.668 70.1783 283.654 64.8099 288.462 59.2839C292.501 54.6114 297.437 48.4567 301.883 44.3781C305.695 40.8723 309.993 37.9341 314.643 35.6542C324.806 30.6806 336.535 29.9755 347.221 33.6965C361.156 38.5327 370.243 48.2548 376.582 61.2329C378.043 64.8905 379.042 68.7161 379.557 72.621C381.304 85.1829 377.848 97.9133 369.989 107.868C365.325 113.867 359.357 118.725 352.536 122.074C345.945 125.26 335.343 127.429 327.943 129.291C321.184 131.03 314.465 132.923 307.793 134.97C305.358 135.703 303.05 136.527 300.636 137.32C284.293 142.688 265.604 156.44 249.384 143.068C242.298 137.227 239.673 130.695 238.744 122.004Z"/></svg></span>
+        <div class="hd">
           <h3>presentation</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">Ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide URLs. The capability is &quot;presentation&quot;; the impl is reveal.js, swappable.</div>
-      <div class="chips"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">ai</span><span class="cc">brand</span><span class="cc">slides</span></div>
+      <div class="meta"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">ai</span><span class="cc">brand</span></div>
     </a>
     <a class="card" href="/toolkits/publish.html"
        data-blob="publish publish at protocol publishing + workbooks network identity — bind a bluesky account, publish signed workbooks, watch the verified feed. deploy  auth tasks"
-       data-cat="Deploy"
-       data-int=""
-       data-caps="auth tasks">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">P</span></span>
-        <div>
+        <span class="logo icon " style="background:#aee5c2"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.4811 223.388C22.7054 213.189 25.339 203.02 30.9681 194.48C44.5292 174.34 81.6453 160.649 105.376 155.578C125.934 151.186 169.047 149.096 175.033 177.422C179.393 198.053 139.22 209.571 130.511 224.908C127.02 231.055 124.582 235.376 126.096 242.975C128.362 257.377 143.781 271.299 155.638 279.198C180.628 295.848 220.184 312.519 250.753 308.46C255.483 307.787 262.713 304.992 265.199 300.57C274.28 283.341 260.05 256.087 251.774 240.727C222.942 187.219 177.378 143.241 127.419 109.411C121.535 105.428 114.17 101.383 108.116 97.5287C81.1947 80.3898 65.2134 50.2718 84.2971 20.9C90.7645 10.9951 102.146 4.66043 113.887 2.74142C127.142 0.574174 139.411 3.78208 150.429 11.5822C160.04 19.4254 162.609 26.3686 167.726 37.3581C170.99 44.4336 174.345 51.4667 177.791 58.4548C188.325 79.8451 199.686 100.819 211.848 121.328C242.655 173.271 278.399 222.122 318.585 267.202C333.038 283.459 349.473 300.553 365.094 315.823C404.647 354.006 359.967 418.985 310.353 396.066C299.035 390.838 286.916 379.789 276.388 372.533C255.858 358.254 234.633 345 212.793 332.82C187.74 318.903 161.882 306.489 135.356 295.642C117.781 288.439 99.9256 281.942 81.8325 276.164C68.6132 271.913 51.0906 268.775 40.4348 259.658C29.6611 250.44 24.4564 237.403 23.4811 223.388Z"/><path d="M238.744 122.004C238.485 118.566 239.159 114.312 240.252 111.063C241.564 107.123 243.657 103.487 246.405 100.374C249.127 97.2965 254.174 93.2232 257.468 90.3375C262.991 85.5433 268.342 80.5548 273.512 75.3816C278.668 70.1783 283.654 64.8099 288.462 59.2839C292.501 54.6114 297.437 48.4567 301.883 44.3781C305.695 40.8723 309.993 37.9341 314.643 35.6542C324.806 30.6806 336.535 29.9755 347.221 33.6965C361.156 38.5327 370.243 48.2548 376.582 61.2329C378.043 64.8905 379.042 68.7161 379.557 72.621C381.304 85.1829 377.848 97.9133 369.989 107.868C365.325 113.867 359.357 118.725 352.536 122.074C345.945 125.26 335.343 127.429 327.943 129.291C321.184 131.03 314.465 132.923 307.793 134.97C305.358 135.703 303.05 136.527 300.636 137.32C284.293 142.688 265.604 156.44 249.384 143.068C242.298 137.227 239.673 130.695 238.744 122.004Z"/></svg></span>
+        <div class="hd">
           <h3>publish</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">auth</span><span class="cc">tasks</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">auth</span><span class="cc">tasks</span></div>
     </a>
     <a class="card" href="/toolkits/railway.html"
        data-blob="railway railway railway&#x27;s cli — deploy a forged workbook as a static site on the user&#x27;s own account. deploy railway image deploy auth docs"
-       data-cat="Deploy"
-       data-int="Railway"
-       data-caps="image deploy auth docs">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">R</span></span>
-        <div>
+        <span class="logo brand " style="background:#f3c5a3"><img src="/toolkits/logos/railway.svg" alt="railway logo"></span>
+        <div class="hd">
           <h3>railway</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">image</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">docs</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">image</span><span class="cc">deploy</span><span class="cc">auth</span></div>
     </a>
     <a class="card" href="/toolkits/sandbox.html"
        data-blob="sandbox sandbox the in-sandbox command set — scripting languages, js engines, crypto, fonts &amp; text-shaping, image, xml, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to wasi and run under wasmtime, no native execution. dev tools  fetch video image fonts database git sandbox ai"
-       data-cat="Dev tools"
-       data-int=""
-       data-caps="fetch video image fonts database git sandbox ai">
+       data-cat="Dev tools">
       <div class="top">
-        <span class="logo "><span class="mono">S</span></span>
-        <div>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M208,36H48A20,20,0,0,0,28,56V200a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V56A20,20,0,0,0,208,36Zm-4,24v56H52V60ZM52,196V140H204v56ZM160,88a16,16,0,1,1,16,16A16,16,0,0,1,160,88Zm32,80a16,16,0,1,1-16-16A16,16,0,0,1,192,168Z"/></svg></span>
+        <div class="hd">
           <h3>sandbox</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">The in-sandbox command set — scripting languages, JS engines, crypto, fonts &amp; text-shaping, image, XML, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to WASI and run under wasmtime, no native execution.</div>
-      <div class="chips"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">image</span><span class="cc">fonts</span></div>
+      <div class="meta"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">image</span></div>
     </a>
     <a class="card" href="/toolkits/tauri.html"
        data-blob="tauri tauri tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app. deploy tauri deploy desktop tasks"
-       data-cat="Deploy"
-       data-int="Tauri"
-       data-caps="deploy desktop tasks">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">T</span></span>
-        <div>
+        <span class="logo brand " style="background:#f0b8b8"><img src="/toolkits/logos/tauri.svg" alt="tauri logo"></span>
+        <div class="hd">
           <h3>tauri</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">desktop</span><span class="cc">tasks</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">desktop</span><span class="cc">tasks</span></div>
     </a>
     <a class="card" href="/toolkits/toolkit-forge.html"
        data-blob="toolkit-forge toolkit-forge forge a new toolkit from a target — npm name / github url / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/authoring.org standard. dev tools  fetch video deploy auth git ai"
-       data-cat="Dev tools"
-       data-int=""
-       data-caps="fetch video deploy auth git ai">
+       data-cat="Dev tools">
       <div class="top">
-        <span class="logo "><span class="mono">T</span></span>
-        <div>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+        <div class="hd">
           <h3>toolkit-forge</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.org standard.</div>
-      <div class="chips"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">deploy</span><span class="cc">auth</span></div>
+      <div class="meta"><span class="cc cat">Dev tools</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">deploy</span></div>
     </a>
     <a class="card" href="/toolkits/video.html"
        data-blob="video video ask for a video, get hyperframes — author a wavelet scene (onready/ontick, fixed canvas), wavelet renders it to a clip. the capability is &quot;video&quot;; the impl is hyperframes, swappable. media  fetch video image fonts ai brand"
-       data-cat="Media"
-       data-int=""
-       data-caps="fetch video image fonts ai brand">
+       data-cat="Media">
       <div class="top">
-        <span class="logo "><span class="mono">V</span></span>
-        <div>
+        <span class="logo icon " style="background:#aee5c2"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M255.494 117.666C250.42 117.679 245.915 123.002 246.758 127.857C247.523 132.264 251.146 138.332 252.975 142.698C256.703 151.729 259.076 161.265 260.017 170.994C262.941 198.91 254.431 226.819 236.441 248.319C218.911 269.373 193.757 282.582 166.519 285.036C139.163 287.575 111.929 279.085 90.8255 261.443C70.8224 244.823 57.8239 221.229 54.4348 195.401C53.4682 187.996 56.7846 165.626 43.6931 166.928C39.8349 167.312 34.3063 172.804 31.4914 175.813C19.0714 189.097 5.63616 199.732 8.35394 219.793C8.83925 223.606 10.0121 227.302 11.8158 230.693C19.0066 244.072 41.4283 263.568 53.5653 272.878C81.7339 293.389 114.092 307.376 148.303 313.83C230.054 329.768 320.621 306.398 376.413 242.421C379.35 239.054 382.335 235.634 384.585 231.752C386.405 228.633 387.668 225.221 388.318 221.663C391.628 203.884 382.414 193.566 371.006 181.484C341.848 150.605 297.396 125.274 255.494 117.666Z"/><path d="M140.399 52.7404C133.98 52.161 131.591 54.9901 128.516 60.3889C124.479 67.4708 120.724 73.5094 113.383 77.6257C104.327 82.7018 94.8418 79.902 85.2957 81.8355C83.216 82.2584 80.5532 84.4703 79.7866 86.4528C75.8066 96.0025 87.9136 100.061 94.0956 104.115C96.9867 106.039 99.5965 108.349 101.843 110.98C113.384 124.617 101.811 143.238 114.945 148.485C124.663 150.098 126.518 140.572 131.281 134.009C134.27 129.883 137.055 126.567 141.52 124.03C148.395 118.108 164.825 122.076 170.383 119.354C186.943 111.247 167.936 100.496 161.885 97.3807C153.493 92.2724 149.525 85.4935 147.967 76.1856C146.405 66.8198 151.005 56.8644 140.399 52.7404Z"/></svg></span>
+        <div class="hd">
           <h3>video</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-beta" style="margin-left:auto">Beta</span>
+        <span class="badge-m m-beta">Beta</span>
       </div>
       <div class="tag">Ask for a video, get HyperFrames — author a wavelet scene (onReady/onTick, fixed canvas), wavelet renders it to a clip. The capability is &quot;video&quot;; the impl is hyperframes, swappable.</div>
-      <div class="chips"><span class="cc cat">Media</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">image</span><span class="cc">fonts</span></div>
+      <div class="meta"><span class="cc cat">Media</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">image</span></div>
     </a>
     <a class="card" href="/toolkits/wavelet.html"
        data-blob="wavelet wavelet imperative editing cli for motion-graphics video compositions (init, inspect, preview, render). design  fetch video audio image fonts brand"
-       data-cat="Design"
-       data-int=""
-       data-caps="fetch video audio image fonts brand">
+       data-cat="Design">
       <div class="top">
-        <span class="logo "><span class="mono">W</span></span>
-        <div>
+        <span class="logo icon " style="background:#f0b8b8"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M218.29,182.17a12,12,0,0,1-16.47,4.12L140,149.19V216a12,12,0,0,1-24,0V149.19l-61.82,37.1a12,12,0,1,1-12.35-20.58L104.68,128,41.83,90.29A12,12,0,1,1,54.18,69.71L116,106.81V40a12,12,0,0,1,24,0v66.81l61.82-37.1a12,12,0,1,1,12.35,20.58L151.32,128l62.85,37.71A12,12,0,0,1,218.29,182.17Z"/></svg></span>
+        <div class="hd">
           <h3>wavelet</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Imperative editing CLI for motion-graphics video compositions (init, inspect, preview, render).</div>
-      <div class="chips"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">audio</span><span class="cc">image</span></div>
+      <div class="meta"><span class="cc cat">Design</span><span class="cc">fetch</span><span class="cc">video</span><span class="cc">audio</span></div>
     </a>
     <a class="card" href="/toolkits/workbooks-system.html"
        data-blob="workbooks-system workbooks-system system knowledge for an agent running inside a workbooks runtime — what a workbook/runtime/toolkit/workflow is, the wasm-only rules of engagement, authoring + publishing from the agent&#x27;s seat, and the product facts to get right when writing about workbooks. system  fetch image deploy git sandbox ai tasks"
-       data-cat="System"
-       data-int=""
-       data-caps="fetch image deploy git sandbox ai tasks">
+       data-cat="System">
       <div class="top">
-        <span class="logo "><span class="mono">W</span></span>
-        <div>
+        <span class="logo icon " style="background:#a8d4f0"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M215.64,128a44,44,0,0,0-43.82-75.9,44,44,0,0,0-87.64,0A44,44,0,0,0,40.36,128a44,44,0,0,0,43.82,75.89,44,44,0,0,0,87.64,0A44,44,0,0,0,215.64,128ZM108,128a20,20,0,1,1,20,20A20,20,0,0,1,108,128Zm72.35-53.32a20,20,0,1,1,20,34.64c-2.65,1.53-10.52,4.88-30.1,6.42a44.08,44.08,0,0,0-10.52-18.18C170.86,81.36,177.7,76.21,180.35,74.68ZM128,36a20,20,0,0,1,20,20c0,3.06-1,11.55-9.49,29.28a43.79,43.79,0,0,0-21,0C109,67.55,108,59.06,108,56A20,20,0,0,1,128,36ZM48.33,82a20,20,0,0,1,27.32-7.32c2.65,1.53,9.49,6.68,20.62,22.88a44.08,44.08,0,0,0-10.52,18.18c-19.58-1.54-27.45-4.89-30.1-6.42A20,20,0,0,1,48.33,82Zm27.32,99.32a20,20,0,1,1-20-34.64c2.65-1.53,10.52-4.88,30.1-6.42a44.08,44.08,0,0,0,10.52,18.18C85.14,174.64,78.3,179.79,75.65,181.32ZM128,220a20,20,0,0,1-20-20c0-3.06,1-11.55,9.49-29.28a43.79,43.79,0,0,0,21,0C147,188.45,148,196.94,148,200A20,20,0,0,1,128,220Zm79.67-46a20,20,0,0,1-27.32,7.32c-2.65-1.53-9.49-6.68-20.62-22.88a44.08,44.08,0,0,0,10.52-18.18c19.58,1.54,27.45,4.89,30.1,6.42A20,20,0,0,1,207.67,174Z"/></svg></span>
+        <div class="hd">
           <h3>workbooks-system</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">System knowledge for an agent running INSIDE a Workbooks runtime — what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, authoring + publishing from the agent&#x27;s seat, and the product facts to get right when writing about Workbooks.</div>
-      <div class="chips"><span class="cc cat">System</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">deploy</span><span class="cc">git</span></div>
+      <div class="meta"><span class="cc cat">System</span><span class="cc">fetch</span><span class="cc">image</span><span class="cc">deploy</span></div>
     </a>
     <a class="card" href="/toolkits/wraith.html"
        data-blob="wraith wraith rust + ts/js codebase analyzer — dead code, unused deps, cycles, dupes, complexity. dev tools  git ai"
-       data-cat="Dev tools"
-       data-int=""
-       data-caps="git ai">
+       data-cat="Dev tools">
       <div class="top">
-        <span class="logo "><span class="mono">W</span></span>
-        <div>
+        <span class="logo icon " style="background:#b8e0e8"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M255.494 117.666C250.42 117.679 245.915 123.002 246.758 127.857C247.523 132.264 251.146 138.332 252.975 142.698C256.703 151.729 259.076 161.265 260.017 170.994C262.941 198.91 254.431 226.819 236.441 248.319C218.911 269.373 193.757 282.582 166.519 285.036C139.163 287.575 111.929 279.085 90.8255 261.443C70.8224 244.823 57.8239 221.229 54.4348 195.401C53.4682 187.996 56.7846 165.626 43.6931 166.928C39.8349 167.312 34.3063 172.804 31.4914 175.813C19.0714 189.097 5.63616 199.732 8.35394 219.793C8.83925 223.606 10.0121 227.302 11.8158 230.693C19.0066 244.072 41.4283 263.568 53.5653 272.878C81.7339 293.389 114.092 307.376 148.303 313.83C230.054 329.768 320.621 306.398 376.413 242.421C379.35 239.054 382.335 235.634 384.585 231.752C386.405 228.633 387.668 225.221 388.318 221.663C391.628 203.884 382.414 193.566 371.006 181.484C341.848 150.605 297.396 125.274 255.494 117.666Z"/><path d="M140.399 52.7404C133.98 52.161 131.591 54.9901 128.516 60.3889C124.479 67.4708 120.724 73.5094 113.383 77.6257C104.327 82.7018 94.8418 79.902 85.2957 81.8355C83.216 82.2584 80.5532 84.4703 79.7866 86.4528C75.8066 96.0025 87.9136 100.061 94.0956 104.115C96.9867 106.039 99.5965 108.349 101.843 110.98C113.384 124.617 101.811 143.238 114.945 148.485C124.663 150.098 126.518 140.572 131.281 134.009C134.27 129.883 137.055 126.567 141.52 124.03C148.395 118.108 164.825 122.076 170.383 119.354C186.943 111.247 167.936 100.496 161.885 97.3807C153.493 92.2724 149.525 85.4935 147.967 76.1856C146.405 66.8198 151.005 56.8644 140.399 52.7404Z"/></svg></span>
+        <div class="hd">
           <h3>wraith</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-stable" style="margin-left:auto">Stable</span>
+        <span class="badge-m m-stable">Stable</span>
       </div>
       <div class="tag">Rust + TS/JS codebase analyzer — dead code, unused deps, cycles, dupes, complexity.</div>
-      <div class="chips"><span class="cc cat">Dev tools</span><span class="cc">git</span><span class="cc">ai</span></div>
+      <div class="meta"><span class="cc cat">Dev tools</span><span class="cc">git</span><span class="cc">ai</span></div>
     </a>
     <a class="card" href="/toolkits/wrangler.html"
        data-blob="wrangler wrangler cloudflare&#x27;s cli — deploy a forged workbook to pages on the user&#x27;s own account. deploy cloudflare deploy auth tasks"
-       data-cat="Deploy"
-       data-int="Cloudflare"
-       data-caps="deploy auth tasks">
+       data-cat="Deploy">
       <div class="top">
-        <span class="logo "><span class="mono">W</span></span>
-        <div>
+        <span class="logo brand " style="background:#a8d4f0"><img src="/toolkits/logos/wrangler.svg" alt="wrangler logo"></span>
+        <div class="hd">
           <h3>wrangler</h3>
           <div class="ver">v0.1.0</div>
         </div>
-        <span class="badge-m m-exp" style="margin-left:auto">Experimental</span>
+        <span class="badge-m m-exp">Experimental</span>
       </div>
       <div class="tag">Cloudflare&#x27;s CLI — deploy a forged workbook to Pages on the user&#x27;s own account.</div>
-      <div class="chips"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">tasks</span></div>
+      <div class="meta"><span class="cc cat">Deploy</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">tasks</span></div>
     </a></div>
-  <div class="empty" id="empty" style="display:none">No toolkits match — clear a filter.</div>
+  <div class="empty" id="empty" style="display:none">No toolkits match — try another search.</div>
 </div>
 
 <div class="foot">
@@ -635,21 +575,21 @@ a{ color:inherit; }
 
 <script>
 (function(){
-  var q=document.getElementById('q'), grid=document.getElementById('grid');
+  var q=document.getElementById('q'), cat=document.getElementById('cat');
+  var grid=document.getElementById('grid');
   var cards=[].slice.call(grid.querySelectorAll('.card'));
   var count=document.getElementById('count'), empty=document.getElementById('empty');
-  var fcat=new Set(), fcap=new Set();
 
   function apply(){
     var term=(q.value||'').trim().toLowerCase();
+    var terms=term?term.split(/\s+/):[];
+    var c2=cat.value;
     var shown=0;
     cards.forEach(function(c){
       var blob=c.dataset.blob;
-      var okTerm=!term || blob.indexOf(term)>=0;
-      var okCat=!fcat.size || fcat.has(c.dataset.cat);
-      var caps=c.dataset.caps.split(' ');
-      var okCap=!fcap.size || caps.some(function(x){return fcap.has(x);});
-      var ok=okTerm && okCat && okCap;
+      var okTerm=terms.every(function(t){return blob.indexOf(t)>=0;});
+      var okCat=!c2 || c.dataset.cat===c2;
+      var ok=okTerm && okCat;
       c.style.display=ok?'':'none';
       if(ok) shown++;
     });
@@ -657,24 +597,10 @@ a{ color:inherit; }
     empty.style.display=shown?'none':'block';
   }
   q.addEventListener('input', apply);
-  document.querySelectorAll('[data-fcat]').forEach(function(b){
-    b.addEventListener('click', function(){
-      var v=b.dataset.fcat;
-      if(fcat.has(v)){fcat.delete(v); b.classList.remove('on');} else {fcat.add(v); b.classList.add('on');}
-      apply();
-    });
-  });
-  document.querySelectorAll('[data-fcap]').forEach(function(b){
-    b.addEventListener('click', function(){
-      var v=b.dataset.fcap;
-      if(fcap.has(v)){fcap.delete(v); b.classList.remove('on');} else {fcap.add(v); b.classList.add('on');}
-      apply();
-    });
-  });
-  // deep-link: ?cap=foo or ?cat=Bar
+  cat.addEventListener('change', apply);
   var p=new URLSearchParams(location.search);
-  if(p.get('cat')){ var bb=document.querySelector('[data-fcat="'+p.get('cat')+'"]'); if(bb) bb.click(); }
-  if(p.get('cap')){ var bc=document.querySelector('[data-fcap="'+p.get('cap')+'"]'); if(bc) bc.click(); }
+  if(p.get('cat')){ cat.value=p.get('cat'); }
+  if(p.get('q')){ q.value=p.get('q'); }
   apply();
 })();
 </script>
