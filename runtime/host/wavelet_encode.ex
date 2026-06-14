@@ -9,9 +9,11 @@ defmodule Workbooks.WaveletEncode do
   Same intent shape as the broker (`frames_dir`, `out_path`, `fps`) but the encode
   happens in the wasm sandbox: no host ffmpeg, no native exec, no broker grant.
 
-  Codec: built-in `mpeg4` video + `mp4` muxer + `png` decoder (dependency-free,
-  universally playable). H.264 quality is the libx264 follow-on — for now the host
-  broker remains the H.264 path; this is the zero-trust, no-native-exec default.
+  Codec: H.264 via in-guest **libx264** (GPL, cross-compiled to wasm32-wasi) +
+  `mp4` muxer + `png` decoder + native AAC audio — broadcast-quality (CRF 18,
+  medium preset, High profile), matching the host broker's output WITHOUT native
+  exec, so the broker is no longer needed for quality. A dependency-free `mpeg4`
+  fallback remains via `vcodec: "mpeg4"` (or `WB_VCODEC=mpeg4`).
 
   Provisioning mirrors the other compiler lanes: `Workbooks.Compilers.build/1` runs
   `runtime/compilers/ffmpeg/build.sh` (cross-compiles wb_encode.wasm with wasi-sdk),
@@ -32,21 +34,20 @@ defmodule Workbooks.WaveletEncode do
   Returns `{:ok, name}` | `{:error, reason}`. Idempotent.
   """
   def ensure_registered do
-    if @command in Workbooks.CommandRegistry.list() do
-      {:ok, @command}
-    else
-      # Compilers.build/1 runs compilers/ffmpeg/build.sh (cross-compiles wb_encode.wasm
-      # with wasi-sdk), content-addresses it, and registers it under CLI_BIN ("wb_encode").
-      case Workbooks.Compilers.build("ffmpeg") do
-        {:ok, @command, _wasm} ->
-          {:ok, @command}
+    # Always go through Compilers.build/1: it runs compilers/ffmpeg/build.sh (idempotent —
+    # if wb_encode.wasm is already built it exits early WITHOUT recompiling), then content-
+    # addresses + (re)registers the CURRENT on-disk wasm under CLI_BIN ("wb_encode"). This
+    # picks up a rebuilt wasm (e.g. after a codec change) even when a stale registration for
+    # the name persists from a prior boot — registry hot-swap replaces by content hash.
+    case Workbooks.Compilers.build("ffmpeg") do
+      {:ok, @command, _wasm} ->
+        {:ok, @command}
 
-        {:ok, other, _wasm} ->
-          {:error, {:encode_lane_unexpected_name, other}}
+      {:ok, other, _wasm} ->
+        {:error, {:encode_lane_unexpected_name, other}}
 
-        {:error, reason} ->
-          {:error, {:encode_lane_build_failed, reason}}
-      end
+      {:error, reason} ->
+        {:error, {:encode_lane_build_failed, reason}}
     end
   end
 
@@ -63,12 +64,16 @@ defmodule Workbooks.WaveletEncode do
       preopen — wasi grants no host paths beyond the explicit preopens) and the
       driver decodes → resamples → encodes a native AAC track muxed alongside the
       video. NO host ffmpeg, NO native exec — the audio mux is fully in-guest.
+    * `:vcodec` (`"h264"` | `"mpeg4"`, default `"h264"`) — video codec. `"h264"`
+      uses the in-guest libx264 lane (broadcast quality); `"mpeg4"` uses the
+      dependency-free built-in encoder. Both run fully in the wasm sandbox.
   """
   def encode(frames_dir, out_path, opts \\ [])
       when is_binary(frames_dir) and is_binary(out_path) and is_list(opts) do
     fps = Keyword.get(opts, :fps, 30)
     timeout_ms = Keyword.get(opts, :timeout_ms, 600_000)
     audio = Keyword.get(opts, :audio)
+    vcodec = Keyword.get(opts, :vcodec, "h264")
 
     frames_abs = Path.expand(frames_dir)
     out_abs = Path.expand(out_path)
@@ -78,8 +83,17 @@ defmodule Workbooks.WaveletEncode do
 
     with {:ok, audio_argv} <- stage_audio(audio, frames_abs),
          {:ok, _name} <- ensure_registered() do
+      # driver argv positions: 4=audio (""=none), 5=vcodec. If a non-default vcodec is set
+      # without audio, pad position 4 with "" so vcodec lands at position 5.
+      tail =
+        case {audio_argv, vcodec} do
+          {a, "h264"} -> a
+          {[], v} -> ["", v]
+          {[a], v} -> [a, v]
+        end
+
       argv =
-        ["/in/#{@frame_pattern}", "/out/#{out_base}", Integer.to_string(fps)] ++ audio_argv
+        ["/in/#{@frame_pattern}", "/out/#{out_base}", Integer.to_string(fps)] ++ tail
 
       dirs = ["#{frames_abs}::/in", "#{out_dir}::/out"]
       ropts = [timeout_ms: timeout_ms, fuel: 500_000_000_000]

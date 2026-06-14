@@ -67,6 +67,50 @@ if [ ! -f "$ZDIR/libz.a" ]; then
     "$SDK/bin/llvm-ar" rcs libz.a obj/*.o )
 fi
 
+# --- 1b. libx264 (GPL H.264 encoder) -> wasm32-wasi --------------------------------------
+# x264's configure is a hand-written shell script (NOT autotools). It cross-compiles fine
+# C-only: --disable-asm (no nasm/wasm SIMD), --disable-thread (single-threaded wasm), and
+# --host=wasm32 so it skips the host PIC/exec probes. We build a static libx264.a + headers.
+X264DIR="$BD/x264"
+if [ ! -f "$X264DIR/libx264.a" ]; then
+  # pinned snapshot from VideoLAN's stable-branch mirror (commit-locked tarball, sha-verified)
+  X264_REV="31e19f92f00c7003fa115047ce50978bc98c3a0d"
+  X264_SHA="d053c9d86988d6bc78237ca5205865c5ddf99c98ef4cd9927eec8f6d388f6dd9"
+  X264TGZ="$BD/x264-$X264_REV.tar.gz"
+  [ -f "$X264TGZ" ] || { echo "[ffmpeg] fetch x264 $X264_REV"; curl -fsSL \
+    "https://code.videolan.org/videolan/x264/-/archive/$X264_REV/x264-$X264_REV.tar.gz" -o "$X264TGZ"; }
+  echo "$X264_SHA  $X264TGZ" | shasum -a 256 -c - || { echo "[ffmpeg] x264 SHA MISMATCH"; exit 1; }
+  rm -rf "$BD/x264-$X264_REV" "$X264DIR"
+  tar xzf "$X264TGZ" -C "$BD"
+  mv "$BD/x264-$X264_REV" "$X264DIR"
+  echo "[ffmpeg] building libx264 -> wasm32-wasi"
+  ( cd "$X264DIR"
+    # (a) config.sub (2012 vintage) doesn't know wasm32/wasi -> short-circuit wasm32-* targets.
+    perl -0pi -e 's/(timestamp=.2012-12-06.\n)/$1\ncase "\$1" in wasm32-*) echo "wasm32-unknown-wasi"; exit 0;; esac\n/' config.sub
+    # (b) configure's host_os case has no wasi -> add one (SYS=LINUX; libm exists in wasi-sysroot).
+    #     Crucially DO NOT define HAVE_MALLOC_H: that path calls memalign(), absent from wasi-libc;
+    #     without it x264 uses its portable malloc()+manual-align fallback (works on wasm).
+    perl -0pi -e 's/    \*\)\n        die "Unknown system \$host, edit the configure"\n        ;;\nesac/    wasi*|none*|unknown*)\n        SYS="LINUX"\n        libm="-lm"\n        ;;\n    *)\n        die "Unknown system \$host, edit the configure"\n        ;;\nesac/' configure
+    grep -q 'wasi\*|none\*|unknown\*' configure || { echo "[ffmpeg] x264 configure patch FAILED"; exit 1; }
+    # x264 references log2f/expf etc (libm in wasi-sysroot) and a few POSIX bits; the wasi
+    # emulation libs cover signal/getpid/clock. --disable-cli => library only (no main()).
+    # AR must be the bare binary — x264's configure appends the `rc` operation itself.
+    CC="$CLANG" \
+    CFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT -O2 -fno-stack-protector \
+            -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS" \
+    LDFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT" \
+    AR="$SDK/bin/llvm-ar" RANLIB="$SDK/bin/llvm-ranlib" STRIP=: \
+    ./configure \
+      --host=wasm32-unknown-wasi \
+      --disable-cli --enable-static \
+      --disable-asm --disable-thread --disable-opencl \
+      --disable-avs --disable-swscale --disable-lavf --disable-ffms --disable-gpac --disable-lsmash \
+      --disable-interlaced \
+      --extra-cflags="--target=wasm32-wasi --sysroot=$SYSROOT" >/dev/null || { echo "[ffmpeg] x264 configure FAILED"; tail -40 config.log 2>/dev/null; exit 1; }
+    make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" libx264.a >/dev/null )
+  [ -f "$X264DIR/libx264.a" ] || { echo "[ffmpeg] libx264.a NOT built"; exit 1; }
+fi
+
 # --- 2. ffmpeg source --------------------------------------------------------------------
 FF_VER="6.1.1"; FF_SHA="8684f4b00f94b85461884c3719382f1261f0d9eb3d59640a1f4ac0873616f968"
 FFDIR="$BD/ffmpeg-$FF_VER"
@@ -101,24 +145,29 @@ EOF
 # --- 4. configure + build libav* (single-threaded, mpeg4/mp4/png only) --------------------
 if [ ! -f "$FFDIR/libavformat/libavformat.a" ]; then
   echo "[ffmpeg] configure (minimal, no-threads, mpeg4/mp4/png)"
-  CFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -O2 -fno-stack-protector -I$ZDIR -include $SHIM"
-  LDFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT -L$ZDIR -lwasi-emulated-signal -lwasi-emulated-mman -lwasi-emulated-getpid -lwasi-emulated-process-clocks -Wl,--allow-undefined"
+  CFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -O2 -fno-stack-protector -I$ZDIR -I$X264DIR -include $SHIM"
+  LDFLAGS="--target=wasm32-wasi --sysroot=$SYSROOT -L$ZDIR -L$X264DIR -lwasi-emulated-signal -lwasi-emulated-mman -lwasi-emulated-getpid -lwasi-emulated-process-clocks -Wl,--allow-undefined"
   ( cd "$FFDIR"
+    # libx264 has no pkg-config in our cross tree; point ffmpeg's probe at the static lib +
+    # headers directly via --extra-cflags/--extra-libs (configure links a tiny x264 program).
     ./configure \
       --cc="$CLANG" --ar="$SDK/bin/llvm-ar" --ranlib="$SDK/bin/llvm-ranlib" --nm="$SDK/bin/llvm-nm" \
       --target-os=none --arch=wasm32 --enable-cross-compile \
       --disable-everything --disable-asm --disable-network --disable-pthreads \
       --disable-autodetect --disable-x86asm --disable-doc \
       --disable-debug --disable-stripping --disable-runtime-cpudetect --enable-zlib \
-      --enable-decoder=png --enable-demuxer=image2 --enable-encoder=mpeg4 \
+      --enable-gpl --enable-libx264 \
+      --enable-decoder=png --enable-demuxer=image2 \
+      --enable-encoder=mpeg4 --enable-encoder=libx264 \
       --enable-muxer=mp4 --enable-protocol=file \
       --enable-decoder=mp3,mp3float,aac,pcm_s16le,pcm_f32le \
       --enable-demuxer=mp3,aac,wav,pcm_s16le \
-      --enable-parser=mpegaudio,aac \
+      --enable-parser=mpegaudio,aac,h264 \
       --enable-encoder=aac \
       --enable-bsf=aac_adtstoasc,extract_extradata \
       --enable-filter=scale,format,fps,vflip,aresample,aformat,anull \
-      --extra-cflags="$CFLAGS" --extra-ldflags="$LDFLAGS" >/dev/null
+      --extra-cflags="$CFLAGS" --extra-ldflags="$LDFLAGS" \
+      --extra-libs="-lx264 -lm" >/dev/null
 
     # configure mis-detects host (macOS/Linux) POSIX features for the unknown wasm32 arch.
     # Force-disable the ones wasm32-wasi lacks so the libs compile.
@@ -149,6 +198,7 @@ echo "[ffmpeg] linking wb_encode.wasm"
   "$FFDIR/libavcodec/libavcodec.a" "$FFDIR/libswscale/libswscale.a" \
   "$FFDIR/libswresample/libswresample.a" "$FFDIR/libavutil/libavutil.a" \
   -L"$ZDIR" -lz \
+  -L"$X264DIR" -lx264 -lm \
   -lwasi-emulated-signal -lwasi-emulated-mman -lwasi-emulated-getpid -lwasi-emulated-process-clocks \
   -Wl,--allow-undefined \
   -o "$OUT"

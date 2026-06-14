@@ -1,11 +1,12 @@
 /* wb_encode: minimal in-sandbox PNG-sequence -> mp4 transcoder built on libav*.
  * Replaces the host ffmpeg CLI for the wavelet encode path. Single-threaded, wasm32-wasi.
  *
- * usage: wb_encode <in_pattern> <out.mp4> [fps] [audio.mp3]
+ * usage: wb_encode <in_pattern> <out.mp4> [fps] [audio.mp3] [vcodec]
  *   video only:  wb_encode /in/frame_%05d.png /out/out.mp4 30
  *   with audio:  wb_encode /in/frame_%05d.png /out/out.mp4 30 /in/audio.mp3
+ *   mpeg4 fallback: wb_encode /in/frame_%05d.png /out/out.mp4 30 "" mpeg4   (or WB_VCODEC=mpeg4)
  *
- * VIDEO: png decoder | image2 demuxer | scale+format(yuv420p) filter | mpeg4 encoder | mp4 muxer
+ * VIDEO (default): png decoder | image2 demuxer | scale+format(yuv420p) | H.264 (libx264) | mp4 muxer
  * AUDIO (optional): mp3/aac/wav decoder | aresample+aformat filter | native AAC encoder
  *                   muxed as a second stream into the SAME mp4. NO external audio libs.
  *
@@ -170,7 +171,7 @@ static void audio_run(Audio*A, AVFormatContext*ofmt){
 }
 
 int main(int argc,char**argv){
-  if(argc<3){ fprintf(stderr,"usage: %s <in_%%05d.png> <out.mp4> [fps] [audio.mp3]\n",argv[0]); return 2; }
+  if(argc<3){ fprintf(stderr,"usage: %s <in_%%05d.png> <out.mp4> [fps] [audio.mp3] [vcodec]\n",argv[0]); return 2; }
   const char*inpat=argv[1]; const char*outpath=argv[2];
   int fps = argc>3?atoi(argv[3]):30; if(fps<=0)fps=30;
   const char*audiopath = argc>4 && argv[4][0] ? argv[4] : NULL;
@@ -212,18 +213,36 @@ int main(int argc,char**argv){
   if((ret=avfilter_graph_parse_ptr(graph,"format=yuv420p",&ins,&outs,NULL))<0) die("parse graph",ret);
   if((ret=avfilter_graph_config(graph,NULL))<0) die("config graph",ret);
 
-  /* ---- output: mp4 muxer + mpeg4 encoder ---- */
+  /* ---- output: mp4 muxer + H.264 (libx264) encoder ----
+   * Default = H.264 via libx264 (GPL), yuv420p, CRF/preset for broadcast-quality output that
+   * matches the host broker — so the broker is no longer needed for quality. Set WB_VCODEC=mpeg4
+   * (env, or pass "mpeg4" as a 5th argv) to fall back to the dependency-free mpeg4 encoder. */
   AVFormatContext*ofmt=NULL;
   if((ret=avformat_alloc_output_context2(&ofmt,NULL,"mp4",outpath))<0) die("alloc out",ret);
-  const AVCodec*enc=avcodec_find_encoder(AV_CODEC_ID_MPEG4);
-  if(!enc){fprintf(stderr,"no mpeg4 encoder\n");return 1;}
+  const char*vcodec = (argc>5 && argv[5][0]) ? argv[5] : (getenv("WB_VCODEC")?getenv("WB_VCODEC"):"h264");
+  int use_x264 = !(strcmp(vcodec,"mpeg4")==0);
+  const AVCodec*enc = use_x264 ? avcodec_find_encoder_by_name("libx264")
+                               : avcodec_find_encoder(AV_CODEC_ID_MPEG4);
+  if(!enc && use_x264){ fprintf(stderr,"libx264 unavailable, falling back to mpeg4\n");
+                        enc=avcodec_find_encoder(AV_CODEC_ID_MPEG4); use_x264=0; }
+  if(!enc){fprintf(stderr,"no video encoder\n");return 1;}
   AVStream*ost=avformat_new_stream(ofmt,NULL);
   AVCodecContext*ectx=avcodec_alloc_context3(enc);
   ectx->width=W;ectx->height=H;ectx->pix_fmt=AV_PIX_FMT_YUV420P;
   ectx->time_base=(AVRational){1,fps};ectx->framerate=(AVRational){fps,1};
-  ectx->gop_size=12;ectx->max_b_frames=0;ectx->bit_rate=2000000;
+  if(use_x264){
+    /* H.264: CRF 18 (visually lossless), medium preset, GOP ~= 2s of frames, B-frames on.
+     * libx264 options go through its private AVOptions (set BEFORE avcodec_open2). */
+    ectx->gop_size=fps*2; ectx->max_b_frames=2;
+    av_opt_set(ectx->priv_data,"preset","medium",0);
+    av_opt_set(ectx->priv_data,"crf","18",0);
+    av_opt_set(ectx->priv_data,"profile","high",0);
+  } else {
+    ectx->gop_size=12; ectx->max_b_frames=0; ectx->bit_rate=2000000;
+  }
   if(ofmt->oformat->flags&AVFMT_GLOBALHEADER) ectx->flags|=AV_CODEC_FLAG_GLOBAL_HEADER;
   if((ret=avcodec_open2(ectx,enc,NULL))<0) die("open enc",ret);
+  fprintf(stderr,"video codec: %s\n",use_x264?"libx264 (H.264) crf18/medium/high":"mpeg4");
   avcodec_parameters_from_context(ost->codecpar,ectx);
   ost->time_base=ectx->time_base;
 

@@ -3,11 +3,12 @@ defmodule Workbooks.WaveletCommandTest do
   End-to-end proof of the Phase-3 `wavelet render` toolkit command: a bash-only
   tenant authors an HTML composition and runs ONE command that renders the frame
   sequence IN-SANDBOX (the render-core wasm via CommandRegistry) then muxes it to
-  an mp4. The DEFAULT mux engine is :in_guest — the Forge ffmpeg lane's
-  wb_encode.wasm encodes mpeg4/mp4 UNDER WASMTIME (no host ffmpeg, no native exec,
-  no broker grant). The :host engine (native ffmpeg + libx264 H.264 + audio) stays
-  available as the quality path and remains default-deny. Empirical — actually runs
-  the wasm under wasmtime and shells ffprobe only to inspect, never faked.
+  an mp4. The DEFAULT mux engine is :in_guest with DEFAULT codec H.264 — the Forge
+  ffmpeg lane's wb_encode.wasm encodes H.264 (in-guest libx264) + AAC into mp4 UNDER
+  WASMTIME (no host ffmpeg, no native exec, no broker grant); `vcodec: "mpeg4"` is a
+  dependency-free in-guest fallback. The :host engine (native ffmpeg) is a legacy
+  escape hatch and remains default-deny. Empirical — actually runs the wasm under
+  wasmtime and shells ffprobe only to inspect, never faked.
   """
   use ExUnit.Case, async: false
   alias Workbooks.Wavelet
@@ -63,15 +64,16 @@ defmodule Workbooks.WaveletCommandTest do
     assert {:ok, ^name} = Wavelet.ensure_registered()
   end
 
-  test "wavelet render: in-sandbox frames -> IN-GUEST mpeg4 mp4 (default, no native exec)",
+  test "wavelet render: in-sandbox frames -> IN-GUEST H.264 mp4 (default, no native exec)",
        %{root: root} do
     comp = Path.join(root, "clip.html")
     File.write!(comp, @composition)
     out = Path.join(root, "clip.mp4")
 
-    # The exact bash-tenant command surface. The DEFAULT encode engine is :in_guest:
-    # the mp4 mux runs the Forge ffmpeg lane's wb_encode.wasm UNDER WASMTIME — no host
-    # ffmpeg, no native exec, no broker grant (:allow not required for the in-guest path).
+    # The exact bash-tenant command surface. The DEFAULT encode engine is :in_guest
+    # and the DEFAULT video codec is H.264 via the in-guest libx264 lane: the mp4 mux
+    # runs the Forge ffmpeg lane's wb_encode.wasm UNDER WASMTIME — no host ffmpeg, no
+    # native exec, no broker grant (:allow not required for the in-guest path).
     assert {:ok, delivered} =
              Wavelet.command(
                ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12", "--duration", "1"],
@@ -82,20 +84,40 @@ defmodule Workbooks.WaveletCommandTest do
     assert File.regular?(delivered)
     # mp4 magic: bytes 4..7 == "ftyp"
     assert <<_::32, "ftyp", _::binary>> = File.read!(delivered)
-    # the in-guest encoder produced real mpeg4/yuv420p
-    assert probe(delivered, "codec_name") == "mpeg4"
+    # the in-guest encoder produced real H.264/yuv420p — matching the broker's quality
+    assert probe(delivered, "codec_name") == "h264"
     assert probe(delivered, "pix_fmt") == "yuv420p"
     assert String.to_integer(probe(delivered, "nb_frames")) > 0
   end
 
-  test "wavelet render encode_engine: :host -> brokered h264 mp4 (quality path)",
+  test "wavelet render vcodec: mpeg4 -> IN-GUEST mpeg4 fallback (dependency-free, no native exec)",
+       %{root: root} do
+    comp = Path.join(root, "clip_m4.html")
+    File.write!(comp, @composition)
+    out = Path.join(root, "clip_m4.mp4")
+
+    # The dependency-free fallback codec, still fully in-guest (no broker grant).
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12", "--duration", "1"],
+               vcodec: "mpeg4",
+               roots: [root]
+             )
+
+    assert File.regular?(delivered)
+    assert probe(delivered, "codec_name") == "mpeg4"
+    assert probe(delivered, "pix_fmt") == "yuv420p"
+  end
+
+  test "wavelet render encode_engine: :host -> brokered h264 mp4 (legacy escape hatch)",
        %{root: root} do
     comp = Path.join(root, "clip_h264.html")
     File.write!(comp, @composition)
     out = Path.join(root, "clip_h264.mp4")
 
-    # Explicit :host engine selects the native ffmpeg + libx264 broker (default-deny:
-    # needs the encode grant via :allow).
+    # Explicit :host engine selects the native ffmpeg broker (default-deny: needs the
+    # encode grant via :allow). Kept as a legacy escape hatch — the in-guest lane now
+    # reaches the same H.264 quality without native exec.
     assert {:ok, delivered} =
              Wavelet.command(
                ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12", "--duration", "1"],
@@ -125,7 +147,7 @@ defmodule Workbooks.WaveletCommandTest do
 
     out = Path.join(root, "av.mp4")
 
-    # No `allow:` grant — audio now muxes ENTIRELY in the wasm guest (mpeg4 video +
+    # No `allow:` grant — audio now muxes ENTIRELY in the wasm guest (H.264 video +
     # native AAC), so it needs NO `encode` broker cap. This is the bedrock close.
     assert {:ok, delivered} =
              Wavelet.command(
@@ -134,9 +156,8 @@ defmodule Workbooks.WaveletCommandTest do
                roots: [root]
              )
 
-    # In-guest video codec is mpeg4 (the dependency-free default); H.264 stays the
-    # opt-in host-broker quality path.
-    assert probe(delivered, "codec_name") == "mpeg4"
+    # In-guest video codec is H.264 (the default libx264 lane), muxed alongside AAC.
+    assert probe(delivered, "codec_name") == "h264"
 
     {a, 0} =
       System.cmd(

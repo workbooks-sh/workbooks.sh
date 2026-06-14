@@ -3,9 +3,10 @@
 Closing the last **bedrock gap** in the wavelet video pipeline: the mp4 ENCODE now
 runs INSIDE the wasm sandbox under wasmtime — **no host ffmpeg, no native exec**.
 
-Codec (dependency-free): ffmpeg's built-in `mpeg4` encoder + `mp4` muxer + `png`
-decoder + `image2` demuxer + `scale/format` filters. A real, universally-playable
-mp4 with **no external codec libs** (no libx264/GPL). H.264 is the noted follow-on.
+Codec (default, Phase 2): in-guest **libx264** (GPL, cross-compiled to wasm32-wasi)
+→ **H.264** + native **AAC** audio, `mp4` muxer, `png` decoder, `image2` demuxer,
+`scale/format` filters — broadcast quality (CRF 18) matching the host broker. A
+dependency-free `mpeg4` fallback (no external libs) remains via `vcodec: "mpeg4"`.
 
 ## Stage 1 — cross-compile minimal ffmpeg -> wasm32-wasi (wasi-sdk-25) — DONE
 ffmpeg CLI (fftools/) can't build threadless (pthread_create in demux/mux). The
@@ -80,7 +81,59 @@ instead of auto-falling-back to `:host` when audio is present. mix test green
 (wavelet_command + ffmpeg_broker, 17/17; the --audio test now asserts in-guest
 mpeg4+aac, no broker grant).
 
-## Left to make in-guest encode the default for `wavelet render`
-DONE: :in_guest is the default + muxes audio in-guest; lane self-provisions on
-first use. Follow-ons: H.264 via a libx264/GPL lane (the only remaining reason to
-reach for :host); wire the Stage-4 curated compile loop into build.sh behind a flag.
+## Phase 2 — IN-GUEST H.264 (libx264) — DONE/PROVEN
+The in-guest lane now encodes **H.264** via a wasm32-wasi build of **libx264**
+(GPL). This is the default video codec — `wavelet render` output is H.264+AAC
+matching the host broker's quality, so the broker is no longer needed for quality.
+
+build.sh additions:
+  - Step 1b: fetch (sha-verified) + cross-compile libx264 -> wasm32-wasi static lib.
+    x264's configure is a hand-written shell script. Two surgical, reproducible
+    patches (applied by build.sh via perl after extract):
+      (a) config.sub (2012 vintage) doesn't know wasm32/wasi -> short-circuit
+          `wasm32-*` targets to echo `wasm32-unknown-wasi` (top of config.sub).
+      (b) configure's host_os `case` has no wasi -> add `wasi*)` => SYS=LINUX,
+          libm=-lm. CRUCIALLY do NOT `define HAVE_MALLOC_H`: that path calls
+          memalign() which wasi-libc lacks; without it x264 uses its portable
+          malloc()+manual-align fallback (compiles+runs clean on wasm).
+    configure flags: --host=wasm32-unknown-wasi --disable-cli --enable-static
+      --disable-asm --disable-thread --disable-opencl --disable-{avs,swscale,lavf,
+      ffms,gpac,lsmash} --disable-interlaced. AR must be the BARE binary (configure
+      appends the `rc` operation itself — passing `llvm-ar rc` yields `rc rc`).
+    Builds libx264.a (~2.5MB, 8-bit + 10-bit). NO asm/nasm, NO threads.
+  - ffmpeg configure: --enable-gpl --enable-libx264 --enable-encoder=libx264
+    --enable-parser=h264; libx264 has no pkg-config in our cross tree so the probe
+    is pointed at the static lib + headers via --extra-cflags(-I$X264DIR)/
+    --extra-ldflags(-L$X264DIR)/--extra-libs("-lx264 -lm"). configure links its
+    libx264 test program for wasm32-wasi and reports License: GPL, CONFIG_LIBX264=1.
+  - link: wb_encode.wasm now also links -lx264 -lm.
+
+wb_encode.c: default video codec = "h264" (libx264) — CRF 18, preset medium,
+profile High, GOP=2s, max_b_frames=2 (libx264 private AVOptions set before open2).
+Optional 5th argv (or WB_VCODEC env) = "mpeg4" selects the dependency-free fallback.
+If libx264 is somehow unavailable it auto-falls-back to mpeg4.
+
+PROVEN under wasmtime (clean full build.sh from scratch, ~27s; NO native exec, NO
+broker — wasm-tools confirms ALL 22 imports are wasi, ZERO non-wasi):
+  wasmtime run --dir frames::/in --dir out::/out wb_encode.wasm \
+    /in/frame_%05d.png /out/h264.mp4 30 /in/audio.mp3
+  libx264 ran in-guest (logged: "profile High, level 1.3, 4:2:0, 8-bit ... crf=18.0").
+  ffprobe (inspect only): stream0 h264 High yuv420p 320x240 30f; stream1 aac LC
+  44100 stereo. Decoded H.264 frame 12 vs the source PNG: PSNR_avg 49.1 dB / PSNR_y
+  47.6 dB (CRF-18 visually-lossless — correct pixels, not garbage). Decoded the AAC
+  back -> Goertzel: 440Hz power dominates every other bin by ~9 orders of magnitude
+  (tone survived mp3->AAC through the H.264 pipeline). mpeg4 fallback (vcodec=mpeg4)
+  and video-only H.264 (3-arg) both verified. wasm grew 3.1MB -> 4.1MB.
+
+Host wiring: WaveletEncode.encode/3 gained a `:vcodec` opt (default "h264", appended
+as the driver's 5th argv; "" pads position 4 when no audio). wavelet.ex `:in_guest`
+engine passes vcodec through (default h264). ensure_registered now ALWAYS goes
+through Compilers.build (idempotent — build.sh early-exits if the wasm exists) so a
+rebuilt wasm hot-swaps the persisted registration by content hash. mix test 18/18
+green (wavelet_command + ffmpeg_broker): default render = h264, vcodec:mpeg4 fallback,
+--audio = h264+aac in-guest, encode_engine::host still default-deny.
+
+## Left
+The in-guest H.264+AAC lane fully matches the broker; `encode_engine: :host` is now a
+legacy escape hatch only. Remaining follow-on: wire the Stage-4 curated in-sandbox
+compile loop into build.sh behind a flag (a true clang.wasm self-build).
