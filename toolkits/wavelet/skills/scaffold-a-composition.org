@@ -1,48 +1,89 @@
 #+TITLE: wavelet — scaffold a composition
 #+TOOLKIT: wavelet
 #+SKILL: scaffold-a-composition
-#+TAGS: video init scaffold
-#+STATUS: stable
+#+TAGS: video html css scaffold
+#+STATUS: experimental
 
 * When to use this
   :PROPERTIES:
-  :NETWORK: yes
+  :NETWORK: no
   :DESTRUCTIVE: no
-  :REQUIRES: node>=20
   :END:
 
-  Empty directory; need a starting-point wavelet composition the
-  user can iterate on. Templates are domain-specific (text-card,
-  product-reel, etc.); =wavelet init --help= lists the current
-  set.
+  Empty directory; you need a starting-point composition to iterate
+  on. There is no =init= command — a wavelet composition is just an
+  HTML file you write. This skill gives you a known-good skeleton.
 
-* Workflow
+* The composition skeleton
 
-  #+CAPTION: 1. scaffold a new composition
+  Full-bleed dark canvas, an absolutely-positioned headline that
+  slides in, and a progress bar that grows for the clip's length —
+  all pure CSS =@keyframes=. Save as =clip.html=:
+
+  #+CAPTION: write a starter composition
   #+begin_src bash
-  wavelet init my-comp --template=text-card
-  cd my-comp
+  cat > clip.html <<'HTML'
+  <!doctype html>
+  <html>
+    <head>
+      <style>
+        html, body { margin:0; padding:0; width:100%; height:100%;
+                     background:#0b1020; overflow:hidden; font-family:sans-serif; }
+        h1 { position:absolute; left:80px; top:260px; margin:0;
+             font-size:96px; font-weight:800; letter-spacing:-0.03em; color:#fff;
+             animation: slidein 1s ease-out forwards; }
+        p  { position:absolute; left:84px; top:380px; margin:0;
+             font-size:34px; color:#3fe081;
+             animation: slidein 1s 0.25s ease-out both; }
+        @keyframes slidein {
+          from { opacity:0; transform:translateX(60px); }
+          to   { opacity:1; transform:translateX(0); }
+        }
+        #bar { position:absolute; left:0; bottom:0; height:18px;
+               background:linear-gradient(90deg,#149157,#3fe081);
+               animation: grow 4s linear forwards; }
+        @keyframes grow { from { width:0; } to { width:1280px; } }
+      </style>
+    </head>
+    <body>
+      <h1>Wavelet</h1>
+      <p>frames assembled in the nexus</p>
+      <div id="bar"></div>
+    </body>
+  </html>
+  HTML
   #+end_src
 
-  #+CAPTION: 2. inspect the source structure
-  #+begin_src bash
-  cat main.xml          # the composition declaration
-  ls assets/            # fonts, images the composition references
+  #+CAPTION: confirm the file exists and is HTML
+  #+begin_src bash :role post :path clip.html
+  test -f "$1" || { echo "$1 missing"; exit 1; }
+  grep -q '<html' "$1" || { echo "$1 is not an HTML composition"; exit 1; }
+  echo "✓ composition ready — render it with: wavelet render $1 -o out.mp4"
   #+end_src
 
-  #+CAPTION: confirm scaffold produced what we expect
-  #+begin_src bash :role post :path my-comp
-  test -f "$1/main.xml" || { echo "$1/main.xml missing"; exit 1; }
-  test -d "$1/assets"   || { echo "$1/assets missing"; exit 1; }
-  echo "✓ scaffold ok"
-  #+end_src
+* Adding image assets
+
+  Reference images by a path relative to the composition file; keep
+  them in a sibling directory (conventionally =assets/=). The renderer
+  resolves relative URLs against the composition's directory.
+
+  #+begin_example
+  <img id="logo" src="assets/logo.png" />
+  #+end_example
+
+  The whole composition directory is staged into the sandbox at render
+  time, so the relative path resolves exactly as written.
 
 * Gotchas
 
-  - Fonts are not bundled; the composition references Google Fonts
-    / Bunny / Fontshare URLs. First render fetches + caches.
-  - Asset paths in main.xml are relative to the project root.
+  - Pure CSS only — no =<script>=, no JS animation libraries. Drive
+    every motion with =@keyframes=.
+  - The progress bar's =to { width: 1280px }= assumes a 1280-wide
+    canvas; use =100%= or match it to =--w= if you change the size.
+  - Fonts: use a web-safe family (=sans-serif=, =serif=, =monospace=).
+    Remote font fetching is not part of the in-sandbox render lane.
 
 * See also
 
-  - [[file:preview-and-render.org][preview-and-render]] — iterate + ship
+  - [[file:render.org][render]] — turn this file into an mp4
+  - [[file:text-cards.org][text-cards]] — title / lower-third / end-card patterns

@@ -1,232 +1,77 @@
-#+TITLE: wavelet — styled text overlays (titles, lower-thirds, end cards)
+#+TITLE: wavelet — text cards (titles, lower-thirds, end cards)
 #+TOOLKIT: wavelet
 #+SKILL: text-cards
-#+VERSION: 0.1.0
-#+DESCRIPTION: Use when the composition needs a text overlay — title card, lower-third, kicker, end card — anchored to a time window with enter/exit animation. Author it as a `<gm-scene>` with a `<template>` + GSAP timeline registered via `wavelet.registerTimeline`.
-#+TAGS: video text overlay titles lower-third gsap scene
+#+TAGS: video text titles lower-third css
 #+STATUS: experimental
 
 * When to use this
   :PROPERTIES:
   :NETWORK: no
   :DESTRUCTIVE: no
-  :REQUIRES: node>=20 wavelet
   :END:
 
-  The composition needs HTML/CSS-styled text shown for a slice
-  of the timeline — opening title, lower-third name strap,
-  kicker phrase, end-card payoff. The text is part of the
-  scene graph, not a baked frame in a video asset.
+  The composition needs styled text shown for a slice of the clip —
+  an opening title, a lower-third name strap, a kicker, an end card.
+  In wavelet this is just HTML elements positioned with CSS and timed
+  with CSS =@keyframes= (there is no scene graph and no JS runtime —
+  the renderer seeks the CSS-animation clock to =t = frame / fps=).
 
-  Not for: text burned into a video asset (do that upstream in
-  your renderer), or single-line subtitles synced to spoken
-  audio (those are a separate pattern; see =audio-sync.org=).
+* Timing a card to a window
 
-* Composition shape recap
+  Use =animation-delay= to set the in-point and a finite animation
+  (with =forwards=/=both= fill) to hold the end state. To make a card
+  LEAVE, give it a second keyframe animation with its own delay.
 
-  Wavelet sources are HTML-like XML with =<gm-doc>= at the
-  root, one or more =<gm-timeline>= children, and =<gm-track
-  z="...">= children inside each timeline. Overlay scenes live
-  on a track with =z= above the base video layer:
-
-  #+begin_example
-  <gm-track id="content" z="10">
-    <gm-scene id="<slug>" start="<t>" duration="<d>">
-      <template>
-        <!-- HTML for the overlay -->
-        <script>
-          const tl = gsap.timeline({ paused: true });
-          // tweens here, anchored at 0..<d>
-          wavelet.registerTimeline("<slug>", tl);
-        </script>
-      </template>
-    </gm-scene>
-  </gm-track>
-  #+end_example
-
-  The runtime drives =tl.progress(localFrame / durationFrames)=
-  every tick — the timeline's full length IS the scene window.
-  Enter near time 0, exit near =duration=. Scrub-safe by
-  construction.
-
-* Workflow
-
-  #+CAPTION: 1. confirm scaffold exists + has the expected shape
-  #+begin_src bash :role pre
-  test -f gamut.html || { echo "no gamut.html — run 'wavelet init' first"; exit 1; }
-  grep -q "<gm-doc" gamut.html || { echo "gamut.html missing <gm-doc> root"; exit 1; }
-  echo "✓ wavelet project shape ok"
+  #+CAPTION: an opening title that enters at 0.2s and exits at 2.5s
+  #+begin_src bash
+  cat > title.html <<'HTML'
+  <!doctype html>
+  <html><head><style>
+    html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:sans-serif}
+    #title{
+      position:absolute; left:80px; top:300px; margin:0;
+      font-size:104px; font-weight:800; color:#fff; letter-spacing:-.03em;
+      /* enter (0.2s..1.0s) then exit (2.5s..3.0s), both holding their end */
+      animation: enter .8s .2s ease-out both, exit .5s 2.5s ease-in forwards;
+    }
+    @keyframes enter { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes exit  { from{opacity:1} to{opacity:0} }
+  </style></head>
+  <body><h1 id="title">Built in the nexus</h1></body></html>
+  HTML
+  wavelet render title.html -o title.mp4 --duration 3 --fps 30
   #+end_src
 
-** Title card — full-bleed centered headline
+* Lower-third strap
 
-   Lives on the content track above the base video. Enter
-   bottom-up, hold, exit upward. The example below is for a
-   3.0s scene at 0.4s on a 30fps timeline.
+  A lower-third is the same idea pinned to the bottom-left with a
+  backing bar:
 
-   #+CAPTION: title-card scene — paste inside <gm-track id="content" z="10">
-   #+begin_src html
-   <gm-scene id="title" start="0.4s" duration="3.0s">
-     <template>
-       <h1 class="title">YOUR HEADLINE</h1>
-       <p  class="title-sub">A tagline beneath it.</p>
-       <script>
-         const tl = gsap.timeline({ paused: true });
-         // Enter — first 0.7s
-         tl.from(".title",     { y: 80, opacity: 0, duration: 0.7, ease: "back.out(1.6)" }, 0);
-         tl.from(".title-sub", { y: 40, opacity: 0, duration: 0.6, ease: "power3.out" },   0.2);
-         // Hold — implicit; nothing tweens between 0.7s and 2.4s
-         // Exit — last 0.6s (scene duration 3.0s)
-         tl.to(".title",     { y: -40, opacity: 0, duration: 0.6, ease: "power2.in" }, 2.4);
-         tl.to(".title-sub", { y: -20, opacity: 0, duration: 0.5, ease: "power2.in" }, 2.5);
-         wavelet.registerTimeline("title", tl);
-       </script>
-     </template>
-   </gm-scene>
-   #+end_src
+  #+begin_example
+  #strap { position:absolute; left:60px; bottom:90px; padding:14px 22px;
+           background:rgba(20,145,87,.9); color:#fff; font-size:34px;
+           animation: wipe .5s .4s ease-out both; }
+  @keyframes wipe { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)} }
+  #+end_example
 
-   #+CAPTION: matching styles — append to ./styles.css
-   #+begin_src css
-   .title {
-     position: absolute; inset: 0;
-     display: flex; align-items: center; justify-content: center;
-     font: 700 96px/1.0 "Inter Tight", system-ui, sans-serif;
-     letter-spacing: -0.02em; color: #fff;
-     text-shadow: 0 2px 24px rgba(0,0,0,0.35);
-     margin: 0;
-   }
-   .title-sub {
-     position: absolute; left: 0; right: 0; bottom: 22%;
-     text-align: center; color: #fff; opacity: 0.85;
-     font: 500 28px/1.2 "Inter Tight", system-ui, sans-serif;
-   }
-   #+end_src
+* Verify
 
-** Lower-third — name strap anchored bottom-left
+  #+CAPTION: confirm the card rendered
+  #+begin_src bash :role post :path title.mp4
+  head -c 8 "$1" | tail -c 4 | grep -q ftyp || { echo "render failed"; exit 1; }
+  echo "✓ text card rendered"
+  #+end_src
 
-   Stays for the duration of an introduction (typically 2.0–
-   3.5s). Slide in from the left, exit by collapsing width.
+* Gotchas
 
-   #+CAPTION: lower-third — speaker name + role
-   #+begin_src html
-   <gm-scene id="lower-third-jane" start="6.0s" duration="3.0s">
-     <template>
-       <div class="lt-bar">
-         <div class="lt-name">JANE DOE</div>
-         <div class="lt-role">Head of Design</div>
-       </div>
-       <script>
-         const tl = gsap.timeline({ paused: true });
-         // Enter — bar slides in, text fades in
-         tl.from(".lt-bar",  { x: -480, duration: 0.55, ease: "power3.out" }, 0);
-         tl.from(".lt-name", { opacity: 0, x: -20, duration: 0.4 }, 0.25);
-         tl.from(".lt-role", { opacity: 0, x: -20, duration: 0.4 }, 0.35);
-         // Exit — collapse to width 0 at the right
-         tl.to(".lt-bar",    { scaleX: 0, transformOrigin: "right", duration: 0.4, ease: "power2.in" }, 2.5);
-         wavelet.registerTimeline("lower-third-jane", tl);
-       </script>
-     </template>
-   </gm-scene>
-   #+end_src
-
-   #+CAPTION: styles for the lower-third bar
-   #+begin_src css
-   .lt-bar {
-     position: absolute; left: 6%; bottom: 12%;
-     padding: 14px 28px;
-     background: rgba(15,15,20,0.78);
-     backdrop-filter: blur(8px);
-     border-left: 4px solid #ff5a1f;
-     color: #fff;
-   }
-   .lt-name { font: 700 32px/1 "Inter Tight"; letter-spacing: -0.01em; }
-   .lt-role { font: 500 18px/1.4 "Inter Tight"; opacity: 0.75; margin-top: 4px; }
-   #+end_src
-
-** End card — terminal payoff (no exit tween)
-
-   Last scene in the timeline. Enter once, stay until the
-   timeline ends. Don't add an exit tween — there's nothing
-   to cut to.
-
-   #+CAPTION: end card — payoff line + URL
-   #+begin_src html
-   <gm-scene id="end-card" start="12.0s" duration="3.0s">
-     <template>
-       <div class="ec-wrap">
-         <div class="ec-logo">brand</div>
-         <div class="ec-cta">workbooks.sh</div>
-       </div>
-       <script>
-         const tl = gsap.timeline({ paused: true });
-         tl.from(".ec-logo", { scale: 0.7, opacity: 0, filter: "blur(20px)",
-                               duration: 0.8, ease: "back.out(1.4)" }, 0);
-         tl.from(".ec-cta",  { y: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, 0.4);
-         // Terminal scene — no exit
-         wavelet.registerTimeline("end-card", tl);
-       </script>
-     </template>
-   </gm-scene>
-   #+end_src
-
-** Verify
-
-   #+CAPTION: lint the source — surfaces unregistered scenes + bad time spans
-   #+begin_src bash :role post
-   wavelet lint
-   #+end_src
-
-   #+CAPTION: preview at the scene's start time
-   #+begin_src bash
-   wavelet preview --start 0.4
-   # navigate the browser to the printed URL
-   #+end_src
-
-* Common pitfalls
-
-  1. *Forgot =wavelet.registerTimeline(id, tl)=.* Scene renders
-     as static HTML; nothing animates. The id passed MUST match
-     the scene's =id=. Verify with =wavelet lint=.
-
-  2. *Created the GSAP timeline with =paused: false=.* The
-     runtime drives progress manually — an autoplaying timeline
-     fights the scrubber. Always =gsap.timeline({ paused: true })=.
-
-  3. *Tween anchored past scene duration.* If a tween's
-     start + duration exceeds the scene's =duration=, it never
-     fully plays at render time (runtime caps progress at 1.0).
-     Re-check: every tween's end ≤ scene duration.
-
-  4. *Used non-position-relative class on overlay.* The
-     overlay's containing element needs to span the viewport
-     for =position: absolute; inset: 0= to fill it. Inherit
-     the scaffold's CSS reset.
-
-  5. *Tried to share state across scenes via DOM.* Each scene's
-     =<template>= mounts and unmounts independently. State that
-     needs to persist (counters, previous values) goes on
-     =window.__myState= — visible across scenes but the agent
-     should treat the namespace as the contract.
-
-  6. *Font not yet cached on first render.* Wavelet fetches
-     web fonts on demand (Google Fonts / Bunny / Fontshare).
-     First =wavelet render= may FOUT-flash the fallback; a
-     second render uses the cache.
-
-* Verification checklist
-
-  - [ ] Scene id matches =wavelet.registerTimeline(id, ...)= arg
-  - [ ] GSAP timeline created with ={ paused: true }=
-  - [ ] All tweens anchored within =[0, scene.duration]=
-  - [ ] Terminal scene has no exit tween
-  - [ ] =wavelet lint= reports clean
-  - [ ] Visual preview matches expectation at scene start
+  - No web-font fetch in the render lane — use =sans-serif= / =serif=
+    / =monospace=, or a font installed in the render core.
+  - Hard cuts read better than fades between separate clips; keep
+    fades INSIDE one composition (opacity keyframes), per brand canon.
+  - Times in =animation-delay= are absolute clip time — keep them
+    inside =--duration= or the card never appears.
 
 * See also
 
-  - [[file:overview.org][overview]] — when to reach for wavelet
-  - [[file:scaffold-a-composition.org][scaffold-a-composition]] — empty dir → composition
-  - [[file:transitions.org][transitions]] — cuts and cross-fades between scenes
-  - [[file:audio-sync.org][audio-sync]] — aligning text reveals to audio cues
-  - [[file:template-catalog.org][template-catalog]] — what scaffolds exist
-  - [[file:preview-and-render.org][preview-and-render]] — dev loop → mp4
+  - [[file:transitions.org][transitions]] — moving between sections in one composition
+  - [[file:render.org][render]] — produce the mp4

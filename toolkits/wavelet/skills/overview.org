@@ -1,53 +1,73 @@
 #+TITLE: wavelet — overview
 #+TOOLKIT: wavelet
 #+SKILL: overview
-#+TAGS: video motion-graphics render
-#+STATUS: stable
+#+TAGS: video motion-graphics render html css
+#+STATUS: experimental
 
 * When to use this
   :PROPERTIES:
-  :NETWORK: yes
+  :NETWORK: no
   :DESTRUCTIVE: no
   :END:
 
-  Request involves producing or editing a motion-graphics video:
-  short-form ad, explainer reel, animated title card, etc.
-  Wavelet is Workbooks' renderer — output is an mp4 (or a
-  workbook .html bundling the source for re-rendering elsewhere).
+  Request involves producing a short motion-graphics video from
+  declarative source: an animated title card, a kinetic-type reel,
+  an explainer beat, a logo sting. You author a *plain HTML + CSS*
+  file and wavelet renders it to an mp4 — entirely in-nexus, no
+  external tooling.
 
   Don't reach for wavelet for:
-  - Encoding an existing video file → use [[file:../ffmpeg/skills/overview.org][ffmpeg toolkit]]
-  - Extracting frames / audio from video → ffmpeg
-  - Authoring static documents → [[file:../wb/skills/overview.org][wb toolkit]]
+  - Encoding / transcoding an existing video file → the host encode
+    broker handles muxing already; wavelet is for *generating* frames
+    from an HTML composition, not re-encoding footage.
+  - Extracting frames / audio from an existing video.
+  - Authoring static documents → use the =wb= toolkit.
 
-* Composition source shape
+* The whole surface: one command
 
-  A wavelet composition is an HTML-like declarative source:
+  #+begin_src bash
+  wavelet render <composition.html> -o <out.mp4> \
+    [--w 1280] [--h 720] [--fps 30] [--duration 4] [--crf 18] [--audio track.mp3]
+  #+end_src
 
-  #+begin_example
-  <wavelet duration="6">
-    <scene>
-      <text>Hello world</text>
-    </scene>
-  </wavelet>
-  #+end_example
+  - =<composition.html>= — the HTML+CSS file you authored (required).
+  - =-o/--out= — output mp4 path (required; must end in =.mp4=).
+  - =--w / --h= — frame size in px (default 1280×720).
+  - =--fps= — frames per second (default 30).
+  - =--duration= — clip length in seconds (default 2).
+  - =--crf= — libx264 quality 0–51, lower = better (default 18).
+  - =--audio= — an mp3 to mux as an AAC track (clip trims to shortest).
 
-  =wavelet init= scaffolds a starter; =wavelet render= produces
-  =out.mp4=.
+  There is no =init=, =preview=, =inspect=, =trim=, =concat= — the
+  surface is exactly =render=. Author the HTML, render it.
 
-* Verify
+* How it renders (so your CSS behaves)
 
-  #+CAPTION: confirm wavelet CLI is on PATH + node 20+ available
+  The renderer is Blitz (HTML/CSS) + Stylo's CSS-animation timeline +
+  a CPU rasterizer. For each output frame it seeks the animation clock
+  to =t = frame / fps= and re-rasterizes. So:
+
+  - Animate with CSS =@keyframes= + the =animation= property. Use
+    =forwards= / =both= fill modes for one-shot intros; the clock is
+    absolute time, scrub-safe by construction.
+  - There is NO JavaScript runtime. No =<script>=, no GSAP, no DOM
+    timers — pure declarative CSS animation only.
+  - No GPU effects, no filters that need WebGL. Stick to layout,
+    transforms, opacity, color, gradients, =<img>=.
+  - Relative asset paths (e.g. =<img src="assets/logo.png">=) resolve
+    against the composition file's directory — keep assets beside it.
+
+* Verify the command is wired
+
+  #+CAPTION: wavelet render is in-nexus — no install, no node, no PATH check
   #+begin_src bash :role pre
-  command -v wavelet >/dev/null || { echo "wavelet CLI missing — install with 'npm i -g @work.books/wavelet-cli'"; exit 1; }
-  node --version | grep -qE '^v(2[0-9]|[3-9][0-9])\.' || { echo "node >=20 required"; exit 1; }
+  echo "wavelet render is a built-in command (like jq/grep) — nothing to install"
   #+end_src
 
 * See also
 
-  - [[file:scaffold-a-composition.org][scaffold-a-composition]] — start from empty dir
-  - [[file:preview-and-render.org][preview-and-render]] — dev loop → final mp4
+  - [[file:scaffold-a-composition.org][scaffold-a-composition]] — empty dir → a renderable HTML file
+  - [[file:render.org][render]] — run the render, flags, verify the mp4
   - [[file:text-cards.org][text-cards]] — title / lower-third / end-card overlays
-  - [[file:transitions.org][transitions]] — hand-offs between scenes
-  - [[file:audio-sync.org][audio-sync]] — anchor visuals to audio cues
-  - [[file:template-catalog.org][template-catalog]] — what =wavelet init= templates exist
+  - [[file:transitions.org][transitions]] — section hand-offs with CSS keyframes
+  - [[file:audio-sync.org][audio-sync]] — mux an mp3 + time visuals to it

@@ -1,230 +1,64 @@
-#+TITLE: wavelet — align audio cues to visual events
+#+TITLE: wavelet — add a soundtrack (mux an mp3)
 #+TOOLKIT: wavelet
 #+SKILL: audio-sync
-#+VERSION: 0.1.0
-#+DESCRIPTION: Use when a visual event (text reveal, cut, animation kick) must land on an audio cue (beat, downbeat, lyric, sfx hit). Identify the cue time, then anchor the visual via scene `start=` or tween `position=`.
-#+TAGS: video audio sync beat timing music sfx voice-over
+#+TAGS: video audio mp3 mux
 #+STATUS: experimental
 
 * When to use this
   :PROPERTIES:
   :NETWORK: no
   :DESTRUCTIVE: no
-  :REQUIRES: node>=20 wavelet ffprobe
   :END:
 
-  An animation needs to land on a specific moment in an audio
-  track — a beat, a vocal entry, a sound-effect hit, the end
-  of a voiceover sentence. Wavelet authors visuals in seconds;
-  your job is to translate "the kick at bar 2" into a timestamp
-  and anchor a scene or tween there.
+  The rendered clip needs sound — a music bed, a voiceover, an sfx
+  track. Pass =--audio <file.mp3>= to =wavelet render=; the host
+  encode broker muxes it as an AAC track alongside the video.
 
-  Not for: real-time audio reactivity (wavelet renders to a
-  fixed frame schedule — there's no live audio analysis at
-  playback). For audio-reactive HTML in hyperframes, see the
-  separate hyperframes skill.
+  Wavelet does not generate or analyze audio — there is no beat
+  detection or auto-sync. You time visuals to the audio by HAND:
+  pick the beat times, and set your CSS =animation-delay= to match.
 
-* Mental model
+* Mux an mp3 onto the clip
 
-  Audio in wavelet lives on its own =<gm-track>= via
-  =<gm-audio>= elements. The track's =z= is required but
-  doesn't visually composite (audio never paints). Per-cue
-  properties:
-
-  - =start=     — when the cue begins on the timeline (s)
-  - =duration=  — how long it plays
-  - =volume=    — 0.0 to ~1.0
-  - =fade-in=   — ramp-up at the cue's start (s)
-  - =fade-out=  — ramp-down at the cue's end (s)
-
-  Visual events are anchored two ways:
-  1. =<gm-scene start="...">= — the scene mounts at that time
-  2. Tween =position= inside the scene-local timeline — the
-     tween starts at that local offset (relative to scene start)
-
-  Syncing = converting absolute audio-cue times into one or
-  both of the above.
-
-* Workflow
-
-  #+CAPTION: 1. confirm ffprobe is available (we'll inspect audio)
-  #+begin_src bash :role pre
-  command -v ffprobe >/dev/null \
-    || { echo "ffprobe missing — install ffmpeg first"; exit 1; }
-  test -f gamut.html || { echo "no gamut.html"; exit 1; }
+  #+CAPTION: render with a soundtrack (video trims to the shorter stream)
+  #+begin_src bash
+  wavelet render clip.html -o out.mp4 --duration 6 --fps 30 --audio bed.mp3
   #+end_src
 
-** Step 1 — find the cue times in your audio
+  The clip length is =min(--duration, audio length)= — the encoder
+  uses =-shortest=, so a long bed under a 6s clip yields a 6s mp4, and
+  a 4s bed under a 6s clip yields ~4s.
 
-   #+CAPTION: total duration + sample-rate of the asset
-   #+begin_src bash
-   ffprobe -v error \
-     -show_entries format=duration,bit_rate \
-     -show_entries stream=sample_rate,channels \
-     -of default=noprint_wrappers=1 \
-     ./assets/music.mp3
-   #+end_src
+* Hand-timing visuals to audio
 
-   #+CAPTION: list audio loudness peaks (rough way to find beats / hits)
-   #+begin_src bash
-   ffmpeg -hide_banner -i ./assets/music.mp3 \
-     -af "ebur128=peak=true" -f null - 2>&1 \
-     | grep -E "t:|Peak:" | head -40
-   #+end_src
+  Decide the beat times (e.g. hits at 0.5s, 1.0s, 1.5s) and drive each
+  visual with an =animation-delay= equal to that beat:
 
-   For musical content, computing BPM externally is more
-   reliable than peak-picking. If you know the BPM, beat times
-   are straightforward:
+  #+begin_example
+  .hit1{animation: pop .2s 0.5s ease-out both}
+  .hit2{animation: pop .2s 1.0s ease-out both}
+  .hit3{animation: pop .2s 1.5s ease-out both}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+  #+end_example
 
-   #+CAPTION: beat times for a known BPM (e.g. 120 BPM)
-   #+begin_src bash
-   # awk computes: 0, 0.5, 1.0, 1.5 … (60/120 = 0.5s per beat)
-   awk 'BEGIN { for (i=0; i<32; i++) printf "%.3f\n", i*60/120 }'
-   #+end_src
+* Verify the audio track landed
 
-   For voiceover, transcribe and use the per-word timestamps:
+  #+CAPTION: confirm the mp4 has an AAC audio stream
+  #+begin_src bash :role post :path out.mp4
+  ffprobe -v error -select_streams a:0 -show_entries stream=codec_name \
+    -of default=nw=1:nk=1 "$1" | grep -q aac \
+    && echo "✓ audio muxed (aac)" || { echo "no audio stream"; exit 1; }
+  #+end_src
 
-   #+CAPTION: transcribe the VO and emit word-level timings
-   #+begin_src bash
-   wavelet transcribe ./assets/vo.mp3 --out ./assets/vo.json
-   # vo.json contains segments with start/end per word
-   cat ./assets/vo.json | head -40
-   #+end_src
+* Gotchas
 
-** Step 2 — declare the audio cue on its own track
-
-   #+CAPTION: add a music cue with fade-in / fade-out
-   #+begin_src html
-   <gm-track id="audio" z="30">
-     <gm-audio asset="music" start="0s"   duration="15s"
-               volume="0.8" fade-in="0.4" fade-out="1.2"></gm-audio>
-     <gm-audio asset="vo"    start="2.5s" duration="8s"
-               volume="1.0" fade-in="0.05"></gm-audio>
-   </gm-track>
-   #+end_src
-
-   The asset bindings live at the top of =<gm-doc>= alongside
-   any other media:
-
-   #+CAPTION: register the audio assets
-   #+begin_src html
-   <gm-asset id="music" kind="audio" src="./assets/music.mp3"></gm-asset>
-   <gm-asset id="vo"    kind="audio" src="./assets/vo.mp3"></gm-asset>
-   #+end_src
-
-** Step 3 — anchor scene starts to cue times
-
-   The headline lands on the downbeat at 0.500s (beat 2 of a
-   120 BPM song). The end card lands on the final hit at
-   12.000s.
-
-   #+CAPTION: scenes whose start= equals the audio cue time
-   #+begin_src html
-   <gm-scene id="headline"  start="0.500s"  duration="3.0s"> … </gm-scene>
-   <gm-scene id="end-card"  start="12.000s" duration="3.0s"> … </gm-scene>
-   #+end_src
-
-** Step 4 — anchor tweens within a scene to local cues
-
-   The scene starts at the bar; a text reveal happens 0.250s
-   later (the snare). That's a tween =position= of 0.25 inside
-   the scene-local timeline:
-
-   #+CAPTION: text reveal anchored to a local offset
-   #+begin_src html
-   <gm-scene id="lyric" start="2.0s" duration="2.0s">
-     <template>
-       <h2 class="lyric">RIGHT NOW.</h2>
-       <script>
-         const tl = gsap.timeline({ paused: true });
-         // Land "RIGHT NOW." on the snare at scene-local 0.25s
-         tl.from(".lyric", {
-           y: 60, opacity: 0, duration: 0.4, ease: "back.out(1.6)"
-         }, 0.25);
-         wavelet.registerTimeline("lyric", tl);
-       </script>
-     </template>
-   </gm-scene>
-   #+end_src
-
-** Step 5 — duck the music under voiceover
-
-   When VO plays, drop music volume. Today, declare the music
-   cue split into segments with different volumes — there's no
-   automatic ducking primitive.
-
-   #+CAPTION: music split: full → ducked under VO → full
-   #+begin_src html
-   <gm-audio asset="music" start="0s"    duration="2.5s"
-             volume="0.8"  fade-out="0.4"></gm-audio>
-   <gm-audio asset="music" start="2.5s"  duration="8s"
-             volume="0.25" fade-in="0.2" fade-out="0.6"></gm-audio>
-   <gm-audio asset="music" start="10.5s" duration="4.5s"
-             volume="0.8"  fade-in="0.4"></gm-audio>
-   #+end_src
-
-   Each split is its own cue against the same asset. The mixer
-   sums them; cross-fading volumes across the seam reads as a
-   ducked envelope. =fade-in= / =fade-out= prevent the click of
-   a volume jump.
-
-** Verify timing — render a short window + ear-check
-
-   #+CAPTION: render only the seconds around the cue
-   #+begin_src bash :role post
-   wavelet render --start 0 --end 6 --out /tmp/sync-check.mp4
-   open /tmp/sync-check.mp4    # macOS
-   # The text reveal should hit the snare. Re-iterate offset if not.
-   #+end_src
-
-   #+CAPTION: also confirm there are no zero-volume / overlap warnings
-   #+begin_src bash
-   wavelet lint 2>&1 | grep -iE "audio|volume|overlap" || echo "(no audio lint issues)"
-   #+end_src
-
-* Common pitfalls
-
-  1. *Off by one frame.* At 30 fps a frame is 33.3 ms — close
-     enough that a small drift reads as wrong-feeling sync.
-     If the visual feels late, subtract one frame
-     (=1/fps= seconds) from the anchor.
-
-  2. *Anchored scene start at the cue, but the enter tween
-     takes 0.5s.* The viewer reads "the visual arrives 0.5s
-     after the cue." Either start the scene 0.5s EARLIER (so
-     the enter completes ON the cue), or use a faster-out
-     ease so the perceptual peak is closer to the start.
-
-  3. *Two audio cues at exactly the same start.* The mixer
-     sums them — likely clipping. Stagger by 0.05s OR drop
-     both =volume= by ~0.3.
-
-  4. *Forgot =fade-in= / =fade-out= on a hard-edged cue.*
-     Causes a "click" at the boundary. 30–80ms is enough to
-     suppress it.
-
-  5. *Used the music BPM but the track has tempo drift.* Live
-     recordings + many sample packs drift. Use transcribe-style
-     analysis or hand-tap the cue times instead of trusting the
-     BPM grid.
-
-  6. *Tried to react to live audio at render time.* Wavelet
-     renders to a fixed frame schedule. There's no audio
-     analysis in the render loop. All sync must be authored.
-
-* Verification checklist
-
-  - [ ] Cue times measured from the actual audio file, not guessed
-  - [ ] Scene =start= or tween =position= matches the cue
-  - [ ] Enter-tween timing accounts for perceptual arrival
-  - [ ] Ducking envelopes present where VO meets music
-  - [ ] =wavelet lint= clean on the audio track
-  - [ ] Listened to a render-pass clip end-to-end
+  - Only mp3 input is wired for the =--audio= flag.
+  - The audio file is staged into the sandbox scratch by the renderer,
+    so a relative or absolute path both work as long as it is readable.
+  - There is no automatic beat sync; if visuals drift from the music,
+    nudge the =animation-delay= values.
 
 * See also
 
-  - [[file:text-cards.org][text-cards]] — author the visuals being synced
-  - [[file:transitions.org][transitions]] — cuts that need to land on a beat
-  - [[file:preview-and-render.org][preview-and-render]] — render short windows for ear-check
-  - [[file:template-catalog.org][template-catalog]] — starter scaffolds
-  - [[file:../ffmpeg/skills/overview.org][ffmpeg toolkit]] — encoded-audio file ops
+  - [[file:render.org][render]] — the render command + flags
+  - [[file:text-cards.org][text-cards]] — time text to the beats
