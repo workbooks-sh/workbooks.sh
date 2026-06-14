@@ -86,7 +86,8 @@
             "internal cross-links",
             "hoisting"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "Npm.link_workspaces reads workspaces globs -> links member pkgs into node_modules; sibling imports (incl workspace:* protocol) + external deps resolve at bundle time (js_monorepo_test: MONO5.Hi)."
         }
       ]
     },

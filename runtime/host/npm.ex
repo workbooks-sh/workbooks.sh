@@ -266,6 +266,48 @@ defmodule Workbooks.Npm do
     end
   end
 
+  @doc """
+  Link internal workspace packages into `node_modules` (npm/yarn/pnpm workspaces / monorepo). Reads the root
+  package.json `workspaces` globs (`["packages/*"]` or `%{"packages" => [...]}`), and copies each member
+  package into `node_modules/<its name>` so a sibling importing it by name resolves at bundle time. Returns
+  `{:ok, [linked_names]}`.
+  """
+  def link_workspaces(dir) do
+    with {:ok, body} <- File.read(Path.join(dir, "package.json")),
+         {:ok, j} <- Jason.decode(body) do
+      globs =
+        case j["workspaces"] do
+          l when is_list(l) -> l
+          %{"packages" => l} when is_list(l) -> l
+          _ -> []
+        end
+
+      nm = Path.join(dir, "node_modules")
+      File.mkdir_p!(nm)
+
+      linked =
+        for glob <- globs, pkgdir <- Path.wildcard(Path.join(dir, glob)), File.dir?(pkgdir), reduce: [] do
+          acc ->
+            pj = Path.join(pkgdir, "package.json")
+
+            with true <- File.exists?(pj),
+                 {:ok, %{"name" => name}} <- Jason.decode(File.read!(pj)) do
+              dest = Path.join(nm, name)
+              File.mkdir_p!(Path.dirname(dest))
+              File.rm_rf(dest)
+              File.cp_r!(pkgdir, dest)
+              [name | acc]
+            else
+              _ -> acc
+            end
+        end
+
+      {:ok, Enum.reverse(linked)}
+    else
+      _ -> {:error, :no_package_json}
+    end
+  end
+
   @doc "Parse a lockfile in `dir` into pinned specs `[%{name, req: nil, pin: version}]`."
   def parse_lockfile(dir) do
     npm = Path.join(dir, "package-lock.json")
