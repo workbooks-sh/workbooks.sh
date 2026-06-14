@@ -127,8 +127,8 @@ jobs:
             ```
 
             Or download a bundle below. On first launch the app's wizard connects an
-            engine (a local microVM via krunvm, or a cloud engine) — optional;
-            Workbooks runs offline without one.
+            engine — a fast local microVM (vfkit; falls back to docker/krunvm) or a
+            cloud engine — optional; Workbooks runs offline without one.
           releaseDraft: true
           prerelease: false
 

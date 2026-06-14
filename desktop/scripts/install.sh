@@ -5,9 +5,10 @@
 #
 # Downloads the latest Workbooks desktop app from GitHub Releases and installs
 # it. The app is offline-first; on first launch its built-in wizard gets the
-# runtime engine running (a local microVM via krunvm, or a cloud engine). This
-# script only needs to put the app in place — it does NOT install krunvm; the
-# wizard does that, with your consent, when you choose the local engine.
+# runtime engine running — a fast local microVM (vfkit: direct-kernel boot, no
+# daemon; falls back to docker/krunvm), or a cloud engine. This script only puts
+# the app in place; the wizard fetches the runtime disk + boots it on your
+# consent when you choose the local engine.
 #
 # Env overrides:
 #   WB_VERSION      pin a release, e.g. WB_VERSION=0.1.0 (tag desktop-v0.1.0)
