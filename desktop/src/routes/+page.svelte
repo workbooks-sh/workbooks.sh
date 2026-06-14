@@ -46,7 +46,6 @@
   import { openIntent } from "$lib/bridge/openIntent";
   import { dock } from "$lib/bridge/dock.svelte";
   import DockHost from "$lib/components/DockHost.svelte";
-  import { ChatCircle as MessageCircle } from "phosphor-svelte";
   import WaldoMark from "$lib/components/WaldoMark.svelte";
   import { search } from "$lib/search/registry.svelte";
   import { BUILTIN_PROVIDERS } from "$lib/search/builtins";
@@ -533,16 +532,8 @@
       iconOnly: true,
       load: () => import("$lib/components/WaldoPanel.svelte"),
     });
-    // The multi-agent chat panel is dev-only (WB_FF_AGENTS); it coexists
-    // with Waldo when on, and is excluded from the shipped browser.
-    if (features.agents) {
-      dock.register({
-        id: "agent",
-        title: "Agent",
-        icon: MessageCircle,
-        load: () => import("$lib/components/AgentPanel.svelte"),
-      });
-    }
+    // (The old multi-agent chat panel — AgentPanel/ChatPanel/ChatHeader/
+    // ChatComposer — was retired; WaldoPanel is the one canonical chat surface.)
     // Personalization onboarding (wb-aakl.20). first_run_done is a durable
     // flag in setup.json; `?onboarding` forces the flow for preview.
     const forceOnboarding = new URLSearchParams(window.location.search).has(
