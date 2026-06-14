@@ -47,6 +47,18 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{system_prompt: prompt}))
   end
 
+  # The desktop bridge's Phoenix-Channels socket (wb-e95f). The phoenix JS client
+  # connects here (…/socket/websocket?vsn=2.0.0) and multiplexes its topics
+  # (telemetry, desktop:control, env_prompt, …). Workbooks.PhoenixSocket speaks
+  # the v2 wire protocol so the bridge connects + stays joined instead of
+  # reconnect-looping. Auth: a header-less local upgrade falls to the dev path on
+  # the desktop runtime (WB_DESKTOP, unlocked, single-tenant).
+  get "/socket/websocket" do
+    conn
+    |> WebSockAdapter.upgrade(Workbooks.PhoenixSocket, %{}, timeout: 60_000)
+    |> halt()
+  end
+
   # Web search for the desktop browser's composable-search "Web" provider
   # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
   # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)
