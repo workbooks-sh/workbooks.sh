@@ -16,6 +16,7 @@
     member: 'background:var(--sky);color:var(--on-bloom);border-color:var(--sky)',
   };
   const roleStyle = (role) => ROLE_STYLE[role] || '';
+  const pickKey = (e, role) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inviteRole = role; } };
 
   const PAIRS = [['--mint', '--sky'], ['--peach', '--blue'], ['--sage', '--mint'], ['--cream', '--peach'], ['--blue', '--sage']];
   function initials(name) { return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase(); }
@@ -124,8 +125,8 @@
         <div class="lab">Role</div>
         <input type="hidden" name="role" value={inviteRole} />
         <div class="regions">
-          <div class="reg" class:sel={inviteRole === 'member'} style={inviteRole === 'member' ? roleStyle('member') : ''} onclick={() => (inviteRole = 'member')}>Member</div>
-          <div class="reg" class:sel={inviteRole === 'admin'} style={inviteRole === 'admin' ? roleStyle('admin') : ''} onclick={() => (inviteRole = 'admin')}>Admin</div>
+          <div class="reg" role="button" tabindex="0" class:sel={inviteRole === 'member'} style={inviteRole === 'member' ? roleStyle('member') : ''} onclick={() => (inviteRole = 'member')} onkeydown={(e) => pickKey(e, 'member')}>Member</div>
+          <div class="reg" role="button" tabindex="0" class:sel={inviteRole === 'admin'} style={inviteRole === 'admin' ? roleStyle('admin') : ''} onclick={() => (inviteRole = 'admin')} onkeydown={(e) => pickKey(e, 'admin')}>Admin</div>
         </div>
         <div class="sheet-foot">
           <button class="btn" type="button" onclick={() => (inviteOpen = false)}>Cancel</button>
