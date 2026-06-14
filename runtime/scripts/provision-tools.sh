@@ -52,7 +52,11 @@ verify() { # file expected-sha asset-name
 
 fetch() { # url out
   echo "[tools] fetching $(basename "$1")" >&2
-  curl -fsSL -o "$2" "$1"
+  # HARD bounds: an un-timed-out CDN fetch here froze the whole `mix test` suite
+  # for 15-20 min at 0% CPU holding ESTABLISHED conns (wb-1ffa). --connect-timeout
+  # bounds the handshake, --max-time the whole transfer, --retry rides transient
+  # CDN blips. Better a clean failure than an infinite stall.
+  curl -fsSL --connect-timeout 20 --max-time 180 --retry 2 --retry-delay 2 -o "$2" "$1"
 }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
