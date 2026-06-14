@@ -2,6 +2,7 @@
 // AI search UI (prompt → answer + sources + follow-ups) is demonstrable before
 // the real model/nexus lane is wired. Shape mirrors what the live endpoint
 // would return, so the component doesn't change when it goes real.
+import { nexus } from "$lib/bridge/nexus.svelte";
 
 export interface AiSource {
   title: string;
@@ -36,4 +37,30 @@ export function aiAnswer(query: string): AiAnswer {
       `What changed recently with ${topic}?`,
     ],
   };
+}
+
+// Live AI-over-files: ask the connected nexus to search the user's library and
+// synthesize a GROUNDED, cited answer (POST /api/library/ask — auth-tenant). Falls
+// back to the stub when no nexus is connected, the route is missing, or the request
+// fails, so the UI always shows something. The answer is honest when nothing matched
+// (the runtime won't fabricate files), so an empty library reads as "couldn't find it".
+export async function aiAnswerLive(query: string): Promise<AiAnswer> {
+  const q = query.trim();
+  const base = nexus.activeUrl;
+  if (!q || !base) return aiAnswer(q);
+  const token = nexus.activeToken;
+  try {
+    const res = await fetch(`${base}/api/library/ask`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ query: q }),
+      signal: AbortSignal.timeout(46000),
+    });
+    if (!res.ok) return aiAnswer(q);
+    const d = (await res.json()) as Partial<AiAnswer>;
+    if (typeof d.answer !== "string") return aiAnswer(q);
+    return { answer: d.answer, sources: d.sources ?? [], related: d.related ?? [] };
+  } catch {
+    return aiAnswer(q);
+  }
 }

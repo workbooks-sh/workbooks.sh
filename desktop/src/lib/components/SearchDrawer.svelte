@@ -13,7 +13,7 @@
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import { search, WEB_PROVIDERS, WEB_PROVIDER_LABELS, type ProviderResults, type WebProvider } from "$lib/search/registry.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
-  import { aiAnswer, type AiAnswer } from "$lib/search/aiPreview";
+  import { aiAnswerLive, type AiAnswer } from "$lib/search/aiPreview";
   import { setSearch, type SearchApi } from "$lib/search/context";
   import type { SearchResult } from "$lib/search/types";
 
@@ -51,7 +51,7 @@
   onMount(() => {
     if (search.demoQuery) {
       query = search.demoQuery;
-      if (search.mode === "ai") aiResult = aiAnswer(query);
+      if (search.mode === "ai") void runAi(query);
       search.demoQuery = "";
     }
   });
@@ -113,7 +113,7 @@
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (mode === "ai") {
-        aiResult = query.trim() ? aiAnswer(query) : null;
+        void runAi(query);
         return;
       }
       const r = flat[highlighted];
@@ -135,7 +135,15 @@
   }
   function askRelated(q: string) {
     query = q;
-    aiResult = aiAnswer(q);
+    void runAi(q);
+  }
+  // Live AI-over-files: fetch the nexus answer (grounded + cited), busy while it
+  // runs; aiAnswerLive falls back to the stub when no nexus is connected.
+  async function runAi(q: string) {
+    const v = q.trim();
+    if (!v) { aiResult = null; return; }
+    busy = true;
+    try { aiResult = await aiAnswerLive(v); } finally { busy = false; }
   }
   const placeholder = $derived(
     mode === "ai" ? "Ask anything, then press Enter…" : mode === "internal" ? "Search your files…" : "Search files, bookmarks, the web…",
@@ -154,7 +162,7 @@
     get highlighted() { return highlighted; },
     setHighlighted: (i) => { highlighted = i; },
     get ai() { return aiResult; },
-    ask: (q) => { const v = (q ?? query).trim(); aiResult = v ? aiAnswer(v) : null; },
+    ask: (q) => void runAi(q ?? query),
     open: (r) => void open(r),
     openTarget: (t) => openSource(t),
     close: () => onclose?.(),
