@@ -32,6 +32,7 @@
   | =tab-control=  | Open / focus / close a tab by path in the shell       |
   | =app-control=  | Switch theme, add a bookmark, create a workspace      |
   | =key-prompt=   | Ask the user for an API key (modal) via =wb env request= |
+  | =models=       | Inspect/switch your model + discover the live catalog via =wb model/models= |
   | =variables=    | Store config + secrets (per-tenant, secrets by reference) via =wb var= |
   | =library-search= | Find content across the user's workbooks via =wb search= / =wb library= |
 

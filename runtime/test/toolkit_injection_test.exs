@@ -47,6 +47,21 @@ defmodule Workbooks.ToolkitInjectionTest do
     assert out =~ "ghost-zzz: (not installed)"
   end
 
+  test "no manifest drift: every skill file is documented in its toolkit manifest" do
+    # Guards the drift just fixed (the `models` skill existed but was missing from
+    # the workbooks-browser manifest's Live-now table). Every skills/*.org must be
+    # mentioned in manifest.org so the doc can't silently fall behind the files.
+    root = Toolkits.default_root()
+
+    for tk <- ["workbooks-browser", "workbooks-cli"] do
+      manifest = File.read!(Path.join([root, tk, "manifest.org"]))
+
+      for skill <- Toolkits.skills(Path.join(root, tk)) do
+        assert manifest =~ skill, "#{tk}: skill '#{skill}' missing from manifest.org"
+      end
+    end
+  end
+
   test "eval_text case-filter: a non-matching filter selects no case (no LLM run)" do
     # The filter narrows to one eval by filename substring — cheap iteration vs
     # the full suite. A bogus filter must short-circuit to a clear message rather
