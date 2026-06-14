@@ -1115,19 +1115,31 @@ defmodule Workbooks.Web do
   end
 
   get "/api/workbooks" do
-    json = Jason.encode!(Workbooks.ControlPlane.list_workbooks())
-    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
+    # Tenant-scoped (wb-g1yo.9): list only the caller's workbook ids (id-list
+    # contract preserved). Public published workbooks are served by PublicWeb.
+    ids = Workbooks.ControlPlane.list_workbooks(conn.assigns[:tenant]) |> Enum.map(& &1.id)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(ids))
   end
 
   get "/api/w/:id/org" do
-    org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
-    conn |> put_resp_content_type("text/plain; charset=utf-8") |> send_resp(200, org)
+    # IDOR gate (wb-g1yo.9): don't serve another tenant's workbook source. (Public
+    # published content goes through the separate, unauthenticated PublicWeb plane.)
+    if Workbooks.ControlPlane.workbook_visible?(conn.params["id"], conn.assigns[:tenant]) do
+      org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
+      conn |> put_resp_content_type("text/plain; charset=utf-8") |> send_resp(200, org)
+    else
+      conn |> put_resp_content_type("text/plain; charset=utf-8") |> send_resp(404, "")
+    end
   end
 
   # Server-rendered HTML — the runtime renders the Org (orgize, in the kernel).
   get "/api/w/:id/html" do
-    org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
-    conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, Workbooks.OQL.render(org))
+    if Workbooks.ControlPlane.workbook_visible?(conn.params["id"], conn.assigns[:tenant]) do
+      org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
+      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, Workbooks.OQL.render(org))
+    else
+      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(404, "")
+    end
   end
 
   match _ do

@@ -54,6 +54,21 @@ defmodule Workbooks.TenantIsolationHttpTest do
     end
   end
 
+  test "workbook reads are tenant-gated (/api/w/:id, /api/workbooks)" do
+    # store directly (bypass deploy's git commit) under alice
+    Workbooks.ControlPlane.put_workbook("wb-isol", "* secret\n", "isol-alice")
+
+    assert req(:get, "/api/w/wb-isol/org", "isol-alice").status == 200
+    # another tenant: 404, no content leaked
+    bob = req(:get, "/api/w/wb-isol/org", "isol-bob")
+    assert bob.status == 404
+    refute bob.resp_body =~ "secret"
+
+    alice_ids = Jason.decode!(req(:get, "/api/workbooks", "isol-alice").resp_body)
+    assert "wb-isol" in alice_ids
+    refute "wb-isol" in Jason.decode!(req(:get, "/api/workbooks", "isol-bob").resp_body)
+  end
+
   test "GET /api/oql/query confines to .org — no arbitrary host-file read" do
     File.write!("/tmp/wb-it-leak.txt", "* LEAK :secret:\n")
     File.write!("/tmp/wb-it-leak.org", "* LEAK :secret:\n")

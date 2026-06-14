@@ -33,10 +33,28 @@ defmodule Workbooks.ControlPlane do
   @doc "Update a session's lifecycle state (created/active/suspended/frozen/...)."
   def set_state(id, state), do: GenServer.call(__MODULE__, {:set_state, id, state})
 
-  @doc "Store / load a Workbook's Org source by id (the deployable artifact)."
-  def put_workbook(id, org), do: GenServer.call(__MODULE__, {:put_workbook, id, org})
+  @doc "Store / load a Workbook's Org source by id (the deployable artifact). `tenant` scopes ownership (wb-g1yo.9)."
+  def put_workbook(id, org, tenant \\ nil), do: GenServer.call(__MODULE__, {:put_workbook, id, org, tenant})
   def get_workbook(id), do: GenServer.call(__MODULE__, {:get_workbook, id})
+
+  @doc "The owning tenant of a workbook → string | nil (legacy) | :not_found."
+  def workbook_tenant(id), do: GenServer.call(__MODULE__, {:workbook_tenant, id})
+
+  @doc "All workbook rows (%{id, tenant}). list_workbooks/1 scopes to a tenant (nil = all/admin; legacy nil-tenant rows grandfathered)."
   def list_workbooks, do: GenServer.call(__MODULE__, :list_workbooks)
+
+  def list_workbooks(tenant) do
+    list_workbooks()
+    |> Enum.filter(fn %{tenant: t} -> is_nil(tenant) or is_nil(t) or t == tenant end)
+  end
+
+  @doc "May `caller_tenant` read workbook `id`? Same grandfather rule as the rest of wb-g1yo."
+  def workbook_visible?(id, caller_tenant) do
+    case workbook_tenant(id) do
+      :not_found -> true
+      t -> is_nil(caller_tenant) or is_nil(t) or t == caller_tenant
+    end
+  end
 
   @impl true
   def init(_) do
@@ -51,8 +69,13 @@ defmodule Workbooks.ControlPlane do
 
     :ok =
       Sqlite3.execute(conn, """
-      CREATE TABLE IF NOT EXISTS workbooks (id TEXT PRIMARY KEY, org TEXT, created INTEGER)
+      CREATE TABLE IF NOT EXISTS workbooks (id TEXT PRIMARY KEY, org TEXT, created INTEGER, tenant TEXT)
       """)
+
+    # Migration (wb-g1yo.9): add the tenant column to a pre-existing workbooks
+    # table. Errors if it already exists (fresh DBs from the CREATE above) — that's
+    # fine, swallow it so init is idempotent.
+    _ = Sqlite3.execute(conn, "ALTER TABLE workbooks ADD COLUMN tenant TEXT")
 
     {:ok, %{conn: conn}}
   end
@@ -103,12 +126,29 @@ defmodule Workbooks.ControlPlane do
     {:reply, :ok, s}
   end
 
-  def handle_call({:put_workbook, id, org}, _from, %{conn: conn} = s) do
-    {:ok, stmt} = Sqlite3.prepare(conn, "INSERT OR REPLACE INTO workbooks VALUES (?1, ?2, ?3)")
-    :ok = Sqlite3.bind(stmt, [id, org, System.system_time(:second)])
+  def handle_call({:put_workbook, id, org, tenant}, _from, %{conn: conn} = s) do
+    {:ok, stmt} =
+      Sqlite3.prepare(conn, "INSERT OR REPLACE INTO workbooks (id, org, created, tenant) VALUES (?1, ?2, ?3, ?4)")
+
+    :ok = Sqlite3.bind(stmt, [id, org, System.system_time(:second), tenant])
     :done = Sqlite3.step(conn, stmt)
     :ok = Sqlite3.release(conn, stmt)
     {:reply, :ok, s}
+  end
+
+  # The owning tenant of a workbook (wb-g1yo.9) → string | nil (legacy) | :not_found.
+  def handle_call({:workbook_tenant, id}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT tenant FROM workbooks WHERE id = ?1")
+    :ok = Sqlite3.bind(stmt, [id])
+
+    reply =
+      case Sqlite3.step(conn, stmt) do
+        {:row, [t]} -> t
+        _ -> :not_found
+      end
+
+    Sqlite3.release(conn, stmt)
+    {:reply, reply, s}
   end
 
   def handle_call({:get_workbook, id}, _from, %{conn: conn} = s) do
@@ -126,10 +166,10 @@ defmodule Workbooks.ControlPlane do
   end
 
   def handle_call(:list_workbooks, _from, %{conn: conn} = s) do
-    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT id FROM workbooks ORDER BY created DESC")
-    ids = drain(conn, stmt, []) |> Enum.map(fn [id] -> id end)
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT id, tenant FROM workbooks ORDER BY created DESC")
+    rows = drain(conn, stmt, []) |> Enum.map(fn [id, t] -> %{id: id, tenant: t} end)
     Sqlite3.release(conn, stmt)
-    {:reply, ids, s}
+    {:reply, rows, s}
   end
 
   defp drain(conn, stmt, acc) do

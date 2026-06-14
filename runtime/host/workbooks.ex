@@ -14,7 +14,7 @@ defmodule Workbooks do
   tenant's git repo (the versioned source of truth). Every deploy = one commit.
   """
   def deploy(id, org, tenant \\ "dev") do
-    :ok = Workbooks.ControlPlane.put_workbook(id, org)
+    :ok = Workbooks.ControlPlane.put_workbook(id, org, tenant)
     Workbooks.Git.save(Workbooks.Git.identity(tenant), id, org)
   end
 end
