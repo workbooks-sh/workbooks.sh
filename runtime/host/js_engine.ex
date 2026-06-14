@@ -89,4 +89,65 @@ defmodule Workbooks.JsEngine do
       end
     end
   end
+
+  @doc """
+  Run a self-contained JS/TS *program* (e.g. an esbuild bundle) and return its `console` output as
+  `{:ok, stdout}` | `{:error, why}`. This is the GENERAL execution path for npm libraries.
+
+  StarlingMonkey first (the full WHATWG platform — WebCrypto/`crypto.getRandomValues`+`randomUUID`,
+  modern ES, `structuredClone`, brokered `fetch`), auto-falling back to the QuickJS lane only when
+  StarlingMonkey hits its one known gap: regex `\\p{…}` unicode-property escapes (the `run` bootstrap
+  surfaces that as `"ERR: … regular expression"`). QuickJS handles `\\p{}` but lacks WebCrypto — the two
+  are complementary, so the thin fallback covers the residue while StarlingMonkey carries the common
+  case (uuid/nanoid/zod/lodash/date-fns all run on SM; marked-class `\\p{}` users land on QuickJS).
+
+  The SM eval-host has stdio disabled, so we shadow `console.*` into a buffer and return it as the eval
+  value — making SM's output shape identical to the QuickJS command's stdout. `opts`: `:timeout` (SM
+  eval ms); `:stdin`/`:argv` (QuickJS fallback only).
+  """
+  def run_program(js, opts \\ []) when is_binary(js) do
+    case eval(console_capture(js), opts) do
+      {:ok, "ERR: " <> msg} ->
+        Logger.debug("JsEngine.run_program: StarlingMonkey eval failed (#{String.slice(msg, 0, 80)}); QuickJS fallback")
+        quickjs_run(js, opts)
+
+      {:error, reason} ->
+        Logger.debug("JsEngine.run_program: StarlingMonkey host error #{inspect(reason)}; QuickJS fallback")
+        quickjs_run(js, opts)
+
+      {:ok, out} ->
+        {:ok, out}
+    end
+  end
+
+  # Shadow console.* so a program's logging becomes the eval's return value (SM has stdio disabled).
+  # Set on globalThis BEFORE the bundle runs; the trailing expression is what `run`'s eval returns.
+  # Format-robust for a self-contained esbuild bundle (no top-level import/export after bundling).
+  defp console_capture(body) do
+    "globalThis.__wbout=[];{const __p=(...a)=>globalThis.__wbout.push(a.map(String).join(\" \"));" <>
+      "globalThis.console={log:__p,error:__p,warn:__p,info:__p,debug:__p};}\n" <>
+      body <> "\n;globalThis.__wbout.join(\"\\n\")"
+  end
+
+  # QuickJS fallback: compile the bundle to a wasm command in-sandbox, run it; its console.log → stdout.
+  defp quickjs_run(js, opts) do
+    tmp = Path.join(System.tmp_dir!(), "jsfallback-#{:erlang.phash2(js)}.js")
+    File.write!(tmp, js)
+
+    try do
+      case Workbooks.Compilers.js_compile_to_wasm(tmp) do
+        {:ok, wasm, _logs} ->
+          out =
+            Workbooks.PackageManager.run(wasm, Keyword.get(opts, :stdin, ""), Keyword.get(opts, :argv, []))
+
+          out = if is_tuple(out), do: elem(out, 0), else: out
+          {:ok, String.trim_trailing(to_string(out))}
+
+        {:error, _} = err ->
+          err
+      end
+    after
+      File.rm(tmp)
+    end
+  end
 end
