@@ -34,3 +34,23 @@ defmodule Workbooks.BrowseHeadlessTest do
     refute "browse" in Agent.__tool_names_for_test__([])
   end
 end
+
+defmodule Workbooks.BrowseSandboxTest do
+  @moduledoc "Chrome's renderer sandbox is the defense against malicious pages — must stay ON by default."
+  use ExUnit.Case, async: false
+  alias Workbooks.Browse.Headless
+
+  setup do
+    prev = System.get_env("WB_CHROME_NO_SANDBOX")
+    on_exit(fn -> if prev, do: System.put_env("WB_CHROME_NO_SANDBOX", prev), else: System.delete_env("WB_CHROME_NO_SANDBOX") end)
+    :ok
+  end
+
+  test "sandbox ON by default; --no-sandbox only via explicit WB_CHROME_NO_SANDBOX opt-in" do
+    System.delete_env("WB_CHROME_NO_SANDBOX")
+    refute "--no-sandbox" in Headless.chrome_args_for_test("https://x", 1000)
+
+    System.put_env("WB_CHROME_NO_SANDBOX", "1")
+    assert "--no-sandbox" in Headless.chrome_args_for_test("https://x", 1000)
+  end
+end

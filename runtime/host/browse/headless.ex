@@ -10,6 +10,10 @@ defmodule Workbooks.Browse.Headless do
   launches, so the browser can't be aimed at internal/metadata/loopback addresses.
   Bounded by Chrome's own `--timeout`/`--virtual-time-budget` plus a hard
   Task.shutdown, so a hung render can't wedge the runtime.
+
+  Chrome's process sandbox is kept ON (it isolates the renderer processing
+  UNTRUSTED pages); `--no-sandbox` is added only via `WB_CHROME_NO_SANDBOX=1` for
+  hosts that can't init the sandbox (root / minimal container).
   """
   require Logger
 
@@ -39,11 +43,17 @@ defmodule Workbooks.Browse.Headless do
   @doc "Is a local headless browser available on this host?"
   def available?, do: chrome_bin() != nil
 
-  defp run(bin, url, timeout) do
-    args = [
+  @doc false
+  def chrome_args_for_test(url, timeout), do: chrome_args(url, timeout)
+
+  # Chrome's process sandbox is the defense when rendering UNTRUSTED pages — keep it
+  # ON by default. `--no-sandbox` is only added via explicit opt-in
+  # (WB_CHROME_NO_SANDBOX=1) for hosts that can't init the sandbox (root / minimal
+  # container), accepting the weaker isolation there.
+  defp chrome_args(url, timeout) do
+    base = [
       "--headless",
       "--disable-gpu",
-      "--no-sandbox",
       "--timeout=#{timeout}",
       "--virtual-time-budget=#{timeout}",
       "--user-agent=Mozilla/5.0 (WorkbooksBrowse)",
@@ -51,7 +61,11 @@ defmodule Workbooks.Browse.Headless do
       url
     ]
 
-    task = Task.async(fn -> System.cmd(bin, args, stderr_to_stdout: false) end)
+    if System.get_env("WB_CHROME_NO_SANDBOX") == "1", do: ["--no-sandbox" | base], else: base
+  end
+
+  defp run(bin, url, timeout) do
+    task = Task.async(fn -> System.cmd(bin, chrome_args(url, timeout), stderr_to_stdout: false) end)
 
     case Task.yield(task, timeout + 5_000) || Task.shutdown(task, :brutal_kill) do
       {:ok, {dom, 0}} when byte_size(dom) > 0 -> {:ok, dom}
