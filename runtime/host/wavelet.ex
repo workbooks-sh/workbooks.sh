@@ -291,9 +291,29 @@ defmodule Workbooks.Wavelet do
     end
   end
 
+  # Two encode engines:
+  #   :in_guest (default) — Workbooks.WaveletEncode runs the Forge ffmpeg lane's
+  #     wb_encode.wasm UNDER WASMTIME. mpeg4/mp4, dependency-free, NO native exec,
+  #     NO broker grant. Closes the wavelet mp4-encode bedrock gap. No audio mux yet.
+  #   :host — Workbooks.FfmpegBroker (native ffmpeg + libx264/H.264). The quality
+  #     path and the only one that muxes audio. Default-deny via the `encode` cap.
+  # Select with opts[:encode_engine]; :in_guest is the zero-trust default. A request
+  # that needs audio auto-falls-back to :host (in-guest mpeg4 has no audio track yet).
   defp encode(frames, p, gated_out, roots, opts) do
     out_abs = Path.expand(gated_out)
+    engine = Keyword.get(opts, :encode_engine, :in_guest)
 
+    if engine == :in_guest and is_nil(p.audio) do
+      Workbooks.WaveletEncode.encode(frames, out_abs,
+        fps: p.fps,
+        timeout_ms: Keyword.get(opts, :timeout_ms, 600_000)
+      )
+    else
+      encode_host(frames, p, out_abs, roots, opts)
+    end
+  end
+
+  defp encode_host(frames, p, out_abs, roots, opts) do
     with {:ok, gated_audio} <- stage_audio(p.audio, Path.dirname(frames)) do
       enc_opts =
         [

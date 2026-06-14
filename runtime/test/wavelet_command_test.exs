@@ -3,8 +3,11 @@ defmodule Workbooks.WaveletCommandTest do
   End-to-end proof of the Phase-3 `wavelet render` toolkit command: a bash-only
   tenant authors an HTML composition and runs ONE command that renders the frame
   sequence IN-SANDBOX (the render-core wasm via CommandRegistry) then muxes it to
-  an h264 mp4 via the host ffmpeg encode broker. Empirical — actually runs the
-  wasm under wasmtime and shells ffmpeg/ffprobe, never faked.
+  an mp4. The DEFAULT mux engine is :in_guest — the Forge ffmpeg lane's
+  wb_encode.wasm encodes mpeg4/mp4 UNDER WASMTIME (no host ffmpeg, no native exec,
+  no broker grant). The :host engine (native ffmpeg + libx264 H.264 + audio) stays
+  available as the quality path and remains default-deny. Empirical — actually runs
+  the wasm under wasmtime and shells ffprobe only to inspect, never faked.
   """
   use ExUnit.Case, async: false
   alias Workbooks.Wavelet
@@ -60,16 +63,18 @@ defmodule Workbooks.WaveletCommandTest do
     assert {:ok, ^name} = Wavelet.ensure_registered()
   end
 
-  test "wavelet render: in-sandbox frames -> brokered h264 mp4", %{root: root} do
+  test "wavelet render: in-sandbox frames -> IN-GUEST mpeg4 mp4 (default, no native exec)",
+       %{root: root} do
     comp = Path.join(root, "clip.html")
     File.write!(comp, @composition)
     out = Path.join(root, "clip.mp4")
 
-    # The exact bash-tenant command surface: a token list after `wavelet`.
+    # The exact bash-tenant command surface. The DEFAULT encode engine is :in_guest:
+    # the mp4 mux runs the Forge ffmpeg lane's wb_encode.wasm UNDER WASMTIME — no host
+    # ffmpeg, no native exec, no broker grant (:allow not required for the in-guest path).
     assert {:ok, delivered} =
              Wavelet.command(
                ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12", "--duration", "1"],
-               allow: true,
                roots: [root]
              )
 
@@ -77,7 +82,29 @@ defmodule Workbooks.WaveletCommandTest do
     assert File.regular?(delivered)
     # mp4 magic: bytes 4..7 == "ftyp"
     assert <<_::32, "ftyp", _::binary>> = File.read!(delivered)
-    # the encode broker produced real h264/yuv420p
+    # the in-guest encoder produced real mpeg4/yuv420p
+    assert probe(delivered, "codec_name") == "mpeg4"
+    assert probe(delivered, "pix_fmt") == "yuv420p"
+    assert String.to_integer(probe(delivered, "nb_frames")) > 0
+  end
+
+  test "wavelet render encode_engine: :host -> brokered h264 mp4 (quality path)",
+       %{root: root} do
+    comp = Path.join(root, "clip_h264.html")
+    File.write!(comp, @composition)
+    out = Path.join(root, "clip_h264.mp4")
+
+    # Explicit :host engine selects the native ffmpeg + libx264 broker (default-deny:
+    # needs the encode grant via :allow).
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12", "--duration", "1"],
+               allow: true,
+               encode_engine: :host,
+               roots: [root]
+             )
+
+    assert File.regular?(delivered)
     assert probe(delivered, "codec_name") == "h264"
     assert probe(delivered, "pix_fmt") == "yuv420p"
   end
@@ -118,15 +145,20 @@ defmodule Workbooks.WaveletCommandTest do
     assert String.trim(a) == "aac"
   end
 
-  test "encode default-deny: render runs but mux refuses without the encode grant", %{root: root} do
+  test "encode_engine: :host default-deny — the bedrock-escape mux refuses without the grant",
+       %{root: root} do
     comp = Path.join(root, "deny.html")
     File.write!(comp, @composition)
     out = Path.join(root, "deny.mp4")
 
-    # No allow: true -> the broker's default-deny rejects the mux. The frames were
-    # rendered in-sandbox first; the cap gates only the bedrock-escape encode.
+    # The :host broker is the bedrock escape (native ffmpeg) and stays default-deny:
+    # no allow: true -> the mux is rejected. Frames were rendered in-sandbox first;
+    # the cap gates only the native-exec escape. (The in-guest engine needs no grant —
+    # there is no native exec to gate — see the default-engine test above.)
     assert {:error, :denied} =
-             Wavelet.command(["render", comp, "-o", out, "--fps", "12", "--duration", "1"],
+             Wavelet.command(
+               ["render", comp, "-o", out, "--fps", "12", "--duration", "1"],
+               encode_engine: :host,
                roots: [root]
              )
 
