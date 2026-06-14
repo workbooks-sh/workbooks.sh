@@ -23,6 +23,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |
+| **jsonnet** (config templating language) | Go-wasip1 artifact | jsonnet_lane_test (arith/comprehension/stdlib) |
 | SQLite | clean-wasi prebuilt | ships in-tree |
 | crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
 

@@ -2590,6 +2590,13 @@
    "proof": "dasel v2.8.1 (Go->wasip1) queries JSON/YAML/TOML from stdin through PackageManager.run (.name->workbooks, .tags.[1]->wasm, .x->42); dasel_lane_test.exs green \u2014 adds TOML/XML/CSV beyond yq/gojq",
    "lane": "compilers/dasel/build.sh (native GOOS=wasip1, pinned, gitignored)",
    "since": "iter162"
+  },
+  "jsonnet": {
+   "capability": "jsonnet config-templating language in-sandbox",
+   "status": "live",
+   "proof": "go-jsonnet v0.22.0 (Go->wasip1) evaluates jsonnet (arithmetic, list comprehensions, stdlib std.range) to JSON through PackageManager.run -> {a:1,sum:5,sq:[1,4,9]}; jsonnet_lane_test.exs green",
+   "lane": "compilers/jsonnet/build.sh (native GOOS=wasip1, pinned, gitignored)",
+   "since": "iter162"
   }
  },
  "verdict_ladder": {
