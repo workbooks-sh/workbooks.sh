@@ -43,6 +43,17 @@ defmodule Workbooks.TenantIsolationHttpTest do
     assert req(:get, "/api/library/isol-bob", "isol-alice").status == 403
   end
 
+  test "write/action :tenant-path endpoints reject cross-tenant (IDOR)" do
+    # own tenant allowed (200), another tenant forbidden (403). The mirror one is
+    # the worst — it would push the whole repo to a caller-supplied git URL.
+    for ep <- ["search/", "mirror/", "radicle/"] do
+      own_path = "/api/#{ep}isol-alice" <> if(ep == "radicle/", do: "/publish", else: "")
+      other_path = "/api/#{ep}isol-bob" <> if(ep == "radicle/", do: "/publish", else: "")
+      assert req(:post, own_path, "isol-alice", "{}").status == 200
+      assert req(:post, other_path, "isol-alice", "{}").status == 403
+    end
+  end
+
   test "GET /api/oql/query confines to .org — no arbitrary host-file read" do
     File.write!("/tmp/wb-it-leak.txt", "* LEAK :secret:\n")
     File.write!("/tmp/wb-it-leak.org", "* LEAK :secret:\n")

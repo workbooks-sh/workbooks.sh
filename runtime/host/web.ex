@@ -967,39 +967,51 @@ defmodule Workbooks.Web do
 
   # Radicle (2f) — federate the tenant repo over the P2P network; returns rad: id.
   post "/api/radicle/:tenant/publish" do
-    result =
-      try do
-        case Workbooks.Git.publish(conn.params["tenant"]) do
-          nil -> %{ok: false, error: "radicle not available"}
-          rid -> %{ok: true, rid: rid}
+    # IDOR guard (wb-g1yo.9): can't publish another tenant's repo.
+    if path_tenant_ok?(conn) do
+      result =
+        try do
+          case Workbooks.Git.publish(conn.params["tenant"]) do
+            nil -> %{ok: false, error: "radicle not available"}
+            rid -> %{ok: true, rid: rid}
+          end
+        rescue
+          e -> %{ok: false, error: Exception.message(e)}
         end
-      rescue
-        e -> %{ok: false, error: Exception.message(e)}
-      end
 
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{ok: false, error: "forbidden"}))
+    end
   end
 
   # Source rail (2a/2b) — mirror the tenant repo to any git host. {"url": "..."}
   # pushes anywhere; {"forge": "github"|"gitlab"|"gitea"} auto-provisions via its CLI.
   post "/api/mirror/:tenant" do
     {:ok, body, conn} = read_body(conn)
-    opts = if body == "", do: %{}, else: Jason.decode!(body)
-    tenant = conn.params["tenant"]
 
-    outcome =
-      if opts["url"],
-        do: Workbooks.Git.mirror(tenant, opts["url"]),
-        else: Workbooks.Git.forge_push(tenant, forge: opts["forge"], repo: opts["repo"], visibility: opts["visibility"] || "private")
+    # IDOR guard (wb-g1yo.9): mirroring pushes the tenant's WHOLE repo to a
+    # caller-supplied git URL — a cross-tenant call here is repo exfiltration.
+    if path_tenant_ok?(conn) do
+      opts = if body == "", do: %{}, else: Jason.decode!(body)
+      tenant = conn.params["tenant"]
 
-    result =
-      case outcome do
-        {:ok, url} -> %{ok: true, url: url}
-        {:skip, r} -> %{ok: false, skip: r}
-        {:error, e} -> %{ok: false, error: String.slice(to_string(e), 0, 300)}
-      end
+      outcome =
+        if opts["url"],
+          do: Workbooks.Git.mirror(tenant, opts["url"]),
+          else: Workbooks.Git.forge_push(tenant, forge: opts["forge"], repo: opts["repo"], visibility: opts["visibility"] || "private")
 
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+      result =
+        case outcome do
+          {:ok, url} -> %{ok: true, url: url}
+          {:skip, r} -> %{ok: false, skip: r}
+          {:error, e} -> %{ok: false, error: String.slice(to_string(e), 0, 300)}
+        end
+
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{ok: false, error: "forbidden"}))
+    end
   end
 
   # Ledger verify (Phase 2g) — recompute the hash-chain over the run's current
@@ -1013,10 +1025,16 @@ defmodule Workbooks.Web do
   # calls it, not just agents. {"query": "...", "mode": "hybrid"|"semantic"|"literal", "workbook": "..."}
   post "/api/search/:tenant" do
     {:ok, body, conn} = read_body(conn)
-    p = Jason.decode!(body)
-    mode = String.to_atom(p["mode"] || "hybrid")
-    hits = Workbooks.Library.search(conn.params["tenant"], p["query"] || "", mode: mode, workbook: p["workbook"], k: p["k"] || 8)
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{hits: hits}))
+
+    # IDOR guard (wb-g1yo.9): can't search another tenant's library.
+    if path_tenant_ok?(conn) do
+      p = Jason.decode!(body)
+      mode = String.to_atom(p["mode"] || "hybrid")
+      hits = Workbooks.Library.search(conn.params["tenant"], p["query"] || "", mode: mode, workbook: p["workbook"], k: p["k"] || 8)
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{hits: hits}))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
+    end
   end
 
   # Cross-session index (0d) — every run, newest first, each rolled up. The
