@@ -52,6 +52,9 @@ interface GeminiSetupMessage {
     }>;
     generationConfig?: {
       responseModalities?: Array<"AUDIO" | "TEXT">;
+      speechConfig?: {
+        voiceConfig?: { prebuiltVoiceConfig?: { voiceName: string } };
+      };
     };
     outputAudioTranscription?: Record<string, never>;
     inputAudioTranscription?: Record<string, never>;
@@ -300,6 +303,12 @@ class GeminiLiveSession {
             tools: [{ functionDeclarations: declarations }],
             generationConfig: {
               responseModalities: ["AUDIO"],
+              // Male prebuilt voice (Charon) so the resident agent doesn't
+              // surprise users with a default/female voice. Gemini Live male
+              // voices: Charon, Fenrir, Puck; female: Aoede, Kore.
+              speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } },
+              },
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {},

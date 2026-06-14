@@ -17,6 +17,7 @@
   import { applyThemeMode } from "$lib/onboarding/prefs";
   import { setupSaveModelKey, setupCompleteFirstRun } from "$lib/bridge/setup.svelte";
   import { connections } from "$lib/bridge/connections.svelte";
+  import { keys } from "$lib/bridge/keys.svelte";
   import ModelPicker from "$lib/chat/ModelPicker.svelte";
   import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
@@ -102,6 +103,20 @@
 
   onMount(() => {
     onboarding.start();
+    // Reflect already-saved keys so the form shows "Connected" instead of an
+    // empty input — a returning user shouldn't be asked to re-enter a key the
+    // app already holds. OpenRouter lives in the keys store (provider), Gemini
+    // as a connection. The raw value is never exposed; we only show it's set.
+    void (async () => {
+      try {
+        await keys.init();
+        if (keys.keys.some((k) => k.provider === "openrouter")) orConnected = true;
+      } catch { /* offline — leave the input */ }
+      try {
+        await connections.refresh();
+        if (connections.forService("gemini")) gemConnected = true;
+      } catch { /* offline — leave the input */ }
+    })();
     for (const t of DEMO_TOOLKITS)
       dock.register({ id: t.id, title: t.title, icon: t.icon, component: DemoToolkitPanel, props: { title: t.title } });
     return () => {
@@ -357,7 +372,7 @@
             <div class="text">
               <span class="kicker">Your resident agent</span>
               <h1>Meet Waldo</h1>
-              <p>Add your keys to wake Waldo. Stored in your OS keychain — never synced. You can change these later in Settings.</p>
+              <p>Add your keys to wake Waldo. Stored locally on this device — never synced. You can change these later in Settings.</p>
             </div>
             <div class="keys">
               <div class="keyrow" class:done={orConnected}>
@@ -366,7 +381,10 @@
                   OpenRouter <span class="kfor">chat · every model, one key</span>
                 </span>
                 {#if orConnected}
-                  <span class="kok"><CheckCircle size={14} weight="fill" /> Connected</span>
+                  <div class="kfilled">
+                    <span class="kdots">••••••••••••••••</span>
+                    <span class="kadded"><CheckCircle size={13} weight="fill" /> Added</span>
+                  </div>
                 {:else}
                   <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveOpenRouter(); }}>
                     <input type="password" bind:value={orKey} placeholder="sk-or-…" spellcheck="false" autocomplete="off" disabled={orBusy} />
@@ -382,7 +400,10 @@
                   Gemini <span class="kfor">voice chat</span>
                 </span>
                 {#if gemConnected}
-                  <span class="kok"><CheckCircle size={14} weight="fill" /> Connected</span>
+                  <div class="kfilled">
+                    <span class="kdots">••••••••••••••••</span>
+                    <span class="kadded"><CheckCircle size={13} weight="fill" /> Added</span>
+                  </div>
                 {:else}
                   <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveGemini(); }}>
                     <input type="password" bind:value={gemKey} placeholder="AIza…" spellcheck="false" autocomplete="off" disabled={gemBusy} />
@@ -454,6 +475,28 @@
   }
   .klabel :global(img) { display: block; }
   .kfor { font-weight: 400; color: var(--color-fg-subtle); font-size: 0.74rem; }
+  /* Saved-key state: a filled (obfuscated) field so a returning user sees the
+     key is already there and isn't asked to re-enter it. */
+  .kfilled {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface-soft);
+  }
+  .kdots { color: var(--color-fg-subtle); letter-spacing: 2px; font-size: 0.8rem; overflow: hidden; }
+  .kadded {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-ok);
+  }
   .kform { display: flex; gap: 6px; }
   .kform input {
     flex: 1;
