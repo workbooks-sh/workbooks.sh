@@ -46,6 +46,51 @@ defmodule Workbooks.AgentLoopTest do
     assert r.result == "Immediate answer."
   end
 
+  test "runaway protection: a model that NEVER stops calling tools terminates at max_steps" do
+    # An unbounded tool-call loop must hit the step cap, not run forever.
+    always_tool = fn _m, _o ->
+      {:ok,
+       %{
+         tool_calls: [%{name: "wb", args: %{"args" => "model get"}, id: "x"}],
+         raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+       }}
+    end
+
+    r = run(always_tool)
+    assert r.result =~ "max_steps"
+  end
+
+  test "the `done` tool finishes the run with its result" do
+    r =
+      run(
+        scripted([
+          {:ok,
+           %{
+             tool_calls: [%{name: "done", args: %{"result" => "all set"}, id: "d"}],
+             raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+           }}
+        ])
+      )
+
+    assert r.result == "all set"
+  end
+
+  test "an unknown tool is a graceful error (not a crash) — the loop recovers" do
+    r =
+      run(
+        scripted([
+          {:ok,
+           %{
+             tool_calls: [%{name: "bogus_tool_xyz", args: %{}, id: "b"}],
+             raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+           }},
+          {:ok, %{tool_calls: [], content: "recovered after the bad tool"}}
+        ])
+      )
+
+    assert r.result == "recovered after the bad tool"
+  end
+
   test "a hard dead-stop (empty even after the nudge) degrades to '(no result)', no infinite loop" do
     responses = [
       {:ok,
