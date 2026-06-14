@@ -28,13 +28,10 @@ Folder · Shared folder · Add to workspace · Update · Draft · Keep · Discar
 *"A Drive-simple monorepo for AI-built software — share a folder, add a toolkit, undo anything; subtree-synced workspaces + zero-toolchain polyglot builds, built on josh + jj."* Real market gap: every monorepo product is a developer tool; nobody packages subtree-sharing + content-addressed polyglot build behind a non-technical Drive metaphor. Our in-wasm polyglot build is the moat. **Recommended cut:** OSS the sharing/sync/undo UX wrapper (MIT/Apache-2.0, matching josh/jj); keep hosted sync + shared build cache commercial (Nx-Cloud model).
 
 ## Decisions
-**Locked:** CRDT=zero (workbook-only) · Bazel=avoid, keep our lane · GitHub=optional/two-surface · mechanistic git · vendoring=pull-on-demand→Draft · auth thread connected + native Clerk/Auth0/WorkOS integrations.
+**Locked:** CRDT=zero (workbook-only) · Bazel=avoid, keep our lane · GitHub=optional/two-surface · mechanistic git · vendoring=pull-on-demand→Draft · auth thread connected + native Clerk/Auth0/WorkOS integrations · **adopt `josh`** (subtree engine, runtime-tier; desktop syncs through the runtime) · **adopt `jj`** (working/undo layer; delete `git.ex`'s hand-rolled reconciliation) · **WE OWN ALL USER-FACING VOCABULARY** — josh/jj/git terms (subtree, filter, `workspace.josh`, op-log, change, revset, branch, commit, HEAD) are NEVER surfaced; only our Drive-simple verbs. The plumbing is invisible *by policy*, not by accident.
 **Still open (for the founder):**
 1. **Restore = append-only** — final confirm (strong rec: yes).
-2. **Adopt josh** as the runtime-tier subtree engine (accept server-side/desktop split — desktop syncs through the runtime)?
-3. **Promote jj** to the working/undo layer and delete `git.ex`'s manual reconciliation?
-4. **OSS license + the OSS-vs-commercial line** (rec: MIT/Apache wrapper, commercial hosted sync+cache).
-5. **josh DSL**: hide entirely behind Drive verbs, or expose `workspace.josh` as a power-user escape hatch?
+2. **OSS license + the OSS-vs-commercial line** (rec: MIT/Apache wrapper, commercial hosted sync+cache).
 
 ## Phased build proposal (smallest-first; nothing built yet)
 1. **History + Restore** (append-only) — almost pure wiring of `/_changes` + the unwired `git.ex` diff; the headline "nothing is lost". Independent of everything.
