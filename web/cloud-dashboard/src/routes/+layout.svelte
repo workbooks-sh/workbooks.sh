@@ -7,9 +7,16 @@
   import { nexusStore } from '$lib/nexusStore.svelte.js';
   import { goto } from '$app/navigation';
 
-  let { children } = $props();
+  let { children, data } = $props();
   let modalOpen = $state(false);
   let orgOpen = $state(false);
+
+  // /welcome + /denied render full-bleed, without the app chrome.
+  const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');
+  // the signed-in user (from the WorkOS session via +layout.server.js)
+  const userName = $derived(data?.user ? ([data.user.firstName, data.user.lastName].filter(Boolean).join(' ') || data.user.email.split('@')[0]) : 'Account');
+  const userEmail = $derived(data?.user?.email || '');
+  const initial = $derived((userName[0] || 'A').toUpperCase());
 
   // when searching, make sure results are visible on the list page
   function onSearch(e) {
@@ -46,6 +53,9 @@
   }
 </script>
 
+{#if bare}
+  {@render children()}
+{:else}
 <div id="app">
   <!-- sidebar -->
   <aside class="side">
@@ -88,13 +98,18 @@
       <a href="/settings" class:on={active('/settings')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
     </nav>
 
-    <a href="/settings" class="acct">
-      <div class="av">S</div>
-      <div style="flex:1">
-        <div class="nm">Shane</div>
-        <div class="em">shane@shinyobjectz.com</div>
-      </div>
-    </a>
+    <div class="acct" style="display:flex;align-items:center;gap:4px">
+      <a href="/settings" style="display:flex;align-items:center;gap:9px;flex:1;text-decoration:none;color:inherit;min-width:0">
+        <div class="av">{initial}</div>
+        <div style="flex:1;min-width:0">
+          <div class="nm">{userName}</div>
+          <div class="em">{userEmail}</div>
+        </div>
+      </a>
+      <a href="/logout" title="Sign out" aria-label="Sign out" style="display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:8px;color:var(--dim)">
+        <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 17v-2H9v-2h7V9l5 4-5 4ZM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5Z"/></svg>
+      </a>
+    </div>
   </aside>
 
   <!-- main -->
@@ -118,6 +133,7 @@
 </div>
 
 <NewNexusModal open={modalOpen} onclose={() => (modalOpen = false)} />
+{/if}
 <Toast />
 
 <style>

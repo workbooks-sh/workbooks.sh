@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3",
+    "@sveltejs/adapter-cloudflare": "^7.2.8",
     "@sveltejs/kit": "^2",
     "@sveltejs/vite-plugin-svelte": "^4",
     "svelte": "^5",
@@ -18,6 +19,7 @@
     "@tanstack/react-query": "^5",
     "@workos-inc/node": "^10",
     "@workos-inc/widgets": "^1",
+    "@workos/authkit-sveltekit": "^0.3.0",
     "react": "^18",
     "react-dom": "^18"
   }

@@ -1,0 +1,9 @@
+name = "workbooks-cloud"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Secrets (set via `wrangler pages secret put …` or the CF dashboard — NEVER commit):
+#   WORKOS_API_KEY  WORKOS_CLIENT_ID  WORKOS_REDIRECT_URI  WORKOS_COOKIE_PASSWORD
+#   WB_ALLOWLIST (defaults to shane@shinyobjectz.com)
+#   POLAR_ACCESS_TOKEN  POLAR_PRODUCT_TEAM  POLAR_SERVER (sandbox|production)
