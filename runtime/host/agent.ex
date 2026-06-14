@@ -559,12 +559,21 @@ defmodule Workbooks.Agent do
     end)
   end
 
+  @doc false
+  # test seam for the fetch tool's HTML→text extraction
+  def html_to_text_for_test(html), do: html_to_text(html)
+
   defp html_to_text(html) do
     html
     |> String.replace(~r/<script.*?<\/script>/si, " ")
     |> String.replace(~r/<style.*?<\/style>/si, " ")
+    |> String.replace(~r/<noscript.*?<\/noscript>/si, " ")
+    |> String.replace(~r/<nav.*?<\/nav>/si, " ")
+    |> String.replace(~r/<footer.*?<\/footer>/si, " ")
     |> String.replace(~r/<[^>]+>/, " ")
-    |> String.replace(~r/&[a-z]+;/i, " ")
+    # Proper entity decode (named + numeric/hex) — the old `&[a-z]+;`→space mangled
+    # apostrophes/quotes/ampersands and left numeric entities (&#39;) as literal junk.
+    |> Workbooks.Browse.Extract.decode_entities()
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
   end
