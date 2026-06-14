@@ -206,7 +206,14 @@ defmodule Workbooks.CLI do
     "model set to #{id} (this session)"
   end
 
-  def call(["model", "get"], _t), do: System.get_env("WB_LLM_MODEL") || "(default)"
+  def call(["model", "get"], _t) do
+    # Report the EFFECTIVE model id (resolving the built-in default) so an agent
+    # always reads a concrete id, never an opaque "(default)".
+    case System.get_env("WB_LLM_MODEL") do
+      nil -> "#{Workbooks.Llm.default_model()} (default)"
+      id -> id
+    end
+  end
   def call(["model" | _], _t), do: "usage: wb model <get | set ID>"
 
   # `wb workgate request CAP [reason…]` — ask the user to Allow/Deny an OS

@@ -13,6 +13,12 @@ defmodule Workbooks.Llm do
   @endpoint ~c"https://openrouter.ai/api/v1/chat/completions"
   @default_model "xiaomi/mimo-v2.5"
 
+  @doc "The built-in default model id (used when nothing overrides it)."
+  def default_model, do: @default_model
+
+  @doc "The EFFECTIVE model id right now: WB_LLM_MODEL override, else the default."
+  def effective_model, do: System.get_env("WB_LLM_MODEL") || @default_model
+
   @doc """
   One LLM turn. `messages` is a list of %{role, content, ...}; `tools` is a list
   of OpenAI tool specs (or []). Returns {:ok, %{content, tool_calls, finish, usage}}.
