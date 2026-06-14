@@ -62,11 +62,17 @@ defmodule Workbooks.Models do
     end
   end
 
-  defp fetch do
+  defp fetch(retries \\ 2) do
     :inets.start()
     :ssl.start()
     key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
-    headers = [{~c"authorization", ~c"Bearer #{key}"}]
+    # OpenRouter intermittently 400/429s a bare request; a User-Agent + Referer
+    # and a short retry make discovery reliable (the eval caught the flake).
+    headers = [
+      {~c"authorization", ~c"Bearer #{key}"},
+      {~c"user-agent", ~c"workbooks-runtime/0.1"},
+      {~c"http-referer", ~c"https://workbooks.sh"}
+    ]
 
     case :httpc.request(:get, {@endpoint, headers}, [timeout: 20_000], body_format: :binary) do
       {:ok, {{_, 200, _}, _, body}} ->
@@ -75,8 +81,16 @@ defmodule Workbooks.Models do
           _ -> {:error, :bad_body}
         end
 
+      {:ok, {{_, status, _}, _, _}} when status in [400, 408, 429, 500, 502, 503] and retries > 0 ->
+        Process.sleep(600)
+        fetch(retries - 1)
+
       {:ok, {{_, status, _}, _, _}} ->
         {:error, {:http, status}}
+
+      {:error, _reason} when retries > 0 ->
+        Process.sleep(600)
+        fetch(retries - 1)
 
       {:error, reason} ->
         {:error, reason}
