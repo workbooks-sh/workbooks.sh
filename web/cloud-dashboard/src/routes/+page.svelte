@@ -1,23 +1,35 @@
 <script>
-  import WorkOSWidget from '$lib/WorkOSWidget.svelte';
+  import { STATE_LABEL } from '$lib/api.js';
+  import Sparkline from '$lib/Sparkline.svelte';
   let { data } = $props();
 </script>
 
-<main class="wrap">
-  <header>
-    <h1>Team</h1>
-    <p>Members of your workspace — invites, roles &amp; removals are handled entirely by WorkOS. The panel below is the live User Management widget.</p>
-  </header>
-
-  <div class="card">
-    {#if data.authToken}
-      <WorkOSWidget authToken={data.authToken} />
-    {:else}
-      <div style="padding:24px">
-        <p>Couldn't mint the widget token.</p>
-        <p class="muted">{data.error}</p>
-      </div>
-    {/if}
+<section>
+  <div class="sechead">
+    <div>
+      <h2>Nexuses</h2>
+      <p>Your hosted runtimes. Idle ones sleep automatically — you only pay while they work.</p>
+    </div>
   </div>
-  <p class="muted" style="margin-top:14px">workspace · {data.org} · seats auto-sync to Polar on membership change</p>
-</main>
+
+  <div>
+    {#each data.nexuses as n, i (n.id)}
+      <a class="row" href="/nexuses/{n.id}">
+        <div class="nx">
+          <b><span class="dot {n.state}"></span>{n.name}</b>
+          <div class="url">{n.url}</div>
+        </div>
+        {#if n.state === 'run'}
+          <Sparkline seed={i + 1} />
+        {:else}
+          <div class="spark"></div>
+        {/if}
+        <div class="tag">{n.region}</div>
+        <div class="meta">
+          <div class="st">{STATE_LABEL[n.state]}</div>
+          <div class="sub">{n.plan.split(' · ')[1] || n.plan}</div>
+        </div>
+      </a>
+    {/each}
+  </div>
+</section>
