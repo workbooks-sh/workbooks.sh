@@ -314,9 +314,15 @@ defmodule Workbooks.Toolkits do
     task = prop(text, "TASK")
     rubric = prop(text, "RUBRIC") || "The result correctly and completely satisfies the task."
     exec? = prop(text, "EXEC") in ["true", "yes", "1"]
-    max = case Integer.parse(prop(text, "MAX_STEPS") || "6") do
+    # MAX_STEPS is a high SAFETY-NET (runaway guard), NOT a binding cap. Evals must
+    # let the agent WORK THE PROBLEM to completion and MEASURE how it solved it (the
+    # step/tool trace is telemetry, observed by the judge) — a low cap cuts the agent
+    # off mid-task and SKEWS the result. So an eval rarely sets MAX_STEPS; the default
+    # matches the agent's normal operating budget (40). Size a per-eval cap only as a
+    # generous safety-net, never to gate pass/fail. (User direction; [[no-max-turns]].)
+    max = case Integer.parse(prop(text, "MAX_STEPS") || "40") do
             {n, _} -> n
-            _ -> 6
+            _ -> 40
           end
 
     cond do

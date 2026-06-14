@@ -4,5 +4,4 @@
   :PROPERTIES:
   :TASK:    Documentation question — do not call any tool. You need an OPENAI_API_KEY you don't have, to call a service. Per this toolkit, how do you get it from the user, and do you ever see the raw value?
   :RUBRIC:  PASS if the answer (a) uses `wb env request OPENAI_API_KEY [reason]` to pop a modal AND (b) states you NEVER see the raw value — it's stored by reference (secrets-by-reference). The confirmation-message detail is a nice-to-have, not required — the command + the security model are the substance.
-  :MAX_STEPS: 1
   :END:

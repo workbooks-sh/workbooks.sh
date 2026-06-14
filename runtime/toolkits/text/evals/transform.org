@@ -4,5 +4,4 @@
   :PROPERTIES:
   :TASK:    Answer in words only — do not run anything. In one sentence, what is the `text` toolkit for?
   :RUBRIC:  The answer says the text toolkit performs STRING / TEXT TRANSFORMS — e.g. changing case or normalizing text — as a sandboxed command.
-  :MAX_STEPS: 1
   :END:
