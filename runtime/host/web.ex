@@ -1148,8 +1148,9 @@ defmodule Workbooks.Web do
         "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the
-    # default) ALWAYS gets the workbooks-browser toolkit so it knows how to drive
-    # the app (wb app …, wb env request …). A provisioned <slug>.org overrides.
+    # default) ALWAYS gets workbooks-browser (drive the app: wb app …, wb env
+    # request …) AND workbooks-cli (deploy + publish: wb deploy …, wb publish …).
+    # A provisioned <slug>.org overrides.
     {base, toolkits} =
       with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
            dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
@@ -1158,7 +1159,7 @@ defmodule Workbooks.Web do
            %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
         {sys, tks}
       else
-        _ -> {default, ["workbooks-browser"]}
+        _ -> {default, ["workbooks-browser", "workbooks-cli"]}
       end
 
     # Tier-1 progressive disclosure: append the compact toolkit index (skill
