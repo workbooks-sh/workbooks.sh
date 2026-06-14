@@ -2658,6 +2658,13 @@
    "proof": "tree-sitter 0.22.6 runtime + JSON grammar 0.21.0 compile via build_c_dir and parse source into a typed syntax tree: [1,2,3] -> (document (array (number)(number)(number))); {a:[1,2],b:true} -> full pair/key/value tree. treesitter_lane_test.exs green. Other grammars drop in the same way.",
    "lane": "compilers/treesitter/build.sh (fetch core+grammar sha-pinned, stage flat with nested tree_sitter/+unicode/ header dirs, grammar parser.c renamed to dodge core parser.c collision, gitignored) + build_c_dir(-Wno-implicit-function-declaration since wasi lacks dup prototype; include_only the 12 core .c amalgamated by lib.c)",
    "since": "iter163"
+  },
+  "minigmp": {
+   "capability": "arbitrary-precision integer math (bignum) in-sandbox",
+   "status": "live",
+   "proof": "mini-gmp (single-file GMP subset) via build_c_dir computes exact big integers: 2^200=1606938...301376, 30!=265252859812191058636308480000000; minigmp_lane_test.exs green",
+   "lane": "compilers/minigmp/build.sh (fetch GMP sha-pinned, extract mini-gmp, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {

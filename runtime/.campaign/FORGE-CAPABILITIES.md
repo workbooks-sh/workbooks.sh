@@ -36,6 +36,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **libexpat** (XML streaming/SAX parser) | from-C-source -> wasi (build_c_dir) | expat_lane_test (parse + extract) |
 | **miniz** (ZIP/gzip archive handling) | from-C-source -> wasi (build_c_dir) | miniz_lane_test (ZIP create/read/extract) |
 | **tree-sitter** (code -> AST parsing) | from-C-source -> wasi (build_c_dir) | treesitter_lane_test (parse JSON grammar) |
+| **mini-gmp** (arbitrary-precision bignum) | from-C-source -> wasi (build_c_dir) | minigmp_lane_test (2^200, 30!) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
