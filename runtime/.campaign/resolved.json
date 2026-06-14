@@ -2630,6 +2630,13 @@
    "proof": "PCRE2 10.44 8-bit library (31 C files) compiles via build_c_dir + matches (\\w+)@(\\w+) on user@host extracting capture groups g1=user g2=host; pcre2_lane_test.exs green",
    "lane": "compilers/pcre2/build.sh (fetch sha-pinned, stage lib src minus tools, gitignored) + build_c_dir(-DPCRE2_CODE_UNIT_WIDTH=8 -DHAVE_CONFIG_H, include_only the 3 #included .c)",
    "since": "iter163"
+  },
+  "gumbo": {
+   "capability": "HTML5 parsing (DOM) in-sandbox",
+   "status": "live",
+   "proof": "gumbo-parser 0.10.1 (11 C files) via build_c_dir parses HTML -> DOM tree, extracts element text (h1=Hello Forge, p=world); gumbo_lane_test.exs green",
+   "lane": "compilers/gumbo/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {

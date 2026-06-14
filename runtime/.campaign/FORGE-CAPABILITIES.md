@@ -32,6 +32,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **monocypher** (crypto: Ed25519/Blake2b/ChaCha20) | from-C-source -> wasi (build_c_dir) | monocypher_lane_test (sign/verify/tamper) |
 | **stb_image** (image decode PNG/JPEG/...) | from-C-source -> wasi (build_c_dir) | stb_image_lane_test (decode PNG) |
 | **PCRE2** (Perl-compatible regex) | from-C-source -> wasi (build_c_dir) | pcre2_lane_test (match + capture groups) |
+| **gumbo** (HTML5 parser -> DOM) | from-C-source -> wasi (build_c_dir) | gumbo_lane_test (parse + extract text) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
