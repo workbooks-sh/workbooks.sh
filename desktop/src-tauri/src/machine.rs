@@ -43,6 +43,14 @@ const VFKIT_MAC: &str = "5a:94:ef:e4:1c:ee";
 /// Spike-proven cmdline: ext4 root on the first virtio-blk, our PID-1 wrapper.
 const VFKIT_CMDLINE: &str =
     "console=hvc0 root=/dev/vda rw rootfstype=ext4 modules=ext4 init=/sbin/wb-init";
+/// The official crc-org vfkit release we fetch when no vfkit is bundled or on
+/// PATH. It's a SIGNED + NOTARIZED universal (x86_64+arm64) binary carrying the
+/// `com.apple.security.virtualization` entitlement, so it runs standalone — no
+/// app-bundle codesign and no Homebrew needed. This is what lets a fresh mac
+/// boot a local runtime from the installer alone (sidesteps the signed-bundle
+/// path in wb-2s09.17). Override the URL with WB_VFKIT_URL.
+const VFKIT_VERSION: &str = "v0.6.3";
+const VFKIT_URL: &str = "https://github.com/crc-org/vfkit/releases/download/v0.6.3/vfkit";
 /// Layer titles in the engine-disk artifact = file names in the bundle dir.
 const ASSET_KERNEL: &str = "kernel-image";
 const ASSET_INITRD: &str = "initramfs-wb";
@@ -118,13 +126,15 @@ pub fn engine() -> Option<Engine> {
         Some(Engine::Docker)
     } else if podman_ready() {
         Some(Engine::Podman)
-    } else if vfkit_bin().is_some() {
-        // No ready daemon, but vfkit IS available (bundled or PATH): prefer it
-        // and fetch the engine-disk on demand. vfkit is the reliable lane
-        // (0-2s, direct-kernel boot, /health 200 proven) — strictly better than
-        // krunvm, whose libkrun TSI networking measured 8-min-to-never. A dev
-        // machine actively using docker/podman still wins above; this only
-        // beats the krunvm fallback. `WB_ENGINE` overrides either way.
+    } else if vfkit_available() {
+        // No ready daemon, but vfkit is available — present (bundled/PATH) OR
+        // downloadable on macOS: prefer it and fetch the binary + engine-disk on
+        // demand. vfkit is the reliable lane (0-2s, direct-kernel boot, /health
+        // 200 proven) — strictly better than krunvm, whose libkrun TSI
+        // networking measured 8-min-to-never. A dev machine actively using
+        // docker/podman still wins above; this only beats the krunvm fallback.
+        // This is what makes a FRESH mac (nothing installed) able to boot a
+        // local runtime from the installer alone. `WB_ENGINE` overrides either way.
         Some(Engine::Vfkit)
     } else if command_exists("krunvm") {
         Some(Engine::Krunvm)
@@ -215,12 +225,73 @@ fn find_asset(name: &str) -> Option<PathBuf> {
     find_in(&bundle_dirs(), name)
 }
 
-/// The vfkit binary: bundled copy first, PATH fallback (dev: brew vfkit).
+/// Where a downloaded vfkit binary lives (writable engine dir, alongside the
+/// disk). Distinct from the sealed Resources bundle copy.
+fn vfkit_download_path() -> Option<PathBuf> {
+    Some(engine_dir()?.join("vfkit"))
+}
+
+/// The vfkit binary: bundled copy first, PATH fallback (dev: brew vfkit), then a
+/// previously-downloaded copy in the engine dir.
 fn vfkit_bin() -> Option<String> {
     if let Some(p) = find_asset("vfkit") {
         return Some(p.display().to_string());
     }
-    command_exists("vfkit").then(|| "vfkit".into())
+    if command_exists("vfkit") {
+        return Some("vfkit".into());
+    }
+    vfkit_download_path()
+        .filter(|p| p.is_file())
+        .map(|p| p.display().to_string())
+}
+
+/// Whether vfkit can be used at all — present now, OR fetchable. On macOS the
+/// official signed binary is always downloadable, so a fresh mac (no vfkit,
+/// docker, podman) can still elect vfkit and boot a local runtime.
+fn vfkit_available() -> bool {
+    vfkit_bin().is_some() || cfg!(target_os = "macos")
+}
+
+/// Return a usable vfkit path, downloading the official signed+notarized binary
+/// into the engine dir if none is bundled or on PATH. The crc-org binary ships
+/// the virtualization entitlement in its OWN signature, so it runs standalone.
+fn ensure_vfkit_bin(app: &AppHandle) -> Result<String, String> {
+    if let Some(b) = vfkit_bin() {
+        return Ok(b);
+    }
+    let dest = vfkit_download_path().ok_or("no engine dir for vfkit")?;
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let url = std::env::var("WB_VFKIT_URL").unwrap_or_else(|_| VFKIT_URL.into());
+    emit_setup(app, &format!("Downloading the vfkit engine launcher ({VFKIT_VERSION})…"));
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(None)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut resp = client
+        .get(&url)
+        .send()
+        .map_err(|e| format!("vfkit download: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("vfkit download {url}: HTTP {}", resp.status()));
+    }
+    let part = dest.with_extension("part");
+    {
+        let mut out = std::fs::File::create(&part).map_err(|e| e.to_string())?;
+        std::io::copy(&mut resp, &mut out).map_err(|e| e.to_string())?;
+    }
+    // chmod +x — a release asset arrives without the exec bit.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perm = std::fs::metadata(&part).map_err(|e| e.to_string())?.permissions();
+        perm.set_mode(0o755);
+        std::fs::set_permissions(&part, perm).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&part, &dest).map_err(|e| e.to_string())?;
+    Ok(dest.display().to_string())
 }
 
 /// The engine-disk artifact reference — overridable via `WB_ENGINE_DISK`.
@@ -713,7 +784,9 @@ fn unzstd(src: &Path, dst: &Path) -> Result<(), String> {
 /// db, then keep the app's localhost contract via the loopback proxy. The
 /// guest's wb-init (baked into the disk) does the env + discovery writing.
 fn boot_vfkit(app: &AppHandle) -> Result<(), String> {
-    let bin = vfkit_bin().ok_or("vfkit binary not found (bundle dir or PATH)")?;
+    // Download the official signed vfkit if it's neither bundled nor on PATH —
+    // so a fresh mac boots without Homebrew or a codesigned app bundle.
+    let bin = ensure_vfkit_bin(app)?;
     emit_setup(app, "Preparing the engine bundle…");
     let assets = ensure_bundle(app)?;
 
