@@ -374,9 +374,32 @@ defmodule Workbooks.Library do
       |> Enum.sort_by(& &1.score, :desc)
       |> Enum.take(opts[:k] || 5)
     else
-      _ -> []
+      # No content at all → nothing to recall.
+      [] -> []
+      # Embeddings unavailable (key rotation / outage / rate limit): degrade to a
+      # keyword fallback over the chunks we DID read, so the agent's recall still
+      # works instead of silently returning "(no relevant context)".
+      _ -> literal_rank(chunks, query, opts[:k] || 5)
     end
   end
+
+  # Substring/term-overlap ranking — the embeddings-down fallback for search_dir.
+  defp literal_rank(chunks, query, k) do
+    terms = query |> String.downcase() |> String.split(~r/[^\p{L}\p{N}]+/u, trim: true)
+
+    chunks
+    |> Enum.map(fn c -> Map.put(c, :score, term_hits(String.downcase(c.text), terms)) end)
+    |> Enum.filter(&(&1.score > 0))
+    |> Enum.sort_by(& &1.score, :desc)
+    |> Enum.take(k)
+  end
+
+  defp term_hits(_hay, []), do: 0
+  defp term_hits(hay, terms), do: Enum.count(terms, &String.contains?(hay, &1))
+
+  @doc false
+  # test seam for the embeddings-down keyword fallback
+  def literal_rank_for_test(chunks, query, k), do: literal_rank(chunks, query, k)
 
   @text_exts ~w(.org .md .txt .rs .js .ts .jsx .tsx .svelte .ex .exs .py .go .html .css .sql .json .toml .yaml .yml)
   defp text_file?(name), do: Path.extname(name) in @text_exts

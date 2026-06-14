@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 638,
+    "tests": 642,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },
@@ -114,6 +114,14 @@
           "tests": "agent_session_test, run_status_endpoint_test",
           "units": 2,
           "proof": "deterministic",
+          "failure_modes": []
+        },
+        {
+          "name": "Recall (search) + embeddings-down keyword fallback",
+          "status": "done",
+          "tests": "library_search_fallback_test",
+          "units": 4,
+          "proof": "embed live (256-dim); degrades to term-rank when embed unavailable",
           "failure_modes": []
         }
       ]
