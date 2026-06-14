@@ -5,20 +5,11 @@
    * you understand each kind without over-specific names). Reads search.mode.
    */
   import { MagnifyingGlass, Globe, Sparkle } from "phosphor-svelte";
-  import { search, WEB_PROVIDERS, type WebProvider } from "$lib/search/registry.svelte";
+  import { search, WEB_PROVIDERS, WEB_PROVIDER_LABELS, type WebProvider } from "$lib/search/registry.svelte";
   import { SEARCH_MODES } from "$lib/search/modes";
 
   const info = $derived(SEARCH_MODES[search.mode]);
   const Icon = $derived(search.mode === "ai" ? Sparkle : search.mode === "web" ? Globe : MagnifyingGlass);
-
-  // Friendly labels for the web-search backend picker (wb-e4jl / wb-ndlz).
-  const PROVIDER_LABELS: Record<WebProvider, string> = {
-    openrouter: "OpenRouter — reliable",
-    keyless: "Keyless — no setup",
-    exa: "Exa (needs key)",
-    brave_api: "Brave API (needs key)",
-    perplexity: "Perplexity (needs key)",
-  };
 </script>
 
 <aside class="explainer" aria-label="About this search">
@@ -36,7 +27,7 @@
             onchange={(e) => search.setWebProvider(e.currentTarget.value as WebProvider)}
           >
             {#each WEB_PROVIDERS as p}
-              <option value={p}>{PROVIDER_LABELS[p]}</option>
+              <option value={p}>{WEB_PROVIDER_LABELS[p]}</option>
             {/each}
           </select>
         </label>

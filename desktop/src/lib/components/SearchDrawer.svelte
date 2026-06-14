@@ -11,7 +11,7 @@
   import { MagnifyingGlass as Search, X, Sparkle, FileText, Globe, ArrowUpRight } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
-  import { search, type ProviderResults } from "$lib/search/registry.svelte";
+  import { search, WEB_PROVIDERS, WEB_PROVIDER_LABELS, type ProviderResults, type WebProvider } from "$lib/search/registry.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
   import { aiAnswer, type AiAnswer } from "$lib/search/aiPreview";
   import { setSearch, type SearchApi } from "$lib/search/context";
@@ -216,6 +216,20 @@
         {/if}
       </div>
     {:else if mode === "web"}
+      <!-- Web-search backend picker (wb-e4jl / wb-r6o9): persistent here so the
+           user can switch provider any time, not just during onboarding. -->
+      <div class="prov-row">
+        <span>Web search via</span>
+        <select
+          aria-label="Web search provider"
+          value={search.webProvider}
+          onchange={(e) => search.setWebProvider(e.currentTarget.value as WebProvider)}
+        >
+          {#each WEB_PROVIDERS as p}
+            <option value={p}>{WEB_PROVIDER_LABELS[p]}</option>
+          {/each}
+        </select>
+      </div>
       <!-- Browse — a discovery BOARD (masonry). Your files + the live web
            blended as mixed tiles: image-cover web tiles + compact file tiles.
            A different vibe from the Workspace list + the Ask answer page. -->
@@ -485,6 +499,31 @@
   .ai-q:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface-soft); }
 
   /* Browse — a masonry discovery board: mixed tiles, files + web. */
+  .prov-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 0;
+    flex-shrink: 0;
+  }
+  .prov-row span {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+  }
+  .prov-row select {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 8px;
+    font-size: 0.78rem;
+    color: var(--color-fg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
   .board {
     flex: 1 1 auto;
     min-height: 0;

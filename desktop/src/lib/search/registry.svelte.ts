@@ -33,6 +33,16 @@ function loadMode(): SearchMode {
 export const WEB_PROVIDERS = ["openrouter", "keyless", "exa", "brave_api", "perplexity"] as const;
 export type WebProvider = (typeof WEB_PROVIDERS)[number];
 
+// Friendly labels for the provider picker (shared by the onboarding explainer +
+// the search drawer's web lane, so they never drift).
+export const WEB_PROVIDER_LABELS: Record<WebProvider, string> = {
+  openrouter: "OpenRouter — reliable",
+  keyless: "Keyless — no setup",
+  exa: "Exa (needs key)",
+  brave_api: "Brave API (needs key)",
+  perplexity: "Perplexity (needs key)",
+};
+
 interface Prefs {
   disabled: string[]; // provider ids the user turned off
   order: string[]; // provider id order (registered ids not listed sort last)
