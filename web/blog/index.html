@@ -86,8 +86,11 @@
   .feed li { border-top: 1.5px solid var(--line); }
   .feed li:last-child { border-bottom: 1.5px solid var(--line); }
 
-  .post { display: grid; grid-template-columns: 130px 1fr; gap: 28px; padding: 32px 6px; text-decoration: none; color: inherit; align-items: start; transition: padding-left .18s ease; }
+  .post { display: grid; grid-template-columns: 210px 1fr; gap: 28px; padding: 32px 6px; text-decoration: none; color: inherit; align-items: start; transition: padding-left .18s ease; }
   .post:hover { padding-left: 18px; }
+  .post .thumb { width: 210px; aspect-ratio: 16/9; object-fit: cover; border: 2px solid var(--ink); border-radius: 10px; display: block; background: var(--bg); }
+  .post .main { min-width: 0; }
+  @media (max-width: 640px) { .post { grid-template-columns: 1fr; } .post .thumb { width: 100%; } }
   .post .meta { font-size: 10.5px; letter-spacing: .04em; color: var(--dim); line-height: 1.9; padding-top: 6px; }
   .post .meta time { display: block; color: var(--ink); font-weight: 700; }
   .post .meta .mins { display: block; }
@@ -174,14 +177,17 @@
     }).join("");
     return (
       '<li><a class="post" href="/blog/' + esc(p.slug) + '">' +
-        '<div class="meta">' +
-          '<time datetime="' + esc(p.date) + '">' + fmtDate(p.date) + "</time>" +
-          '<span class="mins">' + (p.mins || "—") + " min read</span>" +
-        "</div>" +
-        '<div class="body">' +
-          "<h2>" + esc(p.title) + "</h2>" +
-          "<p>" + esc(p.dek || "") + "</p>" +
-          '<div class="row">' + chips + '<span class="arr">read →</span></div>' +
+        '<img class="thumb" src="/blog/img/' + esc(p.slug) + '.jpg" alt="" loading="lazy">' +
+        '<div class="main">' +
+          '<div class="meta">' +
+            '<time datetime="' + esc(p.date) + '">' + fmtDate(p.date) + "</time>" +
+            '<span class="mins">' + (p.mins || "—") + " min read</span>" +
+          "</div>" +
+          '<div class="body">' +
+            "<h2>" + esc(p.title) + "</h2>" +
+            "<p>" + esc(p.dek || "") + "</p>" +
+            '<div class="row">' + chips + '<span class="arr">read →</span></div>' +
+          "</div>" +
         "</div>" +
       "</a></li>"
     );
