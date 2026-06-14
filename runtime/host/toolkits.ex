@@ -389,7 +389,7 @@ defmodule Workbooks.Toolkits do
 
   defp llm_key?,
     do:
-      System.get_env("OPENROUTER_API_KEY") not in [nil, ""] or
+      Workbooks.Secrets.get("OPENROUTER_API_KEY") not in [nil, ""] or
         System.get_env("WB_LLM_KEY") not in [nil, ""]
 
   # ── Third-party trust: manifest provenance (AUTHOR_DID + SIGNATURE) ────────

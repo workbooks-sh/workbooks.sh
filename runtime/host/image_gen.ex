@@ -58,7 +58,7 @@ defmodule Workbooks.ImageGen do
   defp request(prompt) do
     :inets.start()
     :ssl.start()
-    key = System.get_env("OPENROUTER_API_KEY") || ""
+    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     model = System.get_env("WB_IMAGE_MODEL") || @default_model
 
     body =

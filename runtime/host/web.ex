@@ -30,7 +30,7 @@ defmodule Workbooks.Web do
       end
 
     for {k, v} <- env, is_binary(k), is_binary(v), v != "" do
-      System.put_env(k, v)
+      Workbooks.Secrets.put(k, v)
     end
 
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, count: map_size(env)}))

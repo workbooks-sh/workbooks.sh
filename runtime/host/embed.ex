@@ -165,8 +165,8 @@ defmodule Workbooks.Embed.OpenRouter do
 
   @impl true
   def embed(texts) do
-    case System.get_env("OPENROUTER_API_KEY") do
-      nil -> {:error, "OPENROUTER_API_KEY not set"}
+    case Workbooks.Secrets.get("OPENROUTER_API_KEY") do
+      k when k in [nil, ""] -> {:error, "OPENROUTER_API_KEY not set"}
       key -> do_embed(texts, key)
     end
   end

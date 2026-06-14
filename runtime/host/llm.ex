@@ -56,7 +56,7 @@ defmodule Workbooks.Llm do
   defp post(body, retries) do
     :inets.start()
     :ssl.start()
-    key = System.get_env("OPENROUTER_API_KEY") || ""
+    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
 
     case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
