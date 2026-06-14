@@ -22,6 +22,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **esbuild** (JS/TS bundler) | Go-wasip1 artifact | wired in JS/TS/Svelte lanes (~23min QuickJS → ~0.4s) |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
+| **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |
 | SQLite | clean-wasi prebuilt | ships in-tree |
 | crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
 

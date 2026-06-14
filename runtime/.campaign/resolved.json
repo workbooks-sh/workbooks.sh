@@ -2583,6 +2583,13 @@
    "proof": "gojq v0.12.19 (Go->wasip1) evaluates jq filters over stdin JSON through PackageManager.run: .name->workbooks, .n*2->42, -r .tags[0]->forge; gojq_lane_test.exs green",
    "lane": "compilers/gojq/build.sh (native GOOS=wasip1, pinned, gitignored)",
    "since": "iter162"
+  },
+  "dasel": {
+   "capability": "dasel multi-format data query (JSON/YAML/TOML/XML/CSV) in-sandbox",
+   "status": "live",
+   "proof": "dasel v2.8.1 (Go->wasip1) queries JSON/YAML/TOML from stdin through PackageManager.run (.name->workbooks, .tags.[1]->wasm, .x->42); dasel_lane_test.exs green \u2014 adds TOML/XML/CSV beyond yq/gojq",
+   "lane": "compilers/dasel/build.sh (native GOOS=wasip1, pinned, gitignored)",
+   "since": "iter162"
   }
  },
  "verdict_ladder": {
