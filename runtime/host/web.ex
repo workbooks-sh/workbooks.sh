@@ -1335,6 +1335,53 @@ defmodule Workbooks.Web do
     end
   end
 
+  # --- Shared folders (Phase 3) ----------------------------------------------
+  # The one cross-tenant surface. Tenant is the AUTHENTICATED caller (assigns), never
+  # a body field. Workbooks.SharedFolder enforces owner-only share/revoke and
+  # recipient-only add, fail-closed. Folder/recipient are re-validated in the engine.
+  get "/api/shared-folders" do
+    t = conn.assigns[:tenant]
+
+    body = %{
+      shareable: Workbooks.SharedFolder.shareable(t),
+      shared_by: Workbooks.SharedFolder.shared_by(t),
+      shared_with: Workbooks.SharedFolder.shared_with(t)
+    }
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(body))
+  end
+
+  post "/api/shared-folders/share" do
+    {:ok, raw, conn} = read_body(conn)
+    p = case Jason.decode(raw) do
+      {:ok, %{} = m} -> m
+      _ -> %{}
+    end
+
+    mode = if p["mode"] == "draft", do: :draft, else: :read
+
+    case Workbooks.SharedFolder.share(conn.assigns[:tenant], p["folder"], p["recipient"], mode) do
+      {:ok, grant} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(grant))
+      {:error, :no_such_folder} -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"no such folder"}))
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"bad request"}))
+    end
+  end
+
+  post "/api/shared-folders/:id/add" do
+    case Workbooks.SharedFolder.add_to_workspace(conn.assigns[:tenant], conn.params["id"]) do
+      {:ok, r} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(r))
+      {:error, :not_found} -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(500, ~s({"error":"add failed"}))
+    end
+  end
+
+  post "/api/shared-folders/:id/revoke" do
+    case Workbooks.SharedFolder.revoke(conn.assigns[:tenant], conn.params["id"]) do
+      :ok -> conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+    end
+  end
+
   # A scope is an opaque workbook id: letters/digits/_/- only, no `.`, no separators
   # or traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
   defp valid_scope(s)

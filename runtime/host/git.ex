@@ -450,6 +450,94 @@ defmodule Workbooks.Git do
   end
 
   @doc """
+  CONFINED subtree copy (Phase 3 — "add a shared folder to your workspace"). Extract
+  ONLY `shared/<folder>` from `owner`'s repo and vendor it into `recipient`'s repo at
+  `workspace/<dest>/`, committed as a Draft under the recipient's identity.
+
+  Confinement is structural, not just validated: `git archive HEAD:shared/<folder>`
+  emits a tar of exactly that tree and nothing above it — there is no way to reach a
+  sibling folder, a repo-root file (the ledger, `.workbooks/` keys), or `..`. `folder`
+  and `dest` are additionally allow-listed to a single `[A-Za-z0-9_-]+` segment, so a
+  traversal/flag can't even be formed. The owner's working tree is never touched.
+
+  Returns `{:ok, %{files: [relpath]}}`, `{:error, :bad_name}`, `{:error, :no_such_folder}`
+  (folder absent from the owner's HEAD), or `{:error, reason}`.
+  """
+  def copy_subtree(owner, folder, recipient, dest) do
+    cond do
+      not segment?(folder) or not segment?(dest) ->
+        {:error, :bad_name}
+
+      true ->
+        owner_dir = ensure_repo(owner)
+        recipient_dir = ensure_repo(recipient)
+
+        # git archive of a TREE path emits a tar confined to that subtree. Do NOT
+        # merge stderr — the tar is binary on stdout and must stay uncorrupted.
+        case System.cmd("git", ["-c", "safe.directory=*", "archive", "--format=tar", "HEAD:shared/#{folder}"],
+               cd: owner_dir,
+               stderr_to_stdout: false
+             ) do
+          {tar, 0} when byte_size(tar) > 0 ->
+            dest_path = Path.join([recipient_dir, "workspace", dest])
+            File.mkdir_p!(dest_path)
+
+            case :erl_tar.extract({:binary, tar}, [{:cwd, String.to_charlist(dest_path)}]) do
+              :ok ->
+                rel = "workspace/#{dest}"
+                git(recipient_dir, ["add", rel])
+
+                _ =
+                  git(recipient_dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "Draft: added #{folder} to workspace"],
+                    env: commit_env(identity(recipient))
+                  )
+
+                {:ok, %{files: list_tree_files(recipient_dir, rel)}}
+
+              {:error, reason} ->
+                {:error, "extract failed: #{inspect(reason)}"}
+            end
+
+          # empty tar / non-zero → the folder isn't in the owner's HEAD
+          _ ->
+            {:error, :no_such_folder}
+        end
+    end
+  end
+
+  @doc """
+  The folders a tenant can share — the immediate subdirectories of `shared/` in its
+  repo HEAD (names only, no path). Empty if the repo has no `shared/` tree yet. This
+  is the allow-list `Workbooks.Workspace.share/4` checks membership against, so a
+  caller can only ever share a real folder they actually own under `shared/`.
+  """
+  def shareable_folders(tenant) do
+    dir = ensure_repo(tenant)
+
+    case git(dir, ["ls-tree", "-d", "--name-only", "HEAD", "shared/"]) do
+      {out, 0} ->
+        out
+        |> String.split("\n", trim: true)
+        |> Enum.map(&Path.basename/1)
+        |> Enum.filter(&segment?/1)
+
+      _ ->
+        []
+    end
+  end
+
+  # A single safe path segment — no separators, no `..`, no leading dash (flag).
+  defp segment?(s), do: is_binary(s) and s =~ ~r/\A[A-Za-z0-9_-]+\z/
+
+  # Files currently tracked under a path prefix (post-add), relative to the repo.
+  defp list_tree_files(dir, prefix) do
+    case git(dir, ["ls-files", "--", prefix]) do
+      {out, 0} -> String.split(out, "\n", trim: true)
+      _ -> []
+    end
+  end
+
+  @doc """
   Set `safe.directory=*` in the global git config once at boot, so EVERY git
   invocation (including the direct ones in dreams.ex / library.ex that bypass the
   helper) trusts the /data volume regardless of its uid ownership. Idempotent.

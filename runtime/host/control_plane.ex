@@ -56,6 +56,36 @@ defmodule Workbooks.ControlPlane do
     end
   end
 
+  # --- Shared-folder grants (Phase 3) -----------------------------------------
+  # A grant = "owner_tenant shares folder with recipient_tenant (read|draft)". The
+  # id is a stable content hash so re-sharing the same triple is idempotent (no
+  # Date/random needed). Policy + confinement live in `Workbooks.Workspace`; this
+  # is only the registry. UNLIKE workbook visibility, a grant is the SOLE thing
+  # that lets data cross a tenant boundary — and only for the one named folder.
+
+  @doc "Record (idempotently) that `owner` shares `folder` with `recipient` in `mode`. Returns the grant."
+  def put_share(owner, folder, recipient, mode),
+    do: GenServer.call(__MODULE__, {:put_share, owner, folder, recipient, mode})
+
+  @doc "A single grant by id → %{id, owner, folder, recipient, mode} | nil."
+  def get_share(id), do: GenServer.call(__MODULE__, {:get_share, id})
+
+  @doc "Grants OWNED by `tenant` (folders it shares out)."
+  def shares_by(tenant), do: GenServer.call(__MODULE__, {:shares_by, tenant})
+
+  @doc "Grants made TO `tenant` (folders shared with it, addable to its workspace)."
+  def shares_for(tenant), do: GenServer.call(__MODULE__, {:shares_for, tenant})
+
+  @doc "Revoke a grant by id (future adds are blocked; already-vendored Drafts are the recipient's own)."
+  def delete_share(id), do: GenServer.call(__MODULE__, {:delete_share, id})
+
+  @doc "Stable grant id for a triple (owner/folder→recipient) — idempotent, no timestamp."
+  def share_id(owner, folder, recipient) do
+    :crypto.hash(:sha256, "#{owner}/shared/#{folder}->#{recipient}")
+    |> Base.encode16(case: :lower)
+    |> binary_part(0, 16)
+  end
+
   @impl true
   def init(_) do
     {:ok, conn} = Sqlite3.open(System.get_env("WB_REGISTRY", ":memory:"))
@@ -76,6 +106,14 @@ defmodule Workbooks.ControlPlane do
     # table. Errors if it already exists (fresh DBs from the CREATE above) — that's
     # fine, swallow it so init is idempotent.
     _ = Sqlite3.execute(conn, "ALTER TABLE workbooks ADD COLUMN tenant TEXT")
+
+    :ok =
+      Sqlite3.execute(conn, """
+      CREATE TABLE IF NOT EXISTS shares (
+        id TEXT PRIMARY KEY, owner_tenant TEXT, folder TEXT,
+        recipient_tenant TEXT, mode TEXT, created INTEGER
+      )
+      """)
 
     {:ok, %{conn: conn}}
   end
@@ -170,6 +208,58 @@ defmodule Workbooks.ControlPlane do
     rows = drain(conn, stmt, []) |> Enum.map(fn [id, t] -> %{id: id, tenant: t} end)
     Sqlite3.release(conn, stmt)
     {:reply, rows, s}
+  end
+
+  def handle_call({:put_share, owner, folder, recipient, mode}, _from, %{conn: conn} = s) do
+    id = share_id(owner, folder, recipient)
+    {:ok, stmt} =
+      Sqlite3.prepare(conn, "INSERT OR REPLACE INTO shares VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+
+    :ok = Sqlite3.bind(stmt, [id, owner, folder, recipient, to_string(mode), System.system_time(:second)])
+    :done = Sqlite3.step(conn, stmt)
+    :ok = Sqlite3.release(conn, stmt)
+    {:reply, %{id: id, owner: owner, folder: folder, recipient: recipient, mode: to_string(mode)}, s}
+  end
+
+  def handle_call({:get_share, id}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT id, owner_tenant, folder, recipient_tenant, mode FROM shares WHERE id = ?1")
+    :ok = Sqlite3.bind(stmt, [id])
+
+    reply =
+      case Sqlite3.step(conn, stmt) do
+        {:row, [id, o, f, r, m]} -> %{id: id, owner: o, folder: f, recipient: r, mode: m}
+        :done -> nil
+      end
+
+    Sqlite3.release(conn, stmt)
+    {:reply, reply, s}
+  end
+
+  def handle_call({:shares_by, tenant}, _from, %{conn: conn} = s),
+    do: {:reply, share_rows(conn, "owner_tenant", tenant), s}
+
+  def handle_call({:shares_for, tenant}, _from, %{conn: conn} = s),
+    do: {:reply, share_rows(conn, "recipient_tenant", tenant), s}
+
+  def handle_call({:delete_share, id}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "DELETE FROM shares WHERE id = ?1")
+    :ok = Sqlite3.bind(stmt, [id])
+    :done = Sqlite3.step(conn, stmt)
+    :ok = Sqlite3.release(conn, stmt)
+    {:reply, :ok, s}
+  end
+
+  # `column` is interpolated into the SQL, so it MUST stay a fixed internal literal
+  # (only "owner_tenant" / "recipient_tenant" from shares_by/shares_for) — never a
+  # caller value. Allow-listed here so a future caller can't smuggle SQL through it.
+  defp share_rows(conn, column, tenant) when column in ["owner_tenant", "recipient_tenant"] do
+    {:ok, stmt} =
+      Sqlite3.prepare(conn, "SELECT id, owner_tenant, folder, recipient_tenant, mode FROM shares WHERE #{column} = ?1 ORDER BY created DESC")
+
+    :ok = Sqlite3.bind(stmt, [tenant])
+    rows = drain(conn, stmt, []) |> Enum.map(fn [id, o, f, r, m] -> %{id: id, owner: o, folder: f, recipient: r, mode: m} end)
+    Sqlite3.release(conn, stmt)
+    rows
   end
 
   defp drain(conn, stmt, acc) do
