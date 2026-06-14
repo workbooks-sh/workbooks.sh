@@ -416,6 +416,20 @@ defmodule Workbooks.Web do
     is_nil(caller) or caller == conn.params["tenant"]
   end
 
+  # Session-ownership guard (wb-g1yo.9): only the run's owning tenant may act on
+  # it by id (CTK review pull/commit). Same grandfather rule; a not-found run is
+  # left to the underlying op (which returns :not_found).
+  defp session_owner_ok?(conn, id) do
+    caller = conn.assigns[:tenant]
+
+    case Workbooks.AgentSession.status(id) do
+      %{tenant: st} -> is_nil(caller) or is_nil(st) or st == caller
+      _ -> true
+    end
+  rescue
+    _ -> true
+  end
+
   defp wb_exec(argv, tenant) do
     Workbooks.CLI.call(argv, tenant)
   rescue
@@ -542,6 +556,10 @@ defmodule Workbooks.Web do
         is_nil(run_id) ->
           {400, %{error: "missing run id (pass ?run=<id> or event.run)"}}
 
+        # Only the run's owner may commit a review into it (wb-g1yo.9).
+        not session_owner_ok?(conn, run_id) ->
+          {404, %{error: "no such run", run: run_id}}
+
         true ->
           case Workbooks.AgentSession.put_review(run_id, event) do
             :ok -> {202, %{ok: true, run: run_id}}
@@ -554,7 +572,13 @@ defmodule Workbooks.Web do
 
   # The agent polls this to receive a pending review (204 when none yet).
   get "/api/ctk/review/:id" do
-    case Workbooks.AgentSession.take_review(conn.params["id"]) do
+    # Only the run's owner may pull its pending review (wb-g1yo.9).
+    review_result =
+      if session_owner_ok?(conn, conn.params["id"]),
+        do: Workbooks.AgentSession.take_review(conn.params["id"]),
+        else: :not_found
+
+    case review_result do
       :not_found ->
         conn |> put_resp_content_type("application/json") |> send_resp(404, Jason.encode!(%{error: "no such run"}))
 
