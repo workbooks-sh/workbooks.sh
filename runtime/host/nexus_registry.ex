@@ -20,7 +20,7 @@ defmodule Workbooks.NexusRegistry do
   alias Workbooks.DB
 
   @table "nexuses"
-  @cols ~w(id org_id fly_app fly_machine region plan state addons created)
+  @cols ~w(id org_id fly_app fly_machine region plan state addons neon_project_id created)
 
   @doc "Open the store and ensure the table exists (idempotent). Returns a DB handle."
   def open do
@@ -36,6 +36,7 @@ defmodule Workbooks.NexusRegistry do
       plan TEXT,
       state TEXT,
       addons TEXT,
+      neon_project_id TEXT,
       created INTEGER
     )
     """)
@@ -77,8 +78,8 @@ defmodule Workbooks.NexusRegistry do
           [] ->
             DB.query(
               h,
-              "INSERT INTO #{@table} (id, org_id, fly_app, fly_machine, region, plan, state, addons, created) " <>
-                "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+              "INSERT INTO #{@table} (id, org_id, fly_app, fly_machine, region, plan, state, addons, neon_project_id, created) " <>
+                "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
               [
                 attrs["id"],
                 org,
@@ -88,6 +89,7 @@ defmodule Workbooks.NexusRegistry do
                 attrs["plan"],
                 attrs["state"] || "created",
                 attrs["addons"],
+                attrs["neon_project_id"],
                 attrs["created"] || System.system_time(:second)
               ]
             )
@@ -143,7 +145,7 @@ defmodule Workbooks.NexusRegistry do
     h = h || open()
 
     with {:ok, _current} <- get(id, org_id, h) do
-      attrs = normalize(attrs) |> Map.take(~w(fly_app fly_machine region plan state addons))
+      attrs = normalize(attrs) |> Map.take(~w(fly_app fly_machine region plan state addons neon_project_id))
 
       if map_size(attrs) == 0 do
         get(id, org_id, h)
