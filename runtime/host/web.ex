@@ -381,6 +381,35 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(views))
   end
 
+  # Voice/agent command exec (wb-kbq5): the Gemini voice agent's bash tool POSTs
+  # {command} here. NO native bash (wb-9ja) — a `wb …` command runs the real CLI
+  # (incl. `wb app …` desktop control), anything else runs in the safe in-WASM
+  # shell (cat/grep/jq/pipes). Returns {output} | {error}.
+  post "/api/agents/:slug/exec" do
+    {:ok, body, conn} = read_body(conn)
+    command = (Jason.decode!(body)["command"] || "") |> to_string()
+    tenant = conn.assigns.tenant
+
+    result =
+      case OptionParser.split(command) do
+        ["wb" | argv] -> %{output: wb_exec(argv, tenant)}
+        [] -> %{output: ""}
+        _ ->
+          case Workbooks.Shell.run(command, "", dirs: []) do
+            {:ok, out} -> %{output: out}
+            {:error, e} -> %{error: inspect(e)}
+          end
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  defp wb_exec(argv, tenant) do
+    Workbooks.CLI.call(argv, tenant)
+  rescue
+    e -> "error: #{Exception.message(e)}"
+  end
+
   # Skill catalog for the @-picker (wb-kbq5). User/project SKILL.md authoring
   # isn't wired yet, so this is an empty-but-valid catalog (stops the 404; the
   # picker degrades to empty). Real discovery tracked as follow-up.
