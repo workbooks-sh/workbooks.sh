@@ -152,10 +152,13 @@ export async function voiceVideo({ video, out, lines }) {
     }
     const track = await assembleTrack(clips, videoDur, workDir);
     const voiced = out || video.replace(/\.mp4$/, ".voiced.mp4");
+    // NO -shortest: the audio track is already atrim'd to the exact video
+    // duration, and -shortest's frame-rounding against the audio stream can drop
+    // the final video frame. The video is the master length — keep every frame.
     await exec("ffmpeg", [
       "-y", "-i", video, "-i", track,
       "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0",
-      "-shortest", voiced,
+      voiced,
     ]);
     return { voiced, video, duration: videoDur, lines: lines.length, by: `elevenlabs:${MODEL}` };
   } finally {

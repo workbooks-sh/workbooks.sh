@@ -178,6 +178,10 @@ export class PlaywrightBackend {
   // Finalize the WebM video (Playwright writes it on context close).
   async finishVideo(targetName) {
     const video = this.page.video();
+    // Hold on the final state so the last action's result stays on screen — the
+    // recording otherwise ends the instant the last intent returns, cutting the
+    // tail. Overridable via WB_REC_TAIL_MS.
+    await sleep(Number(process.env.WB_REC_TAIL_MS) || 1200);
     await this.ctx.close(); // flushes video to disk
     if (!video) return null;
     const raw = await video.path();
