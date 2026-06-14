@@ -119,6 +119,10 @@ defmodule Workbooks.CLI do
     abs = Path.expand(to_string(path))
 
     cond do
+      # An ABSOLUTE path could read any .org on the host — including another
+      # tenant's data under WB_DATA. query/tangle/lint operate on relative paths
+      # only (the '..' guard then keeps them from climbing out).
+      Path.type(to_string(path)) == :absolute -> ~s({"error":"only relative paths allowed"})
       String.contains?(to_string(path), "..") -> ~s({"error":"bad path"})
       Path.extname(abs) != ".org" -> ~s({"error":"only .org files can be read"})
       not File.regular?(abs) -> ~s({"error":"no such file"})
