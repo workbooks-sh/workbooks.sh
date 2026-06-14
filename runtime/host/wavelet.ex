@@ -36,6 +36,7 @@ defmodule Workbooks.Wavelet do
 
   @render_command "wavelet-render-seq"
   @present_command "wavelet-render-present"
+  @film_command "wavelet-render-film"
 
   # The render-core binary, compiled to wasm32-wasip1. Built from the wavelet
   # submodule (crates/wavelet-render-core, bin render_seq) by its release build;
@@ -55,7 +56,19 @@ defmodule Workbooks.Wavelet do
                          __DIR__
                        )
 
+  # The film binary (bin render_film). Turns a workbook EDIT-STATE timeline.json
+  # into a deterministic `frame_%05d.png` sequence — one full-bleed scene per edit
+  # step with its `label` composited as an on-screen caption and a crossfade cut
+  # between steps — all in-guest (Blitz/Stylo/Vello-CPU paint + CPU blend, NO
+  # ffmpeg/native exec). Same submodule build output; content-addressed +
+  # registered on first use; the existing ffmpeg lane encodes the frames → mp4.
+  @render_film_wasm Path.expand(
+                      "../wavelet/crates/wavelet-render-core/target/wasm32-wasip1/release/render_film.wasm",
+                      __DIR__
+                    )
+
   @default_present_frame 0
+  @default_crossfade 0.4
 
   @default_w 1280
   @default_h 720
@@ -76,6 +89,12 @@ defmodule Workbooks.Wavelet do
 
   @doc "The CommandRegistry name the presentation-export wasm is registered under."
   def present_command, do: @present_command
+
+  @doc "The CommandRegistry name the film wasm is registered under."
+  def film_command, do: @film_command
+
+  @doc "The path to the film wasm artifact (submodule build output)."
+  def render_film_wasm, do: @render_film_wasm
 
   @doc "The path to the render-core wasm artifact (submodule build output)."
   def render_seq_wasm, do: @render_seq_wasm
@@ -137,6 +156,34 @@ defmodule Workbooks.Wavelet do
   end
 
   @doc """
+  Register the film wasm as a CommandRegistry command (idempotent). Content-
+  addressed + bound under `#{@film_command}` with `:argv` mode. Returns
+  {:ok, name} | {:error, reason}.
+  """
+  def ensure_film_registered do
+    case Workbooks.CommandRegistry.current(@film_command) do
+      nil ->
+        cond do
+          not File.regular?(@render_film_wasm) ->
+            {:error, {:render_film_missing, @render_film_wasm}}
+
+          true ->
+            case Workbooks.CommandRegistry.register_artifact(
+                   @film_command,
+                   @render_film_wasm,
+                   :argv
+                 ) do
+              {:ok, _addressed} -> {:ok, @film_command}
+              {:error, reason} -> {:error, reason}
+            end
+        end
+
+      _spec ->
+        {:ok, @film_command}
+    end
+  end
+
+  @doc """
   The `wavelet` command entry point: a CLI-style argv dispatcher a bash-only tenant
   drives. `argv` is the token list AFTER the command name, e.g.
   `["render", "clip.html", "-o", "out.mp4", "--fps", "24"]`.
@@ -148,6 +195,13 @@ defmodule Workbooks.Wavelet do
     * `present <composition.html> -o <out.pptx> [--w N] [--h N] [--frame N] [--fps N]` —
       PRESENTATION export: one full-bleed slide per scene, assembled as a valid
       OOXML `.pptx` ENTIRELY in-guest (pure-Rust zip; NO ffmpeg, NO native exec).
+    * `film <timeline.json> -o <out.mp4> [--w N] [--h N] [--fps N] [--crossfade SECS] [--audio mp3]` —
+      IN-NEXUS WORKBOOK FILMING: an ordered list of workbook EDIT-STATE snapshots
+      (each `{snapshot_html|snapshot_file, label, hold_secs}`) becomes a demo video
+      — each snapshot played full-bleed as a scene with its `label` as an on-screen
+      caption and a tasteful crossfade cut between steps. Frames rendered in-guest,
+      then encoded to mp4 via the existing in-guest ffmpeg lane (`--audio` muxes a
+      narration track). NO host browser, NO native exec.
 
   Returns {:ok, out_path} | {:error, reason}. `opts` threads non-argv concerns
   (`:allow` for the encode cap, `:principal`, `:rate`, `:roots`, `:timeout_ms`).
@@ -157,6 +211,7 @@ defmodule Workbooks.Wavelet do
       ["render" | rest] -> render(rest, opts)
       ["audio" | rest] -> audio(rest, opts)
       ["present" | rest] -> present(rest, opts)
+      ["film" | rest] -> film(rest, opts)
       [verb | _] -> {:error, {:unknown_verb, verb}}
       [] -> {:error, :no_verb}
     end
@@ -187,6 +242,187 @@ defmodule Workbooks.Wavelet do
          :ok <- validate_present(p),
          {:ok, _name} <- ensure_present_registered() do
       run_present_pipeline(p, opts)
+    end
+  end
+
+  @doc """
+  `wavelet film <timeline.json> -o <out.mp4> [--w N] [--h N] [--fps N] [--crossfade SECS] [--audio mp3]`.
+
+  IN-NEXUS WORKBOOK FILMING. Turns a sequence of workbook EDIT STATES into a demo
+  video, entirely in-nexus (no host browser). `timeline.json` is an ordered list of
+  steps — each `{snapshot_html (inline) | snapshot_file (a sandbox-relative ref),
+  label, hold_secs}`. Each snapshot is played FULL-BLEED as a scene with its
+  `label` composited as an on-screen caption; a tasteful crossfade cuts between
+  steps. The frame sequence is rendered IN-GUEST by the film wasm (Blitz/Stylo/
+  Vello-CPU paint + CPU blend, NO native exec/GPU), then encoded to an mp4 via the
+  SAME in-guest ffmpeg lane as `render` (`--audio` muxes a narration track).
+
+  `argv` is the verb's tokens. `opts`:
+    * `:roots` — scratch-root allow-list (wasm preopen + encode). Default
+      `Workbooks.FfmpegBroker.default_roots/0`.
+    * `:timeout_ms` — wall-clock cap on the render.
+    * `:encode_engine` / `:vcodec` — passed through to the encode (default in-guest
+      H.264), matching `render`.
+
+  `snapshot_file` refs in the timeline are resolved relative to the timeline's
+  directory and staged into the sandbox alongside it, so a snapshot's own relative
+  `<img>` assets resolve exactly as a standalone composition.
+
+  Returns {:ok, out_path} | {:error, reason}.
+  """
+  def film(argv, opts \\ []) when is_list(argv) do
+    with {:ok, p} <- parse_film_args(argv),
+         :ok <- validate_film(p),
+         {:ok, _name} <- ensure_film_registered() do
+      run_film_pipeline(p, opts)
+    end
+  end
+
+  # ── film argv parsing + validation ────────────────────────────────────────────
+
+  defp parse_film_args(argv) do
+    parse_film_args(argv, %{
+      timeline: nil,
+      out: nil,
+      w: @default_w,
+      h: @default_h,
+      fps: @default_fps,
+      crossfade: @default_crossfade,
+      audio: nil
+    })
+  end
+
+  defp parse_film_args([], acc), do: {:ok, acc}
+
+  defp parse_film_args([flag, val | rest], acc) when flag in ["-o", "--out", "--output"],
+    do: parse_film_args(rest, %{acc | out: val})
+
+  defp parse_film_args([flag, val | rest], acc) when flag == "--w",
+    do: with_film_int(val, :w, acc, rest)
+
+  defp parse_film_args([flag, val | rest], acc) when flag == "--h",
+    do: with_film_int(val, :h, acc, rest)
+
+  defp parse_film_args([flag, val | rest], acc) when flag == "--fps",
+    do: with_film_int(val, :fps, acc, rest)
+
+  defp parse_film_args([flag, val | rest], acc) when flag == "--crossfade",
+    do: with_film_float(val, :crossfade, acc, rest)
+
+  defp parse_film_args([flag, val | rest], acc) when flag == "--audio",
+    do: parse_film_args(rest, %{acc | audio: val})
+
+  defp parse_film_args(["-o"], _acc), do: {:error, {:flag_needs_value, "-o"}}
+
+  defp parse_film_args([flag | _], _acc)
+       when binary_part(flag, 0, min(2, byte_size(flag))) == "--",
+       do: {:error, {:flag_needs_value, flag}}
+
+  defp parse_film_args([pos | rest], %{timeline: nil} = acc),
+    do: parse_film_args(rest, %{acc | timeline: pos})
+
+  defp parse_film_args([pos | _rest], _acc), do: {:error, {:unexpected_arg, pos}}
+
+  defp with_film_int(val, key, acc, rest) do
+    case Integer.parse(val) do
+      {n, ""} -> parse_film_args(rest, Map.put(acc, key, n))
+      _ -> {:error, {:invalid, key}}
+    end
+  end
+
+  defp with_film_float(val, key, acc, rest) do
+    case Float.parse(val) do
+      {f, _} -> parse_film_args(rest, Map.put(acc, key, f))
+      _ -> {:error, {:invalid, key}}
+    end
+  end
+
+  defp validate_film(p) do
+    cond do
+      is_nil(p.timeline) -> {:error, :missing_timeline}
+      is_nil(p.out) -> {:error, :missing_output}
+      not String.ends_with?(p.out, ".mp4") -> {:error, :output_not_mp4}
+      p.w < @min_dim or p.w > @max_dim -> {:error, {:invalid, :w}}
+      p.h < @min_dim or p.h > @max_dim -> {:error, {:invalid, :h}}
+      p.fps < @min_fps or p.fps > @max_fps -> {:error, {:invalid, :fps}}
+      p.crossfade < 0.0 or p.crossfade > 10.0 -> {:error, {:invalid, :crossfade}}
+      true -> :ok
+    end
+  end
+
+  # ── the film pipeline: stage timeline+snapshots → in-guest render → encode ─────
+  #
+  # Mirrors run_pipeline/2 (render verb): ONE gated scratch under the encode root
+  # holds the staged timeline (+ its sibling snapshot files/assets) and the rendered
+  # frames, confining BOTH the wasm preopen and the encode. The film wasm renders
+  # the `frame_%05d.png` sequence; the existing in-guest ffmpeg lane encodes it.
+  defp run_film_pipeline(p, opts) do
+    roots = Keyword.get(opts, :roots, Workbooks.FfmpegBroker.default_roots())
+    root = List.first(roots) || System.tmp_dir!()
+    File.mkdir_p!(root)
+
+    scratch = Path.join(root, "wavelet-film-#{:erlang.unique_integer([:positive])}")
+    frames = Path.join(scratch, "frames")
+
+    try do
+      File.mkdir_p!(frames)
+      gated_out = Path.join(scratch, "out.mp4")
+
+      with {:ok, timeline_guest} <- stage_timeline(p.timeline, scratch),
+           :ok <- render_film_frames(scratch, timeline_guest, p),
+           {:ok, encoded} <- encode(frames, p, gated_out, roots, opts),
+           {:ok, delivered} <- deliver(encoded, p.out) do
+        {:ok, delivered}
+      end
+    after
+      File.rm_rf(scratch)
+    end
+  end
+
+  # Stage the timeline.json + its WHOLE directory (sibling snapshot HTML files and
+  # their assets) into the scratch root so `snapshot_file` refs + relative `<img>`
+  # paths resolve in-sandbox. Returns the timeline's guest path under /work.
+  defp stage_timeline(timeline, scratch) do
+    abs = Path.expand(timeline)
+
+    cond do
+      not File.regular?(abs) ->
+        {:error, {:timeline_missing, timeline}}
+
+      true ->
+        src_dir = Path.dirname(abs)
+        base = Path.basename(abs)
+
+        case File.cp_r(src_dir, scratch) do
+          {:ok, _} -> {:ok, "/work/#{base}"}
+          {:error, reason, _} -> {:error, {:stage_failed, reason}}
+        end
+    end
+  end
+
+  # Run the film wasm through the generic CommandRegistry lane. Preopens the scratch
+  # root at /work (read timeline + snapshots, write frames into /work/frames).
+  defp render_film_frames(scratch, timeline_guest, p) do
+    argv = [
+      timeline_guest,
+      "/work/frames",
+      "--w",
+      Integer.to_string(p.w),
+      "--h",
+      Integer.to_string(p.h),
+      "--fps",
+      Integer.to_string(p.fps),
+      "--crossfade",
+      float_arg(p.crossfade)
+    ]
+
+    dirs = ["#{Path.expand(scratch)}::/work"]
+    ropts = [timeout_ms: 300_000, fuel: 500_000_000_000]
+
+    case Workbooks.CommandRegistry.run_status(@film_command, "", argv, dirs, ropts) do
+      {:ok, _out, 0} -> :ok
+      {:ok, out, status} -> {:error, {:film_failed, status, String.slice(out, 0, 400)}}
+      {:error, reason} -> {:error, {:film_failed, reason}}
     end
   end
 

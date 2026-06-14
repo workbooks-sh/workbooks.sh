@@ -50,6 +50,9 @@ defmodule Workbooks.WaveletCommandTest do
     unless File.regular?(Wavelet.render_present_wasm()),
       do: raise("presentation-export wasm not built: #{Wavelet.render_present_wasm()}")
 
+    unless File.regular?(Wavelet.render_film_wasm()),
+      do: raise("film wasm not built: #{Wavelet.render_film_wasm()}")
+
     # A dedicated gated root for the encode broker AND the wasm preopen scratch.
     root = Path.join(System.tmp_dir!(), "wb_wavelet_root_#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
@@ -439,5 +442,173 @@ defmodule Workbooks.WaveletCommandTest do
 
     assert {:error, {:composition_missing, _}} =
              Wavelet.present(["/nonexistent/deck.html", "-o", out], roots: [root])
+  end
+
+  # ── film (in-nexus workbook filming) ────────────────────────────────────────
+
+  # Two workbook edit STATES as full HTML docs with distinct backgrounds, so the
+  # rendered scenes (and hence the encoded video) genuinely differ step-to-step.
+  @snap_one """
+  <!doctype html><html><head><style>
+    html,body{margin:0;background:#0b1020;color:#fff;font-family:sans-serif}
+    h1{padding:40px;font-size:48px}
+  </style></head><body><h1>Blank workbook</h1></body></html>
+  """
+
+  @snap_two """
+  <!doctype html><html><head><style>
+    html,body{margin:0;background:#149157;color:#fff;font-family:sans-serif}
+    h1{padding:40px;font-size:48px}
+  </style></head><body><h1>Added a chart</h1></body></html>
+  """
+
+  defp nb_frames(path) do
+    String.to_integer(probe(path, "nb_frames"))
+  end
+
+  test "ensure_film_registered binds the film wasm as a CommandRegistry command" do
+    assert {:ok, name} = Wavelet.ensure_film_registered()
+    assert name == Wavelet.film_command()
+    assert {:wasm, path, :argv} = Workbooks.CommandRegistry.current(name)
+    assert File.regular?(path)
+    assert {:ok, ^name} = Wavelet.ensure_film_registered()
+  end
+
+  test "wavelet film: an edit-state timeline (inline snapshots) -> IN-GUEST H.264 mp4",
+       %{root: root} do
+    # Inline snapshots, each held 0.5s, with a 0.3s crossfade cut between them.
+    timeline = [
+      %{"snapshot_html" => @snap_one, "label" => "Created a fresh workbook", "hold_secs" => 0.5},
+      %{"snapshot_html" => @snap_two, "label" => "Added a bar chart cell", "hold_secs" => 0.5}
+    ]
+
+    tl = Path.join(root, "timeline.json")
+    File.write!(tl, Jason.encode!(timeline))
+    out = Path.join(root, "demo.mp4")
+
+    # The exact bash-tenant film surface — frames rendered in-guest (no host
+    # browser), encoded in-guest H.264 (no native exec, no broker grant).
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["film", tl, "-o", out, "--w", "160", "--h", "90", "--fps", "10", "--crossfade", "0.3"],
+               roots: [root]
+             )
+
+    assert delivered == Path.expand(out)
+    assert File.regular?(delivered)
+    # mp4 magic: bytes 4..7 == "ftyp"
+    assert <<_::32, "ftyp", _::binary>> = File.read!(delivered)
+    assert probe(delivered, "codec_name") == "h264"
+    assert probe(delivered, "pix_fmt") == "yuv420p"
+
+    # hold 0.5s @ 10fps = 5 frames each; crossfade 0.3s = 3 frames. 5+3+5 = 13.
+    assert nb_frames(delivered) == 13
+  end
+
+  test "wavelet film: a snapshot_file ref resolves in the sandbox + wrapped {steps:[...]} form",
+       %{root: root} do
+    # snapshot_file points at a sibling of the timeline; the host stages the whole
+    # timeline dir so the ref resolves in-sandbox.
+    snap = Path.join(root, "snap2.html")
+    File.write!(snap, @snap_two)
+
+    timeline = %{
+      "steps" => [
+        %{"snapshot_html" => @snap_one, "label" => "step 1", "hold_secs" => 0.4},
+        %{"snapshot_file" => "snap2.html", "label" => "step 2", "hold_secs" => 0.4}
+      ]
+    }
+
+    tl = Path.join(root, "tl.json")
+    File.write!(tl, Jason.encode!(timeline))
+    out = Path.join(root, "fileref.mp4")
+
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["film", tl, "-o", out, "--w", "160", "--h", "90", "--fps", "10", "--crossfade", "0"],
+               roots: [root]
+             )
+
+    assert File.regular?(delivered)
+    assert probe(delivered, "codec_name") == "h264"
+    # hard cut (crossfade 0): 4 + 4 = 8 frames.
+    assert nb_frames(delivered) == 8
+  end
+
+  test "wavelet film --audio: muxes a narration track IN-GUEST (no broker)", %{root: root} do
+    timeline = [
+      %{"snapshot_html" => @snap_one, "label" => "intro", "hold_secs" => 1.0},
+      %{"snapshot_html" => @snap_two, "label" => "the build", "hold_secs" => 1.0}
+    ]
+
+    tl = Path.join(root, "narrated.json")
+    File.write!(tl, Jason.encode!(timeline))
+
+    mp3 = Path.join(root, "vo.mp3")
+
+    {_, 0} =
+      System.cmd(
+        "ffmpeg",
+        ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+         "sine=frequency=440:duration=2", mp3],
+        stderr_to_stdout: true
+      )
+
+    out = Path.join(root, "narrated.mp4")
+
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["film", tl, "-o", out, "--w", "160", "--h", "90", "--fps", "10",
+                "--crossfade", "0.2", "--audio", mp3],
+               roots: [root]
+             )
+
+    assert probe(delivered, "codec_name") == "h264"
+
+    {a, 0} =
+      System.cmd(
+        "ffprobe",
+        ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name",
+         "-of", "default=nw=1:nk=1", delivered],
+        stderr_to_stdout: true
+      )
+
+    assert String.trim(a) == "aac"
+  end
+
+  test "wavelet film argv validation: bad ext, missing input/output, bad dim/crossfade",
+       %{root: root} do
+    tl = Path.join(root, "v.json")
+    File.write!(tl, "[]")
+
+    assert {:error, :output_not_mp4} =
+             Wavelet.film([tl, "-o", Path.join(root, "x.webm")], roots: [root])
+
+    assert {:error, :missing_output} = Wavelet.film([tl], roots: [root])
+    assert {:error, :missing_timeline} = Wavelet.film(["-o", Path.join(root, "x.mp4")])
+
+    assert {:error, {:invalid, :w}} =
+             Wavelet.film([tl, "-o", Path.join(root, "x.mp4"), "--w", "999999"], roots: [root])
+
+    assert {:error, {:invalid, :crossfade}} =
+             Wavelet.film([tl, "-o", Path.join(root, "x.mp4"), "--crossfade", "-1"], roots: [root])
+  end
+
+  test "wavelet film: missing timeline is refused", %{root: root} do
+    out = Path.join(root, "nope.mp4")
+
+    assert {:error, {:timeline_missing, _}} =
+             Wavelet.film(["/nonexistent/timeline.json", "-o", out], roots: [root])
+  end
+
+  test "wavelet film: an empty timeline is refused by the in-guest renderer", %{root: root} do
+    tl = Path.join(root, "empty.json")
+    File.write!(tl, "[]")
+    out = Path.join(root, "empty.mp4")
+
+    assert {:error, {:film_failed, _, _}} =
+             Wavelet.film([tl, "-o", out, "--w", "160", "--h", "90"], roots: [root])
+
+    refute File.exists?(out)
   end
 end
