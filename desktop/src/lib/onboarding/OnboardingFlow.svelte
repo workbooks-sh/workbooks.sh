@@ -17,6 +17,8 @@
   import { applyThemeMode } from "$lib/onboarding/prefs";
   import { setupSaveModelKey, setupCompleteFirstRun } from "$lib/bridge/setup.svelte";
   import { connections } from "$lib/bridge/connections.svelte";
+  import ModelPicker from "$lib/chat/ModelPicker.svelte";
+  import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { nav } from "$lib/bridge/nav.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
@@ -29,6 +31,9 @@
   import Icon from "$lib/ui/Icon.svelte";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
+
+  // The user's chosen LLM model (recommended picks pinned in the picker).
+  let model = $state(getLlmModel());
 
   const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "search", "theme", "connect", "waldo"] as const;
   type Step = (typeof STEPS)[number];
@@ -391,6 +396,11 @@
                 <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get OpenRouter key ↗</a>
                 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get Gemini key ↗</a>
               </div>
+
+              <div class="modelrow">
+                <span class="klabel">Model <span class="kfor">cheaper-but-better, multimodal first</span></span>
+                <ModelPicker bind:value={model} onchange={(m) => void setLlmModel(m)} />
+              </div>
             </div>
           {/if}
         </div>
@@ -481,6 +491,7 @@
     color: var(--color-ok);
   }
   .kerr { color: var(--color-err); font-size: 0.74rem; word-break: break-word; }
+  .modelrow { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
   .kget { display: flex; gap: 14px; margin-top: 2px; }
   .kget a { color: var(--color-fg-subtle); font-size: 0.72rem; text-decoration: none; }
   .kget a:hover { color: var(--color-fg-muted); text-decoration: underline; }

@@ -29,6 +29,10 @@
   import { auth } from "$lib/auth/store.svelte";
   import { loadIdentity, type IdentityView } from "$lib/bridge/network.svelte";
   import { features } from "$lib/bridge/features";
+  import ModelPicker from "$lib/chat/ModelPicker.svelte";
+  import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
+
+  let llmModel = $state(getLlmModel());
 
   let identity = $state<IdentityView | null>(null);
   let identityLoading = $state(false);
@@ -210,6 +214,18 @@
     </span>
   </header>
 
+  <!-- Default model — Waldo + agents run on this. Recommended picks pinned;
+       full OpenRouter catalog searchable. Persists to WB_LLM_MODEL. -->
+  <section class="model-section">
+    <div class="model-text">
+      <h3>Default model</h3>
+      <p class="muted">The LLM Waldo and your agents run on. Recommended picks
+        (MiniMax M3, Gemini 3.5, multimodal) are pinned; search OpenRouter's full
+        catalog below.</p>
+    </div>
+    <ModelPicker bind:value={llmModel} onchange={(m) => void setLlmModel(m)} />
+  </section>
+
   <!-- Identity card: account + network identity, fused. Auth UI is
        flag-gated (WB_FF_AUTH_UI, wb-aakl.3) — off in the shipped browser,
        which leaves just the engine status chip + version footer. The
@@ -339,6 +355,20 @@
   }
 
   /* ── page head ─────────────────────────────────────────────── */
+  .model-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 0.4rem;
+  }
+  .model-section h3 {
+    margin: 0 0 0.2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .model-text .muted { font-size: 0.8rem; line-height: 1.5; }
   .head {
     display: flex;
     align-items: center;
