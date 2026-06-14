@@ -5,9 +5,32 @@ defmodule Workbooks.Web do
   """
   use Plug.Router
 
+  # CORS (wb-e95f). The desktop runs in a WebKit webview whose origin differs
+  # from 127.0.0.1:4000, so every fetch with an Authorization header triggers a
+  # preflight OPTIONS. Without this the preflight 404'd (no OPTIONS route) and
+  # the real request never fired — breaking voice (system_prompt), workspace
+  # sync, and any HTTP engine call. Runs BEFORE Auth so the credential-less
+  # preflight isn't rejected. Local engine → allow any origin (it binds
+  # loopback / a per-boot-token-gated guest, not the public internet).
+  plug(:cors)
   plug(Workbooks.Auth)
   plug(:match)
   plug(:dispatch)
+
+  defp cors(conn, _opts) do
+    conn =
+      conn
+      |> put_resp_header("access-control-allow-origin", "*")
+      |> put_resp_header("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS")
+      |> put_resp_header("access-control-allow-headers", "authorization, content-type, x-tenant")
+      |> put_resp_header("access-control-max-age", "86400")
+
+    if conn.method == "OPTIONS" do
+      conn |> send_resp(204, "") |> halt()
+    else
+      conn
+    end
+  end
 
   get "/health" do
     send_resp(conn, 200, "ok")
