@@ -2637,6 +2637,13 @@
    "proof": "gumbo-parser 0.10.1 (11 C files) via build_c_dir parses HTML -> DOM tree, extracts element text (h1=Hello Forge, p=world); gumbo_lane_test.exs green",
    "lane": "compilers/gumbo/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "expat": {
+   "capability": "XML parsing (streaming/SAX) in-sandbox",
+   "status": "live",
+   "proof": "libexpat 2.6.4 via build_c_dir parses XML with SAX handlers -> parse_ok=1 items=2 lasttext=world; expat_lane_test.exs green. Minimal expat_config.h (XML_POOR_ENTROPY avoids getrandom on wasi)",
+   "lane": "compilers/expat/build.sh (fetch sha-pinned, gitignored) + build_c_dir(-DHAVE_EXPAT_CONFIG_H, include_only xmltok_impl/ns.c)",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
