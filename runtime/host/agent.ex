@@ -161,7 +161,10 @@ defmodule Workbooks.Agent do
       on_step: opts[:on_step] || fn _ -> :ok end,
       # on_delta.(chunk) fires per text token as the model generates — for
       # token-by-token streaming of the agent's reply. nil-op by default.
-      on_delta: opts[:on_delta] || fn _ -> :ok end
+      on_delta: opts[:on_delta] || fn _ -> :ok end,
+      # Set once we've nudged the model for a final answer after a silent
+      # dead-stop (empty content + no tool call). Guards against re-nudging.
+      summarized: false
     }
 
     messages = [%{role: "system", content: system}, %{role: "user", content: task}]
@@ -174,7 +177,27 @@ defmodule Workbooks.Agent do
   defp loop(messages, st) do
     case Llm.complete(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
       {:ok, %{tool_calls: [], content: content}} ->
-        finish(st, content || "(no result)")
+        cond do
+          content not in [nil, ""] ->
+            finish(st, content)
+
+          # Silent dead-stop: the model ran tools then returned empty content with
+          # no further tool call (common on cheap models). Nudge ONCE for a final
+          # answer so the user (and the eval judge) gets a real reply, not "(no
+          # result)" after the work was actually done.
+          st.step > 0 and not st.summarized ->
+            nudge = %{
+              role: "user",
+              content:
+                "Now give your final answer to my original request in plain language, " <>
+                  "using what your tools returned. Don't call any more tools."
+            }
+
+            loop(messages ++ [nudge], %{st | summarized: true, step: st.step + 1})
+
+          true ->
+            finish(st, content || "(no result)")
+        end
 
       {:ok, %{tool_calls: calls, raw_message: assistant}} ->
         {tool_msgs, st2, done} = exec_tools(calls, st)
