@@ -1,0 +1,45 @@
+#+TITLE: workbooks-cli toolkit
+#+TOOLKIT: workbooks-cli
+#+VERSION: 0.1.0
+#+CLI_BIN: wb
+#+STATUS: alpha
+#+TAGLINE: Deploy + publish from the CLI — stand up a runtime (local or cloud) and ship a workbook to a live URL, declaratively.
+
+* workbooks-cli — deploy + publish                              :toolkit:
+  :PROPERTIES:
+  :ID:        workbooks-cli
+  :VERSION:   0.1.0
+  :CLI_BIN:   wb
+  :STATUS:    alpha
+  :SKILL_DIR: skills/
+  :END:
+
+  This toolkit lets an agent operate the two outward-facing =wb= surfaces
+  the user runs themselves:
+
+  - =wb deploy= — stand up THE runtime image (the "nexus") for the user,
+    locally (a krunvm container) or in the cloud (Fly), from a declarative
+    =deployment.org=. The flow is git-like: scaffold → edit → validate →
+    apply, with =status/verify/logs/down= to operate it after.
+  - =wb publish= — render a Workbook (=.org=) to self-contained HTML and
+    ship it to a live URL (Cloudflare Pages / gh-pages / self-hosted),
+    from a declarative =publish.org=.
+
+  Both are NON-INTERACTIVE and take =--json= for machine output (exit 0 =
+  ok, non-zero = fail), so an agent can drive them and read the result.
+
+  This is the USER's tool surface — it deploys runtimes the user controls
+  to a registry the user controls. It is NOT the platform-release path.
+
+  *Live now*
+
+  | Skill        | Use when                                                  |
+  |--------------+-----------------------------------------------------------|
+  | =overview=   | First contact — the deploy + publish verbs                |
+  | =deploy=     | Stand up / operate a runtime (local or cloud nexus)       |
+  | =publish=    | Render a workbook → live URL                              |
+
+  *Not in scope (do not promise)*
+
+  - Platform-release ops (publishing the compilers package / platform runtime
+    image) — those are maintainer-only, never =wb deploy=.
