@@ -29,7 +29,10 @@ defmodule Workbooks.JsEngine do
   @host Path.join(@cache, "eval-host-023.wasm")
 
   # the fixed eval bootstrap — exports `run(input)` (the workbook world), eval's the JS, returns a string.
-  @bootstrap ~S|export function run(src){ try{ const r=(0,eval)(src); if(r===undefined) return "undefined"; if(typeof r==="object"&&r!==null){ try{ return JSON.stringify(r); }catch(_){ return String(r); } } return String(r); }catch(e){ return "ERR: "+(e&&e.message?e.message:String(e)); } }|
+  # ASYNC bootstrap (wb js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
+  # StarlingMonkey drives its internal event loop until this async export settles — so Promises, async/await,
+  # and (with clocks enabled) setTimeout/streams all complete before we return. Sync programs are unaffected.
+  @bootstrap ~S|export async function run(src){ try{ let r=(0,eval)(src); if(r&&typeof r.then==="function") r=await r; if(r===undefined) return "undefined"; if(typeof r==="object"&&r!==null){ try{ return JSON.stringify(r); }catch(_){ return String(r); } } return String(r); }catch(e){ return "ERR: "+(e&&e.message?e.message:String(e)); } }|
 
   @doc """
   Build the eval-host component once (componentize-js@0.18.5 / StarlingMonkey, cached). `{:ok, wasm_path}` |
@@ -47,7 +50,7 @@ defmodule Workbooks.JsEngine do
       import { writeFileSync } from 'node:fs';
       const src = #{Jason.encode!(@bootstrap)};
       const wit = "package wb:jseval;\\nworld workbook { export run: func(input: string) -> string; }";
-      const { component } = await componentize(src, { witWorld: wit, worldName: "workbook", disableFeatures: ["clocks","random","stdio"] });
+      const { component } = await componentize(src, { witWorld: wit, worldName: "workbook", disableFeatures: ["random","stdio"] });
       writeFileSync(#{Jason.encode!(@host)}, component);
       console.log("OK " + component.length);
       """)
@@ -124,9 +127,13 @@ defmodule Workbooks.JsEngine do
   # Set on globalThis BEFORE the bundle runs; the trailing expression is what `run`'s eval returns.
   # Format-robust for a self-contained esbuild bundle (no top-level import/export after bundling).
   defp console_capture(body) do
+    # Run the bundle inside an async IIFE so its awaits settle, then drain a few macrotask turns (timers/
+    # streams flush now that clocks are enabled) before returning the buffer. The async bootstrap awaits this.
     "globalThis.__wbout=[];{const __p=(...a)=>globalThis.__wbout.push(a.map(String).join(\" \"));" <>
       "globalThis.console={log:__p,error:__p,warn:__p,info:__p,debug:__p};}\n" <>
-      body <> "\n;globalThis.__wbout.join(\"\\n\")"
+      "(async()=>{\n" <> body <> "\n" <>
+      "for(let __i=0;__i<5;__i++){await new Promise(r=>setTimeout(r,0));}\n" <>
+      "return globalThis.__wbout.join(\"\\n\");})()"
   end
 
   # QuickJS fallback: compile the bundle to a wasm command in-sandbox, run it; its console.log → stdout.
