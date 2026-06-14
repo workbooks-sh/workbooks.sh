@@ -1138,6 +1138,23 @@ defmodule Workbooks.Web do
     end
   end
 
+  # AI-over-files (wb-ndlz): search the tenant's library, then synthesize a GROUNDED
+  # answer that cites the files — never inventing what isn't there. This is the
+  # backend for the desktop's right-bar "ai" search mode (replacing its mock).
+  # Returns {answer, sources:[{title,path,snippet}], related} to match that contract.
+  post "/api/library/:tenant/ask" do
+    {:ok, body, conn} = read_body(conn)
+
+    if path_tenant_ok?(conn) do
+      p = Jason.decode!(body)
+      query = String.trim(p["query"] || "")
+      hits = if query == "", do: [], else: Workbooks.Library.search(conn.params["tenant"], query, mode: :hybrid, k: 6)
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(library_ask(query, hits)))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
+    end
+  end
+
   # Cross-session index (0d) — every run, newest first, each rolled up. The
   # "see across runs" view for the CLI: catch an error trend, not one run.
   get "/api/telemetry" do
@@ -1372,6 +1389,49 @@ defmodule Workbooks.Web do
   # The viewer SPA: the runtime renders Org→HTML server-side (orgize, in the
   # kernel); the page only fetches that HTML + colors code (highlight.js, BSD).
   # No client Org library, no chrome — a clean page.
+  # Synthesize a grounded, cited answer from library hits (AI-over-files, wb-ndlz).
+  # Empty hits → an HONEST "couldn't find it" (no fabricated files/facts), no LLM call.
+  defp library_ask(query, []) do
+    %{
+      answer:
+        "I couldn't find anything in your files about \"#{query}\". Nothing in your library matched — " <>
+          "I won't make something up. Try different words, or add the relevant workbook.",
+      sources: [],
+      related: []
+    }
+  end
+
+  defp library_ask(query, hits) do
+    sources =
+      Enum.map(hits, fn h ->
+        %{
+          title: Map.get(h, :headline) || Map.get(h, :path),
+          path: Map.get(h, :path),
+          snippet: h |> Map.get(:text, "") |> to_string() |> String.slice(0, 200)
+        }
+      end)
+
+    context =
+      hits
+      |> Enum.map(fn h -> "- #{Map.get(h, :path)}: #{h |> Map.get(:text, "") |> to_string() |> String.slice(0, 400)}" end)
+      |> Enum.join("\n")
+
+    system =
+      "You answer the user's question using ONLY the provided excerpts from THEIR OWN files. " <>
+        "Cite which file each point comes from (by its path). If the excerpts don't cover the question, " <>
+        "say so plainly — NEVER invent files, paths, or facts not present in the excerpts. Be concise."
+
+    user = "Question: #{query}\n\nExcerpts from the user's files:\n#{context}"
+
+    answer =
+      case Workbooks.Llm.complete([%{role: "system", content: system}, %{role: "user", content: user}]) do
+        {:ok, %{content: t}} when is_binary(t) and t != "" -> t
+        _ -> "(no answer — the model didn't respond)"
+      end
+
+    %{answer: answer, sources: sources, related: []}
+  end
+
   # Dispatch a /api/browse request to the Browse capability.
   defp browse(%{"mode" => "search", "query" => q} = p) do
     case Workbooks.Browse.search(q, limit: Map.get(p, "limit", 8)) do
