@@ -535,17 +535,112 @@ defmodule Workbooks.Agent do
   def safe_path_for_test(workdir, rel), do: safe_path(workdir, rel)
 
   # Research fetch: GET a URL, strip HTML to readable text, truncate for the model.
-  defp fetch_url(url) do
-    :inets.start()
-    :ssl.start()
-    headers = [{~c"user-agent", ~c"Mozilla/5.0 (WorkbooksAgent)"}]
+  defp fetch_url(url), do: fetch_url(url, 5)
 
-    case :httpc.request(:get, {String.to_charlist(url), headers}, [timeout: 20_000, autoredirect: true], body_format: :binary) do
-      {:ok, {{_, 200, _}, _, body}} -> body |> html_to_text() |> String.slice(0, 4000)
-      {:ok, {{_, status, _}, _, _}} -> "fetch failed: HTTP #{status}"
-      {:error, e} -> "fetch error: #{inspect(e)}"
+  defp fetch_url(_url, 0), do: "fetch error: too many redirects"
+
+  defp fetch_url(url, hops) do
+    # SSRF guard: validate EVERY hop (initial URL + each redirect target) against
+    # private/internal addresses before connecting. autoredirect is OFF so a public
+    # URL can't redirect into internal space (cloud metadata 169.254.169.254, the
+    # runtime's own :4000, private LAN) — each Location is re-validated here.
+    case safe_remote_url(url) do
+      {:error, why} ->
+        "fetch blocked: #{why}"
+
+      :ok ->
+        :inets.start()
+        :ssl.start()
+        headers = [{~c"user-agent", ~c"Mozilla/5.0 (WorkbooksAgent)"}]
+
+        case :httpc.request(:get, {String.to_charlist(url), headers}, [timeout: 20_000, autoredirect: false], body_format: :binary) do
+          {:ok, {{_, 200, _}, _, body}} ->
+            body |> html_to_text() |> String.slice(0, 4000)
+
+          {:ok, {{_, status, _}, resp_headers, _}} when status in 300..399 ->
+            case redirect_location(resp_headers) do
+              nil -> "fetch failed: HTTP #{status}"
+              loc -> fetch_url(URI.merge(URI.parse(url), loc) |> URI.to_string(), hops - 1)
+            end
+
+          {:ok, {{_, status, _}, _, _}} ->
+            "fetch failed: HTTP #{status}"
+
+          {:error, e} ->
+            "fetch error: #{inspect(e)}"
+        end
     end
   end
+
+  defp redirect_location(headers) do
+    Enum.find_value(headers, fn {k, v} -> if to_string(k) |> String.downcase() == "location", do: to_string(v) end)
+  end
+
+  @doc false
+  # test seam for the SSRF guard (security-critical — see safe_remote_url/1)
+  def safe_remote_url_for_test(url), do: safe_remote_url(url)
+
+  # Allow only http(s) to a PUBLIC host. Blocks private/internal/link-local/
+  # loopback (incl. cloud-metadata 169.254.169.254) by IP literal or DNS result;
+  # an unresolvable host fails closed.
+  defp safe_remote_url(url) do
+    uri = URI.parse(to_string(url))
+
+    cond do
+      uri.scheme not in ["http", "https"] -> {:error, "only http(s) URLs allowed"}
+      is_nil(uri.host) or uri.host == "" -> {:error, "missing host"}
+      blocked_host?(uri.host) -> {:error, "private/internal address (SSRF guard)"}
+      true -> :ok
+    end
+  end
+
+  defp blocked_host?(host) do
+    case :inet.parse_address(String.to_charlist(host)) do
+      {:ok, ip} -> private_ip?(ip)
+      _ -> resolves_private?(host)
+    end
+  end
+
+  defp resolves_private?(host) do
+    hc = String.to_charlist(host)
+
+    v4 =
+      case :inet.getaddrs(hc, :inet) do
+        {:ok, ips} -> ips
+        _ -> []
+      end
+
+    v6 =
+      case :inet.getaddrs(hc, :inet6) do
+        {:ok, ips} -> ips
+        _ -> []
+      end
+
+    case v4 ++ v6 do
+      [] -> true
+      ips -> Enum.any?(ips, &private_ip?/1)
+    end
+  end
+
+  # IPv4 ranges: 0/8, 10/8, 100.64/10 (CGNAT), 127/8, 169.254/16 (link-local +
+  # cloud metadata), 172.16-31, 192.168/16, multicast/reserved 224+.
+  defp private_ip?({a, b, _, _}) do
+    a in [0, 10, 127] or a >= 224 or
+      (a == 100 and b in 64..127) or
+      (a == 169 and b == 254) or
+      (a == 172 and b in 16..31) or
+      (a == 192 and b == 168)
+  end
+
+  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 0}), do: true
+  # ::ffff:V4 — IPv4-mapped IPv6, unwrap and re-check the embedded v4
+  defp private_ip?({0, 0, 0, 0, 0, 0xFFFF, a, b}),
+    do: private_ip?({div(a, 256), rem(a, 256), div(b, 256), rem(b, 256)})
+
+  # fc00::/7 (unique-local) + fe80::/10 (link-local)
+  defp private_ip?({seg, _, _, _, _, _, _, _}),
+    do: (seg >= 0xFC00 and seg <= 0xFDFF) or (seg >= 0xFE80 and seg <= 0xFEBF)
 
   defp html_to_text(html) do
     html
