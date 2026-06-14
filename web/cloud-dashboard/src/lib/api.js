@@ -1,10 +1,31 @@
 // ── Platform Control Plane (PCP) client ──────────────────────────────────────
 // Typed access to the hosted-runtime ("nexus") control plane.
 //
-// RIGHT NOW these return MOCK data so the dashboard is fully navigable without a
-// backend. Each function is the ONE place to swap when the PCP API lands:
-//   MOCK — swap for fetch('/api/platform/nexuses') when the PCP API lands
-// Keep the return shapes identical and the pages won't change.
+// The collaborative-workspaces calls (history / drafts / shared-folders / roles /
+// backup) talk to a REAL runtime when one is configured, and fall back to MOCK
+// data otherwise so the dashboard stays navigable offline. Configure the runtime
+// with `VITE_WB_RUNTIME` (base URL) + `VITE_WB_TENANT` (dev x-tenant); without them
+// `live()` is false and everything is mock. The platform-nexus list/usage/storage
+// calls below remain mock until the PCP platform API lands.
+
+const RUNTIME = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WB_RUNTIME) || '';
+const DEV_TENANT = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WB_TENANT) || '';
+
+/** True when a real runtime is configured — flips the collab calls from mock to live. */
+export function live() { return RUNTIME !== ''; }
+
+/**
+ * One place that talks to the runtime, via SAME-ORIGIN relative paths. In dev the
+ * Vite proxy (vite.config) forwards `/api` → VITE_WB_RUNTIME (no CORS); in prod the
+ * dashboard is served same-origin as the runtime. Returns parsed JSON, throws on non-2xx.
+ */
+async function rt(path, { method = 'GET', body } = {}) {
+  const headers = { 'content-type': 'application/json' };
+  if (DEV_TENANT) headers['x-tenant'] = DEV_TENANT;     // dev single-tenant; prod uses the session cookie/JWT
+  const res = await fetch(path, { method, headers, body: body && JSON.stringify(body), credentials: 'include' });
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
 
 /**
  * @typedef {'run'|'sleep'|'build'|'pause'} NexusState
@@ -146,14 +167,17 @@ const MOCK_DIFF = {
 };
 
 /** @param {string} scope @returns {Promise<Change[]>} */
+// The runtime speaks snake_case (author_type/author_name); the UI uses camelCase.
+const normChange = (c) => ({ id: c.id, when: c.when, authorType: c.author_type ?? c.authorType, authorName: c.author_name ?? c.authorName, title: c.title });
+
 export async function nexusHistory(scope) {
-  // MOCK — swap for fetch(`/api/history/${scope}`) when wired
+  if (live()) return (await rt(`/api/history/${scope}`)).map(normChange);
   return structuredClone(MOCK_HISTORY[scope] || []);
 }
 
 /** @param {string} scope @param {string} changeId @returns {Promise<{before:string, after:string}>} */
 export async function changeDiff(scope, changeId) {
-  // MOCK — swap for fetch(`/api/history/${scope}/${changeId}/diff`) when wired
+  if (live()) return rt(`/api/history/${scope}/${changeId}/diff`);
   return structuredClone(MOCK_DIFF[changeId] || { before: '', after: '' });
 }
 
@@ -163,7 +187,10 @@ export async function changeDiff(scope, changeId) {
  * @returns {Promise<Change>}
  */
 export async function restoreVersion(scope, changeId, when) {
-  // MOCK — swap for fetch(`/api/history/${scope}/restore`, {method:'POST', body: JSON.stringify({to: changeId})})
+  if (live()) {
+    const r = await rt(`/api/history/${scope}/restore`, { method: 'POST', body: { to: changeId } });
+    return r.unchanged ? null : normChange(r);
+  }
   const target = (MOCK_HISTORY[scope] || []).find((c) => c.id === changeId);
   const label = target ? new Date(target.when).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'an earlier version';
   return { id: 'r' + changeId, when, authorType: 'human', authorName: 'You', title: `Restored the version from ${label}` };
@@ -177,7 +204,10 @@ export async function restoreVersion(scope, changeId, when) {
  * @returns {Promise<Change|null>}
  */
 export async function undoLast(scope, when) {
-  // MOCK — swap for fetch(`/api/history/${scope}/undo`, {method:'POST'})
+  if (live()) {
+    const r = await rt(`/api/history/${scope}/undo`, { method: 'POST' });
+    return r.nothing ? null : normChange(r);
+  }
   const list = MOCK_HISTORY[scope] || [];
   if (list.length < 2) return null;            // only the initial change → nothing to undo
   const previous = list[1];                    // [latest, previous, …] — undo returns to `previous`
@@ -208,26 +238,26 @@ const MOCK_SHARED = {
 };
 
 export async function sharedFolders() {
-  // MOCK — swap for fetch('/api/shared-folders')
+  if (live()) return rt('/api/shared-folders');
   return structuredClone(MOCK_SHARED);
 }
 
 /** @param {{folder:string, recipient:string, mode?:'read'|'draft'}} opts */
 export async function shareFolder(opts) {
-  // MOCK — swap for fetch('/api/shared-folders/share', {method:'POST', ...})
+  if (live()) return rt('/api/shared-folders/share', { method: 'POST', body: { folder: opts.folder, recipient: opts.recipient, mode: opts.mode || 'read' } });
   return { id: 'g' + Math.floor(Math.random() * 1e6), owner: 'you', folder: opts.folder, recipient: opts.recipient, mode: opts.mode || 'read' };
 }
 
 /** Add a shared folder to your workspace (append-only Draft). */
 export async function addSharedFolder(id) {
-  // MOCK — swap for fetch(`/api/shared-folders/${id}/add`, {method:'POST'})
+  if (live()) return rt(`/api/shared-folders/${id}/add`, { method: 'POST' });
   const g = MOCK_SHARED.shared_with.find((s) => s.id === id);
   return { folder: g?.folder || 'folder', files: ['logo.svg', 'colors.txt', 'guidelines.md'] };
 }
 
 /** Stop sharing a folder you own. */
 export async function revokeShare(id) {
-  // MOCK — swap for fetch(`/api/shared-folders/${id}/revoke`, {method:'POST'})
+  if (live()) return rt(`/api/shared-folders/${id}/revoke`, { method: 'POST' });
   return { ok: true, id };
 }
 
@@ -256,28 +286,28 @@ const MOCK_DRAFTS = {
 };
 
 export async function listDrafts(nexus) {
-  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts`)
+  if (live()) return rt(`/api/nexuses/${nexus}/drafts`);
   return structuredClone(MOCK_DRAFTS[nexus] || []);
 }
 
 export async function createDraft(nexus, name) {
-  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts`, {method:'POST', body:...})
+  if (live()) return rt(`/api/nexuses/${nexus}/drafts`, { method: 'POST', body: { name } });
   return { name, files_changed: 0, preview_path: `.drafts/${name}`, changes: [] };
 }
 
 export async function draftDiff(nexus, name) {
-  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/diff`)
+  if (live()) return rt(`/api/nexuses/${nexus}/drafts/${name}/diff`);
   const d = (MOCK_DRAFTS[nexus] || []).find((x) => x.name === name);
   return structuredClone(d?.changes || []);
 }
 
 export async function keepDraft(nexus, name) {
-  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/keep`, {method:'POST'})
+  if (live()) return rt(`/api/nexuses/${nexus}/drafts/${name}/keep`, { method: 'POST' });
   return { merged: name };
 }
 
 export async function discardDraft(nexus, name) {
-  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/discard`, {method:'POST'})
+  if (live()) return rt(`/api/nexuses/${nexus}/drafts/${name}/discard`, { method: 'POST' });
   return { ok: true, name };
 }
 
