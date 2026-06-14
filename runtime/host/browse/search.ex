@@ -36,6 +36,7 @@ defmodule Workbooks.Browse.Search do
     case provider(opts) do
       :exa -> keyed(q, limit, opts, "EXA_API_KEY", &exa/3)
       :brave_api -> keyed(q, limit, opts, "BRAVE_API_KEY", &brave_api/3)
+      :openrouter -> openrouter(q, limit, opts)
       :keyless -> query_scrape(q, limit, opts[:engine])
     end
   end
@@ -47,6 +48,7 @@ defmodule Workbooks.Browse.Search do
     case (opts[:provider] || System.get_env("WB_SEARCH_PROVIDER") || "keyless") |> to_string() |> String.downcase() do
       "exa" -> :exa
       p when p in ["brave_api", "brave-api"] -> :brave_api
+      p when p in ["openrouter", "openrouter-web", "openrouter_web"] -> :openrouter
       _ -> :keyless
     end
   end
@@ -94,6 +96,47 @@ defmodule Workbooks.Browse.Search do
     get_json(url, headers, fn json ->
       (get_in(json, ["web", "results"]) || [])
       |> Enum.map(fn r -> %{title: r["title"] || "", url: r["url"] || "", snippet: r["description"]} end)
+      |> Enum.reject(&(&1.url == ""))
+      |> Enum.take(limit)
+    end)
+  end
+
+  # OpenRouter web plugin — reuses the EXISTING OPENROUTER_API_KEY (no separate
+  # key; the "default go-to-market" provider). The model runs a web search via the
+  # `web` plugin and returns url_citation annotations, which we surface as results.
+  defp openrouter(q, limit, opts) do
+    key = opts[:api_key] || Workbooks.Secrets.get("OPENROUTER_API_KEY", System.get_env("OPENROUTER_API_KEY") || "")
+
+    if is_binary(key) and key != "" do
+      case openrouter_web(q, key, limit) do
+        [_ | _] = hits -> hits
+        _ -> query_scrape(q, limit, opts[:engine])
+      end
+    else
+      query_scrape(q, limit, opts[:engine])
+    end
+  end
+
+  defp openrouter_web(q, key, limit) do
+    body =
+      Jason.encode!(%{
+        model: System.get_env("WB_SEARCH_OR_MODEL") || "openai/gpt-4o-mini",
+        plugins: [%{id: "web", max_results: limit}],
+        messages: [%{role: "user", content: "Search the web for: #{q}\nReturn the most relevant results."}]
+      })
+
+    headers = [
+      {~c"authorization", String.to_charlist("Bearer #{key}")},
+      {~c"content-type", ~c"application/json"}
+    ]
+
+    post_json("https://openrouter.ai/api/v1/chat/completions", headers, body, fn json ->
+      (get_in(json, ["choices", Access.at(0), "message", "annotations"]) || [])
+      |> Enum.filter(&(&1["type"] == "url_citation"))
+      |> Enum.map(fn a ->
+        c = a["url_citation"] || %{}
+        %{title: c["title"] || "", url: c["url"] || "", snippet: c["content"]}
+      end)
       |> Enum.reject(&(&1.url == ""))
       |> Enum.take(limit)
     end)

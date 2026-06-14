@@ -20,6 +20,8 @@ defmodule Workbooks.SearchProviderTest do
     assert Search.provider_for_test(provider: "exa") == :exa
     assert Search.provider_for_test(provider: "brave_api") == :brave_api
     assert Search.provider_for_test(provider: "brave-api") == :brave_api
+    assert Search.provider_for_test(provider: "openrouter") == :openrouter
+    assert Search.provider_for_test(provider: "openrouter-web") == :openrouter
     assert Search.provider_for_test(provider: "totally-bogus") == :keyless
   end
 
