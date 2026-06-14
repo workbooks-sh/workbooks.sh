@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Software you can hold — Workbooks Blog</title>
 <meta name="description" content="One file that carries its interface, its data, and its history — software that travels as a thing, and stands on a runtime you own.">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
@@ -25,12 +25,16 @@
 <meta name="twitter:image" content="https://workbooks.sh/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Software you can hold","description":"One file that carries its interface, its data, and its history — software that travels as a thing, and stands on a runtime you own.","url":"https://workbooks.sh/blog/software-you-can-hold","mainEntityOfPage":{"@type":"WebPage","@id":"https://workbooks.sh/blog/software-you-can-hold"},"datePublished":"2026-06-13","dateModified":"2026-06-13","inLanguage":"en","wordCount":700,"image":"https://workbooks.sh/og.jpg","author":{"@type":"Organization","name":"Workbooks","url":"https://workbooks.sh"},"publisher":{"@type":"Organization","name":"Workbooks","url":"https://workbooks.sh","logo":{"@type":"ImageObject","url":"https://workbooks.sh/apple-touch-icon.png"}}}</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
 :root{
   --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157;
   --dim:#6a6f68; --line:#e7e5db; --pc:#a8d4f0;
-  --display:"Groothan","Anton",sans-serif;
+  --display:"Franie",sans-serif;
   --mono:"JetBrains Mono",monospace;
   --read:"EB Garamond",Georgia,serif;
 }
@@ -57,8 +61,8 @@ html{ scrollbar-width:thin; scrollbar-color:#565b54 transparent; }
 header.post{ margin-top:30px; padding-bottom:30px; border-bottom:1px solid var(--line); }
 header.post .kick{ font:700 11px var(--mono); letter-spacing:.22em; text-transform:uppercase;
   color:var(--dim); }
-header.post h1{ font-family:var(--display); font-weight:400; font-size:clamp(42px,7vw,72px);
-  line-height:.96; letter-spacing:-.01em; margin:16px 0 0; color:var(--ink); text-transform:uppercase; }
+header.post h1{ font-family:var(--display); font-weight:600; font-size:clamp(42px,7vw,72px);
+  line-height:.98; letter-spacing:-.018em; margin:16px 0 0; color:var(--ink); }
 header.post .dek{ font-size:clamp(19px,2.4vw,23px); line-height:1.5; color:#34372f;
   font-style:italic; margin:20px 0 0; max-width:34em; }
 header.post .meta{ display:flex; align-items:center; gap:14px; margin-top:24px;
@@ -68,8 +72,8 @@ header.post .meta .sep{ width:4px; height:4px; border-radius:50%; background:var
 article{ margin-top:40px; }
 article p{ font-size:20px; line-height:1.68; margin:0 0 24px; }
 article p.lead{ font-size:23px; line-height:1.56; color:#26282b; }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(25px,3.4vw,33px);
-  line-height:1.1; margin:52px 0 18px; letter-spacing:-.005em; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(25px,3.4vw,33px);
+  line-height:1.1; margin:52px 0 18px; letter-spacing:-.01em; }
 article b,article strong{ font-weight:600; }
 article em{ font-style:italic; }
 article code{ font:500 .82em var(--mono); background:rgba(18,19,22,.05);
@@ -77,8 +81,8 @@ article code{ font:500 .82em var(--mono); background:rgba(18,19,22,.05);
 article a{ color:var(--ink); text-decoration:underline; text-decoration-color:var(--bloom);
   text-decoration-thickness:2px; text-underline-offset:3px; }
 article a:hover{ text-decoration-color:var(--ink); }
-article .pull{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3.6vw,34px);
-  line-height:1.18; margin:46px 0; letter-spacing:-.01em; color:var(--ink); }
+article .pull{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3.6vw,34px);
+  line-height:1.18; margin:46px 0; letter-spacing:-.015em; color:var(--ink); }
 article hr{ border:0; border-top:1px solid var(--line); margin:48px 0; }
 
 footer.post{ margin-top:64px; padding-top:30px; border-top:1px solid var(--line);
@@ -94,7 +98,7 @@ footer.post .sig{ font:700 11px var(--mono); letter-spacing:.08em; text-transfor
 <body>
 
 <div id="site-nav"></div>
-<script src="/nav.js?v=15"></script>
+<script src="/nav.js?v=17"></script>
 
 <main class="wrap">
   <a class="back" href="/blog">← All posts</a>

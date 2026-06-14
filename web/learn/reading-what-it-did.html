@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
 <title>Reading what your agent did — Learning Center — Workbooks</title>
 <meta name="description" content="Level 2-&gt;3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real wb toolkit eval surface.">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
@@ -18,9 +20,13 @@
 if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
+:root{ color-scheme:light; --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
@@ -40,7 +46,7 @@ document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
   --bad-fill:rgba(217,83,79,.13);
   --good-fill:rgba(63,224,129,.16); /* right-answer green wash */
   --on-bloom:#10120f;             /* ink that sits on a bloom fill */
-  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+  --display:"Franie",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
@@ -60,7 +66,7 @@ a{ color:inherit; text-decoration:none; }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand span{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
@@ -109,11 +115,10 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-/* the duo display font (Groothan), all black: lowercase letters render grotesque,
-   the few uppercase letters render as bubble glyphs — a couple inner accents per
-   word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
+/* Franie display: sentence-case SemiBold; emphasis via italic <em> (SemiBoldItalic). */
+.sintro h1{ font-family:var(--display); font-weight:600; font-size:clamp(40px,5vw,78px); line-height:.95;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
+.sintro h1 em{ font-style:italic; }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:var(--prose); max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 /* slim search bar — sits above the splash; fires the wb-search-open overlay */
@@ -155,10 +160,10 @@ a{ color:inherit; text-decoration:none; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:var(--prose-strong); }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3vw,31px); line-height:1.15; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
 article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:var(--prose); border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
+article .big{ font-family:var(--display); font-weight:600; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--stroke); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--shadow); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
@@ -247,6 +252,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    literals scattered in the light CSS (reading prose greys, white cards, ink
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
+  color-scheme:dark;
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
   --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
   /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
@@ -305,7 +311,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:8px 8px 0 var(--shadow); padding:26px 28px 30px; }
 .qhead{ display:flex; align-items:flex-start; gap:12px; }
 .qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
-.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+.qhead h3{ font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:6px 0 0;
   letter-spacing:-.01em; color:var(--ink); }
 .qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--stroke); border-radius:8px;
   background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
@@ -338,7 +344,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   background:none; border:0; cursor:pointer; }
 .qretry:hover{ color:var(--ink); }
 .qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
-.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+.qresult .pct{ font-family:var(--display); font-weight:600; font-size:30px; line-height:1; margin-right:8px;
   color:var(--bloomd); vertical-align:-3px; }
 .qresult.pass .pct{ color:var(--bloomd); }
 .qresult.fail .pct{ color:var(--bad); }
@@ -355,7 +361,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>And the mindset that makes this work is a slightly uncomfortable one: treat the agent like a talented, fast, slightly overconfident colleague you haven't worked with long enough to fully trust. Not an enemy. Not an oracle. A colleague on their first week — capable of brilliant work and capable of confidently handing you something wrong, with the exact same cheerful tone either way.</p>
 
-    <h2>why "looKs fine" Is a coIn flip</h2>
+    <h2>Why "looks fine" is a coin flip</h2>
 
     <p>The natural way to check an agent's work is to read what it tells you and skim what it made. It looks reasonable, so you move on. That feels like diligence. It mostly isn't.</p>
 
@@ -368,7 +374,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>Neither of these announces itself. The agent's tone is identical whether it nailed the task or drifted off it. So "it looks fine" is genuinely a coin flip you've decided to trust. The rest of this lesson is three better moves than the coin flip — and they take about the same thirty seconds.</p>
 
-    <h2>move oNe: the Sniff-Check</h2>
+    <h2>Move one: the sniff-check</h2>
 
     <p>Before anything else, do the thing a sharp colleague does in the first ten seconds of looking at someone's work: poke the part most likely to be wrong. Not all of it. The risky part.</p>
 
@@ -387,7 +393,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
     <em>"Before I trust this, show me: (1) the exact ____ you used as input, (2) the result for ____ specifically, and (3) one case where this could be wrong and why you think it isn't."</em><br>
     Fill the blanks with whatever you care about most. A good agent answers cleanly. A drifting one starts hedging — and the hedging is the tell.</div>
 
-    <h2>move tWo: spoTting Drift</h2>
+    <h2>Move two: spotting drift</h2>
 
     <p>The most common way an agent's work goes wrong over time isn't a dramatic failure. It's <b>drift</b> — slowly solving a slightly different problem than the one you have. You ask for one thing, then a follow-up, then a fix to the fix, and three turns later the agent is confidently maintaining an idea you never actually agreed to.</p>
 
@@ -403,7 +409,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>Concept first, mechanics optional: drift matters because it's how you ship the wrong thing without ever making an obvious mistake. Every move above exists so you can tell whether the agent is still building <em>your</em> thing.</p>
 
-    <h2>move three: tHe ledger — tHe record iT can't fake</h2>
+    <h2>Move three: the ledger — the record it can't fake</h2>
 
     <p>The first two moves rely on you checking the work. But there's a deeper question the agent's own words can never honestly answer: <em>what did it actually do, step by step, to produce this?</em> You can't watch every keystroke. And the agent's summary of its own work is exactly the thing that's unreliable — it'll happily describe a tidy process whether or not that's what happened.</p>
 
@@ -417,7 +423,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>One honest note, so you don't over-trust it either: the ledger proves the log wasn't <em>changed after the fact</em>. It is your trustable record of what was done — not a frame-by-frame video of every byte, and not a guarantee the agent's plan was wise. It's the floor under your review, not the whole building.</p>
 
-    <h2>from one Check to A standiNg habit</h2>
+    <h2>From one check to a standing habit</h2>
 
     <p>Doing all this by hand on every change gets old by the tenth time and impossible by the hundredth. So the same instinct scales up into something you write once and re-run forever: an <a href="evals">eval</a>.</p>
 

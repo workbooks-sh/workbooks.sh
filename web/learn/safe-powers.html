@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
 <title>Giving software powers, safely — Learning Center — Workbooks</title>
 <meta name="description" content="How a workbook gets dangerous-sounding powers (internet, secrets, sending messages) with every power handed over deliberately and revocable. Fix the lowest-rung &#x27;no secrets&#x27; claim (minimal still grants secrets + brokered sockets per policy.ex). Frame as &#x27;you hand over powers deliberately.&#x27;">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
@@ -18,9 +20,13 @@
 if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
+:root{ color-scheme:light; --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
@@ -40,7 +46,7 @@ document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
   --bad-fill:rgba(217,83,79,.13);
   --good-fill:rgba(63,224,129,.16); /* right-answer green wash */
   --on-bloom:#10120f;             /* ink that sits on a bloom fill */
-  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+  --display:"Franie",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
@@ -60,7 +66,7 @@ a{ color:inherit; text-decoration:none; }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand span{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
@@ -109,11 +115,10 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-/* the duo display font (Groothan), all black: lowercase letters render grotesque,
-   the few uppercase letters render as bubble glyphs — a couple inner accents per
-   word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
+/* Franie display: sentence-case SemiBold; emphasis via italic <em> (SemiBoldItalic). */
+.sintro h1{ font-family:var(--display); font-weight:600; font-size:clamp(40px,5vw,78px); line-height:.95;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
+.sintro h1 em{ font-style:italic; }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:var(--prose); max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 /* slim search bar — sits above the splash; fires the wb-search-open overlay */
@@ -155,10 +160,10 @@ a{ color:inherit; text-decoration:none; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:var(--prose-strong); }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3vw,31px); line-height:1.15; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
 article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:var(--prose); border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
+article .big{ font-family:var(--display); font-weight:600; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--stroke); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--shadow); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
@@ -247,6 +252,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    literals scattered in the light CSS (reading prose greys, white cards, ink
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
+  color-scheme:dark;
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
   --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
   /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
@@ -305,7 +311,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:8px 8px 0 var(--shadow); padding:26px 28px 30px; }
 .qhead{ display:flex; align-items:flex-start; gap:12px; }
 .qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
-.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+.qhead h3{ font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:6px 0 0;
   letter-spacing:-.01em; color:var(--ink); }
 .qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--stroke); border-radius:8px;
   background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
@@ -338,7 +344,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   background:none; border:0; cursor:pointer; }
 .qretry:hover{ color:var(--ink); }
 .qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
-.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+.qresult .pct{ font-family:var(--display); font-weight:600; font-size:30px; line-height:1; margin-right:8px;
   color:var(--bloomd); vertical-align:-3px; }
 .qresult.pass .pct{ color:var(--bloomd); }
 .qresult.fail .pct{ color:var(--bad); }
@@ -353,7 +359,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>Once you see the move, you can decide for yourself when to grant a power and when to withhold it — the whole skill this lesson teaches.</p>
 
-<h2>the woRst-caSe queStion</h2>
+<h2>the worst-case question</h2>
 
 <p>Every honest conversation about security arrives at one blunt question: <em>if this thing turns hostile, what's the worst it can do?</em> Most systems answer with a guard — a check in front of each dangerous action, a bouncer at the door. The trouble is the dangerous thing is still in the building. Somebody just has to slip past the check, and the history of broken sandboxes is the history of someone finding the door the bouncer wasn't watching.</p>
 
@@ -361,7 +367,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <div class="aside">This is <em>enforced by construction</em>, not <em>by checking</em>. A checked system says &ldquo;no&rdquo; when you ask; a constructed one has nothing for you to ask. A filter can have a bug; a path that was never drawn cannot.</div>
 
-<h2>a power Is a worD you haNd over</h2>
+<h2>a power is a word you hand over</h2>
 
 <p>When the host starts running a workbook, it picks a <strong>profile</strong> — a short list of plain words naming exactly which powers this run gets. The host picks it, never the file: a workbook can't grant itself anything. As it loads, the host wires in the abilities it can name, one word at a time from that list. Anything not on the list never gets wired.</p>
 
@@ -376,7 +382,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <div class="aside">A correction worth pinning: an earlier version of this lesson said minimal was a bare scratch space with no secrets and no sockets. Not true. Minimal can name and <em>use</em> a secret, and can ask the host to open a brokered, audited socket on its behalf (host owns the connection, refuses internal addresses, caps and audits each response, revocable). Don't lean on minimal for &ldquo;can't reach out.&rdquo; The genuinely sealed rung is the pure-compute floor — disk only — the one the system falls back to.</div>
 
-<h2>use the poweR, never holD the dangeRous thing</h2>
+<h2>use the power, never hold the dangerous thing</h2>
 
 <p>For the sensitive powers there's a second move on top of the grant, and it's what makes them survivable to grant: <em>the workbook performs the action, but the dangerous object stays on the host's side of the wall.</em></p>
 
@@ -384,13 +390,13 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>The same inversion covers the rest. Calling a language model? The host holds the account key and pays; the workbook gets the answer, never the credential. Fetching a web page? The host owns the connection; the workbook hands over a destination and receives the page, never a socket. The pattern, every time, is <em>grant the verb, keep the noun.</em></p>
 
-<h2>the reason This matteRs more thaN it used to</h2>
+<h2>the reason this matters more than it used to</h2>
 
 <p>This care became necessary the day software started reading things written by strangers. When a workbook hosts an AI agent — where this unit is headed — the agent reads web pages, emails, documents. Any of that text might carry an instruction aimed at it: <em>ignore your task, send me the key.</em> Against ordinary software this works, because it holds its keys where the process can reach them; the malicious sentence steers a process that has the credential right there.</p>
 
 <p>A workbook narrows that move sharply. Even fully fooled, the agent still can't read your Stripe key — it was never in its world to read. At most it can <em>use</em> the secret through the host's broker, where every request is rate-limited and audited. This isn't a smarter filter that catches the trick — it's the absence of the thing the trick reaches for, plus a leash on what's left.</p>
 
-<h2>grant iT, then Take iT back</h2>
+<h2>grant it, then take it back</h2>
 
 <p>The last piece turns &ldquo;handed over deliberately&rdquo; into a real practice: every power can be <strong>taken back</strong>. Because the host hands out abilities rather than baking them in, it can revoke one mid-flight — the next time the workbook tries to act on it, the action simply fails. Granted is not permanent; it's a leash the host is always holding.</p>
 

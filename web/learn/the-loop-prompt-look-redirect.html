@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
 <title>The loop: prompt, look, redirect — Learning Center — Workbooks</title>
 <meta name="description" content="Level 2: iteration is a loop, not one perfect prompt. Prompt -&gt; evaluate -&gt; refine -&gt; redirect. When to add context vs. start over. Delegation is not abdication — you stay the reviewer and keep the publish button.">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
@@ -18,9 +20,13 @@
 if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
+:root{ color-scheme:light; --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
@@ -40,7 +46,7 @@ document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
   --bad-fill:rgba(217,83,79,.13);
   --good-fill:rgba(63,224,129,.16); /* right-answer green wash */
   --on-bloom:#10120f;             /* ink that sits on a bloom fill */
-  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+  --display:"Franie",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
@@ -60,7 +66,7 @@ a{ color:inherit; text-decoration:none; }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand span{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
@@ -109,11 +115,10 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-/* the duo display font (Groothan), all black: lowercase letters render grotesque,
-   the few uppercase letters render as bubble glyphs — a couple inner accents per
-   word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
+/* Franie display: sentence-case SemiBold; emphasis via italic <em> (SemiBoldItalic). */
+.sintro h1{ font-family:var(--display); font-weight:600; font-size:clamp(40px,5vw,78px); line-height:.95;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
+.sintro h1 em{ font-style:italic; }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:var(--prose); max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 /* slim search bar — sits above the splash; fires the wb-search-open overlay */
@@ -155,10 +160,10 @@ a{ color:inherit; text-decoration:none; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:var(--prose-strong); }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3vw,31px); line-height:1.15; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
 article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:var(--prose); border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
+article .big{ font-family:var(--display); font-weight:600; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--stroke); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--shadow); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
@@ -247,6 +252,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    literals scattered in the light CSS (reading prose greys, white cards, ink
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
+  color-scheme:dark;
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
   --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
   /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
@@ -305,7 +311,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:8px 8px 0 var(--shadow); padding:26px 28px 30px; }
 .qhead{ display:flex; align-items:flex-start; gap:12px; }
 .qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
-.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+.qhead h3{ font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:6px 0 0;
   letter-spacing:-.01em; color:var(--ink); }
 .qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--stroke); border-radius:8px;
   background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
@@ -338,7 +344,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   background:none; border:0; cursor:pointer; }
 .qretry:hover{ color:var(--ink); }
 .qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
-.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+.qresult .pct{ font-family:var(--display); font-weight:600; font-size:30px; line-height:1; margin-right:8px;
   color:var(--bloomd); vertical-align:-3px; }
 .qresult.pass .pct{ color:var(--bloomd); }
 .qresult.fail .pct{ color:var(--bad); }
@@ -355,7 +361,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>They don't. There are no magic words. What experienced people have is not a better first prompt; it's a <em>loop</em> they trust. They say what they want, they look hard at what came back, and they say the next thing. Over and over, until it's right. That loop is the whole skill. Once you're running it on purpose instead of stumbling through it, you're building software — even if you've never written a line of code.</p>
 
-    <h2>one prompT is a wisH. a loop iS a method.</h2>
+    <h2>One prompt is a wish. A loop is a method.</h2>
 
     <p>Here's the trap. A single prompt asks the agent to read your mind. You're holding a full picture in your head — the feel of the thing, who it's for, what matters and what doesn't — and you're trying to squeeze all of it through one paragraph. No human colleague could build the right thing from that paragraph either. They'd build <em>a</em> thing, show it to you, and ask "like this?"</p>
 
@@ -369,7 +375,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>The work isn't front-loaded into one heroic prompt. It's spread across the turns. That's not a workaround for the agent being dumb — it's how building has always worked, finally made fast enough that you can do a full lap in a minute instead of a week.</p>
 
-    <h2>a real lAp, staRt to fInish</h2>
+    <h2>A real lap, start to finish</h2>
 
     <p>Let's watch one. Say you want a little page where people sign up for a workshop. Here's a perfectly good opening prompt — note how unfussy it is:</p>
 
@@ -385,7 +391,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>Notice what made the redirects work: each one was about <em>the result you saw</em>, not a vague vibe. &ldquo;Make it better&rdquo; gives the agent nothing to aim at. &ldquo;Add a notes box and show remaining spots&rdquo; gives it a target. The clearer your look, the sharper your redirect.</p>
 
-    <h2>you are sTill the One who Decides</h2>
+    <h2>You are still the one who decides</h2>
 
     <p>It's easy to read &ldquo;the agent builds it&rdquo; as &ldquo;the agent is in charge.&rdquo; It isn't, and that distinction is the most important thing in this whole lesson. Handing the labor to an agent is not handing over the judgment. Delegation is not abdication.</p>
 
@@ -395,13 +401,13 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <div class="aside">A quick starter you can steal. Fill in the blanks and run a deliberate lap:<br><br><b>Prompt:</b> &ldquo;Build _______ for _______. It needs to _______. Keep it _______.&rdquo;<br><b>Look:</b> ask yourself — what's missing, what's wrong, what surprised me?<br><b>Redirect:</b> &ldquo;Two changes: _______ and _______.&rdquo;</div>
 
-    <h2>why thiS is saFe to dO fast</h2>
+    <h2>Why this is safe to do fast</h2>
 
     <p>Running a tight loop only feels reckless if you're afraid a wrong turn is permanent. It isn't. Because of how a workbook keeps its own history — every change recorded, with a way back — an agent working this way leaves a trail you can read and undo. You can try a bold redirect, look at it, hate it, and go back. The cost of a bad lap is one more lap. That's what makes &ldquo;just try it and see&rdquo; a real strategy here and not a gamble.</p>
 
     <p>It also means you never have to guess what the agent did between your check-ins. The work records itself — what it changed, and why. So &ldquo;catch me up&rdquo; is an answerable question, and your <b>look</b> beat has something concrete to look at, even on work that happened while you were away.</p>
 
-    <h2>where this Is honest, And where It's headed</h2>
+    <h2>Where this is honest, and where it's headed</h2>
 
     <p>One straight thing: the loop you just learned is the part that works today. You really can prompt, look, redirect, and watch software take shape in front of you, with the human — you — staying in the driver's seat the whole time. That's not a promise about the future; it's the everyday motion of building here.</p>
 

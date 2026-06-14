@@ -7,6 +7,22 @@
 /* sans-serif brand fonts — Geist + Geist Mono, same as the landing pages */
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
 
+/* display/header font — Franie (replaces Geist for --display). Static weights
+   served locally from /fonts. Sentence-case SemiBold (600) headers + italic
+   <em> emphasis, matching the landing web/index.html. */
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:300; font-display:swap;
+  src:url("/fonts/Franie-Light.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:600; font-display:swap;
+  src:url("/fonts/Franie-SemiBold.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:italic; font-weight:600; font-display:swap;
+  src:url("/fonts/Franie-SemiBoldItalic.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:700; font-display:swap;
+  src:url("/fonts/Franie-Bold.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:italic; font-weight:700; font-display:swap;
+  src:url("/fonts/Franie-BoldItalic.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:900; font-display:swap;
+  src:url("/fonts/Franie-Black.woff2") format("woff2"); }
+
 :root{
   --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
@@ -27,7 +43,7 @@
   --run:var(--bloomd); --amber:#c2861f; --pause:#7c63cf; --bad:#d9534f; --bad-fill:rgba(217,83,79,.13);
   --live:var(--run);
 
-  --display:"Geist",system-ui,sans-serif;
+  --display:"Franie",system-ui,sans-serif;
   --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
   --read:"Geist",system-ui,sans-serif;
   --sans:"Geist",system-ui,sans-serif;
@@ -90,7 +106,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .topdna{ margin:-22px -14px 16px; height:8px; overflow:hidden; flex:0 0 auto; }
 .brand{ display:flex; align-items:center; gap:9px; padding:4px 8px 16px; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand b{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand b{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 .brand .cl{ font:700 10px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
   border:2px solid var(--stroke); border-radius:7px; padding:2px 6px; }
@@ -158,7 +174,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .tag{ font:700 11px var(--mono); padding:3px 8px; border-radius:6px; border:2px solid var(--stroke); color:var(--dim); }
 
 .sechead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
-.sechead h2{ font-family:var(--display); font-weight:400; font-size:24px; line-height:1.1; }
+.sechead h2{ font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; }
 .sechead p{ font:400 14px var(--read); color:var(--prose); margin-top:4px; }
 
 /* stat cards */
@@ -166,7 +182,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .stat{ border:2px solid var(--stroke); border-radius:var(--r); padding:16px; background:var(--card);
   box-shadow:3px 3px 0 var(--shadow); }
 .stat .k{ font:700 10px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.12em; }
-.stat .v{ font-family:var(--display); font-weight:400; font-size:26px; margin-top:9px; line-height:1; }
+.stat .v{ font-family:var(--display); font-weight:600; font-size:26px; margin-top:9px; line-height:1; }
 .stat .v small{ font:400 13px var(--read); color:var(--dim); }
 .stat .d{ font:500 11px var(--mono); margin-top:6px; }
 .up{ color:var(--bloomd); } .down{ color:var(--amber); }
@@ -174,7 +190,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 /* cards */
 .card{ border:2px solid var(--stroke); border-radius:var(--r); background:var(--card); padding:20px; margin-bottom:18px;
   box-shadow:3px 3px 0 var(--shadow); }
-.card h3{ font-family:var(--display); font-weight:400; font-size:17px; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.card h3{ font-family:var(--display); font-weight:600; font-size:17px; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
 .kv{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); font:400 14px var(--read); }
 .kv:last-child{ border:0; }
 .kv .k{ color:var(--dim); } .kv .v{ font:500 12.5px var(--mono); color:var(--ink); }
@@ -208,7 +224,7 @@ tr:last-child td{ border:0; }
 .modal{ position:fixed; inset:0; background:var(--scrim-q); display:grid; place-items:center; z-index:40; }
 .sheet{ width:560px; max-width:94vw; max-height:90vh; overflow-y:auto; background:var(--card);
   border:2px solid var(--stroke); border-radius:16px; padding:26px; box-shadow:6px 6px 0 var(--shadow); }
-.sheet h2{ font-family:var(--display); font-weight:400; font-size:22px; margin-bottom:6px; }
+.sheet h2{ font-family:var(--display); font-weight:600; font-size:22px; margin-bottom:6px; }
 .sheet .sub{ color:var(--prose); font:400 14px var(--read); margin-bottom:22px; }
 .lab{ font:700 10px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:18px 0 9px; }
 .field{ margin-bottom:11px; }
@@ -221,7 +237,7 @@ tr:last-child td{ border:0; }
 .plan:hover{ transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--shadow); }
 .plan.sel{ background:var(--mint); color:var(--on-bloom); }
 .plan .nm{ font:600 13px var(--read); }
-.plan .pr{ font-family:var(--display); font-weight:400; font-size:19px; margin:8px 0 3px; }
+.plan .pr{ font-family:var(--display); font-weight:600; font-size:19px; margin:8px 0 3px; }
 .plan .pr small{ font:400 11px var(--mono); color:var(--dim); }
 .plan.sel .pr small{ color:var(--on-bloom); }
 .plan .ds{ font:400 11.5px var(--read); color:var(--dim); line-height:1.4; }

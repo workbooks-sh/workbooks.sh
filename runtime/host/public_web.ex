@@ -402,16 +402,21 @@ defmodule Workbooks.PublicWeb do
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap">
     <style>
-    @font-face{font-family:"Groothan";src:url("https://workbooks.sh/fonts/GroothanMixed-Regular.woff2") format("woff2");font-weight:400;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-Light.woff2") format("woff2");font-weight:300;font-style:normal;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-SemiBold.woff2") format("woff2");font-weight:600;font-style:normal;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-SemiBoldItalic.woff2") format("woff2");font-weight:600;font-style:italic;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-Bold.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-BoldItalic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:block}
+    @font-face{font-family:"Franie";src:url("https://workbooks.sh/fonts/Franie-Black.woff2") format("woff2");font-weight:900;font-style:normal;font-display:block}
     :root{
       --ink:#121316;--ink-soft:#34372f;--ink-faint:#6a6f68;
       --blue:#149157;--blue-soft:#3fe081;--blue-faint:#e3f6ea;
       --bg:#f7f6f1;--bg-warm:#f1f0e8;--panel:#fff;
       --silver:#d9d6c8;--silver-light:#eceadf;--line:#e7e5db;
       --green:#13d943;--amber:#d98b1f;
-      /* match the landing page: mono body, Groothan display — sans/mono, no serif */
+      /* match the landing page: mono body, Franie display — sans/mono, no serif */
       --sans:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-      --display:"Groothan","Anton",sans-serif;
+      --display:"Franie",sans-serif;
       --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
       --sidebar-w:284px;
       --shadow:0 1px 2px rgba(35,42,54,.04),0 10px 28px rgba(35,42,54,.06);
@@ -463,7 +468,8 @@ defmodule Workbooks.PublicWeb do
     .page-body h2::before{content:"";position:absolute;top:calc(-1*clamp(.9rem,2vh,1.2rem));left:0;width:100%;height:1px;background:var(--line)}
     .page-body h2:first-child::before{display:none}
     .page-eyebrow{font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.7rem}
-    .page-title{font-family:var(--display);font-size:clamp(2rem,4.4vw,2.9rem);font-weight:400;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
+    .page-title{font-family:var(--display);font-size:clamp(2rem,4.4vw,2.9rem);font-weight:600;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
+    .page-title em,.page-body h2 em{font-style:italic;font-weight:600}
     /* cross-site links + copy-as-markdown button in the header */
     .page-cross{display:flex;align-items:center;gap:1.1rem;margin-bottom:1rem}
     .page-cross a{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none}
@@ -474,7 +480,7 @@ defmodule Workbooks.PublicWeb do
     .copy-md.done{background:var(--blue-faint);border-color:var(--blue);color:var(--blue)}
     .page-body{padding:2.2rem 3.2rem 6rem;max-width:792px}
     /* ── typography (body) ── */
-    .page-body h2{font-size:1.32rem;font-weight:600;letter-spacing:-.02em;color:var(--ink);margin:clamp(2.6rem,5vh,3.2rem) 0 .8rem;padding-top:clamp(1.8rem,4vh,2.4rem);border-top:1px solid var(--line)}
+    .page-body h2{font-family:var(--display);font-size:1.44rem;font-weight:600;letter-spacing:-.02em;color:var(--ink);margin:clamp(2.6rem,5vh,3.2rem) 0 .8rem;padding-top:clamp(1.8rem,4vh,2.4rem);border-top:1px solid var(--line)}
     .page-body h2:first-child{margin-top:.4rem;padding-top:0;border-top:0}
     .page-body h3{font-family:var(--mono);font-size:.8rem;font-weight:600;letter-spacing:.03em;color:var(--ink-faint);text-transform:uppercase;margin:1.9rem 0 .55rem}
     .page-body p{max-width:66ch;font-size:1.02rem;margin-bottom:1rem;line-height:1.7;color:var(--ink-soft)}

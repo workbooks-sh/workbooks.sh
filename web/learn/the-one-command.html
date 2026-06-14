@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
 <title>The one command (reference) — Learning Center — Workbooks</title>
 <meta name="description" content="Demoted to a reference card: the AGENT runs wbx, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane).">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
@@ -18,9 +20,13 @@
 if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
+:root{ color-scheme:light; --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
@@ -40,7 +46,7 @@ document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
   --bad-fill:rgba(217,83,79,.13);
   --good-fill:rgba(63,224,129,.16); /* right-answer green wash */
   --on-bloom:#10120f;             /* ink that sits on a bloom fill */
-  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+  --display:"Franie",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
@@ -60,7 +66,7 @@ a{ color:inherit; text-decoration:none; }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand span{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
@@ -109,11 +115,10 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-/* the duo display font (Groothan), all black: lowercase letters render grotesque,
-   the few uppercase letters render as bubble glyphs — a couple inner accents per
-   word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
+/* Franie display: sentence-case SemiBold; emphasis via italic <em> (SemiBoldItalic). */
+.sintro h1{ font-family:var(--display); font-weight:600; font-size:clamp(40px,5vw,78px); line-height:.95;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
+.sintro h1 em{ font-style:italic; }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:var(--prose); max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 /* slim search bar — sits above the splash; fires the wb-search-open overlay */
@@ -155,10 +160,10 @@ a{ color:inherit; text-decoration:none; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:var(--prose-strong); }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3vw,31px); line-height:1.15; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
 article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:var(--prose); border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
+article .big{ font-family:var(--display); font-weight:600; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--stroke); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--shadow); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
@@ -247,6 +252,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    literals scattered in the light CSS (reading prose greys, white cards, ink
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
+  color-scheme:dark;
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
   --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
   /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
@@ -305,7 +311,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:8px 8px 0 var(--shadow); padding:26px 28px 30px; }
 .qhead{ display:flex; align-items:flex-start; gap:12px; }
 .qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
-.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+.qhead h3{ font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:6px 0 0;
   letter-spacing:-.01em; color:var(--ink); }
 .qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--stroke); border-radius:8px;
   background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
@@ -338,7 +344,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   background:none; border:0; cursor:pointer; }
 .qretry:hover{ color:var(--ink); }
 .qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
-.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+.qresult .pct{ font-family:var(--display); font-weight:600; font-size:30px; line-height:1; margin-right:8px;
   color:var(--bloomd); vertical-align:-3px; }
 .qresult.pass .pct{ color:var(--bloomd); }
 .qresult.fail .pct{ color:var(--bad); }
@@ -353,7 +359,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>Most of what you do here, you do by talking. You describe what you want; the agent does the work. But underneath the conversation, the agent isn't waving a magic wand — it's running a real command-line tool, over and over, the way a builder reaches for the same trusted handle a hundred times a day. That tool is called <code>wbx</code>, and this lesson is the short version of what it is and why you'll see its name go by.</p>
 
-    <h2>one handlE, mostly Held by tHe agent</h2>
+    <h2>One handle, mostly held by the agent</h2>
 
     <p>The honest way to describe <code>wbx</code> is that it's a handle, not a brain. It's a single program that authors, builds, signs, ships, and runs workbooks — but it owns almost none of the cleverness itself. It parses what it was asked for, does the light local work directly, and hands everything heavy to the engine behind it. The intelligence lives in the system; the command is the grip you hold it by.</p>
 
@@ -361,7 +367,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <div class="aside">This is the correction worth keeping from the older version of this page: it used to read like a getting-started tutorial — "you install the tool, you run two minutes of commands, you get your first workbook." For a builder who works by talking to an agent, that's the wrong picture. You don't have to install <code>wbx</code> or memorize a single verb. Your agent does the driving. This page exists so the driving isn't a black box.</div>
 
-    <h2>why you'd wAnt to reCognize It anyway</h2>
+    <h2>Why you'd want to recognize it anyway</h2>
 
     <p>If the agent does the typing, why learn the tool at all? Because recognizing what it's doing is how you tell whether it did the right thing. When a session log says the agent ran a build, then a bundle, then a sign, you can read that as a sentence: it compiled the work, packed it into one file, and stamped your origin onto it. You don't need to run those commands to know that's the right order — and to notice if a step is missing.</p>
 
@@ -377,7 +383,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>You don't memorize the thirty. You learn that the families share the same manners — you start a thing, you check a thing, you do a thing — so once you've seen one family go by, the others read the same way.</p>
 
-    <h2>it speaks to People and To machineS, on purpose</h2>
+    <h2>It speaks to people and to machines, on purpose</h2>
 
     <p>Here's the design choice that makes <code>wbx</code> safe for an agent to drive. The tool knows it has two kinds of users, and it changes its manners for each <em>without</em> changing what it does.</p>
 
@@ -385,7 +391,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>This matters more than it sounds. The usual industry answer is two separate things — a tool for humans and an interface for machines — and they always drift apart until they quietly disagree about what the software even does. <code>wbx</code> refuses that fork: one program with good manners, not two programs that fall out of sync.</p>
 
-    <h2>the same Tool, inSide thE engine</h2>
+    <h2>The same tool, inside the engine</h2>
 
     <p>And it goes one step further than most people expect. The very same tool runs <em>inside</em> the system, in the sandbox where the engine's own agents do their work. So when an agent's log says it ran a particular command, that's not a stand-in or a translation — it's literally <code>wbx</code>, the same one a person would install on a laptop.</p>
 
@@ -393,7 +399,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <div class="aside">One small piece of self-care worth knowing about: there's a verb called <code>doctor</code> whose whole job is to check that everything is set up correctly — is the tool installed, is the engine reachable, are you standing in a workbook. It runs honest probes and reports what it finds in plain language. The quietly thoughtful part: it never fails the shell just because it found a problem. A health check that found something wrong still did its job. If you ever do open a terminal yourself, that's the one command that tells you where you stand.</div>
 
-    <h2>where thiS is today, And where It's going</h2>
+    <h2>Where this is today, and where it's going</h2>
 
     <p>What's real today: <code>wbx</code> ships as one compiled tool for Mac, Linux, and Windows, and the same source also runs inside the engine's sandbox — so the claim that you and the agents hold the identical tool is literally true, not a metaphor. The verb families, the human-versus-machine manners, the stable outcome codes, and the never-fail health check are all built and tested.</p>
 

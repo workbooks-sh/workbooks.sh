@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="darkreader-lock">
 <title>The system that improves itself — Learning Center — Workbooks</title>
 <meta name="description" content="The honest Level-3 summit and the thesis&#x27;s emotional peak, relocated here from a stray doc-link. The autopoet edits the declarative config layer (toolkits/skills/defs), never host code — Phase-1 reality, brand-canon framed: &#x27;software built in workbooks&#x27;, NOT &#x27;sites that run themselves.&#x27;">
-<link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Franie-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
@@ -18,9 +20,13 @@
 if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <style>
-@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-:root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Light.woff2") format("woff2"); font-weight:300; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBold.woff2") format("woff2"); font-weight:600; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight:600; font-style:italic; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Bold.woff2") format("woff2"); font-weight:700; font-display:block; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight:700; font-style:italic; font-display:swap; }
+@font-face{ font-family:"Franie"; src:url("../fonts/Franie-Black.woff2") format("woff2"); font-weight:900; font-display:block; }
+:root{ color-scheme:light; --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
   --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
@@ -40,7 +46,7 @@ document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
   --bad-fill:rgba(217,83,79,.13);
   --good-fill:rgba(63,224,129,.16); /* right-answer green wash */
   --on-bloom:#10120f;             /* ink that sits on a bloom fill */
-  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
+  --display:"Franie",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif; }
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read); -webkit-font-smoothing:antialiased; }
@@ -60,7 +66,7 @@ a{ color:inherit; text-decoration:none; }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
-.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+.brand span{ font-family:var(--display); font-weight:600; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:none; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
 .themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
@@ -109,11 +115,10 @@ a{ color:inherit; text-decoration:none; }
 .swrap{ display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(40px,6vw,86px); align-items:center;
   width:100%; max-width:1180px; margin:0 auto; }
 .sintro .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
-/* the duo display font (Groothan), all black: lowercase letters render grotesque,
-   the few uppercase letters render as bubble glyphs — a couple inner accents per
-   word, never the first letter. Case in the markup drives which is which. */
-.sintro h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,5vw,78px); line-height:.9;
+/* Franie display: sentence-case SemiBold; emphasis via italic <em> (SemiBoldItalic). */
+.sintro h1{ font-family:var(--display); font-weight:600; font-size:clamp(40px,5vw,78px); line-height:.95;
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
+.sintro h1 em{ font-style:italic; }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:var(--prose); max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 /* slim search bar — sits above the splash; fires the wb-search-open overlay */
@@ -155,10 +160,10 @@ a{ color:inherit; text-decoration:none; }
 article{ margin-top:40px; }
 article > p{ font-size:20px; line-height:1.66; margin:0 0 23px; }
 article > p.lead{ font-size:23px; line-height:1.55; color:var(--prose-strong); }
-article h2{ font-family:var(--display); font-weight:400; font-size:clamp(24px,3vw,31px); line-height:1.1; margin:50px 0 17px; }
+article h2{ font-family:var(--display); font-weight:600; font-size:clamp(24px,3vw,31px); line-height:1.15; margin:50px 0 17px; }
 article b,article strong{ font-weight:600; } article em{ font-style:italic; }
 article .aside{ margin:28px 0; padding:19px 23px; border-left:3px solid var(--pc); background:var(--card); font-size:18.5px; line-height:1.6; color:var(--prose); border-radius:0 10px 10px 0; }
-article .big{ font-family:var(--display); font-weight:400; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
+article .big{ font-family:var(--display); font-weight:600; font-size:clamp(23px,3.4vw,33px); line-height:1.18; margin:42px 0; letter-spacing:-.01em; }
 article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper{ margin:52px 0 0; padding:24px; border:2px solid var(--stroke); border-radius:16px; background:var(--card); box-shadow:4px 4px 0 var(--shadow); }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
@@ -247,6 +252,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    literals scattered in the light CSS (reading prose greys, white cards, ink
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
+  color-scheme:dark;
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
   --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
   /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
@@ -305,7 +311,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:8px 8px 0 var(--shadow); padding:26px 28px 30px; }
 .qhead{ display:flex; align-items:flex-start; gap:12px; }
 .qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
-.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+.qhead h3{ font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; margin:6px 0 0;
   letter-spacing:-.01em; color:var(--ink); }
 .qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--stroke); border-radius:8px;
   background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
@@ -338,7 +344,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   background:none; border:0; cursor:pointer; }
 .qretry:hover{ color:var(--ink); }
 .qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
-.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+.qresult .pct{ font-family:var(--display); font-weight:600; font-size:30px; line-height:1; margin-right:8px;
   color:var(--bloomd); vertical-align:-3px; }
 .qresult.pass .pct{ color:var(--bloomd); }
 .qresult.fail .pct{ color:var(--bad); }
@@ -355,7 +361,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>The point of working with an agent was never that it types faster than you. It's that <strong>improvement can become a standing process instead of a heroic act</strong>. That's the summit. Let's name it accurately.</p>
 
-<h2>the thinG has a naMe — the aUtopoet</h2>
+<h2>The thing has a name — the autopoet</h2>
 
 <p>The agent that tends the system is called the <em>autopoet</em>. The word comes from <em>autopoiesis</em>, the biologists' term for systems that maintain themselves — a cell rebuilding its own walls, a body healing a cut. It sounds exotic, but here it's nothing new. You already met both of its parts.</p>
 
@@ -366,7 +372,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>The autopoet is just those two things pointed <em>inward</em>. A standing agent, working a maintenance plan, whose subject happens to be the system itself. Not a new kind of magic — the same constructs you already directed, aimed at keeping your software from rotting. If you understood the last two lessons, you already understand this one.</p>
 
-<h2>why "software That edits itSelf" isn't terRifying here</h2>
+<h2>Why "software that edits itself" isn't terrifying here</h2>
 
 <p>The phrase "software that edits itself" usually reads like the opening line of an incident report. The reason it's safe here comes down to one boundary the whole system is built around — and it's worth slowing down on, because it's the thing that lets you sleep at night.</p>
 
@@ -376,7 +382,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>So when the autopoet "improves the system," what it does is propose a diff to a text file. You can read it. You can revert it in one move. It runs through the same checks — build, test, sandbox-run — any change you made by hand would face. Being the system's own gardener buys zero exemptions. That's not a policy you have to trust; it's how the thing is shaped.</p>
 
-<h2>what it actuAlly does — a Loop, on purPose humble</h2>
+<h2>What it actually does — a loop, on purpose humble</h2>
 
 <p>The autopoet runs a small, boring loop. Boring is the achievement here:</p>
 
@@ -391,7 +397,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <div class="aside"><b>So you can tell if it did it right:</b> after the autopoet works a ticket, open its plan file and look for four things in plain text — the ticket, the plan entry, a reviewable diff, and a note explaining the change. If those exist and the gates passed, it did its job. If you can't find the diff or the reasoning, something's wrong — the whole value is that the episode is legible and revertible.</div>
 
-<h2>one ticKet, stArt to Finish</h2>
+<h2>One ticket, start to finish</h2>
 
 <p>Concretely. A research agent keeps hitting the same wall: its toolkit can fetch sources but has no way to remove duplicates, so it wastes half its run re-reading the same page. Instead of suffering quietly, it files the ticket: <em>my toolkit lacks a dedupe verb</em>.</p>
 
@@ -399,7 +405,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <p>Next time the research agent runs, the capability is just <em>there</em>. No human reopened the project. No afternoon was spent. But notice what also exists now: a ticket, a plan entry, a diff, and a note — all in plain text, all in the history. You can read the whole episode tomorrow, and undo it in one move if the gardener planted the wrong thing.</p>
 
-<h2>the honest pArt — this is The youngeSt idea here</h2>
+<h2>The honest part — this is the youngest idea here</h2>
 
 <p>Now the part we owe you, because over-promising here would poison everything else you learned.</p>
 
@@ -409,7 +415,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
 <div class="aside">And one thing the autopoet will <em>never</em> be, at any maturity: a pitch about software that runs itself. That phrase is banned here on purpose. The whole shape of this system is <strong>people and AI building together</strong>. The autopoet isn't a replacement for you — it's the part that keeps what <em>you</em> built getting a little better between your sessions. You're still the one who decides what's worth building.</div>
 
-<h2>what yOu can Do now</h2>
+<h2>What you can do now</h2>
 
 <p>You don't need to wire up an autopoet to walk away with the right picture. What you should be able to do now is hold the north star without believing it's already shipped — to tell "an agent lands reviewable fixes to config behind gates" (real, today) from "the software improves itself with no one watching" (the bet, being built). That distinction is the whole gift of an honest summit. Everything before this points at it: a portable file, a legible plan, an agent you direct, a story that travels — and now, a system that helps keep all of it alive, in plain text you can read and revert, with you still holding the wheel.</p>
 </article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="ddl" href="/learn/autopoet"><b>Autopoet</b><span>the deep doc</span></a><a class="ddl" href="/learn/dreaming"><b>dreaming</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 21 of 27</div><div class="audio"><div class="play" id="play" data-src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-system-improves-itself.mp3?v=573"><span class="ico" id="playico"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="lab" id="playlab">Listen</span><span class="time">10 min</span></div><div class="scrub"><div class="sbar" id="sbar"><i id="sbfill"></i></div><div class="stime"><span id="scur">0:00</span><span id="sdur">--:--</span></div></div></div><button class="quizbtn" type="button" data-quiz-lesson="the-system-improves-itself"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="lab">Take the quiz</span><span class="score" data-lscore="the-system-improves-itself"></span></button><button class="cont" id="cc" data-next="proving-origin"><span>Complete & continue</span> →</button><textarea class="notes" id="notes" data-slug="the-system-improves-itself" spellcheck="false" placeholder="Notes are taken here — saved to your browser cache."></textarea></aside></div></div>
