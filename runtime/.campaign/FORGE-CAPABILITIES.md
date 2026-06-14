@@ -62,6 +62,16 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **stb_truetype** (font rasterization) | from-C-source -> wasi (build_c_dir) | stbtt_lane_test (rasterize glyph) |
 | **qrcodegen** (QR code generation) | from-C-source -> wasi (build_c_dir) | qrcodegen_lane_test (encode URL -> matrix) |
 
+## DEFERRED (JS/TS) — terminal, with escape
+
+- **wasm-npm** (sql.js/@swc/wasm — packages that `WebAssembly.instantiate` a bundled `.wasm`): `WebAssembly`
+  is absent in the StarlingMonkey eval-host (jitless SpiderMonkey-in-wasm can't host a nested wasm engine;
+  `js_wasm_npm_test` tripwire). Escapes: host-brokered sibling wasm instance (intercept instantiate → host
+  wasmtime, the toolkit-isolation model), or use our Forge wasi lane for the capability (sql.js → in-tree
+  sqlite.wasm). FORGE/BEDROCK boundary.
+- **Intl** (i18n number/date format): absent on BOTH StarlingMonkey AND QuickJS (ICU stripped). Escape:
+  rebuild SM with ICU, or inject a `@formatjs` polyfill (bulky). See js-ecosystem.json.
+
 ## PROVEN — ran in an experiment, not yet wired+tested
 
 | Capability | Lane | Note |

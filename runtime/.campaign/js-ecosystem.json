@@ -671,7 +671,9 @@
             "pkgs shipping their own .wasm (esbuild-wasm, @swc/wasm, sql.js)",
             "instantiate under our runtime"
           ],
-          "verdict": "pending"
+          "verdict": "deferred",
+          "wall": "forge",
+          "note": "WebAssembly absent in the StarlingMonkey eval-host (jitless SpiderMonkey-in-wasm cannot host a nested wasm engine in-guest; typeof WebAssembly=undefined, js_wasm_npm_test tripwire). So sql.js/@swc/wasm etc. that WebAssembly.instantiate a bundled .wasm cannot run via JS. ESCAPES: (1) host-brokered sibling wasm instance (intercept instantiate -> host wasmtime, flat-forest = toolkit-isolation model); (2) use the capability via our Forge wasi lane instead (sql.js -> in-tree sqlite.wasm; @swc -> esbuild). Terminal."
         },
         {
           "id": "v8-jit-node",
