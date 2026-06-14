@@ -17,9 +17,12 @@ const MODE_KEY = "wb.search.mode";
 export type SearchMode = "internal" | "web" | "ai";
 
 function loadMode(): SearchMode {
-  if (typeof localStorage === "undefined") return "web";
+  // Default to local-first Workspace search — never the web. Web search is a
+  // paid/token surface and is opt-in (the `web` provider is off by default; the
+  // user enables it in Settings). See loadPrefs.
+  if (typeof localStorage === "undefined") return "internal";
   const m = localStorage.getItem(MODE_KEY);
-  return m === "internal" || m === "web" || m === "ai" ? m : "web";
+  return m === "internal" || m === "web" || m === "ai" ? m : "internal";
 }
 
 interface Prefs {
@@ -28,17 +31,21 @@ interface Prefs {
 }
 
 function loadPrefs(): Prefs {
-  if (typeof localStorage === "undefined") return { disabled: [], order: [] };
+  // Web search is OPT-IN: the `web` provider (a paid/token surface) starts
+  // disabled so the default search never hits the web. The user enables it in
+  // Settings (and configures the provider/key in the runtime).
+  const DEFAULT: Prefs = { disabled: ["web"], order: [] };
+  if (typeof localStorage === "undefined") return DEFAULT;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return { disabled: [], order: [] };
+    if (!raw) return DEFAULT;
     const p = JSON.parse(raw);
     return {
-      disabled: Array.isArray(p.disabled) ? p.disabled : [],
+      disabled: Array.isArray(p.disabled) ? p.disabled : ["web"],
       order: Array.isArray(p.order) ? p.order : [],
     };
   } catch {
-    return { disabled: [], order: [] };
+    return DEFAULT;
   }
 }
 
