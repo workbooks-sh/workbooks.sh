@@ -39,6 +39,7 @@
       return { icon: Rocket, phrase: "launch an app" };
     return { icon: ShieldCheck, phrase: `use ${req?.capability ?? "a capability"}` };
   });
+  const CapIcon = $derived(cap.icon);
 
   async function onAllow() {
     if (!req || acting) return;
@@ -67,7 +68,6 @@
   <div class="overlay" data-testid="workgate-overlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wg-title">
       <div class="logo" aria-hidden="true">
-        {@const CapIcon = cap.icon}
         <CapIcon weight="fill" size={24} />
       </div>
 
