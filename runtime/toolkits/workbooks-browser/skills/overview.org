@@ -1,5 +1,12 @@
 #+TITLE: workbooks-browser — overview
 
+* How to invoke (read this first)
+
+  Every command below is a BUILT-IN `wb` verb — run it DIRECTLY through your `wb`
+  tool (args="app status", args="model get"). Do NOT wrap them in `wb toolkit
+  run …` (that's only for compiled command-toolkits, and is refused here).
+  `wb toolkit show …` just READS these skills.
+
 * What this toolkit is
 
   You are an agent in a Workbooks runtime that a desktop shell (the "browser")

@@ -1,5 +1,12 @@
 #+TITLE: workbooks-cli — deploy
 
+* How to invoke (read this first)
+
+  These are BUILT-IN `wb` verbs. Run them DIRECTLY through your `wb` tool —
+  e.g. args="deploy status". Do NOT wrap them in `wb toolkit run …` (that path is
+  for compiled command-toolkits and will be refused for deploy). The command is
+  literally `wb deploy <verb>`, nothing more.
+
 * Stand up + operate a runtime (a "nexus")
 
   `wb deploy` brings THE runtime image up to a declared state. Two homes:

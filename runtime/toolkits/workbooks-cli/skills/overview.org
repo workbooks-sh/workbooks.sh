@@ -1,5 +1,12 @@
 #+TITLE: workbooks-cli — overview
 
+* How to invoke (read this first)
+
+  Everything here is a BUILT-IN `wb` verb — run it DIRECTLY through your `wb` tool
+  (args="deploy status", args="publish apply x.org"). These are NOT compiled
+  command-toolkits: do NOT wrap them in `wb toolkit run …` (that path is refused
+  for deploy/publish). `wb toolkit show …` is only for READING these skills.
+
 * What this toolkit is
 
   Two outward-facing `wb` surfaces the user runs themselves:
