@@ -112,6 +112,9 @@ defmodule Workbooks.AgentSession do
 
   def handle_info({:run_done, run}, state) do
     Enum.each(state.subs, &send(&1, {:agent_done, run.result}))
+    # Persist the transcript (wb-g1yo.8) so a completed run survives the process
+    # + runtime restart and can be re-opened later, tenant-scoped.
+    Workbooks.SessionLedger.persist_transcript(state.id, state.tenant, run)
     {:noreply, %{state | status: :done, run: run}}
   end
 

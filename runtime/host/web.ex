@@ -497,10 +497,22 @@ defmodule Workbooks.Web do
 
   # Poll an agent run's status + result + observable events.org.
   get "/api/run/:id" do
+    id = conn.params["id"]
+    t = conn.assigns[:tenant]
+
     reply =
-      case Workbooks.AgentSession.status(conn.params["id"]) do
-        :not_found -> %{error: "no such run"}
-        s -> s
+      case Workbooks.AgentSession.status(id) do
+        # Live run: tenant-gate (wb-g1yo.2) — another tenant can't read it; fall
+        # through to a persisted transcript only if THEY own one.
+        %{tenant: st} = s ->
+          if is_nil(t) or is_nil(st) or st == t,
+            do: s,
+            else: Workbooks.SessionLedger.transcript(id, t) || %{error: "no such run"}
+
+        # Not live (completed/restarted): serve the persisted transcript (wb-g1yo.8),
+        # tenant-gated.
+        _ ->
+          Workbooks.SessionLedger.transcript(id, t) || %{error: "no such run"}
       end
 
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(reply))

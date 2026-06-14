@@ -93,4 +93,27 @@ defmodule Workbooks.SessionLedgerTest do
     rows = SessionLedger.list()
     assert Enum.count(rows, &(&1.session_id == "dup")) == 1
   end
+
+  test "transcript persists + reads back, tenant-gated (wb-g1yo.8)" do
+    SessionLedger.persist_transcript("run-t1", "alice", %{result: "the answer", log: "* run\n** step 0"})
+
+    # owner reads it
+    t = SessionLedger.transcript("run-t1", "alice")
+    assert t["result"] == "the answer"
+    assert t["events_org"] =~ "step 0"
+    assert t["status"] == "completed"
+
+    # another tenant is denied
+    assert SessionLedger.transcript("run-t1", "bob") == nil
+    # admin/internal (nil) may read
+    assert SessionLedger.transcript("run-t1", nil)["result"] == "the answer"
+    # absent transcript → nil
+    assert SessionLedger.transcript("nope", "alice") == nil
+  end
+
+  test "transcript id is path-safe (no traversal via the URL-supplied id)" do
+    # a malicious id must not escape the transcript dir; it just resolves to a
+    # sanitized filename that doesn't exist → nil, never a read of /etc/*.
+    assert SessionLedger.transcript("../../etc/passwd", "alice") == nil
+  end
 end

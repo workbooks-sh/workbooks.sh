@@ -101,4 +101,51 @@ defmodule Workbooks.SessionLedger do
     |> elem(0)
     |> Enum.reverse()
   end
+
+  # ── Transcript persistence (wb-g1yo.8) ────────────────────────────────────
+  # A completed AgentSession is in-memory only, so its transcript vanishes when
+  # the process dies or the runtime restarts. Persist it (tenant-stamped) so a
+  # past conversation can be re-opened, and gate reads by tenant.
+
+  defp transcript_dir, do: Path.join(System.get_env("WB_DATA") || System.tmp_dir!(), "wb-transcripts")
+
+  # Path-safe id (the id reaches `transcript/2` straight from the /api/run/:id URL).
+  defp safe_id(id), do: id |> to_string() |> String.replace(~r/[^A-Za-z0-9_.-]/, "_")
+
+  @doc "Persist a completed run's transcript. Best-effort; tenant-stamped for read-gating."
+  def persist_transcript(id, tenant, run) do
+    File.mkdir_p(transcript_dir())
+
+    data = %{
+      session_id: id,
+      tenant: tenant,
+      status: "completed",
+      result: Map.get(run, :result),
+      events_org: Map.get(run, :log),
+      finished_at: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    File.write(Path.join(transcript_dir(), "#{safe_id(id)}.json"), Jason.encode!(data))
+  rescue
+    _ -> :ok
+  end
+
+  @doc "Read a persisted transcript, but only if `caller_tenant` may see it (same grandfather rule). nil if absent/denied."
+  def transcript(id, caller_tenant) do
+    case File.read(Path.join(transcript_dir(), "#{safe_id(id)}.json")) do
+      {:ok, body} ->
+        case Jason.decode(body) do
+          {:ok, %{"tenant" => t} = m} ->
+            if is_nil(caller_tenant) or is_nil(t) or t == caller_tenant, do: m, else: nil
+
+          _ ->
+            nil
+        end
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
+  end
 end
