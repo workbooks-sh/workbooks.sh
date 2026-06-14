@@ -16,11 +16,13 @@ const SIG_CDH = 0x02014b50; // Central Directory file Header
 const SIG_LFH = 0x04034b50; // Local File Header
 
 // Zip-bomb guard (mirrors Workbooks.Bundle on the host): a few-KB base64 zip can
-// inflate to gigabytes and OOM the browser tab. We bound the TOTAL decompressed
-// size and each entry's expansion RATIO, checked from the central directory's
-// declared sizes BEFORE inflating — and re-checked against the running total as we
-// inflate, so a lying header still can't run away. Match the host caps.
-const MAX_TOTAL_BYTES = 512 * 1024 * 1024;
+// inflate to gigabytes and OOM the browser tab. The cap is enforced on ACTUAL
+// output bytes — we stream-inflate each entry and abort the moment the running
+// total exceeds the budget. The central directory's DECLARED sizes are never
+// trusted for the stop decision (they're attacker-controlled), so neither a lying
+// header nor N tiny-declared entries can run output past the cap.
+const MAX_TOTAL_BYTES = 512 * 1024 * 1024; // total ACTUAL inflated, across all entries
+const MAX_ENTRY_BYTES = 256 * 1024 * 1024; // per-entry ACTUAL inflated
 const MAX_RATIO = 200;
 
 // base64 → Uint8Array, browser-native (atob); no escaping needed (base64 excludes '<').
@@ -31,17 +33,43 @@ export function b64ToBytes(b64) {
   return out;
 }
 
-// Inflate one raw-deflate (method 8) or stored (method 0) slice → Uint8Array.
-async function inflate(bytes, method) {
-  if (method === 0) return bytes; // stored
+// Inflate one raw-deflate (method 8) or stored (method 0) slice → Uint8Array,
+// capped at `budget` ACTUAL output bytes. We read the DecompressionStream chunk
+// by chunk and ABORT the moment the running output exceeds the budget — so a
+// lying central directory (declared size != actual) can NEVER materialize past
+// the cap (the host enforces the same on actual output, not declared sizes).
+async function inflate(bytes, method, budget) {
+  if (method === 0) {
+    if (bytes.length > budget) throw new Error("wb-bundle: stored entry exceeds budget (zip-bomb guard)");
+    return bytes; // stored
+  }
   if (method !== 8) throw new Error(`wb-bundle: unsupported zip method ${method}`);
-  const stream = new Response(bytes).body.pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = new Response(bytes).body
+    .pipeThrough(new DecompressionStream("deflate-raw"))
+    .getReader();
+  const chunks = [];
+  let len = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    len += value.length;
+    if (len > budget) {
+      await reader.cancel().catch(() => {});
+      throw new Error("wb-bundle: entry inflated past the cap (zip-bomb guard)");
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
 }
 
 // Parse the zip + inflate every entry → Map<path, Uint8Array>. Walks the central
 // directory (authoritative), then seeks each Local File Header for the data offset.
-export async function parseZip(buf) {
+export async function parseZip(buf, opts = {}) {
+  const maxTotal = opts.maxTotalBytes ?? MAX_TOTAL_BYTES;
+  const maxEntry = opts.maxEntryBytes ?? MAX_ENTRY_BYTES;
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const u32 = (o) => dv.getUint32(o, true);
   const u16 = (o) => dv.getUint16(o, true);
@@ -59,25 +87,17 @@ export async function parseZip(buf) {
 
   // (2) walk the central directory entries.
   const vfs = new Map();
-  let total = 0;
+  let actualTotal = 0; // running ACTUAL inflated bytes — the real cap (declared
+                       // sizes are attacker-controlled and are NOT trusted for it).
   for (let e = 0; e < count; e++) {
     if (u32(off) !== SIG_CDH) throw new Error("wb-bundle: bad central-dir entry");
     const method = u16(off + 10);
     const compSize = u32(off + 20);
-    const uncompSize = u32(off + 24);
     const nameLen = u16(off + 28);
     const extraLen = u16(off + 30);
     const commentLen = u16(off + 32);
     const lho = u32(off + 42); // local-header offset
     const name = new TextDecoder().decode(buf.subarray(off + 46, off + 46 + nameLen));
-
-    // zip-bomb guard (declared sizes): refuse a high-ratio entry or an over-budget
-    // total BEFORE inflating, so a malicious tiny payload never expands to GBs.
-    if (compSize > 0 && uncompSize > compSize * MAX_RATIO)
-      throw new Error(`wb-bundle: entry ${name} exceeds ${MAX_RATIO}× expansion (zip-bomb guard)`);
-    total += uncompSize;
-    if (total > MAX_TOTAL_BYTES)
-      throw new Error(`wb-bundle: archive exceeds ${MAX_TOTAL_BYTES}B uncompressed (zip-bomb guard)`);
 
     // (3) seek the Local File Header to find the actual data start (its own
     // name/extra lengths may differ from the central dir's).
@@ -88,10 +108,13 @@ export async function parseZip(buf) {
     const slice = buf.subarray(dataStart, dataStart + compSize);
 
     if (!name.endsWith("/")) {
-      const inflated = await inflate(slice, method); // skip dir entries
-      // Re-check against the ACTUAL inflated size: a lying header can't run away.
-      if (inflated.length > uncompSize + 64 && inflated.length > compSize * MAX_RATIO)
-        throw new Error(`wb-bundle: entry ${name} inflated past its declared size (zip-bomb guard)`);
+      // Budget = the smaller of the per-entry cap and the REMAINING global budget,
+      // computed from ACTUAL bytes inflated so far. inflate() aborts mid-stream the
+      // moment output exceeds it — so neither a single bomb nor N tiny-declared
+      // entries can run total actual output past MAX_TOTAL_BYTES.
+      const budget = Math.min(maxEntry, maxTotal - actualTotal);
+      const inflated = await inflate(slice, method, budget); // skip dir entries
+      actualTotal += inflated.length;
       vfs.set(name, inflated);
     }
     off += 46 + nameLen + extraLen + commentLen;

@@ -30,7 +30,10 @@ function makeZip(entries) {
     lfh.setUint16(8, method, true);
     lfh.setUint32(14, crc, true);
     lfh.setUint32(18, comp.length, true);
-    lfh.setUint32(22, raw.length, true);
+    // e.declUncomp lets a test LIE about the declared uncompressed size (attacker
+    // forging the header). The loader must ignore it and cap on ACTUAL output.
+    const declUncomp = e.declUncomp ?? raw.length;
+    lfh.setUint32(22, declUncomp, true);
     lfh.setUint16(26, nameB.length, true);
     locals.push(new Uint8Array(lfh.buffer), nameB, comp);
 
@@ -39,7 +42,7 @@ function makeZip(entries) {
     cdh.setUint16(10, method, true);
     cdh.setUint32(16, crc, true);
     cdh.setUint32(20, comp.length, true);
-    cdh.setUint32(24, raw.length, true);
+    cdh.setUint32(24, declUncomp, true);
     cdh.setUint16(28, nameB.length, true);
     cdh.setUint32(42, offset, true);
     centrals.push(new Uint8Array(cdh.buffer), nameB);
@@ -86,8 +89,31 @@ test("parseZip rejects a non-zip buffer", async () => {
   await assert.rejects(() => parseZip(enc.encode("not a zip at all")), /no EOCD/);
 });
 
-test("parseZip rejects a zip-bomb (high expansion ratio) before inflating", async () => {
-  // A 4 MB run of zeros deflates to ~KB → expansion ratio far past the 200× cap.
-  const bomb = makeZip([{ name: "bomb", data: new Uint8Array(4 * 1024 * 1024) }]);
-  await assert.rejects(() => parseZip(bomb), /zip-bomb guard/);
+test("parseZip caps on ACTUAL output — a LYING declared size can't run away", async () => {
+  // The review's exact PoC: declare uncomp=1 byte but actually inflate to 1 MB.
+  // The host fix measures actual output; the loader must too. With a 64 KB cap it
+  // aborts mid-stream regardless of the (forged) declared size.
+  const bomb = makeZip([{ name: "bomb", data: new Uint8Array(1024 * 1024), declUncomp: 1 }]);
+  await assert.rejects(
+    () => parseZip(bomb, { maxTotalBytes: 64 * 1024, maxEntryBytes: 64 * 1024 }),
+    /zip-bomb guard|inflated past the cap/,
+  );
+});
+
+test("parseZip caps the RUNNING total across many tiny-declared entries (N-entry bomb)", async () => {
+  // 8 entries, each declaring uncomp=1 (declared total = 8 bytes) but each actually
+  // ~256 KB → 2 MB real. A 512 KB total cap must abort before materializing it all,
+  // proving the running cap is on ACTUAL bytes, not the declared sum.
+  const entries = Array.from({ length: 8 }, (_, i) => ({
+    name: `e${i}.bin`, data: new Uint8Array(256 * 1024), declUncomp: 1,
+  }));
+  await assert.rejects(
+    () => parseZip(makeZip(entries), { maxTotalBytes: 512 * 1024, maxEntryBytes: 512 * 1024 }),
+    /zip-bomb guard|inflated past the cap/,
+  );
+});
+
+test("parseZip allows an honest entry under the cap (no false positive)", async () => {
+  const vfs = await parseZip(makeZip([{ name: "ok.bin", data: new Uint8Array(100 * 1024) }]));
+  assert.equal(vfs.get("ok.bin").length, 100 * 1024);
 });

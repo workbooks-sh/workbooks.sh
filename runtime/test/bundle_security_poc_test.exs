@@ -198,6 +198,25 @@ defmodule Workbooks.BundleSecurityPocTest do
       end
     end
 
+    test "the BROADENED ingress class is refused: CI dirs + top-level dotfiles", %{base: base} do
+      dst = Path.join(base, "dst")
+
+      # nested CI/VCS-hook dirs (code-exec on the next push/git op) + any TOP-LEVEL
+      # dotfile/dir (the .env/.npmrc/.ssh/.gitlab-ci.yml secret+exec class, one rule).
+      refused = ~w(
+        .github/workflows/deploy.yml .githooks/pre-push .hg/hgrc .svn/x
+        .envrc .env .npmrc .gitlab-ci.yml .ssh/id_rsa .vscode/tasks.json
+      )
+
+      for path <- refused do
+        assert_raise ArgumentError, ~r/control-dir/, fn ->
+          Bundle.write_tree(%{path => "x"}, dst)
+        end
+
+        refute File.exists?(Path.join(dst, path)), "#{path} must NOT be written"
+      end
+    end
+
     test "an honest tree still writes through write_tree", %{base: base} do
       dst = Path.join(base, "dst")
       n = Bundle.write_tree(%{"index.html" => "<html></html>", "src/app.js" => "1"}, dst)

@@ -33,7 +33,8 @@ defmodule Workbooks.Bundle do
 
   # VCS/private/build control-dir segments stripped on egress (`read_tree`) AND
   # refused on ingress (`write_tree` via `denied_member?`) — one shared denylist.
-  @strip_segments [".git", ".beads", "node_modules", "_build", ".tmp", ".private"]
+  @strip_segments [".git", ".github", ".githooks", ".hg", ".svn", ".beads",
+                   "node_modules", "_build", ".tmp", ".private"]
 
   defp max_total_bytes, do: Application.get_env(:workbooks, :bundle_max_total_bytes, @default_max_total_bytes)
   defp max_entry_bytes, do: Application.get_env(:workbooks, :bundle_max_entry_bytes, @default_max_entry_bytes)
@@ -280,7 +281,13 @@ defmodule Workbooks.Bundle do
   # denylist with `read_tree` (`@strip_segments`), so egress and ingress agree.
   defp denied_member?(name) do
     parts = name |> String.replace("\\", "/") |> Path.split()
-    Enum.any?(@strip_segments, &(&1 in parts))
+    # (1) a denylisted control dir at ANY segment (nested .git/hooks, .github/workflows…);
+    # (2) any TOP-LEVEL dotfile/dir — one rule that covers the whole ingress code-exec /
+    #     secret class (.env, .envrc, .npmrc, .ssh, .vscode, .gitlab-ci.yml, …) without a
+    #     whack-a-mole list. A bundle writing a top-level dotfile into the target tree is
+    #     never legitimate enough to be worth the code-exec risk when that tree is a repo.
+    Enum.any?(@strip_segments, &(&1 in parts)) or
+      String.starts_with?(List.first(parts) || "", ".")
   end
 
   @doc """

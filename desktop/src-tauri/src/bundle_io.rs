@@ -19,11 +19,26 @@ const B64: base64::engine::general_purpose::GeneralPurpose = base64::engine::gen
 
 // VCS internals + per-session private state never belong in a portable tree —
 // the SAME strip set as `Workbooks.Bundle.read_tree` (host/bundle.ex).
-const STRIP: &[&str] = &[".git", ".beads", "node_modules", "_build", ".tmp", ".private"];
+const STRIP: &[&str] = &[
+    ".git", ".github", ".githooks", ".hg", ".svn", ".beads",
+    "node_modules", "_build", ".tmp", ".private",
+];
 
 fn stripped(rel: &Path) -> bool {
     rel.components()
         .any(|c| STRIP.contains(&c.as_os_str().to_string_lossy().as_ref()))
+}
+
+/// Refuse a member on WRITE (ingress): a denylisted control dir at any segment,
+/// OR any TOP-LEVEL dotfile/dir — one rule covering the whole ingress code-exec /
+/// secret class (.env, .envrc, .npmrc, .ssh, .vscode, .gitlab-ci.yml, .github, .git…)
+/// without a whack-a-mole list. Mirrors `Workbooks.Bundle.denied_member?` so the
+/// desktop write path is as guarded as the host's (a hostile unbundle can't plant a
+/// `.git/hooks/pre-commit` or `.github/workflows/*.yml` that runs on the next git/CI op).
+fn denied_write(rel: &Path) -> bool {
+    stripped(rel)
+        || matches!(rel.components().next(),
+            Some(c) if c.as_os_str().to_string_lossy().starts_with('.'))
 }
 
 /// Walk `dir` into a parts map `{ "rel/path" => base64(bytes) }`, forward-slash
@@ -71,6 +86,12 @@ pub fn bundle_write_tree(files: BTreeMap<String, String>, dir: String) -> Result
         let rel = Path::new(name);
         if name.is_empty() || rel.is_absolute() || rel.components().any(|c| c.as_os_str() == "..") {
             return Err(format!("unsafe bundle path: {name}"));
+        }
+        // Confinement (..\/absolute) is not enough: a confined-but-hostile member like
+        // `.git/hooks/pre-commit` or `.github/workflows/x.yml` is code-exec on the next
+        // git/CI op. Refuse the control-dir + top-level-dotfile class, mirroring the host.
+        if denied_write(rel) {
+            return Err(format!("refused control-dir bundle path: {name}"));
         }
         let dest = root.join(rel);
         // Confinement check on the cleaned join: the dest must stay under root.
