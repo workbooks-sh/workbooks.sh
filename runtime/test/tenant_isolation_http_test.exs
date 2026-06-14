@@ -27,6 +27,19 @@ defmodule Workbooks.TenantIsolationHttpTest do
     Workbooks.Web.call(c, Workbooks.Web.init([]))
   end
 
+  test "DESKTOP INVARIANT: the single 'local' tenant sees its own + pre-scoping (nil) data" do
+    # The desktop authenticates as a stable tenant "local" (Desktop.tenant/0).
+    # Tenant-scoping must NOT hide its data: it sees rows it owns AND legacy rows
+    # written before scoping existed (tenant == nil). This guards against anyone
+    # later dropping the grandfather rule, which would silently empty the desktop.
+    SessionLedger.record("desk-own", "waldo", "mine", "/wd", "local")
+    SessionLedger.record("desk-legacy", "waldo", "old", "/wd", nil)
+
+    ids = Jason.decode!(req(:get, "/api/sessions", "local").resp_body)["sessions"] |> Enum.map(& &1["session_id"])
+    assert "desk-own" in ids, "desktop must see its own sessions"
+    assert "desk-legacy" in ids, "desktop must still see pre-scoping (nil-tenant) sessions"
+  end
+
   test "GET /api/sessions is tenant-scoped at the wire" do
     SessionLedger.record("isol-a", "waldo", "alice work", "/wd", "isol-alice")
     SessionLedger.record("isol-b", "waldo", "bob work", "/wd", "isol-bob")
