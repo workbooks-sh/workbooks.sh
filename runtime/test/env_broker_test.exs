@@ -70,4 +70,43 @@ defmodule Workbooks.EnvBrokerTest do
   test "fulfill for an unknown request_id is a no-op error" do
     assert EnvBroker.fulfill("does-not-exist", "v") == :error
   end
+
+  test "a prompt is pushed ONLY to the requesting tenant's socket (wb-g1yo)" do
+    test_pid = self()
+
+    # bob's desktop socket lives in a separate process; it reports any push.
+    bob =
+      spawn(fn ->
+        EnvBroker.register_socket("jr-bob", "bob")
+        send(test_pid, :bob_ready)
+
+        receive do
+          {:channel_push, _, _, "env_prompt", _} -> send(test_pid, :bob_got_push)
+        after
+          1_200 -> send(test_pid, :bob_no_push)
+        end
+      end)
+
+    assert_receive :bob_ready, 1_000
+
+    # alice's socket = this test process.
+    EnvBroker.register_socket("jr-alice", "alice")
+    task = Task.async(fn -> EnvBroker.request("OPENAI_KEY", "to call", 1_500, "alice") end)
+
+    # alice gets the prompt...
+    request_id =
+      receive do
+        {:channel_push, "jr-alice", _, "env_prompt", p} -> p["request_id"]
+      after
+        1_000 -> flunk("alice's socket didn't receive the prompt")
+      end
+
+    # ...bob does NOT (cross-tenant prompt leak closed).
+    assert_receive :bob_no_push, 2_000
+    refute_received :bob_got_push
+
+    EnvBroker.fulfill(request_id, "sk-x")
+    assert Task.await(task, 2_000) == {:ok, "sk-x"}
+    Process.exit(bob, :kill)
+  end
 end

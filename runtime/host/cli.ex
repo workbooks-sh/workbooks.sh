@@ -195,10 +195,10 @@ defmodule Workbooks.CLI do
   # user for a key/value (wb-kbq5.2). Blocks until they answer. On success the
   # value is stored in the runtime secret store (by reference) and the agent gets
   # a confirmation — never the raw value (secrets-by-reference).
-  def call(["env", "request", name | rest], _t) do
+  def call(["env", "request", name | rest], t) do
     reason = if rest == [], do: nil, else: Enum.join(rest, " ")
 
-    case Workbooks.EnvBroker.request(name, reason) do
+    case Workbooks.EnvBroker.request(name, reason, 120_000, t) do
       {:ok, value} ->
         Workbooks.Secrets.put(name, value)
         "provided — #{name} is now set (#{byte_size(value)} bytes), usable by reference"
@@ -235,10 +235,10 @@ defmodule Workbooks.CLI do
 
   # `wb workgate request CAP [reason…]` — ask the user to Allow/Deny an OS
   # capability (wb-kbq5.3). Blocks. Returns the decision.
-  def call(["workgate", "request", cap | rest], _t) do
+  def call(["workgate", "request", cap | rest], t) do
     reason = if rest == [], do: nil, else: Enum.join(rest, " ")
 
-    case Workbooks.WorkgateBroker.request(cap, reason) do
+    case Workbooks.WorkgateBroker.request(cap, reason, 120_000, t) do
       :allow -> "allowed: #{cap}"
       :deny -> "denied: #{cap}"
       {:error, :no_desktop} -> "(no desktop shell connected to prompt for #{cap})"

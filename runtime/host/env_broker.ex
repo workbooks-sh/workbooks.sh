@@ -24,28 +24,35 @@ defmodule Workbooks.EnvBroker do
     ]
   end
 
-  @doc "A connected shell joined engine:env_prompt — remember it for fan-out."
-  def register_socket(join_ref) do
+  @doc "A connected shell joined engine:env_prompt — remember it (with its tenant) for fan-out."
+  def register_socket(join_ref, tenant \\ nil) do
     Registry.unregister(@sockets, :shells)
-    Registry.register(@sockets, :shells, join_ref)
+    Registry.register(@sockets, :shells, {tenant, join_ref})
   end
 
-  @doc "Is any desktop shell able to surface a prompt right now?"
-  def desktop_subscribed? do
-    Registry.lookup(@sockets, :shells) != []
+  @doc "Is a desktop shell for `tenant` able to surface a prompt right now? (nil = any)"
+  def desktop_subscribed?(tenant \\ nil) do
+    Registry.lookup(@sockets, :shells)
+    |> Enum.any?(fn {_pid, {st, _jr}} -> tenant_visible?(st, tenant) end)
   rescue
     _ -> false
   end
 
+  # Tenant scoping (wb-g1yo): a prompt is pushed to a socket only if their tenants
+  # match; a nil on either side (dev/single-tenant/legacy socket) is grandfathered.
+  defp tenant_visible?(socket_tenant, req_tenant),
+    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
+
   @doc """
-  Ask the user for `name` (with optional `reason`) and BLOCK until they answer
-  or `timeout`. Returns {:ok, value} | {:error, :no_desktop | :timeout}.
+  Ask `tenant`'s user for `name` (with optional `reason`) and BLOCK until they
+  answer or `timeout`. Returns {:ok, value} | {:error, :no_desktop | :timeout}.
+  The prompt is pushed ONLY to that tenant's connected shell(s).
   """
-  def request(name, reason \\ nil, timeout \\ 120_000) do
-    if desktop_subscribed?() do
+  def request(name, reason \\ nil, timeout \\ 120_000, tenant \\ nil) do
+    if desktop_subscribed?(tenant) do
       request_id = "env-#{System.unique_integer([:positive])}"
       Registry.register(@pending, request_id, nil)
-      push_prompt(request_id, name, reason)
+      push_prompt(request_id, name, reason, tenant)
 
       receive do
         {:env_fulfilled, ^request_id, value} ->
@@ -78,11 +85,11 @@ defmodule Workbooks.EnvBroker do
     end
   end
 
-  defp push_prompt(request_id, name, reason) do
+  defp push_prompt(request_id, name, reason, tenant) do
     payload = %{"request_id" => request_id, "name" => name, "reason" => reason}
 
     Registry.dispatch(@sockets, :shells, fn entries ->
-      for {pid, join_ref} <- entries do
+      for {pid, {sock_tenant, join_ref}} <- entries, tenant_visible?(sock_tenant, tenant) do
         send(pid, {:channel_push, join_ref, @topic, "env_prompt", payload})
       end
     end)

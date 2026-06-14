@@ -123,11 +123,13 @@ defmodule Workbooks.PhoenixSocket do
         state
 
       topic == "engine:env_prompt" ->
-        Workbooks.EnvBroker.register_socket(join_ref)
+        # Tag the socket with its tenant (wb-g1yo) so prompts fan out only to the
+        # requesting tenant's shell, not every connected desktop.
+        Workbooks.EnvBroker.register_socket(join_ref, state[:tenant])
         state
 
       topic == "workgate:control" ->
-        Workbooks.WorkgateBroker.register_socket(join_ref)
+        Workbooks.WorkgateBroker.register_socket(join_ref, state[:tenant])
         state
 
       topic == "runtime:telemetry" ->

@@ -23,24 +23,30 @@ defmodule Workbooks.WorkgateBroker do
     ]
   end
 
-  def register_socket(join_ref) do
+  def register_socket(join_ref, tenant \\ nil) do
     Registry.unregister(@sockets, :shells)
-    Registry.register(@sockets, :shells, join_ref)
+    Registry.register(@sockets, :shells, {tenant, join_ref})
   end
 
-  def desktop_subscribed? do
-    Registry.lookup(@sockets, :shells) != []
+  def desktop_subscribed?(tenant \\ nil) do
+    Registry.lookup(@sockets, :shells)
+    |> Enum.any?(fn {_pid, {st, _jr}} -> tenant_visible?(st, tenant) end)
   rescue
     _ -> false
   end
 
-  @doc "Ask the user to Allow/Deny `capability`. Blocks. Returns :allow | :deny | {:error, reason}."
-  def request(capability, reason \\ nil, timeout \\ 120_000) do
-    if desktop_subscribed?() do
+  # Tenant scoping (wb-g1yo): a capability prompt reaches a socket only if their
+  # tenants match; a nil on either side (dev/single-tenant/legacy) is grandfathered.
+  defp tenant_visible?(socket_tenant, req_tenant),
+    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
+
+  @doc "Ask `tenant`'s user to Allow/Deny `capability`. Blocks. Returns :allow | :deny | {:error, reason}."
+  def request(capability, reason \\ nil, timeout \\ 120_000, tenant \\ nil) do
+    if desktop_subscribed?(tenant) do
       request_id = "wg-#{System.unique_integer([:positive])}"
       Registry.register(@pending, request_id, nil)
 
-      push_request(request_id, capability, reason)
+      push_request(request_id, capability, reason, tenant)
 
       receive do
         {:workgate_permit, ^request_id, decision} ->
@@ -66,7 +72,7 @@ defmodule Workbooks.WorkgateBroker do
     end
   end
 
-  defp push_request(request_id, capability, reason) do
+  defp push_request(request_id, capability, reason, tenant) do
     payload = %{
       "request_id" => request_id,
       "capability" => capability,
@@ -75,7 +81,7 @@ defmodule Workbooks.WorkgateBroker do
     }
 
     Registry.dispatch(@sockets, :shells, fn entries ->
-      for {pid, join_ref} <- entries do
+      for {pid, {sock_tenant, join_ref}} <- entries, tenant_visible?(sock_tenant, tenant) do
         send(pid, {:channel_push, join_ref, @topic, "workgate_request", payload})
       end
     end)
