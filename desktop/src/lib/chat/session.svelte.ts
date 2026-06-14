@@ -181,6 +181,15 @@ class ChatSessionStore {
           blocks.push(msg);
           break;
         }
+        case "llm_delta": {
+          // Streamed token chunk — append to the in-progress assistant message
+          // so the reply renders as it generates. The authoritative full text
+          // arrives at llm_turn_stop and reconciles (replaces) the accumulation.
+          const target = findLastMessage(blocks, (m) => m.pending);
+          const chunk = (metadata?.content as string | undefined) ?? "";
+          if (target && chunk) target.text += chunk;
+          break;
+        }
         case "llm_turn_stop": {
           // Match the most-recent pending assistant message; finalize it.
           const target = findLastMessage(blocks, (m) => m.pending);
