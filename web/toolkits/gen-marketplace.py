@@ -308,7 +308,7 @@ def head(title, desc, canonical, extra=""):
 </head>"""
 
 
-NAV = '<div id="site-nav"></div><script src="/nav.js?v=13"></script>'
+NAV = '<div id="site-nav"></div><script src="/nav.js?v=15"></script>'
 
 BASE_CSS = """
 @font-face{ font-family:"Groothan"; src:url("/fonts/GroothanMixed-Regular.woff2") format("woff2"),

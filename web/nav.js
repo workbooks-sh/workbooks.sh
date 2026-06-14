@@ -221,7 +221,7 @@
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
     '<div class="drop"><a href="' + root + 'learn/index.html">Learn</a><div class="panel">' + learnCol + '</div></div>' +
     '<div class="drop"><a href="' + DOCS + '">Docs</a><div class="panel docs">' + docsGrid + '</div></div>' +
-    '<a class="lnk toolkits" href="' + DOCS + 'toolkits/index">Toolkits</a>' +
+    '<a class="lnk toolkits" href="' + root + 'toolkits/">Toolkits</a>' +
     '<a class="lnk" href="' + root + 'blog">Blog</a>' +
     '<button class="srch" aria-label="Search"><span class="i" aria-hidden="true">' + SEARCH + '</span><span class="srch-label" style="display:none">Search</span></button>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +

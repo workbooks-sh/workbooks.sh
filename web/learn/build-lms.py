@@ -384,9 +384,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .deeper .dh{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
 .deeper p{ font-size:17px; line-height:1.55; margin:8px 0 15px; color:var(--prose); }
 .deeper .links{ display:flex; flex-direction:column; gap:8px; }
-.deeper a.dl{ display:flex; align-items:center; gap:11px; padding:11px 13px; border:1.5px solid var(--line); border-radius:10px; }
-.deeper a.dl:hover{ border-color:var(--ink); background:var(--hover-soft); }
-.deeper a.dl b{ font:700 13px var(--mono); } .deeper a.dl span{ font-size:11px; color:var(--dim); margin-left:auto; }
+.deeper a.ddl{ display:flex; align-items:center; gap:11px; padding:11px 13px; border:1.5px solid var(--line); border-radius:10px; }
+.deeper a.ddl:hover{ border-color:var(--ink); background:var(--hover-soft); }
+.deeper a.ddl b{ font:700 13px var(--mono); } .deeper a.ddl span{ font-size:11px; color:var(--dim); margin-left:auto; }
 .soon-pane{ margin-top:40px; }
 .soon-pane .badge{ display:inline-block; font:700 10px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--dim); border:2px dashed var(--dash); border-radius:999px; padding:8px 15px; }
 .soon-pane p{ font-size:20px; line-height:1.6; margin:22px 0; color:var(--prose); }
@@ -743,7 +743,7 @@ def topbar(label):
 
 def deeper_box(docs):
     if not docs: return ""
-    links = "".join('<a class="dl" href="/learn/%s"><b>%s</b><span>the deep doc</span></a>'
+    links = "".join('<a class="ddl" href="/learn/%s"><b>%s</b><span>the deep doc</span></a>'
                     % (esc(s), esc(doc_title.get(s, s))) for s in docs)
     return ('<div class="deeper"><div class="dh">Go deeper — the technical docs</div>'
             '<p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p>'
