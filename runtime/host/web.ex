@@ -346,6 +346,29 @@ defmodule Workbooks.Web do
     end
   end
 
+  # Kanban card mutation (wb-kbq5): PATCH a headline by ID in its org file. Body
+  # {path, op, ...args}; op ∈ transition_todo | set_property | append_logbook.
+  patch "/api/oql/headline/:id" do
+    {:ok, body, conn} = read_body(conn)
+    params = Jason.decode!(body)
+    id = conn.params["id"]
+    path = params["path"]
+    op = params["op"]
+    args = Map.drop(params, ["path", "op"])
+
+    result =
+      with {:ok, org} <- read_workspace_org(path),
+           {:ok, new_org} <- Workbooks.OrgEdit.patch(org, id, op, args),
+           :ok <- File.write(Path.expand(path), new_org) do
+        {200, %{ok: true}}
+      else
+        {:error, reason} -> {422, %{error: inspect(reason)}}
+      end
+
+    {status, payload} = result
+    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
+  end
+
   get "/api/oql/board-views" do
     conn = fetch_query_params(conn)
 
