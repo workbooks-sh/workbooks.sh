@@ -24,6 +24,9 @@ defmodule Workbooks.Application do
         # Runtime → desktop control bus: connected shells register here so an
         # agent's `wb desktop …` call can push tab/theme/key events to them.
         Workbooks.DesktopControl,
+        # Agent→user env-var/key prompts over engine:env_prompt (two registries).
+        Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.EnvBroker.Sockets}, id: :env_broker_sockets),
+        Supervisor.child_spec({Registry, keys: :unique, name: Workbooks.EnvBroker.Pending}, id: :env_broker_pending),
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,

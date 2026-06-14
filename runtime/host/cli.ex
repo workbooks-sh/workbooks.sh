@@ -146,6 +146,26 @@ defmodule Workbooks.CLI do
   def call(["app" | _], _t),
     do: "usage: wb app <status | open-tab PATH | close-tab PATH | focus-tab PATH>"
 
+  # `wb env request NAME [reason…]` — ask the connected desktop to prompt the
+  # user for a key/value (wb-kbq5.2). Blocks until they answer. On success the
+  # value is stored in the runtime secret store (by reference) and the agent gets
+  # a confirmation — never the raw value (secrets-by-reference).
+  def call(["env", "request", name | rest], _t) do
+    reason = if rest == [], do: nil, else: Enum.join(rest, " ")
+
+    case Workbooks.EnvBroker.request(name, reason) do
+      {:ok, value} ->
+        Workbooks.Secrets.put(name, value)
+        "provided — #{name} is now set (#{byte_size(value)} bytes), usable by reference"
+
+      {:error, :no_desktop} -> "(no desktop shell connected to prompt — ask the user to add #{name} in Settings)"
+      {:error, :timeout} -> "(timed out waiting for the user to provide #{name})"
+      {:error, :cancelled} -> "(user declined to provide #{name})"
+    end
+  end
+
+  def call(["env" | _], _t), do: "usage: wb env request NAME [reason]"
+
   # "Memory" is removed by design: the org/code files ARE the context. Recall =
   # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
   # org file. No separate store to drift. See docs/VECTOR-QUERY.org.

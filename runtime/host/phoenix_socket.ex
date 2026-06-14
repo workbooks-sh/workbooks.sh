@@ -35,8 +35,8 @@ defmodule Workbooks.PhoenixSocket do
   @impl true
   def handle_in({text, [opcode: :text]}, state) do
     case Jason.decode(text) do
-      {:ok, [join_ref, ref, topic, event, _payload]} ->
-        {:push, {:text, ack(join_ref, ref, topic)}, maybe_track(event, topic, join_ref, state)}
+      {:ok, [join_ref, ref, topic, event, payload]} ->
+        {:push, {:text, ack(join_ref, ref, topic)}, maybe_track(event, topic, join_ref, payload, state)}
 
       _ ->
         {:ok, state}
@@ -103,12 +103,16 @@ defmodule Workbooks.PhoenixSocket do
   # right channel instance. (Inbound leaves drop it.) For desktop:control we also
   # register in the DesktopControl registry — that's how an agent's `wb desktop`
   # push finds this connected shell.
-  defp maybe_track("phx_join", topic, join_ref, state) do
+  defp maybe_track("phx_join", topic, join_ref, _payload, state) do
     state = track_topic(state, topic, join_ref)
 
     cond do
       topic == "desktop:control" ->
         Workbooks.DesktopControl.register(join_ref)
+        state
+
+      topic == "engine:env_prompt" ->
+        Workbooks.EnvBroker.register_socket(join_ref)
         state
 
       match?("session:" <> _, topic) ->
@@ -119,17 +123,29 @@ defmodule Workbooks.PhoenixSocket do
     end
   end
 
-  defp maybe_track("phx_leave", topic, _join_ref, state) do
+  defp maybe_track("phx_leave", topic, _join_ref, _payload, state) do
     Map.update(state, :topics, %{}, &Map.delete(&1, topic))
   end
 
   # Client→server cancel on a session channel (ws.cancelSession) — stop the run.
-  defp maybe_track("cancel", "session:" <> id, _join_ref, state) do
+  defp maybe_track("cancel", "session:" <> id, _join_ref, _payload, state) do
     Workbooks.AgentSession.cancel(id)
     state
   end
 
-  defp maybe_track(_event, _topic, _join_ref, state), do: state
+  # Client→server env-prompt responses (the modal's Provide / Cancel) — deliver
+  # to the agent blocked in EnvBroker.request/3.
+  defp maybe_track("env:fulfill", "engine:env_prompt", _join_ref, payload, state) do
+    if is_map(payload), do: Workbooks.EnvBroker.fulfill(payload["request_id"], payload["value"])
+    state
+  end
+
+  defp maybe_track("env:cancel", "engine:env_prompt", _join_ref, payload, state) do
+    if is_map(payload), do: Workbooks.EnvBroker.cancel(payload["request_id"])
+    state
+  end
+
+  defp maybe_track(_event, _topic, _join_ref, _payload, state), do: state
 
   # Subscribe this socket to the AgentSession behind a joined session topic so
   # its run events fan out here. The desktop joins right after POSTing /api/run,
