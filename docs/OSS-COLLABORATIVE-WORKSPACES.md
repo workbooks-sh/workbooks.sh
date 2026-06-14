@@ -56,12 +56,11 @@ router in the package so an adopter mounts one plug.
 `Shared folders`, the roles matrix) are the reference front-end — MIT, framework-light,
 copyable.
 
-## Recommended license
+## License — DECIDED: Apache-2.0 (founder, 2026-06-14)
 **Apache-2.0** (matches `josh`/`jj`; patent grant; permissive enough for adoption).
-MIT is the fallback if a patent grant is unwanted. The eventual standalone repo gets
-its own `LICENSE`; **do not** add a root `LICENSE` to THIS repo — that would license
-the commercial runtime too. The package's `NOTICE` should credit josh/jj as design
-prior art.
+The eventual standalone repo gets its own `LICENSE`; **do not** add a root `LICENSE`
+to THIS repo — that would license the commercial runtime too. The package's `NOTICE`
+should credit josh/jj as design prior art.
 
 ## Extraction plan (when greenlit)
 1. New repo `workbooks-collab` (or a path-dep umbrella app here first).
@@ -76,8 +75,9 @@ prior art.
 6. Publish to Hex (`workbooks_collab`) + npm (the UI kit).
 
 ## Before you publish (irreversible — founder call)
-- Confirm the **license** (Apache-2.0 vs MIT) and the **OSS-vs-commercial line** above.
+- License is decided (**Apache-2.0**). Still to confirm at publish time: the exact
+  **OSS-vs-commercial line** above (which modules ship) and the package/repo name.
 - Audit the extracted code for any platform secret/coupling (there should be none —
   these modules are store + tenant only).
-- A public release cannot be un-published; the name + license are effectively
-  permanent. This doc is the staging ground; nothing here ships until that decision.
+- A public release cannot be un-published; the name is effectively permanent. This
+  doc is the staging ground; nothing here ships until the extraction is executed.

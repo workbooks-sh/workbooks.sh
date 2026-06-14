@@ -5,6 +5,10 @@ defmodule Workbooks.Application do
   @impl true
   def start(_type, _args) do
     trace("begin")
+    # Fail fast (wb-2kt9): a hosted/cloud instance must be locked or multi-tenant —
+    # never the unlocked single-tenant posture that would trust an x-tenant header.
+    Workbooks.Tenancy.assert_safe_posture!()
+    trace("posture ok")
     Workbooks.Auth.Guardian.install_config()
     trace("guardian ok")
     # Trust every git working dir process-wide: the /data volume is owned by the

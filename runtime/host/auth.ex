@@ -141,13 +141,9 @@ defmodule Workbooks.Auth do
 
   # True when a shared-secret lock is in effect (WB_PUBLIC_BEARER is set and
   # non-empty). Cached per-process so the env is read only once per boot.
-  defp locked? do
-    case System.get_env("WB_PUBLIC_BEARER") do
-      nil -> false
-      "" -> false
-      _ -> true
-    end
-  end
+  # One source for the "locked" posture (Workbooks.Tenancy), so Auth and the boot
+  # safety assert can't disagree about whether WB_PUBLIC_BEARER gates the runtime.
+  defp locked?, do: Workbooks.Tenancy.locked?()
 
   defp bearer(conn) do
     case conn |> get_req_header("authorization") |> List.first() do
