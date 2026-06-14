@@ -135,6 +135,14 @@
           "failure_modes": []
         },
         {
+          "name": "AI-over-files (POST /api/library/ask — grounded, cited, honest)",
+          "status": "done",
+          "tests": "library_ask_test",
+          "units": 2,
+          "proof": "searches the tenant's own library (Library.search, auth-tenant) → LLM synthesizes a GROUNDED answer citing files by path; HONEST when nothing matched (no fabricated files/facts). The desktop right-bar 'ai' mode calls it (aiAnswerLive, stub fallback when no nexus). Proven live (empty → honest no-fabricate) + deterministic test. Rich path code-complete (needs indexed content to demo).",
+          "failure_modes": []
+        },
+        {
           "name": "web_search — prefers OpenRouter (reliable), tenant/env override, keyless fallback",
           "status": "done",
           "tests": "web_search_format_test, search_rotation_test",
