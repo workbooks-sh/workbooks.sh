@@ -82,6 +82,14 @@ defmodule Workbooks.Web do
     |> halt()
   end
 
+  # Workspace sync (wb-e95f). The desktop's offline-first registry calls this to
+  # reconcile local workspaces with the engine. This runtime keeps no remote
+  # workspace registry, so it acks (local-first) and the desktop just refreshes
+  # its local store — stops the 404 the bridge otherwise swallowed silently.
+  get "/api/workspaces/sync" do
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, synced: false, workspaces: []}))
+  end
+
   # Web search for the desktop browser's composable-search "Web" provider
   # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
   # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)
