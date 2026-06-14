@@ -426,7 +426,8 @@ defmodule Workbooks.PublicWeb do
     .sidebar-title{font-family:var(--mono);font-size:.86rem;font-weight:600;letter-spacing:.01em;color:var(--ink);text-decoration:none}
     .sidebar-close{display:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:1rem;padding:.2rem;margin-left:auto}
     .nav-body{padding:.5rem .8rem 3rem;flex:1}
-    .nav-label{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);padding:.9rem .55rem .4rem;margin-top:.4rem}
+    .nav-label{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);padding:.9rem .55rem .4rem .8rem;margin-top:.4rem;display:flex;align-items:center;gap:.5rem}
+    .nav-label::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:2px;background:var(--sx,var(--blue-soft))}
     .nav-body ul{list-style:none;margin-bottom:.3rem}
     .nav-body li a{display:block;font-size:.875rem;font-weight:400;color:var(--ink-soft);text-decoration:none;padding:.34rem .55rem;border-radius:7px;transition:color .15s,background .15s,box-shadow .15s;position:relative}
     .nav-body li a:hover{color:var(--ink);background:rgba(231,238,252,.5)}

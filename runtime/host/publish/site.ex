@@ -159,9 +159,20 @@ defmodule Workbooks.Publish.Site do
     site_title = config["PUBLISH_TITLE"] || "Workbooks"
     home = if base == "", do: "/index.html", else: "#{base}/index.html"
 
+    # cycle the 7 brand pastels as a per-section marker colour so the docs
+    # sidebar reads sectioned by colour (tasteful: just the section label marker)
+    pastels = ~w(#a8d4f0 #aee5c2 #f3c5a3 #f2ddb0 #d9c5f0 #f0b8b8 #b8e0e8)
+
     items =
-      Enum.map_join(sections, "\n", fn section ->
-        label = if section.title, do: ~s(<p class="nav-label">#{esc(section.title)}</p>), else: ""
+      sections
+      |> Enum.with_index()
+      |> Enum.map_join("\n", fn {section, si} ->
+        pastel = Enum.at(pastels, rem(si, length(pastels)))
+
+        label =
+          if section.title,
+            do: ~s(<p class="nav-label" style="--sx:#{pastel}">#{esc(section.title)}</p>),
+            else: ""
 
         links =
           Enum.map_join(section.pages, "\n", fn page ->

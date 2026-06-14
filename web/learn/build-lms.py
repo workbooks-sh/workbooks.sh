@@ -46,6 +46,22 @@ QUIZ_JSON = json.dumps(QUIZ_PAYLOAD, ensure_ascii=False, separators=(",", ":")).
 
 def esc(s): return html.escape(s or "")
 
+# Per-unit pastel color map — light pastel (--u) + a deep readable companion (--ud).
+# Adjacent units are visibly different. Deep reads on white; light pastel reads on dark.
+UNIT_COLORS = {
+    1: ("#a8d4f0", "#2f6fa8"),  # blue
+    2: ("#aee5c2", "#2f8f5a"),  # green
+    3: ("#f3c5a3", "#b5662a"),  # orange
+    4: ("#d9c5f0", "#6b4ba8"),  # purple
+    5: ("#b8e0e8", "#2f8290"),  # cyan
+    6: ("#f0b8b8", "#b04a4a"),  # pink
+    7: ("#f2ddb0", "#9a7d1f"),  # amber
+    8: ("#a8d4f0", "#2f6fa8"),  # blue
+    9: ("#d9c5f0", "#6b4ba8"),  # purple
+}
+def unit_color(n):
+    return UNIT_COLORS.get(n, ("#a8d4f0", "#2f6fa8"))
+
 SITE = "https://workbooks.sh"
 PROVIDER = {"@type": "Organization", "name": "Workbooks", "url": SITE}
 
@@ -181,8 +197,9 @@ def sidebar(cur_slug=None):
            '<div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of %d complete</span></div>' % TOTAL,
            '<nav class="curr" id="curr">']
     for u in units:
-        out.append('<div class="umod"><div class="uhd"><span class="un">Unit %d</span>%s</div>'
-                   % (u["n"], esc(u["title"])))
+        ulight, udeep = unit_color(u["n"])
+        out.append('<div class="umod" style="--u:%s;--ud:%s"><div class="uhd"><span class="un">Unit %d</span>%s</div>'
+                   % (ulight, udeep, u["n"], esc(u["title"])))
         for l in u["lessons"]:
             cls = "li" + (" cur" if l["slug"] == cur_slug else "")
             out.append('<a class="%s" data-slug="%s" href="/learn/%s">'
@@ -199,7 +216,7 @@ def sidebar(cur_slug=None):
     return "".join(out)
 
 HEAD = """<!doctype html>
-<html lang="en" style="--pc:#a8d4f0;">
+<html lang="en" style="{htmlstyle}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -247,7 +264,7 @@ CSS = """
 @font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
   url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
 :root{ --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
-  --line:#e7e5db; --pc:#a8d4f0; --stroke:var(--ink); --shadow:var(--ink);
+  --line:#e7e5db; --pc:#a8d4f0; --pcd:#2f6fa8; --stroke:var(--ink); --shadow:var(--ink);
   /* semantic tones derived from the palette so every surface themes from one place */
   --prose:#34372f;        /* warm body/aside grey (light) */
   --prose-strong:#26282b; /* lead / strongest prose grey */
@@ -305,19 +322,25 @@ a{ color:inherit; text-decoration:none; }
 .overview.on{ background:var(--ink); color:var(--paper); }
 .prog{ margin:14px 8px 18px; }
 .prog .bar{ height:7px; border:2px solid var(--stroke); border-radius:999px; overflow:hidden; background:var(--well); }
-.prog .bar i{ display:block; height:100%; width:0; background:var(--bloom); transition:width .3s; }
+/* progress bar — pastel rainbow of the 7 brand pastels */
+.prog .bar i{ display:block; height:100%; width:0; transition:width .3s;
+  background:linear-gradient(90deg,#a8d4f0,#aee5c2,#f3c5a3,#f2ddb0,#d9c5f0,#f0b8b8,#b8e0e8); }
 .prog span{ display:block; margin-top:7px; font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.umod{ margin-bottom:13px; }
-.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 6px; font:700 12px var(--mono); }
+/* per-unit colour: deep companion reads on white, light pastel reads on dark */
+.umod{ margin-bottom:13px; --utext:var(--ud); }
+[data-theme="dark"] .umod{ --utext:var(--u); }
+.uhd{ display:flex; align-items:baseline; gap:8px; padding:8px 8px 6px; font:700 12px var(--mono); color:var(--utext); }
 .uhd .un{ font-size:8.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
 .li{ display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:8px; font-size:14.5px; line-height:1.3; color:var(--li-ink); }
 .li:hover{ background:var(--hover); }
 .li .dot{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; border:2px solid var(--dim); border-radius:50%; position:relative; }
-.li.done .dot{ background:var(--bloom); border-color:var(--bloomd); }
+/* done checks take the SECTION colour, not green */
+.li.done .dot{ background:var(--u); border-color:var(--u); }
 .li.done .dot::after{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--stroke); border-width:0 2px 2px 0; transform:rotate(45deg); }
-.li.cur{ background:var(--pc); }
-.li.cur .dot{ border-color:var(--ink); }
-.li.cur .dot::after{ content:""; position:absolute; inset:2px; background:var(--ink); border-radius:50%; }
+/* current row: faint section-tint wash + section edge — works in BOTH themes */
+.li.cur{ background:color-mix(in srgb,var(--u) 16%,transparent); box-shadow:inset 2px 0 0 var(--u); }
+.li.cur .dot{ border-color:var(--u); }
+.li.cur .dot::after{ content:""; position:absolute; inset:2px; background:var(--u); border-radius:50%; }
 .li.cur .t{ font-weight:600; color:var(--ink); }
 
 /* ════ SPLASH — welcome to a living internet + what you'll be able to do + one CTA ════ */
@@ -369,7 +392,7 @@ a{ color:inherit; text-decoration:none; }
 /* ════ LESSON PLAYER — three panes ════ */
 .pane{ display:grid; grid-template-columns:minmax(0,1fr) 326px; gap:0; }
 .reading{ min-width:0; max-width:760px; margin:0 auto; padding:60px 56px 80px; justify-self:center; width:100%; }
-.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--bloomd); }
+.crumb{ font:700 11px var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--pcd); }
 .reading h1{ font-family:var(--read); font-weight:600; font-size:clamp(34px,4vw,52px); line-height:1.08; margin:15px 0 0; letter-spacing:-.012em; }
 .promise{ font-size:clamp(19px,2.2vw,23px); line-height:1.5; color:var(--prose); margin:18px 0 0; font-style:italic; }
 article{ margin-top:40px; }
@@ -416,13 +439,14 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .vplayer .vbar i{ display:block; height:100%; width:0; background:var(--pc); }
 .rail .vwrap{ margin:16px 0 0; }
 .rail .vwrap .vlab{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:0 0 8px; }
+/* big CTA — light-pastel unit fill + dark ink reads in BOTH themes */
 .rail .cont{ margin:18px 0 0; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:9px;
-  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); background:var(--pc);
+  font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:#10120f; background:var(--pc);
   border:2px solid var(--stroke); border-radius:11px; padding:15px 18px; cursor:pointer; box-shadow:4px 4px 0 var(--shadow);
   transition:transform .1s, box-shadow .1s; }
 .rail .cont:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--shadow); }
 .rail .cont:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow); }
-.rail .cont.done{ background:var(--bloom); }
+.rail .cont.done{ background:var(--pc); }
 .rail .nav{ margin:24px 0 0; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:18px; }
 .rail .nav a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:9px 0; }
 .rail .nav a:hover{ color:var(--ink); }
@@ -459,10 +483,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
    tints) get explicit overrides so nothing reads as a light island on dark. */
 [data-theme="dark"]{
   --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
-  --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --pc:#2a3f55; --stroke:#31343a; --shadow:#000;
-  /* the per-lesson light --pc is set inline on <html>; this wins over it so no
-     lesson page paints a light accent island in dark mode */
-  --pc:#2a3f55 !important;
+  --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --stroke:#31343a; --shadow:#000;
+  /* --pc / --pcd are the per-lesson unit colours, set inline on <html>; in dark
+     they STAY (light pastel + dark ink reads great on dark), so no !important wash. */
   /* dark values for every semantic tone — surfaces theme purely from these */
   --prose:#c9ccc2; --prose-strong:#d4d7cd; --li-ink:#c4c8bf;
   --well:#0f1012; --hover:rgba(255,255,255,.05); --hover-soft:rgba(255,255,255,.04);
@@ -473,16 +496,11 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 }
 [data-theme="dark"] body{ background:var(--paper); color:var(--ink); }
 [data-theme="dark"] .prog .bar{ border-color:#3a3d42; }
-[data-theme="dark"] .li.done .dot::after{ border-color:var(--paper); }
-/* current-lesson row: a soft bloom wash + edge, not the light --pc fill */
+/* done-check dot is the light pastel section colour in both themes → dark tick */
+[data-theme="dark"] .li.done .dot::after{ border-color:#16171a; }
 [data-theme="dark"] .overview.on{ background:rgba(255,255,255,.12); color:var(--ink); }
-[data-theme="dark"] .li.cur{ background:rgba(63,224,129,.14); box-shadow:inset 2px 0 0 var(--bloom); }
-[data-theme="dark"] .li.cur .t{ color:var(--ink); }
-[data-theme="dark"] .li.cur .dot{ border-color:var(--bloom); }
-[data-theme="dark"] .li.cur .dot::after{ background:var(--bloom); }
-/* continue / submit CTAs ride a bloom fill → need dark ink on them */
-[data-theme="dark"] .rail .cont{ background:var(--bloom); color:var(--on-bloom); }
-[data-theme="dark"] .rail .cont.done{ background:var(--bloom); color:var(--on-bloom); }
+/* kicker/crumb: deep companion is too dark on dark → use the light pastel */
+[data-theme="dark"] .crumb{ color:var(--pc); }
 [data-theme="dark"] .uquiz{ border-color:#3a3d42; }
 [data-theme="dark"] .uquiz:hover{ border-color:var(--bloomd); }
 /* the .souts icon tiles stay pastel (brand accent) → ink the glyph dark on them */
@@ -496,9 +514,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   box-shadow:3px 3px 0 var(--shadow); cursor:pointer; user-select:none;
   transition:transform .08s, box-shadow .08s; }
 .rail .quizbtn:hover{ transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--shadow); }
-.rail .quizbtn .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--bloomd);
+.rail .quizbtn .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--pc);
   display:flex; align-items:center; justify-content:center; }
-.rail .quizbtn .ico svg{ width:15px; height:15px; stroke:var(--paper); fill:none; stroke-width:2.4;
+.rail .quizbtn .ico svg{ width:15px; height:15px; stroke:#10120f; fill:none; stroke-width:2.4;
   stroke-linecap:round; stroke-linejoin:round; display:block; }
 .rail .quizbtn .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); }
 .rail .quizbtn .score{ margin-left:auto; font:700 11px var(--mono); color:var(--bloomd); }
@@ -510,9 +528,9 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   font-size:14.5px; line-height:1.3; color:var(--li-ink); width:100%; text-align:left;
   background:none; border:0; cursor:pointer; font-family:inherit; }
 .uquiz:hover{ background:var(--hover); }
-.uquiz svg{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; color:var(--dim); }
+.uquiz svg{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; color:var(--utext); }
 .uquiz .t{ flex:1; }
-.uquiz .uscore{ margin-left:auto; font:700 11px var(--mono); color:var(--bloomd); }
+.uquiz .uscore{ margin-left:auto; font:700 11px var(--mono); color:var(--utext); }
 
 /* modal */
 .qmodal{ position:fixed; inset:0; z-index:60; display:none; align-items:flex-start; justify-content:center;
@@ -545,8 +563,8 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   padding-left:12px; border-left:3px solid var(--bloomd); }
 .qitem.graded .qexpl{ display:block; }
 .qfoot{ margin:26px 0 0; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-.qsubmit{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
-  background:var(--bloom); border:2px solid var(--stroke); border-radius:11px; padding:14px 22px; cursor:pointer;
+.qsubmit{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:#10120f;
+  background:var(--pc); border:2px solid var(--stroke); border-radius:11px; padding:14px 22px; cursor:pointer;
   box-shadow:3px 3px 0 var(--shadow); transition:transform .08s, box-shadow .08s; }
 .qsubmit:hover{ transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--shadow); }
 .qsubmit:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--shadow); }
@@ -791,7 +809,9 @@ def lesson_page(l):
             '<div class="nav">%s</div></aside>'
             % (l["i"]+1, TOTAL, audio, quizbtn, esc(nxt), cclabel, nav))
     main = '<div class="pane"><div class="reading">%s</div>%s</div>' % (reading, rail)
+    plight, pdeep = unit_color(l["unit"])
     return HEAD.format(
+        htmlstyle="--pc:%s;--pcd:%s;" % (plight, pdeep),
         title=esc(l["title"]) + " — Learning Center — Workbooks",
         desc=esc(l.get("teaches", "")), ogtype="article",
         url="https://workbooks.sh/learn/" + l["slug"], jsonld=lesson_jsonld(l), css=CSS, js=JS,
@@ -841,6 +861,7 @@ def dashboard():
             '<div class="souts"><div class="lab">What you\'ll be able to do</div><ul>%s</ul></div>'
             '</div></div>' % (title, esc(first), esc(first), TOTAL, lis))
     return HEAD.format(
+        htmlstyle="--pc:#a8d4f0;--pcd:#2f6fa8;",
         title="Learning Center — Workbooks",
         desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
         ogtype="website", url="https://workbooks.sh/learn", jsonld=course_jsonld(), css=CSS, js=JS,
