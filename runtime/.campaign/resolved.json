@@ -2644,6 +2644,13 @@
    "proof": "libexpat 2.6.4 via build_c_dir parses XML with SAX handlers -> parse_ok=1 items=2 lasttext=world; expat_lane_test.exs green. Minimal expat_config.h (XML_POOR_ENTROPY avoids getrandom on wasi)",
    "lane": "compilers/expat/build.sh (fetch sha-pinned, gitignored) + build_c_dir(-DHAVE_EXPAT_CONFIG_H, include_only xmltok_impl/ns.c)",
    "since": "iter163"
+  },
+  "miniz": {
+   "capability": "ZIP/gzip/zlib archive handling in-sandbox",
+   "status": "live",
+   "proof": "miniz 3.0.2 via build_c_dir creates a ZIP archive in memory + reads it back + extracts the entry matching the original (zip_bytes=188 files=1 extract_match=1); miniz_lane_test.exs green",
+   "lane": "compilers/miniz/build.sh (fetch amalgam sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
