@@ -14,6 +14,19 @@ defmodule Workbooks.ControlPlane do
 
   def list, do: GenServer.call(__MODULE__, :list)
 
+  @doc """
+  Instances visible to `tenant` (wb-g1yo.4). Rows are `[id, tenant, state]`. A nil
+  caller tenant (admin/internal) sees all; otherwise only this tenant's rows plus
+  any legacy rows with no recorded tenant.
+  """
+  def list(tenant) do
+    list()
+    |> Enum.filter(fn
+      [_id, t, _state] -> is_nil(tenant) or is_nil(t) or t == tenant
+      _ -> true
+    end)
+  end
+
   @doc "Fetch a session row → %{id, tenant, state, vfs_path} | nil."
   def get(id), do: GenServer.call(__MODULE__, {:get, id})
 

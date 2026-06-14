@@ -210,7 +210,7 @@ defmodule Workbooks.Web do
 
   # List registered Instances for the tenant.
   get "/instances" do
-    json = Jason.encode!(Workbooks.ControlPlane.list())
+    json = Jason.encode!(Workbooks.ControlPlane.list(conn.assigns[:tenant]))
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
