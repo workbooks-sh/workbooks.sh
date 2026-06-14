@@ -13,6 +13,26 @@
   function copyToken() {
     navigator.clipboard?.writeText('wb_live_a1b2c3d4e5f64f2a').then(() => toast('API key copied'));
   }
+
+  // Backup (mock — 1:1 with GET/POST /api/nexuses/:id/backup*)
+  let backup = $state({ connected: false, host: null, url: null });
+  let bkUrl = $state('');
+  function connectBackup() {
+    const url = bkUrl.trim();
+    if (!url) { toast('Enter a repository URL'); return; }
+    const host = url.includes('gitlab') ? 'GitLab' : url.includes('github') ? 'GitHub' : 'Git host';
+    backup = { connected: true, host, url };
+    toast(`Backup connected to ${host}`);
+  }
+
+  // App-auth providers (mirrors Workbooks.AuthIntegrations / GET /api/auth-integrations)
+  const AUTH_PROVIDERS = [
+    { id: 'builtin', name: 'Built-in', blurb: "Workbooks' own end-user auth — nothing to configure." },
+    { id: 'clerk', name: 'Clerk', blurb: "Use Clerk for your app's users." },
+    { id: 'workos', name: 'WorkOS', blurb: "Use WorkOS AuthKit for your app's users." },
+    { id: 'auth0', name: 'Auth0', blurb: "Use Auth0 for your app's users." }
+  ];
+  let authProvider = $state('builtin');
 </script>
 
 <section>
@@ -57,6 +77,42 @@
         <button class="btn sm" onclick={() => toast('New API key generated')}>Regenerate</button>
       </span>
     </div>
+  </div>
+
+  <!-- Backup (Phase 6) -->
+  <div class="card">
+    <h3>Backup</h3>
+    <p class="dim" style="font-size:13px;margin-bottom:12px">Keep a developer-friendly copy of your whole workspace on a git host — your folders become directories, drafts become branches, and every change is a commit you can browse.</p>
+    {#if backup.connected}
+      <div class="kv"><span class="k">Status</span><span class="v" style="color:var(--live)">● Connected to {backup.host}</span></div>
+      <div class="kv"><span class="k">Repository</span><span class="v mono" style="font-size:12px">{backup.url}</span></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+        <button class="btn sm" onclick={() => toast('Backing up…')}>Back up now</button>
+        <button class="btn sm" onclick={() => { backup = { connected: false, host: null, url: null }; toast('Backup disconnected'); }}>Disconnect</button>
+      </div>
+    {:else}
+      <div class="srow"><label for="bkurl">Repository URL</label><input id="bkurl" class="sinput" placeholder="https://github.com/you/workspace.git" bind:value={bkUrl} /></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn sm primary" onclick={connectBackup}>Connect backup</button>
+      </div>
+    {/if}
+  </div>
+
+  <!-- App authentication (Phase 6) -->
+  <div class="card">
+    <h3>App authentication</h3>
+    <p class="dim" style="font-size:13px;margin-bottom:12px">Choose how the people who use <i>your</i> deployed app sign in. Use the built-in option, or connect your own provider. (This is separate from how you sign in here.)</p>
+    <div class="regions">
+      {#each AUTH_PROVIDERS as p}
+        <div class="reg" role="button" tabindex="0" class:sel={authProvider === p.id}
+             onclick={() => (authProvider = p.id)} onkeydown={(e) => { if (e.key === 'Enter') authProvider = p.id; }}>{p.name}</div>
+      {/each}
+    </div>
+    <p class="faint" style="font-size:12px;margin-top:10px">{(AUTH_PROVIDERS.find((p) => p.id === authProvider) || {}).blurb}</p>
+    {#if authProvider !== 'builtin'}
+      <div class="srow" style="margin-top:8px"><label for="iss">Issuer URL</label><input id="iss" class="sinput" placeholder="https://your-tenant.{authProvider}.com" /></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn sm primary" onclick={() => toast(`${authProvider} connected`)}>Save provider</button></div>
+    {/if}
   </div>
 
   <div class="card danger-zone">
