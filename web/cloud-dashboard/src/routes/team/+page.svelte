@@ -18,6 +18,23 @@
   const roleStyle = (role) => ROLE_STYLE[role] || '';
   const pickKey = (e, role) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inviteRole = role; } };
 
+  // Roles → capabilities, mirroring runtime Workbooks.RBAC (GET /api/roles → matrix).
+  const ROLES = ['owner', 'admin', 'member', 'viewer'];
+  const MATRIX = {
+    owner: ['view', 'edit', 'share', 'manage', 'delete', 'manage_roles'],
+    admin: ['view', 'edit', 'share', 'manage'],
+    member: ['view', 'edit'],
+    viewer: ['view']
+  };
+  const CAPS = [
+    { key: 'view', label: 'View', desc: 'Open nexuses, workbooks and folders' },
+    { key: 'edit', label: 'Edit', desc: 'Change workbooks and content' },
+    { key: 'share', label: 'Share folders', desc: 'Share a folder with a teammate' },
+    { key: 'manage', label: 'Manage nexuses', desc: 'Restart, sleep, configure' },
+    { key: 'delete', label: 'Delete', desc: 'Permanently remove a nexus' },
+    { key: 'manage_roles', label: 'Manage roles', desc: 'Change what teammates can do' }
+  ];
+
   const PAIRS = [['--mint', '--sky'], ['--peach', '--blue'], ['--sage', '--mint'], ['--cream', '--peach'], ['--blue', '--sage']];
   function initials(name) { return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase(); }
   function pair(name) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PAIRS[h % PAIRS.length]; }
@@ -108,6 +125,27 @@
       </tbody>
     </table>
   </div>
+
+  <!-- roles & access: the capability matrix, mirroring the runtime RBAC engine -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:2px solid var(--line)">
+      <b style="font-size:13.5px">Roles &amp; access</b>
+      <div class="faint" style="font-size:11.5px">What each role can do. Access also nests — a teammate needs access to a nexus before its workbooks.</div>
+    </div>
+    <table>
+      <thead><tr><th>Capability</th>{#each ROLES as r}<th class="cap">{r}</th>{/each}</tr></thead>
+      <tbody>
+        {#each CAPS as c}
+          <tr>
+            <td><b style="font-weight:600">{c.label}</b><div class="faint" style="font-size:11px">{c.desc}</div></td>
+            {#each ROLES as r}
+              <td class="cap">{MATRIX[r].includes(c.key) ? '✓' : '·'}</td>
+            {/each}
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 </section>
 
 {#if inviteOpen}
@@ -141,4 +179,6 @@
   .mav { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; flex:none;
     font:700 11px var(--mono); color:var(--on-bloom); border:2px solid var(--stroke); }
   .sheet-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+  .cap { text-align:center; text-transform:capitalize; font-variant-numeric:tabular-nums; }
+  th.cap { color:var(--dim); font-size:12px; }
 </style>
