@@ -24,6 +24,8 @@ for i, l in enumerate(flat):
 TOTAL = len(flat)
 LIVE = sum(1 for l in flat if l["status"] == "live")
 
+QUIZ = json.load(open(os.path.join(HERE, "quizzes.json")))
+
 cat = json.load(open(os.path.join(HERE, "lessons.json")))
 doc_title = {}
 for t in cat["tiers"]:
@@ -31,6 +33,16 @@ for t in cat["tiers"]:
         doc_title[cl["slug"]] = cl.get("title", cl["slug"])
         for s in cl.get("sublessons", []):
             doc_title[s["slug"]] = s.get("title", s["slug"])
+
+# quiz payload for the browser: questions + the titles the modal header needs.
+# Serialized once and "</" escaped so it can't break out of the inline <script>.
+QUIZ_PAYLOAD = {
+    "lessons": QUIZ.get("lessons", {}),
+    "units": QUIZ.get("units", {}),
+    "unitTitles": {str(u["n"]): u["title"] for u in units},
+    "lessonTitles": {l["slug"]: l["title"] for l in flat},
+}
+QUIZ_JSON = json.dumps(QUIZ_PAYLOAD, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 def esc(s): return html.escape(s or "")
 
@@ -129,9 +141,30 @@ WORDMARK = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="tr
   '0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915'
   '1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>')
 
+# petal logo (the favicon mark) — the brand glyph, drawn in currentColor so it
+# themes with the sidebar. Sits next to the WORKBOOKS wordmark set in Groothan.
+PETAL = ('<svg viewBox="0 0 113.444 65.6" fill="currentColor" aria-hidden="true">'
+  '<path d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43'
+  '0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717'
+  '-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022'
+  '0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452'
+  '-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683'
+  '-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866'
+  '0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915'
+  '1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>')
+
+# Sun/moon theme toggle button — fires the JS theme switch; both glyphs ship, CSS
+# shows the right one for the active theme.
+THEME_TOGGLE = ('<button class="themetog" id="themetog" type="button" aria-label="Toggle dark mode">'
+  '<svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+  '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>'
+  '<svg class="ic-moon" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+  '</button>')
+
 def sidebar(cur_slug=None):
     out = ['<aside class="side" id="side">',
-           '<a class="brand" href="/">%s<span>Workbooks</span></a>' % WORDMARK,
+           '<div class="brandrow"><a class="brand" href="/">%s<span>WORKBOOKS</span></a>%s</div>'
+           % (PETAL, THEME_TOGGLE),
            '<a class="overview%s" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>'
               % (" on" if cur_slug is None else ""),
            '<div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt">0 of %d complete</span></div>' % TOTAL,
@@ -144,6 +177,12 @@ def sidebar(cur_slug=None):
             out.append('<a class="%s" data-slug="%s" href="/learn/%s">'
                        '<span class="dot"></span><span class="t">%s</span></a>'
                        % (cls, l["slug"], esc(l["slug"]), esc(l["title"])))
+        # unit cumulative quiz entry — opens the shared modal
+        out.append('<button class="uquiz" data-unit="%d" type="button">'
+                   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+                   '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
+                   'Unit %d quiz<span class="uscore" data-uscore="%d"></span></button>'
+                   % (u["n"], u["n"], u["n"]))
         out.append('</div>')
     out.append('</nav></aside>')
     return "".join(out)
@@ -163,6 +202,10 @@ HEAD = """<!doctype html>
 <meta property="og:url" content="{url}">
 <link rel="canonical" href="{url}">
 {jsonld}
+<script>/* no-flash theme: set the attribute before first paint */
+(function(){{try{{var t=localStorage.getItem("wb-lms-theme");
+if(!t)t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+document.documentElement.setAttribute("data-theme",t);}}catch(e){{}}}})();</script>
 <style>{css}</style>
 </head>
 <body class="{bodycls}">
@@ -172,11 +215,22 @@ HEAD = """<!doctype html>
 <div class="main">{main}</div>
 </div>
 <div class="scrim" id="scrim"></div>
+{quizmodal}
+<script>window.WB_QUIZ={quizdata};</script>
 <script>{js}</script>
 <script src="../search.js" defer></script>
 </body>
 </html>
 """
+
+QUIZ_MODAL = ('<div class="qmodal" id="qmodal"><div class="qcard" id="qcard">'
+  '<div class="qhead"><div><div class="qk" id="qkick">Quiz</div><h3 id="qtitle"></h3></div>'
+  '<button class="qclose" id="qclose" aria-label="Close">×</button></div>'
+  '<div class="qbody" id="qbody"></div>'
+  '<div class="qfoot"><button class="qsubmit" id="qsubmit">Submit answers</button>'
+  '<button class="qretry" id="qretry" style="display:none">Try again</button>'
+  '<span class="qresult" id="qresult"></span></div>'
+  '</div></div>')
 
 CSS = """
 @font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
@@ -194,9 +248,21 @@ a{ color:inherit; text-decoration:none; }
 /* ── curriculum sidebar (persistent app rail) ── */
 .side{ width:300px; flex:0 0 300px; position:sticky; top:0; height:100vh; overflow-y:auto;
   border-right:2px solid var(--ink); background:var(--paper); padding:22px 14px 40px; z-index:30; }
-.brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 16px; }
-.brand svg{ width:25px; height:auto; color:var(--ink); }
-.brand span{ font:700 13px var(--mono); letter-spacing:.04em; }
+.brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
+.brand{ display:flex; align-items:center; gap:9px; min-width:0; }
+.brand svg{ width:24px; height:auto; color:var(--bloomd); flex:0 0 auto; }
+.brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
+  color:var(--ink); text-transform:uppercase; }
+/* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
+.themetog{ flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  border:2px solid var(--ink); border-radius:9px; background:var(--card); color:var(--ink); cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.themetog:hover{ transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--ink); }
+.themetog:active{ transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink); }
+.themetog svg{ width:16px; height:16px; display:block; }
+.themetog .ic-sun{ display:none; }
+[data-theme="dark"] .themetog .ic-sun{ display:block; }
+[data-theme="dark"] .themetog .ic-moon{ display:none; }
 .overview{ display:flex; align-items:center; gap:9px; font:700 10px var(--mono); letter-spacing:.16em;
   text-transform:uppercase; color:var(--dim); padding:9px 8px; border-radius:8px; }
 .overview svg{ width:14px; height:14px; }
@@ -351,6 +417,124 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   .dash{ min-height:0; padding:40px 22px 70px; gap:34px; } .arc{ flex-wrap:wrap; } .arc .u{ flex:1 1 44%; }
   .reading{ padding:28px 22px 30px; max-width:none; } .rail{ padding:22px 22px 70px; max-width:none; }
 }
+
+/* ════ DARK MODE ════
+   One [data-theme="dark"] palette. The variables flip; the handful of hardcoded
+   literals scattered in the light CSS (reading prose greys, white cards, ink
+   tints) get explicit overrides so nothing reads as a light island on dark. */
+[data-theme="dark"]{
+  --paper:#16171a; --card:#1f2125; --ink:#ecebe5; --dim:#8c9189;
+  --bloom:#3fe081; --bloomd:#37c873; --line:#2d2f34; --pc:#2a3f55;
+}
+[data-theme="dark"] body{ background:var(--paper); color:var(--ink); }
+[data-theme="dark"] .prog .bar{ background:#0f1012; border-color:#3a3d42; }
+[data-theme="dark"] .prog .bar i{ background:var(--bloom); }
+[data-theme="dark"] .side{ border-right-color:#2d2f34; }
+[data-theme="dark"] .li{ color:#c4c8bf; }
+[data-theme="dark"] .li:hover{ background:rgba(255,255,255,.05); }
+[data-theme="dark"] .li.done .dot::after{ border-color:var(--paper); }
+[data-theme="dark"] .li.cur .t{ color:var(--ink); }
+[data-theme="dark"] .overview:hover{ background:rgba(255,255,255,.06); }
+[data-theme="dark"] .overview.on{ color:var(--paper); }
+[data-theme="dark"] .themetog{ box-shadow:2px 2px 0 #000; }
+/* reading + prose greys */
+[data-theme="dark"] .sintro .lead,
+[data-theme="dark"] .promise,
+[data-theme="dark"] article > p.lead,
+[data-theme="dark"] article .aside,
+[data-theme="dark"] article .big,
+[data-theme="dark"] .deeper p,
+[data-theme="dark"] .soon-pane p,
+[data-theme="dark"] .souts li{ color:#c9ccc2; }
+[data-theme="dark"] article > p{ color:var(--ink); }
+[data-theme="dark"] .lsearch{ background:var(--card); box-shadow:4px 4px 0 #000; }
+[data-theme="dark"] .lsearch kbd{ background:#0f1012; border-color:#3a3d42; }
+[data-theme="dark"] .start{ background:var(--card); box-shadow:0 5px 0 #000; }
+[data-theme="dark"] .start:hover{ background:#26282d; box-shadow:0 6px 0 #000; }
+[data-theme="dark"] .start:active{ box-shadow:0 1px 0 #000; }
+[data-theme="dark"] .souts li .ic{ box-shadow:2px 2px 0 #000; }
+[data-theme="dark"] .souts li .ic svg{ stroke:#16171a; }
+[data-theme="dark"] .deeper{ box-shadow:4px 4px 0 #000; }
+[data-theme="dark"] .deeper a.dl:hover{ background:rgba(255,255,255,.04); }
+[data-theme="dark"] .play{ box-shadow:3px 3px 0 #000; }
+[data-theme="dark"] .play .ico svg{ fill:var(--paper); }
+[data-theme="dark"] .rail .cont{ box-shadow:4px 4px 0 #000; color:var(--ink); }
+[data-theme="dark"] .rail .cont:hover{ box-shadow:5px 5px 0 #000; }
+[data-theme="dark"] .rail .cont.done{ color:#16171a; }
+[data-theme="dark"] .quizbtn{ box-shadow:3px 3px 0 #000; }
+[data-theme="dark"] .topbar{ background:var(--paper); border-bottom-color:#2d2f34; }
+[data-theme="dark"] .topbar .burger span{ background:var(--ink); }
+
+/* ════ QUIZ — Listen-style trigger button + modal ════ */
+.rail .quizbtn{ margin:12px 0 0; width:100%; display:inline-flex; align-items:center; gap:13px;
+  padding:12px 16px; border:2px solid var(--ink); border-radius:999px; background:var(--card);
+  box-shadow:3px 3px 0 var(--ink); cursor:pointer; user-select:none;
+  transition:transform .08s, box-shadow .08s; }
+.rail .quizbtn:hover{ transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--ink); }
+.rail .quizbtn .ico{ width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--bloomd);
+  display:flex; align-items:center; justify-content:center; }
+.rail .quizbtn .ico svg{ width:15px; height:15px; stroke:var(--paper); fill:none; stroke-width:2.4;
+  stroke-linecap:round; stroke-linejoin:round; display:block; }
+.rail .quizbtn .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); }
+.rail .quizbtn .score{ margin-left:auto; font:700 11px var(--mono); color:var(--bloomd); }
+.qzbadge{ display:inline-flex; align-items:center; gap:4px; font:700 9px var(--mono); letter-spacing:.06em;
+  color:var(--bloomd); margin-left:6px; }
+
+/* unit-quiz entry in the sidebar curriculum */
+.uquiz{ display:flex; align-items:center; gap:9px; padding:8px 8px; margin:2px 0 0; border-radius:8px;
+  font:700 9.5px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim);
+  cursor:pointer; border:1.5px dashed var(--line); }
+.uquiz:hover{ color:var(--ink); border-color:var(--dim); }
+.uquiz svg{ width:13px; height:13px; flex:0 0 auto; }
+.uquiz .uscore{ margin-left:auto; color:var(--bloomd); }
+
+/* modal */
+.qmodal{ position:fixed; inset:0; z-index:60; display:none; align-items:flex-start; justify-content:center;
+  background:rgba(10,10,12,.5); padding:5vh 18px; overflow-y:auto; }
+.qmodal.show{ display:flex; }
+.qcard{ width:100%; max-width:620px; background:var(--paper); border:2px solid var(--ink); border-radius:18px;
+  box-shadow:8px 8px 0 var(--ink); padding:26px 28px 30px; }
+[data-theme="dark"] .qcard{ box-shadow:8px 8px 0 #000; }
+.qhead{ display:flex; align-items:flex-start; gap:12px; }
+.qhead .qk{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--bloomd); }
+.qhead h3{ font-family:var(--display); font-weight:400; font-size:26px; line-height:1.06; margin:6px 0 0;
+  letter-spacing:-.01em; color:var(--ink); }
+.qclose{ margin-left:auto; flex:0 0 auto; width:32px; height:32px; border:2px solid var(--ink); border-radius:8px;
+  background:var(--card); color:var(--ink); cursor:pointer; font:700 16px var(--mono); line-height:1; }
+.qclose:hover{ background:var(--pc); }
+.qbody{ margin:22px 0 0; display:flex; flex-direction:column; gap:24px; }
+.qitem{ }
+.qitem .qq{ font-size:18px; line-height:1.4; font-weight:600; color:var(--ink); margin:0 0 12px; }
+.qitem .qq .qn{ font:700 11px var(--mono); color:var(--dim); margin-right:7px; }
+.qopt{ display:flex; align-items:flex-start; gap:11px; padding:11px 13px; border:2px solid var(--line);
+  border-radius:11px; margin:0 0 8px; cursor:pointer; font-size:15.5px; line-height:1.4; color:var(--ink);
+  background:var(--card); transition:border-color .1s, background .1s; }
+.qopt:hover{ border-color:var(--dim); }
+.qopt input{ margin:3px 0 0; accent-color:var(--bloomd); flex:0 0 auto; }
+.qopt.sel{ border-color:var(--ink); background:var(--pc); }
+/* graded states */
+.qitem.graded .qopt{ cursor:default; }
+.qitem.graded .qopt.right{ border-color:var(--bloomd); background:rgba(63,224,129,.16); }
+.qitem.graded .qopt.wrong{ border-color:#d9534f; background:rgba(217,83,79,.13); }
+.qitem .qexpl{ display:none; margin:9px 2px 0; font-size:13.5px; line-height:1.5; color:var(--dim);
+  padding-left:12px; border-left:3px solid var(--bloomd); }
+.qitem.graded .qexpl{ display:block; }
+.qfoot{ margin:26px 0 0; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.qsubmit{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
+  background:var(--bloom); border:2px solid var(--ink); border-radius:11px; padding:14px 22px; cursor:pointer;
+  box-shadow:3px 3px 0 var(--ink); transition:transform .08s, box-shadow .08s; }
+.qsubmit:hover{ transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--ink); }
+.qsubmit:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+[data-theme="dark"] .qsubmit{ color:#16171a; box-shadow:3px 3px 0 #000; }
+.qretry{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim);
+  background:none; border:0; cursor:pointer; }
+.qretry:hover{ color:var(--ink); }
+.qresult{ font:700 13px var(--mono); letter-spacing:.03em; }
+.qresult .pct{ font-family:var(--display); font-weight:400; font-size:30px; line-height:1; margin-right:8px;
+  color:var(--bloomd); vertical-align:-3px; }
+.qresult.pass .pct{ color:var(--bloomd); }
+.qresult.fail .pct{ color:#d9534f; }
+@media (max-width:1080px){ .rail .quizbtn{ margin:0; width:auto; flex:1; min-width:220px; } }
 """
 
 JS = """
@@ -408,6 +592,121 @@ JS = """
     v.addEventListener("ended",function(){ vp.classList.remove("playing"); v.currentTime=0; });
     if(track) track.addEventListener("click",function(e){ var r=this.getBoundingClientRect(); if(v.duration) v.currentTime=(e.clientX-r.left)/r.width*v.duration; });
   });
+
+  // ── light / dark toggle ──
+  var TKEY="wb-lms-theme", root=document.documentElement;
+  var tog=document.getElementById("themetog");
+  if(tog) tog.addEventListener("click",function(){
+    var cur=root.getAttribute("data-theme")==="dark"?"dark":"light";
+    var nx=cur==="dark"?"light":"dark";
+    root.setAttribute("data-theme",nx); try{ localStorage.setItem(TKEY,nx); }catch(e){}
+  });
+
+  // ── quiz module ──
+  var Q=window.WB_QUIZ||{lessons:{},units:{},unitTitles:{},lessonTitles:{}};
+  var QKEY="wb-lms-quiz";
+  function qscores(){ try{ return JSON.parse(localStorage.getItem(QKEY))||{}; }catch(e){ return {}; } }
+  function qsave(o){ localStorage.setItem(QKEY, JSON.stringify(o)); }
+  function setOf(kind,id,questions){ // returns array {kind,id,questions,key}
+    return {kind:kind,id:id,questions:questions,key:kind+":"+id};
+  }
+  var modal=document.getElementById("qmodal"), qbody=document.getElementById("qbody"),
+      qtitle=document.getElementById("qtitle"), qkick=document.getElementById("qkick"),
+      qsubmit=document.getElementById("qsubmit"), qretry=document.getElementById("qretry"),
+      qresult=document.getElementById("qresult"), qclose=document.getElementById("qclose"),
+      qcard=document.getElementById("qcard");
+  var active=null;
+  function renderQuiz(){
+    qbody.innerHTML="";
+    qresult.textContent=""; qresult.className="qresult";
+    qsubmit.style.display=""; qretry.style.display="none";
+    active.questions.forEach(function(item,qi){
+      var it=document.createElement("div"); it.className="qitem"; it.dataset.qi=qi;
+      var h=document.createElement("div"); h.className="qq";
+      h.innerHTML='<span class="qn">'+(qi+1)+'.</span>'+esc(item.q); it.appendChild(h);
+      item.options.forEach(function(opt,oi){
+        var lab=document.createElement("label"); lab.className="qopt"; lab.dataset.oi=oi;
+        var inp=document.createElement("input"); inp.type="radio"; inp.name="q"+qi; inp.value=oi;
+        var sp=document.createElement("span"); sp.innerHTML=esc(opt);
+        lab.appendChild(inp); lab.appendChild(sp);
+        inp.addEventListener("change",function(){
+          it.querySelectorAll(".qopt").forEach(function(o){ o.classList.remove("sel"); });
+          lab.classList.add("sel");
+        });
+        it.appendChild(lab);
+      });
+      var ex=document.createElement("div"); ex.className="qexpl"; ex.textContent=item.explain||""; it.appendChild(ex);
+      qbody.appendChild(it);
+    });
+    qcard.scrollTop=0;
+  }
+  function esc(s){ var d=document.createElement("div"); d.textContent=s==null?"":s; return d.innerHTML; }
+  function openQuiz(set){
+    if(!set||!set.questions||!set.questions.length) return;
+    active=set;
+    qtitle.textContent = set.kind==="lesson"
+      ? (Q.lessonTitles[set.id]||set.id)
+      : ("Unit "+set.id+" — "+(Q.unitTitles[set.id]||""));
+    qkick.textContent = set.kind==="lesson" ? "Lesson quiz" : "Unit quiz";
+    renderQuiz();
+    modal.classList.add("show"); document.body.style.overflow="hidden";
+  }
+  function closeQuiz(){ modal.classList.remove("show"); document.body.style.overflow=""; active=null; }
+  function gradeQuiz(){
+    if(!active) return;
+    var n=active.questions.length, correct=0;
+    active.questions.forEach(function(item,qi){
+      var it=qbody.querySelector('.qitem[data-qi="'+qi+'"]');
+      it.classList.add("graded");
+      var picked=it.querySelector('input[name="q'+qi+'"]:checked');
+      var pickedOi=picked?parseInt(picked.value,10):-1;
+      it.querySelectorAll(".qopt").forEach(function(o){
+        var oi=parseInt(o.dataset.oi,10);
+        if(oi===item.answer) o.classList.add("right");
+        else if(oi===pickedOi) o.classList.add("wrong");
+        o.querySelector("input").disabled=true;
+      });
+      if(pickedOi===item.answer) correct++;
+    });
+    var pct=Math.round(correct/n*100), pass=pct>=70;
+    qresult.className="qresult "+(pass?"pass":"fail");
+    qresult.innerHTML='<span class="pct">'+correct+'/'+n+'</span>'+pct+'%';
+    qsubmit.style.display="none"; qretry.style.display="";
+    // persist best score
+    var sc=qscores(); var prev=sc[active.key]; var rec={correct:correct,total:n,pct:pct};
+    if(!prev||pct>prev.pct) sc[active.key]=rec;
+    qsave(sc); reflectQuizScores();
+    qcard.scrollTop=0;
+  }
+  function reflectQuizScores(){
+    var sc=qscores();
+    document.querySelectorAll("[data-lscore]").forEach(function(el){
+      var r=sc["lesson:"+el.dataset.lscore]; el.textContent=r?(r.correct+"/"+r.total):"";
+    });
+    document.querySelectorAll("[data-uscore]").forEach(function(el){
+      var r=sc["unit:"+el.dataset.uscore]; el.textContent=r?(r.correct+"/"+r.total):"";
+    });
+  }
+  if(modal){
+    qsubmit.addEventListener("click",gradeQuiz);
+    qretry.addEventListener("click",renderQuiz);
+    qclose.addEventListener("click",closeQuiz);
+    modal.addEventListener("click",function(e){ if(e.target===modal) closeQuiz(); });
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&modal.classList.contains("show")) closeQuiz(); });
+    document.querySelectorAll("[data-quiz-lesson]").forEach(function(b){
+      b.addEventListener("click",function(){
+        var id=b.dataset.quizLesson, qs=(Q.lessons||{})[id];
+        if(qs) openQuiz(setOf("lesson",id,qs));
+      });
+    });
+    document.querySelectorAll(".uquiz[data-unit]").forEach(function(b){
+      b.addEventListener("click",function(){
+        var id=b.dataset.unit, qs=(Q.units||{})[id];
+        if(qs) openQuiz(setOf("unit",id,qs));
+      });
+    });
+    reflectQuizScores();
+  }
 })();
 """.replace("%TOTAL%", str(TOTAL))
 
@@ -455,17 +754,25 @@ def lesson_page(l):
         nav += '<a href="/learn/%s">Next →</a>' % esc(l["next"]["slug"])
     nxt = l["next"]["slug"] if l["next"] else ""
     cclabel = "Complete & continue" if l["next"] else "Complete & finish"
-    rail = ('<aside class="rail"><div class="pos">Lesson %d of %d</div>%s'
+    # quiz button — directly below the Listen/audio button — only if questions exist
+    quizbtn = ""
+    if QUIZ.get("lessons", {}).get(l["slug"]):
+        quizbtn = ('<button class="quizbtn" type="button" data-quiz-lesson="%s"><span class="ico">'
+                   '<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>'
+                   '<span class="lab">Take the quiz</span><span class="score" data-lscore="%s"></span></button>'
+                   % (esc(l["slug"]), esc(l["slug"])))
+    rail = ('<aside class="rail"><div class="pos">Lesson %d of %d</div>%s%s'
             '<button class="cont" id="cc" data-next="%s"><span>%s</span> →</button>'
             '<div class="nav">%s</div></aside>'
-            % (l["i"]+1, TOTAL, audio, esc(nxt), cclabel, nav))
+            % (l["i"]+1, TOTAL, audio, quizbtn, esc(nxt), cclabel, nav))
     main = '<div class="pane"><div class="reading">%s</div>%s</div>' % (reading, rail)
     return HEAD.format(
         title=esc(l["title"]) + " — Learning Center — Workbooks",
         desc=esc(l.get("teaches", "")), ogtype="article",
         url="https://workbooks.sh/learn/" + l["slug"], jsonld=lesson_jsonld(l), css=CSS, js=JS,
         bodycls='lesson" data-slug="%s' % esc(l["slug"]),
-        topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]), main=main)
+        topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]), main=main,
+        quizmodal=QUIZ_MODAL, quizdata=QUIZ_JSON)
 
 def dashboard():
     first = next((x["slug"] for x in flat if x["status"] == "live"), flat[0]["slug"])
@@ -512,7 +819,8 @@ def dashboard():
         title="Learning Center — Workbooks",
         desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
         ogtype="website", url="https://workbooks.sh/learn", jsonld=course_jsonld(), css=CSS, js=JS,
-        bodycls="dashpage", topbar=topbar("Learning Center"), sidebar=sidebar(None), main=main)
+        bodycls="dashpage", topbar=topbar("Learning Center"), sidebar=sidebar(None), main=main,
+        quizmodal=QUIZ_MODAL, quizdata=QUIZ_JSON)
 
 open(os.path.join(HERE, "index.html"), "w").write(dashboard())
 for l in flat:
