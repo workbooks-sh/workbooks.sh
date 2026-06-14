@@ -568,7 +568,8 @@
             "zustand",
             "xstate"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "rxjs (of/map/reduce/subscribe, async) proven"
         },
         {
           "id": "lib-data",
@@ -579,7 +580,8 @@
             "big.js",
             "immutable"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "mathjs/decimal.js/immutable proven (js_lib_breadth_test)"
         },
         {
           "id": "lib-text",
@@ -590,7 +592,8 @@
             "kleur",
             "slugify"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "picocolors + slugify run in-sandbox"
         },
         {
           "id": "lib-schema",
@@ -601,7 +604,8 @@
             "msgpackr",
             "flatbuffers"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "graphql parse/print proven"
         },
         {
           "id": "lib-dom",
@@ -612,7 +616,8 @@
             "node-html-parser",
             "linkedom"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "node-html-parser (querySelector) proven; cheerio install failed (dep resolution) \u2014 node-html-parser covers the category"
         },
         {
           "id": "lib-ssr",
