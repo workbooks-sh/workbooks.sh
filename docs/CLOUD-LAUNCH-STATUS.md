@@ -22,7 +22,10 @@ The complete **backend engine** for the hosted-nexus product — all new files, 
 - **R2** — SigV4 adapter put/get/delete round-trip ✅ (bucket `workbooks-cloud`)
 - **Neon** — `Workbooks.DB` + pgvector 0.8.1, SSL ✅
 - **WorkOS** — org/membership/role/invitation + widget token + AuthKit login URL ✅ (demo workspace `org_01KV3947…`, shane@ admin)
-- **Fly / Polar** — clients unit-tested (mocked); live smoke tests pending their API tokens
+- **Fly** — `FlyMachines` client create_app → create_machine → get → destroy → delete, live, clean teardown ✅ (via `fly auth token`)
+- **Polar** — token authenticates (TLS) ✅; webhook verify accepts valid / rejects tampered + replay ✅; entitlements fail-closed ✅
+
+**All five external integrations validated live: R2 · Neon · WorkOS · Polar · Fly.**
 
 ## Security posture (what the adversarial gates caught + fixed)
 Every phase was attacked before commit. Real blockers found and fixed:
