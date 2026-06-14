@@ -166,9 +166,9 @@
         {
           "name": "Web research workflow (search -> fetch -> cite)",
           "status": "done",
-          "tests": "live integration proof",
-          "units": 0,
-          "proof": "LIVE (run-167, after the search fixes): agent got the prompt → called web_search → returned a correct, cited answer (elixir-lang.org) in 1 step. Now efficient because web_search returns real results immediately instead of flailing on empty keyless (was 16 steps).",
+          "tests": "web_search_format_test (cite-able output contract) + live integration proof",
+          "units": 2,
+          "proof": "DETERMINISTIC (web_search_format_test, 2 cases): hits render as title + url + snippet bullets so the agent can cite, and an empty result signals 'might be unavailable' + nudges file_issue (never the false 'topic is empty' mislabel). LIVE (run-167, after the search fixes): agent got the prompt → called web_search → returned a correct, cited answer (elixir-lang.org) in 1 step. Now efficient because web_search returns real results immediately instead of flailing on empty keyless (was 16 steps).",
           "failure_modes": []
         },
         {
