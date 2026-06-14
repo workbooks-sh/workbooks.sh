@@ -36,6 +36,7 @@ defmodule Workbooks.Browse.Search do
     case provider(opts) do
       :exa -> keyed(q, limit, opts, "EXA_API_KEY", &exa/3)
       :brave_api -> keyed(q, limit, opts, "BRAVE_API_KEY", &brave_api/3)
+      :perplexity -> keyed(q, limit, opts, "PERPLEXITY_API_KEY", &perplexity/3)
       :openrouter -> openrouter(q, limit, opts)
       :keyless -> query_scrape(q, limit, opts[:engine])
     end
@@ -50,6 +51,7 @@ defmodule Workbooks.Browse.Search do
     case raw |> to_string() |> String.downcase() do
       "exa" -> :exa
       p when p in ["brave_api", "brave-api"] -> :brave_api
+      "perplexity" -> :perplexity
       p when p in ["openrouter", "openrouter-web", "openrouter_web"] -> :openrouter
       _ -> :keyless
     end
@@ -126,6 +128,32 @@ defmodule Workbooks.Browse.Search do
     get_json(url, headers, fn json ->
       (get_in(json, ["web", "results"]) || [])
       |> Enum.map(fn r -> %{title: r["title"] || "", url: r["url"] || "", snippet: r["description"]} end)
+      |> Enum.reject(&(&1.url == ""))
+      |> Enum.take(limit)
+    end)
+  end
+
+  # Perplexity (api.perplexity.ai) — a sonar model answers + returns its sources;
+  # surfaced as results (search_results{title,url} when present, else citation URLs).
+  defp perplexity(q, key, limit) do
+    body = Jason.encode!(%{model: "sonar", messages: [%{role: "user", content: q}]})
+
+    headers = [
+      {~c"authorization", String.to_charlist("Bearer #{key}")},
+      {~c"content-type", ~c"application/json"}
+    ]
+
+    post_json("https://api.perplexity.ai/chat/completions", headers, body, fn json ->
+      cond do
+        is_list(json["search_results"]) ->
+          Enum.map(json["search_results"], fn r -> %{title: r["title"] || "", url: r["url"] || "", snippet: nil} end)
+
+        is_list(json["citations"]) ->
+          Enum.map(json["citations"], fn url -> %{title: to_string(url), url: to_string(url), snippet: nil} end)
+
+        true ->
+          []
+      end
       |> Enum.reject(&(&1.url == ""))
       |> Enum.take(limit)
     end)

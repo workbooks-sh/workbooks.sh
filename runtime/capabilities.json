@@ -166,7 +166,7 @@
           ]
         },
         {
-          "name": "Pluggable search providers (Exa/Brave-API/OpenRouter-web, keyless fallback)",
+          "name": "Pluggable search providers (keyless/openrouter-web/exa/brave/perplexity)",
           "status": "done",
           "tests": "search_provider_test",
           "units": 3,
