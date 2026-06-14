@@ -55,6 +55,13 @@ defmodule Workbooks.FlyMachines do
     end
   end
 
+  @doc "Delete a Fly app (and everything in it). DELETE /apps/:app."
+  def delete_app(app, opts \\ []) do
+    with {:ok, app} <- safe_segment(app) do
+      request(:delete, ["apps", app], nil, opts)
+    end
+  end
+
   @doc "Fetch one machine. GET /apps/:app/machines/:id."
   def get_machine(app, id, opts \\ []) do
     with {:ok, app} <- safe_segment(app),

@@ -61,6 +61,10 @@ defmodule Workbooks.NexusRegistry do
     cond do
       blank?(attrs["id"]) -> {:error, :invalid_id}
       blank?(org) -> {:error, :no_org}
+      # Strict org_id shape (same rule as NexusProvisioner): a malformed org_id
+      # (path-escape, slashes, control/whitespace, over-long) is refused fail-closed
+      # so it can never reach a scoped WHERE clause or a storage prefix.
+      not valid_org_id?(org) -> {:error, :invalid_org}
       true ->
         h = h || open()
 
@@ -186,6 +190,13 @@ defmodule Workbooks.NexusRegistry do
   defp blank?(""), do: true
   defp blank?(s) when is_binary(s), do: String.trim(s) == ""
   defp blank?(_), do: false
+
+  # Strict org_id shape — the SAME rule as NexusProvisioner.valid_org_id?. Only
+  # [a-zA-Z0-9_-], must start alphanumeric, 1..63 chars.
+  defp valid_org_id?(s) when is_binary(s),
+    do: s =~ ~r/\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}\z/
+
+  defp valid_org_id?(_), do: false
 
   # Accept atom- or string-keyed attrs; emit string keys for uniform access.
   defp normalize(attrs) when is_map(attrs) do
