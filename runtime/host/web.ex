@@ -36,6 +36,17 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, count: map_size(env)}))
   end
 
+  # Agent system prompt (wb-2s09). The desktop's voice/chat clients fetch the
+  # resident agent's persona by slug to seed a session (geminiLive, Waldo). The
+  # prompt lives in the profile (`<WB_PROFILE_DIR>/agents/<slug>.org`, under the
+  # `** System prompt` heading); a sensible default is returned when the profile
+  # has no def for that slug so voice/chat still work out of the box.
+  get "/api/agents/:slug/system_prompt" do
+    conn = fetch_query_params(conn)
+    prompt = agent_system_prompt(conn.params["slug"])
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{system_prompt: prompt}))
+  end
+
   # Web search for the desktop browser's composable-search "Web" provider
   # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
   # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)
@@ -774,6 +785,26 @@ defmodule Workbooks.Web do
 
   match _ do
     send_resp(conn, 404, "not found")
+  end
+
+  # Resolve an agent's system prompt by slug — the profile def if present, else a
+  # safe default so voice/chat work without a provisioned profile. Slug is
+  # path-validated (no traversal out of the agents dir).
+  defp agent_system_prompt(slug) do
+    default =
+      "You are Waldo, the user's resident assistant inside Workbooks. Be concise, warm, and helpful. " <>
+        "Help them navigate and operate their workspace — answer questions, search, open things — by voice or text. " <>
+        "You work problems WITH the user; you never run off on your own."
+
+    with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
+         dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
+         path <- Path.join([dir, "agents", "#{slug}.org"]),
+         {:ok, org} <- File.read(path),
+         %{system: sys} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
+      sys
+    else
+      _ -> default
+    end
   end
 
   # The viewer SPA: the runtime renders Org→HTML server-side (orgize, in the

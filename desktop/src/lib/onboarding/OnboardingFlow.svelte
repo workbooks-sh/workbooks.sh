@@ -15,7 +15,7 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { applyThemeMode } from "$lib/onboarding/prefs";
-  import { setupSaveModelKey } from "$lib/bridge/setup.svelte";
+  import { setupSaveModelKey, setupCompleteFirstRun } from "$lib/bridge/setup.svelte";
   import { connections } from "$lib/bridge/connections.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { nav } from "$lib/bridge/nav.svelte";
@@ -218,6 +218,11 @@
     try {
       localStorage.setItem("wb.browser.prefs", JSON.stringify({ ...prefs, completedAt: new Date().toISOString() }));
     } catch { /* best-effort */ }
+    // Persist the DURABLE first-run flag (setup.json) — the boot gate reads this
+    // via setupStatus(), not localStorage. Without it the tour re-ran on every
+    // reload (and kept re-prompting for keys). Fire-and-forget; the in-memory
+    // oncomplete() below dismisses the tour immediately.
+    void setupCompleteFirstRun().catch((e) => console.warn("[onboarding] complete_first_run failed", e));
     onboarding.done();
     oncomplete();
   }
