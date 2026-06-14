@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workbooks · Cloud</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 113 66'%3E%3Cpath fill='%233fe081' d='M48 0h17v30l1 2c6 2 18-18 25-20 3 1 9 8 11 11-4 6-19 18-21 22v2c2 1 27 1 32 1 0 6 0 11-1 17-12 0-27 1-37-4-8-4-15-12-18-20l-2-8-2 14c-12 21-31 18-52 18 0-6 0-11 0-17 6 0 28 1 31-1l0-1c1-4-17-19-20-24 2-3 8-9 11-11 4-1 18 18 22 20 2 1 2 1 3 0 2-2 1-9 1-12V0Z'/%3E%3C/svg%3E" />
+<style>
+  /* ── brand tokens — lifted verbatim from the lander (app.css :root) ── */
+  :root{
+    --bg:#0c0d10; --panel:#14161b; --panel-2:#191c22; --line:#262a32;
+    --line-soft:rgba(255,255,255,.05);
+    --ink:#eceef2; --dim:#8b909a; --faint:#565b64;
+    --live:#3fe081; --live-dim:rgba(63,224,129,.14); --amber:#e0b34a;
+    --violet:#b48cff; --teal:#4dd6c4;
+    --sans:"Geist",system-ui,sans-serif;
+    --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --r:10px;
+    color-scheme:dark;
+  }
+  @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  .mono{font-family:var(--mono)}
+  .dim{color:var(--dim)} .faint{color:var(--faint)}
+
+  /* ── buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:8px;
+    font:500 13px/1 var(--sans);border:1px solid var(--line);background:transparent;color:var(--ink);transition:.15s}
+  .btn:hover{border-color:var(--faint)}
+  .btn.primary{background:var(--live);color:#04130a;border-color:transparent}
+  .btn.primary:hover{background:#5ceb95}
+  .btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+  .btn.danger{color:#ff7a7a;border-color:rgba(255,122,122,.3)}
+  .btn.danger:hover{background:rgba(255,122,122,.1)}
+  .ico{width:15px;height:15px;display:block;flex:none}
+
+  /* ── status dots ── */
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .dot.run{background:var(--live);box-shadow:0 0 0 3px var(--live-dim);animation:pulse 2.4s ease-in-out infinite}
+  .dot.sleep{background:var(--faint)}
+  .dot.build{background:var(--amber);box-shadow:0 0 0 3px rgba(224,179,74,.14);animation:pulse 1.2s ease-in-out infinite}
+  .dot.pause{background:var(--violet)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* ════════════ AUTH (WorkOS AuthKit — brand-customized hosted page) ════════════ */
+  #auth{position:fixed;inset:0;display:grid;place-items:center;background:
+     radial-gradient(120% 80% at 50% -10%,rgba(63,224,129,.07),transparent 60%),var(--bg);z-index:50}
+  #auth.hide{display:none}
+  .authcard{width:360px;max-width:92vw}
+  .authmark{display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:26px}
+  .authmark svg{width:24px;height:auto;color:var(--live)}
+  .authmark b{font:600 16px/1 var(--sans);letter-spacing:.01em}
+  .authcard h1{font:600 19px/1.3 var(--sans);text-align:center;margin-bottom:5px}
+  .authcard .sub{text-align:center;color:var(--dim);font-size:13px;margin-bottom:22px}
+  .social{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+  .social .btn{width:100%;height:40px;justify-content:center;background:var(--panel);border-color:var(--line);font-weight:500}
+  .social .btn:hover{background:var(--panel-2)}
+  .or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11px;margin:4px 0 16px;text-transform:uppercase;letter-spacing:.08em}
+  .or::before,.or::after{content:"";height:1px;flex:1;background:var(--line)}
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px}
+  .field input{width:100%;height:40px;padding:0 12px;border-radius:8px;background:var(--panel);border:1px solid var(--line);
+    color:var(--ink);font:400 14px var(--sans);outline:none;transition:.15s}
+  .field input:focus{border-color:var(--live);background:var(--panel-2)}
+  .authcard .btn.primary{width:100%;height:40px;justify-content:center;margin-top:4px}
+  .switch{text-align:center;font-size:13px;color:var(--dim);margin-top:18px}
+  .switch a{color:var(--live);cursor:pointer}
+  .secured{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:30px;color:var(--faint);font-size:11.5px}
+  .secured b{color:var(--dim);font-weight:500}
+
+  /* ════════════ APP SHELL ════════════ */
+  #app{display:none;grid-template-columns:232px 1fr;height:100vh}
+  #app.show{display:grid}
+  /* sidebar */
+  .side{border-right:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;padding:16px 12px}
+  .brand{display:flex;align-items:center;gap:9px;padding:6px 8px 16px}
+  .brand svg{width:20px;color:var(--live)}
+  .brand b{font:600 14.5px/1 var(--sans)}
+  .brand .cl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:2px 5px}
+  .org{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:16px;cursor:pointer;transition:.15s}
+  .org:hover{border-color:var(--faint)}
+  .org .av{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--live),var(--teal));flex:none;display:grid;place-items:center;font:600 11px var(--sans);color:#04130a}
+  .org .nm{font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .org .ch{color:var(--faint)}
+  .nav{display:flex;flex-direction:column;gap:2px;flex:1}
+  .nav .lbl{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:10px 8px 6px}
+  .nav a{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;color:var(--dim);font-size:13.5px;font-weight:450;transition:.12s}
+  .nav a:hover{background:var(--panel);color:var(--ink)}
+  .nav a.on{background:var(--panel);color:var(--ink)}
+  .nav a.on .ico{color:var(--live)}
+  .acct{display:flex;align-items:center;gap:9px;padding:9px 8px;border-top:1px solid var(--line);margin-top:8px;cursor:pointer;border-radius:8px}
+  .acct:hover{background:var(--panel)}
+  .acct .av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--live));flex:none;display:grid;place-items:center;font:600 11px var(--sans);color:#04130a}
+  .acct .nm{font-size:13px;font-weight:500;line-height:1.2}
+  .acct .em{font-size:11px;color:var(--faint);line-height:1.2}
+
+  /* main */
+  .main{overflow-y:auto}
+  .topbar{display:flex;align-items:center;gap:12px;padding:18px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(12,13,16,.85);backdrop-filter:blur(8px);z-index:5}
+  .crumb{font-size:14px;font-weight:600;flex:1}
+  .crumb span{color:var(--faint);font-weight:400}
+  .search{display:flex;align-items:center;gap:8px;height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;color:var(--faint);width:200px}
+  .search input{background:none;border:0;outline:none;color:var(--ink);font:400 13px var(--sans);width:100%}
+  .wrap{padding:28px;max-width:1080px}
+  .page{display:none} .page.on{display:block}
+
+  /* nexus list */
+  .row{display:flex;align-items:center;gap:14px;padding:15px 18px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;background:var(--panel);cursor:pointer;transition:.15s}
+  .row:hover{border-color:var(--faint);background:var(--panel-2)}
+  .row .nx{flex:1;min-width:0}
+  .row .nx b{font:600 14px var(--sans);display:flex;align-items:center;gap:9px}
+  .row .nx .url{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:3px}
+  .row .meta{text-align:right;font-size:12px;color:var(--dim);min-width:96px}
+  .row .meta .st{font-weight:500;display:flex;align-items:center;gap:7px;justify-content:flex-end}
+  .row .meta .sub{font-size:11px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
+  .spark{width:84px;height:30px;flex:none}
+  .tag{font:500 11px var(--mono);padding:3px 7px;border-radius:5px;border:1px solid var(--line);color:var(--dim)}
+
+  .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .sechead h2{font:600 16px var(--sans)}
+  .sechead p{font-size:13px;color:var(--dim);margin-top:3px}
+
+  /* stat cards */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  .stat{border:1px solid var(--line);border-radius:var(--r);padding:15px;background:var(--panel)}
+  .stat .k{font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .stat .v{font:600 22px var(--sans);margin-top:7px}
+  .stat .v small{font-size:13px;color:var(--faint);font-weight:400}
+  .stat .d{font-size:11px;margin-top:4px;font-family:var(--mono)}
+  .up{color:var(--live)} .down{color:var(--amber)}
+
+  .card{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:18px;margin-bottom:16px}
+  .card h3{font:600 13.5px var(--sans);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13px}
+  .kv:last-child{border:0}
+  .kv .k{color:var(--dim)} .kv .v{font-family:var(--mono);font-size:12.5px}
+
+  /* logs */
+  .logs{background:#080a0d;border:1px solid var(--line);border-radius:var(--r);padding:14px;font:400 12px/1.7 var(--mono);height:230px;overflow-y:auto}
+  .logs .ln{white-space:pre-wrap;color:var(--dim)}
+  .logs .ln .t{color:var(--faint)} .logs .ln .g{color:var(--live)} .logs .ln .a{color:var(--amber)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--line)}
+  td{padding:13px 12px;border-bottom:1px solid var(--line-soft)}
+  td.num{font-family:var(--mono);text-align:right}
+  tr:last-child td{border:0}
+
+  /* progress */
+  .bar{height:8px;border-radius:5px;background:var(--panel-2);overflow:hidden;margin:10px 0}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--live),var(--teal))}
+
+  /* danger */
+  .danger-zone{border-color:rgba(255,122,122,.28)}
+  .danger-zone h3{color:#ff9a9a}
+
+  /* ════════════ MODAL — new nexus ════════════ */
+  .modal{position:fixed;inset:0;background:rgba(4,5,7,.6);backdrop-filter:blur(4px);display:none;place-items:center;z-index:40}
+  .modal.show{display:grid}
+  .sheet{width:560px;max-width:94vw;max-height:90vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px}
+  .sheet h2{font:600 17px var(--sans);margin-bottom:4px}
+  .sheet .sub{color:var(--dim);font-size:13px;margin-bottom:20px}
+  .lab{font-size:12px;color:var(--dim);margin:16px 0 8px;font-weight:500}
+  .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  .plan{border:1px solid var(--line);border-radius:10px;padding:13px;cursor:pointer;transition:.15s}
+  .plan:hover{border-color:var(--faint)}
+  .plan.sel{border-color:var(--live);background:var(--live-dim)}
+  .plan .nm{font:600 13px var(--sans)}
+  .plan .pr{font:600 17px var(--sans);margin:6px 0 2px}
+  .plan .pr small{font-size:11px;color:var(--faint);font-weight:400}
+  .plan .ds{font-size:11px;color:var(--dim);line-height:1.4}
+  .regions{display:flex;gap:8px;flex-wrap:wrap}
+  .reg{border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.15s}
+  .reg:hover{border-color:var(--faint)} .reg.sel{border-color:var(--live);background:var(--live-dim)}
+  .addon{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px}
+  .addon .info{flex:1}
+  .addon .info b{font-size:13px;font-weight:600}
+  .addon .info p{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .addon .pr{font:500 12px var(--mono);color:var(--dim)}
+  .tog{width:38px;height:22px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);position:relative;flex:none;cursor:pointer;transition:.15s}
+  .tog i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--faint);transition:.18s}
+  .tog.on{background:var(--live-dim);border-color:var(--live)}
+  .tog.on i{left:18px;background:var(--live)}
+  .sheet .foot{display:flex;align-items:center;justify-content:space-between;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+  .sheet .est{font-size:13px;color:var(--dim)} .sheet .est b{color:var(--ink);font-family:var(--mono)}
+  .note{font-size:12px;color:var(--faint);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- ════════ AUTH SURFACE — styled as the brand-customized WorkOS AuthKit hosted page ════════ -->
+<div id="auth">
+  <div class="authcard">
+    <div class="authmark">
+      <svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>
+      <b>Workbooks</b>
+    </div>
+    <h1 id="aTitle">Sign in to Workbooks Cloud</h1>
+    <p class="sub" id="aSub">Run a nexus in the cloud — one click, scales itself.</p>
+
+    <div class="social">
+      <button class="btn" onclick="enterApp()">
+        <svg class="ico" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v3.83h5.35c-.23 1.5-1.7 4.4-5.35 4.4-3.22 0-5.85-2.66-5.85-5.95s2.63-5.95 5.85-5.95c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.7 3.8 14.6 2.9 12 2.9 6.9 2.9 2.8 7 2.8 12.1s4.1 9.2 9.2 9.2c5.3 0 8.8-3.73 8.8-8.98 0-.6-.07-1.06-.15-1.52Z"/></svg>
+        Continue with Google
+      </button>
+      <button class="btn" onclick="enterApp()">
+        <svg class="ico" viewBox="0 0 24 24"><path fill="#fff" d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.22-3.37-1.22-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.36-2.22-.26-4.55-1.14-4.55-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.06.36.32.68.94.68 1.9v2.82c0 .27.18.59.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>
+        Continue with GitHub
+      </button>
+    </div>
+
+    <div class="or">or</div>
+
+    <div class="field"><label>Email</label><input type="email" placeholder="you@company.com" /></div>
+    <div class="field" id="aPwField"><label>Password</label><input type="password" placeholder="••••••••" /></div>
+    <button class="btn primary" onclick="enterApp()" id="aSubmit">Sign in</button>
+
+    <div class="switch" id="aSwitch">New here? <a onclick="toggleAuth()">Create an account</a></div>
+
+    <div class="secured">
+      <svg class="ico" viewBox="0 0 24 24" style="width:13px;height:13px"><path fill="var(--faint)" d="M12 1l9 4v6c0 5-3.8 9.7-9 11-5.2-1.3-9-6-9-11V5l9-4Zm0 2.2L5 6.3V11c0 4 2.9 7.8 7 9 4.1-1.2 7-5 7-9V6.3l-7-3.1Z"/></svg>
+      <span>Secured by <b>WorkOS&nbsp;AuthKit</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ APP ════════ -->
+<div id="app">
+  <!-- sidebar -->
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>
+      <b>Workbooks</b><span class="cl">cloud</span>
+    </div>
+
+    <div class="org">
+      <div class="av">SO</div>
+      <div class="nm">shinyobjectz</div>
+      <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+    </div>
+
+    <nav class="nav">
+      <a class="on" onclick="go('nexuses',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>Nexuses</a>
+      <a onclick="go('storage',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3Zm6 6.6c-1.5.8-3.7 1.4-6 1.4s-4.5-.6-6-1.4V12c0 .6 2.4 2 6 2s6-1.4 6-2V9.6ZM12 5C8.7 5 6 5.8 6 6s2.7 1 6 1 6-.8 6-1-2.7-1-6-1Z"/></svg>Storage</a>
+      <a onclick="go('databases',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c4.4 0 8 1.6 8 3.5S16.4 9 12 9 4 7.4 4 5.5 7.6 2 12 2Zm8 6.7v3.3c0 1.9-3.6 3.5-8 3.5s-8-1.6-8-3.5V8.7C5.6 9.9 8.6 10.5 12 10.5s6.4-.6 8-1.8Zm0 6v3.8c0 1.9-3.6 3.5-8 3.5s-8-1.6-8-3.5v-3.8c1.6 1.2 4.6 1.8 8 1.8s6.4-.6 8-1.8Z"/></svg>Databases</a>
+      <span class="lbl">account</span>
+      <a onclick="go('usage',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 13h4v7H4v-7Zm6-6h4v13h-4V7Zm6 3h4v10h-4V10Z"/></svg>Usage &amp; billing</a>
+      <a onclick="go('settings',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
+    </nav>
+
+    <div class="acct">
+      <div class="av">S</div>
+      <div style="flex:1">
+        <div class="nm">Shane</div>
+        <div class="em">shane@shinyobjectz.com</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">Nexuses</div>
+      <div class="search">
+        <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+        <input placeholder="Search…" />
+      </div>
+      <button class="btn primary" onclick="openModal()">
+        <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
+        New nexus
+      </button>
+    </div>
+
+    <div class="wrap">
+
+      <!-- ── NEXUSES LIST ── -->
+      <section class="page on" id="p-nexuses">
+        <div class="sechead"><div><h2>Nexuses</h2><p>Your hosted runtimes. Idle ones sleep automatically — you only pay while they work.</p></div></div>
+        <div id="nxlist"></div>
+      </section>
+
+      <!-- ── NEXUS DETAIL ── -->
+      <section class="page" id="p-detail">
+        <a class="dim" onclick="go('nexuses')" style="font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;margin-bottom:16px">← all nexuses</a>
+        <div class="sechead">
+          <div>
+            <h2 style="display:flex;align-items:center;gap:11px"><span class="dot run"></span><span id="dName">aurora</span></h2>
+            <p class="mono" id="dUrl">aurora.nexus.workbooks.cloud</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn sm" onclick="window.open('about:blank')">Open ↗</button>
+            <button class="btn sm">Restart</button>
+            <button class="btn sm">Sleep</button>
+            <button class="btn sm">Settings</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="k">CPU</div><div class="v" id="mCpu">18<small>%</small></div><div class="d up">▲ active</div></div>
+          <div class="stat"><div class="k">Memory</div><div class="v" id="mMem">412<small>MB / 1 GB</small></div><div class="d dim">41% of cap</div></div>
+          <div class="stat"><div class="k">Requests</div><div class="v" id="mReq">37<small>/min</small></div><div class="d up">▲ steady</div></div>
+          <div class="stat"><div class="k">Est. this month</div><div class="v">$<span id="mCost">11</span><small>.40</small></div><div class="d dim">at current rate</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <h3>Configuration</h3>
+            <div class="kv"><span class="k">Region</span><span class="v">sfo · San Francisco</span></div>
+            <div class="kv"><span class="k">Plan</span><span class="v">Starter · 1 GB</span></div>
+            <div class="kv"><span class="k">Scale-to-zero</span><span class="v" style="color:var(--live)">on · 5 min idle</span></div>
+            <div class="kv"><span class="k">Storage addon</span><span class="v">R2 · 2.1 GB</span></div>
+            <div class="kv"><span class="k">Database</span><span class="v faint">none</span></div>
+            <div class="kv"><span class="k">Created</span><span class="v">2026-06-02</span></div>
+          </div>
+          <div class="card">
+            <h3>This month</h3>
+            <div class="kv"><span class="k">Active compute</span><span class="v">6.4 hrs</span></div>
+            <div class="kv"><span class="k">Sleeping</span><span class="v">11.6 days</span></div>
+            <div class="kv"><span class="k">Storage</span><span class="v">2.1 GB-mo</span></div>
+            <div class="kv"><span class="k">Egress</span><span class="v">0 GB · via R2</span></div>
+            <div class="kv"><span class="k">Subtotal</span><span class="v" style="color:var(--live)">$11.40</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot run"></span> Live logs</h3>
+          <div class="logs" id="logbox"></div>
+        </div>
+
+        <div class="card danger-zone">
+          <h3>Danger zone</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <p class="dim" style="font-size:13px">Permanently delete this nexus and its storage. This cannot be undone.</p>
+            <button class="btn danger sm">Delete nexus</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── USAGE ── -->
+      <section class="page" id="p-usage">
+        <div class="sechead"><div><h2>Usage &amp; billing</h2><p>June 2026 · billed on the 1st</p></div><button class="btn sm">Download invoice</button></div>
+        <div class="stats">
+          <div class="stat"><div class="k">Month to date</div><div class="v">$<span>38</span><small>.10</small></div><div class="d dim">3 nexuses</div></div>
+          <div class="stat"><div class="k">Compute</div><div class="v">$24<small>.60</small></div><div class="d dim">19.2 active hrs</div></div>
+          <div class="stat"><div class="k">Storage</div><div class="v">$3<small>.50</small></div><div class="d dim">R2 · zero egress</div></div>
+          <div class="stat"><div class="k">Database</div><div class="v">$10<small>.00</small></div><div class="d dim">1 Postgres addon</div></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead><tr><th>Nexus</th><th>Plan</th><th class="num">Active hrs</th><th class="num">Storage</th><th class="num">Database</th><th class="num">Cost</th></tr></thead>
+            <tbody>
+              <tr><td><b>aurora</b></td><td class="dim">Starter · 1 GB</td><td class="num">6.4</td><td class="num">2.1 GB</td><td class="num faint">—</td><td class="num" style="color:var(--live)">$11.40</td></tr>
+              <tr><td><b>atlas</b></td><td class="dim">Pro · 2 GB</td><td class="num">12.8</td><td class="num">0.4 GB</td><td class="num">Postgres</td><td class="num" style="color:var(--live)">$24.20</td></tr>
+              <tr><td><b>relay</b></td><td class="dim">Starter · 1 GB</td><td class="num">0.0</td><td class="num">0.1 GB</td><td class="num faint">—</td><td class="num" style="color:var(--live)">$2.50</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>Plan</h3>
+          <div class="kv"><span class="k">Tier</span><span class="v">Pay-as-you-grow · entry from $20/mo</span></div>
+          <div class="kv"><span class="k">Pricing model</span><span class="v">flat base + metered active compute</span></div>
+          <div class="note">Idle nexuses scale to zero, so you're billed for active compute, storage, and any database addon — not for sitting still. Additional nexuses are discounted against your base.</div>
+        </div>
+      </section>
+
+      <!-- ── STORAGE ── -->
+      <section class="page" id="p-storage">
+        <div class="sechead"><div><h2>Storage</h2><p>Object storage for your nexuses — images, files, artifacts. Served zero-egress via Cloudflare R2.</p></div><button class="btn sm">New bucket</button></div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead><tr><th>Bucket</th><th>Attached to</th><th class="num">Objects</th><th class="num">Size</th><th class="num">Egress</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">aurora-assets</td><td class="dim">aurora</td><td class="num">1,284</td><td class="num">2.1 GB</td><td class="num" style="color:var(--live)">$0.00</td></tr>
+              <tr><td class="mono">atlas-uploads</td><td class="dim">atlas</td><td class="num">96</td><td class="num">0.4 GB</td><td class="num" style="color:var(--live)">$0.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">Storage lives outside the nexus container, so it survives sleep/restart and never bloats your runtime image. Egress is zero because blobs are served from R2, not from the compute host.</div>
+      </section>
+
+      <!-- ── DATABASES ── -->
+      <section class="page" id="p-databases">
+        <div class="sechead"><div><h2>Databases</h2><p>Managed Postgres for a nexus that needs a real backend. Scales to zero like the nexus itself.</p></div><button class="btn sm" onclick="openModal()">Add database</button></div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead><tr><th>Database</th><th>Engine</th><th>Attached to</th><th class="num">Size</th><th class="num">Status</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">atlas-db</td><td class="dim">Postgres 16</td><td class="dim">atlas</td><td class="num">340 MB</td><td class="num"><span style="color:var(--live)">● active</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">Database is a separate addon SKU from the nexus — an agent-only nexus carries no DB cost. Idle databases scale to zero so you don't pay a fixed floor per tenant.</div>
+      </section>
+
+      <!-- ── SETTINGS ── -->
+      <section class="page" id="p-settings">
+        <div class="sechead"><div><h2>Settings</h2><p>Account &amp; organization</p></div></div>
+        <div class="card">
+          <h3>Profile</h3>
+          <div class="kv"><span class="k">Name</span><span class="v">Shane</span></div>
+          <div class="kv"><span class="k">Email</span><span class="v">shane@shinyobjectz.com</span></div>
+          <div class="kv"><span class="k">Auth</span><span class="v">WorkOS AuthKit · Google</span></div>
+          <div class="kv"><span class="k">MFA</span><span class="v faint">not enabled</span></div>
+        </div>
+        <div class="card">
+          <h3>Organization · shinyobjectz</h3>
+          <div class="kv"><span class="k">Members</span><span class="v">1</span></div>
+          <div class="kv"><span class="k">SSO</span><span class="v faint">configure in AuthKit</span></div>
+          <div class="kv"><span class="k">API token</span><span class="v mono">wb_live_••••••••4f2a</span></div>
+        </div>
+        <div class="card">
+          <h3>Sessions</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <p class="dim" style="font-size:13px">Sign out of Workbooks Cloud on this device.</p>
+            <button class="btn sm" onclick="signOut()">Sign out</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════ NEW NEXUS MODAL ════════ -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="sheet">
+    <h2>New nexus</h2>
+    <p class="sub">A hosted runtime that builds and runs your workbooks. Sleeps when idle.</p>
+
+    <div class="lab">Name</div>
+    <div class="field"><input id="nxName" placeholder="my-nexus" value="nova" /></div>
+
+    <div class="lab">Region</div>
+    <div class="regions">
+      <div class="reg sel" onclick="pick(this,'.reg')">🌉 sfo</div>
+      <div class="reg" onclick="pick(this,'.reg')">🗽 ewr</div>
+      <div class="reg" onclick="pick(this,'.reg')">🇩🇪 fra</div>
+      <div class="reg" onclick="pick(this,'.reg')">🇸🇬 sin</div>
+    </div>
+
+    <div class="lab">Plan</div>
+    <div class="plans">
+      <div class="plan sel" onclick="pick(this,'.plan');setEst(20)">
+        <div class="nm">Starter</div><div class="pr">$20<small>/mo</small></div>
+        <div class="ds">1 GB · scale-to-zero · for one app or agent</div>
+      </div>
+      <div class="plan" onclick="pick(this,'.plan');setEst(45)">
+        <div class="nm">Pro</div><div class="pr">$45<small>/mo</small></div>
+        <div class="ds">2 GB · always-warm option · more burst</div>
+      </div>
+      <div class="plan" onclick="pick(this,'.plan');setEst(120)">
+        <div class="nm">Dedicated</div><div class="pr">$120<small>/mo</small></div>
+        <div class="ds">isolated host · strongest boundary</div>
+      </div>
+    </div>
+
+    <div class="lab">Addons</div>
+    <div class="addon">
+      <div class="info"><b>Object storage</b><p>Zero-egress R2 bucket for images &amp; files</p></div>
+      <div class="pr">$0.015/GB</div>
+      <div class="tog" onclick="this.classList.toggle('on')"><i></i></div>
+    </div>
+    <div class="addon">
+      <div class="info"><b>Managed Postgres</b><p>Real backend, scales to zero with the nexus</p></div>
+      <div class="pr">+$10/mo</div>
+      <div class="tog" onclick="this.classList.toggle('on')"><i></i></div>
+    </div>
+
+    <div class="note">Prices are illustrative placeholders — final numbers come from load-testing real tenant cost. You're billed on active compute, not idle time.</div>
+
+    <div class="foot">
+      <div class="est">Base <b>$<span id="est">20</span>/mo</b> + metered usage</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="createNexus()">Deploy nexus</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── data ──
+  const NEXUSES = [
+    {name:'aurora', region:'sfo', plan:'Starter · 1 GB', state:'run',   sub:'active · 37 req/min', url:'aurora.nexus.workbooks.cloud'},
+    {name:'atlas',  region:'ewr', plan:'Pro · 2 GB',     state:'run',   sub:'active · 112 req/min', url:'atlas.nexus.workbooks.cloud'},
+    {name:'relay',  region:'fra', plan:'Starter · 1 GB', state:'sleep', sub:'sleeping · woke 2h ago', url:'relay.nexus.workbooks.cloud'},
+    {name:'beacon', region:'sin', plan:'Starter · 1 GB', state:'build', sub:'building · weaving…', url:'beacon.nexus.workbooks.cloud'},
+  ];
+  const STATE_LABEL = {run:'Running', sleep:'Sleeping', build:'Building', pause:'Paused'};
+
+  function spark(seed){
+    let p='', x=0; const pts=[];
+    for(let i=0;i<14;i++){const v=8+Math.abs(Math.sin(seed+i*0.7))*18; pts.push([x,28-v]); x+=6;}
+    p = pts.map((q,i)=>(i?'L':'M')+q[0]+' '+q[1].toFixed(1)).join(' ');
+    return `<svg class="spark" viewBox="0 0 84 30" preserveAspectRatio="none"><path d="${p}" fill="none" stroke="var(--live)" stroke-width="1.5" opacity=".8"/></svg>`;
+  }
+
+  function renderList(){
+    document.getElementById('nxlist').innerHTML = NEXUSES.map((n,i)=>`
+      <div class="row" onclick="openDetail('${n.name}')">
+        <div class="nx">
+          <b><span class="dot ${n.state}"></span>${n.name}</b>
+          <div class="url">${n.url}</div>
+        </div>
+        ${n.state==='run'?spark(i+1):'<div class="spark"></div>'}
+        <div class="tag">${n.region}</div>
+        <div class="meta">
+          <div class="st">${STATE_LABEL[n.state]}</div>
+          <div class="sub">${n.plan.split(' · ')[1]||n.plan}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── nav ──
+  const TITLES = {nexuses:'Nexuses', usage:'Usage &amp; billing', storage:'Storage', databases:'Databases', settings:'Settings'};
+  function go(page, el){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    document.getElementById('p-'+page).classList.add('on');
+    document.getElementById('crumb').innerHTML = TITLES[page]||'Nexuses';
+    if(el){document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on')); el.classList.add('on');}
+    document.querySelector('.main').scrollTop=0;
+  }
+  function openDetail(name){
+    const n = NEXUSES.find(x=>x.name===name)||NEXUSES[0];
+    document.getElementById('dName').textContent=n.name;
+    document.getElementById('dUrl').textContent=n.url;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    document.getElementById('p-detail').classList.add('on');
+    document.getElementById('crumb').innerHTML='Nexuses <span>/ '+n.name+'</span>';
+    seedLogs(n.name);
+  }
+
+  // ── modal ──
+  function openModal(){document.getElementById('modal').classList.add('show');}
+  function closeModal(){document.getElementById('modal').classList.remove('show');}
+  function pick(el,sel){el.parentElement.querySelectorAll(sel).forEach(p=>p.classList.remove('sel'));el.classList.add('sel');}
+  function setEst(v){document.getElementById('est').textContent=v;}
+  function createNexus(){
+    const name=(document.getElementById('nxName').value||'nova').trim();
+    NEXUSES.unshift({name,region:'sfo',plan:'Starter · 1 GB',state:'build',sub:'building · weaving…',url:name+'.nexus.workbooks.cloud'});
+    renderList(); closeModal(); go('nexuses');
+    document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on'));
+    document.querySelector('.nav a').classList.add('on');
+  }
+
+  // ── auth (mock of the AuthKit redirect → callback → session) ──
+  let signup=false;
+  function toggleAuth(){
+    signup=!signup;
+    document.getElementById('aTitle').textContent = signup?'Create your account':'Sign in to Workbooks Cloud';
+    document.getElementById('aSub').textContent = signup?'Spin up your first nexus in under a minute.':'Run a nexus in the cloud — one click, scales itself.';
+    document.getElementById('aSubmit').textContent = signup?'Create account':'Sign in';
+    document.getElementById('aSwitch').innerHTML = signup?'Already have an account? <a onclick="toggleAuth()">Sign in</a>':'New here? <a onclick="toggleAuth()">Create an account</a>';
+  }
+  function enterApp(){
+    document.getElementById('auth').classList.add('hide');
+    document.getElementById('app').classList.add('show');
+    renderList();
+  }
+  function signOut(){
+    document.getElementById('app').classList.remove('show');
+    document.getElementById('auth').classList.remove('hide');
+  }
+
+  // ── fake live logs ──
+  const LOGLINES = [
+    ['g','▸ nexus woke from sleep in 1.4s'],
+    ['','GET /  200  12ms'],
+    ['','weave workbook "sales-pulse" → ok'],
+    ['a','⚙ compiling rust toolkit (shared build)…'],
+    ['g','✓ toolkit ready · cached'],
+    ['','POST /agent/run  202'],
+    ['','litestream → R2 checkpoint ok'],
+    ['','GET /assets/hero.png  200  (R2, 0 egress)'],
+  ];
+  let logT=null;
+  function seedLogs(name){
+    const box=document.getElementById('logbox'); box.innerHTML='';
+    let i=0;
+    const stamp=()=>new Date().toLocaleTimeString('en-US',{hour12:false});
+    function add(){
+      const [c,txt]=LOGLINES[i%LOGLINES.length];
+      const ln=document.createElement('div'); ln.className='ln';
+      ln.innerHTML=`<span class="t">${stamp()}</span> <span class="${c}">${txt}</span>`;
+      box.appendChild(ln); box.scrollTop=box.scrollHeight; i++;
+      if(box.children.length>40) box.removeChild(box.firstChild);
+    }
+    for(let k=0;k<6;k++) add();
+    clearInterval(logT); logT=setInterval(add, 2200);
+  }
+
+  // ── live metric jitter ──
+  setInterval(()=>{
+    if(!document.getElementById('p-detail').classList.contains('on'))return;
+    const cpu=12+Math.floor(Math.random()*20);
+    const mem=380+Math.floor(Math.random()*90);
+    const req=28+Math.floor(Math.random()*30);
+    document.getElementById('mCpu').innerHTML=cpu+'<small>%</small>';
+    document.getElementById('mMem').innerHTML=mem+'<small>MB / 1 GB</small>';
+    document.getElementById('mReq').innerHTML=req+'<small>/min</small>';
+  }, 2000);
+</script>
+</body>
+</html>

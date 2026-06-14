@@ -2,6 +2,7 @@
   import AsciiField from '../lib/AsciiField.svelte';
   import Wmark from '../lib/Wmark.svelte';
   import { registerRef } from '../lib/stores.js';
+  import { flags } from '../lib/flags.js';
   let h1textEl, caretEl;
   $effect(() => {
     registerRef('h1text', h1textEl);
@@ -25,7 +26,8 @@
   </p>
 
   <div class="ctas blk" id="b-ctas">
-    <a class="btn primary" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="heroDl">download for desktop</a>
+    {#if flags.desktopDownload}<a class="btn primary" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="heroDl">download for desktop</a>{/if}
+    {#if flags.cloud}<a class="btn {flags.desktopDownload ? 'ghost' : 'primary'}" href={flags.dashboardUrl}>run it in the cloud →</a>{/if}
     <a class="btn ghost" href="#timeline">watch it work →</a>
   </div>
 </main>

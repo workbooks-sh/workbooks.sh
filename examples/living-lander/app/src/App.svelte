@@ -13,6 +13,7 @@
   import BlogIndex from './sections/BlogIndex.svelte';
   import BlogPost from './sections/BlogPost.svelte';
   import { boot } from './lib/stores.js';
+  import { flags } from './lib/flags.js';
   import { route, startRouter } from './lib/router.svelte.js';
 
   startRouter();
@@ -42,7 +43,8 @@
   <a class="word" href="/">workbooks</a>
   <a href="/blog">blog</a>
   <a href="https://github.com/workbooks-sh/workbooks.sh">github</a>
-  <a class="cta" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="navDl">download</a>
+  {#if flags.cloud}<a href={flags.dashboardUrl}>sign in</a>{/if}
+  {#if flags.desktopDownload}<a class="cta" href="https://github.com/workbooks-sh/workbooks.sh/releases/tag/desktop-v0.1.0" id="navDl">download</a>{/if}
 </nav>
 
 <!-- ── CONTENT REGION — the only thing navigation swaps ── -->
