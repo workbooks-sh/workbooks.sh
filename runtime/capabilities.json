@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 669,
+    "tests": 671,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },
@@ -138,7 +138,7 @@
           "name": "Headless browse (JS-rendered page, local Chrome --dump-dom)",
           "status": "done",
           "tests": "browse_headless_test",
-          "units": 4,
+          "units": 5,
           "proof": "render proven (example.com -> rendered text); SSRF-floored before launch (NetGuard); exec-gated; no CDP/Node/remote service",
           "failure_modes": [
             "spawns a host Chrome process - multi-tenant resource cap is a follow-up; cloud (exec-off) agents use fetch",

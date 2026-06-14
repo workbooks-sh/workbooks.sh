@@ -28,4 +28,9 @@ defmodule Workbooks.BrowseHeadlessTest do
     {out, _} = Agent.__exec_one_for_test__(%{name: "browse", args: %{"url" => "http://192.168.0.1/"}}, %{exec: true, tenant: "t"})
     assert out =~ "blocked"
   end
+
+  test "browse is EXPOSED only to exec agents (host-process spawn never offered to base/cloud)" do
+    assert "browse" in Agent.__tool_names_for_test__(exec: true)
+    refute "browse" in Agent.__tool_names_for_test__([])
+  end
 end
