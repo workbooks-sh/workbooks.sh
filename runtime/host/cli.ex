@@ -196,6 +196,19 @@ defmodule Workbooks.CLI do
 
   def call(["env" | _], _t), do: "usage: wb env request NAME [reason]"
 
+  # `wb models list [query]` — discover OpenRouter models (wb-d2nx.5). `wb model
+  # set ID` switches the model the agent runs on for the rest of the session.
+  def call(["models", "list" | rest], _t), do: Workbooks.Models.list(Enum.join(rest, " "))
+  def call(["models" | _], _t), do: "usage: wb models list [query]"
+
+  def call(["model", "set", id], _t) do
+    System.put_env("WB_LLM_MODEL", id)
+    "model set to #{id} (this session)"
+  end
+
+  def call(["model", "get"], _t), do: System.get_env("WB_LLM_MODEL") || "(default)"
+  def call(["model" | _], _t), do: "usage: wb model <get | set ID>"
+
   # `wb workgate request CAP [reason…]` — ask the user to Allow/Deny an OS
   # capability (wb-kbq5.3). Blocks. Returns the decision.
   def call(["workgate", "request", cap | rest], _t) do

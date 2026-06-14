@@ -1,0 +1,28 @@
+#+TITLE: workbooks-browser — models
+
+* Discover models + switch your own
+
+  You can browse OpenRouter's whole catalog and change the model YOU run on.
+
+  : wb models list [query]   ;; search models — query matches id/name/modality
+  : wb model get             ;; the model you're running on now
+  : wb model set <id>        ;; switch to a different model (this session)
+
+* Finding a model for a task
+
+  Need a vision/image model? Filter by modality or vendor:
+
+  : wb models list image
+  : wb models list gemini
+  ;; → rows: MODEL  CONTEXT  MODALITY (e.g. text+image->text)  $/Mtok-in
+
+  Then switch to it for the work:
+
+  : wb model set google/gemini-2.5-flash-image
+
+* Notes
+
+  - The list shows id, context window, modality, and prompt price per 1M tokens.
+  - `model set` applies for the rest of this session; it doesn't persist.
+  - Use this when a task needs a capability your current model lacks (vision,
+    cheaper bulk work, a bigger context window).
