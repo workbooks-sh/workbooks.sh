@@ -43,8 +43,19 @@ defmodule Workbooks.AgentSession do
 
   @impl true
   def init({id, system, task, opts}) do
-    {:ok, %{id: id, status: :running, run: nil, run_pid: nil, live: [], subs: [], reviews: [], review_log: []},
-     {:continue, {:run, system, task, opts}}}
+    {:ok,
+     %{
+       id: id,
+       # Owning tenant (wb-g1yo.2) — gates who may join/cancel this session's channel.
+       tenant: Keyword.get(opts, :tenant),
+       status: :running,
+       run: nil,
+       run_pid: nil,
+       live: [],
+       subs: [],
+       reviews: [],
+       review_log: []
+     }, {:continue, {:run, system, task, opts}}}
   end
 
   @impl true
@@ -141,11 +152,12 @@ defmodule Workbooks.AgentSession do
     do: {:reply, r, %{state | reviews: rest}}
 
   def handle_call(:status, _from, %{run: nil, status: st, live: live} = state),
-    do: {:reply, %{status: st, steps: length(live), live: live, reviews: state.review_log}, state}
+    do: {:reply, %{status: st, tenant: state.tenant, steps: length(live), live: live, reviews: state.review_log}, state}
 
   def handle_call(:status, _from, %{run: r, status: st} = state) do
     reply = %{
       status: st,
+      tenant: state.tenant,
       steps: r.steps,
       result: r.result,
       tools: r.events |> Enum.map(& &1.tool) |> Enum.uniq(),

@@ -77,8 +77,11 @@ defmodule Workbooks.Web do
   # reconnect-looping. Auth: a header-less local upgrade falls to the dev path on
   # the desktop runtime (WB_DESKTOP, unlocked, single-tenant).
   get "/socket/websocket" do
+    # Carry the authenticated tenant into the socket so per-session joins/cancels
+    # can be gated by ownership (wb-g1yo.2). The upgrade conn already passed the
+    # Auth plug, so conn.assigns.tenant is set.
     conn
-    |> WebSockAdapter.upgrade(Workbooks.PhoenixSocket, %{}, timeout: 60_000)
+    |> WebSockAdapter.upgrade(Workbooks.PhoenixSocket, %{tenant: conn.assigns[:tenant]}, timeout: 60_000)
     |> halt()
   end
 

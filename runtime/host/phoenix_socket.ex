@@ -151,8 +151,14 @@ defmodule Workbooks.PhoenixSocket do
   end
 
   # Client→server cancel on a session channel (ws.cancelSession) — stop the run.
+  # Gated by tenant (wb-g1yo.2): you can't cancel another tenant's run.
   defp maybe_track("cancel", "session:" <> id, _join_ref, _payload, state) do
-    Workbooks.AgentSession.cancel(id)
+    if session_tenant_ok?(id, state) do
+      Workbooks.AgentSession.cancel(id)
+    else
+      Logger.warning("wb-g1yo.2: DENY cancel of session #{id} — tenant mismatch")
+    end
+
     state
   end
 
@@ -186,13 +192,20 @@ defmodule Workbooks.PhoenixSocket do
   # its run events fan out here. The desktop joins right after POSTing /api/run,
   # so the session exists; if not, we degrade to a quiet (unsubscribed) channel.
   defp bridge_session("session:" <> id = topic, join_ref, state) do
-    case safe_subscribe(id) do
-      :ok ->
-        send(self(), {:bridge_session_started, topic, join_ref})
-        Map.put(state, :session, %{topic: topic, join_ref: join_ref, turn: false})
+    if session_tenant_ok?(id, state) do
+      case safe_subscribe(id) do
+        :ok ->
+          send(self(), {:bridge_session_started, topic, join_ref})
+          Map.put(state, :session, %{topic: topic, join_ref: join_ref, turn: false})
 
-      _ ->
-        state
+        _ ->
+          state
+      end
+    else
+      # Cross-tenant join attempt: degrade to a quiet (unsubscribed) channel —
+      # the joiner sees nothing of another tenant's run.
+      Logger.warning("wb-g1yo.2: DENY join of session #{id} — tenant mismatch")
+      state
     end
   end
 
@@ -201,6 +214,28 @@ defmodule Workbooks.PhoenixSocket do
   rescue
     _ -> :error
   end
+
+  # wb-g1yo.2: a socket may only join/cancel a session owned by its tenant. Reject
+  # ONLY on a definite cross-tenant mismatch (both tenants known AND different); a
+  # nil on either side (dev/single-tenant socket, or a legacy/unknown run) is
+  # grandfathered through so the desktop + dev flows are unaffected.
+  defp session_tenant_ok?(id, state) do
+    socket_tenant = state[:tenant]
+
+    case Workbooks.AgentSession.status(id) do
+      %{tenant: session_tenant} -> tenant_match?(session_tenant, socket_tenant)
+      _ -> true
+    end
+  rescue
+    _ -> true
+  end
+
+  @doc false
+  # Pure tenant-match rule (wb-g1yo.2), public for testing: reject ONLY on a
+  # definite cross-tenant mismatch (both known + different); a nil on either side
+  # (dev/single-tenant socket, or a legacy/unknown run) is grandfathered through.
+  def tenant_match?(session_tenant, socket_tenant),
+    do: is_nil(socket_tenant) or is_nil(session_tenant) or session_tenant == socket_tenant
 
   defp track_topic(state, topic, join_ref) do
     Map.update(state, :topics, %{topic => join_ref}, &Map.put(&1, topic, join_ref))
