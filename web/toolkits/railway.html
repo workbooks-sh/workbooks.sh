@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>railway — Workbooks toolkit</title>
+<meta name="description" content="Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account.">
+<link rel="canonical" href="https://workbooks.sh/toolkits/railway.html">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="railway — Workbooks toolkit">
+<meta property="og:description" content="Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account.">
+<meta property="og:url" content="https://workbooks.sh/toolkits/railway.html">
+<meta property="og:image" content="https://workbooks.sh/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "railway \u2014 Workbooks toolkit", "applicationCategory": "DeveloperApplication", "softwareVersion": "0.1.0", "description": "Railway's CLI \u2014 deploy a forged workbook as a static site on the user's own account.", "url": "https://workbooks.sh/toolkits/railway.html", "isPartOf": {"@type": "WebSite", "name": "Workbooks", "url": "https://workbooks.sh/"}}</script>
+<style>
+
+@font-face{ font-family:"Groothan"; src:url("/fonts/GroothanMixed-Regular.woff2") format("woff2"),
+  url("/fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:swap; }
+:root{
+  --paper:#f7f6f1; --card:#fff; --ink:#121316; --bloom:#13d943; --bloomd:#149157;
+  --dim:#6a6f68; --line:rgba(18,19,22,.12);
+  --display:"Groothan","Arial Black",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{ box-sizing:border-box; margin:0; }
+html{ scrollbar-width:thin; scrollbar-color:#565b54 transparent; }
+body{ background:var(--paper); color:var(--ink); font-family:var(--mono); line-height:1.65;
+  -webkit-font-smoothing:antialiased; }
+a{ color:inherit; }
+.wrap{ max-width:1280px; margin:0 auto; padding:0 28px; }
+
+/* ── hero ── */
+.hero{ padding:170px 28px 50px; max-width:1280px; margin:0 auto; }
+.hero .kick{ font:700 11px var(--mono); letter-spacing:.32em; text-transform:uppercase;
+  color:var(--bloomd); margin-bottom:18px; }
+.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(40px,6vw,78px);
+  line-height:.98; letter-spacing:-.01em; }
+.hero h1 em{ font-style:normal; color:var(--bloomd); }
+.hero p{ margin-top:20px; max-width:62ch; font-size:14px; color:var(--dim); line-height:1.8; }
+.hero .stat{ margin-top:24px; display:flex; gap:26px; flex-wrap:wrap;
+  font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+.hero .stat b{ color:var(--bloomd); }
+
+/* ── controls ── */
+.controls{ position:sticky; top:0; z-index:5; background:var(--paper);
+  border-bottom:2px solid var(--ink); padding:16px 0; }
+.controls .wrap{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+.search{ flex:1 1 260px; display:flex; align-items:center; gap:10px; background:var(--card);
+  border:2px solid var(--ink); border-radius:10px; padding:10px 14px; box-shadow:3px 3px 0 var(--ink); }
+.search svg{ width:16px; height:16px; flex:0 0 auto; color:var(--dim); }
+.search input{ border:0; outline:0; background:none; font:500 13px var(--mono); color:var(--ink);
+  width:100%; }
+.search input::placeholder{ color:var(--dim); }
+.facets{ display:flex; gap:8px; flex-wrap:wrap; }
+.chip{ font:700 10.5px var(--mono); letter-spacing:.04em; text-transform:uppercase;
+  border:1.5px solid var(--ink); background:var(--card); color:var(--ink); border-radius:999px;
+  padding:7px 13px; cursor:pointer; transition:transform .12s ease, background .12s ease; }
+.chip:hover{ transform:translateY(-1px); }
+.chip.on{ background:var(--bloom); border-color:var(--ink); }
+.facet-group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.facet-group .lbl{ font:700 9px var(--mono); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); margin-right:2px; }
+
+/* ── grid ── */
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;
+  padding:34px 0 90px; }
+.count{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
+  padding-top:24px; }
+.card{ display:flex; flex-direction:column; background:var(--card); border:2px solid var(--ink);
+  border-radius:14px; padding:20px; text-decoration:none; box-shadow:4px 4px 0 var(--ink);
+  transition:transform .14s ease, box-shadow .14s ease; }
+.card:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--bloom); }
+.card .top{ display:flex; align-items:center; gap:13px; margin-bottom:13px; }
+.logo{ width:46px; height:46px; border-radius:11px; flex:0 0 auto; display:flex;
+  align-items:center; justify-content:center; overflow:hidden; border:1.5px solid var(--line);
+  background:var(--paper); }
+.logo img{ width:30px; height:30px; object-fit:contain; }
+.logo .mono{ font-family:var(--display); font-size:22px; color:var(--ink); }
+.card h3{ font-family:var(--display); font-weight:400; font-size:23px; line-height:1; }
+.card .ver{ font:700 9.5px var(--mono); letter-spacing:.05em; color:var(--dim); margin-top:5px; }
+.card .tag{ font-size:12px; color:var(--dim); line-height:1.6; flex:1;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.card .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; }
+.cc{ font:700 9px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
+.cc.cat{ background:var(--bloom); border-color:var(--ink); }
+.badge-m{ font:700 9px var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  padding:3px 8px; border-radius:6px; border:1.5px solid var(--ink); }
+.m-stable{ background:#aee5c2; } .m-beta{ background:#a8d4f0; } .m-exp{ background:#f2ddb0; }
+.empty{ padding:70px 0; text-align:center; color:var(--dim); font-size:13px; }
+
+/* ── detail ── */
+.detail{ max-width:1080px; margin:0 auto; padding:150px 28px 90px; }
+.crumb{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
+  margin-bottom:26px; }
+.crumb a{ text-decoration:none; color:var(--dim); }
+.crumb a:hover{ color:var(--bloomd); }
+.dhead{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+.dhead .logo{ width:78px; height:78px; border-radius:18px; }
+.dhead .logo img{ width:50px; height:50px; }
+.dhead .logo .mono{ font-size:38px; }
+.dhead h1{ font-family:var(--display); font-weight:400; font-size:clamp(38px,5vw,60px); line-height:.96; }
+.dhead .meta{ display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+.dhead .lede{ margin-top:18px; font-size:15px; line-height:1.8; color:var(--ink); max-width:70ch; }
+.cols{ display:grid; grid-template-columns:1fr 320px; gap:48px; margin-top:48px; align-items:start; }
+.sec{ margin-bottom:42px; }
+.sec h2{ font-family:var(--display); font-weight:400; font-size:28px; margin-bottom:16px; }
+.sec p{ font-size:14px; line-height:1.85; color:var(--ink); margin-bottom:14px; }
+.sec .dim{ color:var(--dim); }
+.caplist{ display:flex; gap:9px; flex-wrap:wrap; }
+.caplist .cc{ font-size:11px; padding:7px 11px; }
+.install{ background:var(--ink); color:var(--paper); border-radius:12px; padding:18px 20px;
+  font:500 13px var(--mono); display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.install code{ color:var(--bloom); }
+.install button{ font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  background:var(--paper); color:var(--ink); border:0; border-radius:7px; padding:8px 12px; cursor:pointer; }
+.aside{ position:sticky; top:120px; }
+.box{ background:var(--card); border:2px solid var(--ink); border-radius:14px;
+  box-shadow:4px 4px 0 var(--ink); padding:20px; margin-bottom:20px; }
+.box h4{ font:700 10px var(--mono); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); margin-bottom:12px; }
+.box .kv{ display:flex; justify-content:space-between; gap:12px; font-size:12px; padding:7px 0;
+  border-bottom:1px solid var(--line); }
+.box .kv:last-child{ border-bottom:0; }
+.box .kv b{ font-weight:700; }
+.related{ display:flex; flex-direction:column; gap:10px; }
+.related a{ display:flex; align-items:center; gap:11px; text-decoration:none; padding:8px;
+  border-radius:9px; }
+.related a:hover{ background:var(--paper); }
+.related .logo{ width:34px; height:34px; border-radius:9px; }
+.related .logo img{ width:22px; height:22px; }
+.related .logo .mono{ font-size:17px; }
+.related b{ font:700 12px var(--mono); }
+.related small{ display:block; font:400 10px var(--mono); color:var(--dim); }
+.foot{ border-top:2px solid var(--ink); padding:40px 28px; text-align:center;
+  font:500 11px var(--mono); letter-spacing:.04em; color:var(--dim); }
+.foot a{ color:var(--bloomd); text-decoration:none; }
+@media (max-width:860px){
+  .cols{ grid-template-columns:1fr; }
+  .aside{ position:static; }
+  .controls{ position:static; }
+}
+
+</style>
+</head>
+<body>
+<div id="site-nav"></div><script src="/nav.js?v=13"></script>
+<main class="detail">
+  <div class="crumb"><a href="/toolkits/">Marketplace</a> / railway</div>
+
+  <div class="dhead">
+    <span class="logo "><span class="mono">R</span></span>
+    <div>
+      <h1>railway</h1>
+      <div class="meta">
+        <span class="badge-m m-exp">Experimental</span>
+        <span class="cc cat">Deploy</span>
+        <span class="cc">v0.1.0</span>
+      </div>
+      <p class="lede">Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account.</p>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <div class="sec">
+        <h2>What it does</h2>
+        <p>Wrapper around the standard railway binary. The Workbooks use case: publish a built workbook (dist/&lt;slug&gt;.html) as a static site on the *user&#x27;s own* Railway account. wb forge web --to railway drives this CLI</p>
+      </div>
+
+      <div class="sec">
+        <h2>Capabilities it grants</h2>
+        <div class="caplist"><span class="cc">image</span><span class="cc">deploy</span><span class="cc">auth</span><span class="cc">docs</span></div>
+      </div>
+
+      <div class="sec">
+        <h2>Add it to a workbook</h2>
+        <div class="install">
+          <span>$ <code>wbx toolkit add railway</code></span>
+          <button data-copy="wbx toolkit add railway">Copy</button>
+        </div>
+        <p class="dim" style="margin-top:14px">Once added, the toolkit is wired into the workbook's Dock —
+        the agent reaches its verbs by name, the host brokers any capability it needs.
+        <a href="https://docs.workbooks.sh/toolkits/railway" style="color:var(--bloomd)">Read the docs →</a></p>
+      </div>
+
+      <div class="sec">
+        <h2>Integration</h2>
+        <p><b>Railway.</b> This toolkit connects a workbook to Railway. </p>
+      </div>
+      
+    </div>
+
+    <aside class="aside">
+      <div class="box">
+        <h4>At a glance</h4>
+        <div class="kv"><span class="dim">Version</span><b>v0.1.0</b></div><div class="kv"><span class="dim">Kind</span><b>toolkit</b></div><div class="kv"><span class="dim">Category</span><b>Deploy</b></div><div class="kv"><span class="dim">Maturity</span><b>Experimental</b></div><div class="kv"><span class="dim">CLI</span><b>railway</b></div><div class="kv"><span class="dim">Integration</span><b>Railway</b></div><div class="kv"><span class="dim">Updated</span><b>2026-06-07</b></div>
+      </div>
+      <div class="box">
+        <h4>Related toolkits</h4>
+        <div class="related">
+      <a href="/toolkits/byod.html">
+        <span class="logo "><span class="mono">B</span></span>
+        <span><b>byod</b><small>Deploy · v0.1.0</small></span>
+      </a>
+      <a href="/toolkits/capacitor.html">
+        <span class="logo "><span class="mono">C</span></span>
+        <span><b>capacitor</b><small>Deploy · v0.1.0</small></span>
+      </a>
+      <a href="/toolkits/cloudflare.html">
+        <span class="logo "><span class="mono">C</span></span>
+        <span><b>cloudflare</b><small>Deploy · v0.1.0</small></span>
+      </a>
+      <a href="/toolkits/publish.html">
+        <span class="logo "><span class="mono">P</span></span>
+        <span><b>publish</b><small>Deploy · v0.1.0</small></span>
+      </a></div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="foot">
+  Open source · forever — <a href="https://github.com/workbooks-sh/toolkits">github.com/workbooks-sh/toolkits</a>
+  · <a href="/toolkits/">back to the marketplace</a>
+</div>
+
+<script>
+document.querySelectorAll('button[data-copy]').forEach(function(b){
+  b.addEventListener('click', async function(){
+    try{ await navigator.clipboard.writeText(b.dataset.copy); }catch(e){}
+    var t=b.textContent; b.textContent='Copied ✓';
+    setTimeout(function(){ b.textContent=t; }, 1400);
+  });
+});
+</script>
+</body>
+</html>

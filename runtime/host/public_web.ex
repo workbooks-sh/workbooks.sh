@@ -378,16 +378,17 @@ defmodule Workbooks.PublicWeb do
     <title>#{escape(title)} — #{escape(site_title)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap">
     <style>
     @font-face{font-family:"Groothan";src:url("https://workbooks.sh/fonts/GroothanMixed-Regular.woff2") format("woff2");font-weight:400;font-display:block}
     :root{
-      --ink:#1a1b1e;--ink-soft:#34372f;--ink-faint:#6a6f68;
+      --ink:#121316;--ink-soft:#34372f;--ink-faint:#6a6f68;
       --blue:#149157;--blue-soft:#3fe081;--blue-faint:#e3f6ea;
       --bg:#f7f6f1;--bg-warm:#f1f0e8;--panel:#fff;
       --silver:#d9d6c8;--silver-light:#eceadf;--line:#e7e5db;
       --green:#13d943;--amber:#d98b1f;
-      --sans:"EB Garamond",Georgia,serif;
+      /* match the landing page: mono body, Groothan display — sans/mono, no serif */
+      --sans:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
       --display:"Groothan","Anton",sans-serif;
       --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
       --sidebar-w:284px;
@@ -404,12 +405,14 @@ defmodule Workbooks.PublicWeb do
     .grid{position:fixed;inset:0;z-index:-1;background-image:radial-gradient(circle at 1px 1px,rgba(35,42,54,.055) 1px,transparent 0);background-size:23px 23px;-webkit-mask-image:linear-gradient(180deg,transparent,#000 24%,#000 76%,transparent);mask-image:linear-gradient(180deg,transparent,#000 24%,#000 76%,transparent);pointer-events:none}
     ::selection{background:var(--blue-faint);color:var(--ink)}
     /* ── liquid-metal accent ── */
-    .metal{height:3px;border-radius:3px;background:linear-gradient(90deg,#b3bbc8,#7c869a 28%,var(--blue) 50%,#7c869a 72%,#b3bbc8);background-size:220% 100%;animation:shimmer 7s linear infinite}
-    @keyframes shimmer{to{background-position:-220% 0}}
+    /* DNA-seam divider — flat brand color blocks (matches the landing page seam) */
+    .metal{height:7px;border-radius:2px;background:
+      linear-gradient(90deg,#13d943 0 11%,#9ba095 11% 19%,#149157 19% 34%,#8b9085 34% 41%,
+      #13d943 41% 47%,#6a7064 47% 60%,#9ba095 60% 66%,#149157 66% 80%,#8b9085 80% 87%,#13d943 87% 100%)}
     /* ── sidebar ── */
     .sidebar{width:var(--sidebar-w);flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px)}
     .sidebar-head{padding:1.5rem 1.4rem 1.1rem;display:flex;align-items:center;gap:.6rem}
-    .brand-mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#f3f5f9,#c9d0db 46%,var(--blue));box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 2px rgba(35,42,54,.12),0 2px 8px rgba(47,111,224,.24);flex:0 0 auto}
+    .brand-mark{width:26px;height:26px;border-radius:7px;background:url("https://workbooks.sh/favicon.svg") center/contain no-repeat;flex:0 0 auto}
     .sidebar-sub{color:var(--ink-faint);font-weight:400;font-family:var(--mono);font-size:.86rem}
     .sidebar-sub-link{text-decoration:none;transition:color .15s}
     .sidebar-sub-link:hover{color:var(--blue)}
@@ -424,7 +427,11 @@ defmodule Workbooks.PublicWeb do
     /* ── main content ── */
     .page-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
     .page-header{padding:3rem 3.2rem 1.6rem;position:relative}
-    .page-header .metal{position:absolute;top:0;left:0;width:64px;margin:0}
+    .page-header .metal{position:absolute;top:0;left:0;width:168px;margin:0}
+    /* DNA-seam section dividers (replaces the plain h2 top border) */
+    .page-body h2{border-top:0!important;position:relative}
+    .page-body h2::before{content:"";position:absolute;top:calc(-1*clamp(.9rem,2vh,1.2rem));left:0;width:120px;height:6px;border-radius:2px;background:linear-gradient(90deg,#13d943 0 14%,#9ba095 14% 24%,#149157 24% 42%,#8b9085 42% 52%,#13d943 52% 60%,#6a7064 60% 78%,#149157 78% 100%)}
+    .page-body h2:first-child::before{display:none}
     .page-eyebrow{font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.7rem}
     .page-title{font-family:var(--display);font-size:clamp(2rem,4.4vw,2.9rem);font-weight:400;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
     /* cross-site links + copy-as-markdown button in the header */
