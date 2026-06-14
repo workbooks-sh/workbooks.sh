@@ -26,13 +26,13 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **jsonnet** (config templating language) | Go-wasip1 artifact | jsonnet_lane_test (arith/comprehension/stdlib) |
 | SQLite | clean-wasi prebuilt | ships in-tree |
 | crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
+| **DuckDB** (full SQL engine) | from-C++-source -> wasi | duckdb_lane_test (CREATE/INSERT/SELECT GROUP BY, 34MB wasm) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
 | Capability | Lane | Note |
 |---|---|---|
 | **12 C leaf-libs** | `build_c_dir` | zstd, brotli, md4c, tinyscheme, xxHash, miniz, cmark, libyaml, cJSON, tinyexpr, tomlc99, utf8proc (9 domains). Recipes in resolved.json |
-| **DuckDB** (SQL engine) | `build_c_dir` from C++ source | 71 split TUs compile; to-live build in progress (driver fixed; ~6 portability shims) |
 
 ## ROADMAP — not reachable in-guest (the walls)
 

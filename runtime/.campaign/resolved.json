@@ -2548,15 +2548,13 @@
   },
   "duckdb": {
    "capability": "DuckDB SQL engine from C++ source -> wasm",
-   "status": "proven",
-   "proof": "9/9 split-amalgamation TUs compile clean through build_c_dir (the C++ exceptions lane): ~25s/TU, <=700MB RSS (well under clang.wasm 4GB), incl. fmt/re2/httplib TUs + the C-API driver. NO clang.wasm OOM (the single-25MB-TU fear is dead \u2014 split amalgam fixes it).",
+   "status": "live",
+   "proof": "REAL SQL ran in-sandbox: duckdb.wasm (34.6MB, 70 amalgamation TUs + shims, wasm32-wasip1) executed CREATE TABLE + INSERT + SELECT b,COUNT(*),SUM(a) WHERE a<15 GROUP BY b -> x|3|18, y|2|19, z|1|14. duckdb_lane_test.exs green (runs the staged artifact).",
    "full_build": "~29 CPU-min, RAM-bound NOT toolchain-bound at lane concurrency-6 (~4GB aggregate); on this 16GB/15GB-used box it swaps to ~50min wall; give >=6GB free or cap concurrency ~2 -> lands, then one wasm-ld link of ~70 objs (~30MB)",
-   "recipe": "DuckDB v1.1.3; python3 scripts/amalgamation.py --splits=64 --no-linenumbers; 3 source patches (single-thread Semaphore shim \u2014 NOT -DDUCKDB_NO_THREADS which dup-defines; excise cpp-httplib ~9376 lines from duckdb-internal.hpp; InstallFromHttpUrl throws); -D_WASI_EMULATED_MMAN -DDUCKDB_AMALGAMATION -DNDEBUG. Full recipe: forge-runs/duckdb-recipe.md",
-   "to_live": "apply the additional portability shims (mbedtls entropy define, fcntl file-locking constants+stub, duckdb-6/42 fixes) then full build at low concurrency + link + SELECT",
+   "recipe": "5 gaps, all -D flags or 1-line patches (NO toolchain wall): fcntl F_*LCK -D; sched_getcpu()=0 -D; winsize struct + TIOCGWINSZ -D; mbedtls entropy via wb-wasi-stubs.c hardware_poll (NO -DMBEDTLS define needed); DuckDBPlatform() duplicate-symbol -> prefix inline (1-line patch). build_c_dir supplies EH/sjlj/mmap-shim/emulated-libs. Full reproducible recipe: forge-runs/duckdb-tolive2.md + compilers/duckdb/{ddbq.sh,ddb-link.sh}.",
    "validates": "the C++ exceptions keystone (build_c_dir EH) on a real large C++ codebase",
    "since": "iter160",
-   "full_build_finding": "conc-2 full build (to-live attempt) hit REAL portability errors (not OOM) on ~4 TUs: duckdb-mbedtls (#error needs -DMBEDTLS_NO_PLATFORM_ENTROPY + an entropy source), duckdb-5 (fcntl F_RDLCK/F_WRLCK/F_SETLK/F_GETLK undeclared \u2014 wasi-libc omits file-locking; needs -D constants + stub), + duckdb-6/42. So the FULL build needs ~6 trivial-portability patches, not the 3 the 9-TU subset showed. Still NO toolchain wall \u2014 all the omitted-POSIX class \u2014 but more source-patching than first characterized.",
-   "to_live_status": "DEFERRED (firm) \u2014 NOT a one-line fix (verified by un-truncated single-TU diagnostics). duckdb-5/6/42/mbedtls fail on TWO interacting issues: (1) fcntl F_RDLCK/F_WRLCK/F_SETLK/F_GETLK undeclared (wasi-libc omits file-locking) \u2014 -D-able; (2) BUT adding those -D surfaces a libc++ <cstdlib>/wasi-libc <stdlib.h> ldiv/lldiv/ldiv_t #include_next-chain breakage (the same tricky class as the C++ EH build, sensitive to defines). Needs build_c_dir include handling matched precisely or source patches \u2014 a multi-hour debug, not a flag. DuckDB stays PROVEN (most TUs compile, reached link). Real fix = a dedicated session: match the -iquote include chain, resolve ldiv_t, add fcntl shims, one clean build on a stable box with .o caching."
+   "caveat": "reproducible build is heavy (~30min, 70 TUs, incremental .o cache) -> a stable box / provision step, not CI. The ldiv_t fear was a clang.wasm -include/-I artifact, NOT real (use -D flags)."
   },
   "wasm_simd_intrinsics": {
    "capability": "wasm SIMD intrinsics (llvm.wasm.* \u2014 bitmask/swizzle/narrow/relaxed/etc.) in the Rust lane",
