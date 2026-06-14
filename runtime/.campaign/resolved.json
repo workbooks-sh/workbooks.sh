@@ -2687,6 +2687,13 @@
    "proof": "utf8proc 2.9.0 via build_c_dir case-folds + NFC-composes UTF-8: HeLLo->hello, e+U+0301->\u00e9 (c3a9); utf8proc_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
    "lane": "compilers/utf8proc/build.sh (fetch sha-pinned, gitignored) + build_c_dir(include_only utf8proc_data.c)",
    "since": "iter163"
+  },
+  "xdiff": {
+   "capability": "text diffing (unified diff \u2014 the git diff engine) in-sandbox",
+   "status": "live",
+   "proof": "libgit2 xdiff via build_c_dir produces a unified diff: alpha/beta/gamma vs alpha/BETA/gamma -> @@ -1,3 +1,3 @@ / -beta / +BETA; xdiff_lane_test.exs green. Needed a minimal git-xdiff.h shim (xdl_malloc->malloc, XDL_UNUSED, ctype, funcname-regex stubbed)",
+   "lane": "compilers/xdiff/build.sh (fetch libgit2 v1.8.1 deps/xdiff + shim, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
