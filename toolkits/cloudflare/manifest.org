@@ -21,14 +21,18 @@
   standing entirely on the user's OWN Cloudflare account, with just a
   =wrangler= login — no second provider, no DB to provision elsewhere.
 
-  - DATA + AI: the unified gateway Worker, d1 driver (=deploy-kit/app/gateway=) — D1 (SQLite)
-    for tenant-scoped data, Workers AI for the AI features. Driven by
-    ~wb forge app deploy --backend cf-d1~ (recipe =toolkits/wrangler/deploy/cf-d1.sh=).
+  STATUS: the turnkey one-command deploy (=wb forge app deploy --backend cf-d1=)
+  is NOT currently available — the =wb forge= verb and the unified gateway Worker
+  (=deploy-kit/app/gateway=) were removed 2026-06-09 (restore-or-drop tracked in
+  =wb-dtd0.1=). The skill gives the real raw-=wrangler= primitives to build it
+  today; do NOT invoke =wb forge app=.
+
+  - DATA + AI: a Cloudflare Worker over D1 (SQLite, tenant-scoped data) + Workers
+    AI. Built with =wrangler d1 create= / =wrangler d1 execute= / =wrangler deploy=.
   - AUTH: BetterAuth-on-D1 mounted in the Worker at =/api/auth/*= when
-    =BETTER_AUTH_SECRET= is set (sessions, organizations, JWKS, bearer); an
-    HS256 dev-token path is the fallback when it isn't.
-  - HOSTING: the workbook =.html= frontend ships to Cloudflare Pages via
-    ~wb forge web deploy --to cloudflare~ (=toolkits/wrangler/deploy/cloudflare.sh=).
+    =BETTER_AUTH_SECRET= is set (sessions, organizations, JWKS, bearer).
+  - HOSTING: the workbook =.html= frontend ships to Cloudflare Pages via the
+    =wrangler= toolkit (=wrangler pages deploy=) — that path works today.
 
   Account selection is automatic: with one account on the login it's derived
   from =wrangler whoami=; with several, set =CLOUDFLARE_ACCOUNT_ID=. The token

@@ -17,15 +17,21 @@
   :SKILL_DIR: skills/
   :END:
 
-  Wraps ~wb forge app~ — connect a forged workbook to a live Postgres
-  (Crunchy/Railway/RDS) through a secure data gateway, with the developer's
-  OWN auth (BetterAuth) for sign-in, sessions, organizations (multi-tenant),
-  and API keys. No agent engine required.
+  Connect a forged workbook to a live database (Postgres, or Cloudflare D1)
+  through a secure data backend, with the developer's OWN auth (BetterAuth) for
+  sign-in, sessions, organizations (multi-tenant), and API keys. No agent engine
+  required.
 
-  The workbook .html is the frontend; the gateway + auth deploy SEPARATELY and
+  STATUS: the turnkey provisioning (=wb forge app deploy=) + its unified gateway
+  (=deploy-kit/app/gateway=) were removed 2026-06-09 and are NOT currently
+  available (restore-or-drop tracked in =wb-dtd0.1=). Do NOT invoke =wb forge
+  app=. The skill still gives the (real, current) architecture + frontend wiring,
+  and points at the live provider tools to stand up the backend yourself
+  (=cloudflare= / =railway= / =wrangler= toolkits + BetterAuth).
+
+  The workbook .html is the frontend; the backend + auth deploy SEPARATELY and
   are pointed at via a PUBLIC connection descriptor injected into the .html —
-  never DB credentials or server code. See plans/forge-byod.org +
-  plans/forge-auth.org.
+  never DB credentials or server code.
 
   Skill index (read on demand):
 

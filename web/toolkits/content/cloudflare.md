@@ -10,18 +10,17 @@ Reach for `cloudflare` when you want a workbook's backend to live on a single ac
 
 ```
 wrangler login
-wb forge app deploy --backend cf-d1     # D1 + Workers AI gateway Worker
-wb forge web deploy --to cloudflare     # ship the .html to Pages
-# BetterAuth mounts at /api/auth/* when BETTER_AUTH_SECRET is set
+wrangler d1 create <slug>               # data: create the D1 database
+wrangler d1 execute <slug> --remote --file schema.sql
+wrangler deploy                         # your Worker (D1 + [ai] binding + BetterAuth)
+# ship the .html frontend with the wrangler toolkit: wrangler pages deploy
 ```
 
 ## What it grants
 
-- Data + AI: a unified gateway Worker with a D1 driver — tenant-scoped SQLite plus Workers AI.
-- Auth: BetterAuth-on-D1 at `/api/auth/*` (sessions, organizations, JWKS, bearer); an HS256 dev-token fallback when no secret is set.
-- Hosting: the workbook `.html` frontend on Cloudflare Pages.
+- The architecture + the **real raw-`wrangler` primitives** to build an all-Cloudflare backend: D1 (tenant-scoped SQLite) + Workers AI + BetterAuth-on-D1 at `/api/auth/*`, with the `.html` frontend on Pages.
 - Automatic account selection from `wrangler whoami` (set `CLOUDFLARE_ACCOUNT_ID` if you have several).
 
 ## Maturity
 
-Experimental. Uses wrangler's own token in `~/.wrangler` — Workbooks never reads, stores, or proxies it. Requires wrangler 3+.
+Experimental. The turnkey one-command deploy (`wb forge app deploy --backend cf-d1`) and its bundled gateway Worker were removed 2026-06-09 and are **not currently available** (restore-or-drop tracked in `wb-dtd0.1`); the skill gives the raw primitives to build it today. Uses wrangler's own token in `~/.wrangler` — Workbooks never reads, stores, or proxies it. Requires wrangler 3+.
