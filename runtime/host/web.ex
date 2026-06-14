@@ -874,7 +874,7 @@ defmodule Workbooks.Web do
 
         html = html |> Workbooks.Bundle.embed(blob) |> Workbooks.Bundle.embed_loader()
         sign? = Plug.Conn.fetch_query_params(conn).query_params["sign"] == "1"
-        html = if sign?, do: Workbooks.Manifest.sign(html, t), else: html
+        html = if sign?, do: Workbooks.Bundle.sign_embedded(html, t), else: html
         %{ok: true, html_b64: Base.encode64(html), files: Map.keys(parts)}
       rescue
         e -> %{error: Exception.message(e)}

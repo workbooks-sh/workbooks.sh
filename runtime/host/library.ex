@@ -92,7 +92,19 @@ defmodule Workbooks.Library do
   def checkin(tenant, member_id, workdir) do
     with %{ref: {:path, p}} = m <- find(tenant, member_id),
          {:ok, html} <- File.read(Path.join(workdir, "workbook.html")) do
-      signed = Workbooks.Manifest.sign(html, tenant, [%{"type" => "c2pa.action.updated", "actor" => Git.did(tenant)}])
+      # Bind the embedded filesystem into the signature (FAIL-CLOSED on verify if a
+      # payload is later swapped): an embedded `.html` is signed with a
+      # `wb.bundle.sha256` assertion; a plain page falls back to a page-only sig.
+      updated = %{"type" => "c2pa.action.updated", "actor" => Git.did(tenant)}
+
+      signed =
+        case Workbooks.Bundle.extract(html) do
+          nil ->
+            Workbooks.Manifest.sign(html, tenant, [updated])
+
+          blob ->
+            Workbooks.Manifest.sign(html, tenant, [updated, Workbooks.Bundle.bundle_sha_assertion_for(blob)])
+        end
       dest = Path.join(Git.repo_path(tenant), p)
       File.write!(dest, signed)
       %{member: m, bytes: byte_size(signed)}

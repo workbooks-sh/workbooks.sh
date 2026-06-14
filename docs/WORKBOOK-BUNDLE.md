@@ -108,25 +108,34 @@ default and the reason deflate was chosen.)
       (legacy sealing pinned at `egress: :wbundle`). Inferred-security floor below.
 - [x] **Inferred security adjacents** (shipped alongside the migration, see
       `docs/BUNDLE-INFERRED-ITEMS.md`):
-  - **Zip-bomb / decompression-ratio guard** — `Bundle.unpack` reads the central
-    directory's declared sizes (`:zip.list_dir`) and rejects a blob over
-    512 MB uncompressed total OR any single entry past 200× expansion, BEFORE
-    `:zip.extract` runs away. The JS loader (`web/wb-bundle-loader.js`) mirrors the
-    same caps from the central dir AND re-checks the actual inflated size per entry
-    (a lying header can't run away). Tests: `bundle_egress_migration_test.exs` +
-    `web/wb-bundle-loader.test.js`.
-  - **Path-traversal (zip-slip) guard** — `Library.unpack` now routes through
-    `Bundle.write_tree`, whose `safe_member?` rejects absolute / `..` entry names
-    (mirrors the CLI `with_org_file` confinement); `wb unbundle` already used
-    `write_tree`. Pinned in `bundle_cli_test.exs` + `bundle_egress_migration_test.exs`.
-  - **Manifest signing over the embedded form** — `Manifest.sign`/`verify` hash the
-    page with the wb-bundle block STRIPPED (so the signature is invariant under
-    embed/extract), preserving the block in the signed OUTPUT (only the prior
-    manifest is removed before re-inject — the wb-bundle and a `workbook-spec` marker
-    coexist). The embedded zip is bound by a signed `wb.bundle.sha256` assertion
-    (`Bundle.bundle_sha_assertion_for/1`), so `Bundle.verify/1` catches a swapped
-    payload under an otherwise-valid signature (`bundle_integrity: false`). Pinned in
-    `bundle_egress_migration_test.exs`.
+  - **Zip-bomb / decompression guard (ACTUAL-output, not declared)** — `Bundle.unpack`
+    does NOT trust `:zip.list_dir`'s declared sizes (a forged central dir declaring
+    100 B could inflate to 30 MB+ via `:zip.extract` and bypass a declared-size cap →
+    BEAM OOM). It parses the zip itself and raw-inflates each entry via
+    `:zlib.safeInflate` in bounded chunks, enforcing a hard PER-ENTRY (256 MB) +
+    RUNNING-TOTAL (512 MB) cap on ACTUAL output and ABORTING before materializing
+    past it. Caps are configurable (`:workbooks, :bundle_max_total_bytes` /
+    `:bundle_max_entry_bytes`); the guard governs every host unpack path. The JS
+    loader (`web/wb-bundle-loader.js`) likewise caps actual inflated output. Tests:
+    `bundle_security_poc_test.exs` (forged 100 B-declared → 30 MB REJECTED) +
+    `bundle_egress_migration_test.exs` + `web/wb-bundle-loader.test.js`.
+  - **Path-traversal (zip-slip) + control-dir denylist** — `Bundle.write_tree`'s
+    `safe_member?` rejects absolute / `..` entry names (CLI `with_org_file`
+    confinement), AND it applies the SAME `@strip_segments` denylist `read_tree` uses
+    (`.git`/`.beads`/`node_modules`/`_build`/`.tmp`/`.private`) — a hostile bundle
+    smuggling `.git/hooks/pre-commit` (code-exec on the next git op) is REFUSED, not
+    just `..`-confined. `Library.unpack` + `wb unbundle` both route through it. Pinned
+    in `bundle_security_poc_test.exs` + `bundle_cli_test.exs` + `bundle_egress_migration_test.exs`.
+  - **Manifest signing over the embedded form (bind + fail-closed)** — `Manifest.sign`/
+    `verify` hash the page with the wb-bundle block STRIPPED (signature invariant
+    under embed/extract; wb-bundle + a `workbook-spec` marker coexist), so the
+    signature alone does NOT cover the payload. EVERY embedded-form signing path binds
+    the blob with a signed `wb.bundle.sha256` assertion (`bundle_sha_assertion_for/1`):
+    `ship(egress: :html)`, RCP `POST /rcp/bundle?sign=1` and `Library.checkin` (via
+    `Bundle.sign_embedded/1`). And `Bundle.verify/1` FAILS CLOSED (`valid: false`,
+    `bundle_unbound: true`) on a signed embedded form with NO such assertion; a
+    swapped payload yields `bundle_integrity: false`. Pinned in
+    `bundle_security_poc_test.exs` + `bundle_egress_migration_test.exs`.
   - **CSP + inert-payload on served pages** — `PublicWeb.serve_html` sets a
     `Content-Security-Policy` (`default-src 'self'`, `object-src 'none'`, `base-uri
     'self'`); hydrated VFS entries are DATA, not scripts, until the runtime explicitly

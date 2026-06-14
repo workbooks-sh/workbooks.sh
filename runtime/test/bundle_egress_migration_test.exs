@@ -121,10 +121,13 @@ defmodule Workbooks.BundleEgressMigrationTest do
   end
 
   describe "zip-bomb guard on unpack (the inferred security floor)" do
-    test "a high-ratio single entry is rejected before runaway inflation" do
-      # 4 MB of zeros deflates to ~KB → expansion ratio far past the cap.
-      bomb = Bundle.pack(%{"bomb" => :binary.copy(<<0>>, 4 * 1024 * 1024)})
+    test "an entry that inflates past the ACTUAL-output cap is rejected" do
+      # The guard caps ACTUAL inflated output (not the attacker-declared size). Lower
+      # the cap so a few-MB of zeros — which deflates to ~KB — is refused on output.
+      Application.put_env(:workbooks, :bundle_max_entry_bytes, 1 * 1024 * 1024)
+      on_exit(fn -> Application.delete_env(:workbooks, :bundle_max_entry_bytes) end)
 
+      bomb = Bundle.pack(%{"bomb" => :binary.copy(<<0>>, 4 * 1024 * 1024)})
       assert_raise ArgumentError, ~r/zip-bomb guard/, fn -> Bundle.unpack(bomb) end
     end
 

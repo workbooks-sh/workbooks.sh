@@ -14,53 +14,180 @@ defmodule Workbooks.Bundle do
     zip
   end
 
-  # Zip-bomb / decompression-ratio guard (the inferred security floor). A few-KB
-  # base64 zip can inflate to gigabytes and OOM the host BEAM (`:zip.extract`), the
-  # agent sandbox, or — via the JS loader — a browser tab. So we cap the TOTAL
-  # decompressed size AND each entry's expansion RATIO, refusing BEFORE the runaway
-  # output is fully materialized in the caller. The JS loader mirrors these caps.
-  @max_total_bytes 512 * 1024 * 1024
-  @max_ratio 200
+  # Zip-bomb / decompression guard (the inferred security floor). A few-KB base64
+  # zip can inflate to gigabytes and OOM the host BEAM, the agent sandbox, or — via
+  # the JS loader — a browser tab. The DECLARED sizes in a zip's central directory
+  # are attacker-controlled, so we DO NOT trust them: `:zip.extract`/`:zip.list_dir`
+  # would happily inflate a 100B-declared entry into 30MB+ of actual output. Instead
+  # we inflate every entry OURSELVES via `:zlib` raw-deflate in bounded chunks,
+  # enforcing a hard PER-ENTRY and RUNNING-TOTAL cap on ACTUAL output bytes and
+  # ABORTING the instant either cap is crossed — regardless of any declared size.
+  # The JS loader (`web/wb-bundle-loader.js`) mirrors this (caps actual inflated
+  # output). Caps are configurable via app env (`:workbooks, :bundle_max_*`).
+  @default_max_total_bytes 512 * 1024 * 1024
+  @default_max_entry_bytes 256 * 1024 * 1024
+
+  @sig_eocd 0x06054B50
+  @sig_cdh 0x02014B50
+  @sig_lfh 0x04034B50
+
+  # VCS/private/build control-dir segments stripped on egress (`read_tree`) AND
+  # refused on ingress (`write_tree` via `denied_member?`) — one shared denylist.
+  @strip_segments [".git", ".beads", "node_modules", "_build", ".tmp", ".private"]
+
+  defp max_total_bytes, do: Application.get_env(:workbooks, :bundle_max_total_bytes, @default_max_total_bytes)
+  defp max_entry_bytes, do: Application.get_env(:workbooks, :bundle_max_entry_bytes, @default_max_entry_bytes)
 
   @doc """
-  Unpack a Bundle blob back to its parts map. Guards against zip-bombs: rejects a
-  blob whose entries together exceed `#{@max_total_bytes}` bytes uncompressed, or
-  any single entry that expands beyond `#{@max_ratio}×` its compressed size. Raises
-  `ArgumentError` on a bomb rather than letting decompression run away.
+  Unpack a Bundle blob back to its parts map. Zip-bomb safe: each entry is inflated
+  with a hard cap on ACTUAL output (per-entry and running-total), aborting before
+  any runaway output is materialized — declared sizes in the central directory are
+  NEVER trusted. Raises `ArgumentError` on a bomb (or a malformed/unsupported zip).
   """
   def unpack(blob) when is_binary(blob) do
-    guard_zip_bomb!(blob)
-    {:ok, files} = :zip.extract(blob, [:memory])
-    Map.new(files, fn {name, content} -> {List.to_string(name), content} end)
+    parse_zip(blob)
   end
 
-  # Read the central directory's declared sizes (authoritative; cheap, no inflate)
-  # and reject before extraction if the bomb thresholds are crossed. We use the
-  # per-entry compressed/uncompressed pair from `:zip.list_dir` so a single
-  # high-ratio entry is caught even when the total stays modest.
-  defp guard_zip_bomb!(blob) do
-    {:ok, entries} = :zip.list_dir(blob)
+  # Walk the central directory for the member list (name + method + local-header
+  # offset), then seek each local file header and inflate the compressed slice with
+  # a bounded running output cap. The ACTUAL output is what's capped — a forged
+  # central dir that lies about uncompressed size cannot bypass the guard, because
+  # we never read its declared size to decide when to stop.
+  defp parse_zip(blob) do
+    eocd = find_eocd(blob) || raise(ArgumentError, "not a wbundle: no EOCD record (not a zip)")
+    <<_::binary-size(eocd + 10), count::little-16, _::binary>> = blob
+    <<_::binary-size(eocd + 16), cd_off::little-32, _::binary>> = blob
 
-    {total, _} =
-      Enum.reduce(entries, {0, 0}, fn
-        {:zip_file, _name, info, _comment, _offset, comp_size}, {total, _} ->
-          uncomp = elem(info, 1)
-
-          if comp_size > 0 and uncomp > comp_size * @max_ratio do
-            raise ArgumentError, "bundle entry exceeds #{@max_ratio}× expansion (zip-bomb guard)"
-          end
-
-          {total + uncomp, comp_size}
-
-        _other, acc ->
-          acc
+    # Walk the central-directory entries sequentially, advancing by each header's
+    # own length. Output is bounded as we inflate, never by declared sizes.
+    {parts, _total, _off} =
+      Enum.reduce(1..count//1, {%{}, 0, cd_off}, fn _e, {acc, total, off} ->
+        read_cdh!(blob, off, acc, total)
       end)
 
-    if total > @max_total_bytes do
-      raise ArgumentError, "bundle exceeds #{@max_total_bytes}B uncompressed (zip-bomb guard)"
+    parts
+  end
+
+  # Read one central-directory header at `off`: validate signature, pull method +
+  # name + local-header offset, inflate the entry under the running cap, advance.
+  defp read_cdh!(blob, off, acc, total) do
+    <<_::binary-size(off), sig::little-32, _::binary>> = blob
+
+    unless sig == @sig_cdh do
+      raise ArgumentError, "bad central-dir entry (zip-bomb guard / malformed zip)"
     end
 
-    :ok
+    <<_::binary-size(off + 10), method::little-16, _::binary>> = blob
+    <<_::binary-size(off + 28), name_len::little-16, extra_len::little-16, comment_len::little-16, _::binary>> = blob
+    <<_::binary-size(off + 42), lho::little-32, _::binary>> = blob
+    <<_::binary-size(off + 46), name::binary-size(name_len), _::binary>> = blob
+    name = List.to_string(:erlang.binary_to_list(name))
+
+    {acc, total} =
+      if String.ends_with?(name, "/") do
+        {acc, total}
+      else
+        data = inflate_entry!(blob, lho, method, name, total)
+        {Map.put(acc, name, data), total + byte_size(data)}
+      end
+
+    next = off + 46 + name_len + extra_len + comment_len
+    {acc, total, next}
+  end
+
+  # Seek the local file header for the data start (its own name/extra lengths may
+  # differ from the central dir's), then inflate the compressed slice with a hard
+  # running + per-entry output cap. Stored (method 0) is bounded by the slice it
+  # copies plus the same total guard.
+  defp inflate_entry!(blob, lho, method, name, total) do
+    <<_::binary-size(lho), sig::little-32, _::binary>> = blob
+
+    unless sig == @sig_lfh do
+      raise ArgumentError, "bad local header for #{name} (malformed zip)"
+    end
+
+    <<_::binary-size(lho + 18), comp_size::little-32, _uncomp::little-32, l_name_len::little-16,
+      l_extra_len::little-16, _::binary>> = blob
+
+    data_start = lho + 30 + l_name_len + l_extra_len
+    <<_::binary-size(data_start), comp::binary-size(comp_size), _::binary>> = blob
+
+    out = bounded_inflate!(comp, method, name, total)
+
+    if total + byte_size(out) > max_total_bytes() do
+      raise ArgumentError, "bundle exceeds #{max_total_bytes()}B uncompressed (zip-bomb guard)"
+    end
+
+    out
+  end
+
+  # Raw-deflate (or stored) inflate with a HARD output cap enforced as bytes are
+  # produced — `:zlib.safeInflate` yields chunk-by-chunk, so we abort the moment
+  # the running ACTUAL output crosses the per-entry or remaining-total budget,
+  # never materializing past the cap. This is the core of the zip-bomb defense:
+  # the declared uncompressed size is irrelevant; only what actually inflates counts.
+  defp bounded_inflate!(comp, 0, _name, total) do
+    # Stored: the slice IS the output. Still bound by the per-entry + total caps.
+    if byte_size(comp) > max_entry_bytes() or total + byte_size(comp) > max_total_bytes() do
+      raise ArgumentError, "bundle entry exceeds output cap (zip-bomb guard)"
+    end
+
+    comp
+  end
+
+  defp bounded_inflate!(comp, 8, name, total) do
+    z = :zlib.open()
+
+    try do
+      :zlib.inflateInit(z, -15)
+      entry_cap = max_entry_bytes()
+      total_remaining = max(max_total_bytes() - total, 0)
+      cap = min(entry_cap, total_remaining)
+
+      acc = safe_inflate_loop(z, :zlib.safeInflate(z, comp), name, cap, 0, [])
+      IO.iodata_to_binary(acc)
+    after
+      :zlib.close(z)
+    end
+  end
+
+  defp bounded_inflate!(_comp, method, name, _total) do
+    raise ArgumentError, "unsupported zip method #{method} for #{name}"
+  end
+
+  defp safe_inflate_loop(z, {:continue, chunk}, name, cap, produced, acc) do
+    produced = produced + IO.iodata_length(chunk)
+
+    if produced > cap do
+      raise ArgumentError, "bundle entry #{name} exceeds output cap (zip-bomb guard)"
+    end
+
+    safe_inflate_loop(z, :zlib.safeInflate(z, []), name, cap, produced, [acc | chunk])
+  end
+
+  defp safe_inflate_loop(_z, {:finished, chunk}, name, cap, produced, acc) do
+    produced = produced + IO.iodata_length(chunk)
+
+    if produced > cap do
+      raise ArgumentError, "bundle entry #{name} exceeds output cap (zip-bomb guard)"
+    end
+
+    [acc | chunk]
+  end
+
+  # Scan backward for the End-Of-Central-Directory signature (the zip comment may be
+  # up to 64KB, so we scan rather than assume a fixed tail). Returns the offset or nil.
+  defp find_eocd(blob) do
+    size = byte_size(blob)
+
+    if size < 22 do
+      nil
+    else
+      Enum.find((size - 22)..0//-1, fn i ->
+        <<_::binary-size(i), sig::little-32, _::binary>> = blob
+        sig == @sig_eocd
+      end)
+    end
   end
 
   @doc ~S"""
@@ -105,7 +232,7 @@ defmodule Workbooks.Bundle do
   defp strip_path?(abs) do
     parts = Path.split(abs)
 
-    Enum.any?([".git", ".beads", "node_modules", "_build", ".tmp", ".private"], &(&1 in parts)) or
+    Enum.any?(@strip_segments, &(&1 in parts)) or
       Workbooks.Private.private?(abs)
   end
 
@@ -117,23 +244,43 @@ defmodule Workbooks.Bundle do
   def write_tree(parts, dir) when is_map(parts) and is_binary(dir) do
     root = Path.expand(dir)
 
-    for {name, content} <- parts do
-      p = Path.expand(Path.join(dir, name))
+    written =
+      for {name, content} <- parts, reduce: 0 do
+        n ->
+          p = Path.expand(Path.join(dir, name))
 
-      unless safe_member?(name) and String.starts_with?(p <> "/", root <> "/") do
-        raise ArgumentError, "unsafe bundle path: #{name}"
+          unless safe_member?(name) and String.starts_with?(p <> "/", root <> "/") do
+            raise ArgumentError, "unsafe bundle path: #{name}"
+          end
+
+          # A hostile bundle that smuggles a VCS/dotfile control dir (e.g.
+          # `.git/hooks/pre-commit`) would unpack into the tree and run on the next
+          # git op — code-exec. Apply the SAME denylist `read_tree` strips on the
+          # way OUT, refusing it on the way IN. Confinement (`..`/absolute) is not
+          # enough: these are confined-but-hostile relative paths.
+          if denied_member?(name) do
+            raise ArgumentError, "refused control-dir bundle path: #{name}"
+          end
+
+          File.mkdir_p!(Path.dirname(p))
+          File.write!(p, content)
+          n + 1
       end
 
-      File.mkdir_p!(Path.dirname(p))
-      File.write!(p, content)
-    end
-
-    map_size(parts)
+    written
   end
 
   defp safe_member?(name) do
     name != "" and Path.type(name) == :relative and
       ".." not in Path.split(name)
+  end
+
+  # The write-side mirror of `strip_path?` for a RELATIVE member name: refuse any
+  # path that traverses a VCS/private/build control dir at any segment. One shared
+  # denylist with `read_tree` (`@strip_segments`), so egress and ingress agree.
+  defp denied_member?(name) do
+    parts = name |> String.replace("\\", "/") |> Path.split()
+    Enum.any?(@strip_segments, &(&1 in parts))
   end
 
   @doc """
@@ -444,18 +591,28 @@ defmodule Workbooks.Bundle do
     end
   end
 
-  # Bind signature ⇄ embedded filesystem: if the signed manifest pinned the zip blob
-  # (a `wb.bundle.sha256` assertion the embedded-form ship adds), the actual blob's
-  # sha must match — else a recipient could swap the wb-bundle payload under an
-  # otherwise-valid signature. No such assertion → the base verdict stands.
+  # Bind signature ⇄ embedded filesystem. The embedded `.html` form carries its
+  # filesystem in the wb-bundle block, which is STRIPPED before the page is hashed
+  # for the signature — so the signature alone does NOT cover the payload. The only
+  # thing binding the payload is a signed `wb.bundle.sha256` assertion. Therefore a
+  # signed embedded form that carries NO such assertion is UNBOUND: an attacker
+  # could swap the wb-bundle payload and the signature would still validate. We FAIL
+  # CLOSED on that — a valid signature over an embedded form MUST pin the blob's sha,
+  # and that sha MUST match the actual embedded blob, or the verdict is invalid.
   defp bind_bundle_integrity(%{valid: true} = base, blob) when is_binary(blob) do
+    actual = :crypto.hash(:sha256, blob) |> Base.encode16(case: :lower)
+
     case bundle_sha_assertion(base[:assertions]) do
       nil ->
-        base
+        # Signed embedded form with no payload binding ⇒ the fs is swappable under
+        # the signature. Do not bless it.
+        Map.merge(base, %{valid: false, bundle_integrity: false, bundle_unbound: true})
 
-      expected ->
-        actual = :crypto.hash(:sha256, blob) |> Base.encode16(case: :lower)
-        if actual == expected, do: base, else: Map.put(%{base | valid: false}, :bundle_integrity, false)
+      ^actual ->
+        Map.put(base, :bundle_integrity, true)
+
+      _mismatch ->
+        Map.merge(base, %{valid: false, bundle_integrity: false})
     end
   end
 
@@ -477,6 +634,27 @@ defmodule Workbooks.Bundle do
   """
   def bundle_sha_assertion_for(blob) when is_binary(blob) do
     %{"type" => "wb.bundle.sha256", "value" => :crypto.hash(:sha256, blob) |> Base.encode16(case: :lower)}
+  end
+
+  @doc ~S"""
+  Sign an already-embedded self-contained `.html` as `tenant`, BINDING its embedded
+  filesystem. Because `Manifest.sign` hashes the page with the wb-bundle block
+  stripped, the signature alone does NOT cover the payload — so this adds the
+  `wb.bundle.sha256` assertion pinning the embedded blob (and a `published` action).
+  Use this for EVERY embedded-form signing path (RCP `?sign=1`, `Library.checkin`)
+  so a swapped payload under a valid signature fails `verify/1`. A page with no
+  embedded bundle falls back to a plain page signature.
+  """
+  def sign_embedded(html, tenant) when is_binary(html) do
+    assertions = [%{"type" => "c2pa.action.published", "actor" => Workbooks.Git.did(tenant)}]
+
+    assertions =
+      case extract(html) do
+        nil -> assertions
+        blob -> [bundle_sha_assertion_for(blob) | assertions]
+      end
+
+    Workbooks.Manifest.sign(html, tenant, assertions)
   end
 
   # ── The self-contained Workbook: the bundle lives INSIDE the .html ──────────
