@@ -101,4 +101,49 @@ defmodule Workbooks.Bundle do
   def verify(blob) when is_binary(blob) do
     Workbooks.Manifest.verify(unpack(blob)["workbook.html"] || "")
   end
+
+  # ── The self-contained Workbook: the bundle lives INSIDE the .html ──────────
+  #
+  # The canonical portable Workbook is ONE .html that carries its filesystem as an
+  # embedded bundle: the `pack/1` zip (already deflate-compressed per entry),
+  # base64'd into a single `<script id="wb-bundle">` block. So one file is the page
+  # AND its compressed data store — move it, archive it, serve it, all as one file.
+  # base64's alphabet excludes `<`, so the payload can never break out of the
+  # script tag (no escaping needed, injection-inert). Every tier unpacks the SAME
+  # bytes: a browser via `DecompressionStream('deflate-raw')` per zip entry; the
+  # host via `:zip`/`unpack/1`; the agent's sandbox via the wasm zip lane.
+
+  @bundle_open ~s(<script type="application/zip" id="wb-bundle" data-encoding="base64">)
+  @bundle_re ~r/<script[^>]*id="wb-bundle"[^>]*>(.*?)<\/script>/s
+
+  @doc """
+  Embed a bundle blob INTO a workbook html — the self-contained form. Idempotent:
+  any prior embedded bundle is replaced first, so re-bundling after edits stays
+  clean. Injected just before `</body>` (or appended when there's no body).
+  """
+  def embed(html, blob) when is_binary(html) and is_binary(blob) do
+    block = @bundle_open <> Base.encode64(blob) <> "</script>"
+    html = strip_bundle(html)
+
+    if String.contains?(html, "</body>"),
+      do: String.replace(html, "</body>", block <> "\n</body>", global: false),
+      else: html <> "\n" <> block
+  end
+
+  @doc "Extract the embedded bundle blob from a workbook html, or nil if none."
+  def extract(html) when is_binary(html) do
+    with [_, b64] <- Regex.run(@bundle_re, html),
+         {:ok, blob} <- Base.decode64(String.trim(b64)) do
+      blob
+    else
+      _ -> nil
+    end
+  end
+
+  @doc "True when the html carries an embedded bundle."
+  def embedded?(html) when is_binary(html), do: extract(html) != nil
+
+  # Drop any existing wb-bundle block so embed/2 is idempotent (the edit loop:
+  # unbundle → edit → re-bundle must not stack stale payloads).
+  defp strip_bundle(html), do: Regex.replace(@bundle_re, html, "", global: true) |> String.replace(~r/\n{3,}/, "\n\n")
 end
