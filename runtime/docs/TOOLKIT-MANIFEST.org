@@ -176,7 +176,7 @@
      │      component: Instance.call (in-process, typed)
      │      kernel   : fabric instantiates once, calls bytes→bytes in a loop
      │
-  PROMOTE   session-local → workspace (.wbundle) → registry (sign + sha pin)
+  PROMOTE   session-local → workspace (self-contained .html) → registry (sign + sha pin)
   #+end_src
 
   The compiler is itself WASM, so BUILD never escapes the sandbox and needs no

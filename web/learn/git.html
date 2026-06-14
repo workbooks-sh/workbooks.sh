@@ -135,8 +135,8 @@
     <tr><td>the <a href="vfs">vfs.sqlite</a> disk</td><td>binary database file</td><td class="n">stored, but git can't line-diff it</td><td><code>wbx unbundle</code> recovers a source tree; the legible-SQL projection is design intent (see honesty)</td></tr>
   </table>
   <p>Two things follow. First, the source is never trapped: a workbook ships as
-  a <code>.wbundle</code> — a plain zip carrying <code>workbook.html</code> and
-  <code>workbook.org</code> side by side, on purpose, so a recipient can
+  one <code>.html</code> that carries a plain zip inside it, holding
+  <code>workbook.org</code> right beside the rendered page, on purpose, so a recipient can
   <code>wbx unbundle</code> it back into a diffable tree and re-author. The
   comment in the bundler says it outright: <i>source travels with the artifact —
   recipients can unbundle and re-author.</i> Second, the one binary layer —
@@ -433,9 +433,10 @@ flowchart LR
   </details>
   <details>
     <summary>How do I get a diffable tree out of a workbook someone sent me?</summary>
-    <p><code>wbx unbundle &lt;file&gt;</code>. A <code>.wbundle</code> carries
-    <code>workbook.org</code> alongside the artifact specifically so you can
-    extract the source and re-author it. The source travels with the artifact.</p>
+    <p><code>wbx unbundle &lt;file&gt;</code>. A workbook <code>.html</code> carries
+    <code>workbook.org</code> in the filesystem embedded inside it (and a legacy
+    <code>.wbundle</code> carries it the same way), so you can extract the source
+    and re-author it. The source travels with the artifact.</p>
   </details>
 </section>
 

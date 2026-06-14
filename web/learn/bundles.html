@@ -39,11 +39,13 @@
     <div class="lcol">
       <div class="kicker">learn / 01·1 — <b>under workbook · bundles</b></div>
       <h1><span class="ln">the carton</span><span class="ln bub">AROUND</span><span class="ln">the app</span></h1>
-      <p class="dek">You bundled a <a href="workbook">workbook</a> and got a second file
-      with a strange extension. Relax: a <b>.wbundle is a plain zip</b> — the app, its
-      source, its disk, and a one-object label. This page opens one with tools you
-      already have, walks the round trips, and shows exactly what leaves home when
-      you share — and what stays.</p>
+      <p class="dek">A <a href="workbook">workbook</a> is one <code>.html</code> that
+      carries its whole filesystem inside it — the app, its source, its disk, and a
+      one-object label, packed as a <b>plain deflate zip</b>. This page opens that zip
+      with tools you already have, walks the round trips, and shows exactly what leaves
+      home when you share — and what stays. (The same zip also exists as a standalone
+      <b>.wbundle</b> file for back-compat; the self-contained <code>.html</code> is the
+      standard.)</p>
       <div class="meta">
         <span class="on">the carton</span><span>11 min read</span>
       </div>
@@ -417,13 +419,13 @@ flowchart TD
   left; <a href="#sealed">sealed entries</a> protect what shipped as
   ciphertext; everything else in the carton is readable by design. Don't
   put a secret in the workspace and hope the extension protects it.</p>
-  <p><b>The .html is still the artifact people open.</b> The parent lesson's
-  terminal story ends at a self-contained <code>shop.html</code> — and
-  that's right: the html is the runnable thing, the page you double-click.
-  The <code>.wbundle</code> is the shipping carton <em>around</em> it —
-  html plus source plus disk plus label — and it exists for
-  <b>round-tripping authorship</b>, not for viewing. Hand a reader the
-  html; hand a collaborator the carton. As for the two packers — Erlang's
+  <p><b>The .html is the artifact — and it already carries the carton.</b> The
+  parent lesson's terminal story ends at a self-contained <code>shop.html</code>,
+  and that's the standard: the html is the runnable thing you double-click, and
+  the source, disk, and label ride <em>inside</em> it as the embedded zip. The
+  standalone <code>.wbundle</code> is the same zip as a separate file — it exists
+  for back-compat and as a convenience for <b>round-tripping authorship</b>, not
+  for viewing. Hand a reader the html and they already have everything. As for the two packers — Erlang's
   on the engine, Rust's in the CLI — the guarantee is the same container
   either way: same entries, same manifest, same tag. Byte-identical
   archives are not the claim; interchangeability is.</p>
@@ -439,12 +441,13 @@ flowchart TD
     called it.</p>
   </details>
   <details>
-    <summary>Why not just ship the bare .html?</summary>
-    <p>You can — that's exactly what publish does: it pulls
-    <code>workbook.html</code> out of the carton and serves it. The bundle
-    earns its keep when the recipient is a collaborator, not a viewer: it
-    adds the org source for re-authoring and the disk as a separate,
-    directly queryable file.</p>
+    <summary>Then why does a separate .wbundle still exist?</summary>
+    <p>The bare <code>.html</code> already carries everything — source, disk,
+    and label are packed in the embedded zip, so a recipient can extract them
+    straight from the page. The standalone <code>.wbundle</code> is the same zip
+    written as its own file: a back-compat form, and a convenience when you'd
+    rather hand a collaborator the disk as a separate, directly queryable file
+    than have them pull it out of the html.</p>
   </details>
   <details>
     <summary>Does my agent's memory ship when I share?</summary>

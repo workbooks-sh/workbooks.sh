@@ -92,7 +92,19 @@ defmodule Workbooks.Library do
   def checkin(tenant, member_id, workdir) do
     with %{ref: {:path, p}} = m <- find(tenant, member_id),
          {:ok, html} <- File.read(Path.join(workdir, "workbook.html")) do
-      signed = Workbooks.Manifest.sign(html, tenant, [%{"type" => "c2pa.action.updated", "actor" => Git.did(tenant)}])
+      # Bind the embedded filesystem into the signature (FAIL-CLOSED on verify if a
+      # payload is later swapped): an embedded `.html` is signed with a
+      # `wb.bundle.sha256` assertion; a plain page falls back to a page-only sig.
+      updated = %{"type" => "c2pa.action.updated", "actor" => Git.did(tenant)}
+
+      signed =
+        case Workbooks.Bundle.extract(html) do
+          nil ->
+            Workbooks.Manifest.sign(html, tenant, [updated])
+
+          blob ->
+            Workbooks.Manifest.sign(html, tenant, [updated, Workbooks.Bundle.bundle_sha_assertion_for(blob)])
+        end
       dest = Path.join(Git.repo_path(tenant), p)
       File.write!(dest, signed)
       %{member: m, bytes: byte_size(signed)}
@@ -138,15 +150,27 @@ defmodule Workbooks.Library do
 
   defp member_vfs_bytes(tenant, %{ref: {:path, p}}) do
     src = Path.join(Git.repo_path(tenant), p)
-    if String.ends_with?(src, ".wbundle") and File.exists?(src) do
+    # A queryable member is any bundled form (legacy `.wbundle` OR self-contained
+    # `.html` with an embedded bundle) — restore (via read_any) yields its VFS.
+    if bundled_member?(src) and File.exists?(src) do
       {_m, _html, vfs} = Workbooks.Bundle.restore(File.read!(src))
-      {:ok, vfs}
+      if is_binary(vfs), do: {:ok, vfs}, else: :none
     else
       :none
     end
   end
 
   defp member_vfs_bytes(_tenant, _m), do: :none
+
+  # A member is a bundle (carries a queryable VFS) when it's a legacy `.wbundle`
+  # OR a `.html` whose bytes embed a wb-bundle block (the self-contained form).
+  defp bundled_member?(src) do
+    cond do
+      String.ends_with?(src, ".wbundle") -> true
+      String.ends_with?(src, ".html") and File.exists?(src) -> Workbooks.Bundle.embedded?(File.read!(src))
+      true -> false
+    end
+  end
 
   defp query_bytes(bytes, sql) do
     tmp = Path.join(System.tmp_dir!(), "lib-q-#{:erlang.phash2({bytes, sql})}.sqlite")
@@ -208,10 +232,37 @@ defmodule Workbooks.Library do
         # even if it writes nothing. Safe by default, native by design.
         parts = if include_private, do: parts, else: parts |> Workbooks.Private.strip_parts() |> drop_gitignored(repo)
         parts = if opts[:build], do: build_projection(parts, include_private), else: parts
-        {:ok, Workbooks.Bundle.pack(parts)}
+        {:ok, egress(parts, opts)}
     end
   rescue
     e -> {:error, Exception.message(e)}
+  end
+
+  # The egress FORM (the migration): `egress: :html` (DEFAULT for new artifacts)
+  # returns the self-contained `.html` — pick the page html (index.html /
+  # workbook.html / rendered workspace.org) and embed the packed parts into it, so
+  # one file is page + filesystem. `egress: :wbundle` returns the legacy raw zip
+  # (back-compat; restore/unpack still accept it). The parts themselves are
+  # identical between forms — only the carrier differs.
+  defp egress(parts, opts) do
+    blob = Workbooks.Bundle.pack(parts)
+
+    case Keyword.get(opts, :egress, :html) do
+      :wbundle ->
+        blob
+
+      _ ->
+        html = page_html(parts)
+        Workbooks.Bundle.embed(html, blob)
+    end
+  end
+
+  # The page that carries the embedded filesystem: a built page if the tree has
+  # one, else the rendered workspace org (the same source-of-truth the `bundle`
+  # CLI verb renders from — org is canonical, html is derived).
+  defp page_html(parts) do
+    parts["index.html"] || parts["workbook.html"] ||
+      Workbooks.OQL.render(parts["workspace.org"] || parts["source.org"] || parts["workbook.org"] || "")
   end
 
   @doc """
@@ -223,7 +274,11 @@ defmodule Workbooks.Library do
   def store(tenant, workspace_slug, opts \\ []) do
     case pack(tenant, workspace_slug, opts) do
       {:ok, blob} ->
-        key = "workbooks/#{workspace_slug}.wbundle"
+        # New stores land as the self-contained `.html` (the default egress); a
+        # `:wbundle` egress keeps the legacy extension. Reads accept both forms
+        # (`fetch`/`unpack` via `Bundle.read_any`), so old `.wbundle` keys still open.
+        ext = if Keyword.get(opts, :egress, :html) == :wbundle, do: "wbundle", else: "html"
+        key = "workbooks/#{workspace_slug}.#{ext}"
         case Workbooks.Storage.put(tenant, key, blob) do
           :ok ->
             # Index for semantic search at store time (best-effort — storage is
@@ -462,15 +517,15 @@ defmodule Workbooks.Library do
   (the monorepo projection). Mirror of `pack/3`; reuses `Bundle.unpack`.
   Returns the list of files written.
   """
-  def unpack(blob, dest) when is_binary(blob) do
+  def unpack(input, dest) when is_binary(input) do
     File.mkdir_p!(dest)
+    parts = Workbooks.Bundle.unpack(Workbooks.Bundle.read_any(input))
 
-    for {name, content} <- Workbooks.Bundle.unpack(blob) do
-      path = Path.join(dest, name)
-      File.mkdir_p!(Path.dirname(path))
-      File.write!(path, content)
-      name
-    end
+    # Path-confined write (zip-slip guard): any entry that is absolute or escapes
+    # `dest` via `..` is rejected by `write_tree` (mirrors `with_org_file`), so a
+    # hostile bundle can't write outside the target tree. Returns names written.
+    Workbooks.Bundle.write_tree(parts, dest)
+    Map.keys(parts)
   end
 
   @doc """
@@ -492,7 +547,7 @@ defmodule Workbooks.Library do
   def install(blob, opts \\ []) when is_binary(blob) do
     with :ok <- pin_ok(blob, opts[:sha]),
          :ok <- sig_ok(blob, opts[:require_signature]) do
-      parts = Workbooks.Bundle.unpack(blob)
+      parts = Workbooks.Bundle.unpack(Workbooks.Bundle.read_any(blob))
       tmp = Path.join(System.tmp_dir!(), "wb-install-#{:erlang.unique_integer([:positive])}")
       File.mkdir_p!(tmp)
 
@@ -626,12 +681,14 @@ defmodule Workbooks.Library do
 
   defp find(tenant, member_id), do: Enum.find(members(tenant), &(&1.id == member_id))
 
-  # Unpack a member into the working dir: a .wbundle → its html + vfs; else copy.
+  # Unpack a member into the working dir: a bundle (either form) → its html + vfs;
+  # else copy. The self-contained `.html` is its own carrier (restore returns the
+  # page as workbook_html), so its vfs hydrates the same as a legacy `.wbundle`.
   defp place(src, workdir) do
-    if String.ends_with?(src, ".wbundle") and File.exists?(src) do
+    if bundled_member?(src) and File.exists?(src) do
       {_m, html, vfs} = Workbooks.Bundle.restore(File.read!(src))
       File.write!(Path.join(workdir, "workbook.html"), html)
-      File.write!(Path.join(workdir, "vfs.sqlite"), vfs)
+      if is_binary(vfs), do: File.write!(Path.join(workdir, "vfs.sqlite"), vfs)
     else
       File.cp(src, Path.join(workdir, "workbook.html"))
     end

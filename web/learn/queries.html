@@ -330,9 +330,10 @@ flowchart LR
   <p>Here is the payoff of one-table-per-disk. Because every workbook's disk is
   the same four-column SQLite file, asking a question of your whole library needs
   no new query engine at all. <code>Library.query</code> takes one SQL statement
-  and runs it across every member that is a <code>.wbundle</code> — and a
-  <code>.wbundle</code> is just a plain zip of <code>workbook.html</code>,
-  <code>vfs.sqlite</code>, and a manifest, so its disk is right there to read.</p>
+  and runs it across every member that carries a bundle — and a workbook's bundle
+  is just a plain zip of <code>workbook.html</code>, <code>vfs.sqlite</code>, and a
+  manifest (whether it rides embedded in the <code>.html</code> or sits beside it as
+  a <code>.wbundle</code>), so its disk is right there to read.</p>
   <p>The mechanism is deliberately dumb, in the good way. For each member it
   extracts that <code>vfs.sqlite</code> part, writes it to a <b>throwaway temp
   copy</b>, opens it with the same <code>VFS.open</code>, runs your statement with

@@ -17,6 +17,7 @@ use tauri::{
 };
 
 mod agent_settings;
+mod bundle_io;
 mod daemon;
 mod fs;
 mod fs_ops;
@@ -150,6 +151,10 @@ pub fn run() {
             // Workbooks + memory.
             workbooks::workbook_spec_read,
             workbooks::memory_source_resolve,
+            // Bundle file IO (the desktop's only role; bundling itself is the
+            // engine's `Workbooks.Bundle` over /rcp/bundle + /rcp/unbundle).
+            bundle_io::bundle_read_tree,
+            bundle_io::bundle_write_tree,
             // Packages.
             packages::package_list,
             packages::package_get_active,

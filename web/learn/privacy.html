@@ -131,8 +131,8 @@
   <ul>
     <li><b>Git commit</b> — the work syncs to a tenant repo and, on push, to a host like
     GitHub.</li>
-    <li><b>Bundle ship</b> — the workbook is packed into a <a href="bundles">.wbundle</a>
-    and sent as a file.</li>
+    <li><b>Bundle ship</b> — the workbook is packed into the <a href="bundles">bundle</a>
+    carried inside its <code>.html</code> and sent as a file.</li>
     <li><b>Library pack</b> — a workbook is exported from your library to share or to
     archive.</li>
   </ul>
@@ -143,7 +143,7 @@
   <pre class="mermaid">
 flowchart LR
   git["git commit<br/>→ tenant repo, GitHub"]
-  bun["bundle ship<br/>→ a .wbundle file"]
+  bun["bundle ship<br/>→ a self-contained .html"]
   lib["library pack<br/>→ share or archive"]
   priv{"Workbooks.Private<br/>is this private?"}
   out["what actually leaves<br/>the work — never the session"]

@@ -257,11 +257,43 @@ defmodule Workbooks.CLI do
   # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
   # org file. No separate store to drift. See docs/VECTOR-QUERY.org.
 
-  def call(["bundle", src, dest], _t) do
-    org = File.read!(src)
-    parts = %{"source.org" => org, "manifest.json" => Jason.encode!(%{components: OQL.tangle_plan(org), v: 1})}
-    File.write!(dest, Bundle.pack(parts))
-    "bundled #{map_size(parts)} parts → #{dest}"
+  # Single tree → one self-contained .html: pack the dir, embed the zip into the
+  # page html. The page is the tree's own index/workbook, or rendered from its
+  # source.org. (`wbx pack/unpack` is the workspace-level, multi-member sibling.)
+  def call(["bundle", dir, out | flags], _t) do
+    # The workbook compiler (docs/WORKBOOK-BUNDLE.md "lifecycle"): tangle the org
+    # source-of-truth → native source, COMPILE native → .wasm via the in-sandbox
+    # lanes (Workbooks.Build → PackageManager/Compilers), then pack the tree
+    # INCLUDING the compiled .wasm so the bundled .html carries org (re-editable),
+    # native (tangled), and .wasm (runnable). `--no-build` packs source-only (the
+    # tangle still runs — native source stays in sync with the org).
+    build? = "--no-build" not in flags
+
+    parts =
+      dir
+      |> Bundle.read_tree()
+      |> Bundle.tangle_files()
+      |> Bundle.compile_tree(build: build?)
+
+    blob = Bundle.pack(parts)
+    html = parts["index.html"] || parts["workbook.html"] || OQL.render(parts["source.org"] || parts["workbook.org"] || "")
+    File.write!(out, Bundle.embed(html, blob))
+    "bundled #{map_size(parts)} files → #{out} (#{byte_size(blob)} bytes embedded)"
+  end
+
+  def call(["unbundle", in_html, dir], _t) do
+    input = File.read!(in_html)
+    # Accept BOTH forms: a self-contained `.html` (wb-bundle block) or a legacy raw
+    # `.wbundle` zip — `read_any` dispatches. write_tree is path-confined (zip-slip
+    # guard), and unpack carries the zip-bomb size/ratio guard.
+    blob =
+      cond do
+        Bundle.embedded?(input) or String.starts_with?(input, "PK") -> Bundle.read_any(input)
+        true -> raise "no wb-bundle in #{in_html}"
+      end
+
+    n = Bundle.write_tree(Bundle.unpack(blob), dir)
+    "unbundled #{n} files → #{dir}"
   end
 
   # Observability through the CLI (not a dashboard) — the telemetry + ledger
@@ -677,7 +709,10 @@ defmodule Workbooks.CLI do
       wbx var get <key>                     read a variable (secrets redacted)
       wbx var list                          list variables
       wbx var ref <template>                inject {{var:KEY}} / {{secret:KEY}}
-      wb bundle <src.org> <out>            pack a Workbook Bundle
+      wb bundle <dir> <out.html> [--no-build]  compile a dir tree → one self-contained .html
+                                           (tangle org→native, compile native→wasm, then pack+embed;
+                                            --no-build packs source-only, still tangling the org)
+      wb unbundle <in.html> <dir>          extract an embedded bundle → dir tree
       wb telemetry [<slug>]                runs index, or one run's summary + errors
       wb ledger <slug>                     verify a run's signed ledger (tamper/attribution)
       wbx sign <file.html> [--out <f>]      embed a did:key provenance manifest

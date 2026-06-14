@@ -4,7 +4,7 @@
 // loopback + PKCE flow; the resulting session bearer is stashed in the keychain.
 
 use base64::Engine as _;
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::SigningKey;
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -95,7 +95,10 @@ pub fn identity_set_workos(workos_user_id: Option<String>) -> Result<IdentityVie
     Ok(id)
 }
 
-/// Load the ed25519 signing key from the keychain.
+/// Load the ed25519 signing key from the keychain. Retained for the identity
+/// key lifecycle; workspace packaging now signs tenant-side on the engine
+/// (C2PA manifest), so this no longer participates in egress.
+#[allow(dead_code)]
 fn load_signing_key() -> Result<SigningKey, String> {
     let b64 = Entry::new(KC_SERVICE, KC_IDENTITY_SK)
         .map_err(|e| e.to_string())?
@@ -110,39 +113,84 @@ fn load_signing_key() -> Result<SigningKey, String> {
     Ok(SigningKey::from_bytes(&arr))
 }
 
-/// Bundle a workspace's folders into a single signed .html and write it under
-/// app_data/packages/<ws>.html. Local-only: tangle+bundle via the kernel, then
-/// append an ed25519 signature comment.
+/// Package a workspace into a single self-contained, tenant-signed `.html` and
+/// write it under app_data/packages/<ws>.html.
+///
+/// De-Tauri'd (WORKBOOK-BUNDLE.md): this used to render the org locally and
+/// append a bespoke `<!-- wb-signature -->` comment, producing a `.html` with NO
+/// embedded filesystem and a signature format nothing else understood — drift
+/// from the CLI/runtime egress. Now the desktop is a pure caller: it gathers the
+/// workspace tree (file IO only) and ships it to the engine's `/rcp/bundle`
+/// (`sign=1`), which does the canonical `Workbooks.Bundle.pack` + `embed` +
+/// `embed_loader` + `Workbooks.Manifest.sign`. The result is byte-identical to
+/// what `wb bundle` + a tenant sign produce — ONE egress format, ONE bundler,
+/// ONE signature scheme (C2PA manifest, not an ad-hoc comment). The host
+/// keychain ed25519 key is no longer used here; provenance is tenant-signed by
+/// the engine via `Workbooks.Git`.
 #[tauri::command]
 pub fn workspace_package(workspace_name: String) -> Result<String, String> {
-    // Concatenate the workspace's package folders' source into one org doc,
-    // weave it through the embedded kernel, and sign the result.
     let pkg = crate::packages::package_load(workspace_name.clone())?;
-    let mut org = String::new();
+
+    // Gather every workspace folder's tree into one parts map (file IO only —
+    // no bundling here). Later folders win on a key collision.
+    let mut files = std::collections::BTreeMap::new();
     for folder in &pkg.folders {
-        for entry in walkdir::WalkDir::new(folder).into_iter().flatten() {
-            if entry.path().extension().and_then(|e| e.to_str()) == Some("org") {
-                if let Ok(s) = std::fs::read_to_string(entry.path()) {
-                    org.push_str(&s);
-                    org.push('\n');
-                }
-            }
+        for (k, v) in crate::bundle_io::read_tree_map(folder)? {
+            files.insert(k, v);
         }
     }
-    let html = crate::kernel::call("render", &org)?;
 
-    // Sign the rendered HTML and append the signature as an HTML comment so the
-    // artifact stays a valid standalone document.
-    let signing = load_signing_key()?;
-    let sig = signing.sign(html.as_bytes());
-    let sig_b64 = base64::engine::general_purpose::STANDARD.encode(sig.to_bytes());
-    let signed = format!("{html}\n<!-- wb-signature: {sig_b64} -->\n");
+    // The engine bundles + signs (the canonical path). Requires a running
+    // runtime: signing is tenant-scoped on the engine, so there's no offline
+    // equivalent — same as publish().
+    let html = bundle_via_runtime(&files, true)?;
 
     let out_dir = crate::paths::ensure_dir(crate::paths::app_data_dir().join("packages"))
         .map_err(|e| e.to_string())?;
     let out = out_dir.join(format!("{workspace_name}.html"));
-    std::fs::write(&out, signed).map_err(|e| e.to_string())?;
+    std::fs::write(&out, html).map_err(|e| e.to_string())?;
     Ok(out.to_string_lossy().to_string())
+}
+
+/// POST a parts map to the engine's `/rcp/bundle` and return the self-contained
+/// `.html`. The desktop owns NO bundler — `Workbooks.Bundle` on the engine does
+/// the zip/embed/loader/sign. `sign=1` ⇒ the engine tenant-signs via
+/// `Workbooks.Manifest`. Errors when no runtime is discovered (no offline path
+/// for a tenant-signed egress, mirroring publish()).
+fn bundle_via_runtime(
+    files: &std::collections::BTreeMap<String, String>,
+    sign: bool,
+) -> Result<String, String> {
+    let d = crate::daemon::Discovery::read()
+        .ok_or("The agent server isn't running — start it to package a workspace.")?;
+    let url = format!(
+        "{}://{}:{}/rcp/bundle{}",
+        d.scheme,
+        d.host,
+        d.port,
+        if sign { "?sign=1" } else { "" }
+    );
+    let resp = reqwest::blocking::Client::new()
+        .post(&url)
+        .bearer_auth(&d.token)
+        .json(&serde_json::json!({ "files": files }))
+        .send()
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("engine bundle failed: {}", resp.status()));
+    }
+    let body: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
+    if let Some(err) = body.get("error").and_then(|v| v.as_str()) {
+        return Err(err.to_string());
+    }
+    let html_b64 = body
+        .get("html_b64")
+        .and_then(|v| v.as_str())
+        .ok_or("engine bundle: no html in response")?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(html_b64.as_bytes())
+        .map_err(|e| e.to_string())?;
+    String::from_utf8(bytes).map_err(|e| e.to_string())
 }
 
 // ── WorkOS sign-in (RFC 8252 loopback + PKCE) ─────────────────────

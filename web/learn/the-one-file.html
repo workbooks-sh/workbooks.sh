@@ -359,20 +359,20 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <p>The thing you walk away with is called a <em>workbook</em>, and it's the core unit of everything here. At first glance it looks like a web page — an <em>.html</em> file, the same humble format the entire internet is built from. That's deliberate. An HTML file opens on any phone, any laptop, any tablet made in the last twenty-five years, with no installation and no permission. We just usually ask it to be a page you read. A workbook asks it to be a thing that <em>works</em>.</p>
 
-    <p>But here's the first correction to make, because it's where most people get the mental model wrong: a workbook is not <em>only</em> a single HTML file. When it travels, it travels as a small <strong>bundle</strong> — and the bundle is the unit you actually own and send.</p>
+    <p>Here's the first thing to get right, because it's where most people's mental model goes wrong: a workbook really is a single HTML file — and that one <code>.html</code> carries its whole filesystem <em>inside</em> it. The file you own and send is the page itself; everything else rides within.</p>
 
     <h2>what's InsidE the bUndle</h2>
 
-    <p>If you take a workbook that's ready to ship and crack it open, you'll find four pieces sitting together. They're four well-known standards, bound into one object:</p>
+    <p>If you take a workbook that's ready to ship and crack open the filesystem it carries, you'll find four pieces sitting together. They're four well-known standards, bound into one object:</p>
 
     <ul>
       <li><b>workbook.html</b> — the face. The screen you see and touch: the layout, the buttons, the HTML, CSS, and JavaScript. This is the part that renders the same on every browser on earth.</li>
-      <li><b>vfs.sqlite</b> — the disk. A real SQLite database <em>and</em> a little virtual file system, riding inside the bundle. This is what the workbook remembers — your notes, your numbers, your save file, even images and binary files.</li>
+      <li><b>vfs.sqlite</b> — the disk. A real SQLite database <em>and</em> a little virtual file system, riding inside the file. This is what the workbook remembers — your notes, your numbers, your save file, even images and binary files.</li>
       <li><b>workbook.org</b> — the why. A plain-text layer holding the intent, the tasks, and the memory — the part you and agents actually write and read. (There's a whole separate lesson on this layer; it's written in a grammar called org.)</li>
       <li><b>manifest.json</b> — one tiny line that says &ldquo;this is a workbook bundle.&rdquo; That's the whole trick. Something like <code>{"format":"wbundle/1"}</code>.</li>
     </ul>
 
-    <div class="aside">And the container? It's a plain zip. A <em>.wbundle</em> is just a zip file with a familiar extension — you can open it with the same <code>unzip</code> that's shipped on every computer for decades. No invented format, no proprietary archive. When a workbook is sent as a single <em>.html</em> file, those same parts are gzip-bound inside it; the bundle is just the same thing, unfolded so you can see the seams.</div>
+    <div class="aside">And where does it all live? Inside the one <code>.html</code>. Those four parts are packed into a zip — every entry deflate-compressed, no invented format, no proprietary archive — and that zip is carried in the page itself, base64-encoded in a single <code>&lt;script id="wb-bundle"&gt;</code> block. deflate so the page can unpack itself in any browser with zero dependencies. (A separate <em>.wbundle</em> file — the same zip, with a familiar extension you can open with <code>unzip</code> — still exists for back-compat, but the self-contained <code>.html</code> is the standard: the workbook <em>is</em> the page.)</div>
 
     <p>So the honest picture is: <strong>four standards — HTML, SQLite, org, and a one-line manifest — bound into one portable object.</strong> Not &ldquo;one HTML file that magically contains everything.&rdquo; A small, boring, openable bundle. The boring part is the point: boring formats don't stop opening when a company loses interest.</p>
 
@@ -400,13 +400,13 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 
     <h2>where thiS is today, And where It's going</h2>
 
-    <p>Most of what's above ships today: the bundle is real, it's a plain zip, you can unzip it right now and see the four parts. Single workbooks open and run on their own. The runtime runs workbooks and hosts agents inside them.</p>
+    <p>Most of what's above ships today: the filesystem inside the <code>.html</code> is a real deflate zip, the page unpacks it in any browser, and you can pull the same zip out and read the four parts directly. Single workbooks open and run on their own. The runtime runs workbooks and hosts agents inside them.</p>
 
     <p>The honest edges: a workbook is a file, and files are happiest shareable-sized — megabytes, not the entire archive of a streaming service. When a project needs a mountain of data or thousands of simultaneous users, it leans on the runtime for the heavy parts. And the more autonomous ideas — a system that watches itself run and edits its own configuration to improve — are real directions being built, not finished guarantees. We'll be clear, lesson by lesson, about which is which.</p>
 
     <hr>
 
-    <p>So that's the thing in your hands, named accurately. A workbook is the core unit of an ecosystem: a small bundle — HTML for the face, SQLite for the disk, org for the why, a one-line manifest to bind them, all zipped into one object you can hold, own, and send. It runs on its own when that's all you need, and stands on a runtime when you want it to do more. Hold that picture clearly and the rest of the Learning Center is just discovering what such a portable, legible little unit can become.</p>
+    <p>So that's the thing in your hands, named accurately. A workbook is the core unit of an ecosystem: one <code>.html</code> — HTML for the face, and carried inside it a deflate zip of SQLite for the disk, org for the why, and a one-line manifest to bind them — one file you can hold, own, and send. It runs on its own when that's all you need, and stands on a runtime when you want it to do more. Hold that picture clearly and the rest of the Learning Center is just discovering what such a portable, legible little unit can become.</p>
 </article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="ddl" href="/learn/workbook"><b>Workbooks</b><span>the deep doc</span></a><a class="ddl" href="/learn/bundles"><b>bundles</b><span>the deep doc</span></a><a class="ddl" href="/learn/nesting"><b>nesting</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 6 of 27</div><div class="audio"><div class="play" id="play" data-src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-one-file.mp3?v=460"><span class="ico" id="playico"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="lab" id="playlab">Listen</span><span class="time">8 min</span></div><div class="scrub"><div class="sbar" id="sbar"><i id="sbfill"></i></div><div class="stime"><span id="scur">0:00</span><span id="sdur">--:--</span></div></div></div><button class="quizbtn" type="button" data-quiz-lesson="the-one-file"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="lab">Take the quiz</span><span class="score" data-lscore="the-one-file"></span></button><button class="cont" id="cc" data-next="carries-its-story"><span>Complete & continue</span> →</button><textarea class="notes" id="notes" data-slug="the-one-file" spellcheck="false" placeholder="Notes are taken here — saved to your browser cache."></textarea></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
