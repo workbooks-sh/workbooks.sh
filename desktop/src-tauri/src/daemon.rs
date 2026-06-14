@@ -75,6 +75,23 @@ pub struct DaemonStatus {
 
 /// Probe the daemon: no discovery → stopped; discovery + /health 200 → running;
 /// otherwise unhealthy. Short blocking timeout so the status chip never stalls.
+/// Probe the discovered engine's `/health` with a caller-chosen timeout. The
+/// titlebar chip uses a short one (snappy, won't flap). The COLD-BOOT wait uses
+/// a far more patient one: a microVM under first-boot load (image pull, BEAM
+/// start, initial compile) can take well over 200ms to answer /health even
+/// though it IS coming up healthy — a too-short probe is exactly what produced
+/// "the engine booted but never reported healthy" (wb-gozb / wb-iq4n).
+fn discovered_health_ok(d: &Discovery, timeout_ms: u64) -> bool {
+    let url = format!("{}://{}:{}", d.scheme, d.host, d.port);
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(timeout_ms))
+        .build()
+        .ok()
+        .and_then(|c| c.get(format!("{url}/health")).bearer_auth(&d.token).send().ok())
+        .map(|r| r.status().as_u16() == 200)
+        .unwrap_or(false)
+}
+
 pub fn status() -> DaemonStatus {
     let Some(d) = Discovery::read() else {
         return DaemonStatus {
@@ -87,20 +104,10 @@ pub fn status() -> DaemonStatus {
     };
     let url = format!("{}://{}:{}", d.scheme, d.host, d.port);
     // 200ms for a loopback microVM; a touch longer so a cloud host across the
-    // network doesn't flap to "unhealthy" on a slow round-trip.
+    // network doesn't flap to "unhealthy" on a slow round-trip. (The cold-boot
+    // wait uses a far more patient timeout — see discovered_health_ok.)
     let timeout = if d.host == "127.0.0.1" { 200 } else { 800 };
-    let healthy = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_millis(timeout))
-        .build()
-        .ok()
-        .and_then(|c| {
-            c.get(format!("{url}/health"))
-                .bearer_auth(&d.token)
-                .send()
-                .ok()
-        })
-        .map(|r| r.status().as_u16() == 200)
-        .unwrap_or(false);
+    let healthy = discovered_health_ok(&d, timeout);
     let manager = if d.mode.is_empty() { "container".into() } else { d.mode };
     DaemonStatus {
         state: if healthy { "running" } else { "unhealthy" }.into(),
@@ -256,8 +263,12 @@ pub async fn engine_install_backend(app: AppHandle) -> Result<machine::BackendSt
 #[tauri::command]
 pub async fn engine_boot_local(app: AppHandle) -> Result<DaemonStatus, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        // Idempotent retry: a healthy-but-SLOW engine (cold microVM answering
+        // /health in >200ms) must NOT be judged stale and purged — that strands
+        // the running engine and boots a second one. Use the patient probe so a
+        // re-run reuses the live engine.
         if let Some(d) = Discovery::read() {
-            let stale = d.mode != "cloud" && status().state != "running";
+            let stale = d.mode != "cloud" && !discovered_health_ok(&d, 2000);
             if stale {
                 if let Some(p) = discovery_path() {
                     let _ = std::fs::remove_file(p);
@@ -266,24 +277,32 @@ pub async fn engine_boot_local(app: AppHandle) -> Result<DaemonStatus, String> {
             }
         }
         machine::boot(&app)?;
-        // First boot pulls the multi-hundred-MB image — poll patiently, nudging
-        // the UI every few seconds so it never looks hung.
-        for i in 0..720 {
-            if status().state == "running" {
-                break;
+        // First boot pulls the multi-hundred-MB image AND a cold microVM answers
+        // /health slowly under load — poll PATIENTLY (a 2s probe, not the chip's
+        // 200ms, which falsely read "never healthy") on a wall-clock deadline so
+        // a slow probe can't blow past it. Nudge the UI so it never looks hung.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(360);
+        let mut healthy = false;
+        let mut i: u32 = 0;
+        while std::time::Instant::now() < deadline {
+            if let Some(d) = Discovery::read() {
+                if d.mode == "cloud" || discovered_health_ok(&d, 2000) {
+                    healthy = true;
+                    break;
+                }
             }
             if i > 0 && i % 16 == 0 {
                 let _ = app.emit("engine-setup", "still pulling the engine image…");
             }
+            i += 1;
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        let fin = status();
-        if fin.state != "running" {
+        if !healthy {
             return Err(
                 "The engine booted but never reported healthy. Check the tray → engine logs, then retry.".into(),
             );
         }
-        Ok(fin)
+        Ok(status())
     })
     .await
     .map_err(|e| e.to_string())?
