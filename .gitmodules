@@ -1,0 +1,3 @@
+[submodule "runtime/wavelet"]
+	path = runtime/wavelet
+	url = https://github.com/workbooks-sh/wavelet
