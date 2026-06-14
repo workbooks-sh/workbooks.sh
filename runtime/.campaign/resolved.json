@@ -2595,6 +2595,13 @@
    "proof": "go-jsonnet v0.22.0 (Go->wasip1) evaluates jsonnet (arithmetic, list comprehensions, stdlib std.range) to JSON through PackageManager.run -> {a:1,sum:5,sq:[1,4,9]}; jsonnet_lane_test.exs green",
    "lane": "compilers/jsonnet/build.sh (native GOOS=wasip1, pinned, gitignored)",
    "since": "iter162"
+  },
+  "lua": {
+   "capability": "Lua 5.4 scripting language in-sandbox",
+   "status": "live",
+   "proof": "Lua 5.4.7 reference interpreter compiles from source (33 C files via build_c_dir) + runs scripts: print(\"hi\",2+3,math.sqrt(16))->hi 5 4.0, loop i*i->1 4 9; lua_lane_test.exs green",
+   "lane": "compilers/lua/build.sh (fetch lua.org source sha-verified, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {

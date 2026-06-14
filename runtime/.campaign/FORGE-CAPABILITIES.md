@@ -27,6 +27,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | SQLite | clean-wasi prebuilt | ships in-tree |
 | crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
 | **DuckDB** (full SQL engine) | from-C++-source -> wasi | duckdb_lane_test (CREATE/INSERT/SELECT GROUP BY, 34MB wasm) |
+| **Lua 5.4** (scripting language) | from-C-source -> wasi (build_c_dir) | lua_lane_test (arith/math/loop) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
