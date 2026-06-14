@@ -20,6 +20,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | C/pthread threads (shared-mem) | `compile_threads` wasm32-wasi-threads | threads_lane_test |
 | **Go → wasi** | native `GOOS=wasip1` (provision-time) | go_wasip1 |
 | **esbuild** (JS/TS bundler) | Go-wasip1 artifact | wired in JS/TS/Svelte lanes (~23min QuickJS → ~0.4s) |
+| **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | SQLite | clean-wasi prebuilt | ships in-tree |
 | crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
 

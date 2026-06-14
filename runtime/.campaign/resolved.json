@@ -2569,6 +2569,13 @@
    "status": "proven",
    "proof": "itoa@1.0.11 via rust_compile_to_wasm(src, deps: [\"itoa@1.0.11\"]) \u2014 fetched + compiled through the full mrustc->clang MIR pipeline -> u32=12345 i64=-987654321 u8=255 correct",
    "since": "iter161"
+  },
+  "yq": {
+   "capability": "yq YAML processor in-sandbox",
+   "status": "live",
+   "proof": "yq v4.53.3 (Go->wasip1) processes YAML from stdin through PackageManager.run: .name->workbooks, .tags[1]->wasm; yq_lane_test.exs green",
+   "lane": "compilers/yq/build.sh (native GOOS=wasip1 go build, pinned, -trimpath, gitignored 24MB wasm) \u2014 same provision path as esbuild",
+   "since": "iter162"
   }
  },
  "verdict_ladder": {
