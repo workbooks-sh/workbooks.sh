@@ -306,6 +306,14 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
 
+  # Agent picker catalog (wb-kbq5): project-scope (<workdir>/.oql/agents/*.org) →
+  # user-scope (WB_PROFILE_DIR/agents/*.org) → the builtin Waldo. The desktop's
+  # agents.svelte refreshes this; without it the picker was empty (404).
+  get "/api/agents/list" do
+    agents = agent_catalog(conn.params["workdir"])
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{agents: agents}))
+  end
+
   # Live agent telemetry — each tool step streamed as it happens (brandnana-style).
   get "/api/run/:id/stream" do
     conn
@@ -879,6 +887,46 @@ defmodule Workbooks.Web do
 
   match _ do
     send_resp(conn, 404, "not found")
+  end
+
+  # Build the agent catalog the desktop picker reads. Project agents (if a
+  # workdir is given) override user agents override the builtin. Every entry is
+  # {slug, path, scope, title, model, toolkits} — AgentCatalogEntry shape.
+  defp agent_catalog(workdir) do
+    builtin = [%{slug: "workhorse", path: "workhorse", scope: "builtin", title: "Waldo", model: nil, toolkits: []}]
+
+    project =
+      if is_binary(workdir) and workdir != "",
+        do: catalog_dir(Path.join(workdir, ".oql/agents"), "project"),
+        else: []
+
+    user = catalog_dir(Path.join(System.get_env("WB_PROFILE_DIR") || "/opt/profile", "agents"), "user")
+
+    # De-dupe by slug, keeping the higher-precedence scope (project > user > builtin).
+    (project ++ user ++ builtin)
+    |> Enum.reduce({[], MapSet.new()}, fn a, {acc, seen} ->
+      if MapSet.member?(seen, a.slug), do: {acc, seen}, else: {[a | acc], MapSet.put(seen, a.slug)}
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
+  defp catalog_dir(dir, scope) do
+    case File.ls(dir) do
+      {:ok, files} ->
+        files
+        |> Enum.filter(&String.ends_with?(&1, ".org"))
+        |> Enum.map(fn f ->
+          def = Workbooks.AgentDef.parse(File.read!(Path.join(dir, f)))
+          slug = def.id || Path.rootname(f)
+          %{slug: slug, path: f, scope: scope, title: def.tagline || slug, model: def.model, toolkits: def.toolkits}
+        end)
+
+      _ ->
+        []
+    end
+  rescue
+    _ -> []
   end
 
   # Resolve an agent's system prompt by slug — the profile def if present, else a
