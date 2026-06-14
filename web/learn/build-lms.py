@@ -163,7 +163,7 @@ THEME_TOGGLE = ('<button class="themetog" id="themetog" type="button" aria-label
 
 def sidebar(cur_slug=None):
     out = ['<aside class="side" id="side">',
-           '<div class="brandrow"><a class="brand" href="/">%s<span>WORKBOOKS</span></a>%s</div>'
+           '<div class="brandrow"><a class="brand" href="/">%s<span>workbooks</span></a>%s</div>'
            % (PETAL, THEME_TOGGLE),
            '<a class="overview%s" href="/learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>'
               % (" on" if cur_slug is None else ""),
@@ -435,7 +435,19 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 [data-theme="dark"] .li.done .dot::after{ border-color:var(--paper); }
 [data-theme="dark"] .li.cur .t{ color:var(--ink); }
 [data-theme="dark"] .overview:hover{ background:rgba(255,255,255,.06); }
-[data-theme="dark"] .overview.on{ color:var(--paper); }
+/* dark-mode light-island fixes: per-lesson --pc is set inline on <html> (beats the
+   theme var), so force it + override every element that filled with a light accent */
+[data-theme="dark"]{ --pc:#2a3f55 !important; }
+[data-theme="dark"] .overview.on{ background:rgba(255,255,255,.12); color:var(--ink); }
+[data-theme="dark"] .li.cur{ background:rgba(63,224,129,.14); box-shadow:inset 2px 0 0 var(--bloom); }
+[data-theme="dark"] .li.cur .t{ color:var(--ink); }
+[data-theme="dark"] .li.cur .dot{ border-color:var(--bloom); }
+[data-theme="dark"] .li.cur .dot::after{ background:var(--bloom); }
+[data-theme="dark"] .rail .cont{ background:var(--bloom); color:#10120f; }
+[data-theme="dark"] .rail .cont.done{ background:var(--bloom); color:#10120f; }
+[data-theme="dark"] .uquiz{ background:transparent; color:var(--dim); border-color:#3a3d42; }
+[data-theme="dark"] .uquiz:hover{ color:var(--ink); border-color:var(--bloomd); }
+[data-theme="dark"] .quizbtn{ background:var(--card); color:var(--ink); }
 [data-theme="dark"] .themetog{ box-shadow:2px 2px 0 #000; }
 /* reading + prose greys */
 [data-theme="dark"] .sintro .lead,
