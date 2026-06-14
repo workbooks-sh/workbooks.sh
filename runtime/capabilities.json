@@ -170,9 +170,9 @@
           "status": "done",
           "tests": "search_provider_test",
           "units": 3,
-          "proof": "routing + fallback proven; OpenRouter-web LIVE (3 real results via web plugin, reuses OPENROUTER_API_KEY); Exa+Brave-API ready (work when keyed)",
+          "proof": "routing + fallback proven; OpenRouter-web LIVE (3 real results via web plugin, reuses OPENROUTER_API_KEY); Exa+Brave-API ready (work when keyed); per-tenant keys resolve from Vars secrets (host-readable via ref :host) -> env fallback",
           "failure_modes": [
-            "per-tenant Vars/settings key wiring + Perplexity + OpenRouter-web pending (wb-vgga/wb-e4jl)"
+            "Perplexity provider + Settings UI pending (frontend)"
           ]
         }
       ]

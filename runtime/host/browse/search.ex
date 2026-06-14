@@ -66,9 +66,26 @@ defmodule Workbooks.Browse.Search do
     end
   end
 
+  @doc false
+  def tenant_secret_for_test(tenant, name), do: tenant_secret(tenant, name)
+
+  # Per-tenant API key from the variable store (Settings stores it as a secret),
+  # read host-side via ref(:host). nil when unset → caller falls back to env.
+  defp tenant_secret(nil, _name), do: nil
+
+  defp tenant_secret(tenant, name) do
+    tmpl = "{{secret:#{name}}}"
+
+    case Workbooks.Vars.ref(tenant, tmpl, :host) do
+      ^tmpl -> nil
+      val when is_binary(val) and val != "" -> val
+      _ -> nil
+    end
+  end
+
   # Run a keyed provider; missing key OR empty/error → fall back to keyless scrape.
   defp keyed(q, limit, opts, key_env, fun) do
-    case opts[:api_key] || System.get_env(key_env) do
+    case opts[:api_key] || tenant_secret(opts[:tenant], key_env) || System.get_env(key_env) do
       k when is_binary(k) and k != "" ->
         case fun.(q, k, limit) do
           [_ | _] = hits -> hits
@@ -118,7 +135,9 @@ defmodule Workbooks.Browse.Search do
   # key; the "default go-to-market" provider). The model runs a web search via the
   # `web` plugin and returns url_citation annotations, which we surface as results.
   defp openrouter(q, limit, opts) do
-    key = opts[:api_key] || Workbooks.Secrets.get("OPENROUTER_API_KEY", System.get_env("OPENROUTER_API_KEY") || "")
+    key =
+      opts[:api_key] || tenant_secret(opts[:tenant], "OPENROUTER_API_KEY") ||
+        Workbooks.Secrets.get("OPENROUTER_API_KEY", System.get_env("OPENROUTER_API_KEY") || "")
 
     if is_binary(key) and key != "" do
       case openrouter_web(q, key, limit) do

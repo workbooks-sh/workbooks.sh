@@ -41,4 +41,12 @@ defmodule Workbooks.SearchProviderTest do
     assert Search.provider_for_test(tenant: "sp-unset-#{System.unique_integer([:positive])}") == :keyless
     assert Search.provider_for_test(tenant: t, provider: "exa") == :exa
   end
+
+  test "per-tenant API key resolves from a Vars secret (host-readable); unset → nil → env fallback" do
+    t = "spk-#{System.unique_integer([:positive])}"
+    Workbooks.Vars.set(t, "EXA_API_KEY", "sk-tenant-xyz", true)
+    assert Search.tenant_secret_for_test(t, "EXA_API_KEY") == "sk-tenant-xyz"
+    assert Search.tenant_secret_for_test("spk-unset-#{System.unique_integer([:positive])}", "EXA_API_KEY") == nil
+    assert Search.tenant_secret_for_test(nil, "EXA_API_KEY") == nil
+  end
 end
