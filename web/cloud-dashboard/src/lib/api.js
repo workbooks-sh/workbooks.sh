@@ -184,4 +184,51 @@ export async function undoLast(scope, when) {
   return restoreVersion(scope, previous.id, when);
 }
 
+// ── Shared folders ───────────────────────────────────────────────────────────
+// "Share a folder · add it to your workspace." Mirrors the runtime endpoints:
+//   GET  /api/shared-folders                 → { shareable, shared_by, shared_with }
+//   POST /api/shared-folders/share           {folder, recipient, mode} → grant
+//   POST /api/shared-folders/:id/add         → { folder, files }
+//   POST /api/shared-folders/:id/revoke      → { ok }
+// No git/subtree/josh words cross this seam — only Folder / Share / Add to workspace.
+
+const MOCK_SHARED = {
+  // folders you own and could share
+  shareable: ['brand', 'campaign-q3', 'press-kit'],
+  // folders you share OUT (with whom)
+  shared_by: [
+    { id: 'g1', owner: 'you', folder: 'brand', recipient: 'Maya Chen', mode: 'read' },
+    { id: 'g2', owner: 'you', folder: 'campaign-q3', recipient: 'Atlas team', mode: 'draft' }
+  ],
+  // folders shared WITH you (addable to your workspace)
+  shared_with: [
+    { id: 'g7', owner: 'Dana Rivera', folder: 'design-system', recipient: 'you', mode: 'read', added: false },
+    { id: 'g8', owner: 'Atlas team', folder: 'shared-assets', recipient: 'you', mode: 'draft', added: true }
+  ]
+};
+
+export async function sharedFolders() {
+  // MOCK — swap for fetch('/api/shared-folders')
+  return structuredClone(MOCK_SHARED);
+}
+
+/** @param {{folder:string, recipient:string, mode?:'read'|'draft'}} opts */
+export async function shareFolder(opts) {
+  // MOCK — swap for fetch('/api/shared-folders/share', {method:'POST', ...})
+  return { id: 'g' + Math.floor(Math.random() * 1e6), owner: 'you', folder: opts.folder, recipient: opts.recipient, mode: opts.mode || 'read' };
+}
+
+/** Add a shared folder to your workspace (append-only Draft). */
+export async function addSharedFolder(id) {
+  // MOCK — swap for fetch(`/api/shared-folders/${id}/add`, {method:'POST'})
+  const g = MOCK_SHARED.shared_with.find((s) => s.id === id);
+  return { folder: g?.folder || 'folder', files: ['logo.svg', 'colors.txt', 'guidelines.md'] };
+}
+
+/** Stop sharing a folder you own. */
+export async function revokeShare(id) {
+  // MOCK — swap for fetch(`/api/shared-folders/${id}/revoke`, {method:'POST'})
+  return { ok: true, id };
+}
+
 export { STATE_LABEL, MOCK_NEXUSES, MOCK_DETAIL, MOCK_HISTORY };
