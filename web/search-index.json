@@ -1,6 +1,6 @@
 {
  "generated": true,
- "count": 72,
+ "count": 75,
  "records": [
   {
    "title": "Why Workbooks",
@@ -505,6 +505,27 @@
    "kind": "docs",
    "url": "https://docs.workbooks.sh/docs/toolkits/slack",
    "text": ""
+  },
+  {
+   "title": "The wall is coming down",
+   "sub": "Renting micro-VMs, buying Mac minis, wiring serverless functions — every agent setup today fights the same wall: isolation that costs you a machine. A workbook carries its own.",
+   "kind": "blog",
+   "url": "/blog/the-wall-is-coming-down",
+   "text": "The wall is coming down Renting micro-VMs, buying Mac minis, wiring serverless functions — every agent setup today fights the same wall: isolation that costs you a machine. A workbook carries its own. thesis sandbox runtime"
+  },
+  {
+   "title": "Your secrets never touch the OS",
+   "sub": "Give an agent the operating system and you've given it your keychain, your env vars, your everything. The fix isn't more rules — it's an agent that never gets the OS in the first place.",
+   "kind": "blog",
+   "url": "/blog/your-secrets-never-touch-the-os",
+   "text": "Your secrets never touch the OS Give an agent the operating system and you've given it your keychain, your env vars, your everything. The fix isn't more rules — it's an agent that never gets the OS in the first place. security isolation agents"
+  },
+  {
+   "title": "Software you can hold",
+   "sub": "An app, a database, a sandbox, and the agents that keep it building — all in one file you can send. What it means when the unit of software is something you hold in your hand.",
+   "kind": "blog",
+   "url": "/blog/software-you-can-hold",
+   "text": "Software you can hold An app, a database, a sandbox, and the agents that keep it building — all in one file you can send. What it means when the unit of software is something you hold in your hand. thesis workbook format"
   }
  ]
 }

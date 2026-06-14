@@ -75,8 +75,24 @@ def docs_records():
     return out
 
 
+def blog_records():
+    out = []
+    p = os.path.join(HERE, "blog", "posts.json")
+    if not os.path.exists(p): return out
+    posts = json.load(open(p))
+    posts = posts if isinstance(posts, list) else posts.get("posts", [])
+    for b in posts:
+        out.append({
+            "title": b.get("title", b.get("slug", "")),
+            "sub": b.get("dek", ""),
+            "kind": "blog",
+            "url": "/blog/" + b["slug"],
+            "text": (b.get("title", "") + " " + b.get("dek", "") + " " + " ".join(b.get("tags", []))).strip(),
+        })
+    return out
+
 def main():
-    records = learn_records() + docs_records()
+    records = learn_records() + docs_records() + blog_records()
     out = {"generated": True, "count": len(records), "records": records}
     dest = os.path.join(HERE, "search-index.json")
     with open(dest, "w") as f:
