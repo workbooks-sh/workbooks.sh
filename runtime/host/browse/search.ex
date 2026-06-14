@@ -45,11 +45,24 @@ defmodule Workbooks.Browse.Search do
   def provider_for_test(opts), do: provider(opts)
 
   defp provider(opts) do
-    case (opts[:provider] || System.get_env("WB_SEARCH_PROVIDER") || "keyless") |> to_string() |> String.downcase() do
+    raw = opts[:provider] || tenant_provider(opts[:tenant]) || System.get_env("WB_SEARCH_PROVIDER") || "keyless"
+
+    case raw |> to_string() |> String.downcase() do
       "exa" -> :exa
       p when p in ["brave_api", "brave-api"] -> :brave_api
       p when p in ["openrouter", "openrouter-web", "openrouter_web"] -> :openrouter
       _ -> :keyless
+    end
+  end
+
+  # Per-tenant provider choice from the variable store (what Settings writes:
+  # `wb var set wb.search.provider exa`). Plain (non-secret) var.
+  defp tenant_provider(nil), do: nil
+
+  defp tenant_provider(tenant) do
+    case Workbooks.Vars.get(tenant, "wb.search.provider") do
+      {:ok, p} when is_binary(p) and p != "" -> p
+      _ -> nil
     end
   end
 

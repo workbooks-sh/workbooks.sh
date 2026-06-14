@@ -422,7 +422,8 @@ defmodule Workbooks.Agent do
   # blocked all SERP work and made the lander mislabel itself "env-gated"). No
   # keys, no native exec; the host queries the engine and returns parsed results.
   defp exec_one(%{name: "web_search", args: a}, st) do
-    {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", limit: 8)), st, nil}
+    # tenant: lets Browse.Search pick the tenant's configured provider (Settings).
+    {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", limit: 8, tenant: st[:tenant])), st, nil}
   end
 
   # file_issue: the metacognitive seam (wb-9ae). An agent that hits a wall files

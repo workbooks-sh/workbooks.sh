@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 675,
+    "tests": 676,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },

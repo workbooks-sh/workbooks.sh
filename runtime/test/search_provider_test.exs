@@ -33,4 +33,12 @@ defmodule Workbooks.SearchProviderTest do
   test "a keyed provider with NO key falls back to keyless — returns a list, never crashes" do
     assert is_list(Search.query("test query", provider: :exa, api_key: nil, limit: 1))
   end
+
+  test "per-tenant provider comes from Vars (Settings); explicit opt overrides; unset → keyless" do
+    t = "sp-test-#{System.unique_integer([:positive])}"
+    Workbooks.Vars.set(t, "wb.search.provider", "openrouter")
+    assert Search.provider_for_test(tenant: t) == :openrouter
+    assert Search.provider_for_test(tenant: "sp-unset-#{System.unique_integer([:positive])}") == :keyless
+    assert Search.provider_for_test(tenant: t, provider: "exa") == :exa
+  end
 end
