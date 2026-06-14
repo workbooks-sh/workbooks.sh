@@ -11,6 +11,8 @@ defmodule Workbooks.Auth do
     4. BetterAuth/Guardian JWT — production multi-tenant path.
     5. x-tenant dev header fallback — only when NOT locked (WB_PUBLIC_BEARER
        unset) AND not multi-tenant. Safe for local dev; rejected on cloud.
+       The reserved "*" sentinel (and blank values) are never honored here —
+       they carry PLATFORM-admin rows and would escalate via RBAC subject/2.
 
   Assigns: `:identity` (%{user_id, tenant_id, session_id}) and `:tenant`.
   """
@@ -106,15 +108,36 @@ defmodule Workbooks.Auth do
   end
 
   defp dev_fallback(conn) do
-    tenant = conn |> get_req_header("x-tenant") |> List.first() || "dev"
+    # The x-tenant dev header is caller-controlled. A blank value, or the reserved
+    # "*" sentinel (which carries PLATFORM-admin rows — RBAC subject/2 maps
+    # user==tenant ⇒ :owner, so honoring "*" here would mint a platform admin),
+    # must NEVER become the scope. Sanitize back to the throwaway "dev" tenant.
+    tenant =
+      case conn |> get_req_header("x-tenant") |> List.first() do
+        t when is_binary(t) -> if reserved_tenant?(t), do: "dev", else: t
+        _ -> "dev"
+      end
+
     assign_tenant(conn, tenant)
   end
 
   defp assign_tenant(conn, tenant) do
-    conn
-    |> assign(:identity, %{user_id: tenant, tenant_id: tenant, session_id: nil})
-    |> assign(:tenant, tenant)
+    # Defense in depth: the reserved "*" tenant is set ONLY by ControlPlane's
+    # internal platform-admin row, never from a request. Any auth rung that resolved
+    # a blank/sentinel tenant fails closed rather than scoping to the platform tenant.
+    if reserved_tenant?(tenant) do
+      Workbooks.Web.Error.render(conn, :unauthorized, "invalid tenant")
+    else
+      conn
+      |> assign(:identity, %{user_id: tenant, tenant_id: tenant, session_id: nil})
+      |> assign(:tenant, tenant)
+    end
   end
+
+  # A tenant string that must never be set from request-controlled input: the
+  # reserved platform sentinel "*", nil, or an empty/whitespace-only value.
+  defp reserved_tenant?(t) when is_binary(t), do: String.trim(t) in ["", "*"]
+  defp reserved_tenant?(_), do: true
 
   # True when a shared-secret lock is in effect (WB_PUBLIC_BEARER is set and
   # non-empty). Cached per-process so the env is read only once per boot.

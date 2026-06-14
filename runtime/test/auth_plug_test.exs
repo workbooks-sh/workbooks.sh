@@ -169,4 +169,43 @@ defmodule AuthPlugTest do
     assert conn.halted
     refute conn.assigns[:tenant] == "victim-org"
   end
+
+  # wb-2kt9: the reserved "*" tenant carries PLATFORM-admin rows. The x-tenant dev
+  # header must NEVER be able to set the tenant to "*" (or empty/whitespace) — that
+  # would make a dev/single-tenant caller owner-of-"*" (RBAC subject/2: user==tenant
+  # ⇒ :owner) and let them mint a platform-admin role row. The boundary sanitizes it
+  # back to the safe "dev" scope instead of honoring the sentinel.
+  test "dev mode: x-tenant '*' is REJECTED — never sets the reserved platform tenant" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.delete_env("WB_TENANCY_MODE")
+
+    conn = conn_for("/api/run", [{"x-tenant", "*"}]) |> call()
+
+    refute conn.halted
+    refute conn.assigns[:tenant] == "*"
+    assert conn.assigns[:tenant] == "dev"
+    assert conn.assigns[:identity].tenant_id == "dev"
+  end
+
+  test "dev mode: an empty/whitespace x-tenant falls back to 'dev' (no nil/empty tenant)" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.delete_env("WB_TENANCY_MODE")
+
+    for bad <- ["", "   "] do
+      conn = conn_for("/api/run", [{"x-tenant", bad}]) |> call()
+      refute conn.halted
+      assert conn.assigns[:tenant] == "dev"
+    end
+  end
+
+  # A public/infra path (no tenant data) also routes through the dev fallback; the
+  # same "*"-rejection must hold there so the :tenant assign can never be the sentinel.
+  test "public path: x-tenant '*' never yields the reserved tenant assign" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.delete_env("WB_TENANCY_MODE")
+
+    conn = conn_for("/health", [{"x-tenant", "*"}]) |> call()
+    refute conn.halted
+    refute conn.assigns[:tenant] == "*"
+  end
 end
