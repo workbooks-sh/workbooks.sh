@@ -14,10 +14,12 @@ defmodule Workbooks.Wavelet do
        `PackageManager.run` wasm lane as jq/grep — argv + WASI preopen, NO native
        exec, NO GPU. This is the "render the frame sequence IN-SANDBOX" step.
 
-    2. ENCODE (host broker). ffmpeg cannot run in the wasm guest (no native exec =
-       BEDROCK), so muxing the PNG sequence → h264/yuv420p mp4 is the one trusted
-       host-service escape — `Workbooks.FfmpegBroker.encode/3` (Phase 2). The
-       `encode` Policy cap gates it.
+    2. ENCODE (in-guest, default). The PNG sequence → mpeg4/yuv420p mp4 — and,
+       when `--audio` is given, a native AAC audio track muxed alongside — is done
+       ENTIRELY in the wasm guest by the Forge `ffmpeg` lane (`wb_encode.wasm`,
+       libav* under wasmtime, NO native exec). `Workbooks.WaveletEncode.encode/3`.
+       The host ffmpeg broker (`Workbooks.FfmpegBroker.encode/3`, `encode` Policy
+       cap) remains only as the opt-in H.264 quality path (`encode_engine: :host`).
 
   Both halves operate inside ONE gated scratch root so: (a) the wasm only preopens
   that root (confined fs), and (b) the broker's path-gating accepts the frames dir
@@ -293,19 +295,21 @@ defmodule Workbooks.Wavelet do
 
   # Two encode engines:
   #   :in_guest (default) — Workbooks.WaveletEncode runs the Forge ffmpeg lane's
-  #     wb_encode.wasm UNDER WASMTIME. mpeg4/mp4, dependency-free, NO native exec,
-  #     NO broker grant. Closes the wavelet mp4-encode bedrock gap. No audio mux yet.
-  #   :host — Workbooks.FfmpegBroker (native ffmpeg + libx264/H.264). The quality
-  #     path and the only one that muxes audio. Default-deny via the `encode` cap.
-  # Select with opts[:encode_engine]; :in_guest is the zero-trust default. A request
-  # that needs audio auto-falls-back to :host (in-guest mpeg4 has no audio track yet).
+  #     wb_encode.wasm UNDER WASMTIME. mpeg4/mp4 video + native AAC AUDIO mux,
+  #     dependency-free, NO native exec, NO broker grant. Closes the wavelet
+  #     mp4-encode bedrock gap INCLUDING audio — `--audio` no longer escapes.
+  #   :host — Workbooks.FfmpegBroker (native ffmpeg + libx264/H.264). The H.264
+  #     QUALITY path. Default-deny via the `encode` cap; opt in with :host.
+  # Select with opts[:encode_engine]; :in_guest is the zero-trust default and now
+  # muxes audio in-guest, so audio no longer forces the host broker.
   defp encode(frames, p, gated_out, roots, opts) do
     out_abs = Path.expand(gated_out)
     engine = Keyword.get(opts, :encode_engine, :in_guest)
 
-    if engine == :in_guest and is_nil(p.audio) do
+    if engine == :in_guest do
       Workbooks.WaveletEncode.encode(frames, out_abs,
         fps: p.fps,
+        audio: p.audio,
         timeout_ms: Keyword.get(opts, :timeout_ms, 600_000)
       )
     else

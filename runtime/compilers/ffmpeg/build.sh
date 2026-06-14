@@ -112,7 +112,12 @@ if [ ! -f "$FFDIR/libavformat/libavformat.a" ]; then
       --disable-debug --disable-stripping --disable-runtime-cpudetect --enable-zlib \
       --enable-decoder=png --enable-demuxer=image2 --enable-encoder=mpeg4 \
       --enable-muxer=mp4 --enable-protocol=file \
-      --enable-filter=scale,format,fps,vflip --enable-parser=png \
+      --enable-decoder=mp3,mp3float,aac,pcm_s16le,pcm_f32le \
+      --enable-demuxer=mp3,aac,wav,pcm_s16le \
+      --enable-parser=mpegaudio,aac \
+      --enable-encoder=aac \
+      --enable-bsf=aac_adtstoasc,extract_extradata \
+      --enable-filter=scale,format,fps,vflip,aresample,aformat,anull \
       --extra-cflags="$CFLAGS" --extra-ldflags="$LDFLAGS" >/dev/null
 
     # configure mis-detects host (macOS/Linux) POSIX features for the unknown wasm32 arch.

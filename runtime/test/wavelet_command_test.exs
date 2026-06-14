@@ -109,7 +109,8 @@ defmodule Workbooks.WaveletCommandTest do
     assert probe(delivered, "pix_fmt") == "yuv420p"
   end
 
-  test "wavelet render --audio: muxes an mp3 as an aac track", %{root: root} do
+  test "wavelet render --audio: muxes an mp3 as an aac track IN-GUEST (no broker)",
+       %{root: root} do
     comp = Path.join(root, "av.html")
     File.write!(comp, @composition)
     mp3 = Path.join(root, "tone.mp3")
@@ -124,15 +125,18 @@ defmodule Workbooks.WaveletCommandTest do
 
     out = Path.join(root, "av.mp4")
 
+    # No `allow:` grant — audio now muxes ENTIRELY in the wasm guest (mpeg4 video +
+    # native AAC), so it needs NO `encode` broker cap. This is the bedrock close.
     assert {:ok, delivered} =
              Wavelet.command(
                ["render", comp, "-o", out, "--w", "160", "--h", "90", "--fps", "12",
                 "--duration", "2", "--audio", mp3],
-               allow: true,
                roots: [root]
              )
 
-    assert probe(delivered, "codec_name") == "h264"
+    # In-guest video codec is mpeg4 (the dependency-free default); H.264 stays the
+    # opt-in host-broker quality path.
+    assert probe(delivered, "codec_name") == "mpeg4"
 
     {a, 0} =
       System.cmd(

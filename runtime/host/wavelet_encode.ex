@@ -58,11 +58,17 @@ defmodule Workbooks.WaveletEncode do
   opts:
     * `:fps` (int, default 30)
     * `:timeout_ms` (int, default 600_000) — wall-clock cap on the wasm encode.
+    * `:audio` (path | nil) — optional audio file (mp3/aac/wav). When set, the
+      file is STAGED INTO `frames_dir` (so it's reachable under the single `/in`
+      preopen — wasi grants no host paths beyond the explicit preopens) and the
+      driver decodes → resamples → encodes a native AAC track muxed alongside the
+      video. NO host ffmpeg, NO native exec — the audio mux is fully in-guest.
   """
   def encode(frames_dir, out_path, opts \\ [])
       when is_binary(frames_dir) and is_binary(out_path) and is_list(opts) do
     fps = Keyword.get(opts, :fps, 30)
     timeout_ms = Keyword.get(opts, :timeout_ms, 600_000)
+    audio = Keyword.get(opts, :audio)
 
     frames_abs = Path.expand(frames_dir)
     out_abs = Path.expand(out_path)
@@ -70,8 +76,11 @@ defmodule Workbooks.WaveletEncode do
     out_base = Path.basename(out_abs)
     File.mkdir_p!(out_dir)
 
-    with {:ok, _name} <- ensure_registered() do
-      argv = ["/in/#{@frame_pattern}", "/out/#{out_base}", Integer.to_string(fps)]
+    with {:ok, audio_argv} <- stage_audio(audio, frames_abs),
+         {:ok, _name} <- ensure_registered() do
+      argv =
+        ["/in/#{@frame_pattern}", "/out/#{out_base}", Integer.to_string(fps)] ++ audio_argv
+
       dirs = ["#{frames_abs}::/in", "#{out_dir}::/out"]
       ropts = [timeout_ms: timeout_ms, fuel: 500_000_000_000]
 
@@ -92,4 +101,29 @@ defmodule Workbooks.WaveletEncode do
 
   @doc "The frame-filename pattern the in-guest encoder expects (wavelet render_seq layout)."
   def frame_pattern, do: @frame_pattern
+
+  # Stage the optional audio source INTO the frames dir so it's reachable under the
+  # single `/in` wasi preopen, then return the driver's 4th argv (the in-guest path).
+  # `nil` → no audio argv. The source may live anywhere on the host; we copy a single
+  # known-named file (`audio<ext>`) next to the frames so the sandbox sees only it.
+  defp stage_audio(nil, _frames_abs), do: {:ok, []}
+
+  defp stage_audio(audio, frames_abs) when is_binary(audio) do
+    src = Path.expand(audio)
+
+    cond do
+      not File.regular?(src) ->
+        {:error, {:audio_missing, audio}}
+
+      true ->
+        ext = Path.extname(src)
+        name = "audio" <> if(ext == "", do: ".mp3", else: ext)
+        dest = Path.join(frames_abs, name)
+
+        case File.cp(src, dest) do
+          :ok -> {:ok, ["/in/#{name}"]}
+          {:error, reason} -> {:error, {:audio_stage_failed, reason}}
+        end
+    end
+  end
 end

@@ -28,8 +28,9 @@ reproduced from clean exit 0), wb_encode.c, manifest.org (CLI_BIN wb_encode, KIN
 encode), .gitignore. Wiring: host/wavelet_encode.ex (Workbooks.WaveletEncode —
 provisions via Compilers.build("ffmpeg"), registers wb-encode command, runs under
 wasmtime). host/wavelet.ex encode/5 now has two engines via opts[:encode_engine]:
-:in_guest (DEFAULT, mpeg4/mp4, no native exec, no broker grant) and :host
-(FfmpegBroker, libx264/H.264 + audio). --audio auto-falls-back to :host.
+:in_guest (DEFAULT, mpeg4/mp4 + in-guest AAC audio — see Phase 1 below — no native
+exec, no broker grant) and :host (FfmpegBroker, libx264/H.264). [Originally --audio
+auto-fell-back to :host; Phase 1 removed that fallback.]
 
 ## Stage 4 — true in-sandbox build via our clang.wasm — PARTIAL
 COMPILATION PROVEN: clang.wasm compiled base64.c/mem.c/avstring.c/log.c and
@@ -45,7 +46,41 @@ in-guest COMPILE proven incl. the mpeg4 encoder; a turnkey in-sandbox BUILD stil
 needs (a) host-side configure, (b) the curated ~260-file compile loop, (c) wasm-ld
 link wired into build.sh. Mechanical, not a wall.
 
+## Phase 1 — IN-GUEST AUDIO — DONE/PROVEN
+The `--audio` path no longer falls back to the host broker. Extended the lane to
+mux a native AAC track ENTIRELY in-sandbox alongside the mpeg4 video.
+
+build.sh configure additions (all ffmpeg built-ins, NO external audio libs):
+  --enable-decoder=mp3,mp3float,aac,pcm_s16le,pcm_f32le
+  --enable-demuxer=mp3,aac,wav,pcm_s16le
+  --enable-parser=mpegaudio,aac
+  --enable-encoder=aac            (ffmpeg's own AAC encoder — not libfdk/no GPL)
+  --enable-bsf=aac_adtstoasc,extract_extradata
+  --enable-filter=...,aresample,aformat,anull   (resample + channel/fmt convert)
+
+wb_encode.c: optional 4th argv = audio path. Pipeline = decode (mp3/aac/wav) ->
+abuffer -> aformat(44100/stereo/fltp) -> abuffersink(frame_size=AAC's 1024) ->
+AAC encoder -> 2nd mp4 stream. Audio stream is wired BEFORE write_header so the
+mp4 declares both streams; audio is drained AFTER the video so packets interleave.
+aformat does the resample+upmix (proven: a 22050Hz MONO mp3 -> 44100/stereo AAC).
+
+PROVEN under wasmtime (NO native exec, NO broker, only wasi imports — verified via
+wasm-tools): 30 PNG frames + a 1.2s 440Hz stereo mp3 ->
+`wasmtime run --dir frames::/in --dir out::/out wb_encode.wasm
+/in/frame_%05d.png /out/out_av.mp4 30 /in/audio.mp3`. ffprobe (inspect only):
+stream0 mpeg4 320x240 yuv420p 30f; stream1 aac 44100 stereo 1.2s 53f. Decoded the
+AAC back -> Goertzel: 440Hz power dominates the next-strongest bin by ~5 orders of
+magnitude — the tone survived the full mp3->AAC re-encode. Video-only mode (3-arg)
+still produces a single mpeg4 stream (regression-clean). wasm grew 2.1MB -> 3.1MB.
+
+Host wiring: WaveletEncode.encode/3 gained an `:audio` opt — stages the source
+into the frames dir (so it's reachable under the single `/in` wasi preopen) and
+appends the 4th argv. wavelet.ex `:in_guest` engine now passes `p.audio` through
+instead of auto-falling-back to `:host` when audio is present. mix test green
+(wavelet_command + ffmpeg_broker, 17/17; the --audio test now asserts in-guest
+mpeg4+aac, no broker grant).
+
 ## Left to make in-guest encode the default for `wavelet render`
-DONE: :in_guest is the default; lane self-provisions on first use. Follow-ons:
-in-guest AUDIO (built-in AAC; today audio falls back to :host); H.264 via a
-libx264/GPL lane; wire the Stage-4 curated compile loop into build.sh behind a flag.
+DONE: :in_guest is the default + muxes audio in-guest; lane self-provisions on
+first use. Follow-ons: H.264 via a libx264/GPL lane (the only remaining reason to
+reach for :host); wire the Stage-4 curated compile loop into build.sh behind a flag.

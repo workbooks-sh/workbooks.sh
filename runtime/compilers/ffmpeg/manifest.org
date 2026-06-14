@@ -5,5 +5,5 @@
 #+ARG_MODE: argv
 #+TARGET: wasm32-wasi
 #+ARTIFACT: wb_encode.wasm
-#+INVOKE: wb_encode <in_%05d.png> <out.mp4> [fps]   (preopen frames dir -> /in, out dir -> /out)
-#+SOURCE: ffmpeg 6.1.1 libav* (built-in png decoder + image2 demuxer + mpeg4 encoder + mp4 muxer + scale/format filters), zlib 1.3.1. NO external codec libs (no libx264/GPL). Single-threaded; ffmpeg CLI's pthread-bound fftools are bypassed via a hand-written libav* transcode driver (wb_encode.c). Cross-compiled with wasi-sdk-25 clang. Closes the wavelet mp4-encode bedrock gap: encode runs in-guest under wasmtime, no host ffmpeg broker.
+#+INVOKE: wb_encode <in_%05d.png> <out.mp4> [fps] [audio.mp3]   (preopen frames dir -> /in, out dir -> /out; audio path must be under /in too)
+#+SOURCE: ffmpeg 6.1.1 libav* — VIDEO: built-in png decoder + image2 demuxer + mpeg4 encoder + mp4 muxer + scale/format filters. AUDIO (optional 4th arg): built-in mp3/aac/wav/pcm decoders+demuxers + native AAC encoder + aresample/aformat filters, muxed as a 2nd stream into the same mp4. zlib 1.3.1. NO external codec libs (no libx264/GPL, no libfdk/lame — the AAC encoder is ffmpeg's own). Single-threaded; ffmpeg CLI's pthread-bound fftools are bypassed via a hand-written libav* transcode driver (wb_encode.c). Cross-compiled with wasi-sdk-25 clang. Closes the wavelet mp4-encode bedrock gap INCLUDING audio: encode + audio mux run in-guest under wasmtime, no host ffmpeg broker.
