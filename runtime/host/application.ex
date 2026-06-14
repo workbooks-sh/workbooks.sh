@@ -32,6 +32,9 @@ defmodule Workbooks.Application do
         Supervisor.child_spec({Registry, keys: :unique, name: Workbooks.WorkgateBroker.Pending}, id: :workgate_pending),
         # runtime:telemetry firehose — all-sessions event fan-out.
         Workbooks.TelemetryBus,
+        # monorepo:watch — workspace file-change poller + its subscriber registry.
+        Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.MonorepoWatch.Registry}, id: :monorepo_watch_registry),
+        Workbooks.MonorepoWatcher,
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,

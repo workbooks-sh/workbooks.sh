@@ -134,6 +134,10 @@ defmodule Workbooks.PhoenixSocket do
         Workbooks.TelemetryBus.register(join_ref)
         state
 
+      topic == "monorepo:watch" ->
+        Workbooks.MonorepoWatcher.register(join_ref)
+        state
+
       match?("session:" <> _, topic) ->
         bridge_session(topic, join_ref, state)
 
@@ -149,6 +153,12 @@ defmodule Workbooks.PhoenixSocket do
   # Client→server cancel on a session channel (ws.cancelSession) — stop the run.
   defp maybe_track("cancel", "session:" <> id, _join_ref, _payload, state) do
     Workbooks.AgentSession.cancel(id)
+    state
+  end
+
+  # Client→server workspace scope — tell the file watcher which folders to poll.
+  defp maybe_track("set_scope", "workspace:control", _join_ref, payload, state) do
+    if is_map(payload), do: Workbooks.MonorepoWatcher.set_scope(payload["folders"] || [])
     state
   end
 
