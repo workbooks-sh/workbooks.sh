@@ -173,11 +173,10 @@ defmodule Workbooks.Publish.Site do
       end)
 
     dna =
-      [3, 5, 2, 6, 4, 3, 7, 2, 5, 4, 6, 3, 2, 5, 4, 7, 3, 5, 2, 6]
-      |> Enum.with_index()
-      |> Enum.map_join("", fn {w, i} ->
+      0..21
+      |> Enum.map_join("", fn i ->
         c = Enum.at(~w(#a8d4f0 #aee5c2 #f3c5a3 #f2ddb0 #d9c5f0 #f0b8b8 #b8e0e8), rem(i, 7))
-        ~s(<i style="flex:#{w};background:#{c};animation-delay:#{Float.round(i * 0.35, 2)}s"></i>)
+        ~s(<i style="background:#{c};animation-delay:-#{Float.round(i * 0.62, 2)}s"></i>)
       end)
 
     """

@@ -165,11 +165,10 @@ THEME_TOGGLE = ('<button class="themetog" id="themetog" type="button" aria-label
 # Matches the docs sidebar: ~20 segments cycling the 7 brand pastels, varying
 # flex-grow, staggered scaleY breathe. Pastels stay pastel in both themes.
 DNA_PASTELS = ["#a8d4f0", "#aee5c2", "#f3c5a3", "#f2ddb0", "#d9c5f0", "#f0b8b8", "#b8e0e8"]
-DNA_FLEX = [3, 5, 2, 6, 4, 3, 7, 2, 5, 4, 6, 3, 2, 5, 4, 7, 3, 5, 2, 6]
 DNA_STRIP = ('<div class="dnastrip" aria-hidden="true">'
-  + "".join('<i style="flex:%d;background:%s;animation-delay:%.2fs"></i>'
-            % (DNA_FLEX[k], DNA_PASTELS[k % len(DNA_PASTELS)], k * 0.35)
-            for k in range(len(DNA_FLEX)))
+  + "".join('<i style="background:%s;animation-delay:-%.2fs"></i>'
+            % (DNA_PASTELS[k % len(DNA_PASTELS)], k * 0.62)
+            for k in range(22))
   + '</div>')
 
 def sidebar(cur_slug=None):
@@ -281,12 +280,12 @@ a{ color:inherit; text-decoration:none; }
 /* DNA strip — bleeds to the panel edges (cancels .side's 22px/14px padding), gentle breathe */
 .dnastrip{ display:flex; width:auto; height:8px; overflow:hidden; flex:0 0 auto;
   margin:-22px -14px 18px; }
-.dnastrip i{ display:block; height:100%; transform-origin:center bottom; animation:dnab 6s ease-in-out infinite; }
-@keyframes dnab{ 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(.5); } }
+.dnastrip i{ height:100%; flex:1 1 0; min-width:2px; animation:dnaw 9s ease-in-out infinite; }
+@keyframes dnaw{ 0%,100%{ flex-grow:1; } 50%{ flex-grow:3.4; } }
 @media (prefers-reduced-motion:reduce){ .dnastrip i{ animation:none; } }
 .brandrow{ display:flex; align-items:center; justify-content:space-between; padding:4px 8px 16px; }
 .brand{ display:flex; align-items:center; gap:9px; min-width:0; }
-.brand svg{ width:24px; height:auto; color:var(--bloomd); flex:0 0 auto; }
+.brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
 .brand span{ font-family:var(--display); font-weight:400; font-size:21px; line-height:1; letter-spacing:.005em;
   color:var(--ink); text-transform:uppercase; }
 /* light/dark toggle — a small keycap; shows sun in dark theme, moon in light */
