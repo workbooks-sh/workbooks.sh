@@ -1,0 +1,22 @@
+[
+  {
+    "snapshot_file": "step-0.html",
+    "label": "Empty workbook",
+    "hold_secs": 1.8
+  },
+  {
+    "snapshot_file": "step-1.html",
+    "label": "Add the title — Launch Board",
+    "hold_secs": 2.2
+  },
+  {
+    "snapshot_file": "step-2.html",
+    "label": "Add three sections: To do, In progress, Done",
+    "hold_secs": 2.4
+  },
+  {
+    "snapshot_file": "step-3.html",
+    "label": "Fill the sections with launch tasks",
+    "hold_secs": 3
+  }
+]

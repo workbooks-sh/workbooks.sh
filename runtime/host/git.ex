@@ -361,6 +361,72 @@ defmodule Workbooks.Git do
   end
 
   @doc """
+  Structured commit history for ONE scope file (`<scope>.org`) in the tenant repo —
+  `[%{sha, ts, author, msg}]` newest-first. Backs `Workbooks.History` (Phase 1). The
+  scope is appended `.org` and passed as a pathspec after `--`, so git treats it as a
+  literal file, never a revision/flag (the caller has already confined it to a
+  workbook id the tenant owns).
+  """
+  def log_entries(tenant, scope) do
+    case git(repo_path(tenant), ["log", "--format=%h%x09%ct%x09%an%x09%s", "--", "#{scope}.org"]) do
+      {out, 0} ->
+        for line <- String.split(out, "\n", trim: true),
+            [sha, ts, author, msg] <- [String.split(line, "\t", parts: 4)] do
+          %{sha: sha, ts: String.to_integer(ts), author: author, msg: msg}
+        end
+
+      _ ->
+        []
+    end
+  end
+
+  @doc """
+  Before/after of ONE scope file at change `sha` → `%{before, after}` (the file's
+  full content at `sha`'s parent and at `sha`). For `History.diff/3`. A missing side
+  (e.g. the first commit has no parent) is an empty string.
+  """
+  def scope_diff(tenant, scope, sha) do
+    path = "#{scope}.org"
+    %{before: show(tenant, "#{sha}~1", path), after: show(tenant, sha, path)}
+  end
+
+  defp show(tenant, rev, path) do
+    case git(repo_path(tenant), ["show", "#{rev}:./#{path}"]) do
+      {out, 0} -> out
+      _ -> ""
+    end
+  end
+
+  @doc """
+  APPEND-ONLY restore (Phase 1): re-apply the version of `<scope>.org` at change
+  `to_id` as a NEW commit. Reads the file content at `to_id`, writes it as the
+  working copy, stages + commits under the tenant identity. NEVER resets/rewrites
+  history — it only moves the tree FORWARD, so every prior change stays intact.
+  Returns `{:ok, new_sha}`, `{:nochange, :identical}` (already at that content), or
+  `{:error, reason}`.
+  """
+  def restore(tenant, scope, to_id) do
+    dir = ensure_repo(tenant)
+    path = "#{scope}.org"
+
+    case git(dir, ["show", "#{to_id}:./#{path}"]) do
+      {content, 0} ->
+        File.write!(Path.join(dir, path), content)
+        git(dir, ["add", path])
+
+        case git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "restore #{scope}"],
+               env: commit_env(identity(tenant))
+             ) do
+          {_, 0} -> {sha, _} = git(dir, ["rev-parse", "--short", "HEAD"]); {:ok, String.trim(sha)}
+          {_, _} -> {:nochange, :identical}
+        end
+
+      {out, _} ->
+        {:error, String.slice(String.trim(out), 0, 160)}
+    end
+  end
+
+  @doc """
   Set `safe.directory=*` in the global git config once at boot, so EVERY git
   invocation (including the direct ones in dreams.ex / library.ex that bypass the
   helper) trusts the /data volume regardless of its uid ownership. Idempotent.

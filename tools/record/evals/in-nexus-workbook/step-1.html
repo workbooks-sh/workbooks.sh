@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<style>
+  :root{--bg:#0b0f0d;--panel:#111714;--line:#1d2a23;--ink:#e8f3ec;--mut:#7f9a8c;--green:#3fe081;--greend:#149157}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:radial-gradient(120% 120% at 50% -10%,#0e1512 0%,#0b0f0d 60%);color:var(--ink);
+       font-family:'Geist','Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{height:100%;display:flex;flex-direction:column}
+  .bar{display:flex;align-items:center;gap:10px;padding:14px 22px;border-bottom:1px solid var(--line);background:rgba(17,23,20,.6)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+  .wb-name{font-size:13px;letter-spacing:.04em;color:var(--mut);font-weight:600}
+  .wb-name b{color:var(--ink);font-weight:700}
+  .canvas{flex:1;overflow:hidden;padding:34px 40px}
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--mut)}
+  .empty .glyph{width:54px;height:54px;border:2px dashed var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--line)}
+  h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+  .dek{color:var(--mut);font-size:15px;margin-bottom:26px}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;height:calc(100% - 90px)}
+  .col{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:0}
+  .col h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);display:flex;align-items:center;gap:8px}
+  .col h2 .pip{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .col.todo h2 .pip{background:#5b6b62}
+  .col.doing h2 .pip{background:var(--green)}
+  .col.done h2 .pip{background:var(--greend)}
+  .card{background:#0d1411;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:9px;padding:11px 12px;font-size:13px;line-height:1.35}
+  .card .tag{display:inline-block;margin-top:7px;font-size:10px;color:var(--green);border:1px solid var(--greend);border-radius:999px;padding:1px 8px}
+  .card.muted{border-left-color:#3a4a42;opacity:.65}
+  .ph{height:34px;border:1px dashed var(--line);border-radius:9px}
+</style></head>
+<body><div class="app">
+  <div class="bar"><span class="dot"></span><span class="wb-name">workbook · <b>Launch Board</b></span></div>
+  <div class="canvas"><h1>Launch Board</h1><div class="dek">Track the v1 launch from idea to shipped.</div></div>
+</div></body></html>

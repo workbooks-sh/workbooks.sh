@@ -3,7 +3,7 @@
 #+VERSION: 0.2.0
 #+CLI_BIN: wavelet
 #+STATUS: experimental
-#+TAGLINE: Render an HTML/CSS composition to an mp4 — wholly in-nexus (in-sandbox frame render + host encode).
+#+TAGLINE: Render HTML/CSS compositions (and edit-state timelines) to mp4 / image / gif / pptx / audio — wholly in-nexus (in-sandbox render AND in-guest encode).
 
 * wavelet — HTML-composition video renderer                       :toolkit:
   :PROPERTIES:
@@ -14,41 +14,54 @@
   :SKILL_DIR: skills/
   :END:
 
-  Wavelet renders a *plain HTML + CSS composition* to an mp4 with NO
-  external tooling — no Node, no native CLI, no GPU. The pipeline is
-  wholly in-nexus:
+  Wavelet renders *plain HTML + CSS* (or a timeline of HTML snapshots)
+  to video and adjacent artifacts with NO external tooling — no Node,
+  no native CLI, no GPU, no host browser. The pipeline is WHOLLY
+  in-nexus:
 
   1. RENDER (in-sandbox). The carved render core (Blitz HTML/CSS +
      Stylo CSS-animation timeline + a CPU Vello rasterizer), compiled
      to wasm, paints the composition to a deterministic PNG frame
-     sequence. It runs in the SAME sandbox as every other command.
-  2. ENCODE (host broker). The host muxes that frame sequence into an
-     h264/yuv420p mp4 (ffmpeg cannot run in the guest — it is the one
-     trusted host-service escape, gated by the =encode= capability).
+     sequence. Runs in the SAME sandbox as every other command.
+  2. ENCODE (in-guest). =wb_encode.wasm= (our clang.wasm-built libx264
+     + native AAC) muxes the frame sequence into an h264/yuv420p mp4
+     INSIDE the sandbox — no host ffmpeg, no native exec, no broker
+     grant for the default in-guest engine.
 
-  The agent AUTHORS an HTML file and runs ONE command:
+  The verb surface:
+
+  | Verb       | Input → output                                              |
+  |------------+-------------------------------------------------------------|
+  | =render=   | one animated HTML composition → mp4                          |
+  | =film=     | a TIMELINE of edit-state HTML snapshots → captioned mp4      |
+  | =present=  | one HTML composition → pptx deck                            |
+  | =audio=    | audio file → clean AAC =.m4a= (no video, fully in-guest)     |
+  | image/gif  | render-core capabilities (=render_one= still / media GIF lane) |
 
   #+begin_src bash
   wavelet render clip.html -o out.mp4 --w 1280 --h 720 --fps 30 --duration 4
+  wavelet film  timeline.json -o demo.mp4 --crossfade 0.4 --audio narration.mp3
+  wavelet present deck.html  -o slides.pptx
+  wavelet audio  voice.mp3   -o voice.m4a --bitrate 128
   #+end_src
 
-  There is exactly one verb today: =render=. Flags: =-o/--out= (mp4
-  path, required), =--w=, =--h=, =--fps=, =--duration= (seconds),
-  =--crf= (libx264 quality), =--audio= (mp3 to mux as AAC). The
-  composition is animated with CSS =@keyframes=; each frame seeks the
-  animation clock to =t = frame / fps=, so renders are deterministic.
+  =render=/=film= take =--audio= (mp3/aac/wav muxed as AAC; NOT m4a —
+  the ISO-BMFF container isn't decodable in-guest). =film= is how an
+  in-nexus agent films its OWN workbook edits — each timeline entry is a
+  state the agent authored; see =tools/record/IN-NEXUS-FILMING.md=.
 
   This REPLACES the old external =@work.books/wavelet-cli= assumption.
-  There is no =init=, =preview=, =inspect= or trimming verb — author
-  the HTML directly, render it, done.
+  No =init=, =preview=, =inspect= or trim verb — author the HTML (or the
+  snapshot timeline), render the artifact, done.
 
   Skill index (read on demand):
 
-  | Skill                        | Use when                                            |
-  |------------------------------+-----------------------------------------------------|
-  | =overview=                   | First contact, when to use wavelet, the one command |
-  | =scaffold-a-composition=     | Empty dir → an HTML composition you can render       |
-  | =render=                     | Run =wavelet render=; flags, output, verification   |
-  | =text-cards=                 | Titles, lower-thirds, end cards as CSS-animated text|
-  | =transitions=                | Cross-fade / cut between sections with CSS keyframes|
-  | =audio-sync=                 | Mux an mp3 + time visuals to it                     |
+  | Skill                    | Use when                                              |
+  |--------------------------+-------------------------------------------------------|
+  | =overview=               | First contact; the full verb surface                  |
+  | =scaffold-a-composition= | Empty dir → an HTML composition you can render         |
+  | =render=                 | Run =wavelet render=; flags, output, verification     |
+  | =film=                   | Film an edit-state timeline (agent filming its workbook)|
+  | =text-cards=             | Titles, lower-thirds, end cards as CSS-animated text  |
+  | =transitions=            | Cross-fade / cut between sections with CSS keyframes  |
+  | =audio-sync=             | Build / mux an audio (narration) track                |

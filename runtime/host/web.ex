@@ -1257,6 +1257,51 @@ defmodule Workbooks.Web do
     end
   end
 
+  # --- History + Restore (Phase 1) -------------------------------------------
+  # Tenant-scoped per the same wb-g1yo rule as /instances + /api/sessions: the
+  # tenant comes from conn.assigns[:tenant] (set by the Auth plug above) and
+  # Workbooks.History enforces that the scope (a workbook id) is owned by it.
+  # :scope is an OPAQUE id — reject any path/traversal chars (wb-g1yo.10) BEFORE
+  # it reaches the engine, so it can never be coerced into a filesystem path.
+  get "/api/history/:scope" do
+    with :ok <- valid_scope(conn.params["scope"]),
+         {:ok, changes} <- Workbooks.History.timeline(conn.params["scope"], conn.assigns[:tenant]) do
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(changes))
+    else
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+    end
+  end
+
+  get "/api/history/:scope/:id/diff" do
+    with :ok <- valid_scope(conn.params["scope"]),
+         {:ok, diff} <- Workbooks.History.diff(conn.params["scope"], conn.params["id"], conn.assigns[:tenant]) do
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(diff))
+    else
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+    end
+  end
+
+  post "/api/history/:scope/restore" do
+    {:ok, body, conn} = read_body(conn)
+    to = with {:ok, %{"to" => to}} <- Jason.decode(body), do: to, else: (_ -> nil)
+
+    with :ok <- valid_scope(conn.params["scope"]),
+         {:ok, change} <- Workbooks.History.restore(conn.params["scope"], to, conn.assigns[:tenant]) do
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(change))
+    else
+      _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+    end
+  end
+
+  # A scope is an opaque workbook id: letters/digits/_/-/. only, no separators or
+  # traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
+  defp valid_scope(s)
+       when is_binary(s) and s != "" do
+    if s =~ ~r/\A[A-Za-z0-9_-]+\z/, do: :ok, else: :error
+  end
+
+  defp valid_scope(_), do: :error
+
   match _ do
     send_resp(conn, 404, "not found")
   end
