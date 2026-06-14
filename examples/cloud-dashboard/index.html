@@ -248,7 +248,8 @@
       <a class="on" onclick="go('nexuses',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>Nexuses</a>
       <a onclick="go('storage',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3Zm6 6.6c-1.5.8-3.7 1.4-6 1.4s-4.5-.6-6-1.4V12c0 .6 2.4 2 6 2s6-1.4 6-2V9.6ZM12 5C8.7 5 6 5.8 6 6s2.7 1 6 1 6-.8 6-1-2.7-1-6-1Z"/></svg>Storage</a>
       <a onclick="go('databases',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c4.4 0 8 1.6 8 3.5S16.4 9 12 9 4 7.4 4 5.5 7.6 2 12 2Zm8 6.7v3.3c0 1.9-3.6 3.5-8 3.5s-8-1.6-8-3.5V8.7C5.6 9.9 8.6 10.5 12 10.5s6.4-.6 8-1.8Zm0 6v3.8c0 1.9-3.6 3.5-8 3.5s-8-1.6-8-3.5v-3.8c1.6 1.2 4.6 1.8 8 1.8s6.4-.6 8-1.8Z"/></svg>Databases</a>
-      <span class="lbl">account</span>
+      <span class="lbl">workspace</span>
+      <a onclick="go('team',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 2c-2.7 0-8 1.3-8 4v3h10v-3c0-1 .4-1.9 1-2.6-.9-.3-2-.4-3-.4Zm8 0c-.4 0-.8 0-1.3.1C16.1 14 17 15.3 17 17v3h7v-3c0-2.7-5.3-4-8-4Z"/></svg>Team</a>
       <a onclick="go('usage',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 13h4v7H4v-7Zm6-6h4v13h-4V7Zm6 3h4v10h-4V10Z"/></svg>Usage &amp; billing</a>
       <a onclick="go('settings',this)"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
     </nav>
@@ -398,6 +399,68 @@
       </section>
 
       <!-- ── SETTINGS ── -->
+      <!-- ── TEAM (the embedded WorkOS User Management widget + seat strip) ── -->
+      <section class="page" id="p-team">
+        <div class="sechead">
+          <div><h2>Team</h2><p>Members of the <b>shinyobjectz</b> workspace. Invites, roles &amp; removals are handled entirely by WorkOS — the panel below is the embedded User Management widget.</p></div>
+        </div>
+
+        <!-- seat-usage strip -->
+        <div class="card" style="display:flex;align-items:center;gap:18px">
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span><b>Team</b> plan · 3 of 10 seats used</span><span class="dim mono">7 seats left</span></div>
+            <div class="bar"><i style="width:30%"></i></div>
+            <div class="faint" style="font-size:11.5px">Seats sync automatically — adding a member bumps your Polar subscription; removing one drops it.</div>
+          </div>
+          <button class="btn sm">Upgrade plan</button>
+        </div>
+
+        <!-- WorkOS User Management widget (embedded) -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg class="ico" viewBox="0 0 24 24" style="width:13px;height:13px"><path fill="var(--faint)" d="M12 1l9 4v6c0 5-3.8 9.7-9 11-5.2-1.3-9-6-9-11V5l9-4Z"/></svg>
+              <span class="faint" style="font-size:11.5px">WorkOS · User Management widget</span>
+            </div>
+            <button class="btn primary sm"><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg> Invite member</button>
+          </div>
+          <table>
+            <thead><tr><th>Member</th><th>Role</th><th>Last active</th><th class="num">Status</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--live))">S</span><div><div style="font-weight:600">Shane</div><div class="faint mono" style="font-size:11px">shane@shinyobjectz.com</div></div></div></td>
+                <td><span class="tag" style="border-color:var(--live);color:var(--live)">Owner</span></td>
+                <td class="dim">active now</td>
+                <td class="num"><span style="color:var(--live)">● active</span></td>
+                <td class="num faint">—</td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--live))">M</span><div><div style="font-weight:600">Maya</div><div class="faint mono" style="font-size:11px">maya@shinyobjectz.com</div></div></div></td>
+                <td><span class="tag">Admin</span></td>
+                <td class="dim">2h ago</td>
+                <td class="num"><span style="color:var(--live)">● active</span></td>
+                <td class="num"><button class="btn sm" style="height:26px">Manage</button></td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--violet))">D</span><div><div style="font-weight:600">Devin</div><div class="faint mono" style="font-size:11px">devin@shinyobjectz.com</div></div></div></td>
+                <td><span class="tag">Member</span></td>
+                <td class="dim">1d ago</td>
+                <td class="num"><span style="color:var(--live)">● active</span></td>
+                <td class="num"><button class="btn sm" style="height:26px">Manage</button></td>
+              </tr>
+              <tr style="opacity:.75">
+                <td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:28px;height:28px;border-radius:50%;background:var(--panel-2);color:var(--faint)">J</span><div><div style="font-weight:600">jordan@acme.co</div><div class="faint mono" style="font-size:11px">invited 1h ago</div></div></div></td>
+                <td><span class="tag">Member</span></td>
+                <td class="faint">—</td>
+                <td class="num"><span class="amber">● pending</span></td>
+                <td class="num"><button class="btn sm" style="height:26px">Resend</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">Enterprise workspaces also get the WorkOS <b>Admin Portal</b> widgets here for self-serve SSO + SCIM/Directory Sync — gated by plan.</div>
+      </section>
+
       <section class="page" id="p-settings">
         <div class="sechead"><div><h2>Settings</h2><p>Account &amp; organization</p></div></div>
         <div class="card">
@@ -517,7 +580,7 @@
   }
 
   // ── nav ──
-  const TITLES = {nexuses:'Nexuses', usage:'Usage &amp; billing', storage:'Storage', databases:'Databases', settings:'Settings'};
+  const TITLES = {nexuses:'Nexuses', team:'Team', usage:'Usage &amp; billing', storage:'Storage', databases:'Databases', settings:'Settings'};
   function go(page, el){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
     document.getElementById('p-'+page).classList.add('on');
