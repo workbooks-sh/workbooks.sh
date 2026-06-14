@@ -5935,59 +5935,6 @@
    ]
   },
   {
-   "slug": "why-you-can-build-now",
-   "title": "Why you can build software now",
-   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-you-can-build-now.mp3?v=459",
-   "dur": 459,
-   "chapters": [
-    {
-     "id": "intro",
-     "title": "The wall is gone",
-     "t": 2
-    },
-    {
-     "id": "what-youre-after",
-     "title": "What you're really after",
-     "t": 50
-    },
-    {
-     "id": "try-it",
-     "title": "Try it once, in your head",
-     "t": 96
-    },
-    {
-     "id": "the-loop",
-     "title": "Then the real work begins",
-     "t": 159
-    },
-    {
-     "id": "directing",
-     "title": "Directing what you can't read",
-     "t": 208
-    },
-    {
-     "id": "sandbox",
-     "title": "Why a safe sandbox matters",
-     "t": 264
-    },
-    {
-     "id": "safe-by-design",
-     "title": "Safe by design, not by luck",
-     "t": 324
-    },
-    {
-     "id": "what-workbooks-is",
-     "title": "What workbooks actually is",
-     "t": 371
-    },
-    {
-     "id": "outro",
-     "title": "Where you stand",
-     "t": 421
-    }
-   ]
-  },
-  {
    "slug": "why-workbooks",
    "title": "Why Workbooks",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-workbooks.mp3?v=247",
