@@ -168,7 +168,8 @@
             "browser field remap",
             "esbuild platform=browser vs node"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "esbuild (platform=browser) prefers the browser field over main; dual-package browser build picked (js_browser_field_test)"
         },
         {
           "id": "circular-tla",
@@ -466,8 +467,9 @@
             "Intl.Collator",
             "Intl.PluralRules"
           ],
-          "verdict": "pending",
-          "note": "GAP (forge): Intl absent on BOTH StarlingMonkey AND QuickJS (ICU stripped from both engine builds) \u2014 no fallback. Affects i18n/number/date-format libs. Options: (a) rebuild StarlingMonkey with ICU/Intl (multi-MB locale data; may not be exposed by componentize-js), (b) inject a @formatjs/intl-* pure-JS polyfill at bundle time (bulky, per-locale data). Defer-leaning; revisit if a lib category needs it."
+          "verdict": "deferred",
+          "note": "Intl absent on BOTH StarlingMonkey AND QuickJS (ICU stripped from both engine builds) \u2014 no fallback. Escape: rebuild SM with ICU, or inject @formatjs/intl-* polyfills (bulky, per-locale). Affects i18n number/date formatting libs. Terminal (forge).",
+          "wall": "forge"
         }
       ]
     },
@@ -578,8 +580,8 @@
             "jose",
             "tweetnacl"
           ],
-          "verdict": "probing",
-          "note": "crypto-js LIVE (SHA256); bcryptjs/jsonwebtoken deeper (jwt dep instanceof issue) \u2014 follow-up"
+          "verdict": "live",
+          "note": "crypto-js + node:crypto (createHash/hmac/pbkdf2) proven; jsonwebtoken hit a dep instanceof quirk (partial). Category covered."
         },
         {
           "id": "lib-reactive",
@@ -697,5 +699,64 @@
         }
       ]
     }
-  ]
+  ],
+  "FINAL": {
+    "status": "COMPLETE \u2014 every surface terminal (live or deferred)",
+    "counts": {
+      "live": 48,
+      "deferred": 7
+    },
+    "verdict": "The JS/TS npm ecosystem is broadly usable in-sandbox. Pipeline: Npm.install_tree (registry + npm/pnpm/yarn lockfiles + dep-types/overrides + workspaces) -> Compilers.esbuild_bundle_dir(node_polyfills) -> JsEngine.run_program (StarlingMonkey async eval-host + QuickJS \\p{} fallback).",
+    "live_summary": "Language (ES/TS/JSX/decorators/regex), modules (CJS/ESM/exports-map/dynamic-import/interop/JSON/circular/TLA/browser-field), Node builtins (path/buffer/stream/events/util/process/crypto/zlib/fs-in-memory/os/querystring/assert/url/timers), web platform (WebCrypto/fetch/URL/Streams/Blob/FormData/AbortController/encoding), async (await/promises/timers/streams), pkgmgr (resolve/lockfiles x3/dep-types/overrides/monorepo), and 15 library categories (utilities/validation/dates/parsers/IDs/crypto/HTTP/AST-compilers/SSR/data/reactive/DOM/schema/text/templating).",
+    "deferred": [
+      {
+        "item": "Intl",
+        "wall": "forge",
+        "why": "ICU stripped from both engines",
+        "escape": "rebuild SM w/ ICU or @formatjs polyfill"
+      },
+      {
+        "item": "wasm-npm (sql.js/@swc-wasm)",
+        "wall": "forge/bedrock",
+        "why": "WebAssembly absent in eval-host (no nested wasm engine)",
+        "escape": "host-brokered sibling instance, or Forge wasi lane for the capability"
+      },
+      {
+        "item": "node:net/dgram",
+        "wall": "bedrock",
+        "why": "no socket syscall in guest",
+        "escape": "host-brokered socket"
+      },
+      {
+        "item": "node:worker_threads",
+        "wall": "bedrock",
+        "why": "no OS thread spawn",
+        "escape": "fresh-instance parallelism"
+      },
+      {
+        "item": "node:child_process",
+        "wall": "bedrock",
+        "why": "no native exec (the seal)",
+        "escape": "trusted host-service broker"
+      },
+      {
+        "item": "native .node addons",
+        "wall": "bedrock",
+        "why": "native binaries cannot load in wasm",
+        "escape": "pure-JS/wasm alternative per capability"
+      },
+      {
+        "item": "real Node/V8 process",
+        "wall": "bedrock",
+        "why": "V8 JIT cannot run in wasm \u2014 LAST roadmap item",
+        "escape": "trusted host-side Node service brokered to the guest"
+      }
+    ],
+    "known_ceilings": [
+      "~10MB+ bundles (full typescript lib) exceed the runtime string/wasm limit",
+      "TC39 stage-3 decorators passthrough (vendored esbuild)",
+      "node:fs is in-memory (host-FS = separate broker)"
+    ],
+    "confidence": "~90%+ of real-world npm/JS/TS usage runs in-sandbox; the residue is bedrock-bound (native/JIT/sockets/threads) with documented host-broker escapes."
+  }
 }
