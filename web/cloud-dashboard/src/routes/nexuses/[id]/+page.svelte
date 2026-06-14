@@ -6,6 +6,7 @@
   import { toast } from '$lib/toastStore.svelte.js';
   import Confirm from '$lib/Confirm.svelte';
   import History from '$lib/History.svelte';
+  import Drafts from '$lib/Drafts.svelte';
 
   const id = $derived(page.params.id);
   const detail = $derived(nexusStore.detail(id));
@@ -138,6 +139,8 @@
       {/each}
     </div>
   </div>
+
+  <Drafts nexus={id} />
 
   <History scope={id} />
 

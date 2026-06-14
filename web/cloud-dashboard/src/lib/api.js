@@ -231,4 +231,54 @@ export async function revokeShare(id) {
   return { ok: true, id };
 }
 
+// ── Drafts ───────────────────────────────────────────────────────────────────
+// "Try a change safely — Keep it or Discard it." A Draft is an isolated copy of the
+// workspace; the live version keeps serving until you Keep. Mirrors the runtime:
+//   GET    /api/nexuses/:id/drafts            → [{ name, files_changed, preview_path }]
+//   POST   /api/nexuses/:id/drafts {name}     → { name, preview_path }
+//   GET    /api/nexuses/:id/drafts/:name/diff → [{ path, status }]
+//   POST   /api/nexuses/:id/drafts/:name/keep → { merged }
+//   POST   /api/nexuses/:id/drafts/:name/discard → ok
+// No git/branch/merge words cross this seam — only Draft / preview / Keep / Discard.
+
+const MOCK_DRAFTS = {
+  aurora: [
+    { name: 'spring-refresh', files_changed: 4, preview_path: '.drafts/spring-refresh',
+      changes: [
+        { path: 'home.md', status: 'modified' },
+        { path: 'pricing.md', status: 'modified' },
+        { path: 'hero.svg', status: 'added' },
+        { path: 'old-banner.png', status: 'removed' }
+      ] },
+    { name: 'waldo-copy-pass', files_changed: 2, preview_path: '.drafts/waldo-copy-pass',
+      changes: [{ path: 'about.md', status: 'modified' }, { path: 'faq.md', status: 'modified' }] }
+  ]
+};
+
+export async function listDrafts(nexus) {
+  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts`)
+  return structuredClone(MOCK_DRAFTS[nexus] || []);
+}
+
+export async function createDraft(nexus, name) {
+  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts`, {method:'POST', body:...})
+  return { name, files_changed: 0, preview_path: `.drafts/${name}`, changes: [] };
+}
+
+export async function draftDiff(nexus, name) {
+  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/diff`)
+  const d = (MOCK_DRAFTS[nexus] || []).find((x) => x.name === name);
+  return structuredClone(d?.changes || []);
+}
+
+export async function keepDraft(nexus, name) {
+  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/keep`, {method:'POST'})
+  return { merged: name };
+}
+
+export async function discardDraft(nexus, name) {
+  // MOCK — swap for fetch(`/api/nexuses/${nexus}/drafts/${name}/discard`, {method:'POST'})
+  return { ok: true, name };
+}
+
 export { STATE_LABEL, MOCK_NEXUSES, MOCK_DETAIL, MOCK_HISTORY };
