@@ -354,7 +354,11 @@ defmodule Workbooks.Compilers do
         # and writes a DISTINCT object in the shared /work (outputs never collide), so concurrent
         # wasmtime processes are safe. ~1.7x on a 33-file build (Lua 280s→166s; clang.wasm is CPU-bound
         # so N instances compete rather than scale linearly). Capped so heavy instances don't OOM.
-        conc = max(1, min(System.schedulers_online() - 1, 6))
+        conc =
+          case System.get_env("WB_CC_CONC") do
+            nil -> max(1, min(System.schedulers_online() - 1, 6))
+            v -> max(1, String.to_integer(v))
+          end
 
         logs1 =
           srcs
