@@ -8,40 +8,67 @@
 
 * Start here
   - [[start/install.org][Install]]
+  - [[start/your-first-workbook.org][Your first workbook (direct an agent)]]
+  - [[start/first-workbook.org][Your first workbook, end to end (write it yourself)]]
   - [[start/first-toolkit.org][Your first toolkit]]
 
 * Concepts
+  Thin stubs. Each links to the canonical deep explanation under
+  [[https://workbooks.sh/learn/][/learn]] — never duplicated here.
   - [[concepts/what-is-a-toolkit.org][What is a toolkit]]
   - [[concepts/two-surfaces.org][Workbooks & toolkits]]
   - [[concepts/exec-shapes.org][The six shapes]]
   - [[concepts/the-dock.org][The Dock & capabilities]]
   - [[concepts/isolation.org][Isolation tiers]]
 
-* Build a toolkit
+* Build
   - [[build/pick-a-shape.org][Pick a shape]]
   - [[build/dock-sdk.org][The Dock SDK]]
   - [[build/skills.org][Authoring skills]]
   - [[build/languages.org][Language lanes]]
   - [[build/self-authoring.org][Self-authoring & hot-swap]]
+  - [[workbooks/anatomy.org][Anatomy of a workbook]]
+  - [[workbooks/build-plan.org][The build plan]]
+  - [[workbooks/publish.org][Publish a workbook]]
 
-* Run & isolate
-  - [[run/invoke.org][Invoking a toolkit]]
-  - [[run/fabric.org][The fabric]]
+* Run
+  - [[run/invoke.org][Invoke a toolkit]]
   - [[run/tiers.org][Isolation tiers & trust]]
+  - [[run/fabric.org][The fabric]]
 
 * Distribute
   - [[distribute/package.org][Package & sign]]
   - [[distribute/install.org][Install & registry]]
   - [[distribute/federation.org][Federation]]
 
-* Workbooks
-  - [[workbooks/anatomy.org][Anatomy of a workbook]]
-  - [[workbooks/build-plan.org][The build plan]]
-  - [[workbooks/publish.org][Publish]]
+* Deploy
+  - [[deploy/local.org][Deploy locally]]
+  - [[deploy/cloud.org][Deploy to the cloud]]
+  - [[deploy/release-layers.org][The three release layers]]
+
+* Maturity
+  The honest answer to "what works?" — capability × tier × evidence.
+  - [[maturity/index.org][Capability Matrix]]
 
 * Reference
+  Exhaustive, tangled from code. No narrative.
+  - [[reference/cli.org][wbx CLI]]
+  - [[reference/runtime.org][Runtime RCP API]]
+  - [[reference/engine.org][Engine internals]]
+  - [[reference/browser.org][Browser / desktop Host]]
+  - [[reference/toolkits.org][Toolkits]]
+  - [[reference/compilers.org][Compilers & lanes]]
+  - [[reference/deploy.org][Deploy & kernel]]
   - [[reference/manifest.org][Manifest fields]]
   - [[reference/exec-shapes.org][#+EXEC shapes]]
   - [[reference/caps.org][Dock capabilities]]
-  - [[reference/cli.org][wb CLI]]
   - [[reference/sdk.org][Dock SDK API]]
+
+* Toolkits
+  Integrations and the toolkit catalog — what ships, and how to author your own.
+  - [[toolkits/index.org][Toolkits & integrations (hub)]]
+  - [[toolkits/fly.org][Workbooks + Fly.io]]
+  - [[toolkits/github.org][Workbooks + GitHub]]
+  - [[toolkits/slack.org][Workbooks + Slack]]
+  - [[reference/toolkits.org][Toolkit catalog & status]]
+  - [[build/pick-a-shape.org][Author a toolkit]]

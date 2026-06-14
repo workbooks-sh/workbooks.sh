@@ -56,7 +56,9 @@ for (const page of scripts) {
     const mp3 = join(HERE, "raw", `${stem}.mp3`);
     if (existsSync(mp3)) { skipped++; continue; }
     process.stdout.write(`${stem} … `);
-    const d = await tts(t.text);
+    let d;
+    try { d = await tts(t.text); } catch (e) { console.log(`FAILED (${e.message}) — skipped`); continue; }
+    if (!d || !d.audio_base64) { console.log("FAILED (no audio) — skipped"); continue; }
     writeFileSync(mp3, Buffer.from(d.audio_base64, "base64"));
     // keep only what pacing needs: char + end-time arrays
     const a = d.alignment || {};

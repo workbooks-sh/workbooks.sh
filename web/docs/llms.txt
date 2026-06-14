@@ -1,0 +1,77 @@
+# Workbooks Docs
+
+> Workbooks is one frontend, many targets: a UI that talks to a single Host capability surface (the Dock membrane) fulfilled by local, runtime, or kernel providers. Docs are org-authored, Diátaxis-shaped, and honesty-gated — every capability is marked ships-today / partial / north-star / wall against a real file:line. These are the developer docs (docs.workbooks.sh), distinct from the marketing/explanation site at workbooks.sh/learn. Links point at the .md sibling of each page; badges like [partial] and [north-star] are kept verbatim so the honest state is ingested, not the aspirational one.
+
+## Start here (tutorials — shallow + complete, one happy path)
+
+- [Install](https://docs.workbooks.sh/start/install.md): Get the wbx CLI and a runnable environment.
+- [Your first workbook — direct an agent](https://docs.workbooks.sh/start/your-first-workbook.md): End-to-end first success by directing an agent.
+- [Your first workbook — write it yourself](https://docs.workbooks.sh/start/first-workbook.md): Author org source by hand, build, run.
+- [Your first toolkit](https://docs.workbooks.sh/start/first-toolkit.md): Scaffold, build, and invoke a toolkit.
+
+## Concepts (thin stubs linking to the canonical /learn deep pages)
+
+- [What is a toolkit](https://docs.workbooks.sh/concepts/what-is-a-toolkit.md): Orientation; links to the canonical /learn explanation.
+- [Workbooks & toolkits — two surfaces](https://docs.workbooks.sh/concepts/two-surfaces.md): The document surface vs the capability surface.
+- [The six shapes](https://docs.workbooks.sh/concepts/exec-shapes.md): The #+EXEC shape taxonomy at a glance.
+- [The Dock & capabilities](https://docs.workbooks.sh/concepts/the-dock.md): The Host membrane and how caps flow by grant.
+- [Isolation tiers](https://docs.workbooks.sh/concepts/isolation.md): How toolkits are isolated and trust flows.
+
+## Build (how-to — goal-titled tasks)
+
+- [Pick a shape](https://docs.workbooks.sh/build/pick-a-shape.md): Choose the right EXEC shape for your toolkit.
+- [The Dock SDK](https://docs.workbooks.sh/build/dock-sdk.md): Request and use host capabilities from a toolkit.
+- [Authoring skills](https://docs.workbooks.sh/build/skills.md): Write progressive-disclosure skill files.
+- [Language lanes](https://docs.workbooks.sh/build/languages.md): Compile C / Rust / Go / Zig / JS to WASM commands.
+- [Self-authoring & hot-swap](https://docs.workbooks.sh/build/self-authoring.md): Edit the declarative layer live.
+- [Anatomy of a workbook](https://docs.workbooks.sh/workbooks/anatomy.md): The parts of a single-file workbook.
+- [The build plan](https://docs.workbooks.sh/workbooks/build-plan.md): How org tangles to a typed build plan.
+- [Publish a workbook](https://docs.workbooks.sh/workbooks/publish.md): Ship an assembled workbook to a surface.
+
+## Run (how-to)
+
+- [Invoke a toolkit](https://docs.workbooks.sh/run/invoke.md): Call a capability through the Host seam.
+- [Isolation tiers & trust](https://docs.workbooks.sh/run/tiers.md): The tier ladder from wasm-instance to container.
+- [The fabric](https://docs.workbooks.sh/run/fabric.md): How runs are coordinated across the runtime.
+
+## Distribute (how-to)
+
+- [Package & sign](https://docs.workbooks.sh/distribute/package.md): Bundle and did:key-sign an artifact.
+- [Install & registry](https://docs.workbooks.sh/distribute/install.md): Install toolkits and resolve the registry.
+- [Federation](https://docs.workbooks.sh/distribute/federation.md): Federate the tenant repo over the network.
+
+## Deploy (how-to — wb deploy is the USER's tool, not platform release)
+
+- [Deploy locally](https://docs.workbooks.sh/deploy/local.md): Run the runtime image locally via krunvm/podman/docker.
+- [Deploy to the cloud](https://docs.workbooks.sh/deploy/cloud.md): Apply a cloud deployment (e.g. Fly).
+- [The three release layers](https://docs.workbooks.sh/deploy/release-layers.md): Do not conflate compilers package / runtime image / wb deploy.
+
+## Toolkits & integrations (Workbooks + X)
+
+- [Toolkits & integrations hub](https://docs.workbooks.sh/toolkits/index.md): The integration directory landing page.
+- [Workbooks + Fly.io](https://docs.workbooks.sh/toolkits/fly.md): What you can do, setup, capabilities requested.
+- [Workbooks + GitHub](https://docs.workbooks.sh/toolkits/github.md): What you can do, setup, capabilities requested.
+- [Workbooks + Slack](https://docs.workbooks.sh/toolkits/slack.md): What you can do, setup, capabilities requested.
+
+## Reference (exhaustive, tangled from code — tables only, every row cites source)
+
+- [wbx CLI](https://docs.workbooks.sh/reference/cli.md): Every wbx verb, flag, mode, env var, exit code, from the clap surface.
+- [Runtime RCP API](https://docs.workbooks.sh/reference/runtime.md): Route table, auth, JSON envelopes from web.ex / public_web.ex.
+- [Engine internals](https://docs.workbooks.sh/reference/engine.md): The runtime module clusters with file:line anchors.
+- [Browser / desktop Host](https://docs.workbooks.sh/reference/browser.md): The Host capability/provider surface in the browser.
+- [Toolkits](https://docs.workbooks.sh/reference/toolkits.md): The catalog harvested from each manifest, with status.
+- [Compilers & lanes](https://docs.workbooks.sh/reference/compilers.md): Language → status → recipe path lane matrix.
+- [Deploy & kernel](https://docs.workbooks.sh/reference/deploy.md): Provider matrix and the kernel WIT world.
+- [Manifest fields](https://docs.workbooks.sh/reference/manifest.md): Every toolkit manifest field.
+- [#+EXEC shapes](https://docs.workbooks.sh/reference/exec-shapes.md): The six EXEC shapes, exhaustively.
+- [Dock capabilities](https://docs.workbooks.sh/reference/caps.md): The capability surface a toolkit can request.
+- [Dock SDK API](https://docs.workbooks.sh/reference/sdk.md): The SDK a toolkit uses to call the Host.
+
+## Maturity (the honest answer to "what actually works")
+
+- [Capability Matrix](https://docs.workbooks.sh/maturity/index.md): Every capability × tier (ships-today/partial/north-star/wall) × evidence × caveat × wall, grouped by surface.
+
+## Optional
+
+- [Full docs (single file)](https://docs.workbooks.sh/llms-full.txt): Every page concatenated in nav order, page-delimited, with maturity badges preserved.
+- [Marketing & explanation site](https://workbooks.sh/learn/): The canonical deep explanation pages (the EXPLANATION tier these docs link to).

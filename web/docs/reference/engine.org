@@ -1,0 +1,620 @@
+#+TITLE: Engine internals
+#+DESCRIPTION: The runtime host (runtime/host/*.ex) by subsystem — exhaustive, source-anchored, maturity-tagged.
+
+* Engine internals
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host
+:END:
+
+The *engine* is the BEAM runtime in =runtime/host/*.ex= — the trusted host behind
+the Dock membrane. It runs WASM, gates capabilities, brokers the I/O WASM cannot
+do, builds source to WASM in-sandbox, signs artifacts, and persists state. This
+page is the internals map: every fact carries a =:SRC:= anchor and an honest
+maturity tier per subsystem.
+
+This is *reference*, not explanation. For *why* the design is shaped this way see
+the deep pages under [[https://workbooks.sh/learn/safe-powers.html][/learn]]; for the *external* RCP/HTTP API see the
+nexus reference; this page is the host code.
+
+Maturity legend: =ships-today= (verifiable now at a cited =file:line=) ·
+=partial= (primitive exists, feature as described is scoped) · =north-star=
+(intended, code may be stub/absent) · =wall= (impossible-as-described under the
+architecture).
+
+** Subsystem map
+
+| cluster                | what it owns                                     | primary source                                  |
+|------------------------+--------------------------------------------------+-------------------------------------------------|
+| Agent loop             | LLM ↔ tool ↔ VFS loop; sessions; defs            | =agent.ex= =agent_session.ex= =agent_def.ex=    |
+| Isolation & policy     | cap profiles, memory/CPU caps, tier ladder       | =policy.ex= =isolation.ex= =instance.ex=        |
+| Brokers (Dock caps)    | host-mediated net/exec/storage/serve, SSRF guard | =*_broker.ex= =net_guard.ex= =instance/imports.ex= |
+| Build & compilers      | source → WASM in-sandbox, package manager        | =compilers.ex= =package_manager.ex= =command_registry.ex= |
+| Provenance & signing   | Ed25519 did:key/did:web, artifact manifests      | =git.ex= =did.ex= =manifest.ex=                 |
+| Storage & VFS          | per-instance SQLite, bundles, library            | =vfs.ex= =bundle.ex= =library.ex=               |
+| Fabric & kernel        | fan-out (width × tier), hot kernel ABI           | =fabric.ex= =kernel.ex= =isolation_node.ex=     |
+
+---
+
+* Agent loop
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/agent.ex
+:END:
+
+An agent is a BEAM loop: call the LLM → if it requests tools, run them → append
+results → loop, until the model stops calling tools or signals =done=. Bounded by
+=max_steps=, resumable because state lives in the VFS.
+
+** The loop
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/agent.ex:171-184
+:END:
+
+=Workbooks.Agent.run/3= takes =(system, task, opts)= and returns a run record
+=%{result, steps, events, log}=. The loop drives =Llm.complete/2=; an empty
+=tool_calls= or a =done= tool ends it (=agent.ex:172-179=). Default
+=max_steps= = =12= (=agent.ex:148=), raised to =40= by the session wrapper
+(=agent_session.ex:60=).
+
+| opt          | default              | source                |
+|--------------+----------------------+-----------------------|
+| =:model=     | (caller / def)       | =agent.ex:143=        |
+| =:max_steps= | =12=                 | =agent.ex:148=        |
+| =:vfs=       | =VFS.open(":memory:")= | =agent.ex:138=      |
+| =:tenant=    | ="dev"=              | =agent.ex:147=        |
+| =:exec=      | =false=              | =agent.ex:154=        |
+| =:workdir=   | =System.tmp_dir!()=  | =agent.ex:158=        |
+| =:on_step=   | no-op                | =agent.ex:161=        |
+
+** Tool surface
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/agent.ex:57-112
+:END:
+
+There is *no OS shell* — the native =run= bash hatch was deleted (wb-9ja). The
+agent cannot execute native code by construction; the test seam
+=__tool_names_for_test__/1= (=agent.ex:117=) asserts this.
+
+| tool         | grant     | source                |
+|--------------+-----------+-----------------------|
+| =shell=      | base      | =agent.ex:58-65=      |
+| =search=     | base      | =agent.ex:66-70=      |
+| =wb=         | base      | =agent.ex:71-75=      |
+| =fetch=      | base      | =agent.ex:76-80=      |
+| =web_search= | base      | =agent.ex:81-85=      |
+| =file_issue= | base      | =agent.ex:86-90=      |
+| =vfs_write=  | base      | =agent.ex:91-95=      |
+| =vfs_read=   | base      | =agent.ex:96-100=     |
+| =done=       | base      | =agent.ex:101-105=    |
+| =git=        | exec-only | =agent.ex:34-40=      |
+| =publish=    | exec-only | =agent.ex:41-45=      |
+| =image=      | exec-only | =agent.ex:46-54=      |
+
+=shell= runs in-WASM over =Workbooks.Shell= + the CommandRegistry (coreutils, jq,
+grep, pipes, =; && ||=, vars, redirection) — =agent.ex:60=. The exec tools are
+*host-brokered*: trusted host Elixir performs a fixed =git commit && push= or a
+constrained =File.cp=, never an agent-chosen command line (=agent.ex:26-32=).
+
+#+begin_quote
+=:exec= is a TRUST grant (host-brokered git/publish/image + OS-workdir routing),
+*not* native execution. The =run= hatch is gone. — =agent.ex:151-154=
+#+end_quote
+
+** Bounds & telemetry
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/agent.ex:228-238
+:END:
+
+Every tool call is wall-clock bounded at *150s* via =Task.async= + =Task.yield=;
+on overrun the task is =Task.shutdown(:brutal_kill)= and the model sees a tool
+error (=agent.ex:228-238=). Every step is appended to =<workdir>/_steps.jsonl=
+(=agent.ex:216-221=) and to an org event log; the =image= tool is capped at *2
+calls/run* (=agent.ex:156-157=).
+
+** Sessions (long-horizon, streamed)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/agent_session.ex:48-75
+:END:
+
+=Workbooks.AgentSession= runs the agent in a =DynamicSupervisor= child; the HTTP
+caller starts it and polls (=status/1=) or subscribes (=subscribe/1=,
+=agent_session.ex:89-91=) for live =:agent_step= / =:agent_done= messages
+(brandnana-style telemetry). It carries a CTK human-in-the-loop review queue
+(=put_review/2= / =take_review/1=, =agent_session.ex:96-116=), persisted per-run
+to JSONL (=agent_session.ex:105-111=). The run's own VFS holds resumable state.
+
+** Agent definitions (authored as org)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/agent_def.ex:12-22
+:END:
+
+=Workbooks.AgentDef.parse/1= finds the first =:agent:= node and reads
+=:ID:= / =:MODEL:= / =:TOOLKITS:= / =:TAGLINE:= props plus the system prompt.
+
+#+begin_quote
+The system prompt is read ONLY from under the =** System prompt= heading
+(=agent_def.ex:43-44=); with no such heading it falls back to the node body —
+"an agent authored as a plain def shouldn't silently run prompt-less."
+#+end_quote
+
+=run/3= auto-injects a compact toolkit index from =:TOOLKITS:= into the prompt
+(progressive disclosure tier 1; skill bodies stay on-demand via the =wb= tool —
+=agent_def.ex:28-37=).
+
+---
+
+* Isolation & policy
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/policy.ex
+:END:
+
+** Capability profiles
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/policy.ex:28-37
+:END:
+
+A profile maps to a memory cap, a capability set (which Dock imports of the
+=workbooks:engine= world are reachable), and a wall-clock CPU timeout.
+
+| profile   | memory | timeout | caps                                                              |
+|-----------+--------+---------+-------------------------------------------------------------------|
+| =compute= | 64 MiB | 5 s     | =vfs=                                                             |
+| =minimal= | 64 MiB | 5 s     | =vfs commands exec kv secrets queue tcp udp tls=                  |
+| =network= | 128 MiB| 30 s    | minimal + =net llm browse=                                        |
+| =posix=   | 256 MiB| 60 s    | network + =posix parallel=                                        |
+
+Source: =policy.ex:28-37=. =compute= is the *fail-closed default*: an
+unknown/typo'd profile resolves to =compute= (vfs-only), never the over-granting
+=minimal= (=policy.ex:69-71=).
+
+#+begin_quote
+=minimal= grants the SSRF-brokered raw sockets (=tcp/udp/tls=) but *not*
+high-level egress (=net/llm/browse=). "minimal network", not "minimal caps" —
+pick =compute= for a true sandbox. — =policy.ex:22-26=
+#+end_quote
+
+** Memory & CPU caps
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/instance.ex:101-105
+:CAVEAT: components get a WALL-CLOCK timeout trap, not fuel; epoch interruption (frees the runaway thread) is unbuilt (wb-11ck.11/.13). Core-module (Javy) tools DO run fuel-capped via the PackageManager.
+:WALL: none
+:END:
+
+- *Memory* — enforced by =Wasmex.StoreLimits= from the profile; a component
+  growing past it traps (=policy.ex:41-44=, =instance.ex:72=).
+- *CPU* — a component call runs on a tokio thread; on overrun the boundary call
+  times out and the caller gets ={:error, :cpu_timeout}=, BEAM stays responsive
+  (=instance.ex:101-105=). This is a *trap*, not preemption: the runaway worker
+  thread is only freed by epoch interruption, which is not yet built
+  (=instance.ex:9-13=).
+
+** Network gate
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/policy.ex:64-67
+:END:
+
+=allow_http?/1= is DERIVED from caps: only profiles granting =net= or =browse=
+get =WasiP2Options.allow_http=, the single stock-wasmex switch gating
+=wasi:http= linking AND =inherit_network()= + DNS (=policy.ex:51-67=,
+=instance.ex:59=). A non-network profile reaches no host network stack at all.
+Per-instance raw-socket scope is *resolve-then-pinned to public IPs* host-side
+(closes DNS-exfil; =instance.ex:60-66=).
+
+** Isolation tier ladder
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/isolation.ex:33-58
+:CAVEAT: isolation.ex tags all four tiers :live, but the FABRIC only wires :instance — fabric.ex:15 states os_process/node/container are "NOT yet wired" for fan-out. :instance + :os_process (per-call command subprocess) are genuinely live; :node and :container have modules (isolation_node.ex, isolation_container.ex) but are runtime-gated on a distributed BEAM / a wasmtime container image.
+:WALL: none
+:END:
+
+The depth knob of the =(width, tier)= surface. =tier_for_shape/1= maps an
+=#+EXEC= shape to its tier; the tier is determined by *shape*, not a free knob
+(=isolation.ex:92-100=).
+
+| tier         | boundary       | shape mapping        | reality                                            |
+|--------------+----------------+----------------------+----------------------------------------------------|
+| =:instance=  | linear memory  | =kernel=, =component=| live — persistent in-VM Wasmex instance            |
+| =:os_process=| OS process     | =command=, =posix=   | live — per-call =run_wasmtime= subprocess (-W fuel/timeout) |
+| =:node=      | BEAM VM        | (escalation target)  | module present (=isolation_node.ex=), needs distributed runtime |
+| =:container= | OS kernel      | —                    | module present (=isolation_container.ex=), needs container image |
+
+Default tier comes from =#+TRUST=: first-party → =:instance=, third-party →
+=:node= (=isolation.ex:80-81=). Third-party escalates one rung toward stronger
+isolation (=effective_tier/2=, =isolation.ex:112-120=). =resolve/1= returns WHY
+a non-live tier failed rather than a bare error (=isolation.ex:127-138=).
+
+** Instance lifecycle
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/instance.ex:36-84
+:END:
+
+=Workbooks.Instance= is one =Wasmex.Components= component under a GenServer.
+=init/1= owns a VFS, builds the typed Dock imports from the profile's caps
+(=Instance.Imports.for_caps/4=, =instance.ex:46=), and disables stdio inheritance
+(the typed Dock is the real surface — =instance.ex:73-77=). A fault returns an
+error tuple; the BEAM survives. API: =call/3=, =vfs_put/4=, =vfs_get/3=,
+=info/1= (=instance.ex:21-31=).
+
+---
+
+* Brokers (the Dock capability surface)
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/exec_broker.ex
+:END:
+
+The Dock membrane: a sandboxed guest names a privileged op; trusted host Elixir
+performs it under a uniform security cadence. The guest never opens a socket,
+forks a process, or holds a credential.
+
+** Dock world imports (in-VM components)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/instance/imports.ex:34-57
+:END:
+
+=Instance.Imports.for_caps/4= links one import per granted cap into the
+=workbooks:engine= world:
+
+| world import        | cap        | source                       |
+|---------------------+------------+------------------------------|
+| =vfs-query=         | =vfs=      | =instance/imports.ex:34=     |
+| =run-command=       | =commands= | =instance/imports.ex:38=     |
+| =llm-complete=      | =llm=      | =instance/imports.ex:42=     |
+| =browse-fetch=      | =browse=   | =instance/imports.ex:48=     |
+| =run-command-many=  | =parallel= | =instance/imports.ex:57=     |
+
+Importing an ungranted cap fails to instantiate. (Compiled-Rust core modules use
+a parallel =env.host_*= surface via =rust_dock.ex=; compiled-JS via =js_dock.ex=.)
+
+** Common security cadence
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/exec_broker.ex:45-92
+:END:
+
+Every broker enforces: *default-deny* (a cap must grant it) · per-principal
+*revocation* (=revocation.ex=, checked every call, owned by a never-dying process
+=revocation.ex:9-15=) · per-principal *rate limit* (=rate_limiter.ex=, atomic
+time-bucketed counter, default =120_000/60_000ms= =rate_limiter.ex:18=) ·
+*size-capped output* · *audit on denial* (=broker_audit.ex=, =record/3=,
+=stats/0=).
+
+** The brokers
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/net_guard.ex:7-13
+:END:
+
+| broker                 | capability delivered                          | key guard                                              | source                  |
+|------------------------+-----------------------------------------------+--------------------------------------------------------+-------------------------|
+| =NetGuard=             | SSRF floor for host-mediated egress           | denies loopback/RFC1918/link-local (169.254.169.254)/CGNAT/ULA; deny on resolve fail | =net_guard.ex:7-13=     |
+| =CappedHttp=           | streaming GET with hard body + deadline cap   | =:stream= accumulate to =max_bytes=, cancel on overflow | =capped_http.ex:2-13=   |
+| =ExecBroker=           | =exec(cmd)= → in-sandbox CommandRegistry      | registered-only, structural argv (no shell), depth ≤ 8, ≤ 64 concurrent/principal | =exec_broker.ex:19-92=  |
+| =ProcessBroker=        | fork-exec model (=spawn/await/kill=)          | per-principal ≤ 32 live processes (fork-bomb)          | =process_broker.ex:16-17= |
+| =ParallelBroker=       | brokered data-parallelism (map over N)        | =:max_inputs= 1024, per-task timeout, default-deny     | =parallel_broker.ex:16-19= |
+| =StorageBroker=        | durable per-tenant K/V (survives instance)    | tenant isolation; value ≤ 1 MiB, ≤ 10k keys           | =storage_broker.ex:21-23= |
+| =QueueBroker=          | inter-guest FIFO message queue                | per-tenant; msg ≤ 256 KiB, depth ≤ 1000               | =queue_broker.ex:16-18= |
+| =SecretBroker=         | sign-with-secret (host holds the key)         | NO read op exists; only =sign/3=; tenant-scoped       | =secret_broker.ex:9-12= |
+| =TcpBroker=            | raw-TCP request/response                      | SSRF + resolve-then-pin (connect pinned IP)            | =tcp_broker.ex:7-13=    |
+| =UdpBroker=            | UDP send/recv-one                             | SSRF + resolve-then-pin                                | =udp_broker.ex:7-9=     |
+| =TlsBroker=            | TLS request/response (cert-verified)          | SSRF + pin + SNI = hostname + verify_peer              | =tls_broker.ex:7-11=    |
+| =ServeBroker=          | inbound server flip (host listens, guest handles) | per-=serve_id= request channel, response size-capped | =serve_broker.ex:2-13=  |
+| =TcpServeBroker=       | raw-TCP inbound listener flip                 | per-client rate, request byte cap, mid-flight revocation | =tcp_serve_broker.ex:2-16= |
+| =BuildBroker=          | compile-source-then-run (build other tools)   | default-deny, source/output caps, sandboxed compile+run | =build_broker.ex:11-17= |
+
+** ExecBroker wire protocol
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/exec_broker.ex:103-111
+:END:
+
+A guest writes a length-prefixed little-endian request into wasm memory for
+=host_exec=:
+
+#+begin_src text
+[name_len:u32][name][argc:u32][ (arg_len:u32)(arg) ]*[stdin_len:u32][stdin]
+#+end_src
+
+=parse_request/1= returns ={:ok, name, argv, stdin}= or =:error=
+(=exec_broker.ex:103-111=). Binary-safe; trailing bytes tolerated. The unified
+fork-bomb defense (=@max_concurrent_exec= 64) is acquired here — the single choke
+point all exec callers pass through (=exec_broker.ex:71-91=).
+
+** Brokered CLI tools
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/brokered_tools.ex:1-9
+:END:
+
+=Workbooks.BrokeredTools= registers real commands (=http=, =pip-fetch=) at boot
+as =:pynet= commands — CPython with the brokered transport, so every request goes
+through NetGuard and every exec through ExecBroker. This delivers the curl/httpie
+class without a per-binary port (=brokered_tools.ex:1-9,11-13=).
+
+---
+
+* Build & compilers
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/compilers.ex
+:END:
+
+** The canon: untrusted source never compiles or runs natively
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/package_manager.ex:1-20
+:END:
+
+Every language lane compiles AND runs untrusted source entirely in the wasm
+sandbox (wasmtime), zero native compilation. The compiler wasms themselves are
+built once by trusted provisioning.
+
+| lane | path                                  | helper                          | source                       |
+|------+---------------------------------------+---------------------------------+------------------------------|
+| C    | clang.wasm + wasm-ld                   | =Compilers.compile_c=           | =package_manager.ex:8=       |
+| Zig  | zig1.wasm → clang.wasm                  | =Compilers.zig_compile…=        | =package_manager.ex:9=       |
+| Rust | mrustc.wasm → clang.wasm + std          | =Compilers.rust_compile…=       | =package_manager.ex:10=      |
+| JS   | QuickJS-ng built by clang.wasm          | =Compilers.js_compile…=         | =package_manager.ex:11=      |
+| Go   | yaegi interpreter (yaegi-run.wasm)      | —                               | =package_manager.ex:12=      |
+| TS   | tsc inside QuickJS → JS lane            | =Compilers.ts_compile…=         | =package_manager.ex:13=      |
+
+** Compiler kinds
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/compilers.ex:11-21
+:END:
+
+=Workbooks.Compilers= recognizes three kinds (=compilers.ex:11-21=):
+- *compile-and-run* — compiler reads source and executes it (=compile_run/4=).
+- *compile-to-c* — emits C, fed through the C lane → wasm → run (=compile/4=).
+- *compile-to-wasm* — emits an artifact =.wasm= we then run.
+
+Lanes reuse the command path (CommandRegistry + =PackageManager.run=, which
+enables =-W exceptions= + memory64).
+
+** Command registry
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/command_registry.ex:93-101
+:END:
+
+A *command* is a CLI converted to a runnable WASM module (stdin → stdout),
+invoked by name via =run-command= (=command_registry.ex:1-8=). =list/0= returns
+registered names (=command_registry.ex:93=); =run/5= executes one with argv, dir
+preopens, and =depth=/ropts (=command_registry.ex:976=).
+
+** Proc-macro host bridge
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/proc_macro_host.ex:1-16
+:CAVEAT: proc-macro expansion can't use the wasmtime CLI (no custom imports), so it must route through Wasmex/BEAM via pm_expand/pm_read; non-proc-macro Rust compiles keep using the CLI. Requires mrustc built with -DWB_PROCMACRO_HOST.
+:WALL: none
+:END:
+
+=Workbooks.ProcMacroHost= replaces a proc-macro executable's native
+=posix_spawn= with two host imports under the =workbooks= module —
+=pm_expand(...)= runs the proc-macro server wasm and stashes the result,
+=pm_read(...)= copies it back into guest memory (=proc_macro_host.ex:5-13=).
+
+** BuildBroker
+
+See the brokers table — =build_broker.ex= wraps the proven in-sandbox compile
+recipes in the standard default-deny / size-cap / rate / revocation cadence so a
+tool can build *other* tools without native exec (=build_broker.ex:2-17=).
+
+---
+
+* Provenance & signing
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/git.ex
+:END:
+
+** Tenant identity (Ed25519 did:key)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/git.ex:103-117
+:END:
+
+=Workbooks.Git= idempotently ensures a per-tenant Ed25519 keypair under
+=.workbooks/= (=git.ex:27,55=). =did_key/1= encodes the public key as a real
+=did:key:z6Mk…= (multicodec =0xED 0x01= + base58btc — =git.ex:103-110=). =sign/2=
+signs with the private half (=git.ex:117=); =verify/3= decodes the pubkey
+straight from the DID, no registry (=git.ex:124=). =WB_SIGNING_KEY= (base64 of
+the 32-byte seed) overrides the stored key (=git.ex:81=).
+
+** did:web resolution
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/did.ex:1-12
+:END:
+
+=Workbooks.Did= republishes the *same* Ed25519 key as a =did:web= document
+resolvable at =https://<host>/.well-known/did.json=. did:key and did:web wrap one
+key, so a signature verifies under either (=did.ex:8-13=). "Self-host for now":
+no Radicle/PLC/registry.
+
+** Artifact signing (workbooks-c2pa)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/manifest.ex:40-66
+:END:
+
+=Workbooks.Manifest.sign/4= embeds
+=<script type="application/workbooks-c2pa+json" id="wb-c2pa-manifest">= carrying
+an Ed25519-over-canonical-JSON manifest + signature into the published HTML
+(=manifest.ex:16,30,40-53=). =verify/1= checks two things — signature validity
+AND asset integrity — and returns
+=%{signature, asset_integrity, valid}= (=manifest.ex:57-66=); the asset half
+needs no key (pure read). This is the did:key scheme, NOT a full COSE/X.509 C2PA
+claim — the X.509 cert-chain spike is superseded (=manifest.ex:8-15=).
+
+---
+
+* Storage & VFS
+:PROPERTIES:
+:STATUS: ships-today
+:OWNER: runtime
+:SRC: runtime/host/vfs.ex
+:END:
+
+** Per-instance VFS
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/vfs.ex:2-16
+:END:
+
+A Workbook's VFS is SQLite-backed, one db file per Instance, with three named
+*volumes* (=vfs.ex:14=):
+
+| volume      | role                                  | lifetime                  |
+|-------------+---------------------------------------+---------------------------|
+| =workspace= | the working tree (default)            | persists                  |
+| =memory=    | agent long-term memory                | persists across freeze/resume |
+| =tmp=       | scratch                               | cleared on resume         |
+
+A volume is the =(volume, path)= key in one table — one file, one connection.
+Off-box durability is Litestream's job. The raw =vfs-query= Dock import sees the
+=volume= column, so a component can scope a query to any volume (=vfs.ex:7-11=).
+
+** StorageBroker (durable K/V)
+
+Durable, tenant-isolated K/V that survives the instance — see the brokers table
+(=storage_broker.ex=). Distinct from the ephemeral in-instance VFS.
+
+** Bundle (egress format)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/bundle.ex:1-15
+:END:
+
+=Workbooks.Bundle= packs the Workbook HTML + its SQLite VFS (all volumes) + a
+manifest into one portable =.wbundle= zip — any tool can open it
+(=bundle.ex:2-8,11-14=). ship → restore round-trips it.
+
+** Library (access graph)
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/library.ex:2-17
+:CAVEAT: effective scope = member scope ∩ requester grant is Guardian tenant-ownership today; cross-org grants are a documented EXTENSION POINT, not built.
+:WALL: none
+:END:
+
+=Workbooks.Library= is an index + access layer over an identity's workspaces, not
+new machinery: workspaces ← =workspace.org= manifests in the tenant git repo;
+provenance ← did:key (=library.ex:2-17=).
+
+---
+
+* Fabric & kernel
+:PROPERTIES:
+:STATUS: partial
+:OWNER: runtime
+:SRC: runtime/host/fabric.ex
+:END:
+
+** Fabric (width × tier fan-out)
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/fabric.ex:28-45
+:CAVEAT: only the :instance tier is wired for fan-out — fabric.ex:15 states :os_process/:node/:container are "NOT yet wired"; a non-instance tier returns {:error, {:unsupported_tier, tier}} (fabric.ex:45).
+:WALL: none
+:END:
+
+=Workbooks.Fabric= fans a command/kernel over N inputs across isolated WASM
+instances at a chosen =(width, tier)=. Defaults: =width= = =16=, per-worker
+=timeout= = =60_000ms=, =tier= = =:instance= (=fabric.ex:28-29,39-41=).
+=:instance= runs each input in its own wasmtime instance across BEAM schedulers
+(strong + cheap); heavier tiers are not yet wired (=fabric.ex:11-15=).
+
+** Kernel ABI (hot path)
+
+:PROPERTIES:
+:MATURITY: ships-today
+:EVIDENCE: runtime/host/kernel.ex:32-40
+:END:
+
+=Workbooks.Kernel= instantiates a =bytes → bytes= wasm kernel once and calls it
+many times, reusing a fixed in/out arena — the =#+EXEC: kernel= shape. The module
+exports =memory= and an entry (default =process=); per call the host writes input
+at =:in_off=, calls =process(in_len) -> out_len=, reads back =out_len=
+(=kernel.ex:11-17=).
+
+| param      | default  | source           |
+|------------+----------+------------------|
+| =:entry=   | =process=| =kernel.ex:38=   |
+| =:in_off=  | =1024=   | =kernel.ex:32,39=|
+| =:out_off= | =65_536= | =kernel.ex:33,40=|
+| timeout    | =60_000= | =kernel.ex:34=   |
+
+Per-call cost is one function call + two memory copies — no fresh Store, no WASI
+stdio round-trip (what =command= shape pays — =kernel.ex:6-9=).
+
+** Heavier isolation tiers
+
+:PROPERTIES:
+:MATURITY: partial
+:EVIDENCE: runtime/host/isolation_node.ex:1-15
+:CAVEAT: :node (peer BEAM VM, isolation_node.ex) requires a distributed runtime (self-bootstraps a longname node locally); :container (isolation_container.ex) requires a wasmtime container image + docker/podman. Modules exist; neither is wired into the fabric fan-out path yet.
+:WALL: none
+:END:
+
+- =:node= — run a command on a separate =:peer= BEAM VM; full VM isolation AND
+  cross-machine scale (the render-farm case). One peer started lazily and reused
+  (=isolation_node.ex:2-16=).
+- =:container= — run the content-addressed =.wasm= in a throwaway container with
+  =--network none=, mem/CPU/pids ceilings, read-only rootfs; image =WB_CONTAINER_IMAGE=
+  (default =wb-wasmtime:latest=), runtime =WB_CONTAINER_RUNTIME= (default =docker=,
+  podman/krunvm drop-in — =isolation_container.ex:2-12=).
+
+---
+
+* See also
+
+- [[caps.org][Dock capabilities]] · [[sdk.org][Dock SDK API]] · [[exec-shapes.org][#+EXEC shapes]] — the author-facing surface of what this engine runs.
+- [[https://workbooks.sh/learn/safe-powers.html][/learn: safe powers]] · [[https://workbooks.sh/learn/under-the-hood.html][under the hood]] — the narrative explanation tier.

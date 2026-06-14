@@ -4723,6 +4723,1269 @@
      "t": 835
     }
    ]
+  },
+  {
+   "slug": "a-disk-that-travels",
+   "title": "A disk that travels with the work",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/a-disk-that-travels.mp3?v=478",
+   "dur": 478,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Whose disk?",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "The work belonged to a machine",
+     "t": 30
+    },
+    {
+     "id": "not-a-computer",
+     "title": "A disk that isn't a computer",
+     "t": 85
+    },
+    {
+     "id": "ask-questions",
+     "title": "A disk you can ask questions",
+     "t": 153
+    },
+    {
+     "id": "travels-lets-go",
+     "title": "It travels, and it lets go",
+     "t": 236
+    },
+    {
+     "id": "same-object",
+     "title": "The workspace and the work are the same object",
+     "t": 328
+    },
+    {
+     "id": "where-it-ends",
+     "title": "Where the disk ends",
+     "t": 420
+    }
+   ]
+  },
+  {
+   "slug": "agents-that-persist",
+   "title": "Agents that persist",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/agents-that-persist.mp3?v=554",
+   "dur": 554,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "From chat to worker",
+     "t": 2
+    },
+    {
+     "id": "outlive",
+     "title": "When the work has to outlive you",
+     "t": 69
+    },
+    {
+     "id": "receptionist",
+     "title": "The receptionist and the worker",
+     "t": 153
+    },
+    {
+     "id": "standing",
+     "title": "Standing watch, taking shifts",
+     "t": 248
+    },
+    {
+     "id": "resting",
+     "title": "Resting when there's nothing to do",
+     "t": 355
+    },
+    {
+     "id": "ask",
+     "title": "The run that knows when to ask",
+     "t": 462
+    }
+   ]
+  },
+  {
+   "slug": "carries-its-story",
+   "title": "The file that remembers how it was made",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/carries-its-story.mp3?v=504",
+   "dur": 504,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The rename test",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Why the name was never enough",
+     "t": 48
+    },
+    {
+     "id": "marker",
+     "title": "A name tag worn on the inside",
+     "t": 106
+    },
+    {
+     "id": "library",
+     "title": "How a folder becomes a library",
+     "t": 173
+    },
+    {
+     "id": "source",
+     "title": "The recipe baked into the loaf",
+     "t": 220
+    },
+    {
+     "id": "history",
+     "title": "A project that remembers every change",
+     "t": 287
+    },
+    {
+     "id": "publish",
+     "title": "Every publish is a recorded change",
+     "t": 358
+    },
+    {
+     "id": "author",
+     "title": "Who made the change, and proof it was them",
+     "t": 394
+    },
+    {
+     "id": "outro",
+     "title": "The truth about the thing",
+     "t": 442
+    }
+   ]
+  },
+  {
+   "slug": "code-in-the-document",
+   "title": "Code in the document",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/code-in-the-document.mp3?v=507",
+   "dur": 507,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "When the writing and the program are the same thing",
+     "t": 2
+    },
+    {
+     "id": "wiring",
+     "title": "Where the wiring usually lives",
+     "t": 63
+    },
+    {
+     "id": "tangling",
+     "title": "A document that compiles into a plan",
+     "t": 134
+    },
+    {
+     "id": "derived",
+     "title": "The part where nothing is drawn",
+     "t": 219
+    },
+    {
+     "id": "validate",
+     "title": "A plan you can check before it runs",
+     "t": 314
+    },
+    {
+     "id": "same-thing",
+     "title": "Why the same thing is the whole point",
+     "t": 382
+    },
+    {
+     "id": "outro",
+     "title": "The named edges, and the wonder",
+     "t": 471
+    }
+   ]
+  },
+  {
+   "slug": "coming-alive",
+   "title": "Where a workbook comes alive",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/coming-alive.mp3?v=606",
+   "dur": 606,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The thing you set the file down on",
+     "t": 2
+    },
+    {
+     "id": "the-pillar",
+     "title": "The pillar everything rests on",
+     "t": 70
+    },
+    {
+     "id": "docking",
+     "title": "Three words, one motion",
+     "t": 134
+    },
+    {
+     "id": "three-lights",
+     "title": "What switches on when you dock",
+     "t": 220
+    },
+    {
+     "id": "own-it",
+     "title": "Why you'd want an engine you own",
+     "t": 311
+    },
+    {
+     "id": "why-safe",
+     "title": "Why a forty-year-old phone system makes this safe",
+     "t": 387
+    },
+    {
+     "id": "the-line",
+     "title": "The line you don't have to cross",
+     "t": 497
+    },
+    {
+     "id": "outro",
+     "title": "One engine, one setting",
+     "t": 561
+    }
+   ]
+  },
+  {
+   "slug": "compiled-plans",
+   "title": "Compiled plans — when a plan becomes a program",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/compiled-plans.mp3?v=567",
+   "dur": 567,
+   "chapters": [
+    {
+     "id": "intro",
+     "t": 2
+    },
+    {
+     "id": "order",
+     "t": 78
+    },
+    {
+     "id": "handoff",
+     "t": 177
+    },
+    {
+     "id": "agents",
+     "t": 258
+    },
+    {
+     "id": "changing",
+     "t": 371
+    },
+    {
+     "id": "rule",
+     "t": 437
+    },
+    {
+     "id": "outro",
+     "t": 526
+    }
+   ]
+  },
+  {
+   "slug": "did-it-do-well",
+   "title": "Knowing whether the agent did well",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/did-it-do-well.mp3?v=480",
+   "dur": 480,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The thirty-second coin flip",
+     "t": 2
+    },
+    {
+     "id": "the-invisible-failures",
+     "title": "The failures that leave no fingerprint",
+     "t": 34
+    },
+    {
+     "id": "what-an-eval-is",
+     "title": "A test for behavior, not text",
+     "t": 79
+    },
+    {
+     "id": "judge-watches-work",
+     "title": "The judge watches the work, not just the answer",
+     "t": 137
+    },
+    {
+     "id": "traps-not-checklists",
+     "title": "Write traps, not checklists",
+     "t": 209
+    },
+    {
+     "id": "cheap-to-run",
+     "title": "Cheap enough to leave running",
+     "t": 315
+    },
+    {
+     "id": "honest-limits",
+     "title": "Honest about its own limits",
+     "t": 391
+    },
+    {
+     "id": "outro",
+     "title": "The whole discipline",
+     "t": 455
+    }
+   ]
+  },
+  {
+   "slug": "first-workbook-end-to-end",
+   "title": "Your first workbook, start to finish",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/first-workbook-end-to-end.mp3?v=534",
+   "dur": 534,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Let's just watch someone do it",
+     "t": 2
+    },
+    {
+     "id": "the-thing",
+     "title": "Something small, something real",
+     "t": 52
+    },
+    {
+     "id": "first-prompt",
+     "title": "The first thing she types",
+     "t": 78
+    },
+    {
+     "id": "the-reply",
+     "title": "The collaborator shows up",
+     "t": 124
+    },
+    {
+     "id": "it-builds",
+     "title": "What it builds actually looks like",
+     "t": 168
+    },
+    {
+     "id": "what-came-back",
+     "title": "What she actually got handed",
+     "t": 227
+    },
+    {
+     "id": "the-review",
+     "title": "You review, even without reading code",
+     "t": 257
+    },
+    {
+     "id": "send-notes",
+     "title": "Send it back like a draft",
+     "t": 322
+    },
+    {
+     "id": "three-levels",
+     "title": "The three levels, hiding in plain sight",
+     "t": 364
+    },
+    {
+     "id": "ships-it",
+     "title": "And then she ships it",
+     "t": 431
+    },
+    {
+     "id": "outro",
+     "title": "The whole shape, once",
+     "t": 485
+    }
+   ]
+  },
+  {
+   "slug": "giving-it-abilities",
+   "title": "Toolkits — giving a workbook real abilities",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/giving-it-abilities.mp3?v=505",
+   "dur": 505,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "When the agent needs a real tool",
+     "t": 2
+    },
+    {
+     "id": "toolkit",
+     "title": "The thing your agent reaches for",
+     "t": 55
+    },
+    {
+     "id": "layers",
+     "title": "The three layers, in plain terms",
+     "t": 135
+    },
+    {
+     "id": "manual",
+     "title": "Why the manual is the connection",
+     "t": 238
+    },
+    {
+     "id": "plugin",
+     "title": "Isn't this just a plugin?",
+     "t": 302
+    },
+    {
+     "id": "stack",
+     "title": "They stack, and the box keeps filling",
+     "t": 361
+    },
+    {
+     "id": "honest",
+     "title": "Where this honestly stands",
+     "t": 407
+    },
+    {
+     "id": "outro",
+     "title": "Wrapping up",
+     "t": 471
+    }
+   ]
+  },
+  {
+   "slug": "going-live",
+   "title": "Going live — putting it on the internet",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/going-live.mp3?v=516",
+   "dur": 516,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The scary word",
+     "t": 2
+    },
+    {
+     "id": "terror",
+     "title": "Why going live is usually terrifying",
+     "t": 37
+    },
+    {
+     "id": "fivelines",
+     "title": "The whole move, in one short list",
+     "t": 101
+    },
+    {
+     "id": "check",
+     "title": "The step that refuses to let you lie",
+     "t": 194
+    },
+    {
+     "id": "local-real",
+     "title": "Local was never a pretend version",
+     "t": 279
+    },
+    {
+     "id": "tells-story",
+     "title": "The live thing tells its own story",
+     "t": 338
+    },
+    {
+     "id": "one-push",
+     "title": "One push today, instant push tomorrow",
+     "t": 427
+    }
+   ]
+  },
+  {
+   "slug": "plans-that-run",
+   "title": "Plans that run themselves",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/plans-that-run.mp3?v=608",
+   "dur": 608,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Where does the plan live?",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Four pictures of the same project",
+     "t": 41
+    },
+    {
+     "id": "one-file",
+     "title": "One file you read and the agent runs",
+     "t": 102
+    },
+    {
+     "id": "ready",
+     "title": "The only rule that runs it",
+     "t": 176
+    },
+    {
+     "id": "loop",
+     "title": "The loop that clears itself",
+     "t": 244
+    },
+    {
+     "id": "board",
+     "title": "The board talks back, both ways",
+     "t": 314
+    },
+    {
+     "id": "time",
+     "title": "Time the engine has to honor",
+     "t": 396
+    },
+    {
+     "id": "interchangeable",
+     "title": "The workers are interchangeable",
+     "t": 470
+    },
+    {
+     "id": "limits",
+     "title": "What it does not promise",
+     "t": 520
+    },
+    {
+     "id": "outro",
+     "title": "Wrapping up",
+     "t": 589
+    }
+   ]
+  },
+  {
+   "slug": "proving-origin",
+   "title": "Proving where it came from",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/proving-origin.mp3?v=534",
+   "dur": 534,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The price of a handable file",
+     "t": 2
+    },
+    {
+     "id": "obvious-fixes",
+     "title": "The problem with every obvious fix",
+     "t": 54
+    },
+    {
+     "id": "seal",
+     "title": "A seal that travels in the bytes",
+     "t": 127
+    },
+    {
+     "id": "two-questions",
+     "title": "Why checking asks two questions",
+     "t": 221
+    },
+    {
+     "id": "snake",
+     "title": "Signing the thing you're changing",
+     "t": 317
+    },
+    {
+     "id": "honest-limits",
+     "title": "What this proves, and what it doesn't",
+     "t": 397
+    },
+    {
+     "id": "outro",
+     "title": "The seal that makes the gift safe",
+     "t": 500
+    }
+   ]
+  },
+  {
+   "slug": "reading-what-it-did",
+   "title": "Reading what your agent did",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/reading-what-it-did.mp3?v=640",
+   "dur": 640,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The part nobody warns you about",
+     "t": 2
+    },
+    {
+     "id": "mindset",
+     "title": "A colleague on their first week",
+     "t": 51
+    },
+    {
+     "id": "coinflip",
+     "title": "Why looks fine is a coin flip",
+     "t": 84
+    },
+    {
+     "id": "sniff",
+     "title": "Move one — the sniff-check",
+     "t": 155
+    },
+    {
+     "id": "prove",
+     "title": "Make the agent prove it",
+     "t": 230
+    },
+    {
+     "id": "drift",
+     "title": "Move two — spotting drift",
+     "t": 263
+    },
+    {
+     "id": "ledger",
+     "title": "Move three — the record it can't fake",
+     "t": 360
+    },
+    {
+     "id": "evals",
+     "title": "From one check to a standing habit",
+     "t": 496
+    },
+    {
+     "id": "outro",
+     "title": "Wrapping up",
+     "t": 601
+    }
+   ]
+  },
+  {
+   "slug": "safe-powers",
+   "title": "Safe powers — the leash",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/safe-powers.mp3?v=464",
+   "dur": 464,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Real powers, handed over deliberately",
+     "t": 2
+    },
+    {
+     "id": "worst-case",
+     "title": "The worst-case question",
+     "t": 58
+    },
+    {
+     "id": "the-word",
+     "title": "A power is a word you hand over",
+     "t": 139
+    },
+    {
+     "id": "use-not-hold",
+     "title": "Use the power, never hold the dangerous thing",
+     "t": 238
+    },
+    {
+     "id": "why-now",
+     "title": "Why this matters more than it used to",
+     "t": 322
+    },
+    {
+     "id": "take-it-back",
+     "title": "Grant it, then take it back",
+     "t": 387
+    }
+   ]
+  },
+  {
+   "slug": "secrets-in-the-open",
+   "title": "Secrets in the open",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/secrets-in-the-open.mp3?v=526",
+   "dur": 526,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "A secret inside the gift",
+     "t": 2
+    },
+    {
+     "id": "theater",
+     "title": "Why the obvious tricks are theater",
+     "t": 46
+    },
+    {
+     "id": "locked-in-the-open",
+     "title": "Locked in the open",
+     "t": 111
+    },
+    {
+     "id": "the-decision",
+     "title": "The key is a decision, not a thing",
+     "t": 186
+    },
+    {
+     "id": "one-door",
+     "title": "One key opens exactly one door",
+     "t": 283
+    },
+    {
+     "id": "dead-man-switch",
+     "title": "The dead-man switch",
+     "t": 374
+    },
+    {
+     "id": "limits",
+     "title": "What the seal does not do",
+     "t": 439
+    }
+   ]
+  },
+  {
+   "slug": "tell-it-what-you-want",
+   "title": "Telling your agent what you want",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/tell-it-what-you-want.mp3?v=516",
+   "dur": 516,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The first request",
+     "t": 2
+    },
+    {
+     "id": "outcome",
+     "title": "Describe the outcome, not the steps",
+     "t": 75
+    },
+    {
+     "id": "back-and-forth",
+     "title": "It builds, then you react",
+     "t": 164
+    },
+    {
+     "id": "whole-picture",
+     "title": "Give it the whole picture",
+     "t": 212
+    },
+    {
+     "id": "specificity",
+     "title": "Specificity is the dial",
+     "t": 316
+    },
+    {
+     "id": "templates",
+     "title": "Three starter requests you can steal",
+     "t": 379
+    },
+    {
+     "id": "outro",
+     "title": "An honest note",
+     "t": 472
+    }
+   ]
+  },
+  {
+   "slug": "the-disk-grows",
+   "title": "When the work outgrows one file",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-disk-grows.mp3?v=544",
+   "dur": 544,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The worry that should arrive",
+     "t": 2
+    },
+    {
+     "id": "dont-tear-the-seal",
+     "title": "Don't tear the seal",
+     "t": 62
+    },
+    {
+     "id": "live-data",
+     "title": "Reaching past the edge for live data",
+     "t": 92
+    },
+    {
+     "id": "no-code-and-the-key",
+     "title": "No code, and the key never moves",
+     "t": 173
+    },
+    {
+     "id": "pull-the-world-in",
+     "title": "The safest face: pull the world in",
+     "t": 228
+    },
+    {
+     "id": "remember-by-meaning",
+     "title": "Remembering by meaning, not by matching letters",
+     "t": 306
+    },
+    {
+     "id": "the-warehouse",
+     "title": "The warehouse behind the file",
+     "t": 396
+    },
+    {
+     "id": "where-the-walls-live",
+     "title": "Where the walls live",
+     "t": 466
+    },
+    {
+     "id": "outro",
+     "title": "Answered three times over",
+     "t": 519
+    }
+   ]
+  },
+  {
+   "slug": "the-loop-prompt-look-redirect",
+   "title": "The loop — prompt, look, redirect",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-loop-prompt-look-redirect.mp3?v=484",
+   "dur": 484,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The first version is supposed to be a little wrong",
+     "t": 2
+    },
+    {
+     "id": "the-skill",
+     "title": "The loop is the whole skill",
+     "t": 46
+    },
+    {
+     "id": "wish-vs-method",
+     "title": "One prompt is a wish. A loop is a method.",
+     "t": 71
+    },
+    {
+     "id": "real-lap",
+     "title": "A real lap, start to finish",
+     "t": 155
+    },
+    {
+     "id": "clear-look",
+     "title": "A clear look makes a sharp redirect",
+     "t": 258
+    },
+    {
+     "id": "you-decide",
+     "title": "You are still the one who decides",
+     "t": 281
+    },
+    {
+     "id": "safe-to-go-fast",
+     "title": "Why this is safe to do fast",
+     "t": 349
+    },
+    {
+     "id": "honest-horizon",
+     "title": "Where this is honest, and where it's headed",
+     "t": 403
+    },
+    {
+     "id": "outro",
+     "title": "Wrapping up",
+     "t": 460
+    }
+   ]
+  },
+  {
+   "slug": "the-one-command",
+   "title": "The one command — a reference",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-one-command.mp3?v=446",
+   "dur": 446,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The handle your agent holds",
+     "t": 2
+    },
+    {
+     "id": "talking",
+     "title": "You direct, it operates",
+     "t": 35
+    },
+    {
+     "id": "handle",
+     "title": "A handle, not a brain",
+     "t": 82
+    },
+    {
+     "id": "families",
+     "title": "Why recognize it anyway",
+     "t": 138
+    },
+    {
+     "id": "manners",
+     "title": "Polite to people, plain to machines",
+     "t": 221
+    },
+    {
+     "id": "inside",
+     "title": "The same tool, inside the engine",
+     "t": 301
+    },
+    {
+     "id": "outro",
+     "title": "Where it stands",
+     "t": 372
+    }
+   ]
+  },
+  {
+   "slug": "the-one-file",
+   "title": "The file you end up holding",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-one-file.mp3?v=460",
+   "dur": 460,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Name the thing in your hands",
+     "t": 2
+    },
+    {
+     "id": "problem",
+     "title": "Software you can't hand to anyone",
+     "t": 28
+    },
+    {
+     "id": "core-unit",
+     "title": "The core unit is a workbook",
+     "t": 66
+    },
+    {
+     "id": "anatomy",
+     "title": "What's inside the bundle",
+     "t": 115
+    },
+    {
+     "id": "inherit",
+     "title": "What you inherit by being a file",
+     "t": 205
+    },
+    {
+     "id": "runtime",
+     "title": "The part a file can't do alone",
+     "t": 296
+    },
+    {
+     "id": "today",
+     "title": "Where this is today, and the honest edges",
+     "t": 382
+    },
+    {
+     "id": "outro",
+     "title": "Wrapping up",
+     "t": 429
+    }
+   ]
+  },
+  {
+   "slug": "the-one-language",
+   "title": "The one language underneath",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-one-language.mp3?v=489",
+   "dur": 489,
+   "chapters": [
+    {
+     "id": "intro",
+     "t": 2
+    },
+    {
+     "id": "why",
+     "t": 55
+    },
+    {
+     "id": "trade",
+     "t": 113
+    },
+    {
+     "id": "borrowed",
+     "t": 197
+    },
+    {
+     "id": "one-page",
+     "t": 275
+    },
+    {
+     "id": "everywhere",
+     "t": 343
+    },
+    {
+     "id": "edges",
+     "t": 393
+    },
+    {
+     "id": "outro",
+     "t": 465
+    }
+   ]
+  },
+  {
+   "slug": "the-system-improves-itself",
+   "title": "The system that improves itself",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/the-system-improves-itself.mp3?v=573",
+   "dur": 573,
+   "chapters": [
+    {
+     "id": "intro",
+     "t": 2
+    },
+    {
+     "id": "stake",
+     "t": 45
+    },
+    {
+     "id": "autopoet",
+     "t": 95
+    },
+    {
+     "id": "boundary",
+     "t": 160
+    },
+    {
+     "id": "loop",
+     "t": 246
+    },
+    {
+     "id": "ticket",
+     "t": 356
+    },
+    {
+     "id": "honest",
+     "t": 430
+    },
+    {
+     "id": "outro",
+     "t": 522
+    }
+   ]
+  },
+  {
+   "slug": "under-the-hood",
+   "title": "Under the hood — why none of this is magic",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/under-the-hood.mp3?v=578",
+   "dur": 578,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "It looks like a trick",
+     "t": 2
+    },
+    {
+     "id": "the-reader",
+     "title": "The thing that does the reading",
+     "t": 53
+    },
+    {
+     "id": "the-kernel",
+     "title": "One reader, everywhere",
+     "t": 120
+    },
+    {
+     "id": "no-hands",
+     "title": "A program with no hands",
+     "t": 172
+    },
+    {
+     "id": "same-idea",
+     "title": "The same idea, different clothes",
+     "t": 242
+    },
+    {
+     "id": "the-seam",
+     "title": "One seam, drawn once",
+     "t": 319
+    },
+    {
+     "id": "why-so-little",
+     "title": "Why it's built to do so little",
+     "t": 363
+    },
+    {
+     "id": "toolkits",
+     "title": "And when you want it to do more",
+     "t": 451
+    },
+    {
+     "id": "outro",
+     "title": "One good idea, refusing to become many",
+     "t": 541
+    }
+   ]
+  },
+  {
+   "slug": "what-an-agent-is",
+   "title": "What an agent really is",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/what-an-agent-is.mp3?v=482",
+   "dur": 482,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The most over-promised word",
+     "t": 2
+    },
+    {
+     "id": "the-whole-thing",
+     "title": "A model, in a loop, with tools",
+     "t": 44
+    },
+    {
+     "id": "the-loop",
+     "title": "The loop is the whole trick",
+     "t": 63
+    },
+    {
+     "id": "tools",
+     "title": "A model, with tools",
+     "t": 152
+    },
+    {
+     "id": "tenure",
+     "title": "From conversation to tenure",
+     "t": 221
+    },
+    {
+     "id": "four-things",
+     "title": "The four things an agent needs",
+     "t": 291
+    },
+    {
+     "id": "not-autopilot",
+     "title": "Agents, not autopilot",
+     "t": 372
+    },
+    {
+     "id": "outro",
+     "title": "One loop, going around",
+     "t": 446
+    }
+   ]
+  },
+  {
+   "slug": "who-sees-what",
+   "title": "Sharing without oversharing",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/who-sees-what.mp3?v=585",
+   "dur": 585,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Everything rides inside the file",
+     "t": 2
+    },
+    {
+     "id": "lock",
+     "title": "The lock that isn't a lock",
+     "t": 54
+    },
+    {
+     "id": "stances",
+     "title": "Three honest answers",
+     "t": 124
+    },
+    {
+     "id": "refused",
+     "title": "Refused at the door",
+     "t": 251
+    },
+    {
+     "id": "seal",
+     "title": "Who made this, and has it been touched?",
+     "t": 375
+    },
+    {
+     "id": "limits",
+     "title": "What the seal does not promise",
+     "t": 483
+    },
+    {
+     "id": "outro",
+     "title": "The line, drawn",
+     "t": 512
+    }
+   ]
+  },
+  {
+   "slug": "why-a-sandbox",
+   "title": "Why a sandbox, not a Mac mini",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-a-sandbox.mp3?v=539",
+   "dur": 539,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "Is it safe?",
+     "t": 2
+    },
+    {
+     "id": "two-nightmares",
+     "title": "The two things that go wrong",
+     "t": 76
+    },
+    {
+     "id": "the-move",
+     "title": "Remove it from the room",
+     "t": 157
+    },
+    {
+     "id": "whats-inside",
+     "title": "What's inside the agent's world",
+     "t": 262
+    },
+    {
+     "id": "mac-mini",
+     "title": "Why not a Mac mini",
+     "t": 330
+    },
+    {
+     "id": "company-data",
+     "title": "What it means for your data",
+     "t": 398
+    },
+    {
+     "id": "honest-line",
+     "title": "Where this stands",
+     "t": 465
+    },
+    {
+     "id": "outro",
+     "title": "A real answer",
+     "t": 508
+    }
+   ]
+  },
+  {
+   "slug": "why-you-can-build-now",
+   "title": "Why you can build software now",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-you-can-build-now.mp3?v=459",
+   "dur": 459,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The wall is gone",
+     "t": 2
+    },
+    {
+     "id": "what-youre-after",
+     "title": "What you're really after",
+     "t": 50
+    },
+    {
+     "id": "try-it",
+     "title": "Try it once, in your head",
+     "t": 96
+    },
+    {
+     "id": "the-loop",
+     "title": "Then the real work begins",
+     "t": 159
+    },
+    {
+     "id": "directing",
+     "title": "Directing what you can't read",
+     "t": 208
+    },
+    {
+     "id": "sandbox",
+     "title": "Why a safe sandbox matters",
+     "t": 264
+    },
+    {
+     "id": "safe-by-design",
+     "title": "Safe by design, not by luck",
+     "t": 324
+    },
+    {
+     "id": "what-workbooks-is",
+     "title": "What workbooks actually is",
+     "t": 371
+    },
+    {
+     "id": "outro",
+     "title": "Where you stand",
+     "t": 421
+    }
+   ]
   }
  ]
 }

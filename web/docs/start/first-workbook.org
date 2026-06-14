@@ -1,0 +1,59 @@
+#+TITLE: Your first workbook, end to end
+#+DESCRIPTION: Write a workbook, run it, and publish it as one self-contained .html — the whole happy path.
+
+* Your first workbook, end to end
+
+A workbook is a single =.org= file that runs. In this tutorial you write one, run
+it, and publish it as a self-contained =.html= you can open in any browser. You
+need the =wb= CLI ([[install.org][install it here]]) and nothing else.
+
+This is the shallow, complete happy path — one branch, no detours. For the model
+behind each step, follow the links into Build and Concepts.
+
+** 1 · Write the file
+
+A workbook is standard Org with one top-level heading marked as a workbook.
+
+#+begin_src org
+,#+TITLE: Hello
+
+,* Hello
+  :PROPERTIES:
+  :WORKBOOK_VERSION: 1
+  :END:
+
+Some prose, then a source block the runtime will compile and run.
+
+,#+begin_src js
+console.log("hello from a workbook");
+,#+end_src
+#+end_src
+
+Save it as =hello.org=. See [[../workbooks/anatomy.org][Anatomy of a workbook]] for the full structure.
+
+** 2 · Run it
+
+#+begin_src bash
+wb run hello.org
+#+end_src
+
+The runtime parses the Org, compiles each source block to WASM *inside its own
+sandbox* — no toolchain on your machine — and runs it.
+
+** 3 · Publish it
+
+#+begin_src bash
+wb publish hello.org
+#+end_src
+
+The output is one =.html=: prose, compiled WASM, and the source it tangles from,
+all inline. Open it in any browser — no server is required to view it.
+
+See [[../workbooks/publish.org][Publish a workbook]] for providers and options, and
+[[../workbooks/build-plan.org][The build plan]] for what =tangle= derives along the way.
+
+** Where to go next
+
+- Give your workbook a new capability: [[first-toolkit.org][Your first toolkit]].
+- Understand the two surfaces: [[../concepts/two-surfaces.org][Workbooks & toolkits]].
+- The exact CLI verbs: [[../reference/cli.org][Reference → wbx CLI]].
