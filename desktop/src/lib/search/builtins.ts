@@ -8,14 +8,9 @@ import { tabs } from "$lib/tabs/store.svelte";
 import { nexus } from "$lib/bridge/nexus.svelte";
 import { fileIndex, fileCrumb } from "./fileIndex.svelte";
 import type { SearchProvider, SearchResult } from "./types";
+import { search } from "./registry.svelte";
 
 const WORKBOOK_EXT = /\.(html?|org)$/i;
-
-// Default web-search provider for the opt-in "web" lane (wb-e4jl). OpenRouter's
-// web plugin is the reliable path (keyless scraping is best-effort, often empty);
-// it reuses the model key and the runtime falls back to keyless if none is set.
-// A future Settings picker (wb-ndlz) can let the user choose exa/brave/perplexity.
-const WEB_SEARCH_PROVIDER = "openrouter";
 
 // Preview content (wb-aakl.19) — shown so the "everything search" UI is
 // demonstrable before a nexus/file index exists. Files: a small stand-in set
@@ -182,7 +177,7 @@ export const nexusWebProvider: SearchProvider = {
       // no key is present. The LLM+web call legitimately takes up to the runtime's
       // 45s cap, so the client must allow at least that (the old 8s aborted it).
       const res = await fetch(
-        `${base}/api/browse/search?q=${encodeURIComponent(q)}&provider=${WEB_SEARCH_PROVIDER}`,
+        `${base}/api/browse/search?q=${encodeURIComponent(q)}&provider=${search.webProvider}`,
         {
           headers: token ? { authorization: `Bearer ${token}` } : {},
           signal: AbortSignal.timeout(46000),

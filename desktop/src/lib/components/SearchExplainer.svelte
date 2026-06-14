@@ -5,11 +5,20 @@
    * you understand each kind without over-specific names). Reads search.mode.
    */
   import { MagnifyingGlass, Globe, Sparkle } from "phosphor-svelte";
-  import { search } from "$lib/search/registry.svelte";
+  import { search, WEB_PROVIDERS, type WebProvider } from "$lib/search/registry.svelte";
   import { SEARCH_MODES } from "$lib/search/modes";
 
   const info = $derived(SEARCH_MODES[search.mode]);
   const Icon = $derived(search.mode === "ai" ? Sparkle : search.mode === "web" ? Globe : MagnifyingGlass);
+
+  // Friendly labels for the web-search backend picker (wb-e4jl / wb-ndlz).
+  const PROVIDER_LABELS: Record<WebProvider, string> = {
+    openrouter: "OpenRouter — reliable",
+    keyless: "Keyless — no setup",
+    exa: "Exa (needs key)",
+    brave_api: "Brave API (needs key)",
+    perplexity: "Perplexity (needs key)",
+  };
 </script>
 
 <aside class="explainer" aria-label="About this search">
@@ -19,6 +28,19 @@
       <span class="tag">{info.tagline}</span>
       <h3>{info.label}</h3>
       <p>{info.blurb}</p>
+      {#if search.mode === "web"}
+        <label class="prov">
+          <span>Web search via</span>
+          <select
+            value={search.webProvider}
+            onchange={(e) => search.setWebProvider(e.currentTarget.value as WebProvider)}
+          >
+            {#each WEB_PROVIDERS as p}
+              <option value={p}>{PROVIDER_LABELS[p]}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
     </div>
   {/key}
 </aside>
@@ -75,6 +97,29 @@
     font-size: 0.82rem;
     line-height: 1.5;
     color: var(--color-fg-muted);
+  }
+  .prov {
+    display: block;
+    margin-top: 12px;
+  }
+  .prov span {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+    margin-bottom: 4px;
+  }
+  .prov select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    color: var(--color-fg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
   }
   @keyframes ex-in {
     from { opacity: 0; transform: translateY(6px); }

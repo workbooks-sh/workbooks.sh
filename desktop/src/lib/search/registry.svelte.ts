@@ -25,16 +25,25 @@ function loadMode(): SearchMode {
   return m === "internal" || m === "web" || m === "ai" ? m : "internal";
 }
 
+// The web-search backends the nexus can route to (matches the runtime's
+// Browse.Search provider seam). "openrouter" is the reliable default (reuses the
+// model key); "keyless" is the no-key best-effort scrape; the rest need a key
+// configured in the runtime. The picker writes `webProvider`; the web provider
+// sends it to /api/browse/search?provider=…
+export const WEB_PROVIDERS = ["openrouter", "keyless", "exa", "brave_api", "perplexity"] as const;
+export type WebProvider = (typeof WEB_PROVIDERS)[number];
+
 interface Prefs {
   disabled: string[]; // provider ids the user turned off
   order: string[]; // provider id order (registered ids not listed sort last)
+  webProvider: WebProvider; // which backend the opt-in "web" lane uses
 }
 
 function loadPrefs(): Prefs {
   // Web search is OPT-IN: the `web` provider (a paid/token surface) starts
   // disabled so the default search never hits the web. The user enables it in
   // Settings (and configures the provider/key in the runtime).
-  const DEFAULT: Prefs = { disabled: ["web"], order: [] };
+  const DEFAULT: Prefs = { disabled: ["web"], order: [], webProvider: "openrouter" };
   if (typeof localStorage === "undefined") return DEFAULT;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -43,6 +52,7 @@ function loadPrefs(): Prefs {
     return {
       disabled: Array.isArray(p.disabled) ? p.disabled : ["web"],
       order: Array.isArray(p.order) ? p.order : [],
+      webProvider: WEB_PROVIDERS.includes(p.webProvider) ? p.webProvider : "openrouter",
     };
   } catch {
     return DEFAULT;
@@ -66,6 +76,15 @@ class SearchRegistry {
   setMode(m: SearchMode): void {
     this.mode = m;
     try { localStorage.setItem(MODE_KEY, m); } catch { /* non-fatal */ }
+  }
+
+  /** The backend the opt-in web lane queries (set by the Settings picker). */
+  get webProvider(): WebProvider {
+    return this.#prefs.webProvider;
+  }
+  setWebProvider(p: WebProvider): void {
+    this.#prefs = { ...this.#prefs, webProvider: p };
+    this.#persist();
   }
 
   register(p: SearchProvider): void {
