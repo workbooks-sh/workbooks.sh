@@ -164,7 +164,10 @@ defmodule Workbooks.Agent do
       on_delta: opts[:on_delta] || fn _ -> :ok end,
       # Set once we've nudged the model for a final answer after a silent
       # dead-stop (empty content + no tool call). Guards against re-nudging.
-      summarized: false
+      summarized: false,
+      # The LLM completion fn — injectable so the loop is testable without the
+      # network (default is the real Llm.complete/2). Same {messages, opts} shape.
+      complete_fn: opts[:complete_fn] || (&Workbooks.Llm.complete/2)
     }
 
     messages = [%{role: "system", content: system}, %{role: "user", content: task}]
@@ -175,7 +178,7 @@ defmodule Workbooks.Agent do
     do: finish(st, "stopped: reached max_steps (#{max})")
 
   defp loop(messages, st) do
-    case Llm.complete(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
+    case st.complete_fn.(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
       {:ok, %{tool_calls: [], content: content}} ->
         cond do
           content not in [nil, ""] ->
