@@ -36,8 +36,11 @@ const gate = async ({ event, resolve }) => {
   // not signed in → start the WorkOS sign-in (returnTo brings them back here)
   if (!user) throw redirect(302, `/login?returnTo=${encodeURIComponent(pathname + event.url.search)}`);
 
-  // signed in but NOT allowlisted → hard wall (no app data ever reaches them)
-  if (!ALLOWLIST.includes((user.email || '').toLowerCase())) throw redirect(302, '/denied');
+  // signed in but NOT allowlisted → hard wall (no app data ever reaches them).
+  // REQUIRE a VERIFIED email: without this, a self-serve sign-up could register the
+  // founder's address unverified and pass the gate. Verified + allowlisted only.
+  const email = (user.email || '').toLowerCase();
+  if (user.emailVerified !== true || !ALLOWLIST.includes(email)) throw redirect(302, '/denied');
 
   return resolve(event);
 };
