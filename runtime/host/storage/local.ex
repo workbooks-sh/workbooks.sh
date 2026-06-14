@@ -38,7 +38,13 @@ defmodule Workbooks.Storage.Local do
 
   @impl true
   def delete(tenant, key) do
-    File.rm(path(tenant, key))
-    :ok
+    # Fail-CLOSED: only report :ok when the object is actually gone. ENOENT (already
+    # absent) counts as gone; any other rm error surfaces so the facade keeps the
+    # bytes charged in the ledger.
+    case File.rm(path(tenant, key)) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      {:error, _} = err -> err
+    end
   end
 end
