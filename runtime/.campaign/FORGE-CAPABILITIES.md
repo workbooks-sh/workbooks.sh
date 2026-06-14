@@ -35,7 +35,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **gumbo** (HTML5 parser -> DOM) | from-C-source -> wasi (build_c_dir) | gumbo_lane_test (parse + extract text) |
 | **libexpat** (XML streaming/SAX parser) | from-C-source -> wasi (build_c_dir) | expat_lane_test (parse + extract) |
 | **miniz** (ZIP/gzip archive handling) | from-C-source -> wasi (build_c_dir) | miniz_lane_test (ZIP create/read/extract) |
-| **tree-sitter** (code -> AST parsing) | from-C-source -> wasi (build_c_dir) | treesitter_lane_test (parse JSON grammar) |
+| **tree-sitter** (code -> AST, real C grammar) | from-C-source -> wasi (build_c_dir) | treesitter_lane_test (parse C source) |
 | **mini-gmp** (arbitrary-precision bignum) | from-C-source -> wasi (build_c_dir) | minigmp_lane_test (2^200, 30!) |
 | **stb_image_write** (image encode/generate PNG/JPG) | from-C-source -> wasi (build_c_dir) | stbwrite_lane_test (encode->decode roundtrip) |
 

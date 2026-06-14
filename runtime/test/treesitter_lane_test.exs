@@ -1,8 +1,9 @@
 defmodule Workbooks.TreesitterLaneTest do
   @moduledoc """
-  Proves the tree-sitter lane (code → AST parsing, C→wasm32-wasip1): the tree-sitter runtime + the JSON grammar
-  compile via build_c_dir and parse source into a typed syntax tree in-sandbox. Source provisioned by
-  compilers/treesitter/build.sh (fetched, gitignored); skips if absent. (Other grammars drop in the same way.)
+  Proves the tree-sitter lane (code → AST parsing, C→wasm32-wasip1): the tree-sitter runtime + the C grammar
+  compile via build_c_dir and parse REAL C source into a typed syntax tree in-sandbox (translation_unit,
+  function_definition, …). Any tree-sitter grammar swaps in the same way. Source provisioned by
+  compilers/treesitter/build.sh (fetched, gitignored); skips if absent.
   """
   use ExUnit.Case, async: false
   alias Workbooks.PackageManager
@@ -11,7 +12,7 @@ defmodule Workbooks.TreesitterLaneTest do
 
   @tag :build
   @tag timeout: 300_000
-  test "tree-sitter parses source into a typed AST in-sandbox (JSON grammar)" do
+  test "tree-sitter parses real C source into a typed AST in-sandbox" do
     if not File.regular?(Path.join(@src, "lib.c")) do
       IO.puts("\n[skip] tree-sitter source not staged — run compilers/treesitter/build.sh")
     else
@@ -19,9 +20,8 @@ defmodule Workbooks.TreesitterLaneTest do
       on_exit(fn -> File.rm(wasm) end)
       out = PackageManager.run(wasm, "", [])
       out = if is_tuple(out), do: elem(out, 0), else: out
-      assert out =~ "root=document"
-      assert out =~ "array"      # [1,2,3] -> (document (array (number) (number) (number)))
-      assert out =~ "number"
+      assert out =~ "root=translation_unit"
+      assert out =~ "has_func=1"     # function_definition recognized in the AST
     end
   end
 end

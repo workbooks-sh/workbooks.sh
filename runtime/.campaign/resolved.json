@@ -2655,9 +2655,10 @@
   "treesitter": {
    "capability": "tree-sitter code->AST parsing in-sandbox",
    "status": "live",
-   "proof": "tree-sitter 0.22.6 runtime + JSON grammar 0.21.0 compile via build_c_dir and parse source into a typed syntax tree: [1,2,3] -> (document (array (number)(number)(number))); {a:[1,2],b:true} -> full pair/key/value tree. treesitter_lane_test.exs green. Other grammars drop in the same way.",
+   "proof": "tree-sitter 0.22.6 runtime + the C grammar 0.21.4 compile via build_c_dir and parse REAL C source into a typed AST: int add(int a,int b){return a+b;} -> (translation_unit (function_definition type:(primitive_type) declarator:(function_declarator declarator:(identifier) parameters:(parameter_list ...)))). treesitter_lane_test green. ANY tree-sitter grammar swaps in the same way.",
    "lane": "compilers/treesitter/build.sh (fetch core+grammar sha-pinned, stage flat with nested tree_sitter/+unicode/ header dirs, grammar parser.c renamed to dodge core parser.c collision, gitignored) + build_c_dir(-Wno-implicit-function-declaration since wasi lacks dup prototype; include_only the 12 core .c amalgamated by lib.c)",
-   "since": "iter163"
+   "since": "iter163",
+   "note": "Upgraded from the JSON proof to real C-code parsing. Grammar version must match the core (the grammar ships tree_sitter/parser.h with TSCharacterRange; use the grammar own header)."
   },
   "minigmp": {
    "capability": "arbitrary-precision integer math (bignum) in-sandbox",
