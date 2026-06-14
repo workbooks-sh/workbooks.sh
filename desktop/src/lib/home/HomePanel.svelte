@@ -716,10 +716,12 @@
     transition: opacity 0.15s, filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.35; cursor: default; }
-  /* Send: monochrome — fg fill with a page-colored glyph. Inverts cleanly in
-     both themes (white button/dark glyph in dark mode, and vice-versa). */
-  .btn.primary { background: var(--color-fg); color: var(--color-page); }
-  .btn.primary :global(svg) { color: var(--color-page); fill: currentColor; }
+  /* Send: fg-filled button. The glyph uses mix-blend-mode:difference against the
+     button so it ALWAYS contrasts with its own background — never invisible,
+     regardless of theme-token resolution (a token-based icon color washed out
+     when the active theme broke). */
+  .btn.primary { background: var(--color-fg); isolation: isolate; }
+  .btn.primary :global(svg) { color: #fff; fill: currentColor; mix-blend-mode: difference; }
   .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
 
   .err {
