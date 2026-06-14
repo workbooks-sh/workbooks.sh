@@ -60,23 +60,28 @@ defmodule Workbooks.PhoenixSocket do
   # (session_started / llm_turn_start / llm_delta / llm_turn_stop /
   # tool_call_*). Without this the desktop's chat channel was joined-but-silent.
   def handle_info({:bridge_session_started, topic, jr}, state) do
+    tele(topic, "session_started", %{"agent" => %{"name" => "Waldo"}})
     {:push, {:text, push_frame(jr, topic, "session_started", %{"agent" => %{"name" => "Waldo"}})}, state}
   end
 
   def handle_info({:agent_step, ev}, %{session: %{topic: topic, join_ref: jr}} = state) do
     tcid = "s#{ev.step}"
-    start = push_frame(jr, topic, "tool_call_start", %{"metadata" => %{"tool_name" => ev.tool, "tool_call_id" => tcid, "args" => ev.args}})
+    start_meta = %{"tool_name" => ev.tool, "tool_call_id" => tcid, "args" => ev.args}
+    stop_meta = %{"tool_call_id" => tcid, "status" => if(ev.error, do: "error", else: "ok"), "result_size" => byte_size(ev.output || "")}
+    tele(topic, "tool_call_start", %{"metadata" => start_meta})
+    tele(topic, "tool_call_stop", %{"metadata" => stop_meta})
 
-    stop =
-      push_frame(jr, topic, "tool_call_stop", %{
-        "metadata" => %{"tool_call_id" => tcid, "status" => if(ev.error, do: "error", else: "ok"), "result_size" => byte_size(ev.output || "")}
-      })
-
-    {:push, [{:text, start}, {:text, stop}], state}
+    {:push,
+     [
+       {:text, push_frame(jr, topic, "tool_call_start", %{"metadata" => start_meta})},
+       {:text, push_frame(jr, topic, "tool_call_stop", %{"metadata" => stop_meta})}
+     ], state}
   end
 
   def handle_info({:agent_delta, chunk}, %{session: %{topic: topic, join_ref: jr, turn: turn}} = state) do
     # The first delta of a text turn opens an assistant message; the rest append.
+    if not turn, do: tele(topic, "llm_turn_start", %{"metadata" => %{}})
+    tele(topic, "llm_delta", %{"metadata" => %{"content" => chunk}})
     start = if turn, do: [], else: [{:text, push_frame(jr, topic, "llm_turn_start", %{"metadata" => %{}})}]
     delta = {:text, push_frame(jr, topic, "llm_delta", %{"metadata" => %{"content" => chunk}})}
     {:push, start ++ [delta], %{state | session: %{state.session | turn: true}}}
@@ -84,10 +89,16 @@ defmodule Workbooks.PhoenixSocket do
 
   def handle_info({:agent_done, result}, %{session: %{topic: topic, join_ref: jr}} = state) do
     # Authoritative full text reconciles whatever the deltas accumulated.
+    tele(topic, "llm_turn_stop", %{"metadata" => %{"content" => result, "status" => "ok"}})
+    tele(topic, "session_completed", %{})
     stop = push_frame(jr, topic, "llm_turn_stop", %{"metadata" => %{"content" => result, "status" => "ok"}})
     done = push_frame(jr, topic, "session_completed", %{})
     {:push, [{:text, stop}, {:text, done}], %{state | session: %{state.session | turn: false}}}
   end
+
+  # Fan a translated session event out to the runtime:telemetry firehose.
+  defp tele("session:" <> id, event, payload), do: Workbooks.TelemetryBus.emit(id, event, payload)
+  defp tele(_topic, _event, _payload), do: :ok
 
   def handle_info(_msg, state), do: {:ok, state}
 
@@ -117,6 +128,10 @@ defmodule Workbooks.PhoenixSocket do
 
       topic == "workgate:control" ->
         Workbooks.WorkgateBroker.register_socket(join_ref)
+        state
+
+      topic == "runtime:telemetry" ->
+        Workbooks.TelemetryBus.register(join_ref)
         state
 
       match?("session:" <> _, topic) ->

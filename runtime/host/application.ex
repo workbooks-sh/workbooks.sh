@@ -30,6 +30,8 @@ defmodule Workbooks.Application do
         # Agent→user OS-capability approvals over workgate:control (two registries).
         Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.WorkgateBroker.Sockets}, id: :workgate_sockets),
         Supervisor.child_spec({Registry, keys: :unique, name: Workbooks.WorkgateBroker.Pending}, id: :workgate_pending),
+        # runtime:telemetry firehose — all-sessions event fan-out.
+        Workbooks.TelemetryBus,
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,
