@@ -3,7 +3,7 @@
 #+VERSION: 0.1.0
 #+CLI_BIN: wb
 #+STATUS: alpha
-#+TAGLINE: Drive the Workbooks desktop shell — open and focus tabs, and (soon) bookmarks, themes, workspaces, key prompts.
+#+TAGLINE: Drive the Workbooks desktop shell — tabs, themes, bookmarks, workspaces, and key prompts.
 
 * workbooks-browser — control the desktop shell                  :toolkit:
   :PROPERTIES:
@@ -26,14 +26,14 @@
 
   *Live now*
 
-  | Skill          | Use when                                            |
-  |----------------+-----------------------------------------------------|
-  | =overview=     | First contact — what this toolkit can drive         |
-  | =tab-control=  | Open / focus / close a tab by path in the shell     |
+  | Skill          | Use when                                              |
+  |----------------+-------------------------------------------------------|
+  | =overview=     | First contact — what this toolkit can drive           |
+  | =tab-control=  | Open / focus / close a tab by path in the shell       |
+  | =app-control=  | Switch theme, add a bookmark, create a workspace      |
+  | =key-prompt=   | Ask the user for an API key (modal) via =wb env request= |
 
   *Planned (epic wb-d2nx — not yet wired, do not promise these)*
 
-  - =theme-control= — switch or author the app theme
-  - =bookmarks= — add / manage bookmarks
-  - =workspaces= — create / switch workspaces, manage folders
-  - =key-prompt= — pop the "add an API key" modal for the user
+  - =switch-workspace= — switch the active workspace / manage folders
+  - =theme-author= — author a NEW theme (only set existing ones today)
