@@ -12,25 +12,31 @@ defmodule Workbooks.Models do
   Returns a compact text table (id · context · modality · prompt-price).
   """
   def list(query \\ "") do
+    case fetch() do
+      {:ok, models} -> render(models, query)
+      {:error, reason} -> "model list failed: #{inspect(reason)}"
+    end
+  end
+
+  @doc """
+  Pure renderer: filter `models` (a decoded OpenRouter catalog list) by `query`
+  and format the compact table. Split out from `list/1` so the formatting is
+  deterministically testable without the network.
+  """
+  def render(models, query \\ "") do
     q = query |> to_string() |> String.downcase() |> String.trim()
 
-    case fetch() do
-      {:ok, models} ->
-        rows =
-          models
-          |> Enum.filter(&match_query?(&1, q))
-          |> Enum.sort_by(& &1["id"])
-          |> Enum.take(60)
+    rows =
+      models
+      |> Enum.filter(&match_query?(&1, q))
+      |> Enum.sort_by(& &1["id"])
+      |> Enum.take(60)
 
-        if rows == [] do
-          "no models match #{inspect(query)}"
-        else
-          header = "MODEL\tCONTEXT\tMODALITY\t$/Mtok-in"
-          header <> "\n" <> Enum.map_join(rows, "\n", &row/1)
-        end
-
-      {:error, reason} ->
-        "model list failed: #{inspect(reason)}"
+    if rows == [] do
+      "no models match #{inspect(query)}"
+    else
+      header = "MODEL\tCONTEXT\tMODALITY\t$/Mtok-in"
+      header <> "\n" <> Enum.map_join(rows, "\n", &row/1)
     end
   end
 
