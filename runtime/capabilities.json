@@ -1,0 +1,211 @@
+{
+  "title": "Waldo / Runtime \u2014 Capability Ledger",
+  "updated": "2026-06-14",
+  "note": "Canonical, agent-maintained ledger of capabilities, their tests, proof, and known failure modes. The /capabilities dashboard reads this file LIVE (re-poll every few seconds). Edited as work lands; status: done | wip | gated | planned.",
+  "areas": [
+    {
+      "area": "Security \u2014 multi-tenant isolation",
+      "capabilities": [
+        {
+          "name": "One visibility rule (Tenant.visible?/2)",
+          "status": "done",
+          "tests": "tenant_visible_test, tenant_isolation_http_test",
+          "units": 2,
+          "proof": "router-level, env-isolated",
+          "failure_modes": []
+        },
+        {
+          "name": "wb deploy exec-gate (no infra ops for exec-denied agents)",
+          "status": "done",
+          "tests": "wb_tool_test, capability_gate_test",
+          "units": 2,
+          "proof": "deterministic + live",
+          "failure_modes": []
+        },
+        {
+          "name": "raw-fs wb verb class gated (bundle/sign/verify/pack/unpack/fetch)",
+          "status": "done",
+          "tests": "wb_tool_test",
+          "units": 1,
+          "proof": "all 7 verbs refused without exec",
+          "failure_modes": [
+            "desktop exec agent paths still unconfined \u2014 wb-oyhh (low sev)"
+          ]
+        },
+        {
+          "name": "query/tangle/lint reject absolute paths (no cross-tenant .org read)",
+          "status": "done",
+          "tests": "cli_dispatch_test",
+          "units": 1,
+          "proof": "deterministic",
+          "failure_modes": []
+        },
+        {
+          "name": "Agent fetch SSRF guard (via shared NetGuard floor)",
+          "status": "done",
+          "tests": "fetch_ssrf_test, net_guard_test",
+          "units": 2,
+          "proof": "live: 127.0.0.1 blocked",
+          "failure_modes": [
+            "DNS rebinding TOCTOU \u2014 wb-ntx6 (low sev)"
+          ]
+        },
+        {
+          "name": "Broker egress body cap (host_http_get memory)",
+          "status": "done",
+          "tests": "net_guard_cap_test",
+          "units": 1,
+          "proof": "deterministic",
+          "failure_modes": [
+            "peak receive RAM streaming cap \u2014 wb-4had"
+          ]
+        },
+        {
+          "name": "CORS * safe via auth lockdown (no tokenless x-tenant impersonation)",
+          "status": "done",
+          "tests": "auth_plug_test",
+          "units": 1,
+          "proof": "locked-deploy x-tenant ignored",
+          "failure_modes": []
+        }
+      ]
+    },
+    {
+      "area": "Agent \u2014 execution + tools",
+      "capabilities": [
+        {
+          "name": "Loop robustness (dead-stop/runaway/unknown-tool/parallel)",
+          "status": "done",
+          "tests": "agent_loop_test",
+          "units": 10,
+          "proof": "complete_fn seam",
+          "failure_modes": []
+        },
+        {
+          "name": "System-prompt composition (persona + toolkit index)",
+          "status": "done",
+          "tests": "agent_prompt_test",
+          "units": 3,
+          "proof": "via /api/agents/:slug/system_prompt",
+          "failure_modes": []
+        },
+        {
+          "name": "vfs_write/read workdir confinement",
+          "status": "done",
+          "tests": "vfs_write_confinement_test",
+          "units": 3,
+          "proof": "escape blocked, nothing written outside",
+          "failure_modes": []
+        },
+        {
+          "name": "image tool guards (budget/arg/escape/capability)",
+          "status": "done",
+          "tests": "image_tool_test",
+          "units": 5,
+          "proof": "deterministic",
+          "failure_modes": []
+        },
+        {
+          "name": "Self-editing seam (file_issue tool \u2192 autopoet backlog)",
+          "status": "done",
+          "tests": "autopoet_test",
+          "units": 9,
+          "proof": "tool path pinned",
+          "failure_modes": []
+        },
+        {
+          "name": "Session not-found contract (AgentSession + /api/run/:id)",
+          "status": "done",
+          "tests": "agent_session_test, run_status_endpoint_test",
+          "units": 2,
+          "proof": "deterministic",
+          "failure_modes": []
+        }
+      ]
+    },
+    {
+      "area": "Toolkit \u2014 skills + evals",
+      "capabilities": [
+        {
+          "name": "toolkit-run vs direct-verb confusion fixed",
+          "status": "done",
+          "tests": "toolkit_injection_test",
+          "units": 2,
+          "proof": "live: gemini runs wb deploy status directly",
+          "failure_modes": []
+        },
+        {
+          "name": "Manifest drift guard (every skill documented)",
+          "status": "done",
+          "tests": "toolkit_injection_test",
+          "units": 1,
+          "proof": "all 4 toolkits",
+          "failure_modes": []
+        },
+        {
+          "name": "EXEC-shape descriptor parsing",
+          "status": "done",
+          "tests": "toolkit_descriptor_test",
+          "units": 3,
+          "proof": "all 9 BUILD_SRC schemes",
+          "failure_modes": []
+        },
+        {
+          "name": "Eval suite (workbooks-cli + browser)",
+          "status": "wip",
+          "tests": "wb toolkit eval",
+          "units": 19,
+          "proof": "16/19 on mimo; deploy-status/model-switch are cheap-model multi-step convergence (wb-3hdb)",
+          "failure_modes": [
+            "mimo weak at multi-step chaining (eval-model artifact; gemini converges)"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "Human-gated (awaiting product/frontend decision)",
+      "capabilities": [
+        {
+          "name": "Admin role (wb-g1yo.5)",
+          "status": "gated",
+          "tests": "\u2014",
+          "units": 0,
+          "proof": "fix-design filed",
+          "failure_modes": []
+        },
+        {
+          "name": "Session sharing (wb-g1yo.6)",
+          "status": "gated",
+          "tests": "\u2014",
+          "units": 0,
+          "proof": "fix-design filed",
+          "failure_modes": []
+        },
+        {
+          "name": "Chat-in-a-tab + server session log (wb-g1yo.7/.8)",
+          "status": "gated",
+          "tests": "\u2014",
+          "units": 0,
+          "proof": "backend ready; needs real desktop app to verify",
+          "failure_modes": []
+        },
+        {
+          "name": "Image-gen skill (wb-d2nx.6)",
+          "status": "gated",
+          "tests": "\u2014",
+          "units": 0,
+          "proof": "product surface undefined",
+          "failure_modes": []
+        },
+        {
+          "name": "ACP external-CLI orchestration (wb-d2nx.7)",
+          "status": "gated",
+          "tests": "\u2014",
+          "units": 0,
+          "proof": "needs host-brokered external-exec broker",
+          "failure_modes": []
+        }
+      ]
+    }
+  ]
+}

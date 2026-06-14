@@ -25,7 +25,7 @@ defmodule Workbooks.Auth do
   # Public infra endpoints: liveness + the RCP handshake + DID doc. They carry no
   # tenant data and MUST answer in any mode (a client reads the capabilities doc
   # to learn the required auth rung BEFORE it has a credential).
-  @public ~w(/health /.well-known/workbooks-runtime /.well-known/did.json)
+  @public ~w(/health /.well-known/workbooks-runtime /.well-known/did.json /capabilities /api/capabilities)
 
   @impl true
   def call(conn, _opts) do

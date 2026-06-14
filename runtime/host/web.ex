@@ -36,6 +36,19 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, "ok")
   end
 
+  # Live capability dashboard (dev). `capabilities.json` is an agent-maintained
+  # ledger (the DSL: capabilities, their tests/units, proof, failure modes);
+  # `capabilities.html` self-polls it every few seconds. BOTH are read FRESH per
+  # request, so editing the ledger shows up live with NO restart. Public — holds
+  # only work-progress metadata, no secrets/tenant data.
+  get "/capabilities" do
+    serve_repo_file(conn, "capabilities.html", "text/html")
+  end
+
+  get "/api/capabilities" do
+    serve_repo_file(conn, "capabilities.json", "application/json")
+  end
+
   # Secret injection (wb-2s09). The desktop holds the user's API keys in the OS
   # keychain; the runtime — especially containerized — can't read that, yet the
   # host-side loaders pull creds from the process ENV (e.g. llm.ex reads
@@ -427,6 +440,21 @@ defmodule Workbooks.Web do
   # caller's tenant. A nil caller (admin/internal/dev-unset) is grandfathered.
   defp path_tenant_ok?(conn),
     do: Workbooks.Tenant.visible?(conn.params["tenant"], conn.assigns[:tenant])
+
+  # Serve a file from the runtime root, read FRESH (so dashboard/ledger edits are
+  # live). Tries cwd then the source-relative path so it works under `mix`
+  # regardless of where the runtime was launched.
+  defp serve_repo_file(conn, name, ctype) do
+    body =
+      [Path.join(File.cwd!(), name), Path.expand(Path.join([__DIR__, "..", name]))]
+      |> Enum.find_value(fn p -> match?({:ok, _}, File.read(p)) && File.read!(p) end)
+
+    if body do
+      conn |> put_resp_content_type(ctype) |> send_resp(200, body)
+    else
+      send_resp(conn, 404, ~s({"error":"#{name} not found"}))
+    end
+  end
 
   # Session-ownership guard (wb-g1yo.9): only the run's owning tenant may act on
   # it by id (CTK review pull/commit). Same grandfather rule; a not-found run is
