@@ -2715,6 +2715,13 @@
    "proof": "stb_truetype via build_c_dir parses a TTF (read on stdin) and rasterizes glyph A at 24px -> w=11 h=14, 104 ink pixels; stbtt_lane_test.exs green. Distinct typography domain; with stb_image_write, render text -> images.",
    "lane": "compilers/stbtt/build.sh (fetch stb_truetype.h pinned + Tiny5 font sha-pinned, gitignored) + build_c_dir(include_only font.ttf)",
    "since": "iter163"
+  },
+  "qrcodegen": {
+   "capability": "QR code generation (2D barcode) in-sandbox",
+   "status": "live",
+   "proof": "nayuki qrcodegen 1.8.0 via build_c_dir encodes https://workbooks.sh -> a 25x25 QR module matrix (qr_ok=1 size=25 dark=330 corner=1); qrcodegen_lane_test.exs green",
+   "lane": "compilers/qrcodegen/build.sh (fetch single-file pinned v1.8.0, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {

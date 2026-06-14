@@ -44,6 +44,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **xxHash** (fast non-crypto hashing XXH32/64/XXH3) | from-C-source -> wasi (build_c_dir) | xxhash_lane_test (deterministic digests) |
 | **tinyexpr** (math-expression evaluator) | from-C-source -> wasi (build_c_dir) | tinyexpr_lane_test (expr + bound vars) |
 | **stb_truetype** (font rasterization) | from-C-source -> wasi (build_c_dir) | stbtt_lane_test (rasterize glyph) |
+| **qrcodegen** (QR code generation) | from-C-source -> wasi (build_c_dir) | qrcodegen_lane_test (encode URL -> matrix) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
