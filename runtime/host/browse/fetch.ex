@@ -48,6 +48,17 @@ defmodule Workbooks.Browse.Fetch do
     do: {:error, :too_many_redirects}
 
   defp request(url, profile, headers, redirects) do
+    # SSRF floor (same as the headless path): refuse private/link-local/metadata
+    # targets BEFORE connecting. Checked on every hop so an open redirect can't
+    # bounce a public URL onto 169.254.169.254 or 192.168.x.
+    if Workbooks.NetGuard.allowed?(url) do
+      request_allowed(url, profile, headers, redirects)
+    else
+      {:error, :blocked}
+    end
+  end
+
+  defp request_allowed(url, profile, headers, redirects) do
     http_opts = [ssl: ssl_opts(profile), timeout: @timeout, connect_timeout: @timeout, autoredirect: false]
     req = {String.to_charlist(url), Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)}
 
