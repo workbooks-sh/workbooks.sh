@@ -1,0 +1,18 @@
+/* brand tokens — lifted from the lander */
+:root {
+  --bg: #0c0d10; --panel: #14161b; --panel-2: #191c22; --line: #262a32;
+  --ink: #eceef2; --dim: #8b909a; --faint: #565b64; --live: #3fe081;
+  --sans: "Geist", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 48px 28px; }
+.wrap header h1 { font: 600 22px/1.2 var(--sans); margin: 0 0 6px; }
+.wrap header p { color: var(--dim); font-size: 14px; margin: 0 0 28px; }
+.card { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 4px; overflow: hidden; }
+.muted { color: var(--faint); font-size: 12px; }
+.brandbar { display: flex; align-items: center; gap: 10px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+.brandbar svg { width: 20px; color: var(--live); }
+.brandbar b { font: 600 14.5px var(--sans); }
+.brandbar .cl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; }

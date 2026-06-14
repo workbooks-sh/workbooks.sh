@@ -1,0 +1,24 @@
+{
+  "name": "wb-cloud-dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 5179",
+    "build": "vite build",
+    "preview": "vite preview --port 5179"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^3",
+    "@sveltejs/kit": "^2",
+    "@sveltejs/vite-plugin-svelte": "^4",
+    "svelte": "^5",
+    "vite": "^5"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5",
+    "@workos-inc/node": "^10",
+    "@workos-inc/widgets": "^1",
+    "react": "^18",
+    "react-dom": "^18"
+  }
+}
