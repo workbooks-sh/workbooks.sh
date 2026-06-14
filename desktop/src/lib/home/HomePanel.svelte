@@ -716,10 +716,13 @@
     transition: opacity 0.15s, filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.35; cursor: default; }
-  /* Send: fg-filled button. The glyph uses mix-blend-mode:difference against the
-     button so it ALWAYS contrasts with its own background — never invisible,
-     regardless of theme-token resolution (a token-based icon color washed out
-     when the active theme broke). */
+  /* THE bug behind the "invisible send icon": an inline <svg> flex-item has a
+     min-content width of 0, so flex-shrink collapsed it to width:0 (height
+     stayed 16px — only the main axis shrinks). flex:none pins it to its 16px
+     intrinsic size. It was never a color problem. */
+  .btn :global(svg) { flex: none; }
+  /* Send: fg-filled button; the glyph uses mix-blend-mode:difference so it always
+     contrasts with the button regardless of theme-token resolution. */
   .btn.primary { background: var(--color-fg); isolation: isolate; }
   .btn.primary :global(svg) { color: #fff; fill: currentColor; mix-blend-mode: difference; }
   .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
