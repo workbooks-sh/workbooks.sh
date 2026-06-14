@@ -273,3 +273,87 @@ agents (`3w browse`) get host-brokered computer-use. Same intents as Phase 0, se
    sufficient as the gate of record?
 7. **Baseline drift on macOS upgrades** — golden screenshots break on OS font-rendering changes.
    Re-baseline cadence + who approves?
+
+---
+
+## 7. Empirical run — 2026-06-14 (web tier, desktop-app demos + voiceover)
+
+Goal: produce real, vision-verified, *voiced* demo videos of the Workbooks
+Browser desktop UI, and validate the toolkit on this macOS box.
+
+### What was produced (all verified PASS, all voiced, all live on R2)
+
+The desktop app was driven as a **web app** (`cd desktop && bun run dev`, vite
+:5178, `$lib/platform/webHost` mock providers) — the legitimate cross-platform
+desktop-UI demo lane. Four `target:"web"` recipes, each `./pipeline …
+--voiceover recipe` → recorded WebM → MP4 → ElevenLabs narration muxed in →
+re-verified the FINAL voiced MP4 with the vision cascade.
+
+| Demo | Recipe | Final-MP4 verify | R2 URL |
+|---|---|---|---|
+| Command palette / shell | `recipes/desktop-command-palette.json` | pass 0.90 | `…/demos/desktop-command-palette.mp4` |
+| Search drawer | `recipes/desktop-search-drawer.json` | pass 1.00 | `…/demos/desktop-search-drawer.mp4` |
+| Kanban workbook | `recipes/desktop-kanban-workbook.json` | pass 1.00 | `…/demos/desktop-kanban-board.mp4` |
+| Tabbed workspaces | `recipes/desktop-tabs-navigation.json` | pass 1.00 | `…/demos/desktop-tabbed-workspaces.mp4` |
+
+R2 base: `https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev`
+(bucket `workbooks-media`, prefix `demos/`; all 4 return `200 video/mp4`).
+Verify cascade: `google/gemini-3.5-flash` (triage) via OpenRouter, on the muxed
+voiced MP4 (not just the silent WebM). Videos are NOT committed (R2 is canon).
+
+### Toolkit bugs found + fixed this session
+
+1. **`hover` ignored `x,y` coordinates** (`lib/backend-playwright.mjs`). `click`
+   accepted `{selector | x,y}` but `hover` only handled `selector`, so a
+   coordinate hover threw. Fixed to mirror `click` (DRY). This mattered because
+   **each workbook renders inside an iframe** — main-frame text selectors
+   (`text=…`, `getByText`) can't see card content, so coordinate hover is the
+   reliable intent for inside-workbook interaction. Documented gotcha.
+2. **No voiceover stage existed** (task gap, not a bug). Added
+   `lib/voiceover.mjs` (ElevenLabs v3, reuses the `web/learn/audio/generate.mjs`
+   call pattern + `XI_API_KEY`): TTS per line → `adelay`/`amix`/`apad` evenly
+   paces clips across the video's real `ffprobe` duration → muxes AAC over the
+   copied video stream. Wired `--voiceover <script.json|recipe>` (+
+   `WB_REC_VOICEOVER`) into `pipeline`; the web branch now finalizes WebM→MP4
+   and records `finalVideo`/`voiced` in the manifest. A `voiceover` block on the
+   recipe (`{"lines":[…]}`) is the zero-arg path.
+
+### Honest gaps / not-validated
+
+- **Native Tauri app tier (`target:"app"`)**: confirmed wiring-gated, exactly
+  per §6 above. The pipeline does an honest macOS dry-validation and emits a
+  non-publishable manifest. Did not sink time driving the native binary.
+- **Some sidebar workspaces are stubs** in the mock webHost (Notes, Tracker,
+  Reading render a "This is a placeholder page. No real workbook is wired"
+  card). Only **Kanban** is a fully-rendered workbook today, so it's the one
+  "real workbook" demo. Demos picked around this (shell/search/tabs +
+  the one real Kanban board) so every frame is clean and non-empty.
+
+### Nexus-in-WASM verdict (RUNBOOK §8) — **BLOCKED / unbuilt, evidence below**
+
+Read `runtime/host/browse.ex` + `runtime/host/browse/provider.ex` +
+`runtime/host/browse/native.ex`:
+- `Workbooks.Browse.Provider` declares **exactly** `@callback capabilities()
+  :: [:fetch | :crawl | :search]` — there is **no `:drive` capability**.
+- `Native.capabilities/0` returns `[:fetch, :crawl, :search]`; `Browse`'s only
+  public verbs are `fetch/2`, `crawl/2`, `search/2`. No `navigate/click/type/
+  screenshot/eval_js` anywhere in `runtime/host/`.
+- `grep -rn ':drive\|Browse.Drive'` over `runtime/host/` → **0 hits.** The only
+  MCP reference is `cli/desktop.ex` (`wb desktop mcp --stdio`), a stdio↔UDS
+  **relay for Claude Code → the live browser**, whose own comment says the
+  in-browser MCP **server** is "impl wb-aakl.23" — i.e. not shipped.
+
+So a bash-only WASM guest emitting a record intent across the Dock and getting
+back pixels/DOM **cannot round-trip today**: no `:drive` provider, no guest
+EXEC-shape, and no shipped MCP server to receive the intents. I did **not** wire
+a fake round-trip. The remaining wiring is precisely:
+1. add `:drive` to the `Browse.Provider` behaviour + a `Workbooks.Browse.Drive`
+   provider whose executor shells this `tools/record` rig (it already speaks the
+   locked intent set);
+2. ship the in-browser MCP **server** (`wb-aakl.23`) so intents actually execute;
+3. expose `:drive` as a toolkit EXEC-shape over RCP so a wasm tenant emits
+   intents across the Dock membrane.
+Maturity: architecturally proven, **unbuilt** (not merely "partially built" —
+the capability slot itself does not yet exist). The vision-verify gate
+(`lib/verify.mjs`) and demo seed are host-side and would gate any take
+regardless of emitter — those are done.

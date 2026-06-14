@@ -45,6 +45,7 @@ Output: `<out>/pipeline.json` (publishable flag, verdict, artifact paths) +
 | `tools/record/record.mjs` | Driver + (inline) verify for the **web** tier. The orchestrator calls it `--no-verify --emit-context` for the **app** tier so it just drives + drops `<take>.expected.txt`/`.signals.json`. |
 | `tools/record/lib/backend-mcp.mjs` | App-tier driver: intents → the Browser's embedded MCP (`/tmp/workbooks-mcp.sock`). |
 | `tools/record/lib/backend-playwright.mjs` | Web-tier driver: Chromium + visible cursor + human typing, self-records WebM. |
+| `tools/record/lib/voiceover.mjs` | Adds a narrated track to a recorded MP4 (ElevenLabs v3; `XI_API_KEY`). TTS per line → paced across the video's real duration → muxed AAC. CLI: `node lib/voiceover.mjs --video f.mp4 --script narration.json`. Wired into `pipeline` via `--voiceover <script.json|recipe>` / `WB_REC_VOICEOVER`; a recipe `"voiceover":{"lines":[…]}` block is the zero-arg path. |
 | `tools/record/lib/verify.mjs` | The proof cascade (Gemini 3.5 Flash → 3.1 Pro → MiniMax M3). |
 | `tools/record/lib/verify-only.mjs` | Run that cascade against an **already-captured** MP4 (the orchestrator gates the *real* capture, not a still-strip). |
 | `runtime/demos/seed/` + `wb demo seed` | The reproducible demo environment every take plays against. |

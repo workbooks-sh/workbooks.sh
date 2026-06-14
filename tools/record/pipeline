@@ -50,6 +50,48 @@ if have node; then JS=node
 elif have bun; then JS=bun
 else die "need node or bun on PATH to run the driver (record.mjs)"; fi
 
+# ---- finalize a take: webm/mp4 -> mp4, then optional voiceover ---------------
+# Reads the take's source video from <out>, transcodes to MP4 (the publishable
+# container), and — when voiceover is requested — narrates it via ElevenLabs.
+# Echoes the path of the final (voiced if produced, else plain) MP4.
+finalize_video() {
+  fv_src="$1"   # source video (.webm or .mp4)
+  fv_mp4="${fv_src%.*}.mp4"
+  if [ "$fv_src" != "$fv_mp4" ]; then
+    have ffmpeg && ffmpeg -y -i "$fv_src" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -an "$fv_mp4" >/dev/null 2>&1 \
+      || { err "ffmpeg webm->mp4 failed"; printf '%s' "$fv_src"; return; }
+  fi
+  if [ -z "$voiceover" ]; then printf '%s' "$fv_mp4"; return; fi
+  fv_voiced="${fv_mp4%.mp4}.voiced.mp4"
+  if [ "$voiceover" = recipe ]; then
+    fv_lines=$("$JS" -e '
+      const fs=require("fs");
+      const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+      const vo=r.voiceover; const lines=Array.isArray(vo)?vo:(vo&&vo.lines)||[];
+      process.stdout.write(lines.map(l=>"--line\n"+l).join("\n"));
+    ' "$recipe")
+    [ -n "$fv_lines" ] || { err "voiceover=recipe but recipe has no voiceover.lines"; printf '%s' "$fv_mp4"; return; }
+    # feed lines via a temp script to avoid arg-splitting on the narration text
+    fv_script="$out/voiceover.json"
+    "$JS" -e '
+      const fs=require("fs");
+      const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+      const vo=r.voiceover; const lines=Array.isArray(vo)?vo:(vo&&vo.lines)||[];
+      fs.writeFileSync(process.argv[2], JSON.stringify({lines}));
+    ' "$recipe" "$fv_script"
+    set +e
+    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$fv_script" >&2
+    fv_rc=$?
+    set -e
+  else
+    set +e
+    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$voiceover" >&2
+    fv_rc=$?
+    set -e
+  fi
+  if [ "$fv_rc" = 0 ] && [ -s "$fv_voiced" ]; then printf '%s' "$fv_voiced"; else err "voiceover failed (rc=$fv_rc) — using silent MP4"; printf '%s' "$fv_mp4"; fi
+}
+
 # ---- defaults (env-overridable) ----------------------------------------------
 backend="${WB_REC_DRIVER:-auto}"
 retries="${WB_REC_RETRIES:-1}"
@@ -60,6 +102,7 @@ app_cmd="${WB_REC_APP:-}"
 verify=1
 out=""
 recipe=""
+voiceover="${WB_REC_VOICEOVER:-}"   # path to a narration script JSON, or "recipe" to use the recipe's voiceover block
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -70,6 +113,7 @@ while [ $# -gt 0 ]; do
     --seed-args)  seed_args="$2"; shift 2;;
     --app)        app_cmd="$2"; shift 2;;
     --no-verify)  verify=0; shift;;
+    --voiceover)  voiceover="$2"; shift 2;;
     --out)        out="$2"; shift 2;;
     -h|--help)    sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     --*)          die "unknown opt: $1";;
@@ -134,6 +178,21 @@ if [ "$target" = web ]; then
       --retries "$retries" --timeout-ms "$timeout_ms" --out "$out" $vflag
   rc=$?
   set -e
+  # On a publishable take, finalize the source video to MP4 (+ optional voiceover)
+  # and record the final path in the manifest so callers know what to publish.
+  if [ "$rc" = 0 ] && [ -f "$out/manifest.json" ]; then
+    src_video=$("$JS" -e 'const m=require(process.argv[1]); process.stdout.write((m.result&&m.result.video)||"");' "$out/manifest.json")
+    if [ -n "$src_video" ] && [ -s "$src_video" ]; then
+      final_mp4=$(finalize_video "$src_video")
+      "$JS" -e '
+        const fs=require("fs"); const [mf,fin]=process.argv.slice(1);
+        const m=JSON.parse(fs.readFileSync(mf,"utf8"));
+        m.finalVideo=fin; m.voiced=/\.voiced\.mp4$/.test(fin);
+        fs.writeFileSync(mf, JSON.stringify(m,null,2));
+      ' "$out/manifest.json" "$final_mp4"
+      log "final MP4: $final_mp4"
+    fi
+  fi
   [ -f "$out/manifest.json" ] && cp -f "$out/manifest.json" "$out/pipeline.json"
   cat "$out/pipeline.json" 2>/dev/null || true
   exit "$rc"

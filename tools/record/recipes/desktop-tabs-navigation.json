@@ -1,0 +1,25 @@
+{
+  "name": "Workbooks Desktop — tabbed workspaces",
+  "target": "web",
+  "viewport": { "width": 1440, "height": 900 },
+  "headless": false,
+  "verifyFrames": 9,
+  "voiceover": {
+    "lines": [
+      "The Workbooks Browser keeps every workspace open in tabs, like the web itself.",
+      "Open the Kanban board — it lands in its own tab up top.",
+      "Open another workspace and a second tab appears right beside it.",
+      "Switch back and forth instantly. Your whole working life, one window."
+    ]
+  },
+  "steps": [
+    { "intent": "navigate", "url": "http://localhost:5178/", "waitUntil": "networkidle", "label": "open the Workbooks Browser" },
+    { "intent": "wait", "ms": 2000, "label": "let the shell settle", "afterMs": 1200 },
+    { "intent": "click", "selector": "button:has-text(\"Kanban\")", "label": "open the first workspace as a tab", "afterMs": 2000 },
+    { "intent": "screenshot", "name": "tab-one", "checkpoint": "the Kanban workspace is open with a 'Kanban' tab in the tab strip at the top", "label": "capture the first tab", "afterMs": 1200 },
+    { "intent": "click", "selector": "button:has-text(\"Notes\")", "label": "open a second workspace as a new tab", "afterMs": 2000 },
+    { "intent": "screenshot", "name": "tab-two", "checkpoint": "two tabs are now visible in the tab strip — 'Kanban' and 'Notes'", "label": "capture the second tab", "afterMs": 1200 },
+    { "intent": "click", "selector": "[role=\"tab\"]:has-text(\"Kanban\"), .tab:has-text(\"Kanban\")", "label": "switch back to the first tab", "afterMs": 1500 },
+    { "intent": "screenshot", "name": "tab-switch", "checkpoint": "the Kanban board is shown again after switching tabs; no error overlay", "label": "capture the tab switch", "afterMs": 1500 }
+  ]
+}

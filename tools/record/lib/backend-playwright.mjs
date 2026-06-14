@@ -130,7 +130,7 @@ export class PlaywrightBackend {
         return {};
       }
       case "hover": {
-        const { x, y } = await this._center(step.selector);
+        const { x, y } = step.selector ? await this._center(step.selector) : { x: step.x, y: step.y };
         await this._moveTo(x, y);
         return {};
       }
