@@ -309,13 +309,18 @@ defmodule Workbooks.Web do
         _ -> nil
       end
 
+    # Workdir confinement (wb-g1yo.4b): the DESKTOP (trusted, single-tenant) may
+    # name its own local workbook path; a CLOUD/shared caller MUST NOT — a
+    # user-supplied workdir there is path-traversal + cross-tenant FS. So on
+    # cloud, ignore params["workdir"] and use a confined per-tenant scratch dir.
+    workdir = effective_workdir(conn.assigns.tenant, id, params["workdir"])
+
     opts =
-      [tenant: conn.assigns.tenant, max_steps: 40, exec: exec?]
+      [tenant: conn.assigns.tenant, max_steps: 40, exec: exec?, workdir: workdir]
       |> then(&if tenant_model, do: [{:model, tenant_model} | &1], else: &1)
-      |> then(&if params["workdir"], do: [{:workdir, params["workdir"]} | &1], else: &1)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, prompt, opts)
-    Workbooks.SessionLedger.record(id, slug, prompt, params["workdir"], conn.assigns.tenant)
+    Workbooks.SessionLedger.record(id, slug, prompt, workdir, conn.assigns.tenant)
     json = Jason.encode!(%{session_id: id, status: "running"})
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
@@ -437,6 +442,28 @@ defmodule Workbooks.Web do
     end
   rescue
     _ -> true
+  end
+
+  # Workdir confinement (wb-g1yo.4b). Desktop = trusted local path; cloud/shared =
+  # a confined per-tenant scratch (the agent's FS work stays under its tenant root,
+  # no arbitrary host path, no cross-tenant reach).
+  defp effective_workdir(tenant, run_id, requested),
+    do: confined_workdir(Workbooks.Desktop.enabled?(), tenant, run_id, requested)
+
+  @doc false
+  # Pure (testable): desktop-trusted callers keep their requested local path; any
+  # other (cloud/shared) caller is confined to a per-tenant scratch root — no
+  # arbitrary host path, no cross-tenant FS reach.
+  def confined_workdir(desktop?, tenant, run_id, requested) do
+    if desktop? and is_binary(requested) and requested != "" do
+      requested
+    else
+      base = System.get_env("WB_DATA") || System.tmp_dir!()
+      # Strip dots too (not just separators) so a tenant like "../../etc" can't
+      # smuggle ".." into the path.
+      safe_tenant = (tenant || "anon") |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_")
+      Path.join([base, "wb-runs", safe_tenant, run_id])
+    end
   end
 
   defp wb_exec(argv, tenant) do
