@@ -54,6 +54,10 @@
   - This is the USER's tool — it deploys runtimes + sites the user controls.
     It is NOT how the platform ships the compilers package or the platform
     runtime image (maintainer-only). Never conflate them.
+  - NEVER fabricate a command's output. `wb publish apply` prints the real live
+    URL; `wb deploy status` prints the real state — quote ONLY what the command
+    actually printed. If you have NOT run it, say the value comes from running it
+    (don't invent a URL, status, or any result you didn't observe).
   - Prefer `validate` before `apply`; prefer `--json` when you need to branch on
     the outcome. Read a skill for detail:
     `wb toolkit show workbooks-cli <skill>` (deploy, publish).
