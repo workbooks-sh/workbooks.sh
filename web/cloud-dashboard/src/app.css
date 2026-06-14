@@ -1,15 +1,11 @@
 /* ── Workbooks cloud — re-skinned to the LMS/docs design system ──────────────
    Neo-brutalist: 2px solid var(--stroke) borders, offset box-shadows
-   (3px 3px 0 var(--shadow)), ink-on-paper active states, Groothan display +
-   JetBrains Mono labels + EB Garamond prose. Tokens copied VERBATIM from
-   web/learn/index.html (light :root + [data-theme="dark"]). DARK by default. */
+   (3px 3px 0 var(--shadow)), ink-on-paper active states. Fonts are Geist +
+   Geist Mono (sans, matching the landing pages). Color tokens copied VERBATIM
+   from web/learn/index.html (light :root + [data-theme="dark"]). DARK by default. */
 
-/* display face — self-hosted Groothan (mirrors learn.css inline @font-face) */
-@font-face{ font-family:"Groothan"; src:url("/fonts/GroothanMixed-Regular.woff2") format("woff2"),
-  url("/fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
-
-/* text faces (JetBrains Mono + EB Garamond) self-hosted exactly as the LMS does */
-@import url("/fonts/fonts.css");
+/* sans-serif brand fonts — Geist + Geist Mono, same as the landing pages */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
 
 :root{
   --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
@@ -31,10 +27,10 @@
   --run:var(--bloomd); --amber:#c2861f; --pause:#7c63cf; --bad:#d9534f; --bad-fill:rgba(217,83,79,.13);
   --live:var(--run);
 
-  --display:"Groothan","Anton",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,monospace;
-  --read:"EB Garamond",Georgia,serif;
-  --sans:var(--read);   /* prose default */
+  --display:"Geist",system-ui,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --read:"Geist",system-ui,sans-serif;
+  --sans:"Geist",system-ui,sans-serif;
   --r:10px;
   color-scheme:light;
 }
