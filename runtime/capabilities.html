@@ -57,8 +57,12 @@ function render(d){
   const caps = (d.areas||[]).flatMap(a=>a.capabilities||[]);
   const tot = { done:0, wip:0, gated:0, planned:0, units:0 };
   caps.forEach(c=>{ tot[c.status] = (tot[c.status]||0)+1; tot.units += (c.units||0); });
+  const su = d.suite || {};
+  const failColor = (su.failures||0) > 0 ? 'var(--amber)' : 'var(--green)';
   document.getElementById('totals').innerHTML =
-    `<span class="dim">units <b>${tot.units}</b></span>`+
+    `<span class="dim">suite <b>${su.tests==null?'—':su.tests}</b></span>`+
+    `<span class="dim">fails <b style="color:${failColor}">${su.failures==null?'—':su.failures}</b></span>`+
+    `<span class="dim">tracked <b>${tot.units}</b></span>`+
     ST.map(s=> tot[s] ? `<span class="dim">${s} <b>${tot[s]}</b></span>`:'').join('');
 
   const root = document.getElementById('root'); root.innerHTML='';
