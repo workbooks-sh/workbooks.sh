@@ -36,4 +36,12 @@ defmodule Workbooks.ToolkitInjectionTest do
     assert out =~ "workbooks-browser"
     assert out =~ "ghost-zzz: (not installed)"
   end
+
+  test "eval_text case-filter: a non-matching filter selects no case (no LLM run)" do
+    # The filter narrows to one eval by filename substring — cheap iteration vs
+    # the full suite. A bogus filter must short-circuit to a clear message rather
+    # than running (and billing) anything.
+    out = Toolkits.eval_text("workbooks-cli", Toolkits.default_root(), "no-such-eval-zzz")
+    assert out == ~s(workbooks-cli: no eval matches "no-such-eval-zzz")
+  end
 end

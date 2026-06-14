@@ -385,6 +385,9 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
   def call(["toolkit", "eval", id], _t), do: Toolkits.eval_text(id)
+  # `wb toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
+  def call(["toolkit", "eval", id, filter], _t),
+    do: Toolkits.eval_text(id, Toolkits.default_root(), filter)
   def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
   def call(["toolkit", "versions", id], _t), do: Toolkits.versions_text(id)
   def call(["toolkit", "live"], _t), do: Toolkits.live_text()

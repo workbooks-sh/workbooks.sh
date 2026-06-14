@@ -255,7 +255,7 @@ defmodule Workbooks.Toolkits do
   same sandbox as verify (only with WB_TOOLKIT_EXEC=1), and PASSES on exit 0 +
   stdout containing the case's `#+EXPECT:` substring (when set). See EVALS.org.
   """
-  def eval_text(id, root \\ default_root()) do
+  def eval_text(id, root \\ default_root(), filter \\ nil) do
     case tk_dir(id, root) do
       nil ->
         "no such toolkit: #{id}"
@@ -264,10 +264,15 @@ defmodule Workbooks.Toolkits do
         cases =
           Path.wildcard(Path.join([dir, "evals", "*.org"]))
           |> Enum.filter(&contained?(&1, Path.expand(dir)))
+          # `filter` (a substring of the eval filename) runs just ONE case — cheap
+          # iteration on a single eval rather than the whole LLM-driven suite.
+          |> Enum.filter(&(is_nil(filter) or String.contains?(Path.basename(&1), filter)))
           |> Enum.sort()
 
         if cases == [] do
-          "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
+          if filter,
+            do: "#{id}: no eval matches #{inspect(filter)}",
+            else: "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
         else
           results = Enum.map(cases, &run_eval_case(&1, dir, id))
           pass = Enum.count(results, &(elem(&1, 0) == :pass))
