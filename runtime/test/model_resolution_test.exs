@@ -33,4 +33,15 @@ defmodule Workbooks.ModelResolutionTest do
     assert CLI.call(["model", "get"], "dev") == "anthropic/claude-haiku-4.5"
     assert Llm.effective_model() == "anthropic/claude-haiku-4.5"
   end
+
+  test "wb model set is PER-TENANT — one tenant's choice doesn't leak to another (wb-g1yo)" do
+    a = "mr-alice-#{System.unique_integer([:positive])}"
+    b = "mr-bob-#{System.unique_integer([:positive])}"
+
+    assert CLI.call(["model", "set", "anthropic/claude-haiku-4.5"], a) =~ "model set"
+    assert CLI.call(["model", "get"], a) == "anthropic/claude-haiku-4.5"
+    # bob never set one → falls back to the default, NOT alice's choice
+    refute CLI.call(["model", "get"], b) == "anthropic/claude-haiku-4.5"
+    assert CLI.call(["model", "get"], b) =~ "(default)"
+  end
 end

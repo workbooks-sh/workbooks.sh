@@ -301,8 +301,17 @@ defmodule Workbooks.Web do
     id = "run-#{System.unique_integer([:positive])}"
     exec? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
 
+    # The tenant's own model choice (wb-g1yo / wb-d2nx.5), if they set one via
+    # `wb model set` — per-tenant, not the process-global default.
+    tenant_model =
+      case Workbooks.Vars.get(conn.assigns.tenant, "wb.model") do
+        {:ok, m} -> m
+        _ -> nil
+      end
+
     opts =
       [tenant: conn.assigns.tenant, max_steps: 40, exec: exec?]
+      |> then(&if tenant_model, do: [{:model, tenant_model} | &1], else: &1)
       |> then(&if params["workdir"], do: [{:workdir, params["workdir"]} | &1], else: &1)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, prompt, opts)

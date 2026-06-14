@@ -201,17 +201,19 @@ defmodule Workbooks.CLI do
   def call(["models", "list" | rest], _t), do: Workbooks.Models.list(Enum.join(rest, " "))
   def call(["models" | _], _t), do: "usage: wb models list [query]"
 
-  def call(["model", "set", id], _t) do
-    System.put_env("WB_LLM_MODEL", id)
-    "model set to #{id} (this session)"
+  def call(["model", "set", id], t) do
+    # PER-TENANT (wb-g1yo): store in the tenant's Vars, not a process-global env
+    # var — on a shared nexus one tenant's model choice must not change everyone's.
+    Workbooks.Vars.set(t, "wb.model", id)
+    "model set to #{id}"
   end
 
-  def call(["model", "get"], _t) do
-    # Report the EFFECTIVE model id (resolving the built-in default) so an agent
-    # always reads a concrete id, never an opaque "(default)".
-    case System.get_env("WB_LLM_MODEL") do
-      nil -> "#{Workbooks.Llm.default_model()} (default)"
-      id -> id
+  def call(["model", "get"], t) do
+    # Effective model for THIS tenant: their Vars override, else the deploy-time
+    # global default, else the built-in. Always a concrete id, never "(default)".
+    case Workbooks.Vars.get(t, "wb.model") do
+      {:ok, id} -> id
+      _ -> System.get_env("WB_LLM_MODEL") || "#{Workbooks.Llm.default_model()} (default)"
     end
   end
   def call(["model" | _], _t), do: "usage: wb model <get | set ID>"
