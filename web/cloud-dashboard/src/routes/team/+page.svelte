@@ -8,6 +8,15 @@
   let inviteEmail = $state('');
   let inviteRole = $state('member');
 
+  // One consistent color PER ROLE — admin/member/owner look the SAME everywhere
+  // (member-list tags, pending rows, AND the invite modal's selected role button).
+  const ROLE_STYLE = {
+    owner: 'background:var(--cream);color:var(--on-bloom);border-color:var(--cream)',
+    admin: 'background:var(--mint);color:var(--on-bloom);border-color:var(--mint)',
+    member: 'background:var(--sky);color:var(--on-bloom);border-color:var(--sky)',
+  };
+  const roleStyle = (role) => ROLE_STYLE[role] || '';
+
   const PAIRS = [['--mint', '--sky'], ['--peach', '--blue'], ['--sage', '--mint'], ['--cream', '--peach'], ['--blue', '--sage']];
   function initials(name) { return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase(); }
   function pair(name) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PAIRS[h % PAIRS.length]; }
@@ -61,7 +70,7 @@
                 <div><div style="font-weight:600">{m.name}</div><div class="faint mono" style="font-size:11px">{m.email}</div></div>
               </div>
             </td>
-            <td><span class="tag" style={m.role === 'admin' ? 'background:var(--mint);color:var(--on-bloom)' : ''}>{m.role}</span></td>
+            <td><span class="tag" style={roleStyle(m.role)}>{m.role}</span></td>
             <td class="dim">{ago(m.lastActive)}</td>
             <td class="num">
               <form method="POST" action="?/remove" use:enhance={() => async ({ result }) => {
@@ -83,7 +92,7 @@
                 <div><div style="font-weight:600">{p.email}</div><div class="faint mono" style="font-size:11px">invited</div></div>
               </div>
             </td>
-            <td><span class="tag">member</span></td>
+            <td><span class="tag" style={roleStyle('member')}>member</span></td>
             <td><span class="mono" style="color:var(--amber);font-size:12px">● pending</span></td>
             <td class="num">
               <form method="POST" action="?/revoke" use:enhance={() => async ({ result }) => {
@@ -115,8 +124,8 @@
         <div class="lab">Role</div>
         <input type="hidden" name="role" value={inviteRole} />
         <div class="regions">
-          <div class="reg" class:sel={inviteRole === 'member'} onclick={() => (inviteRole = 'member')}>Member</div>
-          <div class="reg" class:sel={inviteRole === 'admin'} onclick={() => (inviteRole = 'admin')}>Admin</div>
+          <div class="reg" class:sel={inviteRole === 'member'} style={inviteRole === 'member' ? roleStyle('member') : ''} onclick={() => (inviteRole = 'member')}>Member</div>
+          <div class="reg" class:sel={inviteRole === 'admin'} style={inviteRole === 'admin' ? roleStyle('admin') : ''} onclick={() => (inviteRole = 'admin')}>Admin</div>
         </div>
         <div class="sheet-foot">
           <button class="btn" type="button" onclick={() => (inviteOpen = false)}>Cancel</button>
