@@ -25,7 +25,15 @@ discovery file).
 ### 1. Per-surface inner loop (seconds)
 - **Runtime** — `WB_WEB=1 iex -S mix` (control plane on `:4000`; add `WB_DESKTOP=1`
   to also write the desktop discovery file). Unit/contract suite: `wb dev test`
-  (= `mix test`, ~58 files). `mix compile` is the first gate for any runtime edit.
+  (= `mix test`). `mix compile` is the first gate for any runtime edit.
+  - `mix test` is the **fast, deterministic** gate (~60s, ~590 tests): it
+    excludes the heavy/external tags by default (`:build :netdeps :pallet :node
+    :threads :serde :simd :rayon`, see `test/test_helper.exs`) which need a wasm
+    toolchain or live network and otherwise stall.
+  - Run those explicitly in a provisioned env: `mix test --include build`
+    (add more `--include` flags as needed). Toolkit LLM evals are separate —
+    `wb toolkit eval <id> [<case>]` (pass a case substring to run just one cheaply;
+    the full suite makes ~2N sequential model calls and is slow).
 - **Desktop frontend** — `cd desktop && bun run dev` → `:5178`. Runs the *real*
   44k-LOC frontend with `$lib/platform/webHost` mocking the providers (no runtime
   needed). A Vite plugin forces a full reload on every `src/` edit, so changes
