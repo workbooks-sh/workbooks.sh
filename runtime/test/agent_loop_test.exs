@@ -121,6 +121,45 @@ defmodule Workbooks.AgentLoopTest do
     assert r.result == "handled the broken command"
   end
 
+  test "multiple parallel tool calls in one response all execute, then the loop continues" do
+    # The model can request several tools at once (parallel function calling);
+    # exec_tools must run them all (not just the first) and continue.
+    r =
+      run(
+        scripted([
+          {:ok,
+           %{
+             tool_calls: [
+               %{name: "wb", args: %{"args" => "model get"}, id: "p1"},
+               %{name: "wb", args: %{"args" => "model get"}, id: "p2"}
+             ],
+             raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+           }},
+          {:ok, %{tool_calls: [], content: "ran both tools"}}
+        ])
+      )
+
+    assert r.result == "ran both tools"
+  end
+
+  test "a `done` among multiple parallel calls finishes the run with its result" do
+    r =
+      run(
+        scripted([
+          {:ok,
+           %{
+             tool_calls: [
+               %{name: "wb", args: %{"args" => "model get"}, id: "q1"},
+               %{name: "done", args: %{"result" => "finished via done"}, id: "q2"}
+             ],
+             raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
+           }}
+        ])
+      )
+
+    assert r.result == "finished via done"
+  end
+
   test "a hard dead-stop (empty even after the nudge) degrades to '(no result)', no infinite loop" do
     responses = [
       {:ok,
