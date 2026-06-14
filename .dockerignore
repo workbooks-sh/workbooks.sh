@@ -21,6 +21,17 @@ runtime/.publish_out
 runtime/commands/*/target
 runtime/kernel/target
 
+# --- runtime-generated WASM scratch (content-addressed; the engine regenerates
+# both on demand — same contract as build/cache). Was leaking ~766 MB into the
+# CI/ghcr image (ci/Dockerfile.runtime) because the root .dockerignore — which
+# governs the repo-root build context — never excluded them; only
+# runtime/.dockerignore (the deploy-kit variant's context) did. Keep ONLY the
+# named prebuilt externals (jq/grep) the engine does NOT synthesize. ---
+runtime/build/cache
+runtime/build/commands/*
+!runtime/build/commands/jq.wasm
+!runtime/build/commands/grep.wasm
+
 # --- the ~6.6G provisioned compile-tool SCRATCH (rustc src, mrustc C++ build, wasi-sdk, .bak) ---
 # Never run, only used to PRODUCE the wasm tools. The lean compilers-dist/ ships instead.
 runtime/compilers
