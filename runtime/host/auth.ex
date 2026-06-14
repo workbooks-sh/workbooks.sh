@@ -68,9 +68,20 @@ defmodule Workbooks.Auth do
       locked?() ->
         verify_public_bearer(conn, token)
 
+      # OIDC IdP (WorkOS/Clerk/Auth0/…) when the deployment configured one.
+      Workbooks.OIDC.configured?() ->
+        verify_oidc(conn, token)
+
       # BetterAuth JWT.
       true ->
         verify_jwt(conn, token)
+    end
+  end
+
+  defp verify_oidc(conn, token) do
+    case Workbooks.OIDC.verify_token(token) do
+      {:ok, tenant} -> assign_tenant(conn, tenant)
+      :error -> Workbooks.Web.Error.render(conn, :unauthorized, "unauthorized")
     end
   end
 

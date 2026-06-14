@@ -65,12 +65,12 @@
         },
         {
           "name": "Generic OIDC/JWKS verifier (pluggable IdP: WorkOS/Clerk/Auth0)",
-          "status": "wip",
+          "status": "done",
           "tests": "oidc_test",
           "units": 6,
-          "proof": "fixture-proven RS256+JWKS-by-kid+expiry+issuer+tenant-claim; provider-agnostic; INERT until WB_OIDC_JWKS_URL set; NOT yet wired into the auth ladder",
+          "proof": "fixture-proven verifier (RS256/JWKS/expiry/issuer/tenant-claim) + WIRED into the auth ladder (gated by configured?, fail-closed); 2 wiring tests in auth_plug_test",
           "failure_modes": [
-            "auth-ladder integration pending (careful step); platform-admin access path is separate + needs deliberate design"
+            "login/onboarding UI is frontend; real-IdP end-to-end needs a configured provider"
           ]
         }
       ]

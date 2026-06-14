@@ -123,4 +123,25 @@ defmodule AuthPlugTest do
 
     refute conn.halted
   end
+
+  # OIDC seam wired into the ladder (wb-wejt): when configured, a token is verified
+  # by Workbooks.OIDC; an unverifiable one is rejected (fail-closed). Loopback JWKS
+  # URL → NetGuard blocks it → verify fails → 401, deterministically.
+  test "OIDC configured: an unverifiable token is rejected (fail-closed, no fall-through to dev)" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.put_env("WB_OIDC_JWKS_URL", "http://127.0.0.1:1/jwks")
+    on_exit(fn -> System.delete_env("WB_OIDC_JWKS_URL") end)
+
+    conn = conn_for("/api/run", [{"authorization", "Bearer not.a.real.oidc.token"}]) |> call()
+    assert conn.status == 401
+    assert conn.halted
+  end
+
+  # And it stays inert when not configured (existing ladder unchanged).
+  test "OIDC unconfigured: the branch is skipped (dev x-tenant fallback still works)" do
+    System.delete_env("WB_PUBLIC_BEARER")
+    System.delete_env("WB_OIDC_JWKS_URL")
+    conn = conn_for("/api/run", [{"x-tenant", "t-x"}]) |> call()
+    assert conn.assigns[:tenant] == "t-x"
+  end
 end
