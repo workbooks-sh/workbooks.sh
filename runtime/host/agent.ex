@@ -54,7 +54,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "browse",
-      description: "Load a web page in a HEADLESS BROWSER (runs its JavaScript) and return the rendered text — host-brokered local Chrome, no remote service. Use for JS-heavy/dynamic pages where plain `fetch` returns little (single-page apps, content rendered client-side). Slower than fetch; prefer fetch for static pages + APIs. e.g. url=\"https://example.com/app\".",
+      description: "Load a web page in a HEADLESS BROWSER and return its rendered text — runs the page's on-load JavaScript via local Chrome (no remote service). Use when `fetch` returns too little because content renders with JS on load. Captures the DOM after load; content that streams in LATER via async requests (e.g. search-result SPAs) may not be captured — use web_search for results, browse to read a specific page. Slower than fetch; prefer fetch for static pages + APIs. e.g. url=\"https://example.com/app\".",
       parameters: %{type: "object", properties: %{url: %{type: "string"}}, required: ["url"]}
     }}
   ]

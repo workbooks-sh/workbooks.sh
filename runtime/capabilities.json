@@ -141,7 +141,8 @@
           "units": 4,
           "proof": "render proven (example.com -> rendered text); SSRF-floored before launch (NetGuard); exec-gated; no CDP/Node/remote service",
           "failure_modes": [
-            "spawns a host Chrome process - multi-tenant resource cap is a follow-up; cloud (exec-off) agents use fetch"
+            "spawns a host Chrome process - multi-tenant resource cap is a follow-up; cloud (exec-off) agents use fetch",
+            "async-XHR SPAs (e.g. search-result pages) not captured by --dump-dom; needs CDP wait-for-selector (wb-70mi)"
           ]
         }
       ]
