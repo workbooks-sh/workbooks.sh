@@ -406,9 +406,7 @@ defmodule Workbooks.PublicWeb do
     ::selection{background:var(--blue-faint);color:var(--ink)}
     /* ── liquid-metal accent ── */
     /* DNA-seam divider — flat brand color blocks (matches the landing page seam) */
-    .metal{height:7px;border-radius:2px;background:
-      linear-gradient(90deg,#13d943 0 11%,#9ba095 11% 19%,#149157 19% 34%,#8b9085 34% 41%,
-      #13d943 41% 47%,#6a7064 47% 60%,#9ba095 60% 66%,#149157 66% 80%,#8b9085 80% 87%,#13d943 87% 100%)}
+    .metal{height:1px;background:var(--line)}
     /* ── sidebar ── */
     .sidebar{width:var(--sidebar-w);flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px)}
     /* DNA strip — top of the left panel, full width, brand pastels; segments keep
@@ -439,7 +437,7 @@ defmodule Workbooks.PublicWeb do
     .page-header .metal{position:absolute;top:0;left:0;width:168px;margin:0}
     /* DNA-seam section dividers (replaces the plain h2 top border) */
     .page-body h2{border-top:0!important;position:relative}
-    .page-body h2::before{content:"";position:absolute;top:calc(-1*clamp(.9rem,2vh,1.2rem));left:0;width:120px;height:6px;border-radius:2px;background:linear-gradient(90deg,#13d943 0 14%,#9ba095 14% 24%,#149157 24% 42%,#8b9085 42% 52%,#13d943 52% 60%,#6a7064 60% 78%,#149157 78% 100%)}
+    .page-body h2::before{content:"";position:absolute;top:calc(-1*clamp(.9rem,2vh,1.2rem));left:0;width:100%;height:1px;background:var(--line)}
     .page-body h2:first-child::before{display:none}
     .page-eyebrow{font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.7rem}
     .page-title{font-family:var(--display);font-size:clamp(2rem,4.4vw,2.9rem);font-weight:400;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
