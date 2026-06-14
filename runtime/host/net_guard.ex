@@ -27,6 +27,11 @@ defmodule Workbooks.NetGuard do
     allow = Keyword.get(opts, :allow, nil)
     principal = Keyword.get(opts, :principal)
     rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+    # wb-j3n8: cap the body we HOLD/return (parity with request/3, which already
+    # caps). Without this a large/hostile upstream balloons host memory even when
+    # the caller (e.g. host_http_get) only wants out_cap bytes. Peak RECEIVE RAM
+    # (the transient :httpc buffer) is the separate streaming cap, wb-4had.
+    max_bytes = Keyword.get(opts, :max_bytes, 32 * 1024 * 1024)
 
     cond do
       principal && Workbooks.Revocation.revoked?(principal) ->
@@ -41,15 +46,32 @@ defmodule Workbooks.NetGuard do
 
       true ->
         case do_get(url, timeout, allow, 5) do
-          {:ok, _} = ok ->
+          {:ok, body} ->
             Workbooks.BrokerAudit.record(:net, :allow)
-            ok
+            {:ok, cap_body(url, body, max_bytes)}
 
           other ->
             other
         end
     end
   end
+
+  # Truncate an over-cap body and AUDIT it (observability: a truncation means an
+  # upstream exceeded the host memory budget — worth seeing, not silent).
+  defp cap_body(url, body, max_bytes) when is_binary(body) do
+    if byte_size(body) > max_bytes do
+      Logger.warning("wb-broker: TRUNCATED egress body #{inspect(url)} #{byte_size(body)}B → #{max_bytes}B (wb-j3n8 cap)")
+      binary_part(body, 0, max_bytes)
+    else
+      body
+    end
+  end
+
+  defp cap_body(_url, body, _max_bytes), do: body
+
+  @doc false
+  # test seam for the wb-j3n8 body cap
+  def cap_body_for_test(body, max_bytes), do: cap_body("test://x", body, max_bytes)
 
   @doc """
   Brokered HTTP request with an arbitrary METHOD + headers + body — the full-client generalization of `get/2`,
