@@ -25,7 +25,7 @@ defmodule Workbooks.Private do
   @private_globs ~w(
     _steps.jsonl _status.json _trace.jsonl _telemetry.db _ledger.json
   )
-  @private_dirs ~w(scratch/ .workbooks/ .beads/ .claude/)
+  @private_dirs ~w(scratch/ .workbooks/ .beads/ .claude/ .drafts/)
   # `_*.jsonl|json|db` catches future session sidecars without editing this list.
   @private_prefixes ~w(_)
 
