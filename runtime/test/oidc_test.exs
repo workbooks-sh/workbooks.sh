@@ -50,4 +50,17 @@ defmodule Workbooks.OIDCTest do
     assert OIDC.verify_token("not.a.jwt", jwks) == :error
     assert OIDC.verify_token("", jwks) == :error
   end
+
+  # JWT alg-confusion attacks — the verifier pins RS256, so neither lands.
+  test "rejects an alg:none (unsigned) token", %{jwks: jwks} do
+    hdr = Base.url_encode64(Jason.encode!(%{"alg" => "none", "kid" => "k1"}), padding: false)
+    pl = Base.url_encode64(Jason.encode!(%{"org_id" => "x", "exp" => future()}), padding: false)
+    assert OIDC.verify_token("#{hdr}.#{pl}.", jwks) == :error
+  end
+
+  test "rejects an HS256 token (alg outside the RS256 whitelist — key-confusion)", %{jwks: jwks} do
+    oct = JOSE.JWK.from_oct("attacker-secret")
+    {_, tok} = JOSE.JWT.sign(oct, %{"alg" => "HS256", "kid" => "k1"}, %{"org_id" => "x", "exp" => future()}) |> JOSE.JWS.compact()
+    assert OIDC.verify_token(tok, jwks) == :error
+  end
 end

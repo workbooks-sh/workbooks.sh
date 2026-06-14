@@ -67,8 +67,8 @@
           "name": "Generic OIDC/JWKS verifier (pluggable IdP: WorkOS/Clerk/Auth0)",
           "status": "done",
           "tests": "oidc_test",
-          "units": 6,
-          "proof": "fixture-proven verifier (RS256/JWKS/expiry/issuer/tenant-claim) + WIRED into the auth ladder (gated by configured?, fail-closed); 2 wiring tests in auth_plug_test",
+          "units": 8,
+          "proof": "fixture-proven verifier (RS256/JWKS/expiry/issuer/tenant-claim) + WIRED into the auth ladder (gated by configured?, fail-closed); 2 wiring tests in auth_plug_test; rejects alg:none + HS256 key-confusion",
           "failure_modes": [
             "login/onboarding UI is frontend; real-IdP end-to-end needs a configured provider"
           ]
