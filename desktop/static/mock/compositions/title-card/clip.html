@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="resolution" content="1280x720" />
+    <meta name="fps" content="30" />
+    <meta name="duration" content="6" />
+    <style>
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden;
+        font-family: "Geist", system-ui, sans-serif;
+        /* green gradient field — brand canon: live green over deep forest */
+        background: radial-gradient(120% 120% at 30% 20%, #0f3d2a 0%, #072018 55%, #03100c 100%);
+      }
+      /* the green gradient wash itself fades up under everything */
+      #wash {
+        position: absolute; inset: 0;
+        background: linear-gradient(135deg, rgba(63,224,129,0.22), rgba(20,145,87,0.06) 60%, transparent);
+        opacity: 0;
+        animation: washIn 1.4s ease-out forwards;
+      }
+      @keyframes washIn { from { opacity: 0; } to { opacity: 1; } }
+
+      h1 {
+        position: absolute; left: 0; right: 0; top: 250px; margin: 0;
+        text-align: center;
+        font-size: 132px; font-weight: 800; letter-spacing: -0.04em;
+        color: #ffffff;
+        text-shadow: 0 0 60px rgba(63,224,129,0.35);
+        opacity: 0;
+        animation: titleFade 1.6s 0.3s ease-out forwards;
+      }
+      @keyframes titleFade {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      p {
+        position: absolute; left: 0; right: 0; top: 410px; margin: 0;
+        text-align: center;
+        font-size: 38px; font-weight: 500; letter-spacing: 0.02em;
+        color: #3fe081;
+        opacity: 0;
+        animation: subUp 1.2s 1.4s ease-out forwards;
+      }
+      @keyframes subUp {
+        from { opacity: 0; transform: translateY(46px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* accent bar grows from center outward */
+      #bar {
+        position: absolute; left: 50%; bottom: 150px;
+        height: 6px; width: 0;
+        transform: translateX(-50%);
+        border-radius: 3px;
+        background: linear-gradient(90deg, #149157, #3fe081, #149157);
+        box-shadow: 0 0 24px rgba(63,224,129,0.6);
+        animation: barGrow 2.6s 2.4s cubic-bezier(0.22,1,0.36,1) forwards;
+      }
+      @keyframes barGrow {
+        from { width: 0; }
+        to   { width: 520px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wash"></div>
+    <h1>Workbooks</h1>
+    <p>frames assembled in the nexus</p>
+    <div id="bar"></div>
+  </body>
+</html>
