@@ -16,3 +16,7 @@ vendor/**/target
 
 # stale prebuilt rustler NIF (host-arch) — build fresh in-image
 **/priv/native/*.so
+
+# Runtime-generated WASM compile cache (content-addressed; the engine regenerates
+# it on demand). Never ship it — it bloated local deploy builds by ~290MB.
+build/cache
