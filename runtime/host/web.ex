@@ -13,6 +13,29 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, "ok")
   end
 
+  # Secret injection (wb-2s09). The desktop holds the user's API keys in the OS
+  # keychain; the runtime — especially containerized — can't read that, yet the
+  # host-side loaders pull creds from the process ENV (e.g. llm.ex reads
+  # OPENROUTER_API_KEY). So the desktop FORWARDS the keys here and we put them on
+  # this runtime's env. Token-auth'd (Workbooks.Auth ran above; not @public), so
+  # only the local shell holding the per-boot token can set them. An empty body
+  # is a harmless no-op nudge. Body: {"env": {"OPENROUTER_API_KEY": "…", …}}.
+  post "/internal/secrets/refresh" do
+    {:ok, body, conn} = read_body(conn)
+
+    env =
+      case String.trim(body) do
+        "" -> %{}
+        b -> Jason.decode!(b)["env"] || %{}
+      end
+
+    for {k, v} <- env, is_binary(k), is_binary(v), v != "" do
+      System.put_env(k, v)
+    end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, count: map_size(env)}))
+  end
+
   # Web search for the desktop browser's composable-search "Web" provider
   # (wb-aakl.19). The browser has no SERP keys; the nexus does the search via
   # Browse.Search (keyless ddg/brave/bing, or DataForSEO when credentialed)

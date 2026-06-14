@@ -131,7 +131,14 @@ pub async fn daemon_up(app: AppHandle) -> Result<DaemonStatus, String> {
         }
         let _ = machine::boot(&app);
         wait_for_discovery(40);
-        status()
+        let s = status();
+        // A freshly-booted runtime starts with no secrets in its env — forward
+        // the user's keys (OpenRouter/Gemini/…) so Waldo chat + voice work
+        // without waiting for the next key-save (wb-2s09).
+        if s.state == "running" {
+            crate::keychain::refresh_runtime_secrets();
+        }
+        s
     })
     .await
     .map_err(|e| e.to_string())

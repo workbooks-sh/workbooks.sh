@@ -49,16 +49,49 @@ fn mask() -> String {
     "•".repeat(8)
 }
 
-/// Best-effort nudge to a live daemon to re-read secrets. Never fails the
-/// calling command — offline this is a no-op.
+/// Forward the user's secrets into the live runtime's process ENV. The runtime
+/// — especially containerized — can't read the host keychain, but its host-side
+/// loaders pull creds from ENV (e.g. llm.ex reads OPENROUTER_API_KEY). So we
+/// gather every model key, connection, and env-var, resolve its env-var name,
+/// and POST the values to /internal/secrets/refresh (token-auth'd). Best-effort:
+/// offline / no daemon → silent no-op; never fails the calling command.
 pub fn refresh_runtime_secrets() {
-    if let Some(d) = crate::daemon::Discovery::read() {
-        let url = format!("http://127.0.0.1:{}/internal/secrets/refresh", d.port);
-        let _ = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_millis(400))
-            .build()
-            .and_then(|c| c.post(url).bearer_auth(&d.token).send());
+    let Some(d) = crate::daemon::Discovery::read() else {
+        return;
+    };
+
+    let mut env = serde_json::Map::new();
+
+    // Model keys (OpenRouter, …) — keyed by provider's env-var name.
+    let keys: KeyIndex = paths::read_json(&keys_path());
+    for k in &keys.keys {
+        if let Some(name) = provider_env_var(&k.provider, k.custom_provider.as_deref()) {
+            if let Ok(v) = kc_get(SVC_KEYS, &k.id) {
+                env.insert(name, serde_json::Value::String(v));
+            }
+        }
     }
+    // Third-party connections (Gemini, …) — keyed by service's env-var name.
+    let conns: ConnIndex = paths::read_json(&conn_path());
+    for c in &conns.connections {
+        if let Ok(v) = kc_get(SVC_CONN, &c.service) {
+            env.insert(conn_env_var(&c.service), serde_json::Value::String(v));
+        }
+    }
+    // User-scoped env vars — forwarded verbatim by name.
+    let envs: EnvIndex = paths::read_json(&env_path());
+    for e in &envs.vars {
+        if let Ok(v) = kc_get(SVC_ENV, &e.id) {
+            env.insert(e.name.clone(), serde_json::Value::String(v));
+        }
+    }
+
+    let body = serde_json::json!({ "env": env });
+    let url = format!("http://127.0.0.1:{}/internal/secrets/refresh", d.port);
+    let _ = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .and_then(|c| c.post(url).bearer_auth(&d.token).json(&body).send());
 }
 
 // ── API keys ──────────────────────────────────────────────────────
