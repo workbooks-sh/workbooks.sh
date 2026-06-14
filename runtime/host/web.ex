@@ -1017,8 +1017,22 @@ defmodule Workbooks.Web do
   # Ledger verify (Phase 2g) — recompute the hash-chain over the run's current
   # _steps.jsonl and check the did:key signature: tamper-evident + attributable.
   get "/api/ledger/:slug" do
-    result = Workbooks.Ledger.verify("/tmp/bb/#{conn.params["slug"]}")
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    slug = conn.params["slug"]
+    wd = "/tmp/bb/#{slug}"
+
+    # Tenant-gate + path-safe (wb-g1yo.9): a run ledger (tamper/attribution status)
+    # is another tenant's; the slug also can't escape /tmp/bb.
+    cond do
+      String.contains?(slug, "/") or String.contains?(slug, "..") ->
+        conn |> put_resp_content_type("application/json") |> send_resp(400, Jason.encode!(%{error: "bad slug"}))
+
+      not Workbooks.Workflow.Telemetry.run_visible?(wd, conn.assigns[:tenant]) ->
+        conn |> put_resp_content_type("application/json") |> send_resp(404, Jason.encode!(%{error: "no such run"}))
+
+      true ->
+        result = Workbooks.Ledger.verify(wd)
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+    end
   end
 
   # Query surface (semantic ∪ literal) — consumer-agnostic; any script/service
