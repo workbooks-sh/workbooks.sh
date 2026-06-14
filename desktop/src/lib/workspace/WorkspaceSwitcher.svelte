@@ -92,13 +92,19 @@
     }
   }
 
-  // Position relative to the anchor (left rail = right edge of anchor).
+  // Position relative to the anchor. Two placements:
+  //  • rail (Sidebar): fly out to the RIGHT of the anchor.
+  //  • titlebar (Shelf): the anchor sits in the title bar, so dropping the menu
+  //    at the anchor's TOP tucks it behind the bar. Detect a near-top anchor and
+  //    drop BELOW it instead, left-aligned — so it's never occluded.
   let style = $derived.by(() => {
     if (!anchor) return "";
     const r = anchor.getBoundingClientRect();
-    const top = Math.round(r.top);
-    const left = Math.round(r.right + 8);
-    return `top: ${top}px; left: ${left}px;`;
+    const inTitlebar = r.top < 48;
+    if (inTitlebar) {
+      return `top: ${Math.round(r.bottom + 6)}px; left: ${Math.round(r.left)}px;`;
+    }
+    return `top: ${Math.round(r.top)}px; left: ${Math.round(r.right + 8)}px;`;
   });
 </script>
 

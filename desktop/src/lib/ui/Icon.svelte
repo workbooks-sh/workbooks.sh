@@ -77,6 +77,12 @@
       ? `${LOBE_BASE}/${value.slice("lobe:".length)}.svg`
       : null,
   );
+  // LobeHub mono brand marks (slug WITHOUT the `-color` suffix, e.g.
+  // `openrouter`) ship as a single-color shape — usually black, so they vanish
+  // in dark mode when drawn as an <img>. Render them as a CSS mask filled with
+  // currentColor so they follow the text color (white on dark, dark on light).
+  // Multi-color marks (`*-color`, e.g. `gemini-color`) stay as <img>.
+  const lobeMono = $derived(!!lobeUrl && !value.endsWith("-color"));
   const isImage = $derived(value.startsWith("data:image/"));
   /** Unresolvable prefixed values fall through to initials, never to
    *  raw text like "lucide:Foo". */
@@ -85,6 +91,12 @@
 
 {#if miUrl}
   <img src={miUrl} alt="" style="width: {size}px; height: {size}px;" />
+{:else if lobeMono}
+  <span
+    class="lobe-mono"
+    aria-hidden="true"
+    style="width: {size}px; height: {size}px; --lobe-mask: url('{lobeUrl}');"
+  ></span>
 {:else if lobeUrl}
   <img src={lobeUrl} alt="" style="width: {size}px; height: {size}px;" loading="lazy" />
 {:else if isImage}
@@ -100,6 +112,13 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  .lobe-mono {
+    display: inline-block;
+    flex: none;
+    background-color: currentColor;
+    -webkit-mask: var(--lobe-mask) center / contain no-repeat;
+    mask: var(--lobe-mask) center / contain no-repeat;
   }
   .emoji {
     line-height: 1;
