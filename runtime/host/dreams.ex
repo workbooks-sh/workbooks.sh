@@ -264,7 +264,7 @@ defmodule Workbooks.Dreams do
     """
 
     File.write!(Path.join(repo, file), entry)
-    write_manifest(repo, dir)
+    write_manifest(dir)
     publish(tenant, repo)
 
     first_line =
@@ -282,7 +282,7 @@ defmodule Workbooks.Dreams do
     Logger.info("Dreams: dreamed #{file}")
   end
 
-  defp write_manifest(repo, dir) do
+  defp write_manifest(dir) do
     entries =
       dir
       |> File.ls!()

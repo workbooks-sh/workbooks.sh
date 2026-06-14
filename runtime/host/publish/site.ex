@@ -155,8 +155,7 @@ defmodule Workbooks.Publish.Site do
   end
 
   # Build sidebar nav HTML. Current page gets `aria-current="page"`.
-  defp build_nav_html(sections, config, base \\ "") do
-    site_title = config["PUBLISH_TITLE"] || "Workbooks"
+  defp build_nav_html(sections, _config, base \\ "") do
     home = if base == "", do: "/index.html", else: "#{base}/index.html"
 
     # cycle the 7 brand pastels as a per-section marker colour so the docs

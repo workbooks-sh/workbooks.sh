@@ -268,8 +268,6 @@ defmodule Workbooks.PublicWeb do
   # so they survive machine restarts / scale-to-zero; fall back to cwd in dev.
   defp site_dir(app), do: Path.join([System.get_env("WB_DATA") || File.cwd!(), "build", "public", app])
 
-  defp index_default(path), do: if(File.dir?(path), do: Path.join(path, "index.html"), else: path)
-
   # Reject any ".." segment; return the cleaned relative path.
   defp safe_rel(request_path) do
     segs = request_path |> String.split("/", trim: true)
