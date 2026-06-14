@@ -11,6 +11,12 @@ import type { SearchProvider, SearchResult } from "./types";
 
 const WORKBOOK_EXT = /\.(html?|org)$/i;
 
+// Default web-search provider for the opt-in "web" lane (wb-e4jl). OpenRouter's
+// web plugin is the reliable path (keyless scraping is best-effort, often empty);
+// it reuses the model key and the runtime falls back to keyless if none is set.
+// A future Settings picker (wb-ndlz) can let the user choose exa/brave/perplexity.
+const WEB_SEARCH_PROVIDER = "openrouter";
+
 // Preview content (wb-aakl.19) — shown so the "everything search" UI is
 // demonstrable before a nexus/file index exists. Files: a small stand-in set
 // used only when the real index is empty. Web: plausible mock results when no
@@ -170,10 +176,18 @@ export const nexusWebProvider: SearchProvider = {
     if (!base) return mockWeb(q); // preview until a nexus is connected
     const token = nexus.activeToken;
     try {
-      const res = await fetch(`${base}/api/browse/search?q=${encodeURIComponent(q)}`, {
-        headers: token ? { authorization: `Bearer ${token}` } : {},
-        signal: AbortSignal.timeout(8000),
-      });
+      // Web search is opt-in (this provider is disabled by default). When the
+      // user turns it on, default to OpenRouter's web plugin (wb-e4jl): reliable,
+      // reuses the existing model key, and the runtime falls back to keyless if
+      // no key is present. The LLM+web call legitimately takes up to the runtime's
+      // 45s cap, so the client must allow at least that (the old 8s aborted it).
+      const res = await fetch(
+        `${base}/api/browse/search?q=${encodeURIComponent(q)}&provider=${WEB_SEARCH_PROVIDER}`,
+        {
+          headers: token ? { authorization: `Bearer ${token}` } : {},
+          signal: AbortSignal.timeout(46000),
+        },
+      );
       if (!res.ok) return mockWeb(q); // nexus reachable but no route → preview
       const data = (await res.json()) as { results?: { title: string; url: string; snippet?: string }[] };
       const results = (data.results ?? []).map((r, i) => {
