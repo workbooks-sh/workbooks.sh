@@ -21,6 +21,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **Go → wasi** | native `GOOS=wasip1` (provision-time) | go_wasip1 |
 | **esbuild** (JS/TS bundler) | Go-wasip1 artifact | wired in JS/TS/Svelte lanes (~23min QuickJS → ~0.4s) |
 | **JS/TS npm libraries** (run any library) | `JsEngine.run_program` — StarlingMonkey default + QuickJS fallback | js_engine_fallback_test; install→bundle→run proven for lodash/zod/date-fns/marked/js-yaml/uuid/nanoid |
+| **Node built-in modules** (path/events/util/querystring/process…) | `esbuild_bundle_dir(node_polyfills: true)` — alias→pure-JS polyfill + process banner | node_polyfills_test; StarlingMonkey has no Node builtins, the preset supplies them (stream/Buffer-global in progress) |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |

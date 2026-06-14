@@ -1,0 +1,636 @@
+{
+  "meta": {
+    "goal": "Drive the ENTIRE JS/TS npm ecosystem surface to a terminal verdict in-sandbox. Deep + thorough: each item's EVERY surface, never surface-level. Do not stop until every surface is live or deferred and we are ~90% confident the whole ecosystem is usable in the sandbox.",
+    "verdict_ladder": "pending < probing < live | deferred",
+    "live_means": "proven in-sandbox through the REAL pipeline (Npm.install_tree -> Compilers.esbuild_bundle_dir -> JsEngine.run_program, or the relevant lane) + a skip-guarded test + recorded here and in FORGE-CAPABILITIES.md",
+    "deferred_means": "empirically blocked in-guest; record the WALL (bedrock|bridge|forge) + the concrete reason + any host-broker escape. Deferred is a terminal verdict too \u2014 it counts as 'covered'.",
+    "engine": "JsEngine.run_program/2 = StarlingMonkey default + QuickJS thin fallback (SM lacks regex \\p{}; QJS lacks WebCrypto).",
+    "walls": "bedrock = no native exec in guest (V8 JIT, .node addons, child_process spawn) -> only via trusted host-service broker. bridge = browser/DOM-bound. forge = toolchain gap we can build from source.",
+    "git": "PATH-SPECIFIC commits only (concurrent worker shares repo). Never git stash / git add -A.",
+    "loop": "2-min cron; each tick drives ONE next pending surface to a terminal verdict, deeply, then commits. Multitask within a tick when cheap."
+  },
+  "categories": [
+    {
+      "id": "pkgmgr",
+      "name": "Package managers & resolution",
+      "items": [
+        {
+          "id": "npm-registry",
+          "item": "npm registry resolve+fetch+tree",
+          "surfaces": [
+            "semver ranges (^ ~ x || ranges)",
+            "scoped @pkg",
+            "dist-tags",
+            "transitive dedup",
+            "integrity/tarball extract"
+          ],
+          "verdict": "live",
+          "note": "npm.ex install_tree; proven lodash/zod/uuid/etc"
+        },
+        {
+          "id": "npm-lock",
+          "item": "package-lock.json",
+          "surfaces": [
+            "parse lockfileVersion 2/3",
+            "install exact pinned tree",
+            "honor integrity"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "pnpm",
+          "item": "pnpm",
+          "surfaces": [
+            "pnpm-lock.yaml parse",
+            "workspace: protocol",
+            "content-addressed store layout (.pnpm)",
+            "peer/hoist resolution",
+            "catalog:"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "yarn",
+          "item": "yarn",
+          "surfaces": [
+            "yarn.lock classic parse",
+            "berry (v2+) yarn.lock",
+            "resolutions field",
+            "workspace protocol",
+            "PnP (.pnp.cjs) note"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "dep-types",
+          "item": "dependency kinds",
+          "surfaces": [
+            "peerDependencies",
+            "optionalDependencies",
+            "devDependencies skip in prod tree",
+            "overrides",
+            "git/url/file/tarball deps"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "monorepo",
+          "item": "workspaces",
+          "surfaces": [
+            "npm/yarn workspaces globs",
+            "internal cross-links",
+            "hoisting"
+          ],
+          "verdict": "pending"
+        }
+      ]
+    },
+    {
+      "id": "modules",
+      "name": "Module systems & bundling",
+      "items": [
+        {
+          "id": "cjs",
+          "item": "CommonJS require",
+          "surfaces": [
+            "require()",
+            "module.exports",
+            "__dirname/__filename shims"
+          ],
+          "verdict": "live",
+          "note": "lodash"
+        },
+        {
+          "id": "esm",
+          "item": "ESM import",
+          "surfaces": [
+            "import/export",
+            "default+named",
+            "namespace import"
+          ],
+          "verdict": "live",
+          "note": "zod/uuid"
+        },
+        {
+          "id": "exports-map",
+          "item": "package.json exports/imports map",
+          "surfaces": [
+            "conditional exports (import/require/node/default)",
+            "subpath exports",
+            "subpath patterns",
+            "#imports internal"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "dynamic-import",
+          "item": "dynamic import()",
+          "surfaces": [
+            "await import()",
+            "code-split chunks under one bundle"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "interop",
+          "item": "CJS<->ESM interop",
+          "surfaces": [
+            "import a cjs pkg from esm",
+            "require an esm pkg",
+            "default interop (esModuleInterop)"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "json-asset",
+          "item": "JSON & asset imports",
+          "surfaces": [
+            "import x from './x.json'",
+            "import assertions with {type:'json'}",
+            "text/binary asset import via esbuild loader"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "browser-field",
+          "item": "package.json browser field",
+          "surfaces": [
+            "browser field remap",
+            "esbuild platform=browser vs node"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "circular-tla",
+          "item": "circular deps & top-level await",
+          "surfaces": [
+            "circular require/import",
+            "top-level await in a module"
+          ],
+          "verdict": "pending"
+        }
+      ]
+    },
+    {
+      "id": "lang",
+      "name": "Language & transpile",
+      "items": [
+        {
+          "id": "modern-es",
+          "item": "modern ECMAScript",
+          "surfaces": [
+            "arrow/Map/Set/Promise/async/spread",
+            "BigInt",
+            "private #fields",
+            "optional chaining/nullish",
+            "WeakRef/FinalizationRegistry"
+          ],
+          "verdict": "live",
+          "note": "SM spec-complete"
+        },
+        {
+          "id": "ts-strip",
+          "item": "TypeScript type-strip",
+          "surfaces": [
+            "esbuild ts->js",
+            "tsc transpileModule (QJS)",
+            "enums/namespaces",
+            "tsconfig paths"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "jsx",
+          "item": "JSX/TSX",
+          "surfaces": [
+            "esbuild jsx transform",
+            "automatic runtime",
+            "preserve"
+          ],
+          "verdict": "live",
+          "note": "esbuild_lane_test jsx"
+        },
+        {
+          "id": "decorators",
+          "item": "decorators",
+          "surfaces": [
+            "TS experimentalDecorators",
+            "TC39 stage-3 decorators",
+            "metadata reflect"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "regex-unicode",
+          "item": "regex \\p{} unicode-property",
+          "surfaces": [
+            "/[\\p{L}]/u",
+            "named groups",
+            "lookbehind",
+            "v-flag class subtraction"
+          ],
+          "verdict": "live",
+          "note": "\\p{} via QJS fallback; rest on SM"
+        }
+      ]
+    },
+    {
+      "id": "node-builtins",
+      "name": "Node.js built-in modules",
+      "items": [
+        {
+          "id": "node-pure",
+          "item": "pure builtins",
+          "surfaces": [
+            "path",
+            "url",
+            "querystring",
+            "string_decoder",
+            "punycode",
+            "assert"
+          ],
+          "verdict": "live",
+          "note": "path/url/querystring/string_decoder/assert via node_polyfills preset (alias->pure-JS polyfill)"
+        },
+        {
+          "id": "node-core",
+          "item": "core data builtins",
+          "surfaces": [
+            "buffer/Buffer",
+            "util",
+            "events/EventEmitter",
+            "stream (Readable/Writable/Transform)"
+          ],
+          "verdict": "probing",
+          "note": "events+util LIVE; stream partial (Readable.from needs event-loop); buffer-global pending"
+        },
+        {
+          "id": "node-crypto",
+          "item": "node:crypto",
+          "surfaces": [
+            "createHash",
+            "createHmac",
+            "randomBytes",
+            "createCipheriv",
+            "scrypt/pbkdf2",
+            "subtle vs node API"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-fs",
+          "item": "node:fs",
+          "surfaces": [
+            "fs sync",
+            "fs/promises",
+            "readdir/stat",
+            "brokered via js_dock"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-net",
+          "item": "node net/http",
+          "surfaces": [
+            "http(s) client request",
+            "fetch broker route",
+            "net.Socket (raw TCP)",
+            "dns"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-process",
+          "item": "process/os",
+          "surfaces": [
+            "process.argv/env/cwd/platform",
+            "process.nextTick",
+            "os.platform/cpus/tmpdir"
+          ],
+          "verdict": "live",
+          "note": "process shim banner (platform/env/argv/cwd/nextTick); os via os-browserify"
+        },
+        {
+          "id": "node-zlib",
+          "item": "node:zlib",
+          "surfaces": [
+            "gzip/gunzip",
+            "deflate/inflate",
+            "brotli"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-async",
+          "item": "async/timers",
+          "surfaces": [
+            "setTimeout/setInterval/setImmediate",
+            "queueMicrotask",
+            "async_hooks (defer?)"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-worker",
+          "item": "worker_threads",
+          "surfaces": [
+            "Worker spawn",
+            "MessageChannel",
+            "SharedArrayBuffer"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "node-childproc",
+          "item": "child_process",
+          "surfaces": [
+            "spawn/exec native subprocess"
+          ],
+          "verdict": "pending"
+        }
+      ]
+    },
+    {
+      "id": "web-apis",
+      "name": "Web platform APIs",
+      "items": [
+        {
+          "id": "webcrypto",
+          "item": "WebCrypto",
+          "surfaces": [
+            "crypto.getRandomValues",
+            "crypto.randomUUID",
+            "subtle.digest/sign/encrypt"
+          ],
+          "verdict": "live",
+          "note": "SM"
+        },
+        {
+          "id": "encoding",
+          "item": "encoding",
+          "surfaces": [
+            "TextEncoder/Decoder",
+            "atob/btoa",
+            "structuredClone"
+          ],
+          "verdict": "live",
+          "note": "SM"
+        },
+        {
+          "id": "url-api",
+          "item": "URL/URLSearchParams",
+          "surfaces": [
+            "new URL()",
+            "searchParams",
+            "URLSearchParams"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "fetch",
+          "item": "fetch",
+          "surfaces": [
+            "fetch() brokered",
+            "Request/Response/Headers",
+            "SSRF guard"
+          ],
+          "verdict": "pending",
+          "note": "wasi:http route exists; needs e2e proof"
+        },
+        {
+          "id": "streams-web",
+          "item": "Web Streams",
+          "surfaces": [
+            "ReadableStream",
+            "WritableStream",
+            "TransformStream"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "blob-file",
+          "item": "Blob/File/FormData",
+          "surfaces": [
+            "Blob",
+            "File",
+            "FormData",
+            "AbortController/AbortSignal"
+          ],
+          "verdict": "pending"
+        }
+      ]
+    },
+    {
+      "id": "libs",
+      "name": "Real-library breadth (per category)",
+      "items": [
+        {
+          "id": "lib-util",
+          "item": "utilities",
+          "surfaces": [
+            "lodash",
+            "ramda",
+            "immer"
+          ],
+          "verdict": "live",
+          "note": "lodash proven"
+        },
+        {
+          "id": "lib-validate",
+          "item": "validation",
+          "surfaces": [
+            "zod",
+            "yup",
+            "joi",
+            "ajv (JSON-schema)"
+          ],
+          "verdict": "live",
+          "note": "zod proven"
+        },
+        {
+          "id": "lib-dates",
+          "item": "dates",
+          "surfaces": [
+            "date-fns",
+            "dayjs",
+            "luxon"
+          ],
+          "verdict": "live",
+          "note": "date-fns proven"
+        },
+        {
+          "id": "lib-parse",
+          "item": "parsers",
+          "surfaces": [
+            "marked",
+            "js-yaml",
+            "papaparse(csv)",
+            "fast-xml-parser",
+            "toml"
+          ],
+          "verdict": "live",
+          "note": "marked+js-yaml proven"
+        },
+        {
+          "id": "lib-id",
+          "item": "id/hash",
+          "surfaces": [
+            "uuid",
+            "nanoid"
+          ],
+          "verdict": "live",
+          "note": "uuid+nanoid proven (SM crypto)"
+        },
+        {
+          "id": "lib-http",
+          "item": "http clients",
+          "surfaces": [
+            "axios",
+            "got",
+            "ky",
+            "node-fetch"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-template",
+          "item": "templating",
+          "surfaces": [
+            "handlebars",
+            "mustache",
+            "ejs"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-ast",
+          "item": "AST/compilers",
+          "surfaces": [
+            "acorn",
+            "@babel/parser",
+            "postcss",
+            "typescript",
+            "prettier"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-crypto",
+          "item": "crypto libs",
+          "surfaces": [
+            "crypto-js",
+            "bcryptjs",
+            "jsonwebtoken",
+            "jose",
+            "tweetnacl"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-reactive",
+          "item": "reactive/state",
+          "surfaces": [
+            "rxjs",
+            "redux",
+            "zustand",
+            "xstate"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-data",
+          "item": "math/data",
+          "surfaces": [
+            "mathjs",
+            "decimal.js",
+            "big.js",
+            "immutable"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-text",
+          "item": "terminal/text",
+          "surfaces": [
+            "chalk",
+            "picocolors",
+            "kleur",
+            "slugify"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-schema",
+          "item": "schema/serialize",
+          "surfaces": [
+            "graphql",
+            "protobufjs",
+            "msgpackr",
+            "flatbuffers"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-dom",
+          "item": "DOM/HTML",
+          "surfaces": [
+            "cheerio",
+            "jsdom (heavy)",
+            "node-html-parser",
+            "linkedom"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "lib-ssr",
+          "item": "framework SSR",
+          "surfaces": [
+            "react+react-dom/server renderToString",
+            "vue server-renderer",
+            "svelte SSR",
+            "preact-render-to-string"
+          ],
+          "verdict": "pending"
+        }
+      ]
+    },
+    {
+      "id": "bedrock-tier",
+      "name": "Bedrock tier (last \u2014 native/JIT)",
+      "items": [
+        {
+          "id": "native-addons",
+          "item": "native .node addons",
+          "surfaces": [
+            "sharp",
+            "better-sqlite3",
+            "bcrypt(native)",
+            "node-gyp builds"
+          ],
+          "verdict": "pending",
+          "note": "expect deferred (bedrock); look for pure-JS/wasm alt or host broker"
+        },
+        {
+          "id": "wasm-npm",
+          "item": "wasm-backed npm pkgs",
+          "surfaces": [
+            "pkgs shipping their own .wasm (esbuild-wasm, @swc/wasm, sql.js)",
+            "instantiate under our runtime"
+          ],
+          "verdict": "pending"
+        },
+        {
+          "id": "v8-jit-node",
+          "item": "V8/JIT/full-node process",
+          "surfaces": [
+            "a real Node process (V8 JIT)",
+            "host-brokered node service idea",
+            "vm module"
+          ],
+          "verdict": "pending",
+          "note": "LAST roadmap item; bedrock \u2014 explore trusted-host-service escape only"
+        }
+      ]
+    }
+  ]
+}

@@ -1933,7 +1933,7 @@ defmodule Workbooks.Compilers do
           ["--dir", "#{abs}::/", wasm, "/" <> entry_rel, "--bundle",
            "--format=" <> Keyword.get(opts, :format, "esm"),
            "--outfile=/" <> out_rel] ++
-          esbuild_opts(opts)
+          esbuild_opts(opts) ++ node_polyfill_extra(abs, root, opts)
 
       try do
         case System.cmd("wasmtime", args, stderr_to_stdout: true) do
@@ -1972,6 +1972,50 @@ defmodule Workbooks.Compilers do
 
     min = if Keyword.get(opts, :minify, false), do: ["--minify"], else: []
     jsx ++ min ++ Keyword.get(opts, :extra, [])
+  end
+
+  # Node-builtin polyfills for the StarlingMonkey/web-target path. StarlingMonkey is a WHATWG web
+  # platform with NO Node builtins, and esbuild won't resolve `path`/`events`/… on its own — so alias
+  # each Node builtin (and its `node:`-prefixed form) to a pure-JS polyfill installed on demand, plus a
+  # minimal `process`/`global` banner. This is what lets the huge fraction of node-authored npm libraries
+  # bundle + run unchanged. `opts[:node_polyfills]` (default off) turns it on. Impure builtins (fs/net/
+  # crypto) stay brokered (js_dock / wasi:http) — these are the PURE, self-contained ones.
+  @node_polyfills %{
+    "path" => "path-browserify",
+    "events" => "events",
+    "util" => "util",
+    "stream" => "stream-browserify",
+    "querystring" => "querystring-es3",
+    "assert" => "assert",
+    "string_decoder" => "string_decoder",
+    "url" => "url",
+    "buffer" => "buffer",
+    "os" => "os-browserify"
+  }
+
+  @node_banner "globalThis.global=globalThis.global||globalThis;" <>
+                 "globalThis.process=globalThis.process||{env:{},argv:[\"node\",\"script\"]," <>
+                 "platform:\"wasi\",arch:\"wasm32\",version:\"v18.0.0\",versions:{node:\"18.0.0\"}," <>
+                 "cwd:function(){return \"/\"},browser:false," <>
+                 "nextTick:function(f){var a=[].slice.call(arguments,1);queueMicrotask(function(){f.apply(null,a)})}};"
+
+  defp node_polyfill_extra(abs, root, opts) do
+    if Keyword.get(opts, :node_polyfills, false) do
+      # install any polyfill package not already present in the project's node_modules (cached after first)
+      specs =
+        for {_b, pkg} <- @node_polyfills,
+            not File.dir?(Path.join([abs, "node_modules", pkg])),
+            do: %{name: pkg, req: "*", pin: nil}
+
+      if specs != [], do: Workbooks.Npm.install_tree(specs, abs)
+      _ = root
+
+      aliases = for {b, pkg} <- @node_polyfills, do: "--alias:#{b}=#{pkg}"
+      node_aliases = for {b, pkg} <- @node_polyfills, do: "--alias:node:#{b}=#{pkg}"
+      aliases ++ node_aliases ++ ["--banner:js=#{@node_banner}"]
+    else
+      []
+    end
   end
 
   @doc """
