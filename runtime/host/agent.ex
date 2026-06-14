@@ -492,8 +492,16 @@ defmodule Workbooks.Agent do
   defp exec_one(%{name: "done", args: a}, st), do: {"ok", st, a["result"] || ""}
   defp exec_one(%{name: n}, st), do: {"unknown tool: #{n}", st, nil}
 
-  # Verbs that affect the host/infra (not tenant-scoped) → require exec.
-  defp effectful_wb?(["deploy" | _]), do: true
+  # Platform / build verbs that modify infra (deploy) or read+write the host fs by
+  # RAW, unconfined path (bundle/sign/verify/pack/unpack/fetch all do File.read!/
+  # write! on caller-supplied paths and are NOT tenant-scoped). Reachable via the
+  # wb tool, they'd let an exec-denied (cloud/shared) tenant's agent read another
+  # tenant's files or secrets / write anywhere — so they require exec, like
+  # git/publish. The tenant-scoped verbs (model/var/app/env/telemetry/ledger/…)
+  # stay open. (Confining these verbs' paths to the workdir even WITH exec — a
+  # desktop prompt-injection hardening — is tracked in wb-oyhh.)
+  @effectful_wb ~w(deploy bundle sign verify pack unpack fetch)
+  defp effectful_wb?([verb | _]) when verb in @effectful_wb, do: true
   defp effectful_wb?(_), do: false
 
   # Resolve an agent-supplied path under the workdir. Absolute paths are used

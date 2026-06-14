@@ -29,6 +29,22 @@ defmodule Workbooks.WbToolTest do
     assert out =~ "not permitted"
   end
 
+  test "the raw-fs platform verbs are ALL exec-gated (no arbitrary host-fs read/write via wb)" do
+    # bundle/sign/verify/pack/unpack/fetch each do File.read!/write! on raw paths;
+    # an exec-denied agent must not reach any of them.
+    for cmd <- [
+          "bundle /etc/passwd /tmp/leak",
+          "sign /etc/hosts",
+          "verify /etc/hosts",
+          "pack secret /tmp/out",
+          "unpack /etc/hosts /tmp/x",
+          "fetch somekey /tmp/out"
+        ] do
+      {out, _} = wb(cmd, "wbtool-noexec", false)
+      assert out =~ "not permitted", "expected #{inspect(cmd)} gated, got: #{out}"
+    end
+  end
+
   test "`wb deploy` with exec is NOT refused (the trusted desktop may deploy)" do
     {out, _} = wb("deploy status", "wbtool-exec", true)
     refute out =~ "not permitted"
