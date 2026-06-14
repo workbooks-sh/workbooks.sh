@@ -43,6 +43,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **xdiff** (text diffing / unified diff) | from-C-source -> wasi (build_c_dir) | xdiff_lane_test (diff -> unified hunk) |
 | **xxHash** (fast non-crypto hashing XXH32/64/XXH3) | from-C-source -> wasi (build_c_dir) | xxhash_lane_test (deterministic digests) |
 | **tinyexpr** (math-expression evaluator) | from-C-source -> wasi (build_c_dir) | tinyexpr_lane_test (expr + bound vars) |
+| **stb_truetype** (font rasterization) | from-C-source -> wasi (build_c_dir) | stbtt_lane_test (rasterize glyph) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
