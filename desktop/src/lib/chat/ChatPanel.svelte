@@ -40,6 +40,7 @@
   import AgentEditor from "./AgentEditor.svelte";
   import SkillPicker from "./SkillPicker.svelte";
   import ModelPicker from "./ModelPicker.svelte";
+  import AssistantMessageView from "./AssistantMessageView.svelte";
   import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
   import { moonshineStt } from "$lib/stt/moonshine.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
@@ -364,7 +365,7 @@
                   {/if}
                 </div>
                 {#if b.text}
-                  <div class="agent-text">{b.text}</div>
+                  <AssistantMessageView text={b.text} />
                 {:else if !b.pending}
                   <div class="agent-text muted">(no content)</div>
                 {/if}
