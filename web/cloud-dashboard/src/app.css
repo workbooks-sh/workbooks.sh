@@ -1,23 +1,29 @@
-/* ── Workbooks cloud — LIGHT brand skin ──────────────────────────────────────
-   Aligned to the docs/learn system: paper + ink, the pastel DNA family used for
-   semantic grouping (ink icons on pastel), the logo is ink (black on light /
-   white on dark), and a moving DNA strip in the sidebar. */
+/* ── Workbooks cloud — dual-theme brand skin (DARK default, LIGHT toggle) ──────
+   Aligned to the docs/learn system: the pastel DNA family for semantic grouping
+   (ink on pastel), an ink-anchored logo (white on dark / black on light), a
+   full-width moving DNA strip across the top, and a clean CSS-defined dark theme
+   (not browser auto-dark). Theme is set via html[data-theme]. */
 :root {
-  --paper: #f7f6f1; --bg: #f7f6f1;
-  --panel: #ffffff; --panel-2: #f0efe8;
-  --line: #e4e1d6; --line-soft: rgba(18,19,22,.07);
-  --ink: #121316; --dim: #565b54; --faint: #9a978c;
-
-  /* pastel DNA family — each surface/category owns one; ink sits on top */
+  /* shared pastel DNA family */
   --mint: #aee5c2; --sky: #a8d4f0; --sage: #c8e0b0; --cream: #f2ddb0; --peach: #f3c5a3; --blue: #9fc4e8;
-
-  /* saturated semantic accents (readable on light) */
-  --run: #1f9d5b; --amber: #c2861f; --violet: #7c63cf; --teal: #2f9e8c;
-  --live: var(--run); --live-dim: rgba(31,157,91,.12);
-
   --sans: "Geist", system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --r: 10px;
+
+  /* DARK (default) */
+  --bg: #0f1012; --panel: #16171a; --panel-2: #1e1f23;
+  --line: #2a2c31; --line-soft: rgba(255,255,255,.06);
+  --ink: #ededea; --dim: #9b9a92; --faint: #6a695f;
+  --run: #3fe081; --amber: #e0b34a; --violet: #b48cff; --teal: #4dd6c4;
+  --live: var(--run); --live-dim: rgba(63,224,129,.14);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #f7f6f1; --panel: #ffffff; --panel-2: #f0efe8;
+  --line: #e4e1d6; --line-soft: rgba(18,19,22,.07);
+  --ink: #121316; --dim: #565b54; --faint: #9a978c;
+  --run: #1f9d5b; --amber: #c2861f; --violet: #7c63cf; --teal: #2f9e8c;
+  --live: var(--run); --live-dim: rgba(31,157,91,.12);
   color-scheme: light;
 }
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
@@ -35,7 +41,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 .btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 8px;
   font: 500 13px/1 var(--sans); border: 1px solid var(--line); background: var(--panel); color: var(--ink); transition: .15s; }
 .btn:hover { border-color: var(--ink); }
-.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .btn.primary:hover { background: #000; }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
 .btn.danger { color: #c0392b; border-color: rgba(192,57,43,.3); background: transparent; }
@@ -54,11 +60,16 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 #app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
 
 /* sidebar */
-.side { border-right: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; padding: 16px 12px; }
-.brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 16px; }
-.brand svg { width: 20px; color: var(--ink); }          /* logo = ink (black on light) */
-.brand b { font: 600 14.5px/1 var(--sans); }
+.side { border-right: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; padding: 16px 12px; }
+.brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 16px; }
+.brand svg { width: 22px; color: var(--ink); }          /* logo = ink (white on dark / black on light) */
+.brand b { font: 700 15px/1 var(--sans); letter-spacing: .035em; text-transform: uppercase; }
 .brand .cl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; }
+/* full-bleed moving DNA strip across the very top of the sidebar */
+.topdna { margin: -16px -12px 14px; height: 14px; overflow: hidden; }
+.themebtn { margin-left: auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--dim); background: var(--panel); transition: .15s; cursor: pointer; }
+.themebtn:hover { color: var(--ink); border-color: var(--ink); }
+.themebtn svg { width: 16px; height: 16px; }
 .org { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; cursor: pointer; transition: .15s; background: var(--panel); }
 .org:hover { border-color: var(--ink); }
 .org .av { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg,var(--mint),var(--sky)); flex: none; display: grid; place-items: center; font: 600 11px var(--sans); color: var(--ink); }
@@ -80,7 +91,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 
 /* main */
 .main { overflow-y: auto; }
-.topbar { display: flex; align-items: center; gap: 12px; padding: 18px 28px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(247,246,241,.85); backdrop-filter: blur(8px); z-index: 5; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 18px 28px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(8px); z-index: 5; }
 .crumb { font-size: 14px; font-weight: 600; flex: 1; }
 .crumb span { color: var(--faint); font-weight: 400; }
 .search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); width: 200px; background: var(--panel); }
@@ -143,7 +154,7 @@ tr:last-child td { border: 0; }
 
 /* ════════════ MODAL — new nexus ════════════ */
 .modal { position: fixed; inset: 0; background: rgba(18,19,22,.4); backdrop-filter: blur(4px); display: grid; place-items: center; z-index: 40; }
-.sheet { width: 560px; max-width: 94vw; max-height: 90vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 24px; box-shadow: 0 24px 60px -20px rgba(18,19,22,.35); }
+.sheet { width: 560px; max-width: 94vw; max-height: 90vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; box-shadow: 0 24px 60px -20px rgba(18,19,22,.35); }
 .sheet h2 { font: 600 17px var(--sans); margin-bottom: 4px; }
 .sheet .sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
 .lab { font-size: 12px; color: var(--dim); margin: 16px 0 8px; font-weight: 500; }
