@@ -329,6 +329,39 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(about))
   end
 
+  # Skill catalog for the @-picker (wb-kbq5). User/project SKILL.md authoring
+  # isn't wired yet, so this is an empty-but-valid catalog (stops the 404; the
+  # picker degrades to empty). Real discovery tracked as follow-up.
+  get "/api/skills" do
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{skills: []}))
+  end
+
+  # Command palette "ask" (wb-kbq5): a one-shot LLM answer for the ⌘/ palette.
+  # Returns {mode:"answer",text} to show in-modal (the desktop also accepts a
+  # {mode:"write",text} to inject into the composer; we answer by default).
+  post "/api/palette/ask" do
+    {:ok, body, conn} = read_body(conn)
+    params = Jason.decode!(body)
+    prompt = params["prompt"] || ""
+    composer = params["composer_text"] || ""
+
+    system =
+      "You are the Workbooks command-palette assistant. Answer the user's request " <>
+        "directly and concisely in plain text. If a draft is shown, help refine it."
+
+    user = if composer != "", do: "Current draft:\n#{composer}\n\nRequest: #{prompt}", else: prompt
+
+    payload =
+      case Workbooks.Llm.complete([%{role: "system", content: system}, %{role: "user", content: user}]) do
+        {:ok, %{content: text}} when is_binary(text) and text != "" -> %{mode: "answer", text: text}
+        {:error, reason} -> %{error: "llm", detail: inspect(reason)}
+        _ -> %{mode: "answer", text: "(no response)"}
+      end
+
+    status = if Map.has_key?(payload, :error), do: 502, else: 200
+    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
+  end
+
   # Agent picker catalog (wb-kbq5): project-scope (<workdir>/.oql/agents/*.org) →
   # user-scope (WB_PROFILE_DIR/agents/*.org) → the builtin Waldo. The desktop's
   # agents.svelte refreshes this; without it the picker was empty (404).
