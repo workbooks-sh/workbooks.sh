@@ -62,6 +62,16 @@
           "units": 8,
           "proof": "locked-deploy x-tenant ignored",
           "failure_modes": []
+        },
+        {
+          "name": "Generic OIDC/JWKS verifier (pluggable IdP: WorkOS/Clerk/Auth0)",
+          "status": "wip",
+          "tests": "oidc_test",
+          "units": 6,
+          "proof": "fixture-proven RS256+JWKS-by-kid+expiry+issuer+tenant-claim; provider-agnostic; INERT until WB_OIDC_JWKS_URL set; NOT yet wired into the auth ladder",
+          "failure_modes": [
+            "auth-ladder integration pending (careful step); platform-admin access path is separate + needs deliberate design"
+          ]
         }
       ]
     },
