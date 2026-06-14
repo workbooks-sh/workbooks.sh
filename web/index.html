@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="darkreader-lock">
 <title>Workbooks — living breathing software</title>
 <link rel="preload" href="fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Franie-Black.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
@@ -41,13 +44,21 @@ const WB_FLAGS = { desktopDownload: false };</script>
 @font-face { font-family: "Groothan"; src: url("fonts/GroothanMixed-Regular.woff2") format("woff2"), url("fonts/GroothanMixed-Regular.woff") format("woff"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Groothan"; src: url("fonts/GroothanMixed-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: "Muzzaro"; src: url("fonts/Muzzaro.woff2") format("woff2"), url("fonts/Muzzaro.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-Light.woff2") format("woff2"); font-weight: 300; font-display: block; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: block; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-SemiBoldItalic.woff2") format("woff2"); font-weight: 600; font-style: italic; font-display: block; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-Bold.woff2") format("woff2"); font-weight: 700; font-display: block; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-BoldItalic.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Franie"; src: url("fonts/Franie-Black.woff2") format("woff2"); font-weight: 900; font-display: block; }
 
   :root {
+    color-scheme: light;
     --paper: #f7f6f1;
     --ink: #121316;
     --bloom: #13d943;  /* neon green — the one accent */
-    --display: "Groothan", "Warlock", "Anton", sans-serif;
-    --accent: "Groothan", "Muzzaro", "Handjet", sans-serif;
+    --display: "Franie", sans-serif;
+    --accent: "Franie", sans-serif;
     --mono: "JetBrains Mono", monospace;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -82,16 +93,20 @@ const WB_FLAGS = { desktopDownload: false };</script>
   .brandlock { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
   .brandlock svg { width: 46px; height: auto; display: block; color: var(--ink); }
   .brandlock span {
-    font-family: var(--display); font-size: 27px; letter-spacing: .05em;
-    color: var(--ink); line-height: 1;
+    font-family: var(--display); font-weight: 500; font-size: 31px; letter-spacing: .01em;
+    text-transform: uppercase; color: var(--ink); line-height: 1;
   }
 
-  .lockup { width: min(900px, 92vw); }
+  .lockup { width: fit-content; max-width: 96vw; margin-inline: auto; --hero: clamp(48px, 8.25vw, 112px); }
   .lockup .jl {
-    display: block; font-family: var(--display); font-weight: 400;
-    font-size: clamp(64px, 11vw, 150px); line-height: .94;
+    display: block; font-family: var(--display); font-weight: 900; text-transform: uppercase;
+    font-size: var(--hero); line-height: .85;
     white-space: nowrap; color: var(--ink); text-align: center;
   }
+  .lockup .jl:nth-child(1) { font-weight: 300; font-size: calc(var(--hero) * 1.25); }  /* living  — light */
+  .lockup .jl:nth-child(2) { font-weight: 600; font-style: italic; }  /* breathing — semibold */
+  .lockup .jl:nth-child(3) { font-size: calc(var(--hero) * 0.875); }  /* software — one size down */
+  /* software (nth-child 3) stays 900 black */
   /* the counterpoint line: PIXELS against Anton's block — same ink,
      lowercase, the machine voice between two human shouts */
   /* the pixel voice, canonicalized: 900 so its strokes read the same ink
@@ -101,19 +116,6 @@ const WB_FLAGS = { desktopDownload: false };</script>
   /* the counterpoint line (2026-06-12): solid white fill + a thick ink ring,
      rendered as a real SVG outline by nav.js (paint-order:stroke) — fixed scale,
      identical on Safari/iOS where -webkit-text-stroke broke. */
-  .lockup .jl.bub {
-    font-family: var(--accent); font-weight: 400; font-synthesis: none;
-    text-transform: uppercase; letter-spacing: 0;
-    font-size: clamp(48px, 8.6vw, 116px); line-height: 1; text-align: center;
-    color: #fff; --bub-stroke: 3;
-    position: relative; z-index: 2; margin: -.30em 0 -.26em;
-  }
-
-  @keyframes bub-breathe {
-    0%   { background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0; }
-    50%  { background-position: 100% 0%, 0% 100%, 10% 0%, 85% 100%, 0 0; }
-    100% { background-position: 0% 0%, 100% 100%, 60% 0%, 30% 100%, 0 0; }
-  }
   @media (prefers-reduced-motion: reduce) {
     .lockup .jl:nth-child(2) { animation: none; }
   }
@@ -188,18 +190,18 @@ const WB_FLAGS = { desktopDownload: false };</script>
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
     padding: 11vh 7vw 5vh; text-align: center; pointer-events: none;
   }
-  .sky-head { max-width: 820px; }
+  .sky-head { max-width: 820px; margin-inline: auto; }
   .sky-kicker {
     font-size: 11px; font-weight: 700; letter-spacing: .34em; text-transform: uppercase;
     color: var(--ink); margin-bottom: 18px;
   }
   .sky-kicker b { color: var(--bloom); }
   .sky-h {
-    font-family: var(--display); font-size: clamp(32px, 3.7vw, 60px); line-height: .98;
-    color: var(--ink); white-space: nowrap;
+    font-family: var(--display); font-weight: 600; font-size: clamp(32px, 3.7vw, 60px); line-height: .98;
+    color: var(--ink);
   }
   .sky-h em {
-    font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none;
+    font-style: italic; font-weight: inherit;
     color: var(--ink);
   }
   .sky-points {
@@ -226,10 +228,10 @@ const WB_FLAGS = { desktopDownload: false };</script>
   #s3 .sky-kicker { color: #8b9085; }
   .s3-grid { display: grid; grid-template-columns: 340px 1fr; gap: 76px; max-width: 1480px; margin: 0 auto; align-items: start; }
   .s3-left h2 {
-    font-family: var(--display); font-size: clamp(34px, 3.4vw, 52px); line-height: 1;
+    font-family: var(--display); font-weight: 600; font-size: clamp(34px, 3.4vw, 52px); line-height: 1;
     color: var(--paper); margin-bottom: 18px;
   }
-  .s3-left h2 em { font-family: var(--accent); font-style: normal; font-weight: 400; font-synthesis: none; }
+  .s3-left h2 em { font-style: italic; font-weight: inherit; }
   .s3-left .lede { font-size: 12.5px; line-height: 1.8; color: #9ba095; max-width: 42ch; margin-bottom: 30px; }
 
   .s3-sel { border-top: 1px solid rgba(247,246,241,.2); display: flex; flex-direction: column; }
@@ -294,7 +296,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   }
   .s3-scroll .thumb { position: absolute; left: 0; width: 2px; background: var(--ac); }
   .s3-stage .role { font: 700 10px var(--mono); letter-spacing: .3em; text-transform: uppercase; margin-bottom: 6px; }
-  .s3-stage h3 { font-family: var(--display); font-size: 38px; line-height: 1; color: var(--paper); }
+  .s3-stage h3 { font-family: var(--display); font-weight: 600; font-size: 38px; line-height: 1; color: var(--paper); }
   .s3-stage p { font-size: 12.5px; line-height: 1.8; margin-bottom: 12px; max-width: 58ch; color: #9ba095; }
   .s3-feats { list-style: none; padding: 0; margin: 6px 0 16px; display: flex; flex-direction: column; gap: 9px; }
   .s3-feats li { font: 400 12px var(--mono); line-height: 1.6; color: #9ba095; padding-left: 20px; position: relative; }
@@ -327,10 +329,75 @@ const WB_FLAGS = { desktopDownload: false };</script>
     .btn { padding: 12px 16px; }
     .lockup { width: 84vw; }
     .lockup .jl { font-size: clamp(42px, 13.5vw, 56px); line-height: 1; }
-    .lockup .jl.bub {
-      font-size: clamp(33px, 10.6vw, 46px); line-height: 1; margin: -.22em 0 -.18em;
-    }
   }
+</style>
+<style>
+/* ── hero v2 — sentence headline + above/below desktop-demo overlap ── */
+.hero { height: auto; min-height: 0; justify-content: flex-start; padding: 15vh 24px 0; }
+.brandlock span { font-size: 24px; font-weight: 600; letter-spacing: 0; }
+.hero-h { font-family: var(--display); font-weight: 600; font-size: clamp(34px, 4.6vw, 70px); line-height: 1.05; letter-spacing: -.012em; color: var(--ink); max-width: 17ch; margin: 4px auto 0; text-transform: none; }
+.hero-h em { font-style: italic; font-weight: 600; }
+.herodemo { width: min(1200px, 94vw); margin: 5vh auto -15vh; position: relative; z-index: 6; }
+.appwin { border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; background: var(--card); box-shadow: 0 40px 90px -28px rgba(18,19,22,.5); }
+.appbar { display: flex; align-items: center; gap: 7px; padding: 11px 15px; border-bottom: 2px solid var(--ink); background: var(--paper); }
+.appbar i { width: 11px; height: 11px; border-radius: 50%; background: var(--ink); opacity: .22; }
+.appbar .apptitle { margin-left: 11px; font: 600 12px var(--mono); color: var(--dim); letter-spacing: .04em; }
+.appscreen { position: relative; aspect-ratio: 16/10; background: #0b1020; overflow: hidden; }
+.appscreen > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cursor3d { position: absolute; width: 28px; height: 28px; left: 22%; top: 30%; pointer-events: none; z-index: 3; filter: drop-shadow(0 5px 7px rgba(0,0,0,.45)); animation: cursorpath 11s ease-in-out infinite; }
+.cursor3d svg { width: 100%; height: 100%; display: block; }
+@keyframes cursorpath { 0%,100%{left:22%;top:30%} 22%{left:58%;top:36%} 45%{left:60%;top:64%} 68%{left:36%;top:56%} 85%{left:72%;top:44%} }
+#s2 { padding-top: 18vh; }
+@media (max-width:820px){ .herodemo{ margin-bottom:-8vh } #s2{ padding-top:11vh } .hero{ padding-top:13vh } }
+</style>
+<style>
+/* hero v2 fixes: stop #s1 clipping the demo overlap; desktop-app frame (stoplight only) */
+#s1 { height: auto; overflow: visible; }
+.herodemo { width: min(1060px, 90vw); margin: 4vh auto -13vh; }
+.appwin { border-radius: 14px; }
+.appscreen { aspect-ratio: 16/10; }
+.stoplight { position: absolute; top: 15px; left: 16px; display: flex; gap: 8px; z-index: 4; }
+.stoplight i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: 0 0 0 .5px rgba(0,0,0,.12) inset; }
+.stoplight i:nth-child(1){ background:#ff5f57 } .stoplight i:nth-child(2){ background:#febc2e } .stoplight i:nth-child(3){ background:#28c840 }
+#s2 { padding-top: 16vh; }
+</style>
+<style>
+/* demo straddles the section boundary, overlapping PAST the DNA strip into #s2 */
+#dna { position: static; width: 100%; height: 18px; margin: 0; z-index: 1; }
+.herodemo { margin: 4vh auto -17vh; }
+#s2 { padding-top: 17vh; }
+/* stoplight: scale with the desktop window (container units), and smaller */
+.appscreen { container-type: inline-size; }
+.stoplight { top: 1.25cqw; left: 1.5cqw; gap: 0.62cqw; }
+.stoplight i { width: 0.78cqw; height: 0.78cqw; box-shadow: 0 0 0 .4px rgba(0,0,0,.1) inset; }
+</style>
+<style>
+/* DNA strip pinned to the section boundary (#s2 top); demo overlaps DOWN past it */
+#dna { position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: 18px; z-index: 1; }
+</style>
+<style>
+/* softer shadow (~75% less), drop the heavy black stroke, scale the hero up */
+.appwin { box-shadow: 0 14px 34px -18px rgba(18,19,22,.20); border: 1px solid rgba(18,19,22,.08); }
+.hero-h { font-size: clamp(40px, 5.4vw, 84px); }
+</style>
+<style>
+/* DNA strip = tight divider right after the hero content; demo overlaps down from it into #s2 */
+#dna { position: static; width: 100%; height: 18px; margin: 0; left: auto; right: auto; top: auto; bottom: auto; z-index: 1; }
+.herodemo { margin: 0 auto -17vh; }
+#s2 { padding-top: 0; }
+</style>
+<style>
+/* ════ CLEAN SECTION MODEL — flow-based, sizes to content (like #s3). ════
+   Overlap between hero demo and the workbooks section = ONE var (--overlap).
+   No fixed 100vh + absolute-centered content; sections can't clip each other. */
+:root { --demo-w: min(1060px, 90vw); --overlap: 14vh; }
+#s1 { height: auto; min-height: 0; overflow: visible; }
+.hero { height: auto; min-height: 0; justify-content: flex-start; padding: 13vh 24px 0; }
+.herodemo { position: relative; z-index: 6; width: var(--demo-w); margin: 5vh auto calc(-1 * var(--overlap)); }
+#s2 { position: relative; height: auto; min-height: 0; overflow: visible; background: var(--paper); padding: 0; }
+.sky-pin { position: relative; height: auto; min-height: 0; overflow: visible; }
+.sky-content { position: static; inset: auto; min-height: 122vh; padding: calc(var(--overlap) + 9vh) 7vw 6vh; }
+#dna { position: absolute; top: 0; left: 0; right: 0; height: 18px; z-index: 1; }
 </style>
 </head>
 <body>
@@ -338,7 +405,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <canvas id="lattice" aria-hidden="true"></canvas>
 
 <div id="site-nav"></div>
-<script src="nav.js?v=15"></script>
+<script src="nav.js?v=17"></script>
 
 
 <main class="hero">
@@ -351,11 +418,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
     <span>workbooks</span>
   </div>
 
-  <h1 class="lockup" aria-label="living breathing software">
-    <span class="jl">living</span>
-    <span class="jl bub">breathing</span>
-    <span class="jl">software</span>
-  </h1>
+  <h1 class="hero-h">software that's <em>living, breathing,</em> and yours.</h1>
 
   <p class="caption">
     <b>Workbooks</b> is a software ecosystem and systems architecture where
@@ -364,10 +427,10 @@ const WB_FLAGS = { desktopDownload: false };</script>
   </p>
 
   <div class="ctas" id="download">
-    <a class="btn btn-dl soon" aria-disabled="true">
+    <a class="btn btn-dl" href="https://github.com/workbooks-sh/workbooks.sh/releases">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 12.79c-.027-2.747 2.243-4.067 2.345-4.13-1.277-1.868-3.265-2.124-3.972-2.152-1.69-.171-3.3.995-4.158.995-.857 0-2.182-.971-3.588-.945-1.846.027-3.55 1.073-4.5 2.726-1.92 3.328-.49 8.253 1.38 10.954.915 1.323 2.005 2.808 3.435 2.755 1.38-.055 1.9-.892 3.567-.892 1.667 0 2.136.892 3.594.864 1.485-.027 2.424-1.35 3.33-2.68 1.05-1.536 1.482-3.024 1.508-3.1-.033-.015-2.894-1.11-2.92-4.395zM13.63 4.04c.76-.92 1.273-2.2 1.133-3.474-1.095.044-2.42.73-3.205 1.65-.703.813-1.32 2.114-1.154 3.362 1.22.095 2.467-.62 3.227-1.538z"/></svg>
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.45L9.75 2.1v9.4H0zM10.95 1.95L24 0v11.5H10.95zM0 12.5h9.75v9.4L0 20.55zM10.95 12.5H24V24l-13.05-1.95z"/></svg>
-      Download <span class="tag">soon</span>
+      Download
     </a>
     <button class="btn btn-copy" data-copy="Install the Workbooks skills with `npx skills add workbooks-sh/workbooks.sh`, then build me a living workbook app.">
       <svg class="cpy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="vd" aria-hidden="true"></span>
@@ -397,16 +460,33 @@ const WB_FLAGS = { desktopDownload: false };</script>
   </div>
   </div>
 </main>
-<div id="dna"><canvas id="dnaCv" aria-hidden="true"></canvas></div>
+
+<!-- hero demo: full-width desktop app, overlaps down into the workbooks section.
+     Placeholder = a real R2 looping demo video; the recording will later ship with
+     an INVISIBLE in-video cursor + a position track, so the .cursor3d overlay below
+     follows the true cursor path. For now .cursor3d animates a sample path. -->
+<div class="herodemo">
+  <div class="appwin">
+    <div class="appscreen">
+      <span class="stoplight" aria-hidden="true"><i></i><i></i><i></i></span>
+      <video src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/demos/desktop-tabbed-workspaces.mp4" autoplay loop muted playsinline preload="metadata"></video>
+      <span class="cursor3d" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 2.5l13.5 7-6.1 1.7-1.8 6.1z" fill="#fff" stroke="#111316" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </span>
+    </div>
+  </div>
+</div>
+
 </section>
 
 <section id="s2">
+<div id="dna"><canvas id="dnaCv" aria-hidden="true"></canvas></div>
   <div class="sky-pin">
     <canvas id="tree" aria-hidden="true"></canvas>
     <div class="sky-content">
       <div class="sky-head">
         <p class="sky-kicker">what is a workbook <b>■</b> 01</p>
-        <h2 class="sky-h">the ATOM of <em>a living internet.</em></h2>
+        <h2 class="sky-h">the atom of <em>a living internet.</em></h2>
       </div>
       <div class="sky-foot">
         <ul class="sky-points">
@@ -414,7 +494,6 @@ const WB_FLAGS = { desktopDownload: false };</script>
           <li><b>It becomes anything.</b> The same workbook ships as a mobile app, a desktop app, or a website — no porting, no rebuilds.</li>
           <li><b>It carries its own infrastructure.</b> Every workbook runs a sandbox for its code, a database for its state, and agents that keep it building.</li>
         </ul>
-        <a class="sky-more" href="learn/workbook">watch a workbook grow →</a>
       </div>
     </div>
   </div>
@@ -424,7 +503,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   <div class="s3-grid">
     <div class="s3-left">
       <p class="sky-kicker" style="text-align:left">the ecosystem <b>■</b> 02</p>
-      <h2>three pieces. <em>one orgAnism.</em></h2>
+      <h2>three pieces. <em>one organism.</em></h2>
       <p class="lede">The file carries everything, the engine keeps it running, the parts let it
         grow — each is simple alone, together they feed each other.</p>
       <nav class="s3-sel" id="s3Sel"></nav>
@@ -462,7 +541,7 @@ let W, H, DPR, COLS, ROWS, exclude = null;
 
 function resize() {
   DPR = Math.min(devicePixelRatio || 1, 2);
-  W = innerWidth; H = innerHeight;
+  W = innerWidth; H = (document.getElementById("s1") || {}).offsetHeight || innerHeight;
   cv.width = W * DPR; cv.height = H * DPR;
   cv.style.width = W + "px"; cv.style.height = H + "px"; /* replaced elements don't stretch with inset:0 */
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1284,7 +1363,7 @@ const STRIPE_P = 4, STRIPE_GAP = 2, BLOB_C = 5;   /* 5px cells — the mosaic mu
      3. solid ink re-drawn only where the matte covers.
    Everything is canvas text with one font + baseline — registration is
    perfect by construction. */
-const fluidEl = document.querySelector(".lockup .jl:nth-child(2)");
+const fluidEl = null; /* TRICK: plain hero, Groothan fluid/bubble casing removed */
 let fluidCv = null, fluidCtx = null, FP = null;  /* FP: paint params */
 function fluidSetup() {
   if (!fluidEl) return;

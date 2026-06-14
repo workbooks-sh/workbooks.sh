@@ -3,7 +3,7 @@
    <div id="site-nav"></div><script src="(../)nav.js"></script>. Drift between
    per-page navs is what this file exists to kill. Feature flags bake here. */
 (function () {
-  var FLAGS = { desktopDownload: false };
+  var FLAGS = { desktopDownload: false, learningCenter: false };
   // Absolute base so links work from ANY path (/blog/, /toolkits/, /learn/<slug>)
   // and from the docs domain (cross-site → the main site). Was path-relative,
   // which 404'd Learn/Blog/lessons.json from non-/learn pages.
@@ -255,13 +255,12 @@
         html += '<div class="colhead">' + t.title + '</div>';
         t.lessons.forEach(function (l) { html += row(l); });
       });
-      html += '<div class="sep" aria-hidden="true"></div>';
-      html += '<a class="viewall" href="' + root + 'learn/index.html">Learning Center <small>the full course</small></a>';
+      if (FLAGS.learningCenter) { html += '<div class="sep" aria-hidden="true"></div>'; html += '<a class="viewall" href="' + root + 'learn/index.html">Learning Center <small>the full course</small></a>'; }
       host.innerHTML = html;
     })
     .catch(function () {
       var host = nav.querySelector("[data-learn]");
-      if (host) host.innerHTML = '<a class="viewall" href="' + root + 'learn/index.html">Learning Center</a>';
+      if (host && FLAGS.learningCenter) host.innerHTML = '<a class="viewall" href="' + root + 'learn/index.html">Learning Center</a>';
     });
 
   nav.querySelectorAll(".drop > a").forEach(function (drop) {
