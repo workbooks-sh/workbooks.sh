@@ -65,7 +65,8 @@ defmodule Workbooks.AgentSession do
           # WB_RUN lets the agent address its OWN run for CTK reviews — build the
           # ?run= connect URL + `wb ctk await $WB_RUN` (see toolkits/ctk).
           env: [{"WB_RUN", run_id} | Keyword.get(opts, :env, [])],
-          on_step: fn ev -> send(parent, {:step, ev}) end
+          on_step: fn ev -> send(parent, {:step, ev}) end,
+          on_delta: fn chunk -> send(parent, {:delta, chunk}) end
         )
 
       send(parent, {:run_done, run})
@@ -78,6 +79,14 @@ defmodule Workbooks.AgentSession do
   def handle_info({:step, ev}, state) do
     Enum.each(state.subs, &send(&1, {:agent_step, ev}))
     {:noreply, %{state | live: state.live ++ [ev]}}
+  end
+
+  # Per-token text delta from the agent's LLM stream → fan out to live
+  # subscribers. Not accumulated here (the final run.result carries the full
+  # text); this is purely the incremental wire.
+  def handle_info({:delta, chunk}, state) do
+    Enum.each(state.subs, &send(&1, {:agent_delta, chunk}))
+    {:noreply, state}
   end
 
   def handle_info({:run_done, run}, state) do

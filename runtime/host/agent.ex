@@ -158,7 +158,10 @@ defmodule Workbooks.Agent do
       workdir: opts[:workdir] || System.tmp_dir!(),
       env: opts[:env] || [],
       # on_step.(event) fires as each tool step completes — for live streaming.
-      on_step: opts[:on_step] || fn _ -> :ok end
+      on_step: opts[:on_step] || fn _ -> :ok end,
+      # on_delta.(chunk) fires per text token as the model generates — for
+      # token-by-token streaming of the agent's reply. nil-op by default.
+      on_delta: opts[:on_delta] || fn _ -> :ok end
     }
 
     messages = [%{role: "system", content: system}, %{role: "user", content: task}]
@@ -169,7 +172,7 @@ defmodule Workbooks.Agent do
     do: finish(st, "stopped: reached max_steps (#{max})")
 
   defp loop(messages, st) do
-    case Llm.complete(messages, model: st.model, tools: tools(st)) do
+    case Llm.complete(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
       {:ok, %{tool_calls: [], content: content}} ->
         finish(st, content || "(no result)")
 

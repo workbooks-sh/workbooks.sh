@@ -23,6 +23,13 @@ defmodule Workbooks.AgentStream do
     {:push, {:text, frame(%{type: "step", step: ev.step, tool: ev.tool, output: String.slice(ev.output, 0, 500)})}, state}
   end
 
+  # Token-by-token text deltas as the model generates the reply (wb-2s09 /
+  # streaming). The client appends these to the in-progress assistant message,
+  # then reconciles against the final `done` result.
+  def handle_info({:agent_delta, chunk}, state) do
+    {:push, {:text, frame(%{type: "delta", content: chunk})}, state}
+  end
+
   def handle_info({:agent_done, result}, state) do
     {:push, {:text, frame(%{type: "done", result: result})}, state}
   end
