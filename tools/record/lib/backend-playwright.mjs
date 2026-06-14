@@ -23,6 +23,11 @@ const INIT_SCRIPT = `(()=>{
   const sink = (window.__WB_REC_ERRORS__ = window.__WB_REC_ERRORS__ || []);
   window.addEventListener('error', e => sink.push({type:'error',msg:String(e.message),at:Date.now()}));
   window.addEventListener('unhandledrejection', e => sink.push({type:'rejection',msg:String(e.reason),at:Date.now()}));
+  // addInitScript runs in EVERY frame; the visible cursor must live only in the
+  // top frame, or each workbook iframe spawns its own (a 2nd, un-driven cursor
+  // parked at the iframe's origin). The top-frame cursor is position:fixed at
+  // max z-index, so it already floats over iframe content.
+  if(window.top !== window.self) return;
   function ensure(){
     if(document.getElementById('__wb_cursor__')) return;
     if(!document.body){ return requestAnimationFrame(ensure); }
