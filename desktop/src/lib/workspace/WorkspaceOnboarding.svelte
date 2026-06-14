@@ -16,8 +16,8 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
 
-  const state = $derived(sidecar.status.state);
-  const connecting = $derived(state === "starting" || state === "restarting");
+  const engineState = $derived(sidecar.status.state);
+  const connecting = $derived(engineState === "starting" || engineState === "restarting");
 
   async function connect() {
     if (busy) return;
@@ -50,7 +50,7 @@
 
 <div class="screen">
   <div class="card">
-    <div class="badge" class:warn={state === "unhealthy" || state === "crashed"}>
+    <div class="badge" class:warn={engineState === "unhealthy" || engineState === "crashed"}>
       <Plugs weight="fill" size={28} />
     </div>
 
@@ -60,11 +60,11 @@
       set up your <strong>Personal</strong> workspace automatically.
     </p>
 
-    <div class="status" data-state={state}>
+    <div class="status" data-state={engineState}>
       <span class="dot"></span>
       {#if connecting}Connecting to the engine…
-      {:else if state === "unhealthy"}Engine reachable but unhealthy
-      {:else if state === "crashed"}Engine stopped unexpectedly
+      {:else if engineState === "unhealthy"}Engine reachable but unhealthy
+      {:else if engineState === "crashed"}Engine stopped unexpectedly
       {:else}No engine connected{/if}
     </div>
 
