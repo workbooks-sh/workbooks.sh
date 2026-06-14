@@ -50,6 +50,26 @@ defmodule AuthPlugTest do
     assert conn.halted
   end
 
+  # (a) Locked deploy: the x-tenant header is IGNORED — this is the invariant that
+  # makes CORS '*' safe. Without it, any website (CORS *) could send
+  # `x-tenant: victim` with no token and impersonate that tenant on a cloud runtime.
+  test "locked deploy: x-tenant header grants NOTHING without a valid bearer (no tokenless impersonation)" do
+    System.put_env("WB_PUBLIC_BEARER", "supersecret-token-abc123")
+
+    # x-tenant alone (no bearer) → 401, never authed as the named tenant
+    conn = conn_for("/api/run", [{"x-tenant", "victim-org"}]) |> call()
+    assert conn.status == 401
+    assert conn.halted
+    refute conn.assigns[:tenant] == "victim-org"
+
+    # x-tenant + a WRONG bearer → still 401
+    conn2 =
+      conn_for("/api/run", [{"x-tenant", "victim-org"}, {"authorization", "Bearer nope"}]) |> call()
+
+    assert conn2.status == 401
+    refute conn2.assigns[:tenant] == "victim-org"
+  end
+
   # (b) Locked deploy, correct bearer → authed with default tenant "local"
   test "locked deploy: correct bearer authenticates with default tenant 'local'" do
     System.put_env("WB_PUBLIC_BEARER", "supersecret-token-abc123")
