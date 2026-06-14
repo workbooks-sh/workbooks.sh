@@ -18,6 +18,8 @@ import { fileURLToPath } from "node:url";
 import { validateStep, sleep } from "./lib/intents.mjs";
 import { McpBackend } from "./lib/backend-mcp.mjs";
 import { verifyRecording } from "./lib/verify.mjs";
+import { loadOrg, orgToRecipe } from "./lib/dsl.mjs";
+import { toSeconds, fmt } from "./lib/timecode.mjs";
 // Playwright is imported LAZILY (in makeBackend) so the app/MCP tier — which runs
 // in the Linux substrate where Chromium/Playwright may not be installed — loads
 // and drives the real Tauri app without the web-walkthrough dependency present.
@@ -44,7 +46,15 @@ function parseArgs(argv) {
 }
 
 async function loadRecipe(p) {
-  const recipe = JSON.parse(await fs.readFile(p, "utf8"));
+  // .org timeline (frame-accurate, single source of truth) or legacy JSON recipe.
+  let recipe;
+  if (/\.org$/i.test(p)) {
+    const demo = await loadOrg(p);
+    for (const w of demo.warnings) process.stderr.write(`dsl warn: ${w}\n`);
+    recipe = orgToRecipe(demo);
+  } else {
+    recipe = JSON.parse(await fs.readFile(p, "utf8"));
+  }
   if (!recipe.name) throw new Error("recipe needs a name");
   if (!Array.isArray(recipe.steps)) throw new Error("recipe needs steps[]");
   recipe.steps.forEach(validateStep);
@@ -75,23 +85,69 @@ async function makeBackend(kind, outDir, recipe) {
   }).connect();
 }
 
-// Drive one take. Returns { video, stills, signals }.
+// Drive one take. Returns { video, stills, signals, timing }.
+//
+// When the recipe carries `__cues` (an .org timeline), each intent is PACED to
+// START at its declared cue frame relative to capture start (sleep-to-mark). The
+// previous intent must finish first; if it overruns its slot we log a drift
+// warning and fire the next intent immediately (no crash). The ACTUAL landed
+// frame of every cue is recorded for the voiceover to delay against.
 async function driveOnce(kind, recipe, outDir, takeName) {
   const backend = await makeBackend(kind, outDir, recipe);
   const stills = [];
+  const cues = recipe.__cues || null;
+  const fps = recipe.fps || 30;
+  const timing = [];
+  // The capture began ~1s before the driver per the pipeline lead-in; the driver
+  // can only mark its OWN start, so cue frames are relative to the driver's t0.
+  const t0 = Date.now();
+  const nowFrame = () => Math.round(((Date.now() - t0) / 1000) * fps);
+  let maxDrift = 0;
   try {
     for (let i = 0; i < recipe.steps.length; i++) {
       const step = recipe.steps[i];
       const label = step.label || step.intent;
-      process.stderr.write(`  [${i + 1}/${recipe.steps.length}] ${label}\n`);
+      const cue = cues ? cues[i] : null;
+
+      if (cue) {
+        // sleep-to-mark: wait until the wall clock reaches the cue's frame
+        const targetMs = toSeconds(cue.frame, fps) * 1000;
+        const waitMs = targetMs - (Date.now() - t0);
+        if (waitMs > 0) await sleep(waitMs);
+        else if (waitMs < -(1000 / fps))
+          process.stderr.write(`  drift: cue ${i + 1} (${cue.tcode}) overran by ${Math.round(-waitMs)}ms — previous intent ran long\n`);
+      }
+
+      const landedFrame = nowFrame();
+      process.stderr.write(`  [${i + 1}/${recipe.steps.length}]${cue ? ` @${cue.tcode}(landed ${fmt(landedFrame, fps)})` : ""} ${label}\n`);
       const r = await backend.perform(step);
+
+      if (cue) {
+        const driftFrames = landedFrame - cue.frame;
+        if (Math.abs(driftFrames) > Math.abs(maxDrift)) maxDrift = driftFrames;
+        timing.push({
+          cue: i + 1,
+          intent: cue.intent,
+          tcode: cue.tcode,
+          declaredFrame: cue.frame,
+          actualFrame: landedFrame,
+          driftFrames,
+        });
+      }
+
       if (step.intent === "screenshot" && r?.path) stills.push(r.path);
       if (step.checkpoint) {
         // a checkpoint always grabs a still for the verifier to anchor on
         const s = await backend.screenshot(`${takeName}-chk-${i}`);
         stills.push(s.path);
       }
-      if (step.afterMs) await sleep(step.afterMs);
+      // Legacy JSON recipes pace by explicit afterMs dwell. Org timelines pace by
+      // the NEXT cue's frame (sleep-to-mark above), so afterMs is ignored there.
+      if (!cues && step.afterMs) await sleep(step.afterMs);
+    }
+    if (cues) {
+      await fs.writeFile(path.join(outDir, `${takeName}.timing.json`), JSON.stringify(timing, null, 2));
+      process.stderr.write(`  timing: max declared-vs-actual drift = ${maxDrift} frame(s) (fps ${fps})\n`);
     }
     const signals = await backend.collectSignals();
     let video = null;
@@ -107,7 +163,7 @@ async function driveOnce(kind, recipe, outDir, takeName) {
         video = candidate;
       } catch {}
     }
-    return { video, stills, signals };
+    return { video, stills, signals, timing };
   } finally {
     await backend.close();
   }

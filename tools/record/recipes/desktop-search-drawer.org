@@ -1,0 +1,31 @@
+#+TITLE: Workbooks Desktop — search drawer
+#+TARGET: web
+#+URL: http://localhost:5178/
+#+FPS: 30
+#+VIEWPORT: 1440x900
+#+VERIFY_FRAMES: 8
+
+* 00:00 navigate [url:http://localhost:5178/] [waitUntil:networkidle]
+  Everything you've made is one keystroke away.
+
+* 00:04 click
+  Open the search drawer and it slides in from the right.
+  :PROPERTIES:
+  :selector: [aria-label="Search"]
+  :checkpoint: a search drawer is open on the right showing a feed of file cards (markdown notes, a canvas, a notebook, a python script)
+  :END:
+
+* 00:09 type [text:design]
+  Start typing and it filters across files, bookmarks, and the web at once.
+  :PROPERTIES:
+  :selector: [placeholder="Search files, bookmarks, the web…"]
+  :END:
+
+* 00:14 screenshot [name:drawer-filtered]
+  One search, every workspace.
+  :PROPERTIES:
+  :checkpoint: the search drawer shows results filtered by the query; no error overlay
+  :END:
+
+* 00:17 wait [ms:1500]
+  No folders to dig through.

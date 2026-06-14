@@ -1,0 +1,30 @@
+#+TITLE: Workbooks Desktop — command palette
+#+TARGET: web
+#+URL: http://localhost:5178/
+#+FPS: 30
+#+VIEWPORT: 1440x900
+#+VERIFY_FRAMES: 8
+
+* 00:00 navigate [url:http://localhost:5178/] [waitUntil:networkidle]
+  This is the Workbooks Browser — one desktop shell for every workspace you keep.
+
+* 00:05 screenshot [name:home]
+  The whole thing opens on a single prompt. You just say what you want to do.
+  :PROPERTIES:
+  :checkpoint: Arc-style shell with a left workspace sidebar and a centered prompt that reads 'What would you like to do?'
+  :END:
+
+* 00:10 type [text:Summarize my Kanban backlog]
+  We'll ask it to summarize the Kanban backlog.
+  :PROPERTIES:
+  :selector: [placeholder="What would you like to do?"]
+  :END:
+
+* 00:15 screenshot [name:prompt-filled]
+  Every workspace lives in the sidebar, one click away.
+  :PROPERTIES:
+  :checkpoint: the centered prompt now contains the typed text 'Summarize my Kanban backlog'
+  :END:
+
+* 00:18 wait [ms:1500]
+  One window, your whole desk.

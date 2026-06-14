@@ -57,35 +57,47 @@ else die "need node or bun on PATH to run the driver (record.mjs)"; fi
 finalize_video() {
   fv_src="$1"   # source video (.webm or .mp4)
   fv_mp4="${fv_src%.*}.mp4"
+  fv_fps=$(recipe_field fps); [ -n "$fv_fps" ] || fv_fps=30
   if [ "$fv_src" != "$fv_mp4" ]; then
     have ffmpeg && ffmpeg -y -i "$fv_src" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -an "$fv_mp4" >/dev/null 2>&1 \
       || { err "ffmpeg webm->mp4 failed"; printf '%s' "$fv_src"; return; }
   fi
   if [ -z "$voiceover" ]; then printf '%s' "$fv_mp4"; return; fi
   fv_voiced="${fv_mp4%.mp4}.voiced.mp4"
+  # Org timelines emit <slug>-take1.timing.json — place narration by cue frame
+  # (frame-accurate) instead of even-spread. Pass --timing/--fps when present.
+  fv_timing_args=""
+  if [ "$is_org" = 1 ]; then
+    fv_timing="$out/${slug}-take1.timing.json"
+    [ -f "$fv_timing" ] && fv_timing_args="--timing $fv_timing --fps $fv_fps"
+  fi
   if [ "$voiceover" = recipe ]; then
-    fv_lines=$("$JS" -e '
-      const fs=require("fs");
-      const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-      const vo=r.voiceover; const lines=Array.isArray(vo)?vo:(vo&&vo.lines)||[];
-      process.stdout.write(lines.map(l=>"--line\n"+l).join("\n"));
-    ' "$recipe")
-    [ -n "$fv_lines" ] || { err "voiceover=recipe but recipe has no voiceover.lines"; printf '%s' "$fv_mp4"; return; }
-    # feed lines via a temp script to avoid arg-splitting on the narration text
+    # write the narration lines (from .org cues or JSON voiceover block) to a script
     fv_script="$out/voiceover.json"
-    "$JS" -e '
-      const fs=require("fs");
-      const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-      const vo=r.voiceover; const lines=Array.isArray(vo)?vo:(vo&&vo.lines)||[];
-      fs.writeFileSync(process.argv[2], JSON.stringify({lines}));
-    ' "$recipe" "$fv_script"
+    if [ "$is_org" = 1 ]; then
+      "$JS" --input-type=module -e '
+        import { loadOrg, orgToRecipe } from "'"$HERE"'/lib/dsl.mjs"; import fs from "node:fs";
+        const r = orgToRecipe(await loadOrg(process.argv[1]));
+        const lines = (r.voiceover && r.voiceover.lines) || [];
+        fs.writeFileSync(process.argv[2], JSON.stringify({lines}));
+      ' "$recipe" "$fv_script"
+    else
+      "$JS" -e '
+        const fs=require("fs");
+        const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+        const vo=r.voiceover; const lines=Array.isArray(vo)?vo:(vo&&vo.lines)||[];
+        fs.writeFileSync(process.argv[2], JSON.stringify({lines}));
+      ' "$recipe" "$fv_script"
+    fi
     set +e
-    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$fv_script" >&2
+    # shellcheck disable=SC2086
+    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$fv_script" $fv_timing_args >&2
     fv_rc=$?
     set -e
   else
     set +e
-    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$voiceover" >&2
+    # shellcheck disable=SC2086
+    "$JS" "$HERE/lib/voiceover.mjs" --video "$fv_mp4" --out "$fv_voiced" --script "$voiceover" $fv_timing_args >&2
     fv_rc=$?
     set -e
   fi
@@ -124,15 +136,28 @@ done
 [ -f "$recipe" ] || die "recipe not found: $recipe"
 
 # ---- recipe introspection (no jq dep) ----------------------------------------
-# target + slug, read by the JS runtime (single source of truth = intents/JSON).
+# target + slug + fps, read by the JS runtime (single source of truth =
+# the .org timeline or the legacy JSON recipe).
+is_org=0
+case "$recipe" in *.org) is_org=1;; esac
 recipe_field() {
-  "$JS" -e '
-    const fs=require("fs");
-    const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-    const k=process.argv[2];
-    if(k==="slug"){process.stdout.write((r.name||"take").replace(/[^a-z0-9]+/gi,"-").toLowerCase());}
-    else process.stdout.write(String(r[k]??""));
-  ' "$recipe" "$1"
+  if [ "$is_org" = 1 ]; then
+    "$JS" --input-type=module -e '
+      import { loadOrg, orgToRecipe } from "'"$HERE"'/lib/dsl.mjs";
+      const r = orgToRecipe(await loadOrg(process.argv[1]));
+      const k = process.argv[2];
+      if (k==="slug") process.stdout.write((r.name||"take").replace(/[^a-z0-9]+/gi,"-").toLowerCase());
+      else process.stdout.write(String(r[k] ?? ""));
+    ' "$recipe" "$1"
+  else
+    "$JS" -e '
+      const fs=require("fs");
+      const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+      const k=process.argv[2];
+      if(k==="slug"){process.stdout.write((r.name||"take").replace(/[^a-z0-9]+/gi,"-").toLowerCase());}
+      else process.stdout.write(String(r[k]??""));
+    ' "$recipe" "$1"
+  fi
 }
 target=$(recipe_field target); [ -n "$target" ] || target=app
 slug=$(recipe_field slug)

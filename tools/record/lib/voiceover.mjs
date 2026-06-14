@@ -24,6 +24,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { toSeconds } from "./timecode.mjs";
 
 const exec = promisify(execFile);
 
@@ -40,6 +41,10 @@ function parse(argv) {
     else if (x === "--out") a.out = argv[++i];
     else if (x === "--script") a.script = argv[++i];
     else if (x === "--line") a.lines.push(argv[++i]);
+    // a <take>.timing.json from the org-scheduled driver: place each clip at its
+    // cue's ACTUAL landed frame (frame-accurate), not even-spread.
+    else if (x === "--timing") a.timing = argv[++i];
+    else if (x === "--fps") a.fps = Number(argv[++i]);
   }
   return a;
 }
@@ -135,8 +140,60 @@ async function assembleTrack(clips, videoDur, workDir) {
   return out;
 }
 
+// Frame-accurate track: place each clip's start at its cue's ACTUAL landed frame
+// (from <take>.timing.json) so audio lands on the action it narrates. If two
+// clips would overlap, the later one is pushed to start when the earlier ends
+// (and we warn). Trailing silence pads to the exact video duration. mp4 mux still
+// uses no -shortest, so the video stays the master length.
+async function assembleTrackByCue(clips, starts, videoDur, fps, workDir) {
+  const clipDurs = [];
+  for (const c of clips) clipDurs.push(await probeDuration(c));
+
+  // resolve start offsets (seconds), de-overlap forward
+  const offsets = [];
+  let prevEnd = 0;
+  for (let i = 0; i < clips.length; i++) {
+    let start = starts[i];
+    if (start < prevEnd) {
+      process.stderr.write(
+        `voiceover warn: clip ${i} (cue start ${start.toFixed(2)}s) overlaps previous (ends ${prevEnd.toFixed(2)}s) — pushing to ${prevEnd.toFixed(2)}s\n`
+      );
+      start = prevEnd;
+    }
+    if (start + clipDurs[i] > videoDur) {
+      process.stderr.write(
+        `voiceover warn: clip ${i} would run past video end (${(start + clipDurs[i]).toFixed(2)}s > ${videoDur.toFixed(2)}s) — it will be atrim'd\n`
+      );
+    }
+    offsets.push(start);
+    prevEnd = start + clipDurs[i];
+  }
+
+  const inputs = [];
+  const filters = [];
+  clips.forEach((c, i) => {
+    inputs.push("-i", c);
+    const delayMs = Math.round(offsets[i] * 1000);
+    filters.push(`[${i}:a]adelay=${delayMs}|${delayMs}[a${i}]`);
+  });
+  const mixIn = clips.map((_, i) => `[a${i}]`).join("");
+  const out = path.join(workDir, "voiceover.m4a");
+  const filterComplex =
+    filters.join(";") +
+    `;${mixIn}amix=inputs=${clips.length}:normalize=0[mix];` +
+    `[mix]apad,atrim=0:${videoDur.toFixed(3)}[out]`;
+  await exec("ffmpeg", [
+    "-y", ...inputs,
+    "-filter_complex", filterComplex,
+    "-map", "[out]", "-c:a", "aac", "-b:a", "160k", out,
+  ]);
+  return out;
+}
+
 // Public: voice a video. Returns { voiced, duration, lines } or throws.
-export async function voiceVideo({ video, out, lines }) {
+// `timing` (optional): the <take>.timing.json array — when present, clips are
+// placed by cue ACTUAL landed frame instead of even-spread.
+export async function voiceVideo({ video, out, lines, timing, fps }) {
   if (!KEY) throw new Error("XI_API_KEY not set — cannot synthesize voiceover");
   if (!lines || !lines.length) throw new Error("no narration lines provided");
   const videoDur = await probeDuration(video);
@@ -150,7 +207,19 @@ export async function voiceVideo({ video, out, lines }) {
       await tts(lines[i], f);
       clips.push(f);
     }
-    const track = await assembleTrack(clips, videoDur, workDir);
+    let track;
+    if (timing && timing.length) {
+      // Map each narration line to its cue's actual landed frame. timing entries
+      // align 1:1 with cues (= lines) in declared order.
+      const f = fps || 30;
+      const starts = clips.map((_, i) => {
+        const t = timing[i];
+        return t ? toSeconds(t.actualFrame, f) : 0;
+      });
+      track = await assembleTrackByCue(clips, starts, videoDur, f, workDir);
+    } else {
+      track = await assembleTrack(clips, videoDur, workDir);
+    }
     const voiced = out || video.replace(/\.mp4$/, ".voiced.mp4");
     // NO -shortest: the audio track is already atrim'd to the exact video
     // duration, and -shortest's frame-rounding against the audio stream can drop
@@ -173,8 +242,16 @@ async function main() {
     process.exit(2);
   }
   const lines = await loadLines(a);
+  let timing = null;
+  if (a.timing) {
+    try {
+      timing = JSON.parse(await fs.readFile(a.timing, "utf8"));
+    } catch (e) {
+      console.error(`voiceover: could not read --timing ${a.timing}: ${e.message}`);
+    }
+  }
   try {
-    const m = await voiceVideo({ video: a.video, out: a.out, lines });
+    const m = await voiceVideo({ video: a.video, out: a.out, lines, timing, fps: a.fps });
     console.log(JSON.stringify(m, null, 2));
     process.exit(0);
   } catch (e) {
