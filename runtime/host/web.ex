@@ -898,9 +898,9 @@ defmodule Workbooks.Web do
   # execution gated by the runtime's WB_TOOLKIT_EXEC). The thin CLI hits this.
   post "/rcp/toolkit/eval" do
     conn = fetch_query_params(conn)
-    # ?case=<substring> runs just ONE eval case — cheap iteration on a single
-    # LLM-driven eval instead of the whole suite.
-    out = Workbooks.Toolkits.eval_text(conn.query_params["id"], Workbooks.Toolkits.default_root(), conn.query_params["case"])
+    # ?case=<substring> runs just ONE eval case; ?model=<id> overrides WB_EVAL_MODEL
+    # for that run (the "re-run a failing eval with a stronger model" triage step).
+    out = Workbooks.Toolkits.eval_text(conn.query_params["id"], Workbooks.Toolkits.default_root(), conn.query_params["case"], conn.query_params["model"])
     send_resp(conn, 200, out)
   end
 

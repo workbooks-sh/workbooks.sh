@@ -255,7 +255,7 @@ defmodule Workbooks.Toolkits do
   same sandbox as verify (only with WB_TOOLKIT_EXEC=1), and PASSES on exit 0 +
   stdout containing the case's `#+EXPECT:` substring (when set). See EVALS.org.
   """
-  def eval_text(id, root \\ default_root(), filter \\ nil) do
+  def eval_text(id, root \\ default_root(), filter \\ nil, model \\ nil) do
     case tk_dir(id, root) do
       nil ->
         "no such toolkit: #{id}"
@@ -274,7 +274,7 @@ defmodule Workbooks.Toolkits do
             do: "#{id}: no eval matches #{inspect(filter)}",
             else: "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
         else
-          results = Enum.map(cases, &run_eval_case(&1, dir, id))
+          results = Enum.map(cases, &run_eval_case(&1, dir, id, model))
           pass = Enum.count(results, &(elem(&1, 0) == :pass))
           skip = Enum.count(results, &(elem(&1, 0) == :skip))
           n = length(results)
@@ -290,12 +290,12 @@ defmodule Workbooks.Toolkits do
 
   # Each evals/*.org is one case: Tier 2 (agent + judge) if it declares :TASK:,
   # else Tier 1 (deterministic :role eval + #+EXPECT:). Returns {:pass|:fail|:skip, label}.
-  defp run_eval_case(path, dir, id) do
+  defp run_eval_case(path, dir, id, model \\ nil) do
     text = File.read!(path)
     name = Path.relative_to(path, dir)
 
     cond do
-      prop(text, "TASK") != nil -> agent_judge_case(text, name, dir, id)
+      prop(text, "TASK") != nil -> agent_judge_case(text, name, dir, id, model)
       extract_role_blocks(text, "eval") != [] -> deterministic_case(text, name, dir)
       true -> {:fail, "#{name}: no :role eval block and no :TASK:"}
     end
@@ -310,7 +310,7 @@ defmodule Workbooks.Toolkits do
 
   # Tier 2 — run an agent on :TASK: (the toolkit's overview injected so it knows
   # the surface), then a judge model scores the result + tool trace vs :RUBRIC:.
-  defp agent_judge_case(text, name, dir, id) do
+  defp agent_judge_case(text, name, dir, id, model \\ nil) do
     task = prop(text, "TASK")
     rubric = prop(text, "RUBRIC") || "The result correctly and completely satisfies the task."
     exec? = prop(text, "EXEC") in ["true", "yes", "1"]
@@ -337,7 +337,7 @@ defmodule Workbooks.Toolkits do
 
         run =
           Workbooks.Agent.run(system, task,
-            model: System.get_env("WB_EVAL_MODEL"),
+            model: model || System.get_env("WB_EVAL_MODEL"),
             max_steps: max,
             exec: exec?,
             tenant: "eval"
