@@ -152,8 +152,29 @@ defmodule Workbooks.CLI do
     if n == 0, do: "(no desktop shell connected — nothing to #{action})", else: "#{action} tab → #{path} (#{n} shell#{if n == 1, do: "", else: "s"})"
   end
 
+  # App-control beyond tabs (wb-d2nx.2): theme / bookmark / workspace.
+  def call(["app", "theme", id], _t),
+    do: app_command("set_theme", %{"id" => id}, "theme → #{id}")
+
+  def call(["app", "bookmark", path | rest], _t) do
+    title = if rest == [], do: path, else: Enum.join(rest, " ")
+    app_command("bookmark", %{"path" => path, "title" => title}, "bookmarked #{path}")
+  end
+
+  def call(["app", "workspace", name | rest], _t) do
+    icon = List.first(rest) || ""
+    app_command("new_workspace", %{"name" => name, "icon" => icon}, "workspace → #{name}")
+  end
+
   def call(["app" | _], _t),
-    do: "usage: wb app <status | open-tab PATH | close-tab PATH | focus-tab PATH>"
+    do: "usage: wb app <status | open-tab PATH | close-tab PATH | focus-tab PATH | theme ID | bookmark PATH [title] | workspace NAME [icon]>"
+
+  defp app_command(action, args, ok_msg) do
+    case Workbooks.DesktopControl.command(action, args) do
+      {:ok, 0} -> "(no desktop shell connected — nothing to do)"
+      {:ok, n} -> "#{ok_msg} (#{n} shell#{if n == 1, do: "", else: "s"})"
+    end
+  end
 
   # `wb env request NAME [reason…]` — ask the connected desktop to prompt the
   # user for a key/value (wb-kbq5.2). Blocks until they answer. On success the

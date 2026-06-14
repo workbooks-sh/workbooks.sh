@@ -71,4 +71,13 @@ defmodule Workbooks.DesktopControl do
   def tab(action, path, session_id \\ nil) when action in ["open", "close", "focus"] do
     push("tab_command", %{"action" => action, "path" => path, "session_id" => session_id})
   end
+
+  @doc """
+  Drive a non-tab app capability — theme switch, bookmark add, workspace create.
+  The shell's app_command handler dispatches on `action`. Generic so new
+  capabilities are one CLI verb + one desktop case, no new channel event.
+  """
+  def command(action, args) when is_binary(action) and is_map(args) do
+    push("app_command", Map.put(args, "action", action))
+  end
 end

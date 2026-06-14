@@ -569,6 +569,11 @@ class WsBridgeStore {
       ch.on("tab_command", (payload: TabCommandPayload) => {
         this.#dispatchTabCommand(payload);
       });
+      // wb-d2nx.2 — non-tab app capabilities (theme / bookmark / workspace) the
+      // agent drives via `wb app …`. Generic action dispatch to the local stores.
+      ch.on("app_command", (payload: Record<string, unknown>) => {
+        void this.#dispatchAppCommand(payload);
+      });
     }
     // wb-80q0.10 — workgate:control's workgate_request events need
     // to enqueue into the workgate store so the modal renders. Same
@@ -662,6 +667,29 @@ class WsBridgeStore {
         });
       }
     });
+  }
+
+  // wb-d2nx.2 — dispatch a non-tab app_command to the right local store. Lazy
+  // store imports keep them out of the bridge's eager graph.
+  async #dispatchAppCommand(payload: Record<string, unknown>) {
+    const action = String(payload.action ?? "");
+    try {
+      if (action === "set_theme") {
+        const { themes } = await import("$lib/bridge/themes.svelte");
+        await themes.setActive(String(payload.id ?? ""));
+      } else if (action === "bookmark") {
+        const { bookmarks } = await import("$lib/bridge/bookmarks.svelte");
+        await bookmarks.create(String(payload.title ?? payload.path ?? "Bookmark"), String(payload.path ?? ""));
+      } else if (action === "new_workspace") {
+        const { workspaces } = await import("$lib/bridge/workspaces.svelte");
+        await workspaces.create(String(payload.name ?? "Workspace"), String(payload.icon ?? ""));
+      } else {
+        return;
+      }
+      this.#emit({ name: "bridge:tx", payload: { kind: "app_command", action }, topic: DESKTOP_CONTROL_TOPIC });
+    } catch (err) {
+      this.#emit({ name: "bridge:error", payload: { kind: "app_command", action, error: String(err) }, topic: DESKTOP_CONTROL_TOPIC });
+    }
   }
 
   #emit(partial: PartialEvent) {
