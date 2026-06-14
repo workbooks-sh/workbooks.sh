@@ -7,7 +7,8 @@
     "engine": "JsEngine.run_program/2 = StarlingMonkey default + QuickJS thin fallback (SM lacks regex \\p{}; QJS lacks WebCrypto).",
     "walls": "bedrock = no native exec in guest (V8 JIT, .node addons, child_process spawn) -> only via trusted host-service broker. bridge = browser/DOM-bound. forge = toolchain gap we can build from source.",
     "git": "PATH-SPECIFIC commits only (concurrent worker shares repo). Never git stash / git add -A.",
-    "loop": "2-min cron; each tick drives ONE next pending surface to a terminal verdict, deeply, then commits. Multitask within a tick when cheap."
+    "loop": "2-min cron; each tick drives ONE next pending surface to a terminal verdict, deeply, then commits. Multitask within a tick when cheap.",
+    "known_ceiling": "Bundles ~10MB+ (e.g. full typescript) exceed the SM eval-host string / QuickJS wasm runtime limit. Most libs are well under; tree-shaking + minify helps. Filed under lib-ast."
   },
   "categories": [
     {
@@ -198,7 +199,8 @@
             "enums/namespaces",
             "tsconfig paths"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "esbuild strips TS->JS at bundle time (esbuild_lane_test + every node_polyfills bundle); full tsc lib hits the 10MB ceiling but type-strip is the common need"
         },
         {
           "id": "jsx",
@@ -541,7 +543,8 @@
             "typescript",
             "prettier"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "acorn/@babel/parser/postcss LIVE (js_ast_test). CEILING: ~10MB+ bundles (full typescript lib) exceed eval-host/QuickJS runtime limit \u2014 narrow edge."
         },
         {
           "id": "lib-crypto",
