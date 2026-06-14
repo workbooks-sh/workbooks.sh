@@ -156,8 +156,16 @@ class WorkspacesStore {
     try {
       const file = await readFile();
       this.workspaces = file.workspaces;
-      this.active =
-        file.workspaces.find((w) => w.id === file.active_id) ?? null;
+      let active = file.workspaces.find((w) => w.id === file.active_id) ?? null;
+      // Auto-select + persist the first workspace when none resolves but some
+      // exist — otherwise active_id:null (e.g. legacy data, or a create() that
+      // didn't activate) leaves the shell with workspaces yet no active space,
+      // which reads as "nothing set up". The app should always boot usable.
+      if (!active && file.workspaces.length > 0) {
+        active = file.workspaces[0];
+        await writeFile({ ...file, active_id: active.id });
+      }
+      this.active = active;
     } catch (e) {
       this.lastError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -185,6 +193,9 @@ class WorkspacesStore {
     };
     await this.#mutate((file) => {
       file.workspaces.push(w);
+      // The first workspace becomes active immediately so a fresh install (or
+      // the auto-created Personal space) boots straight into a usable shell.
+      if (file.active_id == null) file.active_id = w.id;
     });
     return w;
   }
