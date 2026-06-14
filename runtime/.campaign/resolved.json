@@ -2513,12 +2513,17 @@
     "zstd": "compress roundtrip OK (9000->66)",
     "brotli": "compress roundtrip OK (9000->50)",
     "md4c": "markdown->HTML (# Hello **bold** -> <h1>+<strong>)",
-    "tinyscheme": "(fact 10)=3628800, (* 6 7)=42"
+    "tinyscheme": "(fact 10)=3628800, (* 6 7)=42",
+    "xxHash": "0.8.2 \u2014 hash buffer, build_c_dir plain",
+    "miniz": "3.0.2 \u2014 deflate/inflate roundtrip, build_c_dir plain",
+    "cmark": "0.31.1 \u2014 CommonMark->HTML, build_c_dir + 3 generated headers",
+    "libyaml": "0.2.5 \u2014 parse YAML (scalars/maps/seqs), build_c_dir [-DHAVE_CONFIG_H=1]"
    },
    "lane": "PackageManager.build_c_dir / BuildBroker.build_and_run(:c) \u2014 recipes in sweep result",
    "more_available": "same-shape S vein: xxHash, cmark, libyaml, miniz, CRC/hash tools \u2014 build through build_c_dir with little/no flag work",
    "wiring": "proven on-demand; standing-CLI registration is a packaging step (not yet done)",
-   "since": "iter159"
+   "since": "iter159",
+   "proven_count": 8
   },
   "rust_simd": {
    "capability": "wasm SIMD (v128) in the Rust lane",
@@ -2549,9 +2554,8 @@
   },
   "wasm_simd_intrinsics": {
    "capability": "wasm SIMD intrinsics (llvm.wasm.* \u2014 bitmask/swizzle/narrow/relaxed/etc.) in the Rust lane",
-   "status": "proven",
-   "proof": "~30 llvm.wasm.* SIMD intrinsics now LOWERED in mrustc codegen (same codegen_c.cpp patch as the rayon futex) instead of the Extern-LLVM abort \u2014 the ~40-intrinsic wall the CFG sweep found is largely cleared",
-   "caveat": "codegen-unblocked + the patch compiles; a dedicated runtime proof per-intrinsic (e.g. i8x16_bitmask) is the remaining TBD",
+   "status": "live",
+   "proof": "runtime-proven via rust_compile_to_wasm(simd:true): i8x16_bitmask=21845, i8x16_swizzle, u8x16_narrow_i16x8 (saturation), i32x4_all_true/v128_any_true/i32x4_bitmask \u2014 all correct. test rust_simd_test.exs (2 tests: autovec + explicit intrinsics) green.",
    "since": "iter160"
   }
  },

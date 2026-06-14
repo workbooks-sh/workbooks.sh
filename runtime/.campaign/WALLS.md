@@ -108,6 +108,8 @@ Members:
   provision). This is the FIRST deliberate mrustc-source patch — surgical + reproducible, NOT a divergent
   fork; the "no mrustc fork" stance is relaxed for upstreamable codegen-completeness patches. (Top-level
   `rayon` par_iter sugar still blocked — mrustc trait-resolution ceiling; use rayon-core's join/scope.)
+  The lowered SIMD intrinsics are now RUNTIME-PROVEN too (i8x16_bitmask/swizzle/u8x16_narrow/all_true/
+  any_true correct via `rust_compile_to_wasm(simd: true)`; rust_simd_test.exs).
 - ~~no EH-enabled libc++ → C++ exceptions~~ → **PROVEN 2026-06-13** (from-source EH runtime via our
   clang.wasm: llvmorg-22.1.0 libcxxabi/libunwind built `-fwasm-exceptions -mllvm
   -wasm-use-legacy-eh=false` → `libc++abi-eh.a`+`libunwind-eh.a`; throwing C++ catches with full

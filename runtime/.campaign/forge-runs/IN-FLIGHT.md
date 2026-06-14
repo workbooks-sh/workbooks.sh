@@ -4,7 +4,9 @@ Kill a runaway with `TaskStop <agentId>`. On resume, re-launch any that `failed`
 
 | agentId | mission | checkpoint | status |
 |---|---|---|---|
-| ac2172afdee7a1851 | light sweep: SIMD-intrinsic runtime proof + C leaf-lib vein (xxHash/cmark/libyaml/miniz) | forge-runs/light-sweep.md | running (light, machine-safe) |
+| aa992f6f8fa8a5bc7 | DuckDB to-live: apply the ~6 portability shims + low-concurrency full build + SELECT | forge-runs/duckdb-tolive.md | running (heavy, solo, bounded) |
+| ac2172afdee7a1851 | light sweep: SIMD-intrinsic runtime proof + C leaf-lib vein | forge-runs/light-sweep.md | DONE — SIMD intrinsics LIVE + 4 C libs (xxHash/miniz/cmark/libyaml) proven; committed |
+| (orphaned ab497938) | DuckDB conc-2 detached build | n/a | DEAD (0 procs); revealed real portability errors (mbedtls entropy, fcntl F_*LCK) — folded into the to-live agent |
 
 ## Recently completed (this session)
 - rayon-core + llvm.wasm.* codegen patch → **LIVE**, committed `d32f9437` (verified through crash recovery).
