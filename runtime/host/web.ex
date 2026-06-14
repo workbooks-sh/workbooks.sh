@@ -1310,6 +1310,31 @@ defmodule Workbooks.Web do
     end
   end
 
+  # Undo (Phase 2): "undo the last change" to a scope — append-only, riding the same
+  # Restore primitive, tenant-gated by the same scope-ownership rule. Returns the new
+  # Change, or {"nothing":true} when there's nothing earlier to undo to.
+  post "/api/history/:scope/undo" do
+    result =
+      case valid_scope(conn.params["scope"]) do
+        :ok -> Workbooks.History.undo(conn.params["scope"], conn.assigns[:tenant])
+        _ -> {:error, :not_found}
+      end
+
+    case result do
+      {:ok, %{} = change} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(change))
+
+      {:ok, :nothing_to_undo} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"nothing":true}))
+
+      {:error, reason} when reason in [:not_found, :bad_id] ->
+        conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(500, ~s({"error":"undo failed"}))
+    end
+  end
+
   # A scope is an opaque workbook id: letters/digits/_/- only, no `.`, no separators
   # or traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
   defp valid_scope(s)

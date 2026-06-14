@@ -122,6 +122,37 @@ defmodule Workbooks.History do
     end
   end
 
+  @doc """
+  Phase 2 — **Undo** ("undo anything an agent did"). Undo the most recent Change to
+  `scope` by re-applying the version that came BEFORE it — built on the exact
+  append-only `restore/3` primitive, so it inherits all of its guarantees: nothing
+  is erased, the undo is itself a new Change, and it is reversible (undo the undo by
+  restoring forward again). Tenant-gated by the same scope-ownership rule.
+
+  `{:ok, %{id, when, author_type, author_name, title}}` (the new Change) on success;
+  `{:ok, :nothing_to_undo}` when `scope` has only its initial Change (nothing earlier
+  to return to); `{:error, :not_found}` cross-tenant/unknown scope; `{:error, reason}`
+  on a genuine failure.
+
+  (The `jj` op-log — `Workbooks.JJ.op_entries/2` — remains a SECOND, corroborating
+  record of repo operations for tamper-evidence, but the user-facing Undo deliberately
+  rides the git-level append-only Restore, not jj: it must work identically whether or
+  not `jj` is installed, and it must never erase.)
+  """
+  def undo(scope, tenant) do
+    with {:ok, owner} <- authorize(scope, tenant) do
+      case Git.log_entries(owner, scope) do
+        # [latest, previous | _] — undo = restore the scope to `previous`
+        [_latest, %{sha: previous} | _] ->
+          restore(scope, previous, tenant)
+
+        # only the initial Change (or none) — there is nothing earlier to undo to
+        _ ->
+          {:ok, :nothing_to_undo}
+      end
+    end
+  end
+
   # The restore target MUST be a change that appears in THIS scope's own timeline
   # (the `<scope>.org` file's git history), not merely any sha in the tenant repo —
   # otherwise a caller could restore a workbook to an unrelated revision that touched

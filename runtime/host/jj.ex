@@ -81,6 +81,40 @@ defmodule Workbooks.JJ do
     end
   end
 
+  @doc """
+  Structured op-log: the user-facing "Undo" list. Each entry is the substrate for
+  one undoable step. Returns `[%{id, description}]` newest-first, or `[]`.
+
+  `id` is a short op hash (`^[0-9a-f]+$`) — the ONLY token the client may hand back
+  to `restore_to/2`, and it is re-validated against this list there.
+  """
+  def op_entries(tenant, limit \\ 20) do
+    with :ok <- ensure(tenant),
+         {out, 0} <-
+           jj(repo(tenant), [
+             "op", "log", "--no-graph", "--limit", to_string(limit),
+             "-T", ~s|id.short() ++ "\t" ++ description ++ "\n"|
+           ]) do
+      out
+      |> String.split("\n", trim: true)
+      |> Enum.flat_map(fn line ->
+        case String.split(line, "\t", parts: 2) do
+          [id, desc] -> [%{id: String.trim(id), description: String.trim(desc)}]
+          _ -> []
+        end
+      end)
+      |> Enum.filter(&valid_op_id?(&1.id))
+    else
+      _ -> []
+    end
+  end
+
+  # jj short op ids are lowercase hex. Tight allowlist for the op-log reader; the
+  # op-log is read-only here — user-facing Undo rides the git-level append-only
+  # Restore (see `Workbooks.History.undo/2`), NOT jj, so it works identically with
+  # or without jj and can never erase. jj stays a corroborating ledger only.
+  defp valid_op_id?(id), do: is_binary(id) and id =~ ~r/\A[0-9a-f]{4,}\z/
+
   defp repo(tenant), do: Git.repo_path(tenant)
 
   defp jj(dir, args), do: System.cmd("jj", args, cd: dir, stderr_to_stdout: true)
