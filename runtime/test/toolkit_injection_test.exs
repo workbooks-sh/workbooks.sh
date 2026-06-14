@@ -53,7 +53,16 @@ defmodule Workbooks.ToolkitInjectionTest do
     # mentioned in manifest.org so the doc can't silently fall behind the files.
     root = Toolkits.default_root()
 
-    for tk <- ["workbooks-browser", "workbooks-cli"] do
+    # Discover EVERY installed toolkit (not a hardcoded pair) so a new toolkit or
+    # skill can't dodge the guard.
+    toolkits =
+      root
+      |> File.ls!()
+      |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.org"])))
+
+    assert toolkits != [], "no toolkits discovered under #{root}"
+
+    for tk <- toolkits do
       manifest = File.read!(Path.join([root, tk, "manifest.org"]))
 
       for skill <- Toolkits.skills(Path.join(root, tk)) do
