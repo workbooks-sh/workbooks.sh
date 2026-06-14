@@ -1432,6 +1432,76 @@ defmodule Workbooks.Web do
     end
   end
 
+  # --- Drafts (Phase 5) ------------------------------------------------------
+  # Try a change safely on the caller's own workspace; Keep or Discard. Operates on
+  # the AUTHENTICATED tenant's repo (the :id is the workspace context). RBAC-gated:
+  # :view to list/diff, :edit to create/keep/discard. Draft enforces name confinement.
+  get "/api/nexuses/:id/drafts" do
+    if draft_can?(conn, :view) do
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Draft.list(conn.assigns[:tenant])))
+    else
+      forbidden(conn)
+    end
+  end
+
+  post "/api/nexuses/:id/drafts" do
+    {:ok, raw, conn} = read_body(conn)
+    name = with {:ok, %{"name" => n}} <- Jason.decode(raw), do: n, else: (_ -> nil)
+
+    if draft_can?(conn, :edit) do
+      case Workbooks.Draft.create(conn.assigns[:tenant], name) do
+        {:ok, d} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(d))
+        {:error, :exists} -> conn |> put_resp_content_type("application/json") |> send_resp(409, ~s({"error":"exists"}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"bad request"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  get "/api/nexuses/:id/drafts/:name/diff" do
+    if draft_can?(conn, :view) do
+      case Workbooks.Draft.diff(conn.assigns[:tenant], conn.params["name"]) do
+        {:ok, changes} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(changes))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  post "/api/nexuses/:id/drafts/:name/keep" do
+    if draft_can?(conn, :edit) do
+      case Workbooks.Draft.keep(conn.assigns[:tenant], conn.params["name"]) do
+        {:ok, r} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(r))
+        {:error, :conflict} -> conn |> put_resp_content_type("application/json") |> send_resp(409, ~s({"error":"conflict"}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  post "/api/nexuses/:id/drafts/:name/discard" do
+    if draft_can?(conn, :edit) do
+      case Workbooks.Draft.discard(conn.assigns[:tenant], conn.params["name"]) do
+        :ok -> conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  # A Draft acts on the caller's own workspace → the RBAC resource is their own nexus.
+  defp draft_can?(conn, cap) do
+    t = conn.assigns[:tenant]
+    Workbooks.RBAC.can?(caller_subject(conn), cap, %{tenant: t, level: :nexus, id: t})
+  end
+
+  defp forbidden(conn),
+    do: conn |> put_resp_content_type("application/json") |> send_resp(403, ~s({"error":"forbidden"}))
+
   # The RBAC subject for the authenticated caller — role resolved from the registry
   # (never the body). Falls back to tenant-as-user (the single-tenant/desktop identity
   # → owner) when no richer identity is present.
