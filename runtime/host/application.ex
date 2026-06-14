@@ -27,6 +27,9 @@ defmodule Workbooks.Application do
         # Agent→user env-var/key prompts over engine:env_prompt (two registries).
         Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.EnvBroker.Sockets}, id: :env_broker_sockets),
         Supervisor.child_spec({Registry, keys: :unique, name: Workbooks.EnvBroker.Pending}, id: :env_broker_pending),
+        # Agent→user OS-capability approvals over workgate:control (two registries).
+        Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.WorkgateBroker.Sockets}, id: :workgate_sockets),
+        Supervisor.child_spec({Registry, keys: :unique, name: Workbooks.WorkgateBroker.Pending}, id: :workgate_pending),
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,

@@ -166,6 +166,21 @@ defmodule Workbooks.CLI do
 
   def call(["env" | _], _t), do: "usage: wb env request NAME [reason]"
 
+  # `wb workgate request CAP [reason…]` — ask the user to Allow/Deny an OS
+  # capability (wb-kbq5.3). Blocks. Returns the decision.
+  def call(["workgate", "request", cap | rest], _t) do
+    reason = if rest == [], do: nil, else: Enum.join(rest, " ")
+
+    case Workbooks.WorkgateBroker.request(cap, reason) do
+      :allow -> "allowed: #{cap}"
+      :deny -> "denied: #{cap}"
+      {:error, :no_desktop} -> "(no desktop shell connected to prompt for #{cap})"
+      {:error, :timeout} -> "(timed out waiting for an Allow/Deny on #{cap})"
+    end
+  end
+
+  def call(["workgate" | _], _t), do: "usage: wb workgate request CAPABILITY [reason]"
+
   # "Memory" is removed by design: the org/code files ARE the context. Recall =
   # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
   # org file. No separate store to drift. See docs/VECTOR-QUERY.org.

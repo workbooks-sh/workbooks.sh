@@ -115,6 +115,10 @@ defmodule Workbooks.PhoenixSocket do
         Workbooks.EnvBroker.register_socket(join_ref)
         state
 
+      topic == "workgate:control" ->
+        Workbooks.WorkgateBroker.register_socket(join_ref)
+        state
+
       match?("session:" <> _, topic) ->
         bridge_session(topic, join_ref, state)
 
@@ -142,6 +146,12 @@ defmodule Workbooks.PhoenixSocket do
 
   defp maybe_track("env:cancel", "engine:env_prompt", _join_ref, payload, state) do
     if is_map(payload), do: Workbooks.EnvBroker.cancel(payload["request_id"])
+    state
+  end
+
+  # Client→server OS-capability decision (the workgate Allow/Deny modal).
+  defp maybe_track("permit", "workgate:control", _join_ref, payload, state) do
+    if is_map(payload), do: Workbooks.WorkgateBroker.permit(payload["request_id"], payload["decision"])
     state
   end
 
