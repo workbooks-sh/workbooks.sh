@@ -1,24 +1,31 @@
 <script lang="ts">
   /**
-   * WaldoPanel (wb-aakl.21) — the browser's ONE resident agent.
+   * WaldoPanel — the browser's ONE resident agent (the canonical chat surface).
    *
-   * Not the multi-agent chat chrome (that stays flagged off); a single
-   * voice you summon to set up and work the system. Salvages the existing
-   * chatSession transport (text via OpenRouter) + geminiLive (voice). Talks
-   * to the "waldo" agent slug — the autopoet (wb-9ae) surfaced in the
-   * browser. The runtime agent definition + autopoet file_issue seam + the
-   * MCP waldo_ask/do bridge are tracked in wb-aakl.25 (runtime/Rust work).
+   * A single voice you summon to set up + work the system: text via OpenRouter
+   * (chatSession) + voice via geminiLive. Talks to the "waldo" slug. The older
+   * multi-agent ChatPanel/ChatHeader chrome is flagged off; the good pieces
+   * (session history, rich org/component render, typing) live HERE now.
    *
    * Pitch guard: a communicator you summon, never a self-running manager.
    */
-  import { PaperPlaneRight, Sparkle, MagnifyingGlass, Wrench, Compass } from "phosphor-svelte";
+  import {
+    PaperPlaneRight,
+    MagnifyingGlass,
+    Wrench,
+    Compass,
+    ClockCounterClockwise,
+    Plus,
+    CaretLeft,
+  } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { sessionHistory, type SavedSession } from "$lib/chat/session_history.svelte";
   import Icon from "$lib/ui/Icon.svelte";
+  import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
 
   const WALDO_SLUG = "waldo";
 
-  // Quick-starts for the empty state — click to drop into the composer.
   const SUGGESTIONS = [
     { icon: MagnifyingGlass, label: "Search my files", text: "Search my files for " },
     { icon: Wrench, label: "Set up my agents", text: "Help me connect Claude Code to this workspace" },
@@ -28,43 +35,81 @@
   let prompt = $state("");
   let sending = $state(false);
   let composerEl = $state<HTMLTextAreaElement | null>(null);
-  function useSuggestion(text: string) {
-    prompt = text;
-    composerEl?.focus();
-  }
-  // Local echo of the user's lines (chatSession.blocks holds the agent's
-  // response stream; the prompt is shown here so the thread reads as a chat).
+  let view = $state<"chat" | "history">("chat");
+  let viewing = $state<SavedSession | null>(null); // a past session opened read-only
   let myLines = $state<{ text: string; ts: number }[]>([]);
+  let lastSavedId: string | null = null;
 
   const ready = $derived(sidecar.status.state === "ready");
 
   // Merge user echoes + agent blocks into one time-ordered transcript.
-  const transcript = $derived.by(() => {
-    const mine = myLines.map((m) => ({ who: "you" as const, text: m.text, ts: m.ts, kind: "msg" }));
-    const theirs = chatSession.blocks.map((b) => {
-      if (b.kind === "message")
-        return { who: "waldo" as const, text: b.text, ts: b.ts, kind: "msg", pending: b.pending, error: b.error };
-      if (b.kind === "tool")
-        return { who: "waldo" as const, text: `⚙ ${b.toolName}${b.pending ? "…" : ""}`, ts: b.ts, kind: "tool" };
-      if (b.kind === "status")
-        return { who: "waldo" as const, text: b.label, ts: b.ts, kind: "status", level: b.level };
-      return null;
-    });
-    return [...mine, ...theirs.filter(Boolean)].sort((a, b) => (a!.ts ?? 0) - (b!.ts ?? 0)) as Array<{
-      who: "you" | "waldo";
-      text: string;
-      ts: number;
-      kind: string;
-      pending?: boolean;
-      error?: boolean;
-      level?: string;
-    }>;
+  type Line = { who: "you" | "waldo"; text: string; ts: number; kind: string; pending?: boolean; error?: boolean };
+  const transcript = $derived.by<Line[]>(() => {
+    const mine: Line[] = myLines.map((m) => ({ who: "you", text: m.text, ts: m.ts, kind: "msg" }));
+    const theirs = chatSession.blocks
+      .map((b): Line | null => {
+        if (b.kind === "message") return { who: "waldo", text: b.text, ts: b.ts, kind: "msg", pending: b.pending, error: b.error };
+        if (b.kind === "tool") return { who: "waldo", text: `${b.toolName}${b.pending ? "…" : ""}`, ts: b.ts, kind: "tool" };
+        if (b.kind === "status") return { who: "waldo", text: b.label, ts: b.ts, kind: "status" };
+        return null;
+      })
+      .filter((x): x is Line => x !== null);
+    return [...mine, ...theirs].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   });
+
+  // Show "thinking" between send and the first agent output.
+  const thinking = $derived(
+    !viewing &&
+      (sending || chatSession.session?.status === "pending" || chatSession.session?.status === "running") &&
+      !transcript.some((m) => m.who === "waldo" && (m.text || m.pending)),
+  );
+
+  // Persist each finished exchange so history can read it back.
+  $effect(() => {
+    const s = chatSession.session;
+    if (s && s.status === "completed" && s.id !== lastSavedId) {
+      const lines = transcript
+        .filter((m) => m.kind === "msg" || m.kind === "tool")
+        .map((m) => ({ who: m.who, text: m.text, kind: m.kind }));
+      if (lines.length > 0) {
+        sessionHistory.save({
+          id: s.id,
+          agent: WALDO_SLUG,
+          title: (myLines.at(-1)?.text ?? lines[0]?.text ?? "Chat").slice(0, 80),
+          ts: s.startedAt ?? Date.now(),
+          lines,
+        });
+        lastSavedId = s.id;
+      }
+    }
+  });
+
+  function useSuggestion(text: string) {
+    prompt = text;
+    composerEl?.focus();
+  }
+  function newChat() {
+    myLines = [];
+    chatSession.blocks = [];
+    chatSession.session = null;
+    viewing = null;
+    view = "chat";
+    composerEl?.focus();
+  }
+  function openHistory() {
+    sessionHistory.ensureLoaded();
+    view = "history";
+  }
+  function openSession(s: SavedSession) {
+    viewing = s;
+    view = "chat";
+  }
 
   async function send() {
     const t = prompt.trim();
     if (!t || sending || !ready) return;
     sending = true;
+    viewing = null;
     myLines = [...myLines, { text: t, ts: Date.now() }];
     prompt = "";
     try {
@@ -82,66 +127,130 @@
       void send();
     }
   }
+
+  function relTime(ts: number): string {
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+
+  const showBar = $derived(view === "history" || !!viewing || transcript.length > 0);
 </script>
 
 <div class="waldo">
-  <div class="intro" class:hide={transcript.length > 0}>
-    <div class="hero" class:alive={ready}><Sparkle size={26} weight="fill" /></div>
-    <h2>Meet Waldo</h2>
-    <p>
-      Your resident agent — ask, search, open tabs, or debug the system with
-      you, by text or voice. It works issues with you; never runs off on its own.
-    </p>
-    <span class="powered">
-      <Icon value="lobe:openrouter" name="OpenRouter" size={13} />
-      Runs on OpenRouter — every model, one key
-    </span>
-    {#if ready}
-      <div class="suggestions">
-        {#each SUGGESTIONS as s (s.label)}
-          {@const SIcon = s.icon}
-          <button type="button" class="chip" onclick={() => useSuggestion(s.text)}>
-            <SIcon size={13} weight="bold" />
-            {s.label}
-          </button>
-        {/each}
-      </div>
-    {:else}
-      <p class="hint">
-        Connect a nexus (engine chip, top-right) and add your OpenRouter key to
-        wake Waldo.
-      </p>
-    {/if}
-  </div>
-
-  {#if transcript.length > 0}
-    <div class="thread">
-      {#each transcript as m, i (m.ts + "-" + i)}
-        <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
-          {#if m.who === "waldo" && m.kind === "msg"}<span class="tag">Waldo</span>{/if}
-          <span class="text">{m.text || (m.pending ? "…" : "")}</span>
-        </div>
-      {/each}
+  {#if showBar}
+    <div class="bar">
+      {#if view === "history" || viewing}
+        <button type="button" class="bar-btn" onclick={() => { view = "chat"; viewing = null; }}>
+          <CaretLeft size={13} weight="bold" /> Back
+        </button>
+      {:else}
+        <button type="button" class="bar-btn" onclick={openHistory}>
+          <ClockCounterClockwise size={13} weight="bold" /> History
+        </button>
+      {/if}
+      <span class="spacer"></span>
+      {#if view === "chat" && !viewing && (transcript.length > 0 || sending)}
+        <button type="button" class="bar-btn" onclick={newChat} title="New chat">
+          <Plus size={13} weight="bold" /> New
+        </button>
+      {/if}
     </div>
   {/if}
 
-  <form class="composer" onsubmit={(e) => { e.preventDefault(); void send(); }}>
-    <textarea
-      bind:this={composerEl}
-      bind:value={prompt}
-      onkeydown={onKey}
-      placeholder={ready ? "Ask Waldo…" : "Connect a nexus first"}
-      rows="2"
-      spellcheck="false"
-      disabled={!ready || sending}
-    ></textarea>
-    <div class="composer-foot">
-      <span class="kbd">⌘↵</span>
-      <button type="submit" class="send" disabled={!ready || !prompt.trim() || sending} aria-label="Send">
-        <PaperPlaneRight size={14} weight="fill" />
-      </button>
+  {#if view === "history"}
+    <div class="history">
+      {#if sessionHistory.sessions.length === 0}
+        <p class="empty-note">No past chats yet — your conversations show up here.</p>
+      {:else}
+        {#each sessionHistory.sessions as s (s.id)}
+          <button type="button" class="hist-row" onclick={() => openSession(s)}>
+            <span class="hist-title">{s.title}</span>
+            <span class="hist-meta">{relTime(s.ts)}</span>
+          </button>
+        {/each}
+      {/if}
     </div>
-  </form>
+  {:else if viewing}
+    <div class="thread">
+      {#each viewing.lines as m, i (i)}
+        <div class="bubble {m.who}" class:tool={m.kind === "tool"}>
+          {#if m.who === "waldo" && m.kind === "msg"}
+            <span class="tag">Waldo</span><AssistantMessageView text={m.text} />
+          {:else}
+            <span class="text">{m.text}</span>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {:else if transcript.length > 0}
+    <div class="thread">
+      {#each transcript as m, i (m.ts + "-" + i)}
+        <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
+          {#if m.who === "waldo" && m.kind === "msg"}
+            <span class="tag">Waldo</span>
+            {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="text dim">…</span>{/if}
+          {:else}
+            <span class="text">{m.text}</span>
+          {/if}
+        </div>
+      {/each}
+      {#if thinking}
+        <div class="bubble waldo">
+          <span class="tag">Waldo</span>
+          <span class="typing"><span></span><span></span><span></span></span>
+        </div>
+      {/if}
+    </div>
+  {:else}
+    <div class="intro">
+      <div class="aura" aria-hidden="true"></div>
+      <h2>Meet Waldo</h2>
+      <p>
+        Your resident agent — ask, search, open tabs, or set things up with you,
+        by text or voice. It works problems with you; never runs off alone.
+      </p>
+      <span class="powered">
+        <Icon value="lobe:openrouter" name="OpenRouter" size={13} />
+        Runs on OpenRouter — every model, one key
+      </span>
+      {#if ready}
+        <div class="suggestions">
+          {#each SUGGESTIONS as s (s.label)}
+            {@const SIcon = s.icon}
+            <button type="button" class="chip" onclick={() => useSuggestion(s.text)}>
+              <SIcon size={13} weight="bold" />
+              {s.label}
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <p class="hint">Connect a nexus (engine chip, top-right) and add your OpenRouter key to wake Waldo.</p>
+      {/if}
+    </div>
+  {/if}
+
+  {#if view !== "history"}
+    <form class="composer" onsubmit={(e) => { e.preventDefault(); void send(); }}>
+      <textarea
+        bind:this={composerEl}
+        bind:value={prompt}
+        onkeydown={onKey}
+        placeholder={ready ? "Ask Waldo…" : "Connect a nexus first"}
+        rows="2"
+        spellcheck="false"
+        disabled={!ready || sending}
+      ></textarea>
+      <div class="composer-foot">
+        <span class="kbd">⌘↵</span>
+        <button type="submit" class="send" disabled={!ready || !prompt.trim() || sending} aria-label="Send">
+          <PaperPlaneRight size={14} weight="fill" />
+        </button>
+      </div>
+    </form>
+  {/if}
 </div>
 
 <style>
@@ -152,7 +261,35 @@
     flex-direction: column;
     background: var(--color-surface);
   }
+
+  /* Slim in-panel toolbar — history / back / new. */
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .bar .spacer { flex: 1; }
+  .bar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .bar-btn:hover { background: var(--color-surface-soft); color: var(--color-fg); }
+
+  /* ── empty state ─────────────────────────────────────────────────────────── */
   .intro {
+    position: relative;
     flex: 1;
     min-height: 0;
     display: flex;
@@ -162,25 +299,39 @@
     gap: 0.7rem;
     padding: 1.5rem;
     text-align: center;
+    overflow: hidden;
   }
-  .intro.hide { display: none; }
-  .hero {
-    display: grid;
-    place-items: center;
-    width: 54px;
-    height: 54px;
-    border-radius: 16px;
-    background: var(--color-surface-soft);
-    border: 1px solid var(--color-border);
-    color: var(--color-fg);
+  /* A subtle, slow, viscous aura — ambient movement, never abrasive. Brand-tinted
+     blurred blob that morphs + drifts behind the copy. */
+  .aura {
+    position: absolute;
+    top: 28%;
+    width: 200px;
+    height: 200px;
+    border-radius: 42% 58% 56% 44%;
+    background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-brand, var(--color-fg)) 24%, transparent), transparent 68%);
+    filter: blur(30px);
+    opacity: 0.55;
+    pointer-events: none;
+    animation: aura-drift 16s ease-in-out infinite;
   }
+  @keyframes aura-drift {
+    0%, 100% { border-radius: 42% 58% 56% 44%; transform: translate(-8px, -6px) scale(1) rotate(0deg); }
+    33% { border-radius: 62% 38% 44% 56%; transform: translate(10px, 6px) scale(1.12) rotate(40deg); }
+    66% { border-radius: 45% 55% 62% 38%; transform: translate(-4px, 10px) scale(0.95) rotate(-30deg); }
+  }
+  @media (prefers-reduced-motion: reduce) { .aura { animation: none; } }
+
   .intro h2 {
+    position: relative;
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     color: var(--color-fg);
   }
   .intro p {
+    position: relative;
     margin: 0;
     font-size: 0.82rem;
     line-height: 1.55;
@@ -193,16 +344,8 @@
     color: var(--color-fg-subtle);
     max-width: 32ch;
   }
-  .hero { transition: background 0.3s, color 0.3s; }
-  .hero.alive { animation: hero-pulse 2.4s ease-in-out infinite; }
-  @keyframes hero-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-fg) 16%, transparent); }
-    50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-fg) 0%, transparent); }
-  }
-  @media (prefers-reduced-motion: reduce) { .hero.alive { animation: none; } }
-
-  /* OpenRouter badge — Waldo's model lane. */
   .powered {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -214,9 +357,8 @@
     color: var(--color-fg-muted);
   }
   .powered :global(img) { display: block; }
-
-  /* Quick-start chips. */
   .suggestions {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -236,11 +378,56 @@
     cursor: pointer;
     transition: border-color 0.14s, color 0.14s, background 0.14s;
   }
-  .chip:hover {
-    border-color: var(--color-border-strong);
-    color: var(--color-fg);
-    background: var(--color-surface);
+  .chip:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface); }
+
+  /* ── history list ────────────────────────────────────────────────────────── */
+  .history {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
+  .empty-note {
+    margin: auto;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--color-fg-subtle);
+    max-width: 28ch;
+  }
+  .hist-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-fg);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .hist-row:hover { background: var(--color-surface-soft); }
+  .hist-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.84rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hist-meta {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    color: var(--color-fg-subtle);
+  }
+
+  /* ── thread ──────────────────────────────────────────────────────────────── */
   .thread {
     flex: 1;
     min-height: 0;
@@ -259,16 +446,8 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .bubble.you {
-    align-self: flex-end;
-    background: var(--color-fg);
-    color: var(--color-page);
-  }
-  .bubble.waldo {
-    align-self: flex-start;
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-  }
+  .bubble.you { align-self: flex-end; background: var(--color-fg); color: var(--color-page); }
+  .bubble.waldo { align-self: flex-start; background: var(--color-surface-soft); color: var(--color-fg); }
   .bubble.tool {
     font-family: var(--font-mono);
     font-size: 0.74rem;
@@ -287,6 +466,24 @@
     color: var(--color-fg-subtle);
     margin-bottom: 2px;
   }
+  .text.dim { color: var(--color-fg-subtle); }
+
+  .typing { display: inline-flex; gap: 3px; padding: 2px 0; }
+  .typing span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--color-fg-subtle);
+    animation: typing-bounce 1.2s infinite ease-in-out both;
+  }
+  .typing span:nth-child(1) { animation-delay: -0.24s; }
+  .typing span:nth-child(2) { animation-delay: -0.12s; }
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-3px); opacity: 1; }
+  }
+
+  /* ── composer ────────────────────────────────────────────────────────────── */
   .composer {
     flex-shrink: 0;
     border-top: 1px solid var(--color-border);
@@ -306,11 +503,7 @@
     outline: none;
   }
   .composer textarea::placeholder { color: var(--color-fg-subtle); }
-  .composer-foot {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .composer-foot { display: flex; align-items: center; gap: 8px; }
   .send {
     display: grid;
     place-items: center;
@@ -322,11 +515,6 @@
     background: var(--color-fg);
     color: var(--color-page);
   }
-  .kbd {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--color-fg-subtle);
-  }
+  .kbd { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-fg-subtle); }
   .send:disabled { opacity: 0.45; cursor: default; }
 </style>
