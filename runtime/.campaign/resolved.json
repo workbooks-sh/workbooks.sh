@@ -2665,6 +2665,13 @@
    "proof": "mini-gmp (single-file GMP subset) via build_c_dir computes exact big integers: 2^200=1606938...301376, 30!=265252859812191058636308480000000; minigmp_lane_test.exs green",
    "lane": "compilers/minigmp/build.sh (fetch GMP sha-pinned, extract mini-gmp, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "stb_image_write": {
+   "capability": "image encoding/generation (PNG/JPG/BMP/TGA) in-sandbox",
+   "status": "live",
+   "proof": "stb_image_write via build_c_dir encodes 2x2 pixels -> PNG (76 bytes) and decodes back (stb_image) to w=2 h=2 ch=4 with the orange pixel intact (255,128,0); stbwrite_lane_test.exs green. Complements stb_image (decode).",
+   "lane": "compilers/stbwrite/build.sh (fetch stb headers pinned commit, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
