@@ -415,7 +415,7 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .soon-pane p{ font-size:20px; line-height:1.6; margin:22px 0; color:var(--prose); }
 
 /* right pane — course controls */
-.rail{ border-left:1px solid var(--line); padding:62px 30px; position:sticky; top:0; align-self:start; min-height:100vh; }
+.rail{ border-left:1px solid var(--line); padding:62px 30px; position:sticky; top:0; align-self:start; min-height:100vh; display:flex; flex-direction:column; }
 .rail .pos{ font:700 10px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
 .rail .audio{ margin:18px 0 0; }
 .play{ display:flex; align-items:center; gap:13px; padding:12px 16px; border:2px solid var(--stroke); border-radius:999px;
@@ -447,9 +447,12 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .rail .cont:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--shadow); }
 .rail .cont:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow); }
 .rail .cont.done{ background:var(--pc); }
-.rail .nav{ margin:24px 0 0; display:flex; flex-direction:column; gap:2px; border-top:1px solid var(--line); padding-top:18px; }
-.rail .nav a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:9px 0; }
-.rail .nav a:hover{ color:var(--ink); }
+/* notes — full-bleed, browser-cached scratchpad; not a boxed input */
+.rail .notes{ display:block; width:100%; flex:1 1 auto; min-height:calc(100vh - 360px);
+  margin:24px 0 0; padding:20px 0 0; border:0; border-top:1px solid var(--line); border-radius:0;
+  background:transparent; resize:none; outline:none; overflow-y:auto;
+  font:400 15px/1.7 var(--read); color:var(--prose); -webkit-font-smoothing:antialiased; }
+.rail .notes::placeholder{ color:var(--dim); opacity:.85; }
 
 /* topbar (mobile) */
 .topbar{ display:none; }
@@ -459,8 +462,8 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
   .pane{ grid-template-columns:1fr; }
   .rail{ border-left:0; border-top:2px solid var(--stroke); position:static; min-height:0; padding:26px 56px 60px;
     max-width:760px; margin:0 auto; width:100%; display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
-  .rail .audio{ margin:0; } .rail .cont{ margin:0; width:auto; flex:1; min-width:220px; } .rail .nav{ margin:0; width:100%; flex-direction:row; }
-  .rail .nav a{ flex:1; }
+  .rail .audio{ margin:0; } .rail .cont{ margin:0; width:auto; flex:1; min-width:220px; }
+  .rail .notes{ margin:8px 0 0; width:100%; min-height:200px; flex:0 0 auto; }
   .reading{ padding:40px 56px 40px; }
 }
 @media (max-width:900px){
@@ -616,12 +619,19 @@ JS = """
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
   if(scrim) scrim.addEventListener("click",close);
   var pl=document.getElementById("play");
-  if(pl){ var au=null, lab=document.getElementById("playlab");
+  if(pl){ var au=null, lab=document.getElementById("playlab"), pico=document.getElementById("playico");
+    var PLAYSVG='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    var PAUSESVG='<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>';
+    function setPlaying(p){ pl.classList.toggle("playing",p); if(lab) lab.textContent=p?"Pause":"Listen"; if(pico) pico.innerHTML=p?PAUSESVG:PLAYSVG; }
     pl.addEventListener("click",function(){
-      if(!au){ au=new Audio(pl.dataset.src); au.addEventListener("ended",function(){ pl.classList.remove("playing"); lab.textContent="Listen"; }); }
-      if(au.paused){ au.play(); pl.classList.add("playing"); lab.textContent="Pause"; }
-      else{ au.pause(); pl.classList.remove("playing"); lab.textContent="Listen"; }
+      if(!au){ au=new Audio(pl.dataset.src); au.addEventListener("ended",function(){ setPlaying(false); }); }
+      if(au.paused){ au.play(); setPlaying(true); } else { au.pause(); setPlaying(false); }
     });
+  }
+  var nt=document.getElementById("notes");
+  if(nt){ var nk="wb-lms-notes:"+nt.dataset.slug;
+    try{ nt.value=localStorage.getItem(nk)||""; }catch(e){}
+    nt.addEventListener("input",function(){ try{ localStorage.setItem(nk,nt.value); }catch(e){} });
   }
   // custom video players
   document.querySelectorAll(".vplayer").forEach(function(vp){
@@ -786,15 +796,10 @@ def lesson_page(l):
                    % (crumb, esc(l["title"]), esc(l.get("teaches", "")), deeper_box(l.get("docs"))))
     audio = ""
     if l.get("audio"):
-        audio = ('<div class="audio"><div class="play" id="play" data-src="%s"><span class="ico">'
+        audio = ('<div class="audio"><div class="play" id="play" data-src="%s"><span class="ico" id="playico">'
                  '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>'
                  '<span class="lab" id="playlab">Listen</span><span class="time">%s</span></div></div>'
                  % (esc(l["audio"]), esc(l.get("mins", ""))))
-    nav = ""
-    if l["prev"]:
-        nav += '<a href="/learn/%s">← Previous</a>' % esc(l["prev"]["slug"])
-    if l["next"]:
-        nav += '<a href="/learn/%s">Next →</a>' % esc(l["next"]["slug"])
     nxt = l["next"]["slug"] if l["next"] else ""
     cclabel = "Complete & continue" if l["next"] else "Complete & finish"
     # quiz button — directly below the Listen/audio button — only if questions exist
@@ -806,8 +811,9 @@ def lesson_page(l):
                    % (esc(l["slug"]), esc(l["slug"])))
     rail = ('<aside class="rail"><div class="pos">Lesson %d of %d</div>%s%s'
             '<button class="cont" id="cc" data-next="%s"><span>%s</span> →</button>'
-            '<div class="nav">%s</div></aside>'
-            % (l["i"]+1, TOTAL, audio, quizbtn, esc(nxt), cclabel, nav))
+            '<textarea class="notes" id="notes" data-slug="%s" spellcheck="false"'
+            ' placeholder="Notes are taken here — saved to your browser cache."></textarea></aside>'
+            % (l["i"]+1, TOTAL, audio, quizbtn, esc(nxt), cclabel, esc(l["slug"])))
     main = '<div class="pane"><div class="reading">%s</div>%s</div>' % (reading, rail)
     plight, pdeep = unit_color(l["unit"])
     return HEAD.format(
