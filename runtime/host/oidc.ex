@@ -1,19 +1,15 @@
 defmodule Workbooks.OIDC do
   @moduledoc """
-  Generic OIDC / JWKS token verification — the pluggable identity-provider seam
-  (wb-wejt). Any RS256-JWT IdP works the same way: WorkOS, Clerk, Auth0, etc. all
-  publish a JWKS and sign RS256 tokens. A deployment points this at ITS provider's
-  JWKS (it is NOT WorkOS-specific):
+  OIDC / JWKS token verification — the identity-provider seam. A deployment points
+  it at its provider's JWKS endpoint (WorkOS, Clerk, Auth0, or any RS256-JWT IdP):
 
-    WB_OIDC_JWKS_URL    — the provider's JWKS endpoint (required to enable)
-    WB_OIDC_ISSUER      — optional; if set, the token's `iss` must match
-    WB_OIDC_TENANT_CLAIM — optional; which claim → tenant (default: org_id /
-                           organization_id / sub, in that order)
+    WB_OIDC_JWKS_URL     — the provider's JWKS endpoint (required to enable)
+    WB_OIDC_ISSUER       — optional; if set, the token's `iss` must match
+    WB_OIDC_TENANT_CLAIM — optional; which claim maps to the tenant
+                           (default: org_id, then organization_id, then sub)
 
-  Inert until WB_OIDC_JWKS_URL is set, so local/desktop deployments need none of
-  this. Platform-admin access (our own IdP, for support into customer nexuses) is a
-  SEPARATE, deliberate concern — see wb-<admin>. `verify_token/2` takes an explicit
-  jwks so the crypto path is provable without a live IdP.
+  Inert until WB_OIDC_JWKS_URL is set. `verify_token/2` accepts an explicit `jwks`
+  so the verification path is testable without a live provider.
   """
   require Logger
 
