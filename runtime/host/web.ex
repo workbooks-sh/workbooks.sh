@@ -1147,14 +1147,26 @@ defmodule Workbooks.Web do
         "  #+begin_src component :type kv :title Stats\n  key: value\n  other: value\n  #+end_src\n" <>
         "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it."
 
-    with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
-         dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
-         path <- Path.join([dir, "agents", "#{slug}.org"]),
-         {:ok, org} <- File.read(path),
-         %{system: sys} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
-      sys
-    else
-      _ -> default
+    # Resolve the base prompt + the agent's declared toolkits. Waldo (the
+    # default) ALWAYS gets the workbooks-browser toolkit so it knows how to drive
+    # the app (wb app …, wb env request …). A provisioned <slug>.org overrides.
+    {base, toolkits} =
+      with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
+           dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
+           path <- Path.join([dir, "agents", "#{slug}.org"]),
+           {:ok, org} <- File.read(path),
+           %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
+        {sys, tks}
+      else
+        _ -> {default, ["workbooks-browser"]}
+      end
+
+    # Tier-1 progressive disclosure: append the compact toolkit index (skill
+    # names) so the agent knows what it can do; bodies stay on demand via `wb
+    # toolkit show`.
+    case Workbooks.Toolkits.injection_text(toolkits) do
+      "" -> base
+      index -> base <> "\n\n" <> index
     end
   end
 
