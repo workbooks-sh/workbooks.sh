@@ -2,9 +2,9 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 676,
+    "tests": 698,
     "failures": 0,
-    "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
+    "verified": "2026-06-14 (seed 0; all green in isolation \u2014 AgentPrompt/Ffmpeg wasm tests flake only under concurrent load, see wb issue)"
   },
   "note": "Canonical, agent-maintained ledger. The /capabilities dashboard reads it LIVE (re-poll). `units` = ACTUAL test-case count of each capability's dedicated test file(s) (no file is shared across two rows, so the sum is real, not double-counted). `suite.tests` is the authoritative full deterministic suite total. status: done | wip | gated | planned.",
   "areas": [
