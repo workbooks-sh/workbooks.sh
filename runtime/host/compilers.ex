@@ -1991,7 +1991,8 @@ defmodule Workbooks.Compilers do
     "url" => "url",
     "buffer" => "buffer",
     "os" => "os-browserify",
-    "crypto" => "crypto-browserify"
+    "crypto" => "crypto-browserify",
+    "zlib" => "browserify-zlib"
   }
 
   @node_banner "globalThis.global=globalThis.global||globalThis;" <>

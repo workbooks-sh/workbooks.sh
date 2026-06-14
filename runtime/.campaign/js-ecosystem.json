@@ -339,7 +339,8 @@
             "deflate/inflate",
             "brotli"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "zlib->browserify-zlib in node_polyfills map: gzip/gunzip + deflate/inflate roundtrips (js_zlib_test)"
         },
         {
           "id": "node-async",
@@ -349,7 +350,8 @@
             "queueMicrotask",
             "async_hooks (defer?)"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "setTimeout/setInterval/setImmediate/queueMicrotask/process.nextTick all proven (js_async_test + banner shims; clocks enabled)"
         },
         {
           "id": "node-worker",
