@@ -79,6 +79,29 @@ defmodule Workbooks.ControlPlane do
   @doc "Revoke a grant by id (future adds are blocked; already-vendored Drafts are the recipient's own)."
   def delete_share(id), do: GenServer.call(__MODULE__, {:delete_share, id})
 
+  # --- Roles (Phase 4 RBAC) ---------------------------------------------------
+  # A member's role WITHIN a tenant (owner|admin|member|viewer). The runtime's own
+  # source of truth — independent of the JWT (which carries no role today) and of
+  # any IdP, so RBAC works the same on desktop/dev/cloud. A reserved tenant `"*"`
+  # row marks a PLATFORM admin (cross-tenant :view, wb-g1yo.5).
+
+  @doc "Role of `user_id` in `tenant` → \"owner\"|\"admin\"|\"member\"|\"viewer\". Default in `Workbooks.RBAC`."
+  def role_of(tenant, user_id), do: GenServer.call(__MODULE__, {:role_of, tenant, user_id})
+
+  @doc "Set a member's role in a tenant (idempotent)."
+  def set_role(tenant, user_id, role), do: GenServer.call(__MODULE__, {:set_role, tenant, user_id, to_string(role)})
+
+  @doc "All (user_id, role) rows for a tenant."
+  def list_roles(tenant), do: GenServer.call(__MODULE__, {:list_roles, tenant})
+
+  @doc "Is `user_id` a PLATFORM admin (a row under the reserved `\"*\"` tenant)?"
+  def platform_admin?(user_id) do
+    case role_of("*", user_id) do
+      r when r in ["admin", "owner"] -> true
+      _ -> false
+    end
+  end
+
   @doc "Stable grant id for a triple (owner/folder→recipient) — idempotent, no timestamp."
   def share_id(owner, folder, recipient) do
     :crypto.hash(:sha256, "#{owner}/shared/#{folder}->#{recipient}")
@@ -112,6 +135,14 @@ defmodule Workbooks.ControlPlane do
       CREATE TABLE IF NOT EXISTS shares (
         id TEXT PRIMARY KEY, owner_tenant TEXT, folder TEXT,
         recipient_tenant TEXT, mode TEXT, created INTEGER
+      )
+      """)
+
+    :ok =
+      Sqlite3.execute(conn, """
+      CREATE TABLE IF NOT EXISTS roles (
+        tenant TEXT, user_id TEXT, role TEXT, updated INTEGER,
+        PRIMARY KEY (tenant, user_id)
       )
       """)
 
@@ -252,6 +283,36 @@ defmodule Workbooks.ControlPlane do
   # `column` is interpolated into the SQL, so it MUST stay a fixed internal literal
   # (only "owner_tenant" / "recipient_tenant" from shares_by/shares_for) — never a
   # caller value. Allow-listed here so a future caller can't smuggle SQL through it.
+  def handle_call({:role_of, tenant, user_id}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT role FROM roles WHERE tenant = ?1 AND user_id = ?2")
+    :ok = Sqlite3.bind(stmt, [tenant, user_id])
+
+    reply =
+      case Sqlite3.step(conn, stmt) do
+        {:row, [role]} -> role
+        :done -> nil
+      end
+
+    Sqlite3.release(conn, stmt)
+    {:reply, reply, s}
+  end
+
+  def handle_call({:set_role, tenant, user_id, role}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "INSERT OR REPLACE INTO roles VALUES (?1, ?2, ?3, ?4)")
+    :ok = Sqlite3.bind(stmt, [tenant, user_id, role, System.system_time(:second)])
+    :done = Sqlite3.step(conn, stmt)
+    :ok = Sqlite3.release(conn, stmt)
+    {:reply, :ok, s}
+  end
+
+  def handle_call({:list_roles, tenant}, _from, %{conn: conn} = s) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT user_id, role FROM roles WHERE tenant = ?1 ORDER BY user_id")
+    :ok = Sqlite3.bind(stmt, [tenant])
+    rows = drain(conn, stmt, []) |> Enum.map(fn [u, r] -> %{user_id: u, role: r} end)
+    Sqlite3.release(conn, stmt)
+    {:reply, rows, s}
+  end
+
   defp share_rows(conn, column, tenant) when column in ["owner_tenant", "recipient_tenant"] do
     {:ok, stmt} =
       Sqlite3.prepare(conn, "SELECT id, owner_tenant, folder, recipient_tenant, mode FROM shares WHERE #{column} = ?1 ORDER BY created DESC")

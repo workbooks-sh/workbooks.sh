@@ -1359,11 +1359,61 @@ defmodule Workbooks.Web do
     end
 
     mode = if p["mode"] == "draft", do: :draft, else: :read
+    t = conn.assigns[:tenant]
 
-    case Workbooks.SharedFolder.share(conn.assigns[:tenant], p["folder"], p["recipient"], mode) do
-      {:ok, grant} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(grant))
-      {:error, :no_such_folder} -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"no such folder"}))
-      _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"bad request"}))
+    # RBAC (Phase 4): sharing an org folder is an admin+ capability. The tenant wall
+    # still confines WHICH folders (SharedFolder), RBAC gates WHO may share them.
+    if Workbooks.RBAC.can?(caller_subject(conn), :share, %{tenant: t, level: :folder, id: p["folder"]}) do
+      case Workbooks.SharedFolder.share(t, p["folder"], p["recipient"], mode) do
+        {:ok, grant} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(grant))
+        {:error, :no_such_folder} -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"no such folder"}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"bad request"}))
+      end
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, ~s({"error":"forbidden"}))
+    end
+  end
+
+  # --- Roles (Phase 4 RBAC) --------------------------------------------------
+  # Read your tenant's roles (any member); set a member's role (owner-only —
+  # :manage_roles). Subject is built from the authenticated identity, never a body.
+  get "/api/roles" do
+    t = conn.assigns[:tenant]
+
+    if Workbooks.RBAC.can?(caller_subject(conn), :view, %{tenant: t, level: :nexus, id: t}) do
+      body = %{roles: Workbooks.ControlPlane.list_roles(t), matrix: rbac_matrix()}
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(body))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(403, ~s({"error":"forbidden"}))
+    end
+  end
+
+  post "/api/roles" do
+    {:ok, raw, conn} = read_body(conn)
+    p = case Jason.decode(raw) do
+      {:ok, %{} = m} -> m
+      _ -> %{}
+    end
+
+    t = conn.assigns[:tenant]
+    role = p["role"]
+    user = p["user_id"]
+
+    cond do
+      # the reserved "*" tenant carries PLATFORM-admin rows — never writable through a
+      # tenant-scoped route, regardless of how the tenant string was set.
+      t in [nil, "", "*"] ->
+        conn |> put_resp_content_type("application/json") |> send_resp(403, ~s({"error":"forbidden"}))
+
+      not Workbooks.RBAC.can?(caller_subject(conn), :manage_roles, %{tenant: t, level: :nexus, id: t}) ->
+        conn |> put_resp_content_type("application/json") |> send_resp(403, ~s({"error":"forbidden"}))
+
+      not (is_binary(user) and user != "" and role in ["owner", "admin", "member", "viewer"]) ->
+        conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"bad request"}))
+
+      true ->
+        :ok = Workbooks.ControlPlane.set_role(t, user, role)
+        conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
     end
   end
 
@@ -1380,6 +1430,20 @@ defmodule Workbooks.Web do
       :ok -> conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
       _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
     end
+  end
+
+  # The RBAC subject for the authenticated caller — role resolved from the registry
+  # (never the body). Falls back to tenant-as-user (the single-tenant/desktop identity
+  # → owner) when no richer identity is present.
+  defp caller_subject(conn) do
+    t = conn.assigns[:tenant]
+    uid = (conn.assigns[:identity] && conn.assigns[:identity].user_id) || t
+    Workbooks.RBAC.subject(t || "", uid || "")
+  end
+
+  # The role→capability legend, for the dashboard "Roles & access" surface.
+  defp rbac_matrix do
+    Map.new(Workbooks.RBAC.roles(), fn r -> {r, Workbooks.RBAC.capabilities(r)} end)
   end
 
   # A scope is an opaque workbook id: letters/digits/_/- only, no `.`, no separators
