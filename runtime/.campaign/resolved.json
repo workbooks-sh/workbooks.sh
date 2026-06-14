@@ -2602,6 +2602,13 @@
    "proof": "Lua 5.4.7 reference interpreter compiles from source (33 C files via build_c_dir) + runs scripts: print(\"hi\",2+3,math.sqrt(16))->hi 5 4.0, loop i*i->1 4 9; lua_lane_test.exs green",
    "lane": "compilers/lua/build.sh (fetch lua.org source sha-verified, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "zstd": {
+   "capability": "zstd compression in-sandbox",
+   "status": "live",
+   "proof": "zstd 1.5.6 single-file amalgam compiles via build_c_dir + compress->decompress roundtrip (orig=72 comp=49 match=1); zstd_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
+   "lane": "compilers/zstd/build.sh (fetch+combine.py amalgam, sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
