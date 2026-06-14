@@ -36,6 +36,9 @@ defmodule Workbooks.JsEngine do
   # Pure-JS Node builtins resolvable on StarlingMonkey. process is injected by the prelude itself
   # (host-supplied env/argv, buffered stdout) — NOT loaded from the Javy-bound process.js shim.
   @node_builtins ~w(path events util os querystring url string_decoder assert timers)
+  # SM-lane shims that supersede the generic pure-JS ones when a capability is granted. child_process on
+  # SM dispatches over fetch() to the ExecLoopback sentinel (the only host seam SM has) — NOT Javy.Exec.
+  @sm_shim_dir Path.join(@js_root, "shims-sm")
 
   # the fixed eval bootstrap — exports `run(input)` (the workbook world), eval's the JS, returns a string.
   # ASYNC bootstrap (wb js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
@@ -170,27 +173,61 @@ defmodule Workbooks.JsEngine do
   def run_node(src, opts \\ []) when is_binary(src) do
     env = Keyword.get(opts, :env, %{})
     argv = Keyword.get(opts, :argv, ["node", "script"])
+    # exec grant (SLICE 1): `exec: [allow: true, commands: …, principal: …]` enables `require('child_process')`
+    # on the SM lane — it dispatches over fetch() to the ExecLoopback sentinel → ExecBroker. Absent => no exec.
+    exec_opts = Keyword.get(opts, :exec, nil)
 
     with {:ok, prelude} <- File.read(@node_prelude),
          {:ok, shims} <- load_node_shims() do
-      boot =
-        Jason.encode!(%{
-          "shims" => shims,
-          "env" => env,
-          "argv" => argv
-        })
+      {shims, exec_seam, token} = maybe_grant_exec(shims, exec_opts)
+
+      try do
+        boot =
+          Jason.encode!(
+            %{
+              "shims" => shims,
+              "env" => env,
+              "argv" => argv
+            }
+            |> then(fn m -> if exec_seam, do: Map.put(m, "exec", exec_seam), else: m end)
+          )
 
       # One eval payload: (1) set the host-injection seam, (2) run the prelude IIFE (installs globals),
-      # (3) run the user script, (4) return the buffered stdout/stderr + exit code as JSON.
+      # (3) run the user script inside an AWAITED async IIFE, (4) IDLE-DRAIN the event loop so async work
+      #    (fetch/exec) flushes to the buffers, (5) return the buffered stdout/stderr + exit code as JSON.
+      #
+      # The async IIFE + idle-drain mirror console_capture/1: a synchronous wrapper returns BEFORE any
+      # awaited fetch/exec resolves, so its stdout never reaches the host. We instrument fetch with an
+      # in-flight counter (the prelude leaves __wbPend untouched if absent), then await until in-flight is
+      # zero AND output is stable for several turns. The bootstrap's `run` awaits the returned thenable, so
+      # StarlingMonkey drives its event loop until this settles. Sync scripts are unaffected (drain exits
+      # immediately once stable). `await (async()=>{ <src> })()` preserves the user's top-level `await`.
       composed =
         "globalThis.__wbNode=" <>
           boot <>
           ";\n" <>
           prelude <>
-          "\n;(function(){\n" <>
+          "\n;(async function(){\n" <>
+          "globalThis.__wbPend=globalThis.__wbPend||0;\n" <>
+          "if(typeof fetch===\"function\"&&!globalThis.__wbFetchWrapped){globalThis.__wbFetchWrapped=true;" <>
+          "const __of=fetch;globalThis.fetch=function(){globalThis.__wbPend++;" <>
+          "const __r=__of.apply(this,arguments);Promise.resolve(__r).then(x=>x).catch(()=>{}).finally(()=>{globalThis.__wbPend--});return __r;};}\n" <>
+          # also count in-flight setTimeout callbacks so the drain doesn't exit during a quiet gap between
+          # scheduled continuations (a 30ms timer leaves stdout empty until it fires — without this the
+          # stability counter could trip first and we'd return mid-async, losing later output).
+          "if(typeof setTimeout===\"function\"&&!globalThis.__wbTimerWrapped){globalThis.__wbTimerWrapped=true;" <>
+          "const __ot=setTimeout;globalThis.__wbDrainTimer=__ot;globalThis.setTimeout=function(fn,ms){globalThis.__wbPend++;" <>
+          "return __ot.call(this,function(){try{return fn&&fn.apply(this,arguments)}finally{globalThis.__wbPend--}},ms);};}\n" <>
+          "try{ await (async()=>{\n" <>
           src <>
-          "\n})();\n" <>
-          "JSON.stringify({stdout:(globalThis.__wbStdout||[]).join(\"\"),stderr:(globalThis.__wbStderr||[]).join(\"\"),exit_code:(globalThis.process&&globalThis.process.exitCode)|0});"
+          "\n})(); }catch(e){ globalThis.__wbThrew=(e&&e.message)?e.message:String(e); (globalThis.__wbStderr||[]).push(globalThis.__wbThrew+\"\\n\"); if(globalThis.process) globalThis.process.exitCode=globalThis.process.exitCode||1; }\n" <>
+          "const __drainT=globalThis.__wbTimerWrapped?(globalThis.__wbDrainTimer||setTimeout):setTimeout;\n" <>
+          "let __l=-1,__s=0,__t=Date.now();\n" <>
+          "while((globalThis.__wbPend>0||__s<6)&&(Date.now()-__t)<12000){await new Promise(r=>__drainT(r,10));" <>
+          "const __n=(globalThis.__wbStdout||[]).length+(globalThis.__wbStderr||[]).length;" <>
+          "if(__n===__l){__s++}else{__l=__n;__s=0}}\n" <>
+          "return JSON.stringify({stdout:(globalThis.__wbStdout||[]).join(\"\"),stderr:(globalThis.__wbStderr||[]).join(\"\"),threw:(globalThis.__wbThrew||null),exit_code:(globalThis.process&&globalThis.process.exitCode)|0});" <>
+          "\n})();"
 
       case eval(composed, opts) do
         {:ok, "ERR: " <> msg} ->
@@ -198,6 +235,12 @@ defmodule Workbooks.JsEngine do
 
         {:ok, json} ->
           case Jason.decode(json) do
+            # an UNCAUGHT throw with NO stdout surfaces as {:error, :node_eval_failed} (SLICE 0 contract:
+            # a require-failure / load error is a hard failure, not a 0-exit run). A throw AFTER some output,
+            # or a clean process.exit(n), stays {:ok, …} with the captured stderr + non-zero exit_code.
+            {:ok, %{"stdout" => "", "threw" => msg}} when is_binary(msg) ->
+              {:error, {:node_eval_failed, msg}}
+
             {:ok, %{"stdout" => o, "stderr" => e, "exit_code" => c}} ->
               {:ok, %{stdout: o, stderr: e, result: json, exit_code: c}}
 
@@ -207,8 +250,89 @@ defmodule Workbooks.JsEngine do
 
         {:error, _} = err ->
           err
+        end
+      after
+        # single-run token: revoke as soon as the run ends so a leaked sentinel URL can't be replayed.
+        if token, do: Workbooks.ExecLoopback.revoke(token)
       end
     end
+  end
+
+  @doc """
+  Compose a Node-compat BOOT payload for the PERSISTENT lane (SLICE 2, `Workbooks.HarnessSession`): the
+  `__wbNode` seam + the prelude IIFE + the shim registry, as ONE eval string. Run it ONCE on a live
+  StarlingMonkey instance and `require`/`process`/`Buffer`/`__wbExec` persist on `globalThis` for every
+  subsequent `run()` — exactly the resident-harness shape `run_node/2` builds per call, factored out so a
+  persistent session installs the same Node platform without re-running the one-shot drain wrapper.
+
+  `opts`: `:env` (process.env map), `:argv`, and the exec/llm seam either as a ready
+  `%{"url" => …, "token" => …, ...}` (pass `:exec_seam` — caller already minted a session token) OR as a
+  grant keyword list (`:exec`, mints a single token — for parity with `run_node/2`). Returns
+  `{:ok, boot_js, token_or_nil}` (token is nil when a ready seam was supplied — the caller owns its lifetime).
+  """
+  def node_boot_payload(opts \\ []) do
+    env = Keyword.get(opts, :env, %{})
+    argv = Keyword.get(opts, :argv, ["node", "harness"])
+
+    with {:ok, prelude} <- File.read(@node_prelude),
+         {:ok, base_shims} <- load_node_shims() do
+      {shims, exec_seam, token} =
+        case {Keyword.get(opts, :exec_seam), Keyword.get(opts, :exec)} do
+          {seam, _} when is_map(seam) ->
+            # caller minted the (session-lived) token + seam already; just add the child_process shim.
+            cp = File.read!(Path.join(@sm_shim_dir, "child_process.js"))
+            events = Map.get(base_shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
+            dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
+
+            {base_shims
+             |> Map.put("child_process", cp)
+             |> Map.put("events", events)
+             |> Map.put("dock-auth", dock_auth), seam, nil}
+
+          {nil, exec_opts} when is_list(exec_opts) ->
+            maybe_grant_exec(base_shims, exec_opts)
+
+          _ ->
+            {base_shims, nil, nil}
+        end
+
+      boot_seam =
+        Jason.encode!(
+          %{"shims" => shims, "env" => env, "argv" => argv}
+          |> then(fn m -> if exec_seam, do: Map.put(m, "exec", exec_seam), else: m end)
+        )
+
+      {:ok, "globalThis.__wbNode=" <> boot_seam <> ";\n" <> prelude, token}
+    end
+  end
+
+  # When exec is granted, swap in the SM-lane child_process shim (+ events, its dep), mint a single-run
+  # ExecLoopback token, and build the boot seam {url, token}. Without a grant, child_process simply isn't
+  # registered → `require('child_process')` throws (no silent capability). Returns {shims, exec_seam, token}.
+  defp maybe_grant_exec(shims, nil), do: {shims, nil, nil}
+
+  defp maybe_grant_exec(shims, exec_opts) when is_list(exec_opts) do
+    cp = File.read!(Path.join(@sm_shim_dir, "child_process.js"))
+    # events is child_process's require dep; ensure it's present (it's in @node_builtins already, defensive).
+    events = Map.get(shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
+
+    grant = %{
+      allow: Keyword.get(exec_opts, :allow, false),
+      commands: Keyword.get(exec_opts, :commands, :all),
+      principal: Keyword.get(exec_opts, :principal),
+      depth: Keyword.get(exec_opts, :depth, 0),
+      # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}.
+      creds_scope: Keyword.get(exec_opts, :creds_scope, nil)
+    }
+
+    token = Workbooks.ExecLoopback.mint(grant)
+    seam = %{"url" => Workbooks.ExecLoopback.sentinel_url(), "token" => token}
+    # SLICE 3: the dock-auth shim (dock.creds.{get,put} + dock.oauth.loopback) shares the same sentinel
+    # seam + token; register it so `require('dock-auth')` resolves. Creds access is still gated by the
+    # grant's creds_scope at the route — no scope => the routes 403.
+    dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
+    shims = shims |> Map.put("child_process", cp) |> Map.put("events", events) |> Map.put("dock-auth", dock_auth)
+    {shims, seam, token}
   end
 
   # Read each pure-JS Node shim into a name=>source map for the prelude's registry. Misses are skipped

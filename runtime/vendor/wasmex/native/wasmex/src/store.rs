@@ -643,6 +643,31 @@ impl WasiHttpView for ComponentStoreData {
         let is_https = uri.scheme_str() == Some("https");
         let port = uri.port_u16().unwrap_or(if is_https { 443 } else { 80 });
 
+        // wb-broker EXEC sentinel (SLICE 1, wb-b9xv.9): a SINGLE recognized internal hostname,
+        // "wb-exec.internal", is the privileged loopback route to the in-process ExecLoopback listener
+        // (which bottoms out in ExecBroker — default-deny, registered-only, token-gated). This is the ONE
+        // fixed internal URL the WasiHttpView pins past the public-only SSRF floor — NOT a NetGuard
+        // allow-list hole and NOT a general loopback opening (any OTHER internal/loopback host still
+        // resolves through wb_resolve_pinned below and is denied). Pin straight to 127.0.0.1 on the
+        // configured loopback port; the request is plain HTTP and falls through to the authority rewrite.
+        if host == "wb-exec.internal" {
+            let pinned = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+            let mut request = request;
+            if let Ok(hv) = hyper::header::HeaderValue::from_str(&format!("{}:{}", host, port)) {
+                request.headers_mut().insert(hyper::header::HOST, hv);
+            }
+            let auth_str = format!("127.0.0.1:{}", port);
+            if let Ok(authority) = auth_str.parse::<hyper::http::uri::Authority>() {
+                let mut parts = request.uri().clone().into_parts();
+                parts.authority = Some(authority);
+                if let Ok(new_uri) = hyper::Uri::from_parts(parts) {
+                    *request.uri_mut() = new_uri;
+                }
+            }
+            let _ = pinned;
+            return Ok(default_send_request(request, config));
+        }
+
         // Resolve ONCE + SSRF floor: deny if unresolvable or any resolved IP is internal; keep the pinned IP.
         let pinned = match wb_resolve_pinned(&host, port) {
             Some(ip) => ip,

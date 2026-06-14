@@ -25,6 +25,9 @@ defmodule Workbooks.Application do
         Workbooks.BrokerTables,
         {Registry, keys: :unique, name: Workbooks.Instance.Registry},
         {Registry, keys: :unique, name: Workbooks.AgentSession.Registry},
+        # Persistent pooled SM harness sessions (SLICE 2, wb-b9xv.10/.11): one live Wasmex.Components heap
+        # per session id, held across tool round-trips. Registry keys sessions by id for the via-tuple name.
+        {Registry, keys: :unique, name: Workbooks.HarnessSession.Registry},
         # Runtime → desktop control bus: connected shells register here so an
         # agent's `wb desktop …` call can push tab/theme/key events to them.
         Workbooks.DesktopControl,
@@ -43,6 +46,10 @@ defmodule Workbooks.Application do
         Workbooks.ControlPlane,
         Workbooks.Vars,
         Workbooks.Instance.Supervisor,
+        # Brokered-EXEC loopback for the StarlingMonkey eval lane (SLICE 1, wb-b9xv.9): a 127.0.0.1-only
+        # listener the SM `child_process` shim fetches (sentinel host pinned by the WasiHttpView override)
+        # → ExecBroker (same default-deny spine as the JsDock host_exec import). Always-on; cheap.
+        Workbooks.ExecLoopback,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
       ] ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()

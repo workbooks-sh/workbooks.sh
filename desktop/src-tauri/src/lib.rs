@@ -220,6 +220,12 @@ pub fn run() {
             keychain::connections_create,
             keychain::connections_delete,
             keychain::connections_reveal_api_key,
+            // Harness subscription-creds store (SLICE 3, wb-b9xv.7) — dock.creds.{get,put}.
+            keychain::harness_creds_get,
+            keychain::harness_creds_put,
+            keychain::harness_creds_delete,
+            // Harness OAuth loopback (SLICE 3) — dock.oauth.loopback (PKCE-less, generalized).
+            network::harness_oauth_loopback,
             // Identity + WorkOS + packaging.
             network::identity_load,
             network::identity_generate,
