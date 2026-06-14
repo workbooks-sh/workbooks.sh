@@ -180,6 +180,14 @@
           "failure_modes": [
             "Perplexity provider + Settings UI pending (frontend)"
           ]
+        },
+        {
+          "name": "Org→HTML render (OQL kernel — workbook viewing + publish)",
+          "status": "done",
+          "tests": "oql_render_test",
+          "units": 2,
+          "proof": "Workbooks.OQL.render/1 (the oql.wasm kernel) renders Org → HTML — the product's core output (GET /w/:id viewer + the publish path). PROVEN live: GET /w/render-test → 200, rendered HTML (<h1>/<h2>/<pre><code>) in ~1ms. Deterministic test (headings + list → HTML).",
+          "failure_modes": []
         }
       ]
     },
