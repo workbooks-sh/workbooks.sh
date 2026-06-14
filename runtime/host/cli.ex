@@ -107,9 +107,24 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["query", f], _t), do: f |> File.read!() |> OQL.parse_headlines() |> json()
-  def call(["tangle", f], _t), do: f |> File.read!() |> OQL.tangle_plan() |> json()
-  def call(["lint", f], _t), do: f |> File.read!() |> OQL.lint() |> json()
+  def call(["query", f], _t), do: with_org_file(f, &(&1 |> OQL.parse_headlines() |> json()))
+  def call(["tangle", f], _t), do: with_org_file(f, &(&1 |> OQL.tangle_plan() |> json()))
+  def call(["lint", f], _t), do: with_org_file(f, &(&1 |> OQL.lint() |> json()))
+
+  # Read an Org file for the parse/plan/lint verbs, confined to .org + no traversal
+  # (wb-g1yo): the agent's `wb query <path>` otherwise read ANY host file (the CLI
+  # sibling of the HTTP read_workspace_org confinement). The only legit input is an
+  # Org workbook, so this blocks /etc/* + secrets while keeping the real use intact.
+  defp with_org_file(path, fun) do
+    abs = Path.expand(to_string(path))
+
+    cond do
+      String.contains?(to_string(path), "..") -> ~s({"error":"bad path"})
+      Path.extname(abs) != ".org" -> ~s({"error":"only .org files can be read"})
+      not File.regular?(abs) -> ~s({"error":"no such file"})
+      true -> fun.(File.read!(abs))
+    end
+  end
 
   # The variable store + ref (per tenant).
   def call(["var", "set", key, value | rest], t) do
