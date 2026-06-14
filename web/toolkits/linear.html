@@ -43,8 +43,12 @@ a{ color:inherit; }
   border:1.5px solid var(--ink); border-radius:999px; padding:7px 14px; margin-bottom:26px; }
 .hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,8.2vw,116px);
   line-height:.9; letter-spacing:-.02em; max-width:14ch; }
-.hero h1 em{ font-style:normal; background:var(--p-lav); padding:0 .12em;
-  border-radius:.07em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.hero h1 .rot{ background:var(--rotc,var(--p-lav)); padding:0 .1em 0 .12em; border-radius:.07em;
+  box-decoration-break:clone; -webkit-box-decoration-break:clone; transition:background .35s ease; white-space:nowrap; }
+.hero h1 .rot::after{ content:""; display:inline-block; width:.055em; height:.74em; margin-left:.02em;
+  background:var(--ink); vertical-align:-.02em; animation:caret 1.05s step-end infinite; }
+.hero h1 .rot.norot::after{ display:none; }
+@keyframes caret{ 0%,100%{ opacity:1; } 50%{ opacity:0; } }
 .hero p{ margin-top:26px; max-width:60ch; font-size:14.5px; color:var(--dim); line-height:1.85; }
 .hero code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
   padding:.5px 6px; font-size:.92em; color:var(--ink); }
@@ -52,8 +56,8 @@ a{ color:inherit; }
 .stat .badge{ display:flex; flex-direction:column; gap:2px; min-width:140px;
   background:var(--p-blue); border:2px solid var(--ink); border-radius:14px;
   box-shadow:4px 4px 0 var(--ink); padding:16px 20px; }
-.stat .badge b{ font-family:var(--display); font-weight:400; font-size:46px; line-height:.95;
-  color:var(--ink); }
+.stat .badge b{ font-family:var(--mono); font-weight:800; font-size:40px; line-height:1;
+  letter-spacing:-.03em; color:var(--ink); }
 .stat .badge span{ font:700 10.5px var(--mono); letter-spacing:.14em; text-transform:uppercase;
   color:var(--ink); opacity:.78; }
 .stat .badge:nth-child(2){ background:var(--p-mint); }
@@ -230,7 +234,7 @@ a{ color:inherit; }
         <span><b>asana</b><small>Integration · v0.1.0</small></span>
       </a>
       <a href="/toolkits/byod.html">
-        <span class="logo icon " style="background:#f2ddb0"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M372.841 231.087C368.142 237.284 355.136 245.711 348.251 249.221C309.23 269.113 264.188 275.313 220.934 277.441C213.023 277.821 205.101 277.923 197.182 277.744C192.013 277.668 186.474 277.167 181.346 277.864C179.178 278.159 176.991 278.893 175.121 280.031C171.719 282.103 169.261 285.641 168.367 289.51C165.734 300.906 179.191 329.215 185.361 339.025C188.944 344.727 194.128 352.252 201.091 353.77C203.876 354.378 206.469 353.661 208.812 352.12C223.947 342.166 234.753 308.958 238.349 291.689C246.323 291.048 263.054 289.695 270.643 287.942C269.729 293.198 267.974 299.734 266.623 304.959C260.562 327.893 252.352 350.645 236.326 368.569C219.189 387.737 194.325 391.024 174.63 373.048C157.412 357.336 148.795 337.73 141.841 316.012C137.176 301.451 135.586 286.643 122.822 276.504C112.309 267.695 102.588 266.912 89.9585 263.11C70.4228 257.228 50.3411 248.851 35.1557 234.917C26.1974 226.698 19.0139 215.063 18.6391 202.68C18.27 190.483 23.5331 180.649 31.5842 172.022C34.2717 169.25 37.6844 165.73 40.7459 163.376C56.9037 150.944 76.887 143.599 96.3612 138.152C102.405 136.461 109.376 135.161 115.023 133.395C113.587 144.174 112.46 154.995 111.641 165.841C93.757 169.341 65.354 180.045 52.8539 193.738C50.9016 195.84 49.2501 199.263 49.6056 202.262C50.64 210.46 62.2666 218.34 69.6149 222.081C81.3551 227.544 99.2836 236.348 112.4 236.041C129.42 235.642 125.879 213.612 125.71 203.119C125.666 197.012 125.74 190.906 125.93 184.803C127.352 139.839 135.755 75.2879 164.623 38.3603C172.455 28.3383 184.76 18.8599 197.938 18.0096C232.217 15.8014 250.273 52.7129 260.046 79.5054C261.898 84.4889 263.519 89.5551 264.905 94.6869C268.628 108.213 270.336 116.267 281.459 126.161C292.037 135.57 304.17 136.169 316.882 140.335C335.007 146.507 352.686 153.112 367.33 165.921C389.45 185.27 391.976 208.659 372.841 231.087ZM329.666 224.254C336.05 221.325 346.734 214.883 351.108 209.328C357.925 200.625 354.522 194.018 346.048 187.955C333.064 178.668 314.122 169.805 298.372 166.985C275.596 162.907 278.31 184.714 278.552 198.24C278.718 207.042 278.583 215.847 278.145 224.639C266.993 226.928 258.015 227.77 247.306 229.574C247.689 222.519 247.931 215.457 248.029 208.392C248.151 193.15 247.271 181.946 236.538 169.979C228.848 161.406 216.935 155.806 205.466 155.556C195.669 155.342 183.479 155.635 173.685 156.406C174.84 146.05 176.409 135.745 178.387 125.517C187.276 125.117 196.173 124.908 205.071 124.89C208.003 124.896 211.66 124.953 214.55 125.107C246.516 126.811 235.484 100.032 228.763 83.0904C224.865 74.1023 211.374 42.6881 197.309 49.6087C186.291 55.0313 176.875 76.2376 172.918 87.4522C169.376 97.3315 166.505 107.44 164.324 117.709C159.525 140.892 156.9 164.479 156.487 188.163C156.324 194.558 155.999 203.498 156.851 209.67C157.434 213.923 158.689 218.058 160.571 221.919C165.476 232.188 174.408 240.504 185.147 244.434C195.959 248.391 210.581 247.336 222.153 246.748C258.39 244.907 296.458 239.491 329.666 224.254Z"/></svg></span>
+        <span class="logo icon " style="background:#f2ddb0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/></svg></span>
         <span><b>byod</b><small>Deploy · v0.1.0</small></span>
       </a>
       <a href="/toolkits/capacitor.html">

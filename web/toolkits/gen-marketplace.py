@@ -75,11 +75,29 @@ SLUG_ICON = {
     "wavelet": "org", "workbooks-system": "autopoet", "wraith": "browser",
 }
 
-def icon_for(slug):
-    """Pick a sensible library icon for a logo-less toolkit; fallback = toolkit."""
-    if slug in SLUG_ICON:
-        return ICON_LIB[SLUG_ICON[slug]]
-    return ICON_LIB["toolkit"]
+# ── Lucide (standard icon library) — generic icons by CATEGORY ───────────────
+# Logo-less toolkits get a standard Lucide icon chosen by category. Our CUSTOM
+# brand glyphs (petal/workbook/nexus…) are reserved for toolkits that ARE that
+# noun — see NOUN_GLYPH below — never used as generic category fillers.
+_LSTROKE = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+LUCIDE = {
+    "Dev tools":   '<path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>',
+    "Media":       '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/>',
+    "Design":      '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
+    "Deploy":      '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
+    "Integration": '<path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2"/><rect x="14" y="2" width="8" height="8" rx="1"/>',
+    "Pipeline":    '<path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>',
+    "System":      '<path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/>',
+    "Assets":      '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+}
+LUCIDE_DEFAULT = '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/>'
+
+# Toolkits that ARE a core Workbooks noun → keep the custom brand glyph.
+NOUN_GLYPH = {"workbooks-system": "wb-file"}
+
+def lucide_for(category):
+    body = LUCIDE.get(category, LUCIDE_DEFAULT)
+    return f'<svg viewBox="0 0 24 24" {_LSTROKE}>{body}</svg>'
 
 # ── manifest parsing ────────────────────────────────────────────────────────
 
@@ -336,8 +354,12 @@ a{ color:inherit; }
   border:1.5px solid var(--ink); border-radius:999px; padding:7px 14px; margin-bottom:26px; }
 .hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,8.2vw,116px);
   line-height:.9; letter-spacing:-.02em; max-width:14ch; }
-.hero h1 em{ font-style:normal; background:var(--p-lav); padding:0 .12em;
-  border-radius:.07em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.hero h1 .rot{ background:var(--rotc,var(--p-lav)); padding:0 .1em 0 .12em; border-radius:.07em;
+  box-decoration-break:clone; -webkit-box-decoration-break:clone; transition:background .35s ease; white-space:nowrap; }
+.hero h1 .rot::after{ content:""; display:inline-block; width:.055em; height:.74em; margin-left:.02em;
+  background:var(--ink); vertical-align:-.02em; animation:caret 1.05s step-end infinite; }
+.hero h1 .rot.norot::after{ display:none; }
+@keyframes caret{ 0%,100%{ opacity:1; } 50%{ opacity:0; } }
 .hero p{ margin-top:26px; max-width:60ch; font-size:14.5px; color:var(--dim); line-height:1.85; }
 .hero code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
   padding:.5px 6px; font-size:.92em; color:var(--ink); }
@@ -345,8 +367,8 @@ a{ color:inherit; }
 .stat .badge{ display:flex; flex-direction:column; gap:2px; min-width:140px;
   background:var(--p-blue); border:2px solid var(--ink); border-radius:14px;
   box-shadow:4px 4px 0 var(--ink); padding:16px 20px; }
-.stat .badge b{ font-family:var(--display); font-weight:400; font-size:46px; line-height:.95;
-  color:var(--ink); }
+.stat .badge b{ font-family:var(--mono); font-weight:800; font-size:40px; line-height:1;
+  letter-spacing:-.03em; color:var(--ink); }
 .stat .badge span{ font:700 10.5px var(--mono); letter-spacing:.14em; text-transform:uppercase;
   color:var(--ink); opacity:.78; }
 .stat .badge:nth-child(2){ background:var(--p-mint); }
@@ -473,7 +495,10 @@ def logo_tile(item, cls=""):
     if item.get("real_logo"):
         return (f'<span class="logo brand {cls}" {style}>'
                 f'<img src="{item["logo"]}" alt="{html.escape(slug)} logo"></span>')
-    return f'<span class="logo icon {cls}" {style}>{icon_for(slug)}</span>'
+    # custom brand glyph only when the toolkit IS that noun; else a standard Lucide icon by category
+    if slug in NOUN_GLYPH:
+        return f'<span class="logo icon {cls}" {style}>{ICON_LIB[NOUN_GLYPH[slug]]}</span>'
+    return f'<span class="logo icon {cls}" {style}>{lucide_for(item.get("category"))}</span>'
 
 
 # ── index.html ──────────────────────────────────────────────────────────────
@@ -520,7 +545,7 @@ def render_index(items):
 {NAV}
 <section class="hero">
   <div class="kick">The Workbooks Marketplace</div>
-  <h1>Powers your workbook can <em>install.</em></h1>
+  <h1>powers y<span class="ac">O</span>ur <span class="ac">W</span>orkbook can <span class="rot" id="rot">install</span></h1>
   <p>Toolkits are the capabilities a workbook — or its agent — reaches for: sandboxed-WASM
   powers and live service integrations alike. Add one with <code>wbx toolkit add</code>
   and it's wired straight into the workbook's Dock. Search the catalog, open any one for
@@ -557,6 +582,24 @@ def render_index(items):
 </div>
 
 <script>
+(function(){{
+  var el=document.getElementById('rot'); if(!el) return;
+  var words=["install","use","build","integrate","extend"];
+  var cols=["#d9c5f0","#aee5c2","#a8d4f0","#f3c5a3","#b8e0e8"];
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){{
+    el.textContent=words[0]; el.style.setProperty('--rotc',cols[0]); el.classList.add('norot'); return;
+  }}
+  var wi=0, ci=0, dir=1;
+  function tick(){{
+    var w=words[wi];
+    el.style.setProperty('--rotc',cols[wi]);
+    el.textContent=w.slice(0,ci);
+    if(dir>0){{ ci++; if(ci>w.length){{ dir=-1; ci=w.length; setTimeout(tick,1500); return; }} }}
+    else{{ ci--; if(ci<0){{ dir=1; ci=0; wi=(wi+1)%words.length; setTimeout(tick,240); return; }} }}
+    setTimeout(tick, dir>0?95:48);
+  }}
+  tick();
+}})();
 (function(){{
   var q=document.getElementById('q'), cat=document.getElementById('cat');
   var grid=document.getElementById('grid');

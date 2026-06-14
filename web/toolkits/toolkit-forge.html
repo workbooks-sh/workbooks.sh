@@ -43,8 +43,12 @@ a{ color:inherit; }
   border:1.5px solid var(--ink); border-radius:999px; padding:7px 14px; margin-bottom:26px; }
 .hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(48px,8.2vw,116px);
   line-height:.9; letter-spacing:-.02em; max-width:14ch; }
-.hero h1 em{ font-style:normal; background:var(--p-lav); padding:0 .12em;
-  border-radius:.07em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.hero h1 .rot{ background:var(--rotc,var(--p-lav)); padding:0 .1em 0 .12em; border-radius:.07em;
+  box-decoration-break:clone; -webkit-box-decoration-break:clone; transition:background .35s ease; white-space:nowrap; }
+.hero h1 .rot::after{ content:""; display:inline-block; width:.055em; height:.74em; margin-left:.02em;
+  background:var(--ink); vertical-align:-.02em; animation:caret 1.05s step-end infinite; }
+.hero h1 .rot.norot::after{ display:none; }
+@keyframes caret{ 0%,100%{ opacity:1; } 50%{ opacity:0; } }
 .hero p{ margin-top:26px; max-width:60ch; font-size:14.5px; color:var(--dim); line-height:1.85; }
 .hero code{ background:var(--card); border:1px solid var(--line); border-radius:5px;
   padding:.5px 6px; font-size:.92em; color:var(--ink); }
@@ -52,8 +56,8 @@ a{ color:inherit; }
 .stat .badge{ display:flex; flex-direction:column; gap:2px; min-width:140px;
   background:var(--p-blue); border:2px solid var(--ink); border-radius:14px;
   box-shadow:4px 4px 0 var(--ink); padding:16px 20px; }
-.stat .badge b{ font-family:var(--display); font-weight:400; font-size:46px; line-height:.95;
-  color:var(--ink); }
+.stat .badge b{ font-family:var(--mono); font-weight:800; font-size:40px; line-height:1;
+  letter-spacing:-.03em; color:var(--ink); }
 .stat .badge span{ font:700 10.5px var(--mono); letter-spacing:.14em; text-transform:uppercase;
   color:var(--ink); opacity:.78; }
 .stat .badge:nth-child(2){ background:var(--p-mint); }
@@ -175,7 +179,7 @@ a{ color:inherit; }
   <div class="crumb"><a href="/toolkits/">Marketplace</a> / toolkit-forge</div>
 
   <div class="dhead">
-    <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+    <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></span>
     <div>
       <h1>toolkit-forge</h1>
       <div class="meta">
@@ -226,7 +230,7 @@ a{ color:inherit; }
         <h4>Related toolkits</h4>
         <div class="related">
       <a href="/toolkits/ctk.html">
-        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M236.488 385.511C228.089 384.055 215.178 380.149 206.549 377.84L152.046 363.239L106.616 351.057C98.244 348.811 89.656 346.903 81.5422 343.9C60.8347 336.235 58.051 316.967 53.2469 298.52L43.8095 263.146C38.3903 243.522 33.121 223.857 28.0013 204.152C25.1197 193.454 22.0391 182.806 19.4602 172.032C13.8179 148.492 27.2826 137.174 42.3391 122.246C50.3665 114.345 58.3355 106.386 66.2444 98.3739L112.914 51.7801C121.087 43.5938 129.517 34.6708 137.964 26.8447C145.986 19.4138 157.153 16.6864 168.004 17.5065C176.179 18.7436 190.053 22.8767 198.362 25.1029L252.165 39.5247L297.88 51.7788C312.971 55.8179 329.762 58.1276 339.685 71.1678C347.33 81.2183 349.436 95.2271 352.574 107.282L362.399 143.595C370.349 172.763 378.054 202.088 385.791 231.314C386.8 235.13 387.049 241.167 386.59 245.089C385.79 251.979 383.138 258.522 378.917 264.026C374.53 269.823 359.772 283.927 354.018 289.606L316.077 327.62L283.639 359.955C269.457 374.222 259.068 388.38 236.488 385.511ZM202.198 330.78C208.537 332.478 216.386 334.789 222.701 335.993C246.887 339.223 255.702 325.117 271.331 309.444L304.251 276.443C308.445 272.17 312.688 267.944 316.977 263.766C323.917 257.028 333.512 248.603 325.794 238.303C320.64 231.428 301.084 227.998 292.548 225.724L239.394 211.542C221.717 206.814 203.937 204.387 197.868 184.008C190.333 158.705 184.438 132.877 177.14 107.503C175.13 100.513 172.916 87.8214 169.485 81.8156C156.309 67.5475 145.808 81.5015 136.395 91.0129L94.3827 133.273C87.3023 140.386 79.046 147.222 73.246 155.377C61.886 171.346 70.0236 189.049 74.5302 205.929C78.3584 220.747 82.3067 235.531 86.3795 250.282C90.1574 264.061 93.6342 284.179 101.393 296.072C108.382 306.779 125.158 310.12 136.962 313.292L167.763 321.545L202.198 330.78Z"/></svg></span>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></span>
         <span><b>ctk</b><small>Dev tools · v0.1.0</small></span>
       </a>
       <a href="/toolkits/git.html">
@@ -234,11 +238,11 @@ a{ color:inherit; }
         <span><b>git</b><small>Dev tools · v0.1.0</small></span>
       </a>
       <a href="/toolkits/sandbox.html">
-        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M208,36H48A20,20,0,0,0,28,56V200a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V56A20,20,0,0,0,208,36Zm-4,24v56H52V60ZM52,196V140H204v56ZM160,88a16,16,0,1,1,16,16A16,16,0,0,1,160,88Zm32,80a16,16,0,1,1-16-16A16,16,0,0,1,192,168Z"/></svg></span>
+        <span class="logo icon " style="background:#f3c5a3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></span>
         <span><b>sandbox</b><small>Dev tools · v0.1.0</small></span>
       </a>
       <a href="/toolkits/wraith.html">
-        <span class="logo icon " style="background:#b8e0e8"><svg viewBox="0 0 403 403" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M255.494 117.666C250.42 117.679 245.915 123.002 246.758 127.857C247.523 132.264 251.146 138.332 252.975 142.698C256.703 151.729 259.076 161.265 260.017 170.994C262.941 198.91 254.431 226.819 236.441 248.319C218.911 269.373 193.757 282.582 166.519 285.036C139.163 287.575 111.929 279.085 90.8255 261.443C70.8224 244.823 57.8239 221.229 54.4348 195.401C53.4682 187.996 56.7846 165.626 43.6931 166.928C39.8349 167.312 34.3063 172.804 31.4914 175.813C19.0714 189.097 5.63616 199.732 8.35394 219.793C8.83925 223.606 10.0121 227.302 11.8158 230.693C19.0066 244.072 41.4283 263.568 53.5653 272.878C81.7339 293.389 114.092 307.376 148.303 313.83C230.054 329.768 320.621 306.398 376.413 242.421C379.35 239.054 382.335 235.634 384.585 231.752C386.405 228.633 387.668 225.221 388.318 221.663C391.628 203.884 382.414 193.566 371.006 181.484C341.848 150.605 297.396 125.274 255.494 117.666Z"/><path d="M140.399 52.7404C133.98 52.161 131.591 54.9901 128.516 60.3889C124.479 67.4708 120.724 73.5094 113.383 77.6257C104.327 82.7018 94.8418 79.902 85.2957 81.8355C83.216 82.2584 80.5532 84.4703 79.7866 86.4528C75.8066 96.0025 87.9136 100.061 94.0956 104.115C96.9867 106.039 99.5965 108.349 101.843 110.98C113.384 124.617 101.811 143.238 114.945 148.485C124.663 150.098 126.518 140.572 131.281 134.009C134.27 129.883 137.055 126.567 141.52 124.03C148.395 118.108 164.825 122.076 170.383 119.354C186.943 111.247 167.936 100.496 161.885 97.3807C153.493 92.2724 149.525 85.4935 147.967 76.1856C146.405 66.8198 151.005 56.8644 140.399 52.7404Z"/></svg></span>
+        <span class="logo icon " style="background:#b8e0e8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></span>
         <span><b>wraith</b><small>Dev tools · v0.1.0</small></span>
       </a></div>
       </div>
