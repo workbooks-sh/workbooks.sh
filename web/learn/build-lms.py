@@ -34,6 +34,62 @@ for t in cat["tiers"]:
 
 def esc(s): return html.escape(s or "")
 
+SITE = "https://workbooks.sh"
+PROVIDER = {"@type": "Organization", "name": "Workbooks", "url": SITE}
+
+def jsonld_tag(obj):
+    """Render a schema.org JSON-LD <script>. ensure_ascii keeps it byte-safe; the
+    closing-tag escape guards against any '</script>' slipping out of a string."""
+    payload = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return '<script type="application/ld+json">%s</script>' % payload
+
+def lesson_jsonld(l):
+    """LearningResource per lesson, tied to the parent Course via isPartOf."""
+    return jsonld_tag({
+        "@context": "https://schema.org",
+        "@type": "LearningResource",
+        "name": l["title"],
+        "description": l.get("teaches", ""),
+        "url": SITE + "/learn/" + l["slug"],
+        "inLanguage": "en",
+        "learningResourceType": "lesson",
+        "educationalLevel": "beginner",
+        "timeRequired": mins_to_iso(l.get("mins", "")),
+        "isPartOf": {"@type": "Course", "name": "Workbooks Learning Center", "url": SITE + "/learn"},
+        "provider": PROVIDER,
+        "position": l["i"] + 1,
+    })
+
+def course_jsonld():
+    """Course for the Learning Center index, with the full lesson list as a
+    syllabus (ItemList of Course instances per Google's Course carousel guidance)."""
+    items = [{
+        "@type": "ListItem", "position": x["i"] + 1,
+        "item": {"@type": "Course", "name": x["title"],
+                 "url": SITE + "/learn/" + x["slug"],
+                 "description": x.get("teaches", "")}
+    } for x in flat]
+    return jsonld_tag({
+        "@context": "https://schema.org",
+        "@type": "Course",
+        "name": "Workbooks Learning Center",
+        "description": "Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
+        "url": SITE + "/learn",
+        "inLanguage": "en",
+        "provider": PROVIDER,
+        "hasCourseInstance": {
+            "@type": "CourseInstance",
+            "courseMode": "online",
+            "courseWorkload": "PT4H",
+        },
+        "syllabusSections": {"@type": "ItemList", "numberOfItems": TOTAL, "itemListElement": items},
+    })
+
+def mins_to_iso(mins):
+    """'8 min' -> ISO-8601 duration 'PT8M'. Empty/unparseable -> '' (omitted)."""
+    m = re.search(r"\d+", mins or "")
+    return "PT%sM" % m.group(0) if m else ""
+
 def bub_accent(text):
     """Groothan renders uppercase letters as BUBBLE glyphs. Lowercase the header
     (all grotesque) and bubble a couple of INNER letters — never the first letter
@@ -105,6 +161,8 @@ HEAD = """<!doctype html>
 <meta property="og:type" content="{ogtype}"><meta property="og:site_name" content="Workbooks · Learning Center">
 <meta property="og:title" content="{title}"><meta property="og:description" content="{desc}">
 <meta property="og:url" content="{url}">
+<link rel="canonical" href="{url}">
+{jsonld}
 <style>{css}</style>
 </head>
 <body class="{bodycls}">
@@ -115,6 +173,7 @@ HEAD = """<!doctype html>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>{js}</script>
+<script src="../search.js" defer></script>
 </body>
 </html>
 """
@@ -176,6 +235,15 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+/* slim search bar — sits above the splash; fires the wb-search-open overlay */
+.lsearch{ display:flex; align-items:center; gap:12px; width:100%; max-width:1180px; margin:0 auto 4px;
+  background:#fff; border:2px solid var(--ink); border-radius:12px; box-shadow:4px 4px 0 var(--ink);
+  padding:13px 16px; cursor:text; text-align:left; }
+.lsearch:hover{ box-shadow:5px 5px 0 var(--ink); transform:translate(-1px,-1px); transition:transform .1s,box-shadow .1s; }
+.lsearch svg{ width:18px; height:18px; flex:0 0 auto; color:var(--dim); }
+.lsearch .ph{ flex:1; font:500 14px var(--mono); color:var(--dim); letter-spacing:-.01em; }
+.lsearch kbd{ font:700 10px var(--mono); letter-spacing:.06em; color:var(--dim);
+  border:1.5px solid rgba(18,19,22,.22); border-radius:6px; padding:4px 7px; background:var(--paper); }
 /* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
   text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
@@ -314,6 +382,8 @@ JS = """
       var nx=cc.dataset.next; location.href = nx ? "/learn/"+nx : "/learn";
     });
   }
+  var ls=document.getElementById("lsearch");
+  if(ls) ls.addEventListener("click",function(){ window.dispatchEvent(new CustomEvent("wb-search-open")); });
   var side=document.getElementById("side"), scrim=document.getElementById("scrim"), b=document.getElementById("burger");
   function close(){ side&&side.classList.remove("open"); scrim&&scrim.classList.remove("show"); }
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
@@ -393,7 +463,7 @@ def lesson_page(l):
     return HEAD.format(
         title=esc(l["title"]) + " — Learning Center — Workbooks",
         desc=esc(l.get("teaches", "")), ogtype="article",
-        url="https://workbooks.sh/learn/" + l["slug"], css=CSS, js=JS,
+        url="https://workbooks.sh/learn/" + l["slug"], jsonld=lesson_jsonld(l), css=CSS, js=JS,
         bodycls='lesson" data-slug="%s' % esc(l["slug"]),
         topbar=topbar(l["title"]), sidebar=sidebar(l["slug"]), main=main)
 
@@ -423,7 +493,12 @@ def dashboard():
     else:
         hype = ""
         kicker = '<div class="kick">welcome to the learning center</div>'
-    main = ('<div class="splash">' + hype + '<div class="swrap">'
+    searchbar = ('<button class="lsearch" id="lsearch" aria-label="Search lessons and docs">'
+                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">'
+                 '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>'
+                 '<span class="ph">Search lessons &amp; docs…</span>'
+                 '<kbd>⌘K</kbd></button>')
+    main = ('<div class="splash">' + searchbar + hype + '<div class="swrap">'
             '<div class="sintro">' + kicker +
             '<h1>%s</h1>'
             '<p class="lead">The internet is becoming something you can hold — software in a single file, '
@@ -436,7 +511,7 @@ def dashboard():
     return HEAD.format(
         title="Learning Center — Workbooks",
         desc="Learn Workbooks from zero — %d plain-language lessons, no technical background needed." % TOTAL,
-        ogtype="website", url="https://workbooks.sh/learn", css=CSS, js=JS,
+        ogtype="website", url="https://workbooks.sh/learn", jsonld=course_jsonld(), css=CSS, js=JS,
         bodycls="dashpage", topbar=topbar("Learning Center"), sidebar=sidebar(None), main=main)
 
 open(os.path.join(HERE, "index.html"), "w").write(dashboard())

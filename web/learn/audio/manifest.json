@@ -5986,6 +5986,49 @@
      "t": 421
     }
    ]
+  },
+  {
+   "slug": "why-workbooks",
+   "title": "Why Workbooks",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-workbooks.mp3?v=247",
+   "dur": 247,
+   "chapters": [
+    {
+     "id": "intro",
+     "title": "The wall is coming down",
+     "t": 2
+    },
+    {
+     "id": "ecosystem",
+     "title": "An ecosystem, not a product",
+     "t": 39
+    },
+    {
+     "id": "person",
+     "title": "For the person with an idea",
+     "t": 56
+    },
+    {
+     "id": "team",
+     "title": "For the team losing the thread",
+     "t": 103
+    },
+    {
+     "id": "org",
+     "title": "For the org that can't take the risk",
+     "t": 148
+    },
+    {
+     "id": "durable",
+     "title": "Why this is the durable shape",
+     "t": 198
+    },
+    {
+     "id": "outro",
+     "title": "Now the how",
+     "t": 235
+    }
+   ]
   }
  ]
 }

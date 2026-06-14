@@ -11,6 +11,8 @@
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
 <meta property="og:title" content="Why Workbooks — Learning Center — Workbooks"><meta property="og:description" content="The problem/solution case for the ecosystem across people, teams, and organizations — and why this is the durable, future-proof shape, framed indirectly around the shift to directing software rather than hand-building it.">
 <meta property="og:url" content="https://workbooks.sh/learn/why-workbooks">
+<link rel="canonical" href="https://workbooks.sh/learn/why-workbooks">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"Why Workbooks","description":"The problem/solution case for the ecosystem across people, teams, and organizations — and why this is the durable, future-proof shape, framed indirectly around the shift to directing software rather than hand-building it.","url":"https://workbooks.sh/learn/why-workbooks","inLanguage":"en","learningResourceType":"lesson","educationalLevel":"beginner","timeRequired":"PT4M","isPartOf":{"@type":"Course","name":"Workbooks Learning Center","url":"https://workbooks.sh/learn"},"provider":{"@type":"Organization","name":"Workbooks","url":"https://workbooks.sh"},"position":1}</script>
 <style>
 @font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
   url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
@@ -68,6 +70,15 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+/* slim search bar — sits above the splash; fires the wb-search-open overlay */
+.lsearch{ display:flex; align-items:center; gap:12px; width:100%; max-width:1180px; margin:0 auto 4px;
+  background:#fff; border:2px solid var(--ink); border-radius:12px; box-shadow:4px 4px 0 var(--ink);
+  padding:13px 16px; cursor:text; text-align:left; }
+.lsearch:hover{ box-shadow:5px 5px 0 var(--ink); transform:translate(-1px,-1px); transition:transform .1s,box-shadow .1s; }
+.lsearch svg{ width:18px; height:18px; flex:0 0 auto; color:var(--dim); }
+.lsearch .ph{ flex:1; font:500 14px var(--mono); color:var(--dim); letter-spacing:-.01em; }
+.lsearch kbd{ font:700 10px var(--mono); letter-spacing:.06em; color:var(--dim);
+  border:1.5px solid rgba(18,19,22,.22); border-radius:6px; padding:4px 7px; background:var(--paper); }
 /* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
   text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
@@ -240,7 +251,7 @@ keep.</p>
 <p>That's the why. The rest of this course is the how — starting with the part
 that surprises people most: that you can build something real, today, just by
 talking to your agent.</p>
-</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/workbook"><b>Workbooks</b><span>the deep doc</span></a><a class="dl" href="/learn/nexus"><b>Nexus</b><span>the deep doc</span></a><a class="dl" href="/learn/agents"><b>Agents</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 1 of 28</div><button class="cont" id="cc" data-next="why-you-can-build-now"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/why-you-can-build-now">Next →</a></div></aside></div></div>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="dl" href="/learn/workbook"><b>Workbooks</b><span>the deep doc</span></a><a class="dl" href="/learn/nexus"><b>Nexus</b><span>the deep doc</span></a><a class="dl" href="/learn/agents"><b>Agents</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 1 of 28</div><div class="audio"><div class="play" id="play" data-src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-workbooks.mp3?v=247"><span class="ico"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="lab" id="playlab">Listen</span><span class="time">4 min</span></div></div><button class="cont" id="cc" data-next="why-you-can-build-now"><span>Complete & continue</span> →</button><div class="nav"><a href="/learn/why-you-can-build-now">Next →</a></div></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <script>
@@ -272,6 +283,8 @@ talking to your agent.</p>
       var nx=cc.dataset.next; location.href = nx ? "/learn/"+nx : "/learn";
     });
   }
+  var ls=document.getElementById("lsearch");
+  if(ls) ls.addEventListener("click",function(){ window.dispatchEvent(new CustomEvent("wb-search-open")); });
   var side=document.getElementById("side"), scrim=document.getElementById("scrim"), b=document.getElementById("burger");
   function close(){ side&&side.classList.remove("open"); scrim&&scrim.classList.remove("show"); }
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
@@ -298,5 +311,6 @@ talking to your agent.</p>
   });
 })();
 </script>
+<script src="../search.js" defer></script>
 </body>
 </html>

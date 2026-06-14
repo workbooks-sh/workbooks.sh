@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolkit Library — Workbooks</title>
+<meta name="description" content="Browse the Workbooks toolkit library — every sandboxed-WASM capability and integration a workbook (or its agent) can reach, filterable by capability, integration, and EXEC shape.">
+<link rel="canonical" href="https://workbooks.sh/toolkits/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Workbooks">
+<meta property="og:title" content="Toolkit Library — Workbooks">
+<meta property="og:description" content="Every sandboxed-WASM capability and integration a workbook can reach — browsable by capability, integration, and EXEC shape.">
+<meta property="og:url" content="https://workbooks.sh/toolkits/">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "Toolkit Library — Workbooks",
+  "description": "The catalog of sandboxed-WASM capabilities and external-service integrations a Workbooks workbook or agent can reach.",
+  "url": "https://workbooks.sh/toolkits/",
+  "isPartOf": { "@type": "WebSite", "name": "Workbooks", "url": "https://workbooks.sh/" }
+}
+</script>
+<style>
+@font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
+  url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:swap; }
+:root{
+  --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --bloom:#13d943; --bloomd:#149157; --dim:#6a6f68;
+  --line:#e7e5db; --soft:rgba(18,19,22,.06);
+  --display:"Groothan","Anton",sans-serif; --mono:"JetBrains Mono",monospace; --read:"EB Garamond",Georgia,serif;
+}
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--read);
+  -webkit-font-smoothing:antialiased; }
+a{ color:inherit; text-decoration:none; }
+.wrap{ max-width:1180px; margin:0 auto; padding:0 clamp(20px,5vw,40px); }
+
+/* ── preview banner (flagged) ── */
+.preview{ background:var(--ink); color:var(--paper); }
+.preview .wrap{ display:flex; align-items:center; gap:14px; padding:11px clamp(20px,5vw,40px);
+  flex-wrap:wrap; }
+.preview .tag{ font:700 9.5px var(--mono); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink); background:var(--bloom); border-radius:5px; padding:5px 9px; flex:0 0 auto; }
+.preview p{ margin:0; font:500 12.5px/1.5 var(--mono); letter-spacing:.01em; color:#d7d9d3; }
+.preview p b{ color:var(--paper); font-weight:700; }
+
+/* ── header ── */
+header.hero{ padding:118px 0 8px; }
+.hero .kick{ font:700 11px var(--mono); letter-spacing:.24em; text-transform:uppercase; color:var(--bloomd); margin:0; }
+.hero h1{ font-family:var(--display); font-weight:400; font-size:clamp(44px,7vw,92px); line-height:.92;
+  letter-spacing:-.015em; margin:14px 0 0; color:var(--ink); }
+.hero .lead{ margin:22px 0 0; font-size:clamp(18px,2.2vw,22px); line-height:1.55; color:#34372f; max-width:34em; }
+.hero .lead a{ color:var(--bloomd); text-decoration:underline; text-underline-offset:3px; }
+
+/* ── controls ── */
+.controls{ position:sticky; top:0; z-index:5; background:var(--paper);
+  border-bottom:2px solid var(--ink); margin-top:40px; }
+.controls .wrap{ padding-top:18px; padding-bottom:18px; }
+.search{ display:flex; align-items:center; gap:11px; border:2px solid var(--ink); border-radius:12px;
+  background:var(--card); padding:13px 16px; box-shadow:4px 4px 0 var(--ink); }
+.search svg{ width:18px; height:18px; flex:0 0 auto; stroke:var(--dim); fill:none; stroke-width:2.2; }
+.search input{ border:0; outline:0; background:none; flex:1; min-width:0; font:500 16px var(--mono);
+  letter-spacing:.01em; color:var(--ink); }
+.search input::placeholder{ color:var(--dim); }
+.search .clr{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim);
+  cursor:pointer; padding:5px 7px; border-radius:6px; display:none; }
+.search .clr:hover{ background:var(--soft); color:var(--ink); }
+.search.has .clr{ display:inline-block; }
+
+.facets{ display:flex; flex-wrap:wrap; gap:22px 34px; margin-top:18px; }
+.facet{ display:flex; flex-direction:column; gap:8px; }
+.facet .fl{ font:700 9px var(--mono); letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+.chips{ display:flex; flex-wrap:wrap; gap:7px; }
+.chip{ font:700 11px var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--ink);
+  background:var(--card); border:1.5px solid var(--ink); border-radius:999px; padding:7px 13px;
+  cursor:pointer; transition:transform .08s, background .12s, color .12s; user-select:none; }
+.chip:hover{ transform:translateY(-1px); }
+.chip .n{ color:var(--dim); margin-left:6px; font-weight:500; }
+.chip.on{ background:var(--ink); color:var(--paper); }
+.chip.on .n{ color:#b8bcb3; }
+
+.barrow{ display:flex; align-items:center; gap:16px; margin-top:18px; flex-wrap:wrap; }
+.count{ font:700 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.count b{ color:var(--ink); }
+.sortwrap{ margin-left:auto; display:flex; align-items:center; gap:9px; }
+.sortwrap label{ font:700 9px var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+.sortwrap select{ font:700 11px var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--ink);
+  background:var(--card); border:1.5px solid var(--ink); border-radius:8px; padding:8px 11px; cursor:pointer; }
+.reset{ font:700 10px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
+  cursor:pointer; border:0; background:none; padding:6px 0; display:none; }
+.reset.show{ display:inline; }
+.reset:hover{ color:var(--ink); }
+
+/* ── grid ── */
+main{ padding:34px 0 90px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+.card{ display:flex; flex-direction:column; background:var(--card); border:2px solid var(--ink);
+  border-radius:16px; padding:22px 22px 18px; box-shadow:4px 4px 0 var(--ink);
+  transition:transform .1s, box-shadow .1s; min-width:0; }
+.card:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--ink); }
+.card .top{ display:flex; align-items:flex-start; gap:13px; }
+.card .ico{ flex:0 0 auto; width:42px; height:42px; border:2px solid var(--ink); border-radius:11px;
+  display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 var(--ink);
+  font:700 17px var(--mono); color:var(--ink); }
+.card .hd{ min-width:0; }
+.card h2{ font:700 16px var(--mono); letter-spacing:.01em; margin:2px 0 0; color:var(--ink); }
+.card .ver{ font:500 10px var(--mono); color:var(--dim); margin-top:4px; letter-spacing:.04em; }
+.card .status{ margin-left:auto; flex:0 0 auto; font:700 8.5px var(--mono); letter-spacing:.1em;
+  text-transform:uppercase; padding:5px 8px; border-radius:6px; border:1.5px solid currentColor; }
+.st-stable{ color:var(--bloomd); }
+.st-beta{ color:#b07d1a; }
+.st-experimental{ color:#7a6cc0; }
+.card .tag{ margin:15px 0 0; font-size:15px; line-height:1.5; color:#34372f; flex:1; }
+.card .meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; }
+.card .meta .m{ font:700 9px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim);
+  background:var(--soft); border-radius:5px; padding:4px 7px; }
+.card .meta .m.exec{ color:var(--ink); background:#eee9dc; }
+.card .more{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
+  display:flex; align-items:center; gap:8px; font:700 11px var(--mono); letter-spacing:.04em;
+  text-transform:uppercase; color:var(--bloomd); }
+.card:hover .more{ color:var(--ink); }
+.card .more svg{ width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2.4; }
+
+.empty{ text-align:center; padding:70px 20px; color:var(--dim); }
+.empty p{ font:500 16px var(--mono); margin:0 0 18px; }
+.empty button{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink);
+  background:var(--card); border:2px solid var(--ink); border-radius:10px; padding:12px 20px; cursor:pointer;
+  box-shadow:3px 3px 0 var(--ink); }
+
+/* ── footer note ── */
+footer{ border-top:2px solid var(--ink); }
+footer .wrap{ padding:34px clamp(20px,5vw,40px); display:flex; flex-wrap:wrap; gap:14px 40px; align-items:baseline; }
+footer p{ margin:0; font:500 12.5px/1.6 var(--mono); color:var(--dim); max-width:48em; }
+footer p a{ color:var(--bloomd); text-decoration:underline; text-underline-offset:3px; }
+footer .links{ margin-left:auto; display:flex; gap:20px; }
+footer .links a{ font:700 11px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--ink); }
+footer .links a:hover{ color:var(--bloomd); }
+
+@media (max-width:720px){
+  header.hero{ padding:96px 0 4px; }
+  .sortwrap{ margin-left:0; }
+  .grid{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div id="site-nav"></div>
+
+<!-- ── PREVIEW BANNER (flagged) — the public library is not yet shipped ── -->
+<aside class="preview" id="preview-banner" role="note">
+  <div class="wrap">
+    <span class="tag">Preview</span>
+    <p><b>Library not yet public.</b> These toolkits ship in-repo today under <code>toolkits/&lt;id&gt;/</code>. A browsable, installable registry at a stable URL is on the way — this page previews the intended library ergonomics.</p>
+  </div>
+</aside>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kick">The integration ecosystem</p>
+    <h1>Toolkit Library</h1>
+    <p class="lead">A <strong>toolkit</strong> is the unit of capability — packaged sandboxed WebAssembly that does one thing, authored in any language, run isolated, and shipped inside a workbook. Browse what a workbook (or its agent) can reach, filterable by capability, integration, and EXEC shape. <a href="https://workbooks.sh/learn/giving-it-abilities.html">Learn what a toolkit is →</a></p>
+  </div>
+</header>
+
+<section class="controls" aria-label="Filter toolkits">
+  <div class="wrap">
+    <div class="search" id="searchbox">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" id="q" placeholder="Search toolkits — name, tagline, capability…" aria-label="Search toolkits" autocomplete="off">
+      <span class="clr" id="clr" role="button" tabindex="0">Clear</span>
+    </div>
+
+    <div class="facets">
+      <div class="facet">
+        <span class="fl">Capability</span>
+        <div class="chips" id="cap-chips" role="group" aria-label="Filter by capability"></div>
+      </div>
+      <div class="facet">
+        <span class="fl">Integration</span>
+        <div class="chips" id="int-chips" role="group" aria-label="Filter by integration"></div>
+      </div>
+      <div class="facet">
+        <span class="fl">EXEC shape</span>
+        <div class="chips" id="exec-chips" role="group" aria-label="Filter by EXEC shape"></div>
+      </div>
+    </div>
+
+    <div class="barrow">
+      <span class="count" id="count"></span>
+      <button class="reset" id="reset" type="button">Reset filters</button>
+      <span class="sortwrap">
+        <label for="sort">Sort</label>
+        <select id="sort">
+          <option value="status">Maturity</option>
+          <option value="name">Name (A–Z)</option>
+          <option value="exec">EXEC shape</option>
+        </select>
+      </span>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="wrap">
+    <ul class="grid" id="grid" aria-live="polite"></ul>
+    <div class="empty" id="empty" hidden>
+      <p>No toolkits match those filters.</p>
+      <button type="button" id="empty-reset">Reset filters</button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Status reflects each toolkit's own <code>#+STATUS</code> field. Detail pages live at <code>docs.workbooks.sh/toolkits/&lt;slug&gt;</code> for documented integrations; others link the in-repo manifest until the registry ships. See the <a href="https://docs.workbooks.sh/toolkits/">integration hub</a> and <a href="https://docs.workbooks.sh/build/pick-a-shape.html">how to author your own</a>.</p>
+    <span class="links">
+      <a href="https://docs.workbooks.sh/toolkits/">Hub</a>
+      <a href="https://docs.workbooks.sh/reference/manifest.html">Manifest</a>
+      <a href="https://github.com/workbooks-sh/workbooks.sh/tree/main/toolkits">Source</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+/* ── THE toolkit dataset ──────────────────────────────────────────────────────
+   Mirrored from toolkits/<id>/manifest.org headers (#+TOOLKIT/#+VERSION/#+STATUS/
+   #+TAGLINE/#+EXEC) plus the docs/toolkits Zapier-style integration view. caps /
+   integration / exec are the three browse axes from docs/toolkits/index.org. When
+   the registry ships this becomes a fetched feed; the shape stays identical.
+   page: the detail URL (docs.workbooks.sh integration page) or the in-repo
+   manifest fallback (flagged repo:true). ──────────────────────────────────────*/
+var TOOLKITS = [
+  { id:"git", name:"git", ver:"0.1.0", status:"stable", exec:"command", caps:["posix","vfs"],
+    integration:["GitHub"], tag:"Distributed version control — recovery, rebase, undo recipes the agent can lift verbatim.",
+    page:"https://docs.workbooks.sh/toolkits/github.html" },
+  { id:"ffmpeg", name:"ffmpeg", ver:"0.3.0", status:"stable", exec:"command", caps:["vfs"],
+    integration:[], tag:"Image + audio + video at parity — resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video." },
+  { id:"sandbox", name:"sandbox", ver:"0.1.0", status:"stable", exec:"command", caps:["vfs"],
+    integration:[], tag:"The in-sandbox command set — scripting languages, JS engines, crypto, fonts & text-shaping, image, XML, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to WASI and run under wasmtime, no native execution." },
+  { id:"palette", name:"palette", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"The WASM build/runtime palette — language runtimes & compilers as pinned, sandboxed commands (one set, not separate packages)." },
+  { id:"presentation", name:"presentation", ver:"0.1.0", status:"stable", exec:"component", caps:["vfs"],
+    integration:[], tag:"Ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide URLs. The capability is “presentation”; the impl is reveal.js, swappable." },
+  { id:"publish", name:"publish", ver:"0.1.0", status:"stable", exec:"command", caps:["net","secrets","vfs"],
+    integration:["AT Protocol","Bluesky"], tag:"AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed." },
+  { id:"wraith", name:"wraith", ver:"0.1.0", status:"stable", exec:"command", caps:["vfs"],
+    integration:[], tag:"Rust + TS/JS codebase analyzer — dead code, unused deps, cycles, dupes, complexity." },
+  { id:"video", name:"video", ver:"0.1.0", status:"beta", exec:"component", caps:["vfs","llm"],
+    integration:[], tag:"Ask for a video, get HyperFrames — author a wavelet scene (onReady/onTick, fixed canvas), wavelet renders it to a clip. The capability is “video”; the impl is hyperframes, swappable." },
+  { id:"mono", name:"mono", ver:"0.1.0", status:"experimental", exec:"kernel", caps:["vfs"],
+    integration:[], tag:"RGBA → grayscale, the first deployed kernel-shape toolkit (bytes→bytes hot loop)." },
+  { id:"ctk", name:"ctk", ver:"0.1.0", status:"experimental", exec:"component", caps:["vfs"],
+    integration:[], tag:"A human-in-the-loop canvas — render any component with Org-tangled controls in one fixed shell; iterate vibes/sizes/states without designing a UI." },
+  { id:"orgitorial", name:"orgitorial", ver:"0.2.0", status:"experimental", exec:"component", caps:["vfs"],
+    integration:[], tag:"An org-mode blogging/CMS toolkit you plug into any site — a zero-dependency org→HTML renderer, a complete editorial CSS library themed by custom properties, and skills documenting the stable class contract." },
+  { id:"glyphs", name:"glyphs", ver:"0.1.0", status:"experimental", exec:"component", caps:["browse","vfs"],
+    integration:[], tag:"One API resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an SVG (or an <img>). Curated-local-first, CDN fallback for the long tail." },
+  { id:"icons", name:"icons", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"The universal icon library as a CLI — one value grammar (mi: · lobe: · emoji · data: · initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged." },
+  { id:"open-avatars", name:"open-avatars", ver:"0.2.0", status:"experimental", exec:"component", caps:["vfs"],
+    integration:[], tag:"Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine — same seed → byte-identical avatar across every style, forever. Seven styles ship." },
+  { id:"brandnana", name:"brandnana", ver:"0.1.0", status:"experimental", exec:"command", caps:["net","secrets","llm"],
+    integration:["Brandnana"], tag:"Ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net." },
+  { id:"3w", name:"3w", ver:"0.1.0", status:"experimental", exec:"command", caps:["browse","net","vfs"],
+    integration:[], tag:"Local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository." },
+  { id:"docs", name:"docs", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"A reusable, drift-checked documentation pipeline for any Workbooks tenant — Diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output." },
+  { id:"wavelet", name:"wavelet", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"Imperative editing CLI for motion-graphics video compositions (init, inspect, preview, render)." },
+  { id:"toolkit-forge", name:"toolkit-forge", ver:"0.1.0", status:"experimental", exec:"command", caps:["net","vfs"],
+    integration:["GitHub","npm"], tag:"Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest." },
+  { id:"workbooks-system", name:"workbooks-system", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"System knowledge for an agent running INSIDE a Workbooks runtime — what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, and authoring + publishing from the agent's seat." },
+  { id:"linear", name:"linear", ver:"0.1.0", status:"experimental", exec:"federation", caps:["net","secrets"],
+    integration:["Linear"], tag:"Linear task federation — mirror a Linear project into org :task: nodes, query + (gated) write-back." },
+  { id:"asana", name:"asana", ver:"0.1.0", status:"experimental", exec:"federation", caps:["net","secrets"],
+    integration:["Asana"], tag:"Asana task federation — mirror an Asana project into org :task: nodes, query + (gated) write-back." },
+  { id:"fly", name:"fly", ver:"—", status:"partial", exec:"task", caps:["posix","net","secrets"],
+    integration:["Fly.io"], tag:"Deploy the engine, or a forged workbook, to a Fly machine — a runnable deploy recipe (no binary) over the brokered flyctl.",
+    page:"https://docs.workbooks.sh/toolkits/fly.html" },
+  { id:"cloudflare", name:"cloudflare", ver:"0.1.0", status:"experimental", exec:"task", caps:["posix","net","secrets"],
+    integration:["Cloudflare"], tag:"All-Cloudflare backend for a forged workbook — D1 + Workers AI + Pages, on the user's own account." },
+  { id:"wrangler", name:"wrangler", ver:"0.1.0", status:"experimental", exec:"posix", caps:["posix","net","secrets"],
+    integration:["Cloudflare"], tag:"Cloudflare's CLI — deploy a forged workbook to Pages on the user's own account." },
+  { id:"railway", name:"railway", ver:"0.1.0", status:"experimental", exec:"posix", caps:["posix","net","secrets"],
+    integration:["Railway"], tag:"Railway's CLI — deploy a forged workbook as a static site on the user's own account." },
+  { id:"byod", name:"byod", ver:"0.1.0", status:"experimental", exec:"task", caps:["net","secrets"],
+    integration:["Railway"], tag:"Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine." },
+  { id:"capacitor", name:"capacitor", ver:"0.1.0", status:"experimental", exec:"posix", caps:["posix"],
+    integration:["Apple"], tag:"Capacitor — wrap a forged workbook as a native iOS app and ship it to TestFlight." },
+  { id:"tauri", name:"tauri", ver:"0.1.0", status:"experimental", exec:"posix", caps:["posix"],
+    integration:[], tag:"Tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app." },
+  { id:"workbooks-browser", name:"workbooks-browser", ver:"0.1.0", status:"experimental", exec:"command", caps:["vfs"],
+    integration:[], tag:"Drive the Workbooks desktop shell — open and focus tabs, and (soon) bookmarks, themes, workspaces, key prompts." }
+];
+
+/* a known detail page exists for these integrations / ids; otherwise fall back to
+   the in-repo manifest (flagged: registry not live). */
+function detailURL(t){
+  if (t.page) return { url:t.page, repo:false };
+  return { url:"https://github.com/workbooks-sh/workbooks.sh/tree/main/toolkits/"+t.id, repo:true };
+}
+
+/* ── browse-axis label maps (capabilities are short, fix the order) ── */
+var CAP_LABEL = { vfs:"vfs", net:"net", browse:"browse", secrets:"secrets", llm:"llm", posix:"posix" };
+var CAP_ORDER = ["vfs","net","browse","secrets","llm","posix"];
+var EXEC_ORDER = ["command","component","kernel","task","federation","posix"];
+var STATUS_RANK = { stable:0, beta:1, partial:2, experimental:3 };
+
+var state = { q:"", caps:new Set(), ints:new Set(), execs:new Set(), sort:"status" };
+
+var grid = document.getElementById("grid");
+var empty = document.getElementById("empty");
+var countEl = document.getElementById("count");
+var resetBtn = document.getElementById("reset");
+
+function uniqSorted(key, order){
+  var counts = {};
+  TOOLKITS.forEach(function(t){
+    (Array.isArray(t[key]) ? t[key] : [t[key]]).forEach(function(v){
+      if (v) counts[v] = (counts[v]||0)+1;
+    });
+  });
+  var keys = Object.keys(counts);
+  if (order) keys.sort(function(a,b){
+    var ia=order.indexOf(a), ib=order.indexOf(b);
+    if (ia<0&&ib<0) return a.localeCompare(b);
+    if (ia<0) return 1; if (ib<0) return -1; return ia-ib;
+  });
+  else keys.sort(function(a,b){ return a.localeCompare(b); });
+  return keys.map(function(k){ return { v:k, n:counts[k] }; });
+}
+
+function chip(value, label, n){
+  var b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.dataset.val = value;
+  b.setAttribute("aria-pressed","false");
+  b.innerHTML = label + ' <span class="n">' + n + '</span>';
+  return b;
+}
+
+function buildChips(){
+  var capHost = document.getElementById("cap-chips");
+  uniqSorted("caps", CAP_ORDER).forEach(function(c){
+    capHost.appendChild(chip(c.v, CAP_LABEL[c.v]||c.v, c.n));
+  });
+  var intHost = document.getElementById("int-chips");
+  uniqSorted("integration", null).forEach(function(c){
+    intHost.appendChild(chip(c.v, c.v, c.n));
+  });
+  var execHost = document.getElementById("exec-chips");
+  uniqSorted("exec", EXEC_ORDER).forEach(function(c){
+    execHost.appendChild(chip(c.v, c.v, c.n));
+  });
+
+  document.querySelectorAll(".chips").forEach(function(host){
+    host.addEventListener("click", function(e){
+      var b = e.target.closest(".chip"); if (!b) return;
+      var set = host.id==="cap-chips" ? state.caps : host.id==="int-chips" ? state.ints : state.execs;
+      var v = b.dataset.val;
+      if (set.has(v)) { set.delete(v); b.classList.remove("on"); b.setAttribute("aria-pressed","false"); }
+      else { set.add(v); b.classList.add("on"); b.setAttribute("aria-pressed","true"); }
+      render();
+    });
+  });
+}
+
+function matches(t){
+  if (state.caps.size && !t.caps.some(function(c){ return state.caps.has(c); })) return false;
+  if (state.execs.size && !state.execs.has(t.exec)) return false;
+  if (state.ints.size && !(t.integration||[]).some(function(i){ return state.ints.has(i); })) return false;
+  if (state.q){
+    var hay = (t.name+" "+t.tag+" "+t.exec+" "+t.caps.join(" ")+" "+(t.integration||[]).join(" ")).toLowerCase();
+    if (hay.indexOf(state.q) < 0) return false;
+  }
+  return true;
+}
+
+function sortFn(a,b){
+  if (state.sort==="name") return a.name.localeCompare(b.name);
+  if (state.sort==="exec"){
+    var d = EXEC_ORDER.indexOf(a.exec) - EXEC_ORDER.indexOf(b.exec);
+    return d || a.name.localeCompare(b.name);
+  }
+  var d2 = (STATUS_RANK[a.status]??9) - (STATUS_RANK[b.status]??9);
+  return d2 || a.name.localeCompare(b.name);
+}
+
+var ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+function card(t){
+  var li = document.createElement("li");
+  li.className = "card";
+  li.dataset.id = t.id;
+  li.dataset.status = t.status;
+  li.dataset.exec = t.exec;
+  li.dataset.caps = t.caps.join(" ");
+  if ((t.integration||[]).length) li.dataset.integration = t.integration.join(" ");
+
+  var d = detailURL(t);
+  var stClass = t.status==="stable" ? "st-stable" : (t.status==="beta"||t.status==="partial") ? "st-beta" : "st-experimental";
+  var initials = t.name.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase();
+  var caps = t.caps.map(function(c){ return '<span class="m">'+(CAP_LABEL[c]||c)+'</span>'; }).join("");
+  var ints = (t.integration||[]).map(function(i){ return '<span class="m">'+i+'</span>'; }).join("");
+
+  li.innerHTML =
+    '<a href="'+d.url+'"'+(d.repo?' rel="nofollow"':'')+' style="display:flex;flex-direction:column;flex:1;color:inherit">' +
+      '<div class="top">' +
+        '<span class="ico" aria-hidden="true">'+initials+'</span>' +
+        '<div class="hd"><h2>'+t.name+'</h2><div class="ver">v'+t.ver+'</div></div>' +
+        '<span class="status '+stClass+'">'+t.status+'</span>' +
+      '</div>' +
+      '<p class="tag">'+t.tag+'</p>' +
+      '<div class="meta"><span class="m exec">'+t.exec+'</span>'+ints+caps+'</div>' +
+      '<div class="more">'+(d.repo?'View manifest':'Open integration')+' '+ARROW+'</div>' +
+    '</a>';
+  return li;
+}
+
+function render(){
+  var list = TOOLKITS.filter(matches).slice().sort(sortFn);
+  grid.innerHTML = "";
+  list.forEach(function(t){ grid.appendChild(card(t)); });
+  empty.hidden = list.length > 0;
+  grid.hidden = list.length === 0;
+  countEl.innerHTML = '<b>'+list.length+'</b> of '+TOOLKITS.length+' toolkit'+(TOOLKITS.length===1?'':'s');
+  var active = state.q || state.caps.size || state.ints.size || state.execs.size;
+  resetBtn.classList.toggle("show", !!active);
+}
+
+/* search */
+var qEl = document.getElementById("q");
+var box = document.getElementById("searchbox");
+qEl.addEventListener("input", function(){
+  state.q = qEl.value.trim().toLowerCase();
+  box.classList.toggle("has", !!qEl.value);
+  render();
+});
+function clearSearch(){ qEl.value=""; state.q=""; box.classList.remove("has"); qEl.focus(); render(); }
+document.getElementById("clr").addEventListener("click", clearSearch);
+document.getElementById("clr").addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); clearSearch(); } });
+
+/* sort */
+document.getElementById("sort").addEventListener("change", function(e){ state.sort = e.target.value; render(); });
+
+/* reset */
+function resetAll(){
+  state.q=""; state.caps.clear(); state.ints.clear(); state.execs.clear();
+  qEl.value=""; box.classList.remove("has");
+  document.querySelectorAll(".chip.on").forEach(function(c){ c.classList.remove("on"); c.setAttribute("aria-pressed","false"); });
+  render();
+}
+resetBtn.addEventListener("click", resetAll);
+document.getElementById("empty-reset").addEventListener("click", resetAll);
+
+buildChips();
+render();
+</script>
+
+<script src="../nav.js"></script>
+</body>
+</html>

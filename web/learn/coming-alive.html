@@ -11,6 +11,8 @@
 <meta property="og:type" content="article"><meta property="og:site_name" content="Workbooks · Learning Center">
 <meta property="og:title" content="Where a workbook comes alive — Learning Center — Workbooks"><meta property="og:description" content="The runtime as the load-bearing pillar: a workbook on your laptop is a document; plugged into the engine it answers requests, runs on a schedule, serves people. Soften &#x27;thousands = resting state&#x27;; reconcile the Nexus/Dock/seam vocabulary so they don&#x27;t read as four things.">
 <meta property="og:url" content="https://workbooks.sh/learn/coming-alive">
+<link rel="canonical" href="https://workbooks.sh/learn/coming-alive">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"Where a workbook comes alive","description":"The runtime as the load-bearing pillar: a workbook on your laptop is a document; plugged into the engine it answers requests, runs on a schedule, serves people. Soften 'thousands = resting state'; reconcile the Nexus/Dock/seam vocabulary so they don't read as four things.","url":"https://workbooks.sh/learn/coming-alive","inLanguage":"en","learningResourceType":"lesson","educationalLevel":"beginner","timeRequired":"PT10M","isPartOf":{"@type":"Course","name":"Workbooks Learning Center","url":"https://workbooks.sh/learn"},"provider":{"@type":"Organization","name":"Workbooks","url":"https://workbooks.sh"},"position":10}</script>
 <style>
 @font-face{ font-family:"Groothan"; src:url("../fonts/GroothanMixed-Regular.woff2") format("woff2"),
   url("../fonts/GroothanMixed-Regular.woff") format("woff"); font-weight:400; font-display:block; }
@@ -68,6 +70,15 @@ a{ color:inherit; text-decoration:none; }
   margin:14px 0 0; letter-spacing:-.01em; color:var(--ink); }
 .sintro .lead{ margin:24px 0 0; font-size:21px; line-height:1.56; color:#34372f; max-width:30em; }
 .sintro .cta{ margin:34px 0 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+/* slim search bar — sits above the splash; fires the wb-search-open overlay */
+.lsearch{ display:flex; align-items:center; gap:12px; width:100%; max-width:1180px; margin:0 auto 4px;
+  background:#fff; border:2px solid var(--ink); border-radius:12px; box-shadow:4px 4px 0 var(--ink);
+  padding:13px 16px; cursor:text; text-align:left; }
+.lsearch:hover{ box-shadow:5px 5px 0 var(--ink); transform:translate(-1px,-1px); transition:transform .1s,box-shadow .1s; }
+.lsearch svg{ width:18px; height:18px; flex:0 0 auto; color:var(--dim); }
+.lsearch .ph{ flex:1; font:500 14px var(--mono); color:var(--dim); letter-spacing:-.01em; }
+.lsearch kbd{ font:700 10px var(--mono); letter-spacing:.06em; color:var(--dim);
+  border:1.5px solid rgba(18,19,22,.22); border-radius:6px; padding:4px 7px; background:var(--paper); }
 /* keyboard-key button: white/paper cap, ink border, a downward ink lip (the keycap depth); presses down on click */
 .start{ display:inline-flex; align-items:center; gap:10px; font:700 13px var(--mono); letter-spacing:.05em;
   text-transform:uppercase; color:var(--ink); background:#fff; border:2px solid var(--ink); border-radius:12px;
@@ -384,6 +395,8 @@ just found something solid to stand on.</p>
       var nx=cc.dataset.next; location.href = nx ? "/learn/"+nx : "/learn";
     });
   }
+  var ls=document.getElementById("lsearch");
+  if(ls) ls.addEventListener("click",function(){ window.dispatchEvent(new CustomEvent("wb-search-open")); });
   var side=document.getElementById("side"), scrim=document.getElementById("scrim"), b=document.getElementById("burger");
   function close(){ side&&side.classList.remove("open"); scrim&&scrim.classList.remove("show"); }
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
@@ -410,5 +423,6 @@ just found something solid to stand on.</p>
   });
 })();
 </script>
+<script src="../search.js" defer></script>
 </body>
 </html>
