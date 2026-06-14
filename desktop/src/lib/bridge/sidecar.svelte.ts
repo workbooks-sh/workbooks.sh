@@ -77,6 +77,23 @@ class DaemonStore {
   status = $state<SidecarStatus>(DEFAULT);
   #unlisten: UnlistenFn | null = null;
   #initStarted = false;
+  #pushedSecrets = false;
+
+  /** Apply a status update and, the first time the runtime becomes ready,
+   *  forward the user's keys into it — so Waldo chat + voice work at launch
+   *  without re-saving a key or reconnecting (the runtime starts env-empty). */
+  #apply(s: SidecarStatus) {
+    this.status = s;
+    if (s.state === "ready" && !this.#pushedSecrets) {
+      this.#pushedSecrets = true;
+      void invoke("secrets_push").catch((e) =>
+        console.warn("[daemon] secrets_push failed", e),
+      );
+    } else if (s.state !== "ready") {
+      // A restart re-empties the runtime env; re-push on the next ready.
+      this.#pushedSecrets = false;
+    }
+  }
 
   async init() {
     if (this.#initStarted) return;
@@ -84,13 +101,13 @@ class DaemonStore {
     // Listen first so we don't miss the transition between the invoke()
     // snapshot below and the next poll emit (~3s, daemon::spawn_state_poll).
     this.#unlisten = await listen<DaemonStatus>("daemon-state", (e) => {
-      this.status = fromDaemon(e.payload);
+      this.#apply(fromDaemon(e.payload));
     });
     // Pull the current snapshot in case the daemon already booted before
     // this component mounted.
     try {
       const snap = await invoke<DaemonStatus>("daemon_status");
-      this.status = fromDaemon(snap);
+      this.#apply(fromDaemon(snap));
     } catch (e) {
       console.warn("[daemon] daemon_status invoke failed", e);
     }

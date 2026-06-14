@@ -201,6 +201,7 @@ pub fn run() {
             agent_settings::agent_settings_get,
             agent_settings::agent_settings_set,
             // Keychain: keys / env-vars / connections.
+            keychain::secrets_push,
             keychain::keys_list,
             keychain::keys_known_providers,
             keychain::keys_create,

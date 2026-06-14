@@ -94,6 +94,14 @@ pub fn refresh_runtime_secrets() {
         .and_then(|c| c.post(url).bearer_auth(&d.token).json(&body).send());
 }
 
+/// Frontend-triggered secret push — forward the user's keys into the live
+/// runtime. Called when the runtime becomes healthy at app launch so Waldo
+/// chat + voice work without the user re-saving a key or reconnecting.
+#[tauri::command]
+pub fn secrets_push() {
+    refresh_runtime_secrets();
+}
+
 // ── API keys ──────────────────────────────────────────────────────
 
 fn keys_path() -> PathBuf {
