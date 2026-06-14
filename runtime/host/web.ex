@@ -1138,21 +1138,18 @@ defmodule Workbooks.Web do
     end
   end
 
-  # AI-over-files (wb-ndlz): search the tenant's library, then synthesize a GROUNDED
-  # answer that cites the files — never inventing what isn't there. This is the
-  # backend for the desktop's right-bar "ai" search mode (replacing its mock).
-  # Returns {answer, sources:[{title,path,snippet}], related} to match that contract.
-  post "/api/library/:tenant/ask" do
+  # AI-over-files (wb-ndlz): search the AUTHED tenant's own library, then synthesize a
+  # GROUNDED answer that cites the files — never inventing what isn't there. Backend for
+  # the desktop's right-bar "ai" search mode (replacing its mock). Auth-tenant (like
+  # /api/browse/search) — you only ever ask YOUR own files, so no path tenant to know.
+  # Returns {answer, sources:[{title,path,snippet}], related} to match the AiAnswer contract.
+  post "/api/library/ask" do
     {:ok, body, conn} = read_body(conn)
-
-    if path_tenant_ok?(conn) do
-      p = Jason.decode!(body)
-      query = String.trim(p["query"] || "")
-      hits = if query == "", do: [], else: Workbooks.Library.search(conn.params["tenant"], query, mode: :hybrid, k: 6)
-      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(library_ask(query, hits)))
-    else
-      conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
-    end
+    p = Jason.decode!(body)
+    query = String.trim(p["query"] || "")
+    tenant = conn.assigns[:tenant]
+    hits = if query == "" or is_nil(tenant), do: [], else: Workbooks.Library.search(tenant, query, mode: :hybrid, k: 6)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(library_ask(query, hits)))
   end
 
   # Cross-session index (0d) — every run, newest first, each rolled up. The
