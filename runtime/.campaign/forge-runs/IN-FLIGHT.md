@@ -4,8 +4,8 @@ Kill a runaway with `TaskStop <agentId>`. On resume, re-launch any that `failed`
 
 | agentId | mission | checkpoint | status |
 |---|---|---|---|
-| a3386da7a380ec9bc | light sweep2: diverse small libs (cJSON/tomlc99/tinyexpr/utf8proc + a Rust crate) | forge-runs/light-sweep2.md | running (light, reliable) |
-| aa992f6f8fa8a5bc7 | DuckDB to-live (heavy full build) | forge-runs/duckdb-tolive.md | DIED early (no checkpoint, 3rd heavy agent killed by crashes) — DuckDB to-live DEFERRED to a stable box; stays proven |
+| a3386da7a380ec9bc | light sweep2: cJSON/tinyexpr/tomlc99/utf8proc + itoa Rust crate | forge-runs/light-sweep2.md | DONE — 5/5 proven (5 domains + a real crates.io crate); committed |
+| aa992f6f8fa8a5bc7 | DuckDB to-live (heavy full build) | forge-runs/duckdb-tolive.md | FULL BUILD RUNNING — agent COMPLETED, left a bounded build: /tmp/run-duckdb-build.sh (perl-alarm 3600s + ulimit -v 13GB, conc=2), 71 TUs → link → SELECT. log /tmp/duckdb-build.log. (I killed my accidental duplicate b5gpmu4mp — was double-loading.) THE solo heavy build. |
 | ac2172afdee7a1851 | light sweep: SIMD-intrinsic runtime proof + C leaf-lib vein | forge-runs/light-sweep.md | DONE — SIMD intrinsics LIVE + 4 C libs (xxHash/miniz/cmark/libyaml) proven; committed |
 | (orphaned ab497938) | DuckDB conc-2 detached build | n/a | DEAD (0 procs); revealed real portability errors (mbedtls entropy, fcntl F_*LCK) — folded into the to-live agent |
 

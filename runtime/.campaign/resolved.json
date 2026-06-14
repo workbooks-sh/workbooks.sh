@@ -2517,13 +2517,18 @@
     "xxHash": "0.8.2 \u2014 hash buffer, build_c_dir plain",
     "miniz": "3.0.2 \u2014 deflate/inflate roundtrip, build_c_dir plain",
     "cmark": "0.31.1 \u2014 CommonMark->HTML, build_c_dir + 3 generated headers",
-    "libyaml": "0.2.5 \u2014 parse YAML (scalars/maps/seqs), build_c_dir [-DHAVE_CONFIG_H=1]"
+    "libyaml": "0.2.5 \u2014 parse YAML (scalars/maps/seqs), build_c_dir [-DHAVE_CONFIG_H=1]",
+    "cJSON": "1.7.18 \u2014 JSON parse/serialize round-trip, build_c_dir plain",
+    "tinyexpr": "math-expr eval (3+4*2=11, vars, libm), build_c_dir plain",
+    "tomlc99": "TOML parse (scalars/arrays/tables), build_c_dir plain",
+    "utf8proc": "2.9.0 \u2014 Unicode NFC/NFD/casefold, build_c_dir [] [\"utf8proc_data.c\" as include_only]"
    },
    "lane": "PackageManager.build_c_dir / BuildBroker.build_and_run(:c) \u2014 recipes in sweep result",
    "more_available": "same-shape S vein: xxHash, cmark, libyaml, miniz, CRC/hash tools \u2014 build through build_c_dir with little/no flag work",
    "wiring": "proven on-demand; standing-CLI registration is a packaging step (not yet done)",
    "since": "iter159",
-   "proven_count": 8
+   "proven_count": 12,
+   "domains": "compression, markdown, scheme, hashing, JSON, TOML, YAML, math-expr, Unicode"
   },
   "rust_simd": {
    "capability": "wasm SIMD (v128) in the Rust lane",
@@ -2558,6 +2563,12 @@
    "status": "live",
    "proof": "runtime-proven via rust_compile_to_wasm(simd:true): i8x16_bitmask=21845, i8x16_swizzle, u8x16_narrow_i16x8 (saturation), i32x4_all_true/v128_any_true/i32x4_bitmask \u2014 all correct. test rust_simd_test.exs (2 tests: autovec + explicit intrinsics) green.",
    "since": "iter160"
+  },
+  "rust_cratesio_dep": {
+   "capability": "real crates.io crate fetched+compiled in-sandbox via the Rust dep lane",
+   "status": "proven",
+   "proof": "itoa@1.0.11 via rust_compile_to_wasm(src, deps: [\"itoa@1.0.11\"]) \u2014 fetched + compiled through the full mrustc->clang MIR pipeline -> u32=12345 i64=-987654321 u8=255 correct",
+   "since": "iter161"
   }
  },
  "verdict_ladder": {
