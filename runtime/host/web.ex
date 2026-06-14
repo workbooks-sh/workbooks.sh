@@ -410,6 +410,37 @@ defmodule Workbooks.Web do
     e -> "error: #{Exception.message(e)}"
   end
 
+  # Workbook-as-memory (wb-kbq5.1): the desktop loads workbook files as semantic
+  # memory sources. GET lists loaded paths; POST {path} indexes; DELETE {path}
+  # drops. Matches the desktop memory_sources store shapes.
+  get "/api/memory/sources" do
+    workbooks = Workbooks.MemorySources.list(conn.assigns.tenant)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{workbooks: workbooks}))
+  end
+
+  post "/api/memory/sources" do
+    {:ok, body, conn} = read_body(conn)
+    path = Jason.decode!(body)["path"]
+
+    case Workbooks.MemorySources.load(conn.assigns.tenant, to_string(path)) do
+      {:ok, %{indexed_count: n, file_count: fc}} ->
+        send_json(conn, 200, %{workbook_path: path, indexed_count: n, file_count: fc})
+
+      {:error, reason} ->
+        send_json(conn, 422, %{error: inspect(reason)})
+    end
+  end
+
+  delete "/api/memory/sources" do
+    {:ok, body, conn} = read_body(conn)
+    path = Jason.decode!(body)["path"]
+
+    case Workbooks.MemorySources.remove(conn.assigns.tenant, to_string(path)) do
+      {:ok, %{entry_count: n, file_count: fc}} -> send_json(conn, 200, %{entry_count: n, file_count: fc})
+      {:error, reason} -> send_json(conn, 422, %{error: inspect(reason)})
+    end
+  end
+
   # Skill catalog for the @-picker (wb-kbq5). User/project SKILL.md authoring
   # isn't wired yet, so this is an empty-but-valid catalog (stops the 404; the
   # picker degrades to empty). Real discovery tracked as follow-up.
@@ -1038,6 +1069,10 @@ defmodule Workbooks.Web do
   end
 
   defp read_workspace_org(_), do: {:error, :nopath}
+
+  defp send_json(conn, status, payload) do
+    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
+  end
 
   # Map a parsed headline (a board-views file entry) to a desktop BoardView.
   defp headline_to_view(h) do
