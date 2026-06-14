@@ -2,6 +2,7 @@
   import '../app.css';
   import { page } from '$app/state';
   import NewNexusModal from '$lib/NewNexusModal.svelte';
+  import DnaStrip from '$lib/DnaStrip.svelte';
 
   let { children } = $props();
   let modalOpen = $state(false);
@@ -14,6 +15,7 @@
       return m ? { label: 'Nexuses', tail: m[1] } : { label: 'Nexuses' };
     }
     if (p.startsWith('/team')) return { label: 'Team' };
+    if (p.startsWith('/storage')) return { label: 'Storage' };
     if (p.startsWith('/usage')) return { label: 'Usage & billing' };
     if (p.startsWith('/settings')) return { label: 'Settings' };
     return { label: 'Nexuses' };
@@ -41,12 +43,14 @@
 
     <nav class="nav">
       <a href="/" class:on={active('/', '/nexuses')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>Nexuses</a>
-      <a href="/usage" class:on={active('/usage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3Zm6 6.6c-1.5.8-3.7 1.4-6 1.4s-4.5-.6-6-1.4V12c0 .6 2.4 2 6 2s6-1.4 6-2V9.6ZM12 5C8.7 5 6 5.8 6 6s2.7 1 6 1 6-.8 6-1-2.7-1-6-1Z"/></svg>Storage</a>
+      <a href="/storage" class:on={active('/storage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3Zm6 6.6c-1.5.8-3.7 1.4-6 1.4s-4.5-.6-6-1.4V12c0 .6 2.4 2 6 2s6-1.4 6-2V9.6ZM12 5C8.7 5 6 5.8 6 6s2.7 1 6 1 6-.8 6-1-2.7-1-6-1Z"/></svg>Storage</a>
       <span class="lbl">workspace</span>
       <a href="/team" class:on={active('/team')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 2c-2.7 0-8 1.3-8 4v3h10v-3c0-1 .4-1.9 1-2.6-.9-.3-2-.4-3-.4Zm8 0c-.4 0-.8 0-1.3.1C16.1 14 17 15.3 17 17v3h7v-3c0-2.7-5.3-4-8-4Z"/></svg>Team</a>
       <a href="/usage" class:on={active('/usage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 13h4v7H4v-7Zm6-6h4v13h-4V7Zm6 3h4v10h-4V10Z"/></svg>Usage &amp; billing</a>
       <a href="/settings" class:on={active('/settings')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
     </nav>
+
+    <div class="dna-wrap"><DnaStrip seed={7} height={12} /></div>
 
     <a href="/settings" class="acct">
       <div class="av">S</div>

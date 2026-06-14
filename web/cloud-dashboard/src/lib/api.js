@@ -94,4 +94,15 @@ export async function nexusUsage() {
   });
 }
 
+/** Object-storage buckets (R2) for the org. MOCK. */
+export async function listBuckets() {
+  // MOCK — swap for fetch('/api/platform/storage') when the PCP API lands
+  return structuredClone({
+    buckets: [
+      { name: 'aurora-assets', nexus: 'aurora', objects: 1284, size: '2.1 GB', egress: '$0.00' },
+      { name: 'atlas-uploads', nexus: 'atlas',  objects: 96,   size: '0.4 GB', egress: '$0.00' }
+    ]
+  });
+}
+
 export { STATE_LABEL };
