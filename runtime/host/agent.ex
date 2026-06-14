@@ -85,7 +85,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "web_search",
-      description: "Search the WEB by query — returns the top results as title · url · snippet. Keyless (DuckDuckGo/Brave/Bing, host-brokered). This is how you do real research: find what exists, who reported it, then `fetch` the primary sources. Use for SERP scans, finding sources, market/landscape research. e.g. query=\"anthropic fable launch\".",
+      description: "Search the WEB by query — returns the top results as title · url · snippet (host-brokered, no setup needed). This is how you do real research: find what exists, who reported it, then `fetch` the primary sources. Use for SERP scans, finding sources, market/landscape research. e.g. query=\"anthropic fable launch\".",
       parameters: %{type: "object", properties: %{query: %{type: "string"}}, required: ["query"]}
     }},
     %{type: "function", function: %{
@@ -574,10 +574,9 @@ defmodule Workbooks.Agent do
   def format_search_results_for_test(hits), do: format_search_results(hits)
 
   # An EMPTY result is ambiguous: it can mean "nothing matched" OR "the search
-  # backend was unavailable from this host" (the keyless engines ddg/brave/bing
-  # are captcha-blocked from datacenter IPs, so they can return empty on a cloud
-  # box). Say so, so the agent doesn't conclude a topic is empty when search
-  # merely failed — the exact mislabel the file_issue seam exists to catch.
+  # backend was unavailable" (a provider hiccup, rate-limit, or — on the keyless
+  # fallback — a captcha). Say so, so the agent doesn't conclude a topic is empty
+  # when search merely failed — the exact mislabel the file_issue seam exists to catch.
   defp format_search_results([]) do
     "no results — NOTE: this can mean the search backend was unavailable from this " <>
       "host, not only that nothing matched. Don't conclude the topic is empty; " <>
