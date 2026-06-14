@@ -2,7 +2,12 @@
 
 Kill a runaway with `TaskStop <agentId>`. On resume, re-launch any that `failed` without a verdict.
 
-**STATUS: IDLE — loop paused (CronDelete ad8434f7), nothing in-flight, all committed + pushed.**
+**STATUS: loop paused; ONE focused background effort running.**
+
+| agentId | mission | checkpoint | status |
+|---|---|---|---|
+| a5e69fdceb467229e | DuckDB to-live — INCREMENTAL .o-caching build (only recompile failing TUs), time-boxed ~60-90min, resumable via the .o cache | forge-runs/duckdb-tolive2.md | running (background) |
+
 
 ## Session result — Forge campaign (banked, see FORGE-CAPABILITIES.md)
 - **LIVE (14):** C, C++ (+exceptions, both lanes), Zig, Rust, Rust threads, Rust SIMD, wasm SIMD intrinsics,
