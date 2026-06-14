@@ -22,6 +22,23 @@ defmodule Workbooks.WbToolTest do
   end
 
   defp wb(args, tenant), do: Agent.__exec_one_for_test__(%{name: "wb", args: %{"args" => args}}, %{tenant: tenant})
+  defp wb(args, tenant, exec), do: Agent.__exec_one_for_test__(%{name: "wb", args: %{"args" => args}}, %{tenant: tenant, exec: exec})
+
+  test "`wb deploy` is exec-gated: an exec-denied agent is refused (infra op, not tenant-scoped)" do
+    {out, _} = wb("deploy status", "wbtool-noexec", false)
+    assert out =~ "not permitted"
+  end
+
+  test "`wb deploy` with exec is NOT refused (the trusted desktop may deploy)" do
+    {out, _} = wb("deploy status", "wbtool-exec", true)
+    refute out =~ "not permitted"
+  end
+
+  test "a safe tenant-scoped verb (model get) is NOT gated — works without exec" do
+    {out, _} = wb("model get", "wbtool-safe-#{System.unique_integer([:positive])}", false)
+    refute out =~ "not permitted"
+    assert out =~ "mimo"
+  end
 
   test "`wb model get` for a fresh tenant returns the default model (matches the live proof)" do
     {out, _st} = wb("model get", "wbtool-fresh-#{System.unique_integer([:positive])}")

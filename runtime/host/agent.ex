@@ -477,11 +477,24 @@ defmodule Workbooks.Agent do
 
   defp exec_one(%{name: "wb", args: a}, st) do
     argv = OptionParser.split(a["args"] || "")
-    {Workbooks.CLI.call(argv, st.tenant), st, nil}
+
+    # `wb deploy` reaches infra-modifying, non-tenant-scoped Deploy Kit ops, so it
+    # is gated by the exec capability like git/publish — the trusted desktop may
+    # deploy; an exec-denied (cloud/shared) tenant's agent must not. The read +
+    # tenant-scoped verbs (model/var/app/env/telemetry/ledger/…) stay ungated.
+    if effectful_wb?(argv) and not Map.get(st, :exec, false) do
+      {"wb #{List.first(argv)} not permitted (no exec capability)", st, nil}
+    else
+      {Workbooks.CLI.call(argv, st.tenant), st, nil}
+    end
   end
 
   defp exec_one(%{name: "done", args: a}, st), do: {"ok", st, a["result"] || ""}
   defp exec_one(%{name: n}, st), do: {"unknown tool: #{n}", st, nil}
+
+  # Verbs that affect the host/infra (not tenant-scoped) → require exec.
+  defp effectful_wb?(["deploy" | _]), do: true
+  defp effectful_wb?(_), do: false
 
   # Resolve an agent-supplied path under the workdir. Absolute paths are used
   # as-is (the agent already knows the workdir) — else Path.join would DOUBLE it
